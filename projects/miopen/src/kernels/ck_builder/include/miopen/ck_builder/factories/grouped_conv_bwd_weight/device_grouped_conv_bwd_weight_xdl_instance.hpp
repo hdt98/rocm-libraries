@@ -37,12 +37,12 @@ constexpr auto device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_generic_instance
 // F32 instances (with compute types and transpose transfer params)
 // 20 instances
 // =====================================================================================
-constexpr auto device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_instances(
-    std::size_t spatial_dim,
-    ckb::TensorLayout in_layout,
-    ckb::TensorLayout wei_layout,
-    ckb::TensorLayout out_layout,
-    ckb::ConvSpecialization conv_spec)
+constexpr auto
+device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_instances(std::size_t spatial_dim,
+                                                           ckb::TensorLayout in_layout,
+                                                           ckb::TensorLayout wei_layout,
+                                                           ckb::TensorLayout out_layout,
+                                                           ckb::ConvSpecialization conv_spec)
 {
     return std::array{
         // clang-format off
@@ -100,12 +100,12 @@ constexpr auto device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_tf32_generic_ins
 // Note: TF32 compute type used internally by CK
 // TODO: TF32 compute type is not yet supported in ckb::DataType enum
 // =====================================================================================
-constexpr auto device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_tf32_instances(
-    std::size_t spatial_dim,
-    ckb::TensorLayout in_layout,
-    ckb::TensorLayout wei_layout,
-    ckb::TensorLayout out_layout,
-    ckb::ConvSpecialization conv_spec)
+constexpr auto
+device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_tf32_instances(std::size_t spatial_dim,
+                                                                ckb::TensorLayout in_layout,
+                                                                ckb::TensorLayout wei_layout,
+                                                                ckb::TensorLayout out_layout,
+                                                                ckb::ConvSpecialization conv_spec)
 {
     // TODO: TF32 compute type is not yet supported in ckb::DataType enum
     // return std::array{
@@ -140,12 +140,12 @@ constexpr auto device_grouped_conv_bwd_weight_xdl_c_shuffle_f16_generic_instance
 // F16 instances (with compute types and transpose transfer params)
 // 16 instances
 // =====================================================================================
-constexpr auto device_grouped_conv_bwd_weight_xdl_c_shuffle_f16_instances(
-    std::size_t spatial_dim,
-    ckb::TensorLayout in_layout,
-    ckb::TensorLayout wei_layout,
-    ckb::TensorLayout out_layout,
-    ckb::ConvSpecialization conv_spec)
+constexpr auto
+device_grouped_conv_bwd_weight_xdl_c_shuffle_f16_instances(std::size_t spatial_dim,
+                                                           ckb::TensorLayout in_layout,
+                                                           ckb::TensorLayout wei_layout,
+                                                           ckb::TensorLayout out_layout,
+                                                           ckb::ConvSpecialization conv_spec)
 {
     return std::array{
         // clang-format off
@@ -228,12 +228,12 @@ constexpr auto device_grouped_conv_bwd_weight_xdl_c_shuffle_bf16_f32_bf16_instan
 // BF16 (in=BF16, wei=BF16, out=BF16) instances (with compute types and transpose transfer)
 // 16 instances
 // =====================================================================================
-constexpr auto device_grouped_conv_bwd_weight_xdl_c_shuffle_bf16_instances(
-    std::size_t spatial_dim,
-    ckb::TensorLayout in_layout,
-    ckb::TensorLayout wei_layout,
-    ckb::TensorLayout out_layout,
-    ckb::ConvSpecialization conv_spec)
+constexpr auto
+device_grouped_conv_bwd_weight_xdl_c_shuffle_bf16_instances(std::size_t spatial_dim,
+                                                            ckb::TensorLayout in_layout,
+                                                            ckb::TensorLayout wei_layout,
+                                                            ckb::TensorLayout out_layout,
+                                                            ckb::ConvSpecialization conv_spec)
 {
     return std::array{
         // clang-format off

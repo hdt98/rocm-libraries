@@ -41,8 +41,9 @@ void add_device_grouped_conv3d_fwd_wmma_cshufflev3_scaleadd_scaleadd_relu_ndhwgc
     // Specialization aliases
     constexpr auto ConvFwdDefault = ckb::ConvSpecialization::DEFAULT;
 
-    add_device_operation_instances<device_grouped_conv_fwd_wmma_cshufflev3_scaleadd_scaleadd_relu_f16_instances<2>(
-        3, NDHWGC, GKZYXC, {NDHWGK, G_K_layout}, NDHWGK, ConvFwdDefault)>(instances);
+    add_device_operation_instances<
+        device_grouped_conv_fwd_wmma_cshufflev3_scaleadd_scaleadd_relu_f16_instances<2>(
+            3, NDHWGC, GKZYXC, {NDHWGK, G_K_layout}, NDHWGK, ConvFwdDefault)>(instances);
 }
 
 } // namespace instance

@@ -50,7 +50,7 @@ using ProblemDescription = miopen::conv::ProblemDescription;
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
 
 template <typename DataType, typename ComputeType>
-using DeviceOpGWrwPtrs = ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
+using DeviceOpGWrwPtrs = miopen::conv::ck_builder::instance::MetaDeviceOperationInstanceFactory<
     DeviceOpGWrw<DataType, ComputeType>>;
 
 namespace {

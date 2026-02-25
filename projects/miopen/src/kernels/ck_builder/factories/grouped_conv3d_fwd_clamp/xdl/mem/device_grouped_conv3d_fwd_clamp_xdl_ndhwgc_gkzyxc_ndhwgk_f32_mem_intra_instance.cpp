@@ -38,9 +38,9 @@ void add_device_grouped_conv3d_fwd_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f32_mem_intra_
     constexpr auto NDHWGK = ckb::TensorLayout::NDHWGK;
 
     // Specialization aliases
-    constexpr auto ConvFwdDefault    = ckb::ConvSpecialization::DEFAULT;
-    constexpr auto ConvFwd1x1P0      = ckb::ConvSpecialization::FILTER_1X1_PAD0;
-    constexpr auto ConvFwd1x1S1P0    = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
+    constexpr auto ConvFwdDefault = ckb::ConvSpecialization::DEFAULT;
+    constexpr auto ConvFwd1x1P0   = ckb::ConvSpecialization::FILTER_1X1_PAD0;
+    constexpr auto ConvFwd1x1S1P0 = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
 
     constexpr auto Intrawave = ckb::PipelineScheduler::INTRAWAVE;
 

@@ -52,22 +52,21 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
     AComputeType,
     BComputeType>>
 {
-    using DeviceOp =
-        ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<
-            NumDimSpatial,
-            InLayout,
-            WeiLayout,
-            DLayouts,
-            OutLayout,
-            InDataType,
-            WeiDataType,
-            DDataTypes,
-            OutDataType,
-            ck::tensor_operation::element_wise::PassThrough,
-            ck::tensor_operation::element_wise::PassThrough,
-            ck::tensor_operation::element_wise::AddClamp,
-            AComputeType,
-            BComputeType>;
+    using DeviceOp = ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<
+        NumDimSpatial,
+        InLayout,
+        WeiLayout,
+        DLayouts,
+        OutLayout,
+        InDataType,
+        WeiDataType,
+        DDataTypes,
+        OutDataType,
+        ck::tensor_operation::element_wise::PassThrough,
+        ck::tensor_operation::element_wise::PassThrough,
+        ck::tensor_operation::element_wise::AddClamp,
+        AComputeType,
+        BComputeType>;
 
     static auto GetInstances()
     {
@@ -109,8 +108,8 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
 #endif
 #ifdef CK_ENABLE_FP16
             if constexpr(is_same_v<InDataType, ck::half_t> && is_same_v<WeiDataType, ck::half_t> &&
-                         is_same_v<OutDataType, ck::half_t> && is_same_v<AComputeType, ck::half_t> &&
-                         is_same_v<BComputeType, ck::half_t>)
+                         is_same_v<OutDataType, ck::half_t> &&
+                         is_same_v<AComputeType, ck::half_t> && is_same_v<BComputeType, ck::half_t>)
             {
                 add_device_grouped_conv2d_fwd_bias_clamp_xdl_nhwgc_gkyxc_nhwgk_f16_instances(
                     op_ptrs);
@@ -208,8 +207,8 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
 #endif
 #ifdef CK_ENABLE_FP16
             if constexpr(is_same_v<InDataType, ck::half_t> && is_same_v<WeiDataType, ck::half_t> &&
-                         is_same_v<OutDataType, ck::half_t> && is_same_v<AComputeType, ck::half_t> &&
-                         is_same_v<BComputeType, ck::half_t>)
+                         is_same_v<OutDataType, ck::half_t> &&
+                         is_same_v<AComputeType, ck::half_t> && is_same_v<BComputeType, ck::half_t>)
             {
                 add_device_grouped_conv3d_fwd_bias_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_f16_instances(
                     op_ptrs);
@@ -302,8 +301,8 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
 #endif
 #ifdef CK_ENABLE_FP16
             if constexpr(is_same_v<InDataType, ck::half_t> && is_same_v<WeiDataType, ck::half_t> &&
-                         is_same_v<OutDataType, ck::half_t> && is_same_v<AComputeType, ck::half_t> &&
-                         is_same_v<BComputeType, ck::half_t>)
+                         is_same_v<OutDataType, ck::half_t> &&
+                         is_same_v<AComputeType, ck::half_t> && is_same_v<BComputeType, ck::half_t>)
             {
                 add_device_grouped_conv2d_fwd_bias_clamp_wmma_cshufflev3_nhwgc_gkyxc_nhwgk_f16_instances_part1(
                     op_ptrs);
@@ -347,8 +346,8 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
 #endif
 #ifdef CK_ENABLE_FP16
             if constexpr(is_same_v<InDataType, ck::half_t> && is_same_v<WeiDataType, ck::half_t> &&
-                         is_same_v<OutDataType, ck::half_t> && is_same_v<AComputeType, ck::half_t> &&
-                         is_same_v<BComputeType, ck::half_t>)
+                         is_same_v<OutDataType, ck::half_t> &&
+                         is_same_v<AComputeType, ck::half_t> && is_same_v<BComputeType, ck::half_t>)
             {
                 add_device_grouped_conv3d_fwd_bias_clamp_wmma_cshufflev3_ndhwgc_gkzyxc_ndhwgk_f16_instances_part1(
                     op_ptrs);

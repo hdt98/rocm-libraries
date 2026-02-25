@@ -37,9 +37,8 @@ void add_device_grouped_conv3d_bwd_weight_xdl_ngcdhw_gkczyx_ngkdhw_f32_instances
     constexpr auto ConvBwdWeightDefault = ckb::ConvSpecialization::DEFAULT;
 
     // 1. Default
-    add_device_operation_instances<
-        device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_instances(
-            3, NGCDHW, GKCZYX, NGKDHW, ConvBwdWeightDefault)>(instances);
+    add_device_operation_instances<device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_instances(
+        3, NGCDHW, GKCZYX, NGKDHW, ConvBwdWeightDefault)>(instances);
 }
 
 } // namespace instance

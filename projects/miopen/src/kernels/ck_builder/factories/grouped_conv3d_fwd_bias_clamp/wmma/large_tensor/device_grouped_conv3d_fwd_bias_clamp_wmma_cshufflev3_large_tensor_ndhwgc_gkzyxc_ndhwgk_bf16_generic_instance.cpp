@@ -24,7 +24,8 @@ using DeviceOp = ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<
     ck::tensor_operation::element_wise::PassThrough,
     ck::tensor_operation::element_wise::AddClamp>;
 
-// Compilation parameters for in[n, di, hi, wi, g, c] * wei[g, k, z, y, x, c] = out[n, do, ho, wo, g, k]
+// Compilation parameters for in[n, di, hi, wi, g, c] * wei[g, k, z, y, x, c] = out[n, do, ho, wo,
+// g, k]
 void add_device_grouped_conv3d_fwd_bias_clamp_wmma_cshufflev3_large_tensor_ndhwgc_gkzyxc_ndhwgk_bf16_generic_instances(
     std::vector<std::unique_ptr<DeviceOp>>& instances)
 {
@@ -37,11 +38,10 @@ void add_device_grouped_conv3d_fwd_bias_clamp_wmma_cshufflev3_large_tensor_ndhwg
     constexpr auto NDHWGK = ckb::TensorLayout::NDHWGK;
 
     // Specialization aliases
-    constexpr auto ConvFwdDefault    = ckb::ConvSpecialization::DEFAULT;
+    constexpr auto ConvFwdDefault = ckb::ConvSpecialization::DEFAULT;
 
-    add_device_operation_instances<device_grouped_conv_fwd_wmma_large_tensor_bf16_generic_instances<1>(
-        3, NDHWGC, GKZYXC, {NDHWGK}, NDHWGK, ConvFwdDefault, {BF16}, AddClamp)>(instances);
-
+    add_device_operation_instances<device_grouped_conv_fwd_wmma_large_tensor_bf16_generic_instances<
+        1>(3, NDHWGC, GKZYXC, {NDHWGK}, NDHWGK, ConvFwdDefault, {BF16}, AddClamp)>(instances);
 }
 
 } // namespace instance

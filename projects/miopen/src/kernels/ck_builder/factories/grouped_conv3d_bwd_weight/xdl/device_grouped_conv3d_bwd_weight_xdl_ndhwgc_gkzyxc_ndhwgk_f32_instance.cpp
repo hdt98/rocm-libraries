@@ -38,14 +38,12 @@ void add_device_grouped_conv3d_bwd_weight_xdl_ndhwgc_gkzyxc_ndhwgk_f32_instances
     constexpr auto ConvBwdWeight1x1S1P0 = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
 
     // 1. Default
-    add_device_operation_instances<
-        device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_instances(
-            3, NDHWGC, GKZYXC, NDHWGK, ConvBwdWeightDefault)>(instances);
+    add_device_operation_instances<device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_instances(
+        3, NDHWGC, GKZYXC, NDHWGK, ConvBwdWeightDefault)>(instances);
 
     // 2. Filter1x1Stride1Pad0
-    add_device_operation_instances<
-        device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_instances(
-            3, NDHWGC, GKZYXC, NDHWGK, ConvBwdWeight1x1S1P0)>(instances);
+    add_device_operation_instances<device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_instances(
+        3, NDHWGC, GKZYXC, NDHWGK, ConvBwdWeight1x1S1P0)>(instances);
 }
 
 } // namespace instance

@@ -37,9 +37,9 @@ void add_device_grouped_conv2d_fwd_bias_clamp_wmma_cshufflev3_nhwgc_gkyxc_nhwgk_
     constexpr auto NHWGK = ckb::TensorLayout::NHWGK;
 
     // Specialization aliases
-    constexpr auto ConvFwdDefault    = ckb::ConvSpecialization::DEFAULT;
-    constexpr auto ConvFwd1x1P0      = ckb::ConvSpecialization::FILTER_1X1_PAD0;
-    constexpr auto ConvFwd1x1S1P0    = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
+    constexpr auto ConvFwdDefault = ckb::ConvSpecialization::DEFAULT;
+    constexpr auto ConvFwd1x1P0   = ckb::ConvSpecialization::FILTER_1X1_PAD0;
+    constexpr auto ConvFwd1x1S1P0 = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
 
     add_device_operation_instances<device_grouped_conv_fwd_wmma_cshufflev3_f16_instances_part1<1>(
         2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwdDefault, {F16}, AddClamp)>(instances);
@@ -49,7 +49,6 @@ void add_device_grouped_conv2d_fwd_bias_clamp_wmma_cshufflev3_nhwgc_gkyxc_nhwgk_
 
     add_device_operation_instances<device_grouped_conv_fwd_wmma_cshufflev3_f16_instances_part1<1>(
         2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwd1x1S1P0, {F16}, AddClamp)>(instances);
-
 }
 
 } // namespace instance

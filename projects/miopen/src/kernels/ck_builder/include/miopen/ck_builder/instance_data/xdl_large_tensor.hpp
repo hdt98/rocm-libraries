@@ -66,7 +66,8 @@ struct XdlLargeTensorInstance
 // DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor template parameters
 // Parameters are in the same order as the template parameters
 template <std::size_t NumDTensor>
-constexpr XdlLargeTensorInstance<NumDTensor> DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor(
+constexpr XdlLargeTensorInstance<NumDTensor>
+DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor(
     // 1. NDimSpatial
     std::size_t spatial_dim,
     // 2-5. Layouts

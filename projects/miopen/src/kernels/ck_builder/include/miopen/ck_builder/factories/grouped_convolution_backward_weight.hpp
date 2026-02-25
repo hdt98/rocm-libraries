@@ -95,8 +95,7 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                 }
 #endif
 #ifdef CK_ENABLE_BF16
-                if constexpr(is_same_v<InDataType, ck::bhalf_t> &&
-                             is_same_v<WeiDataType, float> &&
+                if constexpr(is_same_v<InDataType, ck::bhalf_t> && is_same_v<WeiDataType, float> &&
                              is_same_v<OutDataType, ck::bhalf_t> &&
                              is_same_v<ComputeTypeA, ck::bhalf_t> &&
                              is_same_v<ComputeTypeB, ck::bhalf_t>)
@@ -128,8 +127,7 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                 }
 #endif
 #ifdef CK_ENABLE_BF16
-                if constexpr(is_same_v<InDataType, ck::bhalf_t> &&
-                             is_same_v<WeiDataType, float> &&
+                if constexpr(is_same_v<InDataType, ck::bhalf_t> && is_same_v<WeiDataType, float> &&
                              is_same_v<OutDataType, ck::bhalf_t> &&
                              is_same_v<ComputeTypeA, ck::bhalf_t> &&
                              is_same_v<ComputeTypeB, ck::bhalf_t>)
@@ -166,8 +164,7 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                 }
 #endif
 #ifdef CK_ENABLE_BF16
-                if constexpr(is_same_v<InDataType, ck::bhalf_t> &&
-                             is_same_v<WeiDataType, float> &&
+                if constexpr(is_same_v<InDataType, ck::bhalf_t> && is_same_v<WeiDataType, float> &&
                              is_same_v<OutDataType, ck::bhalf_t> &&
                              is_same_v<ComputeTypeA, ck::bhalf_t> &&
                              is_same_v<ComputeTypeB, ck::bhalf_t>)
@@ -201,8 +198,7 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                 }
 #endif
 #ifdef CK_ENABLE_BF16
-                if constexpr(is_same_v<InDataType, ck::bhalf_t> &&
-                             is_same_v<WeiDataType, float> &&
+                if constexpr(is_same_v<InDataType, ck::bhalf_t> && is_same_v<WeiDataType, float> &&
                              is_same_v<OutDataType, ck::bhalf_t> &&
                              is_same_v<ComputeTypeA, ck::bhalf_t> &&
                              is_same_v<ComputeTypeB, ck::bhalf_t>)
@@ -239,8 +235,7 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                 }
 #endif
 #ifdef CK_ENABLE_BF16
-                if constexpr(is_same_v<InDataType, ck::bhalf_t> &&
-                             is_same_v<WeiDataType, float> &&
+                if constexpr(is_same_v<InDataType, ck::bhalf_t> && is_same_v<WeiDataType, float> &&
                              is_same_v<OutDataType, ck::bhalf_t> &&
                              is_same_v<ComputeTypeA, ck::bhalf_t> &&
                              is_same_v<ComputeTypeB, ck::bhalf_t>)
@@ -274,8 +269,7 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                 }
 #endif
 #ifdef CK_ENABLE_BF16
-                if constexpr(is_same_v<InDataType, ck::bhalf_t> &&
-                             is_same_v<WeiDataType, float> &&
+                if constexpr(is_same_v<InDataType, ck::bhalf_t> && is_same_v<WeiDataType, float> &&
                              is_same_v<OutDataType, ck::bhalf_t> &&
                              is_same_v<ComputeTypeA, ck::bhalf_t> &&
                              is_same_v<ComputeTypeB, ck::bhalf_t>)
@@ -312,8 +306,7 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                 }
 #endif
 #ifdef CK_ENABLE_BF16
-                if constexpr(is_same_v<InDataType, ck::bhalf_t> &&
-                             is_same_v<WeiDataType, float> &&
+                if constexpr(is_same_v<InDataType, ck::bhalf_t> && is_same_v<WeiDataType, float> &&
                              is_same_v<OutDataType, ck::bhalf_t> &&
                              is_same_v<ComputeTypeA, ck::bhalf_t> &&
                              is_same_v<ComputeTypeB, ck::bhalf_t>)
@@ -360,8 +353,7 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                 }
 #endif
 #ifdef CK_ENABLE_BF16
-                if constexpr(is_same_v<InDataType, ck::bhalf_t> &&
-                             is_same_v<WeiDataType, float> &&
+                if constexpr(is_same_v<InDataType, ck::bhalf_t> && is_same_v<WeiDataType, float> &&
                              is_same_v<OutDataType, ck::bhalf_t> &&
                              is_same_v<ComputeTypeA, ck::bhalf_t> &&
                              is_same_v<ComputeTypeB, ck::bhalf_t>)
@@ -468,8 +460,7 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                 }
 #endif
 #ifdef CK_ENABLE_BF16
-                if constexpr(is_same_v<InDataType, ck::bhalf_t> &&
-                             is_same_v<WeiDataType, float> &&
+                if constexpr(is_same_v<InDataType, ck::bhalf_t> && is_same_v<WeiDataType, float> &&
                              is_same_v<OutDataType, ck::bhalf_t> &&
                              is_same_v<ComputeTypeA, ck::bhalf_t> &&
                              is_same_v<ComputeTypeB, ck::bhalf_t>)
@@ -646,8 +637,7 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                 }
 #endif
 #ifdef CK_ENABLE_BF16
-                if constexpr(is_same_v<InDataType, ck::bhalf_t> &&
-                             is_same_v<WeiDataType, float> &&
+                if constexpr(is_same_v<InDataType, ck::bhalf_t> && is_same_v<WeiDataType, float> &&
                              is_same_v<OutDataType, ck::bhalf_t> &&
                              is_same_v<ComputeTypeA, ck::bhalf_t> &&
                              is_same_v<ComputeTypeB, ck::bhalf_t>)
@@ -750,8 +740,7 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                 }
 #endif
 #ifdef CK_ENABLE_BF16
-                if constexpr(is_same_v<InDataType, ck::bhalf_t> &&
-                             is_same_v<WeiDataType, float> &&
+                if constexpr(is_same_v<InDataType, ck::bhalf_t> && is_same_v<WeiDataType, float> &&
                              is_same_v<OutDataType, ck::bhalf_t> &&
                              is_same_v<ComputeTypeA, ck::bhalf_t> &&
                              is_same_v<ComputeTypeB, ck::bhalf_t>)

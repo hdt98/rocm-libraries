@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 #include <miopen/ck_builder/kernel_instantiation.hpp>
-// TODO: This header may not exist yet - create device_grouped_conv_bwd_weight_xdl_scale_instance.hpp
-// when the scale factory infrastructure is ready.
+// TODO: This header may not exist yet - create
+// device_grouped_conv_bwd_weight_xdl_scale_instance.hpp when the scale factory infrastructure is
+// ready.
 #include <miopen/ck_builder/factories/grouped_conv_bwd_weight/device_grouped_conv_bwd_weight_xdl_scale_instance.hpp>
 #include "ck/library/tensor_operation_instance/gpu/grouped_convolution_backward_weight.hpp"
 
@@ -42,14 +43,12 @@ void add_device_grouped_conv3d_bwd_weight_xdl_scale_ndhwgc_gkzyxc_ndhwgk_f32_ins
     constexpr auto ConvBwdWeight1x1S1P0 = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
 
     // 1. Default
-    add_device_operation_instances<
-        device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_scale_instances(
-            3, NDHWGC, GKZYXC, NDHWGK, ConvBwdWeightDefault)>(instances);
+    add_device_operation_instances<device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_scale_instances(
+        3, NDHWGC, GKZYXC, NDHWGK, ConvBwdWeightDefault)>(instances);
 
     // 2. Filter1x1Stride1Pad0
-    add_device_operation_instances<
-        device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_scale_instances(
-            3, NDHWGC, GKZYXC, NDHWGK, ConvBwdWeight1x1S1P0)>(instances);
+    add_device_operation_instances<device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_scale_instances(
+        3, NDHWGC, GKZYXC, NDHWGK, ConvBwdWeight1x1S1P0)>(instances);
 }
 
 } // namespace instance

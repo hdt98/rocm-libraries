@@ -27,7 +27,7 @@ constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_wmma_c_shuffle_f16
     ckb::TensorLayout out_layout,
     ckb::ConvSpecialization conv_spec,
     ckb::PipelineScheduler scheduler = Intrawave,
-    ckb::PipelineVersion pipe_ver = PipeV1)
+    ckb::PipelineVersion pipe_ver    = PipeV1)
 {
     // TODO: Enable support for Wmma kernels on appropriate platforms later
     // return std::array{
@@ -51,7 +51,7 @@ constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_wmma_c_shuffle_bf1
     ckb::TensorLayout out_layout,
     ckb::ConvSpecialization conv_spec,
     ckb::PipelineScheduler scheduler = Intrawave,
-    ckb::PipelineVersion pipe_ver = PipeV1)
+    ckb::PipelineVersion pipe_ver    = PipeV1)
 {
     // TODO: Enable support for Wmma kernels on appropriate platforms later
     // return std::array{

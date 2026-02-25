@@ -42,6 +42,7 @@ using DeviceOpGFwdScaleBuilderPtrs =
     miopen::conv::ck_builder::instance::DeviceOperationInstanceFactory<
         DeviceOpGFwdScale<DataType, ComputeType>>;
 
+namespace {
 template <typename DataType>
 void CompareInstanceLists()
 {
@@ -50,6 +51,7 @@ void CompareInstanceLists()
 
     compare_instance_vectors(ckFactoryInstances, builderFactoryInstances);
 }
+} // namespace
 
 TEST(CPU_CKBuilderGroupedFwdConv3DScale_FP32, CompareInstanceListsFloat)
 {

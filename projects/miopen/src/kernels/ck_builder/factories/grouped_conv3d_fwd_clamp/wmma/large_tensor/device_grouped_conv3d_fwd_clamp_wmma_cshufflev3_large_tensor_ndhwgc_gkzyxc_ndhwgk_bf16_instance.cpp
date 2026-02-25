@@ -38,7 +38,7 @@ void add_device_grouped_conv3d_fwd_clamp_wmma_cshufflev3_large_tensor_ndhwgc_gkz
     constexpr auto NDHWGK = ckb::TensorLayout::NDHWGK;
 
     // Specialization aliases
-    constexpr auto ConvFwdDefault    = ckb::ConvSpecialization::DEFAULT;
+    constexpr auto ConvFwdDefault = ckb::ConvSpecialization::DEFAULT;
 
     add_device_operation_instances<device_grouped_conv_fwd_wmma_large_tensor_bf16_instances<0>(
         3, NDHWGC, GKZYXC, {}, NDHWGK, ConvFwdDefault, {}, Clamp)>(instances);

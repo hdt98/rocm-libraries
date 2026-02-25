@@ -19,12 +19,12 @@ using namespace instance;
 // F32 scale instances (NumDTensor=0, Empty_Tuple for D)
 // 19 instances from device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_scale_instances
 // =====================================================================================
-constexpr auto device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_scale_instances(
-    std::size_t spatial_dim,
-    ckb::TensorLayout in_layout,
-    ckb::TensorLayout wei_layout,
-    ckb::TensorLayout out_layout,
-    ckb::ConvSpecialization conv_spec)
+constexpr auto
+device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_scale_instances(std::size_t spatial_dim,
+                                                                 ckb::TensorLayout in_layout,
+                                                                 ckb::TensorLayout wei_layout,
+                                                                 ckb::TensorLayout out_layout,
+                                                                 ckb::ConvSpecialization conv_spec)
 {
     return std::array{
         // clang-format off
@@ -54,12 +54,12 @@ constexpr auto device_grouped_conv_bwd_weight_xdl_c_shuffle_f32_scale_instances(
 // F16 scale instances (NumDTensor=0, Empty_Tuple for D)
 // 17 instances from device_grouped_conv_bwd_weight_xdl_c_shuffle_f16_scale_instances
 // =====================================================================================
-constexpr auto device_grouped_conv_bwd_weight_xdl_c_shuffle_f16_scale_instances(
-    std::size_t spatial_dim,
-    ckb::TensorLayout in_layout,
-    ckb::TensorLayout wei_layout,
-    ckb::TensorLayout out_layout,
-    ckb::ConvSpecialization conv_spec)
+constexpr auto
+device_grouped_conv_bwd_weight_xdl_c_shuffle_f16_scale_instances(std::size_t spatial_dim,
+                                                                 ckb::TensorLayout in_layout,
+                                                                 ckb::TensorLayout wei_layout,
+                                                                 ckb::TensorLayout out_layout,
+                                                                 ckb::ConvSpecialization conv_spec)
 {
     return std::array{
         // clang-format off
@@ -89,12 +89,12 @@ constexpr auto device_grouped_conv_bwd_weight_xdl_c_shuffle_f16_scale_instances(
 // BF16 scale instances (in=BF16, wei=F32, out=BF16, NumDTensor=0, Empty_Tuple for D)
 // 18 instances from device_grouped_conv_bwd_weight_xdl_c_shuffle_bf16_scale_instances
 // =====================================================================================
-constexpr auto device_grouped_conv_bwd_weight_xdl_c_shuffle_bf16_scale_instances(
-    std::size_t spatial_dim,
-    ckb::TensorLayout in_layout,
-    ckb::TensorLayout wei_layout,
-    ckb::TensorLayout out_layout,
-    ckb::ConvSpecialization conv_spec)
+constexpr auto
+device_grouped_conv_bwd_weight_xdl_c_shuffle_bf16_scale_instances(std::size_t spatial_dim,
+                                                                  ckb::TensorLayout in_layout,
+                                                                  ckb::TensorLayout wei_layout,
+                                                                  ckb::TensorLayout out_layout,
+                                                                  ckb::ConvSpecialization conv_spec)
 {
     return std::array{
         // clang-format off

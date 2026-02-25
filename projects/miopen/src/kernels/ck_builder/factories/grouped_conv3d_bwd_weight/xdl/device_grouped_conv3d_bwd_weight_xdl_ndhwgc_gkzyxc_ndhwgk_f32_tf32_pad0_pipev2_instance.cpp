@@ -33,8 +33,10 @@ void add_device_grouped_conv3d_bwd_weight_xdl_ndhwgc_gkzyxc_ndhwgk_f32_tf32_pad0
     std::vector<std::unique_ptr<DeviceOp>>& instances)
 {
     // TODO: Port v3 pipeline factory
-    // Original: device_grouped_conv_bwd_weight_v3_xdl_c_shuffle_f32_tf32_instances<3, NDHWGC, GKZYXC, NDHWGK,
-    //     ConvBwdWeightFilter1x1Stride1Pad0, BlockGemmPipelineScheduler::Intrawave, BlockGemmPipelineVersion::v2>
+    // Original: device_grouped_conv_bwd_weight_v3_xdl_c_shuffle_f32_tf32_instances<3, NDHWGC,
+    // GKZYXC, NDHWGK,
+    //     ConvBwdWeightFilter1x1Stride1Pad0, BlockGemmPipelineScheduler::Intrawave,
+    //     BlockGemmPipelineVersion::v2>
     std::ignore = instances;
 }
 

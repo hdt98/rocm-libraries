@@ -129,17 +129,16 @@ template <ck::index_t NumDimSpatial,
           typename InLayout,
           typename WeiLayout,
           typename OutLayout>
-using DeviceOpGFwdActPtrs =
-    miopen::conv::ck_builder::instance::MetaDeviceOperationInstanceFactory<
-        DeviceOpGFwdAct<NumDimSpatial,
-                        DataType,
-                        DataType,
-                        DataType,
-                        DataType,
-                        DataType,
-                        InLayout,
-                        WeiLayout,
-                        OutLayout>>;
+using DeviceOpGFwdActPtrs = miopen::conv::ck_builder::instance::MetaDeviceOperationInstanceFactory<
+    DeviceOpGFwdAct<NumDimSpatial,
+                    DataType,
+                    DataType,
+                    DataType,
+                    DataType,
+                    DataType,
+                    InLayout,
+                    WeiLayout,
+                    OutLayout>>;
 
 namespace {
 

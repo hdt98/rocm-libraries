@@ -43,14 +43,17 @@ void add_device_grouped_conv3d_fwd_xdl_scaleadd_scaleadd_relu_ndhwgc_gkzyxc_ndhw
     constexpr auto ConvFwd1x1P0   = ckb::ConvSpecialization::FILTER_1X1_PAD0;
     constexpr auto ConvFwd1x1S1P0 = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
 
-    add_device_operation_instances<device_grouped_conv_fwd_xdl_scaleadd_scaleadd_relu_int8_instances<2>(
-        3, NDHWGC, GKZYXC, {NDHWGK, G_K_layout}, NDHWGK, ConvFwdDefault)>(instances);
+    add_device_operation_instances<
+        device_grouped_conv_fwd_xdl_scaleadd_scaleadd_relu_int8_instances<2>(
+            3, NDHWGC, GKZYXC, {NDHWGK, G_K_layout}, NDHWGK, ConvFwdDefault)>(instances);
 
-    add_device_operation_instances<device_grouped_conv_fwd_xdl_scaleadd_scaleadd_relu_int8_instances<2>(
-        3, NDHWGC, GKZYXC, {NDHWGK, G_K_layout}, NDHWGK, ConvFwd1x1P0)>(instances);
+    add_device_operation_instances<
+        device_grouped_conv_fwd_xdl_scaleadd_scaleadd_relu_int8_instances<2>(
+            3, NDHWGC, GKZYXC, {NDHWGK, G_K_layout}, NDHWGK, ConvFwd1x1P0)>(instances);
 
-    add_device_operation_instances<device_grouped_conv_fwd_xdl_scaleadd_scaleadd_relu_int8_instances<2>(
-        3, NDHWGC, GKZYXC, {NDHWGK, G_K_layout}, NDHWGK, ConvFwd1x1S1P0)>(instances);
+    add_device_operation_instances<
+        device_grouped_conv_fwd_xdl_scaleadd_scaleadd_relu_int8_instances<2>(
+            3, NDHWGC, GKZYXC, {NDHWGK, G_K_layout}, NDHWGK, ConvFwd1x1S1P0)>(instances);
 }
 
 } // namespace instance

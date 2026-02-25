@@ -83,8 +83,7 @@ struct XdlMultiDBwdWeightInstance
 // DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle template parameters.
 // Parameters follow the same order as the regular XDL backward weight "Generic" helper.
 template <std::size_t NumDTensor>
-constexpr XdlMultiDBwdWeightInstance<NumDTensor>
-DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle(
+constexpr XdlMultiDBwdWeightInstance<NumDTensor> DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle(
     // 1. NDimSpatial
     std::size_t spatial_dim,
     // 2-4. Layouts (A=In, B=Out, E=Wei)

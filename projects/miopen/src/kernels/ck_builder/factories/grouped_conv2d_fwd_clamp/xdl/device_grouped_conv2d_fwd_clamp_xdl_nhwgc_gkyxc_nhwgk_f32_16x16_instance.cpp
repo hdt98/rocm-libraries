@@ -37,9 +37,9 @@ void add_device_grouped_conv2d_fwd_clamp_xdl_nhwgc_gkyxc_nhwgk_f32_16x16_instanc
     constexpr auto NHWGK = ckb::TensorLayout::NHWGK;
 
     // Specialization aliases
-    constexpr auto ConvFwdDefault    = ckb::ConvSpecialization::DEFAULT;
-    constexpr auto ConvFwd1x1P0      = ckb::ConvSpecialization::FILTER_1X1_PAD0;
-    constexpr auto ConvFwd1x1S1P0    = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
+    constexpr auto ConvFwdDefault = ckb::ConvSpecialization::DEFAULT;
+    constexpr auto ConvFwd1x1P0   = ckb::ConvSpecialization::FILTER_1X1_PAD0;
+    constexpr auto ConvFwd1x1S1P0 = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
 
     add_device_operation_instances<device_grouped_conv_fwd_xdl_f32_16x16_instances<0>(
         2, NHWGC, GKYXC, {}, NHWGK, ConvFwdDefault, {}, Clamp)>(instances);

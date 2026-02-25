@@ -37,7 +37,7 @@ void add_device_grouped_conv2d_fwd_clamp_xdl_merged_groups_nhwgc_gkyxc_nhwgk_f32
     constexpr auto NHWGK = ckb::TensorLayout::NHWGK;
 
     // Specialization aliases
-    constexpr auto ConvFwdDefault    = ckb::ConvSpecialization::DEFAULT;
+    constexpr auto ConvFwdDefault = ckb::ConvSpecialization::DEFAULT;
 
     add_device_operation_instances<device_grouped_conv_fwd_xdl_merged_groups_f32_instances<0>(
         2, NHWGC, GKYXC, {}, NHWGK, ConvFwdDefault, {}, Clamp)>(instances);

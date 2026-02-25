@@ -24,7 +24,8 @@ using DeviceOp = ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<
     ck::tensor_operation::element_wise::PassThrough,
     ck::tensor_operation::element_wise::AddClamp>;
 
-// Compilation parameters for in[n, di, hi, wi, g, c] * wei[g, k, z, y, x, c] = out[n, do, ho, wo, g, k]
+// Compilation parameters for in[n, di, hi, wi, g, c] * wei[g, k, z, y, x, c] = out[n, do, ho, wo,
+// g, k]
 void add_device_grouped_conv3d_fwd_bias_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_bf16_mem_intra_instances(
     std::vector<std::unique_ptr<DeviceOp>>& instances)
 {
@@ -37,21 +38,22 @@ void add_device_grouped_conv3d_fwd_bias_clamp_xdl_ndhwgc_gkzyxc_ndhwgk_bf16_mem_
     constexpr auto NDHWGK = ckb::TensorLayout::NDHWGK;
 
     // Specialization aliases
-    constexpr auto ConvFwdDefault    = ckb::ConvSpecialization::DEFAULT;
-    constexpr auto ConvFwd1x1P0      = ckb::ConvSpecialization::FILTER_1X1_PAD0;
-    constexpr auto ConvFwd1x1S1P0    = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
+    constexpr auto ConvFwdDefault = ckb::ConvSpecialization::DEFAULT;
+    constexpr auto ConvFwd1x1P0   = ckb::ConvSpecialization::FILTER_1X1_PAD0;
+    constexpr auto ConvFwd1x1S1P0 = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
 
     constexpr auto Intrawave = ckb::PipelineScheduler::INTRAWAVE;
 
     add_device_operation_instances<device_grouped_conv_fwd_xdl_bf16_mem_instances<1>(
-        3, NDHWGC, GKZYXC, {NDHWGK}, NDHWGK, ConvFwdDefault, Intrawave, {BF16}, AddClamp)>(instances);
+        3, NDHWGC, GKZYXC, {NDHWGK}, NDHWGK, ConvFwdDefault, Intrawave, {BF16}, AddClamp)>(
+        instances);
 
     add_device_operation_instances<device_grouped_conv_fwd_xdl_bf16_mem_instances<1>(
         3, NDHWGC, GKZYXC, {NDHWGK}, NDHWGK, ConvFwd1x1P0, Intrawave, {BF16}, AddClamp)>(instances);
 
     add_device_operation_instances<device_grouped_conv_fwd_xdl_bf16_mem_instances<1>(
-        3, NDHWGC, GKZYXC, {NDHWGK}, NDHWGK, ConvFwd1x1S1P0, Intrawave, {BF16}, AddClamp)>(instances);
-
+        3, NDHWGC, GKZYXC, {NDHWGK}, NDHWGK, ConvFwd1x1S1P0, Intrawave, {BF16}, AddClamp)>(
+        instances);
 }
 
 } // namespace instance

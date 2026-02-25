@@ -62,9 +62,9 @@ struct XdlInstance
 };
 
 template <std::size_t NumDTensor>
-constexpr std::array<AuxTensorConfig, NumDTensor> make_aux_configs(
-    const std::array<ckb::TensorLayout, NumDTensor>& layouts,
-    const std::array<ckb::DataType, NumDTensor>& data_types)
+constexpr std::array<AuxTensorConfig, NumDTensor>
+make_aux_configs(const std::array<ckb::TensorLayout, NumDTensor>& layouts,
+                 const std::array<ckb::DataType, NumDTensor>& data_types)
 {
     std::array<AuxTensorConfig, NumDTensor> result{};
     for(std::size_t i = 0; i < NumDTensor; ++i)

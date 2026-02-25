@@ -38,24 +38,22 @@ void add_device_grouped_conv2d_fwd_bias_clamp_xdl_nhwgc_gkyxc_nhwgk_bf16_comp_pa
     constexpr auto NHWGK = ckb::TensorLayout::NHWGK;
 
     // Specialization aliases
-    constexpr auto ConvFwdDefault    = ckb::ConvSpecialization::DEFAULT;
-    constexpr auto ConvFwd1x1P0      = ckb::ConvSpecialization::FILTER_1X1_PAD0;
-    constexpr auto ConvFwd1x1S1P0    = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
+    constexpr auto ConvFwdDefault = ckb::ConvSpecialization::DEFAULT;
+    constexpr auto ConvFwd1x1P0   = ckb::ConvSpecialization::FILTER_1X1_PAD0;
+    constexpr auto ConvFwd1x1S1P0 = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
 
     if(miopen::get_device_name() != "gfx950")
     {
 
-    add_device_operation_instances<device_grouped_conv_fwd_xdl_bf16_comp_instances_part2<1>(
-        2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwdDefault, {BF16}, AddClamp)>(instances);
+        add_device_operation_instances<device_grouped_conv_fwd_xdl_bf16_comp_instances_part2<1>(
+            2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwdDefault, {BF16}, AddClamp)>(instances);
 
-    add_device_operation_instances<device_grouped_conv_fwd_xdl_bf16_comp_instances_part2<1>(
-        2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwd1x1P0, {BF16}, AddClamp)>(instances);
+        add_device_operation_instances<device_grouped_conv_fwd_xdl_bf16_comp_instances_part2<1>(
+            2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwd1x1P0, {BF16}, AddClamp)>(instances);
 
-    add_device_operation_instances<device_grouped_conv_fwd_xdl_bf16_comp_instances_part2<1>(
-        2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwd1x1S1P0, {BF16}, AddClamp)>(instances);
-
+        add_device_operation_instances<device_grouped_conv_fwd_xdl_bf16_comp_instances_part2<1>(
+            2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwd1x1S1P0, {BF16}, AddClamp)>(instances);
     }
-
 }
 
 } // namespace instance

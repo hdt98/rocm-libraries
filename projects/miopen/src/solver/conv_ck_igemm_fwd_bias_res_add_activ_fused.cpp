@@ -57,20 +57,19 @@ using CK_OutLayout = ck::tensor_layout::convolution::NDHWGK;
 // DataType also applies to weights
 // AccumDataType also applies to added z & bias tensors
 template <typename DataType, typename AccumDataType = DataType>
-using DeviceOpType =
-    ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<
-        3,
-        ck::tensor_layout::convolution::NDHWGC,
-        ck::tensor_layout::convolution::GKZYXC,
-        ck::Tuple<CK_OutLayout, ck::tensor_layout::convolution::G_K>,
-        CK_OutLayout,
-        DataType,                                // in data type
-        DataType,                                // wei data type
-        ck::Tuple<AccumDataType, AccumDataType>, // z & bias tensors data type
-        DataType,                                // out data type
-        ck::tensor_operation::element_wise::PassThrough,
-        ck::tensor_operation::element_wise::PassThrough,
-        ck::tensor_operation::element_wise::ScaleAddScaleAddRelu>;
+using DeviceOpType = ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<
+    3,
+    ck::tensor_layout::convolution::NDHWGC,
+    ck::tensor_layout::convolution::GKZYXC,
+    ck::Tuple<CK_OutLayout, ck::tensor_layout::convolution::G_K>,
+    CK_OutLayout,
+    DataType,                                // in data type
+    DataType,                                // wei data type
+    ck::Tuple<AccumDataType, AccumDataType>, // z & bias tensors data type
+    DataType,                                // out data type
+    ck::tensor_operation::element_wise::PassThrough,
+    ck::tensor_operation::element_wise::PassThrough,
+    ck::tensor_operation::element_wise::ScaleAddScaleAddRelu>;
 
 template <typename DataType, typename AccumDataType = DataType>
 using DeviceOp = miopen::conv::ck_builder::instance::MetaDeviceOperationInstanceFactory<

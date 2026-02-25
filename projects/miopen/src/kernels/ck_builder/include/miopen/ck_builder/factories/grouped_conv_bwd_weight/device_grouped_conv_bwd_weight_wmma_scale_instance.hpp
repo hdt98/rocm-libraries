@@ -28,12 +28,12 @@ using namespace instance;
 // Note: The scale WMMA variant uses the same CK device class as bilinear
 // (DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3) with transfer order S<2,0,1>.
 // =====================================================================================
-constexpr auto device_grouped_conv_bwd_weight_wmma_c_shuffle_f16_scale_instances(
-    std::size_t spatial_dim,
-    ckb::TensorLayout in_layout,
-    ckb::TensorLayout wei_layout,
-    ckb::TensorLayout out_layout,
-    ckb::ConvSpecialization conv_spec)
+constexpr auto
+device_grouped_conv_bwd_weight_wmma_c_shuffle_f16_scale_instances(std::size_t spatial_dim,
+                                                                  ckb::TensorLayout in_layout,
+                                                                  ckb::TensorLayout wei_layout,
+                                                                  ckb::TensorLayout out_layout,
+                                                                  ckb::ConvSpecialization conv_spec)
 {
     // TODO: Enable support for Wmma kernels on appropriate platforms later
     // return std::array{

@@ -20,9 +20,12 @@ using namespace instance;
 // =====================================================================================
 constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_f16_generic_instances(
     std::size_t sd,
-    ckb::TensorLayout il, ckb::TensorLayout wl, ckb::TensorLayout ol,
+    ckb::TensorLayout il,
+    ckb::TensorLayout wl,
+    ckb::TensorLayout ol,
     ckb::ConvSpecialization cs,
-    ckb::PipelineScheduler sched, ckb::PipelineVersion pv)
+    ckb::PipelineScheduler sched,
+    ckb::PipelineVersion pv)
 {
     return std::array{
         // clang-format off
@@ -36,9 +39,12 @@ constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_f16_
 // =====================================================================================
 constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_f16_instances(
     std::size_t sd,
-    ckb::TensorLayout il, ckb::TensorLayout wl, ckb::TensorLayout ol,
+    ckb::TensorLayout il,
+    ckb::TensorLayout wl,
+    ckb::TensorLayout ol,
     ckb::ConvSpecialization cs,
-    ckb::PipelineScheduler sched, ckb::PipelineVersion pv)
+    ckb::PipelineScheduler sched,
+    ckb::PipelineVersion pv)
 {
     return std::array{
         // clang-format off
@@ -59,9 +65,12 @@ constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_f16_
 // =====================================================================================
 constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_f16_part2_instances(
     std::size_t sd,
-    ckb::TensorLayout il, ckb::TensorLayout wl, ckb::TensorLayout ol,
+    ckb::TensorLayout il,
+    ckb::TensorLayout wl,
+    ckb::TensorLayout ol,
     ckb::ConvSpecialization cs,
-    ckb::PipelineScheduler sched, ckb::PipelineVersion pv)
+    ckb::PipelineScheduler sched,
+    ckb::PipelineVersion pv)
 {
     return std::array{
         // clang-format off
@@ -81,9 +90,12 @@ constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_f16_
 // =====================================================================================
 constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_f16_irregular_instances(
     std::size_t sd,
-    ckb::TensorLayout il, ckb::TensorLayout wl, ckb::TensorLayout ol,
+    ckb::TensorLayout il,
+    ckb::TensorLayout wl,
+    ckb::TensorLayout ol,
     ckb::ConvSpecialization cs,
-    ckb::PipelineScheduler sched, ckb::PipelineVersion pv)
+    ckb::PipelineScheduler sched,
+    ckb::PipelineVersion pv)
 {
     return std::array{
         // clang-format off
@@ -101,9 +113,12 @@ constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_f16_
 // =====================================================================================
 constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_bf16_generic_instances(
     std::size_t sd,
-    ckb::TensorLayout il, ckb::TensorLayout wl, ckb::TensorLayout ol,
+    ckb::TensorLayout il,
+    ckb::TensorLayout wl,
+    ckb::TensorLayout ol,
     ckb::ConvSpecialization cs,
-    ckb::PipelineScheduler sched, ckb::PipelineVersion pv)
+    ckb::PipelineScheduler sched,
+    ckb::PipelineVersion pv)
 {
     return std::array{
         // clang-format off
@@ -117,9 +132,12 @@ constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_bf16
 // =====================================================================================
 constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_bf16_instances(
     std::size_t sd,
-    ckb::TensorLayout il, ckb::TensorLayout wl, ckb::TensorLayout ol,
+    ckb::TensorLayout il,
+    ckb::TensorLayout wl,
+    ckb::TensorLayout ol,
     ckb::ConvSpecialization cs,
-    ckb::PipelineScheduler sched, ckb::PipelineVersion pv)
+    ckb::PipelineScheduler sched,
+    ckb::PipelineVersion pv)
 {
     return std::array{
         // clang-format off
@@ -140,9 +158,12 @@ constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_bf16
 // =====================================================================================
 constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_bf16_part2_instances(
     std::size_t sd,
-    ckb::TensorLayout il, ckb::TensorLayout wl, ckb::TensorLayout ol,
+    ckb::TensorLayout il,
+    ckb::TensorLayout wl,
+    ckb::TensorLayout ol,
     ckb::ConvSpecialization cs,
-    ckb::PipelineScheduler sched, ckb::PipelineVersion pv)
+    ckb::PipelineScheduler sched,
+    ckb::PipelineVersion pv)
 {
     return std::array{
         // clang-format off
@@ -160,11 +181,15 @@ constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_bf16
 // =====================================================================================
 // NHWGC BF16 irregular (5 instances)
 // =====================================================================================
-constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_bf16_irregular_instances(
+constexpr auto
+device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_bf16_irregular_instances(
     std::size_t sd,
-    ckb::TensorLayout il, ckb::TensorLayout wl, ckb::TensorLayout ol,
+    ckb::TensorLayout il,
+    ckb::TensorLayout wl,
+    ckb::TensorLayout ol,
     ckb::ConvSpecialization cs,
-    ckb::PipelineScheduler sched, ckb::PipelineVersion pv)
+    ckb::PipelineScheduler sched,
+    ckb::PipelineVersion pv)
 {
     return std::array{
         // clang-format off
@@ -182,9 +207,12 @@ constexpr auto device_grouped_conv_bwd_weight_two_stage_nhwgc_xdl_c_shuffle_bf16
 // =====================================================================================
 constexpr auto device_grouped_conv_bwd_weight_two_stage_ngchw_xdl_c_shuffle_f16_generic_instances(
     std::size_t sd,
-    ckb::TensorLayout il, ckb::TensorLayout wl, ckb::TensorLayout ol,
+    ckb::TensorLayout il,
+    ckb::TensorLayout wl,
+    ckb::TensorLayout ol,
     ckb::ConvSpecialization cs,
-    ckb::PipelineScheduler sched, ckb::PipelineVersion pv)
+    ckb::PipelineScheduler sched,
+    ckb::PipelineVersion pv)
 {
     return std::array{
         // clang-format off
@@ -198,9 +226,12 @@ constexpr auto device_grouped_conv_bwd_weight_two_stage_ngchw_xdl_c_shuffle_f16_
 // =====================================================================================
 constexpr auto device_grouped_conv_bwd_weight_two_stage_ngchw_xdl_c_shuffle_f16_instances(
     std::size_t sd,
-    ckb::TensorLayout il, ckb::TensorLayout wl, ckb::TensorLayout ol,
+    ckb::TensorLayout il,
+    ckb::TensorLayout wl,
+    ckb::TensorLayout ol,
     ckb::ConvSpecialization cs,
-    ckb::PipelineScheduler sched, ckb::PipelineVersion pv)
+    ckb::PipelineScheduler sched,
+    ckb::PipelineVersion pv)
 {
     return std::array{
         // clang-format off
@@ -230,9 +261,12 @@ constexpr auto device_grouped_conv_bwd_weight_two_stage_ngchw_xdl_c_shuffle_f16_
 // =====================================================================================
 constexpr auto device_grouped_conv_bwd_weight_two_stage_ngchw_xdl_c_shuffle_f16_part2_instances(
     std::size_t sd,
-    ckb::TensorLayout il, ckb::TensorLayout wl, ckb::TensorLayout ol,
+    ckb::TensorLayout il,
+    ckb::TensorLayout wl,
+    ckb::TensorLayout ol,
     ckb::ConvSpecialization cs,
-    ckb::PipelineScheduler sched, ckb::PipelineVersion pv)
+    ckb::PipelineScheduler sched,
+    ckb::PipelineVersion pv)
 {
     return std::array{
         // clang-format off
@@ -254,9 +288,12 @@ constexpr auto device_grouped_conv_bwd_weight_two_stage_ngchw_xdl_c_shuffle_f16_
 // =====================================================================================
 constexpr auto device_grouped_conv_bwd_weight_two_stage_ngchw_xdl_c_shuffle_bf16_generic_instances(
     std::size_t sd,
-    ckb::TensorLayout il, ckb::TensorLayout wl, ckb::TensorLayout ol,
+    ckb::TensorLayout il,
+    ckb::TensorLayout wl,
+    ckb::TensorLayout ol,
     ckb::ConvSpecialization cs,
-    ckb::PipelineScheduler sched, ckb::PipelineVersion pv)
+    ckb::PipelineScheduler sched,
+    ckb::PipelineVersion pv)
 {
     return std::array{
         // clang-format off
@@ -270,9 +307,12 @@ constexpr auto device_grouped_conv_bwd_weight_two_stage_ngchw_xdl_c_shuffle_bf16
 // =====================================================================================
 constexpr auto device_grouped_conv_bwd_weight_two_stage_ngchw_xdl_c_shuffle_bf16_instances(
     std::size_t sd,
-    ckb::TensorLayout il, ckb::TensorLayout wl, ckb::TensorLayout ol,
+    ckb::TensorLayout il,
+    ckb::TensorLayout wl,
+    ckb::TensorLayout ol,
     ckb::ConvSpecialization cs,
-    ckb::PipelineScheduler sched, ckb::PipelineVersion pv)
+    ckb::PipelineScheduler sched,
+    ckb::PipelineVersion pv)
 {
     return std::array{
         // clang-format off
@@ -302,9 +342,12 @@ constexpr auto device_grouped_conv_bwd_weight_two_stage_ngchw_xdl_c_shuffle_bf16
 // =====================================================================================
 constexpr auto device_grouped_conv_bwd_weight_two_stage_ngchw_xdl_c_shuffle_bf16_part2_instances(
     std::size_t sd,
-    ckb::TensorLayout il, ckb::TensorLayout wl, ckb::TensorLayout ol,
+    ckb::TensorLayout il,
+    ckb::TensorLayout wl,
+    ckb::TensorLayout ol,
     ckb::ConvSpecialization cs,
-    ckb::PipelineScheduler sched, ckb::PipelineVersion pv)
+    ckb::PipelineScheduler sched,
+    ckb::PipelineVersion pv)
 {
     return std::array{
         // clang-format off

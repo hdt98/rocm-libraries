@@ -29,8 +29,13 @@ void add_device_grouped_conv2d_bwd_weight_two_stage_xdl_ngchw_gkyxc_ngkhw_bf16_p
     using namespace factories::grouped_conv_bwd_weight;
     add_device_operation_instances<
         device_grouped_conv_bwd_weight_two_stage_ngchw_xdl_c_shuffle_bf16_generic_instances(
-            2, ckb::TensorLayout::NGCHW, ckb::TensorLayout::GKYXC, ckb::TensorLayout::NGKHW,
-            ConvBwdWeightDefault, Intrawave, PipeV1)>(instances);
+            2,
+            ckb::TensorLayout::NGCHW,
+            ckb::TensorLayout::GKYXC,
+            ckb::TensorLayout::NGKHW,
+            ConvBwdWeightDefault,
+            Intrawave,
+            PipeV1)>(instances);
 }
 
 } // namespace instance

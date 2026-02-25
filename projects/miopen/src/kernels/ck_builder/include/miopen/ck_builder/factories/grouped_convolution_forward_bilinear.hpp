@@ -46,21 +46,20 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
     ck::tensor_operation::element_wise::Bilinear,
     ComputeType>>
 {
-    using DeviceOp =
-        ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<
-            NumDimSpatial,
-            InLayout,
-            WeiLayout,
-            DLayouts,
-            OutLayout,
-            InDataType,
-            WeiDataType,
-            DDataTypes,
-            OutDataType,
-            ck::tensor_operation::element_wise::PassThrough,
-            ck::tensor_operation::element_wise::PassThrough,
-            ck::tensor_operation::element_wise::Bilinear,
-            ComputeType>;
+    using DeviceOp = ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<
+        NumDimSpatial,
+        InLayout,
+        WeiLayout,
+        DLayouts,
+        OutLayout,
+        InDataType,
+        WeiDataType,
+        DDataTypes,
+        OutDataType,
+        ck::tensor_operation::element_wise::PassThrough,
+        ck::tensor_operation::element_wise::PassThrough,
+        ck::tensor_operation::element_wise::Bilinear,
+        ComputeType>;
 
     static auto GetInstances()
     {
@@ -99,8 +98,7 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
 #endif
 #ifdef CK_ENABLE_BF16
             if constexpr(is_same_v<InDataType, ck::bhalf_t> &&
-                         is_same_v<WeiDataType, ck::bhalf_t> &&
-                         is_same_v<OutDataType, ck::bhalf_t>)
+                         is_same_v<WeiDataType, ck::bhalf_t> && is_same_v<OutDataType, ck::bhalf_t>)
             {
                 add_device_grouped_conv3d_fwd_xdl_bilinear_ndhwgc_gkzyxc_ndhwgk_bf16_instances(
                     op_ptrs);

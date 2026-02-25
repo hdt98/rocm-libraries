@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 #include <miopen/ck_builder/kernel_instantiation.hpp>
-// TODO: This header may not exist yet - create device_grouped_conv_bwd_weight_xdl_bilinear_instance.hpp
-// when the bilinear factory infrastructure is ready.
+// TODO: This header may not exist yet - create
+// device_grouped_conv_bwd_weight_xdl_bilinear_instance.hpp when the bilinear factory infrastructure
+// is ready.
 #include <miopen/ck_builder/factories/grouped_conv_bwd_weight/device_grouped_conv_bwd_weight_xdl_bilinear_instance.hpp>
 #include "ck/library/tensor_operation_instance/gpu/grouped_convolution_backward_weight.hpp"
 

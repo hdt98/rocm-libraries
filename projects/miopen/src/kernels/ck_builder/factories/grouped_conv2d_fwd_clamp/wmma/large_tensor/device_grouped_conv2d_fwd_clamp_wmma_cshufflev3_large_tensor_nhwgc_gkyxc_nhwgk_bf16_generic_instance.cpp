@@ -37,10 +37,10 @@ void add_device_grouped_conv2d_fwd_clamp_wmma_cshufflev3_large_tensor_nhwgc_gkyx
     constexpr auto NHWGK = ckb::TensorLayout::NHWGK;
 
     // Specialization aliases
-    constexpr auto ConvFwdDefault    = ckb::ConvSpecialization::DEFAULT;
+    constexpr auto ConvFwdDefault = ckb::ConvSpecialization::DEFAULT;
 
-    add_device_operation_instances<device_grouped_conv_fwd_wmma_large_tensor_bf16_generic_instances<0>(
-        2, NHWGC, GKYXC, {}, NHWGK, ConvFwdDefault, {}, Clamp)>(instances);
+    add_device_operation_instances<device_grouped_conv_fwd_wmma_large_tensor_bf16_generic_instances<
+        0>(2, NHWGC, GKYXC, {}, NHWGK, ConvFwdDefault, {}, Clamp)>(instances);
 }
 
 } // namespace instance

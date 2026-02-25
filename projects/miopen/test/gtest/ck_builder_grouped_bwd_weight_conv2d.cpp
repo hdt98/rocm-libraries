@@ -18,19 +18,18 @@ using PassThrough                          = ck::tensor_operation::element_wise:
 static constexpr ck::index_t NumDimSpatial = 2;
 
 template <typename DataType, typename ComputeType = DataType>
-using DeviceOpGBwdWeight =
-    ck::tensor_operation::device::DeviceGroupedConvBwdWeight<NumDimSpatial,
-                                                             InLayout,
-                                                             WeiLayout,
-                                                             OutLayout,
-                                                             DataType,
-                                                             DataType,
-                                                             DataType,
-                                                             PassThrough,
-                                                             PassThrough,
-                                                             PassThrough,
-                                                             ComputeType,
-                                                             ComputeType>;
+using DeviceOpGBwdWeight = ck::tensor_operation::device::DeviceGroupedConvBwdWeight<NumDimSpatial,
+                                                                                    InLayout,
+                                                                                    WeiLayout,
+                                                                                    OutLayout,
+                                                                                    DataType,
+                                                                                    DataType,
+                                                                                    DataType,
+                                                                                    PassThrough,
+                                                                                    PassThrough,
+                                                                                    PassThrough,
+                                                                                    ComputeType,
+                                                                                    ComputeType>;
 
 template <typename DataType, typename ComputeType = DataType>
 using DeviceOpGBwdWeightCKPtrs =
@@ -42,6 +41,7 @@ using DeviceOpGBwdWeightBuilderPtrs =
     miopen::conv::ck_builder::instance::DeviceOperationInstanceFactory<
         DeviceOpGBwdWeight<DataType, ComputeType>>;
 
+namespace {
 template <typename DataType>
 void CompareInstanceLists()
 {
@@ -50,6 +50,7 @@ void CompareInstanceLists()
 
     compare_instance_vectors(ckFactoryInstances, builderFactoryInstances);
 }
+} // namespace
 
 TEST(CPU_CKBuilderGroupedBwdWeightConv2D_FP32, CompareInstanceListsFloat)
 {

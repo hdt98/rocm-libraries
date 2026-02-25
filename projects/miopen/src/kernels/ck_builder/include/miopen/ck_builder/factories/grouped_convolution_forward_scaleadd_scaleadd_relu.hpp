@@ -50,21 +50,20 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
     ck::tensor_operation::element_wise::ScaleAddScaleAddRelu,
     ComputeType>>
 {
-    using DeviceOp =
-        ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<
-            NumDimSpatial,
-            InLayout,
-            WeiLayout,
-            DLayouts,
-            OutLayout,
-            InDataType,
-            WeiDataType,
-            DDataTypes,
-            OutDataType,
-            ck::tensor_operation::element_wise::PassThrough,
-            ck::tensor_operation::element_wise::PassThrough,
-            ck::tensor_operation::element_wise::ScaleAddScaleAddRelu,
-            ComputeType>;
+    using DeviceOp = ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<
+        NumDimSpatial,
+        InLayout,
+        WeiLayout,
+        DLayouts,
+        OutLayout,
+        InDataType,
+        WeiDataType,
+        DDataTypes,
+        OutDataType,
+        ck::tensor_operation::element_wise::PassThrough,
+        ck::tensor_operation::element_wise::PassThrough,
+        ck::tensor_operation::element_wise::ScaleAddScaleAddRelu,
+        ComputeType>;
 
     static auto GetInstances()
     {
@@ -72,8 +71,7 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
 
         if constexpr(NumDimSpatial == 3 && is_same_v<InLayout, NDHWGC> &&
                      is_same_v<WeiLayout, GKZYXC> && is_same_v<OutLayout, NDHWGK> &&
-                     DLayouts::Size() == 2 &&
-                     is_same_v<ck::tuple_element_t<0, DLayouts>, NDHWGK> &&
+                     DLayouts::Size() == 2 && is_same_v<ck::tuple_element_t<0, DLayouts>, NDHWGK> &&
                      is_same_v<ck::tuple_element_t<1, DLayouts>, G_K>)
         {
 #ifdef CK_ENABLE_FP32
@@ -102,8 +100,7 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
 #endif
 #ifdef CK_ENABLE_BF16
             if constexpr(is_same_v<InDataType, ck::bhalf_t> &&
-                         is_same_v<WeiDataType, ck::bhalf_t> &&
-                         is_same_v<OutDataType, ck::bhalf_t>)
+                         is_same_v<WeiDataType, ck::bhalf_t> && is_same_v<OutDataType, ck::bhalf_t>)
             {
 #ifdef CK_USE_XDL
                 add_device_grouped_conv3d_fwd_xdl_scaleadd_scaleadd_relu_ndhwgc_gkzyxc_ndhwgk_bf16_instances(

@@ -45,6 +45,7 @@ using DeviceOpGBwdWeight3DBuilderPtrs =
     miopen::conv::ck_builder::instance::DeviceOperationInstanceFactory<
         DeviceOpGBwdWeight3D<DataType, ComputeType>>;
 
+namespace {
 template <typename DataType>
 void CompareInstanceLists()
 {
@@ -53,6 +54,7 @@ void CompareInstanceLists()
 
     compare_instance_vectors(ckFactoryInstances, builderFactoryInstances);
 }
+} // namespace
 
 TEST(CPU_CKBuilderGroupedBwdWeightConv3D_Default_FP32, CompareInstanceListsFloat)
 {

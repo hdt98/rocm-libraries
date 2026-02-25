@@ -64,7 +64,8 @@ struct WmmaTwoStageBwdWeightInstance
 // Helper to create WmmaTwoStageBwdWeightInstance from
 // DeviceGroupedConvBwdWeightTwoStage_Wmma_CShuffleV3 template parameters.
 template <std::size_t NumDTensor>
-constexpr WmmaTwoStageBwdWeightInstance<NumDTensor> DeviceGroupedConvBwdWeightTwoStage_Wmma_CShuffleV3(
+constexpr WmmaTwoStageBwdWeightInstance<NumDTensor>
+DeviceGroupedConvBwdWeightTwoStage_Wmma_CShuffleV3(
     // 1. NDimSpatial
     std::size_t spatial_dim,
     // 2-4. Layouts (A=In, B=Out, E=Wei)

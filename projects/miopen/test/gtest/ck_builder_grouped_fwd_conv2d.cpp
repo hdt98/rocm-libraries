@@ -13,6 +13,8 @@
 #include <ck/library/tensor_operation_instance/gpu/grouped_convolution_forward_scale.hpp>
 #include "ck/library/tensor_operation_instance/gpu/grouped_convolution_forward.hpp"
 
+#include <iostream>
+
 using InLayout                             = ck::tensor_layout::convolution::NHWGC;
 using WeiLayout                            = ck::tensor_layout::convolution::GKYXC;
 using OutLayout                            = ck::tensor_layout::convolution::NHWGK;
@@ -42,6 +44,7 @@ template <typename DataType, typename ComputeType = DataType>
 using DeviceOpGFwdBuilderPtrs = miopen::conv::ck_builder::instance::DeviceOperationInstanceFactory<
     DeviceOpGFwdDefault<DataType, ComputeType>>;
 
+namespace {
 template <typename DataType>
 void CompareInstanceLists()
 {
@@ -50,6 +53,7 @@ void CompareInstanceLists()
 
     compare_instance_vectors(ckFactoryInstances, builderFactoryInstances);
 }
+} // namespace
 
 TEST(CPU_CKBuilderGroupedFwdConv2D_FP32, CompareInstanceListsFloat)
 {

@@ -19,10 +19,10 @@ namespace ckb = ck_tile::builder;
 [[maybe_unused]] constexpr auto F32  = ckb::DataType::FP32;
 // TODO: TF32 compute type is not yet supported in ckb::DataType enum
 // [[maybe_unused]] constexpr auto TF32 = ckb::DataType::TF32;
-[[maybe_unused]] constexpr auto I8   = ckb::DataType::I8;
-[[maybe_unused]] constexpr auto I32  = ckb::DataType::I32;
-[[maybe_unused]] constexpr auto F8   = ckb::DataType::FP8;
-[[maybe_unused]] constexpr auto BF8  = ckb::DataType::BF8;
+[[maybe_unused]] constexpr auto I8  = ckb::DataType::I8;
+[[maybe_unused]] constexpr auto I32 = ckb::DataType::I32;
+[[maybe_unused]] constexpr auto F8  = ckb::DataType::FP8;
+[[maybe_unused]] constexpr auto BF8 = ckb::DataType::BF8;
 
 // Elementwise operations
 [[maybe_unused]] constexpr auto PassThrough = ckb::ElementwiseOperation::PASS_THROUGH;
@@ -43,8 +43,7 @@ namespace ckb = ck_tile::builder;
 [[maybe_unused]] constexpr auto PipeV5 = ckb::PipelineVersion::V5;
 
 // Backward weight convolution specializations
-[[maybe_unused]] constexpr auto ConvBwdWeightDefault =
-    ckb::ConvSpecialization::DEFAULT;
+[[maybe_unused]] constexpr auto ConvBwdWeightDefault = ckb::ConvSpecialization::DEFAULT;
 [[maybe_unused]] constexpr auto ConvBwdWeightFilter1x1Stride1Pad0 =
     ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
 

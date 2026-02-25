@@ -38,18 +38,18 @@ void add_device_grouped_conv2d_fwd_clamp_xdl_nhwgc_gkyxc_nhwgk_bf16_direct_load_
     constexpr auto NHWGK = ckb::TensorLayout::NHWGK;
 
     // Specialization aliases
-    constexpr auto ConvFwdDefault    = ckb::ConvSpecialization::DEFAULT;
-    constexpr auto ConvFwd1x1S1P0    = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
+    constexpr auto ConvFwdDefault = ckb::ConvSpecialization::DEFAULT;
+    constexpr auto ConvFwd1x1S1P0 = ckb::ConvSpecialization::FILTER_1X1_STRIDE1_PAD0;
 
     constexpr auto Intrawave = ckb::PipelineScheduler::INTRAWAVE;
 
     if(miopen::get_device_name() == "gfx950")
     {
         add_device_operation_instances<device_grouped_conv_fwd_xdl_bf16_direct_load_instances<0>(
-        2, NHWGC, GKYXC, {}, NHWGK, ConvFwdDefault, Intrawave, {}, Clamp)>(instances);
+            2, NHWGC, GKYXC, {}, NHWGK, ConvFwdDefault, Intrawave, {}, Clamp)>(instances);
 
-    add_device_operation_instances<device_grouped_conv_fwd_xdl_bf16_direct_load_instances<0>(
-        2, NHWGC, GKYXC, {}, NHWGK, ConvFwd1x1S1P0, Intrawave, {}, Clamp)>(instances);
+        add_device_operation_instances<device_grouped_conv_fwd_xdl_bf16_direct_load_instances<0>(
+            2, NHWGC, GKYXC, {}, NHWGK, ConvFwd1x1S1P0, Intrawave, {}, Clamp)>(instances);
     }
 }
 

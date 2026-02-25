@@ -57,7 +57,6 @@ void add_device_grouped_conv2d_fwd_bias_clamp_xdl_merged_groups_nhwgc_gkyxc_nhwg
         add_device_operation_instances<device_grouped_conv_fwd_xdl_merged_groups_bf16_instances<1>(
             2, NHWGC, GKYXC, {NHWGK}, NHWGK, ConvFwd3x3, {BF16}, AddClamp)>(instances);
     }
-
 }
 
 } // namespace instance

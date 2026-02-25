@@ -40,6 +40,7 @@ template <typename DataType, typename ComputeType = DataType>
 using DeviceOpGFwdBuilderPtrs = miopen::conv::ck_builder::instance::DeviceOperationInstanceFactory<
     DeviceOpGFwdDefault<DataType, ComputeType>>;
 
+namespace {
 template <typename DataType>
 void CompareInstanceLists()
 {
@@ -48,6 +49,7 @@ void CompareInstanceLists()
 
     compare_instance_vectors(ckFactoryInstances, builderFactoryInstances);
 }
+} // namespace
 
 TEST(CPU_CKBuilderGroupedFwdConv3D_FP32, CompareInstanceListsFloat)
 {

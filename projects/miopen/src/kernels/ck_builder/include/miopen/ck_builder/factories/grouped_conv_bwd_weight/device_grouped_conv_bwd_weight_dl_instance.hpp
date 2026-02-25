@@ -19,12 +19,11 @@ using namespace instance;
 // F32 DL instances
 // 1 instance: InData=F32, WeiData=F32, OutData=F32, AccData=F32
 // =====================================================================================
-constexpr auto device_grouped_conv_bwd_weight_dl_f32_instances(
-    std::size_t spatial_dim,
-    ckb::TensorLayout in_layout,
-    ckb::TensorLayout wei_layout,
-    ckb::TensorLayout out_layout,
-    ckb::ConvSpecialization conv_spec)
+constexpr auto device_grouped_conv_bwd_weight_dl_f32_instances(std::size_t spatial_dim,
+                                                               ckb::TensorLayout in_layout,
+                                                               ckb::TensorLayout wei_layout,
+                                                               ckb::TensorLayout out_layout,
+                                                               ckb::ConvSpecialization conv_spec)
 {
     return std::array{
         // clang-format off
@@ -37,12 +36,11 @@ constexpr auto device_grouped_conv_bwd_weight_dl_f32_instances(
 // F16 DL instances
 // 1 instance: InData=F16, WeiData=F16, OutData=F16, AccData=F32
 // =====================================================================================
-constexpr auto device_grouped_conv_bwd_weight_dl_f16_instances(
-    std::size_t spatial_dim,
-    ckb::TensorLayout in_layout,
-    ckb::TensorLayout wei_layout,
-    ckb::TensorLayout out_layout,
-    ckb::ConvSpecialization conv_spec)
+constexpr auto device_grouped_conv_bwd_weight_dl_f16_instances(std::size_t spatial_dim,
+                                                               ckb::TensorLayout in_layout,
+                                                               ckb::TensorLayout wei_layout,
+                                                               ckb::TensorLayout out_layout,
+                                                               ckb::ConvSpecialization conv_spec)
 {
     return std::array{
         // clang-format off
@@ -55,12 +53,11 @@ constexpr auto device_grouped_conv_bwd_weight_dl_f16_instances(
 // BF16 DL instances (InData=BF16, WeiData=F32, OutData=BF16, AccData=F32)
 // 1 instance
 // =====================================================================================
-constexpr auto device_grouped_conv_bwd_weight_dl_bf16_instances(
-    std::size_t spatial_dim,
-    ckb::TensorLayout in_layout,
-    ckb::TensorLayout wei_layout,
-    ckb::TensorLayout out_layout,
-    ckb::ConvSpecialization conv_spec)
+constexpr auto device_grouped_conv_bwd_weight_dl_bf16_instances(std::size_t spatial_dim,
+                                                                ckb::TensorLayout in_layout,
+                                                                ckb::TensorLayout wei_layout,
+                                                                ckb::TensorLayout out_layout,
+                                                                ckb::ConvSpecialization conv_spec)
 {
     return std::array{
         // clang-format off
