@@ -82,7 +82,8 @@ template <typename GridwiseGemm,
           bool HasMainKBlockLoop,
           bool isMultiA,
           bool isMultiB,
-          bool CTranspose>
+          bool CTranspose,
+          bool DoubleBuffer = false>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
 __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
@@ -120,7 +121,14 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
         const long_index_t e_n_offset =
             amd_wave_read_first_lane(compute_ptr_offset_of_n.GetEPtrOffset(n_idx));
 
-        __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte(get_device_arch())];
+        constexpr index_t SharedMemSize =
+            GridwiseGemm::GetSharedMemoryNumberOfByte(get_device_arch());
+        constexpr index_t AdditionalSharedMemSize =
+            DoubleBuffer ? SharedMemSize : 1; // One byte of shared mem to avoid warning of zero
+                                              // size shared memory if DoubleBuffer is false
+
+        __shared__ char p_shared_0[SharedMemSize];
+        __shared__ char p_shared_1[AdditionalSharedMemSize];
 
         DsPointer p_ds_grid_grp;
 
@@ -168,7 +176,7 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
                 p_bs_grid_grp,
                 p_ds_grid_grp,
                 p_e_grid + e_group_offset + e_n_offset,
-                p_shared,
+                p_shared_0,
                 a_element_op,
                 b_element_op,
                 cde_element_op,
@@ -176,7 +184,8 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
                 b_grid_desc_k0_n_k1,
                 ds_grid_desc_mblock_mperblock_nblock_nperblock,
                 e_grid_desc_mblock_mperblock_nblock_nperblock_,
-                block_2_ctile_map);
+                block_2_ctile_map,
+                p_shared_1);
         }
         else
         {
@@ -195,12 +204,15 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
                 CTranspose ? 0
                            : amd_wave_read_first_lane(compute_ptr_offset_of_n.GetAPtrOffset(n_idx));
 
+            constexpr index_t k_batch = 1;
+            constexpr index_t k_idx   = 0;
+
             GridwiseGemm::template Run<HasMainKBlockLoop, InMemoryDataOperationEnum::Set>(
                 p_as_grid + a_group_offset + a_n_offset,
                 p_bs_grid + b_group_offset + b_n_offset,
                 p_ds_grid_grp,
                 p_e_grid + e_group_offset + e_n_offset,
-                p_shared,
+                p_shared_0,
                 a_element_op,
                 b_element_op,
                 cde_element_op,
@@ -208,7 +220,10 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
                 b_grid_desc_k0_n_k1,
                 ds_grid_desc_mblock_mperblock_nblock_nperblock,
                 e_grid_desc_mblock_mperblock_nblock_nperblock_,
-                block_2_ctile_map);
+                block_2_ctile_map,
+                k_batch,
+                k_idx,
+                p_shared_1);
         }
     }
 #else
@@ -307,7 +322,8 @@ template <index_t NDimSpatial,
                                                      // passed
           typename BComputeDataType = AComputeDataType,
           LoopScheduler LoopSched   = make_default_loop_scheduler(),
-          index_t NumGroupsToMerge  = 1>
+          index_t NumGroupsToMerge  = 1,
+          bool DoubleBuffer         = false>
 struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
     : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                              ALayout,
@@ -515,7 +531,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         CShuffleMXdlPerWavePerShuffle, CShuffleNXdlPerWavePerShuffle*(NPerXDL / NPerXDL_),       \
         CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,                        \
         CDEBlockTransferScalarPerVector_NPerBlock, LoopSched, PipelineVersion::v1,               \
-        BComputeDataType
+        BComputeDataType, DoubleBuffer
 
 #define CK_GRIDWISE_GEMM_FWD_MULTIPLE_D_XDL_CSHUFFLE_TEMPLATE_PARAMETERS                       \
     GemmADataType, GemmBDataType, AComputeDataType, AccDataType, CShuffleDataType, DsDataType, \
@@ -532,7 +548,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         CShuffleMXdlPerWavePerShuffle, CShuffleNXdlPerWavePerShuffle*(NPerXDL / NPerXDL_),     \
         CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,                      \
         CDEBlockTransferScalarPerVector_NPerBlock, LoopSched, PipelineVersion::v1,             \
-        BComputeDataType, DoElementwiseBeforeCShuffle
+        BComputeDataType, DoElementwiseBeforeCShuffle, DoubleBuffer
 
 #define CK_GRIDWISE_GEMM_FWD_CTRANSPOSE_XDL_CSHUFFLE_TEMPLATE_PARAMETERS                       \
     GemmBDataType, GemmADataType, AComputeDataType, AccDataType, CShuffleDataType, DsDataType, \
@@ -548,7 +564,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         ABlockLdsExtraM, CShuffleMXdlPerWavePerShuffle, CShuffleNXdlPerWavePerShuffle,         \
         CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,                      \
         CDEBlockTransferScalarPerVector_NPerBlock, LoopSched, PipelineVersion::v1,             \
-        BComputeDataType, DoElementwiseBeforeCShuffle
+        BComputeDataType, DoElementwiseBeforeCShuffle, DoubleBuffer
 
     // Use appropriate gridwise gemm
     template <index_t MXdlPerWave_, index_t MPerXDL_, index_t NPerXDL_>
@@ -1156,7 +1172,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                         has_main_loop,
                         isMultiA,
                         isMultiB,
-                        CTranspose>;
+                        CTranspose,
+                        DoubleBuffer>;
 
                     return launch_and_time_kernel(
                         stream_config,
@@ -1229,7 +1246,9 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                             has_main_loop,
                             isMultiA,
                             isMultiB,
-                            CTranspose>;
+                            CTranspose,
+                            DoubleBuffer>;
+
                         return launch_and_time_kernel(
                             stream_config,
                             kernel,
@@ -1272,7 +1291,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                             has_main_loop,
                             isMultiA,
                             isMultiB,
-                            CTranspose>;
+                            CTranspose,
+                            DoubleBuffer>;
 
                         return launch_and_time_kernel(
                             stream_config,
@@ -1450,9 +1470,9 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             {
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                 {
-                    std::cout << "On gfx908 the accumulation data type must be one of fp32 or int32!"
-                              << " In " << __FILE__ << ":" << __LINE__
-                              << ", in function: " << __func__ << std::endl;
+                    std::cout << "IsSupportedArgument: gfx908 does not support AccDataType other "
+                                 "than float or int32_t"
+                              << std::endl;
                 }
                 return false;
             }
@@ -1489,6 +1509,32 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                     if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                     {
                         std::cout << "Filter1x1Stride1Pad0 specialization requires 1x1, stride=1, pad=0!"
+                                  << " In " << __FILE__ << ":" << __LINE__
+                                  << ", in function: " << __func__ << std::endl;
+                    }
+                    return false;
+                }
+            }
+        }
+        else if constexpr(ConvForwardSpecialization ==
+                          ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
+        {
+            // Check if we have 3x3, stride=1, dilation=1, pad=0 convolution
+            for(index_t i = 0; i < NDimSpatial; ++i)
+            {
+                const index_t SpatialDim   = arg.b_g_k_c_xs_lengths_[i + I3];
+                const index_t ConvStride   = arg.conv_filter_strides_[i];
+                const index_t ConvDilation = arg.conv_filter_dilations_[i];
+                const index_t LeftPad      = arg.input_left_pads_[i];
+                const index_t RightPad     = arg.input_right_pads_[i];
+
+                if(!(SpatialDim == I3 && ConvStride == 1 && ConvDilation == 1 && LeftPad == 0 &&
+                     RightPad == 0))
+                {
+                    if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                    {
+                        std::cout << "IsSupportedArgument: Filter3x3Stride1Pad0 specialization "
+                                     "requires 3x3 filter with stride=1, dilation=1, and no padding"
                                   << " In " << __FILE__ << ":" << __LINE__
                                   << ", in function: " << __func__ << std::endl;
                     }
@@ -1554,7 +1600,9 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                 {
                     std::cout << "Unsupported! G % NumGroupsToMerge != 0: G=" << G
-                              << ", NumGroupsToMerge=" << NumGroupsToMerge << std::endl;
+                              << ", NumGroupsToMerge=" << NumGroupsToMerge <<
+                               " In " << __FILE__ << ":" << __LINE__
+                                  << ", in function: " << __func__ << std::endl;
                 }
                 return false;
             }
@@ -2269,6 +2317,10 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
         if(get_warp_size() != 64) {
             str << "_WmmaPorted";
+        }
+
+        if (DoubleBuffer) {
+            str << "_DoubleBuffer";
         }
 
         str    << "<"

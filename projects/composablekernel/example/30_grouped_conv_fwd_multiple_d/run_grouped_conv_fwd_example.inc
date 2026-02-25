@@ -87,7 +87,7 @@ using DeviceConvFwdInstance =
         8>; // Num groups to merge
 */
 
-/*
+
 template <ck::index_t NDimSpatial>
 using DeviceConvFwdInstance =
     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<
@@ -111,9 +111,9 @@ using DeviceConvFwdInstance =
         256,         // BlockSize
         128,         // MPerBlock
         32,         // NPerBlock
-        64,          // KPerBlock
-        16,           // AK1
-        16,           // BK1
+        32,          // KPerBlock
+        8,           // AK1
+        8,           // BK1
         32,          // MPerXdl
         32,          // NPerXdl
         2,           // MXdlPerWave
@@ -140,7 +140,6 @@ using DeviceConvFwdInstance =
         WeiKernelDataType,
         ck::LoopScheduler::Default,
         8>; // Num groups to merge
-*/
 
 // Best V3 instance
 /*
