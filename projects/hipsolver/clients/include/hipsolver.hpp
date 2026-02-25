@@ -2357,38 +2357,60 @@ inline hipsolverStatus_t hipsolver_gels_bufferSize(bool              BATCHED,
                                                    int               m,
                                                    int               n,
                                                    int               nrhs,
-                                                   hipFloatComplex*  A[],
+                                                   hipsolverComplex* A[],
                                                    int               lda,
-                                                   hipFloatComplex*  B[],
+                                                   hipsolverComplex* B[],
                                                    int               ldb,
-                                                   hipFloatComplex*  X[],
+                                                   hipsolverComplex* X[],
                                                    int               ldx,
                                                    size_t*           lwork,
                                                    int               bc)
 {
     if(!BATCHED)
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
-    return hipsolverCCgelsBatched_bufferSize(handle, m, n, nrhs, A, lda, B, ldb, X, ldx, lwork, bc);
+    return hipsolverCCgelsBatched_bufferSize(handle,
+                                             m,
+                                             n,
+                                             nrhs,
+                                             (hipFloatComplex**)A,
+                                             lda,
+                                             (hipFloatComplex**)B,
+                                             ldb,
+                                             (hipFloatComplex**)X,
+                                             ldx,
+                                             lwork,
+                                             bc);
 }
 
-inline hipsolverStatus_t hipsolver_gels_bufferSize(bool              BATCHED,
-                                                   testAPI_t         API,
-                                                   hipsolverHandle_t handle,
-                                                   int               m,
-                                                   int               n,
-                                                   int               nrhs,
-                                                   hipDoubleComplex* A[],
-                                                   int               lda,
-                                                   hipDoubleComplex* B[],
-                                                   int               ldb,
-                                                   hipDoubleComplex* X[],
-                                                   int               ldx,
-                                                   size_t*           lwork,
-                                                   int               bc)
+inline hipsolverStatus_t hipsolver_gels_bufferSize(bool                    BATCHED,
+                                                   testAPI_t               API,
+                                                   hipsolverHandle_t       handle,
+                                                   int                     m,
+                                                   int                     n,
+                                                   int                     nrhs,
+                                                   hipsolverDoubleComplex* A[],
+                                                   int                     lda,
+                                                   hipsolverDoubleComplex* B[],
+                                                   int                     ldb,
+                                                   hipsolverDoubleComplex* X[],
+                                                   int                     ldx,
+                                                   size_t*                 lwork,
+                                                   int                     bc)
 {
     if(!BATCHED)
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
-    return hipsolverZZgelsBatched_bufferSize(handle, m, n, nrhs, A, lda, B, ldb, X, ldx, lwork, bc);
+    return hipsolverZZgelsBatched_bufferSize(handle,
+                                             m,
+                                             n,
+                                             nrhs,
+                                             (hipDoubleComplex**)A,
+                                             lda,
+                                             (hipDoubleComplex**)B,
+                                             ldb,
+                                             (hipDoubleComplex**)X,
+                                             ldx,
+                                             lwork,
+                                             bc);
 }
 
 inline hipsolverStatus_t hipsolver_gels(bool              BATCHED,
@@ -2412,8 +2434,14 @@ inline hipsolverStatus_t hipsolver_gels(bool              BATCHED,
 {
     if(!BATCHED)
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
-    return hipsolverSSgelsBatched(
-        handle, m, n, nrhs, A, lda, B, ldb, X, ldx, work, lwork, niters, info, bc);
+    // For INPLACE, pass B as both B and X (output overwrites B)
+    // Note: niters parameter is ignored (not used by batched API)
+    if(INPLACE)
+        return hipsolverSSgelsBatched(
+            handle, m, n, nrhs, A, lda, B, ldb, B, ldb, work, lwork, info, bc);
+    else
+        return hipsolverSSgelsBatched(
+            handle, m, n, nrhs, A, lda, B, ldb, X, ldx, work, lwork, info, bc);
 }
 
 inline hipsolverStatus_t hipsolver_gels(bool              BATCHED,
@@ -2437,8 +2465,14 @@ inline hipsolverStatus_t hipsolver_gels(bool              BATCHED,
 {
     if(!BATCHED)
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
-    return hipsolverDDgelsBatched(
-        handle, m, n, nrhs, A, lda, B, ldb, X, ldx, work, lwork, niters, info, bc);
+    // For INPLACE, pass B as both B and X (output overwrites B)
+    // Note: niters parameter is ignored (not used by batched API)
+    if(INPLACE)
+        return hipsolverDDgelsBatched(
+            handle, m, n, nrhs, A, lda, B, ldb, B, ldb, work, lwork, info, bc);
+    else
+        return hipsolverDDgelsBatched(
+            handle, m, n, nrhs, A, lda, B, ldb, X, ldx, work, lwork, info, bc);
 }
 
 inline hipsolverStatus_t hipsolver_gels(bool              BATCHED,
@@ -2448,11 +2482,11 @@ inline hipsolverStatus_t hipsolver_gels(bool              BATCHED,
                                         int               m,
                                         int               n,
                                         int               nrhs,
-                                        hipFloatComplex*  A[],
+                                        hipsolverComplex* A[],
                                         int               lda,
-                                        hipFloatComplex*  B[],
+                                        hipsolverComplex* B[],
                                         int               ldb,
-                                        hipFloatComplex*  X[],
+                                        hipsolverComplex* X[],
                                         int               ldx,
                                         void*             work,
                                         size_t            lwork,
@@ -2462,33 +2496,93 @@ inline hipsolverStatus_t hipsolver_gels(bool              BATCHED,
 {
     if(!BATCHED)
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
-    return hipsolverCCgelsBatched(
-        handle, m, n, nrhs, A, lda, B, ldb, X, ldx, work, lwork, niters, info, bc);
+    // For INPLACE, pass B as both B and X (output overwrites B)
+    // Note: niters parameter is ignored (not used by batched API)
+    if(INPLACE)
+        return hipsolverCCgelsBatched(handle,
+                                      m,
+                                      n,
+                                      nrhs,
+                                      (hipFloatComplex**)A,
+                                      lda,
+                                      (hipFloatComplex**)B,
+                                      ldb,
+                                      (hipFloatComplex**)B,
+                                      ldb,
+                                      work,
+                                      lwork,
+                                      info,
+                                      bc);
+    else
+        return hipsolverCCgelsBatched(handle,
+                                      m,
+                                      n,
+                                      nrhs,
+                                      (hipFloatComplex**)A,
+                                      lda,
+                                      (hipFloatComplex**)B,
+                                      ldb,
+                                      (hipFloatComplex**)X,
+                                      ldx,
+                                      work,
+                                      lwork,
+                                      info,
+                                      bc);
 }
 
-inline hipsolverStatus_t hipsolver_gels(bool              BATCHED,
-                                        bool              INPLACE,
-                                        testAPI_t         API,
-                                        hipsolverHandle_t handle,
-                                        int               m,
-                                        int               n,
-                                        int               nrhs,
-                                        hipDoubleComplex* A[],
-                                        int               lda,
-                                        hipDoubleComplex* B[],
-                                        int               ldb,
-                                        hipDoubleComplex* X[],
-                                        int               ldx,
-                                        void*             work,
-                                        size_t            lwork,
-                                        int*              niters,
-                                        int*              info,
-                                        int               bc)
+inline hipsolverStatus_t hipsolver_gels(bool                    BATCHED,
+                                        bool                    INPLACE,
+                                        testAPI_t               API,
+                                        hipsolverHandle_t       handle,
+                                        int                     m,
+                                        int                     n,
+                                        int                     nrhs,
+                                        hipsolverDoubleComplex* A[],
+                                        int                     lda,
+                                        hipsolverDoubleComplex* B[],
+                                        int                     ldb,
+                                        hipsolverDoubleComplex* X[],
+                                        int                     ldx,
+                                        void*                   work,
+                                        size_t                  lwork,
+                                        int*                    niters,
+                                        int*                    info,
+                                        int                     bc)
 {
     if(!BATCHED)
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
-    return hipsolverZZgelsBatched(
-        handle, m, n, nrhs, A, lda, B, ldb, X, ldx, work, lwork, niters, info, bc);
+    // For INPLACE, pass B as both B and X (output overwrites B)
+    // Note: niters parameter is ignored (not used by batched API)
+    if(INPLACE)
+        return hipsolverZZgelsBatched(handle,
+                                      m,
+                                      n,
+                                      nrhs,
+                                      (hipDoubleComplex**)A,
+                                      lda,
+                                      (hipDoubleComplex**)B,
+                                      ldb,
+                                      (hipDoubleComplex**)B,
+                                      ldb,
+                                      work,
+                                      lwork,
+                                      info,
+                                      bc);
+    else
+        return hipsolverZZgelsBatched(handle,
+                                      m,
+                                      n,
+                                      nrhs,
+                                      (hipDoubleComplex**)A,
+                                      lda,
+                                      (hipDoubleComplex**)B,
+                                      ldb,
+                                      (hipDoubleComplex**)X,
+                                      ldx,
+                                      work,
+                                      lwork,
+                                      info,
+                                      bc);
 }
 /********************************************************/
 
