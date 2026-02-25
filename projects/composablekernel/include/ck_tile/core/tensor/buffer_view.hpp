@@ -485,7 +485,10 @@ struct buffer_view<address_space_enum::global,
         CK_TILE_DEVICE void operator()([[maybe_unused]] const void* addr) const
         {
 #if defined(__gfx125__)
+            // Compiler fence to not move ds_loads freely before/after this prefetch builtin
+            asm volatile("" ::: "memory");
             __builtin_amdgcn_global_prefetch(addr, static_cast<index_t>(Coherence_));
+            asm volatile("" ::: "memory");
 #endif
         }
 
