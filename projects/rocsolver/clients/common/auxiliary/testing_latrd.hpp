@@ -38,6 +38,7 @@
 #include "common/misc/rocsolver_timer.hpp"
 
 static bool latrd_use_hipgraph = std::getenv("LATRD_USE_HIPGRAPH") != nullptr ? true : false;
+static bool print_debug_messages_latrd = std::getenv("PRINT_DEBUG") != nullptr ? true : false;
 
 template <typename T, typename S>
 void latrd_checkBadArgs(const rocblas_handle handle,
@@ -342,11 +343,17 @@ void latrd_getError(const rocblas_handle handle,
         /* Tr_k.print(); */
 
         auto [Ul_k, eig_Tl_k] = eig_lower(real(Tl_k));
-        std::cout << "Eigenvalues of matrix Tl (lapack):" << std::endl;
-        eig_Tl_k.print();
+        if(print_debug_messages_latrd)
+        {
+            std::cout << "Eigenvalues of matrix Tl (lapack):" << std::endl;
+            eig_Tl_k.print();
+        }
         auto [Ur_k, eig_Tr_k] = eig_lower(real(Tr_k));
-        std::cout << "Eigenvalues of matrix Tr (rocsolver):" << std::endl;
-        eig_Tr_k.print();
+        if(print_debug_messages_latrd)
+        {
+            std::cout << "Eigenvalues of matrix Tr (rocsolver):" << std::endl;
+            eig_Tr_k.print();
+        }
 
         err = (eig_Tl_k - eig_Tr_k).max_coeff_norm() / (eig_Tl_k.max_coeff_norm());
         *max_err = err > *max_err ? err : *max_err;
@@ -367,11 +374,17 @@ void latrd_getError(const rocblas_handle handle,
         /* Tr_k.print(); */
 
         auto [Ul_k, eig_Tl_k] = eig_lower(real(Tl_k));
-        std::cout << "Eigenvalues of matrix Tl (lapack):" << std::endl;
-        eig_Tl_k.print();
+        if(print_debug_messages_latrd)
+        {
+            std::cout << "Eigenvalues of matrix Tl (lapack):" << std::endl;
+            eig_Tl_k.print();
+        }
         auto [Ur_k, eig_Tr_k] = eig_lower(real(Tr_k));
-        std::cout << "Eigenvalues of matrix Tr (rocsolver):" << std::endl;
-        eig_Tr_k.print();
+        if(print_debug_messages_latrd)
+        {
+            std::cout << "Eigenvalues of matrix Tr (rocsolver):" << std::endl;
+            eig_Tr_k.print();
+        }
 
         err = (eig_Tl_k - eig_Tr_k).max_coeff_norm() / (eig_Tl_k.max_coeff_norm());
         *max_err = err > *max_err ? err : *max_err;
@@ -413,7 +426,10 @@ void latrd_getPerfData(const rocblas_handle handle,
 
     if(latrd_use_hipgraph)
     {
-        std::cout << "Using hipGraph" << std::endl;
+        if(print_debug_messages_latrd)
+        {
+            std::cout << "Using hipGraph" << std::endl;
+        }
 
         // cold calls
         rocblas_handle handle2;

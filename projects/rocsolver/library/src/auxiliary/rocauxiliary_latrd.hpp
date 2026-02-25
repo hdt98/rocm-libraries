@@ -40,6 +40,9 @@
 #include "rocsolver_device_workspace.hpp"
 #include <rocprofiler-sdk-roctx/roctx.h>
 
+static bool print_debug_messages_latrd_forsytrd
+    = std::getenv("PRINT_DEBUG") != nullptr ? true : false;
+
 ROCSOLVER_BEGIN_NAMESPACE
 
 template <int MAX_THDS, typename T, typename I, typename U>
@@ -2262,7 +2265,10 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
     if(dwptr->size("latrd_scalars") > 0)
         init_scalars(handle, (T*)scalars);
 
-    /* std::cout << "Using forsytrd entry point." << std::endl; */
+    if(print_debug_messages_latrd_forsytrd)
+    {
+        std::cout << "Using latrd_forsytrd entry point." << std::endl;
+    }
 
     // execution
     return rocsolver_latrd_forsytrd_template<T>(

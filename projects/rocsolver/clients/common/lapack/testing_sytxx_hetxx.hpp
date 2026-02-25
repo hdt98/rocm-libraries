@@ -37,6 +37,7 @@
 #include "common/misc/rocsolver_timer.hpp"
 
 static bool sytrd_use_hipgraph = std::getenv("SYTRD_USE_HIPGRAPH") != nullptr ? true : false;
+static bool print_debug_messages_sytrd = std::getenv("PRINT_DEBUG") != nullptr ? true : false;
 
 template <bool STRIDED, bool SYTRD, typename S, typename T, typename U>
 void sytxx_hetxx_checkBadArgs(const rocblas_handle handle,
@@ -379,7 +380,10 @@ void sytxx_hetxx_getPerfData(const rocblas_handle handle,
 
     if(sytrd_use_hipgraph)
     {
-        std::cout << "Using hipGraph" << std::endl;
+        if(print_debug_messages_sytrd)
+        {
+            std::cout << "Using hipGraph" << std::endl;
+        }
 
         // cold calls
         rocblas_handle handle2;
