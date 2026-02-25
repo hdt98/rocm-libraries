@@ -1179,14 +1179,37 @@ private:
         unsigned int ranks[ItemsPerThread];
         while(true)
         {
-            const int pass_bits = min(radix_bits_per_pass, end_bit - begin_bit);
+            // Use a struct to invoke extract digit key to ensure proper inlining.
+            //
+            // On certain architectures, 'radix_bits_per_pass' does not get inlined properly.
+            // By reinforcing the constexpr-ness within the scope of the operator, we can help
+            // the compiler inline it.
+            //
+            // This struct effictively reimplements the following lambda:
+            //   auto digit_extractor = [begin_bit, pass_bits, decomposer](const Key& key) mutable {
+            //     return key_codec::extract_digit(key, begin_bit, pass_bits, decomposer);
+            //   };
+            struct digit_extractor
+            {
+                const unsigned int begin_bit;
+                const unsigned int end_bit;
+                const Decomposer   decomposer;
 
-            block_rank_type().rank_keys(
-                keys,
-                ranks,
-                storage.get().rank,
-                [begin_bit, pass_bits, decomposer](const Key& key) mutable
-                { return key_codec::extract_digit(key, begin_bit, pass_bits, decomposer); });
+                ROCPRIM_FORCE_INLINE ROCPRIM_DEVICE
+                auto               operator()(const Key& key) const
+                {
+                    constexpr auto max_bits_per_pass = radix_bits_per_pass;
+                    const auto     bits_left         = end_bit - begin_bit;
+                    const auto     pass_bits
+                        = bits_left > radix_bits_per_pass ? max_bits_per_pass : bits_left;
+                    return key_codec::extract_digit(key, begin_bit, pass_bits, decomposer);
+                }
+            };
+
+            block_rank_type().rank_keys(keys,
+                                        ranks,
+                                        storage.get().rank,
+                                        digit_extractor{begin_bit, end_bit, decomposer});
             begin_bit += radix_bits_per_pass;
 
             if(begin_bit >= end_bit)
