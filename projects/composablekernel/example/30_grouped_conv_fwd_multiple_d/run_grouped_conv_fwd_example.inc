@@ -107,7 +107,7 @@ using DeviceConvFwdInstance =
         OutElementOp,
         ConvSpec, // Convolution specialization
         GemmSpec,    // GemmSpecialization
-        1,           // Num GEMM-K prefetches.
+        2,           // Num GEMM-K prefetches.
         256,         // BlockSize
         128,         // MPerBlock
         32,         // NPerBlock
@@ -139,7 +139,8 @@ using DeviceConvFwdInstance =
         InKernelDataType,
         WeiKernelDataType,
         ck::LoopScheduler::Default,
-        8>; // Num groups to merge
+        8, // Num groups to merge
+        false>; // Double buffering
 
 // Best V3 instance
 /*
