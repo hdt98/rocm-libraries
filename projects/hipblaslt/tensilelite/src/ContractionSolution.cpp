@@ -1002,6 +1002,11 @@ namespace TensileLite
                                           static_cast<size_t>(sizeMapping.depthU)},
                         .cache_hints_a = sizeMapping.nonTemporalA,
                         .cache_hints_b = sizeMapping.nonTemporalB,
+                        .grvw_a        = sizeMapping.grvwA,
+                        .grvw_b        = sizeMapping.grvwB,
+                        .gwvw_d        = sizeMapping.gwvwD,
+                        .vector_width_a = sizeMapping.VectorWidthA,
+                        .vector_width_b = sizeMapping.VectorWidthB,
                     };
 
                     origami::workgroup_mapping_t prediction_results
@@ -1118,6 +1123,11 @@ namespace TensileLite
                                           static_cast<size_t>(sizeMapping.depthU)},
                         .cache_hints_a = sizeMapping.nonTemporalA,
                         .cache_hints_b = sizeMapping.nonTemporalB,
+                        .grvw_a        = sizeMapping.grvwA,
+                        .grvw_b        = sizeMapping.grvwB,
+                        .gwvw_d        = sizeMapping.gwvwD,
+                        .vector_width_a = sizeMapping.VectorWidthA,
+                        .vector_width_b = sizeMapping.VectorWidthB,
                     };
 
                     origami::staggerU_t prediction_results
@@ -3339,9 +3349,14 @@ namespace TensileLite
                 .batch = batch,
             };
             origami::config_t origami_config = {
-                .mt = {static_cast<size_t>(sizeMapping.macroTile.x),
-                       static_cast<size_t>(sizeMapping.macroTile.y),
-                       static_cast<size_t>(sizeMapping.depthU)},
+                .mt             = {static_cast<size_t>(sizeMapping.macroTile.x),
+                                   static_cast<size_t>(sizeMapping.macroTile.y),
+                                   static_cast<size_t>(sizeMapping.depthU)},
+                .grvw_a         = sizeMapping.grvwA,
+                .grvw_b         = sizeMapping.grvwB,
+                .gwvw_d         = sizeMapping.gwvwD,
+                .vector_width_a = sizeMapping.VectorWidthA,
+                .vector_width_b = sizeMapping.VectorWidthB,
             };
 
             reductionStrat = origami::streamk::select_reduction(
@@ -3420,8 +3435,13 @@ namespace TensileLite
                 .workgroup_mapping         = sizeMapping.workGroupMapping,
                 .workspace_size            = problem.workspaceSize(),
                 .workspace_size_per_elem_c = sizeMapping.workspaceSizePerElemC,
-                .reduction_strategy        = reductionStrat,
+                .grvw_a                    = sizeMapping.grvwA,
+                .grvw_b                    = sizeMapping.grvwB,
+                .gwvw_d                    = sizeMapping.gwvwD,
+                .vector_width_a            = sizeMapping.VectorWidthA,
+                .vector_width_b            = sizeMapping.VectorWidthB,
             };
+            origami_config.reduction_strategy = reductionStrat;
             skGrid = origami::streamk::select_grid_size(
                 origami_problem,
                 *(hipAMDGPU->analyticalHardware),
