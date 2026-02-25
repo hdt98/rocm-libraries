@@ -575,7 +575,7 @@ inline __device__ half_t tanh<half_t>(half_t x)
 template <>
 inline __device__ bhalf_t tanh<bhalf_t>(bhalf_t x)
 {
-#if defined(__gfx13__)
+#if defined(__gfx13__) && !defined(__gfx130F__)
     return __builtin_amdgcn_tanh_bf16(x);
 #else
     return ck::type_convert<bhalf_t>(::tanhf(ck::type_convert<float>(x)));
