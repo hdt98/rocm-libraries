@@ -1549,16 +1549,6 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
         if constexpr(NumGroupsToMerge > 1)
         {
-            if(!(C == 1) && CDEBlockTransferScalarPerVector_NPerBlock > 1)
-            {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "Unsupported! C != 1 && CDEBlockTransferScalarPerVector_NPerBlock > 1 with NumGroupsToMerge > 1!"
-                              << " In " << __FILE__ << ":" << __LINE__
-                              << ", in function: " << __func__ << std::endl;
-                }
-                return false;
-            }
             if(G % NumGroupsToMerge != 0)
             {
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
