@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc.
  * ************************************************************************ */
 
 /*! \file
@@ -1269,6 +1269,99 @@ HIPSOLVER_EXPORT hipsolverStatus_t hipsolverZgetrf(hipsolverHandle_t handle,
                                                    int               lwork,
                                                    int*              devIpiv,
                                                    int*              devInfo);
+
+// getriBatched
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverSgetriBatched_bufferSize(hipsolverHandle_t handle,
+                                                                     int               n,
+                                                                     float**           A,
+                                                                     int               lda,
+                                                                     float**           C,
+                                                                     int               ldc,
+                                                                     int               strideP,
+                                                                     int*              lwork,
+                                                                     int               batch_count);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDgetriBatched_bufferSize(hipsolverHandle_t handle,
+                                                                     int               n,
+                                                                     double**          A,
+                                                                     int               lda,
+                                                                     double**          C,
+                                                                     int               ldc,
+                                                                     int               strideP,
+                                                                     int*              lwork,
+                                                                     int               batch_count);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverCgetriBatched_bufferSize(hipsolverHandle_t handle,
+                                                                     int               n,
+                                                                     hipFloatComplex** A,
+                                                                     int               lda,
+                                                                     hipFloatComplex** C,
+                                                                     int               ldc,
+                                                                     int               strideP,
+                                                                     int*              lwork,
+                                                                     int               batch_count);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverZgetriBatched_bufferSize(hipsolverHandle_t  handle,
+                                                                     int                n,
+                                                                     hipDoubleComplex** A,
+                                                                     int                lda,
+                                                                     hipDoubleComplex** C,
+                                                                     int                ldc,
+                                                                     int                strideP,
+                                                                     int*               lwork,
+                                                                     int batch_count);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverSgetriBatched(hipsolverHandle_t handle,
+                                                          int               n,
+                                                          float**           A,
+                                                          int               lda,
+                                                          float**           C,
+                                                          int               ldc,
+                                                          float*            work,
+                                                          int               lwork,
+                                                          int*              devIpiv,
+                                                          int               strideP,
+                                                          int*              devInfo,
+                                                          int               batch_count);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDgetriBatched(hipsolverHandle_t handle,
+                                                          int               n,
+                                                          double**          A,
+                                                          int               lda,
+                                                          double**          C,
+                                                          int               ldc,
+                                                          double*           work,
+                                                          int               lwork,
+                                                          int*              devIpiv,
+                                                          int               strideP,
+                                                          int*              devInfo,
+                                                          int               batch_count);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverCgetriBatched(hipsolverHandle_t handle,
+                                                          int               n,
+                                                          hipFloatComplex** A,
+                                                          int               lda,
+                                                          hipFloatComplex** C,
+                                                          int               ldc,
+                                                          hipFloatComplex*  work,
+                                                          int               lwork,
+                                                          int*              devIpiv,
+                                                          int               strideP,
+                                                          int*              devInfo,
+                                                          int               batch_count);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverZgetriBatched(hipsolverHandle_t  handle,
+                                                          int                n,
+                                                          hipDoubleComplex** A,
+                                                          int                lda,
+                                                          hipDoubleComplex** C,
+                                                          int                ldc,
+                                                          hipDoubleComplex*  work,
+                                                          int                lwork,
+                                                          int*               devIpiv,
+                                                          int                strideP,
+                                                          int*               devInfo,
+                                                          int                batch_count);
 
 // getrs
 HIPSOLVER_EXPORT hipsolverStatus_t hipsolverSgetrs_bufferSize(hipsolverHandle_t    handle,
