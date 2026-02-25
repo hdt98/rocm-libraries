@@ -1846,7 +1846,14 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
                                                            arg.a_element_op_,
                                                            arg.b_element_op_,
                                                            arg.cde_element_op_};
-                return GridwiseGemm64::CheckValidity(gemm_arg);
+                const auto valid_gemm = GridwiseGemm64::CheckValidity(gemm_arg);
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)) & !valid_gemm)
+                {
+                    std::cout << "GridwiseGemm64 does not support this problem size!" << " In "
+                              << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
+                              << std::endl;
+                }
+                return valid_gemm;
             }
         }
         else
@@ -1868,7 +1875,14 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
                                                            arg.a_element_op_,
                                                            arg.b_element_op_,
                                                            arg.cde_element_op_};
-                return GridwiseGemm32::CheckValidity(gemm_arg);
+                const auto valid_gemm = GridwiseGemm32::CheckValidity(gemm_arg);
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)) & !valid_gemm)
+                {
+                    std::cout << "GridwiseGemm32 does not support this problem size!" << " In "
+                              << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
+                              << std::endl;
+                }
+                return valid_gemm;
             }
         }
 
