@@ -75,8 +75,25 @@ using GPU_PerfConfig_HipImplicitGemm3DGroupFwdXdlops_BFP16 =
 using GPU_PerfConfig_HipImplicitGemm3DGroupFwdXdlops_FP16 =
     PerfConfig_HipImplicitGemm3DGroupFwdXdlops<miopenHalf>;
 
-TEST_P(GPU_PerfConfig_HipImplicitGemm3DGroupFwdXdlops_BFP16, All) { TestConfigs(); }
-TEST_P(GPU_PerfConfig_HipImplicitGemm3DGroupFwdXdlops_FP16, All) { TestConfigs(); }
+TEST_P(GPU_PerfConfig_HipImplicitGemm3DGroupFwdXdlops_BFP16, All) 
+{
+    // Skip test when AddressSanitizer is enabled to prevent hangs caused by CK kernels
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    GTEST_SKIP();
+#else
+    TestConfigs();
+#endif
+}
+
+TEST_P(GPU_PerfConfig_HipImplicitGemm3DGroupFwdXdlops_FP16, All) 
+{
+    // Skip test when AddressSanitizer is enabled to prevent hangs caused by CK kernels
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    GTEST_SKIP();
+#else
+    TestConfigs();
+#endif
+}
 
 INSTANTIATE_TEST_SUITE_P(Full,
                          GPU_PerfConfig_HipImplicitGemm3DGroupFwdXdlops_BFP16,

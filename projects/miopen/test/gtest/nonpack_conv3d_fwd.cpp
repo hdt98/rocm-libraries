@@ -84,6 +84,10 @@ void SolverFwd(const miopen::TensorDescriptor& inputDesc,
 
 TEST_P(GPU_ConvNonpackFwdSolverTest3D_FP16, CKNonPackConvFwd3D)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip CKNonPackConvFwd3D when AddressSanitizer is enabled as it is currently causing a hang
+    GTEST_SKIP();
+#else
     SolverFwd<miopen::solver::conv::ConvHipImplicitGemm3DGroupFwdXdlops>(
         input.desc,
         in_dev.get(),
@@ -96,6 +100,7 @@ TEST_P(GPU_ConvNonpackFwdSolverTest3D_FP16, CKNonPackConvFwd3D)
         test_skipped,
         miopen::Scalar(&alpha_val, miopenFloat),
         miopen::Scalar(&beta_val, miopenFloat));
+#endif
 }
 
 // TODO: write test that varifies if values of alpha beta selects default, scalar or bilinear

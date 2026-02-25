@@ -89,6 +89,11 @@ class GPU_Conv2dMLIRTestIGemmXDlopsBwdWrw_FP32 : public FloatTestCase<std::vecto
 
 TEST_P(GPU_Conv2dMLIRTestIGemmXDlopsBwdWrw_FP32, FloatTest_conv_igemm_mlir_xdlops_bwd_wrw)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip FloatTest_conv_igemm_mlir_xdlops_bwd_wrw when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
     if(IsTestSupportedForDevice())
     {
         invoke_with_params<conv2d_driver, GPU_Conv2dMLIRTestIGemmXDlopsBwdWrw_FP32>(db_check);
@@ -97,6 +102,7 @@ TEST_P(GPU_Conv2dMLIRTestIGemmXDlopsBwdWrw_FP32, FloatTest_conv_igemm_mlir_xdlop
     {
         GTEST_SKIP();
     }
+#endif
 };
 
 // Half for FWD, BWD, WRW

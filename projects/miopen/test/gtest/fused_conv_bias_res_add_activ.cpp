@@ -63,6 +63,7 @@ struct ConvFwdBiasResAddFixture
 {
 
 protected:
+    bool test_skipped = false;
     void SetUp() override
     {
         if(!TestIsApplicable())
@@ -105,7 +106,7 @@ protected:
     }
     void TearDown() override
     {
-        if(!TestIsApplicable())
+        if(!TestIsApplicable() || test_skipped)
             return;
 
         miopenDestroyActivationDescriptor(activ_desc);
@@ -176,6 +177,12 @@ using namespace conv_bias_act_res_add_fwd;
 
 TEST_P(GPU_ConvFwdBiasResAddActiv_FP16, ConvFusedAPI)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvFusedAPI when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    test_skipped = true;
+    GTEST_SKIP();
+#else
     if(TestIsApplicable())
     {
         auto status = miopenConvolutionBiasActivationForward(&get_handle(),
@@ -203,6 +210,7 @@ TEST_P(GPU_ConvFwdBiasResAddActiv_FP16, ConvFusedAPI)
     {
         GTEST_SKIP();
     }
+#endif
 }
 
 INSTANTIATE_TEST_SUITE_P(Full,

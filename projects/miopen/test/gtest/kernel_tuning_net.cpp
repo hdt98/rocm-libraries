@@ -329,13 +329,25 @@ using GPU_KernelTuningNetTestConvHipIgemmGroupFwdXdlops_FP16 =
 TEST_P(GPU_KernelTuningNetTestConvHipIgemmGroupFwdXdlops_FP32,
        ConvHipIgemmGroupFwdXdlopsParameterPredictionModel)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvHipIgemmGroupFwdXdlopsParameterPredictionModel when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
     TestParameterPredictionModel("ConvHipImplicitGemmGroupFwdXdlops");
+#endif
 }
 
 TEST_P(GPU_KernelTuningNetTestConvHipIgemmGroupFwdXdlops_FP16,
        ConvHipIgemmGroupFwdXdlopsParameterPredictionModel)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvHipIgemmGroupFwdXdlopsParameterPredictionModel when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
     TestParameterPredictionModel("ConvHipImplicitGemmGroupFwdXdlops");
+#endif
 }
 
 using GPU_KernelTuningNetTestConvHipIgemmGroupBwdXdlops_FP32 =
@@ -347,13 +359,25 @@ using GPU_KernelTuningNetTestConvHipIgemmGroupBwdXdlops_FP16 =
 TEST_P(GPU_KernelTuningNetTestConvHipIgemmGroupBwdXdlops_FP32,
        ConvHipIgemmGroupBwdXdlopsParameterPredictionModel)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvHipIgemmGroupBwdXdlopsParameterPredictionModel when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
     TestParameterPredictionModel("ConvHipImplicitGemmGroupBwdXdlops");
+#endif
 }
 
 TEST_P(GPU_KernelTuningNetTestConvHipIgemmGroupBwdXdlops_FP16,
        ConvHipIgemmGroupBwdXdlopsParameterPredictionModel)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvHipIgemmGroupBwdXdlopsParameterPredictionModel when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
     TestParameterPredictionModel("ConvHipImplicitGemmGroupBwdXdlops");
+#endif
 }
 
 using GPU_KernelTuningNetTestConvHipIgemmGroupWrwXdlops_FP32 =
@@ -365,13 +389,25 @@ using GPU_KernelTuningNetTestConvHipIgemmGroupWrwXdlops_FP16 =
 TEST_P(GPU_KernelTuningNetTestConvHipIgemmGroupWrwXdlops_FP32,
        ConvHipIgemmGroupWrwXdlopsParameterPredictionModel)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvHipIgemmGroupWrwXdlopsParameterPredictionModel when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
     TestParameterPredictionModel("ConvHipImplicitGemmGroupWrwXdlops");
+#endif
 }
 
 TEST_P(GPU_KernelTuningNetTestConvHipIgemmGroupWrwXdlops_FP16,
        ConvHipIgemmGroupWrwXdlopsParameterPredictionModel)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvHipIgemmGroupWrwXdlopsParameterPredictionModel when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
     TestParameterPredictionModel("ConvHipImplicitGemmGroupWrwXdlops");
+#endif
 }
 
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(GPU_KernelTuningNetTestConvAsm1x1U_FP32);

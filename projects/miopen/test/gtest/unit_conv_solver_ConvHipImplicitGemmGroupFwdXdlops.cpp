@@ -114,27 +114,52 @@ using CPU_UnitTestConvSolverImplicitGemmGroupFwdXdlopsDeterministicApplicability
 
 TEST_P(GPU_UnitTestConvSolverImplicitGemmGroupFwdXdlops_I8, ConvHipImplicitGemmGroupFwdXdlops)
 {
+    // Skip test when AddressSanitizer is enabled to prevent hangs caused by CK kernels
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    GTEST_SKIP();
+#else
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemmGroupFwdXdlops{});
+#endif
 };
 
 TEST_P(GPU_UnitTestConvSolverImplicitGemmGroupFwdXdlops_FP16, ConvHipImplicitGemmGroupFwdXdlops)
 {
+    // Skip test when AddressSanitizer is enabled to prevent hangs caused by CK kernels
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    GTEST_SKIP();
+#else
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemmGroupFwdXdlops{});
+#endif
 };
 
 TEST_P(GPU_UnitTestConvSolverImplicitGemmGroupFwdXdlops_BFP16, ConvHipImplicitGemmGroupFwdXdlops)
 {
+    // Skip test when AddressSanitizer is enabled to prevent hangs caused by CK kernels
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    GTEST_SKIP();
+#else
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemmGroupFwdXdlops{});
+#endif
 };
 
 TEST_P(GPU_UnitTestConvSolverImplicitGemmGroupFwdXdlops_FP32, ConvHipImplicitGemmGroupFwdXdlops)
 {
+    // Skip test when AddressSanitizer is enabled to prevent hangs caused by CK kernels
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    GTEST_SKIP();
+#else
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemmGroupFwdXdlops{});
+#endif
 };
 
 TEST_P(GPU_UnitTestConvSolverImplicitGemmGroupFwdXdlops_TF32, ConvHipImplicitGemmGroupFwdXdlops)
 {
+    // Skip test when AddressSanitizer is enabled to prevent hangs caused by CK kernels
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    GTEST_SKIP();
+#else
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemmGroupFwdXdlops{});
+#endif
 };
 
 TEST_P(CPU_UnitTestConvSolverImplicitGemmGroupFwdXdlopsDevApplicability_FP16,

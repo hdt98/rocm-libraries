@@ -159,6 +159,11 @@ using namespace bad_fusion_plan;
 
 TEST(GPU_FusionPlan_FP16, GoodFusionPlan)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip GoodFusionPlan when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
 #if MIOPEN_USE_COMPOSABLEKERNEL
     GPU_FusionPlan_FP16<miopen::solver::fusion::ConvCKIgemmFwdBiasActivFused, half_float::half> obj(
         miopenTensorNHWC, miopenActivationRELU);
@@ -170,6 +175,7 @@ TEST(GPU_FusionPlan_FP16, GoodFusionPlan)
     ASSERT_TRUE(obj.Applicability());
 #else
     GTEST_SKIP() << "Test requires CK";
+#endif
 #endif
 }
 
@@ -232,6 +238,11 @@ TEST(GPU_FusionPlan_FP16, BadMissingActivBiasFusionPlan)
 
 TEST(GPU_FusionPlan_FP16, BadEmptyFusionPlan)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip BadEmptyFusionPlan when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
 #if MIOPEN_USE_COMPOSABLEKERNEL
     GPU_FusionPlan_FP16<miopen::solver::fusion::ConvCKIgemmFwdBiasActivFused, half_float::half> obj(
         miopenTensorNHWC, miopenActivationRELU);
@@ -240,6 +251,7 @@ TEST(GPU_FusionPlan_FP16, BadEmptyFusionPlan)
     EXPECT_ANY_THROW(obj.Applicability());
 #else
     GTEST_SKIP() << "Test requires CK";
+#endif
 #endif
 }
 

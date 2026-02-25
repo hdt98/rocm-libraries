@@ -134,23 +134,43 @@ using CPU_UnitTestConvSolverImplicitGemm3DGroupWrwXdlopsDeterministicApplicabili
 
 TEST_P(GPU_UnitTestConvSolverImplicitGemm3DGroupWrwXdlops_FP16, ConvHipImplicitGemm3DGroupWrwXdlops)
 {
+    // Skip test when AddressSanitizer is enabled to prevent hangs caused by CK kernels
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    GTEST_SKIP();
+#else
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemm3DGroupWrwXdlops{});
+#endif
 };
 
 TEST_P(GPU_UnitTestConvSolverImplicitGemm3DGroupWrwXdlops_BFP16,
        ConvHipImplicitGemm3DGroupWrwXdlops)
 {
+    // Skip test when AddressSanitizer is enabled to prevent hangs caused by CK kernels
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    GTEST_SKIP();
+#else
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemm3DGroupWrwXdlops{});
+#endif
 };
 
 TEST_P(GPU_UnitTestConvSolverImplicitGemm3DGroupWrwXdlops_FP32, ConvHipImplicitGemm3DGroupWrwXdlops)
 {
+    // Skip test when AddressSanitizer is enabled to prevent hangs caused by CK kernels
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    GTEST_SKIP();
+#else
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemm3DGroupWrwXdlops{});
+#endif
 };
 
 TEST_P(GPU_UnitTestConvSolverImplicitGemm3DGroupWrwXdlops_TF32, ConvHipImplicitGemm3DGroupWrwXdlops)
 {
+    // Skip test when AddressSanitizer is enabled to prevent hangs caused by CK kernels
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    GTEST_SKIP();
+#else
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemm3DGroupWrwXdlops{});
+#endif
 };
 
 TEST_P(CPU_UnitTestConvSolverImplicitGemm3DGroupWrwXdlopsDevApplicability_FP16,

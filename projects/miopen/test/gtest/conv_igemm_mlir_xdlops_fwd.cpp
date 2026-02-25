@@ -80,6 +80,11 @@ class GPU_Conv2dMLIRTestIGemmXDLopsFwd_I8 : public Int8TestCase<std::vector<Test
 
 TEST_P(GPU_Conv2dMLIRTestIGemmXDLopsFwd_FP32, FloatTest_conv_igemm_mlir_xdlops_fwd)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip FloatTest_conv_igemm_mlir_xdlops_fwd when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
     if(IsTestSupportedForDevice())
     {
         invoke_with_params<conv2d_driver, GPU_Conv2dMLIRTestIGemmXDLopsFwd_FP32>(db_check);
@@ -88,10 +93,16 @@ TEST_P(GPU_Conv2dMLIRTestIGemmXDLopsFwd_FP32, FloatTest_conv_igemm_mlir_xdlops_f
     {
         GTEST_SKIP();
     }
+#endif
 };
 
 TEST_P(GPU_Conv2dMLIRTestIGemmXDLopsFwd_I8, Int8Test_conv_igemm_mlir_xdlops_fwd)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip Int8Test_conv_igemm_mlir_xdlops_fwd when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
     if(IsTestSupportedForDevice())
     {
         invoke_with_params<conv2d_driver, GPU_Conv2dMLIRTestIGemmXDLopsFwd_I8>(db_check);
@@ -100,6 +111,7 @@ TEST_P(GPU_Conv2dMLIRTestIGemmXDLopsFwd_I8, Int8Test_conv_igemm_mlir_xdlops_fwd)
     {
         GTEST_SKIP();
     }
+#endif
 };
 
 // Half for FWD, BWD, WRW

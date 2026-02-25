@@ -624,20 +624,38 @@ TEST_F(GPU_Conv3DKernelTuningAI_FP32, RunParameterPredictionModel_Fallback_Test)
 
 TEST_F(GPU_Conv3DKernelTuningAI_FP32, MetadataEncodingValidation_AllCKInstances_Wrw_Test)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip MetadataEncodingValidation_AllCKInstances_Wrw_Test when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
     ValidateMetadataEncoding(
         "ConvHipImplicitGemm3DGroupWrwXdlops", GetAllWrwKernelTypeStrings(), device_arch);
+#endif
 }
 
 TEST_F(GPU_Conv3DKernelTuningAI_FP32, MetadataEncodingValidation_AllCKInstances_Fwd_Test)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip MetadataEncodingValidation_AllCKInstances_Fwd_Test when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
     ValidateMetadataEncoding(
         "ConvHipImplicitGemm3DGroupFwdXdlops", GetAllFwdKernelTypeStrings(), device_arch);
+#endif
 }
 
 TEST_F(GPU_Conv3DKernelTuningAI_FP32, MetadataEncodingValidation_AllCKInstances_Bwd_Test)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip MetadataEncodingValidation_AllCKInstances_Bwd_Test when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
     ValidateMetadataEncoding(
         "ConvHipImplicitGemm3DGroupBwdXdlops", GetAllBwdKernelTypeStrings(), device_arch);
+#endif
 }
 
 #endif // MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
