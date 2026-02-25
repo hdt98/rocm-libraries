@@ -32,13 +32,15 @@
 
 #pragma once
 
+#include <map>
+#include <set>
 #include "../auxiliary/rocauxiliary_lacgv.hpp"
 #include "../auxiliary/rocauxiliary_larfg.hpp"
 #include "rocblas.hpp"
 #include "rocsolver/rocsolver.h"
 
 // Optimization feature flags
-#define LATRD_USE_BUFFER_INTRINSICS 1  // Enable AMD buffer intrinsic optimization
+#define LATRD_USE_BUFFER_INTRINSICS 0  // Enable AMD buffer intrinsic optimization
 
 ROCSOLVER_BEGIN_NAMESPACE
 
@@ -2255,7 +2257,7 @@ void latrd_get_config_for_updates(const rocblas_int n,
     }
 
     *dr = 4;
-    *dc = 2;  // Changed from 0 to 2 for balanced parallelism
+    *dc = 0;  // Changed from 0 to 2 for balanced parallelism
 }
 
 template <bool BATCHED, typename T>
@@ -2312,6 +2314,45 @@ void rocsolver_latrd_forsytrd_getMemorySize(const rocblas_int n,
 
     *size_norms = std::max({n1, n2, n3});
     *size_work = std::max({w1, w2, w3, w4});
+}
+
+// ===============================================================================
+// GRAPH CACHE STRUCTURES (for HIP Graph caching in LATRD)
+// ===============================================================================
+
+// Cache key structure - identifies unique graph configurations
+struct GraphCacheKey {
+    rocblas_int n, k, batch_count;
+    rocblas_int j_start;  // Starting j value for this LATRD call
+    int graph_mode;
+    
+    bool operator<(const GraphCacheKey& other) const {
+        return std::tie(n, k, batch_count, j_start, graph_mode) < 
+               std::tie(other.n, other.k, other.batch_count, other.j_start, other.graph_mode);
+    }
+    
+    bool operator==(const GraphCacheKey& other) const {
+        return n == other.n && k == other.k && batch_count == other.batch_count &&
+               j_start == other.j_start && graph_mode == other.graph_mode;
+    }
+};
+
+// Cache entry structure - stores captured graphs
+struct GraphCacheEntry {
+    std::vector<hipGraph_t> graphs;
+    std::vector<hipGraphExec_t> graph_execs;
+    int num_graphs;
+    int iters_per_graph;
+};
+
+// Global cache storage (namespace-level statics)
+// Note: These are shared across all template instantiations of latrd_forsytrd_template
+namespace latrd_graph_cache_ns {
+    static std::map<GraphCacheKey, GraphCacheEntry> graph_cache;
+    static int total_cache_lookups = 0;
+    static int cache_hits = 0;
+    static int cache_misses = 0;
+    static std::set<GraphCacheKey> unique_keys_seen;
 }
 
 template <typename T, typename S, typename U, bool COMPLEX = rocblas_is_complex<T>>
@@ -2423,10 +2464,49 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
         //   N = N iterations per graph (with multiple graphs)
         //  -1 = All iterations in a single graph
 #ifndef LATRD_GRAPH_MODE
-        #define LATRD_GRAPH_MODE 4  // Default: no graphs
+        #define LATRD_GRAPH_MODE 0  // Default: no graphs
 #endif
 
 #if LATRD_GRAPH_MODE != 0
+        // =====================================================================
+        // SIMPLE GRAPH CACHING (Approach A)
+        // =====================================================================
+        
+        // Get references to cache and statistics from namespace
+        using namespace latrd_graph_cache_ns;
+        
+        // Create cache key for this call
+        GraphCacheKey cache_key{n, k, batch_count, n - 1, LATRD_GRAPH_MODE};  // j_start = n-1
+        
+        // Update statistics
+        total_cache_lookups++;
+        unique_keys_seen.insert(cache_key);
+        
+        // Check if graphs are already cached
+        bool found_in_cache = (graph_cache.find(cache_key) != graph_cache.end());
+        
+        if(found_in_cache) {
+            cache_hits++;
+        } else {
+            cache_misses++;
+        }
+        
+        // Print cache statistics
+        constexpr bool print_cache_stats = true;
+        if(print_cache_stats) {
+            fprintf(stderr, "\n[GRAPH CACHE] Call #%d to latrd_forsytrd (n=%d, k=%d, batch=%d)\n",
+                    total_cache_lookups, (int)n, (int)k, (int)batch_count);
+            fprintf(stderr, "[GRAPH CACHE] Cache key: (n=%d, k=%d, batch=%d, j_start=%d, mode=%d)\n",
+                    (int)cache_key.n, (int)cache_key.k, (int)cache_key.batch_count, 
+                    (int)cache_key.j_start, cache_key.graph_mode);
+            fprintf(stderr, "[GRAPH CACHE] Cache %s (Hits: %d, Misses: %d, Hit Rate: %.1f%%)\n",
+                    found_in_cache ? "HIT!" : "MISS", 
+                    cache_hits, cache_misses,
+                    total_cache_lookups > 0 ? (100.0 * cache_hits / total_cache_lookups) : 0.0);
+            fprintf(stderr, "[GRAPH CACHE] Unique keys seen: %zu, Cache size: %zu entries\n\n",
+                    unique_keys_seen.size(), graph_cache.size());
+        }
+        
         // Graph capture infrastructure
         constexpr bool debug_graphs = false;  // Set to true to enable diagnostic output
         constexpr bool time_graphs = true;   // Set to true to enable timing measurements
@@ -2452,9 +2532,6 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
             num_graphs = (total_iters + iters_per_graph - 1) / iters_per_graph;
         }
         
-        graphs.reserve(num_graphs);
-        graph_execs.reserve(num_graphs);
-        
         // Timing infrastructure
         hipEvent_t timing_start, timing_end;
         float time_capture_total = 0.0f;
@@ -2466,17 +2543,57 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
             HIP_CHECK(hipEventCreate(&timing_end));
         }
         
-        // Create a dedicated stream for graph capture
-        hipStream_t capture_stream;
-        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Creating dedicated stream for graph capture\n");
-        HIP_CHECK(hipStreamCreate(&capture_stream));
-        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Capture stream created: %p\n", (void*)capture_stream);
+        // Declare capture_stream outside so cleanup code can see it
+        hipStream_t capture_stream = nullptr;
         
-        // Set this stream in the handle so rocsolver_larfg_template uses it
-        rocblas_set_stream(handle, capture_stream);
-        
-        // Capture phase: Record graphs
-        for(int graph_idx = 0; graph_idx < num_graphs; ++graph_idx) {
+        // =====================================================================
+        // CACHE LOOKUP: Check if graphs are already cached
+        // =====================================================================
+        if(found_in_cache) {
+            // CACHE HIT - Reuse existing graphs
+            if(print_cache_stats) {
+                fprintf(stderr, "[GRAPH CACHE] Reusing %d cached graphs (skipping capture & instantiation)\n",
+                        graph_cache[cache_key].num_graphs);
+            }
+            
+            // Copy cached graph executables
+            // NOTE: We don't copy num_graphs or iters_per_graph because they're deterministic
+            // (calculated from k and LATRD_GRAPH_MODE) and already set correctly above
+            graph_execs = graph_cache[cache_key].graph_execs;
+            
+            // Verify cached values match calculated values (sanity check)
+            if(graph_cache[cache_key].num_graphs != num_graphs || 
+               graph_cache[cache_key].iters_per_graph != iters_per_graph) {
+                fprintf(stderr, "[GRAPH CACHE ERROR] Cached values don't match! "
+                        "Cached: num_graphs=%d, iters_per_graph=%d, "
+                        "Calculated: num_graphs=%d, iters_per_graph=%d\n",
+                        graph_cache[cache_key].num_graphs, graph_cache[cache_key].iters_per_graph,
+                        num_graphs, iters_per_graph);
+            }
+            
+            // Skip to execution phase (no capture needed)
+            // We still need to time the launches for comparison
+            
+        } else {
+            // CACHE MISS - Need to capture new graphs
+            if(print_cache_stats) {
+                fprintf(stderr, "[GRAPH CACHE] Creating %d new graphs (capture & instantiation required)\n",
+                        num_graphs);
+            }
+            
+            graphs.reserve(num_graphs);
+            graph_execs.reserve(num_graphs);
+            
+            // Create a dedicated stream for graph capture
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Creating dedicated stream for graph capture\n");
+            HIP_CHECK(hipStreamCreate(&capture_stream));
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Capture stream created: %p\n", (void*)capture_stream);
+            
+            // Set this stream in the handle so rocsolver_larfg_template uses it
+            rocblas_set_stream(handle, capture_stream);
+            
+            // Capture phase: Record graphs
+            for(int graph_idx = 0; graph_idx < num_graphs; ++graph_idx) {
             hipGraph_t graph;
             hipGraphExec_t graph_exec;
             
@@ -2599,6 +2716,24 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
             graph_execs.push_back(graph_exec);
         }
         
+        // Store newly created graphs in cache for future reuse
+        fprintf(stderr, "[GRAPH CACHE] Storing %d graphs in cache for key (n=%d, k=%d, batch=%d, j_start=%d, mode=%d)\n",
+                num_graphs, (int)n, (int)k, (int)batch_count, (int)(n-1), LATRD_GRAPH_MODE);
+        graph_cache[cache_key] = GraphCacheEntry{
+            graphs,           // std::vector<hipGraph_t>
+            graph_execs,      // std::vector<hipGraphExec_t>
+            num_graphs,       // int
+            iters_per_graph   // int
+        };
+        fprintf(stderr, "[GRAPH CACHE] Storage complete. Cache now contains %zu entries\n", 
+                graph_cache.size());
+        
+        // Mark that these graphs are now cached so we don't destroy them later
+        // Graphs in the cache must persist across calls
+        found_in_cache = true;
+        
+    } // end else (cache miss - graph creation complete)
+        
         // Start timing for launch phase
         if(time_graphs) {
             HIP_CHECK(hipEventRecord(timing_start, stream));
@@ -2642,24 +2777,36 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                     time_launch_total * 1000.0f);
         }
         
-        // Cleanup: Destroy graph executables and graphs
-        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] About to cleanup graphs\n");
-        for(int graph_idx = 0; graph_idx < num_graphs; ++graph_idx) {
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Destroying graph exec %d\n", graph_idx);
-            HIP_CHECK(hipGraphExecDestroy(graph_execs[graph_idx]));
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Destroying graph %d\n", graph_idx);
-            HIP_CHECK(hipGraphDestroy(graphs[graph_idx]));
+        // Cleanup: Destroy graph executables and graphs ONLY if not cached
+        // Cached graphs persist across calls; non-cached graphs are destroyed
+        if(!found_in_cache) {
+            // We created new graphs in this call - destroy them after execution
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] About to cleanup newly created graphs\n");
+            for(int graph_idx = 0; graph_idx < num_graphs; ++graph_idx) {
+                if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Destroying graph exec %d\n", graph_idx);
+                HIP_CHECK(hipGraphExecDestroy(graph_execs[graph_idx]));
+                if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Destroying graph %d\n", graph_idx);
+                HIP_CHECK(hipGraphDestroy(graphs[graph_idx]));
+            }
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] All graphs cleaned up successfully\n");
+            
+            // Restore original stream to the handle before destroying capture_stream
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Restoring original stream to handle\n");
+            rocblas_set_stream(handle, stream);
+            
+            // Destroy the capture stream (only created if not cached)
+            if(capture_stream != nullptr) {
+                if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Destroying capture stream\n");
+                HIP_CHECK(hipStreamDestroy(capture_stream));
+                if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Capture stream destroyed successfully\n");
+            }
+        } else {
+            // Used cached graphs - don't destroy them, they're owned by the cache
+            fprintf(stderr, "[GRAPH CACHE] Skipping cleanup for cached graphs (owned by cache)\n");
+            // Still need to restore original stream
+            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Restoring original stream to handle\n");
+            rocblas_set_stream(handle, stream);
         }
-        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] All graphs cleaned up successfully\n");
-        
-        // Restore original stream to the handle before destroying capture_stream
-        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Restoring original stream to handle\n");
-        rocblas_set_stream(handle, stream);
-        
-        // Destroy the capture stream
-        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Destroying capture stream\n");
-        HIP_CHECK(hipStreamDestroy(capture_stream));
-        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Capture stream destroyed successfully\n");
         
         // Cleanup timing events
         if(time_graphs) {
