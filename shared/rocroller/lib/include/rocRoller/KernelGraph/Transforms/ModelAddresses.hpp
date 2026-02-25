@@ -34,7 +34,13 @@ namespace rocRoller
     namespace KernelGraph
     {
         /**
-         * @brief TODO
+         * @brief Graph transform that models LDS addresses for LoadLDSTile and StoreLDSTile
+         * operations.
+         *
+         * Simulates workgroup/workitem index expressions to compute per-workitem byte offsets into
+         * LDS for each tile operation, storing the normalized results in the graph's
+         * modelledAddresses map. This is used to analyze LDS access patterns without modifying
+         * the real kernel context.
          */
         class ModelAddresses : public GraphTransform
         {
