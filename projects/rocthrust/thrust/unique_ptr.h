@@ -23,6 +23,18 @@
 #include <type_traits>
 #include <utility>
 
+// Define a portable macro for the no_unique_address attribute
+// - MSVC provides msvc::no_unique_address as a vendor extension
+// - Standard [[no_unique_address]] is available in C++20
+// - For C++17, we omit the attribute (safe, but may increase size with stateful deleters)
+#if defined(_MSC_VER) && !defined(__clang__)
+#  define THRUST_NO_UNIQUE_ADDRESS [[msvc::no_unique_address]]
+#elif __cplusplus >= 202002L
+#  define THRUST_NO_UNIQUE_ADDRESS [[no_unique_address]]
+#else
+#  define THRUST_NO_UNIQUE_ADDRESS
+#endif
+
 THRUST_NAMESPACE_BEGIN
 
 /*! \addtogroup memory_management Memory Management
@@ -337,7 +349,7 @@ public:
 
 private:
   pointer m_ptr;
-  [[no_unique_address]] deleter_type m_deleter;
+  THRUST_NO_UNIQUE_ADDRESS deleter_type m_deleter;
 
   using DeleterSFINAE = thrust::detail::unique_ptr_deleter_sfinae<D>;
 
@@ -701,7 +713,7 @@ private:
   friend class unique_ptr;
 
   pointer m_ptr;
-  [[no_unique_address]] deleter_type m_deleter;
+  THRUST_NO_UNIQUE_ADDRESS deleter_type m_deleter;
 
   using DeleterSFINAE = thrust::detail::unique_ptr_deleter_sfinae<D>;
 
