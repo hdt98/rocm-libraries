@@ -84,6 +84,11 @@ const ck::index_t common_init = -1;
 // test FP4@FP4 with 16x16x128 instruction, scale block size 32, and e8m0 scales
 TEST(MXWMMA, MXFP4WMMA16x16x128_E8M0)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -106,6 +111,11 @@ TEST(MXWMMA, MXFP4WMMA16x16x128_E8M0)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 32, and e8m0 scales
 TEST(MXWMMA, MXFP4WMMA32x16x128_E8M0)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -128,6 +138,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_E8M0)
 // test FP4@FP4 with 16x16x128 instruction, scale block size 16, and e8m0 scales
 TEST(MXWMMA, MXFP4WMMA16x16x128_SCALE16_E8M0)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -149,6 +164,11 @@ TEST(MXWMMA, MXFP4WMMA16x16x128_SCALE16_E8M0)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 16, and e8m0 scales
 TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E8M0)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -171,6 +191,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E8M0)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 32, and e4m3 scale type
 TEST(MXWMMA, MXFP4WMMA32x16x128_E4M3)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -193,6 +218,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_E4M3)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 16, and e4m3 scale type
 TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E4M3)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -215,6 +245,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E4M3)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 32, and e5m3 scale type
 TEST(MXWMMA, MXFP4WMMA32x16x128_E5M3)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -237,6 +272,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_E5M3)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 16, and e5m3 scale type
 TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E5M3)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -259,6 +299,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E5M3)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 32, and e8m0 and e4m3 scales
 TEST(MXWMMA, MXFP4WMMA32x16x128_E8M0_E4M3)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -281,6 +326,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_E8M0_E4M3)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 16, and e8m0 and e4m3 scales
 TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E8M0_E4M3)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -303,6 +353,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E8M0_E4M3)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 32, and e8m0 and e5m3 scales
 TEST(MXWMMA, MXFP4WMMA32x16x128_E8M0_E5M3)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -325,6 +380,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_E8M0_E5M3)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 16, and e8m0 and e5m3 scales
 TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E8M0_E5M3)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -347,6 +407,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E8M0_E5M3)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 32, and e4m3 and e8m0 scales
 TEST(MXWMMA, MXFP4WMMA32x16x128_E4M3_E8M0)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -369,6 +434,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_E4M3_E8M0)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 16, and e4m3 and e8m0 scales
 TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E4M3_E8M0)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -391,6 +461,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E4M3_E8M0)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 32, and e4m3 and e5m3 scales
 TEST(MXWMMA, MXFP4WMMA32x16x128_E4M3_E5M3)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -413,6 +488,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_E4M3_E5M3)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 16, and e4m3 and e5m3 scales
 TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E4M3_E5M3)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -435,6 +515,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E4M3_E5M3)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 32, and e5m3 and e8m0 scales
 TEST(MXWMMA, MXFP4WMMA32x16x128_E5M3_E8M0)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -457,6 +542,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_E5M3_E8M0)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 16, and e5m3 and e8m0 scales
 TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E5M3_E8M0)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -479,6 +569,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E5M3_E8M0)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 32, and e5m3 and e4m3 scales
 TEST(MXWMMA, MXFP4WMMA32x16x128_E5M3_E4M3)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
@@ -501,6 +596,11 @@ TEST(MXWMMA, MXFP4WMMA32x16x128_E5M3_E4M3)
 // test FP4@FP4 with 32x16x128 instruction, scale block size 16, and e5m3 and e4m3 scales
 TEST(MXWMMA, MXFP4WMMA32x16x128_SCALE16_E5M3_E4M3)
 {
+    if(ck::get_device_revision() == 0)
+    {
+        GTEST_SKIP() << "This WMMA is not supported on asicRevision=0";
+    }
+
     using ALayout = ck::tensor_layout::gemm::RowMajor;
     using BLayout = ck::tensor_layout::gemm::ColumnMajor;
     using CLayout = ck::tensor_layout::gemm::RowMajor;
