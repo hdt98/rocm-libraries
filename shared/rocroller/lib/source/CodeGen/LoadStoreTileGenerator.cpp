@@ -209,9 +209,6 @@ namespace rocRoller
 
             ExpressionPtr rowOffsetExpr;
 
-            Log::debug("has offset register? {}",
-                       m_context->registerTagManager()->hasRegister(offsetTag));
-
             if(m_context->registerTagManager()->hasRegister(offsetTag))
             {
                 if(isStorePartOfGlobalToLDS)
