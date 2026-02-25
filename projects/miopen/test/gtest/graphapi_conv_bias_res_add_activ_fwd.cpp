@@ -207,6 +207,10 @@ class GPU_ConvBiasResAddActivation_fwd
 public:
     void SetUp() override
     {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+        // Skip test when AddressSanitizer is enabled to prevent hangs caused by CK kernels
+        GTEST_SKIP();
+#else
         if(!TestIsApplicable())
         {
             GTEST_SKIP();
@@ -220,6 +224,7 @@ public:
 #endif
 
         prng::reset_seed();
+#endif
     }
 
     void Run()

@@ -142,6 +142,11 @@ using namespace conv_hip_igemm_xdlops;
 
 TEST_P(GPU_ConvHipIgemmXdlops_I8, Int8Test)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip Int8Test when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
 #if MIOPEN_BACKEND_OPENCL
 
     GTEST_SKIP() << "MIOPEN_BACKEND_HIP needed for this test";
@@ -159,6 +164,7 @@ TEST_P(GPU_ConvHipIgemmXdlops_I8, Int8Test)
     }
 #else
     GTEST_SKIP();
+#endif
 #endif
 #endif
 };

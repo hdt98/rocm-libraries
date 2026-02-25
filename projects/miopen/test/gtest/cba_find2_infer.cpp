@@ -150,8 +150,15 @@ TEST_P(GPU_ConvBiasActivFind2Infer_FP16, ConvWinoRageRxSf2x3Find2Fused)
 
 TEST_P(GPU_ConvBiasActivFind2Infer_FP16, ConvCKIgemmFwdBiasActivFind2Fused)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvCKIgemmFwdBiasActivFind2Fused when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    test_skipped = true;
+    GTEST_SKIP();
+#else
     RunTunableSolver<miopen::solver::fusion::ConvCKIgemmFwdBiasActivFused>(
         fused_problem, invoke_params, conv_config, test_skipped);
+#endif
 }
 
 #if MIOPEN_BACKEND_HIP

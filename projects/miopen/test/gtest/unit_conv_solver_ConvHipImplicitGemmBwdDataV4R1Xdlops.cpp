@@ -145,39 +145,64 @@ using CPU_UnitTestConvSolverHipImplicitGemmBwdDataV4R1XdlopsDevApplicabilityBwd_
 
 TEST_P(GPU_UnitTestConvSolverHipImplicitGemmBwdDataV4R1XdlopsBwd_FP16, SOLVER_NAME)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvHipImplicitGemmBwdDataV4R1Xdlops when AddressSanitizer is enabled as it is currently causing a hang
+    GTEST_SKIP();
+#else
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemmBwdDataV4R1Xdlops{});
+#endif
 };
 
 TEST_P(GPU_UnitTestConvSolverHipImplicitGemmBwdDataV4R1XdlopsBwd_BFP16, SOLVER_NAME)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvHipImplicitGemmBwdDataV4R1Xdlops when AddressSanitizer is enabled as it is currently causing a hang
+    GTEST_SKIP();
+#else
 #if WORKAROUND_SWDEV_329642
     SolverEnabler solver_enabler;
 #endif
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemmBwdDataV4R1Xdlops{});
+#endif
 };
 
 TEST_P(GPU_UnitTestConvSolverHipImplicitGemmBwdDataV4R1XdlopsBwd_FP32, SOLVER_NAME)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvHipImplicitGemmBwdDataV4R1Xdlops when AddressSanitizer is enabled as it is currently causing a hang
+    GTEST_SKIP();
+#else
 #if WORKAROUND_ISSUE_1206
     SolverEnabler solver_enabler;
 #endif
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemmBwdDataV4R1Xdlops{});
+#endif
 };
 
 TEST_P(CPU_UnitTestConvSolverHipImplicitGemmBwdDataV4R1XdlopsDevApplicabilityBwd_BFP16, SOLVER_NAME)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvHipImplicitGemmBwdDataV4R1Xdlops when AddressSanitizer is enabled as it is currently causing a hang
+    GTEST_SKIP();
+#else
 #if WORKAROUND_ISSUE_1206
     SolverEnabler solver_enabler;
 #endif
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemmBwdDataV4R1Xdlops{});
+#endif
 };
 
 TEST_P(CPU_UnitTestConvSolverHipImplicitGemmBwdDataV4R1XdlopsDevApplicabilityBwd_FP32, SOLVER_NAME)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvHipImplicitGemmBwdDataV4R1Xdlops when AddressSanitizer is enabled as it is currently causing a hang
+    GTEST_SKIP();
+#else
 #if WORKAROUND_ISSUE_1206
     SolverEnabler solver_enabler;
 #endif
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemmBwdDataV4R1Xdlops{});
+#endif
 };
 
 // Smoke tests

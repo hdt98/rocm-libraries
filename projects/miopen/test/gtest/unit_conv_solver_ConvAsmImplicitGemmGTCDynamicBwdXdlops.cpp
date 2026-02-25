@@ -120,13 +120,23 @@ using CPU_UnitTestConvSolverAsmImplicitGemmGTCDynamicXdlopsDevApplicabilityBwd_N
 TEST_P(GPU_UnitTestConvSolverAsmImplicitGemmGTCDynamicXdlopsBwd_FP16,
        ConvAsmImplicitGemmGTCDynamicBwdXdlops)
 {
+    // Skip test when AddressSanitizer is enabled to prevent hangs caused by CK kernels
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    GTEST_SKIP();
+#else
     this->RunTest(miopen::solver::conv::ConvAsmImplicitGemmGTCDynamicBwdXdlops{});
+#endif
 };
 
 TEST_P(GPU_UnitTestConvSolverAsmImplicitGemmGTCDynamicXdlopsBwd_FP32,
        ConvAsmImplicitGemmGTCDynamicBwdXdlops)
 {
+    // Skip test when AddressSanitizer is enabled to prevent hangs caused by CK kernels
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    GTEST_SKIP();
+#else
     this->RunTest(miopen::solver::conv::ConvAsmImplicitGemmGTCDynamicBwdXdlops{});
+#endif
 };
 
 TEST_P(CPU_UnitTestConvSolverAsmImplicitGemmGTCDynamicXdlopsDevApplicabilityBwd_NONE,

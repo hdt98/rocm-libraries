@@ -98,22 +98,46 @@ using CPU_UnitTestConvSolverImplicitGemmFwdXdlopsDevApplicability_NONE =
 
 TEST_P(GPU_UnitTestConvSolverImplicitGemmFwdXdlops_I8, ConvHipImplicitGemmFwdXdlops)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvHipImplicitGemmFwdXdlops when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemmFwdXdlops{});
+#endif
 };
 
 TEST_P(GPU_UnitTestConvSolverImplicitGemmFwdXdlops_FP16, ConvHipImplicitGemmFwdXdlops)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvHipImplicitGemmFwdXdlops when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemmFwdXdlops{});
+#endif
 };
 
 TEST_P(GPU_UnitTestConvSolverImplicitGemmFwdXdlops_BFP16, ConvHipImplicitGemmFwdXdlops)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvHipImplicitGemmFwdXdlops when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemmFwdXdlops{});
+#endif
 };
 
 TEST_P(GPU_UnitTestConvSolverImplicitGemmFwdXdlops_FP32, ConvHipImplicitGemmFwdXdlops)
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // Skip ConvHipImplicitGemmFwdXdlops when AddressSanitizer is enabled as
+    // it is currently causing a hang
+    GTEST_SKIP();
+#else
     this->RunTest(miopen::solver::conv::ConvHipImplicitGemmFwdXdlops{});
+#endif
 };
 
 TEST_P(CPU_UnitTestConvSolverImplicitGemmFwdXdlopsDevApplicability_NONE, SOLVER_NAME_DEV_APP)

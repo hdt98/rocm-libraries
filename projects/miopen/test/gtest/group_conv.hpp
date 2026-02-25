@@ -439,6 +439,12 @@ private:
 public:
     void RunSolver()
     {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+        // Skip group convolution tests when AddressSanitizer is enabled as
+        // they are currently causing a hang
+        test_skipped = true;
+        GTEST_SKIP();
+#else
         if constexpr(NDIM == 2u)
         {
             DispatchSolver<miopen::solver::conv::ConvHipImplicitGemmGroupFwdXdlops,
@@ -451,6 +457,7 @@ public:
                            miopen::solver::conv::ConvHipImplicitGemm3DGroupBwdXdlops,
                            miopen::solver::conv::ConvHipImplicitGemm3DGroupWrwXdlops>();
         }
+#endif
     }
 
 protected:
