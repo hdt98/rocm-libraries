@@ -122,14 +122,12 @@ namespace rocRoller
                 bool                           isTransposedTile = false;
                 bool                           isPadded         = false;
                 // Optional extras for LDS loads
-                Register::ValuePtr ldsAllocation = nullptr;
-                std::string        comment;
+                Register::ValuePtr       ldsAllocation = nullptr;
+                std::vector<std::string> comments;
             };
 
             LoadStoreTileInfo getLoadLDSTileInfo(int tag, ControlGraph::LoadLDSTile const& load);
-            LoadStoreTileInfo getStoreLDSTileInfo(int                               tag,
-                                                  ControlGraph::StoreLDSTile const& store,
-                                                  std::vector<std::string>&         comments);
+            LoadStoreTileInfo getStoreLDSTileInfo(int tag, ControlGraph::StoreLDSTile const& store);
 
         private:
             ContextPtr                       m_context;
@@ -221,11 +219,9 @@ namespace rocRoller
             LoadStoreTileInfo loadMacroTileWAVELDSInfo(int                              tag,
                                                        ControlGraph::LoadLDSTile const& load);
             LoadStoreTileInfo storeMacroTileLDSInfo(int                               tag,
-                                                    ControlGraph::StoreLDSTile const& store,
-                                                    std::vector<std::string>&         comments);
+                                                    ControlGraph::StoreLDSTile const& store);
             LoadStoreTileInfo storeMacroTileWAVELDSInfo(int                               tag,
-                                                        ControlGraph::StoreLDSTile const& store,
-                                                        std::vector<std::string>&         comments);
+                                                        ControlGraph::StoreLDSTile const& store);
 
             // Store Tile Helpers
             Generator<Instruction> storeMacroTileVGPR(int                             tag,
