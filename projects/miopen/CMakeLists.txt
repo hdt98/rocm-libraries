@@ -336,6 +336,66 @@ message(STATUS "Hip compiler flags: ${HIP_COMPILER_FLAGS}")
 
 add_compile_definitions($<$<COMPILE_LANGUAGE:CXX>:HIP_COMPILER_FLAGS=${HIP_COMPILER_FLAGS}>)
 
+# =============================================================================
+# CK Builder Architecture Targeting
+# =============================================================================
+# Parse GPU architectures from CMAKE_HIP_ARCHITECTURES or GPU_TARGETS
+# These define which CK Builder kernel instances are compiled
+# Reduces binary size and compile time by filtering architecture-specific code
+
+set(MIOPEN_ARCH_LIST "")
+
+# Prefer CMAKE_HIP_ARCHITECTURES (CMake 3.21+ standard)
+if(DEFINED CMAKE_HIP_ARCHITECTURES)
+    set(MIOPEN_ARCH_LIST "${CMAKE_HIP_ARCHITECTURES}")
+elseif(DEFINED GPU_TARGETS)
+    set(MIOPEN_ARCH_LIST "${GPU_TARGETS}")
+endif()
+
+# Convert list to string for pattern matching
+string(REPLACE ";" " " MIOPEN_ARCH_STR "${MIOPEN_ARCH_LIST}")
+
+message(STATUS "CK Builder: Detected architectures: ${MIOPEN_ARCH_STR}")
+
+# Define preprocessor macros for each target architecture
+# These control which CK Builder XDL/WMMA instances are compiled
+if(MIOPEN_ARCH_STR MATCHES "gfx908")
+    add_compile_definitions(MIOPEN_GPU_TARGET_GFX908)
+    message(STATUS "CK Builder: Enabling gfx908 (CDNA1) instances")
+endif()
+if(MIOPEN_ARCH_STR MATCHES "gfx90a")
+    add_compile_definitions(MIOPEN_GPU_TARGET_GFX90A)
+    message(STATUS "CK Builder: Enabling gfx90a (CDNA2) instances")
+endif()
+if(MIOPEN_ARCH_STR MATCHES "gfx942")
+    add_compile_definitions(MIOPEN_GPU_TARGET_GFX942)
+    message(STATUS "CK Builder: Enabling gfx942 (CDNA3) instances")
+endif()
+if(MIOPEN_ARCH_STR MATCHES "gfx950")
+    add_compile_definitions(MIOPEN_GPU_TARGET_GFX950)
+    message(STATUS "CK Builder: Enabling gfx950 (CDNA4) instances")
+endif()
+if(MIOPEN_ARCH_STR MATCHES "gfx1030")
+    add_compile_definitions(MIOPEN_GPU_TARGET_GFX1030)
+    message(STATUS "CK Builder: Enabling gfx1030 (RDNA2) instances")
+endif()
+if(MIOPEN_ARCH_STR MATCHES "gfx1100")
+    add_compile_definitions(MIOPEN_GPU_TARGET_GFX1100)
+    message(STATUS "CK Builder: Enabling gfx1100 (RDNA3) instances")
+endif()
+if(MIOPEN_ARCH_STR MATCHES "gfx1200")
+    add_compile_definitions(MIOPEN_GPU_TARGET_GFX1200)
+    message(STATUS "CK Builder: Enabling gfx1200 (RDNA4) instances")
+endif()
+if(MIOPEN_ARCH_STR MATCHES "gfx1201")
+    add_compile_definitions(MIOPEN_GPU_TARGET_GFX1201)
+    message(STATUS "CK Builder: Enabling gfx1201 (RDNA4 variant) instances")
+endif()
+
+# Note: These preprocessor defines map to --offload-arch flags automatically
+# set by the ROCm/HIP toolchain from CMAKE_HIP_ARCHITECTURES/GPU_TARGETS
+# =============================================================================
+
 # HIP
 if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_BACKEND STREQUAL "HIPNOGPU")
     if(MIOPEN_USE_COMPOSABLEKERNEL)
