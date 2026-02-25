@@ -33,14 +33,109 @@
 
 #include <Tensile/hip/HipUtils.hpp>
 
+#include <algorithm>
+#include <cmath>
 #include <csignal>
 #include <cstddef>
+#include <numeric>
 #include <thread>
 
 namespace TensileLite
 {
     namespace Client
     {
+        // ============================================================================
+        // Modified Z-Score based outlier removal (borrowed from MIOpen)
+        // Used to remove high outliers and get a more accurate mean timing
+        // ============================================================================
+        namespace
+        {
+            inline double timing_mean(const std::vector<double>& data)
+            {
+                if(data.empty())
+                    return 0.0;
+                double sum = std::accumulate(data.begin(), data.end(), 0.0);
+                return sum / data.size();
+            }
+
+            inline double timing_median_of_sorted(const std::vector<double>& sortedData)
+            {
+                if(sortedData.empty())
+                    return 0.0;
+                size_t size = sortedData.size();
+                return (size % 2 == 0) ? (sortedData[size / 2 - 1] + sortedData[size / 2]) / 2.0
+                                       : sortedData[size / 2];
+            }
+
+            inline std::vector<double>
+                timing_median_absolute_deviation(const std::vector<double>& sortedData)
+            {
+                double              med = timing_median_of_sorted(sortedData);
+                std::vector<double> absDeviation;
+                absDeviation.reserve(sortedData.size());
+                for(const auto& value : sortedData)
+                {
+                    absDeviation.push_back(std::abs(value - med));
+                }
+                return absDeviation;
+            }
+
+            inline std::vector<double> timing_modified_z_scores(const std::vector<double>& sortedData)
+            {
+                double medianValue = timing_median_of_sorted(sortedData);
+
+                std::vector<double> absolute_deviation
+                    = timing_median_absolute_deviation(sortedData);
+                std::sort(absolute_deviation.begin(), absolute_deviation.end());
+                double mad = timing_median_of_sorted(absolute_deviation);
+
+                // If MAD is 0, then we cannot calculate the ModifiedZScore
+                if(mad == 0.0)
+                {
+                    return std::vector<double>(sortedData.size(), 0.0);
+                }
+
+                std::vector<double> modZScores;
+                modZScores.reserve(sortedData.size());
+                for(const auto& value : sortedData)
+                {
+                    modZScores.push_back(0.6745 * (value - medianValue) / mad);
+                }
+                return modZScores;
+            }
+
+            // Remove high outliers using Modified Z-Score and return mean of filtered data
+            // z_threshold: data points with z-score > z_threshold are considered outliers
+            inline double removeHighOutliersAndGetMean(std::vector<double> data,
+                                                       double              z_threshold = 2.0)
+            {
+                if(data.empty())
+                    return 0.0;
+                if(data.size() == 1)
+                    return data[0];
+
+                std::sort(data.begin(), data.end());
+
+                std::vector<double> modZScores = timing_modified_z_scores(data);
+                std::vector<double> filteredData;
+
+                for(size_t i = 0; i < data.size(); ++i)
+                {
+                    if(modZScores[i] <= z_threshold)
+                    {
+                        filteredData.push_back(data[i]);
+                    }
+                }
+
+                // If all data was filtered out, return mean of original data
+                if(filteredData.empty())
+                    return timing_mean(data);
+
+                return timing_mean(filteredData);
+            }
+        } // anonymous namespace
+        // ============================================================================
+
         static_assert(BenchmarkTimer::clock::is_steady, "Clock must be steady.");
 
         BenchmarkTimer::BenchmarkTimer(po::variables_map const& args,
@@ -57,6 +152,7 @@ namespace TensileLite
             , m_numEnqueuesPerSolution(m_numEnqueuesPerSync * m_numSyncsPerBenchmark)
             , m_useGPUTimer(args["use-gpu-timer"].as<bool>())
             , m_sleepPercent(args["sleep-percent"].as<int>())
+            , m_syncDurations(m_numSyncsPerBenchmark)
             , m_timeInSolution(0)
             , m_totalGPUTime(0)
             , m_currentBestWarmUpTime(std::numeric_limits<double>::max())
@@ -121,6 +217,7 @@ namespace TensileLite
         {
             m_numEnqueuesInSolution = 0;
             m_timeInSolution        = double_millis::zero();
+            m_syncDurationCount     = 0;
             m_skip_slow_solution    = false;
 
             ++m_currSolutionIdx; // update current sol-idx
@@ -161,18 +258,43 @@ namespace TensileLite
 
         void BenchmarkTimer::postSolution()
         {
-            double timePerEnqueue_us;
-            double gflops;
-            double gflopsPerCu;
+            double timePerEnqueue_us = std::numeric_limits<double>::quiet_NaN();
+            double gflops            = 0;
+            double gflopsPerCu       = 0;
+            bool timingAvailable = !(m_skiprun_from_map || m_skip_slow_solution)
+                                    && (m_syncDurationCount > 0);
+
+            if(timingAvailable)
+            {
+                // Convert m_syncDurations to std::vector<double> for timing calculation
+                std::vector<double> syncDurationsMs;
+                syncDurationsMs.reserve(m_syncDurationCount);
+                std::cout << "\nper-run-timer";
+                for(size_t i = 0; i < m_syncDurationCount; i++){
+                    syncDurationsMs.push_back(m_syncDurations[i].count());
+                    std::cout << "," << m_syncDurations[i].count() * 1000 * static_cast<double>(m_syncDurationCount) / static_cast<double>(m_numEnqueuesInSolution);
+                }
+                std::cout << std::endl;
+
+                // Use Modified Z-Score to remove high outliers and get mean
+                double        trimmedMeanMs   = removeHighOutliersAndGetMean(syncDurationsMs, 2.0);
+                double_millis trimmedMean(trimmedMeanMs);
+                double        enqueuesPerSync = static_cast<double>(m_numEnqueuesInSolution)
+                                          / static_cast<double>(m_syncDurationCount);
+
+                if(enqueuesPerSync > 0.0)
+                {
+                    double timePerSync_us = double_micros(trimmedMean).count();
+                    timePerEnqueue_us     = timePerSync_us / enqueuesPerSync - m_flushTimeUs;
+                }
+                else
+                {
+                    timingAvailable = false;
+                }
+            }
 
             {
                 ScopedTimer timer("post_solution_perf_calc");
-                bool   sol_is_skipped    = (m_skiprun_from_map || m_skip_slow_solution);
-                timePerEnqueue_us = !sol_is_skipped ? double_micros(m_timeInSolution).count()
-                                                                     / m_numEnqueuesInSolution
-                                                                 - m_flushTimeUs
-                                                           : std::numeric_limits<double>::quiet_NaN();
-
                 ContractionSolution::ProjectedPerformance pp;
                 double                                    flopCount = 0;
                 if(auto problem = dynamic_cast<ContractionProblemGroupedGemm*>(m_problem))
@@ -191,7 +313,7 @@ namespace TensileLite
                         "[BenchmarkTimer] Failed to cast problem to any ContractionProblem.");
                 }
 
-                gflops      = !sol_is_skipped ? flopCount / (timePerEnqueue_us) / 1000.0 : 0;
+                gflops      = timingAvailable ? flopCount / (timePerEnqueue_us) / 1000.0 : 0;
                 int    tiles       = pp.granularities.tilesPerCu * perf.CUs;
                 int    usedCus     = std::min(tiles, perf.CUs);
                 gflopsPerCu = gflops / usedCus;
@@ -206,6 +328,7 @@ namespace TensileLite
 
             m_timeInSolution        = double_millis::zero();
             m_numEnqueuesInSolution = 0;
+            m_syncDurationCount     = 0;
         }
 
         bool BenchmarkTimer::needMoreRunsInSolution() const
@@ -393,7 +516,15 @@ namespace TensileLite
             }
             else
             {
+                // CPU timing measures the span between m_endTime and m_startTime for this sync.
                 totalTime = double_millis(m_endTime - m_startTime);
+            }
+
+            bool sol_is_skipped = (m_skiprun_from_map || m_skip_slow_solution);
+            if(!sol_is_skipped && m_syncDurationCount < m_syncDurations.size())
+            {
+                m_syncDurations[m_syncDurationCount] = totalTime;
+                m_syncDurationCount++;
             }
 
             m_timeInSolution += totalTime;
