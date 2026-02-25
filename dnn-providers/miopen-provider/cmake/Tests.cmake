@@ -1,7 +1,7 @@
 # Copyright © Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 
-if(HIPDNN_SKIP_TESTS)
+if(MIOPENPROVIDER_SKIP_TESTS)
     return()
 endif()
 
@@ -26,7 +26,7 @@ function(_build_test_environment_list_internal OUT_VAR)
         set(ENVIRONMENT_LIST ${TEST_ENVIRONMENT})
     endif()
 
-    if(HIPDNN_ENABLE_COVERAGE)
+    if(MIOPENPROVIDER_ENABLE_COVERAGE)
         # Ensure coverage report directory exists
         file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/coverage_report/profraw")
 
@@ -182,9 +182,6 @@ function(_add_test_target_internal APPEND_FUNCTION_SUFFIX TARGET WORKING_DIR)
     set(CHECK_EXECUTABLE_PATHS_GLOBAL ${CHECK_EXECUTABLE_PATHS_GLOBAL} "${CMAKE_INSTALL_BINDIR}/${TARGET_EXE}"
         CACHE INTERNAL "Accumulated global check executable paths" FORCE
     )
-
-    # Track this test target for later use in generating installed CTestTestfile.cmake
-    set_property(GLOBAL APPEND PROPERTY HIPDNN_TEST_TARGETS ${TARGET})
 
     set_target_properties(
         ${TARGET} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}"

@@ -39,13 +39,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${ROCM_PATH}/lib
      ${HIP_DIR}/cmake
 )
 
-# Migrate HIP_DNN_SKIP_TESTS -> HIPDNN_SKIP_TESTS
-if(DEFINED HIP_DNN_SKIP_TESTS)
-    set(HIPDNN_SKIP_TESTS ${HIP_DNN_SKIP_TESTS} CACHE BOOL "Skip building tests" FORCE)
-    unset(HIP_DNN_SKIP_TESTS CACHE)
-    message(DEPRECATION "HIP_DNN_SKIP_TESTS has been renamed to HIPDNN_SKIP_TESTS. Please update your build scripts to use -DHIPDNN_SKIP_TESTS instead.")
-endif()
-option(HIPDNN_SKIP_TESTS "Skip building tests" OFF)
+option(MIOPENPROVIDER_SKIP_TESTS "Skip building tests" OFF)
 
 option(BUILD_ADDRESS_SANITIZER "Build with Address Sanitizer enabled" OFF)
 option(ENABLE_CLANG_FORMAT "Enable Clang-Format checks" OFF) # Disable by default for TheRock
@@ -60,7 +54,7 @@ endif()
 
 list(
     PREPEND
-    HIPDNN_WARNING_COMPILE_OPTIONS
+    MIOPENPROVIDER_WARNING_COMPILE_OPTIONS
     -Werror # Treat all warnings as errors
     -Wall # Enable most common warnings
     -Wextra # Enable additional warnings not covered by -Wall
@@ -141,7 +135,7 @@ add_library(
 target_include_directories(miopen_plugin_impl PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(miopen_plugin_impl PUBLIC MIOpen hipdnn_data_sdk hipdnn_plugin_sdk)
 
-target_compile_options(miopen_plugin_impl PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})
+target_compile_options(miopen_plugin_impl PRIVATE ${MIOPENPROVIDER_WARNING_COMPILE_OPTIONS})
 set_target_properties(miopen_plugin_impl PROPERTIES
     CXX_VISIBILITY_PRESET hidden
     POSITION_INDEPENDENT_CODE ON
@@ -162,7 +156,7 @@ if(NOT WIN32)
     target_link_libraries(miopen_plugin PRIVATE "-Xlinker --exclude-libs=ALL")
 endif()
 
-target_compile_options(miopen_plugin PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})
+target_compile_options(miopen_plugin PRIVATE ${MIOPENPROVIDER_WARNING_COMPILE_OPTIONS})
 set_target_properties(
     miopen_plugin
     PROPERTIES CXX_VISIBILITY_PRESET hidden
@@ -180,7 +174,7 @@ set_target_properties(
 set_target_properties(miopen_plugin PROPERTIES
     THEROCK_INSTALL_RPATH_ORIGIN "lib/hipdnn_plugins/engines")
 
-if(NOT HIPDNN_SKIP_TESTS)
+if(NOT MIOPENPROVIDER_SKIP_TESTS)
     add_subdirectory(tests)
     add_subdirectory(integration_tests)
 
