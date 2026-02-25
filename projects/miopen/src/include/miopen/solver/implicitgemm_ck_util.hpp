@@ -45,6 +45,8 @@
 #include <miopen/ck_builder/factories/meta_device_operation_instance_factory.hpp>
 #if CK_EXPERIMENTAL_BUILDER
 #include <miopen/ck_builder/factories/grouped_convolution_backward_weight.hpp>
+#include <miopen/ck_builder/factories/grouped_convolution_backward_weight_scale.hpp>
+#include <miopen/ck_builder/factories/grouped_convolution_backward_weight_bilinear.hpp>
 #endif // CK_EXPERIMENTAL_BUILDER
 #endif // MIOPEN_USE_COMPOSABLEKERNEL
 
@@ -177,11 +179,11 @@ using DeviceOpGBwdWeightDefaultPtrs =
 
 template <typename DataType, typename ComputeType = DataType>
 using DeviceOpGBwdWeightBilinearPtrs = miopen::conv::ck_builder::instance::
-    MetaDeviceOperationInstanceFactory<DeviceOpGBwdWeightBilinear<DataType, ComputeType>, false>;
+    MetaDeviceOperationInstanceFactory<DeviceOpGBwdWeightBilinear<DataType, ComputeType>>;
 
 template <typename DataType, typename ComputeType = DataType>
 using DeviceOpGBwdWeightScalePtrs = miopen::conv::ck_builder::instance::
-    MetaDeviceOperationInstanceFactory<DeviceOpGBwdWeightScale<DataType, ComputeType>, false>;
+    MetaDeviceOperationInstanceFactory<DeviceOpGBwdWeightScale<DataType, ComputeType>>;
 
 } // namespace conv
 

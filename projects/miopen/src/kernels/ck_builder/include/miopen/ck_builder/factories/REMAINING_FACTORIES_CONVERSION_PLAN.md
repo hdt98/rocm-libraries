@@ -608,9 +608,11 @@ Update `test/gtest/CMakeLists.txt` to register both test files behind `MIOPEN_CK
 | Instance data: `dl_bwd_weight.hpp` | [x] |
 | Factory headers: XDL in `factories/grouped_conv_bwd_weight/` | [x] (common_aliases.hpp + xdl_instance.hpp) |
 | Dispatch header: `grouped_convolution_backward_weight.hpp` | [x] |
-| Dispatch header: `grouped_convolution_backward_weight_bilinear.hpp` | [ ] (TODO) |
-| Dispatch header: `grouped_convolution_backward_weight_scale.hpp` | [ ] (TODO) |
-| `.inc` files for dispatch | [x] (xdl, dl, wmma, explicit_xdl, explicit_wmma) |
+| Dispatch header: `grouped_convolution_backward_weight_bilinear.hpp` | [x] |
+| Dispatch header: `grouped_convolution_backward_weight_scale.hpp` | [x] |
+| `.inc` files for dispatch (default) | [x] (xdl, dl, wmma, explicit_xdl, explicit_wmma) |
+| `.inc` files for dispatch (bilinear) | [x] (bilinear_xdl, bilinear_wmma) |
+| `.inc` files for dispatch (scale) | [x] (scale_xdl, scale_wmma) |
 | .cpp files: `grouped_conv2d_bwd_weight/` (56 files) | [x] |
 | .cpp files: `grouped_conv3d_bwd_weight/` (50+6+4 files) | [x] |
 | .cpp files: `grouped_conv3d_bwd_weight_bilinear/` (7 files) | [x] |
@@ -619,6 +621,8 @@ Update `test/gtest/CMakeLists.txt` to register both test files behind `MIOPEN_CK
 | Static tests | [ ] |
 | Runtime test: `ck_builder_grouped_bwd_weight_conv2d.cpp` | [x] |
 | Runtime test: `ck_builder_grouped_bwd_weight_conv3d.cpp` | [x] |
+| Runtime test: `ck_builder_grouped_bwd_weight_conv3d_bilinear.cpp` | [x] |
+| Runtime test: `ck_builder_grouped_bwd_weight_conv3d_scale.cpp` | [x] |
 | Test CMakeLists.txt updated | [x] |
 | Solver file integration | [ ] |
 
@@ -957,6 +961,8 @@ test/gtest/
 ├── ck_builder_grouped_bwd_data_conv3d.cpp       (NEW - Phase 2)
 ├── ck_builder_grouped_bwd_weight_conv2d.cpp     (NEW - Phase 3)
 ├── ck_builder_grouped_bwd_weight_conv3d.cpp     (NEW - Phase 3)
+├── ck_builder_grouped_bwd_weight_conv3d_bilinear.cpp (NEW - Phase 3)
+├── ck_builder_grouped_bwd_weight_conv3d_scale.cpp    (NEW - Phase 3)
 ├── ck_builder_grouped_fwd_conv3d_bilinear.cpp   (existing - Phase 4a)
 ├── ck_builder_grouped_fwd_conv3d_scale.cpp      (existing - Phase 4a)
 ├── ck_builder_grouped_fwd_scaleadd_scaleadd_relu.cpp (NEW - Phase 4b)
@@ -1025,7 +1031,7 @@ Phase 5 (Non-Grouped)
 | 1 - 3D Fwd Default | 0 | 0 | ~86 | 0 | 1 | 1 | COMPLETE |
 | 4a - Fwd Bilinear/Scale | 0 | 0 | 10 | 2 + .inc | 2 | 1 | COMPLETE |
 | 2 - Bwd Data | 3 | ~9 | ~91 | 3 + .inc | 2 | 2 | TODO |
-| 3 - Bwd Weight | 4 | ~12 | ~141 | 3 + .inc | 2 | 3 | TODO |
+| 3 - Bwd Weight | 4 | ~12 | ~141 | 3 + .inc | 4 | 3 | IN PROGRESS |
 | 4b - Fwd Fused (clamp, bias_clamp, scaleadd) | 0 | 2 | 178 | 3 + 6 .inc | 5 | 3 | COMPLETE |
 | 5 - Non-Grouped | 2 | ~2 | ~10 | 2 | 2 | 2 | TODO |
-| **Total** | **~9** | **~23-31** | **~383** | **~13** | **12** | **~12** | |
+| **Total** | **~9** | **~23-31** | **~383** | **~13** | **14** | **~12** | |
