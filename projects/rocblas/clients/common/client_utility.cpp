@@ -45,13 +45,8 @@
 #define setenv(A, B, C) _putenv_s(A, B)
 #define unsetenv(A) _putenv_s(A, "")
 
-#ifdef __cpp_lib_filesystem
 #include <filesystem>
 namespace fs = std::filesystem;
-#else
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
-#endif
 
 // Not WIN32
 #else
