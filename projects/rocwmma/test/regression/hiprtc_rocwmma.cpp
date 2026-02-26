@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,14 +24,10 @@
  *
  *******************************************************************************/
 
-// HIP RTC (Runtime Compilation) regression tests
-//
-// These tests validate that the HIP RTC workflow continues to function
-// correctly across different HIP/ROCm versions and code changes. They test:
-// - Runtime kernel compilation and loading
-// - Error handling and diagnostic reporting
-// - Module management and kernel execution
-// - Support for different data types
+// HIP RTC (Runtime Compilation) regression tests with the rocWMMA headers
+// These tests ensure that the HIP RTC flow works when we include rocwmma.hpp,
+// and that we are able to compile and run a simple GEMM kernel written using
+// rocWMMA.
 
 #include <cstdlib>
 #include <gtest/gtest.h>
@@ -206,10 +202,10 @@ protected:
 
 
 // ============================================================================
-// Test 5: Basic rocWMMA include chain
+// Test 1: Basic rocWMMA include chain
 // ============================================================================
 // Tests that HIP RTC works with the rocWMMA headers
-// - Simple kernel with the rocWMMA header
+// - Simple kernel that includes the rocWMMA header
 
 TEST_F(HipRTC_rocWMMA, RocwmmaBasicIncludeTest)
 {
@@ -334,14 +330,13 @@ TEST_F(HipRTC_rocWMMA, RocwmmaBasicIncludeTest)
 }
 
 // ============================================================================
-// Test 6: Basic rocWMMA GEMM
+// Test 2: Basic rocWMMA GEMM
 // ============================================================================
 // Tests that HIP RTC works with the rocWMMA headers
-// - Simple kernel with the rocWMMA header
+// - Simple GEMM kernel using the rocWMMA header
 
 TEST_F(HipRTC_rocWMMA, RocwmmaGemmTest)
 {
-
     using rocwmma::bfloat16_t;
     using rocwmma::float16_t;
     using rocwmma::float32_t;
@@ -420,8 +415,6 @@ TEST_F(HipRTC_rocWMMA, RocwmmaGemmTest)
     CHECK_HIP_ERROR(hipModuleLoadData(&module, code.data()));
     CHECK_HIP_ERROR(hipModuleGetFunction(&func, module, "gemm_rocwmma_d"));
 
-
-
     // Bounds check
     if((m < (ROCWMMA_M * T_BLOCK_X / WAVE_SIZE) || n < (ROCWMMA_N * T_BLOCK_Y) || k < ROCWMMA_K)
        || (m % ROCWMMA_M || n % ROCWMMA_N || k % ROCWMMA_K))
@@ -435,8 +428,6 @@ TEST_F(HipRTC_rocWMMA, RocwmmaGemmTest)
     uint32_t ldc = n;
     uint32_t ldd = ldc;
 
-    //std::cout << "Initializing host data..." << std::endl;
-
     // Initialize input matrices
     std::vector<InputT>  matrixA(m * k);
     std::vector<InputT>  matrixB(k * n);
@@ -447,8 +438,6 @@ TEST_F(HipRTC_rocWMMA, RocwmmaGemmTest)
     fillRand(matrixA.data(), m, k);
     fillRand(matrixB.data(), k, n);
     fillRand(matrixC.data(), m, n);
-
-    //std::cout << "Initializing device data..." << std::endl;
 
     // Allocate and copy device memory
     hipDeviceptr_t d_a, d_b, d_c, d_d, d_d_ref;
@@ -498,8 +487,6 @@ TEST_F(HipRTC_rocWMMA, RocwmmaGemmTest)
                       &args_size,
                       HIP_LAUNCH_PARAM_END};
 
-    //std::cout << "Launching GEMM kernel..." << std::endl;
-
     hipEvent_t startEvent, stopEvent;
     CHECK_HIP_ERROR(hipEventCreate(&startEvent));
     CHECK_HIP_ERROR(hipEventCreate(&stopEvent));
@@ -526,10 +513,6 @@ TEST_F(HipRTC_rocWMMA, RocwmmaGemmTest)
     CHECK_HIP_ERROR(hipEventDestroy(startEvent));
     CHECK_HIP_ERROR(hipEventDestroy(stopEvent));
 
-    // GEMM flops converge to 2*mnk
-    //auto gFlops       = calculateGFlops(m, n, k);
-    //auto tFlopsPerSec = calculateTFlopsPerSec(m, n, k, static_cast<double>(elapsedTimeMs));
-
     // Echo performance
     std::cout << "BlkM, BlkN, BlkK, "
               << "MatM, MatN, MatK, "
@@ -540,8 +523,6 @@ TEST_F(HipRTC_rocWMMA, RocwmmaGemmTest)
     std::cout << ROCWMMA_M << ", " << ROCWMMA_N << ", " << ROCWMMA_K << ", " << m << ", " << n
               << ", " << k << ", " << alpha << ", " << lda << ", " << ldb << ", " << beta << ", "
               << ldc << ", " << ldd << ", " << elapsedTimeMs << ", " << std::endl;
-
-
 
     // Bring kernel result back to host
     CHECK_HIP_ERROR(hipMemcpy(matrixD.data(), d_d, bytesD, hipMemcpyDeviceToHost));
@@ -575,8 +556,6 @@ TEST_F(HipRTC_rocWMMA, RocwmmaGemmTest)
     CHECK_HIP_ERROR(hipFree(d_b));
     CHECK_HIP_ERROR(hipFree(d_c));
     CHECK_HIP_ERROR(hipFree(d_d));
-
-    //std::cout << "Finished!" << std::endl;
 
     CHECK_HIP_ERROR(hipModuleUnload(module));
     ASSERT_HIPRTC_SUCCESS(hiprtcDestroyProgram(&prog));
