@@ -79,7 +79,6 @@ additional_options = {
         "projects_to_test": ["rocsolver", "hipsolver"],
         "project_to_add": "blas",
     },
-    # due to MIOpen plugin project being inside the hipDNN directory, we cannot have the MIOpen plugin project as a separate project for now https://github.com/ROCm/rocm-libraries/issues/2316
     "hipdnn": {
         "cmake_options": [
             "-DTHEROCK_ENABLE_HIPBLASLTPROVIDER=ON",
