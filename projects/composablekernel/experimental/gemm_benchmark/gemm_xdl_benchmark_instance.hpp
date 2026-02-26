@@ -371,7 +371,7 @@ using gemm_rcr_instances = std::tuple<
     GEMM_RCR_INSTANCE(GemmV3,          ck::BlockGemmPipelineScheduler::Intrawave, ck::BlockGemmPipelineVersion::v5, 1),            // 40
     GEMM_RCR_INSTANCE(GemmV3,          ck::BlockGemmPipelineScheduler::Interwave, ck::BlockGemmPipelineVersion::v1, 1),            // 50
     GEMM_RCR_INSTANCE(GemmAsync,       ck::LoopScheduler::Default,                ck::PipelineVersion::v4,          1),            // 60
-    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Default,   ck_tile::GemmPipeline::BASIC_V1,       1, 1, 1), // 70
+    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::BASIC_V1,       1, 1, 1), // 70
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::MEMORY,         1, 1, 1), // 80
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_V3,     1, 1, 1), // 90
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_V4,     1, 1, 1), // 100
@@ -390,7 +390,7 @@ using gemm_rrr_instances = std::tuple<
     GEMM_RRR_INSTANCE(GemmV3,          ck::BlockGemmPipelineScheduler::Intrawave, ck::BlockGemmPipelineVersion::v5, 1),
     GEMM_RRR_INSTANCE(GemmV3,          ck::BlockGemmPipelineScheduler::Interwave, ck::BlockGemmPipelineVersion::v1, 1),
     GEMM_RRR_INSTANCE(GemmAsync,       ck::LoopScheduler::Default,                ck::PipelineVersion::v4,          1),
-    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Default,   ck_tile::GemmPipeline::BASIC_V1,       1, 1, 1),
+    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::BASIC_V1,       1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::MEMORY,         1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_V3,     1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_V4,     1, 1, 1),
@@ -409,7 +409,7 @@ using gemm_crr_instances = std::tuple<
     GEMM_CRR_INSTANCE(GemmV3,          ck::BlockGemmPipelineScheduler::Intrawave, ck::BlockGemmPipelineVersion::v5, 1),
     GEMM_CRR_INSTANCE(GemmV3,          ck::BlockGemmPipelineScheduler::Interwave, ck::BlockGemmPipelineVersion::v1, 1),
     GEMM_CRR_INSTANCE(GemmAsync,       ck::LoopScheduler::Default,                ck::PipelineVersion::v4,          1),
-    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Default,   ck_tile::GemmPipeline::BASIC_V1,       1, 1, 1),
+    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::BASIC_V1,       1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::MEMORY,         1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_V3,     1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_V4,     1, 1, 1),
@@ -428,7 +428,7 @@ using gemm_ccr_instances = std::tuple<
     GEMM_CCR_INSTANCE(GemmV3,          ck::BlockGemmPipelineScheduler::Intrawave, ck::BlockGemmPipelineVersion::v5, 1),
     GEMM_CCR_INSTANCE(GemmV3,          ck::BlockGemmPipelineScheduler::Interwave, ck::BlockGemmPipelineVersion::v1, 1),
     GEMM_CCR_INSTANCE(GemmAsync,       ck::LoopScheduler::Default,                ck::PipelineVersion::v4,          1),
-    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Default,   ck_tile::GemmPipeline::BASIC_V1,       1, 1, 1),
+    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::BASIC_V1,       1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::MEMORY,         1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_V3,     1, 1, 1),
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::COMPUTE_V4,     1, 1, 1),

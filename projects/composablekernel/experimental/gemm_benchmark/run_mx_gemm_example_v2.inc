@@ -3,11 +3,10 @@
 
 #pragma once
 
-template <typename ProblemType>
+template <bool BPreShuffle, typename ProblemType>
 bool run_mx_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
 {
-    constexpr bool BPreShuffle = ck::is_same_v<BLayout, MFMA>;
-    using BRefLayout           = ck::conditional_t<BPreShuffle, Col, BLayout>;
+    using BRefLayout = ck::conditional_t<BPreShuffle, Col, BLayout>;
 
     auto M       = problem_size.M;
     auto N       = problem_size.N;
@@ -96,26 +95,8 @@ bool run_mx_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
         std::cout << "c_m_n_device_result: " << c_m_n_device_result.mDesc << std::endl;
     }
 
-    auto a_data_element = [](float x) {
-        if constexpr(ck::is_same_v<ADataType, ck::f4x2_pk_t>)
-            return ck::type_convert<ADataType>(ck::float2_t(x));
-        else if constexpr(ck::packed_size_v<ADataType> == 32)
-            return ck::type_convert<ADataType>(ck::float32_t(x));
-        else if constexpr(ck::packed_size_v<ADataType> == 16)
-            return ck::type_convert<ADataType>(ck::float16_t(x));
-        else
-            return ck::type_convert<ADataType>(x);
-    };
-    auto b_data_element = [](float x) {
-        if constexpr(ck::is_same_v<BDataType, ck::f4x2_pk_t>)
-            return ck::type_convert<BDataType>(ck::float2_t(x));
-        else if constexpr(ck::packed_size_v<BDataType> == 32)
-            return ck::type_convert<BDataType>(ck::float32_t(x));
-        else if constexpr(ck::packed_size_v<BDataType> == 16)
-            return ck::type_convert<BDataType>(ck::float16_t(x));
-        else
-            return ck::type_convert<BDataType>(x);
-    };
+    auto a_data_element = [](float x) { return ck::type_convert<ADataType>(x); };
+    auto b_data_element = [](float x) { return ck::type_convert<BDataType>(x); };
 
     using int_distr   = std::uniform_int_distribution<int>;
     using float_distr = std::uniform_real_distribution<float>;
@@ -156,7 +137,20 @@ bool run_mx_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
         b_k_n->GenerateTensorDistr(float_distr{-2.0, 2.0});
         b_k_n_scale.GenerateTensorDistr(float_distr{powf(2.0f, -125.0f), 1.0f});
         break;
+    case 3:
+        a_m_k.GenerateTensorDistr(float_distr{-2.0, 2.0}); // R[-2,2]
+        a_m_k_scale.GenerateTensorDistr(float_distr{powf(2.0f, -125.0f), 1.0f});
 
+        ck::utils::FillConstant<BDataType>{b_data_element(2.0f)}(*b_k_n);
+        ck::utils::FillConstant<XDataType>{ck::type_convert<XDataType>(0.5f)}(b_k_n_scale);
+        break;
+    case 4:
+        ck::utils::FillConstant<ADataType>{a_data_element(0.5f)}(a_m_k);
+        ck::utils::FillConstant<XDataType>{ck::type_convert<XDataType>(2.0f)}(a_m_k_scale);
+
+        b_k_n->GenerateTensorDistr(float_distr{-2.0, 2.0});
+        b_k_n_scale.GenerateTensorDistr(float_distr{powf(2.0f, -125.0f), 1.0f});
+        break;
     default:
         if(config.verbosity > 0)
         {
@@ -195,7 +189,7 @@ bool run_mx_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
     if constexpr(BPreShuffle)
     {
         int NPerXdl = 16; // Fixed 16
-        preShuffleBuffer(b_k_n->mData.data(), b_input->mData.data(), N, K, NPerXdl);
+        preShuffleBuffer(b_k_n->mData.data(), b_input->mData.data(), N, K, NPerXdl, KPack);
     }
 
     if(config.verbosity > 0)
@@ -257,9 +251,9 @@ bool run_mx_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
     float ave_time = invoker.Run(argument,
                                  StreamConfig{nullptr,
                                               config.time_kernel,
-                                              config.verbosity,
-                                              config.warm_up,
-                                              config.repeat,
+                                              0,
+                                              config.cold_niters,
+                                              config.nrepeat,
                                               config.rotating_count > 1,
                                               config.rotating_count});
 
@@ -339,10 +333,12 @@ bool run_mx_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
     return res_verified;
 }
 
+template <bool BPreShuffle>
 bool run_mx_gemm_splitk_example(int argc, char* argv[])
 {
     ProblemSizeSplitK problem_size;
     ExecutionConfig config;
 
-    return !parse_cmd_args(argc, argv, problem_size, config) || run_mx_gemm(problem_size, config);
+    return !parse_cmd_args(argc, argv, problem_size, config) ||
+           run_mx_gemm<BPreShuffle>(problem_size, config);
 }

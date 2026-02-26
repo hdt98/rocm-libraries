@@ -261,7 +261,7 @@ using gemm_rcr_instances = std::tuple<
     GEMM_RCR_INSTANCE(GemmV3,          ck::BlockGemmPipelineScheduler::Intrawave, ck::BlockGemmPipelineVersion::v3, 1),              // 20
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::PRESHUFFLE_V2,  1, 1, 1),   // 30
     GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::PRESHUFFLE_FLATMM,  1, 1, 1), // 40
-    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::PRESHUFFLE_TDM,  1, 1, 1), // 50
+    GEMM_CK_TILE_INSTANCE(GemmCkTile,  ck_tile::GemmPipelineScheduler::Intrawave, ck_tile::GemmPipeline::PRESHUFFLE_TDM,  1, 1, 1) // 50
     >;
 
 using gemm_rrr_instances = std::tuple<

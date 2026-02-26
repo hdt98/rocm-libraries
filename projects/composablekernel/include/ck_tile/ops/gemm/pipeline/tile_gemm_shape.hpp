@@ -106,8 +106,15 @@ constexpr index_t get_k_warp_tile()
 {
 #if CK_TILE_USE_WMMA
 #if defined(CK_USE_GFX1250)
-    constexpr bool is_8bit = sizeof(PrecType) == 1;
-    return is_8bit ? 64 : 32;
+    if constexpr(M_Warp_Tile == 32)
+    {
+        return 128;
+    }
+    else
+    {
+        constexpr bool is_8bit = sizeof(PrecType) == 1;
+        return is_8bit ? 64 : 32;
+    }
 #else
     return 16;
 #endif

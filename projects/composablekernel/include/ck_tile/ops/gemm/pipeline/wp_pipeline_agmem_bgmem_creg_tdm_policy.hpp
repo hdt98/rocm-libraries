@@ -190,8 +190,8 @@ struct UniversalWeightPreshufflePipelineAgBgCrTDMPolicy
                       sequence<kKPerBlock / ScaleSize / 4, 1>>, // 4 is because scale tensor is
                                                                 // int32_t data type, each int32_t
                                                                 // exists 4 fp8 scale values
-                tuple<sequence<1, 0>, sequence<1>>,
-                tuple<sequence<1, 0>, sequence<2>>,
+                tuple<sequence<0, 1>, sequence<1>>,
+                tuple<sequence<0, 1>, sequence<2>>,
                 sequence<1, 2, 2>,
                 sequence<0, 0, 1>>{});
     }
