@@ -12,6 +12,7 @@
 #include <rocRoller/KernelOptions_detail.hpp>
 #include <rocRoller/Scheduling/LDSModel.hpp>
 #include <rocRoller/Scheduling/Observers/FunctionalUnit/MEMObserver.hpp>
+#include <rocRoller/Utilities/Logging.hpp>
 #include <rocRoller/Utilities/Utils.hpp>
 
 namespace rocRoller
@@ -93,15 +94,23 @@ namespace rocRoller
                     auto ctx = m_context.lock();
                     AssertFatal(ctx != nullptr);
 
-                    AssertFatal(inst.getModelledAddresses().has_value(),
-                                inst.toString(LogLevel::Terse));
+                    if(!inst.getModelledAddresses().has_value())
+                    {
+                        // Skip modeling for instructions without modelled addresses
+                        // (e.g., direct LDS operations not from LoadLDSTile/StoreLDSTile)
+                        Log::warn("WeightlessDSMemObserver: Skipping LDS instruction without "
+                                  "modelled addresses: {}",
+                                  inst.toString(LogLevel::Terse));
+                    }
+                    else
+                    {
+                        std::vector<size_t> addresses = inst.getModelledAddresses().value();
+                        auto [stallCycles, additionalCycles]
+                            = m_scheduler.value().predictCycles({{direction}, dwords, addresses});
 
-                    std::vector<size_t> addresses = inst.getModelledAddresses().value();
-                    auto [stallCycles, additionalCycles]
-                        = m_scheduler.value().predictCycles({{direction}, dwords, addresses});
-
-                    status.stallCycles      = stallCycles / 4;
-                    status.additionalCycles = additionalCycles / 4;
+                        status.stallCycles      = stallCycles / 4;
+                        status.additionalCycles = additionalCycles / 4;
+                    }
                 }
             }
 
@@ -141,8 +150,11 @@ namespace rocRoller
                 {
                     auto [direction, dwords] = *ldsInfo;
 
-                    std::vector<size_t> addresses = inst.getModelledAddresses().value();
-                    m_scheduler.value().scheduleInstruction({{direction}, dwords, addresses});
+                    if(inst.getModelledAddresses().has_value())
+                    {
+                        std::vector<size_t> addresses = inst.getModelledAddresses().value();
+                        m_scheduler.value().scheduleInstruction({{direction}, dwords, addresses});
+                    }
                 }
             }
         }
