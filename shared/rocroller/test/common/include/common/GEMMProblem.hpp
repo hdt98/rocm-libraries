@@ -96,5 +96,8 @@ struct GEMMProblem
     std::pair<int, int> padA = {0, 0};
     std::pair<int, int> padB = {0, 0};
 
+    // Enable stochastic rounding conversion when output type differs from accumulator type
+    bool useSrCvt = false;
+
     auto operator<=>(GEMMProblem const& rhs) const = default;
 };

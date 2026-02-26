@@ -217,7 +217,9 @@ namespace rocRollerTest
                       typename TC  = TA,
                       typename TD  = TC,
                       typename ACC = float>
-            auto getCommandArguments() const
+            auto getCommandArguments(bool                    setIdentity = false,
+                                     bool                    notSetC     = false,
+                                     std::optional<uint32_t> srCvtSeed   = std::nullopt) const
             {
                 using namespace rocRoller;
 
@@ -278,11 +280,24 @@ namespace rocRollerTest
                     DGenInput(seed, hostA, descA, hostB, descB, hostC, descC);
                 }
 
+                if(setIdentity)
+                {
+                    SetIdentityMatrix(hostA, K, M);
+                    SetIdentityMatrix(hostB, N, K);
+                    std::fill(hostC.begin(), hostC.end(), static_cast<TD>(0.0));
+                }
+
                 auto deviceA = make_shared_device<TA>(hostA);
                 auto deviceB = make_shared_device<TB>(hostB);
 
-                std::shared_ptr<TC> deviceC = make_shared_device(hostC);
+                std::shared_ptr<TC> deviceC = notSetC ? nullptr : make_shared_device(hostC);
                 std::shared_ptr<TD> deviceD = make_shared_device<TD>(M * N, TD{});
+
+                std::shared_ptr<uint8_t> deviceScaleA, deviceScaleB;
+                if(m_problem.scaleAMode == Operations::ScaleMode::Separate)
+                    deviceScaleA = make_shared_device(hostScaleA);
+                if(m_problem.scaleBMode == Operations::ScaleMode::Separate)
+                    deviceScaleB = make_shared_device(hostScaleB);
 
                 CommandArguments commandArgs = m_command->createArguments();
 
@@ -291,10 +306,48 @@ namespace rocRollerTest
                 setCommandTensorArg(commandArgs, m_tagTensorC, descC, deviceC.get());
                 setCommandTensorArg(commandArgs, m_tagTensorD, descD, deviceD.get());
 
+                if(m_problem.scaleAMode == Operations::ScaleMode::Separate)
+                {
+                    AssertFatal(K % m_problem.scaleBlockSize == 0,
+                                fmt::format("K: {} must be a multiple of the scale block size: {}",
+                                            K,
+                                            m_problem.scaleBlockSize));
+                    TensorDescriptor descAScale(dataTypeA,
+                                                {size_t(M), size_t(K / m_problem.scaleBlockSize)},
+                                                m_problem.transA);
+                    setCommandTensorArg(
+                        commandArgs, m_tagTensorScaleA, descAScale, deviceScaleA.get());
+                }
+
+                if(m_problem.scaleBMode == Operations::ScaleMode::Separate)
+                {
+                    AssertFatal(K % m_problem.scaleBlockSize == 0,
+                                fmt::format("K: {} must be a multiple of the scale block size: {}",
+                                            K,
+                                            m_problem.scaleBlockSize));
+                    TensorDescriptor descBScale(dataTypeB,
+                                                {size_t(K / m_problem.scaleBlockSize), size_t(N)},
+                                                m_problem.transB);
+                    setCommandTensorArg(
+                        commandArgs, m_tagTensorScaleB, descBScale, deviceScaleB.get());
+                }
+
                 commandArgs.setArgument(m_tagScalarAlpha, ArgumentType::Value, alpha);
                 commandArgs.setArgument(m_tagScalarBeta, ArgumentType::Value, beta);
 
-                return std::make_tuple(commandArgs, deviceA, deviceB, deviceC, deviceD);
+                if(srCvtSeed.has_value() && m_tagSeed.has_value())
+                    commandArgs.setArgument(*m_tagSeed, ArgumentType::Value, srCvtSeed.value());
+
+                return std::make_tuple(commandArgs,
+                                       deviceA,
+                                       deviceB,
+                                       deviceC,
+                                       deviceD,
+                                       std::move(hostA),
+                                       std::move(hostB),
+                                       std::move(hostC),
+                                       std::move(hostScaleA),
+                                       std::move(hostScaleB));
             }
 
             std::tuple<rocRoller::Operations::OperationTag,
@@ -303,9 +356,16 @@ namespace rocRollerTest
                        rocRoller::Operations::OperationTag>
                 getOperationTags() const;
 
+            // Returns the tensor/scalar tags for scale A and B (valid for both Separate and
+            // SingleScale modes). Use these to set SingleScale arg values via setArgument().
             std::pair<std::optional<rocRoller::Operations::OperationTag>,
                       std::optional<rocRoller::Operations::OperationTag>>
                 getABScaleTags() const;
+
+            rocRoller::Operations::OperationTag getNumWGsTag() const;
+            rocRoller::Operations::OperationTag getWGMTag() const;
+            std::map<rocRoller::Operations::ScratchPolicy, rocRoller::Operations::OperationTag>
+                getScratchTags() const;
 
         private:
             void createCommand();
@@ -317,9 +377,19 @@ namespace rocRollerTest
             rocRoller::Operations::OperationTag m_tagA, m_tagB, m_tagC, m_tagD;
             rocRoller::Operations::OperationTag m_tagTensorA, m_tagTensorB, m_tagTensorC,
                 m_tagTensorD;
+            // Load tags for scale A/B (used for setDimensionInfo)
             rocRoller::Operations::OperationTag m_tagScaleA, m_tagScaleB;
+            // Tensor/scalar tags for scale A/B (used for setCommandTensorArg / setArgument)
+            rocRoller::Operations::OperationTag m_tagTensorScaleA, m_tagTensorScaleB;
             rocRoller::Operations::OperationTag m_tagScalarAlpha, m_tagScalarBeta;
             rocRoller::Operations::OperationTag m_tagNumWGs;
+            rocRoller::Operations::OperationTag m_tagWGM;
+
+            // Set when m_tc != m_td: the T_Execute tag of the conversion op (used for
+            // setDimensionInfo on the output tile)
+            std::optional<rocRoller::Operations::OperationTag> m_tagCvtOp;
+            // Set when m_problem.useSrCvt: the Scalar(UInt32) tag for the SR seed
+            std::optional<rocRoller::Operations::OperationTag> m_tagSeed;
 
             std::map<rocRoller::Operations::ScratchPolicy, rocRoller::Operations::OperationTag>
                 m_scratchTags;

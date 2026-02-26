@@ -151,7 +151,16 @@ namespace ModelAddressesTest
                 }
             }
 
-            auto [commandArgs, deviceA, deviceB, deviceC, deviceD]
+            auto [commandArgs,
+                  deviceA,
+                  deviceB,
+                  deviceC,
+                  deviceD,
+                  hostA,
+                  hostB,
+                  hostC,
+                  hostScaleA,
+                  hostScaleB]
                 = example.getCommandArguments<float>();
             commandKernel.launchKernel(commandArgs.runtimeArguments());
         }
