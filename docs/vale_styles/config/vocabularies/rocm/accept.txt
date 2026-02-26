@@ -303,7 +303,7 @@ HGX
 Higgs
 hipamd
 hipBLAS|hipblas
-hipBLASLt('s)|hipblaslt
+hipBLASLt('s)?|hipblaslt
 HIPCC|hipcc
 hipCUB|hipcub
 hipDataType
