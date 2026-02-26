@@ -1,4 +1,4 @@
-name: Clang Tidy
+name: clang-tidy
 
 on:
   pull_request:
