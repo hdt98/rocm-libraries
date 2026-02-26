@@ -949,10 +949,8 @@ namespace rocRoller
         LoadStoreTileGenerator::LoadStoreTileInfo
             LoadStoreTileGenerator::loadMacroTileLDSInfo(int tag, LoadLDSTile const& load)
         {
-            auto [ldsTag, lds]   = m_graph->getDimension<LDS>(tag);
-            auto [tileTag, tile] = m_graph->getDimension<MacroTile>(tag);
-            (void)lds;
-            (void)tile;
+            auto [ldsTag, _lds]   = m_graph->getDimension<LDS>(tag);
+            auto [tileTag, _tile] = m_graph->getDimension<MacroTile>(tag);
 
             rocRoller::Log::getLogger()->debug(
                 "KernelGraph::LoadStoreTileGenerator::loadMacroTileLDS: OP {} LDS {} MacroTile {}",
@@ -970,12 +968,6 @@ namespace rocRoller
                     = m_context->registerTagManager()->getRegister(ldsTag); // stores offset
                 result.offset
                     = Register::Value::Literal(result.ldsAllocation->getLDSAllocation()->offset());
-            }
-            else
-            {
-                // Offset not available yet (e.g., modelling before codegen or no context)
-                result.ldsAllocation = nullptr;
-                result.offset        = nullptr;
             }
 
             auto [elemXTag, elemX] = m_graph->getDimension<ElementNumber>(tag, 0);
@@ -1059,9 +1051,8 @@ namespace rocRoller
         LoadStoreTileGenerator::LoadStoreTileInfo
             LoadStoreTileGenerator::loadMacroTileWAVELDSInfo(int tag, LoadLDSTile const& load)
         {
-            auto [ldsTag, lds]           = m_graph->getDimension<LDS>(tag);
+            auto [ldsTag, _]             = m_graph->getDimension<LDS>(tag);
             auto [waveTileTag, waveTile] = m_graph->getDimension<WaveTile>(tag);
-            (void)lds;
 
             rocRoller::Log::getLogger()->debug("KernelGraph::LoadStoreTileGenerator::"
                                                "loadMacroTileWAVELDS: OP {} LDS {} WaveTile {}",
@@ -1082,11 +1073,6 @@ namespace rocRoller
                 result.ldsAllocation = m_context->registerTagManager()->getRegister(ldsTag);
                 result.offset
                     = Register::Value::Literal(result.ldsAllocation->getLDSAllocation()->offset());
-            }
-            else
-            {
-                result.ldsAllocation = nullptr;
-                result.offset        = nullptr;
             }
 
             uint numElements       = waveTile.sizes[0] * waveTile.sizes[1];
@@ -1245,8 +1231,7 @@ namespace rocRoller
         LoadStoreTileGenerator::LoadStoreTileInfo
             LoadStoreTileGenerator::getLoadLDSTileInfo(int tag, LoadLDSTile const& load)
         {
-            auto [macTileTag, macTile] = m_graph->getDimension<MacroTile>(tag);
-            (void)macTileTag;
+            auto [_, macTile] = m_graph->getDimension<MacroTile>(tag);
 
             switch(macTile.memoryType)
             {
@@ -1309,8 +1294,7 @@ namespace rocRoller
         LoadStoreTileGenerator::LoadStoreTileInfo
             LoadStoreTileGenerator::getStoreLDSTileInfo(int tag, StoreLDSTile const& store)
         {
-            auto [macTileTag, macTile] = m_graph->getDimension<MacroTile>(tag);
-            (void)macTileTag;
+            auto [_, macTile] = m_graph->getDimension<MacroTile>(tag);
 
             switch(macTile.memoryType)
             {
@@ -1336,9 +1320,8 @@ namespace rocRoller
         LoadStoreTileGenerator::LoadStoreTileInfo
             LoadStoreTileGenerator::storeMacroTileLDSInfo(int tag, StoreLDSTile const& store)
         {
-            auto [ldsTag, lds]   = m_graph->getDimension<LDS>(tag);
+            auto [ldsTag, _]     = m_graph->getDimension<LDS>(tag);
             auto [tileTag, tile] = m_graph->getDimension<MacroTile>(tag);
-            (void)lds;
 
             rocRoller::Log::getLogger()->debug(
                 "KernelGraph::LoadStoreTileGenerator::storeMacroTileLDS: OP {} LDS {} MacroTile {} "
@@ -1449,13 +1432,11 @@ namespace rocRoller
         LoadStoreTileGenerator::LoadStoreTileInfo
             LoadStoreTileGenerator::storeMacroTileWAVELDSInfo(int tag, StoreLDSTile const& store)
         {
-            auto [ldsTag, lds]           = m_graph->getDimension<LDS>(tag);
-            auto [macTileTag, macTile]   = m_graph->getDimension<MacroTile>(tag);
+            auto [ldsTag, _lds]          = m_graph->getDimension<LDS>(tag);
+            auto [macTileTag, _macTile]  = m_graph->getDimension<MacroTile>(tag);
             auto [waveTileTag, waveTile] = m_graph->getDimension<WaveTile>(tag);
             uint waveTileNumElements     = waveTile.sizes[0] * waveTile.sizes[1];
             auto varType                 = store.varType;
-            (void)lds;
-            (void)macTile;
 
             rocRoller::Log::getLogger()->debug(
                 "KernelGraph::LoadStoreTileGenerator::storeMacroTileWAVELDS: OP {} LDS {} "
