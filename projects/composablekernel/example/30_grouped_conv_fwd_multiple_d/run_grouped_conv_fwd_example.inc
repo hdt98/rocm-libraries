@@ -87,7 +87,7 @@ using DeviceConvFwdInstance =
         8>; // Num groups to merge
 */
 
-
+/*
 template <ck::index_t NDimSpatial>
 using DeviceConvFwdInstance =
     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<
@@ -141,9 +141,9 @@ using DeviceConvFwdInstance =
         ck::LoopScheduler::Default,
         8, // Num groups to merge
         false>; // Double buffering
+*/
 
 // Best V3 instance
-/*
 template <ck::index_t NDimSpatial>
 using DeviceConvFwdInstance =
     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<
@@ -197,9 +197,9 @@ using DeviceConvFwdInstance =
         WeiKernelDataType,
         false, // No direct load
         8>; // Num groups to merge
-*/
 
 // Baseline (current best instance)
+/*
 template <ck::index_t NDimSpatial>
 using DeviceConvFwdInstance =
     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<
