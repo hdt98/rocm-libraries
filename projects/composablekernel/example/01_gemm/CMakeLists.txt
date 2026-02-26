@@ -529,6 +529,7 @@ add_example_executable(example_gemm_wmma_fp16_fp8_v3 gemm_wmma_fp16_fp8_v3.cpp)
 add_example_dependencies(example_gemm_wmma example_gemm_wmma_fp16_fp8_v3)
 target_compile_options(example_gemm_wmma_fp16_fp8_v3 PRIVATE -save-temps=obj -Wno-gnu-line-marker -mprintf-kind=buffered)
 
+
 add_example_executable(example_gemm_wmma_fp16_pk_i4_v3_b_scale gemm_wmma_fp16_pk_i4_v3_b_scale.cpp)
 add_example_dependencies(example_gemm_wmma example_gemm_wmma_fp16_pk_i4_v3_b_scale)
 

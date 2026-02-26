@@ -414,7 +414,7 @@ struct BlockwiseGemmWmmaops_pipeline_base
 #endif
 
 #if defined(__gfx13__)
-    static constexpr auto MConsecutiveAccs = 
+    static constexpr auto MConsecutiveAccs =
         wmma_gemm.GetCMSubGroupNThreadPerSubGroupMAccVgprsThreadBlkLengths()[I2];
 #else
     static constexpr auto MAccVgprs =
@@ -427,14 +427,15 @@ struct BlockwiseGemmWmmaops_pipeline_base
 #if defined(__gfx13__)
         constexpr auto c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens =
             wmma_gemm.GetCMSubGroupNThreadPerSubGroupMAccVgprsThreadBlkLengths();
-        constexpr auto MLoopAcc  = c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens[I1];
+        constexpr auto MLoopAcc      = c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens[I1];
         constexpr auto MAccVgprsTemp = c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens[I2];
-        constexpr auto AccStride = c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens[I3];
+        constexpr auto AccStride     = c_msubgroup_nthreadpersubgroup_maccvgprs_tblk_lens[I3];
         return make_naive_tensor_descriptor(
             // |  MRepeat  |  MWave  |  MLoopAcc  | MSubGroup  |  NRepeat  |
             // |  NWave  |  NThreadPerSubGroup  |  MLoopAcc  |
 
-            make_tuple(Number<MRepeat>{}, I1, MLoopAcc, I1, Number<NRepeat>{}, I1, I1, MAccVgprsTemp),
+            make_tuple(
+                Number<MRepeat>{}, I1, MLoopAcc, I1, Number<NRepeat>{}, I1, I1, MAccVgprsTemp),
             make_tuple(Number<NRepeat>{} * MLoopAcc * MAccVgprsTemp * AccStride,
                        Number<NRepeat>{} * MLoopAcc * MAccVgprsTemp * AccStride,
                        MAccVgprsTemp * AccStride,

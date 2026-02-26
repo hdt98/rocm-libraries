@@ -96,9 +96,9 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
         break;
     default:
         a_m_k.GenerateTensorValue(GeneratorTensor_Sequential<ADataType, 0>{});
-        b_k_n.GenerateTensorValue(GeneratorTensor_Sequential<BDataType, 1>{});    
-        //a_m_k.GenerateTensorValue(GeneratorTensor_3<ADataType>{0.0, 1.0});
-        //b_k_n.GenerateTensorValue(GeneratorTensor_3<BDataType>{-0.5, 0.5});
+        b_k_n.GenerateTensorValue(GeneratorTensor_Sequential<BDataType, 1>{});
+        // a_m_k.GenerateTensorValue(GeneratorTensor_3<ADataType>{0.0, 1.0});
+        // b_k_n.GenerateTensorValue(GeneratorTensor_3<BDataType>{-0.5, 0.5});
     }
 
     Tensor<CDataType> c_m_n_host_result(f_host_tensor_descriptor(M, N, StrideC, CLayout{}));
@@ -129,8 +129,8 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
 #endif
     DeviceMem workspace;
 
-    //dump_tensor(a_m_k);
-    //dump_tensor(b_k_n);
+    // dump_tensor(a_m_k);
+    // dump_tensor(b_k_n);
 
     auto a_element_op = AElementOp{};
     auto b_element_op = BElementOp{};
