@@ -215,6 +215,9 @@ namespace rocRoller::KernelGraph
                 const auto addresses
                     = std::forward<decltype(generator)>(generator).template to<std::vector>();
 
+                AssertFatal(!addresses.empty(),
+                            "No LDS addresses were generated for node.",
+                            ShowValue(node));
                 std::vector<size_t> normalizedAddresses;
                 auto minAddress = *std::min_element(addresses.begin(), addresses.end());
                 for(auto addr : addresses)
