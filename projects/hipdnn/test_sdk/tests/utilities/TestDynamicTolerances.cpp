@@ -1077,11 +1077,11 @@ TEST(TestCalculateConvFpropTolerance, DetectsFailure)
     auto tol = calculateConvFpropTolerance<half, half, float>(-1.0, 1.0, -1.0, 1.0, dims);
 
     // tol approx 0.1
-    EXPECT_LT(tol, 0.15_h);
-    EXPECT_GT(tol, 0.09_h);
+    EXPECT_LT(tol, 0.15f);
+    EXPECT_GT(tol, 0.09f);
 
     auto validator = hipdnn_test_sdk::utilities::createAllCloseValidator(
-        hipdnn_data_sdk::data_objects::DataType::FLOAT, static_cast<float>(tol), 0.0f);
+        hipdnn_data_sdk::data_objects::DataType::FLOAT, tol, 0.0f);
 
     bool valid = validator->allClose(*baseline, *actualPassing);
     EXPECT_TRUE(valid) << "Validator should have passed";
