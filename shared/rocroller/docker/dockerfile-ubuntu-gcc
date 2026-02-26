@@ -21,6 +21,7 @@ RUN apt-get update && apt-get reinstall -y software-properties-common && add-apt
 
 RUN apt-get update && apt-get install -y \
    bc \
+   doxygen \
    gdb \
    libopenblas-dev \
    libncurses-dev \
@@ -102,6 +103,8 @@ RUN pip install \
 ENV PATH="/opt/rocm/bin:${PATH}"
 ENV PYTHONPATH="/opt/rocm:${PYTHONPATH}"
 ENV LLVM_PATH="/opt/rocm/_rocm_sdk_core/lib/llvm"
+ENV LD_LIBRARY_PATH="/opt/rocm/_rocm_sdk_core/lib:/opt/rocm/_rocm_sdk_core/lib/llvm/lib:${LD_LIBRARY_PATH}"
+ENV LIBRARY_PATH="/opt/rocm/_rocm_sdk_core/lib:/opt/rocm/_rocm_sdk_core/lib/llvm/lib:${LIBRARY_PATH}"
 # This command is executed as root to force the creaton of ROCm SDK metadata files.
 RUN rocm-sdk path --cmake
 RUN echo "$(rocm-sdk path --root)/lib" > /etc/ld.so.conf.d/rocm.conf && ldconfig
