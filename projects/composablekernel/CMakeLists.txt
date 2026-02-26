@@ -396,6 +396,7 @@ endif()
 option(USE_BITINT_EXTENSION_INT4 "Whether to enable clang's BitInt extension to provide int4 data type." OFF)
 option(ENABLE_ASM_DUMP "Whether to enable assembly dump for kernels." OFF)
 option(ENABLE_JSON_DUMP "Whether to enable json dump for examples." OFF)
+option(CK_TEST_DISABLE_GPU_VALIDATION "Whether to disable GPU validation in CK tests." OFF )
 
 if(USE_BITINT_EXTENSION_INT4)
     add_compile_definitions(CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4)
@@ -412,6 +413,10 @@ endif()
 if (ENABLE_JSON_DUMP)
     add_compile_definitions(CK_ENABLE_JSON_DUMP)
     message("CK compiled with ENABLE_JSON_DUMP set to ${ENABLE_JSON_DUMP}")
+endif()
+
+if (CK_TEST_DISABLE_GPU_VALIDATION)
+    add_compile_definitions(CK_TEST_DISABLE_GPU_VALIDATION)
 endif()
 
 ## Threads

@@ -68,6 +68,11 @@ template <ck::index_t NDimSpatial,
           typename DataType>
 bool RunConvTest(const ck::utils::conv::ConvParam& param)
 {
+#if defined(CK_TEST_DISABLE_GPU_VALIDATION)
+    static constexpr int verify_ = 1; // CPU reference
+#else
+    static constexpr int verify_ = 2; // GPU reference
+#endif
     using IndexType = ck::long_index_t;
     return ck::profiler::profile_grouped_conv_fwd_impl<NDimSpatial,
                                                        InLayout,
@@ -79,10 +84,10 @@ bool RunConvTest(const ck::utils::conv::ConvParam& param)
                                                        DataType,
                                                        DataType,
                                                        IndexType>(
-        2,     // do_verification
-        1,     // init_method
-        false, // do_log
-        false, // time_kernel
+        verify_, // do_verification
+        1,       // init_method
+        false,   // do_log
+        false,   // time_kernel
         param,
         ck::tensor_operation::element_wise::PassThrough{},
         instance_index);

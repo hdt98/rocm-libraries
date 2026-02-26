@@ -74,6 +74,11 @@ template <ck::index_t NDimSpatial,
           typename OutDataType>
 bool RunConvBwdWeightTest(const ck::utils::conv::ConvParam& param, ck::index_t split_k)
 {
+#if defined(CK_TEST_DISABLE_GPU_VALIDATION)
+    static constexpr int verify_ = 1; // CPU reference
+#else
+    static constexpr int verify_ = 2; // GPU reference
+#endif
     return ck::profiler::profile_grouped_conv_bwd_weight_impl<NDimSpatial,
                                                               InLayout,
                                                               WeiLayout,
@@ -81,7 +86,7 @@ bool RunConvBwdWeightTest(const ck::utils::conv::ConvParam& param, ck::index_t s
                                                               InDataType,
                                                               WeiDataType,
                                                               OutDataType>(
-        2,                       // do_verification
+        verify_,                 // do_verification
         1,                       // init_method
         false,                   // do_log
         false,                   // time_kernel

@@ -163,7 +163,7 @@ bool profile_gemm_universal_streamk_impl(int do_verification,
             b_element_op,
             c_element_op);
 
-        if(ref_gemm_gpu.IsSupportedArgument(&ref_argument_gpu))
+        if(do_verification == 2 && ref_gemm_gpu.IsSupportedArgument(&ref_argument_gpu))
         {
             ref_invoker_gpu.Run(ref_argument_gpu, StreamConfig{nullptr, true});
             c_m_n_device_ref_buf.FromDevice(c_m_n_host_result.mData.data());

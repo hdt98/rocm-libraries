@@ -133,8 +133,42 @@ bool profile_grouped_conv_fwd_scaleadd_ab_impl(int do_verification,
     wei_device_buf.ToDevice(weight.mData.data());
     wei_bias_device_buf.ToDevice(weight_bias.mData.data());
 
-    // Run GPU reference
-    if(do_verification)
+    // Run CPU reference
+    if(do_verification == 1)
+    {
+
+        const std::array<ck::Tensor<InDataType>, NumAs - 1> elementwise_a_tensors  = {input_bias};
+        const std::array<ck::Tensor<WeiDataType>, NumBs - 1> elementwise_b_tensors = {weight_bias};
+        auto ref_conv = ck::tensor_operation::host::ReferenceConvFwd<NDimSpatial,
+                                                                     InDataType,
+                                                                     WeiDataType,
+                                                                     OutDataType,
+                                                                     InElementOp,
+                                                                     WeiElementOp,
+                                                                     OutElementOp,
+                                                                     NumAs - 1,
+                                                                     NumBs - 1>();
+
+        auto ref_invoker  = ref_conv.MakeInvoker();
+        auto ref_argument = ref_conv.MakeArgument(input,
+                                                  weight,
+                                                  host_output,
+                                                  conv_param.conv_filter_strides_,
+                                                  conv_param.conv_filter_dilations_,
+                                                  conv_param.input_left_pads_,
+                                                  conv_param.input_right_pads_,
+                                                  in_element_op,
+                                                  wei_element_op,
+                                                  out_element_op,
+                                                  elementwise_a_tensors,
+                                                  elementwise_b_tensors);
+
+        // init host output to zero
+        host_output.SetZero();
+
+        ref_invoker.Run(ref_argument);
+    }
+    else if(do_verification == 2) // Run GPU reference
     {
         std::array<const InDataType*, 2> in_ptrs = {
             reinterpret_cast<const InDataType*>(in_device_buf.GetDeviceBuffer()),
@@ -327,7 +361,11 @@ class TestGroupedConvndFwdScaleaddAB : public ::testing::Test
     using OutLayout   = std::tuple_element_t<5, Tuple>;
 
     std::vector<ck::utils::conv::ConvParam> conv_params;
-
+#if defined(CK_TEST_DISABLE_GPU_VALIDATION)
+    static constexpr int verify_ = 1; // CPU reference
+#else
+    static constexpr int verify_ = 2; // GPU reference
+#endif
     template <ck::index_t NDimSpatial>
     void Run()
     {
@@ -347,10 +385,10 @@ class TestGroupedConvndFwdScaleaddAB : public ::testing::Test
                                                                             InDataType,
                                                                             WeiDataType,
                                                                             OutDataType>(
-                               true,  // do_verification
-                               1,     // init_method: integer value
-                               false, // do_log
-                               false, // time_kernel
+                               verify_, // do_verification
+                               1,       // init_method: integer value
+                               false,   // do_log
+                               false,   // time_kernel
                                param);
         }
         EXPECT_TRUE(pass);
