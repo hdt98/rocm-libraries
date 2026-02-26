@@ -8,7 +8,7 @@
 #include "ck/tensor_operation/gpu/thread/threadwise_tensor_slice_transfer.hpp"
 #include "ck/tensor_operation/gpu/warp/xdlops_gemm.hpp"
 #include "ck/tensor_description/tensor_adaptor.hpp"
-
+#include "ck/utilitity/vector_load_functor.hpp"
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
 
@@ -37,10 +37,10 @@ template <index_t BlockSize,
           bool LdsScalarLoadToVgpr = false>
 struct BlockwiseGemmXdlops_pipeline_base
 {
-    static constexpr auto I0 = Number<0>{};
-    static constexpr auto I1 = Number<1>{};
-    static constexpr auto I2 = Number<2>{};
-    static constexpr auto I3 = Number<3>{};
+    static constexpr auto I0 = Number<0>;
+    static constexpr auto I1 = Number<1>;
+    static constexpr auto I2 = Number<2>;
+    static constexpr auto I3 = Number<3>;
 
     using ThisThreadBlock = ThisThreadBlock<BlockSize>;
 

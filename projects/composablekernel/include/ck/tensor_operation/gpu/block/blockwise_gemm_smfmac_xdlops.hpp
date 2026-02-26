@@ -380,16 +380,37 @@ struct BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1
                     vector_type<ComputeTypeB, KPack> b_thread_vec;
                     vector_type<int32_t, KPack / elems_per_idx> idx_vec;
 
-                    static_for<0, KPack / 2, 1>{}([&](auto i) {
-                        a_thread_vec.template AsType<ComputeTypeA>()(i) =
-                            a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                                make_tuple(0, 0, 0, k / 2 + i))>{}];
-                    });
+                    auto loadA = load_thread_vec<decltype(a_thread_vec),
+                                                 decltype(a_thread_buf),
+                                                 a_thread_desc_,
+                                                 FloatAB,
+                                                 0,
+                                                 0,
+                                                 0,
+                                                 Add<Ik, k / 2>>{a_thread_vec, a_thread_buf};
+                    auto loadB = load_thread_vec<decltype(b_thread_vec),
+                                                 decltype(b_thread_buf),
+                                                 b_thread_desc_,
+                                                 FloatAB,
+                                                 0,
+                                                 0,
+                                                 0,
+                                                 Add<Ik, k>>{b_thread_vec, b_thread_buf};
 
-                    static_for<0, KPack, 1>{}([&](auto i) {
-                        b_thread_vec.template AsType<ComputeTypeB>()(2 * i) = b_thread_buf
-                            [Number<b_thread_desc_.CalculateOffset(make_tuple(0, 0, 0, k + i))>{}];
-                    });
+                    static_for<0, KPack / 2, 1>{}(loadA);
+                    static_for<0, KPack, 1>{}(loadB);
+
+                    // static_for<0, KPack / 2, 1>{}([&](auto i) {
+                    //     a_thread_vec.template AsType<ComputeTypeA>()(i) =
+                    //         a_thread_buf[Number<a_thread_desc_.CalculateOffset(
+                    //             make_tuple(0, 0, 0, k / 2 + i))>{}];
+                    // });
+
+                    // static_for<0, KPack, 1>{}([&](auto i) {
+                    //     b_thread_vec.template AsType<ComputeTypeB>()(2 * i) = b_thread_buf
+                    //         [Number<b_thread_desc_.CalculateOffset(make_tuple(0, 0, 0, k +
+                    //         i))>{}];
+                    // });
 
                     static_for<0, KPack / elems_per_idx, 1>{}([&](auto i) {
                         idx_vec.template AsType<int32_t>()(i) = idx_buf[k / elems_per_idx + i];

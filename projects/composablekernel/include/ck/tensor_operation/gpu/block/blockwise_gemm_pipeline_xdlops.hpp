@@ -600,14 +600,33 @@ struct BlockwiseGemmXdlops_pipeline_v4
                             vector_type<FloatAB, KPack> a_thread_vec;
                             vector_type<FloatAB, KPack> b_thread_vec;
 
-                            static_for<0, KPack, 1>{}([&](auto ik) {
-                                a_thread_vec.template AsType<FloatAB>()(ik) =
-                                    a_thread_bufs[PingP1{}][Number<a_thread_desc_.CalculateOffset(
-                                        make_tuple(m0, I0, k0, ik))>{}];
-                                b_thread_vec.template AsType<FloatAB>()(ik) =
-                                    b_thread_bufs[PingP1{}][Number<b_thread_desc_.CalculateOffset(
-                                        make_tuple(n0, I0, k0, ik))>{}];
-                            });
+                            auto loadA = load_thread_vec<decltype(a_thread_vec),
+                                                         decltype(a_thread_bufs[PingP1{}]),
+                                                         a_thread_desc_,
+                                                         FloatAB,
+                                                         m0,
+                                                         I0,
+                                                         k0,
+                                                         Ik>{a_thread_vec, a_thread_bufs[PingP1{}]};
+                            auto loadB = load_thread_vec<decltype(b_thread_vec),
+                                                         decltype(b_thread_bufs[PingP1{}]),
+                                                         b_thread_desc_,
+                                                         FloatAB,
+                                                         n0,
+                                                         I0,
+                                                         k0,
+                                                         Ik>{b_thread_vec, b_thread_bufs[PingP1{}]};
+
+                            static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
+
+                            // static_for<0, KPack, 1>{}([&](auto ik) {
+                            //     a_thread_vec.template AsType<FloatAB>()(ik) =
+                            //         a_thread_bufs[PingP1{}][Number<a_thread_desc_.CalculateOffset(
+                            //             make_tuple(m0, I0, k0, ik))>{}];
+                            //     b_thread_vec.template AsType<FloatAB>()(ik) =
+                            //         b_thread_bufs[PingP1{}][Number<b_thread_desc_.CalculateOffset(
+                            //             make_tuple(n0, I0, k0, ik))>{}];
+                            // });
 
                             using mfma_input_type =
                                 typename vector_type<FloatAB, xdlops_gemm.K1PerXdlops>::type;
@@ -668,14 +687,33 @@ struct BlockwiseGemmXdlops_pipeline_v4
                             vector_type<FloatAB, KPack> a_thread_vec;
                             vector_type<FloatAB, KPack> b_thread_vec;
 
-                            static_for<0, KPack, 1>{}([&](auto ik) {
-                                a_thread_vec.template AsType<FloatAB>()(ik) =
-                                    a_thread_bufs[PingP2{}][Number<a_thread_desc_.CalculateOffset(
-                                        make_tuple(m0, I0, k0, ik))>{}];
-                                b_thread_vec.template AsType<FloatAB>()(ik) =
-                                    b_thread_bufs[PingP2{}][Number<b_thread_desc_.CalculateOffset(
-                                        make_tuple(n0, I0, k0, ik))>{}];
-                            });
+                            auto loadA = load_thread_vec<decltype(a_thread_vec),
+                                                         decltype(a_thread_bufs[PingP2{}]),
+                                                         a_thread_desc_,
+                                                         FloatAB,
+                                                         m0,
+                                                         I0,
+                                                         k0,
+                                                         Ik>{a_thread_vec, a_thread_bufs[PingP2{}]};
+                            auto loadB = load_thread_vec<decltype(b_thread_vec),
+                                                         decltype(b_thread_bufs[PingP2{}]),
+                                                         b_thread_desc_,
+                                                         FloatAB,
+                                                         n0,
+                                                         I0,
+                                                         k0,
+                                                         Ik>{b_thread_vec, b_thread_bufs[PingP2{}]};
+
+                            static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
+
+                            // static_for<0, KPack, 1>{}([&](auto ik) {
+                            //     a_thread_vec.template AsType<FloatAB>()(ik) =
+                            //         a_thread_bufs[PingP2{}][Number<a_thread_desc_.CalculateOffset(
+                            //             make_tuple(m0, I0, k0, ik))>{}];
+                            //     b_thread_vec.template AsType<FloatAB>()(ik) =
+                            //         b_thread_bufs[PingP2{}][Number<b_thread_desc_.CalculateOffset(
+                            //             make_tuple(n0, I0, k0, ik))>{}];
+                            // });
 
                             using mfma_input_type =
                                 typename vector_type<FloatAB, xdlops_gemm.K1PerXdlops>::type;
@@ -736,14 +774,33 @@ struct BlockwiseGemmXdlops_pipeline_v4
                         vector_type<FloatAB, KPack> a_thread_vec;
                         vector_type<FloatAB, KPack> b_thread_vec;
 
-                        static_for<0, KPack, 1>{}([&](auto ik) {
-                            a_thread_vec.template AsType<FloatAB>()(ik) =
-                                a_thread_bufs[PingP1{}][Number<a_thread_desc_.CalculateOffset(
-                                    make_tuple(m0, I0, k0, ik))>{}];
-                            b_thread_vec.template AsType<FloatAB>()(ik) =
-                                b_thread_bufs[PingP1{}][Number<b_thread_desc_.CalculateOffset(
-                                    make_tuple(n0, I0, k0, ik))>{}];
-                        });
+                        auto loadA = load_thread_vec<decltype(a_thread_vec),
+                                                     decltype(a_thread_bufs[PingP1{}]),
+                                                     a_thread_desc_,
+                                                     FloatAB,
+                                                     m0,
+                                                     I0,
+                                                     k0,
+                                                     Ik>{a_thread_vec, a_thread_bufs[PingP1{}]};
+                        auto loadB = load_thread_vec<decltype(b_thread_vec),
+                                                     decltype(b_thread_bufs[PingP1{}]),
+                                                     b_thread_desc_,
+                                                     FloatAB,
+                                                     n0,
+                                                     I0,
+                                                     k0,
+                                                     Ik>{b_thread_vec, b_thread_bufs[PingP1{}]};
+
+                        static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
+
+                        // static_for<0, KPack, 1>{}([&](auto ik) {
+                        //     a_thread_vec.template AsType<FloatAB>()(ik) =
+                        //         a_thread_bufs[PingP1{}][Number<a_thread_desc_.CalculateOffset(
+                        //             make_tuple(m0, I0, k0, ik))>{}];
+                        //     b_thread_vec.template AsType<FloatAB>()(ik) =
+                        //         b_thread_bufs[PingP1{}][Number<b_thread_desc_.CalculateOffset(
+                        //             make_tuple(n0, I0, k0, ik))>{}];
+                        // });
 
                         using mfma_input_type =
                             typename vector_type<FloatAB, xdlops_gemm.K1PerXdlops>::type;
@@ -794,14 +851,33 @@ struct BlockwiseGemmXdlops_pipeline_v4
                         vector_type<FloatAB, KPack> a_thread_vec;
                         vector_type<FloatAB, KPack> b_thread_vec;
 
-                        static_for<0, KPack, 1>{}([&](auto ik) {
-                            a_thread_vec.template AsType<FloatAB>()(ik) =
-                                a_thread_bufs[PingP2{}][Number<a_thread_desc_.CalculateOffset(
-                                    make_tuple(m0, I0, k0, ik))>{}];
-                            b_thread_vec.template AsType<FloatAB>()(ik) =
-                                b_thread_bufs[PingP2{}][Number<b_thread_desc_.CalculateOffset(
-                                    make_tuple(n0, I0, k0, ik))>{}];
-                        });
+                        auto loadA = load_thread_vec<decltype(a_thread_vec),
+                                                     decltype(a_thread_bufs[PingP2{}]),
+                                                     a_thread_desc_,
+                                                     FloatAB,
+                                                     m0,
+                                                     I0,
+                                                     k0,
+                                                     Ik>{a_thread_vec, a_thread_bufs[PingP2{}]};
+                        auto loadB = load_thread_vec<decltype(b_thread_vec),
+                                                     decltype(b_thread_bufs[PingP2{}]),
+                                                     b_thread_desc_,
+                                                     FloatAB,
+                                                     n0,
+                                                     I0,
+                                                     k0,
+                                                     Ik>{b_thread_vec, b_thread_bufs[PingP2{}]};
+
+                        static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
+
+                        // static_for<0, KPack, 1>{}([&](auto ik) {
+                        //     a_thread_vec.template AsType<FloatAB>()(ik) =
+                        //         a_thread_bufs[PingP2{}][Number<a_thread_desc_.CalculateOffset(
+                        //             make_tuple(m0, I0, k0, ik))>{}];
+                        //     b_thread_vec.template AsType<FloatAB>()(ik) =
+                        //         b_thread_bufs[PingP2{}][Number<b_thread_desc_.CalculateOffset(
+                        //             make_tuple(n0, I0, k0, ik))>{}];
+                        // });
 
                         using mfma_input_type =
                             typename vector_type<FloatAB, xdlops_gemm.K1PerXdlops>::type;
@@ -825,14 +901,33 @@ struct BlockwiseGemmXdlops_pipeline_v4
                         vector_type<FloatAB, KPack> a_thread_vec;
                         vector_type<FloatAB, KPack> b_thread_vec;
 
-                        static_for<0, KPack, 1>{}([&](auto ik) {
-                            a_thread_vec.template AsType<FloatAB>()(ik) =
-                                a_thread_bufs[PongP2{}][Number<a_thread_desc_.CalculateOffset(
-                                    make_tuple(m0, I0, k, ik))>{}];
-                            b_thread_vec.template AsType<FloatAB>()(ik) =
-                                b_thread_bufs[PongP2{}][Number<b_thread_desc_.CalculateOffset(
-                                    make_tuple(n0, I0, k, ik))>{}];
-                        });
+                        auto loadA = load_thread_vec<decltype(a_thread_vec),
+                                                     decltype(a_thread_bufs[PingP2{}]),
+                                                     a_thread_desc_,
+                                                     FloatAB,
+                                                     m0,
+                                                     I0,
+                                                     k0,
+                                                     Ik>{a_thread_vec, a_thread_bufs[PingP2{}]};
+                        auto loadB = load_thread_vec<decltype(b_thread_vec),
+                                                     decltype(b_thread_bufs[PingP2{}]),
+                                                     b_thread_desc_,
+                                                     FloatAB,
+                                                     n0,
+                                                     I0,
+                                                     k0,
+                                                     Ik>{b_thread_vec, b_thread_bufs[PingP2{}]};
+
+                        static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
+
+                        // static_for<0, KPack, 1>{}([&](auto ik) {
+                        //     a_thread_vec.template AsType<FloatAB>()(ik) =
+                        //         a_thread_bufs[PongP2{}][Number<a_thread_desc_.CalculateOffset(
+                        //             make_tuple(m0, I0, k, ik))>{}];
+                        //     b_thread_vec.template AsType<FloatAB>()(ik) =
+                        //         b_thread_bufs[PongP2{}][Number<b_thread_desc_.CalculateOffset(
+                        //             make_tuple(n0, I0, k, ik))>{}];
+                        // });
 
                         using mfma_input_type =
                             typename vector_type<FloatAB, xdlops_gemm.K1PerXdlops>::type;
@@ -885,14 +980,33 @@ struct BlockwiseGemmXdlops_pipeline_v4
                         vector_type<FloatAB, KPack> a_thread_vec;
                         vector_type<FloatAB, KPack> b_thread_vec;
 
-                        static_for<0, KPack, 1>{}([&](auto ik) {
-                            a_thread_vec.template AsType<FloatAB>()(ik) =
-                                a_thread_bufs[PingP1{}][Number<a_thread_desc_.CalculateOffset(
-                                    make_tuple(m0, I0, k0, ik))>{}];
-                            b_thread_vec.template AsType<FloatAB>()(ik) =
-                                b_thread_bufs[PingP1{}][Number<b_thread_desc_.CalculateOffset(
-                                    make_tuple(n0, I0, k0, ik))>{}];
-                        });
+                        auto loadA = load_thread_vec<decltype(a_thread_vec),
+                                                     decltype(a_thread_bufs[PingP1{}]),
+                                                     a_thread_desc_,
+                                                     FloatAB,
+                                                     m0,
+                                                     I0,
+                                                     k0,
+                                                     Ik>{a_thread_vec, a_thread_bufs[PingP1{}]};
+                        auto loadB = load_thread_vec<decltype(b_thread_vec),
+                                                     decltype(b_thread_bufs[PingP1{}]),
+                                                     b_thread_desc_,
+                                                     FloatAB,
+                                                     n0,
+                                                     I0,
+                                                     k0,
+                                                     Ik>{b_thread_vec, b_thread_bufs[PingP1{}]};
+
+                        static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
+
+                        // static_for<0, KPack, 1>{}([&](auto ik) {
+                        //     a_thread_vec.template AsType<FloatAB>()(ik) =
+                        //         a_thread_bufs[PingP1{}][Number<a_thread_desc_.CalculateOffset(
+                        //             make_tuple(m0, I0, k0, ik))>{}];
+                        //     b_thread_vec.template AsType<FloatAB>()(ik) =
+                        //         b_thread_bufs[PingP1{}][Number<b_thread_desc_.CalculateOffset(
+                        //             make_tuple(n0, I0, k0, ik))>{}];
+                        // });
 
                         using mfma_input_type =
                             typename vector_type<FloatAB, xdlops_gemm.K1PerXdlops>::type;
@@ -922,14 +1036,33 @@ struct BlockwiseGemmXdlops_pipeline_v4
                         vector_type<FloatAB, KPack> a_thread_vec;
                         vector_type<FloatAB, KPack> b_thread_vec;
 
-                        static_for<0, KPack, 1>{}([&](auto ik) {
-                            a_thread_vec.template AsType<FloatAB>()(ik) =
-                                a_thread_bufs[PingP2{}][Number<a_thread_desc_.CalculateOffset(
-                                    make_tuple(m0, I0, k0, ik))>{}];
-                            b_thread_vec.template AsType<FloatAB>()(ik) =
-                                b_thread_bufs[PingP2{}][Number<b_thread_desc_.CalculateOffset(
-                                    make_tuple(n0, I0, k0, ik))>{}];
-                        });
+                        auto loadA = load_thread_vec<decltype(a_thread_vec),
+                                                     decltype(a_thread_bufs[PingP2{}]),
+                                                     a_thread_desc_,
+                                                     FloatAB,
+                                                     m0,
+                                                     I0,
+                                                     k0,
+                                                     Ik>{a_thread_vec, a_thread_bufs[PingP2{}]};
+                        auto loadB = load_thread_vec<decltype(b_thread_vec),
+                                                     decltype(b_thread_bufs[PingP2{}]),
+                                                     b_thread_desc_,
+                                                     FloatAB,
+                                                     n0,
+                                                     I0,
+                                                     k0,
+                                                     Ik>{b_thread_vec, b_thread_bufs[PingP2{}]};
+
+                        static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
+
+                        // static_for<0, KPack, 1>{}([&](auto ik) {
+                        //     a_thread_vec.template AsType<FloatAB>()(ik) =
+                        //         a_thread_bufs[PingP2{}][Number<a_thread_desc_.CalculateOffset(
+                        //             make_tuple(m0, I0, k0, ik))>{}];
+                        //     b_thread_vec.template AsType<FloatAB>()(ik) =
+                        //         b_thread_bufs[PingP2{}][Number<b_thread_desc_.CalculateOffset(
+                        //             make_tuple(n0, I0, k0, ik))>{}];
+                        // });
 
                         using mfma_input_type =
                             typename vector_type<FloatAB, xdlops_gemm.K1PerXdlops>::type;
