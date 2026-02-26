@@ -5066,13 +5066,17 @@ struct ConvWinogradNHWCTransposingSolver
     {
         const bool is_wrw = problem.IsDirectionBackwardWrW();
 
+        // Layout string "NCDHW" supports both 4D (NCHW) and 5D (NCDHW) tensors:
+        // - For 4D tensors: Automatically interpreted as NCHW (D dimension is implicit/1)
+        // - For 5D tensors: Full NCDHW layout for 3D convolutions
+        // This makes the transposing solver future-proof for both 2D and 3D convolutions.
         auto ret = std::array<ProblemTensorTransposeDescriptor<Problem, InvokeParams>, 3>{{
             {
                 &Problem::GetIn,
                 &Problem::GetIn,
                 &InvokeParams::inDesc,
                 {&InvokeParams::in},
-                "NCHW", // in (dy for WrW): always an input, transpose NHWC->NCHW
+                "NCDHW", // in (dy for WrW): always an input, transpose NHWC/NDHWC->NCHW/NCDHW
                 true,
             },
             {
@@ -5080,7 +5084,7 @@ struct ConvWinogradNHWCTransposingSolver
                 &Problem::GetWeights,
                 &InvokeParams::wDesc,
                 {},
-                "NCHW",
+                "NCDHW", // weights: layout adapts to tensor dimensionality
                 !is_wrw, // Fwd/Bwd: w is input; WrW: w (dw) is output
             },
             {
@@ -5088,8 +5092,8 @@ struct ConvWinogradNHWCTransposingSolver
                 &Problem::GetOut,
                 &InvokeParams::outDesc,
                 {},
-                "NCHW",
-                is_wrw, // Fwd/Bwd: out is output; WrW: out (x) is input
+                "NCDHW", // out: layout adapts to tensor dimensionality
+                is_wrw,  // Fwd/Bwd: out is output; WrW: out (x) is input
             },
         }};
 
