@@ -1051,7 +1051,7 @@ namespace rocRoller
         LoadStoreTileGenerator::LoadStoreTileInfo
             LoadStoreTileGenerator::loadMacroTileWAVELDSInfo(int tag, LoadLDSTile const& load)
         {
-            auto [ldsTag, _]             = m_graph->getDimension<LDS>(tag);
+            auto [ldsTag, _lds]          = m_graph->getDimension<LDS>(tag);
             auto [waveTileTag, waveTile] = m_graph->getDimension<WaveTile>(tag);
 
             rocRoller::Log::getLogger()->debug("KernelGraph::LoadStoreTileGenerator::"
