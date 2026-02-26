@@ -31,23 +31,23 @@ static auto _ = []() {
             using QuantGroupSize = ck_tile::QuantGroupShape<ck_tile::sequence<1, 8, 128>>;
             return RUN_GEMM_EXAMPLE_PREC_TYPE;
         };
-    // lut[hash_multiple_strings(
-    //     {"fp8", "bquant", "preshuffleb", "non-preshufflequant", "1x32x128"})] =
-    //     [](const ck_tile::ArgParser& arg_parser) {
-    //         using QuantGroupSize = ck_tile::QuantGroupShape<ck_tile::sequence<1, 32, 128>>;
-    //         return RUN_GEMM_EXAMPLE_PREC_TYPE;
-    //     };
-    // lut[hash_multiple_strings(
-    //     {"fp8", "bquant", "preshuffleb", "non-preshufflequant", "1x64x128"})] =
-    //     [](const ck_tile::ArgParser& arg_parser) {
-    //         using QuantGroupSize = ck_tile::QuantGroupShape<ck_tile::sequence<1, 64, 128>>;
-    //         return RUN_GEMM_EXAMPLE_PREC_TYPE;
-    //     };
-    // lut[hash_multiple_strings(
-    //     {"fp8", "bquant", "preshuffleb", "non-preshufflequant", "1x128x128"})] =
-    //     [](const ck_tile::ArgParser& arg_parser) {
-    //         using QuantGroupSize = ck_tile::QuantGroupShape<ck_tile::sequence<1, 128, 128>>;
-    //         return RUN_GEMM_EXAMPLE_PREC_TYPE;
-    //     };
+    lut[hash_multiple_strings(
+        {"fp8", "bquant", "preshuffleb", "non-preshufflequant", "1x32x128"})] =
+        [](const ck_tile::ArgParser& arg_parser) {
+            using QuantGroupSize = ck_tile::QuantGroupShape<ck_tile::sequence<1, 32, 128>>;
+            return RUN_GEMM_EXAMPLE_PREC_TYPE;
+        };
+    lut[hash_multiple_strings(
+        {"fp8", "bquant", "preshuffleb", "non-preshufflequant", "1x64x128"})] =
+        [](const ck_tile::ArgParser& arg_parser) {
+            using QuantGroupSize = ck_tile::QuantGroupShape<ck_tile::sequence<1, 64, 128>>;
+            return RUN_GEMM_EXAMPLE_PREC_TYPE;
+        };
+    lut[hash_multiple_strings(
+        {"fp8", "bquant", "preshuffleb", "non-preshufflequant", "1x128x128"})] =
+        [](const ck_tile::ArgParser& arg_parser) {
+            using QuantGroupSize = ck_tile::QuantGroupShape<ck_tile::sequence<1, 128, 128>>;
+            return RUN_GEMM_EXAMPLE_PREC_TYPE;
+        };
     return 0;
 }();
