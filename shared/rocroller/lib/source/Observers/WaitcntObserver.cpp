@@ -46,10 +46,11 @@ namespace rocRoller
             }
         }
 
-        void WaitcntState::assertSafeToBranchTo(const WaitcntState& labelState,
-                                                std::string const&  label) const
+        void WaitcntState::assertSafeToBranchTo(const WaitcntState& branchState,
+                                                std::string const&  label,
+                                                bool                strict) const
         {
-            if(*this == labelState)
+            if(*this == branchState)
                 return;
 
             bool fail = false;
@@ -61,46 +62,84 @@ namespace rocRoller
             std::string msg
                 = "Branching to label '" + label + "' with a different waitcnt state.\n";
 
-            // If queues do not have needsWaitZero set, and none of the instructions
-            // contain a destination, it is still safe to branch, even if the
-            // queues do not match exactly.
-            for(auto const& [queue, instructions] : m_instructionQueues)
+            if(strict)
             {
-                if(m_needsWaitZero.at(queue) || labelState.m_needsWaitZero.at(queue))
+                // Strict mode (loops / backward branches): require both sides
+                // to have empty queues if they don't match exactly.
+                for(auto const& [queue, instructions] : m_instructionQueues)
                 {
-                    fail = true;
-                    msg += concatenate(" Wait zero: ",
-                                       ShowValue(m_needsWaitZero.at(queue)),
-                                       ShowValue(labelState.m_needsWaitZero.at(queue)),
-                                       ShowValue(queue),
-                                       "\n");
-
-                    if(!longErrMsg)
-                        AssertFatal(!fail, msg);
-                }
-
-                for(auto const& instruction : instructions)
-                {
-                    if(!instruction.empty())
+                    if(m_needsWaitZero.at(queue) || branchState.m_needsWaitZero.at(queue))
                     {
                         fail = true;
-                        msg += concatenate(" Extra register at label: ",
-                                           ShowValue(instruction),
+                        msg += concatenate(" Wait zero: ",
+                                           ShowValue(m_needsWaitZero.at(queue)),
+                                           ShowValue(branchState.m_needsWaitZero.at(queue)),
                                            ShowValue(queue),
                                            "\n");
 
                         if(!longErrMsg)
                             AssertFatal(!fail, msg);
                     }
-                }
 
-                for(auto const& instruction : labelState.m_instructionQueues.at(queue))
+                    for(auto const& instruction : instructions)
+                    {
+                        if(!instruction.empty())
+                        {
+                            fail = true;
+                            msg += concatenate(" Extra register at label: ",
+                                               ShowValue(instruction),
+                                               ShowValue(queue),
+                                               "\n");
+
+                            if(!longErrMsg)
+                                AssertFatal(!fail, msg);
+                        }
+                    }
+
+                    for(auto const& instruction : branchState.m_instructionQueues.at(queue))
+                    {
+                        if(!instruction.empty())
+                        {
+                            fail = true;
+                            msg += concatenate(" Extra register at branch: ",
+                                               ShowValue(instruction),
+                                               ShowValue(queue),
+                                               "\n");
+
+                            if(!longErrMsg)
+                                AssertFatal(!fail, msg);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Relaxed mode (conditionals / forward branches): the label
+                // state may be more conservative (superset) than the branch
+                // state. Only fail if the branch has entries or flags that the
+                // label doesn't know about.
+                for(auto const& [queue, labelInstructions] : m_instructionQueues)
                 {
-                    if(!instruction.empty())
+                    auto const& branchInstructions = branchState.m_instructionQueues.at(queue);
+
+                    if(branchState.m_needsWaitZero.at(queue) && !m_needsWaitZero.at(queue))
                     {
                         fail = true;
-                        msg += concatenate(" Extra register at branch: ",
-                                           ShowValue(instruction),
+                        msg += concatenate(
+                            " Branch needs waitZero but label does not: ", ShowValue(queue), "\n");
+
+                        if(!longErrMsg)
+                            AssertFatal(!fail, msg);
+                    }
+
+                    if(branchInstructions.size() > labelInstructions.size())
+                    {
+                        fail = true;
+                        msg += concatenate(" Branch queue larger than label queue: ",
+                                           " branch=",
+                                           branchInstructions.size(),
+                                           " label=",
+                                           labelInstructions.size(),
                                            ShowValue(queue),
                                            "\n");
 
@@ -167,6 +206,13 @@ namespace rocRoller
                                 "Branch without a label\n",
                                 ShowValue(inst.toString(LogLevel::Debug)));
                     addBranchState(inst.getSrcs()[0]->toString());
+
+                    // After an unconditional branch (e.g. end of the if-body),
+                    // flag so that addLabelState resets the observer to the
+                    // saved branch state instead of continuing with the
+                    // state accumulated by the previous block.
+                    if(inst.getOpCode() == "s_branch")
+                        m_afterUnconditionalBranch = true;
                 }
                 else if(inst.isLabel())
                 {

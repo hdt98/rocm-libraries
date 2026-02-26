@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <unordered_set>
+
 #include <rocRoller/CodeGen/Instruction.hpp>
 #include <rocRoller/Context.hpp>
 #include <rocRoller/GPUArchitecture/GPUInstructionInfo.hpp>
@@ -40,8 +42,9 @@ namespace rocRoller
              *
              * @param labelState
              */
-            void assertSafeToBranchTo(const WaitcntState& labelState,
-                                      std::string const&  label) const;
+            void assertSafeToBranchTo(const WaitcntState& branchState,
+                                      std::string const&  label,
+                                      bool                strict) const;
 
         private:
             // These members are duplicates of the waitcntobserver members, except we're storing a
@@ -99,6 +102,24 @@ namespace rocRoller
 
             // This member tracks, for every label, what the waitcnt state is everywhere a branch instruction targets that label.
             std::unordered_map<std::string, std::vector<WaitcntState>> m_branchStates;
+
+            // Live snapshot of observer state at forward branch points, used to
+            // restore or merge state when reaching the target label.
+            struct LiveBranchState
+            {
+                WaitCntQueues                  instructionQueues;
+                WaitQueueMap<bool>             needsWaitZero;
+                WaitQueueMap<GPUWaitQueueType> typeInQueue;
+            };
+            std::unordered_map<std::string, LiveBranchState> m_liveBranchStates;
+
+            // Set after an unconditional s_branch; cleared at the next label.
+            bool m_afterUnconditionalBranch = false;
+
+            // Labels that were targeted by a branch before the label was
+            // encountered in the linear traversal (forward branches, i.e.
+            // conditionals). Backward branches (loops) are not in this set.
+            std::unordered_set<std::string> m_forwardBranchLabels;
 
             /**
              * This function updates the given wait queue by applying the given waitcnt.
