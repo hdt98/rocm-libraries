@@ -95,6 +95,7 @@ def runTestCommand (platform, project)
                 find /usr -iname '*comgr*.so' -o -iname '*comgr*.a' || true
                 find /usr -iname '*clang*.so' -o -iname '*clang*.a' || true
                 find /usr -iname '*llvm*.so' -o -iname '*llvm*.a' || true
+                /opt/rocm/bin/amdclang -### "-target" "amdgcn-amd-amdhsa" "-mcpu=gfx908:xnack+" "-I" "/tmp/comgr-4686-0-dd5d8b/include" "-no-integrated-cpp" "-dD" "-c" "-x" "assembler" "-v" "-mcode-object-version=5" "-mwavefrontsize64" "-Xclang" "-no-disable-free" dummyfile.s
                 # Run sharded tests (auto-detects ncores/2, respecting cgroups)
                 scripts/run-tests-sharded precheckin-mci build
             """
