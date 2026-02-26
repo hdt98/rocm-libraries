@@ -121,12 +121,6 @@ ninja check
 # Note: Some HIP-related tests may be skipped due to AddressSanitizer incompatibility
 ```
 
-### Building Specific Components
-```bash
-# Build without plugins
-cmake -GNinja -DHIPDNN_BUILD_PLUGINS=OFF ..
-```
-
 ### ROCM_PATH, ROCM_CMAKE_PATH, and CMAKE_INSTALL_PREFIX
 
 If the ROCm bin folder is included in your system path then the AMD toolchain should be detected automatically. If not, the following CMake variables can be used to assist CMake in the tool discovery.

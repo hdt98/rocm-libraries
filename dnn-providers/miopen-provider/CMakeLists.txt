@@ -40,6 +40,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${ROCM_PATH}/lib
 )
 
 option(MIOPENPROVIDER_SKIP_TESTS "Skip building tests" OFF)
+option(MIOPENPROVIDER_ENABLE_COVERAGE "Build with code coverage flags" OFF)
 
 option(BUILD_ADDRESS_SANITIZER "Build with Address Sanitizer enabled" OFF)
 option(ENABLE_CLANG_FORMAT "Enable Clang-Format checks" OFF) # Disable by default for TheRock
@@ -91,6 +92,12 @@ include(Sanitizers)
 
 include(Dependencies)
 include(Tests)
+
+if(MIOPENPROVIDER_ENABLE_COVERAGE)
+    message(STATUS "Enabling compile flags for coverage-mapping")
+    add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
+    add_link_options(-fprofile-instr-generate -fcoverage-mapping)
+endif()
 
 if(WIN32)
     set(HIPDNN_PLUGIN_ENGINE_ROOTDIR "bin")
@@ -191,3 +198,76 @@ install(TARGETS miopen_plugin EXPORT miopen-plugin
 )
 
 add_clang_tidy_custom_target()
+
+if(MIOPENPROVIDER_ENABLE_COVERAGE)
+    findandcheckllvmtools()
+
+    set(CODE_COVERAGE_IGNORE_REGEX ".*deps.*|.*tests.*")
+    set(CODE_COVERAGE_OBJECTS
+        -object ./${CMAKE_INSTALL_BINDIR}/miopen_plugin_tests
+        -object ./${CMAKE_INSTALL_BINDIR}/miopen_plugin_integration_tests
+    )
+
+    # Helper function to create a code coverage target
+    # ~~~
+    # Parameters:
+    #   TARGET_NAME - Name of the coverage target to create
+    #   DEPENDS_TARGET - The target that must be built before generating
+    #                    coverage (required, use "" for no dependency)
+    # ~~~
+    function(add_custom_coverage_target TARGET_NAME DEPENDS_TARGET)
+        # Build the DEPENDS clause
+        set(DEPENDS_CLAUSE "")
+        if(NOT "${DEPENDS_TARGET}" STREQUAL "")
+            set(DEPENDS_CLAUSE DEPENDS ${DEPENDS_TARGET})
+        endif()
+
+        # cmake-format: off
+        add_custom_target(
+            ${TARGET_NAME}
+            COMMAND find . -name "*.profraw" -print0 | xargs -0 ${LLVM_PROFDATA_BINARY} merge
+                    -sparse -o ./coverage-report/miopen_plugin.profdata
+            COMMAND
+                ${LLVM_COV_BINARY} report ${CODE_COVERAGE_OBJECTS}
+                -instr-profile=./coverage-report/miopen_plugin.profdata
+                -ignore-filename-regex=${CODE_COVERAGE_IGNORE_REGEX} >
+                ./coverage-report/code_cov_miopen_plugin.report
+            COMMAND
+                ${LLVM_COV_BINARY} show -Xdemangler=${LLVM_CXXFILT_BINARY} ${CODE_COVERAGE_OBJECTS}
+                -instr-profile=./coverage-report/miopen_plugin.profdata
+                -ignore-filename-regex=${CODE_COVERAGE_IGNORE_REGEX} --format=html
+                --output-dir=coverage-report
+            COMMAND
+                ${LLVM_COV_BINARY} export ${CODE_COVERAGE_OBJECTS}
+                -instr-profile=./coverage-report/miopen_plugin.profdata
+                -ignore-filename-regex=${CODE_COVERAGE_IGNORE_REGEX} --format=lcov >
+                ./coverage-report/coverage.info
+            ${DEPENDS_CLAUSE}
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            COMMENT "Generating code coverage report"
+            VERBATIM
+            USES_TERMINAL
+        )
+        # cmake-format: on
+    endfunction()
+
+    if(MIOPENPROVIDER_SKIP_TESTS)
+        message(
+            WARNING
+                "\nThe code coverage targets depend on test targets but test targets don't exist because MIOPENPROVIDER_SKIP_TESTS is enabled."
+        )
+    else()
+        add_custom_coverage_target(code_coverage check) # code_coverage depends on 'check'
+        add_custom_coverage_target(unit-coverage unit-check) # unit-coverage depends on 'unit-check'
+        add_custom_coverage_target(integration-coverage integration-check) # ... 'integration-check'
+
+        # Make alias to target coverage
+        add_custom_target(coverage DEPENDS code_coverage COMMENT "Alias for code_coverage")
+    endif()
+
+    # Create a coverage target that does not depend on any other target and will use the coverage
+    # data that already exists on disk from prior / manual target runs performed before this target
+    # is run.
+    add_custom_coverage_target(current-coverage "")
+
+endif()
