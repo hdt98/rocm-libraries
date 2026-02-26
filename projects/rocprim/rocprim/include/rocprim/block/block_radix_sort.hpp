@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2017-2026 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -1185,7 +1185,7 @@ private:
             // By reinforcing the constexpr-ness within the scope of the operator, we can help
             // the compiler inline it.
             //
-            // This struct effictively reimplements the following lambda:
+            // This struct effectively reimplements the following lambda:
             //   auto digit_extractor = [begin_bit, pass_bits, decomposer](const Key& key) mutable {
             //     return key_codec::extract_digit(key, begin_bit, pass_bits, decomposer);
             //   };
