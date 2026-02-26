@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -132,6 +132,10 @@ class GELS_INPLACE : public GELS_BASE<API_NORMAL, true>
 {
 };
 
+class GELS_BATCHED : public GELS_BASE<API_NORMAL, false>
+{
+};
+
 // non-batch tests
 
 TEST_P(GELS, __float)
@@ -214,6 +218,36 @@ TEST_P(GELS_INPLACE, __double_complex)
     run_tests<false, false, rocblas_double_complex>();
 }
 
+// batched tests
+//
+TEST_P(GELS_BATCHED, batched__float)
+{
+    Arguments arg   = gels_setup_arguments(GetParam());
+    arg.batch_count = 3;
+    testing_gels<API_NORMAL, true, false, true, float>(arg); // INPLACE=true
+}
+
+TEST_P(GELS_BATCHED, batched__double)
+{
+    Arguments arg   = gels_setup_arguments(GetParam());
+    arg.batch_count = 3;
+    testing_gels<API_NORMAL, true, false, true, double>(arg);
+}
+
+TEST_P(GELS_BATCHED, batched__float_complex)
+{
+    Arguments arg   = gels_setup_arguments(GetParam());
+    arg.batch_count = 3;
+    testing_gels<API_NORMAL, true, false, true, rocblas_float_complex>(arg);
+}
+
+TEST_P(GELS_BATCHED, batched__double_complex)
+{
+    Arguments arg   = gels_setup_arguments(GetParam());
+    arg.batch_count = 3;
+    testing_gels<API_NORMAL, true, false, true, rocblas_double_complex>(arg);
+}
+
 // INSTANTIATE_TEST_SUITE_P(daily_lapack,
 //                          GELS,
 //                          Combine(ValuesIn(large_matrix_sizeA_range),
@@ -248,4 +282,8 @@ INSTANTIATE_TEST_SUITE_P(checkin_lapack,
 
 INSTANTIATE_TEST_SUITE_P(checkin_lapack,
                          GELS_INPLACE,
+                         Combine(ValuesIn(matrix_sizeA_range), ValuesIn(matrix_sizeB_range)));
+
+INSTANTIATE_TEST_SUITE_P(checkin_lapack,
+                         GELS_BATCHED,
                          Combine(ValuesIn(matrix_sizeA_range), ValuesIn(matrix_sizeB_range)));
