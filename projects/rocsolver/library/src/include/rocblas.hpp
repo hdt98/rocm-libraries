@@ -2263,8 +2263,6 @@ rocblas_status rocblasCall_trsm_mem(rocblas_side side,
 
     int64_t const m_64 = m;
     int64_t const n_64 = n;
-    int64_t const lda_64 = lda;
-    int64_t const ldb_64 = ldb;
     int64_t const batch_count_64 = batch_count;
 
     rocblas_status istat = rocblas_status_success;

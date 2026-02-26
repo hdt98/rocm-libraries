@@ -180,10 +180,12 @@ static bool is_device_pointer(void* ptr)
 
     auto istat = hipPointerGetAttributes(&dev_attributes, ptr);
     if(istat != hipSuccess)
+    {
         fmt::print(stderr, "is_device_pointer: istat = {} {}\n", static_cast<std::int32_t>(istat),
                    hipGetErrorName(istat));
+        return (false);
+    }
 
-    assert(istat == hipSuccess);
     return (dev_attributes.type == hipMemoryTypeDevice);
 }
 

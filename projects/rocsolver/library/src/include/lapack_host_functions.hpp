@@ -211,12 +211,11 @@ static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
     S const two = 2;
     T const czero = 0;
 
-    bool has_work;
-    bool first;
-    int count, i;
-    S d, di, dr, eps, f2, f2s, g2, g2s, safmin;
-    S safmn2, safmx2, scale;
-    T ff, fs, gs;
+    bool has_work = false;
+    int count = 0, i = 0;
+    S d = 0, di = 0, dr = 0, eps = 0, f2 = 0, f2s = 0, g2 = 0, g2s = 0, safmin = 0;
+    S safmn2 = 0, safmx2 = 0, scale = 0;
+    T ff = 0, fs = 0, gs = 0;
 
     // safmin = dlamch( 's' )
     cmach = 'S';
@@ -354,7 +353,6 @@ static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
 template <typename T, typename S, typename I>
 static void call_scal(I& n, S& a, T& x_in, I& incx)
 {
-    bool const is_zero = (a == 0);
     T* const x = &x_in;
     for(I i = 0; i < n; i++)
     {
