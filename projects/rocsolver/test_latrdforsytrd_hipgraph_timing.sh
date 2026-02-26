@@ -15,13 +15,18 @@ echo ""
 
 # Test parameters - sweep multiple sizes and buffer intrinsics modes
 TEST_SIZES=(1024 2048 4096)
-ITERS=1
-BUFFER_INTRINSICS_MODES=(0 1)  # 0 = disabled, 1 = enabled
+# TEST_SIZES=(1024)
+ITERS=25
+BUFFER_INTRINSICS_MODES=(1)  # 0 = disabled, 1 = enabled
+# BUFFER_INTRINSICS_MODES=(0)  # 0 = disabled, 1 = enabled
+GRAPH_MODES=(0 1 2 4 6 8 64 -1)  # All modes to test
+# GRAPH_MODES=(0 1 4)
 
 echo "Test configuration:"
 echo "  Matrix sizes: ${TEST_SIZES[@]}"
 echo "  Iterations per test: ${ITERS}"
 echo "  Buffer intrinsics modes: ${BUFFER_INTRINSICS_MODES[@]}"
+echo "  Graph modes: ${GRAPH_MODES[@]}"
 echo ""
 
 # Function to rebuild with specific graph mode and buffer intrinsics setting
@@ -104,10 +109,24 @@ for BUFFER_MODE in "${BUFFER_INTRINSICS_MODES[@]}"; do
     echo "======================================================================"
     echo ""
     
-    rebuild_with_mode 0 "No graphs (baseline)" ${BUFFER_MODE} "${BUFFER_NAME}"
-    rebuild_with_mode 1 "One graph per iteration" ${BUFFER_MODE} "${BUFFER_NAME}"
-    rebuild_with_mode 4 "Four iterations per graph (default)" ${BUFFER_MODE} "${BUFFER_NAME}"
-    rebuild_with_mode -1 "Single graph for all iterations" ${BUFFER_MODE} "${BUFFER_NAME}"
+    for MODE in "${GRAPH_MODES[@]}"; do
+        case $MODE in
+            0)
+                MODE_NAME="No graphs (baseline)"
+                ;;
+            -1)
+                MODE_NAME="Single graph for all iterations"
+                ;;
+            1)
+                MODE_NAME="One iteration per graph"
+                ;;
+            *)
+                MODE_NAME="${MODE} iterations per graph"
+                ;;
+        esac
+        
+        rebuild_with_mode ${MODE} "${MODE_NAME}" ${BUFFER_MODE} "${BUFFER_NAME}"
+    done
 done
 
 echo "======================================================================="
@@ -115,11 +134,11 @@ echo "TIMING COMPARISON COMPLETE"
 echo "======================================================================="
 echo ""
 echo "Summary:"
-echo "  - Tested modes: 0 (baseline), 1, 4, -1"
+echo "  - Tested hipGraph modes: ${GRAPH_MODES[@]}"
 echo "  - Tested sizes: ${TEST_SIZES[@]}"
 echo "  - Tested buffer intrinsics: ${BUFFER_INTRINSICS_MODES[@]}"
-echo "  - Total configurations: $((4 * ${#TEST_SIZES[@]} * ${#BUFFER_INTRINSICS_MODES[@]}))"
-echo "  - Look for '[LATRD_GRAPH TIMING]' and '[LATRD_NON-GRAPH TIMING]' in output above"
+echo "  - Total configurations: $((${#GRAPH_MODES[@]} * ${#TEST_SIZES[@]} * ${#BUFFER_INTRINSICS_MODES[@]}))"
+echo "  - Look for '[LATRD_TYPE1 TIMING]' and '[LATRD_NON-GRAPH TIMING]' in output above"
 echo ""
 echo "Expected findings:"
 echo "  1. Compare 'Total capture time' vs 'Total instantiation time' vs 'Total launch time'"

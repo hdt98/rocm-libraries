@@ -2460,365 +2460,293 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
         // HIP Graph Configuration
         // LATRD_GRAPH_MODE controls graph granularity:
         //   0 = No graphs (original behavior)
-        //   1 = One graph per iteration
-        //   N = N iterations per graph (with multiple graphs)
-        //  -1 = All iterations in a single graph
+        //   -1 = Single graph for all k iterations (monolithic)
+        //   N>0 = N iterations per graph block (Type 1: intra-call optimization with update)
 #ifndef LATRD_GRAPH_MODE
-        #define LATRD_GRAPH_MODE 0  // Default: no graphs
+        #define LATRD_GRAPH_MODE -1  // Default: no graphs
 #endif
 
 #if LATRD_GRAPH_MODE != 0
         // =====================================================================
-        // SIMPLE GRAPH CACHING (Approach A)
+        // TYPE 1: INTRA-CALL OPTIMIZATION WITH hipGraphExecUpdate
         // =====================================================================
+        // Strategy: Capture LATRD_GRAPH_MODE iterations per block
+        //           - If MODE=-1: capture all k iterations in a single graph
+        //           - If MODE>0: capture MODE iterations per block, use hipGraphExecUpdate for subsequent blocks
+        //           This saves instantiation time within a single LATRD call
+        // Note: No caching across calls - graph destroyed at end of function
         
-        // Get references to cache and statistics from namespace
-        using namespace latrd_graph_cache_ns;
+        // Configuration
+        constexpr bool debug_graphs = false;  // Set to true for diagnostic output
+        constexpr bool time_graphs = false;    // Set to true for timing measurements
         
-        // Create cache key for this call
-        GraphCacheKey cache_key{n, k, batch_count, n - 1, LATRD_GRAPH_MODE};  // j_start = n-1
-        
-        // Update statistics
-        total_cache_lookups++;
-        unique_keys_seen.insert(cache_key);
-        
-        // Check if graphs are already cached
-        bool found_in_cache = (graph_cache.find(cache_key) != graph_cache.end());
-        
-        if(found_in_cache) {
-            cache_hits++;
-        } else {
-            cache_misses++;
-        }
-        
-        // Print cache statistics
-        constexpr bool print_cache_stats = true;
-        if(print_cache_stats) {
-            fprintf(stderr, "\n[GRAPH CACHE] Call #%d to latrd_forsytrd (n=%d, k=%d, batch=%d)\n",
-                    total_cache_lookups, (int)n, (int)k, (int)batch_count);
-            fprintf(stderr, "[GRAPH CACHE] Cache key: (n=%d, k=%d, batch=%d, j_start=%d, mode=%d)\n",
-                    (int)cache_key.n, (int)cache_key.k, (int)cache_key.batch_count, 
-                    (int)cache_key.j_start, cache_key.graph_mode);
-            fprintf(stderr, "[GRAPH CACHE] Cache %s (Hits: %d, Misses: %d, Hit Rate: %.1f%%)\n",
-                    found_in_cache ? "HIT!" : "MISS", 
-                    cache_hits, cache_misses,
-                    total_cache_lookups > 0 ? (100.0 * cache_hits / total_cache_lookups) : 0.0);
-            fprintf(stderr, "[GRAPH CACHE] Unique keys seen: %zu, Cache size: %zu entries\n\n",
-                    unique_keys_seen.size(), graph_cache.size());
-        }
-        
-        // Graph capture infrastructure
-        constexpr bool debug_graphs = false;  // Set to true to enable diagnostic output
-        constexpr bool time_graphs = true;   // Set to true to enable timing measurements
-        
-        std::vector<hipGraph_t> graphs;
-        std::vector<hipGraphExec_t> graph_execs;
-        
-        const int total_iters = k;
-        int iters_per_graph;
-        int num_graphs;
-        
-        if(LATRD_GRAPH_MODE == -1) {
-            // Single graph for all iterations
-            iters_per_graph = total_iters;
-            num_graphs = 1;
-        } else if(LATRD_GRAPH_MODE == 1) {
-            // One graph per iteration
-            iters_per_graph = 1;
-            num_graphs = total_iters;
-        } else {
-            // N iterations per graph
-            iters_per_graph = LATRD_GRAPH_MODE;
-            num_graphs = (total_iters + iters_per_graph - 1) / iters_per_graph;
-        }
+        // Block-iterative parameters
+        const int total_iters = k;  // Total iterations to process
+        // Special case: MODE=-1 means all iterations in one graph
+        const int iters_per_block = (LATRD_GRAPH_MODE == -1) ? k : LATRD_GRAPH_MODE;
+        const int num_full_blocks = total_iters / iters_per_block;
+        const int remainder = total_iters % iters_per_block;
+        const int total_blocks = num_full_blocks + (remainder > 0 ? 1 : 0);
         
         // Timing infrastructure
         hipEvent_t timing_start, timing_end;
         float time_capture_total = 0.0f;
         float time_instantiate_total = 0.0f;
+        float time_update_total = 0.0f;
         float time_launch_total = 0.0f;
+        
+        // Update statistics
+        int num_updates_attempted = 0;
+        int num_updates_successful = 0;
+        int num_updates_failed = 0;
         
         if(time_graphs) {
             HIP_CHECK(hipEventCreate(&timing_start));
             HIP_CHECK(hipEventCreate(&timing_end));
         }
         
-        // Declare capture_stream outside so cleanup code can see it
-        hipStream_t capture_stream = nullptr;
+        // Graph state
+        bool graph_created = false;
+        hipGraphExec_t graph_exec;
         
-        // =====================================================================
-        // CACHE LOOKUP: Check if graphs are already cached
-        // =====================================================================
-        if(found_in_cache) {
-            // CACHE HIT - Reuse existing graphs
-            if(print_cache_stats) {
-                fprintf(stderr, "[GRAPH CACHE] Reusing %d cached graphs (skipping capture & instantiation)\n",
-                        graph_cache[cache_key].num_graphs);
-            }
-            
-            // Copy cached graph executables
-            // NOTE: We don't copy num_graphs or iters_per_graph because they're deterministic
-            // (calculated from k and LATRD_GRAPH_MODE) and already set correctly above
-            graph_execs = graph_cache[cache_key].graph_execs;
-            
-            // Verify cached values match calculated values (sanity check)
-            if(graph_cache[cache_key].num_graphs != num_graphs || 
-               graph_cache[cache_key].iters_per_graph != iters_per_graph) {
-                fprintf(stderr, "[GRAPH CACHE ERROR] Cached values don't match! "
-                        "Cached: num_graphs=%d, iters_per_graph=%d, "
-                        "Calculated: num_graphs=%d, iters_per_graph=%d\n",
-                        graph_cache[cache_key].num_graphs, graph_cache[cache_key].iters_per_graph,
-                        num_graphs, iters_per_graph);
-            }
-            
-            // Skip to execution phase (no capture needed)
-            // We still need to time the launches for comparison
-            
-        } else {
-            // CACHE MISS - Need to capture new graphs
-            if(print_cache_stats) {
-                fprintf(stderr, "[GRAPH CACHE] Creating %d new graphs (capture & instantiation required)\n",
-                        num_graphs);
-            }
-            
-            graphs.reserve(num_graphs);
-            graph_execs.reserve(num_graphs);
-            
-            // Create a dedicated stream for graph capture
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Creating dedicated stream for graph capture\n");
-            HIP_CHECK(hipStreamCreate(&capture_stream));
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Capture stream created: %p\n", (void*)capture_stream);
-            
-            // Set this stream in the handle so rocsolver_larfg_template uses it
-            rocblas_set_stream(handle, capture_stream);
-            
-            // Capture phase: Record graphs
-            for(int graph_idx = 0; graph_idx < num_graphs; ++graph_idx) {
+        // Create dedicated stream for graph capture
+        hipStream_t graph_stream = nullptr;
+        if(debug_graphs) fprintf(stderr, "[LATRD_TYPE1] Creating graph stream\n");
+        HIP_CHECK(hipStreamCreate(&graph_stream));
+        
+        // Set graph stream in handle for rocsolver_larfg_template
+        rocblas_set_stream(handle, graph_stream);
+        
+        // Lambda to capture and process one block of iterations
+        auto captureBlock = [&](rocblas_int startCol, rocblas_int blockSize) {
             hipGraph_t graph;
-            hipGraphExec_t graph_exec;
             
-            // Determine iteration range for this graph
-            int iter_start = graph_idx * iters_per_graph;
-            int iter_end = std::min(iter_start + iters_per_graph, total_iters);
-            int j_start = n - 1 - iter_start;
-            int j_end = n - 1 - iter_end;  // Exclusive
+            // === CAPTURE PHASE ===
+            if(time_graphs) HIP_CHECK(hipEventRecord(timing_start, graph_stream));
             
-            // Ensure stream is idle before capture
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Graph %d: Synchronizing capture_stream before capture\n", graph_idx);
-            hipError_t sync_err = hipStreamSynchronize(capture_stream);
-            if(sync_err != hipSuccess) {
-                if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] ERROR: Stream sync failed with error: %s\n", 
-                        hipGetErrorString(sync_err));
-            }
-            HIP_CHECK(sync_err);
-            
-            // Start timing for capture phase
-            if(time_graphs) {
-                HIP_CHECK(hipEventRecord(timing_start, capture_stream));
-            }
-            
-            // Begin stream capture
             if(debug_graphs) {
-                fprintf(stderr, "[LATRD_GRAPH] Graph %d: About to begin capture (iters %d to %d, n=%d, k=%d)\n", 
-                        graph_idx, iter_start, iter_end, (int)n, (int)k);
-                fprintf(stderr, "[LATRD_GRAPH] Capture stream pointer: %p\n", (void*)capture_stream);
+                fprintf(stderr, "[LATRD_TYPE1] Capturing block: startCol=%d, blockSize=%d\n",
+                        (int)startCol, (int)blockSize);
             }
             
-            // Try ThreadLocal mode first as it's more permissive
-            hipError_t capture_err = hipStreamBeginCapture(capture_stream, hipStreamCaptureModeThreadLocal);
-            if(capture_err != hipSuccess) {
-                if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] ERROR: hipStreamBeginCapture failed with error: %s (%d)\n", 
-                        hipGetErrorString(capture_err), capture_err);
-            }
-            HIP_CHECK(capture_err);
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Graph %d: Capture started successfully\n", graph_idx);
+            // HIP_CHECK(hipStreamSynchronize(graph_stream)); // KO TODO:: remove this and see what happens.
+            HIP_CHECK(hipStreamBeginCapture(graph_stream, hipStreamCaptureModeGlobal));
             
-            // Capture iterations for this graph
+            // Capture blockSize iterations
             rocblas_int jw;
-            for(rocblas_int j = j_start; j > j_end; --j)
+            for(rocblas_int iter = 0; iter < blockSize; ++iter)
             {
+                rocblas_int j = startCol - iter;
                 jw = j - n + k;
 
-                // update column j of A with reflector computed in step j-1
-                //----------------------------------------------------------
+                // Update column j of A with reflector from step j-1
                 ROCSOLVER_LAUNCH_KERNEL(latrd_upper_updateA_kernel<T>,
                                         dim3(grr_updates, grc_updates, batch_count),
-                                        dim3(thr_updates, thc_updates, 1), lmemsize_updates, capture_stream, n,
-                                        k, j, A, shiftA, lda, strideA, W, shiftW, ldw, strideW);
-                //-------------------------------------------------------------
+                                        dim3(thr_updates, thc_updates, 1),
+                                        lmemsize_updates, graph_stream,
+                                        n, k, j, A, shiftA, lda, strideA,
+                                        W, shiftW, ldw, strideW);
 
-                // reduce column j of A with new reflector, then copy off-diagonal element
-                // to E(j) and set off-diagonal to 1
-                //----------------------------------------------------------
-                rocsolver_larfg_template(handle, j, A, shiftA + idx2D(j - 1, j, lda), E, j - 1, strideE,
-                                         A, shiftA + idx2D(0, j, lda), 1, strideA, (tau + j - 1),
-                                         strideP, batch_count, work, norms);
-                //----------------------------------------------------------
+                // Reduce column j with new reflector
+                rocsolver_larfg_template(handle, j, A, shiftA + idx2D(j - 1, j, lda),
+                                        E, j - 1, strideE, A, shiftA + idx2D(0, j, lda),
+                                        1, strideA, (tau + j - 1), strideP,
+                                        batch_count, work, norms);
 
-                // compute column j of W
-                //--------------------------------------------------------------
+                // Compute column j of W
                 static constexpr int NB = 256;
-                dim3 gemvt_grid(n + n - j - 1, 1, batch_count);
-                dim3 gemvt_threads(NB);
-                ROCSOLVER_LAUNCH_KERNEL((latrd_upper_computeW_gemvt_kernel<NB, T>), gemvt_grid,
-                                        gemvt_threads, 0, capture_stream, n, k, j, A, shiftA, lda, strideA, W,
-                                        shiftW, ldw, strideW, W, shiftW + idx2D(0, jw, ldw), ldw,
-                                        strideW, work, strideblk);
+                ROCSOLVER_LAUNCH_KERNEL((latrd_upper_computeW_gemvt_kernel<NB, T>),
+                                        dim3(n + n - j - 1, 1, batch_count),
+                                        dim3(NB), 0, graph_stream,
+                                        n, k, j, A, shiftA, lda, strideA, W, shiftW, ldw, strideW,
+                                        W, shiftW + idx2D(0, jw, ldw), ldw, strideW,
+                                        work, strideblk);
 
-                // update column j of W
-                //--------------------------------------------------------------
-                ROCSOLVER_LAUNCH_KERNEL(
-                    latrd_upper_updateW_kernel<T>, dim3(grr_updates, grc_updates, batch_count),
-                    dim3(thr_updates, thc_updates, 1), lmemsize_updates, capture_stream, n, k, j, A, shiftA,
-                    lda, strideA, W, shiftW, ldw, strideW, work, strideblk, tau, strideP);
+                // Update column j of W
+                ROCSOLVER_LAUNCH_KERNEL(latrd_upper_updateW_kernel<T>,
+                                        dim3(grr_updates, grc_updates, batch_count),
+                                        dim3(thr_updates, thc_updates, 1),
+                                        lmemsize_updates, graph_stream,
+                                        n, k, j, A, shiftA, lda, strideA, W, shiftW, ldw, strideW,
+                                        work, strideblk, tau, strideP);
 
-                ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<1024, T>), dim3(1, 1, batch_count),
-                                        dim3(1024, 1, 1), 0, capture_stream, j, A, shiftA + idx2D(0, j, lda),
-                                        strideA, W, shiftW + idx2D(0, jw, ldw), strideW, tau + j - 1,
-                                        strideP);
+                ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<1024, T>),
+                                        dim3(1, 1, batch_count), dim3(1024, 1, 1),
+                                        0, graph_stream,
+                                        j, A, shiftA + idx2D(0, j, lda), strideA,
+                                        W, shiftW + idx2D(0, jw, ldw), strideW,
+                                        tau + j - 1, strideP);
             }
             
-            // End capture and create graph
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Graph %d: About to end capture\n", graph_idx);
-            HIP_CHECK(hipStreamEndCapture(capture_stream, &graph));
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Graph %d: Capture ended successfully\n", graph_idx);
+            HIP_CHECK(hipStreamEndCapture(graph_stream, &graph));
             
-            // End timing for capture phase
             if(time_graphs) {
-                HIP_CHECK(hipEventRecord(timing_end, capture_stream));
+                HIP_CHECK(hipEventRecord(timing_end, graph_stream));
                 HIP_CHECK(hipEventSynchronize(timing_end));
-                float time_capture_ms = 0.0f;
-                HIP_CHECK(hipEventElapsedTime(&time_capture_ms, timing_start, timing_end));
-                time_capture_total += time_capture_ms;
+                float time_ms;
+                HIP_CHECK(hipEventElapsedTime(&time_ms, timing_start, timing_end));
+                time_capture_total += time_ms;
             }
             
-            // Start timing for instantiation phase
-            if(time_graphs) {
-                HIP_CHECK(hipEventRecord(timing_start, capture_stream));
+            // === INSTANTIATE OR UPDATE PHASE ===
+            if(!graph_created)
+            {
+                // First block - instantiate the graph
+                if(time_graphs) HIP_CHECK(hipEventRecord(timing_start, graph_stream));
+                
+                if(debug_graphs) fprintf(stderr, "[LATRD_TYPE1] Instantiating first graph\n");
+                HIP_CHECK(hipGraphInstantiate(&graph_exec, graph, nullptr, nullptr, 0));
+                graph_created = true;
+                
+                if(time_graphs) {
+                    HIP_CHECK(hipEventRecord(timing_end, graph_stream));
+                    HIP_CHECK(hipEventSynchronize(timing_end));
+                    float time_ms;
+                    HIP_CHECK(hipEventElapsedTime(&time_ms, timing_start, timing_end));
+                    time_instantiate_total += time_ms;
+                }
+            }
+            else
+            {
+                // Subsequent blocks - try to update existing graph
+                if(time_graphs) HIP_CHECK(hipEventRecord(timing_start, graph_stream));
+                
+                num_updates_attempted++;
+                
+                hipGraphExecUpdateResult result;
+                hipGraphNode_t errorNode;
+                hipError_t update_status = hipGraphExecUpdate(graph_exec, graph, &errorNode, &result);
+                
+                if(update_status != hipSuccess || result != hipGraphExecUpdateSuccess)
+                {
+                    // Update failed - recreate graph executable
+                    num_updates_failed++;
+                    if(debug_graphs) {
+                        fprintf(stderr, "[LATRD_TYPE1] Update failed (status=%d, result=%d), re-instantiating\n",
+                                update_status, result);
+                    }
+                    
+                    // HIP_CHECK(hipStreamSynchronize(graph_stream)); // KO TODO:: remove synch and see what happens
+                    HIP_CHECK(hipGraphExecDestroy(graph_exec));
+                    HIP_CHECK(hipGraphInstantiate(&graph_exec, graph, nullptr, nullptr, 0));
+                }
+                else
+                {
+                    // Update succeeded
+                    num_updates_successful++;
+                    if(debug_graphs) fprintf(stderr, "[LATRD_TYPE1] Update successful\n");
+                }
+                
+                if(time_graphs) {
+                    HIP_CHECK(hipEventRecord(timing_end, graph_stream));
+                    HIP_CHECK(hipEventSynchronize(timing_end));
+                    float time_ms;
+                    HIP_CHECK(hipEventElapsedTime(&time_ms, timing_start, timing_end));
+                    time_update_total += time_ms;
+                }
             }
             
-            // Instantiate the graph for execution
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Graph %d: About to instantiate\n", graph_idx);
-            HIP_CHECK(hipGraphInstantiate(&graph_exec, graph, nullptr, nullptr, 0));
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Graph %d: Instantiated successfully\n", graph_idx);
+            // === LAUNCH PHASE ===
+            if(time_graphs) HIP_CHECK(hipEventRecord(timing_start, stream));
             
-            // End timing for instantiation phase
+            if(debug_graphs) fprintf(stderr, "[LATRD_TYPE1] Launching graph\n");
+            HIP_CHECK(hipGraphLaunch(graph_exec, stream));
+            
             if(time_graphs) {
-                HIP_CHECK(hipEventRecord(timing_end, capture_stream));
+                HIP_CHECK(hipEventRecord(timing_end, stream));
                 HIP_CHECK(hipEventSynchronize(timing_end));
-                float time_instantiate_ms = 0.0f;
-                HIP_CHECK(hipEventElapsedTime(&time_instantiate_ms, timing_start, timing_end));
-                time_instantiate_total += time_instantiate_ms;
-            };
+                float time_ms;
+                HIP_CHECK(hipEventElapsedTime(&time_ms, timing_start, timing_end));
+                time_launch_total += time_ms;
+            }
             
-            graphs.push_back(graph);
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Graph size after push back is: %zu\n", graphs.size());
-            graph_execs.push_back(graph_exec);
-        }
-        
-        // Store newly created graphs in cache for future reuse
-        fprintf(stderr, "[GRAPH CACHE] Storing %d graphs in cache for key (n=%d, k=%d, batch=%d, j_start=%d, mode=%d)\n",
-                num_graphs, (int)n, (int)k, (int)batch_count, (int)(n-1), LATRD_GRAPH_MODE);
-        graph_cache[cache_key] = GraphCacheEntry{
-            graphs,           // std::vector<hipGraph_t>
-            graph_execs,      // std::vector<hipGraphExec_t>
-            num_graphs,       // int
-            iters_per_graph   // int
+            // Cleanup graph (not executable - we reuse that)
+            HIP_CHECK(hipGraphDestroy(graph));
         };
-        fprintf(stderr, "[GRAPH CACHE] Storage complete. Cache now contains %zu entries\n", 
-                graph_cache.size());
         
-        // Mark that these graphs are now cached so we don't destroy them later
-        // Graphs in the cache must persist across calls
-        found_in_cache = true;
+        // =====================================================================
+        // MAIN EXECUTION: Process all blocks
+        // =====================================================================
         
-    } // end else (cache miss - graph creation complete)
-        
-        // Start timing for launch phase
-        if(time_graphs) {
-            HIP_CHECK(hipEventRecord(timing_start, stream));
+        if(debug_graphs) {
+            fprintf(stderr, "\n[LATRD_TYPE1] Starting: n=%d, k=%d, block_size=%d, total_blocks=%d\n",
+                    (int)n, (int)k, iters_per_block, total_blocks);
         }
         
-        // Execution phase: Launch all captured graphs on the original stream
-        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] About to launch %d graphs on original stream\n", num_graphs);
-        for(int graph_idx = 0; graph_idx < num_graphs; ++graph_idx) {
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Launching graph %d\n", graph_idx);
-            HIP_CHECK(hipGraphLaunch(graph_execs[graph_idx], stream));
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Graph %d launched successfully\n", graph_idx);
+        rocblas_int currentCol = n - 1;
+        
+        // Process remainder first (if any)
+        if(remainder > 0)
+        {
+            if(debug_graphs) fprintf(stderr, "[LATRD_TYPE1] Processing remainder (%d iters)\n", remainder);
+            captureBlock(currentCol, remainder);
+            currentCol -= remainder;
         }
         
-        // Synchronize original stream to ensure all graphs complete
-        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] About to synchronize original stream\n");
+        // Process full blocks
+        for(int block = 0; block < num_full_blocks; ++block)
+        {
+            if(debug_graphs) fprintf(stderr, "[LATRD_TYPE1] Processing block %d/%d\n", block + 1, num_full_blocks);
+            captureBlock(currentCol, iters_per_block);
+            currentCol -= iters_per_block;
+        }
+        
+        // Synchronize to ensure all work completes
         HIP_CHECK(hipStreamSynchronize(stream));
-        if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Original stream synchronized successfully\n");
         
-        // End timing for launch phase
+        // =====================================================================
+        // TIMING REPORT
+        // =====================================================================
+        
         if(time_graphs) {
-            HIP_CHECK(hipEventRecord(timing_end, stream));
-            HIP_CHECK(hipEventSynchronize(timing_end));
-            float time_launch_ms = 0.0f;
-            HIP_CHECK(hipEventElapsedTime(&time_launch_ms, timing_start, timing_end));
-            time_launch_total = time_launch_ms;
-            
-            // Print timing summary in microseconds
-            fprintf(stderr, "\n[LATRD_GRAPH TIMING] n=%d, k=%d, GRAPH_MODE=%d\n", 
-                    (int)n, (int)k, LATRD_GRAPH_MODE);
-            fprintf(stderr, "[LATRD_GRAPH TIMING] Number of graphs: %d\n", num_graphs);
-            fprintf(stderr, "[LATRD_GRAPH TIMING] Iterations per graph: %d\n", iters_per_graph);
-            fprintf(stderr, "[LATRD_GRAPH TIMING] Total capture time:      %10.2f us (%8.2f us per graph)\n", 
-                    time_capture_total * 1000.0f, time_capture_total * 1000.0f / num_graphs);
-            fprintf(stderr, "[LATRD_GRAPH TIMING] Total instantiation time: %10.2f us (%8.2f us per graph)\n", 
-                    time_instantiate_total * 1000.0f, time_instantiate_total * 1000.0f / num_graphs);
-            fprintf(stderr, "[LATRD_GRAPH TIMING] Total launch time:        %10.2f us (%8.2f us per graph)\n", 
-                    time_launch_total * 1000.0f, time_launch_total * 1000.0f / num_graphs);
-            fprintf(stderr, "[LATRD_GRAPH TIMING] TOTAL OVERHEAD:           %10.2f us\n", 
-                    (time_capture_total + time_instantiate_total) * 1000.0f);
-            fprintf(stderr, "[LATRD_GRAPH TIMING] GRAPH EXECUTION TIME:     %10.2f us\n\n", 
+            fprintf(stderr, "\n[LATRD_TYPE1 TIMING] n=%d, k=%d, BLOCK_SIZE=%d\n",
+                    (int)n, (int)k, iters_per_block);
+            fprintf(stderr, "[LATRD_TYPE1 TIMING] Total iterations: %d, Blocks: %d\n",
+                    total_iters, total_blocks);
+            fprintf(stderr, "[LATRD_TYPE1 TIMING] Total capture time:       %10.2f us (%.2f us/block)\n",
+                    time_capture_total * 1000.0f, time_capture_total * 1000.0f / total_blocks);
+            fprintf(stderr, "[LATRD_TYPE1 TIMING] Total instantiation time:   %10.2f us (first block only)\n",
+                    time_instantiate_total * 1000.0f);
+            fprintf(stderr, "[LATRD_TYPE1 TIMING] Total update time:        %10.2f us (%d attempted, %d OK, %d failed)\n",
+                    time_update_total * 1000.0f, num_updates_attempted,
+                    num_updates_successful, num_updates_failed);
+            fprintf(stderr, "[LATRD_TYPE1 TIMING] Total launch time:        %10.2f us (%.2f us/block)\n",
+                    time_launch_total * 1000.0f, time_launch_total * 1000.0f / total_blocks);
+            fprintf(stderr, "[LATRD_TYPE1 TIMING] TOTAL OVERHEAD:           %10.2f us\n",
+                    (time_capture_total + time_instantiate_total + time_update_total) * 1000.0f);
+            fprintf(stderr, "[LATRD_TYPE1 TIMING] GRAPH EXECUTION TIME:          %10.2f us\n\n",
                     time_launch_total * 1000.0f);
         }
         
-        // Cleanup: Destroy graph executables and graphs ONLY if not cached
-        // Cached graphs persist across calls; non-cached graphs are destroyed
-        if(!found_in_cache) {
-            // We created new graphs in this call - destroy them after execution
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] About to cleanup newly created graphs\n");
-            for(int graph_idx = 0; graph_idx < num_graphs; ++graph_idx) {
-                if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Destroying graph exec %d\n", graph_idx);
-                HIP_CHECK(hipGraphExecDestroy(graph_execs[graph_idx]));
-                if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Destroying graph %d\n", graph_idx);
-                HIP_CHECK(hipGraphDestroy(graphs[graph_idx]));
-            }
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] All graphs cleaned up successfully\n");
-            
-            // Restore original stream to the handle before destroying capture_stream
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Restoring original stream to handle\n");
-            rocblas_set_stream(handle, stream);
-            
-            // Destroy the capture stream (only created if not cached)
-            if(capture_stream != nullptr) {
-                if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Destroying capture stream\n");
-                HIP_CHECK(hipStreamDestroy(capture_stream));
-                if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Capture stream destroyed successfully\n");
-            }
-        } else {
-            // Used cached graphs - don't destroy them, they're owned by the cache
-            fprintf(stderr, "[GRAPH CACHE] Skipping cleanup for cached graphs (owned by cache)\n");
-            // Still need to restore original stream
-            if(debug_graphs) fprintf(stderr, "[LATRD_GRAPH] Restoring original stream to handle\n");
-            rocblas_set_stream(handle, stream);
+        // =====================================================================
+        // CLEANUP
+        // =====================================================================
+        
+        if(graph_created)
+        {
+            if(debug_graphs) fprintf(stderr, "[LATRD_TYPE1] Destroying graph executable\n");
+            HIP_CHECK(hipGraphExecDestroy(graph_exec));
         }
         
-        // Cleanup timing events
+        HIP_CHECK(hipStreamSynchronize(stream)); // KO TODO:: stream here. 
+        // Restore original stream
+        rocblas_set_stream(handle, stream);
+        
+        // Destroy graph stream
+        if(debug_graphs) fprintf(stderr, "[LATRD_TYPE1] Destroying graph stream\n");
+        HIP_CHECK(hipStreamDestroy(graph_stream));
+        
         if(time_graphs) {
             HIP_CHECK(hipEventDestroy(timing_start));
             HIP_CHECK(hipEventDestroy(timing_end));
         }
         
 #else
-        // Original non-graph path
-        constexpr bool time_graphs = true;   // Match graph path timing
+        // =====================================================================
+        // BASELINE: No graphs (original algorithm)
+        // =====================================================================
         
-        // Timing infrastructure for non-graph path
+        constexpr bool time_graphs = false; // KO TODO:: double check the knob before checkin
         hipEvent_t timing_start, timing_end;
         float time_execution_total = 0.0f;
         
@@ -2873,7 +2801,6 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
             //--------------------------------------------------------------
         }
         
-        // End timing for non-graph path
         if(time_graphs) {
             HIP_CHECK(hipEventRecord(timing_end, stream));
             HIP_CHECK(hipEventSynchronize(timing_end));
