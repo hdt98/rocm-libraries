@@ -192,8 +192,8 @@ float gemm_calc_quant(const ck_tile::QuantGemmHostArgs& args, const ck_tile::str
                                                   ABQuantPipeline,
                                                   BQuantPipeline>>>;
 
-        constexpr bool TiledPermuteN =
-            (BQuantGroupSize::kN > 1) ? false : GemmConfig::TiledMMAPermuteN;
+        constexpr bool TiledPermuteN = GemmConfig::TiledMMAPermuteN;
+            //(BQuantGroupSize::kN > 16) ? false :  GemmConfig::TiledMMAPermuteN;
         if(s.log_level_ > 0)
         {
             printf(
@@ -588,7 +588,7 @@ int run_gemm_example_with_layouts(const ck_tile::ArgParser& arg_parser,
                     *bq_tensor_ptr);
             }
 
-            ck_tile::FillUniformDistribution<ADataType>{1.0f, 1.0f/*, fill_seed(gen)*/}(a_m_k);
+            ck_tile::FillUniformDistribution<ADataType>{-5.0f, 5.0f/*, fill_seed(gen)*/}(a_m_k);
         }
         else if constexpr(QuantMode == ck_tile::QuantType::AQuantGrouped)
         {
@@ -666,14 +666,14 @@ int run_gemm_example_with_layouts(const ck_tile::ArgParser& arg_parser,
                     }
                 }
             }
-            for(int i = 0; i < BQK; i++)
-            {
-                for(int j = 0; j < BQN; j++)
-                {
-                    printf("bq_tensor_ptr[%d][%d]: %.0f\n ", i, j, (*bq_tensor_ptr)(i, j));
-                }
-                printf("\n");
-            }
+            // for(int i = 0; i < BQK; i++)
+            // {
+            //     for(int j = 0; j < BQN; j++)
+            //     {
+            //         printf("bq_tensor_ptr[%d][%d]: %.0f\n ", i, j, (*bq_tensor_ptr)(i, j));
+            //     }
+            //     printf("\n");
+            // }
         }
         else if constexpr(QuantMode == ck_tile::QuantType::ABQuantGrouped)
         {
@@ -701,6 +701,22 @@ int run_gemm_example_with_layouts(const ck_tile::ArgParser& arg_parser,
         b_k_n.SetZero();
         bq_tensor_ptr->SetZero();
     }
+    // for(int i = 0; i < K; i++)
+    // {
+    //     for(int j = 0; j < N; j++)
+    //     {
+    //         printf("b_k_n[%d][%d]: %.5f\n", i, j, ck_tile::type_convert<float>(b_k_n(i, j)));
+    //     }
+    //     printf("\n");
+    // }
+    // for(int i = 0; i < BQK; i++)
+    // {
+    //     for(int j = 0; j < BQN; j++)
+    //     {
+    //         printf("bq_tensor_ptr[%d][%d]: %.5f\n ", i, j, (*bq_tensor_ptr)(i, j));
+    //     }
+    //     printf("\n");
+    // }
     ck_tile::DeviceMem a_m_k_dev_buf(a_m_k.get_element_space_size_in_bytes());
     ck_tile::DeviceMem b_k_n_dev_buf(b_k_n.get_element_space_size_in_bytes());
     ck_tile::DeviceMem c_m_n_dev_buf(c_m_n_dev_result.get_element_space_size_in_bytes());
@@ -760,11 +776,48 @@ int run_gemm_example_with_layouts(const ck_tile::ArgParser& arg_parser,
         {
             printf("PreshuffleB with TiledMMAPermuteN\n");
             b_k_n_dev = ck_tile::shuffle_b_permuteN<GemmConfig>(b_k_n);
+            // for(int i = 0; i < static_cast<int>(b_k_n_dev.get_lengths()[0]); i++)
+            // {
+            //     for(int j = 0; j < static_cast<int>(b_k_n_dev.get_lengths()[1]); j++)
+            //     {
+            //         for(int k = 0; k < static_cast<int>(b_k_n_dev.get_lengths()[2]); k++)
+            //         {
+            //             for(int l = 0; l < static_cast<int>(b_k_n_dev.get_lengths()[3]); l++)
+            //             {
+            //                 for(int m = 0; m < static_cast<int>(b_k_n_dev.get_lengths()[4]); m++)
+            //                 {
+            //                     for(int n = 0; n < static_cast<int>(b_k_n_dev.get_lengths()[5]); n++)
+            //                     {
+            //                         for(int o = 0; o < static_cast<int>(b_k_n_dev.get_lengths()[6]); o++)
+            //                         {
+            //                             printf("b_k_n_dev[%d][%d][%d][%d][%d][%d][%d]: %f\n", i, j, k, l, m, n, o, ck_tile::type_convert<float>(b_k_n_dev(i, j, k, l, m, n, o)));
+            //                         }
+            //                     }
+            //                 }
+            //             }
+            //         }
+            //     }
+            // }
+            // printf("\n");
         }
         else
         {
             printf("PreshuffleB without TiledMMAPermuteN\n");
             b_k_n_dev = ck_tile::shuffle_b<GemmConfig>(b_k_n);
+            // for(int i = 0; i < static_cast<int>(b_k_n_dev.get_lengths()[0]); i++)
+            // {
+            //     for(int j = 0; j < static_cast<int>(b_k_n_dev.get_lengths()[1]); j++)
+            //     {
+            //         for(int k = 0; k < static_cast<int>(b_k_n_dev.get_lengths()[2]); k++)
+            //         {
+            //             for(int l = 0; l < static_cast<int>(b_k_n_dev.get_lengths()[3]); l++)
+            //             {
+            //                 printf("b_k_n_dev[%d][%d][%d][%d]: %f\n", i, j, k, l, ck_tile::type_convert<float>(b_k_n_dev(i, j, k, l)));
+            //             }
+            //         }
+            //     }
+            // }
+            //printf("\n");
         }
     }
     if constexpr(std::is_same_v<BDataType, ck_tile::pk_int4_t>)
@@ -788,30 +841,31 @@ int run_gemm_example_with_layouts(const ck_tile::ArgParser& arg_parser,
             ck_tile::HostTensor<BQDataType> bq_permuted_host =
                 ck_tile::bq_permuteN<GemmConfig>(*bq_tensor_ptr, BQuantGroupSize::kN);
 
-            printf("Preshuffle BQ tensor\n");
-            for(int i = 0; i < static_cast<int>(bq_permuted_host.get_lengths()[0]); i++)
-            {
-                for(int j = 0; j < static_cast<int>(bq_permuted_host.get_lengths()[1]); j++)
-                {
-                    for(int k = 0; k < static_cast<int>(bq_permuted_host.get_lengths()[2]); k++)
-                    {
-                        for(int l = 0; l < static_cast<int>(bq_permuted_host.get_lengths()[3]); l++)
-                        {
-                            for(int m = 0; m < static_cast<int>(bq_permuted_host.get_lengths()[4]);
-                                m++)
-                            {
-                                printf("bq_shuffle_host[%d][%d][%d][%d][%d]: %f\n",
-                                        i,
-                                        j,
-                                        k,
-                                        l,
-                                        m,
-                                        bq_permuted_host(i, j, k, l, m));
-                            }
-                        }
-                    }
-                }
-            }
+            printf("Commented for Aviral's case, Preshuffle BQ tensor\n");
+
+            // for(int i = 0; i < static_cast<int>(bq_permuted_host.get_lengths()[0]); i++)
+            // {
+            //     for(int j = 0; j < static_cast<int>(bq_permuted_host.get_lengths()[1]); j++)
+            //     {
+            //         for(int k = 0; k < static_cast<int>(bq_permuted_host.get_lengths()[2]); k++)
+            //         {
+            //             for(int l = 0; l < static_cast<int>(bq_permuted_host.get_lengths()[3]); l++)
+            //             {
+            //                 for(int m = 0; m < static_cast<int>(bq_permuted_host.get_lengths()[4]);
+            //                     m++)
+            //                 {
+            //                     printf("bq_shuffle_host[%d][%d][%d][%d][%d]: %f\n",
+            //                             i,
+            //                             j,
+            //                             k,
+            //                             l,
+            //                             m,
+            //                             bq_permuted_host(i, j, k, l, m));
+            //                 }
+            //             }
+            //         }
+            //     }
+            // }
 
             if constexpr(GemmConfig::BPreshuffleQuant)
             {
@@ -847,6 +901,13 @@ int run_gemm_example_with_layouts(const ck_tile::ArgParser& arg_parser,
         else
         {
             bq_dev_buf_ptr->ToDevice(bq_tensor_ptr->data());
+            // for(int i = 0; i < static_cast<int>(bq_tensor_ptr->get_lengths()[0]); i++)
+            // {
+            //     for(int j = 0; j < static_cast<int>(bq_tensor_ptr->get_lengths()[1]); j++)
+            //     {
+            //         printf("bq_tensor_ptr[%d][%d]: %f\n", i, j, ck_tile::type_convert<float>((*bq_tensor_ptr)(i, j)));
+            //     }
+            // }
         }
     }
 

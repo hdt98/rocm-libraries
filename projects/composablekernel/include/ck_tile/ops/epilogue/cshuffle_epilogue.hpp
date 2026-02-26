@@ -547,7 +547,7 @@ struct CShuffleEpilogue
                                    const ScaleN& scale_n = {})
     {
         static constexpr int RowsPerLane = CWarpTensor::get_thread_buffer_size();
-
+        //printf("i am in if\n");
         static_assert(MPerXdl % RowsPerLane == 0,
                       "CShuffle (permuteN): MPerXdl must be divisible by per-lane row count.");
         constexpr int kM0 = MWave;
@@ -557,16 +557,16 @@ struct CShuffleEpilogue
         constexpr int kN0 = NWave;
         constexpr int kN1 = NPerXdl;
         constexpr int kN2 = NRepeat;
-        if(get_block_id() == 0 && get_thread_id() == 0)
-        {
-            printf("RowsPerLane: %d, kM0: %d, kM1: %d, kM2: %d, kN0: %d, kN1: %d, kN2: %d\n", RowsPerLane, kM0, kM1, kM2, kN0, kN1, kN2);
-        }
+        // if(get_block_id() == 0 && get_thread_id() == 0)
+        // {
+        //     printf("RowsPerLane: %d, kM0: %d, kM1: %d, kM2: %d, kN0: %d, kN1: %d, kN2: %d\n", RowsPerLane, kM0, kM1, kM2, kN0, kN1, kN2);
+        // }
         using IntrThreadShuffleEncode =
             tile_distribution_encoding<sequence<>,
                                        tuple<sequence<kM0, kM1, kM2>, sequence<kN0, kN1, kN2>>,
-                                       tuple<sequence<1, 2>, sequence<1, 2>>,
+                                       tuple<sequence<1, 2>, sequence<1, 2>>, //(MWave, Nwave) = (1, 4), (MPerXdl/RowsPerLane, NPerXdl) = (16/4, 16)
                                        tuple<sequence<0, 0>, sequence<1, 1>>,
-                                       sequence<1, 2>,
+                                       sequence<1, 2>, //(RowsPerLane, NRepeat) = (4, 2)
                                        sequence<2, 2>>;
         constexpr auto dram_tile_distribution =
             make_static_tile_distribution(IntrThreadShuffleEncode{});
@@ -624,13 +624,13 @@ struct CShuffleEpilogue
             shuffle_acc.get_thread_buffer() = o_acc_tile.get_y_sliced_thread_data(
                 merge_sequences(sequence<mIter, 0>{}, c_warp_y_index_zeros),
                 merge_sequences(sequence<1, NRepeat>{}, c_warp_y_lengths));
-            
-            for(index_t i = 0; i < shuffle_acc.size(); ++i)
-            {
-                auto value       = shuffle_acc.get(i);
-                auto float_value = type_convert<float>(value);
-                printf("shuffle_acc [%d] = %f\n", i, float_value);
-            }
+            // auto thread_buffer = shuffle_acc.get_thread_buffer();
+            // for(index_t i = 0; i < thread_buffer.size(); ++i)
+            // {
+            //     auto value       = thread_buffer.get(i);
+            //     auto float_value = type_convert<float>(value);
+            //     printf("shuffle_acc [%d] = %f\n", i, float_value);
+            // }
             // If non-scalar scales provided, load them with identical distribution
             if constexpr(has_scales && !has_scalar_scales)
             {
@@ -639,16 +639,16 @@ struct CShuffleEpilogue
             }
 
             // Pack 4 “rows per lane” as you already do
-            static_for<0, NRepeat, 1>{}([&](auto n_idx) {
+            static_for<0, NRepeat, 1>{}([&](auto n_idx) { //0, 1
                 // source indices in shuffle_acc: (n_idx * product(Y) + row)
                 const index_t plane = c_warp_y_lengths.product();
 
                 // local lambda to fuse scale (if present) and convert
-                static_for<0, kM2, 1>{}([&](auto m_lane) {
+                static_for<0, kM2, 1>{}([&](auto m_lane) { //0,1,2,3
                     const int src = n_idx * plane + m_lane;   // source row in this N-plane
                     const int dst = n_idx + m_lane * NRepeat; // permuted N layout in output
                     AccDataType v = shuffle_acc.get_thread_buffer()[src];
-                    printf("src_idx: %d, dst_idx: %d, v: %f\n", src, dst, type_convert<float>(v));
+                    //printf("n_idx: %d, plane: %d, m_lane: %d, src_idx: %d, dst_idx: %d, v: %f, type_convert(v): %f\n", static_cast<int>(n_idx), static_cast<int>(plane), static_cast<int>(m_lane), static_cast<int>(src), static_cast<int>(dst), v, type_convert<float>(v)); 
                     if constexpr(has_scalar_scales)
                     {
                         v = static_cast<AccDataType>(v * scale_m * scale_n);
@@ -698,7 +698,7 @@ struct CShuffleEpilogue
                                    const ScaleN& scale_n = {})
     {
         constexpr auto LdsTileDistr = make_static_tile_distribution(MakeLdsDistributionEncode());
-
+        //printf("i am in else\n");
         auto lds_tile = make_static_distributed_tensor<AccDataType>(LdsTileDistr);
 
         constexpr auto lds_block_desc = MakeLdsBlockDescriptor<Problem>();

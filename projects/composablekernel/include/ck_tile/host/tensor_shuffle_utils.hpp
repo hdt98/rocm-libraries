@@ -102,16 +102,16 @@ auto shuffle_b(const ck_tile::HostTensor<T>& t, GemmConfig)
     }
     else
     {
-        constexpr int KLane = ck_tile::get_warp_size() / GemmConfig::N_Warp_Tile;
+        constexpr int KLane = ck_tile::get_warp_size() / GemmConfig::N_Warp_Tile; //64/16 = 4
         constexpr int ItemsPerAccess =
-            std::min(16 / static_cast<int>(sizeof(T)), GemmConfig::K_Warp_Tile / KLane);
+            std::min(16 / static_cast<int>(sizeof(T)), GemmConfig::K_Warp_Tile / KLane); //min(16 / 1, 64/4)= 16
 
-        ck_tile::HostTensor<T> t_view({n_ / GemmConfig::N_Warp_Tile,
-                                       GemmConfig::N_Warp_Tile,
-                                       k_ / ItemsPerAccess,
-                                       ItemsPerAccess});
+        ck_tile::HostTensor<T> t_view({n_ / GemmConfig::N_Warp_Tile, //128/16 = 8
+                                       GemmConfig::N_Warp_Tile, //16
+                                       k_ / ItemsPerAccess, //128/16 = 8
+                                       ItemsPerAccess}); //16
         std::copy(t.begin(), t.end(), t_view.begin());
-        return ck_tile::reference_permute(t_view, {0, 2, 1, 3});
+        return ck_tile::reference_permute(t_view, {0, 2, 1, 3}); //8(n), 8(k), 16(n), 16(k)
     }
 }
 
@@ -128,11 +128,11 @@ auto bq_permuteN(const ck_tile::HostTensor<T>& t, index_t group_n)
 
     int n_                = t.get_lengths()[1];
     int bqk_              = t.get_lengths()[0];
-    constexpr int NRepeat = GemmConfig::N_Tile / GemmConfig::N_Warp_Tile / GemmConfig::N_Warp;
+    constexpr int NRepeat = GemmConfig::N_Tile / GemmConfig::N_Warp_Tile / GemmConfig::N_Warp; //128/16/4 = 2
 
-    int dim = n_ / (GemmConfig::N_Warp * (GemmConfig::N_Warp_Tile / group_n) * NRepeat);
+    int dim = n_ / (GemmConfig::N_Warp * (GemmConfig::N_Warp_Tile / group_n) * NRepeat); //16 / (4 * (16/8) * 2) = 1
     ck_tile::HostTensor<T> t_view(
-        {dim, GemmConfig::N_Warp, GemmConfig::N_Warp_Tile / group_n, NRepeat, bqk_});
+        {dim, GemmConfig::N_Warp, GemmConfig::N_Warp_Tile / group_n, NRepeat, bqk_}); //(1, 4, 2, 2, 1)
 
     // ck_tile::HostTensor<T> t_view({n_ / (GemmConfig::N_Tile / group_n),
     //                                GemmConfig::N_Warp,
@@ -148,28 +148,28 @@ auto bq_permuteN(const ck_tile::HostTensor<T>& t, index_t group_n)
            t_view.get_lengths()[2],
            t_view.get_lengths()[3],
            t_view.get_lengths()[4]);
-    for(int i = 0; i < static_cast<int>(t_view.get_lengths()[0]); i++)
-    {
-        for(int j = 0; j < static_cast<int>(t_view.get_lengths()[1]); j++)
-        {
-            for(int k = 0; k < static_cast<int>(t_view.get_lengths()[2]); k++)
-            {
-                for(int l = 0; l < static_cast<int>(t_view.get_lengths()[3]); l++)
-                {
-                    for(int m = 0; m < static_cast<int>(t_view.get_lengths()[4]); m++)
-                    {
-                        printf("t_view[%d][%d][%d][%d][%d]: %f\n",
-                               i,
-                               j,
-                               k,
-                               l,
-                               m,
-                               static_cast<float>(t_view(i, j, k, l, m)));
-                    }
-                }
-            }
-        }
-    }
+    // for(int i = 0; i < static_cast<int>(t_view.get_lengths()[0]); i++)
+    // {
+    //     for(int j = 0; j < static_cast<int>(t_view.get_lengths()[1]); j++)
+    //     {
+    //         for(int k = 0; k < static_cast<int>(t_view.get_lengths()[2]); k++)
+    //         {
+    //             for(int l = 0; l < static_cast<int>(t_view.get_lengths()[3]); l++)
+    //             {
+    //                 for(int m = 0; m < static_cast<int>(t_view.get_lengths()[4]); m++)
+    //                 {
+    //                     printf("t_view[%d][%d][%d][%d][%d]: %f\n",
+    //                            i,
+    //                            j,
+    //                            k,
+    //                            l,
+    //                            m,
+    //                            static_cast<float>(t_view(i, j, k, l, m)));
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 
     return ck_tile::reference_permute(t_view, {0, 3, 1, 2, 4});
 }
@@ -233,7 +233,7 @@ auto shuffle_b_permuteN(const ck_tile::HostTensor<T>& t, const GemmConfig& gemmC
                t_view.get_lengths()[4],
                t_view.get_lengths()[5],
                t_view.get_lengths()[6]);
-        return ck_tile::reference_permute(t_view, {0, 3, 1, 4, 5, 2, 6});
+        return ck_tile::reference_permute(t_view, {0, 3, 1, 4, 5, 2, 6});  //1(n), 2(n), 4(n), 2(k), 4(k), 16(n), 16(k)
     }
 }
 
