@@ -286,35 +286,6 @@ struct TransformConvFwdToGemm
                       is_same_v<ConvDimsType, ck::Array<IndexType, NDimSpatial + I3>>);
 #endif
 
-        // Print out all member and their values for debugging
-        printf("Hi: %d, Wi: %d, Ho: %d, Wo: %d, Y: %d, X: %d, K: %d, C: %d\n",
-               Hi_,
-               Wi_,
-               Ho_,
-               Wo_,
-               Y_,
-               X_,
-               K_,
-               C_);
-        printf("HiStride: %d, WiStride: %d, HoStride: %d, WoStride: %d, XStride: %d\n",
-               HiStride_,
-               WiStride_,
-               HoStride_,
-               WoStride_,
-               XStride_);
-        printf("CStrideTensorA: %d, CStrideTensorB: %d, KStrideTensorB: %d, KStrideTensorC: %d\n",
-               CStrideTensorA_,
-               CStrideTensorB_,
-               KStrideTensorB_,
-               KStrideTensorC_);
-        printf("NStrideTensorA: %d, NStrideTensorC: %d, GStrideTensorA: %d, GStrideTensorB: %d, "
-               "GStrideTensorC: %d\n",
-               NStrideTensorA_,
-               NStrideTensorC_,
-               GStrideTensorA_,
-               GStrideTensorB_,
-               GStrideTensorC_);
-
         if constexpr(SplitN)
         {
             N_ = GetSplitedNSize(
