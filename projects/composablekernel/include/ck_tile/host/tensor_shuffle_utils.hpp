@@ -206,23 +206,15 @@ auto shuffle_b_permuteN(const ck_tile::HostTensor<T>& t, const GemmConfig& gemmC
     }
     else
     {
-        int divisor = 1;
-        if(ck_tile::is_gfx11_supported())
-        {
-            divisor = 1;
-        }
-        else
-        {
-            assert(is_wave32() == false);
-            divisor = get_warp_size() / gemmConfig.N_Warp_Tile;
-        }
+        constexpr int KLane = ck_tile::get_warp_size() / GemmConfig::N_Warp_Tile;
+        constexpr int ItemsPerAccess =
+            std::min(16 / static_cast<int>(sizeof(T)), GemmConfig::K_Warp_Tile / KLane);
         ck_tile::HostTensor<T> t_view({n_ / gemmConfig.N_Tile,
                                        gemmConfig.N_Warp,
                                        gemmConfig.N_Warp_Tile,
                                        NRepeat,
-                                       k_ / gemmConfig.K_Warp_Tile,
-                                       divisor,
-                                       gemmConfig.K_Warp_Tile / divisor});
+                                       k_ / ItemsPerAccess,
+                                       ItemsPerAccess});
         std::copy(t.begin(), t.end(), t_view.begin());
         printf("I am inside shuffle_b PermuteN\n");
         printf("t_view.get_lengths(): %lu, %lu, %lu, %lu, %lu, %lu, %lu\n",
@@ -233,7 +225,7 @@ auto shuffle_b_permuteN(const ck_tile::HostTensor<T>& t, const GemmConfig& gemmC
                t_view.get_lengths()[4],
                t_view.get_lengths()[5],
                t_view.get_lengths()[6]);
-        return ck_tile::reference_permute(t_view, {0, 3, 1, 4, 5, 2, 6});  //1(n), 2(n), 4(n), 2(k), 4(k), 16(n), 16(k)
+        return ck_tile::reference_permute(t_view, {0, 3, 1, 4, 2, 5});  //1(n), 2(n), 4(n), 2(k), 4(k), 16(n), 16(k)
     }
 }
 
