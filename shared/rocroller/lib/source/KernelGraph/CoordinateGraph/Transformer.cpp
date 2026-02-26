@@ -35,31 +35,35 @@ namespace rocRoller
             {
                 auto kernel = context->kernel();
 
-                // TODO: figure out why "Remap Workgroup GPU" test fails when calling other fillExecutionCoordinates here
-                // calling other fillExecutionCoordinates works for majority of other tests
-
                 auto const& kernelWorkgroupIndexes = kernel->workgroupIndex();
                 auto const& kernelWorkitemIndexes  = kernel->workitemIndex();
 
+                std::array<Expression::ExpressionPtr, 3> wgExprs, wiExprs;
+                for(size_t i = 0; i < 3; i++)
+                {
+                    wgExprs[i] = kernelWorkgroupIndexes[i] ? kernelWorkgroupIndexes[i]->expression()
+                                                           : nullptr;
+                    wiExprs[i] = kernelWorkitemIndexes[i] ? kernelWorkitemIndexes[i]->expression()
+                                                          : nullptr;
+                }
+
+                fillExecutionCoordinates(nullptr, wgExprs, wiExprs);
+
+                // TODO Remove this when Workgroup removed from RegisterTagManager
                 for(auto const& tag : m_graph->getNodes())
                 {
                     auto dimension = m_graph->getNode(tag);
                     if(std::holds_alternative<Workgroup>(dimension))
                     {
-                        auto dimensionWorkgroup = std::get<Workgroup>(dimension);
-                        auto expr = kernelWorkgroupIndexes.at(dimensionWorkgroup.dim)->expression();
-                        // TODO Remove this when Workgroup removed from RegisterTagManager
-                        context->registerTagManager()->addRegister(
-                            tag, kernelWorkgroupIndexes.at(dimensionWorkgroup.dim));
-                        setCoordinate(tag, expr);
+                        auto dim = std::get<Workgroup>(dimension).dim;
+                        context->registerTagManager()->addRegister(tag,
+                                                                   kernelWorkgroupIndexes.at(dim));
                     }
                     if(std::holds_alternative<Workitem>(dimension))
                     {
-                        auto dimensionWorkitem = std::get<Workitem>(dimension);
-                        auto expr = kernelWorkitemIndexes.at(dimensionWorkitem.dim)->expression();
-                        context->registerTagManager()->addRegister(
-                            tag, kernelWorkitemIndexes.at(dimensionWorkitem.dim));
-                        setCoordinate(tag, expr);
+                        auto dim = std::get<Workitem>(dimension).dim;
+                        context->registerTagManager()->addRegister(tag,
+                                                                   kernelWorkitemIndexes.at(dim));
                     }
                 }
             }
