@@ -1409,6 +1409,9 @@ class Solution(collections.abc.Mapping):
       state["StreamKXCCMapping"] = 0
       state["StreamKFixupTreeReduction"] = 0
       state["DebugStreamK"] = 0
+    
+    if (state["GlobalSplitU"] > 1 or state["GlobalSplitU"] == -1) and not state["BufferStore"]:
+      reject(state, printRejectionReason, "GlobalSplitU > 1 requires BufferStore (flat store workspace addressing not supported)")
 
     computeBytes = int(state["ProblemType"]["ComputeDataType"].numBytes())
     state["_WorkspaceSizePerElemC"] = computeBytes
@@ -1681,6 +1684,8 @@ class Solution(collections.abc.Mapping):
       state["DirectToLdsA"] = False
       state["DirectToLdsB"] = False
       state["_UseSgprForGRO"] = False
+      # StaggerU only works with source kernels, or with BufferLoad.
+      state["StaggerU"] = 0
       if state["PrefetchGlobalRead"] >= 2:
         reject(state, printRejectionReason, "BufferLoad=0 does not support PrefetchGlobalRead>=2")
         return
