@@ -43,7 +43,7 @@ option(MIOPENPROVIDER_SKIP_TESTS "Skip building tests" OFF)
 option(MIOPENPROVIDER_ENABLE_COVERAGE "Build with code coverage flags" OFF)
 
 option(BUILD_ADDRESS_SANITIZER "Build with Address Sanitizer enabled" OFF)
-option(ENABLE_CLANG_FORMAT "Enable Clang-Format checks" ON)
+option(ENABLE_CLANG_FORMAT "Enable Clang-Format checks" OFF)
 if(NOT ENABLE_CLANG_FORMAT)
     message(WARNING "Clang-Format checks are disabled. CI requires passing clang-format checks.")
 endif()
@@ -53,7 +53,10 @@ if(WIN32)
         message(WARNING "Clang-Tidy enabled on Windows - this significantly increases build time.")
     endif()
 else()
-    option(ENABLE_CLANG_TIDY "Enable Clang-Tidy checks" ON)
+    option(ENABLE_CLANG_TIDY "Enable Clang-Tidy checks" OFF)
+    if(NOT ENABLE_CLANG_TIDY)
+        message(WARNING "Clang-Tidy checks are disabled. CI requires passing clang-tidy checks.")
+    endif()
 endif()
 
 list(
@@ -207,6 +210,7 @@ if(MIOPENPROVIDER_ENABLE_COVERAGE)
 
     set(CODE_COVERAGE_IGNORE_REGEX ".*deps.*|.*tests.*")
     set(CODE_COVERAGE_OBJECTS
+        -object ./${HIPDNN_PLUGIN_ENGINE_ROOTDIR}/${HIPDNN_PLUGIN_ENGINE_SUBDIR}/libmiopen_plugin.so
         -object ./${CMAKE_INSTALL_BINDIR}/miopen_plugin_tests
         -object ./${CMAKE_INSTALL_BINDIR}/miopen_plugin_integration_tests
     )
