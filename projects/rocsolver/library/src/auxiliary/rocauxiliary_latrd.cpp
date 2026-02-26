@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,6 +26,8 @@
  * *************************************************************************/
 
 #include "rocauxiliary_latrd.hpp"
+
+static bool latrd_forsytrd = std::getenv("USE_REFERENCE_LATRD") != nullptr ? false : true;
 
 ROCSOLVER_BEGIN_NAMESPACE
 
@@ -62,38 +64,19 @@ rocblas_status rocsolver_latrd_impl(rocblas_handle handle,
     rocblas_stride strideW = 0;
     rocblas_int batch_count = 1;
 
-    // memory workspace sizes:
-    // size for constants in rocblas calls
-    size_t size_scalars;
-    // size of arrays of pointers (for batched cases) and re-usable workspace
-    size_t size_workArr;
-    // extra requirements for calling LARFG
-    size_t size_work, size_norms;
-    rocsolver_latrd_getMemorySize<false, T>(n, k, batch_count, &size_scalars, &size_work,
-                                            &size_norms, &size_workArr);
-
-    if(rocblas_is_device_memory_size_query(handle))
-        return rocblas_set_optimal_device_memory_size(handle, size_scalars, size_work, size_norms,
-                                                      size_workArr);
-
-    // memory workspace allocation
-    void *scalars, *work, *norms, *workArr;
-    rocblas_device_malloc mem(handle, size_scalars, size_work, size_norms, size_workArr);
-
-    if(!mem)
-        return rocblas_status_memory_error;
-
-    scalars = mem[0];
-    work = mem[1];
-    norms = mem[2];
-    workArr = mem[3];
-    if(size_scalars > 0)
-        init_scalars(handle, (T*)scalars);
-
     // execution
-    return rocsolver_latrd_template<T>(handle, uplo, n, k, A, shiftA, lda, strideA, E, strideE, tau,
-                                       strideP, W, shiftW, ldw, strideW, batch_count, (T*)scalars,
-                                       (T*)work, (T*)norms, (T**)workArr);
+    if(latrd_forsytrd)
+    {
+        return rocsolver_latrd_forsytrd_template<T>(handle, uplo, n, k, A, shiftA, lda, strideA, E,
+                                                    strideE, tau, strideP, W, shiftW, ldw, strideW,
+                                                    batch_count, nullptr);
+    }
+    else
+    {
+        return rocsolver_latrd_template<T>(handle, uplo, n, k, A, shiftA, lda, strideA, E, strideE,
+                                           tau, strideP, W, shiftW, ldw, strideW, batch_count,
+                                           nullptr);
+    }
 }
 
 ROCSOLVER_END_NAMESPACE

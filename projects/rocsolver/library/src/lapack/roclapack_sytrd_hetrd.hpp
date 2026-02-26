@@ -37,6 +37,9 @@
 #include "roclapack_sytd2_hetd2.hpp"
 #include "rocsolver/rocsolver.h"
 
+/* #include <rocprofiler-sdk-roctx/roctx.h> */
+#include <roctracer/roctx.h>
+
 ROCSOLVER_BEGIN_NAMESPACE
 
 template <bool BATCHED, typename T>
@@ -147,6 +150,7 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
 {
     ROCSOLVER_ENTER("sytrd_hetrd", "uplo:", uplo, "n:", n, "shiftA:", shiftA, "lda:", lda,
                     "bc:", batch_count);
+    roctxRangePush("rocsolver_sytrd_hetrd");
 
     // quick return
     if(n == 0 || batch_count == 0)
@@ -280,6 +284,7 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
     }
 
     rocblas_set_pointer_mode(handle, old_mode);
+    roctxRangePop();
     return rocblas_status_success;
 }
 

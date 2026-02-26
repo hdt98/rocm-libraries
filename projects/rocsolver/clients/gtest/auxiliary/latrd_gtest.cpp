@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,6 +33,8 @@ using ::testing::Values;
 using ::testing::ValuesIn;
 using namespace std;
 
+static bool latrd_old_test_sizes = std::getenv("LATRD_OLD_TESTS_SIZES") != nullptr ? true : false;
+
 typedef std::tuple<vector<int>, vector<int>> latrd_tuple;
 
 // each matrix_size_range is a {n, lda, ldw}
@@ -45,7 +47,7 @@ typedef std::tuple<vector<int>, vector<int>> latrd_tuple;
 // (null handle, null pointers and invalid values)
 
 // for checkin_lapack tests
-const vector<vector<int>> matrix_size_range = {
+const vector<vector<int>> matrix_size_range_old = {
     // quick return
     {0, 1, 1},
     // invalid
@@ -57,8 +59,22 @@ const vector<vector<int>> matrix_size_range = {
     {70, 100, 70},
     {130, 130, 150},
     {150, 150, 150}};
+const vector<vector<int>> matrix_size_range_new = {
+    // quick return
+    {0, 1, 1},
+    // invalid
+    {-1, 1, 1},
+    {20, 5, 20},
+    {20, 20, 5},
+    // normal (valid) samples
+    {32, 64, 64},
+    {64, 128, 64},
+    {128, 128, 256},
+    {128, 128, 128}};
+const vector<vector<int>> matrix_size_range
+    = latrd_old_test_sizes ? matrix_size_range_old : matrix_size_range_new;
 
-const vector<vector<int>> op_range = {
+const vector<vector<int>> op_range_old = {
     // quick return
     {0, 0},
     // invalid
@@ -69,12 +85,31 @@ const vector<vector<int>> op_range = {
     {25, 1},
     {30, 0},
     {30, 1}};
+const vector<vector<int>> op_range_new = {
+    // quick return
+    {0, 0},
+    // invalid
+    {-1, 0},
+    {180, 0},
+    // normal (valid) samples
+    {8, 0},
+    {16, 1},
+    {16, 0},
+    {16, 1}};
+const vector<vector<int>> op_range = latrd_old_test_sizes ? op_range_old : op_range_new;
 
 // for daily_lapack tests
-const vector<vector<int>> large_matrix_size_range
+const vector<vector<int>> large_matrix_size_range_old
     = {{152, 152, 152}, {640, 640, 656}, {1000, 1024, 1000}};
+const vector<vector<int>> large_matrix_size_range_new
+    = {{384, 384, 384}, {640, 640, 656}, {1000, 1024, 1000}};
+const vector<vector<int>> large_matrix_size_range
+    = latrd_old_test_sizes ? large_matrix_size_range_old : large_matrix_size_range_new;
 
-const vector<vector<int>> large_op_range = {{64, 0}, {98, 1}, {130, 0}, {150, 1}};
+const vector<vector<int>> large_op_range_old = {{64, 0}, {98, 1}, {130, 0}, {150, 1}};
+const vector<vector<int>> large_op_range_new = {{64, 0}, {96, 1}, {128, 0}, {160, 1}};
+const vector<vector<int>> large_op_range
+    = latrd_old_test_sizes ? large_op_range_old : large_op_range_new;
 
 Arguments latrd_setup_arguments(latrd_tuple tup)
 {

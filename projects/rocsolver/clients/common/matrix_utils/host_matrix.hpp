@@ -32,6 +32,7 @@
 #include <cstring>
 #include <initializer_list>
 #include <iostream>
+#include <iomanip>
 #include <memory>
 #include <new>
 #include <type_traits>
@@ -784,6 +785,9 @@ public:
         /*         else */
         /*             std::cout << "\n" << std::flush; */
         /* } */
+        const auto precision{std::cout.precision()}; 
+        const std::size_t digits = 8;
+        std::cout << std::setw(digits) << std::scientific;
         for(I i = 0; i < nrows_; ++i)
         {
             for(I j = 0; j < ncols_; ++j)
@@ -795,6 +799,7 @@ public:
                     std::cout << "\n" << std::flush;
             }
         }
+        std::cout << std::setprecision(precision);
     }
 
 protected:
@@ -1205,6 +1210,32 @@ HostMatrix_<T, I> adjoint(const HostMatrix_<T, I>& A)
     Z = transpose(Z);
 
     return Z;
+}
+
+template <template <typename, typename> class HostMatrix_, typename T, typename I>
+auto real(const HostMatrix_<T, I>& A)
+{
+    HostMatrix_<typename HostMatrix_<T, I>::S, I> reA(A.nrows(), A.ncols());
+
+    for(I i = 0; i < A.size(); ++i)
+    {
+        reA[i] = std::real(A[i]);
+    }
+
+    return reA;
+}
+
+template <template <typename, typename> class HostMatrix_, typename T, typename I>
+auto imag(const HostMatrix_<T, I>& A)
+{
+    HostMatrix_<typename HostMatrix_<T, I>::S, I> imA(A.nrows(), A.ncols());
+
+    for(I i = 0; i < A.size(); ++i)
+    {
+        imA[i] = std::imag(A[i]);
+    }
+
+    return imA;
 }
 
 template <template <typename, typename> class HostMatrix_, typename T, typename I>

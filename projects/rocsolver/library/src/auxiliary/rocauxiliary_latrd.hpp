@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     June 2017
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,6 +36,12 @@
 #include "../auxiliary/rocauxiliary_larfg.hpp"
 #include "rocblas.hpp"
 #include "rocsolver/rocsolver.h"
+
+#include "rocsolver_device_workspace.hpp"
+#include <rocprofiler-sdk-roctx/roctx.h>
+
+static bool print_debug_messages_latrd_forsytrd
+    = std::getenv("PRINT_DEBUG") != nullptr ? true : false;
 
 ROCSOLVER_BEGIN_NAMESPACE
 
@@ -217,6 +223,7 @@ rocblas_status rocsolver_latrd_template(rocblas_handle handle,
 {
     ROCSOLVER_ENTER("latrd", "uplo:", uplo, "n:", n, "k:", k, "shiftA:", shiftA, "lda:", lda,
                     "shiftW:", shiftW, "ldw:", ldw, "bc:", batch_count);
+    roctxRangePush("rocsolver_latrd");
 
     // quick return
     if(n == 0 || k == 0 || batch_count == 0)
@@ -393,7 +400,83 @@ rocblas_status rocsolver_latrd_template(rocblas_handle handle,
     }
 
     rocblas_set_pointer_mode(handle, old_mode);
+    roctxRangePop();
     return rocblas_status_success;
+}
+
+template <typename T, typename S, typename U, bool COMPLEX = rocblas_is_complex<T>>
+auto rocsolver_latrd_getWorkItems(rocblas_handle handle,
+                                  const rocblas_fill uplo,
+                                  const rocblas_int n,
+                                  const rocblas_int k,
+                                  U A,
+                                  const rocblas_int shiftA,
+                                  const rocblas_int lda,
+                                  const rocblas_stride strideA,
+                                  S* E,
+                                  const rocblas_stride strideE,
+                                  T* tau,
+                                  const rocblas_stride strideP,
+                                  T* W,
+                                  const rocblas_int shiftW,
+                                  const rocblas_int ldw,
+                                  const rocblas_stride strideW,
+                                  const rocblas_int batch_count)
+{
+    // memory workspace sizes:
+    // size for constants in rocblas calls
+    size_t size_scalars;
+    // size of arrays of pointers (for batched cases) and re-usable workspace
+    size_t size_workArr;
+    // extra requirements for calling LARFG
+    size_t size_work, size_norms;
+    rocsolver_latrd_getMemorySize<false, T>(n, k, batch_count, &size_scalars, &size_work,
+                                            &size_norms, &size_workArr);
+
+    auto work_items = create_work_item({"latrd_scalars", size_scalars})
+        + create_work_item({"latrd_workArr", size_workArr})
+        + create_work_item({"latrd_work", size_work}) + create_work_item({"latrd_norms", size_norms});
+
+    return work_items;
+}
+
+template <typename T, typename S, typename U, bool COMPLEX = rocblas_is_complex<T>>
+rocblas_status rocsolver_latrd_template(rocblas_handle handle,
+                                        const rocblas_fill uplo,
+                                        const rocblas_int n,
+                                        const rocblas_int k,
+                                        U A,
+                                        const rocblas_int shiftA,
+                                        const rocblas_int lda,
+                                        const rocblas_stride strideA,
+                                        S* E,
+                                        const rocblas_stride strideE,
+                                        T* tau,
+                                        const rocblas_stride strideP,
+                                        T* W,
+                                        const rocblas_int shiftW,
+                                        const rocblas_int ldw,
+                                        const rocblas_stride strideW,
+                                        const rocblas_int batch_count,
+                                        rocsolver_device_workspace_ptr_t dwptr)
+{
+    ROCSOLVER_INIT_DEVICE_WORKSPACE(
+        dwptr,
+        rocsolver_latrd_getWorkItems(handle, uplo, n, k, A, shiftA, lda, strideA, E, strideE, tau,
+                                     strideP, W, shiftW, ldw, strideW, batch_count));
+
+    T* scalars = (T*)dwptr->work("latrd_scalars");
+    T* work = (T*)dwptr->work("latrd_work");
+    T* norms = (T*)dwptr->work("latrd_norms");
+    T** workArr = (T**)dwptr->work("latrd_workArr");
+
+    if(dwptr->size("latrd_scalars") > 0)
+        init_scalars(handle, (T*)scalars);
+
+    // execution
+    return rocsolver_latrd_template<T>(handle, uplo, n, k, A, shiftA, lda, strideA, E, strideE, tau,
+                                       strideP, W, shiftW, ldw, strideW, batch_count, (T*)scalars,
+                                       (T*)work, (T*)norms, (T**)workArr);
 }
 
 /**************************************************************************************/
@@ -1992,8 +2075,9 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                                                  T* norms,
                                                  T** workArr)
 {
-    ROCSOLVER_ENTER("latrd", "uplo:", uplo, "n:", n, "k:", k, "shiftA:", shiftA, "lda:", lda,
-                    "shiftW:", shiftW, "ldw:", ldw, "bc:", batch_count);
+    ROCSOLVER_ENTER("latrd_forsytrd", "uplo:", uplo, "n:", n, "k:", k, "shiftA:", shiftA,
+                    "lda:", lda, "shiftW:", shiftW, "ldw:", ldw, "bc:", batch_count);
+    roctxRangePush("rocsolver_latrd_forsytrd");
 
     // quick return
     if(n == 0 || k == 0 || batch_count == 0)
@@ -2108,7 +2192,88 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
         }
     }
 
+    roctxRangePop();
     return rocblas_status_success;
+}
+
+template <typename T, typename S, typename U, bool COMPLEX = rocblas_is_complex<T>>
+auto rocsolver_latrd_forsytrd_getWorkItems(rocblas_handle handle,
+                                           const rocblas_fill uplo,
+                                           const rocblas_int n,
+                                           const rocblas_int k,
+                                           U A,
+                                           const rocblas_int shiftA,
+                                           const rocblas_int lda,
+                                           const rocblas_stride strideA,
+                                           S* E,
+                                           const rocblas_stride strideE,
+                                           T* tau,
+                                           const rocblas_stride strideP,
+                                           T* W,
+                                           const rocblas_int shiftW,
+                                           const rocblas_int ldw,
+                                           const rocblas_stride strideW,
+                                           const rocblas_int batch_count)
+{
+    // memory workspace sizes:
+    // size for constants in rocblas calls
+    size_t size_scalars;
+    // size of arrays of pointers (for batched cases) and re-usable workspace
+    size_t size_workArr;
+    // extra requirements for calling LARFG
+    size_t size_work, size_norms;
+    rocsolver_latrd_forsytrd_getMemorySize<false, T>(n, k, batch_count, &size_scalars, &size_work,
+                                                     &size_norms, &size_workArr);
+
+    auto work_items = create_work_item({"latrd_scalars", size_scalars})
+        + create_work_item({"latrd_workArr", size_workArr})
+        + create_work_item({"latrd_work", size_work}) + create_work_item({"latrd_norms", size_norms});
+
+    return work_items;
+}
+
+template <typename T, typename S, typename U, bool COMPLEX = rocblas_is_complex<T>>
+rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
+                                                 const rocblas_fill uplo,
+                                                 const rocblas_int n,
+                                                 const rocblas_int k,
+                                                 U A,
+                                                 const rocblas_int shiftA,
+                                                 const rocblas_int lda,
+                                                 const rocblas_stride strideA,
+                                                 S* E,
+                                                 const rocblas_stride strideE,
+                                                 T* tau,
+                                                 const rocblas_stride strideP,
+                                                 T* W,
+                                                 const rocblas_int shiftW,
+                                                 const rocblas_int ldw,
+                                                 const rocblas_stride strideW,
+                                                 const rocblas_int batch_count,
+                                                 rocsolver_device_workspace_ptr_t dwptr)
+{
+    ROCSOLVER_INIT_DEVICE_WORKSPACE(dwptr,
+                                    rocsolver_latrd_forsytrd_getWorkItems(
+                                        handle, uplo, n, k, A, shiftA, lda, strideA, E, strideE,
+                                        tau, strideP, W, shiftW, ldw, strideW, batch_count));
+
+    T* scalars = (T*)dwptr->work("latrd_scalars");
+    T* work = (T*)dwptr->work("latrd_work");
+    T* norms = (T*)dwptr->work("latrd_norms");
+    T** workArr = (T**)dwptr->work("latrd_workArr");
+
+    if(dwptr->size("latrd_scalars") > 0)
+        init_scalars(handle, (T*)scalars);
+
+    if(print_debug_messages_latrd_forsytrd)
+    {
+        std::cout << "Using latrd_forsytrd entry point." << std::endl;
+    }
+
+    // execution
+    return rocsolver_latrd_forsytrd_template<T>(
+        handle, uplo, n, k, A, shiftA, lda, strideA, E, strideE, tau, strideP, W, shiftW, ldw,
+        strideW, batch_count, (T*)scalars, (T*)work, (T*)norms, (T**)workArr);
 }
 
 ROCSOLVER_END_NAMESPACE

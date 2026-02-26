@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,6 +35,9 @@
 #include "common/misc/rocsolver_arguments.hpp"
 #include "common/misc/rocsolver_test.hpp"
 #include "common/misc/rocsolver_timer.hpp"
+
+static bool sytrd_use_hipgraph = std::getenv("SYTRD_USE_HIPGRAPH") != nullptr ? true : false;
+static bool print_debug_messages_sytrd = std::getenv("PRINT_DEBUG") != nullptr ? true : false;
 
 template <bool STRIDED, bool SYTRD, typename S, typename T, typename U>
 void sytxx_hetxx_checkBadArgs(const rocblas_handle handle,
@@ -375,43 +378,115 @@ void sytxx_hetxx_getPerfData(const rocblas_handle handle,
         *cpu_time_used = get_time_us_no_sync() - *cpu_time_used;
     }
 
-    sytxx_hetxx_initData<true, false, T>(handle, n, dA, lda, bc, hA);
-
-    // cold calls
-    for(int iter = 0; iter < 2; iter++)
+    if(sytrd_use_hipgraph)
     {
-        sytxx_hetxx_initData<false, true, T>(handle, n, dA, lda, bc, hA);
+        if(print_debug_messages_sytrd)
+        {
+            std::cout << "Using hipGraph" << std::endl;
+        }
 
-        CHECK_ROCBLAS_ERROR(rocsolver_sytxx_hetxx(STRIDED, SYTRD, handle, uplo, n, dA.data(), lda,
+        // cold calls
+        rocblas_handle handle2;
+        rocblas_create_handle(&handle2);
+
+        hipStream_t stream;
+        CHECK_HIP_ERROR(hipStreamCreate(&stream));
+        CHECK_ROCBLAS_ERROR(rocblas_set_stream(handle2, stream));
+
+        sytxx_hetxx_initData<true, false, T>(handle2, n, dA, lda, bc, hA);
+
+        // cold calls
+        for(int iter = 0; iter < 2; iter++)
+        {
+            sytxx_hetxx_initData<false, true, T>(handle2, n, dA, lda, bc, hA);
+
+            CHECK_ROCBLAS_ERROR(rocsolver_sytxx_hetxx(STRIDED, SYTRD, handle2, uplo, n, dA.data(),
+                                                      lda, stA, dD.data(), stD, dE.data(), stE,
+                                                      dTau.data(), stP, bc));
+        }
+
+        // graph capture
+        sytxx_hetxx_initData<false, true, T>(handle2, n, dA, lda, bc, hA);
+
+        hipGraph_t graph;
+        CHECK_HIP_ERROR(hipStreamBeginCapture(stream, hipStreamCaptureModeGlobal));
+        CHECK_ROCBLAS_ERROR(rocsolver_sytxx_hetxx(STRIDED, SYTRD, handle2, uplo, n, dA.data(), lda,
                                                   stA, dD.data(), stD, dE.data(), stE, dTau.data(),
                                                   stP, bc));
+        CHECK_HIP_ERROR(hipStreamEndCapture(stream, &graph));
+
+        // graphExec
+        hipGraphExec_t graphExec;
+        CHECK_HIP_ERROR(hipGraphInstantiate(&graphExec, graph, nullptr, nullptr, 0));
+        CHECK_HIP_ERROR(hipGraphDestroy(graph));
+
+        // gpu-lapack performance
+        /* hipStream_t stream; */
+        /* CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream)); */
+        rocsolver_timer timer;
+
+        if(profile > 0)
+        {
+            if(profile_kernels)
+                rocsolver_log_set_layer_mode(rocblas_layer_mode_log_profile
+                                             | rocblas_layer_mode_ex_log_kernel);
+            else
+                rocsolver_log_set_layer_mode(rocblas_layer_mode_log_profile);
+            rocsolver_log_set_max_levels(profile);
+        }
+
+        for(rocblas_int iter = 0; iter < hot_calls; iter++)
+        {
+            sytxx_hetxx_initData<false, true, T>(handle2, n, dA, lda, bc, hA);
+
+            timer.start(stream);
+            CHECK_HIP_ERROR(hipGraphLaunch(graphExec, stream));
+            /* rocsolver_sytxx_hetxx(STRIDED, SYTRD, handle, uplo, n, dA.data(), lda, stA, dD.data(), stD, */
+            /*         dE.data(), stE, dTau.data(), stP, bc); */
+            timer.end(stream);
+        }
+        *gpu_time_used = timer.get_combined();
     }
-
-    // gpu-lapack performance
-    hipStream_t stream;
-    CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream));
-    rocsolver_timer timer;
-
-    if(profile > 0)
+    else
     {
-        if(profile_kernels)
-            rocsolver_log_set_layer_mode(rocblas_layer_mode_log_profile
-                                         | rocblas_layer_mode_ex_log_kernel);
-        else
-            rocsolver_log_set_layer_mode(rocblas_layer_mode_log_profile);
-        rocsolver_log_set_max_levels(profile);
-    }
+        sytxx_hetxx_initData<true, false, T>(handle, n, dA, lda, bc, hA);
 
-    for(rocblas_int iter = 0; iter < hot_calls; iter++)
-    {
-        sytxx_hetxx_initData<false, true, T>(handle, n, dA, lda, bc, hA);
+        // cold calls
+        for(int iter = 0; iter < 2; iter++)
+        {
+            sytxx_hetxx_initData<false, true, T>(handle, n, dA, lda, bc, hA);
 
-        timer.start(stream);
-        rocsolver_sytxx_hetxx(STRIDED, SYTRD, handle, uplo, n, dA.data(), lda, stA, dD.data(), stD,
-                              dE.data(), stE, dTau.data(), stP, bc);
-        timer.end(stream);
+            CHECK_ROCBLAS_ERROR(rocsolver_sytxx_hetxx(STRIDED, SYTRD, handle, uplo, n, dA.data(),
+                                                      lda, stA, dD.data(), stD, dE.data(), stE,
+                                                      dTau.data(), stP, bc));
+        }
+
+        // gpu-lapack performance
+        hipStream_t stream;
+        CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream));
+        rocsolver_timer timer;
+
+        if(profile > 0)
+        {
+            if(profile_kernels)
+                rocsolver_log_set_layer_mode(rocblas_layer_mode_log_profile
+                                             | rocblas_layer_mode_ex_log_kernel);
+            else
+                rocsolver_log_set_layer_mode(rocblas_layer_mode_log_profile);
+            rocsolver_log_set_max_levels(profile);
+        }
+
+        for(rocblas_int iter = 0; iter < hot_calls; iter++)
+        {
+            sytxx_hetxx_initData<false, true, T>(handle, n, dA, lda, bc, hA);
+
+            timer.start(stream);
+            rocsolver_sytxx_hetxx(STRIDED, SYTRD, handle, uplo, n, dA.data(), lda, stA, dD.data(),
+                                  stD, dE.data(), stE, dTau.data(), stP, bc);
+            timer.end(stream);
+        }
+        *gpu_time_used = timer.get_combined();
     }
-    *gpu_time_used = timer.get_combined();
 }
 
 template <bool BATCHED, bool STRIDED, bool SYTRD, typename T>
