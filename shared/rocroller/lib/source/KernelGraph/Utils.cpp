@@ -1123,7 +1123,8 @@ namespace rocRoller
                 else
                     break;
 
-                AssertFatal(graph.mapper.get<CT::Unroll>(tag) > 0,
+                AssertFatal(graph.mapper.get<CT::Unroll>(tag) > 0
+                                || graph.mapper.get<CT::ForLoop>(tag) > 0,
                             "SetCoordinate needs Unroll dimension");
             }
             return tag;

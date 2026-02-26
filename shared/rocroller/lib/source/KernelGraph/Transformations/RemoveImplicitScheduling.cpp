@@ -36,45 +36,50 @@ namespace rocRoller::KernelGraph
     {
         void breakupNodes(KernelGraph& graph, std::vector<int> const& nodes)
         {
-            auto getLoopOp = [&](int op) -> std::optional<int> {
-                auto stack = controlStack(op, graph);
+            auto dependenceDAG = NodeScheduling::ConstructDataDependenceDAG(graph);
 
-                for(auto parent : std::views::reverse(stack))
-                {
-                    if(graph.control.get<ControlGraph::ForLoopOp>(parent))
-                        return parent;
-                }
-
-                return std::nullopt;
-            };
-
-            auto notMultiply = [&graph](int idx) {
-                if(graph.control.getElementType(idx) != Graph::ElementType::Node)
-                    return false;
-
-                return !(graph.control.get<ControlGraph::Multiply>(idx).has_value());
-            };
-
-            std::map<int, int> connectionsToKeep;
-
+            // Pull every Multiply node next to its body parent
             for(auto node : nodes)
             {
-                auto upstreamNode
-                    = graph.control.breadthFirstVisit(node, Graph::Direction::Upstream)
-                          .filter(notMultiply)
-                          .take(1)
-                          .only();
+                auto parent = bodyParents(node, graph).take(1).only();
+                AssertFatal(parent.has_value(), "Node has no body parent", ShowValue(node));
 
-                AssertFatal(upstreamNode.has_value(), ShowValue(node));
-
-                AssertFatal(getLoopOp(node) == getLoopOp(*upstreamNode), ShowValue(node));
-
-                connectionsToKeep[node] = *upstreamNode;
+                auto bodyEdge = graph.control.findEdge(parent.value(), node);
+                // if node is not directly connected to its parent via Body edge
+                if(!bodyEdge.has_value())
+                {
+                    auto replaceOp = graph.control.addElement(ControlGraph::NOP());
+                    replaceWith(graph, node, replaceOp, false);
+                    // add the body edge from parent to node
+                    graph.control.addElement(ControlGraph::Body(), {parent.value()}, {node});
+                }
             }
 
-            Log::debug("Got connections.");
+            // add Sequence edges between dependent nodes
+            for(auto node : nodes)
+            {
+                for(auto sourceNode :
+                    dependenceDAG.getInputNodeIndices<ControlGraph::Sequence>(node))
+                {
+                    auto topOp   = getTopSetCoordinate(graph, sourceNode);
+                    auto seqEdge = graph.control.findEdge(topOp, node);
+                    if(!seqEdge.has_value())
+                    {
+                        graph.control.addElement(ControlGraph::Sequence(), {topOp}, {node});
+                    }
+                }
 
-            auto dependenceDAG = NodeScheduling::ConstructDataDependenceDAG(graph);
+                for(auto destNode :
+                    dependenceDAG.getOutputNodeIndices<ControlGraph::Sequence>(node))
+                {
+                    auto topOp   = getTopSetCoordinate(graph, destNode);
+                    auto seqEdge = graph.control.findEdge(node, topOp);
+                    if(!seqEdge.has_value())
+                    {
+                        graph.control.addElement(ControlGraph::Sequence(), {node}, {topOp});
+                    }
+                }
+            }
 
             for(auto nodeA : nodes)
             {
@@ -83,33 +88,33 @@ namespace rocRoller::KernelGraph
                     if(nodeA == nodeB)
                         continue;
 
-                    auto depEdge = dependenceDAG.findEdge(nodeA, nodeB);
-                    auto seqEdge = graph.control.findEdge(nodeA, nodeB);
+                    auto pathAToB = dependenceDAG
+                                        .path<Graph::Direction::Downstream>(std::vector<int>{nodeA},
+                                                                            std::vector<int>{nodeB})
+                                        .to<std::vector>();
+                    auto pathBToA = dependenceDAG
+                                        .path<Graph::Direction::Downstream>(std::vector<int>{nodeB},
+                                                                            std::vector<int>{nodeA})
+                                        .to<std::vector>();
+                    AssertFatal(pathAToB.empty() || pathBToA.empty(),
+                                "Dependence DAG has a cycle!");
 
-                    if(depEdge.has_value())
-                    {
-                        if(!seqEdge.has_value())
-                        {
-                            graph.control.addElement(ControlGraph::Sequence(), {nodeA}, {nodeB});
-                        }
-                    }
-                    else if(seqEdge.has_value())
-                    {
-                        auto upstream = connectionsToKeep.at(nodeB);
-                        auto order
-                            = graph.control.compareNodes(UseCacheIfAvailable, upstream, nodeB);
-                        AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst
-                                        || order == ControlGraph::NodeOrdering::RightInBodyOfLeft,
-                                    ShowValue(order),
-                                    ShowValue(upstream),
-                                    ShowValue(nodeB),
-                                    ShowValue(seqEdge.value()));
-                        graph.control.deleteElement(seqEdge.value());
-                        if(order == ControlGraph::NodeOrdering::LeftFirst)
-                            graph.control.chain<ControlGraph::Sequence>(upstream, nodeB);
-                        else
-                            graph.control.chain<ControlGraph::Body>(upstream, nodeB);
-                    }
+                    auto order = graph.control.compareNodes(UseCacheIfAvailable, nodeA, nodeB);
+
+                    AssertFatal(
+                        (pathAToB.empty() && pathBToA.empty()
+                         && order == ControlGraph::NodeOrdering::Undefined)
+                            || (!pathAToB.empty()
+                                && (order == ControlGraph::NodeOrdering::LeftFirst
+                                    || order == ControlGraph::NodeOrdering::RightInBodyOfLeft))
+                            || (!pathBToA.empty()
+                                && (order == ControlGraph::NodeOrdering::RightFirst
+                                    || order == ControlGraph::NodeOrdering::LeftInBodyOfRight)),
+                        ShowValue(nodeA),
+                        ShowValue(nodeB),
+                        ShowValue(pathAToB.empty()),
+                        ShowValue(pathBToA.empty()),
+                        ShowValue(order));
                 }
             }
         }
