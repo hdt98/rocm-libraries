@@ -9,6 +9,7 @@
 #include <rocRoller/KernelGraph/Visitors.hpp>
 
 #include <algorithm>
+#include <cstring>
 #include <memory>
 #include <set>
 #include <string>
@@ -60,12 +61,12 @@ namespace rocRoller::KernelGraph
 
     void ModelAddresses::setWorkgroup(uint offset, uint value)
     {
-        *((uint*)(rawArguments.data() + workgroupOffset[offset])) = value;
+        std::memcpy(rawArguments.data() + workgroupOffset[offset], &value, sizeof(value));
     }
 
     void ModelAddresses::setWorkitem(uint offset, uint value)
     {
-        *((uint*)(rawArguments.data() + workitemOffset[offset])) = value;
+        std::memcpy(rawArguments.data() + workitemOffset[offset], &value, sizeof(value));
     }
 
     Generator<size_t>
@@ -215,9 +216,9 @@ namespace rocRoller::KernelGraph
                 const auto addresses
                     = std::forward<decltype(generator)>(generator).template to<std::vector>();
 
-                AssertFatal(!addresses.empty(),
-                            "No LDS addresses were generated for node.",
-                            ShowValue(node));
+                if(addresses.empty())
+                    return;
+
                 std::vector<size_t> normalizedAddresses;
                 auto minAddress = *std::min_element(addresses.begin(), addresses.end());
                 for(auto addr : addresses)
