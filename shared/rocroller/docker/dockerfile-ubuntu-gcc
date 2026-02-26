@@ -94,13 +94,14 @@ ARG ROCROLLER_THEROCK_ROCM_NIGHTLY_URL
 ARG ROCROLLER_THEROCK_ROCM_GFX
 ARG ROCROLLER_THEROCK_ROCM_VERSION
 
-RUN apt purge -y libllvm* libclang*
+RUN apt remove -y libllvm* libclang*
 RUN pip install \
   --index-url ${ROCROLLER_THEROCK_ROCM_NIGHTLY_URL}/${ROCROLLER_THEROCK_ROCM_GFX} \
   "rocm[devel]==${ROCROLLER_THEROCK_ROCM_VERSION}" \
   --target /opt/rocm/
 ENV PATH="/opt/rocm/bin:${PATH}"
 ENV PYTHONPATH="/opt/rocm:${PYTHONPATH}"
+ENV LLVM_PATH="/opt/rocm/_rocm_sdk_core/lib/llvm"
 # This command is executed as root to force the creaton of ROCm SDK metadata files.
 RUN rocm-sdk path --cmake
 RUN echo "$(rocm-sdk path --root)/lib" > /etc/ld.so.conf.d/rocm.conf && ldconfig
