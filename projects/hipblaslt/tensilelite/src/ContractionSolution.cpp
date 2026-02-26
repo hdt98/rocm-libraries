@@ -976,10 +976,11 @@ namespace TensileLite
 
         // If any of the problem sizes are less than 1, return 0 for all values
         auto sizes = problem.problemSizes();
-        if(sizes[0] < 1 || sizes[1] < 1 || sizes[2] < 1 || sizes[3] < 1)
-        {
-            return std::make_tuple(defaultWGM, defaultWGMXCC, defaultWGMXCCCHUNK);
-        }
+        if(!problemType.sparse)
+            if(sizes[0] < 1 || sizes[1] < 1 || sizes[2] < 1 || sizes[3] < 1)
+            {
+                return std::make_tuple(defaultWGM, defaultWGMXCC, defaultWGMXCCCHUNK);
+            }
 
         // Dynamically pick the values
         if(sizeMapping.streamK != 0 && skgrid != 0 && sizeMapping.workGroupMapping == 0
@@ -1089,11 +1090,12 @@ namespace TensileLite
 
         // If any of the problem sizes are less than 1, return 0 for all values
         auto sizes = problem.problemSizes();
-        if(sizes[0] < 1 || sizes[1] < 1 || sizes[2] < 1 || sizes[3] < 1)
-        {
-            return std::make_tuple(
-                defaultStaggerUMapping, defaultStaggerU, defaultStaggerUStrideShift);
-        }
+        if(!problemType.sparse)
+            if(sizes[0] < 1 || sizes[1] < 1 || sizes[2] < 1 || sizes[3] < 1)
+            {
+                return std::make_tuple(
+                    defaultStaggerUMapping, defaultStaggerU, defaultStaggerUStrideShift);
+            }
 
         // Dynamically pick the values
         if(sizeMapping.streamK != 0 && skgrid != 0 && sizeMapping.workGroupMapping == 0
