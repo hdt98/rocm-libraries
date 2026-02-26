@@ -897,22 +897,25 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
             }
         }
         else if constexpr(ConvForwardSpecialization ==
-                     ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
+                          ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
         {
             // Check if we have 3x3, stride=1, dilation=1, pad=0 convolution
             for(index_t i = 0; i < NDimSpatial; ++i)
             {
-                const index_t SpatialDim = arg.b_g_k_c_xs_lengths_[i + I3];
-                const index_t ConvStride = arg.conv_filter_strides_[i];
-                const index_t ConvDilation  = arg.conv_filter_dilations_[i];
-                const index_t LeftPad    = arg.input_left_pads_[i];
-                const index_t RightPad   = arg.input_right_pads_[i];
+                const index_t SpatialDim   = arg.b_g_k_c_xs_lengths_[i + I3];
+                const index_t ConvStride   = arg.conv_filter_strides_[i];
+                const index_t ConvDilation = arg.conv_filter_dilations_[i];
+                const index_t LeftPad      = arg.input_left_pads_[i];
+                const index_t RightPad     = arg.input_right_pads_[i];
 
-                if(!(SpatialDim == I3 && ConvStride == 1 && ConvDilation == 1 && LeftPad == 0 && RightPad == 0))
+                if(!(SpatialDim == I3 && ConvStride == 1 && ConvDilation == 1 && LeftPad == 0 &&
+                     RightPad == 0))
                 {
                     if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                     {
-                        std::cout << "IsSupportedArgument: Filter3x3Stride1Pad0 specialization requires 3x3 filter with stride=1, dilation=1, and no padding" << std::endl;
+                        std::cout << "IsSupportedArgument: Filter3x3Stride1Pad0 specialization "
+                                     "requires 3x3 filter with stride=1, dilation=1, and no padding"
+                                  << std::endl;
                     }
                     return false;
                 }

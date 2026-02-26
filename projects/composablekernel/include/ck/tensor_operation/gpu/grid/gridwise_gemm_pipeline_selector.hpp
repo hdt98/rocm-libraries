@@ -23,7 +23,7 @@ template <PipelineVersion PipelineVer,
           bool DoubleBuffer       = false>
 constexpr auto GridwiseGemmPipeline_Selector()
 {
-    if constexpr (DoubleBuffer)
+    if constexpr(DoubleBuffer)
     {
         return GridwiseGemmDoubleBufferPipeline_v1{};
     }

@@ -14,10 +14,7 @@ struct GridwiseGemmDoubleBufferPipeline_v1
     static constexpr auto I0 = Number<0>{};
     static constexpr auto I1 = Number<1>{};
 
-    __host__ __device__ static constexpr bool IsSupported(index_t)
-    {
-        return true;
-    }
+    __host__ __device__ static constexpr bool IsSupported(index_t) { return true; }
 
     __host__ __device__ static constexpr bool CalculateHasMainLoop(index_t num_loop)
     {
@@ -129,7 +126,7 @@ struct GridwiseGemmDoubleBufferPipeline_v1
         }
 
         // tail - handle remaining iterations
-        if (num_loop % 2 == 0)
+        if(num_loop % 2 == 0)
         {
             // Even number of loops: need to process 2 more iterations
             // Read from global mem to registers (I1 scratch)

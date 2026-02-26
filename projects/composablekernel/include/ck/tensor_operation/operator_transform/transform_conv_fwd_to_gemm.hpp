@@ -539,15 +539,16 @@ struct TransformConvFwdToGemm
         else if constexpr(ConvForwardSpecialization ==
                           device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
         {
-            static_assert(NumGroupsToMerge == 1, "Filter3x3Stride1Pad0 specialization only supports NumGroupsToMerge == 1");
+            static_assert(
+                NumGroupsToMerge == 1,
+                "Filter3x3Stride1Pad0 specialization only supports NumGroupsToMerge == 1");
 
-            constexpr index_t FilterX = 3;
-            constexpr index_t ConvStride = 1;
+            constexpr index_t FilterX      = 3;
+            constexpr index_t ConvStride   = 1;
             constexpr index_t ConvDilation = 1;
 
             const auto in_n_wi_c_desc = make_naive_tensor_descriptor(
-                make_tuple(N_, Wi_, C_),
-                make_tuple(NStrideTensorA_, WiStride_, CStrideTensorA_));
+                make_tuple(N_, Wi_, C_), make_tuple(NStrideTensorA_, WiStride_, CStrideTensorA_));
 
             const auto in_n_x_wo_c_desc = transform_tensor_descriptor(
                 in_n_wi_c_desc,
@@ -784,11 +785,13 @@ struct TransformConvFwdToGemm
         else if constexpr(ConvForwardSpecialization ==
                           device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
         {
-            static_assert(NumGroupsToMerge == 1, "Filter3x3Stride1Pad0 specialization only supports NumGroupsToMerge == 1");
+            static_assert(
+                NumGroupsToMerge == 1,
+                "Filter3x3Stride1Pad0 specialization only supports NumGroupsToMerge == 1");
 
-            constexpr index_t FilterX = 3;
-            constexpr index_t FilterY = 3;
-            constexpr index_t ConvStride = 1;
+            constexpr index_t FilterX      = 3;
+            constexpr index_t FilterY      = 3;
+            constexpr index_t ConvStride   = 1;
             constexpr index_t ConvDilation = 1;
 
             const auto in_n_hi_wi_c_desc = make_naive_tensor_descriptor(
@@ -1060,42 +1063,44 @@ struct TransformConvFwdToGemm
             }
         }
         else if constexpr(ConvForwardSpecialization ==
-                     device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
+                          device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
         {
-            static_assert(NumGroupsToMerge == 1, "Filter3x3Stride1Pad0 specialization only supports NumGroupsToMerge == 1");
+            static_assert(
+                NumGroupsToMerge == 1,
+                "Filter3x3Stride1Pad0 specialization only supports NumGroupsToMerge == 1");
 
-            constexpr index_t FilterX = 3;
-            constexpr index_t FilterY = 3;
-            constexpr index_t FilterZ = 3;
-            constexpr index_t ConvStride = 1;
+            constexpr index_t FilterX      = 3;
+            constexpr index_t FilterY      = 3;
+            constexpr index_t FilterZ      = 3;
+            constexpr index_t ConvStride   = 1;
             constexpr index_t ConvDilation = 1;
 
             const auto in_n_di_hi_wi_c_desc = make_naive_tensor_descriptor(
-                    make_tuple(N_, Di_, Hi_, Wi_, C_),
-                    make_tuple(NStrideTensorA_, DiStride_, HiStride_, WiStride_, CStrideTensorA_));
+                make_tuple(N_, Di_, Hi_, Wi_, C_),
+                make_tuple(NStrideTensorA_, DiStride_, HiStride_, WiStride_, CStrideTensorA_));
 
             const auto in_n_z_do_y_ho_x_wo_c_desc = transform_tensor_descriptor(
                 in_n_di_hi_wi_c_desc,
                 make_tuple(make_pass_through_transform(N_),
-                            make_embed_transform(make_tuple(FilterZ, Do_),
+                           make_embed_transform(make_tuple(FilterZ, Do_),
                                                 make_tuple(ConvDilation, ConvStride)),
-                            make_embed_transform(make_tuple(FilterY, Ho_),
+                           make_embed_transform(make_tuple(FilterY, Ho_),
                                                 make_tuple(ConvDilation, ConvStride)),
-                            make_embed_transform(make_tuple(FilterX, Wo_),
+                           make_embed_transform(make_tuple(FilterX, Wo_),
                                                 make_tuple(ConvDilation, ConvStride)),
-                            make_pass_through_transform(C_)),
+                           make_pass_through_transform(C_)),
                 make_tuple(
                     Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}, Sequence<4>{}),
                 make_tuple(Sequence<0>{},
-                            Sequence<1, 2>{},
-                            Sequence<3, 4>{},
-                            Sequence<5, 6>{},
-                            Sequence<7>{}));
+                           Sequence<1, 2>{},
+                           Sequence<3, 4>{},
+                           Sequence<5, 6>{},
+                           Sequence<7>{}));
 
             return transform_tensor_descriptor(
                 in_n_z_do_y_ho_x_wo_c_desc,
                 make_tuple(make_merge_transform(make_tuple(N_, Do_, Ho_, Wo_)),
-                            make_merge_transform(make_tuple(FilterZ, FilterY, FilterX, C_))),
+                           make_merge_transform(make_tuple(FilterZ, FilterY, FilterX, C_))),
                 make_tuple(Sequence<0, 2, 4, 6>{}, Sequence<1, 3, 5, 7>{}),
                 make_tuple(Sequence<0>{}, Sequence<1>{}));
         }
