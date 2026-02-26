@@ -144,7 +144,7 @@ inline void sort_keys()
         TestFixture::params::min_segment_length,
         TestFixture::params::max_segment_length);
 
-    if(use_graphs)
+    if constexpr(use_graphs)
     {
         HIP_CHECK(hipStreamCreateWithFlags(&stream, hipStreamNonBlocking));
     }
@@ -252,7 +252,7 @@ inline void sort_keys_empty_data()
     using offset_type = unsigned int;
 
     hipStream_t stream = 0;
-    if(use_graphs)
+    if constexpr(use_graphs)
     {
         HIP_CHECK(hipStreamCreateWithFlags(&stream, hipStreamNonBlocking));
     }
@@ -438,7 +438,7 @@ inline void sort_keys_unspecified_ranges()
     using offset_type = unsigned int;
 
     hipStream_t stream = 0;
-    if(use_graphs)
+    if constexpr(use_graphs)
     {
         HIP_CHECK(hipStreamCreateWithFlags(&stream, hipStreamNonBlocking));
     }
@@ -585,7 +585,7 @@ inline void sort_pairs()
     using offset_type = unsigned int;
 
     hipStream_t stream = 0;
-    if(use_graphs)
+    if constexpr(use_graphs)
     {
         HIP_CHECK(hipStreamCreateWithFlags(&stream, hipStreamNonBlocking));
     }
@@ -734,7 +734,7 @@ inline void sort_pairs_unspecified_ranges()
     using offset_type = unsigned int;
 
     hipStream_t stream = 0;
-    if(use_graphs)
+    if constexpr(use_graphs)
     {
         HIP_CHECK(hipStreamCreateWithFlags(&stream, hipStreamNonBlocking));
     }
@@ -892,7 +892,7 @@ inline void sort_keys_double_buffer()
     using offset_type = unsigned int;
 
     hipStream_t stream = 0;
-    if(use_graphs)
+    if constexpr(use_graphs)
     {
         HIP_CHECK(hipStreamCreateWithFlags(&stream, hipStreamNonBlocking));
     }
@@ -1017,7 +1017,7 @@ inline void sort_pairs_double_buffer()
     using offset_type = unsigned int;
 
     hipStream_t stream = 0;
-    if(use_graphs)
+    if constexpr(use_graphs)
     {
         HIP_CHECK(hipStreamCreateWithFlags(&stream, hipStreamNonBlocking));
     }
