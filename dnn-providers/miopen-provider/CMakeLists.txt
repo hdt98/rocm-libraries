@@ -11,7 +11,7 @@ set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/cmake/ClangToolChain.cmake"
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(MIOPEN_PLUGIN_VERSION "0.0.1")
-project(hipDNN VERSION ${MIOPEN_PLUGIN_VERSION} LANGUAGES CXX)
+project(miopen_provider VERSION ${MIOPEN_PLUGIN_VERSION} LANGUAGES CXX)
 
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/CheckPreCommit.cmake)
 
@@ -43,14 +43,17 @@ option(MIOPENPROVIDER_SKIP_TESTS "Skip building tests" OFF)
 option(MIOPENPROVIDER_ENABLE_COVERAGE "Build with code coverage flags" OFF)
 
 option(BUILD_ADDRESS_SANITIZER "Build with Address Sanitizer enabled" OFF)
-option(ENABLE_CLANG_FORMAT "Enable Clang-Format checks" OFF) # Disable by default for TheRock
+option(ENABLE_CLANG_FORMAT "Enable Clang-Format checks" ON)
+if(NOT ENABLE_CLANG_FORMAT)
+    message(WARNING "Clang-Format checks are disabled. CI requires passing clang-format checks.")
+endif()
 if(WIN32)
-    option(ENABLE_CLANG_TIDY "Enable Clang-Tidy checks" OFF) # Disable by default for TheRock
+    option(ENABLE_CLANG_TIDY "Enable Clang-Tidy checks" OFF)
     if(ENABLE_CLANG_TIDY)
         message(WARNING "Clang-Tidy enabled on Windows - this significantly increases build time.")
     endif()
 else()
-    option(ENABLE_CLANG_TIDY "Enable Clang-Tidy checks" OFF)
+    option(ENABLE_CLANG_TIDY "Enable Clang-Tidy checks" ON)
 endif()
 
 list(
@@ -225,6 +228,7 @@ if(MIOPENPROVIDER_ENABLE_COVERAGE)
         # cmake-format: off
         add_custom_target(
             ${TARGET_NAME}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ./coverage-report
             COMMAND find . -name "*.profraw" -print0 | xargs -0 ${LLVM_PROFDATA_BINARY} merge
                     -sparse -o ./coverage-report/miopen_plugin.profdata
             COMMAND
