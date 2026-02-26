@@ -112,6 +112,8 @@ namespace rocRoller
                 std::vector<size_t> scaleShuffleTileA;
                 std::vector<size_t> scaleShuffleTileB;
 
+                std::vector<size_t> pretileB;
+
                 std::string kernelNamePart() const;
             };
 

@@ -89,13 +89,26 @@ namespace rocRoller
                         }
                     };
 
+                    auto pretileB = not solutionParams.types.pretileB.empty();
+
                     m_tagTensorA = command->addOperation(
                         Operations::Tensor(2, typeA, {}, unitStrides(solutionParams.types.transA)));
                     m_tagA = command->addOperation(Operations::T_Load_Tiled(m_tagTensorA));
 
-                    m_tagTensorB = command->addOperation(
-                        Operations::Tensor(2, typeB, {}, unitStrides(solutionParams.types.transB)));
-                    m_tagB = command->addOperation(Operations::T_Load_Tiled(m_tagTensorB));
+                    auto stridesB = pretileB ? std::vector<size_t>{}
+                                             : unitStrides(solutionParams.types.transB);
+                    m_tagTensorB
+                        = command->addOperation(Operations::Tensor(2, typeB, {}, stridesB));
+
+                    auto loadInputB = m_tagTensorB;
+
+                    if(pretileB)
+                    {
+                        loadInputB = command->addOperation(Operations::SubTileTranspose(
+                            loadInputB, solutionParams.types.pretileB));
+                    }
+
+                    m_tagB = command->addOperation(Operations::T_Load_Tiled(loadInputB));
 
                     auto mulInputA = m_tagA;
                     auto mulInputB = m_tagB;
@@ -648,6 +661,22 @@ namespace rocRoller
                                            {K, N},
                                            problemParams.types.transB == TransposeType::T ? "T"
                                                                                           : "N");
+
+                    auto pretileB = not problemParams.types.pretileB.empty();
+                    if(pretileB)
+                    {
+                        AssertFatal(problemParams.types.transB == TransposeType::N,
+                                    "Pre-tiling B only supported for TransposeType::N");
+
+                        auto const tileK = problemParams.types.pretileB[0];
+                        auto const tileN = problemParams.types.pretileB[1];
+
+                        descB
+                            = TensorDescriptor(fromString<DataType>(problemParams.types.typeB),
+                                               {K, N},
+                                               {static_cast<size_t>(tileK * tileN),
+                                                static_cast<size_t>((K / tileK) * tileK * tileN)});
+                    }
 
                     setCommandTensorArg(commandArgs, m_tagTensorA, descA, (float*)nullptr);
                     setCommandTensorArg(commandArgs, m_tagTensorB, descB, (float*)nullptr);
