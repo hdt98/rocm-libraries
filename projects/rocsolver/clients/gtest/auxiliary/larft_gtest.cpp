@@ -35,9 +35,6 @@ using namespace std;
 
 typedef std::tuple<vector<int>, vector<int>> larft_tuple;
 
-template <typename I>
-using larft_tuple_t = std::tuple<vector<I>, vector<I>>;
-
 // each order_size_range vector is {N,ldv,s}
 // if s = 0, then storev = 'C'
 // if s = 1, then storev = 'R'
@@ -80,37 +77,6 @@ const vector<vector<int>> large_order_size_range
 const vector<vector<int>> large_reflector_size_range
     = {{15, 15, 0}, {25, 40, 1}, {45, 45, 0}, {60, 70, 1}, {75, 75, 0}, {85, 90, 1}};
 
-// for checkin_lapack tests (64-bit)
-const vector<vector<int64_t>> order_size_range_64 = {
-    // quick return
-    {0, 1, 0},
-    // invalid
-    {-1, 1, 0},
-    {10, 5, 0},
-    {10, 3, 1},
-    // normal (valid) samples
-    {75, 75, 0},
-    {60, 60, 1},
-    {95, 100, 0}};
-
-const vector<vector<int64_t>> reflector_size_range_64 = {
-    // invalid
-    {0, 1, 0},
-    {5, 1, 0},
-    // normal (valid) samples
-    {5, 5, 0},
-    {10, 20, 1},
-    {15, 15, 0},
-    {70, 70, 0},
-    {75, 80, 1}};
-
-// for daily_lapack tests (64-bit)
-const vector<vector<int64_t>> large_order_size_range_64
-    = {{192, 192, 0}, {640, 75, 1}, {1024, 1200, 0}, {2048, 100, 1}};
-
-const vector<vector<int64_t>> large_reflector_size_range_64
-    = {{15, 15, 0}, {25, 40, 1}, {45, 45, 0}, {60, 70, 1}, {75, 75, 0}, {85, 90, 1}};
-
 Arguments larft_setup_arguments(larft_tuple tup)
 {
     vector<int> order_size = std::get<0>(tup);
@@ -132,27 +98,7 @@ Arguments larft_setup_arguments(larft_tuple tup)
 }
 
 template <typename I>
-Arguments larft_setup_arguments_t(larft_tuple_t<I> tup)
-{
-    vector<I> order_size = std::get<0>(tup);
-    vector<I> reflector_size = std::get<1>(tup);
-
-    Arguments arg;
-
-    arg.set<I>("n", order_size[0]);
-    arg.set<I>("ldv", order_size[1]);
-    arg.set<char>("storev", order_size[2] == 1 ? 'R' : 'C');
-
-    arg.set<I>("k", reflector_size[0]);
-    arg.set<I>("ldt", reflector_size[1]);
-    arg.set<char>("direct", reflector_size[2] == 1 ? 'B' : 'F');
-
-    arg.timing = 0;
-
-    return arg;
-}
-
-class LARFT : public ::TestWithParam<larft_tuple>
+class LARFT_BASE : public ::TestWithParam<larft_tuple>
 {
 protected:
     void TearDown() override
@@ -166,10 +112,18 @@ protected:
         Arguments arg = larft_setup_arguments(GetParam());
 
         if(arg.peek<rocblas_int>("n") == 0 && arg.peek<rocblas_int>("k") == 0)
-            testing_larft_bad_arg<T, rocblas_int>();
+            testing_larft_bad_arg<T, I>();
 
-        testing_larft<T, rocblas_int>(arg);
+        testing_larft<T, I>(arg);
     }
+};
+
+class LARFT : public LARFT_BASE<rocblas_int>
+{
+};
+
+class LARFT_64 : public LARFT_BASE<int64_t>
+{
 };
 
 // non-batch tests
@@ -193,26 +147,6 @@ TEST_P(LARFT, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
-
-class LARFT_64 : public ::TestWithParam<larft_tuple_t<int64_t>>
-{
-protected:
-    void TearDown() override
-    {
-        EXPECT_EQ(hipGetLastError(), hipSuccess);
-    }
-
-    template <typename T>
-    void run_tests()
-    {
-        Arguments arg = larft_setup_arguments_t<int64_t>(GetParam());
-
-        if(arg.peek<int64_t>("n") == 0 && arg.peek<int64_t>("k") == 0)
-            testing_larft_bad_arg<T, int64_t>();
-
-        testing_larft<T, int64_t>(arg);
-    }
-};
 
 TEST_P(LARFT_64, __float)
 {
@@ -245,9 +179,9 @@ INSTANTIATE_TEST_SUITE_P(checkin_lapack,
 
 INSTANTIATE_TEST_SUITE_P(daily_lapack,
                          LARFT_64,
-                         Combine(ValuesIn(large_order_size_range_64),
-                                 ValuesIn(large_reflector_size_range_64)));
+                         Combine(ValuesIn(large_order_size_range),
+                                 ValuesIn(large_reflector_size_range)));
 
 INSTANTIATE_TEST_SUITE_P(checkin_lapack,
                          LARFT_64,
-                         Combine(ValuesIn(order_size_range_64), ValuesIn(reflector_size_range_64)));
+                         Combine(ValuesIn(order_size_range), ValuesIn(reflector_size_range)));
