@@ -32,8 +32,9 @@ struct MHCProblemV5GemmDist
     // Use ONLY WarpTile configs supported by WarpGemmDispatcher for bf16!
     // M=16: 1 warp, WarpTile 16×16×32 (supported!)
     // M=32: 1 warp, WarpTile 32×32×16 (supported!) - BEST PERFORMER!
-    // M=64: 2 warps (2×1), WarpTile 32×32×16, Block K=128 (testing)
-    // M=128: 2 warps (4×1), WarpTile 32×32×16, Block K=128 (testing more work/block)
+    // M=64: 2 warps (2×1), WarpTile 32×32×16, Block K=64 (FIXED: was K=128, caused register
+    // pressure!) M=128: 4 warps (4×1), WarpTile 32×32×16, Block K=64 (FIXED: was K=128, caused
+    // register pressure!)
     using BlockGemmShape = std::conditional_t<
         MTile_ == 16,
         TileGemmShape<sequence<16, 16, 64>, sequence<1, 1, 1>, sequence<16, 16, 32>>,
@@ -42,8 +43,8 @@ struct MHCProblemV5GemmDist
             TileGemmShape<sequence<32, 32, 64>, sequence<1, 1, 1>, sequence<32, 32, 16>>,
             std::conditional_t<
                 MTile_ == 64,
-                TileGemmShape<sequence<64, 32, 128>, sequence<2, 1, 1>, sequence<32, 32, 16>>,
-                TileGemmShape<sequence<128, 32, 128>, sequence<4, 1, 1>, sequence<32, 32, 16>>>>>;
+                TileGemmShape<sequence<64, 32, 64>, sequence<2, 1, 1>, sequence<32, 32, 16>>,
+                TileGemmShape<sequence<128, 32, 64>, sequence<4, 1, 1>, sequence<32, 32, 16>>>>>;
 
     // Standard vector sizes for all configurations
     static constexpr index_t VectorSizeA = 4;

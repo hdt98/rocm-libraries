@@ -51,12 +51,13 @@ struct MHCKernelV5
     // Adaptive K-tiles per block based on C dimension
     CK_TILE_HOST_DEVICE static constexpr index_t GetKTilesPerBlock(index_t nC)
     {
-        // Adaptive selection based on C size:
-        // - Large C (≥4096): 8 tiles/block (512 elements) - maximize MFMA utilization
-        // - Medium C (≥1024): 4 tiles/block (256 elements) - balance overhead and work
-        // - Small C (≥256): 2 tiles/block (128 elements) - reduce overhead
-        // - Tiny C (<256): 1 tile/block (64 elements) - minimize overhead
-        return (nC >= 4096) ? 8 : (nC >= 1024) ? 4 : (nC >= 256) ? 2 : 1;
+        // OPTIMIZED: Adaptive selection based on C size to minimize split-K overhead
+        // - Very Large C (≥8192): 16 tiles/block (1024 elements) - minimize split-K overhead
+        // - Large C (≥4096): 12 tiles/block (768 elements) - balance overhead and work
+        // - Medium C (≥1024): 8 tiles/block (512 elements) - good MFMA utilization
+        // - Small C (≥256): 4 tiles/block (256 elements) - reduce overhead
+        // - Tiny C (<256): 2 tiles/block (128 elements) - minimize overhead
+        return (nC >= 8192) ? 16 : (nC >= 4096) ? 12 : (nC >= 1024) ? 8 : (nC >= 256) ? 4 : 2;
     }
 
     CK_TILE_HOST static constexpr auto BlockSize() { return kBlockSize; }
@@ -327,8 +328,11 @@ struct MHCKernelV5
             // Removing this sync cuts multi-warp overhead in half
         }
 
-        // Store partial results to workspace buffer: p_workspace[block_k, batch, output_dim]
-        // Layout: [grid_k][batch][output_dim]
+        // Store partial results to workspace buffer
+        // OPTIMIZED LAYOUT: [batch][grid_k][output_dim] for coalesced reduction access
+        // Old layout [grid_k][batch][output_dim] caused strided access in reduction kernel
+        const index_t grid_k_total = (nC + k_per_block - 1) / k_per_block;
+
         constexpr auto result_spans = decltype(result_tile)::get_distributed_spans();
         sweep_tile_span(result_spans[number<0>{}], [&](auto idx0) {
             sweep_tile_span(result_spans[number<1>{}], [&](auto idx1) {
@@ -345,9 +349,11 @@ struct MHCKernelV5
                     constexpr auto i_j_idx = make_tuple(idx0, idx1);
                     ComputeDataType value  = result_tile[i_j_idx];
 
-                    // Store to workspace: [block_k][global_m][global_n]
+                    // Store to workspace: [global_m][block_k][global_n]
+                    // This layout ensures consecutive threads in reduction kernel access
+                    // consecutive memory
                     const index_t workspace_idx =
-                        block_k * (batch * output_dim) + global_m * output_dim + global_n;
+                        global_m * (grid_k_total * output_dim) + block_k * output_dim + global_n;
                     p_workspace[workspace_idx] = value;
                 }
             });
@@ -431,10 +437,14 @@ struct MHCReductionKernel
         norm                          = (norm > 1e-12f) ? norm : 1.0f;
 
         // Step 3: Reduce partial GEMM results and apply normalization (no activation yet)
-        ComputeDataType value          = 0.0f;
-        const index_t workspace_stride = batch * output_dim;
+        // OPTIMIZED: New layout [batch][grid_k][output_dim] enables coalesced access
+        ComputeDataType value  = 0.0f;
+        const index_t global_n = global_idx % output_dim;
 
-        // Vectorized reduction for workspace
+        // Base address for this batch element's data: [global_m][0][global_n]
+        const index_t workspace_base = global_m * (grid_k * output_dim) + global_n;
+
+        // Vectorized reduction for workspace - now with coalesced access!
         k = 0;
         for(; k + kVecSize <= grid_k; k += kVecSize)
         {
@@ -444,7 +454,8 @@ struct MHCReductionKernel
 #pragma unroll
             for(index_t i = 0; i < kVecSize; ++i)
             {
-                const index_t workspace_idx = (k + i) * workspace_stride + global_idx;
+                // Access pattern: [global_m][(k+i)][global_n]
+                const index_t workspace_idx = workspace_base + (k + i) * output_dim;
                 vec_values[i]               = p_workspace[workspace_idx];
             }
 
@@ -458,13 +469,11 @@ struct MHCReductionKernel
         // Handle remaining elements
         for(; k < grid_k; ++k)
         {
-            const index_t workspace_idx = k * workspace_stride + global_idx;
+            const index_t workspace_idx = workspace_base + k * output_dim;
             value += p_workspace[workspace_idx];
         }
 
         // Step 4: Apply formulas - write H^pre and H^post directly, buffer H^res
-        const index_t global_n = global_idx % output_dim;
-
         if(global_n < n)
         {
             // Section 1: H^pre [0:n] -> (alpha_pre/norm) * σ(GEMM) + bias
