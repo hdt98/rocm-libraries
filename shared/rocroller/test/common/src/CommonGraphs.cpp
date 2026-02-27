@@ -622,7 +622,7 @@ namespace rocRollerTest::Graphs
                                  m_problem.waveN,
                                  m_problem.waveK / m_problem.scaleBlockSize,
                                  m_problem.waveB},
-                                GetMemoryType(m_problem.loadScalePathA));
+                                GetMemoryType(SolutionParams::LoadPath::BufferToVGPR));
             }
             params->setDimensionInfo(m_tagScaleA, macTileScaleA);
         }
@@ -658,7 +658,7 @@ namespace rocRollerTest::Graphs
                                  m_problem.waveN,
                                  m_problem.waveK / m_problem.scaleBlockSize,
                                  m_problem.waveB},
-                                GetMemoryType(m_problem.loadScalePathB));
+                                GetMemoryType(SolutionParams::LoadPath::BufferToVGPR));
             }
             params->setDimensionInfo(m_tagScaleB, macTileScaleB);
         }
