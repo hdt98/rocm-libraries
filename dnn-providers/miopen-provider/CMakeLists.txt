@@ -1,5 +1,6 @@
 # Copyright © Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
+# CI test: verify miopenprovider and hipblasltprovider test jobs trigger correctly.
 
 cmake_minimum_required(VERSION 3.25.2)
 message(STATUS "Building miopen provider plugin standalone")
