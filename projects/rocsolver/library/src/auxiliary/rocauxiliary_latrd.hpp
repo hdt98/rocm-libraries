@@ -1237,7 +1237,7 @@ ROCSOLVER_KERNEL void latrd_upper_computeW_gemvt_kernel(const rocblas_int mm,
     // partial sums
     rocblas_int n_full = (n / NB_X) * NB_X;
 
-    if(it != c)
+    if(i != c)
     {
         for(rocblas_int j = 0; j < n_full; j += NB_X)
             res += conj(a[j]) * x[tx + j];
