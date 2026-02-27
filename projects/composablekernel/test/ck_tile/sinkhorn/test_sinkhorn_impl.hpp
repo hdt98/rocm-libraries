@@ -64,7 +64,7 @@ class TestCkTileSinkHorn : public ::testing::Test
         }
 
         auto timer = ck_tile::launch_kernel(
-            ck_tile::stream_config{nullptr, false, 0},
+            ck_tile::stream_config{nullptr, true, 0},
             ck_tile::make_kernel<kBlockPerCu>(Kernel{}, kGridSize, kBlockSize, 0, args));
 
         printf("Average time: %f ms\n", timer);
