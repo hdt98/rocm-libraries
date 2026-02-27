@@ -555,7 +555,7 @@ def create_conv_parser():
         "-V",
         "--verify",
         "--V",
-        default=1,
+        default=2,
         type=int,
         required=False,
         help="Verify Each Layer (Default=1)",
@@ -673,8 +673,13 @@ def process_batch_file(input_file, output_file, parser, profiler_path=None, verb
         verbose: If True, show full output; if False, show only best configuration
     """
     try:
-        with open(input_file, 'r') as f_in:
-            lines = f_in.readlines()
+        # Try UTF-8 first, fall back to UTF-16 (common on Windows)
+        try:
+            with open(input_file, 'r', encoding='utf-8') as f_in:
+                lines = f_in.readlines()
+        except UnicodeDecodeError:
+            with open(input_file, 'r', encoding='utf-16') as f_in:
+                lines = f_in.readlines()
     except IOError as e:
         print(f"Error reading input file '{input_file}': {e}")
         sys.exit(1)
