@@ -40,6 +40,13 @@
 #include "rocsolver_device_workspace.hpp"
 #include <rocprofiler-sdk-roctx/roctx.h>
 
+#include <array>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
+#include <vector>
+
 static bool print_debug_messages_latrd_forsytrd
     = std::getenv("PRINT_DEBUG") != nullptr ? true : false;
 
@@ -2194,173 +2201,271 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
         hipError_t err = hipGetDeviceProperties(&deviceProp, 0);
         assert(err == hipSuccess);
         cuCount = deviceProp.multiProcessorCount;
-        HIP_CHECK(hipStreamSynchronize(stream));
 
         // Tunable parameter: number of loop iterations to capture per graph
         // Adjust this value based on performance profiling for different problem sizes
-        constexpr rocblas_int GRAPH_BLOCK_SIZE = 16;
+        const rocblas_int GRAPH_BLOCK_SIZE = 4;
 
         // Calculate total iterations and blocking parameters
         const rocblas_int total_iters = k;  // columns to process: n-1 down to n-k
         const rocblas_int num_full_blocks = total_iters / GRAPH_BLOCK_SIZE;
         const rocblas_int remainder = total_iters % GRAPH_BLOCK_SIZE;
+        const rocblas_int total_blocks = num_full_blocks + (remainder > 0 ? 1 : 0);
 
-        auto graphCreated = false;
-        auto graphExec = hipGraphExec_t{};
-        auto graphStream = hipStream_t{};
-        HIP_CHECK(hipStreamCreate(&graphStream));
-        rocblas_set_stream(handle, graphStream);
-        // Helper lambda to capture and process a block of iterations
-        auto captureBlock = [&](rocblas_int startCol, rocblas_int blockSize) {
-            auto graph = hipGraph_t{};
-            HIP_CHECK(hipStreamBeginCapture(graphStream, hipStreamCaptureModeGlobal));
+        // Producer-consumer triple-buffering setup
+        // Three persistent graphExec slots to better hide latency
+        constexpr int NUM_SLOTS = 3;
 
-            // Process blockSize iterations within this graph capture
-            for(rocblas_int iter = 0; iter < blockSize; ++iter)
-            {
-                rocblas_int j = startCol - iter;
-                jw = j - n + k;
-                // compute update_grid based on Cucount and problem size to ensure good occupancy without oversubscribing
-                // the product of x and y grid dims should not exceed 8x the cu count.
-                int totalGroups = grr_updates * grc_updates;
-                int maxGroups = cuCount * 8;
-                int updateW_grr = grr_updates;
-                int updateW_grc = grc_updates;
+        // Persistent graph execution objects (static to persist across calls)
+        static std::array<hipGraphExec_t, NUM_SLOTS> graphExecs = {};
+        static std::array<bool, NUM_SLOTS> graphExecsInitialized = {false, false, false};
 
-                if(totalGroups > maxGroups)
-                {
-                    // Try to preserve aspect ratio first
-                    float scale = std::sqrt(static_cast<float>(maxGroups) / totalGroups);
-                    updateW_grr = std::max(1, std::min(static_cast<int>(grr_updates * scale), grr_updates));
-                    updateW_grc = std::max(1, std::min(static_cast<int>(grc_updates * scale), grc_updates));
+        // Synchronization primitives
+        std::mutex mtx;
+        std::condition_variable cvReady;      // Signals consumer that graphExec is ready
+        std::condition_variable cvAvailable;  // Signals producer that slot is available
+        std::array<bool, NUM_SLOTS> slotReady = {false, false, false};
+        std::array<bool, NUM_SLOTS> slotAvailable = {true, true, true};
+        std::atomic<bool> producerDone{false};
+        std::atomic<int> producerError{0};
 
-                    // If still exceeding, favor X dim: maximize grr, then fit grc
-                    if(updateW_grr * updateW_grc > maxGroups)
-                    {
-                        updateW_grr = std::min(grr_updates, maxGroups);
-                        updateW_grc = std::max(1, std::min(maxGroups / updateW_grr, grc_updates));
-                    }
-                }
-
-                dim3 update_grid(updateW_grr, updateW_grc, batch_count);
-                dim3 update_threads(thr_updates, thc_updates, 1);
-
-                // update column j of A with reflector computed in step j-1
-                //----------------------------------------------------------
-                ROCSOLVER_LAUNCH_KERNEL(latrd_upper_updateA_kernel<T>,
-                                        update_grid,
-                                        update_threads,
-                                        lmemsize_updates,
-                                        graphStream,
-                                        grr_updates, grc_updates,
-                                        n, k, j, A, shiftA,
-                                        lda, strideA, pW,
-                                        shiftW, ldw, strideW);
-
-                //-------------------------------------------------------------
-                // reduce column j of A with new reflector, then copy off-diagonal element
-                // to E(j) and set off-diagonal to 1
-                //-------------------------------------------------------------
-                rocsolver_larfg_template(handle,
-                                         j, A, shiftA + idx2D(j - 1, j, lda), pE, j - 1, strideE,
-                                         A, shiftA + idx2D(0, j, lda), 1, strideA, (pTau + j - 1),
-                                         strideP, batch_count, pWork, pNorms);
-
-                //--------------------------------------------------------------
-                // compute column j of W
-                //--------------------------------------------------------------
-                static constexpr int NB = 256;
-                const int blocksX = n + n - j - 1;
-                int maxBlocks = cuCount * 8; // max occupancy without oversubscribing
-                int gridX = std::min(blocksX, maxBlocks);
-
-                dim3 gemvt_grid(gridX, 1, batch_count);
-                dim3 gemvt_threads(NB);
-                ROCSOLVER_LAUNCH_KERNEL((latrd_upper_computeW_gemvt_kernel<NB, T>),
-                                        gemvt_grid,
-                                        gemvt_threads,
-                                        0,
-                                        graphStream,
-                                        blocksX,
-                                        n, k, j, A, shiftA, lda, strideA, pW,
-                                        shiftW, ldw, strideW, pW, shiftW + idx2D(0, jw, ldw), ldw,
-                                        strideW, pWork, strideblk);
-
-                // update column j of W
-                //--------------------------------------------------------------
-                ROCSOLVER_LAUNCH_KERNEL(latrd_upper_updateW_kernel<T>,
-                                        update_grid,
-                                        update_threads,
-                                        lmemsize_updates,
-                                        graphStream,
-                                        grr_updates, grc_updates,
-                                        n, k, j, A, shiftA, lda, strideA,
-                                        pW, shiftW, ldw, strideW, pWork,
-                                        strideblk, pTau, strideP);
-
-                ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<1024, T>),
-                                        dim3(1, 1, batch_count),
-                                        dim3(1024, 1, 1),
-                                        0,
-                                        graphStream,
-                                        j, A, shiftA + idx2D(0, j, lda), strideA,
-                                        pW, shiftW + idx2D(0, jw, ldw), strideW,
-                                        pTau + j - 1, strideP);
-            }
-
-            HIP_CHECK(hipStreamEndCapture(graphStream, &graph));
-
-            if(!graphCreated)
-            {
-                HIP_CHECK(hipGraphInstantiate(&graphExec, graph, nullptr, nullptr, 0));
-                graphCreated = true;
-            }
-            else
-            {
-                auto result = hipGraphExecUpdateResult{};
-                auto errorNode = hipGraphNode_t{};
-                auto updateStatus = hipGraphExecUpdate(graphExec, graph, &errorNode, &result);
-
-                // If update fails (graph structure changed), recreate the executable graph
-                if(updateStatus != hipSuccess || result != hipGraphExecUpdateSuccess)
-                {
-                    // Wait for any pending work on the graph stream before destroying
-                    HIP_CHECK(hipStreamSynchronize(stream));
-                    HIP_CHECK(hipGraphExecDestroy(graphExec));
-                    HIP_CHECK(hipGraphInstantiate(&graphExec, graph, nullptr, nullptr, 0));
-                }
-            }
-
-            HIP_CHECK(hipGraphLaunch(graphExec, stream));
-            HIP_CHECK(hipGraphDestroy(graph));
-            return rocblas_status_success;
-        };
-
-        // Starting column index
-        rocblas_int currentCol = n - 1;
-
-        // Process remainder first (if any) to handle cases where k is not divisible by GRAPH_BLOCK_SIZE
-        //TODO: error handle captureBlock returns
-        if(remainder > 0)
+        // Create capture stream if not already created
+        static hipStream_t graphStream = nullptr;
+        static bool streamCreated = false;
+        if(!streamCreated)
         {
-            captureBlock(currentCol, remainder);
-            currentCol -= remainder;
+            HIP_CHECK(hipStreamCreate(&graphStream));
+            streamCreated = true;
         }
 
-        // Process full blocks
+        // Build list of blocks to process: (startCol, blockSize) pairs
+        std::vector<std::pair<rocblas_int, rocblas_int>> blockList;
+        blockList.reserve(total_blocks);
+
+        rocblas_int currentCol = n - 1;
+        if(remainder > 0)
+        {
+            blockList.emplace_back(currentCol, remainder);
+            currentCol -= remainder;
+        }
         for(rocblas_int block = 0; block < num_full_blocks; ++block)
         {
-            captureBlock(currentCol, GRAPH_BLOCK_SIZE);
+            blockList.emplace_back(currentCol, GRAPH_BLOCK_SIZE);
             currentCol -= GRAPH_BLOCK_SIZE;
         }
 
-        HIP_CHECK(hipStreamSynchronize(stream));
-        if(graphCreated)
+        // Producer thread: captures graphs and updates persistent graphExec objects
+        auto producerFunc = [&]() {
+            rocblas_set_stream(handle, graphStream);
+
+            for(size_t blockIdx = 0; blockIdx < blockList.size(); ++blockIdx)
+            {
+                int slot = blockIdx % NUM_SLOTS;
+                rocblas_int startCol = blockList[blockIdx].first;
+                rocblas_int blockSize = blockList[blockIdx].second;
+
+                // Capture graph (can proceed without waiting for slot)
+                hipGraph_t graph{};
+                auto captureStatus = hipStreamBeginCapture(graphStream, hipStreamCaptureModeGlobal);
+                if(captureStatus != hipSuccess)
+                {
+                    producerError.store(1);
+                    producerDone.store(true);
+                    cvReady.notify_all();
+                    return;
+                }
+
+                // Process blockSize iterations within this graph capture
+                for(rocblas_int iter = 0; iter < blockSize; ++iter)
+                {
+                    rocblas_int j = startCol - iter;
+                    rocblas_int jw_local = j - n + k;
+
+                    // compute update_grid based on CU count and problem size
+                    int totalGroups = grr_updates * grc_updates;
+                    int maxGroups = cuCount * 8;
+                    int updateW_grr = grr_updates;
+                    int updateW_grc = grc_updates;
+
+                    if(totalGroups > maxGroups)
+                    {
+                        float scale = std::sqrt(static_cast<float>(maxGroups) / totalGroups);
+                        updateW_grr = std::max(1, std::min(static_cast<int>(grr_updates * scale), grr_updates));
+                        updateW_grc = std::max(1, std::min(static_cast<int>(grc_updates * scale), grc_updates));
+
+                        if(updateW_grr * updateW_grc > maxGroups)
+                        {
+                            updateW_grr = std::min(grr_updates, maxGroups);
+                            updateW_grc = std::max(1, std::min(maxGroups / updateW_grr, grc_updates));
+                        }
+                    }
+
+                    dim3 update_grid(updateW_grr, updateW_grc, batch_count);
+                    dim3 update_threads(thr_updates, thc_updates, 1);
+
+                    // update column j of A with reflector computed in step j-1
+                    ROCSOLVER_LAUNCH_KERNEL(latrd_upper_updateA_kernel<T>,
+                                            update_grid,
+                                            update_threads,
+                                            lmemsize_updates,
+                                            graphStream,
+                                            grr_updates, grc_updates,
+                                            n, k, j, A, shiftA,
+                                            lda, strideA, pW,
+                                            shiftW, ldw, strideW);
+
+                    // reduce column j of A with new reflector
+                    rocsolver_larfg_template(handle,
+                                             j, A, shiftA + idx2D(j - 1, j, lda), pE, j - 1, strideE,
+                                             A, shiftA + idx2D(0, j, lda), 1, strideA, (pTau + j - 1),
+                                             strideP, batch_count, pWork, pNorms);
+
+                    // compute column j of W
+                    static constexpr int NB = 256;
+                    const int blocksX = n + n - j - 1;
+                    int maxBlocks = cuCount * 8;
+                    int gridX = std::min(blocksX, maxBlocks);
+
+                    dim3 gemvt_grid(gridX, 1, batch_count);
+                    dim3 gemvt_threads(NB);
+                    ROCSOLVER_LAUNCH_KERNEL((latrd_upper_computeW_gemvt_kernel<NB, T>),
+                                            gemvt_grid,
+                                            gemvt_threads,
+                                            0,
+                                            graphStream,
+                                            blocksX,
+                                            n, k, j, A, shiftA, lda, strideA, pW,
+                                            shiftW, ldw, strideW, pW, shiftW + idx2D(0, jw_local, ldw), ldw,
+                                            strideW, pWork, strideblk);
+
+                    // update column j of W
+                    ROCSOLVER_LAUNCH_KERNEL(latrd_upper_updateW_kernel<T>,
+                                            update_grid,
+                                            update_threads,
+                                            lmemsize_updates,
+                                            graphStream,
+                                            grr_updates, grc_updates,
+                                            n, k, j, A, shiftA, lda, strideA,
+                                            pW, shiftW, ldw, strideW, pWork,
+                                            strideblk, pTau, strideP);
+
+                    ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<1024, T>),
+                                            dim3(1, 1, batch_count),
+                                            dim3(1024, 1, 1),
+                                            0,
+                                            graphStream,
+                                            j, A, shiftA + idx2D(0, j, lda), strideA,
+                                            pW, shiftW + idx2D(0, jw_local, ldw), strideW,
+                                            pTau + j - 1, strideP);
+                }
+
+                auto endStatus = hipStreamEndCapture(graphStream, &graph);
+                if(endStatus != hipSuccess)
+                {
+                    producerError.store(1);
+                    producerDone.store(true);
+                    cvReady.notify_all();
+                    return;
+                }
+
+                // Wait for slot to be available before updating graphExec
+                {
+                    std::unique_lock<std::mutex> lock(mtx);
+                    cvAvailable.wait(lock, [&]() { return slotAvailable[slot]; });
+                    slotAvailable[slot] = false;
+                }
+
+                // Update or instantiate the persistent graphExec
+                if(!graphExecsInitialized[slot])
+                {
+                    auto instStatus = hipGraphInstantiate(&graphExecs[slot], graph, nullptr, nullptr, 0);
+                    if(instStatus != hipSuccess)
+                    {
+                        hipGraphDestroy(graph);
+                        producerError.store(1);
+                        producerDone.store(true);
+                        cvReady.notify_all();
+                        return;
+                    }
+                    graphExecsInitialized[slot] = true;
+                }
+                else
+                {
+                    hipGraphExecUpdateResult result{};
+                    hipGraphNode_t errorNode{};
+                    auto updateStatus = hipGraphExecUpdate(graphExecs[slot], graph, &errorNode, &result);
+
+                    if(updateStatus != hipSuccess || result != hipGraphExecUpdateSuccess)
+                    {
+                        // Structure changed - must recreate (rare case)
+                        hipGraphExecDestroy(graphExecs[slot]);
+                        auto instStatus = hipGraphInstantiate(&graphExecs[slot], graph, nullptr, nullptr, 0);
+                        if(instStatus != hipSuccess)
+                        {
+                            hipGraphDestroy(graph);
+                            producerError.store(1);
+                            producerDone.store(true);
+                            cvReady.notify_all();
+                            return;
+                        }
+                    }
+                }
+
+                // Signal that this slot is ready for launch
+                // (do this before hipGraphDestroy since destroy has no dependencies on launch)
+                {
+                    std::lock_guard<std::mutex> lock(mtx);
+                    slotReady[slot] = true;
+                }
+                cvReady.notify_one();
+
+                // Destroy the temporary graph after notifying consumer
+                // (graphExec persists, graph destruction is independent of launch)
+                hipGraphDestroy(graph);
+            }
+
+            producerDone.store(true);
+            cvReady.notify_all();
+        };
+
+        // Start producer thread
+        std::thread producerThread(producerFunc);
+
+        // Consumer (main thread): launches graphExec objects on primary stream
+        for(size_t blockIdx = 0; blockIdx < blockList.size(); ++blockIdx)
         {
-            HIP_CHECK(hipGraphExecDestroy(graphExec));
+            int slot = blockIdx % NUM_SLOTS;
+
+            // Wait for this slot to be ready
+            {
+                std::unique_lock<std::mutex> lock(mtx);
+                cvReady.wait(lock, [&]() { return slotReady[slot] || producerError.load(); });
+
+                if(producerError.load())
+                    break;
+
+                slotReady[slot] = false;
+            }
+
+            // Launch the graphExec on the primary stream
+            HIP_CHECK(hipGraphLaunch(graphExecs[slot], stream));
+
+            // Signal that slot is available for reuse
+            {
+                std::lock_guard<std::mutex> lock(mtx);
+                slotAvailable[slot] = true;
+            }
+            cvAvailable.notify_one();
         }
-        rocblas_set_stream(handle, stream);
-        HIP_CHECK(hipStreamDestroy(graphStream));
+
+        // Wait for producer to finish
+        producerThread.join();
+
+        // Synchronize to ensure all work is complete
+        HIP_CHECK(hipStreamSynchronize(stream));
+
+        // Note: graphExecs are kept alive (static) for reuse in future calls
+        // They will be cleaned up when the program exits
     }
 
     roctxRangePop();
