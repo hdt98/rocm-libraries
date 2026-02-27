@@ -1254,7 +1254,7 @@ ROCSOLVER_KERNEL void latrd_upper_computeW_gemvt_kernel(const int         blocks
         T res = 0;
 
 
-        if(it != c)
+        if(i != c)
         {
             for(rocblas_int j = 0; j < n_full; j += NB_X)
             {
