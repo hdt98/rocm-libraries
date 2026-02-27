@@ -42,6 +42,10 @@ namespace rocRoller
 
             template <typename Op>
             Generator<size_t> getLDSAddresses(KernelGraph& graph, int tag, Op const& op);
+
+            template <typename Op>
+            Generator<size_t> getLDSAddressesForTiled(KernelGraph& graph, int tag, Op const& op);
+
             void              setup();
             void              setWorkgroup(uint offset, uint value);
             void              setWorkitem(uint offset, uint value);

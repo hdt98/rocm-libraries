@@ -195,10 +195,45 @@ namespace rocRoller::KernelGraph
         }
     }
 
+    template <typename Op>
+    Generator<size_t>
+        ModelAddresses::getLDSAddressesForTiled(KernelGraph& graph, int tag, Op const& op)
+    {
+        auto ldsTagOrNeg1 = graph.mapper.get<LDS>(tag);
+        if(ldsTagOrNeg1 == -1)
+        {
+            // No LDS coordinate - this LoadTiled/StoreTiled doesn't use LDS
+            Log::debug("LoadTiled/StoreTiled operation {} has no LDS coordinate", tag);
+            co_return;
+        }
+
+        auto [ldsTag, lds]   = graph.getDimension<LDS>(tag);
+        auto [tileTag, tile] = graph.getDimension<MacroTile>(tag);
+
+        constexpr bool isLoad    = std::is_same_v<Op, LoadTiled>;
+        constexpr auto direction = isLoad ? LDSDirection::Load : LDSDirection::Store;
+
+        // Simplified dimensions
+        LoadStoreTileGenerator::LoadStoreTileInfo info{.tag = tag,
+                                                       .kind
+                                                       = MemoryInstructions::MemoryKind::Local,
+                                                       .m       = 1,
+                                                       .n       = 1,
+                                                       .data    = nullptr,
+                                                       .varType = op.varType};
+
+        co_yield getLDSAddressesImpl(graph, tag, info, direction);
+    }
+
     template Generator<size_t>
         ModelAddresses::getLDSAddresses(KernelGraph&, int, LoadLDSTile const&);
     template Generator<size_t>
         ModelAddresses::getLDSAddresses(KernelGraph&, int, StoreLDSTile const&);
+
+    template Generator<size_t>
+        ModelAddresses::getLDSAddressesForTiled(KernelGraph&, int, LoadTiled const&);
+    template Generator<size_t>
+        ModelAddresses::getLDSAddressesForTiled(KernelGraph&, int, StoreTiled const&);
 
     KernelGraph ModelAddresses::apply(KernelGraph const& original)
     {
@@ -229,11 +264,14 @@ namespace rocRoller::KernelGraph
                 graph.modelledAddresses[node] = std::move(normalizedAddresses);
             };
 
-            auto visitor
-                = rocRoller::overloaded{[&](CIsAnyOf<LoadLDSTile, StoreLDSTile> auto op) {
-                                            modelAddresses(getLDSAddresses(graph, node, op));
-                                        },
-                                        [&](auto op) {}};
+            auto visitor = rocRoller::overloaded{
+                [&](CIsAnyOf<LoadLDSTile, StoreLDSTile> auto op) {
+                    modelAddresses(getLDSAddresses(graph, node, op));
+                },
+                [&](CIsAnyOf<LoadTiled, StoreTiled> auto op) {
+                    modelAddresses(getLDSAddressesForTiled(graph, node, op));
+                },
+                [&](auto op) {}};
 
             std::visit(visitor, graph.control.getNode(node));
         }

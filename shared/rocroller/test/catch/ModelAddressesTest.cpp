@@ -165,4 +165,88 @@ namespace ModelAddressesTest
             commandKernel.launchKernel(commandArgs.runtimeArguments());
         }
     }
+
+    TEST_CASE("StreamK LDS Address Modelling", "[mem-addressing][streamk]")
+    {
+        // StreamK uses LoadTiled/StoreTiled operations for intermediate WAVE tiles stored in LDS
+        // This test verifies that ModelAddresses correctly handles these operations
+        auto streamKMode
+            = GENERATE(StreamKMode::Standard, StreamKMode::TwoTile, StreamKMode::TwoTileDPFirst);
+
+        SECTION("StreamK mode: " + toString(streamKMode))
+        {
+            auto context = TestContext::ForTestDevice(
+                {{.dsObserver = DSObserverType::WeightlessDSMemObserver}},
+                "StreamK " + toString(streamKMode));
+
+            auto const& arch = context->targetArchitecture();
+
+            if(!arch.HasCapability(GPUCapability::HasMFMA))
+            {
+                SKIP("StreamK requires MFMA architecture");
+            }
+
+            auto example = rocRollerTest::Graphs::GEMM(DataType::Float);
+
+            example.setUseLDS(true, true, false);
+            example.setTranspose("N", "T");
+            example.setStreamK(streamKMode);
+
+            auto command = example.getCommand();
+            auto params  = example.getCommandParameters();
+
+            CommandKernel commandKernel(command, context.KernelName());
+            commandKernel.setContext(context.get());
+            commandKernel.setCommandParameters(params);
+
+            commandKernel.generateKernelGraph();
+            auto graph = commandKernel.getKernelGraph();
+
+            // Count LDS instructions with modelled addresses
+            size_t ldsReadCount          = 0;
+            size_t ldsWriteCount         = 0;
+            size_t ldsReadWithAddresses  = 0;
+            size_t ldsWriteWithAddresses = 0;
+
+            for(auto inst : kernelInstructions(context.get(), command, graph))
+            {
+                context.get()->schedule(inst);
+                auto opCode = inst.getOpCode();
+
+                if(opCode.find("ds_read") != std::string::npos)
+                {
+                    ldsReadCount++;
+                    if(inst.getModelledAddresses().has_value())
+                    {
+                        ldsReadWithAddresses++;
+                        auto addresses = inst.getModelledAddresses().value();
+                        // Verify we have 64 addresses (one per workitem in a wave)
+                        CHECK(addresses.size() == 64);
+                    }
+                }
+                else if(opCode.find("ds_write") != std::string::npos)
+                {
+                    ldsWriteCount++;
+                    if(inst.getModelledAddresses().has_value())
+                    {
+                        ldsWriteWithAddresses++;
+                        auto addresses = inst.getModelledAddresses().value();
+                        // Verify we have 64 addresses (one per workitem in a wave)
+                        CHECK(addresses.size() == 64);
+                    }
+                }
+            }
+
+            INFO("LDS reads: " << ldsReadCount << ", with addresses: " << ldsReadWithAddresses);
+            INFO("LDS writes: " << ldsWriteCount << ", with addresses: " << ldsWriteWithAddresses);
+
+            // All LDS instructions should have modelled addresses
+            REQUIRE(ldsReadCount > 0); // Verify we found some LDS instructions
+            REQUIRE(ldsWriteCount > 0);
+            CHECK(ldsReadWithAddresses == ldsReadCount);
+            CHECK(ldsWriteWithAddresses == ldsWriteCount);
+
+            // TODO: assert against rocgdb
+        }
+    }
 }
