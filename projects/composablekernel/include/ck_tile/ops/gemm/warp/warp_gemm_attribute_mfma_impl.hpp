@@ -1714,8 +1714,9 @@ struct WarpGemmAttributeMfmaImpl_f32_32x32x64_f8f6f4
     static constexpr index_t kCM1PerLane = 4;
 
     static constexpr index_t kScaleGranularity = 32;
+    static constexpr index_t kDefaultScale     = 0x7F7F7F7F;
 
-    // c_vec += a_vec * b_vec
+    // c_vec += a_vec * b_vec (scaled)
     template <index_t opselA, index_t opselB, bool post_nop_ = false>
     CK_TILE_DEVICE void operator()(CVecType& c_vec,
                                    const AVecType& a_vec,
@@ -1766,7 +1767,7 @@ struct WarpGemmAttributeMfmaImpl_f32_32x32x64_f8f6f4
 #endif
     }
 
-    // c_vec = a_vec * b_vec
+    // c_vec = a_vec * b_vec (scaled)
     template <index_t opselA, index_t opselB>
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec,
                                        const int32_t& a_scale,
@@ -1778,22 +1779,27 @@ struct WarpGemmAttributeMfmaImpl_f32_32x32x64_f8f6f4
         return c_vec;
     }
 
-    // c_vec += a_vec * b_vec
+    // c_vec += a_vec * b_vec (unscaled, uses default unity scale)
     template <bool post_nop_ = false>
     CK_TILE_DEVICE void operator()(CVecType& c_vec,
                                    const AVecType& a_vec,
                                    const BVecType& b_vec,
                                    bool_constant<post_nop_> = {}) const
     {
-        operator()<0, 0>(c_vec, a_vec, 0, b_vec, 0);
+        operator()<0, 0>(c_vec, a_vec, kDefaultScale, b_vec, kDefaultScale);
     }
 
-    // c_vec = a_vec * b_vec
+    // c_vec = a_vec * b_vec (unscaled, uses default unity scale)
     CK_TILE_DEVICE CVecType operator()(const AVecType& a_vec, const BVecType& b_vec) const
     {
-        return operator()<0, 0>(a_vec, 0, b_vec, 0);
+        return operator()<0, 0>(a_vec, kDefaultScale, b_vec, kDefaultScale);
     }
 };
+
+// Backward-compatible type aliases for existing fp8/bf8 specializations
+template <typename AType_, typename BType_, WGAttrCtlEnum Ctrl_ = WGAttrCtlEnum::Default_>
+using WarpGemmAttributeMfmaImpl_f32_32x32x64_f8_bf8_base =
+    WarpGemmAttributeMfmaImpl_f32_32x32x64_f8f6f4<AType_, BType_, Ctrl_>;
 
 template <WGAttrCtlEnum Ctrl_ = WGAttrCtlEnum::Default_>
 using WarpGemmAttributeMfmaImpl_f32_32x32x64_fp8_fp8 =
