@@ -135,7 +135,7 @@ struct idx_identity
 
 namespace detail {
 
-// Compile-time index decomposition for flat loop → multi-index conversion.
+// Compile-time index decomposition for flat loop -> multi-index conversion.
 // Uses pre-computed strides to convert a linear index into N-dimensional coordinates.
 template <class OrderedLengths, class IndexSeq>
 struct index_decomposer;
@@ -152,9 +152,12 @@ struct index_decomposer<sequence<Ls...>, sequence<Is...>>
         if constexpr(NDim > 0)
         {
             result[NDim - 1] = 1;
-            for(index_t i = NDim - 2; i >= 0; --i)
+            if constexpr(NDim > 1)
             {
-                result[i] = result[i + 1] * lengths[i + 1];
+                for(index_t i = NDim - 2; i >= 0; --i)
+                {
+                    result[i] = result[i + 1] * lengths[i + 1];
+                }
             }
         }
         return result;
@@ -162,16 +165,28 @@ struct index_decomposer<sequence<Ls...>, sequence<Is...>>
 
     static constexpr detail::index_array<NDim> strides = compute_all_strides();
 
-    // Compile-time decomposition: linear index → sequence of ordered indices
+    // Compile-time decomposition: linear index -> sequence of ordered indices
+    // e.g. for lengths {2,3}: idx 4 -> (4/3)%2=1, (4/1)%3=1 -> sequence<1,1>
     template <index_t LinearIdx>
     using decompose = sequence<((LinearIdx / strides[Is]) % lengths[Is])...>;
+
+    // Runtime decomposition: linear index -> multi-index with reordering.
+    // Decomposes linear_idx into ordered indices, then reorders to original dimension order.
+    template <class New2Old, class MultiIndex>
+    CK_TILE_HOST_DEVICE static constexpr void decompose_runtime(index_t linear_idx,
+                                                                MultiIndex& result)
+    {
+        ((result[New2Old::at(number<Is>{})] = (linear_idx / strides[Is]) % lengths[Is]), ...);
+    }
 };
 
 } // namespace detail
 
 // Compile-time N-dimensional loop with static multi-indices.
-// Uses O(1) template instantiation depth via flat loop with index decomposition,
-// avoiding the recursive template structures of the old implementation.
+// Uses O(1) template instantiation depth via flat loop with index decomposition.
+// The old recursive implementation produced O(product(Lengths)) unique template
+// instantiations, causing excessive GPU compile times. This flat approach generates
+// the same iteration sequence with far fewer instantiations.
 //
 // Lengths is sequence<...>, the size of each dimension for N-dimensional loop
 // Orders is sequence<...>, the iteration order of dimensions
@@ -207,6 +222,49 @@ struct static_ford
             using OrderedIdx = typename Decomposer::template decompose<linear_idx.value>;
             f(OrderedIdx::reorder_old_to_new(Orders{}));
         });
+    }
+};
+
+// Runtime fallback for static_ford when compile-time indices are not needed.
+// Produces the same iteration order as static_ford, but multi-indices are runtime values
+// (stored in detail::index_array) rather than compile-time sequence types.
+//
+// Lengths is sequence<...>, the size of each dimension for N-dimensional loop
+// Orders is sequence<...>, the iteration order of dimensions
+//
+// Example:
+//   ford<sequence<2, 3>>{}([](auto multi_id) {
+//       index_t i = multi_id[0];  // Runtime values
+//       index_t j = multi_id[1];
+//   });
+template <class Lengths,
+          class Orders = typename arithmetic_sequence_gen<0, Lengths::size(), 1>::type>
+struct ford
+{
+    static constexpr index_t NDim      = Lengths::size();
+    static constexpr index_t TotalSize = Lengths::product();
+
+    CK_TILE_HOST_DEVICE constexpr ford()
+    {
+        static_assert(NDim > 0, "wrong! Lengths is empty");
+        static_assert(NDim == Orders::size(), "wrong! inconsistent size");
+    }
+
+    using Decomposer =
+        detail::index_decomposer<remove_cvref_t<decltype(Lengths::reorder_new_to_old(Orders{}))>,
+                                 make_index_sequence<NDim>>;
+
+    // F signature: F(detail::index_array<NDim> multi_id)
+    // multi_id contains runtime index values in the original dimension order
+    template <class F>
+    CK_TILE_HOST_DEVICE constexpr void operator()(F f) const
+    {
+        for(index_t linear_idx = 0; linear_idx < TotalSize; ++linear_idx)
+        {
+            detail::index_array<NDim> multi_id{};
+            Decomposer::template decompose_runtime<Orders>(linear_idx, multi_id);
+            f(multi_id);
+        }
     }
 };
 
