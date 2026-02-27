@@ -20,16 +20,18 @@ set(COMMON_CLIENT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/CSVStackFile.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/SolutionIterator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/LibraryUpdateReporter.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../clients/common/src/mxDataGen.cpp"
 )
 
 target_sources(tensilelite-client PRIVATE ${COMMON_CLIENT_SOURCES})
 target_sources(cpu-gemm-driver PRIVATE ${COMMON_CLIENT_SOURCES})
 
-target_sources(tensilelite-client
-    PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../../clients/common/src/mxDataGen.cpp"
-)
 target_include_directories(tensilelite-client
+    PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../clients/common/include"
+)
+
+target_include_directories(cpu-gemm-driver
     PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../../../clients/common/include"
 )
