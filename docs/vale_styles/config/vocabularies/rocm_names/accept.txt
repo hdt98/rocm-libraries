@@ -1,0 +1,2 @@
+# People's names that show up in the ROCm documentation, set here to ignore them during linting.
+Andrej
