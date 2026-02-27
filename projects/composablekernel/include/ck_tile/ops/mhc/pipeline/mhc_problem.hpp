@@ -1,0 +1,120 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
+
+#pragma once
+
+#include "ck_tile/core.hpp"
+#include "ck_tile/ops/common/tensor_layout.hpp"
+#include "ck_tile/ops/mhc/pipeline/mhc_gemm_shape.hpp"
+#include "ck_tile/ops/gemm/pipeline/gemm_pipeline_agmem_bgmem_creg_v1_default_policy.hpp"
+
+namespace ck_tile {
+
+// MHC Problem V5 - Reusing GEMM Pipeline Tile Distributions
+// This approach reuses the proven tile distributions from GEMM pipeline
+// which are designed to work correctly with make_tile_window and offsets
+
+template <typename XDataType_, typename ComputeDataType_, typename YDataType_, index_t MTile_ = 16>
+struct MHCProblemV5GemmDist
+{
+    using XDataType       = remove_cvref_t<XDataType_>;
+    using ComputeDataType = remove_cvref_t<ComputeDataType_>;
+    using YDataType       = remove_cvref_t<YDataType_>;
+
+    using PhiDataType = XDataType;
+    using ADataType   = XDataType;
+    using BDataType   = PhiDataType;
+    using CDataType   = ComputeDataType;
+
+    static constexpr index_t kMTile = MTile_;
+
+    // BlockGemmShape defines the warp grid and tile sizes
+    // Use ONLY WarpTile configs supported by WarpGemmDispatcher for bf16!
+    // M=16: 1 warp, WarpTile 16×16×32 (supported!)
+    // M=32: 1 warp, WarpTile 32×32×16 (supported!) - BEST PERFORMER!
+    // M=64: 2 warps (2×1), WarpTile 32×32×16, Block K=128 (testing)
+    // M=128: 2 warps (4×1), WarpTile 32×32×16, Block K=128 (testing more work/block)
+    using BlockGemmShape = std::conditional_t<
+        MTile_ == 16,
+        TileGemmShape<sequence<16, 16, 64>, sequence<1, 1, 1>, sequence<16, 16, 32>>,
+        std::conditional_t<
+            MTile_ == 32,
+            TileGemmShape<sequence<32, 32, 64>, sequence<1, 1, 1>, sequence<32, 32, 16>>,
+            std::conditional_t<
+                MTile_ == 64,
+                TileGemmShape<sequence<64, 32, 128>, sequence<2, 1, 1>, sequence<32, 32, 16>>,
+                TileGemmShape<sequence<128, 32, 128>, sequence<4, 1, 1>, sequence<32, 32, 16>>>>>;
+
+    // Standard vector sizes for all configurations
+    static constexpr index_t VectorSizeA = 4;
+    static constexpr index_t VectorSizeB = 4;
+
+    // Adaptive block size based on number of warps
+    // M=16, M=32: 1 warp = 64 threads
+    // M=64: 2 warps (2×1 grid) = 128 threads
+    // M=128: 4 warps (4×1 grid) = 256 threads
+    using BlockShape = std::conditional_t<
+        MTile_ == 16 || MTile_ == 32,
+        Generic2dBlockShape<sequence<1, 64>, sequence<1, 64>, sequence<1, 1>>,
+        std::conditional_t<
+            MTile_ == 64,
+            Generic2dBlockShape<sequence<1, 128>, sequence<1, 128>, sequence<1, 1>>,
+            Generic2dBlockShape<sequence<1, 256>, sequence<1, 256>, sequence<1, 1>>>>;
+
+    // Layouts: X is row-major, Phi is column-major (transposed for GEMM)
+    using ALayout = ck_tile::tensor_layout::gemm::RowMajor;
+    using BLayout = ck_tile::tensor_layout::gemm::ColumnMajor;
+    using CLayout = ck_tile::tensor_layout::gemm::RowMajor;
+
+    using AsDataTypeTuple = tuple<ADataType>;
+    using BsDataTypeTuple = tuple<BDataType>;
+    using AsLayoutTuple   = tuple<ALayout>;
+    using BsLayoutTuple   = tuple<BLayout>;
+
+    using AElementWise = identity;
+    using BElementWise = identity;
+
+    static constexpr bool TransposeC            = false;
+    static constexpr bool kPadM                 = true;
+    static constexpr bool kPadN                 = true;
+    static constexpr bool kPadK                 = true;
+    static constexpr bool Preshuffle            = false;
+    static constexpr auto Scheduler             = GemmPipelineScheduler::Intrawave;
+    static constexpr index_t NumWaveGroups      = 1;
+    static constexpr index_t VectorLoadSize     = 16;
+    static constexpr index_t kBlockSize         = BlockShape::BlockSize;
+    static constexpr bool DoubleSmemBuffer      = true;
+    static constexpr bool UseStructuredSparsity = false;
+    static constexpr bool FixedVectorSize       = false;
+
+    struct Traits
+    {
+        static constexpr bool UsePersistentKernel = false;
+    };
+
+    CK_TILE_HOST static const std::string GetName()
+    {
+        return MTile_ == 16   ? "MHCProblemV5GemmDist_M16"
+               : MTile_ == 32 ? "MHCProblemV5GemmDist_M32"
+               : MTile_ == 64 ? "MHCProblemV5GemmDist_M64"
+                              : "MHCProblemV5GemmDist_M128";
+    }
+
+    // Use default GEMM tile distributions - they are proven to work with multi-warp!
+
+    CK_TILE_HOST_DEVICE static constexpr auto MakeXLoadTileDistribution()
+    {
+        // X is A matrix in GEMM (M × K, row-major)
+        return GemmPipelineAGmemBGmemCRegV1DefaultPolicy::MakeADramTileDistribution<
+            MHCProblemV5GemmDist>();
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr auto MakePhiLoadTileDistribution()
+    {
+        // Phi is B matrix in GEMM (N × K, column-major for transposed access)
+        return GemmPipelineAGmemBGmemCRegV1DefaultPolicy::MakeBDramTileDistribution<
+            MHCProblemV5GemmDist>();
+    }
+};
+
+} // namespace ck_tile
