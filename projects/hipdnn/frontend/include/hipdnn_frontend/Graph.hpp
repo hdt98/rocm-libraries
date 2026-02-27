@@ -62,6 +62,11 @@
 
 #pragma once
 
+#include <algorithm>
+#include <limits>
+
+#include <hip/hip_runtime.h>
+
 #include <HipdnnBackendFlatbufferData.h>
 #include <hipdnn_backend.h>
 #include <hipdnn_data_sdk/data_objects/knob_value_generated.h>
@@ -1305,8 +1310,7 @@ public:
             }
 
             // Finalize execution plan
-            auto planFinalizeStatus
-                = detail::hipdnnBackend()->backendFinalize(planDesc->get());
+            auto planFinalizeStatus = detail::hipdnnBackend()->backendFinalize(planDesc->get());
             if(planFinalizeStatus != HIPDNN_STATUS_SUCCESS)
             {
                 HIPDNN_FE_LOG_WARN("Failed to finalize execution plan for engine "
@@ -1452,12 +1456,12 @@ public:
             detail::hipdnnBackend()->backendFinalize(variantPackDesc->get()),
             "Failed to finalize variant pack descriptor");
 
-        HIPDNN_RETURN_ON_BACKEND_FAILURE(
-            detail::hipdnnBackend()->backendExecute(
-                handle,
-                _executionPlanDescs[static_cast<size_t>(index)]->get(),
-                variantPackDesc->get()),
-            "Execute failed for plan at index " + std::to_string(index) + ".");
+        HIPDNN_RETURN_ON_BACKEND_FAILURE(detail::hipdnnBackend()->backendExecute(
+                                             handle,
+                                             _executionPlanDescs[static_cast<size_t>(index)]->get(),
+                                             variantPackDesc->get()),
+                                         "Execute failed for plan at index " + std::to_string(index)
+                                             + ".");
 
         return {ErrorCode::OK, ""};
     }
@@ -1522,11 +1526,11 @@ public:
             std::move(*_engineConfigDescs[idx]));
         _engineConfigDescs[idx] = nullptr;
 
-        HIPDNN_FE_LOG_INFO("Selected plan at index "
-                           << index << " (engine "
-                           << hipdnn_data_sdk::utilities::getEngineNameFromId(
-                                  _candidateEngineIds[idx])
-                           << ") as active plan.");
+        HIPDNN_FE_LOG_INFO(
+            "Selected plan at index "
+            << index << " (engine "
+            << hipdnn_data_sdk::utilities::getEngineNameFromId(_candidateEngineIds[idx])
+            << ") as active plan.");
 
         return {ErrorCode::OK, ""};
     }
@@ -2207,6 +2211,220 @@ public:
 
         return newTensor;
     }
+
+    /**
+     * @brief Get the maximum workspace size across all built candidate plans
+     * @return The maximum workspace size in bytes, or 0 if no plans are built
+     *
+     * Iterates over all plans built via build_plans(ALL) and returns the
+     * largest workspace size. Useful for allocating a single workspace buffer
+     * that works for any plan during autotuning.
+     */
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    int64_t get_max_workspace_size() const
+    {
+        int64_t maxSize = 0;
+        for(int64_t i = 0; i < static_cast<int64_t>(_executionPlanDescs.size()); ++i)
+        {
+            maxSize = std::max(maxSize, get_workspace_size_plan_at_index(i));
+        }
+        return maxSize;
+    }
+
+    /**
+     * @brief Benchmark all built candidate plans and return sorted results
+     * @param handle The hipDNN handle
+     * @param variantPack Map from tensor UID to device memory pointers
+     * @param workspace Pointer to workspace memory (must be >= get_max_workspace_size())
+     * @param results Output vector of AutotuneResult, sorted by avgTimeMs ascending
+     * @param config Benchmark configuration (warmup/timed iteration counts)
+     * @return Error indicating success or failure
+     *
+     * Requires build_plans(BuildPlanPolicy::ALL) to have been called first.
+     * For each plan: runs warmup iterations, then timed iterations using HIP events.
+     * Plans that fail during warmup are marked as failed and skipped.
+     * Results are sorted fastest-first.
+     */
+    Error autotune(hipdnnHandle_t handle,
+                   std::unordered_map<int64_t, void*>& variantPack,
+                   void* workspace,
+                   std::vector<AutotuneResult>& results,
+                   AutotuneConfig const& config = {}) // NOLINT(readability-identifier-naming)
+    {
+        if(_executionPlanDescs.empty())
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR,
+                    "No candidate plans built. Call build_plans(BuildPlanPolicy::ALL) first."};
+        }
+
+        auto planCount = static_cast<int64_t>(_executionPlanDescs.size());
+
+        hipEvent_t startEvent;
+        hipEvent_t stopEvent;
+        auto createStartStatus = hipEventCreate(&startEvent);
+        if(createStartStatus != hipSuccess)
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR,
+                    std::string("Failed to create HIP start event: ")
+                        + hipGetErrorString(createStartStatus)};
+        }
+        auto createStopStatus = hipEventCreate(&stopEvent);
+        if(createStopStatus != hipSuccess)
+        {
+            (void)hipEventDestroy(startEvent);
+            return {ErrorCode::HIPDNN_BACKEND_ERROR,
+                    std::string("Failed to create HIP stop event: ")
+                        + hipGetErrorString(createStopStatus)};
+        }
+
+        hipStream_t stream = nullptr;
+
+        results.clear();
+        results.reserve(static_cast<size_t>(planCount));
+
+        for(int64_t i = 0; i < planCount; ++i)
+        {
+            AutotuneResult result;
+            result.planIndex = i;
+            result.workspaceSize = get_workspace_size_plan_at_index(i);
+
+            std::string name;
+            auto nameErr = get_plan_name_at_index(i, name);
+            result.engineName = nameErr.is_good() ? name : "unknown";
+
+            // Warmup
+            auto warmupStatus = execute_plan_at_index(handle, variantPack, workspace, i);
+            if(warmupStatus.is_bad())
+            {
+                result.avgTimeMs = std::numeric_limits<float>::max();
+                result.succeeded = false;
+                result.errorMessage = warmupStatus.get_message();
+                results.push_back(std::move(result));
+                continue;
+            }
+
+            // Additional warmup iterations
+            for(int iter = 1; iter < config.warmupIterations; ++iter)
+            {
+                execute_plan_at_index(handle, variantPack, workspace, i);
+            }
+            (void)hipDeviceSynchronize();
+
+            // Timed iterations
+            (void)hipEventRecord(startEvent, stream);
+            for(int iter = 0; iter < config.timedIterations; ++iter)
+            {
+                execute_plan_at_index(handle, variantPack, workspace, i);
+            }
+            (void)hipEventRecord(stopEvent, stream);
+            (void)hipEventSynchronize(stopEvent);
+
+            float totalMs = 0.0f;
+            (void)hipEventElapsedTime(&totalMs, startEvent, stopEvent);
+            result.avgTimeMs = totalMs / static_cast<float>(config.timedIterations);
+            result.succeeded = true;
+
+            results.push_back(std::move(result));
+        }
+
+        // Sort by execution time (ascending)
+        std::sort(results.begin(), results.end(), [](const auto& a, const auto& b) {
+            return a.avgTimeMs < b.avgTimeMs;
+        });
+
+        (void)hipEventDestroy(startEvent);
+        (void)hipEventDestroy(stopEvent);
+
+        return {ErrorCode::OK, ""};
+    }
+
+    /**
+     * @brief Autotune all plans and select the fastest as the active plan
+     * @param handle The hipDNN handle
+     * @param variantPack Map from tensor UID to device memory pointers
+     * @param workspace Pointer to workspace memory (must be >= get_max_workspace_size())
+     * @param config Benchmark configuration
+     * @return Error indicating success or failure
+     *
+     * Calls autotune() to benchmark all plans, then calls select_plan() with the
+     * fastest successful plan. After this call, execute() will use the winning plan.
+     */
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    Error autotune_and_select(hipdnnHandle_t handle,
+                              std::unordered_map<int64_t, void*>& variantPack,
+                              void* workspace,
+                              AutotuneConfig const& config = {})
+    {
+        std::vector<AutotuneResult> results;
+        HIPDNN_CHECK_ERROR(autotune(handle, variantPack, workspace, results, config));
+
+        auto winnerIt = std::find_if(
+            results.begin(), results.end(), [](const auto& r) { return r.succeeded; });
+
+        if(winnerIt == results.end())
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR, "No plans succeeded during autotuning."};
+        }
+
+        return select_plan(winnerIt->planIndex);
+    }
+
+#ifndef HIPDNN_FRONTEND_SKIP_JSON_LIB
+    /**
+     * @brief Autotune all plans and save the winner to an engine override config file
+     * @param handle The hipDNN handle
+     * @param variantPack Map from tensor UID to device memory pointers
+     * @param workspace Pointer to workspace memory (must be >= get_max_workspace_size())
+     * @param outputPath Path for the output JSON engine override config file
+     * @param config Benchmark configuration
+     * @return Error indicating success or failure
+     *
+     * Calls autotune() to benchmark all plans, extracts operation info from the graph,
+     * builds an OperationRule from the winner, and saves it via EngineOverrideConfig::save().
+     * The resulting file can be loaded via the HIPDNN_ENGINE_OVERRIDE_FILE environment variable.
+     */
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    Error autotune_and_save(hipdnnHandle_t handle,
+                            std::unordered_map<int64_t, void*>& variantPack,
+                            void* workspace,
+                            const std::string& outputPath,
+                            AutotuneConfig const& config = {})
+    {
+        std::vector<AutotuneResult> results;
+        HIPDNN_CHECK_ERROR(autotune(handle, variantPack, workspace, results, config));
+
+        auto winnerIt = std::find_if(
+            results.begin(), results.end(), [](const auto& r) { return r.succeeded; });
+
+        if(winnerIt == results.end())
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR, "No plans succeeded during autotuning."};
+        }
+
+        auto opInfo = engine_override::extractOperationInfo(*this);
+        if(!opInfo.has_value())
+        {
+            return {ErrorCode::INVALID_VALUE,
+                    "Could not extract operation info from graph for engine override config."};
+        }
+
+        engine_override::OperationRule rule;
+        rule.op = opInfo->op;
+        rule.engineName = winnerIt->engineName;
+        rule.tensors = opInfo->tensors;
+
+        engine_override::EngineOverrideConfig overrideConfig;
+        overrideConfig.addRule(std::move(rule));
+
+        if(!overrideConfig.save(outputPath))
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR,
+                    "Failed to save engine override config to: " + outputPath};
+        }
+
+        return {ErrorCode::OK, ""};
+    }
+#endif
 };
 
 } // namespace hipdnn_frontend::graph

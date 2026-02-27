@@ -746,4 +746,28 @@ inline const auto& getTernaryModesBitset()
     return hipdnn_data_sdk::utilities::getTernaryModesBitset();
 }
 
+/**
+ * @struct AutotuneConfig
+ * @brief Configuration parameters for the autotuning benchmark loop
+ */
+struct AutotuneConfig
+{
+    int warmupIterations = 1; ///< Number of warmup iterations before timing
+    int timedIterations = 10; ///< Number of timed iterations for averaging
+};
+
+/**
+ * @struct AutotuneResult
+ * @brief Result from benchmarking a single execution plan
+ */
+struct AutotuneResult
+{
+    int64_t planIndex; ///< Index of the plan in the candidate list
+    std::string engineName; ///< Human-readable engine name
+    float avgTimeMs; ///< Average execution time in milliseconds
+    int64_t workspaceSize; ///< Workspace size in bytes required by this plan
+    bool succeeded; ///< Whether the plan executed successfully
+    std::string errorMessage; ///< Error message if the plan failed
+};
+
 } // namespace hipdnn_frontend
