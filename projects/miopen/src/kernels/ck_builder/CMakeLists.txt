@@ -31,17 +31,28 @@ set(WMMA_FILES "")
 set(ARCH_AGNOSTIC_FILES "")
 
 foreach(SOURCE_FILE ${ALL_FACTORY_FILES})
-    # Check if file is in xdl/ directory or has xdl in filename
+    # Pattern matching priority (first match wins):
+    #   1. XDL:  /xdl/ directory or _xdl_ in filename → CDNA only (gfx908/90a/942/950)
+    #   2. WMMA: /wmma/ directory or _wmma_ in filename → RDNA only (gfx1030/1100/1200/1201)
+    #   3. Default: Architecture-agnostic (compiles for all targets)
+    #
+    # Note: Files should use EXACTLY ONE architecture marker for clarity.
+    # Mixed markers (e.g., "_xdl_wmma_" or "_xdl_dl_") would be ambiguous.
+    # This matches Composable Kernel's naming convention (0 mixed markers across 1000+ files).
+
     if(SOURCE_FILE MATCHES "/xdl/|_xdl_")
         list(APPEND XDL_FILES "${SOURCE_FILE}")
-    # Check if file is in wmma/ directory or has wmma in filename
     elseif(SOURCE_FILE MATCHES "/wmma/|_wmma_")
         list(APPEND WMMA_FILES "${SOURCE_FILE}")
-    # DL, reference, or flat structure files (no arch marker)
     else()
+        # DL, reference, or flat structure files (no arch marker)
         list(APPEND ARCH_AGNOSTIC_FILES "${SOURCE_FILE}")
     endif()
 endforeach()
+
+# Initialize counters for summary
+set(XDL_COUNT 0)
+set(WMMA_COUNT 0)
 
 # Add XDL files only if building for CDNA architectures
 set(CDNA_ENABLED FALSE)
@@ -74,13 +85,10 @@ message(STATUS "CK Builder: Adding ${AGNOSTIC_COUNT} architecture-agnostic insta
 
 # Verify we have at least some sources
 if(NOT CK_BUILDER_SOURCES)
-    message(WARNING "CK Builder: No kernel instance files selected! Check GPU architecture settings.")
-    message(WARNING "  CMAKE_HIP_ARCHITECTURES: ${CMAKE_HIP_ARCHITECTURES}")
-    message(WARNING "  GPU_TARGETS: ${GPU_TARGETS}")
-    message(WARNING "  CDNA enabled: ${CDNA_ENABLED}, RDNA enabled: ${RDNA_ENABLED}")
-    # Create empty library to avoid build errors
-    add_library(ck_builder INTERFACE)
-    return()
+    message(FATAL_ERROR "CK Builder: No kernel instance files selected! This indicates a configuration error.\n"
+                        "  GPU_TARGETS: ${GPU_TARGETS}\n"
+                        "  CDNA enabled: ${CDNA_ENABLED}, RDNA enabled: ${RDNA_ENABLED}\n"
+                        "Please set GPU_TARGETS to target GPU architectures or disable MIOPEN_CK_BUILDER_EXPERIMENTAL.")
 endif()
 
 # Create library from filtered sources
