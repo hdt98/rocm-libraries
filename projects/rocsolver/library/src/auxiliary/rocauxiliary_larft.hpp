@@ -590,11 +590,11 @@ rocblas_status rocsolver_larft_template(rocblas_handle handle,
     // Fix diagonal of T, make zero the not used triangular part,
     // setup tau (changing signs) and account for the non-stored 1's on the
     // householder vectors
-    I blocks = (k - 1) / 32 + 1;
-    ROCSOLVER_LAUNCH_KERNEL((set_triangular<T, U, I>), dim3(blocks, blocks, batch_count),
-                            dim3(32, 32), 0, stream, n, k, V, shiftV, ldv, strideV, tau, strideT, F,
-                            ldf, strideF, direct, storev, use_gemm);
-    ROCSOLVER_LAUNCH_KERNEL((set_tau<T, I>), dim3(blocks, batch_count), dim3(32, 1), 0, stream, k,
+    I blocks = (k - 1) / BS2 + 1;
+    ROCSOLVER_LAUNCH_KERNEL((set_triangular<T, I, U>), dim3(blocks, blocks, batch_count),
+                            dim3(BS2, BS2), 0, stream, n, k, V, shiftV, ldv, strideV, tau, strideT,
+                            F, ldf, strideF, direct, storev, use_gemm);
+    ROCSOLVER_LAUNCH_KERNEL((set_tau<T, I>), dim3(blocks, batch_count), dim3(BS2, 1), 0, stream, k,
                             tau, strideT);
 
     const hipDeviceProp_t* props = rocblas_internal_get_device_prop(handle);
@@ -713,7 +713,7 @@ rocblas_status rocsolver_larft_template(rocblas_handle handle,
     }
 
     // restore tau
-    ROCSOLVER_LAUNCH_KERNEL(set_tau, dim3(blocks, batch_count), dim3(32, 1), 0, stream, k, tau,
+    ROCSOLVER_LAUNCH_KERNEL(set_tau, dim3(blocks, batch_count), dim3(BS2, 1), 0, stream, k, tau,
                             strideT);
 
     rocblas_set_pointer_mode(handle, old_mode);
@@ -892,9 +892,9 @@ rocblas_status rocsolver_larft_inverse_template(rocblas_handle handle,
         tri_offset = (!forward && n > k) ? idx2D(0, n - k, ldv) : 0;
     }
 
-    I blocks = (k - 1) / 32 + 1;
+    I blocks = (k - 1) / BS2 + 1;
     dim3 gridTri(blocks, blocks, batch_count);
-    dim3 blockTri(32, 32);
+    dim3 blockTri(BS2, BS2);
 
     // set V to unit triangular/trapezoidal
     ROCSOLVER_LAUNCH_KERNEL((larft_set_tri<T, I, U>), gridTri, blockTri, 0, stream, tri_uplo, k, V,
