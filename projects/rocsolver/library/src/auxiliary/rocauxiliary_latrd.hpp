@@ -2198,7 +2198,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
 
         // Tunable parameter: number of loop iterations to capture per graph
         // Adjust this value based on performance profiling for different problem sizes
-        constexpr rocblas_int GRAPH_BLOCK_SIZE = 64;
+        constexpr rocblas_int GRAPH_BLOCK_SIZE = 16;
 
         // Calculate total iterations and blocking parameters
         const rocblas_int total_iters = k;  // columns to process: n-1 down to n-k
