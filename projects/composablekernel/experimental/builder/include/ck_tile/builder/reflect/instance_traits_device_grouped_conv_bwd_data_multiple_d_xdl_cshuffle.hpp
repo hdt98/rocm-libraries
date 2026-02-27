@@ -60,7 +60,8 @@ template <ck::index_t NDimSpatial,
           typename ComputeTypeA,
           typename ComputeTypeB,
           ck::index_t max_transpose_transfer_src_scalar_per_vector,
-          ck::index_t max_transpose_transfer_dst_scalar_per_vector>
+          ck::index_t max_transpose_transfer_dst_scalar_per_vector,
+          ck::index_t NumGroupsToMerge>
 struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1;
 
 } // namespace ck::tensor_operation::device
@@ -120,7 +121,8 @@ template <ck::index_t NDimSpatial,
           typename ComputeTypeA_,
           typename ComputeTypeB_,
           ck::index_t max_transpose_transfer_src_scalar_per_vector,
-          ck::index_t max_transpose_transfer_dst_scalar_per_vector>
+          ck::index_t max_transpose_transfer_dst_scalar_per_vector,
+          ck::index_t NumGroupsToMerge>
 struct InstanceTraits<
     ck::tensor_operation::device::DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1<
         NDimSpatial,
@@ -173,7 +175,8 @@ struct InstanceTraits<
         ComputeTypeA_,
         ComputeTypeB_,
         max_transpose_transfer_src_scalar_per_vector,
-        max_transpose_transfer_dst_scalar_per_vector>>
+        max_transpose_transfer_dst_scalar_per_vector,
+        NumGroupsToMerge>>
 {
     static constexpr auto kTensorOpName = "DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle";
 
@@ -335,7 +338,7 @@ struct InstanceTraits<
         oss << "," << detail::type_name<ComputeTypeB>();           // 45.
         oss << "," << kMaxTransposeTransferSrcScalarPerVector;     // 46.
         oss << "," << kMaxTransposeTransferDstScalarPerVector;     // 47.
-
+        oss << "," << NumGroupsToMerge;                            // 48.
         oss << ">";
 
         return oss.str();

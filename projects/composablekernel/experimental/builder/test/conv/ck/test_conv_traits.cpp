@@ -350,7 +350,8 @@ TEST_F(ConvTraitsTest, ConvBwdDataMultipleDCshuffleXDLTraitsExtraction)
             ck::half_t,                 // AComputeDataType
             ck::half_t,                 // BComputeDataType
             1,                          // MaxTransposeTransferSrcScalarPerVector
-            1>;                         // MaxTransposeTransferDstScalarPerVector
+            1,                          // MaxTransposeTransferDstScalarPerVector
+            1>;                         // NumGroupsToMerge
 
     // Use ConvTraitsTmpl to extract compile-time information
     const auto traits = ck_tile::reflect::conv::instance_to_conv_traits<DeviceInstance>();
