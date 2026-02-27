@@ -1394,10 +1394,18 @@ public:
                                 void* workspace,
                                 int64_t index) const
     {
-        HIPDNN_RETURN_IF_GE(index,
-                            static_cast<int64_t>(_executionPlanDescs.size()),
-                            ErrorCode::INVALID_VALUE,
-                            "Plan index out of range.");
+        if(index < 0 || index >= static_cast<int64_t>(_executionPlanDescs.size()))
+        {
+            return {ErrorCode::INVALID_VALUE, "Plan index out of range."};
+        }
+
+        // Guard against plans invalidated by a prior select_plan() call on this index
+        if(!_executionPlanDescs[static_cast<size_t>(index)])
+        {
+            return {ErrorCode::INVALID_VALUE,
+                    "Plan at index " + std::to_string(index)
+                        + " has been consumed by a previous select_plan() call."};
+        }
 
         auto variantPackDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(
             HIPDNN_BACKEND_VARIANT_PACK_DESCRIPTOR);
@@ -1463,10 +1471,10 @@ public:
     // NOLINTNEXTLINE(readability-identifier-naming)
     Error get_plan_name_at_index(int64_t index, std::string& name) const
     {
-        HIPDNN_RETURN_IF_GE(index,
-                            static_cast<int64_t>(_candidateEngineIds.size()),
-                            ErrorCode::INVALID_VALUE,
-                            "Plan index out of range.");
+        if(index < 0 || index >= static_cast<int64_t>(_candidateEngineIds.size()))
+        {
+            return {ErrorCode::INVALID_VALUE, "Plan index out of range."};
+        }
 
         auto engineId = _candidateEngineIds[static_cast<size_t>(index)];
         name = std::string(hipdnn_data_sdk::utilities::getEngineNameFromId(engineId));
@@ -1478,22 +1486,41 @@ public:
      * @brief Select a specific plan by index as the active plan for subsequent execute() calls
      * @param index The index of the plan to select
      * @return Error indicating success or failure
+     *
+     * @note This is a **destructive, one-shot operation**. Calling select_plan() for a given
+     *       index moves the underlying descriptors out of the candidate vectors, leaving
+     *       the entries at that index as nullptr. Subsequent calls to execute_plan_at_index()
+     *       or select_plan() for the same index will return an error. This is intentional
+     *       for this POC implementation to avoid double-free of RAII backend descriptors.
      */
     // NOLINTNEXTLINE(readability-identifier-naming)
     Error select_plan(int64_t index)
     {
-        HIPDNN_RETURN_IF_GE(index,
-                            static_cast<int64_t>(_executionPlanDescs.size()),
-                            ErrorCode::INVALID_VALUE,
-                            "Plan index out of range.");
+        if(index < 0 || index >= static_cast<int64_t>(_executionPlanDescs.size()))
+        {
+            return {ErrorCode::INVALID_VALUE, "Plan index out of range."};
+        }
 
         auto idx = static_cast<size_t>(index);
 
-        // Move the selected plan's descriptors to the active single-plan members
+        // Guard against a second call for the same index (plan already consumed)
+        if(!_executionPlanDescs[idx] || !_engineConfigDescs[idx])
+        {
+            return {ErrorCode::INVALID_VALUE,
+                    "Plan at index " + std::to_string(index)
+                        + " has already been consumed by a previous select_plan() call."};
+        }
+
+        // Move the selected plan's descriptors to the active single-plan members.
+        // The source entries are set to nullptr to signal that this plan has been consumed
+        // and to prevent double-free should the candidate vectors be visited again.
         _executionPlanDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(
             std::move(*_executionPlanDescs[idx]));
+        _executionPlanDescs[idx] = nullptr;
+
         _engineConfigDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(
             std::move(*_engineConfigDescs[idx]));
+        _engineConfigDescs[idx] = nullptr;
 
         HIPDNN_FE_LOG_INFO("Selected plan at index "
                            << index << " (engine "
