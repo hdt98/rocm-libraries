@@ -98,6 +98,8 @@ def runTestCommand (platform, project)
                 /opt/rocm/bin/amdclang -### "-target" "amdgcn-amd-amdhsa" "-mcpu=gfx908:xnack+" "-I" "/tmp/comgr-4686-0-dd5d8b/include" "-no-integrated-cpp" "-dD" "-c" "-x" "assembler" "-v" "-mcode-object-version=5" "-mwavefrontsize64" "-Xclang" "-no-disable-free" dummyfile.s
                 export LD_LIBRARY_PATH="/opt/rocm/_rocm_sdk_core/lib:/opt/rocm/_rocm_sdk_core/lib/llvm/lib:\${LD_LIBRARY_PATH}"
                 export LIBRARY_PATH="/opt/rocm/_rocm_sdk_core/lib:/opt/rocm/_rocm_sdk_core/lib/llvm/lib:\${LIBRARY_PATH}"
+                amdclang++ -Wall -Wextra -O2 simple_comgr_test.cpp -I/opt/rocm/_rocm_sdk_devel/include -L /opt/rocm/_rocm_sdk_devel/lib -lamd_comgr -o simple_comgr_test
+                ./simple_comgr_test
                 # Run sharded tests (auto-detects ncores/2, respecting cgroups)
                 scripts/run-tests-sharded precheckin-mci build
             """
