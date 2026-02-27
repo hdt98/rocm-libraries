@@ -121,8 +121,11 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
         const long_index_t e_n_offset =
             amd_wave_read_first_lane(compute_ptr_offset_of_n.GetEPtrOffset(n_idx));
 
-        constexpr index_t SharedMemSize = GridwiseGemm::GetSharedMemoryNumberOfByte(get_device_arch());
-        constexpr index_t AdditionalSharedMemSize = DoubleBuffer ? SharedMemSize : 1; // One byte of shared mem to avoid warning of zero size shared memory if DoubleBuffer is false
+        constexpr index_t SharedMemSize =
+            GridwiseGemm::GetSharedMemoryNumberOfByte(get_device_arch());
+        constexpr index_t AdditionalSharedMemSize =
+            DoubleBuffer ? SharedMemSize : 1; // One byte of shared mem to avoid warning of zero
+                                              // size shared memory if DoubleBuffer is false
 
         __shared__ char p_shared_0[SharedMemSize];
         __shared__ char p_shared_1[AdditionalSharedMemSize];
@@ -320,7 +323,7 @@ template <index_t NDimSpatial,
           typename BComputeDataType = AComputeDataType,
           LoopScheduler LoopSched   = make_default_loop_scheduler(),
           index_t NumGroupsToMerge  = 1,
-          bool DoubleBuffer = false>
+          bool DoubleBuffer         = false>
 struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
     : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                              ALayout,
@@ -1467,7 +1470,9 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             {
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                 {
-                    std::cout << "IsSupportedArgument: gfx908 does not support AccDataType other than float or int32_t" << std::endl;
+                    std::cout << "IsSupportedArgument: gfx908 does not support AccDataType other "
+                                 "than float or int32_t"
+                              << std::endl;
                 }
                 return false;
             }
@@ -1480,7 +1485,9 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         {
             if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
             {
-                std::cout << "IsSupportedArgument: XDL/WMMA not supported for given compute data types" << std::endl;
+                std::cout
+                    << "IsSupportedArgument: XDL/WMMA not supported for given compute data types"
+                    << std::endl;
             }
             return false;
         }
@@ -1501,7 +1508,34 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 {
                     if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                     {
-                        std::cout << "IsSupportedArgument: Filter1x1Stride1Pad0 specialization requires 1x1 filter with stride=1 and no padding" << std::endl;
+                        std::cout << "IsSupportedArgument: Filter1x1Stride1Pad0 specialization "
+                                     "requires 1x1 filter with stride=1 and no padding"
+                                  << std::endl;
+                    }
+                    return false;
+                }
+            }
+        }
+        else if constexpr(ConvForwardSpecialization ==
+                          ConvolutionForwardSpecialization::Filter3x3Stride1Pad0)
+        {
+            // Check if we have 3x3, stride=1, dilation=1, pad=0 convolution
+            for(index_t i = 0; i < NDimSpatial; ++i)
+            {
+                const index_t SpatialDim   = arg.b_g_k_c_xs_lengths_[i + I3];
+                const index_t ConvStride   = arg.conv_filter_strides_[i];
+                const index_t ConvDilation = arg.conv_filter_dilations_[i];
+                const index_t LeftPad      = arg.input_left_pads_[i];
+                const index_t RightPad     = arg.input_right_pads_[i];
+
+                if(!(SpatialDim == I3 && ConvStride == 1 && ConvDilation == 1 && LeftPad == 0 &&
+                     RightPad == 0))
+                {
+                    if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                    {
+                        std::cout << "IsSupportedArgument: Filter3x3Stride1Pad0 specialization "
+                                     "requires 3x3 filter with stride=1, dilation=1, and no padding"
+                                  << std::endl;
                     }
                     return false;
                 }
@@ -1521,7 +1555,9 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 {
                     if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                     {
-                        std::cout << "IsSupportedArgument: Filter1x1Pad0 specialization requires 1x1 filter with no padding" << std::endl;
+                        std::cout << "IsSupportedArgument: Filter1x1Pad0 specialization requires "
+                                     "1x1 filter with no padding"
+                                  << std::endl;
                     }
                     return false;
                 }
@@ -1533,7 +1569,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             {
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                 {
-                    std::cout << "IsSupportedArgument: Filter3x3 specialization requires C == 1" << std::endl;
+                    std::cout << "IsSupportedArgument: Filter3x3 specialization requires C == 1"
+                              << std::endl;
                 }
                 return false;
             }
@@ -1545,7 +1582,9 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 {
                     if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                     {
-                        std::cout << "IsSupportedArgument: Filter3x3 specialization requires 3x3 filter" << std::endl;
+                        std::cout
+                            << "IsSupportedArgument: Filter3x3 specialization requires 3x3 filter"
+                            << std::endl;
                     }
                     return false;
                 }
@@ -1558,7 +1597,9 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             {
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                 {
-                    std::cout << "IsSupportedArgument: NumGroupsToMerge > 1 requires C == 1 when CDEBlockTransferScalarPerVector_NPerBlock > 1" << std::endl;
+                    std::cout << "IsSupportedArgument: NumGroupsToMerge > 1 requires C == 1 when "
+                                 "CDEBlockTransferScalarPerVector_NPerBlock > 1"
+                              << std::endl;
                 }
                 return false;
             }
@@ -1566,7 +1607,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             {
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                 {
-                    std::cout << "IsSupportedArgument: G (" << G << ") must be divisible by NumGroupsToMerge" << std::endl;
+                    std::cout << "IsSupportedArgument: G (" << G
+                              << ") must be divisible by NumGroupsToMerge" << std::endl;
                 }
                 return false;
             }
@@ -1577,7 +1619,9 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             {
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                 {
-                    std::cout << "IsSupportedArgument: NumGroupsToMerge > 1 requires specific layout combination" << std::endl;
+                    std::cout << "IsSupportedArgument: NumGroupsToMerge > 1 requires specific "
+                                 "layout combination"
+                              << std::endl;
                 }
                 return false;
             }
@@ -1604,7 +1648,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 {
                     if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                     {
-                        std::cout << "IsSupportedArgument: A tensor vector access check failed. C=" << C << ", G=" << G << std::endl;
+                        std::cout << "IsSupportedArgument: A tensor vector access check failed. C="
+                                  << C << ", G=" << G << std::endl;
                     }
                     return false;
                 }
@@ -1621,7 +1666,9 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 {
                     if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                     {
-                        std::cout << "IsSupportedArgument: NGCHW/NGCDHW layout requires ABlockTransferSrcVectorDim == 1" << std::endl;
+                        std::cout << "IsSupportedArgument: NGCHW/NGCDHW layout requires "
+                                     "ABlockTransferSrcVectorDim == 1"
+                                  << std::endl;
                     }
                     return false;
                 }
@@ -1629,7 +1676,10 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 {
                     if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                     {
-                        std::cout << "IsSupportedArgument: input_spatial_acum (" << input_spatial_acum << ") must be divisible by ABlockTransferSrcScalarPerVector" << std::endl;
+                        std::cout << "IsSupportedArgument: input_spatial_acum ("
+                                  << input_spatial_acum
+                                  << ") must be divisible by ABlockTransferSrcScalarPerVector"
+                                  << std::endl;
                     }
                     return false;
                 }
@@ -1658,7 +1708,9 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             {
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                 {
-                    std::cout << "IsSupportedArgument: B tensor vector access check failed. C=" << C << " must be divisible by BBlockTransferSrcScalarPerVector" << std::endl;
+                    std::cout << "IsSupportedArgument: B tensor vector access check failed. C=" << C
+                              << " must be divisible by BBlockTransferSrcScalarPerVector"
+                              << std::endl;
                 }
                 return false;
             }
@@ -1688,7 +1740,10 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 {
                     if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                     {
-                        std::cout << "IsSupportedArgument: D tensor K (" << K << ") must be divisible by CDEBlockTransferScalarPerVector_NPerBlock" << std::endl;
+                        std::cout
+                            << "IsSupportedArgument: D tensor K (" << K
+                            << ") must be divisible by CDEBlockTransferScalarPerVector_NPerBlock"
+                            << std::endl;
                     }
                     valid = false;
                 }
@@ -1701,7 +1756,9 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                     {
                         if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                         {
-                            std::cout << "IsSupportedArgument: D tensor (G_K layout) G and K must match E tensor" << std::endl;
+                            std::cout << "IsSupportedArgument: D tensor (G_K layout) G and K must "
+                                         "match E tensor"
+                                      << std::endl;
                         }
                         valid = false;
                     }
@@ -1715,7 +1772,9 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                         {
                             if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                             {
-                                std::cout << "IsSupportedArgument: D tensor shape must match E tensor at dim " << d << std::endl;
+                                std::cout << "IsSupportedArgument: D tensor shape must match E "
+                                             "tensor at dim "
+                                          << d << std::endl;
                             }
                             valid = false;
                         }
@@ -1738,7 +1797,10 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             {
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                 {
-                    std::cout << "IsSupportedArgument: NeedTransposeKernel requires (G*C)=" << (G*C) << " divisible by CDEBlockTransferScalarPerVector_NPerBlock" << std::endl;
+                    std::cout << "IsSupportedArgument: NeedTransposeKernel requires (G*C)="
+                              << (G * C)
+                              << " divisible by CDEBlockTransferScalarPerVector_NPerBlock"
+                              << std::endl;
                 }
                 return false;
             }
@@ -1747,7 +1809,10 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             {
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                 {
-                    std::cout << "IsSupportedArgument: NeedTransposeKernel requires (G*K)=" << (G*K) << " divisible by CDEBlockTransferScalarPerVector_NPerBlock" << std::endl;
+                    std::cout << "IsSupportedArgument: NeedTransposeKernel requires (G*K)="
+                              << (G * K)
+                              << " divisible by CDEBlockTransferScalarPerVector_NPerBlock"
+                              << std::endl;
                 }
                 return false;
             }
@@ -1759,7 +1824,10 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             {
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                 {
-                    std::cout << "IsSupportedArgument: NeedTransposeKernel requires input_spatial_acum=" << input_spatial_acum << " divisible by CDEBlockTransferScalarPerVector_NPerBlock" << std::endl;
+                    std::cout
+                        << "IsSupportedArgument: NeedTransposeKernel requires input_spatial_acum="
+                        << input_spatial_acum
+                        << " divisible by CDEBlockTransferScalarPerVector_NPerBlock" << std::endl;
                 }
                 return false;
             }
@@ -1768,7 +1836,10 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             {
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                 {
-                    std::cout << "IsSupportedArgument: NeedTransposeKernel requires output_spatial_acum=" << output_spatial_acum << " divisible by CDEBlockTransferScalarPerVector_NPerBlock" << std::endl;
+                    std::cout
+                        << "IsSupportedArgument: NeedTransposeKernel requires output_spatial_acum="
+                        << output_spatial_acum
+                        << " divisible by CDEBlockTransferScalarPerVector_NPerBlock" << std::endl;
                 }
                 return false;
             }
@@ -1791,7 +1862,9 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             {
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                 {
-                    std::cout << "IsSupportedArgument: NeedTransposeKernel tensor size exceeds 2GB limit" << std::endl;
+                    std::cout
+                        << "IsSupportedArgument: NeedTransposeKernel tensor size exceeds 2GB limit"
+                        << std::endl;
                 }
                 return false;
             }
@@ -1820,7 +1893,10 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 {
                     if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                     {
-                        std::cout << "IsSupportedArgument: E tensor K (" << K << ") must be divisible by CDEBlockTransferScalarPerVector_NPerBlock" << std::endl;
+                        std::cout
+                            << "IsSupportedArgument: E tensor K (" << K
+                            << ") must be divisible by CDEBlockTransferScalarPerVector_NPerBlock"
+                            << std::endl;
                     }
                     return false;
                 }
@@ -1834,7 +1910,10 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 {
                     if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                     {
-                        std::cout << "IsSupportedArgument: E tensor CTranspose output_spatial_acum must be divisible by CDEBlockTransferScalarPerVector_NPerBlock" << std::endl;
+                        std::cout
+                            << "IsSupportedArgument: E tensor CTranspose output_spatial_acum must "
+                               "be divisible by CDEBlockTransferScalarPerVector_NPerBlock"
+                            << std::endl;
                     }
                     return false;
                 }
@@ -1855,7 +1934,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             {
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                 {
-                    std::cout << "IsSupportedArgument: TF32 is not supported on this device" << std::endl;
+                    std::cout << "IsSupportedArgument: TF32 is not supported on this device"
+                              << std::endl;
                 }
                 return false;
             }
@@ -1950,7 +2030,9 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
         if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
         {
-            std::cout << "IsSupportedArgument: GridwiseGemm validation failed or warp size not supported" << std::endl;
+            std::cout
+                << "IsSupportedArgument: GridwiseGemm validation failed or warp size not supported"
+                << std::endl;
         }
         return false;
     }

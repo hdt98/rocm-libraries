@@ -74,7 +74,7 @@ template <typename ADataType,
           PipelineVersion PipelineVer      = PipelineVersion::v1,
           typename BComputeDataType_       = AComputeDataType_,
           bool DoElementwiseBeforeCShuffle = false,
-          bool DoubleBuffer = false>
+          bool DoubleBuffer                = false>
 struct GridwiseGemmMultipleD_xdl_cshuffle
     : public GridwiseGemm_xdl_cshuffle_base<
           tensor_layout::gemm::RowMajor,
@@ -186,8 +186,13 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
     static constexpr auto AK0PerBlock = Base::AK0Number;
     static constexpr auto BK0PerBlock = Base::BK0Number;
 
-    using GridwiseGemmPipe = remove_cvref_t<
-        decltype(GridwiseGemmPipeline_Selector<PipelineVer, NumGemmKPrefetchStage, LoopSched, true, true, DoubleBuffer>())>;
+    using GridwiseGemmPipe =
+        remove_cvref_t<decltype(GridwiseGemmPipeline_Selector<PipelineVer,
+                                                              NumGemmKPrefetchStage,
+                                                              LoopSched,
+                                                              true,
+                                                              true,
+                                                              DoubleBuffer>())>;
 
 #if CK_GFX90A_DENORM_WORKAROUND
     using AComputeDataType =
@@ -605,8 +610,8 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
                                const EGridDesc_MBlock_MPerBlock_NBlock_NPerBlock&
                                    e_grid_desc_mblock_mperblock_nblock_nperblock,
                                const Block2ETileMap& block_2_etile_map,
-                               const index_t k_batch = 1,
-                               const index_t k_idx   = 0,
+                               const index_t k_batch         = 1,
+                               const index_t k_idx           = 0,
                                void* __restrict__ p_shared_1 = nullptr)
     {
         const auto a_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
@@ -769,19 +774,23 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
         constexpr auto b_block_slice_copy_step = make_multi_index(KPerBlock / BK1, 0, 0);
 
         // gridwise GEMM pipeline
-        constexpr bool EnableLDS = true;
-        const auto gridwise_gemm_pipeline =
-            GridwiseGemmPipeline_Selector<PipelineVer, NumGemmKPrefetchStage, LoopSched, EnableLDS, EnableLDS, DoubleBuffer>();
+        constexpr bool EnableLDS          = true;
+        const auto gridwise_gemm_pipeline = GridwiseGemmPipeline_Selector<PipelineVer,
+                                                                          NumGemmKPrefetchStage,
+                                                                          LoopSched,
+                                                                          EnableLDS,
+                                                                          EnableLDS,
+                                                                          DoubleBuffer>();
 
         const index_t num_k_block_main_loop = __builtin_amdgcn_readfirstlane(
             (a_grid_desc_ak0_m_ak1.GetLength(I0) * a_grid_desc_ak0_m_ak1.GetLength(I2)) /
             (KPerBlock * k_batch));
 
-        if constexpr (DoubleBuffer)
+        if constexpr(DoubleBuffer)
         {
-            //Double buffers for A and B in LDS
+            // Double buffers for A and B in LDS
             auto a_block_buf_extra = make_dynamic_buffer<AddressSpaceEnum::Lds>(
-                static_cast<AComputeDataType*>(p_shared_1), 
+                static_cast<AComputeDataType*>(p_shared_1),
                 a_block_desc_ak0_m_ak1.GetElementSpaceSize());
 
             auto b_block_buf_extra = make_dynamic_buffer<AddressSpaceEnum::Lds>(
@@ -789,40 +798,40 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
                 b_block_desc_bk0_n_bk1.GetElementSpaceSize());
 
             gridwise_gemm_pipeline.template Run<HasMainKBlockLoop>(a_grid_desc_ak0_m_ak1,
-                                                               a_block_desc_ak0_m_ak1,
-                                                               a_blockwise_copy,
-                                                               a_grid_buf,
-                                                               a_block_buf,
-                                                               a_block_buf_extra,
-                                                               a_block_slice_copy_step,
-                                                               b_grid_desc_bk0_n_bk1,
-                                                               b_block_desc_bk0_n_bk1,
-                                                               b_blockwise_copy,
-                                                               b_grid_buf,
-                                                               b_block_buf,
-                                                               b_block_buf_extra,
-                                                               b_block_slice_copy_step,
-                                                               blockwise_gemm,
-                                                               c_thread_buf,
-                                                               num_k_block_main_loop);
+                                                                   a_block_desc_ak0_m_ak1,
+                                                                   a_blockwise_copy,
+                                                                   a_grid_buf,
+                                                                   a_block_buf,
+                                                                   a_block_buf_extra,
+                                                                   a_block_slice_copy_step,
+                                                                   b_grid_desc_bk0_n_bk1,
+                                                                   b_block_desc_bk0_n_bk1,
+                                                                   b_blockwise_copy,
+                                                                   b_grid_buf,
+                                                                   b_block_buf,
+                                                                   b_block_buf_extra,
+                                                                   b_block_slice_copy_step,
+                                                                   blockwise_gemm,
+                                                                   c_thread_buf,
+                                                                   num_k_block_main_loop);
         }
-        else 
+        else
         {
             gridwise_gemm_pipeline.template Run<HasMainKBlockLoop>(a_grid_desc_ak0_m_ak1,
-                                                               a_block_desc_ak0_m_ak1,
-                                                               a_blockwise_copy,
-                                                               a_grid_buf,
-                                                               a_block_buf,
-                                                               a_block_slice_copy_step,
-                                                               b_grid_desc_bk0_n_bk1,
-                                                               b_block_desc_bk0_n_bk1,
-                                                               b_blockwise_copy,
-                                                               b_grid_buf,
-                                                               b_block_buf,
-                                                               b_block_slice_copy_step,
-                                                               blockwise_gemm,
-                                                               c_thread_buf,
-                                                               num_k_block_main_loop);
+                                                                   a_block_desc_ak0_m_ak1,
+                                                                   a_blockwise_copy,
+                                                                   a_grid_buf,
+                                                                   a_block_buf,
+                                                                   a_block_slice_copy_step,
+                                                                   b_grid_desc_bk0_n_bk1,
+                                                                   b_block_desc_bk0_n_bk1,
+                                                                   b_blockwise_copy,
+                                                                   b_grid_buf,
+                                                                   b_block_buf,
+                                                                   b_block_slice_copy_step,
+                                                                   blockwise_gemm,
+                                                                   c_thread_buf,
+                                                                   num_k_block_main_loop);
         }
 
         // Shuffle C and write out.

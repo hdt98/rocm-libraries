@@ -37,6 +37,7 @@ void add_device_grouped_conv3d_fwd_xdl_gndhwc_gkzyxc_gndhwk_bf16_instances(
                                                                               Empty_Tuple,
                                                                               GNDHWK,
                                                                               ConvFwd1x1P0>{});
+
     add_device_operation_instances(instances,
                                    device_grouped_conv_fwd_xdl_bf16_instances<3,
                                                                               GNDHWC,
@@ -44,6 +45,14 @@ void add_device_grouped_conv3d_fwd_xdl_gndhwc_gkzyxc_gndhwk_bf16_instances(
                                                                               Empty_Tuple,
                                                                               GNDHWK,
                                                                               ConvFwd1x1S1P0>{});
+
+    add_device_operation_instances(instances,
+                                   device_grouped_conv_fwd_xdl_bf16_instances<3,
+                                                                              GNDHWC,
+                                                                              GKZYXC,
+                                                                              Empty_Tuple,
+                                                                              GNDHWK,
+                                                                              ConvFwd3x3S1D1P0>{});
 }
 
 } // namespace instance
