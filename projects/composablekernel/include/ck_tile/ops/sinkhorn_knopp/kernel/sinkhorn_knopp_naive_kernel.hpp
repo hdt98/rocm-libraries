@@ -49,8 +49,10 @@ struct SinkhornKnoppNaiveKernel
         auto* p_out = static_cast<Problem::OutDataType*>(args.p_out);
 
         // Input and output match
-        const auto in_out_desc = make_naive_tensor_descriptor(
-            make_tuple(S::N, S::N), make_tuple(S::N, 1), number<S::N>{}, number<1>{});
+        const auto in_out_desc = make_naive_tensor_descriptor(make_tuple(S::BatchSize, S::N * S::N),
+                                                              make_tuple(S::N * S::N, 1),
+                                                              number<S::N>{},
+                                                              number<1>{});
 
         const auto input_window = [&]() {
             // We require exp(input) > 0, and exp(padding) == 0
@@ -64,7 +66,7 @@ struct SinkhornKnoppNaiveKernel
 
             return make_tile_window(
                 in_tensor,
-                make_tuple(number<S::N>{}, number<S::N>{}),
+                make_tuple(number<S::BatchSize>{}, number<S::N * S::N>{}),
                 {0, 0},
                 Policy::template MakeFullMatrixBlockTileDistribution<Problem>());
         }();
@@ -79,14 +81,14 @@ struct SinkhornKnoppNaiveKernel
 
             return make_tile_window(
                 out_tensor,
-                make_tuple(number<S::N>{}, number<S::N>{}),
+                make_tuple(number<S::BatchSize>{}, number<S::N * S::N>{}),
                 {0, 0},
                 Policy::template MakeFullMatrixBlockTileDistribution<Problem>());
         }();
 
         auto input_tile = load_tile(input_window);
 
-        sinkhorn_knopp_naive_full(input_tile, out_window, args.iterations);
+        sinkhorn_knopp_naive_full<S::N>(input_tile, out_window, args.iterations);
     }
 };
 

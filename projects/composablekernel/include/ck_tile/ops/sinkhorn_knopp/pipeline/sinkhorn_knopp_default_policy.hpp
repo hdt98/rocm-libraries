@@ -12,13 +12,13 @@ struct SinkhornKnoppDefaultPolicy
     CK_TILE_DEVICE static constexpr auto MakeFullMatrixBlockTileDistribution()
     {
         using S = typename Problem::BlockShape;
-        return make_static_tile_distribution(
+        return make_static_tile_distribution( // B x N x N
             tile_distribution_encoding<sequence<>,
-                                       tuple<sequence<S::BatchSize, S::N>, sequence<1, S::N>>,
+                                       tuple<sequence<S::BatchSize>, sequence<S::N, S::N>>,
                                        tuple<sequence<1>>,
                                        tuple<sequence<0>>,
-                                       sequence<1, 2>,
-                                       sequence<1, 1>>{});
+                                       sequence<2, 2>,
+                                       sequence<0, 1>>{});
     }
 };
 

@@ -16,7 +16,7 @@
 #include "test_sinkhorn_impl.hpp"
 
 // Shape parameters for different test configurations
-using Shape1_BatchSize = ck_tile::sequence<1>;
+using Shape1_BatchSize = ck_tile::sequence<2>;
 using Shape1_N         = ck_tile::sequence<4>;
 
 // Test configurations for different data types and input size
@@ -30,4 +30,4 @@ using TestTypes = ::testing::Types<TestConfig_F16>;
 
 TYPED_TEST_SUITE(TestCkTileSinkHorn, TestTypes);
 
-TYPED_TEST(TestCkTileSinkHorn, Test_4x4) { this->RunGenericTest({1, 4, 4}, 20); }
+TYPED_TEST(TestCkTileSinkHorn, Test_4x4) { this->RunGenericTest({2, 4, 4}, 20); }
