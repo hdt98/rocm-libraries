@@ -6,6 +6,13 @@
 #        [Aa]ccuracy(y('s)?|ie(s|s'))
 
 
+# SYMBOLS/SPECIAL
+
+
+# anything with an underscore
+.+_.+
+
+
 # LETTER A
 
 
@@ -50,7 +57,7 @@ AlexNet
 alloc
 AllReduce
 AlmaLinux
-ALU
+ALU(s|s'|'s)?
 AMD
 # amdgpu
 AMDGPU(s)?|amdgpu(s)?
@@ -90,8 +97,7 @@ bb
 [Bb]ackend(s|'s|s')?
 # backtrace
 [Bb]acktrace
-# batchnorm
-[Bb]atchnorm
+BatchNorm
 # benchmark
 [Bb]enchmark(s|'s|s'|ed|ing)?
 # bilinear
@@ -147,6 +153,8 @@ CCD
 [Cc]heckpoint(s|'s|s'|ed|ing)?
 # chiplet
 [Cc]hiplet
+# CI
+CI(s|'s|s')?
 # coalescable
 [Cc]oalescable
 # codename
@@ -156,7 +164,7 @@ CCD
 # completers
 [Cc]ompleters
 # composable
-[Cc]ompsabl(e|ity)
+[Cc]omposabl(e|ity)
 # concretize
 [Cc]oncretiz(e|es|ed|ing|ation)
 # conda
@@ -183,6 +191,8 @@ CGUI
 ChatGPT
 CHTML
 CIFAR
+# CK
+CK(s|'s|s')?
 classList
 CLI
 CLion
@@ -363,6 +373,8 @@ epilog
 EPYC
 ESXi
 etcd
+# exponentiate
+[Ee]xponentiat(e|es|ed|ing)
 
 
 # LETTER F
@@ -388,6 +400,7 @@ Flang
 FlashAttention
 # flashinfer
 FlashInfer('s)?
+FlatBuffers
 FluxBenchmark
 FMA
 forEach
@@ -432,8 +445,7 @@ GFXIP
 [Gg]lobal(s)?
 # grayscale
 [Gg]rayscale
-# groupnorm
-[Gg]roupnorm
+GroupNorm
 GGUF
 GiB
 GIM
@@ -449,7 +461,7 @@ GPG
 GPR
 GPT
 # gpu
-GPU(s|'s|s')?
+GPU(s|'s|s')?|gpu
 Graphbolt
 GraphSage
 GRBM
@@ -527,7 +539,9 @@ ICV
 # ide
 IDE(s)?
 iDRAC
+IEngine
 IFWI
+IGraph
 # inband
 [Ii]nband
 # increment
@@ -571,6 +585,7 @@ IOP
 IOPM
 IOPS
 IOV
+IPlan
 ipo
 IRQ
 ISA
@@ -621,12 +636,11 @@ libs
 linalg
 # latency
 [Ll]atenc(y('s)?|ies(')?)
-# layernorm
-[Ll]ayernorm
+LayerNorm
 # learnable
 [Ll]earnable
 # linearize
-[Ll]ineariz(e|es|ed|ing)
+[Ll]ineariz(e|es|ed|ing|ation)
 # linter
 [Ll]inter
 # linux
@@ -855,6 +869,8 @@ PowerShell
 [Pp]erformant
 # pipeline
 [Pp]ipelin(e(s|'s|s')?|ed|ing)
+# PR
+PR(s|'s|s')?
 # pre
 [Pp]re
 # prebuild
@@ -882,7 +898,7 @@ PowerShell
 # prerequisite
 [Pp]rerequisite(s|'s|s')?
 # preshuffle
-[Pp]reshuffle
+[Pp]reshuffl(e|es|ed|ing)
 # pretrain
 [Pp]retrain(s|ed|ing)?
 # primus
@@ -1023,8 +1039,8 @@ RPP
 [Rr]eusability
 # roadmap
 [Rr]oadmap
-# rowise
-[Rr]owise
+# rowwise
+[Rr]owwise
 # ruleset
 [Rr]uleset(s|'s|s')?
 # runfile
@@ -1213,6 +1229,8 @@ TSME
 [Tt]oolset(s|'s|s')?
 # traceback
 [Tt]raceback(s|'s|s')?
+# transformative
+[Tt]ransformative
 # triage
 [Tt]riag(e|es|ed|ing)
 TVM
@@ -1253,6 +1271,8 @@ utils
 [Uu]nittest(s|'s|s')?
 # unmapped
 [Uu]nmapped
+# unmerge
+[Uu]nmerg(e|es|ed|ing)
 # unsqueeze
 [Uu]nsqueez(e|es|ed|ing)
 # unstack
@@ -1277,6 +1297,8 @@ Vanhoucke
 VBIOS
 VCN
 vdi
+# venv
+[Vv]env
 # verl
 verl('s)?
 # vgpr
