@@ -46,7 +46,7 @@ ROCSOLVER_BEGIN_NAMESPACE
 /*************** Main kernels *********************************************************/
 /**************************************************************************************/
 
-template <typename T, typename U, typename I, std::enable_if_t<!rocblas_is_complex<T>, int> = 0>
+template <typename T, typename I, typename U, std::enable_if_t<!rocblas_is_complex<T>, int> = 0>
 ROCSOLVER_KERNEL void set_triangular(const I n,
                                      const I k,
                                      U V,
@@ -140,7 +140,7 @@ ROCSOLVER_KERNEL void set_triangular(const I n,
     }
 }
 
-template <typename T, typename U, typename I, std::enable_if_t<rocblas_is_complex<T>, int> = 0>
+template <typename T, typename I, typename U, std::enable_if_t<rocblas_is_complex<T>, int> = 0>
 ROCSOLVER_KERNEL void set_triangular(const I n,
                                      const I k,
                                      U V,
@@ -248,7 +248,7 @@ ROCSOLVER_KERNEL void set_tau(const I k, T* tau, const rocblas_stride strideT)
     }
 }
 
-template <typename T, typename U, typename I>
+template <typename T, typename I, typename U>
 ROCSOLVER_KERNEL void larft_kernel_forward(const rocblas_storev storev,
                                            const I n,
                                            const I k,
@@ -342,7 +342,7 @@ ROCSOLVER_KERNEL void larft_kernel_forward(const rocblas_storev storev,
             Ftemp[i + j * ldfA] = F[i + j * ldf];
 }
 
-template <typename T, typename U, typename I>
+template <typename T, typename I, typename U>
 ROCSOLVER_KERNEL void larft_kernel_backward(const rocblas_storev storev,
                                             const I n,
                                             const I k,
@@ -470,7 +470,7 @@ void rocsolver_larft_getMemorySize(const I n,
         *size_workArr = 0;
 }
 
-template <typename T, typename U, typename I>
+template <typename T, typename I, typename U>
 rocblas_status rocsolver_larft_argCheck(rocblas_handle handle,
                                         const rocblas_direct direct,
                                         const rocblas_storev storev,
@@ -508,7 +508,7 @@ rocblas_status rocsolver_larft_argCheck(rocblas_handle handle,
     return rocblas_status_continue;
 }
 
-template <typename T, typename U, typename I, bool COMPLEX = rocblas_is_complex<T>>
+template <typename T, typename I, typename U, bool COMPLEX = rocblas_is_complex<T>>
 rocblas_status rocsolver_larft_template(rocblas_handle handle,
                                         const rocblas_direct direct,
                                         const rocblas_storev storev,
@@ -613,7 +613,7 @@ rocblas_status rocsolver_larft_template(rocblas_handle handle,
 
         if(k <= LARFT_SWITCHSIZE && lmemsize <= props->sharedMemPerBlock)
         {
-            ROCSOLVER_LAUNCH_KERNEL((larft_kernel_forward<T, U, I>), dim3(1, batch_count),
+            ROCSOLVER_LAUNCH_KERNEL((larft_kernel_forward<T, I, U>), dim3(1, batch_count),
                                     dim3(BS1, 1), lmemsize, stream, storev, u1_n, k, V, shiftV, ldv,
                                     strideV, tau, strideT, F, ldf, strideF);
         }
@@ -669,7 +669,7 @@ rocblas_status rocsolver_larft_template(rocblas_handle handle,
         {
             auto shiftU2 = shiftV
                 + ((storev == rocblas_column_wise) ? idx2D(u2_n, 0, ldv) : idx2D(0, u2_n, ldv));
-            ROCSOLVER_LAUNCH_KERNEL((larft_kernel_backward<T, U, I>), dim3(1, batch_count),
+            ROCSOLVER_LAUNCH_KERNEL((larft_kernel_backward<T, I, U>), dim3(1, batch_count),
                                     dim3(BS1, 1), lmemsize, stream, storev, u1_n, k, V, shiftU2,
                                     ldv, strideV, tau, strideT, F, ldf, strideF);
         }
@@ -720,7 +720,7 @@ rocblas_status rocsolver_larft_template(rocblas_handle handle,
     return rocblas_status_success;
 }
 
-template <typename T, typename U, typename I>
+template <typename T, typename I, typename U>
 ROCSOLVER_KERNEL void larft_set_tri(const rocblas_fill uplo,
                                     const I k,
                                     U A,
@@ -755,7 +755,7 @@ ROCSOLVER_KERNEL void larft_set_tri(const rocblas_fill uplo,
     }
 }
 
-template <typename T, typename U, typename I>
+template <typename T, typename I, typename U>
 ROCSOLVER_KERNEL void larft_restore_tri(const rocblas_fill uplo,
                                         const I k,
                                         U A,
@@ -833,7 +833,7 @@ void rocsolver_larft_inverse_getMemorySize(const I n,
         *size_workArr = 0;
 }
 
-template <typename T, typename U, typename I, bool COMPLEX = rocblas_is_complex<T>>
+template <typename T, typename I, typename U, bool COMPLEX = rocblas_is_complex<T>>
 rocblas_status rocsolver_larft_inverse_template(rocblas_handle handle,
                                                 const rocblas_direct direct,
                                                 const rocblas_storev storev,
@@ -897,7 +897,7 @@ rocblas_status rocsolver_larft_inverse_template(rocblas_handle handle,
     dim3 blockTri(32, 32);
 
     // set V to unit triangular/trapezoidal
-    ROCSOLVER_LAUNCH_KERNEL((larft_set_tri<T, U, I>), gridTri, blockTri, 0, stream, tri_uplo, k, V,
+    ROCSOLVER_LAUNCH_KERNEL((larft_set_tri<T, I, U>), gridTri, blockTri, 0, stream, tri_uplo, k, V,
                             shiftV + tri_offset, ldv, strideV, work);
 
     // compute: V' * V or V * V'
@@ -905,11 +905,11 @@ rocblas_status rocsolver_larft_inverse_template(rocblas_handle handle,
                    strideV, &zero, F, 0, ldf, strideF, batch_count, workArr);
 
     // set F diag to 1 / tau
-    ROCSOLVER_LAUNCH_KERNEL((larft_set_diag<T, I>), dim3(blocks, 1, batch_count), dim3(32, 1), 0,
+    ROCSOLVER_LAUNCH_KERNEL((larft_set_diag<T, I>), dim3(blocks, 1, batch_count), dim3(BS2, 1), 0,
                             stream, k, tau, strideT, F, ldf, strideF);
 
     // restore original V
-    ROCSOLVER_LAUNCH_KERNEL((larft_restore_tri<T, U, I>), gridTri, blockTri, 0, stream, tri_uplo, k,
+    ROCSOLVER_LAUNCH_KERNEL((larft_restore_tri<T, I, U>), gridTri, blockTri, 0, stream, tri_uplo, k,
                             V, shiftV + tri_offset, ldv, strideV, work);
 
     rocblas_set_pointer_mode(handle, old_mode);
