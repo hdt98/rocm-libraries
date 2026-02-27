@@ -7048,7 +7048,6 @@ class KernelWriterAssembly(KernelWriter):
       raise Exception(f"unsupport tc %s{tc}")
 
     numVgprValuPerBlock = int(kernel["MIWaveTile%s"%tc] * ceil(kernel["MIInputPerThread%s"%tc] * tP["bpe"] / self.states.bpr))
-    useDirect32XEmulation   = statesTc.useDirect32XEmulation  if tc == "A" or tc == "B" else False
 
     # calculate vgprBufferA_new ( or B) and offset for DirectToVgpr. Use u instead of m (number of local prefetch buffer does not matter)
     m_or_u = u if kernel["DirectToVgpr%s"%tc] else m
@@ -7067,7 +7066,7 @@ class KernelWriterAssembly(KernelWriter):
     iui_new_offset = iui%numReadsIterCoalesced*vgprPerInput
     ab_new = idxAB*vgprPerInput*numReadsIterCoalesced
     abStr = "Valu%s_X%u_I%u+%u+%u+%u" % (tc, vgprBuffer_new, iui_new, ab_new, vgprBuffer_new_offset, iui_new_offset)
-    if useDirect32XEmulation:
+    if statesTc.useDirect32XEmulationThis or statesTc.useDirect32XEmulationNext:
       lrvwTile = self.states.lrvwTileA if tP["isA"] else self.states.lrvwTileB
       component = Component.LocalRead.find(self)
       # tranpose case, we do ShiftK -> cnv -> MFMA
@@ -7080,9 +7079,9 @@ class KernelWriterAssembly(KernelWriter):
         idx += bk
         bk = None
       if shiftK:
-        abStr = component.getVgprStrForEmu(self, kernel, tc, vgprBuffer_new, iui_new, idx, lrvwTile)
+        abStr = component.getVgprStrForEmuMfma(self, kernel, tc, vgprBuffer_new, iui_new, idx, lrvwTile, u)
       else:
-        abStr = component.getVgprStrForEmu(self, kernel, tc, vgprBuffer_new, iui_new, idx, lrvwTile, dst=True)
+        abStr = component.getVgprStrForEmuMfma(self, kernel, tc, vgprBuffer_new, iui_new, idx, lrvwTile, u, dst=True)
       # need to add dummy for after string conversion
       abStr += "+0+0"
 
