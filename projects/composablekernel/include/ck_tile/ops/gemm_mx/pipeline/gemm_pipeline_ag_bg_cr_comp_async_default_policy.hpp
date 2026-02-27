@@ -105,9 +105,11 @@ struct MXGemmPipelineAgBgCrCompAsyncDefaultPolicy
         using BDataType = typename Problem::BDataType;
         using CDataType = typename Problem::CDataType;
 
-        // FP4 and FP8 require different layouts for the scaled mfma instructions
+        // Non-packed 1-byte types (fp8/bf8) require Double access pattern,
+        // packed types (fp4/fp6) use Single
         constexpr auto wg_attr_num_access =
-            (std::is_same_v<ADataType, fp8_t> || std::is_same_v<BDataType, fp8_t>)
+            (std::is_same_v<ADataType, fp8_t> || std::is_same_v<ADataType, bf8_t> ||
+             std::is_same_v<BDataType, fp8_t> || std::is_same_v<BDataType, bf8_t>)
                 ? WGAttrNumAccessEnum::Double
                 : WGAttrNumAccessEnum::Single;
 

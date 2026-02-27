@@ -54,10 +54,9 @@ class TestMxGemmUtil : public ::testing::Test
             ck_tile::get_default_stride(K, N, 0, is_row_major(BLayout{}));
         const ck_tile::index_t stride_C =
             ck_tile::get_default_stride(M, N, 0, is_row_major(CLayout{}));
-        const ck_tile::index_t stride_scale_a =
-            ck_tile::get_default_stride(M, scale_k_size, 0, is_row_major(ALayout{}));
-        const ck_tile::index_t stride_scale_b =
-            ck_tile::get_default_stride(scale_k_size, N, 0, is_row_major(BLayout{}));
+        // Scales are always row-major [M, K/32] and [N, K/32], independent of A/B layout
+        const ck_tile::index_t stride_scale_a = scale_k_size;
+        const ck_tile::index_t stride_scale_b = scale_k_size;
 
         ck_tile::HostTensor<ADataType> a_host(
             ck_tile::host_tensor_descriptor(M, K, stride_A, is_row_major(ALayout{})));
@@ -66,9 +65,9 @@ class TestMxGemmUtil : public ::testing::Test
         ck_tile::HostTensor<CDataType> c_host(
             ck_tile::host_tensor_descriptor(M, N, stride_C, is_row_major(CLayout{})));
         ck_tile::HostTensor<ScaleType> scale_a_host(ck_tile::host_tensor_descriptor(
-            M, scale_k_size, stride_scale_a, is_row_major(ALayout{})));
+            M, scale_k_size, stride_scale_a, ck_tile::bool_constant<true>{}));
         ck_tile::HostTensor<ScaleType> scale_b_host(ck_tile::host_tensor_descriptor(
-            scale_k_size, N, stride_scale_b, is_row_major(BLayout{})));
+            scale_k_size, N, stride_scale_b, ck_tile::bool_constant<false>{}));
 
         ck_tile::FillUniformDistribution<ADataType>{-2.f, 2.f, seed++}(a_host);
         ck_tile::FillUniformDistribution<BDataType>{-2.f, 2.f, seed++}(b_host);

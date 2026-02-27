@@ -93,3 +93,24 @@ struct MXfp8_GemmConfig16 : MxGemmConfig
     static constexpr ck_tile::index_t N_Tile = 64;
     static constexpr ck_tile::index_t K_Tile = 256;
 };
+
+struct MxGemmConfig32 : MxGemmConfig
+{
+    static constexpr ck_tile::index_t M_Warp_Tile = 32;
+    static constexpr ck_tile::index_t N_Warp_Tile = 32;
+    static constexpr ck_tile::index_t K_Warp_Tile = 64;
+};
+
+struct MXfp4_GemmConfig32 : MxGemmConfig32
+{
+    static constexpr ck_tile::index_t M_Tile = 128;
+    static constexpr ck_tile::index_t N_Tile = 128;
+    static constexpr ck_tile::index_t K_Tile = 256;
+};
+
+struct MXfp8_GemmConfig32 : MxGemmConfig32
+{
+    static constexpr ck_tile::index_t M_Tile = 128;
+    static constexpr ck_tile::index_t N_Tile = 128;
+    static constexpr ck_tile::index_t K_Tile = 256;
+};

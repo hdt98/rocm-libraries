@@ -451,37 +451,36 @@ struct MXGemmPipelineAgBgCrCompAsync : public BaseMXGemmPipelineAgBgCrCompAsync<
                 move_tile_window(scale_b_dram_window, scale_b_dram_tile_window_step);
             };
 
-            /// TODO: enable transpose
-            // constexpr auto a_lds_input_tile_distr = [ALdsTileDistr]() {
-            //     if constexpr(is_a_load_tr_v)
-            //         return make_static_tile_distribution(
-            //             typename InputTileDistributionTraits<
-            //                 typename decltype(ALdsTileDistr)::DstrEncode,
-            //                 typename Problem::ADataType>::TransposedDstrEncode{});
-            //     else
-            //         return ALdsTileDistr;
-            // }();
-            // constexpr auto b_lds_input_tile_distr = [BLdsTileDistr]() {
-            //     if constexpr(is_b_load_tr_v)
-            //         return make_static_tile_distribution(
-            //             typename InputTileDistributionTraits<
-            //                 typename decltype(BLdsTileDistr)::DstrEncode,
-            //                 typename Problem::BDataType>::TransposedDstrEncode{});
-            //     else
-            //         return BLdsTileDistr;
-            // }();
+            constexpr auto a_lds_input_tile_distr = [ALdsTileDistr]() {
+                if constexpr(is_a_load_tr_v)
+                    return make_static_tile_distribution(
+                        typename InputTileDistributionTraits<
+                            typename decltype(ALdsTileDistr)::DstrEncode,
+                            typename Problem::ADataType>::TransposedDstrEncode{});
+                else
+                    return ALdsTileDistr;
+            }();
+            constexpr auto b_lds_input_tile_distr = [BLdsTileDistr]() {
+                if constexpr(is_b_load_tr_v)
+                    return make_static_tile_distribution(
+                        typename InputTileDistributionTraits<
+                            typename decltype(BLdsTileDistr)::DstrEncode,
+                            typename Problem::BDataType>::TransposedDstrEncode{});
+                else
+                    return BLdsTileDistr;
+            }();
 
             // LDS tile windows for reading;
             // they share the data pointer with the LDS windows for storing
             // but also associate with a distribution to produce a register tile when reading
             auto a_lds_ld_window0 =
-                make_tile_window(a_lds_block0, a_lds_shape, {0, 0}, ALdsTileDistr);
+                make_tile_window(a_lds_block0, a_lds_shape, {0, 0}, a_lds_input_tile_distr);
             auto a_lds_ld_window1 =
-                make_tile_window(a_lds_block1, a_lds_shape, {0, 0}, ALdsTileDistr);
+                make_tile_window(a_lds_block1, a_lds_shape, {0, 0}, a_lds_input_tile_distr);
             auto b_lds_ld_window0 =
-                make_tile_window(b_lds_block0, b_lds_shape, {0, 0}, BLdsTileDistr);
+                make_tile_window(b_lds_block0, b_lds_shape, {0, 0}, b_lds_input_tile_distr);
             auto b_lds_ld_window1 =
-                make_tile_window(b_lds_block1, b_lds_shape, {0, 0}, BLdsTileDistr);
+                make_tile_window(b_lds_block1, b_lds_shape, {0, 0}, b_lds_input_tile_distr);
 
             static_assert(!(is_tile_window_linear_v<decltype(a_lds_ld_window0)>) &&
                               !(is_tile_window_linear_v<decltype(a_lds_ld_window1)>) &&

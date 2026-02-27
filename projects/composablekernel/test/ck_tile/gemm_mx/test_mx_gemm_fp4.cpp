@@ -7,24 +7,48 @@
 using Row = ck_tile::tensor_layout::gemm::RowMajor;
 using Col = ck_tile::tensor_layout::gemm::ColumnMajor;
 
-using MxFp4Types = ::testing::Types<
+// 16x16x128 warp tile configs
+using MxFp4Types16 = ::testing::Types<
     std::tuple<ck_tile::pk_fp4_t, ck_tile::pk_fp4_t, MXfp4_GemmConfig16, Row, Col, Row>>;
 
 template <typename TypeParam>
-class TestMxGemmFp4 : public TestMxGemmUtil<std::tuple_element_t<0, TypeParam>,
-                                            std::tuple_element_t<1, TypeParam>,
-                                            std::tuple_element_t<2, TypeParam>,
-                                            std::tuple_element_t<3, TypeParam>,
-                                            std::tuple_element_t<4, TypeParam>,
-                                            std::tuple_element_t<5, TypeParam>>
+class TestMxGemmFp4_16 : public TestMxGemmUtil<std::tuple_element_t<0, TypeParam>,
+                                               std::tuple_element_t<1, TypeParam>,
+                                               std::tuple_element_t<2, TypeParam>,
+                                               std::tuple_element_t<3, TypeParam>,
+                                               std::tuple_element_t<4, TypeParam>,
+                                               std::tuple_element_t<5, TypeParam>>
 {
 };
 
-TYPED_TEST_SUITE(TestMxGemmFp4, MxFp4Types);
+TYPED_TEST_SUITE(TestMxGemmFp4_16, MxFp4Types16);
 
-TYPED_TEST(TestMxGemmFp4, BasicSizes)
+TYPED_TEST(TestMxGemmFp4_16, BasicSizes)
 {
     this->Run(64, 64, 256);
     this->Run(128, 128, 256);
     this->Run(64, 128, 512);
+}
+
+// 32x32x64 warp tile configs (enables ds_read_tr for transpose loads)
+using MxFp4Types32 = ::testing::Types<
+    std::tuple<ck_tile::pk_fp4_t, ck_tile::pk_fp4_t, MXfp4_GemmConfig32, Row, Col, Row>,
+    std::tuple<ck_tile::pk_fp4_t, ck_tile::pk_fp4_t, MXfp4_GemmConfig32, Col, Col, Row>>;
+
+template <typename TypeParam>
+class TestMxGemmFp4_32 : public TestMxGemmUtil<std::tuple_element_t<0, TypeParam>,
+                                               std::tuple_element_t<1, TypeParam>,
+                                               std::tuple_element_t<2, TypeParam>,
+                                               std::tuple_element_t<3, TypeParam>,
+                                               std::tuple_element_t<4, TypeParam>,
+                                               std::tuple_element_t<5, TypeParam>>
+{
+};
+
+TYPED_TEST_SUITE(TestMxGemmFp4_32, MxFp4Types32);
+
+TYPED_TEST(TestMxGemmFp4_32, BasicSizes)
+{
+    this->Run(128, 128, 256);
+    this->Run(128, 128, 512);
 }
