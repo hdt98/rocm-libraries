@@ -413,4 +413,108 @@ TEST(TestEngineOverrideConfig, JsonWithStrideConstraint)
     EXPECT_FALSE(config->matchOperation("conv_fprop", {xWrong, w}).has_value());
 }
 
+// ── Test 17: addRule adds rules and they are matchable ───────────────────────
+
+TEST(TestEngineOverrideConfig, AddRuleAddsAndMatches)
+{
+    EngineOverrideConfig config;
+
+    // Start empty — no matches
+    std::vector<std::shared_ptr<TensorAttributes>> tensors = {makeTensor({1, 3, 224, 224})};
+    EXPECT_FALSE(config.matchOperation("conv_fprop", tensors).has_value());
+
+    // Add a rule
+    OperationRule rule;
+    rule.op = "conv_fprop";
+    rule.engineName = MIOPEN_ENGINE_NAME;
+    rule.tensors = {makePattern({1, 3, 224, 224})};
+    config.addRule(std::move(rule));
+
+    // Now it should match
+    auto result = config.matchOperation("conv_fprop", tensors);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(*result, MIOPEN_ENGINE_ID);
+
+    // rules() should reflect the added rule
+    ASSERT_EQ(config.rules().size(), 1u);
+    EXPECT_EQ(config.rules()[0].op, "conv_fprop");
+    EXPECT_EQ(config.rules()[0].engineName, MIOPEN_ENGINE_NAME);
+}
+
+// ── Test 18: toJson round-trip ──────────────────────────────────────────────
+
+TEST(TestEngineOverrideConfig, ToJsonRoundTrip)
+{
+    // Build a config with two rules
+    OperationRule rule1;
+    rule1.op = "conv_fprop";
+    rule1.engineName = MIOPEN_ENGINE_NAME;
+    rule1.tensors = {makePattern({1, 3, 224, 224}), makePattern({64, 3, 7, 7})};
+
+    OperationRule rule2;
+    rule2.op = "conv_dgrad";
+    rule2.engineName = HIPBLASLT_ENGINE_NAME;
+    rule2.tensors = {makePatternWithStride({8, 64, 56, 56}, {200704, 3136, 56, 1})};
+
+    auto config = makeConfig({std::move(rule1), std::move(rule2)});
+
+    // Serialize to JSON
+    auto j = config.toJson();
+
+    // Parse back
+    auto roundTripped = EngineOverrideConfig::loadFromContent(j.dump());
+    ASSERT_TRUE(roundTripped.has_value());
+
+    // Verify original matches still work
+    std::vector<std::shared_ptr<TensorAttributes>> tensors1
+        = {makeTensor({1, 3, 224, 224}), makeTensor({64, 3, 7, 7})};
+    auto r1 = roundTripped->matchOperation("conv_fprop", tensors1);
+    ASSERT_TRUE(r1.has_value());
+    EXPECT_EQ(*r1, MIOPEN_ENGINE_ID);
+
+    auto t2 = makeTensorWithStride({8, 64, 56, 56}, {200704, 3136, 56, 1});
+    auto r2 = roundTripped->matchOperation("conv_dgrad", {t2});
+    ASSERT_TRUE(r2.has_value());
+    EXPECT_EQ(*r2, HIPBLASLT_ENGINE_ID);
+
+    // Verify rules() count is preserved
+    EXPECT_EQ(roundTripped->rules().size(), 2u);
+}
+
+// ── Test 19: save and load file round-trip ──────────────────────────────────
+
+TEST(TestEngineOverrideConfig, SaveAndLoadFileRoundTrip)
+{
+    // Build a config
+    OperationRule rule;
+    rule.op = "conv_fprop";
+    rule.engineName = FUSILLI_ENGINE_NAME;
+    rule.tensors = {makePattern({4, 32, 28, 28}), makePattern({64, 32, 3, 3})};
+
+    auto config = makeConfig({std::move(rule)});
+
+    // Save to a temp file
+    std::string tmpPath = "/tmp/hipdnn_test_override_save_load.json";
+    ASSERT_TRUE(config.save(tmpPath));
+
+    // Load back
+    auto loaded = EngineOverrideConfig::load(tmpPath);
+    ASSERT_TRUE(loaded.has_value());
+
+    // Verify matching still works
+    std::vector<std::shared_ptr<TensorAttributes>> tensors
+        = {makeTensor({4, 32, 28, 28}), makeTensor({64, 32, 3, 3})};
+    auto result = loaded->matchOperation("conv_fprop", tensors);
+    ASSERT_TRUE(result.has_value());
+    EXPECT_EQ(*result, FUSILLI_ENGINE_ID);
+
+    // Verify rules() on the loaded config
+    ASSERT_EQ(loaded->rules().size(), 1u);
+    EXPECT_EQ(loaded->rules()[0].op, "conv_fprop");
+    EXPECT_EQ(loaded->rules()[0].engineName, FUSILLI_ENGINE_NAME);
+
+    // Cleanup
+    std::remove(tmpPath.c_str());
+}
+
 #endif // HIPDNN_FRONTEND_SKIP_JSON_LIB

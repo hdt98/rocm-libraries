@@ -122,6 +122,11 @@ private:
     std::unique_ptr<detail::ScopedHipdnnBackendDescriptor> _engineConfigDesc;
     std::unique_ptr<detail::ScopedHipdnnBackendDescriptor> _executionPlanDesc;
 
+    // Multi-plan support for autotuning
+    std::vector<std::unique_ptr<detail::ScopedHipdnnBackendDescriptor>> _executionPlanDescs;
+    std::vector<std::unique_ptr<detail::ScopedHipdnnBackendDescriptor>> _engineConfigDescs;
+    std::vector<int64_t> _candidateEngineIds;
+
     std::optional<int64_t> _preferredEngineId;
 
     static std::optional<int64_t> getDefaultEngineId()
@@ -1210,6 +1215,321 @@ public:
             "Failed to finalize execution plan descriptor");
 
         return {ErrorCode::OK, ""};
+    }
+
+    /**
+     * @brief Build execution plans for all available engines or use heuristics
+     * @param policy When ALL, builds plans for all available engines.
+     *               When HEURISTICS_CHOICE, delegates to build_plans().
+     * @return Error indicating success or failure
+     *
+     * When using BuildPlanPolicy::ALL, this method iterates over all engines
+     * returned by get_ranked_engine_ids(), attempts to build an engine config
+     * and execution plan for each, and stores successfully-built plans in the
+     * internal vectors. Plans that fail to build are logged and skipped.
+     */
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    Error build_plans(BuildPlanPolicy policy)
+    {
+        if(policy != BuildPlanPolicy::ALL)
+        {
+            return build_plans();
+        }
+
+        HIPDNN_FE_LOG_INFO("Building ALL plans for graph " << graph_attributes.get_name());
+
+        if(!_graphDesc || !_graphDesc->valid())
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR,
+                    "Graph has not been built, build the operation graph first. Cannot build "
+                    "all plans."};
+        }
+
+        // Get all ranked engine IDs
+        std::vector<int64_t> rankedEngineIds;
+        HIPDNN_CHECK_ERROR(get_ranked_engine_ids(rankedEngineIds));
+
+        // Clear any previously built multi-plan state
+        _executionPlanDescs.clear();
+        _engineConfigDescs.clear();
+        _candidateEngineIds.clear();
+
+        for(auto engineId : rankedEngineIds)
+        {
+            // Try to initialize engine config for this engine
+            auto configError = initializeEngineConfig(engineId);
+            if(configError.is_bad())
+            {
+                HIPDNN_FE_LOG_WARN("Failed to initialize engine config for engine "
+                                   << hipdnn_data_sdk::utilities::getEngineNameFromId(engineId)
+                                   << " (id=" << engineId << "): " << configError.get_message());
+                continue;
+            }
+
+            // Finalize the engine config
+            auto finalizeStatus
+                = detail::hipdnnBackend()->backendFinalize(_engineConfigDesc->get());
+            if(finalizeStatus != HIPDNN_STATUS_SUCCESS)
+            {
+                HIPDNN_FE_LOG_WARN("Failed to finalize engine config for engine "
+                                   << hipdnn_data_sdk::utilities::getEngineNameFromId(engineId)
+                                   << " (id=" << engineId << ")");
+                continue;
+            }
+
+            // Create execution plan descriptor
+            auto planDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(
+                HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR);
+
+            if(!planDesc || !planDesc->valid())
+            {
+                HIPDNN_FE_LOG_WARN("Failed to create execution plan descriptor for engine "
+                                   << hipdnn_data_sdk::utilities::getEngineNameFromId(engineId)
+                                   << " (id=" << engineId << ")");
+                continue;
+            }
+
+            // Set engine config on execution plan
+            auto setStatus = detail::hipdnnBackend()->backendSetAttribute(
+                planDesc->get(),
+                HIPDNN_ATTR_EXECUTION_PLAN_ENGINE_CONFIG,
+                HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                1,
+                &_engineConfigDesc->get());
+            if(setStatus != HIPDNN_STATUS_SUCCESS)
+            {
+                HIPDNN_FE_LOG_WARN("Failed to set engine config on execution plan for engine "
+                                   << hipdnn_data_sdk::utilities::getEngineNameFromId(engineId)
+                                   << " (id=" << engineId << ")");
+                continue;
+            }
+
+            // Finalize execution plan
+            auto planFinalizeStatus
+                = detail::hipdnnBackend()->backendFinalize(planDesc->get());
+            if(planFinalizeStatus != HIPDNN_STATUS_SUCCESS)
+            {
+                HIPDNN_FE_LOG_WARN("Failed to finalize execution plan for engine "
+                                   << hipdnn_data_sdk::utilities::getEngineNameFromId(engineId)
+                                   << " (id=" << engineId << ")");
+                continue;
+            }
+
+            // Successfully built this plan - store it
+            _executionPlanDescs.push_back(std::move(planDesc));
+            _engineConfigDescs.push_back(std::move(_engineConfigDesc));
+            _candidateEngineIds.push_back(engineId);
+
+            HIPDNN_FE_LOG_INFO("Successfully built plan for engine "
+                               << hipdnn_data_sdk::utilities::getEngineNameFromId(engineId)
+                               << " (id=" << engineId << ")");
+        }
+
+        if(_executionPlanDescs.empty())
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR,
+                    "Failed to build any execution plans for the graph."};
+        }
+
+        HIPDNN_FE_LOG_INFO("Built " << _executionPlanDescs.size() << " execution plan(s) for graph "
+                                    << graph_attributes.get_name());
+
+        return {ErrorCode::OK, ""};
+    }
+
+    /**
+     * @brief Get the number of execution plans built via build_plans(ALL)
+     * @return The number of available execution plans
+     */
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    int64_t get_execution_plan_count() const
+    {
+        return static_cast<int64_t>(_executionPlanDescs.size());
+    }
+
+    /**
+     * @brief Get workspace size for a specific execution plan by index
+     * @param index The index of the plan (0-based)
+     * @return The workspace size in bytes, or -1 on error
+     */
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    int64_t get_workspace_size_plan_at_index(int64_t index) const
+    {
+        if(index < 0 || index >= static_cast<int64_t>(_executionPlanDescs.size()))
+        {
+            HIPDNN_FE_LOG_ERROR("Plan index " << index << " out of range [0, "
+                                              << _executionPlanDescs.size() << ")");
+            return -1;
+        }
+
+        int64_t workspaceSize = 0;
+        auto status = detail::hipdnnBackend()->backendGetAttribute(
+            _executionPlanDescs[static_cast<size_t>(index)]->get(),
+            HIPDNN_ATTR_EXECUTION_PLAN_WORKSPACE_SIZE,
+            HIPDNN_TYPE_INT64,
+            1,
+            nullptr,
+            &workspaceSize);
+
+        if(status != HIPDNN_STATUS_SUCCESS)
+        {
+            HIPDNN_FE_LOG_ERROR("Failed to get workspace size for plan at index " << index);
+            return -1;
+        }
+
+        return workspaceSize;
+    }
+
+    /**
+     * @brief Execute a specific plan by index
+     * @param handle The hipDNN handle
+     * @param variantPack Map from tensor UID to device memory pointers
+     * @param workspace Pointer to workspace memory
+     * @param index The index of the plan to execute
+     * @return Error indicating success or failure
+     */
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    Error execute_plan_at_index(hipdnnHandle_t handle,
+                                std::unordered_map<int64_t, void*>& variantPack,
+                                void* workspace,
+                                int64_t index) const
+    {
+        HIPDNN_RETURN_IF_GE(index,
+                            static_cast<int64_t>(_executionPlanDescs.size()),
+                            ErrorCode::INVALID_VALUE,
+                            "Plan index out of range.");
+
+        auto variantPackDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(
+            HIPDNN_BACKEND_VARIANT_PACK_DESCRIPTOR);
+        if(!variantPackDesc || !variantPackDesc->valid())
+        {
+            return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to create variant pack descriptor."};
+        }
+
+        std::vector<int64_t> variantPackKeys;
+        std::vector<void*> variantPackValues;
+        variantPackKeys.reserve(variantPack.size());
+        variantPackValues.reserve(variantPack.size());
+        for(const auto& [key, value] : variantPack)
+        {
+            variantPackKeys.push_back(key);
+            variantPackValues.push_back(value);
+        }
+
+        HIPDNN_RETURN_ON_BACKEND_FAILURE(detail::hipdnnBackend()->backendSetAttribute(
+                                             variantPackDesc->get(),
+                                             HIPDNN_ATTR_VARIANT_PACK_DATA_POINTERS,
+                                             HIPDNN_TYPE_VOID_PTR,
+                                             static_cast<int64_t>(variantPackValues.size()),
+                                             variantPackValues.data()),
+                                         "failed to set the variant pack data pointers.");
+
+        HIPDNN_RETURN_ON_BACKEND_FAILURE(detail::hipdnnBackend()->backendSetAttribute(
+                                             variantPackDesc->get(),
+                                             HIPDNN_ATTR_VARIANT_PACK_UNIQUE_IDS,
+                                             HIPDNN_TYPE_INT64,
+                                             static_cast<int64_t>(variantPackKeys.size()),
+                                             variantPackKeys.data()),
+                                         "failed to set the variant pack unique ids.");
+
+        HIPDNN_RETURN_ON_BACKEND_FAILURE(
+            detail::hipdnnBackend()->backendSetAttribute(variantPackDesc->get(),
+                                                         HIPDNN_ATTR_VARIANT_PACK_WORKSPACE,
+                                                         HIPDNN_TYPE_VOID_PTR,
+                                                         1,
+                                                         &workspace),
+            "failed to set the variant pack workspace.");
+
+        HIPDNN_RETURN_ON_BACKEND_FAILURE(
+            detail::hipdnnBackend()->backendFinalize(variantPackDesc->get()),
+            "Failed to finalize variant pack descriptor");
+
+        HIPDNN_RETURN_ON_BACKEND_FAILURE(
+            detail::hipdnnBackend()->backendExecute(
+                handle,
+                _executionPlanDescs[static_cast<size_t>(index)]->get(),
+                variantPackDesc->get()),
+            "Execute failed for plan at index " + std::to_string(index) + ".");
+
+        return {ErrorCode::OK, ""};
+    }
+
+    /**
+     * @brief Get the engine name for a specific plan by index
+     * @param index The index of the plan
+     * @param name Output parameter for the engine name
+     * @return Error indicating success or failure
+     */
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    Error get_plan_name_at_index(int64_t index, std::string& name) const
+    {
+        HIPDNN_RETURN_IF_GE(index,
+                            static_cast<int64_t>(_candidateEngineIds.size()),
+                            ErrorCode::INVALID_VALUE,
+                            "Plan index out of range.");
+
+        auto engineId = _candidateEngineIds[static_cast<size_t>(index)];
+        name = std::string(hipdnn_data_sdk::utilities::getEngineNameFromId(engineId));
+
+        return {ErrorCode::OK, ""};
+    }
+
+    /**
+     * @brief Select a specific plan by index as the active plan for subsequent execute() calls
+     * @param index The index of the plan to select
+     * @return Error indicating success or failure
+     */
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    Error select_plan(int64_t index)
+    {
+        HIPDNN_RETURN_IF_GE(index,
+                            static_cast<int64_t>(_executionPlanDescs.size()),
+                            ErrorCode::INVALID_VALUE,
+                            "Plan index out of range.");
+
+        auto idx = static_cast<size_t>(index);
+
+        // Move the selected plan's descriptors to the active single-plan members
+        _executionPlanDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(
+            std::move(*_executionPlanDescs[idx]));
+        _engineConfigDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(
+            std::move(*_engineConfigDescs[idx]));
+
+        HIPDNN_FE_LOG_INFO("Selected plan at index "
+                           << index << " (engine "
+                           << hipdnn_data_sdk::utilities::getEngineNameFromId(
+                                  _candidateEngineIds[idx])
+                           << ") as active plan.");
+
+        return {ErrorCode::OK, ""};
+    }
+
+    /**
+     * @brief Build (activate) a specific plan by index for subsequent execute() calls
+     * @param index The index of the plan to activate
+     * @return Error indicating success or failure
+     *
+     * This is an alias for select_plan() for API compatibility.
+     */
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    Error build_plan_at_index(int64_t index)
+    {
+        return select_plan(index);
+    }
+
+    /**
+     * @brief Get the engine ID for a candidate plan at a given index
+     * @param index The index of the candidate plan
+     * @return The engine ID, or -1 if index is out of range
+     */
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    int64_t get_candidate_engine_id(int64_t index) const
+    {
+        if(index < 0 || index >= static_cast<int64_t>(_candidateEngineIds.size()))
+        {
+            return -1;
+        }
+        return _candidateEngineIds[static_cast<size_t>(index)];
     }
 
     /**

@@ -134,6 +134,7 @@ public:
     /// Construct directly from a vector of rules (useful for tests).
     explicit EngineOverrideConfig(std::vector<OperationRule> rules)
     {
+        _allRules = rules; // copy before moving
         for(size_t i = 0; i < rules.size(); ++i)
         {
             indexRule(std::move(rules[i]), i);
@@ -278,6 +279,77 @@ public:
         return std::nullopt;
     }
 
+    /// Add a rule to the config. The rule is appended to the end of the rule list.
+    void addRule(OperationRule rule)
+    {
+        size_t order = _allRules.size();
+        _allRules.push_back(rule); // copy before moving
+        indexRule(std::move(rule), order);
+    }
+
+    /// Return a const reference to all rules in declaration order.
+    const std::vector<OperationRule>& rules() const
+    {
+        return _allRules;
+    }
+
+#ifndef HIPDNN_FRONTEND_SKIP_JSON_LIB
+    /// Serialize the config to JSON.
+    /// Produces the exact inverse of parseJson():
+    /// { "engine_overrides": [ { "op": ..., "engine_name": ..., "tensors": [...] }, ... ] }
+    nlohmann::json toJson() const
+    {
+        nlohmann::json overrides = nlohmann::json::array();
+        for(const auto& rule : _allRules)
+        {
+            nlohmann::json entry;
+            entry["op"] = rule.op;
+            entry["engine_name"] = rule.engineName;
+
+            nlohmann::json tensorsJson = nlohmann::json::array();
+            for(const auto& tp : rule.tensors)
+            {
+                nlohmann::json tensorEntry;
+                tensorEntry["dim"] = tp.dim;
+                if(!tp.stride.empty())
+                {
+                    tensorEntry["stride"] = tp.stride;
+                }
+                tensorsJson.push_back(std::move(tensorEntry));
+            }
+            entry["tensors"] = std::move(tensorsJson);
+            overrides.push_back(std::move(entry));
+        }
+
+        nlohmann::json j;
+        j["engine_overrides"] = std::move(overrides);
+        return j;
+    }
+
+    /// Save the config to a JSON file.
+    /// Returns true on success, false on failure.
+    bool save(const std::string& filepath) const
+    {
+        std::ofstream file(filepath);
+        if(!file.is_open())
+        {
+            HIPDNN_FE_LOG_WARN("EngineOverrideConfig: cannot open file for writing: " << filepath);
+            return false;
+        }
+
+        file << toJson().dump(2);
+        if(!file.good())
+        {
+            HIPDNN_FE_LOG_WARN("EngineOverrideConfig: write error to file: " << filepath);
+            return false;
+        }
+
+        HIPDNN_FE_LOG_INFO("EngineOverrideConfig: saved " << _allRules.size() << " rule(s) to "
+                                                           << filepath);
+        return true;
+    }
+#endif // HIPDNN_FRONTEND_SKIP_JSON_LIB
+
 private:
     /// enginedId and declaration index for an exact-match rule.
     struct ExactEntry
@@ -307,6 +379,9 @@ private:
     };
 
     std::unordered_map<std::string, OpBucket> _index;
+
+    /// All rules in original declaration order, preserved for serialization.
+    std::vector<OperationRule> _allRules;
 
     // ── helpers ───────────────────────────────────────────────────────────────
 

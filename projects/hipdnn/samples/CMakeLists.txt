@@ -55,6 +55,8 @@ add_hipdnn_sample(serialization_roundtrip serialization/SerializationRoundTrip.c
 
 add_hipdnn_sample(knobs_usage knobs/KnobsUsage.cpp)
 
+add_hipdnn_sample(autotuning_conv_fprop autotuning/AutoTuningConvFprop.cpp)
+
 # Enable testing and add sample tests
 enable_testing()
 
