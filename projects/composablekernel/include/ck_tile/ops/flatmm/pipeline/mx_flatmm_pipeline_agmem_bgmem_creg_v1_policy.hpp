@@ -262,10 +262,7 @@ struct MXFlatmmPipelineAgBgCrPolicy : UniversalFlatmmPipelineAgBgCrPolicy
         constexpr index_t KWavePerBlk = 1;
         constexpr index_t K0          = KWavePerBlk;
 
-        constexpr index_t WaveRepeat   = WaveNum / TileShape::flatNPerWarp;
-        constexpr index_t kKPerThread  = 32;
-        constexpr index_t num_access_v = static_cast<index_t>(wg_attr_num_access<Problem>);
-        constexpr index_t K2           = kKPerThread / num_access_v;
+        constexpr index_t WaveRepeat = WaveNum / TileShape::flatNPerWarp;
 
         if constexpr(std::is_same_v<BDataType, pk_fp4_t>)
             return make_static_tile_distribution(
