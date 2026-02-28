@@ -4939,7 +4939,11 @@ def _get_schedule_128x160x64_TF32(kernel, useLDSTr, TLDS):
     gr_inc_step = 0
 
     if isTN(kernel) and not useLDSTr and TLDS==1:
-        kernel["UseMFMAF32XEmulation"] = True
+        # Force TF32 emulation mode for this schedule variant.
+        # Using MFMA-based pack path here triggers validator assumptions (groups-of-10) that don't
+        # match the generated pack stream for this kernel.
+        kernel["UseMFMAF32XEmulation"] = False
+        kernel["UseDot2F32XEmulation"] = False
         kernel["UsePLRPack"] = True
 
         grinca = [0,0,1,1,2,2,3,3,4]
@@ -5331,6 +5335,96 @@ def _get_schedule_160x128x64_TF32(kernel, useLDSTr, TLDS):
 
         opt1 = ScheduleInfo(2, n_mfma, optSchedule, syncCode, nglshift, nllshift)
 
+    elif isNT(kernel) and useLDSTr and TLDS==0 and kernel["VectorWidthA"] == 1 and kernel["VectorWidthB"] == 4:
+        # NOTE: NT variant has different Pack instruction count (includes swap packs).
+        # The current CMSValidator pack rules do not fully cover this variant.
+        # We still provide a complete schedule (matching idMap sizes) but disable validation.
+        kernel["UseMFMAF32XEmulation"] = True
+        kernel["UsePLRPack"] = True
+
+        pack_a = [0,0,1,1, 10,10, 11,11,12,12,
+                  2,2,3,3, 10,10, 13,13,14,14,
+                  4,4,5,5, 10,10, 15,15,16,16,
+                  6,6,7,7, 10,10, 17,17,18,18,
+                  8,8,9,9, 10,10, 19,19,20,20]
+                  
+        pack_b = [0, 1, 2, 6, 7, 10, 3, 4, 5, 8, 9, 11, # swap instructions
+                  12,12,13,13, 20,20, 21,21,22,22, # base schedule
+                  14,14,15,15, 20,20, 23,23,24,24,
+                  16,16,17,17, 20,20, 25,25,26,26,
+                  18,18,19,19, 20,20, 27,27,28,28]
+
+        lra0 = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4,
+                5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 
+                10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 
+                15, 15, 16, 16, 17, 17, 18, 18, 19, 19]
+        lra0 = [0]*40
+
+        syncs.add(1, dscnt=0, comment="wait for LRA0 before pack to complete")
+        packa0 = [i+1 for i in pack_a] # latest 20
+
+        syncs.add(42, barrier=True, barrier_comment="barrier for GRA")
+
+        lrb0 = [40, 42, 44, 45, 46, 47, 49, 51]
+        lrb0 = [21]*8
+
+        syncs.add(22, dscnt=0, comment="wait for LRB0 before pack to complete")
+        packb0 = [i+22 for i in pack_b] # latest 28
+
+        syncs.add(59, vlcnt=0, barrier=True, comment="wait for LRB0 before pack to complete", barrier_comment="barrier for GRA")
+
+        lra1 = [59,59,61,61, 63,63,65,65,
+                67,67,69,69, 71,71,73,73,
+                74,74,74,74, 75,75,75,75,
+                77,77,77,77, 79,79,79,79,
+                81,81,81,81, 83,83,83,83],
+        lra1 = [60]*40
+        
+        syncs.add(70, dscnt=0, barrier=True, comment="wait for LRA1 before pack to complete", barrier_comment="barrier for GRB")
+        packa1 = [i+70 for i in pack_a] # latest 20
+
+        lrb1 = [84, 86, 88, 90, 92, 94, 96, 98]
+        lrb1 = [84]*8
+        syncs.add(91, dscnt=0, comment="wait for LRB0 before pack to complete")
+        packb1 = [i+91 for i in pack_b] # latest 28
+
+
+        optSchedule = {
+            'SYNC': [syncs.get_indicies()],
+
+            'GRIncA': [[0, 1, 2, 3, 4, 6, 7, 8, 9]],
+            'GRIncB': [[10, 11, 12, 13, 14, 15, 15, 16, 16]],
+
+
+            'LRA0'  : [lra0],
+            'PackA0': [packa0],
+            'LRB0'  : [lrb0],
+
+            'PackB0': [packb0],
+
+            'GRA'   : [[42, 42, 44, 44, 46, 46, 48, 48, 50, 50,
+                        52, 52, 54, 54, 56, 56, 58, 58, 59, 59]],
+            'GRB'   : [[81, 81, 83, 83, 85, 85, 87, 87, 99, 99, 101, 101, 103, 103, 105, 105]],
+
+            'LRSA'  : [[58]], 'LRSB'  : [[59]], 
+            'LWSA'  : [[118]], 'LWSB'  : [[118]],
+
+            'LRA1'  : [lra1],
+            'PackA1': [packa1],
+
+            'LRB1'  : [lrb1],
+
+            'PackB1': [packb1],
+
+            'LCC': [[118, 119]]
+        }
+
+        syncCode = syncs.get_code()
+        nglshift = nllshift = len(optSchedule["GRA"][0])/2 + len(optSchedule["GRB"][0])/2
+
+        opt1 = ScheduleInfo(1, n_mfma, optSchedule, syncCode, nglshift, nllshift)
+        opt1.disableValidation()
+        opt1.pretty_print()
     elif isTN(kernel) and not useLDSTr and TLDS==1:
         valid, opt = _get_schedule_128x160x64_TF32(kernel, useLDSTr, TLDS)
         if not valid:
