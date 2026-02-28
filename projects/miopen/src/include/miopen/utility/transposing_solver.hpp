@@ -371,18 +371,13 @@ inline std::string SyncLayoutDims(const char* from, const char* to)
 template <class Problem, class InvokeParams>
 struct ProblemTensorTransposeDescriptor
 {
-    using DescriptorGetter      = TensorDescriptor& (Problem::*)();
     using ConstDescriptorGetter = const TensorDescriptor& (Problem::*)() const;
 
-    DescriptorGetter descriptor;
     ConstDescriptorGetter cdescriptor;
     TensorDescriptor InvokeParams::*rt_descriptor;
 
-    union
-    {
-        ConstData_t InvokeParams::*as_input;
-        Data_t InvokeParams::*as_output;
-    };
+    ConstData_t InvokeParams::*as_input = nullptr;
+    Data_t InvokeParams::*as_output     = nullptr;
 
     const char* to;
     bool is_input;
@@ -391,8 +386,10 @@ struct ProblemTensorTransposeDescriptor
     inline void Transpose(const Problem& src, Problem_& dest) const
     {
         const auto& desc_from = (src.*cdescriptor)();
-        auto& desc_to         = (dest.*descriptor)();
-        desc_to               = Transpose(desc_from);
+        // Use const_cast on the copy (dest) only - this is safe because we're mutating a copy,
+        // not the original problem. The copy is owned by the transposing solver and not shared.
+        auto& desc_to = const_cast<TensorDescriptor&>((dest.*cdescriptor)());
+        desc_to       = Transpose(desc_from);
     }
 
     inline void Transpose(const InvokeParams& src, InvokeParams& dest) const
@@ -536,7 +533,7 @@ template <class Derived,
           class Problem,
           class InvokeParams,
           class Inner,
-          bool IsTunable = std::is_base_of<TunableSolverTrait, Base>::value>
+          bool IsTunable = std::is_base_of_v<TunableSolverTrait, Base>>
 struct TransposingSolverGetSolution;
 
 // Forward declaration
@@ -580,7 +577,7 @@ struct TransposingSolver : TransposingSolverGetSolution<Derived, Base, Problem, 
                                                Problem,
                                                InvokeParams,
                                                Inner,
-                                               std::is_base_of<TunableSolverTrait, Base>::value>;
+                                               std::is_base_of_v<TunableSolverTrait, Base>>;
 
     using TransposeDescriptor = ProblemTensorTransposeDescriptor<Problem, InvokeParams>;
 

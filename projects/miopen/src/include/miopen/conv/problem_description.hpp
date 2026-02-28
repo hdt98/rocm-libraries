@@ -216,9 +216,6 @@ struct MIOPEN_INTERNALS_EXPORT ProblemDescription : ProblemDescriptionBase
     const TensorDescriptor& GetIn() const { return in; }
     const TensorDescriptor& GetWeights() const { return weights; }
     const TensorDescriptor& GetOut() const { return out; }
-    TensorDescriptor& GetIn() { return in; }
-    TensorDescriptor& GetWeights() { return weights; }
-    TensorDescriptor& GetOut() { return out; }
     const ConvolutionDescriptor& GetConv() const { return conv; }
 
     Direction GetDirection() const { return direction; }

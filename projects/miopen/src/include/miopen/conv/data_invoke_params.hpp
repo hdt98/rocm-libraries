@@ -135,9 +135,8 @@ struct TransposeConvInvokeParams : InvokeParams
           wDesc(params.tensors.dwDesc),
           outDesc(params.tensors.xDesc),
           in(params.tensors.dy),
-          w(params.tensors.dw), // const cast: stored as ConstData_t but actually writable
-          // NOLINTNEXTLINE (cppcoreguidelines-pro-type-const-cast)
-          out(const_cast<Data_t>(params.tensors.x)), // stored as Data_t but actually read-only
+          w(params.tensors.dw),
+          out(nullptr), // not used for WrW — x is accessed via out_as_input
           workspace(params.workSpace),
           workspaceSize(params.workSpaceSize),
           gfx90aFp16alt(params.gfx90aFp16alt),

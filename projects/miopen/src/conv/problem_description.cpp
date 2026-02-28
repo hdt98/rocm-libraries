@@ -128,6 +128,16 @@ void ProblemDescription::HeuristicUpdateLayouts()
 
     static const auto strict = TensorDescriptor::LayoutValidationMode::StrictDecreasingStrides;
 
+    // Early return optimization: if layouts are already consistent, skip recomputation
+    if(!in_layout.empty() && in_layout == out_layout && in_layout == weights_layout &&
+       std::find(supported_layouts.begin(), supported_layouts.end(), in_layout) !=
+           supported_layouts.end() &&
+       in.IsPossibleLayout4D5D(in_layout, strict) && out.IsPossibleLayout4D5D(out_layout, strict) &&
+       weights.IsPossibleLayout4D5D(weights_layout, strict))
+    {
+        return;
+    }
+
     // Note: The order here is important, as we want to try and find a match with strict decreasing
     // strides first.
     static const std::vector<LayoutValidationMode> validation_modes = {
@@ -144,6 +154,10 @@ void ProblemDescription::HeuristicUpdateLayouts()
 
             if(in_ok && out_ok && wei_ok)
             {
+                // Update the cached layout strings to match the detected layout
+                in_layout      = layout;
+                weights_layout = layout;
+                out_layout     = layout;
                 return;
             }
         }

@@ -5056,8 +5056,10 @@ struct ConvWinogradNHWCTransposingSolver
     inline static Problem Transpose(const Problem& problem)
     {
         auto transposed_problem = Base::Transpose(problem);
-        // Trigger layout recomputation by calling HeuristicUpdateLayouts
-        // Now that the early return is removed, this should properly update the layout strings
+        // CRITICAL: Update cached layout strings to match the transposed strides.
+        // Some inner solvers (e.g., RxSf2x3g1) check IsLayoutDefault() which validates
+        // cached layout strings (not actual strides). Without this update, the cached
+        // strings remain as NHWC even though strides are now NCHW, causing rejection.
         transposed_problem.HeuristicUpdateLayouts();
         return transposed_problem;
     }
@@ -5073,43 +5075,29 @@ struct ConvWinogradNHWCTransposingSolver
         auto ret = std::array<ProblemTensorTransposeDescriptor<Problem, InvokeParams>, 3>{{
             {
                 &Problem::GetIn,
-                &Problem::GetIn,
                 &InvokeParams::inDesc,
-                {&InvokeParams::in},
-                "NCDHW", // in (dy for WrW): always an input, transpose NHWC/NDHWC->NCHW/NCDHW
+                &InvokeParams::in, // in (dy for WrW): always an input
+                nullptr,
+                "NCDHW", // transpose NHWC/NDHWC->NCHW/NCDHW
                 true,
             },
             {
                 &Problem::GetWeights,
-                &Problem::GetWeights,
                 &InvokeParams::wDesc,
-                {},
+                is_wrw ? nullptr : &InvokeParams::w,           // Fwd/Bwd: w is input
+                is_wrw ? &InvokeParams::w_as_output : nullptr, // WrW: dw is output
                 "NCDHW", // weights: layout adapts to tensor dimensionality
-                !is_wrw, // Fwd/Bwd: w is input; WrW: w (dw) is output
+                !is_wrw, // Fwd/Bwd: input; WrW: output
             },
             {
                 &Problem::GetOut,
-                &Problem::GetOut,
                 &InvokeParams::outDesc,
-                {},
+                is_wrw ? &InvokeParams::out_as_input : nullptr, // WrW: x is input
+                is_wrw ? nullptr : &InvokeParams::out,          // Fwd/Bwd: out is output
                 "NCDHW", // out: layout adapts to tensor dimensionality
-                is_wrw,  // Fwd/Bwd: out is output; WrW: out (x) is input
+                is_wrw,  // Fwd/Bwd: output; WrW: input
             },
         }};
-
-        // Before C++20 you can't aggregate initialize non-first union element
-        if(is_wrw)
-        {
-            // WrW: w slot holds dw (output), out slot holds x (input)
-            ret[1].as_output = &InvokeParams::w_as_output;
-            ret[2].as_input  = &InvokeParams::out_as_input;
-        }
-        else
-        {
-            // Fwd/Bwd: w is input, out is output
-            ret[1].as_input  = &InvokeParams::w;
-            ret[2].as_output = &InvokeParams::out;
-        }
 
         return ret;
     }

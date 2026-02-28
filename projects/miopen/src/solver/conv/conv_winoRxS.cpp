@@ -311,7 +311,13 @@ inline bool IsShaderConstraintsMet(const ProblemDescription& problem,
     }
 
     if(!problem.IsLayoutDefault())
+    {
+        MIOPEN_LOG_I("IsShaderConstraintsMet<"
+                     << Winodata << "," << Winofilter << ">: Non-default layout rejected (in="
+                     << problem.GetInLayout() << " out=" << problem.GetOutLayout()
+                     << " weights=" << problem.GetWeightsLayout() << ")");
         return false;
+    }
 
     return IsWinogradV21Preferred<Winodata, Winofilter>(asic, problem)
                ? IsShaderConstraintsMetV21(problem, R, S, C, K, H, W, OH, OW, N)
@@ -659,32 +665,44 @@ static bool IsApplicableBase(const ExecutionContext& ctx, const ProblemDescripti
     }
     if(problem.HasNonPackedTensors())
     {
+        MIOPEN_LOG_I("IsApplicableBase<" << Winodata << "," << Winofilter
+                                         << ">: Non-packed tensors");
         return false;
     }
     if(!problem.AllTensorsDimsFitIntoInt())
     {
+        MIOPEN_LOG_I("IsApplicableBase<" << Winodata << "," << Winofilter
+                                         << ">: Tensor dims don't fit into int");
         return false;
     }
     if(!(problem.IsFp32() || problem.IsFp16()))
     {
+        MIOPEN_LOG_I("IsApplicableBase<" << Winodata << "," << Winofilter
+                                         << ">: Unsupported data type");
         return false;
     }
     if(problem.IsTensorsCasted())
     {
+        MIOPEN_LOG_I("IsApplicableBase<" << Winodata << "," << Winofilter
+                                         << ">: Casted tensors not supported");
         return false;
     }
     if(!ctx.use_asm_kernels)
     {
+        MIOPEN_LOG_I("IsApplicableBase<" << Winodata << "," << Winofilter
+                                         << ">: ASM kernels disabled");
         return false;
     }
     if(!ctx.rmv.IsV3())
     {
+        MIOPEN_LOG_I("IsApplicableBase<" << Winodata << "," << Winofilter << ">: Not RMV V3");
         return false;
     }
 
     const auto& target = ctx.GetStream().GetTargetProperties();
     if(target.isXnackEnabled())
     {
+        MIOPEN_LOG_I("IsApplicableBase<" << Winodata << "," << Winofilter << ">: Xnack enabled");
         return false;
     }
 
@@ -692,6 +710,8 @@ static bool IsApplicableBase(const ExecutionContext& ctx, const ProblemDescripti
     if(!(StartsWith(name, "gfx9") || StartsWith(name, "gfx10") || StartsWith(name, "gfx11") ||
          StartsWith(name, "gfx12")))
     {
+        MIOPEN_LOG_I("IsApplicableBase<" << Winodata << "," << Winofilter
+                                         << ">: Unsupported device: " << name);
         return false;
     }
     if(problem.IsFp16() &&
@@ -699,11 +719,15 @@ static bool IsApplicableBase(const ExecutionContext& ctx, const ProblemDescripti
          StartsWith(name, "gfx95") || name == "gfx1011" || name == "gfx1012" ||
          StartsWith(name, "gfx103") || StartsWith(name, "gfx11") || StartsWith(name, "gfx12")))
     {
+        MIOPEN_LOG_I("IsApplicableBase<" << Winodata << "," << Winofilter
+                                         << ">: FP16 not supported on " << name);
         return false;
     }
 
     if(name == "gfx90a" && problem.IsGfx90aFp16altRequired())
     {
+        MIOPEN_LOG_I("IsApplicableBase<" << Winodata << "," << Winofilter
+                                         << ">: gfx90a FP16 alt required");
         return false;
     }
 
@@ -718,9 +742,16 @@ static bool IsApplicableBase(const ExecutionContext& ctx, const ProblemDescripti
     const bool dilation_h_ok = (problem.GetDilationH() == 1);
     const bool bias_ok = (problem.GetBias() == 0);
     const bool layout_ok = problem.GetIn().IsPossibleLayout4D5D("NCHW", strict);
-    
+
     if (!(stride_w_ok && stride_h_match && dilation_w_ok && dilation_h_ok && bias_ok && layout_ok))
     {
+        MIOPEN_LOG_I("IsApplicableBase<" << Winodata << "," << Winofilter << ">: Constraints failed: "
+                     << "stride_w=" << problem.GetKernelStrideW() << " (ok=" << stride_w_ok << ") "
+                     << "stride_h=" << problem.GetKernelStrideH() << " (match=" << stride_h_match << ") "
+                     << "dilation_w=" << problem.GetDilationW() << " (ok=" << dilation_w_ok << ") "
+                     << "dilation_h=" << problem.GetDilationH() << " (ok=" << dilation_h_ok << ") "
+                     << "bias=" << problem.GetBias() << " (ok=" << bias_ok << ") "
+                     << "layout_ok=" << layout_ok << " (cached=" << problem.GetInLayout() << ")");
         return false;
     }
     // clang-format on
@@ -732,7 +763,9 @@ static bool IsApplicableBase(const ExecutionContext& ctx, const ProblemDescripti
         const auto gl = ShaderModel(ctx, problem, Winodata, Winofilter).GetGranularityLoss();
         if(gl > (1.0 - 1.0 / max_perf_drop_due_to_granularity))
         {
-            MIOPEN_LOG_I("granularity_loss =" << gl);
+            MIOPEN_LOG_I("IsApplicableBase<" << Winodata << "," << Winofilter
+                                             << ">: granularity_loss =" << gl
+                                             << " (too high, rejected)");
             return false;
         }
     }
@@ -746,7 +779,14 @@ static bool IsApplicableBase(const ExecutionContext& ctx, const ProblemDescripti
            && problem.GetInWidth() <= 6   //
            && problem.GetBatchSize() <= 4 //
            && problem.GetInChannels() <= 4)
+        {
+            MIOPEN_LOG_I("IsApplicableBase<"
+                         << Winodata << "," << Winofilter
+                         << ">: tiny tensor rejected (H=" << problem.GetInHeight()
+                         << " W=" << problem.GetInWidth() << " N=" << problem.GetBatchSize()
+                         << " C=" << problem.GetInChannels() << ")");
             return false;
+        }
     }
 #endif
 
@@ -1178,8 +1218,28 @@ bool ConvBinWinogradRxSf2x3g1::IsApplicable(const ExecutionContext& ctx,
                                             const ProblemDescription& problem) const
 {
     if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS_F2X3_G1))
+    {
+        MIOPEN_LOG_I("ConvBinWinogradRxSf2x3g1: Disabled by MIOPEN_DEBUG_AMD_WINOGRAD_RXS_F2X3_G1");
         return false;
-    return IsApplicableBase<2, 3>(ctx, problem) && problem.GetGroupCount() == 1;
+    }
+
+    const auto group_count = problem.GetGroupCount();
+    if(group_count != 1)
+    {
+        MIOPEN_LOG_I(
+            "ConvBinWinogradRxSf2x3g1: Grouped convolution not supported: groups=" << group_count);
+        return false;
+    }
+
+    const bool base_applicable = IsApplicableBase<2, 3>(ctx, problem);
+    MIOPEN_LOG_I("ConvBinWinogradRxSf2x3g1: IsApplicableBase<2,3> returned "
+                 << base_applicable << " for problem: N=" << problem.GetInBatchSize()
+                 << " C=" << problem.GetInChannels() << " H=" << problem.GetInHeight()
+                 << " W=" << problem.GetInWidth() << " K=" << problem.GetOutChannels()
+                 << " R=" << problem.GetWeightsHeight() << " S=" << problem.GetWeightsWidth()
+                 << " layout=" << problem.GetInLayout());
+
+    return base_applicable;
 }
 
 float ConvBinWinogradRxSf2x3g1::GetWti(const ExecutionContext& ctx,
