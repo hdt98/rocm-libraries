@@ -1296,7 +1296,7 @@ __device__ auto amd_ds_tiled_load_to_vgpr(__attribute__((address_space(3))) cons
                                           bool is_src_valid)
 {
     using vector_t = typename vector_type_maker<T, N>::type::type;
-#if defined(__gfx13__)
+#if 0 // defined(__gfx13__)
     if(is_src_valid)
     {
         if constexpr(NumThreadsPerTile == 2)

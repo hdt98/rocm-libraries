@@ -495,6 +495,7 @@ struct GridwiseGemm_wmma_cshuffle_v3_base
                                    const std::array<index_t, NumBTensor>& StrideBs,
                                    const index_t BK0)
     {
+
         using GemmSpecialization = tensor_operation::device::GemmSpecialization;
         constexpr bool padN      = GemmSpec == GemmSpecialization::NKPadding ||
                               GemmSpec == GemmSpecialization::MNKPadding ||
