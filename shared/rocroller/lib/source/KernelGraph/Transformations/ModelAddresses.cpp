@@ -112,7 +112,8 @@ namespace rocRoller::KernelGraph
             coords.setCoordinate(elemXTag, Expression::literal(0));
             coords.setCoordinate(elemYTag, Expression::literal(0));
         }
-        else if(tile.layoutType == LayoutType::MATRIX_ACCUMULATOR)
+        else if(tile.layoutType == LayoutType::MATRIX_ACCUMULATOR
+                && graph.mapper.get<VGPRBlockNumber>(tag) != -1)
         {
             // SK accumulator tile: uses VGPRBlockNumber/VGPRBlockIndex coordinates,
             // matching loadMacroTileWAVECIACCUM.
@@ -199,7 +200,8 @@ namespace rocRoller::KernelGraph
 
             co_yield getLDSAddressesImpl(graph, tag, info, direction);
         }
-        else if(isLoad && tile.layoutType == LayoutType::MATRIX_ACCUMULATOR)
+        else if(isLoad && tile.layoutType == LayoutType::MATRIX_ACCUMULATOR
+                && graph.mapper.get<VGPRBlockNumber>(tag) != -1)
         {
             // SK accumulator LoadLDSTile: memoryType is not WAVE, but we still need to model
             // addresses. Use VGPRBlockNumber/VGPRBlockIndex dimensions, matching
