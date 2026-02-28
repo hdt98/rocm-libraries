@@ -555,7 +555,7 @@ ConvDepthwiseFwd2D::GetSolution(const ExecutionContext&,
                     {
                         {
                             WorkAroundHipEventProfiler prf(handle);
-                            invoker.Run(argument, StreamConfig{nullptr, false});
+                            invoker.Run(argument, StreamConfig{handle.GetStream(), false});
                         }
                         if(handle.IsProfilingEnabled())
                         {
