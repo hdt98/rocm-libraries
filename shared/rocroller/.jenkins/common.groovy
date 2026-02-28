@@ -100,6 +100,7 @@ def runTestCommand (platform, project)
                 export LIBRARY_PATH="/opt/rocm/_rocm_sdk_core/lib:/opt/rocm/_rocm_sdk_core/lib/llvm/lib:\${LIBRARY_PATH}"
                 amdclang++ -Wall -Wextra -O2 simple_comgr_test.cpp -I/opt/rocm/_rocm_sdk_devel/include -L /opt/rocm/_rocm_sdk_devel/lib -lamd_comgr -o simple_comgr_test
                 ./simple_comgr_test
+                ldd ./build/test/rocroller-tests
                 # Run sharded tests (auto-detects ncores/2, respecting cgroups)
                 scripts/run-tests-sharded precheckin-mci build
             """

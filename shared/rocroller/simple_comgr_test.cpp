@@ -22,11 +22,12 @@
     } while(0)
 
 int main() {
-  const std::string isa = "amdgcn-amd-amdhsa--gfx950:sramecc+";
+  // const std::string isa = "amdgcn-amd-amdhsa--gfx950:sramecc+";
+  const std::string isa = "amdgcn-amd-amdhsa--gfx90a:xnack+";
 
   const std::string src_name = "kernel.s";
   const std::string src = R"(
-.amdgcn_target "amdgcn-amd-amdhsa--gfx950:sramecc+"
+.amdgcn_target "amdgcn-amd-amdhsa--gfx90a:xnack+"
   )";
 
   std::vector<char> result;
