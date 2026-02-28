@@ -23,9 +23,9 @@
 ################################################################################
 
 from rocisa.code import Module
-from rocisa.container import DSModifiers, vgpr, sgpr, SDWAModifiers, VOP3PModifiers, ContinuousRegister
+from rocisa.container import DSModifiers, vgpr, sgpr, SDWAModifiers, VOP3PModifiers, ContinuousRegister, VCC
 from rocisa.enum import SelectBit, InstType
-from rocisa.instruction import SMovB32, SWaitCnt, VOrB32, VPermB32, VLShiftLeftOrB32, \
+from rocisa.instruction import SMovB32, SWaitCnt, VOrB32, VPermB32, VLShiftLeftOrB32, VCmpClassF32, VCndMaskB32,\
                             VMovB32, VMovB64,VLShiftRightB32, VCvtPkFP8toF32, VCvtF32toF16, VCvtFP8toF32,VCvtScaleFP8toF16,VCvtScalePkFP8toF16, \
                             VCvtPkF32toBF16, VCvtBF16toFP32, PVCvtBF16toFP32, VDot2CF32BF16, SNop, VSubF32, VSwapB32, MFMAInstruction
 
@@ -478,6 +478,9 @@ class LocalReadMFMA(LocalRead):
         # interleaveTreg case (means dst and src are same (dot2 or mfma))
         if kernel["UseMFMAF32XEmulation"]:
             vHiBase = str(vHi0.regName)
+            #infVgpr = writer.vgprPool.checkOut(1, "inf check")
+            packCodeT.add(VMovB32(v0t, "0x207", comment="inf check"))
+            packCodeT.add(VCmpClassF32(dst=VCC(), src0=vgpr(vTBase), src1=v0t, comment="Check if high bits are Inf"))
             idMat = vgpr(writer.states.startVgprIdentityMatrix,2)
             # We use a single MFMA 4x4x4_16b to perform 4 `vT - vHi` operations.
             # - A is set to negative identity matrix
@@ -487,9 +490,48 @@ class LocalReadMFMA(LocalRead):
                 # add comment for scheduling (__TF32_1_)
                 # UseMFMAF32XEmulation case, put the mark at second mfma4x4. Skip here
                 commentStr = commentForSchedule1 + ": "
+            # packCodeT.add(MFMAInstruction(instType=InstType.INST_BF16, accType=InstType.INST_F32, variant=[4,4,4,16], mfma1k=False,acc=vgpr(vTBase,4), a=idMat, b=vgpr(vHiBase,2), acc2=vgpr(vTBase,4),
+            # comment="Calculate low bits for TF32 emulation%s"%commentStr))
             packCodeT.add(MFMAInstruction(instType=InstType.INST_BF16, accType=InstType.INST_F32, variant=[4,4,4,16], mfma1k=False,acc=vgpr(vTBase,4), a=idMat, b=vgpr(vHiBase,2), acc2=vgpr(vTBase,4),
-            comment="Calculate low bits for TF32 emulation%s"%commentStr))
+            comment="Calculate low bits for TF32 emulation"))
+            packCodeT.add(SNop(0))
+            # packCodeT.add(VMovB32(v0t, "0x7F800000", comment="vtBase"))
+            # packCodeT.add(VMovB32(v1t, "0x7F800000", comment="1"))
+            # packCodeT.add(VMovB32(v2t, "0x7F800000", comment="2"))
+            # packCodeT.add(VMovB32(v3t, "0x7F800000", comment="3%s"%commentStr))
+            tmp = writer.vgprPool.checkOut(1, "tmp for inf fix")
+            packCodeT.add(VMovB32(vgpr(tmp), "0x7F800000", comment="set to inf"))
+            packCodeT.add(VCndMaskB32(dst=v0t, src0=vgpr(tmp), src1=v0t, src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
+            packCodeT.add(VCndMaskB32(dst=v1t, src0=vgpr(tmp), src1=v1t, src2=VCC(), comment=""))
+            packCodeT.add(VCndMaskB32(dst=v2t, src0=vgpr(tmp), src1=v2t, src2=VCC(), comment=""))
+            packCodeT.add(VCndMaskB32(dst=v3t, src0=vgpr(tmp), src1=v3t, src2=VCC(), comment="inf fix %s"%commentStr))
+            writer.vgprPool.checkIn(tmp)
         else:
+    #             struct VCmpClassF32 : public VCmpInstruction
+    # {
+    #     VCmpClassF32(const std::shared_ptr<Container>& dst,
+    #                  const InstructionInput&           src0,
+    #                  const InstructionInput&           src1,
+    #                  std::optional<SDWAModifiers>      sdwa    = std::nullopt,
+    #                  const std::string&                comment = "")
+    #         : VCmpInstruction(InstType::INST_F32, dst, src0, src1, sdwa, comment)
+    #     {
+    #         setInst("v_cmp_class_f32");
+    #     }
+
+    #     VCmpClassF32(const VCmpClassF32& other)
+    #         : VCmpInstruction(other)
+    #     {
+    #     }
+
+    #     std::shared_ptr<Item> clone() const override
+    #     {
+    #         return std::make_shared<VCmpClassF32>(*this);
+    #     }
+    # };
+# v_cvt_f32_bf16  tmp0, high01
+# v_cmp_class_f32  vcc, tmp0, vtmp1(includes constant 0x207)
+# v_cndmask  low0, tmp0, low0, vcc # store tmp0 or low0 into low0 based on vcc
             tmp = writer.vgprPool.checkOut(1, "x32f tmp mod 4")
             # Compute low bits = fp32(highBF16(A/B)) - fp32(A/B)
             if kernel["UseDot2F32XEmulation"]:
