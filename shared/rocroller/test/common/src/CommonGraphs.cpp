@@ -214,8 +214,8 @@ namespace rocRollerTest::Graphs
 
         if(m_problem.scaleAMode == Operations::ScaleMode::Separate)
         {
-            m_tagTensorScaleA
-                = m_command->addOperation(rocRoller::Operations::Tensor(2, m_problem.scaleTypeA));
+            m_tagTensorScaleA = m_command->addOperation(rocRoller::Operations::Tensor(
+                2, m_problem.scaleTypeA, {}, m_problem.transA == "N" ? oneStridesN : oneStridesT));
             m_tagScaleA
                 = m_command->addOperation(rocRoller::Operations::T_Load_Tiled(m_tagTensorScaleA));
 
@@ -238,8 +238,8 @@ namespace rocRollerTest::Graphs
 
         if(m_problem.scaleBMode == Operations::ScaleMode::Separate)
         {
-            m_tagTensorScaleB
-                = m_command->addOperation(rocRoller::Operations::Tensor(2, m_problem.scaleTypeB));
+            m_tagTensorScaleB = m_command->addOperation(rocRoller::Operations::Tensor(
+                2, m_problem.scaleTypeB, {}, m_problem.transB == "N" ? oneStridesN : oneStridesT));
             m_tagScaleB
                 = m_command->addOperation(rocRoller::Operations::T_Load_Tiled(m_tagTensorScaleB));
 
@@ -622,7 +622,15 @@ namespace rocRollerTest::Graphs
                                  m_problem.waveN,
                                  m_problem.waveK / m_problem.scaleBlockSize,
                                  m_problem.waveB},
-                                GetMemoryType(SolutionParams::LoadPath::BufferToVGPR));
+                                GetMemoryType(m_problem.loadScalePathA),
+                                {m_problem.waveM,
+                                 m_problem.waveN,
+                                 m_problem.waveK / m_problem.scaleBlockSize,
+                                 m_problem.waveB},
+                                {m_problem.swizzleM,
+                                 m_problem.swizzleN,
+                                 m_problem.swizzleK,
+                                 m_problem.swizzleB});
             }
             params->setDimensionInfo(m_tagScaleA, macTileScaleA);
         }
@@ -658,7 +666,15 @@ namespace rocRollerTest::Graphs
                                  m_problem.waveN,
                                  m_problem.waveK / m_problem.scaleBlockSize,
                                  m_problem.waveB},
-                                GetMemoryType(SolutionParams::LoadPath::BufferToVGPR));
+                                GetMemoryType(m_problem.loadScalePathB),
+                                {m_problem.waveM,
+                                 m_problem.waveN,
+                                 m_problem.waveK / m_problem.scaleBlockSize,
+                                 m_problem.waveB},
+                                {m_problem.swizzleM,
+                                 m_problem.swizzleN,
+                                 m_problem.swizzleK,
+                                 m_problem.swizzleB});
             }
             params->setDimensionInfo(m_tagScaleB, macTileScaleB);
         }
