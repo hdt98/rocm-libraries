@@ -17,6 +17,9 @@
 #include "ck_tile/host/joinable_thread.hpp"
 #include "ck_tile/host/ranges.hpp"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
+
 namespace ck_tile {
 
 template <typename Range>
@@ -597,6 +600,8 @@ struct HostTensor
 
     typename Data::size_type size() const { return mData.size(); }
 
+    bool empty() const { return mData.empty(); }
+
     T max() const { return *std::max_element(mData.begin(), mData.end()); }
 
     // return a slice of this tensor
@@ -859,3 +864,4 @@ auto get_default_stride(std::size_t row,
         return stride;
 }
 } // namespace ck_tile
+#pragma clang diagnostic pop

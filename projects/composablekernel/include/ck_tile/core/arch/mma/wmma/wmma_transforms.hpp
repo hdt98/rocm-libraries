@@ -121,20 +121,4 @@ struct MmaTransformsDefaultSelector<MmaOp,
     using SelectedTransforms = MmaDefaultTransformsGfx12;
 };
 
-/**
- * @struct MmaTransformsDefaultSelector
- * @brief Implements the default MMA transforms selection for gfx13 targets
- * @tparam MmaOp Mma operation
- * @tparam CompilerTarget The compiler target
- */
-template <typename MmaOp, typename CompilerTarget>
-// TODO: c++20 template <MmaOpI MmaOp, amdgcn_target_arch_id GfxTargetId>
-// TODO: c++20 requires
-struct MmaTransformsDefaultSelector<MmaOp,
-                                    CompilerTarget,
-                                    enable_if_target_family_gfx13_t<CompilerTarget>>
-{
-    using SelectedTransforms = MmaDefaultTransformsGfx13;
-};
-
 } // namespace ck_tile::core::arch::mma

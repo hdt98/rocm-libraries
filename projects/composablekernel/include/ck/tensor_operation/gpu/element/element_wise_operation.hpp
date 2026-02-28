@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -8,6 +8,7 @@
 #include "ck/tensor_operation/gpu/element/unary_element_wise_operation.hpp"
 #include "ck/tensor_operation/gpu/element/binary_element_wise_operation.hpp"
 #include "ck/tensor_operation/gpu/element/quantization_operation.hpp"
+#include "ck/utility/type_convert.hpp"
 
 namespace ck {
 namespace tensor_operation {
@@ -256,8 +257,9 @@ struct MultiplyAddImpl
                                                                        const half_t& d0,
                                                                        const half_t& d1) const
     {
-        const half_t y = type_convert<half_t>(c) * d0 + d1;
-        e              = y;
+        const half_t y =
+            type_convert<half_t>(c * type_convert<float>(d0) + type_convert<float>(d1));
+        e = y;
     }
     template <>
     __host__ __device__ void operator()<bhalf_t, float, bhalf_t, bhalf_t>(bhalf_t& e,
@@ -265,8 +267,9 @@ struct MultiplyAddImpl
                                                                           const bhalf_t& d0,
                                                                           const bhalf_t& d1) const
     {
-        const bhalf_t y = type_convert<bhalf_t>(c) * d0 + d1;
-        e               = y;
+        const bhalf_t y =
+            type_convert<bhalf_t>(c * type_convert<float>(d0) + type_convert<float>(d1));
+        e = y;
     }
     template <>
     __host__ __device__ void operator()<float, float, half_t, half_t>(float& e,

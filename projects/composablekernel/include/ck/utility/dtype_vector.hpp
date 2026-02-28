@@ -7,6 +7,8 @@
 #include <vector>
 #endif
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
 namespace ck {
 
 // vector_type
@@ -119,7 +121,7 @@ struct vector_type<T, 2, typename ck::enable_if_t<is_native_type<T>()>>
     __host__ __device__ constexpr vector_type(type v) : data_{v} {}
 
     template <typename X>
-    __host__ __device__ constexpr const auto& AsType() const
+    __host__ __device__ constexpr const auto& AsType() const [[clang::lifetimebound]]
     {
         static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value,
                       "Something went wrong, please check src and dst types.");
@@ -139,7 +141,7 @@ struct vector_type<T, 2, typename ck::enable_if_t<is_native_type<T>()>>
     }
 
     template <typename X>
-    __host__ __device__ constexpr auto& AsType()
+    __host__ __device__ constexpr auto& AsType() [[clang::lifetimebound]]
     {
         static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value,
                       "Something went wrong, please check src and dst types.");
@@ -251,7 +253,7 @@ struct vector_type<T, 4, typename ck::enable_if_t<is_native_type<T>()>>
     __host__ __device__ constexpr vector_type(type v) : data_{v} {}
 
     template <typename X>
-    __host__ __device__ constexpr const auto& AsType() const
+    __host__ __device__ constexpr const auto& AsType() const [[clang::lifetimebound]]
     {
         static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value || is_same<X, d4_t>::value,
                       "Something went wrong, please check src and dst types.");
@@ -275,7 +277,7 @@ struct vector_type<T, 4, typename ck::enable_if_t<is_native_type<T>()>>
     }
 
     template <typename X>
-    __host__ __device__ constexpr auto& AsType()
+    __host__ __device__ constexpr auto& AsType() [[clang::lifetimebound]]
     {
         static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value || is_same<X, d4_t>::value,
                       "Something went wrong, please check src and dst types.");
@@ -586,7 +588,7 @@ struct vector_type<T, 8, typename ck::enable_if_t<is_native_type<T>()>>
     }
 
     template <typename X>
-    __host__ __device__ constexpr auto& AsType()
+    __host__ __device__ constexpr auto& AsType() [[clang::lifetimebound]]
     {
         static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value ||
                           is_same<X, d4_t>::value || is_same<X, d8_t>::value,
@@ -942,7 +944,7 @@ struct vector_type<T, 16, typename ck::enable_if_t<is_native_type<T>()>>
     }
 
     template <typename X>
-    __host__ __device__ constexpr auto& AsType()
+    __host__ __device__ constexpr auto& AsType() [[clang::lifetimebound]]
     {
         static_assert(is_same<X, d1_t>::value || is_same<X, d2_t>::value ||
                           is_same<X, d4_t>::value || is_same<X, d8_t>::value ||
@@ -2566,7 +2568,7 @@ struct non_native_vector_base<
     }
 
     template <typename X>
-    __host__ __device__ constexpr auto& AsType()
+    __host__ __device__ constexpr auto& AsType() [[clang::lifetimebound]]
     {
         static_assert(is_same_v<X, data_t> || is_same_v<X, T> || is_same_v<X, data_v>,
                       "Something went wrong, please check src and dst types.");
@@ -2778,7 +2780,7 @@ struct vector_type<T, 2, typename ck::enable_if_t<!is_native_type<T>()>>
     __host__ __device__ constexpr vector_type(type v) : data_{v} {}
 
     template <typename X>
-    __host__ __device__ constexpr const auto& AsType() const
+    __host__ __device__ constexpr const auto& AsType() const [[clang::lifetimebound]]
     {
         static_assert(is_same<X, d1_t>::value || is_same<X, d1_nnv_t>::value ||
                           is_same<X, d2_t>::value,
@@ -2948,7 +2950,7 @@ struct vector_type<T, 8, typename ck::enable_if_t<!is_native_type<T>()>>
     }
 
     template <typename X>
-    __host__ __device__ constexpr auto& AsType()
+    __host__ __device__ constexpr auto& AsType() [[clang::lifetimebound]]
     {
         static_assert(is_same<X, d1_t>::value || is_same<X, d1_nnv_t>::value ||
                           is_same<X, d2_t>::value || is_same<X, d4_t>::value ||
@@ -5316,3 +5318,4 @@ using pk_i4x4_t = typename vector_type<pk_i4_t, 4>::type;
 using pk_i4x8_t = typename vector_type<pk_i4_t, 8>::type;
 
 } // namespace ck
+#pragma clang diagnostic pop

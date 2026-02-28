@@ -1,3 +1,6 @@
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+
 cmake_minimum_required(VERSION 3.15)
 project(ck_app)
 add_compile_options(-std=c++20)
@@ -23,9 +26,6 @@ if (DTYPES)
     if (DTYPES MATCHES "fp32")
         add_definitions(-DCK_ENABLE_FP32)
         set(CK_ENABLE_FP32 "ON")
-    endif()
-    if (DTYPES MATCHES "tf32")
-        set(CK_ENABLE_TF32 "ON")
     endif()
     if (DTYPES MATCHES "tf32")
         set(CK_ENABLE_TF32 "ON")
