@@ -168,6 +168,8 @@ class GemmKernelBuilder:
             default_pipeline = "compv4"
         elif self.kernel_name_prefix == "gemm_preshuffle":
             default_pipeline = "preshufflev2"
+        elif self.kernel_name_prefix == "grouped_gemm":
+            default_pipeline = "compv4"
 
         configs = []
         for tile_m in tile_m_values:
@@ -335,7 +337,7 @@ class GemmKernelBuilder:
 
         kernel_name += f"_{tile_str}"
 
-        if self.kernel_name_prefix in ["gemm_universal", "gemm_multi_d"]:
+        if self.kernel_name_prefix in ["gemm_universal", "gemm_multi_d", "grouped_gemm"]:
             # Map pipeline names to the correct pipeline implementation
             pipeline_impl_map = {
                 "mem": "ck_tile::GemmPipelineAgBgCrMem",
@@ -425,10 +427,11 @@ class GemmKernelBuilder:
         # Assign layouts based on self.layout
         if self.kernel_name_prefix == "gemm_multi_d":
             a_layout, b_layout, c_layout, ds_layout = get_abcd_layouts(self.layout)
-        elif (
-            self.kernel_name_prefix == "gemm_universal"
-            or self.kernel_name_prefix == "gemm_preshuffle"
-        ):
+        elif self.kernel_name_prefix in [
+            "gemm_universal",
+            "gemm_preshuffle",
+            "grouped_gemm",
+        ]:
             a_layout, b_layout, c_layout = get_abc_layouts(self.layout)
 
         instance_code = f"""
@@ -502,8 +505,8 @@ struct SelectedKernel {{
     static constexpr bool TransposeC = false;
     static constexpr bool DoubleSmemBuffer = {"true" if pipeline in ["compv4", "preshufflev2"] else "false"};"""
 
-        if self.kernel_name_prefix in ["gemm_universal", "gemm_preshuffle"]:
-            instance_code += f"""    
+        if self.kernel_name_prefix in ["gemm_universal", "gemm_preshuffle", "grouped_gemm"]:
+            instance_code += f"""
     static constexpr bool UsePersistentKernel = {"true" if persistent in [True, "true"] else "false"};
     static constexpr bool UseStructuredSparsity = false;
     static constexpr ck_tile::index_t NumWaveGroups = 1;"""
@@ -528,9 +531,9 @@ struct SelectedKernel {{
         ck_tile::sequence<WarpPerBlock_M, WarpPerBlock_N, WarpPerBlock_K>,
         ck_tile::sequence<WarpTileM, WarpTileN, WarpTileK>>;"""
 
-        elif self.kernel_name_prefix in ["gemm_universal", "gemm_preshuffle"]:
+        elif self.kernel_name_prefix in ["gemm_universal", "gemm_preshuffle", "grouped_gemm"]:
             instance_code = """
-            
+
     // Tile shape
     using TileShape = ck_tile::TileGemmShape<
         ck_tile::sequence<TileM, TileN, TileK>,
@@ -753,14 +756,14 @@ struct SelectedKernel {{
         """
 
         if epilogue == "cshuffle":
-            if self.kernel_name_prefix == "gemm_universal":
+            if self.kernel_name_prefix in ["gemm_universal", "grouped_gemm"]:
                 instance_code += self.populate_cshuffle_gemm_universal()
             elif self.kernel_name_prefix == "gemm_multi_d":
                 instance_code += self.populate_cshuffle_gemm_multi_d()
             elif self.kernel_name_prefix == "gemm_preshuffle":
                 instance_code += self.populate_cshuffle_gemm_preshuffle()
         else:  # default epilogue
-            if self.kernel_name_prefix == "gemm_universal":
+            if self.kernel_name_prefix in ["gemm_universal", "grouped_gemm"]:
                 instance_code += self.populate_default_gemm_universal()
             elif self.kernel_name_prefix == "gemm_multi_d":
                 instance_code += self.populate_default_gemm_multi_d()
