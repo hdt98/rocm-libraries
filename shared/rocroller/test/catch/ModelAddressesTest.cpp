@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
+#include <hip/hip_runtime.h>
 
 #include <rocRoller/AssemblyKernel.hpp>
 #include <rocRoller/CodeGen/Instruction.hpp>
@@ -168,8 +169,19 @@ namespace ModelAddressesTest
 
     TEST_CASE("StreamK LDS Address Modelling", "[mem-addressing][streamk]")
     {
-        // StreamK uses LoadTiled/StoreTiled operations for intermediate WAVE tiles stored in LDS
-        // This test verifies that ModelAddresses correctly handles these operations
+        const std::vector<size_t> skWritePattern{
+            0,    16,   32,   48,   64,   80,   96,   112,  128,  144,  160,  176,  192,
+            208,  224,  240,  1024, 1040, 1056, 1072, 1088, 1104, 1120, 1136, 1152, 1168,
+            1184, 1200, 1216, 1232, 1248, 1264, 2048, 2064, 2080, 2096, 2112, 2128, 2144,
+            2160, 2176, 2192, 2208, 2224, 2240, 2256, 2272, 2288, 3072, 3088, 3104, 3120,
+            3136, 3152, 3168, 3184, 3200, 3216, 3232, 3248, 3264, 3280, 3296, 3312};
+
+        const std::vector<size_t> skReadPattern{
+            0,   4,   8,   12,  16,  20,  24,  28,  32,  36,  40,  44,  48,  52,  56,  60,
+            64,  68,  72,  76,  80,  84,  88,  92,  96,  100, 104, 108, 112, 116, 120, 124,
+            256, 260, 264, 268, 272, 276, 280, 284, 288, 292, 296, 300, 304, 308, 312, 316,
+            320, 324, 328, 332, 336, 340, 344, 348, 352, 356, 360, 364, 368, 372, 376, 380};
+
         auto streamKMode
             = GENERATE(StreamKMode::Standard, StreamKMode::TwoTile, StreamKMode::TwoTileDPFirst);
 
@@ -188,6 +200,18 @@ namespace ModelAddressesTest
 
             auto example = rocRollerTest::Graphs::GEMM(DataType::Float);
 
+            // Taken from rrsuite kernel
+            {
+                auto p = example.getProblem();
+                p.m    = 3072;
+                p.n    = 4096;
+                p.k    = 4096;
+                p.macM = 64;
+                p.macN = 64;
+                p.macK = 64;
+                example.setProblem(p);
+            }
+
             example.setUseLDS(true, true, false);
             example.setTranspose("N", "T");
             example.setStreamK(streamKMode);
@@ -202,51 +226,56 @@ namespace ModelAddressesTest
             commandKernel.generateKernelGraph();
             auto graph = commandKernel.getKernelGraph();
 
-            // Count LDS instructions with modelled addresses
-            size_t ldsReadCount          = 0;
-            size_t ldsWriteCount         = 0;
-            size_t ldsReadWithAddresses  = 0;
-            size_t ldsWriteWithAddresses = 0;
-
             for(auto inst : kernelInstructions(context.get(), command, graph))
             {
                 context.get()->schedule(inst);
                 auto opCode = inst.getOpCode();
 
-                if(opCode.find("ds_read") != std::string::npos)
+                if(inst.getModelledAddresses().has_value())
                 {
-                    ldsReadCount++;
-                    if(inst.getModelledAddresses().has_value())
-                    {
-                        ldsReadWithAddresses++;
-                        auto addresses = inst.getModelledAddresses().value();
-                        // Verify we have 64 addresses (one per workitem in a wave)
-                        CHECK(addresses.size() == 64);
-                    }
-                }
-                else if(opCode.find("ds_write") != std::string::npos)
-                {
-                    ldsWriteCount++;
-                    if(inst.getModelledAddresses().has_value())
-                    {
-                        ldsWriteWithAddresses++;
-                        auto addresses = inst.getModelledAddresses().value();
-                        // Verify we have 64 addresses (one per workitem in a wave)
-                        CHECK(addresses.size() == 64);
-                    }
+                    auto addresses = inst.getModelledAddresses().value();
+                    INFO(addresses);
+                    INFO(opCode);
+
+                    if(opCode.find("ds_read") != std::string::npos)
+                        CHECK(addresses == skReadPattern);
+                    else if(opCode.find("ds_write") != std::string::npos)
+                        CHECK(addresses == skWritePattern);
                 }
             }
 
-            INFO("LDS reads: " << ldsReadCount << ", with addresses: " << ldsReadWithAddresses);
-            INFO("LDS writes: " << ldsWriteCount << ", with addresses: " << ldsWriteWithAddresses);
+            // Launch kernel to confirm it executes correctly with these parameters.
+            auto [commandArgs,
+                  deviceA,
+                  deviceB,
+                  deviceC,
+                  deviceD,
+                  hostA,
+                  hostB,
+                  hostC,
+                  hostScaleA,
+                  hostScaleB]
+                = example.getCommandArguments<float>();
 
-            // All LDS instructions should have modelled addresses
-            REQUIRE(ldsReadCount > 0); // Verify we found some LDS instructions
-            REQUIRE(ldsWriteCount > 0);
-            CHECK(ldsReadWithAddresses == ldsReadCount);
-            CHECK(ldsWriteWithAddresses == ldsWriteCount);
+            commandArgs.setArgument(example.getNumWGsTag(), ArgumentType::Value, 100);
 
-            // TODO: assert against rocgdb
+            // Allocate scratch buffers required by the StreamK kernel.
+            auto                                  scratchTags = example.getScratchTags();
+            std::vector<std::shared_ptr<uint8_t>> scratchBufs;
+            for(int i = 0; i < static_cast<int>(Operations::ScratchPolicy::Count); ++i)
+            {
+                auto   policy = static_cast<Operations::ScratchPolicy>(i);
+                size_t sz
+                    = commandKernel.scratchSpaceRequired(policy, commandArgs.runtimeArguments());
+                if(sz > 0)
+                {
+                    scratchBufs.emplace_back(make_shared_device<uint8_t>(sz, 0));
+                    commandArgs.setArgument(
+                        scratchTags.at(policy), ArgumentType::Value, scratchBufs.back().get());
+                }
+            }
+
+            commandKernel.launchKernel(commandArgs.runtimeArguments());
         }
     }
 }

@@ -99,7 +99,7 @@ namespace rocRoller::KernelGraph
 
         auto coords = graph.buildTransformer(tag);
 
-        // Set the appropriate coordinate to 0 based on memory type
+        // Set the appropriate coordinate to 0 based on memory type / layout
         if(tile.memoryType == MemoryType::WAVE)
         {
             auto [vgprTag, vgpr] = graph.getDimension<VGPR>(tag);
@@ -111,6 +111,16 @@ namespace rocRoller::KernelGraph
             auto [elemYTag, elemY] = graph.getDimension<ElementNumber>(tag, 1);
             coords.setCoordinate(elemXTag, Expression::literal(0));
             coords.setCoordinate(elemYTag, Expression::literal(0));
+        }
+        else if(tile.layoutType == LayoutType::MATRIX_ACCUMULATOR)
+        {
+            // SK accumulator tile: uses VGPRBlockNumber/VGPRBlockIndex coordinates,
+            // matching loadMacroTileWAVECIACCUM.
+            auto [vgprBlockNumberTag, vgprBlockNumber]
+                = graph.getDimension<VGPRBlockNumber>(tag, 0);
+            auto [vgprBlockIndexTag, vgprBlockIndex] = graph.getDimension<VGPRBlockIndex>(tag, 0);
+            coords.setCoordinate(vgprBlockNumberTag, Expression::literal(0));
+            coords.setCoordinate(vgprBlockIndexTag, Expression::literal(0));
         }
 
         coords.fillExecutionCoordinates(nullptr, kernelWorkgroupIndexes, kernelWorkitemIndexes);
@@ -189,6 +199,31 @@ namespace rocRoller::KernelGraph
 
             co_yield getLDSAddressesImpl(graph, tag, info, direction);
         }
+        else if(isLoad && tile.layoutType == LayoutType::MATRIX_ACCUMULATOR)
+        {
+            // SK accumulator LoadLDSTile: memoryType is not WAVE, but we still need to model
+            // addresses. Use VGPRBlockNumber/VGPRBlockIndex dimensions, matching
+            // loadMacroTileWAVECIACCUM logic.
+            auto [vgprBlockNumberTag, vgprBlockNumber]
+                = graph.getDimension<VGPRBlockNumber>(tag, 0);
+            auto [vgprBlockIndexTag, vgprBlockIndex] = graph.getDimension<VGPRBlockIndex>(tag, 0);
+
+            const auto packing = std::max<uint32_t>(1u, DataTypeInfo::Get(op.varType).packing);
+            const auto m       = getUnsignedInt(evaluate(vgprBlockNumber.size));
+            auto       n       = getUnsignedInt(evaluate(vgprBlockIndex.size));
+            AssertFatal(n % packing == 0, ShowValue(n), ShowValue(packing));
+            n /= packing;
+
+            LoadStoreTileGenerator::LoadStoreTileInfo info{.tag = tag,
+                                                           .kind
+                                                           = MemoryInstructions::MemoryKind::Local,
+                                                           .m       = m,
+                                                           .n       = n,
+                                                           .data    = nullptr,
+                                                           .varType = op.varType};
+
+            co_yield getLDSAddressesImpl(graph, tag, info, direction);
+        }
         else
         {
             Log::debug("Skipping LDS address annotations due to {}", toString(tile.memoryType));
@@ -213,12 +248,21 @@ namespace rocRoller::KernelGraph
         constexpr bool isLoad    = std::is_same_v<Op, LoadTiled>;
         constexpr auto direction = isLoad ? LDSDirection::Load : LDSDirection::Store;
 
-        // Simplified dimensions
+        // Derive m/n from VGPRBlock dimensions, matching loadMacroTileWAVECIACCUM logic.
+        auto [vgprBlockNumberTag, vgprBlockNumber] = graph.getDimension<VGPRBlockNumber>(tag, 0);
+        auto [vgprBlockIndexTag, vgprBlockIndex]   = graph.getDimension<VGPRBlockIndex>(tag, 0);
+
+        const auto packing = std::max<uint32_t>(1u, DataTypeInfo::Get(op.varType).packing);
+        const auto m       = getUnsignedInt(evaluate(vgprBlockNumber.size));
+        auto       n       = getUnsignedInt(evaluate(vgprBlockIndex.size));
+        AssertFatal(n % packing == 0, ShowValue(n), ShowValue(packing));
+        n /= packing;
+
         LoadStoreTileGenerator::LoadStoreTileInfo info{.tag = tag,
                                                        .kind
                                                        = MemoryInstructions::MemoryKind::Local,
-                                                       .m       = 1,
-                                                       .n       = 1,
+                                                       .m       = m,
+                                                       .n       = n,
                                                        .data    = nullptr,
                                                        .varType = op.varType};
 
