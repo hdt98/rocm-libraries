@@ -22,7 +22,8 @@
 inline auto create_args(int argc, char* argv[])
 {
     ck_tile::ArgParser arg_parser;
-    arg_parser.insert("m", "3840", "Default M for all groups (if Ms not specified). Default is 3840.")
+    arg_parser
+        .insert("m", "3840", "Default M for all groups (if Ms not specified). Default is 3840.")
         .insert("n", "4096", "Default N for all groups (if Ns not specified). Default is 4096.")
         .insert("k", "2048", "Default K for all groups (if Ks not specified). Default is 2048.")
         .insert("Ms", "", "Comma-separated M dimensions per group.")
@@ -57,7 +58,8 @@ inline auto create_args(int argc, char* argv[])
                 "true",
                 "To flush cache, possible values are true or false. "
                 "Default is true.")
-        .insert("rotating_count", "1000", "number of iterations to rotate the cache. default is 1000.")
+        .insert(
+            "rotating_count", "1000", "number of iterations to rotate the cache. default is 1000.")
         .insert("metric",
                 "0",
                 "Metric with which to measure kernel performance. Set to 0 for latency, 1 for "
@@ -92,9 +94,9 @@ void benchmark_single(const ck_tile::ArgParser& arg_parser)
     const int kbatch      = arg_parser.get_int("kbatch");
 
     // Parse per-group dimensions
-    std::vector<int> Ms = arg_parser.get_int_vec("Ms");
-    std::vector<int> Ns = arg_parser.get_int_vec("Ns");
-    std::vector<int> Ks = arg_parser.get_int_vec("Ks");
+    std::vector<int> Ms        = arg_parser.get_int_vec("Ms");
+    std::vector<int> Ns        = arg_parser.get_int_vec("Ns");
+    std::vector<int> Ks        = arg_parser.get_int_vec("Ks");
     std::vector<int> stride_As = arg_parser.get_int_vec("stride_As");
     std::vector<int> stride_Bs = arg_parser.get_int_vec("stride_Bs");
     std::vector<int> stride_Cs = arg_parser.get_int_vec("stride_Cs");

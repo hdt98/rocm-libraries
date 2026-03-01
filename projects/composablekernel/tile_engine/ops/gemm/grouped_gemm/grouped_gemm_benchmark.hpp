@@ -198,20 +198,20 @@ bool compare_grouped(std::string instanceName,
     for(int i = 0; i < problem.group_count_; ++i)
     {
         pass &= compare_single(instanceName + "[" + std::to_string(i) + "]",
-                                problem.Ks_[i],
-                                problem.kbatch_,
-                                c_dev_results[i],
-                                c_host_results[i]);
+                               problem.Ks_[i],
+                               problem.kbatch_,
+                               c_dev_results[i],
+                               c_host_results[i]);
     }
     return pass;
 }
 
 /// @brief Function to get the kernel output with reference implementation on CPU for all groups
 void gemm_host_reference_grouped(int verify,
-                                  int group_count,
-                                  std::vector<ck_tile::HostTensor<ADataType>>& a_tensors,
-                                  std::vector<ck_tile::HostTensor<BDataType>>& b_tensors,
-                                  std::vector<ck_tile::HostTensor<CDataType>>& c_host_results)
+                                 int group_count,
+                                 std::vector<ck_tile::HostTensor<ADataType>>& a_tensors,
+                                 std::vector<ck_tile::HostTensor<BDataType>>& b_tensors,
+                                 std::vector<ck_tile::HostTensor<CDataType>>& c_host_results)
 {
     if(verify == 1)
     {
