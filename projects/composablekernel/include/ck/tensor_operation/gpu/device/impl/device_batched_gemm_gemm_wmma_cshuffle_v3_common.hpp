@@ -33,8 +33,7 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
 #endif
     kernel_batched_gemm_gemm_wmma_cshuffle_v3(typename DeviceOp::Argument arg)
 {
-#if(!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx11__) || defined(__gfx12__) || \
-    defined(__gfx13__))
+#if defined(__gfx11__) || defined(__gfx12__)
 
     __shared__ char p_shared[GridwiseOp::GetSharedMemoryNumberOfByte()];
     const index_t num_blocks_per_batch =

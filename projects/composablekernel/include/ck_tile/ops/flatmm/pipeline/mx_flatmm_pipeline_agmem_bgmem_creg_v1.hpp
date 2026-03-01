@@ -496,28 +496,6 @@ struct MXFlatmmPipelineAGmemBGmemCRegV1 : FlatmmPipelineAGmemBGmemCRegV1<Problem
         return c_block_tile;
     }
 
-    template <typename... Args>
-    CK_TILE_DEVICE auto operator()(Args&&... args) const
-    {
-        auto c_warp_tensors = Run_(std::forward<Args>(args)...);
-
-        // Block GEMM Acc register tile
-        using CWarpDstr = typename WG::CWarpDstr;
-        constexpr auto c_warp_y_lengths =
-            to_sequence(CWarpDstr{}.get_ys_to_d_descriptor().get_lengths());
-        constexpr auto c_warp_y_index_zeros = uniform_sequence_gen_t<CWarpDstr::NDimY, 0>{};
-        auto c_block_tile                   = BlockFlatmm{}.MakeCBlockTile();
-        static_for<0, MIterPerWarp, 1>{}([&](auto mIter) {
-            static_for<0, NIterPerWarp, 1>{}([&](auto nIter) {
-                c_block_tile.set_y_sliced_thread_data(
-                    merge_sequences(sequence<mIter, nIter>{}, c_warp_y_index_zeros),
-                    merge_sequences(sequence<1, 1>{}, c_warp_y_lengths),
-                    c_warp_tensors(mIter)(nIter).get_thread_buffer());
-            });
-        });
-        return c_block_tile;
-    }
-
     template <typename ADramBlockWindowTmp,
               typename BFlatBlockWindowTmp,
               typename ScaleADramBlockWindowTmp,

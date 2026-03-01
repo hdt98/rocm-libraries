@@ -44,8 +44,6 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, MinimumOccupancy)
 
         auto splitk_batch_offset = typename GridwiseGemm::SplitKBatchOffset(karg);
 
-        auto splitk_batch_offset = typename GridwiseGemm::SplitKBatchOffset(karg);
-
         GridwiseGemm::template Run<HasMainKBlockLoop, CGlobalMemoryDataOperation, TailNum>(
             karg.p_a_grid + splitk_batch_offset.a_k_split_offset,
             karg.p_b_grid + splitk_batch_offset.b_k_split_offset,
