@@ -111,7 +111,7 @@ protected:
         if(arg.peek<rocblas_int>("n") == -1 && arg.peek<rocblas_int>("nrhs") == -1)
             testing_gels_bad_arg<API, BATCHED, STRIDED, T>();
 
-        arg.batch_count = 1;
+        arg.batch_count = (BATCHED || STRIDED ? 3 : 1);
         testing_gels<API, BATCHED, STRIDED, INPLACE, T>(arg);
     }
 };
@@ -132,7 +132,7 @@ class GELS_INPLACE : public GELS_BASE<API_NORMAL, true>
 {
 };
 
-class GELS_BATCHED : public GELS_BASE<API_NORMAL, false>
+class GELS_BATCHED : public GELS_BASE<API_NORMAL, true>
 {
 };
 
@@ -219,33 +219,25 @@ TEST_P(GELS_INPLACE, __double_complex)
 }
 
 // batched tests
-//
+
 TEST_P(GELS_BATCHED, batched__float)
 {
-    Arguments arg   = gels_setup_arguments(GetParam());
-    arg.batch_count = 3;
-    testing_gels<API_NORMAL, true, false, true, float>(arg); // INPLACE=true
+    run_tests<true, false, float>();
 }
 
 TEST_P(GELS_BATCHED, batched__double)
 {
-    Arguments arg   = gels_setup_arguments(GetParam());
-    arg.batch_count = 3;
-    testing_gels<API_NORMAL, true, false, true, double>(arg);
+    run_tests<true, false, double>();
 }
 
 TEST_P(GELS_BATCHED, batched__float_complex)
 {
-    Arguments arg   = gels_setup_arguments(GetParam());
-    arg.batch_count = 3;
-    testing_gels<API_NORMAL, true, false, true, rocblas_float_complex>(arg);
+    run_tests<true, false, rocblas_float_complex>();
 }
 
 TEST_P(GELS_BATCHED, batched__double_complex)
 {
-    Arguments arg   = gels_setup_arguments(GetParam());
-    arg.batch_count = 3;
-    testing_gels<API_NORMAL, true, false, true, rocblas_double_complex>(arg);
+    run_tests<true, false, rocblas_double_complex>();
 }
 
 // INSTANTIATE_TEST_SUITE_P(daily_lapack,
