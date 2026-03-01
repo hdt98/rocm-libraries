@@ -29,10 +29,17 @@ using ::testing::Values;
 using ::testing::ValuesIn;
 using namespace std;
 
-typedef std::tuple<vector<int>, char, char> larft_tuple;
+typedef std::tuple<vector<int>, vector<char>> larft_tuple;
 
 // each size_range is a {n, k, ldv, ldt}
 // if n = -1 and k = -1, then the bad arguments test will be run
+
+// each op_range vector is a {direct, storev}
+
+// case when n == -1, k == -1, direct == F, and storev == C will also execute the bad arguments test
+// (null handle, null pointers and invalid values)
+
+const vector<vector<char>> op_range = {{'F', 'C'}, {'F', 'R'}, {'B', 'C'}, {'B', 'R'}};
 
 // for checkin_lapack tests
 const vector<vector<int>> size_range = {
@@ -44,15 +51,14 @@ const vector<vector<int>> size_range = {
     {30, 15, 30, 15},
     {50, 25, 50, 25}};
 
-const vector<char> direct_range = {'F', 'B'};
-
-const vector<char> storev_range = {'C', 'R'};
+// for daily_lapack tests
+// const vector<vector<int>> large_size_range
+//     = {{100, 50, 100, 50}, {200, 100, 200, 100}, {500, 250, 500, 250}, {1000, 500, 1000, 500}};
 
 Arguments larft_setup_arguments(larft_tuple tup)
 {
-    vector<int> size   = std::get<0>(tup);
-    char        direct = std::get<1>(tup);
-    char        storev = std::get<2>(tup);
+    vector<int>  size = std::get<0>(tup);
+    vector<char> op   = std::get<1>(tup);
 
     Arguments arg;
 
@@ -61,8 +67,8 @@ Arguments larft_setup_arguments(larft_tuple tup)
     arg.set<rocblas_int>("ldv", size[2]);
     arg.set<rocblas_int>("ldt", size[3]);
 
-    arg.set<char>("direct", direct);
-    arg.set<char>("storev", storev);
+    arg.set<char>("direct", op[0]);
+    arg.set<char>("storev", op[1]);
 
     // only testing standard use case/defaults for strides
 
@@ -85,7 +91,8 @@ protected:
     {
         Arguments arg = larft_setup_arguments(GetParam());
 
-        if(arg.peek<rocblas_int>("n") == -1 && arg.peek<rocblas_int>("k") == -1)
+        if(arg.peek<rocblas_int>("n") == -1 && arg.peek<rocblas_int>("k") == -1
+           && arg.peek<char>("direct") == 'F' && arg.peek<char>("storev") == 'C')
             testing_larft_bad_arg<API, BATCHED, STRIDED, T, I, SIZE>();
 
         arg.batch_count = 1;
@@ -119,8 +126,10 @@ TEST_P(LARFT_COMPAT_64, __double_complex)
     run_tests<false, false, rocblas_double_complex>();
 }
 
+// INSTANTIATE_TEST_SUITE_P(daily_lapack,
+//                          LARFT_COMPAT_64,
+//                          Combine(ValuesIn(large_size_range), ValuesIn(op_range)));
+
 INSTANTIATE_TEST_SUITE_P(checkin_lapack,
                          LARFT_COMPAT_64,
-                         Combine(ValuesIn(size_range),
-                                 ValuesIn(direct_range),
-                                 ValuesIn(storev_range)));
+                         Combine(ValuesIn(size_range), ValuesIn(op_range)));
