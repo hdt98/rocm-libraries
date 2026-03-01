@@ -1696,7 +1696,7 @@ struct WmmaSelector
     {
 #if defined(__gfx13__)
         return WmmaInstr::wmma_f32_16x16_f16_gfx13;
-#if defined(__gfx120__)
+#elif defined(__gfx120__)
         return WmmaInstr::wmma_f32_16x16x16_f16_gfx12;
 #elif defined(__gfx125__)
         return WmmaInstr::wmma_f32_16x16x32_f16_gfx12;
@@ -1710,7 +1710,7 @@ struct WmmaSelector
     {
 #if defined(__gfx13__)
         return WmmaInstr::wmma_f32_16x16_bf16_gfx13;
-#if defined(__gfx120__)
+#elif defined(__gfx120__)
         return WmmaInstr::wmma_f32_16x16x16_bf16_gfx12;
 #elif defined(__gfx125__)
         return WmmaInstr::wmma_f32_16x16x32_bf16_gfx12;

@@ -788,7 +788,7 @@ struct WmmaTraits<gfx125_t, AType, BType, float, 32, 32, 128>
 // fp8/bf8 specialization - GFX13
 template <>
 struct WmmaTraits<gfx13_t, fp8_t, fp8_t, float, 16, 16, 16>
-    : WmmaTraitsBase<gfx13_t, fp8_t, fp8_t, float>
+    : WmmaTraitsBase<gfx13_t, fp8_t, fp8_t, float, 16>
 {
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
@@ -807,7 +807,7 @@ struct WmmaTraits<gfx13_t, fp8_t, fp8_t, float, 16, 16, 16>
 
 template <>
 struct WmmaTraits<gfx13_t, bf8_t, bf8_t, float, 16, 16, 16>
-    : WmmaTraitsBase<gfx13_t, bf8_t, bf8_t, float>
+    : WmmaTraitsBase<gfx13_t, bf8_t, bf8_t, float, 16>
 {
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
@@ -826,7 +826,7 @@ struct WmmaTraits<gfx13_t, bf8_t, bf8_t, float, 16, 16, 16>
 
 template <>
 struct WmmaTraits<gfx13_t, fp8_t, bf8_t, float, 16, 16, 16>
-    : WmmaTraitsBase<gfx13_t, fp8_t, bf8_t, float>
+    : WmmaTraitsBase<gfx13_t, fp8_t, bf8_t, float, 16>
 {
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
@@ -845,7 +845,7 @@ struct WmmaTraits<gfx13_t, fp8_t, bf8_t, float, 16, 16, 16>
 
 template <>
 struct WmmaTraits<gfx13_t, bf8_t, fp8_t, float, 16, 16, 16>
-    : WmmaTraitsBase<gfx13_t, bf8_t, fp8_t, float>
+    : WmmaTraitsBase<gfx13_t, bf8_t, fp8_t, float, 16>
 {
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType

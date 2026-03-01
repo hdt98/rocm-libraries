@@ -1143,7 +1143,7 @@ struct waitcnt_arg
     }
 };
 
-#if defined(__gfx12__)
+#if defined(__gfx12__) || defined(__gfx13__)
 extern "C" CK_TILE_DEVICE_EXTERN void
 llvm_amdgcn_s_wait_dscnt(unsigned short count) asm("llvm.amdgcn.s.wait.dscnt");
 
@@ -1248,8 +1248,7 @@ CK_TILE_DEVICE void block_sync_lds_direct_load()
     __builtin_amdgcn_s_wait_asynccnt(vmcnt);
     __builtin_amdgcn_s_barrier_signal(-1);
     __builtin_amdgcn_s_barrier_wait(-1);
-#else
-#if defined(__gfx13__)
+#elif defined(__gfx13__)
     asm volatile("\
     s_wait_loadcnt 0x0 \n \
     s_wait_kmcnt 0x0 \n \
@@ -1399,6 +1398,8 @@ CK_TILE_DEVICE static constexpr auto get_max_vgpr_count(gfx120_t) { return 256; 
 
 CK_TILE_DEVICE static constexpr auto get_max_vgpr_count(gfx125_t) { return 1024; }
 
+CK_TILE_DEVICE static constexpr auto get_max_vgpr_count(gfx13_t) { return 1024; }
+
 CK_TILE_DEVICE static constexpr auto get_max_vgpr_count(gfx950_t) { return 512; }
 
 CK_TILE_DEVICE static constexpr auto get_max_vgpr_count(gfx_invalid_t) { return 0; }
@@ -1413,6 +1414,8 @@ CK_TILE_DEVICE static constexpr auto get_lds_size(gfx11_t) { return 64 * 1024; }
 CK_TILE_DEVICE static constexpr auto get_lds_size(gfx120_t) { return 64 * 1024; }
 
 CK_TILE_DEVICE static constexpr auto get_lds_size(gfx125_t) { return 320 * 1024; }
+
+CK_TILE_DEVICE static constexpr auto get_lds_size(gfx13_t) { return 192 * 1024; }
 
 CK_TILE_DEVICE static constexpr auto get_lds_size(gfx950_t) { return 160 * 1024; }
 

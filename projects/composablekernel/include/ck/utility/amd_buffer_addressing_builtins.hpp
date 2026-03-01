@@ -180,24 +180,6 @@ make_wave_buffer_resource_with_default_range_new(T CK_CONSTANT_ADDRESS_SPACE* p_
 }
 #endif
 
-#if defined(__gfx125__)
-// SW workaround for HW issue: SMEM Buffer Ops Misinterpreting V# NUM_RECORDS (A)
-// W/A - set STRIDE to 1 for constant address space buffer access
-template <typename T>
-__device__ __amdgpu_buffer_rsrc_t
-make_wave_buffer_resource_with_default_range_new(T CK_CONSTANT_ADDRESS_SPACE* p_wave)
-{
-    // Cast constant address space pointer to generic and set stride = 1
-    auto p         = const_cast<remove_cv_t<T>*>(cast_pointer_to_generic_address_space(p_wave));
-    int32_t stride = 1; // stride = 1 for constant address space buffer access
-    int32_t num    = 0xffffffff;
-    auto flags     = CK_BUFFER_RESOURCE_3RD_DWORD;
-
-    return __builtin_amdgcn_make_buffer_rsrc(p, stride, num, flags);
-}
-#endif
-
-#if defined(__gfx13__)
 // buffer atomic-add fp16
 __device__ half2_t llvm_amdgcn_raw_buffer_atomic_add_fp16x2(
     half2_t vdata,
@@ -226,37 +208,6 @@ __device__ double llvm_amdgcn_raw_buffer_atomic_max_fp64(
     int voffset,    // dst_thread_addr_offset
     int soffset,    // dst_wave_addr_offset
     int glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fmax.f64.v4i32");
-
-#else
-// buffer atomic-add fp16
-__device__ half2_t llvm_amdgcn_raw_buffer_atomic_add_fp16x2(
-    half2_t vdata,
-    int32x4_t rsrc,
-    index_t voffset,
-    index_t soffset,
-    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.v2f16.v4i32");
-
-__device__ int32_t llvm_amdgcn_raw_buffer_atomic_add_i32(
-    int32_t vdata,
-    int32x4_t rsrc,
-    index_t voffset,
-    index_t soffset,
-    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.add.i32.v4i32");
-
-__device__ float llvm_amdgcn_raw_buffer_atomic_add_fp32(
-    float vdata,
-    int32x4_t rsrc,
-    index_t voffset,
-    index_t soffset,
-    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.f32.v4i32");
-
-__device__ double llvm_amdgcn_raw_buffer_atomic_max_fp64(
-    double vdata,
-    int32x4_t rsrc, // dst_wave_buffer_resource
-    int voffset,    // dst_thread_addr_offset
-    int soffset,    // dst_wave_addr_offset
-    int glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fmax.f64.v4i32");
-#endif
 
 // To do: need refactor as a tuple for combination load
 enum struct TensorLoadOption
@@ -1120,7 +1071,7 @@ __device__ void amd_async_store_to_global_impl_raw(__attribute__((address_space(
 
     // ROCm 7.0.1 compiler flags unsupported builtins even though the function is never instantiated
     // for gfx9xx architectures
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
     if constexpr(NumBytesPerThread == 1)
     {
         __attribute__((address_space(3))) char* lds_ptr =
@@ -1219,7 +1170,7 @@ template <typename T,
 __device__ void amd_async_store_to_global_impl(__attribute__((address_space(3))) const T* src_ptr,
                                                __attribute__((address_space(1))) T* dst_ptr)
 {
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
     // copy 8, 32, 64, or 128 bit per thread
     static_assert((is_same<T, double>::value && (N == 1 || N == 2)) ||
                       (is_same<T, float>::value && (N == 1 || N == 2 || N == 4)) ||
@@ -1293,7 +1244,7 @@ __device__ void amd_async_store_lds_to_global(const T* lds_base_ptr,
         __attribute__((address_space(1))) T* global_ptr =
             reinterpret_cast<__attribute__((address_space(1))) T*>(
                 reinterpret_cast<uintptr_t>(global_base_ptr + global_offset));
-        amd_async_store_to_global_impl<T, NumElemsPerThread, coherence>(lds_ptr, global_ptr);
+        amd_async_store_to_global_impl<T, NumElemsPerThread, 0, coherence>(lds_ptr, global_ptr);
     }
 }
 
@@ -1391,67 +1342,6 @@ __device__ void amd_async_copy_to_lds_impl_raw(__attribute__((address_space(1)))
 
 template <typename T,
           index_t N,
-          AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence>
-__device__ void amd_async_store_to_global_impl_raw(__attribute__((address_space(3)))
-                                                   const T* src_ptr,
-                                                   __attribute__((address_space(1))) T* dst_ptr)
-{
-#if defined(__gfx13__)
-    if constexpr(N == 1)
-    {
-        __attribute__((address_space(3))) char* lds_ptr =
-            const_cast<__attribute__((address_space(3))) char*>(
-                reinterpret_cast<const __attribute__((address_space(3))) char*>(src_ptr));
-        __attribute__((address_space(1))) char* global_ptr =
-            reinterpret_cast<__attribute__((address_space(1))) char*>(dst_ptr);
-        __builtin_amdgcn_global_store_async_from_lds_b8(
-            global_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
-        return;
-    }
-
-    if constexpr(N == 4)
-    {
-        __attribute__((address_space(3))) int* lds_ptr =
-            const_cast<__attribute__((address_space(3))) int*>(
-                reinterpret_cast<const __attribute__((address_space(3))) int*>(src_ptr));
-        __attribute__((address_space(1))) int* global_ptr =
-            reinterpret_cast<__attribute__((address_space(1))) int*>(dst_ptr);
-        __builtin_amdgcn_global_store_async_from_lds_b32(
-            global_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
-        return;
-    }
-
-    if constexpr(N == 8)
-    {
-        __attribute__((address_space(3))) int32x2_t* lds_ptr =
-            const_cast<__attribute__((address_space(3))) int32x2_t*>(
-                reinterpret_cast<const __attribute__((address_space(3))) int32x2_t*>(src_ptr));
-        __attribute__((address_space(1))) int32x2_t* global_ptr =
-            reinterpret_cast<__attribute__((address_space(1))) int32x2_t*>(dst_ptr);
-        __builtin_amdgcn_global_store_async_from_lds_b64(
-            global_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
-        return;
-    }
-
-    if constexpr(N == 16)
-    {
-        __attribute__((address_space(3))) int32x4_t* lds_ptr =
-            const_cast<__attribute__((address_space(3))) int32x4_t*>(
-                reinterpret_cast<const __attribute__((address_space(3))) int32x4_t*>(src_ptr));
-        __attribute__((address_space(1))) int32x4_t* global_ptr =
-            reinterpret_cast<__attribute__((address_space(1))) int32x4_t*>(dst_ptr);
-        __builtin_amdgcn_global_store_async_from_lds_b128(
-            global_ptr, lds_ptr, 0, static_cast<index_t>(coherence));
-        return;
-    }
-#else
-    ignore = src_ptr;
-    ignore = dst_ptr;
-#endif
-}
-
-template <typename T,
-          index_t N,
           AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence,
           bool multicast                   = false>
 __device__ void amd_async_copy_to_lds_impl(__attribute__((address_space(1))) const T* src_ptr,
@@ -1470,28 +1360,6 @@ __device__ void amd_async_copy_to_lds_impl(__attribute__((address_space(1))) con
                   "wrong! not implemented");
 
     amd_async_copy_to_lds_impl_raw<T, sizeof(T) * N, coherence, multicast>(src_ptr, dst_ptr);
-    return;
-}
-
-template <typename T,
-          index_t N,
-          AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence>
-__device__ void amd_async_store_to_global_impl(__attribute__((address_space(3))) const T* src_ptr,
-                                               __attribute__((address_space(1))) T* dst_ptr)
-{
-    // currently only support to b8, b32, b64, b128 when one async copy
-    static_assert((is_same<T, double>::value && (N == 1 || N == 2)) ||
-                      (is_same<T, float>::value && (N == 1 || N == 2 || N == 4)) ||
-                      (is_same<T, int32_t>::value && (N == 1 || N == 2 || N == 4)) ||
-                      (is_same<T, half_t>::value && (N == 2 || N == 4 || N == 8)) ||
-                      (is_same<T, bhalf_t>::value && (N == 2 || N == 4 || N == 8)) ||
-                      (is_same<T, f8_t>::value && (N == 1 || N == 4 || N == 8 || N == 16)) ||
-                      (is_same<T, bf8_t>::value && (N == 1 || N == 4 || N == 8 || N == 16)) ||
-                      (is_same<T, int8_t>::value && (N == 1 || N == 4 || N == 8 || N == 16)) ||
-                      (is_same<T, uint8_t>::value && (N == 1 || N == 4 || N == 8 || N == 16)),
-                  "wrong! not implemented");
-
-    amd_async_store_to_global_impl_raw<T, sizeof(T) * N, coherence>(src_ptr, dst_ptr);
     return;
 }
 
@@ -1534,35 +1402,6 @@ __device__ void amd_async_load_global_to_lds(const T* global_base_ptr,
         {
             return; // do nothing
         }
-    }
-}
-
-template <typename T,
-          index_t NumElemsPerThread,
-          AmdBufferCoherenceEnum coherence = AmdBufferCoherenceEnum::DefaultCoherence>
-__device__ void amd_async_store_lds_to_global(const T* lds_base_ptr,
-                                              const index_t lds_offset,
-                                              T* global_base_ptr,
-                                              const index_t global_offset,
-                                              const bool is_src_valid,
-                                              const bool is_dst_valid)
-{
-    if(is_src_valid && is_dst_valid)
-    {
-#if defined(__gfx13__)
-        __attribute__((address_space(3))) const T* lds_ptr =
-            reinterpret_cast<__attribute__((address_space(3))) T*>(
-                reinterpret_cast<uintptr_t>(lds_base_ptr + lds_offset));
-        __attribute__((address_space(1))) T* global_ptr =
-            reinterpret_cast<__attribute__((address_space(1))) T*>(
-                reinterpret_cast<uintptr_t>(global_base_ptr + global_offset));
-        amd_async_store_to_global_impl<T, NumElemsPerThread, coherence>(lds_ptr, global_ptr);
-#else
-        ignore = lds_base_ptr;
-        ignore = lds_offset;
-        ignore = global_base_ptr;
-        ignore = global_offset;
-#endif
     }
 }
 

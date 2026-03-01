@@ -543,45 +543,7 @@ struct GridwiseGemmMultipleD_Wmma
     template <typename ABlockDesc_>
     __host__ __device__ static constexpr auto MakeAWaveDescriptor(const ABlockDesc_&)
     {
-
 #if defined(__gfx13__)
-        constexpr auto a_wave_desc = [&]() {
-            if constexpr(AEnableLds)
-            {
-                // AK0_M_AK1 -> AK0_MRepeat_Mwaves_AKRow_MPerWmma_AK1
-                constexpr auto A_K0 = ABlockDesc_{}.GetLength(I0);
-                constexpr auto A_K1 = ABlockDesc_{}.GetLength(I2);
-
-                constexpr auto A_KRow = I2;
-
-                return transform_tensor_descriptor(
-                    ABlockDesc_{},
-                    make_tuple(make_unmerge_transform(make_tuple(Number<A_K0 / A_KRow>{}, A_KRow)),
-                               make_unmerge_transform(make_tuple(
-                                   Number<MRepeat>{}, Number<MWaves>{}, Number<MPerWmma>{})),
-                               make_pass_through_transform(Number<A_K1>{})),
-                    make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}),
-                    make_tuple(Sequence<1, 3>{}, Sequence<0, 2, 4>{}, Sequence<5>{}));
-            }
-            else
-            {
-                // KWmma_MRepeat_MWave_K0PerWmma_KRow_MPerWmma_K1 -> K0_MRepeat_Mwaves_MPerWmma_K1
-                constexpr auto KWmma     = ABlockDesc_{}.GetLength(I0);
-                constexpr auto K0PerWmma = ABlockDesc_{}.GetLength(I4);
-                constexpr auto A_KRow    = ABlockDesc_{}.GetLength(I5);
-                constexpr auto A_K1      = ABlockDesc_{}.GetLength(I7);
-
-                return make_naive_tensor_descriptor_packed(make_tuple(Number<MRepeat>{},
-                                                                      Number<KWmma * K0PerWmma>{},
-                                                                      I1,
-                                                                      Number<A_KRow>{},
-                                                                      I1,
-                                                                      Number<A_K1>{}));
-            }
-        }();
-
-        return a_wave_desc;
-#else
         constexpr auto a_wave_desc = [&]() {
             if constexpr(AEnableLds)
             {
@@ -1166,7 +1128,7 @@ struct GridwiseGemmMultipleD_Wmma
                                                 make_tuple(make_unmerge_transform(make_tuple(M0, Number<MRepeat>{})),
                                                             make_pass_through_transform(A_OriginKWmma),
                                                             make_pass_through_transform(Number<OriginMWaves>{}),
-                                                            make_pass_through_transform(Number<A_OriginK0PerWmma>{}),
+                                                            make_pass_through_transform(A_OriginK0PerWmma),
                                                             make_pass_through_transform(Number<A_OriginKRow>{}),
                                                             make_pass_through_transform(Number<OriginMPerWmma>{}),
                                                             make_pass_through_transform(A_OriginK1Number)),
@@ -1198,7 +1160,7 @@ struct GridwiseGemmMultipleD_Wmma
                                             make_tuple(make_unmerge_transform(make_tuple(N0, Number<NRepeat>{})),
                                                     make_pass_through_transform(B_OriginKWmma),
                                                     make_pass_through_transform(Number<OriginNWaves>{}),
-                                                    make_pass_through_transform(Number<B_OriginK0PerWmma>{}),
+                                                    make_pass_through_transform(B_OriginK0PerWmma),
                                                     make_pass_through_transform(Number<B_OriginKRow>{}),
                                                     make_pass_through_transform(Number<OriginNPerWmma>{}),
                                                     make_pass_through_transform(B_OriginK1Number)),

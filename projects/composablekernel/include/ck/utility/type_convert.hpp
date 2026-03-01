@@ -52,7 +52,6 @@ inline __host__ __device__ constexpr bhalf_t bf16_convert_rtn<bhalf_t, float>(fl
     return static_cast<__bf16>(x);
 #else
     // Nan check
-    uint16_t ret = 0;
     if(x != x)
     {
         return bit_cast<bhalf_t>(uint16_t(0x7FC0));

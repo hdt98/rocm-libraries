@@ -120,30 +120,17 @@ using WarpGemmAttributeWmmaImpl_f32_16x16x16_bf16_bf16 =
 using WarpGemmAttributeWmmaImpl_i32_16x16x16_i8_i8 =
     WarpGemmAttributeWmmaImpl<WmmaTraits<DeviceIp, int8_t, int8_t, int32_t, 16, 16, 16>>;
 
-#if defined(__gfx13__)
 using WarpGemmAttributeWmmaImpl_f32_16x16x16_f8_f8 =
-    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx13_t, fp8_t, fp8_t, float, 16, 16, 16>>;
+    WarpGemmAttributeWmmaImpl<WmmaTraits<DeviceIp, fp8_t, fp8_t, float, 16, 16, 16>>;
 
 using WarpGemmAttributeWmmaImpl_f32_16x16x16_bf8_bf8 =
-    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx13_t, bf8_t, bf8_t, float, 16, 16, 16>>;
+    WarpGemmAttributeWmmaImpl<WmmaTraits<DeviceIp, bf8_t, bf8_t, float, 16, 16, 16>>;
 
 using WarpGemmAttributeWmmaImpl_f32_16x16x16_f8_bf8 =
-    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx13_t, fp8_t, bf8_t, float, 16, 16, 16>>;
+    WarpGemmAttributeWmmaImpl<WmmaTraits<DeviceIp, fp8_t, bf8_t, float, 16, 16, 16>>;
 
 using WarpGemmAttributeWmmaImpl_f32_16x16x16_bf8_f8 =
-    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx13_t, bf8_t, fp8_t, float, 16, 16, 16>>;
-#else
-using WarpGemmAttributeWmmaImpl_f32_16x16x16_f8_f8 =
-    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx120_t, fp8_t, fp8_t, float, 16, 16, 16>>;
-
-using WarpGemmAttributeWmmaImpl_f32_16x16x16_bf8_bf8 =
-    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx120_t, bf8_t, bf8_t, float, 16, 16, 16>>;
-
-using WarpGemmAttributeWmmaImpl_f32_16x16x16_f8_bf8 =
-    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx120_t, fp8_t, bf8_t, float, 16, 16, 16>>;
-
-using WarpGemmAttributeWmmaImpl_f32_16x16x16_bf8_f8 =
-    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx120_t, bf8_t, fp8_t, float, 16, 16, 16>>;
+    WarpGemmAttributeWmmaImpl<WmmaTraits<DeviceIp, bf8_t, fp8_t, float, 16, 16, 16>>;
 
 using WarpGemmAttributeWmmaImpl_f32_16x16x32_f16_f16 =
     WarpGemmAttributeWmmaImpl<WmmaTraits<gfx125_t, fp16_t, fp16_t, float, 16, 16, 32>>;
@@ -203,7 +190,6 @@ using WarpGemmAttributeWmmaImpl_f32_16x16x128_f8f6f4 =
 template <typename AType, typename BType>
 using WarpGemmAttributeWmmaImpl_f32_32x32x128_f8f6f4 =
     WarpGemmAttributeWmmaImpl<WmmaTraits<gfx125_t, AType, BType, float, 32, 32, 128>>;
-#endif
 
 template <typename Arch,
           typename AType,

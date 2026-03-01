@@ -580,7 +580,6 @@ inline __device__ bhalf_t tanh<bhalf_t>(bhalf_t x)
 #else
     return ck::type_convert<bhalf_t>(::tanhf(ck::type_convert<float>(x)));
 #endif
-#endif
 };
 
 template <>

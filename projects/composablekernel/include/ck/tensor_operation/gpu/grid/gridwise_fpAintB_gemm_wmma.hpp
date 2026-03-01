@@ -441,6 +441,7 @@ struct GridwiseFpAintBGemm_Wmma
                                    Sequence<4>{},
                                    Sequence<5>{}));
                 }
+#endif
             }
         }();
 
@@ -529,6 +530,7 @@ struct GridwiseFpAintBGemm_Wmma
                                    Sequence<4>{},
                                    Sequence<5>{}));
                 }
+#endif
             }
         }();
 
@@ -765,7 +767,7 @@ struct GridwiseFpAintBGemm_Wmma
                     make_tuple(make_unmerge_transform(make_tuple(M0, Number<MRepeat>{})),
                                make_pass_through_transform(A_OriginKWmma),
                                make_pass_through_transform(Number<OriginMWaves>{}),
-                               make_pass_through_transform(Number<A_OriginK0PerWmma>{}),
+                               make_pass_through_transform(A_OriginK0PerWmma),
                                make_pass_through_transform(Number<A_OriginKRow>{}),
                                make_pass_through_transform(Number<OriginMPerWmma>{}),
                                make_pass_through_transform(A_OriginK1Number)),
@@ -810,7 +812,7 @@ struct GridwiseFpAintBGemm_Wmma
                     make_tuple(make_unmerge_transform(make_tuple(N0, Number<NRepeat>{})),
                                make_pass_through_transform(B_OriginKWmma),
                                make_pass_through_transform(Number<OriginNWaves>{}),
-                               make_pass_through_transform(Number<B_OriginK0PerWmma>{}),
+                               make_pass_through_transform(B_OriginK0PerWmma),
                                make_pass_through_transform(Number<B_OriginKRow>{}),
                                make_pass_through_transform(Number<OriginNPerWmma>{}),
                                make_pass_through_transform(B_OriginK1Number)),

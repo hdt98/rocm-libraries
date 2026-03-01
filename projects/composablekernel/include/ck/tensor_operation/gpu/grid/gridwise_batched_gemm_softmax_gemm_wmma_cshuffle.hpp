@@ -120,8 +120,8 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
     static constexpr auto WmmaK = 16;
     static constexpr auto WmmaL = 16;
 #endif
-
-    using ThisThreadBlock = ThisThreadBlock<BlockSize>;
+    static constexpr auto KPerWmma = 16;
+    using ThisThreadBlock          = ThisThreadBlock<BlockSize>;
 
     using GridwiseGemmPipe =
         remove_cvref_t<decltype(GridwiseGemmPipeline_Selector<PipelineVer,
@@ -499,19 +499,6 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
                 constexpr auto K0PerWmma = ABlockDesc_{}.GetLength(I4);
                 constexpr auto A_KRow    = ABlockDesc_{}.GetLength(I5);
                 constexpr auto A_K1      = ABlockDesc_{}.GetLength(I7);
-                
-                return make_naive_tensor_descriptor_packed(make_tuple(Number<MRepeat>{},
-                                                                      Number<KWmma * K0PerWmma>{},
-                                                                      I1,
-                                                                      Number<A_KRow>{},
-                                                                      I1,
-                                                                      Number<A_K1>{}));
-#else
-                // KWmma_MRepeat_MWave_K0PerWmma_KRow_MPerWmma_K1 -> K0_MRepeat_Mwaves_MPerWmma_K1
-                constexpr auto KWmma     = ABlockDesc_{}.GetLength(I0);
-                constexpr auto K0PerWmma = ABlockDesc_{}.GetLength(I4);
-                constexpr auto A_KRow    = ABlockDesc_{}.GetLength(I5);
-                constexpr auto A_K1      = ABlockDesc_{}.GetLength(I7);
 
                 return make_naive_tensor_descriptor_packed(make_tuple(Number<MRepeat>{},
                                                                       Number<KWmma * K0PerWmma>{},
@@ -559,6 +546,7 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
                                    Sequence<4>{},
                                    Sequence<5>{}));
                 }
+#endif
             }
         }();
 
@@ -632,20 +620,6 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
                                                                       Number<B_K1>{}));
 #else
                 // KWmma_MRepeat_MWave_K0PerWmma_KRow_MPerWmma_K1 -> K0_MRepeat_Mwaves_MPerWmma_K1
-                constexpr auto KWmma     = B0BlockDesc_{}.GetLength(I0);
-                constexpr auto K0PerWmma = B0BlockDesc_{}.GetLength(I4);
-                constexpr auto B_KRow    = B0BlockDesc_{}.GetLength(I5);
-                constexpr auto B_K1      = B0BlockDesc_{}.GetLength(I7);
-
-                // Workaround, Freeze transform
-                return make_naive_tensor_descriptor_packed(make_tuple(Number<LRepeat>{},
-                                                                      Number<KWmma * K0PerWmma>{},
-                                                                      I1,
-                                                                      Number<B_KRow>{},
-                                                                      I1,
-                                                                      Number<B_K1>{}));
-#else
-                // KWmma_MRepeat_MWave_K0PerWmma_KRow_MPerWmma_K1 -> K0_MRepeat_Mwaves_MPerWmma_K1
                 constexpr auto KWmmaPerblock = B0BlockDesc_{}.GetLength(I0);
                 constexpr auto K0PerWmma     = B0BlockDesc_{}.GetLength(I3);
                 constexpr auto B_K1          = B0BlockDesc_{}.GetLength(I6);
@@ -684,6 +658,7 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
                                    Sequence<4>{},
                                    Sequence<5>{}));
                 }
+#endif
             }
         }();
 
@@ -812,6 +787,7 @@ struct GridwiseBatchedGemmSoftmaxGemm_Wmma
                                    Sequence<4>{},
                                    Sequence<5>{}));
                 }
+#endif
             }
         }();
 
@@ -1132,7 +1108,7 @@ const auto a_grid_desc = [&](){
                                                 make_tuple(make_unmerge_transform(make_tuple(M0, Number<MRepeat>{})),
                                                             make_pass_through_transform(A_OriginKWmma),
                                                             make_pass_through_transform(Number<OriginMWaves>{}),
-                                                            make_pass_through_transform(Number<A_OriginK0PerWmma>{}),
+                                                            make_pass_through_transform(A_OriginK0PerWmma),
                                                             make_pass_through_transform(Number<A_OriginKRow>{}),
                                                             make_pass_through_transform(Number<OriginMPerWmma>{}),
                                                             make_pass_through_transform(A_OriginK1Number)),
@@ -1164,7 +1140,7 @@ const auto a_grid_desc = [&](){
                                             make_tuple(make_unmerge_transform(make_tuple(N0, Number<NRepeat>{})),
                                                     make_pass_through_transform(B_OriginKWmma),
                                                     make_pass_through_transform(Number<OriginNWaves>{}),
-                                                    make_pass_through_transform(Number<B_OriginK0PerWmma>{}),
+                                                    make_pass_through_transform(B_OriginK0PerWmma),
                                                     make_pass_through_transform(Number<B_OriginKRow>{}),
                                                     make_pass_through_transform(Number<OriginNPerWmma>{}),
                                                     make_pass_through_transform(B_OriginK1Number)),
@@ -1196,7 +1172,7 @@ const auto a_grid_desc = [&](){
                                             make_tuple(make_unmerge_transform(make_tuple(N0, Number<NRepeat>{})),
                                                     make_pass_through_transform(B_OriginKWmma),
                                                     make_pass_through_transform(Number<OriginNWaves>{}),
-                                                    make_pass_through_transform(Number<B_OriginK0PerWmma>{}),
+                                                    make_pass_through_transform(B_OriginK0PerWmma),
                                                     make_pass_through_transform(Number<B_OriginKRow>{}),
                                                     make_pass_through_transform(Number<OriginNPerWmma>{}),
                                                     make_pass_through_transform(B_OriginK1Number)),
