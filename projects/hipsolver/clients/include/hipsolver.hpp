@@ -2311,47 +2311,47 @@ inline hipsolverStatus_t hipsolver_gels(testAPI_t               API,
 }
 
 // gelsBatched - array of pointers
-inline hipsolverStatus_t hipsolver_gels_bufferSize(testAPI_t         API,
-                                                   hipsolverHandle_t handle,
-                                                   int               m,
-                                                   int               n,
-                                                   int               nrhs,
-                                                   float*            A[],
-                                                   int               lda,
-                                                   float*            B[],
-                                                   int               ldb,
-                                                   size_t*           lwork,
-                                                   int               bc)
+inline hipsolverStatus_t hipsolver_gelsBatched_bufferSize(testAPI_t         API,
+                                                          hipsolverHandle_t handle,
+                                                          int               m,
+                                                          int               n,
+                                                          int               nrhs,
+                                                          float*            A[],
+                                                          int               lda,
+                                                          float*            B[],
+                                                          int               ldb,
+                                                          size_t*           lwork,
+                                                          int               bc)
 {
     return hipsolverSSgelsBatched_bufferSize(handle, m, n, nrhs, A, lda, B, ldb, B, ldb, lwork, bc);
 }
 
-inline hipsolverStatus_t hipsolver_gels_bufferSize(testAPI_t         API,
-                                                   hipsolverHandle_t handle,
-                                                   int               m,
-                                                   int               n,
-                                                   int               nrhs,
-                                                   double*           A[],
-                                                   int               lda,
-                                                   double*           B[],
-                                                   int               ldb,
-                                                   size_t*           lwork,
-                                                   int               bc)
+inline hipsolverStatus_t hipsolver_gelsBatched_bufferSize(testAPI_t         API,
+                                                          hipsolverHandle_t handle,
+                                                          int               m,
+                                                          int               n,
+                                                          int               nrhs,
+                                                          double*           A[],
+                                                          int               lda,
+                                                          double*           B[],
+                                                          int               ldb,
+                                                          size_t*           lwork,
+                                                          int               bc)
 {
     return hipsolverDDgelsBatched_bufferSize(handle, m, n, nrhs, A, lda, B, ldb, B, ldb, lwork, bc);
 }
 
-inline hipsolverStatus_t hipsolver_gels_bufferSize(testAPI_t         API,
-                                                   hipsolverHandle_t handle,
-                                                   int               m,
-                                                   int               n,
-                                                   int               nrhs,
-                                                   hipsolverComplex* A[],
-                                                   int               lda,
-                                                   hipsolverComplex* B[],
-                                                   int               ldb,
-                                                   size_t*           lwork,
-                                                   int               bc)
+inline hipsolverStatus_t hipsolver_gelsBatched_bufferSize(testAPI_t         API,
+                                                          hipsolverHandle_t handle,
+                                                          int               m,
+                                                          int               n,
+                                                          int               nrhs,
+                                                          hipsolverComplex* A[],
+                                                          int               lda,
+                                                          hipsolverComplex* B[],
+                                                          int               ldb,
+                                                          size_t*           lwork,
+                                                          int               bc)
 {
     return hipsolverCCgelsBatched_bufferSize(handle,
                                              m,
@@ -2367,17 +2367,17 @@ inline hipsolverStatus_t hipsolver_gels_bufferSize(testAPI_t         API,
                                              bc);
 }
 
-inline hipsolverStatus_t hipsolver_gels_bufferSize(testAPI_t               API,
-                                                   hipsolverHandle_t       handle,
-                                                   int                     m,
-                                                   int                     n,
-                                                   int                     nrhs,
-                                                   hipsolverDoubleComplex* A[],
-                                                   int                     lda,
-                                                   hipsolverDoubleComplex* B[],
-                                                   int                     ldb,
-                                                   size_t*                 lwork,
-                                                   int                     bc)
+inline hipsolverStatus_t hipsolver_gelsBatched_bufferSize(testAPI_t               API,
+                                                          hipsolverHandle_t       handle,
+                                                          int                     m,
+                                                          int                     n,
+                                                          int                     nrhs,
+                                                          hipsolverDoubleComplex* A[],
+                                                          int                     lda,
+                                                          hipsolverDoubleComplex* B[],
+                                                          int                     ldb,
+                                                          size_t*                 lwork,
+                                                          int                     bc)
 {
     return hipsolverZZgelsBatched_bufferSize(handle,
                                              m,
@@ -2393,55 +2393,55 @@ inline hipsolverStatus_t hipsolver_gels_bufferSize(testAPI_t               API,
                                              bc);
 }
 
-inline hipsolverStatus_t hipsolver_gels(testAPI_t         API,
-                                        hipsolverHandle_t handle,
-                                        int               m,
-                                        int               n,
-                                        int               nrhs,
-                                        float*            A[],
-                                        int               lda,
-                                        float*            B[],
-                                        int               ldb,
-                                        void*             work,
-                                        size_t            lwork,
-                                        int*              info,
-                                        int               bc)
+inline hipsolverStatus_t hipsolver_gelsBatched(testAPI_t         API,
+                                               hipsolverHandle_t handle,
+                                               int               m,
+                                               int               n,
+                                               int               nrhs,
+                                               float*            A[],
+                                               int               lda,
+                                               float*            B[],
+                                               int               ldb,
+                                               void*             work,
+                                               size_t            lwork,
+                                               int*              info,
+                                               int               bc)
 {
     return hipsolverSSgelsBatched(
         handle, m, n, nrhs, A, lda, B, ldb, B, ldb, work, lwork, info, bc);
 }
 
-inline hipsolverStatus_t hipsolver_gels(testAPI_t         API,
-                                        hipsolverHandle_t handle,
-                                        int               m,
-                                        int               n,
-                                        int               nrhs,
-                                        double*           A[],
-                                        int               lda,
-                                        double*           B[],
-                                        int               ldb,
-                                        void*             work,
-                                        size_t            lwork,
-                                        int*              info,
-                                        int               bc)
+inline hipsolverStatus_t hipsolver_gelsBatched(testAPI_t         API,
+                                               hipsolverHandle_t handle,
+                                               int               m,
+                                               int               n,
+                                               int               nrhs,
+                                               double*           A[],
+                                               int               lda,
+                                               double*           B[],
+                                               int               ldb,
+                                               void*             work,
+                                               size_t            lwork,
+                                               int*              info,
+                                               int               bc)
 {
     return hipsolverDDgelsBatched(
         handle, m, n, nrhs, A, lda, B, ldb, B, ldb, work, lwork, info, bc);
 }
 
-inline hipsolverStatus_t hipsolver_gels(testAPI_t         API,
-                                        hipsolverHandle_t handle,
-                                        int               m,
-                                        int               n,
-                                        int               nrhs,
-                                        hipsolverComplex* A[],
-                                        int               lda,
-                                        hipsolverComplex* B[],
-                                        int               ldb,
-                                        void*             work,
-                                        size_t            lwork,
-                                        int*              info,
-                                        int               bc)
+inline hipsolverStatus_t hipsolver_gelsBatched(testAPI_t         API,
+                                               hipsolverHandle_t handle,
+                                               int               m,
+                                               int               n,
+                                               int               nrhs,
+                                               hipsolverComplex* A[],
+                                               int               lda,
+                                               hipsolverComplex* B[],
+                                               int               ldb,
+                                               void*             work,
+                                               size_t            lwork,
+                                               int*              info,
+                                               int               bc)
 {
     return hipsolverCCgelsBatched(handle,
                                   m,
@@ -2459,19 +2459,19 @@ inline hipsolverStatus_t hipsolver_gels(testAPI_t         API,
                                   bc);
 }
 
-inline hipsolverStatus_t hipsolver_gels(testAPI_t               API,
-                                        hipsolverHandle_t       handle,
-                                        int                     m,
-                                        int                     n,
-                                        int                     nrhs,
-                                        hipsolverDoubleComplex* A[],
-                                        int                     lda,
-                                        hipsolverDoubleComplex* B[],
-                                        int                     ldb,
-                                        void*                   work,
-                                        size_t                  lwork,
-                                        int*                    info,
-                                        int                     bc)
+inline hipsolverStatus_t hipsolver_gelsBatched(testAPI_t               API,
+                                               hipsolverHandle_t       handle,
+                                               int                     m,
+                                               int                     n,
+                                               int                     nrhs,
+                                               hipsolverDoubleComplex* A[],
+                                               int                     lda,
+                                               hipsolverDoubleComplex* B[],
+                                               int                     ldb,
+                                               void*                   work,
+                                               size_t                  lwork,
+                                               int*                    info,
+                                               int                     bc)
 {
     return hipsolverZZgelsBatched(handle,
                                   m,
