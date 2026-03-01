@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -79,6 +79,7 @@ class hipsolver_dispatcher
         static const func_map map = {
             {"gebrd", testing_gebrd<API_NORMAL, false, false, T>},
             {"gels", testing_gels<API_NORMAL, false, false, false, T>},
+            {"gels_batched", testing_gels<API_NORMAL, true, false, true, T>},
             {"geqrf", testing_geqrf<API_NORMAL, false, false, T, int, int>},
             {"geqrf_64", testing_geqrf<API_COMPAT, false, false, T, int64_t, size_t>},
             {"gesv", testing_gesv<API_NORMAL, false, false, false, T>},
