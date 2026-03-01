@@ -7188,6 +7188,8 @@ try
         CHECK_ROCBLAS_ERROR(hipsolverManageWorkspace((rocblas_handle)handle, lwork));
     }
 
+    CHECK_ROCBLAS_ERROR(hipsolverZeroInfo((rocblas_handle)handle, devInfo, batch_count));
+
     if(devIpiv != nullptr)
         return hipsolver::rocblas2hip_status(rocsolver_sgetrf_batched(
             (rocblas_handle)handle, m, n, A, lda, devIpiv, strideP, devInfo, batch_count));
@@ -7222,6 +7224,8 @@ try
         CHECK_ROCBLAS_ERROR(hipsolverManageWorkspace((rocblas_handle)handle, lwork));
     }
 
+    CHECK_ROCBLAS_ERROR(hipsolverZeroInfo((rocblas_handle)handle, devInfo, batch_count));
+
     if(devIpiv != nullptr)
         return hipsolver::rocblas2hip_status(rocsolver_dgetrf_batched(
             (rocblas_handle)handle, m, n, A, lda, devIpiv, strideP, devInfo, batch_count));
@@ -7255,6 +7259,8 @@ try
             (rocblas_handle)handle, m, n, A, lda, strideP, &lwork, batch_count));
         CHECK_ROCBLAS_ERROR(hipsolverManageWorkspace((rocblas_handle)handle, lwork));
     }
+
+    CHECK_ROCBLAS_ERROR(hipsolverZeroInfo((rocblas_handle)handle, devInfo, batch_count));
 
     if(devIpiv != nullptr)
         return hipsolver::rocblas2hip_status(rocsolver_cgetrf_batched((rocblas_handle)handle,
@@ -7296,6 +7302,8 @@ try
             (rocblas_handle)handle, m, n, A, lda, strideP, &lwork, batch_count));
         CHECK_ROCBLAS_ERROR(hipsolverManageWorkspace((rocblas_handle)handle, lwork));
     }
+
+    CHECK_ROCBLAS_ERROR(hipsolverZeroInfo((rocblas_handle)handle, devInfo, batch_count));
 
     if(devIpiv != nullptr)
         return hipsolver::rocblas2hip_status(rocsolver_zgetrf_batched((rocblas_handle)handle,
