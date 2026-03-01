@@ -3856,6 +3856,8 @@ try
     if(B != X)
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
 
+    CHECK_ROCBLAS_ERROR(hipsolverZeroInfo((rocblas_handle)handle, devInfo, batch_count));
+
     return hipsolver::rocblas2hip_status(rocsolver_sgels_batched((rocblas_handle)handle,
                                                                  rocblas_operation_none,
                                                                  m,
@@ -3906,6 +3908,8 @@ try
     // TODO: Implement proper out-of-place support with B->X copying
     if(B != X)
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
+
+    CHECK_ROCBLAS_ERROR(hipsolverZeroInfo((rocblas_handle)handle, devInfo, batch_count));
 
     return hipsolver::rocblas2hip_status(rocsolver_dgels_batched((rocblas_handle)handle,
                                                                  rocblas_operation_none,
@@ -3958,6 +3962,8 @@ try
     if(B != X)
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
 
+    CHECK_ROCBLAS_ERROR(hipsolverZeroInfo((rocblas_handle)handle, devInfo, batch_count));
+
     return hipsolver::rocblas2hip_status(rocsolver_cgels_batched((rocblas_handle)handle,
                                                                  rocblas_operation_none,
                                                                  m,
@@ -4008,6 +4014,8 @@ try
     // TODO: Implement proper out-of-place support with B->X copying
     if(B != X)
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
+
+    CHECK_ROCBLAS_ERROR(hipsolverZeroInfo((rocblas_handle)handle, devInfo, batch_count));
 
     return hipsolver::rocblas2hip_status(rocsolver_zgels_batched((rocblas_handle)handle,
                                                                  rocblas_operation_none,
