@@ -1401,8 +1401,6 @@ struct BlockwiseGemmWMMA
     static constexpr auto I4 = Number<4>{};
     static constexpr auto I5 = Number<5>{};
 
-    static constexpr auto WmmaK = Number<16>{};
-
     using ThisThreadBlock = ThisThreadBlock<BlockSize>;
 
     // Hardcode of WaveSize, since current HIP Runtime(5.4.0-10984) could not return correct one.
@@ -1419,6 +1417,8 @@ struct BlockwiseGemmWMMA
 
     static constexpr auto wmma_gemm =
         WmmaGemm<FloatA, FloatB, FloatAcc, MPerWMMA, NPerWMMA, KPack, TransposeC>{};
+
+    static constexpr auto WmmaK = Number<wmma_gemm.wmma_instr.k_per_wmma>{};
 
     static constexpr index_t MWaves = MPerBlock / (MRepeat * MPerWMMA);
     static constexpr index_t NWaves = NPerBlock / (NRepeat * NPerWMMA);

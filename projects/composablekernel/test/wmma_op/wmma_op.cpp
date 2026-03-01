@@ -18,11 +18,8 @@ static ck::index_t test_case_id = -1;
 
 static ck::index_t case_id = 0;
 
-template <typename SrcType,
-          typename DstType,
-          typename GPUAccType,
-          typename CPUAccType,
-          ck::index_t AccNum>
+// gfx12
+template <typename SrcType, typename DstType, typename GPUAccType, typename CPUAccType>
 bool run_test()
 {
     if(ck::is_gfx13_supported()) // gfx13 uses another test
@@ -54,12 +51,10 @@ bool run_test()
     using PassThrough = ck::tensor_operation::element_wise::PassThrough;
     bool pass         = true;
 
-    const auto matmul_default = ck::wmma_op_util::matmul<SrcType, DstType, GPUAccType, AccNum>;
-    const auto matmul_swizzle_a =
-        ck::wmma_op_util::matmul_swizzle_a<SrcType, DstType, GPUAccType, AccNum>;
+    const auto matmul_default   = ck::wmma_op_util::matmul<SrcType, DstType, GPUAccType>;
+    const auto matmul_swizzle_a = ck::wmma_op_util::matmul_swizzle_a<SrcType, DstType, GPUAccType>;
 
     const auto wmma_kernel_container = std::make_tuple(matmul_default, matmul_swizzle_a);
-
     ck::static_for<0, 2, 1>{}([&](auto i) {
         pass &=
             ck::wmma_op_util::TestWmma<decltype(std::get<ck::Number<i>{}>(wmma_kernel_container)),
@@ -74,27 +69,38 @@ bool run_test()
                                        PassThrough,
                                        PassThrough,
                                        PassThrough,
-                                       AccNum>{}(std::get<ck::Number<i>{}>(wmma_kernel_container));
+                                       1>{}(std::get<ck::Number<i>{}>(wmma_kernel_container));
     });
 
     return pass ? 1 : 0;
 }
 
+// gfx1250, gfx1251
 template <typename SrcAType,
           typename SrcBType,
           typename DstType,
           typename GPUAccType,
           typename CPUAccType,
-          ck::index_t KMultiplier = 1>
+          ck::index_t KMultiplier = 1> // KValue on gfx1250
 bool run_test()
 {
-    if(!ck::is_gfx13_supported())
+    if(!(ck::is_gfx13_supported() || ck::is_gfx125_supported()))
+    {
+        fprintf(stderr,
+                "----- WARNING: gfx1250/gfx13 not supported, reporting SUCCESS and skipping test "
+                "-----\n");
         return true;
+    }
+    else
+    {
+        fprintf(stderr, "----- INFO: gfx1250/gfx13 supported, running test -----\n");
+    }
 
     case_id++;
 
     if(test_case_id != -1 && (test_case_id + 1) != case_id)
     {
+
         return true;
     }
 
@@ -123,9 +129,9 @@ bool run_test()
                                        PassThrough,
                                        PassThrough,
                                        PassThrough,
-                                       8, // not use
                                        KMultiplier>{}(
                 std::get<ck::Number<i>{}>(wmma_kernel_container));
+        kValue > {}(std::get<ck::Number<i>{}>(wmma_kernel_container));
     });
 
     return pass ? 1 : 0;
@@ -188,12 +194,13 @@ bool run_mixedfp_test()
 
 int main(int argc, char* argv[])
 {
+    // bool pass = true;
     bool pass = true;
     if(argc > 1)
     {
         test_case_id = atoi(argv[1]);
     }
-
+#if !defined(CK_USE_GFX1250)
     // clang-format off
     //              |SrcType     |DstType     |GPUAccType  |CPUAccType |AccNum
     pass &= run_test<ck::half_t,  ck::half_t,  float,       float,      8     >();
@@ -325,6 +332,49 @@ int main(int argc, char* argv[])
                              /*AScaleSel*/  1,
                              /*BScaleSel*/  0>();
     // clang-format on
+#else
+    // // clang-format off
+    // //              |SrcType     |DstType     |GPUAccType  |CPUAccType
+    // pass &= run_test<ck::half_t,  ck::half_t,  float,       float   >();
+    // pass &= run_test<ck::bhalf_t, ck::bhalf_t, float,       float,      8     >();
+    // pass &= run_test<ck::half_t,  ck::half_t,  ck::half_t,  ck::half_t, 16    >();
+    // pass &= run_test<ck::bhalf_t, ck::bhalf_t, ck::bhalf_t, float,      16    >();
+    // pass &= run_test<int8_t,      int8_t,      int32_t,     int32_t,    8     >();
+    // // clang-format on
+
+    // clang-format off
+    //              |SrcAType    |SrcBType,     |DstType     |GPUAccType  |CPUAccType      |kValue
+    pass &= run_test<ck::half_t,  ck::half_t,   float,        float,       float,              32>(); // V_WMMA_F32_16X16X32_F16
+    pass &= run_test<ck::half_t,  ck::half_t,   ck::half_t,   ck::half_t,  ck::half_t,         32>(); // V_WMMA_F16_16X16X32_F16
+    pass &= run_test<ck::bhalf_t, ck::bhalf_t,  float,        float,       float,              32>(); // V_WMMA_F32_16X16X32_BF16
+    pass &= run_test<ck::bhalf_t, ck::bhalf_t,  ck::bhalf_t,  ck::bhalf_t, float,              32>(); // V_WMMA_BF16_16X16X32_BF16 ****
+    pass &= run_test<ck::bf8_t,   ck::bf8_t,    float,        float,       float,              64>(); // V_WMMA_F32_16X16X64_BF8_BF8
+    pass &= run_test<ck::bf8_t,   ck::f8_t,     float,        float,       float,              64>(); // V_WMMA_F32_16X16X64_BF8_F8
+    pass &= run_test<ck::f8_t,    ck::bf8_t,    float,        float,       float,              64>(); // V_WMMA_F32_16X16X64_F8_BF8
+    pass &= run_test<ck::f8_t,    ck::f8_t,     float,        float,       float,              64>(); // V_WMMA_F32_16X16X64_F8_F8
+    pass &= run_test<ck::bf8_t,   ck::bf8_t,    ck::half_t,   ck::half_t,  ck::half_t,         64>(); // V_WMMA_F16_16X16X64_BF8_BF8
+    pass &= run_test<ck::bf8_t,   ck::f8_t,     ck::half_t,   ck::half_t,  ck::half_t,         64>(); // V_WMMA_F16_16X16X64_BF8_F8
+    pass &= run_test<ck::f8_t,    ck::bf8_t,    ck::half_t,   ck::half_t,  ck::half_t,         64>(); // V_WMMA_F16_16X16X64_F8_BF8
+    pass &= run_test<ck::f8_t,    ck::f8_t,     ck::half_t,   ck::half_t,  ck::half_t,         64>(); // V_WMMA_F16_16X16X64_F8_F8
+    pass &= run_test<ck::bf8_t,   ck::bf8_t,    float,        float,       float,              128>(); // V_WMMA_F32_16X16X128_BF8_BF8
+    pass &= run_test<ck::bf8_t,   ck::f8_t,     float,        float,       float,              128>(); // V_WMMA_F32_16X16X128_BF8_F8
+    pass &= run_test<ck::f8_t,    ck::bf8_t,    float,        float,       float,              128>(); // V_WMMA_F32_16X16X128_F8_BF8
+    pass &= run_test<ck::f8_t,    ck::f8_t,     float,        float,       float,              128>(); // V_WMMA_F32_16X16X128_F8_F8
+    pass &= run_test<ck::bf8_t,   ck::bf8_t,    ck::half_t,   ck::half_t,  ck::half_t,         128>(); // V_WMMA_F16_16X16X128_BF8_BF8
+    pass &= run_test<ck::bf8_t,   ck::f8_t,     ck::half_t,   ck::half_t,  ck::half_t,         128>(); // V_WMMA_F16_16X16X128_BF8_F8
+    pass &= run_test<ck::f8_t,    ck::bf8_t,    ck::half_t,   ck::half_t,  ck::half_t,         128>(); // V_WMMA_F16_16X16X128_F8_BF8
+    pass &= run_test<ck::f8_t,    ck::f8_t,     ck::half_t,   ck::half_t,  ck::half_t,         128>(); // V_WMMA_F16_16X16X128_F8_F8
+    pass &= run_test<ck::bhalf_t, ck::bhalf_t,  ck::bhalf_t,  float,       float,              32>(); // V_WMMA_BF16F32_16X16X32_BF16
+    pass &= run_test<int8_t,      int8_t,       int32_t,      int32_t,     int32_t,            64>(); // V_WMMA_I32_16X16X64_IU8
+    pass &= run_test<float,       float,        float,        float,       float,              4>(); // V_WMMA_F32_16X16X4_F32
+
+    // gfx1251 only
+#if defined(__gfx1251__)
+    pass &= run_test<double,       double,        double,        double,       double,              4>(); // V_WMMA_F32_16X16X4_F32
+#endif
+
+    //clang-format on
+#endif
 
     std::cout << "TestGemm ..... " << (pass ? "SUCCESS" : "FAILURE") << std::endl;
     return pass ? 0 : 1;
