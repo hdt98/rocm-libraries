@@ -29,19 +29,19 @@ using ::testing::Values;
 using ::testing::ValuesIn;
 using namespace std;
 
-typedef std::tuple<vector<int>, char> trtri_tuple;
+typedef std::tuple<vector<int>, vector<char>> trtri_tuple;
 
 // each matrix_size_range vector is a {n, lda, singular/diag}
 // if singular = 0, then the used matrix for the tests is triangular unit
 // if singular = 1, then the used matrix for the tests is triangular non-unit and singular
 // otherwise, the used matrix is triangular non-unit and not singular
 
-// each uplo_range is {uplo}
+// each op_range vector is a {uplo}
 
 // case when n = 0 and uplo = L will also execute the bad arguments test
 // (null handle, null pointers and invalid values)
 
-const vector<char> uplo_range = {'L', 'U'};
+const vector<vector<char>> op_range = {{'L'}, {'U'}};
 
 // for checkin_lapack tests
 const vector<vector<int>> matrix_size_range = {
@@ -64,15 +64,15 @@ const vector<vector<int>> large_matrix_size_range
 
 Arguments trtri_setup_arguments(trtri_tuple tup)
 {
-    vector<int> matrix_size = std::get<0>(tup);
-    char        uplo        = std::get<1>(tup);
+    vector<int>  matrix_size = std::get<0>(tup);
+    vector<char> op          = std::get<1>(tup);
 
     Arguments arg;
 
     arg.set<rocblas_int>("n", matrix_size[0]);
     arg.set<rocblas_int>("lda", matrix_size[1]);
 
-    arg.set<char>("uplo", uplo);
+    arg.set<char>("uplo", op[0]);
 
     if(matrix_size[2] == 0)
         arg.set<char>("diag", 'U');
@@ -145,8 +145,8 @@ TEST_P(TRTRI_COMPAT_64, __double_complex)
 
 INSTANTIATE_TEST_SUITE_P(daily_lapack,
                          TRTRI_COMPAT_64,
-                         Combine(ValuesIn(large_matrix_size_range), ValuesIn(uplo_range)));
+                         Combine(ValuesIn(large_matrix_size_range), ValuesIn(op_range)));
 
 INSTANTIATE_TEST_SUITE_P(checkin_lapack,
                          TRTRI_COMPAT_64,
-                         Combine(ValuesIn(matrix_size_range), ValuesIn(uplo_range)));
+                         Combine(ValuesIn(matrix_size_range), ValuesIn(op_range)));
