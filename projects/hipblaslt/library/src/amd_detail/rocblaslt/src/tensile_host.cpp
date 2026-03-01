@@ -3834,23 +3834,39 @@ rocblaslt_status
         }
 
 #endif
-        auto solution = library->getSolutionByIndex(*hardware, index);
-        if(!solution)
+        try
         {
-            isOutOfBound = true;
+            auto solution = library->getSolutionByIndex(*hardware, index);
+            if(!solution)
+            {
+                isOutOfBound = true;
+                continue;
+            }
+            // Skip solutions that do not target the current hardware architecture.
+            // In multi-architecture builds, the shared index mapping may reference
+            // solutions for other GPUs.
+            if(!(*solution->hardwarePredicate)(*hardware))
+            {
+                continue;
+            }
+            rocblaslt_matmul_heuristic_result result;
+            memset(&result, 0, sizeof(rocblaslt_matmul_heuristic_result));
+            memset(result.algo.data, 0, sizeof(result.algo.data));
+            int* solutionIndex              = (int*)(result.algo.data);
+            *solutionIndex                  = solution->index;
+            result.algo.max_workspace_bytes = maxWorkSpaceBytes;
+            result.algo.fallback            = false;
+            result.state                    = rocblaslt_status_success;
+            result.workspaceSize            = 0;
+            i++;
+            heuristicResults.push_back(result);
+        }
+        catch(const std::exception&)
+        {
+            // Deserialization failure (e.g. wrong-architecture .dat file with
+            // type mismatch). Skip gracefully instead of crashing the process.
             continue;
         }
-        rocblaslt_matmul_heuristic_result result;
-        memset(&result, 0, sizeof(rocblaslt_matmul_heuristic_result));
-        memset(result.algo.data, 0, sizeof(result.algo.data));
-        int* solutionIndex              = (int*)(result.algo.data);
-        *solutionIndex                  = solution->index;
-        result.algo.max_workspace_bytes = maxWorkSpaceBytes;
-        result.algo.fallback            = false;
-        result.state                    = rocblaslt_status_success;
-        result.workspaceSize            = 0;
-        i++;
-        heuristicResults.push_back(result);
     }
     if(isOutOfBound)
         return rocblaslt_status_invalid_value;
