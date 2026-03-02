@@ -6,6 +6,12 @@ Full documentation for hipSOLVER is available at the [hipSOLVER Documentation](h
 ## (Unreleased) hipSOLVER
 
 ### Added
+
+* Added compatibility-only functions:
+  * trtri
+    * hipsolverDnXtrtri_bufferSize
+    * hipsolverDnXtrtri
+
 ### Changed
 ### Removed
 ### Optimized
