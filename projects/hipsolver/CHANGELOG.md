@@ -6,6 +6,12 @@ Full documentation for hipSOLVER is available at the [hipSOLVER Documentation](h
 ## (Unreleased) hipSOLVER
 
 ### Added
+
+* Added functions:
+  * getriBatched
+    * hipsolverXgetriBatched_bufferSize
+    * hipsolverXgetriBatched
+
 ### Changed
 ### Removed
 ### Optimized
