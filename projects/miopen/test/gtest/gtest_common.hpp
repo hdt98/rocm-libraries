@@ -309,6 +309,7 @@ void invoke_with_params(Check&& check)
 
 namespace sizer
 {
+static constexpr size_t LOW_MEMORY_GPU_MAX_BYTES_PER_TENSOR = 1ULL << 30;
 struct TestConfigSizer
 {
     virtual ~TestConfigSizer() {}

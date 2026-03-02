@@ -38,7 +38,7 @@ using Direction = miopen::conv::Direction;
 struct GroupConvTestConfigBase
 {
     virtual ~GroupConvTestConfigBase() = default;
-    static constexpr size_t HUGE_SHAPE_MIN_BYTES = 1ULL << 30;
+    static constexpr size_t HUGE_SHAPE_MIN_BYTES = sizer::LOW_MEMORY_GPU_MAX_BYTES_PER_TENSOR;
 };
 
 template <unsigned NDIM>
