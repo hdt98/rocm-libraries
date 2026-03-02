@@ -136,7 +136,7 @@ static void call_las2(T& f, T& g, T& h, T& ssmin, T& ssmax)
     }
 }
 
-template <typename T, typename S>
+template <typename T, typename S = decltype(std::real(T{}))>
 static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
 {
     // ------------------------------------------------------
@@ -205,41 +205,38 @@ static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
         return (ddlapy2);
     };
 
-    char cmach = 'E';
     S const zero = 0;
     S const one = 1;
     S const two = 2;
     T const czero = 0;
 
-    bool has_work = false;
-    int count = 0, i = 0;
-    S d = 0, di = 0, dr = 0, eps = 0, f2 = 0, f2s = 0, g2 = 0, g2s = 0, safmin = 0;
-    S safmn2 = 0, safmx2 = 0, scale = 0;
-    T ff = 0, fs = 0, gs = 0;
+    auto get_lamch = [](char cmach_in) {
+        char cmach = cmach_in;
+        S val = 0;
+        call_lamch(cmach, val);
+        return (val);
+    };
 
-    // safmin = dlamch( 's' )
-    cmach = 'S';
-    call_lamch(cmach, safmin);
+    S const safmin = get_lamch('S');
 
-    // eps = dlamch( 'e' )
-    cmach = 'E';
-    call_lamch(cmach, eps);
+    S const eps = get_lamch('E');
 
     // safmn2 = dlamch( 'b' )**int( log( safmin / eps ) / log( dlamch( 'b' ) ) / two )
-    cmach = 'B';
-    S radix = 2;
-    call_lamch(cmach, radix);
 
-    int const npow = (std::log(safmin / eps) / std::log(radix) / two);
-    safmn2 = std::pow(radix, npow);
-    safmx2 = one / safmn2;
-    scale = std::max(abs1(f), abs1(g));
-    fs = f;
-    gs = g;
-    count = 0;
+    S const radix = get_lamch('B');
+
+    auto const npow = (std::log(safmin / eps) / std::log(radix) / two);
+    auto const safmn2 = std::pow(radix, npow);
+    auto const safmx2 = one / safmn2;
+
+    auto scale = std::max(abs1(f), abs1(g));
+    auto fs = f;
+    auto gs = g;
+    int count = 0;
 
     if(scale >= safmx2)
     {
+        bool has_work = false;
         do
         {
             count = count + 1;
@@ -260,6 +257,8 @@ static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
                 r = f;
                 return;
             }
+
+            bool has_work = false;
             do
             {
                 count = count - 1;
@@ -269,8 +268,10 @@ static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
                 has_work = (scale <= safmn2);
             } while(has_work);
         }
-        f2 = abssq(fs);
-        g2 = abssq(gs);
+
+        S const f2 = abssq(fs);
+        S const g2 = abssq(gs);
+
         if(f2 <= std::max(g2, one) * safmin)
         {
             //
@@ -281,14 +282,14 @@ static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
                 cs = zero;
                 r = dlapy2(dble(g), dimag(g));
                 //           do complex/real division explicitly with two real divisions
-                d = dlapy2(dble(gs), dimag(gs));
+                auto const d = dlapy2(dble(gs), dimag(gs));
                 sn = dcmplx(dble(gs) / d, -dimag(gs) / d);
                 return;
             }
-            f2s = dlapy2(dble(fs), dimag(fs));
+            auto const f2s = dlapy2(dble(fs), dimag(fs));
             //        g2 and g2s are accurate
             //        g2 is at least safmin, and g2s is at least safmn2
-            g2s = std::sqrt(g2);
+            auto const g2s = std::sqrt(g2);
             //        error in cs from underflow in f2s is at most
             //        unfl / safmn2  <  sqrt(unfl*eps) .lt. eps
             //        if max(g2,one)=g2,  then f2  <  g2*safmin,
@@ -299,16 +300,18 @@ static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
             cs = f2s / g2s;
             //        make sure abs(ff) = 1
             //        do complex/real division explicitly with 2 real divisions
+
+            S ff = 0;
             if(abs1(f) > one)
             {
-                d = dlapy2(dble(f), dimag(f));
+                auto const d = dlapy2(dble(f), dimag(f));
                 ff = dcmplx(dble(f) / d, dimag(f) / d);
             }
             else
             {
-                dr = safmx2 * dble(f);
-                di = safmx2 * dimag(f);
-                d = dlapy2(dr, di);
+                auto const dr = safmx2 * dble(f);
+                auto const di = safmx2 * dimag(f);
+                auto const d = dlapy2(dr, di);
                 ff = dcmplx(dr / d, di / d);
             }
             sn = ff * dcmplx(dble(gs) / g2s, -dimag(gs) / g2s);
@@ -321,11 +324,11 @@ static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
             //        neither f2 nor f2/g2 are less than safmin
             //        f2s cannot overflow, and it is accurate
             //
-            f2s = std::sqrt(one + g2 / f2);
+            auto const f2s = std::sqrt(one + g2 / f2);
             //        do the f2s(real)*fs(complex) multiply with two real multiplies
             r = dcmplx(f2s * dble(fs), f2s * dimag(fs));
             cs = one / f2s;
-            d = f2 + g2;
+            auto const d = f2 + g2;
             //        do complex/real division explicitly with two real divisions
             sn = dcmplx(dble(r) / d, dimag(r) / d);
             sn = sn * dconjg(gs);
@@ -333,14 +336,14 @@ static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
             {
                 if(count > 0)
                 {
-                    for(i = 1; i <= count; i++)
+                    for(int i = 1; i <= count; i++)
                     {
                         r = r * safmx2;
                     };
                 }
                 else
                 {
-                    for(i = 1; i <= -count; i++)
+                    for(int i = 1; i <= -count; i++)
                     {
                         r = r * safmn2;
                     }
