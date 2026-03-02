@@ -65,7 +65,7 @@ inline bool is_gfx12_supported()
     return get_device_name() == "gfx1200" || get_device_name() == "gfx1201";
 }
 
-inline bool is_load_tr_supported()
+inline bool is_gfx95_supported()
 {
     // Check if load transpose is supported.
     return get_device_name() == "gfx950";
@@ -75,6 +75,23 @@ inline bool is_gfx13_supported()
 {
     return ck_tile::get_device_name() == "gfx1310" || ck_tile::get_device_name() == "gfx1370" ||
            ck_tile::get_device_name() == "gfx130F" || ck_tile::get_device_name() == "gfx131F";
+}
+
+inline size_t get_num_cus()
+{
+    hipDeviceProp_t props{};
+    int device;
+    auto status = hipGetDevice(&device);
+    if(status != hipSuccess)
+    {
+        return 0;
+    }
+    status = hipGetDeviceProperties(&props, device);
+    if(status != hipSuccess)
+    {
+        return 0;
+    }
+    return static_cast<size_t>(props.multiProcessorCount);
 }
 
 } // namespace ck_tile

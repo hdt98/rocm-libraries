@@ -1,11 +1,10 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
 #if !defined(__HIPCC_RTC__) || !defined(CK_CODE_GEN_RTC)
 #include <iostream>
-#include <ostream>
 #endif
 
 #include "ck/utility/pipeline_enum.hpp"

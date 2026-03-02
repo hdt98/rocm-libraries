@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 #include "data_type.hpp"
@@ -7,6 +7,7 @@
 #if defined(__gfx1310__) || defined(__gfx1370__) || defined(__gfx130F__) || defined(__gfx131F__)
 #define __gfx13__
 #endif
+#include "ck/utility/amd_buffer_coherence.hpp"
 
 namespace ck {
 
@@ -154,30 +155,6 @@ llvm_amdgcn_raw_buffer_atomic_max_fp64(double vdata,
                                        int soffset,    // dst_wave_addr_offset
                                        int glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fmax.f64");
 #endif
-
-// memory coherency bit for buffer store/load instruction
-// check ISA manual for each GFX target
-// e.g. for
-// https://www.amd.com/system/files/TechDocs/instinct-mi200-cdna2-instruction-set-architecture.pdf,
-// page 67~68
-enum struct AmdBufferCoherenceEnum
-{
-    DefaultCoherence = 0, // default value
-    GLC              = 1,
-    SLC              = 2,
-    GLC_SLC          = 3,
-    // gfx94: bit 0 = sc0, bit 1 = nt, bit 3 = swz, bit 4 = sc1
-    // SC[1:0] System Cache level: 0=wave, 1=group, 2=device, 3=system
-    // NT Non-Temporal: 0=expect temporal reuse; 1=do not expect temporal reuse
-    WAVE_NT0   = 0,
-    WAVE_NT1   = 2,
-    GROUP_NT0  = 1,
-    GROUP_NT1  = 3,
-    DEVICE_NT0 = 8,
-    DEVICE_NT1 = 10,
-    SYSTEM_NT0 = 9,
-    SYSTEM_NT1 = 11,
-};
 
 // To do: need refactor as a tuple for combination load
 enum struct TensorLoadOption
@@ -1296,7 +1273,7 @@ __device__ auto amd_ds_tiled_load_to_vgpr(__attribute__((address_space(3))) cons
                                           bool is_src_valid)
 {
     using vector_t = typename vector_type_maker<T, N>::type::type;
-#if defined(__gfx13__)
+#if defined(__gfx1370__)
     if(is_src_valid)
     {
         if constexpr(NumThreadsPerTile == 2)
