@@ -536,7 +536,7 @@ struct BlockwiseGemmXdlops_pipeline_moe_blockscale_bpreshuffle_gufusion_v1<
                                                                  Number<0>,
                                                                  decltype(var),
                                                                  Number<0>,
-                                                                 decltype(ik)>{a_thread_vec, a_thread_buf};
+                                                                 Ik>{a_thread_vec, a_thread_buf};
                                     auto loadB =
                                         load_thread_vec<decltype(b_thread_vec),
                                                         decltype(b_thread_bufs[mfma_reg_buf]),
@@ -769,14 +769,13 @@ struct BlockwiseGemmXdlops_pipeline_moe_blockscale_bpreshuffle_gufusion_v1<
                             auto loadA   = load_thread_vec<decltype(a_thread_vec),
                                                            decltype(a_thread_buf),
                                                            decltype(a_thread_desc_),
-                                                           Base,
                                                            ComputeDataType,
                                                            decltype(m0),
                                                            Number<0>,
                                                            Number<0>,
                                                            decltype(var),
                                                            Number<0>,
-                                                           decltype(ik)>{a_thread_vec, a_thread_buf};
+                                                           Ik>{a_thread_vec, a_thread_buf};
                             auto loadB   = load_thread_vec<decltype(b_thread_vec),
                                                            decltype(b_thread_bufs[I0]),
                                                            decltype(b_thread_desc_),
@@ -934,7 +933,7 @@ struct BlockwiseGemmXdlops_pipeline_moe_blockscale_bpreshuffle_gufusion_v1<
                                                            Number<0>,
                                                            decltype(var),
                                                            Number<0>,
-                                                           decltype(ik)>{a_thread_vec, a_thread_buf};
+                                                           Ik>{a_thread_vec, a_thread_buf};
                             auto loadB   = load_thread_vec<decltype(b_thread_vec),
                                                            decltype(b_thread_bufs[I1]),
                                                            decltype(b_thread_desc_),
@@ -1056,7 +1055,7 @@ struct BlockwiseGemmXdlops_pipeline_moe_blockscale_bpreshuffle_gufusion_v1<
                                                            Number<0>,
                                                            decltype(var),
                                                            Number<0>,
-                                                           decltype(ik)>{a_thread_vec, a_thread_buf};
+                                                           Ik>{a_thread_vec, a_thread_buf};
                             auto loadB   = load_thread_vec<decltype(b_thread_vec),
                                                            decltype(b_thread_bufs[I0]),
                                                            decltype(b_thread_desc_),
