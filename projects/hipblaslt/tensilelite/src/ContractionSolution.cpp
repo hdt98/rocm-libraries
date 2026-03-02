@@ -913,6 +913,7 @@ namespace TensileLite
                                               (uint8_t*)inputs.ws + workspaceOffsetInByte);
             args.template append<const void*>("AmaxSync", inputs.Synchronizer);
         }
+        args.template append<const void*>("f32XEmuInf", inputs.amaxD);
     }
 
     inline uint32_t getNumWorkGroups(const KernelInvocation& rv)

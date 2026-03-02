@@ -58,6 +58,11 @@ namespace rocblaslt
         m_benchPrintCommand = p;
     }
 
+    bool Debug::xf32EmuInf() const
+    {
+        return m_xf32_emu_inf;
+    }
+
     Debug::Debug()
         : m_value(DEBUG_SM)
         , m_value2(DEBUG_SM2)
@@ -81,6 +86,10 @@ namespace rocblaslt
 
         const char *hipblaslt_preload = std::getenv("HIPBLASLT_PRELOAD_KERNELS");
         m_preloadAllKernels = hipblaslt_preload && strtol(hipblaslt_preload, nullptr, 0) != 0;
+
+        const char* xf32_emu_inf = std::getenv("HIPBLASLT_XF32_EMU_INF");
+        if(xf32_emu_inf)
+            m_xf32_emu_inf = strtol(xf32_emu_inf, nullptr, 0) != 0;
     }
 
 } // namespace rocblaslt

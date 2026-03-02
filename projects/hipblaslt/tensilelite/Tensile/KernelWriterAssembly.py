@@ -6733,6 +6733,10 @@ class KernelWriterAssembly(KernelWriter):
       module.add(RegSet("s", "sgprSrdTD", self.sgprs["SrdTD"]))
       self.defineSgpr("GSUSync", 1)
       module.add(RegSet("s", "sgprGSUSync", self.sgprs["GSUSync"]))
+    
+    if (kernel["UseF32XEmulation"]):
+      self.defineSgpr("pf32XEmuInf", 1)
+      module.add(RegSet("s", "pf32XEmuInf", self.sgprs["pf32XEmuInf"]))
 
     if kernel["ProblemType"]["UseE"]:
       self.defineSgpr("SrdE", 4, 4)

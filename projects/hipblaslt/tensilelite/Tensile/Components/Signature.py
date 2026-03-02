@@ -274,6 +274,10 @@ class SignatureDefault(Signature):
             signature.addArg(    "dstD", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
             signature.addArg(               "Synchronizer", SVK.SIG_GLOBALBUFFER, cptValueType, "generic")
             signature.addArg(               "GSUSync", SVK.SIG_VALUE,              "u32")
+        
+        if (kernel["UseF32XEmulation"]):
+            signature.addArg(    "f32XEmuInf", SVK.SIG_VALUE, "u32")
+            #signature.addArg(    "f32XEmuInf", SVK.SIG_GLOBALBUFFER, "u32", "generic")
 
         activationType = ActivationType("all")
         for name in activationType.getAdditionalArgStringList():

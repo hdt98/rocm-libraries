@@ -95,11 +95,10 @@ namespace rocblaslt
         }
 
         bool printLogAsMarker() const;
-
         bool benchPrintCommand() const;
         void setBenchPrint(bool p);
-
         bool preload() const;
+        bool xf32EmuInf() const;
 
     private:
         friend LazySingleton<Debug>;
@@ -110,6 +109,7 @@ namespace rocblaslt
         bool        m_printLogAsMarker  = false;
         bool        m_preloadAllKernels = false;
         bool        m_benchPrintCommand = false;
+        bool        m_xf32_emu_inf      = false;
 
         Debug();
     };
