@@ -5,83 +5,269 @@
 # CK Builder Kernel Instances with Architecture-Aware Filtering
 # =============================================================================
 #
-# This CMakeLists.txt implements filename-based architecture filtering to
-# compile only the kernel instances compatible with the target GPU architectures.
+# This CMakeLists.txt implements architecture-aware filtering to compile only
+# the kernel instances compatible with the target GPU architectures.
 #
 # Architecture Detection:
-#   - Files matching **/xdl/*.cpp or **/*_xdl_*.cpp → CDNA only (gfx908/90a/942/950)
-#   - Files matching **/wmma/*.cpp or **/*_wmma_*.cpp → RDNA only (gfx1030/1100/1200/1201)
-#   - Files matching **/dl/*.cpp or **/reference/*.cpp → All architectures
-#   - Flat structure files (no arch markers) → All architectures (backward compat)
+#   - Files in **/xdl/** directories → CDNA only (gfx908/90a/942/950)
+#   - Files in **/wmma/** directories → RDNA only (gfx1030/1100/1200/1201)
+#   - Files in **/dl/** directories → All architectures
+#   - Static test files → All architectures
 #
 # Benefits:
 #   - Reduces binary size by 20-30% for single-arch builds
 #   - Reduces compile time by skipping unused architectures
-#   - Automatic: no manual tagging required, just follow naming conventions
+#   - Automatic: follows directory structure from develop
+# =============================================================================
+
+include(cmake/ShardInstantiation.cmake)
+
+# Grouped Conv2D Forward - DL (4 files) - ARCHITECTURE AGNOSTIC
+set(GROUPED_CONV2D_FWD_DL_SOURCES
+    factories/grouped_conv2d_fwd/dl/device_grouped_conv2d_fwd_dl_gnhwc_gkyxc_gnhwk_f16_instance.cpp
+    factories/grouped_conv2d_fwd/dl/device_grouped_conv2d_fwd_dl_gnhwc_gkyxc_gnhwk_f32_instance.cpp
+    factories/grouped_conv2d_fwd/dl/device_grouped_conv2d_fwd_dl_nhwgc_gkyxc_nhwgk_f16_instance.cpp
+    factories/grouped_conv2d_fwd/dl/device_grouped_conv2d_fwd_dl_nhwgc_gkyxc_nhwgk_f32_instance.cpp
+)
+
+# Grouped Conv2D Forward - WMMA Base (16 files) - RDNA ONLY
+set(GROUPED_CONV2D_FWD_WMMA_SOURCES
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_gnhwc_gkyxc_gnhwk_f16_1x1p0_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_gnhwc_gkyxc_gnhwk_f16_1x1s1p0_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_gnhwc_gkyxc_gnhwk_f16_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_gnhwc_gkyxc_gnhwk_f16_oddc_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_gnhwc_gkyxc_gnhwk_i8_1x1p0_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_gnhwc_gkyxc_gnhwk_i8_1x1s1p0_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_gnhwc_gkyxc_gnhwk_i8_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_gnhwc_gkyxc_gnhwk_i8_oddc_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_nhwgc_gkyxc_nhwgk_f16_1x1p0_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_nhwgc_gkyxc_nhwgk_f16_1x1s1p0_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_nhwgc_gkyxc_nhwgk_f16_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_nhwgc_gkyxc_nhwgk_f16_oddc_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_nhwgc_gkyxc_nhwgk_i8_1x1p0_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_nhwgc_gkyxc_nhwgk_i8_1x1s1p0_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_nhwgc_gkyxc_nhwgk_i8_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_nhwgc_gkyxc_nhwgk_i8_oddc_instance.cpp
+)
+
+# Grouped Conv2D Forward - XDL Comp (15 files) - CDNA ONLY
+set(GROUPED_CONV2D_FWD_XDL_COMP_SOURCES
+    factories/grouped_conv2d_fwd/xdl/comp/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_bf16_comp_2x_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/comp/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_bf16_comp_part2_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/comp/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_f16_comp_2x_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/comp/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_f16_comp_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/comp/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_f16_comp_part2_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/comp/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_f32_comp_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/comp/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_bf16_comp_2x_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/comp/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_bf16_comp_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/comp/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_bf16_comp_part2_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/comp/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f16_comp_2x_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/comp/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f16_comp_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/comp/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f16_comp_part2_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/comp/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f32_comp_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/comp/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f32_tf32_comp_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/comp/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_int8_comp_instance.cpp
+)
+
+# Grouped Conv2D Forward - XDL Large Tensor (5 files) - CDNA ONLY
+set(GROUPED_CONV2D_FWD_XDL_LARGE_TENSOR_SOURCES
+    factories/grouped_conv2d_fwd/xdl/large_tensor/device_grouped_conv2d_fwd_xdl_large_tensor_nhwgc_gkyxc_nhwgk_bf16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/large_tensor/device_grouped_conv2d_fwd_xdl_large_tensor_nhwgc_gkyxc_nhwgk_f16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/large_tensor/device_grouped_conv2d_fwd_xdl_large_tensor_nhwgc_gkyxc_nhwgk_f32_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/large_tensor/device_grouped_conv2d_fwd_xdl_large_tensor_nhwgc_gkyxc_nhwgk_f32_tf32_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/large_tensor/device_grouped_conv2d_fwd_xdl_large_tensor_nhwgc_gkyxc_nhwgk_int8_instance.cpp
+)
+
+# Grouped Conv2D Forward - XDL Merged Groups (8 files) - CDNA ONLY
+set(GROUPED_CONV2D_FWD_XDL_MERGED_GROUPS_SOURCES
+    factories/grouped_conv2d_fwd/xdl/merged_groups/device_grouped_conv2d_fwd_xdl_merged_groups_ngchw_gkcyx_ngkhw_bf16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/merged_groups/device_grouped_conv2d_fwd_xdl_merged_groups_ngchw_gkcyx_ngkhw_f16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/merged_groups/device_grouped_conv2d_fwd_xdl_merged_groups_ngchw_gkcyx_ngkhw_f32_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/merged_groups/device_grouped_conv2d_fwd_xdl_merged_groups_nhwgc_gkyxc_nhwgk_bf16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/merged_groups/device_grouped_conv2d_fwd_xdl_merged_groups_nhwgc_gkyxc_nhwgk_f16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/merged_groups/device_grouped_conv2d_fwd_xdl_merged_groups_nhwgc_gkyxc_nhwgk_f32_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/merged_groups/device_grouped_conv2d_fwd_xdl_merged_groups_nhwgc_gkyxc_nhwgk_f32_tf32_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/merged_groups/device_grouped_conv2d_fwd_xdl_merged_groups_nhwgc_gkyxc_nhwgk_int8_instance.cpp
+)
+
+# Grouped Conv2D Forward - WMMA CShuffleV3 (10 files) - RDNA ONLY
+set(GROUPED_CONV2D_FWD_WMMA_CSHUFFLEV3_SOURCES
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_cshufflev3_nhwgc_gkyxc_nhwgk_bf16_instance_part1.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_cshufflev3_nhwgc_gkyxc_nhwgk_bf16_instance_part2.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_cshufflev3_nhwgc_gkyxc_nhwgk_bf16_instance_part3.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_cshufflev3_nhwgc_gkyxc_nhwgk_bf16_instance_part4.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_cshufflev3_nhwgc_gkyxc_nhwgk_f16_instance_part1.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_cshufflev3_nhwgc_gkyxc_nhwgk_f16_instance_part2.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_cshufflev3_nhwgc_gkyxc_nhwgk_f16_instance_part3.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_cshufflev3_nhwgc_gkyxc_nhwgk_f16_instance_part4.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_cshufflev3_wave_transfer_nhwgc_gkyxc_nhwgk_bf16_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/device_grouped_conv2d_fwd_wmma_cshufflev3_wave_transfer_nhwgc_gkyxc_nhwgk_f16_instance.cpp
+)
+
+# Grouped Conv2D Forward - WMMA Large Tensor (2 files) - RDNA ONLY
+set(GROUPED_CONV2D_FWD_WMMA_LARGE_TENSOR_SOURCES
+    factories/grouped_conv2d_fwd/wmma/large_tensor/device_grouped_conv2d_fwd_wmma_cshufflev3_large_tensor_nhwgc_gkyxc_nhwgk_bf16_instance.cpp
+    factories/grouped_conv2d_fwd/wmma/large_tensor/device_grouped_conv2d_fwd_wmma_cshufflev3_large_tensor_nhwgc_gkyxc_nhwgk_f16_instance.cpp
+)
+
+# Grouped Conv2D Forward - XDL Base (bf16/f16 sharded separately) - CDNA ONLY
+set(GROUPED_CONV2D_FWD_XDL_SOURCES
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_gnhwc_gkyxc_gnhwk_bf16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_gnhwc_gkyxc_gnhwk_f16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_gnhwc_gkyxc_gnhwk_f32_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_bf16_16x16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_f16_16x16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_f32_16x16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_f32_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_ngchw_gkyxc_ngkhw_bf16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_ngchw_gkyxc_ngkhw_f16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_ngchw_gkyxc_ngkhw_f32_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_ngchw_gkyxc_ngkhw_int8_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_bf16_16x16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_bf16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f16_16x16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f32_16x16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f32_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f32_tf32_16x16_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f32_tf32_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_int8_instance.cpp
+)
+
+# Grouped Conv2D Forward - XDL MEM (14 files, int8 inter/intra sharded separately) - CDNA ONLY
+set(GROUPED_CONV2D_FWD_XDL_MEM_SOURCES
+    factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_bf16_mem_inter_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_bf16_mem_intra_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_f16_mem_inter_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_f16_mem_intra_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_f32_mem_inter_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_f32_mem_intra_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_bf16_direct_load_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_bf16_mem_inter_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_bf16_mem_intra_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f16_direct_load_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f16_mem_inter_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f16_mem_intra_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f32_mem_inter_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f32_mem_intra_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f32_tf32_mem_inter_instance.cpp
+    factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_f32_tf32_mem_intra_instance.cpp
+)
+
+# =============================================================================
+# Architecture-Aware Source List Construction
 # =============================================================================
 
 set(CK_BUILDER_SOURCES "")
 
-# Get all factory source files
-file(GLOB_RECURSE ALL_FACTORY_FILES "${CMAKE_CURRENT_SOURCE_DIR}/factories/*.cpp")
+# Static test files - ALWAYS INCLUDED (architecture agnostic)
+set(CK_BUILDER_STATIC_TEST_SOURCES
+    static_tests/grouped_conv_2d_fwd_xdl_f32.cpp
+    static_tests/grouped_conv_2d_fwd_xdl_v3_f32.cpp
+    static_tests/grouped_conv_2d_fwd_xdl_large_tensor_f32.cpp
+    static_tests/grouped_conv_2d_fwd_wmma_f32.cpp
+    static_tests/grouped_conv_2d_fwd_dl_f32.cpp
+    static_tests/grouped_conv_fwd_xdl_test.cpp
+)
 
-# Separate files by architecture based on directory structure and naming
-set(XDL_FILES "")
-set(WMMA_FILES "")
-set(ARCH_AGNOSTIC_FILES "")
+# Always add architecture-agnostic sources
+list(APPEND CK_BUILDER_SOURCES ${CK_BUILDER_STATIC_TEST_SOURCES})
+list(APPEND CK_BUILDER_SOURCES ${GROUPED_CONV2D_FWD_DL_SOURCES})
 
-foreach(SOURCE_FILE ${ALL_FACTORY_FILES})
-    # Pattern matching priority (first match wins):
-    #   1. XDL:  /xdl/ directory or _xdl_ in filename → CDNA only (gfx908/90a/942/950)
-    #   2. WMMA: /wmma/ directory or _wmma_ in filename → RDNA only (gfx1030/1100/1200/1201)
-    #   3. Default: Architecture-agnostic (compiles for all targets)
-    #
-    # Note: Files should use EXACTLY ONE architecture marker for clarity.
-    # Mixed markers (e.g., "_xdl_wmma_" or "_xdl_dl_") would be ambiguous.
-    # This matches Composable Kernel's naming convention (0 mixed markers across 1000+ files).
-
-    if(SOURCE_FILE MATCHES "/xdl/|_xdl_")
-        list(APPEND XDL_FILES "${SOURCE_FILE}")
-    elseif(SOURCE_FILE MATCHES "/wmma/|_wmma_")
-        list(APPEND WMMA_FILES "${SOURCE_FILE}")
-    else()
-        # DL, reference, or flat structure files (no arch marker)
-        list(APPEND ARCH_AGNOSTIC_FILES "${SOURCE_FILE}")
-    endif()
-endforeach()
-
-# Initialize counters for summary
-set(XDL_COUNT 0)
-set(WMMA_COUNT 0)
-
-# Add XDL files only if building for CDNA architectures
+# Detect CDNA architectures
 set(CDNA_ENABLED FALSE)
 if(DEFINED MIOPEN_GPU_TARGET_GFX908 OR
    DEFINED MIOPEN_GPU_TARGET_GFX90A OR
    DEFINED MIOPEN_GPU_TARGET_GFX942 OR
    DEFINED MIOPEN_GPU_TARGET_GFX950)
     set(CDNA_ENABLED TRUE)
-    list(APPEND CK_BUILDER_SOURCES ${XDL_FILES})
-    list(LENGTH XDL_FILES XDL_COUNT)
-    message(STATUS "CK Builder: Adding ${XDL_COUNT} XDL instance files (CDNA)")
 endif()
 
-# Add WMMA files only if building for RDNA architectures
+# Detect RDNA architectures
 set(RDNA_ENABLED FALSE)
 if(DEFINED MIOPEN_GPU_TARGET_GFX1030 OR
    DEFINED MIOPEN_GPU_TARGET_GFX1100 OR
    DEFINED MIOPEN_GPU_TARGET_GFX1200 OR
    DEFINED MIOPEN_GPU_TARGET_GFX1201)
     set(RDNA_ENABLED TRUE)
-    list(APPEND CK_BUILDER_SOURCES ${WMMA_FILES})
-    list(LENGTH WMMA_FILES WMMA_COUNT)
-    message(STATUS "CK Builder: Adding ${WMMA_COUNT} WMMA instance files (RDNA)")
 endif()
 
-# Always add architecture-agnostic files
-list(APPEND CK_BUILDER_SOURCES ${ARCH_AGNOSTIC_FILES})
-list(LENGTH ARCH_AGNOSTIC_FILES AGNOSTIC_COUNT)
-message(STATUS "CK Builder: Adding ${AGNOSTIC_COUNT} architecture-agnostic instance files")
+# Sharded instantiations for large instance files
+set(GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
+
+# Add CDNA (XDL) sources if building for CDNA architectures
+if(CDNA_ENABLED)
+    list(APPEND CK_BUILDER_SOURCES ${GROUPED_CONV2D_FWD_XDL_SOURCES})
+    list(APPEND CK_BUILDER_SOURCES ${GROUPED_CONV2D_FWD_XDL_COMP_SOURCES})
+    list(APPEND CK_BUILDER_SOURCES ${GROUPED_CONV2D_FWD_XDL_LARGE_TENSOR_SOURCES})
+    list(APPEND CK_BUILDER_SOURCES ${GROUPED_CONV2D_FWD_XDL_MEM_SOURCES})
+    list(APPEND CK_BUILDER_SOURCES ${GROUPED_CONV2D_FWD_XDL_MERGED_GROUPS_SOURCES})
+
+    # Generate sharded XDL instantiations
+    generate_sharded_instantiations(
+        INSTANCES_NAME device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_bf16_instances
+        TEMPLATE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_bf16_instance.in
+        NUM_SHARDS 16
+        SRC_LIST CK_BUILDER_XDL_SHARDED_SOURCES
+        OUTPUT_DIR ${GENERATED_DIR}/xdl
+    )
+
+    generate_sharded_instantiations(
+        INSTANCES_NAME device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_f16_instances
+        TEMPLATE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/factories/grouped_conv2d_fwd/xdl/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_f16_instance.in
+        NUM_SHARDS 16
+        SRC_LIST CK_BUILDER_XDL_SHARDED_SOURCES
+        OUTPUT_DIR ${GENERATED_DIR}/xdl
+    )
+
+    generate_sharded_instantiations(
+        INSTANCES_NAME device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_bf16_comp_instances
+        TEMPLATE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/factories/grouped_conv2d_fwd/xdl/comp/device_grouped_conv2d_fwd_xdl_ngchw_gkcyx_ngkhw_bf16_comp_instance.in
+        NUM_SHARDS 16
+        SRC_LIST CK_BUILDER_XDL_SHARDED_SOURCES
+        OUTPUT_DIR ${GENERATED_DIR}/xdl/comp
+    )
+
+    generate_sharded_instantiations(
+        INSTANCES_NAME device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_int8_mem_inter_instances
+        TEMPLATE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_int8_mem_inter_instance.in
+        NUM_SHARDS 21
+        SRC_LIST CK_BUILDER_XDL_SHARDED_SOURCES
+        OUTPUT_DIR ${GENERATED_DIR}/xdl/mem
+    )
+
+    generate_sharded_instantiations(
+        INSTANCES_NAME device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_int8_mem_intra_instances
+        TEMPLATE_FILE ${CMAKE_CURRENT_SOURCE_DIR}/factories/grouped_conv2d_fwd/xdl/mem/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_int8_mem_intra_instance.in
+        NUM_SHARDS 21
+        SRC_LIST CK_BUILDER_XDL_SHARDED_SOURCES
+        OUTPUT_DIR ${GENERATED_DIR}/xdl/mem
+    )
+
+    list(APPEND CK_BUILDER_SOURCES ${CK_BUILDER_XDL_SHARDED_SOURCES})
+
+    list(LENGTH GROUPED_CONV2D_FWD_XDL_SOURCES XDL_BASE_COUNT)
+    list(LENGTH GROUPED_CONV2D_FWD_XDL_COMP_SOURCES XDL_COMP_COUNT)
+    list(LENGTH GROUPED_CONV2D_FWD_XDL_LARGE_TENSOR_SOURCES XDL_LT_COUNT)
+    list(LENGTH GROUPED_CONV2D_FWD_XDL_MEM_SOURCES XDL_MEM_COUNT)
+    list(LENGTH GROUPED_CONV2D_FWD_XDL_MERGED_GROUPS_SOURCES XDL_MG_COUNT)
+    list(LENGTH CK_BUILDER_XDL_SHARDED_SOURCES XDL_SHARDED_COUNT)
+    math(EXPR XDL_TOTAL "${XDL_BASE_COUNT} + ${XDL_COMP_COUNT} + ${XDL_LT_COUNT} + ${XDL_MEM_COUNT} + ${XDL_MG_COUNT} + ${XDL_SHARDED_COUNT}")
+    message(STATUS "CK Builder: Adding ${XDL_TOTAL} XDL instance files (CDNA: gfx908, gfx90a, gfx942, gfx950)")
+endif()
+
+# Add RDNA (WMMA) sources if building for RDNA architectures
+if(RDNA_ENABLED)
+    list(APPEND CK_BUILDER_SOURCES ${GROUPED_CONV2D_FWD_WMMA_SOURCES})
+    list(APPEND CK_BUILDER_SOURCES ${GROUPED_CONV2D_FWD_WMMA_CSHUFFLEV3_SOURCES})
+    list(APPEND CK_BUILDER_SOURCES ${GROUPED_CONV2D_FWD_WMMA_LARGE_TENSOR_SOURCES})
+
+    list(LENGTH GROUPED_CONV2D_FWD_WMMA_SOURCES WMMA_BASE_COUNT)
+    list(LENGTH GROUPED_CONV2D_FWD_WMMA_CSHUFFLEV3_SOURCES WMMA_CSV3_COUNT)
+    list(LENGTH GROUPED_CONV2D_FWD_WMMA_LARGE_TENSOR_SOURCES WMMA_LT_COUNT)
+    math(EXPR WMMA_TOTAL "${WMMA_BASE_COUNT} + ${WMMA_CSV3_COUNT} + ${WMMA_LT_COUNT}")
+    message(STATUS "CK Builder: Adding ${WMMA_TOTAL} WMMA instance files (RDNA: gfx1030, gfx1100, gfx1200, gfx1201)")
+endif()
 
 # Verify we have at least some sources
 if(NOT CK_BUILDER_SOURCES)
@@ -92,9 +278,6 @@ if(NOT CK_BUILDER_SOURCES)
 endif()
 
 # Create library from filtered sources
-list(LENGTH CK_BUILDER_SOURCES TOTAL_COUNT)
-message(STATUS "CK Builder: Total instance files: ${TOTAL_COUNT}")
-
 add_library(ck_builder STATIC ${CK_BUILDER_SOURCES})
 
 set_target_properties(ck_builder PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -105,7 +288,10 @@ target_include_directories(ck_builder PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 find_package(composable_kernel 1.0.0 COMPONENTS device_conv_operations)
 target_link_libraries(ck_builder composable_kernel::device_conv_operations)
 
-# Enable offload-compress if available (benefits large GPU code libraries)
+# CK template instantiations can produce fold expressions exceeding the default bracket-depth limit of 256
+target_compile_options(ck_builder PRIVATE $<$<CXX_COMPILER_ID:Clang>:-fbracket-depth=2048>)
+
+# This static library contains a large amount of GPU code that will benefit from offload-compress if it's available
 check_cxx_compiler_flag("--offload-compress -x hip" CXX_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
 if(CXX_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
     target_compile_options(ck_builder PRIVATE --offload-compress)
@@ -113,10 +299,16 @@ if(CXX_COMPILER_SUPPORTS_OFFLOAD_COMPRESS)
 endif()
 
 # Summary message
+list(LENGTH CK_BUILDER_SOURCES TOTAL_COUNT)
+list(LENGTH GROUPED_CONV2D_FWD_DL_SOURCES DL_COUNT)
 message(STATUS "==========================================")
 message(STATUS "CK Builder Architecture Filter Summary:")
-message(STATUS "  CDNA (XDL): ${XDL_COUNT} files")
-message(STATUS "  RDNA (WMMA): ${WMMA_COUNT} files")
-message(STATUS "  Arch-agnostic: ${AGNOSTIC_COUNT} files")
+if(CDNA_ENABLED)
+    message(STATUS "  CDNA (XDL): ${XDL_TOTAL} files")
+endif()
+if(RDNA_ENABLED)
+    message(STATUS "  RDNA (WMMA): ${WMMA_TOTAL} files")
+endif()
+message(STATUS "  Arch-agnostic (DL + tests): ${DL_COUNT} + static tests")
 message(STATUS "  Total compiled: ${TOTAL_COUNT} files")
 message(STATUS "==========================================")
