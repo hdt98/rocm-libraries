@@ -777,6 +777,33 @@ class TestCustomScheduleBF16:
         valid, message = isValid(schedule_info, {"kernel" : kernel})
         assert valid, message
 
+    def test_schedule_128x128x64_16bit(self):
+        """Tests the 128x128x64  NT schedule."""
+        kernel = create_base_kernel()
+        dtype_16bit = _mock_dtype(is_16bit=True, num_bytes=2)
+        kernel["ProblemType"].update({
+            "DataType": dtype_16bit, "DataTypeA": dtype_16bit, "DataTypeB": dtype_16bit,
+            "TransposeA": False, "TransposeB": True
+        })
+
+        kernel.update({
+            "MacroTile0": 128, "MacroTile1": 128, "DepthU": 64,
+            "PrefetchGlobalRead": 2, "PrefetchLocalRead": 1,
+            "DirectToLds": True,
+            "GlobalReadVectorWidthA": 8, "GlobalReadVectorWidthB": 8, "LocalReadVectorWidth": 8,
+            "MatrixInstruction": [16, 16, 32, 1], "MIWaveGroup": [2, 2],
+            "LDSTrInst": True, "TransposeLDS": 0, "MIWaveTileA": 4, "MIWaveTileB": 4,
+        })
+
+        has_schedule, schedule_info = hasCustomSchedule(kernel)
+        assert has_schedule
+        assert isinstance(schedule_info, ScheduleInfo)
+        assert schedule_info.numCodePaths == 1
+        assert schedule_info.numMfma == TestCustomScheduleBF16.get_num_mfma(kernel)
+        valid, message = isValid(schedule_info, {"kernel": kernel})
+        assert valid, message
+
+
 class TestCustomScheduleTF32:
     @staticmethod
     def get_num_mfma(kernel):

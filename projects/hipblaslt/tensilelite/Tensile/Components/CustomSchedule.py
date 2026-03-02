@@ -3341,6 +3341,60 @@ def _get_schedule_128x192x64_16bit(kernel, useLDSTr, TLDS):
     return True, opt1
 
 @RegisterSchedule(
+    tile_config=TileConfig(128, 128, 64, 2, 1, 1, False, 0, 0),
+    dtype_predicate=is16bit,
+    vector_widths=[8, 8, 8],
+    matrix_inst=[16, 16, 32, 1],
+    mfma_wave_group=[2, 2]
+)
+def _get_schedule_128x128x64_16bit(kernel, useLDSTr, TLDS):
+    numMfma = 32
+    optSchedule = dict()
+    syncs = SyncSchedule()
+    if isNT(kernel) and useLDSTr and TLDS==0:
+        kernel["MfmaInitCVgprs"] = True
+        syncs.add(-1, dscnt=0, comment="wait for prior local read local write")
+        syncs.add(8, dscnt=0, barrier=True, comment="Wait for LRA0 to finish before issuing GRA+LRB0")
+        syncs.add(15, dscnt=5, comment="Finish partial LRB0")
+        syncs.add(17, dscnt=0, vlcnt=4, barrier=True, comment="Wait for GRs from previous iteration before starting LR1s")
+
+        lra0 = [0,1,2,3,4,5,6,7]
+
+        # Interleave GRA+LRB0 after finishing LRA0.
+        lrb0 = [8,9,10,11,12,13,14,15]
+        grA  = [8,8,10,10,12,12,16,16]
+
+        # Interleave GRB+LRA1 after LRB0 completes
+        # and let LRB1 tail on them.
+        lra1 = [18,19,20,21,22,26,28,30]
+        grB  = [17,17,19,19,21,21,24,24]
+        lrb1 = [24,25,26,27,28,29,30,31]
+
+        optSchedule = {
+            'SYNC': [syncs.get_indicies()],
+            'GRA': [grA],
+            'GRB': [grB],
+            'GRIncA': [[0,0,0,1,1,1,2,2,2]],
+            'GRIncB': [[3,3,3,4,4,4,5,5,5]],
+            'LRA0': [lra0],
+            'LRB0': [lrb0],
+            'LRSA': [[17]],
+            'LRSB': [[17]],
+            'LRA1': [lra1],
+            'LRB1': [lrb1],
+            'LWSA': [[31]],
+            'LWSB': [[31]],
+            'LCC': [[31,31]],
+        }
+
+        opt1 = ScheduleInfo(1, numMfma, optSchedule, nllshift=8, nglshift=8, syncCode=syncs.get_code())
+    else:
+        return False, None
+
+    return True, opt1
+
+
+@RegisterSchedule(
     tile_config=TileConfig(128, 192, 32, 2, 1, 1, False, 0, 0),
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
