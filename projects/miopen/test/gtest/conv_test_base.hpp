@@ -29,6 +29,7 @@
 #include <miopen/miopen.h>
 #include <iostream>
 
+#include "gtest_common.hpp"
 #include "tensor_holder.hpp"
 #include "conv_common.hpp"
 #include "conv_tensor_gen.hpp"
@@ -158,12 +159,12 @@ struct GroupConvTestConfig<2u> : GroupConvTestConfigBase
     }
 
     template <Direction DIR>
-    static std::vector<GroupConvTestConfig> GetConfigs(const sizer::TestConfigSizer& sizer)
+    static std::vector<GroupConvTestConfig> GetConfigs()
     {
         if constexpr(DIR == Direction::Forward)
         {
             // clang-format off
-        return Sanitize({
+        return {
             // g   n     C     K      img       filter   pad    stride  dilation
               {1,  64,  1024, 2048, {14, 14},   {1, 1}, {0, 0}, {2, 2}, {1, 1}},
               {1,  256, 192,  192,  {28, 28},   {3, 3}, {1, 1}, {1, 1}, {1, 1}},
@@ -179,10 +180,19 @@ struct GroupConvTestConfig<2u> : GroupConvTestConfigBase
               {32, 256, 1024, 2048, {28, 28},   {1, 1}, {1, 1}, {2, 2}, {1, 1}},
               {1,  6,   448,  896,  {118, 182}, {1, 1}, {0, 0}, {2, 2}, {1, 1}},
               {4,  16,  224,  224,  {469, 724}, {3, 3}, {1, 1}, {2, 2}, {1, 1}},
-        }, sizer);
+        };
             // clang-format on
         }
     }
+
+    template <Direction DIR>
+    static std::vector<GroupConvTestConfig> GetSizedConfigs(const sizer::TestConfigSizer& sizer)
+    {
+        if constexpr(DIR == Direction::Forward)
+        {
+            return Sanitize(GetConfigs<DIR>(), sizer);
+        }
+    };
 };
 
 template <>

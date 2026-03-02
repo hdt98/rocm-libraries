@@ -47,7 +47,6 @@ using ConfigBase = GroupConvTestConfigBase;
 template <typename T, typename TestCaseType = ConvTestCaseBase>
 struct CBAInferBase : ConvBiasActivInferTest<T, TestCaseType>
 {
-    using DataType = T;
     void RunSolver(const miopen::solver::fusion::FusionSolverBase& solv)
     {
         auto& handle              = get_handle();
@@ -283,13 +282,13 @@ INSTANTIATE_TEST_SUITE_P(
 INSTANTIATE_TEST_SUITE_P(
     Full,
     GPU_ConvGrpBiasActivInfer_BFP16,
-        gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetConfigs<Direction::Forward>(sizer::EqualOrBelow<bfloat16, ConfigBase::HUGE_SHAPE_MIN_BYTES>{}),
+        gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetSizedConfigs<Direction::Forward>(sizer::EqualOrBelow<bfloat16, ConfigBase::HUGE_SHAPE_MIN_BYTES>{}),
                           testing::Values(miopenTensorNHWC, miopenTensorNCHW)));
 
 INSTANTIATE_TEST_SUITE_P(
     FullHuge,
     GPU_ConvGrpBiasActivInfer_BFP16,
-    gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetConfigs<Direction::Forward>(sizer::Above<bfloat16, ConfigBase::HUGE_SHAPE_MIN_BYTES>{}),
+    gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetSizedConfigs<Direction::Forward>(sizer::Above<bfloat16, ConfigBase::HUGE_SHAPE_MIN_BYTES>{}),
                           testing::Values(miopenTensorNHWC, miopenTensorNCHW)));
 INSTANTIATE_TEST_SUITE_P(
     Full,
@@ -312,12 +311,12 @@ INSTANTIATE_TEST_SUITE_P(
 INSTANTIATE_TEST_SUITE_P(
     Full,
     GPU_ConvGrpBiasActivInfer_FP16,
-    gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetConfigs<Direction::Forward>(sizer::EqualOrBelow<float16, ConfigBase::HUGE_SHAPE_MIN_BYTES>{}),
+    gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetSizedConfigs<Direction::Forward>(sizer::EqualOrBelow<float16, ConfigBase::HUGE_SHAPE_MIN_BYTES>{}),
                           testing::Values(miopenTensorNHWC, miopenTensorNCHW)));
 INSTANTIATE_TEST_SUITE_P(
     FullHuge,
     GPU_ConvGrpBiasActivInfer_FP16,
-    gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetConfigs<Direction::Forward>(sizer::Above<float16, ConfigBase::HUGE_SHAPE_MIN_BYTES>{}),
+    gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetSizedConfigs<Direction::Forward>(sizer::Above<float16, ConfigBase::HUGE_SHAPE_MIN_BYTES>{}),
                           testing::Values(miopenTensorNHWC, miopenTensorNCHW)));
 INSTANTIATE_TEST_SUITE_P(
     Full,
@@ -340,12 +339,12 @@ INSTANTIATE_TEST_SUITE_P(
 INSTANTIATE_TEST_SUITE_P(
     Full,
     GPU_ConvGrpBiasActivInfer_FP32,
-    gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetConfigs<Direction::Forward>(sizer::EqualOrBelow<float, ConfigBase::HUGE_SHAPE_MIN_BYTES>{}),
+    gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetSizedConfigs<Direction::Forward>(sizer::EqualOrBelow<float, ConfigBase::HUGE_SHAPE_MIN_BYTES>{}),
                           testing::Values(miopenTensorNHWC, miopenTensorNCHW)));
 INSTANTIATE_TEST_SUITE_P(
     FullHuge,
     GPU_ConvGrpBiasActivInfer_FP32,
-    gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetConfigs<Direction::Forward>(sizer::Above<float, ConfigBase::HUGE_SHAPE_MIN_BYTES>{}),
+    gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetSizedConfigs<Direction::Forward>(sizer::Above<float, ConfigBase::HUGE_SHAPE_MIN_BYTES>{}),
                           testing::Values(miopenTensorNHWC, miopenTensorNCHW)));
 INSTANTIATE_TEST_SUITE_P(
     Full,
