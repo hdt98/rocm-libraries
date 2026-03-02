@@ -30,6 +30,7 @@ using TGemmMulMulF8F8F16Instances =
                                                                      PassThrough,
                                                                      PassThrough,
                                                                      MultiplyMultiply>>>;
+
 #ifdef CK_USE_XDL
 void add_device_gemm_multiply_multiply_weight_preshuffle_xdl_f8_f8_f16_mk_mfma_mn_compute_default_instances_p1(
     TGemmMulMulF8F8F16Instances& instances);
@@ -84,20 +85,6 @@ void add_device_gemm_multiply_multiply_weight_preshuffle_xdl_f8_f8_f16_mk_mfma16
 
 void add_device_gemm_multiply_multiply_weight_preshuffle_xdl_f8_f8_f16_mk_mfma16x16_mn_compute_default_instances_p6(
     TGemmMulMulF8F8F16Instances& instances);
-#endif
-#ifdef CK_USE_WMMA
-void add_device_gemm_multiply_multiply_weight_preshuffle_wmma_f8_f8_f16_mk_wmma_mn_default_instances_p1(
-    TGemmMulMulF8F8F16Instances& instances);
-
-void add_device_gemm_multiply_multiply_weight_preshuffle_wmma_f8_f8_f16_mk_wmma_mn_default_instances_p2(
-    TGemmMulMulF8F8F16Instances& instances);
-
-void add_device_gemm_multiply_multiply_weight_preshuffle_wmma_f8_f8_f16_mk_wmma_mn_default_instances_p3(
-    TGemmMulMulF8F8F16Instances& instances);
-
-void add_device_gemm_multiply_multiply_weight_preshuffle_wmma_f8_f8_f16_mk_wmma_mn_default_instances_p4(
-    TGemmMulMulF8F8F16Instances& instances);
-#endif
 #endif
 
 #ifdef CK_USE_WMMA
