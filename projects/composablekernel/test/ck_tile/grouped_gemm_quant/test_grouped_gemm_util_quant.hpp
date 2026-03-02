@@ -69,17 +69,6 @@ class TestCkTileGroupedGemmQuant : public ::testing::Test
             ck_tile::get_k_warp_tile<ADataType, M_Warp_Tile>();
     };
 
-    struct GroupedGemKernelParam_Wmma : public GroupedGemKernelParam_Mfma
-    {
-        static const ck_tile::index_t M_Tile = 128;
-        static const ck_tile::index_t N_Tile = 128;
-        static const ck_tile::index_t K_Tile = 128;
-
-        static const ck_tile::index_t M_Warp_Tile = 16;
-        static const ck_tile::index_t N_Warp_Tile = 16;
-        static const ck_tile::index_t K_Warp_Tile = 16;
-    };
-
     using grouped_gemm_kargs = ck_tile::QuantGroupedGemmHostArgs;
     std::size_t get_workspace_size(const std::vector<grouped_gemm_kargs>& gemm_descs)
     {

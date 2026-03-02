@@ -131,9 +131,6 @@ class TestCkTileGemmQuantBase : public ::testing::Test
 
         using TilePartitioner = ck_tile::GemmTile1DPartitioner<CodegenGemmShape>;
 
-        // BQLayout is always ColumnMajor for BQuant
-        using BQLayout = ck_tile::tensor_layout::gemm::ColumnMajor;
-
         using CodegenGemmTraits = ck_tile::TileGemmQuantTraits<kPadM,
                                                                kPadN,
                                                                kPadK,

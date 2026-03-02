@@ -315,40 +315,41 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
             }
 #endif
         }
-    }
-    // layout NDHWGC/GKZYXC/NDHWGK
-    if constexpr(NumDimSpatial == 3 && is_same_v<InLayout, NDHWGC> &&
-                 is_same_v<WeiLayout, GKZYXC> && is_same_v<OutLayout, NDHWGK>)
-    {
-#ifdef CK_ENABLE_BF16
-        if constexpr(is_same_v<InDataType, ck::bhalf_t> && is_same_v<WeiDataType, ck::bhalf_t> &&
-                     is_same_v<OutDataType, ck::bhalf_t> && is_same_v<AComputeType, ck::bhalf_t> &&
-                     is_same_v<BComputeType, ck::bhalf_t>)
+        // layout NDHWGC/GKZYXC/NDHWGK
+        if constexpr(NumDimSpatial == 3 && is_same_v<InLayout, NDHWGC> &&
+                     is_same_v<WeiLayout, GKZYXC> && is_same_v<OutLayout, NDHWGK>)
         {
-            add_device_grouped_conv3d_fwd_bias_bn_clamp_wmma_cshufflev3_ndhwgc_gkzyxc_ndhwgk_bf16_instances(
-                op_ptrs);
+#ifdef CK_ENABLE_BF16
+            if constexpr(is_same_v<InDataType, ck::bhalf_t> &&
+                         is_same_v<WeiDataType, ck::bhalf_t> &&
+                         is_same_v<OutDataType, ck::bhalf_t> &&
+                         is_same_v<AComputeType, ck::bhalf_t> &&
+                         is_same_v<BComputeType, ck::bhalf_t>)
+            {
+                add_device_grouped_conv3d_fwd_bias_bn_clamp_wmma_cshufflev3_ndhwgc_gkzyxc_ndhwgk_bf16_instances(
+                    op_ptrs);
 
-            add_device_grouped_conv3d_fwd_bias_bn_clamp_wmma_cshufflev3_large_tensor_ndhwgc_gkzyxc_ndhwgk_bf16_instances(
-                op_ptrs);
-        }
+                add_device_grouped_conv3d_fwd_bias_bn_clamp_wmma_cshufflev3_large_tensor_ndhwgc_gkzyxc_ndhwgk_bf16_instances(
+                    op_ptrs);
+            }
 #endif
 #ifdef CK_ENABLE_FP16
-        if constexpr(is_same_v<InDataType, half_t> && is_same_v<WeiDataType, half_t> &&
-                     is_same_v<OutDataType, half_t> && is_same_v<AComputeType, half_t> &&
-                     is_same_v<BComputeType, half_t>)
-        {
-            add_device_grouped_conv3d_fwd_bias_bn_clamp_wmma_cshufflev3_ndhwgc_gkzyxc_ndhwgk_f16_instances(
-                op_ptrs);
+            if constexpr(is_same_v<InDataType, half_t> && is_same_v<WeiDataType, half_t> &&
+                         is_same_v<OutDataType, half_t> && is_same_v<AComputeType, half_t> &&
+                         is_same_v<BComputeType, half_t>)
+            {
+                add_device_grouped_conv3d_fwd_bias_bn_clamp_wmma_cshufflev3_ndhwgc_gkzyxc_ndhwgk_f16_instances(
+                    op_ptrs);
 
-            add_device_grouped_conv3d_fwd_bias_bn_clamp_wmma_cshufflev3_large_tensor_ndhwgc_gkzyxc_ndhwgk_f16_instances(
-                op_ptrs);
-        }
+                add_device_grouped_conv3d_fwd_bias_bn_clamp_wmma_cshufflev3_large_tensor_ndhwgc_gkzyxc_ndhwgk_f16_instances(
+                    op_ptrs);
+            }
 #endif
-    }
+        }
 #endif // CK_USE_WMMA
 
-    return op_ptrs;
-}
+        return op_ptrs;
+    }
 };
 
 } // namespace instance
