@@ -49,6 +49,7 @@ struct BlockGemmWeightPreshuffleBQuantARegBRegCReg
     static constexpr index_t NWarp = config.template at<2>();
 
     static constexpr index_t MPerBlock = BlockGemmShape::kM;
+    static constexpr index_t NPerBlock = BlockGemmShape::kN;
     static constexpr index_t KPerBlock = BlockGemmShape::kK;
 
     static constexpr index_t kBlockSize = Problem::kBlockSize;
@@ -176,7 +177,19 @@ struct BlockGemmWeightPreshuffleBQuantARegBRegCReg
 
                     if constexpr(BPreshuffleQuant)
                     {
-                        constexpr index_t reg_offset = nIter;
+                        constexpr index_t reg_offset = [&]() {
+                            if constexpr(BQuantGroupSize::kN >
+                                             (NWarp * WG::kN) &&
+                                         NPerBlock == BQuantGroupSize::kN)
+                            {
+                                return kQScale; // prefill: one quant group per block
+                            }
+                            else
+                            {
+                                return nIter; // decode or multiple groups per warp
+                            }
+                        }();
+
                         auto pull_from_lane = (__lane_id() & (WG::kN - 1)) * KPerBlockBQ + kQScale;
                         auto& scale_reg     = bq_block_tensor.get_thread_buffer()[reg_offset];
                         // cross lane ops
