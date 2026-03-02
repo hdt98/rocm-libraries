@@ -49,7 +49,9 @@
 
 namespace TensileLite
 {
-    enum KernelArgumentType
+    
+
+    enum CustomArgSemantic
     {
         SizeFree0,  // 0
         SizeFree1,  // 1
@@ -70,12 +72,23 @@ namespace TensileLite
         Alpha,      // 16
         Beta,       // 17
         DebugPattern,      // 18
-        Count,      // 19
+        CustomArgSemantic_Count,      // 19
     };
     
-    std::string toString(KernelArgumentType arg);
-    std::ostream& operator<<(std::ostream& stream, const KernelArgumentType& t);
-    std::istream& operator>>(std::istream& stream, KernelArgumentType& t);
+    std::string toString(CustomArgSemantic arg);
+    CustomArgSemantic fromStringCustomArgSemantic(std::string& str);
+    std::ostream& operator<<(std::ostream& stream, const CustomArgSemantic& t);
+    std::istream& operator>>(std::istream& stream, CustomArgSemantic& t);
+
+    struct CustomArgDefinition
+    {
+        CustomArgType type;
+        CustomArgSemantic semantic;
+    };
+
+    std::string toString(CustomArgDefinition arg);
+    std::ostream& operator<<(std::ostream& stream, const CustomArgDefinition& t);
+    std::istream& operator>>(std::istream& stream, CustomArgDefinition& t);
 
     template <typename TAct>
     struct DeviceUserArguments
@@ -141,7 +154,7 @@ namespace TensileLite
     struct CustomKernel
     {
         std::string name;
-        std::vector<KernelArgumentType> args;
+        std::vector<CustomArgDefinition> args;
     };
 
     struct SizeMapping
