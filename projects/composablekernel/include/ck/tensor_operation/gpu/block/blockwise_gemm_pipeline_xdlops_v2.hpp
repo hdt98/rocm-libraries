@@ -386,7 +386,7 @@ struct BlockwiseGemmXdlops_pipeline_v2<BlockGemmPipelineScheduler::Intrawave,
                                                          decltype(m0),
                                                          Number<0>,
                                                          decltype(k0),
-                                                         Add<Number<k_>, Ik>>{a_thread_vec, a_thread_buf};
+                                                         Ik>{a_thread_vec, a_thread_buf};
                             auto loadB = load_thread_vec<decltype(b_thread_vec),
                                                          decltype(b_thread_buf),
                                                          decltype(b_thread_desc_),
@@ -394,7 +394,7 @@ struct BlockwiseGemmXdlops_pipeline_v2<BlockGemmPipelineScheduler::Intrawave,
                                                          decltype(n0),
                                                          Number<0>,
                                                          decltype(k0),
-                                                         Add<Number<k_>, Ik>>{b_thread_vec, b_thread_buf};
+                                                         Ik>{b_thread_vec, b_thread_buf};
 
                             static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
@@ -461,7 +461,7 @@ struct BlockwiseGemmXdlops_pipeline_v2<BlockGemmPipelineScheduler::Intrawave,
                                                      decltype(m0),
                                                      Number<0>,
                                                      decltype(k0),
-                                                     Add<Number<k_>, Ik>>{a_thread_vec, a_thread_buf};
+                                                     Ik>{a_thread_vec, a_thread_buf};
                         auto loadB = load_thread_vec<decltype(b_thread_vec),
                                                      decltype(b_thread_buf),
                                                      decltype(b_thread_desc_),
@@ -469,7 +469,7 @@ struct BlockwiseGemmXdlops_pipeline_v2<BlockGemmPipelineScheduler::Intrawave,
                                                      decltype(n0),
                                                      Number<0>,
                                                      decltype(k0),
-                                                     Add<Number<k_>, Ik>>{b_thread_vec, b_thread_buf};
+                                                     Ik>{b_thread_vec, b_thread_buf};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
@@ -531,7 +531,7 @@ struct BlockwiseGemmXdlops_pipeline_v2<BlockGemmPipelineScheduler::Intrawave,
                                                      decltype(m0),
                                                      Number<0>,
                                                      decltype(k0),
-                                                     Add<Number<k_>, Ik>>{a_thread_vec, a_thread_buf};
+                                                     Ik>{a_thread_vec, a_thread_buf};
                         auto loadB = load_thread_vec<decltype(b_thread_vec),
                                                      decltype(b_thread_buf),
                                                      decltype(b_thread_desc_),
@@ -539,7 +539,7 @@ struct BlockwiseGemmXdlops_pipeline_v2<BlockGemmPipelineScheduler::Intrawave,
                                                      decltype(n0),
                                                      Number<0>,
                                                      decltype(k0),
-                                                     Add<Number<k_>, Ik>>{b_thread_vec, b_thread_buf};
+                                                     Ik>{b_thread_vec, b_thread_buf};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
