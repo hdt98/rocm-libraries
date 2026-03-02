@@ -223,9 +223,9 @@ struct WmmaTraitsBase<gfx13_t, ADType, BDType, CDType, K, MixPrec, M, N>
     static constexpr index_t kAMBlock = 1;
     static constexpr index_t kBNBlock = 1;
 
-    static constexpr index_t kRepeat      = 1;
-    static constexpr index_t kAMLane      = 16;
-    static constexpr index_t kBNLane      = 16;
+    static constexpr index_t kRepeat = 1;
+    static constexpr index_t kAMLane = 16;
+    static constexpr index_t kBNLane = 16;
 
     static constexpr index_t kAK0PerLane = 1;
     static constexpr index_t kBK0PerLane = 1;
