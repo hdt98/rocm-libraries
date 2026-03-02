@@ -580,58 +580,45 @@ public:
     };
 
 private:
-    template<typename V = Value, typename F>
+    template<typename F>
     ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
     static auto invoke_warp_sort(Key (&keys)[items_per_thread],
                           Value (&values)[items_per_thread],
                           storage_type& storage,
                           F             comparator)
-        -> std::enable_if_t<std::is_same<V, ::rocprim::empty_type>::value>
     {
-        (void)values;
-        sort_type().sort(keys, storage.sort, comparator);
+        if constexpr(std::is_same_v<Value, ::rocprim::empty_type>)
+        {
+            sort_type().sort(keys, storage.sort, comparator);
+        }
+        else
+        {
+            sort_type().sort(keys, values, storage.sort, comparator);
+        }
     }
 
-    template<typename V = Value, typename F>
-    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
-    static auto invoke_warp_sort(Key (&keys)[items_per_thread],
-                                 Value (&values)[items_per_thread],
-                                 storage_type& storage,
-                                 F             comparator)
-        -> std::enable_if_t<!std::is_same<V, ::rocprim::empty_type>::value>
-    {
-        sort_type().sort(keys, values, storage.sort, comparator);
-    }
-
-    template<class K = Key>
-    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
-    static auto invoke_warp_sort(Key (&keys)[items_per_thread],
-                                 Value (&values)[items_per_thread],
-                                 storage_type& storage,
-                                 unsigned int  begin_bit,
-                                 unsigned int  end_bit) -> std::enable_if_t<!is_integral<K>::value>
-    {
-        (void)begin_bit;
-        (void)end_bit;
-        invoke_warp_sort(keys, values, storage, radix_comparator_type<false>{});
-    }
-
-    template<class K = Key>
     ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
     static auto invoke_warp_sort(Key (&keys)[items_per_thread],
                           Value (&values)[items_per_thread],
                           storage_type& storage,
                           unsigned int  begin_bit,
-                          unsigned int  end_bit) -> std::enable_if_t<is_integral<K>::value>
+                          unsigned int  end_bit)
     {
-        if(begin_bit == 0 && end_bit == 8 * sizeof(Key))
+        if constexpr(is_integral<Key>::value)
         {
-            invoke_warp_sort(keys, values, storage, radix_comparator_type<false>{});
+            if(begin_bit == 0 && end_bit == 8 * sizeof(Key))
+            {
+                invoke_warp_sort(keys, values, storage, radix_comparator_type<false>{});
+            }
+            else
+            {
+                radix_comparator_type<true> comparator(begin_bit, end_bit - begin_bit);
+                invoke_warp_sort(keys, values, storage, comparator);
+            }
         }
         else
         {
-            radix_comparator_type<true> comparator(begin_bit, end_bit - begin_bit);
-            invoke_warp_sort(keys, values, storage, comparator);
+            invoke_warp_sort(keys, values, storage, radix_comparator_type<false>{});
         }
     }
 
