@@ -1,12 +1,13 @@
 # People's names, including usernames that show up in the ROCm documentation, set here to ignore them during linting.
+# In alphabetical order, lowercase after uppercase.
 Afaganis
 Agarwal
-Anathan
+Ananthan
 Andrej
 Andriy
 Astha
 Aviral
-Barlomeij
+Bartlomiej
 Bing
 Chao
 Chunyu
@@ -14,13 +15,14 @@ Geyyer
 Goel
 Gowda
 Guangzhao
+Hadamard
 Hanwen
 Hao
 Hari
 Illia
 Jehandad
 Jia
-Jiangeng
+Jianfeng
 Jing
 Khushbu
 Kocot
@@ -39,7 +41,7 @@ Poyen
 Qianfeng
 Qin
 Raman
-Roschenko
+Roshchenko
 Rosty
 Sadasivan
 Shaojie
@@ -52,7 +54,7 @@ Thrupti
 Vidyasagar
 Welford
 Wroblewski
-Xiayan
+Xiaoyan
 Yan
 Yao
 Ying
