@@ -3666,7 +3666,7 @@ namespace TensileLite
 
     origami::data_type_t ContractionSolution::getOrigamiDatatype(Problem const& problem) const
     {
-        return datatypeToAnalyticalDatatype(problem.computeInputType());
+        return datatypeToAnalyticalDatatype(problem.computeInputTypeA());
     }
 
     std::ostream& operator<<(std::ostream&                                      stream,
