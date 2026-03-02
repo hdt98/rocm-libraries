@@ -307,6 +307,28 @@ void invoke_with_params(Check&& check)
     }
 }
 
+namespace sizer
+{
+struct TestConfigSizer
+{
+    virtual ~TestConfigSizer() {}
+    virtual bool CheckBytes(size_t bytes) const = 0;
+    virtual bool CheckElements(size_t count) const = 0;
+};
+template <typename T, size_t MAX_BYTES>
+struct EqualOrBelow : public TestConfigSizer
+{
+    bool CheckBytes(size_t bytes) const override { return bytes <= MAX_BYTES; }
+    bool CheckElements(size_t elements) const override { return CheckBytes(sizeof(T) * elements); }
+};
+template <typename T, size_t MIN_BYTES>
+struct Above : public TestConfigSizer
+{
+    bool CheckBytes(size_t bytes) const override { return bytes > MIN_BYTES; }
+    bool CheckElements(size_t elements) const override { return CheckBytes(sizeof(T) * elements); }
+};
+}
+
 /// repalcement of gtest's FAIL() because FAIL() returns void and messes up the
 /// return type deduction
 #define MIOPEN_FRIENDLY_FAIL(MSG)   \

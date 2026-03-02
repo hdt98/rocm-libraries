@@ -38,6 +38,7 @@ using Direction = miopen::conv::Direction;
 struct GroupConvTestConfigBase
 {
     virtual ~GroupConvTestConfigBase() = default;
+    static constexpr size_t HUGE_SHAPE_MIN_BYTES = 1ULL << 30;
 };
 
 template <unsigned NDIM>
@@ -89,6 +90,25 @@ struct GroupConvTestConfig<2u> : GroupConvTestConfigBase
     {
     }
 
+    size_t GetSize()
+    {
+        return N * C * img.x * img.y;
+    }
+
+    static std::vector<GroupConvTestConfig> Sanitize(const std::vector<GroupConvTestConfig>& configs, const sizer::TestConfigSizer& sizer)
+    {
+        std::vector<GroupConvTestConfig> sanitized;
+        for(auto config : configs)
+        {
+            if(sizer.CheckElements(config.GetSize()))
+            {
+                sanitized.push_back(config);
+            }
+        }
+
+        return sanitized;
+    }
+
     friend std::ostream& operator<<(std::ostream& os, const GroupConvTestConfig& tc)
     {
         return os << " G:" << tc.G << " N:" << tc.N << " C:" << tc.C << " K:" << tc.k
@@ -138,12 +158,12 @@ struct GroupConvTestConfig<2u> : GroupConvTestConfigBase
     }
 
     template <Direction DIR>
-    static std::vector<GroupConvTestConfig> GetConfigs()
+    static std::vector<GroupConvTestConfig> GetConfigs(const sizer::TestConfigSizer& sizer)
     {
         if constexpr(DIR == Direction::Forward)
         {
             // clang-format off
-        return {
+        return Sanitize({
             // g   n     C     K      img       filter   pad    stride  dilation
               {1,  64,  1024, 2048, {14, 14},   {1, 1}, {0, 0}, {2, 2}, {1, 1}},
               {1,  256, 192,  192,  {28, 28},   {3, 3}, {1, 1}, {1, 1}, {1, 1}},
@@ -158,22 +178,8 @@ struct GroupConvTestConfig<2u> : GroupConvTestConfigBase
               {8,  256, 384,  384,  {28, 28},   {1, 1}, {1, 1}, {2, 2}, {1, 1}},
               {32, 256, 1024, 2048, {28, 28},   {1, 1}, {1, 1}, {2, 2}, {1, 1}},
               {1,  6,   448,  896,  {118, 182}, {1, 1}, {0, 0}, {2, 2}, {1, 1}},
-        };
-            // clang-format on
-        }
-    }
-
-    // configs known to fail on arch's such as gfx1151 that support small-memory configs
-    template <Direction DIR>
-    static std::vector<GroupConvTestConfig> GetHugeConfigs()
-    {
-        if constexpr(DIR == Direction::Forward)
-        {
-            // clang-format off
-        return {
-            // g   n     C     K      img       filter   pad    stride  dilation
               {4,  16,  224,  224,  {469, 724}, {3, 3}, {1, 1}, {2, 2}, {1, 1}},
-        };
+        }, sizer);
             // clang-format on
         }
     }
