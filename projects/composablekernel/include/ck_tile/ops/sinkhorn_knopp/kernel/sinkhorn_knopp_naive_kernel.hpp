@@ -3,7 +3,7 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
-#include "ck_tile/ops/sinkhorn_knopp/block/block_sinkhorn_reduce.hpp"
+#include "ck_tile/ops/sinkhorn_knopp/block/block_sinkhorn_naive.hpp"
 
 namespace ck_tile {
 
