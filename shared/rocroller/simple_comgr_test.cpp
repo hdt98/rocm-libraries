@@ -38,7 +38,7 @@ int main() {
   amd_comgr_action_info_t dataAction;
 
   const char* codeGenOptions[]
-      = {"-v",
+      = {"-v", "-###",
          "-mcode-object-version=5",
          "-mwavefrontsize64"};
   size_t codeGenOptionsCount = sizeof(codeGenOptions) / sizeof(codeGenOptions[0]);
