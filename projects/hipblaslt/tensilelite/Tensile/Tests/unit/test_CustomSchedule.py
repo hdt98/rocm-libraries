@@ -1026,13 +1026,14 @@ class TestCustomScheduleTF32:
     @pytest.mark.parametrize(
         # fmt: off
         "transA, transB, lds_tr_inst,  tr_lds, mt0, mt1", [
-        (  True,  False,       False,       1, 128, 160),
-        ( False,  False,        True,       1, 160, 128),
-        (  True,  False,       False,       1, 160, 128),
+        (  True,  False,       False,       1, 128, 160),  # TN (128x160x64)
+        ( False,  False,        True,       1, 160, 128),  # NN (160x128x64)
+        (  True,  False,       False,       1, 160, 128),  # TN (160x128x64)
+        ( False,   True,        True,       0, 160, 128),  # NT (160x128x64)
         # fmt: on
         ])
     def test_schedule_128x160x64_160x128x64(self, transA, transB, lds_tr_inst, tr_lds, mt0, mt1):
-        """Tests the 128x160x64, 160x128x64 TF32 TN schedule and 160x128x64 TF32 NN."""
+        """Tests the 128x160x64 and 160x128x64 TF32 schedules (TN/NN/NT variants)."""
 
         kernel = create_base_kernel()
         kernel["ProblemType"].update({
@@ -1055,7 +1056,9 @@ class TestCustomScheduleTF32:
         has_schedule, schedule_info = hasCustomSchedule(kernel)
         assert has_schedule
         assert isinstance(schedule_info, ScheduleInfo)
-        assert schedule_info.numCodePaths == 2
+        # NT 160x128x64 uses a single code path; others in this group use 2.
+        expected_code_paths = 1 if (transA is False and transB is True and mt0 == 160 and mt1 == 128) else 2
+        assert schedule_info.numCodePaths == expected_code_paths
         assert schedule_info.numMfma == TestCustomScheduleTF32.get_num_mfma(kernel)
         valid, message = isValid(schedule_info, {"kernel" : kernel})
         assert valid, message
