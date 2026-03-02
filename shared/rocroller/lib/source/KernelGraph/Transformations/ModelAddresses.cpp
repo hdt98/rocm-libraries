@@ -99,13 +99,18 @@ namespace rocRoller::KernelGraph
 
         auto coords = graph.buildTransformer(tag);
 
-        // Set the appropriate coordinate to 0 based on memory type
-        if(tile.memoryType == MemoryType::WAVE)
+        // Set the appropriate coordinate to 0 based on memory type.
+        // WAVE / WAVE_SWIZZLE / WAVE_FROM_GLOBAL use VGPR indexing (loadMacroTileWAVELDSInfo /
+        // storeMacroTileWAVELDSInfo).  VGPR / WAVE_SPLIT / LDS use ElementNumber indexing
+        // (loadMacroTileLDSInfo / storeMacroTileLDSInfo).
+        if(tile.memoryType == MemoryType::WAVE || tile.memoryType == MemoryType::WAVE_SWIZZLE
+           || tile.memoryType == MemoryType::WAVE_FROM_GLOBAL)
         {
             auto [vgprTag, vgpr] = graph.getDimension<VGPR>(tag);
             coords.setCoordinate(vgprTag, Expression::literal(0));
         }
-        else if(tile.memoryType == MemoryType::VGPR)
+        else if(tile.memoryType == MemoryType::VGPR || tile.memoryType == MemoryType::WAVE_SPLIT
+                || tile.memoryType == MemoryType::LDS)
         {
             auto [elemXTag, elemX] = graph.getDimension<ElementNumber>(tag, 0);
             auto [elemYTag, elemY] = graph.getDimension<ElementNumber>(tag, 1);
@@ -164,37 +169,25 @@ namespace rocRoller::KernelGraph
     template <typename Op>
     Generator<size_t> ModelAddresses::getLDSAddresses(KernelGraph& graph, int tag, Op const& op)
     {
-        auto [tileTag, tile] = graph.getDimension<MacroTile>(tag);
+        constexpr bool isLoad    = std::is_same_v<Op, LoadLDSTile>;
+        constexpr auto direction = isLoad ? LDSDirection::Load : LDSDirection::Store;
 
-        constexpr bool isLoad          = std::is_same_v<Op, LoadLDSTile>;
-        const auto     expectedMemType = isLoad ? MemoryType::WAVE : MemoryType::VGPR;
-        constexpr auto direction       = isLoad ? LDSDirection::Load : LDSDirection::Store;
+        auto graphPtr = std::make_shared<KernelGraph>(graph);
+        // Use nullptr context to avoid modifying the real tag manager during modeling
+        LoadStoreTileGenerator tileGenerator(
+            graphPtr, nullptr, m_context->kernel()->max_flat_workgroup_size());
 
-        if(tile.memoryType == expectedMemType)
+        LoadStoreTileGenerator::LoadStoreTileInfo info;
+        if constexpr(isLoad)
         {
-            auto graphPtr = std::make_shared<KernelGraph>(graph);
-            // Use nullptr context to avoid modifying the real tag manager during modeling
-            LoadStoreTileGenerator tileGenerator(
-                graphPtr, nullptr, m_context->kernel()->max_flat_workgroup_size());
-
-            LoadStoreTileGenerator::LoadStoreTileInfo info;
-            if constexpr(isLoad)
-            {
-                info = tileGenerator.getLoadLDSTileInfo(tag, op);
-            }
-            else
-            {
-                info = tileGenerator.getStoreLDSTileInfo(tag, op);
-            }
-
-            co_yield getLDSAddressesImpl(graph, tag, info, direction);
+            info = tileGenerator.getLoadLDSTileInfo(tag, op);
         }
         else
         {
-            Log::info("Skipping LDS address annotations due to {} and isLoad {}",
-                      toString(tile.memoryType),
-                      isLoad);
+            info = tileGenerator.getStoreLDSTileInfo(tag, op);
         }
+
+        co_yield getLDSAddressesImpl(graph, tag, info, direction);
     }
 
     template Generator<size_t>
