@@ -5348,45 +5348,47 @@ def _get_schedule_160x128x64_TF32(kernel, useLDSTr, TLDS):
                   6,6,7,7, 10,10, 17,17,18,18,
                   8,8,9,9, 10,10, 19,19,20,20]
                   
-        pack_b = [0, 1, 2, 6, 7, 10, 3, 4, 5, 8, 9, 11, # swap instructions
-                  12,12,13,13, 20,20, 21,21,22,22, # base schedule
-                  14,14,15,15, 20,20, 23,23,24,24,
-                  16,16,17,17, 20,20, 25,25,26,26,
-                  18,18,19,19, 20,20, 27,27,28,28]
+        pack_b = [#0, 1, 2, 6, 7, 10, 3, 4, 5, 8, 9, 11, # swap instructions
+                  0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, # swap instructions
+                  6,6,7,7, 14,14, 15,15,16,16, # base schedule
+                  8,8,9,9, 14,14, 17,17,18,18,
+                  10,10,11,11, 14,14, 19,19,20,20,
+                  12,12,13,13, 14,14, 21,21,22,22]
 
         lra0 = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4,
-                5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 
-                10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 
+                5, 5, 6, 6, 7, 7, 8, 8, 9, 9,
+                10, 10, 11, 11, 12, 12, 13, 13, 14, 14,
                 15, 15, 16, 16, 17, 17, 18, 18, 19, 19]
-        lra0 = [0]*40
+        packa0 = [i+13 for i in pack_a] # latest 20
+        syncs.add(13, dscnt=15, comment="wait for LRA0 before pack to complete")
+        syncs.add(28, dscnt=0, comment="wait for LRA0 before pack to complete")
 
-        syncs.add(1, dscnt=0, comment="wait for LRA0 before pack to complete")
-        packa0 = [i+1 for i in pack_a] # latest 20
 
+        lrb0 = [21, 23, 25, 26, 27, 29, 31, 33]
+        syncs.add(37, dscnt=0, comment="wait for LRB0 before pack to complete")
+        packb0 = [i+37 for i in pack_b] # latest 22
+
+        gla = [21, 21, 23, 23, 25, 25, 27, 27, 29, 29,
+               31, 31, 33, 33, 35, 35, 37, 37, 39, 39]
+        glb = [59, 59, 61, 61, 63, 63, 65, 65, 67, 67, 69, 69, 71, 71, 73, 73]
         syncs.add(42, barrier=True, barrier_comment="barrier for GRA")
+        syncs.add(60, vlcnt=19, barrier=True, comment="wait for LRB0 before pack to complete", barrier_comment="barrier for GRA")
 
-        lrb0 = [40, 42, 44, 45, 46, 47, 49, 51]
-        lrb0 = [21]*8
-
-        syncs.add(22, dscnt=0, comment="wait for LRB0 before pack to complete")
-        packb0 = [i+22 for i in pack_b] # latest 28
-
-        syncs.add(59, vlcnt=0, barrier=True, comment="wait for LRB0 before pack to complete", barrier_comment="barrier for GRA")
-
-        lra1 = [59,59,61,61, 63,63,65,65,
-                67,67,69,69, 71,71,73,73,
-                74,74,74,74, 75,75,75,75,
-                77,77,77,77, 79,79,79,79,
-                81,81,81,81, 83,83,83,83],
-        lra1 = [60]*40
+        lra1 = [60,60,61,61, 62,62,63,63,
+                64,64,65,65, 66,66,67,67,
+                68,68,69,69, 70,70,71,71,
+                72,72,73,73, 74,74,75,75,
+                76,76,77,77, 78,78,79,79]
         
-        syncs.add(70, dscnt=0, barrier=True, comment="wait for LRA1 before pack to complete", barrier_comment="barrier for GRB")
-        packa1 = [i+70 for i in pack_a] # latest 20
+        packa1 = [i+73 for i in pack_a] # latest 20
+        syncs.add(73, dscnt=10, comment="wait for LRA1(0-15) for first 8 cvt")
+        syncs.add(77, dscnt=2, comment="wait for LRA1(16-31) for second 8 cvt")
+        syncs.add(81, dscnt=0, vlcnt=18, barrier=True, comment="wait for LRA1(32-39) before pack to complete", barrier_comment="barrier for GRB")
 
-        lrb1 = [84, 86, 88, 90, 92, 94, 96, 98]
-        lrb1 = [84]*8
-        syncs.add(91, dscnt=0, comment="wait for LRB0 before pack to complete")
-        packb1 = [i+91 for i in pack_b] # latest 28
+        lrb1 = [81, 83, 85, 87, 89, 91, 93, 95]
+
+        syncs.add(97, dscnt=0, comment="wait for LRB0 before pack to complete")
+        packb1 = [i+97 for i in pack_b] # latest 22
 
 
         optSchedule = {
@@ -5402,9 +5404,8 @@ def _get_schedule_160x128x64_TF32(kernel, useLDSTr, TLDS):
 
             'PackB0': [packb0],
 
-            'GRA'   : [[42, 42, 44, 44, 46, 46, 48, 48, 50, 50,
-                        52, 52, 54, 54, 56, 56, 58, 58, 59, 59]],
-            'GRB'   : [[81, 81, 83, 83, 85, 85, 87, 87, 99, 99, 101, 101, 103, 103, 105, 105]],
+            'GRA'   : [gla],
+            'GRB'   : [glb],
 
             'LRSA'  : [[58]], 'LRSB'  : [[59]], 
             'LWSA'  : [[118]], 'LWSB'  : [[118]],
@@ -5420,7 +5421,7 @@ def _get_schedule_160x128x64_TF32(kernel, useLDSTr, TLDS):
         }
 
         syncCode = syncs.get_code()
-        nglshift = nllshift = len(optSchedule["GRA"][0])/2 + len(optSchedule["GRB"][0])/2
+        nglshift = nllshift = 18
 
         opt1 = ScheduleInfo(1, n_mfma, optSchedule, syncCode, nglshift, nllshift)
         opt1.disableValidation()
