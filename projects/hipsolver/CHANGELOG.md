@@ -6,6 +6,12 @@ Full documentation for hipSOLVER is available at the [hipSOLVER Documentation](h
 ## (Unreleased) hipSOLVER
 
 ### Added
+
+* Added functions:
+  * gelsBatched
+    * hipsolverXXgelsBatched_bufferSize
+    * hipsolverXXgelsBatched
+
 ### Changed
 ### Removed
 ### Optimized
