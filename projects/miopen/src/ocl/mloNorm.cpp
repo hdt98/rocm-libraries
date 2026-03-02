@@ -109,7 +109,7 @@ int mlo_construct_norm::mloConstructFwd()
     auto ocl_group_lg2sz1 =
         static_cast<int>(ceil(log(static_cast<double>(_out_pix_tile1)) / std::numbers::ln2));
 
-    _kernel_file = "MIOpenLRNFwd.cl";
+    _kernel_file = "MIOpenLRNFwd.cpp";
     _kernel_name = (_norm_region == MLO_LRN_ACROSS_CHANNELS) ? "MIOpenLRNAcrossChannels4"
                                                              : "MIOpenLRNWithinChannel_PS";
     if(_norm_region == MLO_LRN_ACROSS_CHANNELS)
@@ -162,7 +162,7 @@ int mlo_construct_norm::mloConstructFwd()
                       : _problem.GetInWidth() * _problem.GetInHeight() - (MAP_SZ4 - 1) * read_unit;
 
     std::string READ_TYPE =
-        (read_unit == 1) ? "_FLOAT" : "_FLOAT" + std::to_string(static_cast<long long>(read_unit));
+        (read_unit == 1) ? "FLOAT" : "FLOAT" + std::to_string(static_cast<long long>(read_unit));
 
     _comp_options =
         std::string(" -DMLO_LRN_KERNEL_SZ=") + std::to_string(static_cast<long long>(_norm_area)) +
@@ -367,7 +367,7 @@ int mlo_construct_norm::mloConstructBwd()
         std::string(" -DMLO_LRN_N_OUTPUTS=") +
         std::to_string(static_cast<long long>(_problem.GetOutChannels())) + getGeneralCompOptions();
 
-    _kernel_file = "MIOpenLRNBwd.cl";
+    _kernel_file = "MIOpenLRNBwd.cpp";
 
     _l_wk.clear();
     _g_wk.clear();
