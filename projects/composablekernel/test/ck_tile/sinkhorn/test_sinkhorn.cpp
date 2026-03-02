@@ -16,6 +16,7 @@
 #include "test_sinkhorn_impl.hpp"
 
 // Shape parameters for different test configurations
+// TODO: Add more sizes once kernel generalized to handle input & kernel size mismatches
 using BatchSize32 = ck_tile::sequence<32>;
 using N4          = ck_tile::sequence<4>;
 

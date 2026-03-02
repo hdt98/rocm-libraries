@@ -4,6 +4,7 @@
 
 namespace ck_tile {
 
+// TODO: Generalize to Warps > 1, Batchsize != BlockSize
 template <typename _BatchSize, // Number of N x N matrices
           typename _N>         // N x N matrix size
 struct SinkhornKnoppShape
