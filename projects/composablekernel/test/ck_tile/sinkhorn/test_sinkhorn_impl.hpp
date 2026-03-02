@@ -82,17 +82,18 @@ class TestCkTileSinkHorn : public ::testing::Test
         ck_tile::HostTensor<YDataType> unit_n({batchsize, input_n}, {input_n, 1});
         ck_tile::FillConstant<YDataType>{1.0}(unit_n);
 
-        auto rows_ref = row_sum_ref(h_y_ref);
-        auto cols_ref = col_sum_ref(h_y_ref);
-
         bool result = true;
 
-        result &= ck_tile::check_err(rows_ref,
-                                     unit_n,
-                                     "Error: Reference computation result rows do not sum to 1!",
-                                     rtol,
-                                     atol);
+        // NOTE: As the iteration happens first on rows, then columns, only the latter
+        // can be expected to be exactly normalized
+        // auto rows_ref = row_sum_ref(h_y_ref);
+        // result &= ck_tile::check_err(rows_ref,
+        //                              unit_n,
+        //                              "Error: Reference computation result rows do not sum to 1!",
+        //                              rtol,
+        //                              atol);
 
+        auto cols_ref = col_sum_ref(h_y_ref);
         result &= ck_tile::check_err(cols_ref,
                                      unit_n,
                                      "Error: Reference computation result cols do not sum to 1!",
@@ -102,12 +103,13 @@ class TestCkTileSinkHorn : public ::testing::Test
         // Transfer data from device and check that it matches reference
         d_y_mem.FromDevice(h_y.data());
 
-        auto rows = row_sum_ref(h_y);
+        // NOTE: As the iteration happens first on rows, then columns, only the latter
+        // can be expected to be exactly normalized
+        // auto rows = row_sum_ref(h_y);
+        // result &=
+        //     ck_tile::check_err(rows, unit_n, "Error: Result rows do not sum to 1!", rtol, atol);
+
         auto cols = col_sum_ref(h_y);
-
-        result &=
-            ck_tile::check_err(rows, unit_n, "Error: Result rows do not sum to 1!", rtol, atol);
-
         result &=
             ck_tile::check_err(cols, unit_n, "Error: Result cols do not sum to 1!", rtol, atol);
 
