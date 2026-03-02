@@ -2891,7 +2891,7 @@ namespace TensileLite
                 throw std::runtime_error("hipblasLT Error: Cannot use Parallel reduction with StreamK kernel with splitting factor < 2\n");
             }
         }
-	    std::cout << "KERNELNAME:\n" << sizeMapping.customKernel.name << std::endl;
+
         if(sizeMapping.customKernel.name.empty())
         {
             // Regular generated kernel
