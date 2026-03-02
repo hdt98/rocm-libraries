@@ -729,9 +729,7 @@ namespace rocRoller
             return std::visit(
                 rocRoller::overloaded{
                     [&](CIsAnyOf<CG::StoreTiled, CG::StoreVGPR, CG::StoreSGPR> auto const& op)
-                        -> result {
-                        return {kgraph.mapper.get<CT::User>(tag), GD::Upstream};
-                    },
+                        -> result { return {kgraph.mapper.get<CT::User>(tag), GD::Upstream}; },
                     [&](CIsAnyOf<CG::LoadTileDirect2LDS> auto const& op) -> result {
                         if(isStorePartOfBidirectionalOp)
                         {
@@ -740,9 +738,7 @@ namespace rocRoller
                         return {kgraph.mapper.get<CT::User>(tag), GD::Downstream};
                     },
                     [&](CIsAnyOf<CG::LoadTiled, CG::LoadVGPR, CG::LoadSGPR> auto const& op)
-                        -> result {
-                        return {kgraph.mapper.get<CT::User>(tag), GD::Downstream};
-                    },
+                        -> result { return {kgraph.mapper.get<CT::User>(tag), GD::Downstream}; },
                     [&](CG::StoreLDSTile const& op) -> result {
                         return {kgraph.mapper.get<CT::LDS>(tag), GD::Upstream};
                     },
@@ -1123,7 +1119,8 @@ namespace rocRoller
                 else
                     break;
 
-                AssertFatal(graph.mapper.get<CT::Unroll>(tag) > 0,
+                AssertFatal(graph.mapper.get<CT::Unroll>(tag) > 0
+                                || graph.mapper.get<CT::ForLoop>(tag) > 0,
                             "SetCoordinate needs Unroll dimension");
             }
             return tag;

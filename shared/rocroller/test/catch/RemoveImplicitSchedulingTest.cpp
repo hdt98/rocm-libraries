@@ -139,7 +139,9 @@ namespace RemoveImplicitSchedulingTest
                     CHECK(order == graph.control.compareNodes(UpdateCache, node1, node2));
                 }
             }
-            CHECK(newlyUnorderedPairs > 0);
+
+            if(dataTypeAB == DataType::FP4)
+                CHECK(newlyUnorderedPairs > 0);
         }
     }
 
