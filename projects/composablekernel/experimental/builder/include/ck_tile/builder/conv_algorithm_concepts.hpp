@@ -151,47 +151,6 @@ concept TileOptimizationsDescriptor = requires(T t) {
     { t.explicit_gemm } -> std::convertible_to<bool>;
 };
 
-// Concept for thread block dimensions for a GEMM problem for CK Tile (Block
-// size is deduced from block gemm structure).
-template <typename T>
-concept TileThreadBlockDescriptor = requires(T t) {
-    { t.tile_size.m } -> std::convertible_to<size_t>;
-    { t.tile_size.n } -> std::convertible_to<size_t>;
-    { t.tile_size.k } -> std::convertible_to<size_t>;
-};
-
-// Concept for thread block dimensions for a GEMM problem for CK Tile (Block
-// size is deduced from block gemm structure).
-template <typename T>
-concept TileTransferDescriptor = requires(T t) {
-    { t.a_scalar_per_vector } -> std::convertible_to<size_t>;
-    { t.b_scalar_per_vector } -> std::convertible_to<size_t>;
-    { t.c_scalar_per_vector } -> std::convertible_to<size_t>;
-};
-
-// Concept to check if struct specifies block GEMM (CK Tile).
-template <typename T>
-concept TileBlockGemmDescriptor = requires(T t) {
-    { t.warps.m } -> std::convertible_to<int>;
-    { t.warps.n } -> std::convertible_to<int>;
-    { t.warps.k } -> std::convertible_to<int>;
-    { t.warp_tile.m } -> std::convertible_to<int>;
-    { t.warp_tile.n } -> std::convertible_to<int>;
-    { t.warp_tile.k } -> std::convertible_to<int>;
-    { t.double_smem_buffer } -> std::convertible_to<bool>;
-    { t.num_wave_groups } -> std::convertible_to<int>;
-    { t.pipeline_version } -> std::convertible_to<PipelineVersion>;
-    { t.scheduler } -> std::convertible_to<PipelineScheduler>;
-};
-
-// Concept to check if struct specifies optimizations (CK Tile).
-template <typename T>
-concept TileOptimizationsDescriptor = requires(T t) {
-    { t.num_groups_to_merge } -> std::convertible_to<int>;
-    { t.split_image } -> std::convertible_to<bool>;
-    { t.explicit_gemm } -> std::convertible_to<bool>;
-};
-
 // Base requirement for all ConvAlgorithm concepts, i.e., all conv algorithm concepts must meet this
 // concept.
 template <typename T>

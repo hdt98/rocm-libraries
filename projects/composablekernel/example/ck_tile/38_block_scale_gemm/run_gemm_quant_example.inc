@@ -185,14 +185,6 @@ float gemm_calc_quant(const ck_tile::QuantGemmHostArgs& args, const ck_tile::str
             printf(
                 "TiledPermuteN: %d (QuantGroupSize::kN=%d)\n", TiledPermuteN, BQuantGroupSize::kN);
         }
-
-        constexpr bool TiledPermuteN =
-            (QuantGroupSize::kN > 1) ? false : GemmConfig::TiledMMAPermuteN;
-        if(s.log_level_ > 0)
-        {
-            printf(
-                "TiledPermuteN: %d (QuantGroupSize::kN=%d)\n", TiledPermuteN, QuantGroupSize::kN);
-        }
         using GemmEpilogue = ck_tile::CShuffleEpilogue<
             ck_tile::CShuffleEpilogueProblem<typename PipelineProblem::ComputeDataType,
                                              typename PipelineProblem::ComputeDataType,

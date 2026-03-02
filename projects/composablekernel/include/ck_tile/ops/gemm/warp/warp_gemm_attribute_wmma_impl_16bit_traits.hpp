@@ -98,6 +98,8 @@ template <>
 struct WmmaTraits<gfx13_t, fp16_t, fp16_t, float, 16, 16, 16>
     : WmmaTraitsBase<gfx13_t, fp16_t, fp16_t, float>
 {
+    using ArchType = gfx13_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
@@ -118,6 +120,8 @@ template <>
 struct WmmaTraits<gfx13_t, bf16_t, bf16_t, float, 16, 16, 16>
     : WmmaTraitsBase<gfx13_t, bf16_t, bf16_t, float>
 {
+    using ArchType = gfx13_t;
+
     template <bool clamp = false>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)

@@ -190,8 +190,7 @@ enum class TileConvSpecialization
     DEFAULT,
     FILTER_1X1_PAD0,
     FILTER_1X1_STRIDE1_PAD0,
-    FILTER_3x3,
-    ODD_C
+    FILTER_3x3
 };
 
 // Enums for the convolution specializations.
