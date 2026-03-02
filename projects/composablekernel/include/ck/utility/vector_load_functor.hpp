@@ -101,7 +101,7 @@ struct IndexEval<Mod<L, R>, ik>
 
 template <typename ThreadVec,
           typename ThreadBuf,
-          auto ThreadDesc,
+          typename ThreadDesc,
           typename ComputeType,
           typename... IdxWrapper>
 struct load_thread_vec
@@ -117,8 +117,9 @@ struct load_thread_vec
     template <index_t ik>
     __host__ __device__ constexpr void operator()(Number<ik>) const
     {
+        constexpr auto thread_desc = ThreadDesc{};
         thread_vec.template AsType<ComputeType>()(Number<ik>{}) =
-            thread_buf[Number<ThreadDesc.CalculateOffset(
+            thread_buf[Number<thread_desc.CalculateOffset(
                 ck::make_tuple(Number<IndexEval<IdxWrapper, ik>::value>{}...))>{}];
     }
 };

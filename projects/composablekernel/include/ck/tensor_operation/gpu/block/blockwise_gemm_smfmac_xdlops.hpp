@@ -382,7 +382,7 @@ struct BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1
 
                     auto loadA = load_thread_vec<decltype(a_thread_vec),
                                                  decltype(a_thread_buf),
-                                                 a_thread_desc_,
+                                                 decltype(a_thread_desc_),
                                                  FloatAB,
                                                  0,
                                                  0,
@@ -390,7 +390,7 @@ struct BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1
                                                  Add<Ik, k / 2>>{a_thread_vec, a_thread_buf};
                     auto loadB = load_thread_vec<decltype(b_thread_vec),
                                                  decltype(b_thread_buf),
-                                                 b_thread_desc_,
+                                                 decltype(b_thread_desc_),
                                                  FloatAB,
                                                  0,
                                                  0,

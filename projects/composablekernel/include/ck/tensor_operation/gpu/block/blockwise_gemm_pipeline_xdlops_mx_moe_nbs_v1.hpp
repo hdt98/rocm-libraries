@@ -408,22 +408,22 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_nbs_v1<BlockGemmPipelineScheduler::In
                                         auto loadA =
                                             load_thread_vec<decltype(a_thread_vec),
                                                             decltype(a_thread_buf),
-                                                            a_thread_desc_,
+                                                            decltype(a_thread_desc_),
                                                             ComputeTypeA,
-                                                            m0,
-                                                            I0,
-                                                            imxdl,
-                                                            kxdl,
+                                                            decltype(m0),
+                                                            Number<0>,
+                                                            decltype(imxdl),
+                                                            decltype(kxdl),
                                                             Ik>{a_thread_vec, a_thread_buf};
                                         auto loadB =
                                             load_thread_vec<decltype(b_thread_vec),
                                                             decltype(b_thread_buf),
-                                                            b_thread_desc_,
+                                                            decltype(b_thread_desc_),
                                                             ComputeTypeB,
-                                                            n0,
-                                                            I0,
-                                                            inxdl,
-                                                            kxdl,
+                                                            decltype(n0),
+                                                            Number<0>,
+                                                            decltype(inxdl),
+                                                            decltype(kxdl),
                                                             Ik>{b_thread_vec, b_thread_buf};
 
                                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
@@ -616,21 +616,21 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_nbs_v1<BlockGemmPipelineScheduler::In
 
                                     auto loadA = load_thread_vec<decltype(a_thread_vec),
                                                                  decltype(a_thread_buf),
-                                                                 a_thread_desc_,
+                                                                 decltype(a_thread_desc_),
                                                                  ComputeTypeA,
-                                                                 m0,
-                                                                 I0,
-                                                                 imxdl,
-                                                                 kxdl,
+                                                                 decltype(m0),
+                                                                 Number<0>,
+                                                                 decltype(imxdl),
+                                                                 decltype(kxdl),
                                                                  Ik>{a_thread_vec, a_thread_buf};
                                     auto loadB = load_thread_vec<decltype(b_thread_vec),
                                                                  decltype(b_thread_buf),
-                                                                 b_thread_desc_,
+                                                                 decltype(b_thread_desc_),
                                                                  ComputeTypeB,
-                                                                 n0,
-                                                                 I0,
-                                                                 inxdl,
-                                                                 kxdl,
+                                                                 decltype(n0),
+                                                                 Number<0>,
+                                                                 decltype(inxdl),
+                                                                 decltype(kxdl),
                                                                  Ik>{b_thread_vec, b_thread_buf};
 
                                     static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));

@@ -425,22 +425,22 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_v3<BlockGemmPipelineScheduler::I
                                     (m0 + HotloopLocalBufSwitch * mfma_reg_buf) % 2;
                                 auto loadA = load_thread_vec<decltype(a_thread_vec),
                                                              decltype(a_thread_buf),
-                                                             a_thread_desc_,
+                                                             decltype(a_thread_desc_),
                                                              ComputeDataType,
-                                                             var,
-                                                             I0,
-                                                             I0,
-                                                             k0,
-                                                             I0,
-                                                             ik>{a_thread_vec, a_thread_buf};
+                                                             decltype(var),
+                                                             Number<0>,
+                                                             Number<0>,
+                                                             decltype(k0),
+                                                             Number<0>,
+                                                             Ik>{a_thread_vec, a_thread_buf};
                                 auto loadB =
                                     load_thread_vec<decltype(b_thread_vec),
                                                     decltype(b_thread_bufs[mfma_reg_buf]),
-                                                    b_thread_desc_,
+                                                    decltype(b_thread_desc_),
                                                     ComputeDataType,
-                                                    n0,
-                                                    I0,
-                                                    k0,
+                                                    decltype(n0),
+                                                    Number<0>,
+                                                    decltype(k0),
                                                     Ik>{b_thread_vec, b_thread_bufs[mfma_reg_buf]};
 
                                 static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
@@ -585,21 +585,21 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_v3<BlockGemmPipelineScheduler::I
                         constexpr auto var = m0 % 2;
                         auto loadA         = load_thread_vec<decltype(a_thread_vec),
                                                              decltype(a_thread_buf),
-                                                             a_thread_desc_,
+                                                             decltype(a_thread_desc_),
                                                              ComputeDataType,
-                                                             var,
-                                                             I0,
-                                                             I0,
-                                                             k0,
-                                                             I0,
-                                                             ik>{a_thread_vec, a_thread_buf};
+                                                             decltype(var),
+                                                             Number<0>,
+                                                             Number<0>,
+                                                             decltype(k0),
+                                                             Number<0>,
+                                                             Ik>{a_thread_vec, a_thread_buf};
                         auto loadB         = load_thread_vec<decltype(b_thread_vec),
                                                              decltype(b_thread_bufs[I0]),
-                                                             b_thread_desc_,
+                                                             decltype(b_thread_desc_),
                                                              ComputeDataType,
-                                                             n0,
-                                                             I0,
-                                                             k0,
+                                                             decltype(n0),
+                                                             Number<0>,
+                                                             decltype(k0),
                                                              Ik>{b_thread_vec, b_thread_bufs[I0]};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
@@ -696,21 +696,21 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_v3<BlockGemmPipelineScheduler::I
                         constexpr auto var = (m0 + HotloopLocalBufSwitch) % 2;
                         auto loadA         = load_thread_vec<decltype(a_thread_vec),
                                                              decltype(a_thread_buf),
-                                                             a_thread_desc_,
+                                                             decltype(a_thread_desc_),
                                                              ComputeDataType,
-                                                             var,
-                                                             I0,
-                                                             I0,
-                                                             k0,
-                                                             I0,
-                                                             ik>{a_thread_vec, a_thread_buf};
+                                                             decltype(var),
+                                                             Number<0>,
+                                                             Number<0>,
+                                                             decltype(k0),
+                                                             Number<0>,
+                                                             Ik>{a_thread_vec, a_thread_buf};
                         auto loadB         = load_thread_vec<decltype(b_thread_vec),
                                                              decltype(b_thread_bufs[I1]),
-                                                             b_thread_desc_,
+                                                             decltype(b_thread_desc_),
                                                              ComputeDataType,
-                                                             n0,
-                                                             I0,
-                                                             k0,
+                                                             decltype(n0),
+                                                             Number<0>,
+                                                             decltype(k0),
                                                              Ik>{b_thread_vec, b_thread_bufs[I1]};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
@@ -771,21 +771,21 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_v3<BlockGemmPipelineScheduler::I
                         constexpr auto var = m0 % 2;
                         auto loadA         = load_thread_vec<decltype(a_thread_vec),
                                                              decltype(a_thread_buf),
-                                                             a_thread_desc_,
+                                                             decltype(a_thread_desc_),
                                                              ComputeDataType,
-                                                             var,
-                                                             I0,
-                                                             I0,
-                                                             k0,
-                                                             I0,
-                                                             ik>{a_thread_vec, a_thread_buf};
+                                                             decltype(var),
+                                                             Number<0>,
+                                                             Number<0>,
+                                                             decltype(k0),
+                                                             Number<0>,
+                                                             Ik>{a_thread_vec, a_thread_buf};
                         auto loadB         = load_thread_vec<decltype(b_thread_vec),
                                                              decltype(b_thread_bufs[I0]),
-                                                             b_thread_desc_,
+                                                             decltype(b_thread_desc_),
                                                              ComputeDataType,
-                                                             n0,
-                                                             I0,
-                                                             k0,
+                                                             decltype(n0),
+                                                             Number<0>,
+                                                             decltype(k0),
                                                              Ik>{b_thread_vec, b_thread_bufs[I0]};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));

@@ -602,19 +602,19 @@ struct BlockwiseGemmXdlops_pipeline_v4
 
                             auto loadA = load_thread_vec<decltype(a_thread_vec),
                                                          decltype(a_thread_bufs[PingP1{}]),
-                                                         a_thread_desc_,
+                                                         decltype(a_thread_desc_),
                                                          FloatAB,
-                                                         m0,
-                                                         I0,
-                                                         k0,
+                                                         decltype(m0),
+                                                         Number<0>,
+                                                         decltype(k0),
                                                          Ik>{a_thread_vec, a_thread_bufs[PingP1{}]};
                             auto loadB = load_thread_vec<decltype(b_thread_vec),
                                                          decltype(b_thread_bufs[PingP1{}]),
-                                                         b_thread_desc_,
+                                                         decltype(b_thread_desc_),
                                                          FloatAB,
-                                                         n0,
-                                                         I0,
-                                                         k0,
+                                                         decltype(n0),
+                                                         Number<0>,
+                                                         decltype(k0),
                                                          Ik>{b_thread_vec, b_thread_bufs[PingP1{}]};
 
                             static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
@@ -689,19 +689,19 @@ struct BlockwiseGemmXdlops_pipeline_v4
 
                             auto loadA = load_thread_vec<decltype(a_thread_vec),
                                                          decltype(a_thread_bufs[PingP2{}]),
-                                                         a_thread_desc_,
+                                                         decltype(a_thread_desc_),
                                                          FloatAB,
-                                                         m0,
-                                                         I0,
-                                                         k0,
+                                                         decltype(m0),
+                                                         Number<0>,
+                                                         decltype(k0),
                                                          Ik>{a_thread_vec, a_thread_bufs[PingP2{}]};
                             auto loadB = load_thread_vec<decltype(b_thread_vec),
                                                          decltype(b_thread_bufs[PingP2{}]),
-                                                         b_thread_desc_,
+                                                         decltype(b_thread_desc_),
                                                          FloatAB,
-                                                         n0,
-                                                         I0,
-                                                         k0,
+                                                         decltype(n0),
+                                                         Number<0>,
+                                                         decltype(k0),
                                                          Ik>{b_thread_vec, b_thread_bufs[PingP2{}]};
 
                             static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
@@ -776,19 +776,19 @@ struct BlockwiseGemmXdlops_pipeline_v4
 
                         auto loadA = load_thread_vec<decltype(a_thread_vec),
                                                      decltype(a_thread_bufs[PingP1{}]),
-                                                     a_thread_desc_,
+                                                     decltype(a_thread_desc_),
                                                      FloatAB,
-                                                     m0,
-                                                     I0,
-                                                     k0,
+                                                     decltype(m0),
+                                                     Number<0>,
+                                                     decltype(k0),
                                                      Ik>{a_thread_vec, a_thread_bufs[PingP1{}]};
                         auto loadB = load_thread_vec<decltype(b_thread_vec),
                                                      decltype(b_thread_bufs[PingP1{}]),
-                                                     b_thread_desc_,
+                                                     decltype(b_thread_desc_),
                                                      FloatAB,
-                                                     n0,
-                                                     I0,
-                                                     k0,
+                                                     decltype(n0),
+                                                     Number<0>,
+                                                     decltype(k0),
                                                      Ik>{b_thread_vec, b_thread_bufs[PingP1{}]};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
@@ -853,19 +853,19 @@ struct BlockwiseGemmXdlops_pipeline_v4
 
                         auto loadA = load_thread_vec<decltype(a_thread_vec),
                                                      decltype(a_thread_bufs[PingP2{}]),
-                                                     a_thread_desc_,
+                                                     decltype(a_thread_desc_),
                                                      FloatAB,
-                                                     m0,
-                                                     I0,
-                                                     k0,
+                                                     decltype(m0),
+                                                     Number<0>,
+                                                     decltype(k0),
                                                      Ik>{a_thread_vec, a_thread_bufs[PingP2{}]};
                         auto loadB = load_thread_vec<decltype(b_thread_vec),
                                                      decltype(b_thread_bufs[PingP2{}]),
-                                                     b_thread_desc_,
+                                                     decltype(b_thread_desc_),
                                                      FloatAB,
-                                                     n0,
-                                                     I0,
-                                                     k0,
+                                                     decltype(n0),
+                                                     Number<0>,
+                                                     decltype(k0),
                                                      Ik>{b_thread_vec, b_thread_bufs[PingP2{}]};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
@@ -903,19 +903,19 @@ struct BlockwiseGemmXdlops_pipeline_v4
 
                         auto loadA = load_thread_vec<decltype(a_thread_vec),
                                                      decltype(a_thread_bufs[PingP2{}]),
-                                                     a_thread_desc_,
+                                                     decltype(a_thread_desc_),
                                                      FloatAB,
-                                                     m0,
-                                                     I0,
-                                                     k0,
+                                                     decltype(m0),
+                                                     Number<0>,
+                                                     decltype(k0),
                                                      Ik>{a_thread_vec, a_thread_bufs[PingP2{}]};
                         auto loadB = load_thread_vec<decltype(b_thread_vec),
                                                      decltype(b_thread_bufs[PingP2{}]),
-                                                     b_thread_desc_,
+                                                     decltype(b_thread_desc_),
                                                      FloatAB,
-                                                     n0,
-                                                     I0,
-                                                     k0,
+                                                     decltype(n0),
+                                                     Number<0>,
+                                                     decltype(k0),
                                                      Ik>{b_thread_vec, b_thread_bufs[PingP2{}]};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
@@ -982,19 +982,19 @@ struct BlockwiseGemmXdlops_pipeline_v4
 
                         auto loadA = load_thread_vec<decltype(a_thread_vec),
                                                      decltype(a_thread_bufs[PingP1{}]),
-                                                     a_thread_desc_,
+                                                     decltype(a_thread_desc_),
                                                      FloatAB,
-                                                     m0,
-                                                     I0,
-                                                     k0,
+                                                     decltype(m0),
+                                                     Number<0>,
+                                                     decltype(k0),
                                                      Ik>{a_thread_vec, a_thread_bufs[PingP1{}]};
                         auto loadB = load_thread_vec<decltype(b_thread_vec),
                                                      decltype(b_thread_bufs[PingP1{}]),
-                                                     b_thread_desc_,
+                                                     decltype(b_thread_desc_),
                                                      FloatAB,
-                                                     n0,
-                                                     I0,
-                                                     k0,
+                                                     decltype(n0),
+                                                     Number<0>,
+                                                     decltype(k0),
                                                      Ik>{b_thread_vec, b_thread_bufs[PingP1{}]};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
@@ -1038,19 +1038,19 @@ struct BlockwiseGemmXdlops_pipeline_v4
 
                         auto loadA = load_thread_vec<decltype(a_thread_vec),
                                                      decltype(a_thread_bufs[PingP2{}]),
-                                                     a_thread_desc_,
+                                                     decltype(a_thread_desc_),
                                                      FloatAB,
-                                                     m0,
-                                                     I0,
-                                                     k0,
+                                                     decltype(m0),
+                                                     Number<0>,
+                                                     decltype(k0),
                                                      Ik>{a_thread_vec, a_thread_bufs[PingP2{}]};
                         auto loadB = load_thread_vec<decltype(b_thread_vec),
                                                      decltype(b_thread_bufs[PingP2{}]),
-                                                     b_thread_desc_,
+                                                     decltype(b_thread_desc_),
                                                      FloatAB,
-                                                     n0,
-                                                     I0,
-                                                     k0,
+                                                     decltype(n0),
+                                                     Number<0>,
+                                                     decltype(k0),
                                                      Ik>{b_thread_vec, b_thread_bufs[PingP2{}]};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
