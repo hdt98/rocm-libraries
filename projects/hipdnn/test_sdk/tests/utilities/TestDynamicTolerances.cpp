@@ -970,11 +970,11 @@ protected:
 
         if(params.expectThrow)
         {
+            SCOPED_TRACE("Failed to throw for dims size: " + std::to_string(params.wDims.size()));
             EXPECT_THROW(
                 (calculateConvFpropTolerance<Out, In, Comp>(
                     params.inputMin, params.inputMax, params.wMin, params.wMax, params.wDims)),
-                std::invalid_argument)
-                << "Failed to throw for dims size: " << params.wDims.size();
+                std::invalid_argument);
         }
         else
         {
@@ -983,7 +983,8 @@ protected:
 
             auto expected = static_cast<float>(params.expectedTolerance);
 
-            EXPECT_NEAR(tol, expected, 1e-5f) << "Failed for dims size: " << params.wDims.size();
+            SCOPED_TRACE("Failed for dims size: " + std::to_string(params.wDims.size()));
+            EXPECT_NEAR(tol, expected, 1e-5f);
         }
     }
 };
@@ -1083,10 +1084,12 @@ TEST(TestCalculateConvFpropTolerance, DetectsFailure)
         hipdnn_data_sdk::data_objects::DataType::FLOAT, tol, 0.0f);
 
     bool valid = validator->allClose(*baseline, *actualPassing);
-    EXPECT_TRUE(valid) << "Validator should have passed";
+    SCOPED_TRACE("Validator should have passed");
+    EXPECT_TRUE(valid);
 
     valid = validator->allClose(*baseline, *actualFailing);
-    EXPECT_FALSE(valid) << "Validator should have failed";
+    SCOPED_TRACE("Validator should have failed");
+    EXPECT_FALSE(valid);
 }
 
 // Test that calculateConvFpropTolerance throws when nU >= 1.0 (singularity)
