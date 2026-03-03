@@ -18,8 +18,11 @@ static ck::index_t test_case_id = -1;
 
 static ck::index_t case_id = 0;
 
-// gfx12
-template <typename SrcType, typename DstType, typename GPUAccType, typename CPUAccType>
+template <typename SrcType,
+          typename DstType,
+          typename GPUAccType,
+          typename CPUAccType,
+          ck::index_t AccNum>
 bool run_test()
 {
     if(ck::is_gfx13_supported()) // gfx13 uses another test
@@ -34,7 +37,7 @@ bool run_test()
         }
         else
         {
-            if(ck::is_gfx12_supported())
+            if(ck::is_gfx120_supported())
                 return true;
         }
     }
@@ -51,10 +54,12 @@ bool run_test()
     using PassThrough = ck::tensor_operation::element_wise::PassThrough;
     bool pass         = true;
 
-    const auto matmul_default   = ck::wmma_op_util::matmul<SrcType, DstType, GPUAccType>;
-    const auto matmul_swizzle_a = ck::wmma_op_util::matmul_swizzle_a<SrcType, DstType, GPUAccType>;
+    const auto matmul_default = ck::wmma_op_util::matmul<SrcType, DstType, GPUAccType, AccNum>;
+    const auto matmul_swizzle_a =
+        ck::wmma_op_util::matmul_swizzle_a<SrcType, DstType, GPUAccType, AccNum>;
 
     const auto wmma_kernel_container = std::make_tuple(matmul_default, matmul_swizzle_a);
+
     ck::static_for<0, 2, 1>{}([&](auto i) {
         pass &=
             ck::wmma_op_util::TestWmma<decltype(std::get<ck::Number<i>{}>(wmma_kernel_container)),
@@ -69,13 +74,13 @@ bool run_test()
                                        PassThrough,
                                        PassThrough,
                                        PassThrough,
-                                       1>{}(std::get<ck::Number<i>{}>(wmma_kernel_container));
+                                       AccNum>{}(std::get<ck::Number<i>{}>(wmma_kernel_container));
     });
 
     return pass ? 1 : 0;
 }
 
-// gfx1250, gfx1251
+// gfx1250, gfx1251 & gfx13
 template <typename SrcAType,
           typename SrcBType,
           typename DstType,
@@ -100,7 +105,6 @@ bool run_test()
 
     if(test_case_id != -1 && (test_case_id + 1) != case_id)
     {
-
         return true;
     }
 
@@ -129,14 +133,15 @@ bool run_test()
                                        PassThrough,
                                        PassThrough,
                                        PassThrough,
+                                       8,
                                        KMultiplier>{}(
                 std::get<ck::Number<i>{}>(wmma_kernel_container));
-        kValue > {}(std::get<ck::Number<i>{}>(wmma_kernel_container));
     });
 
     return pass ? 1 : 0;
 }
 
+// gfx13
 template <typename GPUSrc0Type,
           typename GPUSrc1Type,
           typename CPUSrc0Type,
@@ -194,13 +199,12 @@ bool run_mixedfp_test()
 
 int main(int argc, char* argv[])
 {
-    // bool pass = true;
     bool pass = true;
     if(argc > 1)
     {
         test_case_id = atoi(argv[1]);
     }
-#if !defined(CK_USE_GFX1250)
+
     // clang-format off
     //              |SrcType     |DstType     |GPUAccType  |CPUAccType |AccNum
     pass &= run_test<ck::half_t,  ck::half_t,  float,       float,      8     >();
@@ -211,8 +215,11 @@ int main(int argc, char* argv[])
     // for gfx12 AccType = half_t/bhalf_t the accNum should be 8 not 16 which is incorrect in dev branch
     pass &= run_test<ck::half_t,  ck::half_t,  ck::half_t,  ck::half_t, 8    >();
     pass &= run_test<ck::bhalf_t, ck::bhalf_t, ck::bhalf_t, float,      8    >();
-    pass &= run_test<int8_t,      int8_t,      int32_t,     int32_t,    8     >();
+    pass &= run_test<int8_t,      int8_t,      int32_t,     int32_t,    8    >();
+    // clang-format on
 
+#if !defined(CK_USE_GFX1250)
+    // clang-format off
     // the below are gfx13 only
     //               |SrcAType    |SrcBType,     |DstType     |GPUAccType  |CPUAccType      |KMultiplier
     pass &= run_test<ck::half_t,  ck::half_t,   float,       float,       float              >(); // V_WMMA_F32_16X16_F16
@@ -241,7 +248,7 @@ int main(int argc, char* argv[])
     pass &= run_test<ck::f8_t,    ck::f8_t,     ck::half_t,  ck::half_t,  ck::half_t,       2>();
     pass &= run_test<int8_t,      int8_t,       float,       int32_t,     int32_t            >();
     pass &= run_test<int8_t,      int8_t,       float,       int32_t,     int32_t,          2>();
-    #ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
+#ifdef CK_EXPERIMENTAL_BIT_INT_EXTENSION_INT4
     pass &= run_test<ck::int4_t,  ck::int4_t,   int32_t,     int32_t,     int32_t            >();
     pass &= run_test<ck::int4_t,  ck::int4_t,   int32_t,     int32_t,     int32_t,          2>();
     pass &= run_test<ck::int4_t,  ck::int4_t,   int32_t,     int32_t,     int32_t,          4>();
@@ -251,7 +258,7 @@ int main(int argc, char* argv[])
     pass &= run_test<ck::int4_t,  ck::int4_t,   float,       int32_t,     int32_t            >();
     pass &= run_test<ck::int4_t,  ck::int4_t,   float,       int32_t,     int32_t,          2>();
     pass &= run_test<ck::int4_t,  ck::int4_t,   float,       int32_t,     int32_t,          4>();
-    #endif
+#endif
     pass &= run_mixedfp_test</*DeviceAType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP8_E4M3>,
                              /*DeviceBType*/ck::MxType_t<ck::MTX_FMT::MTX_FMT_FP8_E5M2>,
                              /*HostAType*/  float,
@@ -333,15 +340,6 @@ int main(int argc, char* argv[])
                              /*BScaleSel*/  0>();
     // clang-format on
 #else
-    // // clang-format off
-    // //              |SrcType     |DstType     |GPUAccType  |CPUAccType
-    // pass &= run_test<ck::half_t,  ck::half_t,  float,       float   >();
-    // pass &= run_test<ck::bhalf_t, ck::bhalf_t, float,       float,      8     >();
-    // pass &= run_test<ck::half_t,  ck::half_t,  ck::half_t,  ck::half_t, 16    >();
-    // pass &= run_test<ck::bhalf_t, ck::bhalf_t, ck::bhalf_t, float,      16    >();
-    // pass &= run_test<int8_t,      int8_t,      int32_t,     int32_t,    8     >();
-    // // clang-format on
-
     // clang-format off
     //              |SrcAType    |SrcBType,     |DstType     |GPUAccType  |CPUAccType      |kValue
     pass &= run_test<ck::half_t,  ck::half_t,   float,        float,       float,              32>(); // V_WMMA_F32_16X16X32_F16
@@ -366,13 +364,11 @@ int main(int argc, char* argv[])
     pass &= run_test<ck::f8_t,    ck::f8_t,     ck::half_t,   ck::half_t,  ck::half_t,         128>(); // V_WMMA_F16_16X16X128_F8_F8
     pass &= run_test<ck::bhalf_t, ck::bhalf_t,  ck::bhalf_t,  float,       float,              32>(); // V_WMMA_BF16F32_16X16X32_BF16
     pass &= run_test<int8_t,      int8_t,       int32_t,      int32_t,     int32_t,            64>(); // V_WMMA_I32_16X16X64_IU8
-    pass &= run_test<float,       float,        float,        float,       float,              4>(); // V_WMMA_F32_16X16X4_F32
-
+    pass &= run_test<float,       float,        float,        float,       float,              4>();  // V_WMMA_F32_16X16X4_F32
     // gfx1251 only
 #if defined(__gfx1251__)
-    pass &= run_test<double,       double,        double,        double,       double,              4>(); // V_WMMA_F32_16X16X4_F32
+    pass &= run_test<double,       double,        double,        double,       double,         4>();  // V_WMMA_F32_16X16X4_F32
 #endif
-
     //clang-format on
 #endif
 

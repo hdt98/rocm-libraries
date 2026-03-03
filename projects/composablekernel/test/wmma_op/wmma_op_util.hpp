@@ -16,7 +16,7 @@
 namespace ck {
 namespace wmma_op_util {
 
-#if defined(__gfx125__)
+#if defined(CK_USE_GFX1250)
 
 #define CK_WMMA_CALL_INTRIN_1(dst_fmt, src0_fmt, size)              \
     intrin_wmma_##dst_fmt##_16x16x##size##_##src0_fmt<16, 16>::Run( \
@@ -693,25 +693,6 @@ __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
 
 // #endif
 #else
-
-template <typename AccType>
-struct WMMA_ACCNumber_traits
-{
-    static constexpr index_t ACC_NUMBER = 8;
-};
-
-template <>
-struct WMMA_ACCNumber_traits<ck::half_t>
-{
-    static constexpr index_t ACC_NUMBER = 16;
-};
-
-template <>
-struct WMMA_ACCNumber_traits<ck::bhalf_t>
-{
-    static constexpr index_t ACC_NUMBER = 16;
-};
-
 template <typename src_vec, typename acc_vec>
 __device__ void builtin_wmma_naive_selector(const src_vec&, const src_vec&, acc_vec&)
 {
@@ -1036,7 +1017,7 @@ builtin_wmma_naive_selector<int4x16_t,
 }
 #endif
 
-template <typename src_t, typename dst_t, typename acc_t>
+template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
 __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
 {
 #if defined(__gfx11__)
@@ -1045,10 +1026,9 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
     // a and b fragments are stored in 8 VGPRs each, in packed format, so 16 elements each for a and
     // b a_frag will store one column of the 16x16 matrix tile b_frag will store one row of the
     // 16x16 matrix tile
-    using src_vec             = typename vector_type<src_t, 16>::type;
-    constexpr index_t acc_num = WMMA_ACCNumber_traits<acc_t>::ACC_NUMBER;
-    src_vec a_frag            = {};
-    src_vec b_frag            = {};
+    using src_vec  = typename vector_type<src_t, 16>::type;
+    src_vec a_frag = {};
+    src_vec b_frag = {};
 
     src_vec a_temp = {};
     src_vec b_temp = {};
@@ -1192,17 +1172,16 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
 #endif
 }
 
-template <typename src_t, typename dst_t, typename acc_t>
+template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
 __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
 {
 #if defined(__gfx11__)
     const int lIdx = threadIdx.x;
 
-    using src_vec             = typename vector_type<src_t, 16>::type;
-    constexpr index_t acc_num = WMMA_ACCNumber_traits<acc_t>::ACC_NUMBER;
-    src_vec a_frag            = {};
-    src_vec b_frag            = {};
-    using acc_vec = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, acc_t, 1, acc_num, true>;
+    using src_vec  = typename vector_type<src_t, 16>::type;
+    src_vec a_frag = {};
+    src_vec b_frag = {};
+    using acc_vec  = StaticBufferTupleOfVector<AddressSpaceEnum::Vgpr, acc_t, 1, acc_num, true>;
     acc_vec c_thread_buf_;
 
     const int lane = lIdx % 16;
@@ -1264,6 +1243,7 @@ __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
     });
 #endif
 }
+#endif
 
 template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, index_t kMultiplier>
 __global__ void matmul_with_kMultiplier(const srcA_t* a, const srcB_t* b, dst_t* c)
@@ -1511,23 +1491,6 @@ __global__ void matmul_mixedfp(const typename src0_t::type_t* a,
     });
 }
 
-template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kValue>
-__global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
-{
-    ignore = a;
-    ignore = b;
-    ignore = c;
-}
-
-template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kValue>
-__global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
-{
-    ignore = a;
-    ignore = b;
-    ignore = c;
-}
-#endif
-
 struct GemmParams
 {
     GemmParams() : M(16), N(16), K(16), StrideA(16), StrideB(16), StrideC(16), alpha(1), beta(0) {}
@@ -1730,6 +1693,7 @@ template <typename DeviceWmma,
           typename AElementwiseOperation,
           typename BElementwiseOperation,
           typename CElementwiseOperation,
+          index_t CAccNum,
           index_t KMultiplier = 1>
 struct TestWmma
 {
@@ -1788,25 +1752,6 @@ struct TestWmma
         std::cout << "]" << std::endl;
     }
 
-    template <typename DataType>
-    void dump_tensor(Tensor<DataType> mat)
-    {
-        std::cout << "mat [ " << std::endl;
-
-        auto len = mat.GetLengths();
-        for(uint32_t i = 0; i < len[0]; i++)
-        {
-            std::cout << "    [";
-            for(uint32_t j = 0; j < len[1]; j++)
-            {
-                std::vector<std::size_t> idx({i, j});
-                std::cout << ck::type_convert<float>(mat(idx)) << ", ";
-            }
-            std::cout << "]" << std::endl;
-        }
-        std::cout << "]" << std::endl;
-    }
-
     auto operator()(const DeviceWmma& wmma_kernel)
     {
         std::cout << "ALayout = " << ALayout{}.name << ", BLayout = " << BLayout{}.name
@@ -1816,7 +1761,7 @@ struct TestWmma
         ck::wmma_op_util::GemmParams params;
         params.M = 16;
         params.N = 16;
-        if(is_gfx13_supported())
+        if constexpr(KMultiplier <= 4)
         {
             params.K       = 16 * KMultiplier;
             params.StrideA = 16 * KMultiplier;
@@ -1824,9 +1769,10 @@ struct TestWmma
         }
         else
         {
-            params.K       = kValue;
-            params.StrideA = kValue;
-            params.StrideB = kValue;
+            constexpr auto kValue = KMultiplier;
+            params.K              = kValue;
+            params.StrideA        = kValue;
+            params.StrideB        = kValue;
         }
         params.StrideC = 16;
 
@@ -2055,8 +2001,6 @@ struct TestMixedFPWmma
         // dump_tensor(b);
         // dump_tensor(c_device);
         // dump_tensor(c_host);
-        bool is_supported = (ck::is_gfx11_supported() || ck::is_gfx12_supported()) &&
-                            ck::wmma_op_util::RunDeviceGEMM(wmma_kernel, a, b, c_device);
 
         if(is_supported)
         {

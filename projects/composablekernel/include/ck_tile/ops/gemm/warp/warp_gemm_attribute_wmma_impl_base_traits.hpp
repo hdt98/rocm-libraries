@@ -223,6 +223,9 @@ struct WmmaTraitsBase<gfx13_t, ADType, BDType, CDType, K, MixPrec, M, N>
     static constexpr index_t kAMBlock = 1;
     static constexpr index_t kBNBlock = 1;
 
+    static constexpr index_t kCMBlock = 1;
+    static constexpr index_t kCNBlock = 1;
+
     static constexpr index_t kRepeat = 1;
     static constexpr index_t kAMLane = 16;
     static constexpr index_t kBNLane = 16;
@@ -242,7 +245,7 @@ struct WmmaTraitsBase<gfx13_t, ADType, BDType, CDType, K, MixPrec, M, N>
     using kABPs2RHssMinor = sequence<1, 0>;
     using kABYs2RHsMajor  = sequence<2, 2>;
     using kABYs2RHsMinor  = sequence<0, 2>;
-
+#if 0
     using kCPs2RHssMajor = sequence<1, 2>;
     using kCPs2RHssMinor = sequence<1, 0>;
     using kCYs2RHsMajor  = sequence<1, 1>;
@@ -252,7 +255,20 @@ struct WmmaTraitsBase<gfx13_t, ADType, BDType, CDType, K, MixPrec, M, N>
     using kCTPs2RHssMinor = sequence<1, 0>;
     using kCTYs2RHsMajor  = sequence<2, 2>;
     using kCTYs2RHsMinor  = sequence<0, 2>;
+#endif
+    using kCPs2RHssMajor = sequence<1, 2>;
+    using kCPs2RHssMinor = sequence<2, 1>;
+    using kCYs2RHsMajor =
+        std::conditional_t<(kCMBlock == 1 && kCNBlock == 1), sequence<1, 1>, sequence<1, 2, 1, 1>>;
+    using kCYs2RHsMinor =
+        std::conditional_t<(kCMBlock == 1 && kCNBlock == 1), sequence<1, 3>, sequence<0, 0, 1, 3>>;
 
+    using kCTPs2RHssMajor = sequence<2, 1>;
+    using kCTPs2RHssMinor = sequence<2, 1>;
+    using kCTYs2RHsMajor =
+        std::conditional_t<(kCMBlock == 1 && kCNBlock == 1), sequence<2, 2>, sequence<2, 1, 2, 2>>;
+    using kCTYs2RHsMinor =
+        std::conditional_t<(kCMBlock == 1 && kCNBlock == 1), sequence<1, 3>, sequence<0, 0, 1, 3>>;
     // OOXX need change here
 #if 0
     using ADataType = ADType;

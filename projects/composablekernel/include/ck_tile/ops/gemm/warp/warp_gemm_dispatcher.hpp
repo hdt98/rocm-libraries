@@ -172,7 +172,6 @@ template<> struct Dispatcher<fp8_t, fp8_t, float, 16, 16,  64, true> { using Typ
 template<> struct Dispatcher<bf8_t, bf8_t, float, 16, 16,  64, true> { using Type = WarpGemmMfma_f32_16x16x64_bf8_bf8_CTransposed; };
 #endif
 
-#if defined(__gfx125__)
 template<typename A, typename B, bool TransposeC>
 struct Dispatcher<A, B, float, 32, 32, 128, TransposeC, false> { using Type = WarpGemmWmma_f32_32x32x128_f8f6f4<A, B, TransposeC>; };
 
@@ -180,7 +179,7 @@ template<bool TransposeC> struct Dispatcher<fp8_t, fp8_t, half_t, 16, 16,  64, T
 template<bool TransposeC> struct Dispatcher<bf8_t, bf8_t, half_t, 16, 16,  64, TransposeC, false> { using Type =WarpGemmWmma_f16_16x16x64_bf8_bf8<TransposeC>; };
 template<bool TransposeC> struct Dispatcher<fp8_t, bf8_t, half_t, 16, 16,  64, TransposeC, false> { using Type =WarpGemmWmma_f16_16x16x64_f8_bf8<TransposeC>; };
 template<bool TransposeC> struct Dispatcher<bf8_t, fp8_t, half_t, 16, 16,  64, TransposeC, false> { using Type =WarpGemmWmma_f16_16x16x64_bf8_f8<TransposeC>; };
-#endif
+
 
 // int8
 // ADataType, BDataType, AccDataType, MPerWave, NPerWave, KPerWave, TransposeC, SwizzleA, UseStructuredSparsity
@@ -189,11 +188,9 @@ template<> struct Dispatcher<int8_t, int8_t, int32_t, 32, 32, 16,  true> { using
 template<> struct Dispatcher<int8_t, int8_t, int32_t, 16, 16, 32, false> { using Type = WarpGemmMfma_i32_16x16x32_i8_i8; };
 template<> struct Dispatcher<int8_t, int8_t, int32_t, 16, 16, 32,  true> { using Type = WarpGemmMfma_i32_16x16x32_i8_i8_CTransposed; };
 // WMMA cases
-#if defined(__gfx125__)
 template<bool TransposeC> struct Dispatcher<int8_t, int8_t, int32_t, 16, 16, 16, TransposeC, false> { using Type = WarpGemmWmma_i32_16x16x16_i8_i8<TransposeC>; };
 template<bool TransposeC> struct Dispatcher<int8_t, int8_t, int32_t, 16, 16, 64, TransposeC, false> { using Type = WarpGemmWmma_i32_16x16x64_i8_i8<TransposeC>; };
 template<bool TransposeC> struct Dispatcher<uint8_t, uint8_t, int32_t, 16, 16, 64, TransposeC, false> { using Type = WarpGemmWmma_i32_16x16x64_u8_u8<TransposeC>; };
-#endif
 // clang-format on
 } // namespace warp_gemm_dispatcher
 } // namespace impl

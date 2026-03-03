@@ -1,3 +1,6 @@
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+
 # Find Python3 (if not already found)
 if(NOT Python3_EXECUTABLE)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
@@ -34,14 +37,13 @@ set(WCNN_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 # Parameters:
 #   TARGET_NAME         - Name of the executable target
 #   SOURCE_FILE         - Path to the source .cpp file
-#   COMPILE_DEFINITIONS - List of extra compile definitions
-#   COMPILE_OPTIONS     - List of extra compile options
+#   DISABLE_VOPD        - Whether disable VOPD instructions
 #   TEST_FILTER         - Regex pattern to filter tests
 # ============================================================================
-function(add_wcnn_splited_target TARGET_NAME SOURCE_FILE COMPILE_DEFINITIONS COMPILE_OPTIONS)
+function(add_wcnn_splited_target TARGET_NAME SOURCE_FILE DISABLE_VOPD)
     # Optional TEST_FILTER parameter (5th argument), defaults to ".*"
-    if(ARGC GREATER 4)
-        set(TEST_FILTER "${ARGV4}")
+    if(ARGC GREATER 3)
+        set(TEST_FILTER "${ARGV3}")
     else()
         set(TEST_FILTER ".*")
     endif()
@@ -123,26 +125,12 @@ function(add_wcnn_splited_target TARGET_NAME SOURCE_FILE COMPILE_DEFINITIONS COM
         )
 
         # Extra compile options for this variant
-        if(COMPILE_OPTIONS)
-            foreach(OPT ${COMPILE_OPTIONS})
-                target_compile_options(${OBJ_LIB_NAME} PRIVATE ${OPT})
-            endforeach()
+        if(${DISABLE_VOPD})
+            target_compile_options(${OBJ_LIB_NAME} PRIVATE -mllvm -amdgpu-enable-vopd=0)
         endif()
 
         # C++ standard
         target_compile_features(${OBJ_LIB_NAME} PRIVATE cxx_std_17)
-
-        # Compile definitions for this variant
-        if(COMPILE_DEFINITIONS)
-            foreach(DEF ${COMPILE_DEFINITIONS})
-                target_compile_definitions(${OBJ_LIB_NAME} PRIVATE ${DEF})
-            endforeach()
-        endif()
-
-        # Inherit device compile definitions
-        if(DEFINED DEVICE_COMPILE_DEFINITIONS)
-            target_compile_definitions(${OBJ_LIB_NAME} PRIVATE ${DEVICE_COMPILE_DEFINITIONS})
-        endif()
     endforeach()
 
     # Create the executable
@@ -214,10 +202,8 @@ endfunction()
 # Parameters:
 #   TARGET_NAME         - Name of the executable target
 #   SOURCE_FILE         - Path to the source .cpp file
-#   COMPILE_DEFINITIONS - List of compile definitions
-#   COMPILE_OPTIONS     - Additional compile options
 # ============================================================================
-function(add_wcnn_monolithic_target TARGET_NAME SOURCE_FILE COMPILE_DEFINITIONS COMPILE_OPTIONS)
+function(add_wcnn_monolithic_target TARGET_NAME SOURCE_FILE)
     # Create executable directly from the monolithic file
     add_executable(${TARGET_NAME}
         ${WCNN_SOURCE_DIR}/${SOURCE_FILE}
@@ -245,27 +231,8 @@ function(add_wcnn_monolithic_target TARGET_NAME SOURCE_FILE COMPILE_DEFINITIONS 
         -Wno-gnu-line-marker
     )
 
-    # Extra compile options
-    if(COMPILE_OPTIONS)
-        foreach(OPT ${COMPILE_OPTIONS})
-            target_compile_options(${TARGET_NAME} PRIVATE ${OPT})
-        endforeach()
-    endif()
-
     # C++ standard
     target_compile_features(${TARGET_NAME} PRIVATE cxx_std_17)
-
-    # Compile definitions
-    if(COMPILE_DEFINITIONS)
-        foreach(DEF ${COMPILE_DEFINITIONS})
-            target_compile_definitions(${TARGET_NAME} PRIVATE ${DEF})
-        endforeach()
-    endif()
-
-    # Inherit device compile definitions
-    if(DEFINED DEVICE_COMPILE_DEFINITIONS)
-        target_compile_definitions(${TARGET_NAME} PRIVATE ${DEVICE_COMPILE_DEFINITIONS})
-    endif()
 
     # Link libraries
     target_link_libraries(${TARGET_NAME} PRIVATE utility)
@@ -290,96 +257,84 @@ endfunction()
 add_wcnn_splited_target(
     test_grouped_conv_fwd_wcnn    # TARGET_NAME
     "grouped_conv_fwd_wcnn.cpp"   # SOURCE_FILE
-    ""                            # COMPILE_DEFINITIONS
-    ""                            # COMPILE_OPTIONS
+    OFF
     "^grouped_conv_fwd_wcnn__.+"  # TEST_FILTER
 )
 
 add_wcnn_splited_target(
     test_grouped_conv_fwd_wcnn_wg      # TARGET_NAME
     "grouped_conv_fwd_wcnn.cpp"        # SOURCE_FILE
-    ""                                 # COMPILE_DEFINITIONS
-    ""                                 # COMPILE_OPTIONS
+    OFF
     "^grouped_conv_fwd_wcnn_wg.*__.+"  # TEST_FILTER
 )
 
 add_wcnn_splited_target(
     test_grouped_conv_fwd_wcnn_fma       # TARGET_NAME
     "grouped_conv_fwd_wcnn_fma_cvt.cpp"  # SOURCE_FILE
-    ""                                   # COMPILE_DEFINITIONS
-    ""                                   # COMPILE_OPTIONS
+    OFF
     "^grouped_conv_fwd_wcnn_fma__.+"     # TEST_FILTER
 )
 
 add_wcnn_splited_target(
     test_grouped_conv_fwd_wcnn_fma_cvt    # TARGET_NAME
     "grouped_conv_fwd_wcnn_fma_cvt.cpp"   # SOURCE_FILE
-    ""                                    # COMPILE_DEFINITIONS
-    ""                                    # COMPILE_OPTIONS
+    OFF
     "^grouped_conv_fwd_wcnn_fma_cvt__.+"  # TEST_FILTER
 )
 
 add_wcnn_splited_target(
     test_grouped_conv_fwd_wcnn_fma_wg    # TARGET_NAME
     "grouped_conv_fwd_wcnn_fma_cvt.cpp"  # SOURCE_FILE
-    ""                                   # COMPILE_DEFINITIONS
-    ""                                   # COMPILE_OPTIONS
+    OFF
     "^grouped_conv_fwd_wcnn_fma_wg__.+"  # TEST_FILTER
 )
 
 add_wcnn_splited_target(
     test_grouped_conv_fwd_wcnn_fma_cvt_wg    # TARGET_NAME
     "grouped_conv_fwd_wcnn_fma_cvt.cpp"      # SOURCE_FILE
-    ""                                       # COMPILE_DEFINITIONS
-    ""                                       # COMPILE_OPTIONS
+    OFF
     "^grouped_conv_fwd_wcnn_fma_cvt_wg__.+"  # TEST_FILTER
 )
 
 add_wcnn_splited_target(
     test_grouped_conv_fwd_wcnn_sba       # TARGET_NAME
     "grouped_conv_fwd_wcnn_sba_cvt.cpp"  # SOURCE_FILE
-    ""                                   # COMPILE_DEFINITIONS
-    ""                                   # COMPILE_OPTIONS
+    OFF
     "^grouped_conv_fwd_wcnn_sba__.+"     # TEST_FILTER
 )
 
 add_wcnn_splited_target(
     test_grouped_conv_fwd_wcnn_sba_cvt    # TARGET_NAME
     "grouped_conv_fwd_wcnn_sba_cvt.cpp"   # SOURCE_FILE
-    ""                                    # COMPILE_DEFINITIONS
-    ""                                    # COMPILE_OPTIONS
+    OFF
     "^grouped_conv_fwd_wcnn_sba_cvt__.+"  # TEST_FILTER
 )
 
 add_wcnn_splited_target(
     test_grouped_conv_fwd_wcnn_sba_wg    # TARGET_NAME
     "grouped_conv_fwd_wcnn_sba_cvt.cpp"  # SOURCE_FILE
-    ""                                   # COMPILE_DEFINITIONS
-    ""                                   # COMPILE_OPTIONS
+    OFF
     "^grouped_conv_fwd_wcnn_sba_wg__.+"  # TEST_FILTER
 )
 
 add_wcnn_splited_target(
     test_grouped_conv_fwd_wcnn_sba_cvt_wg    # TARGET_NAME
     "grouped_conv_fwd_wcnn_sba_cvt.cpp"      # SOURCE_FILE
-    ""                                       # COMPILE_DEFINITIONS
-    ""                                       # COMPILE_OPTIONS
+    OFF
     "^grouped_conv_fwd_wcnn_sba_cvt_wg__.+"  # TEST_FILTER
 )
 
 add_wcnn_splited_target(
     test_grouped_conv_bwd_data_wcnn    # TARGET_NAME
     "grouped_conv_bwd_data_wcnn.cpp"   # SOURCE_FILE
-    ""                                 # COMPILE_DEFINITIONS
-    ""                                 # COMPILE_OPTIONS
+    OFF
     "^grouped_conv_bwd_data_wcnn__.+"  # TEST_FILTER
 )
 
 add_wcnn_splited_target(
     test_grouped_conv_bwd_data_wcnn_wg    # TARGET_NAME
     "grouped_conv_bwd_data_wcnn.cpp"      # SOURCE_FILE
-    ""                                    # COMPILE_DEFINITIONS
-    "-mllvm -amdgpu-enable-vopd=0"        # COMPILE_OPTIONS
+    ON
     "^grouped_conv_bwd_data_wcnn_wg__.+"  # TEST_FILTER
 )
 
@@ -389,29 +344,21 @@ add_wcnn_splited_target(
 add_wcnn_monolithic_target(
     test_grouped_conv_fwd_wcnn_monolithic  # TARGET_NAME
     "grouped_conv_fwd_wcnn.cpp"            # SOURCE_FILE
-    ""                                     # COMPILE_DEFINITIONS
-    ""                                     # COMPILE_OPTIONS
 )
 
 add_wcnn_monolithic_target(
     test_grouped_conv_fwd_wcnn_fma_cvt_monolithic  # TARGET_NAME
     "grouped_conv_fwd_wcnn_fma_cvt.cpp"            # SOURCE_FILE
-    ""                                             # COMPILE_DEFINITIONS
-    ""                                             # COMPILE_OPTIONS
 )
 
 add_wcnn_monolithic_target(
     test_grouped_conv_fwd_wcnn_sba_cvt_monolithic  # TARGET_NAME
     "grouped_conv_fwd_wcnn_sba_cvt.cpp"            # SOURCE_FILE
-    ""                                             # COMPILE_DEFINITIONS
-    ""                                             # COMPILE_OPTIONS
 )
 
 add_wcnn_monolithic_target(
     test_grouped_conv_bwd_data_wcnn_monolithic  # TARGET_NAME
     "grouped_conv_bwd_data_wcnn.cpp"            # SOURCE_FILE
-    ""                                          # COMPILE_DEFINITIONS
-    ""                                          # COMPILE_OPTIONS
 )
 
 # ============================================================================
