@@ -450,7 +450,8 @@ private:
                             int out_c, int out_h, int out_w,
                             size_t flopCnt,
                             size_t readBytes,
-                            size_t outputBytes) const
+                            size_t outputBytes,
+                            const std::string& db_key) const
     {
         std::cout << "{\"performance\":{"
                   << "\"name\":\"" << operation_name << wei_h << "x" << wei_w << "u" << miopen::deref(convDesc).GetConvStrides()[0] << "\","
@@ -468,6 +469,7 @@ private:
                   << "\"y\":" << wei_h << ","
                   << "\"x\":" << wei_w << ","
                   << "\"k\":" << out_c << ","
+                  << "\"db_key\":\"" << db_key << "\","
                   << "\"results\":{"
                   << "\"average_time_ms\":" << kernel_average_time << ","
                   << "\"flop_count\":" << flopCnt << ","
@@ -482,12 +484,13 @@ private:
                             const std::string& direction,
                             float kernel_average_time,
                             const miopenConvSolution_t& solution,
-                            int in_n, int in_c, int in_h, int in_w,
+                            int in_n, int in_c, int in_h, int in_w, int in_d,
                             int wei_h, int wei_w,int wei_d,
                             int out_c, int out_h, int out_w, int out_d,
                             size_t flopCnt,
                             size_t readBytes,
-                            size_t outputBytes) const
+                            size_t outputBytes,
+                            const std::string& db_key) const
     {
         std::cout << "{\"performance\":{"
                     << "\"name\":\"" << operation_name << wei_d << "x" << wei_h << "x" << wei_w << "u" <<  miopen::deref(convDesc).GetConvStrides()[0] << "\","
@@ -507,6 +510,7 @@ private:
                     << "\"y\":" << wei_h << ","
                     << "\"x\":" << wei_w << ","
                     << "\"k\":" << out_c << ","
+                    << "\"db_key\":\"" << db_key << "\","
                     << "\"results\":{"
                     << "\"average_time_ms\":" << kernel_average_time << ","
                     << "\"flop_count\":" << flopCnt << ","
@@ -1869,7 +1873,14 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
 
         if(performance_logging_enabled)
         {
-            Print2DConvJsonLog("fwd-conv", "forward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes);
+            // Create ProblemDescription to get the db key
+            const auto problem = miopen::conv::ProblemDescription(
+                miopen::deref(inputTensor), miopen::deref(weightTensor), 
+                miopen::deref(outputTensor), miopen::deref(convDesc), 
+                miopen::conv::Direction::Forward);
+            const auto db_key = problem.MakeNetworkConfig();
+            
+            Print2DConvJsonLog("fwd-conv", "forward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes, db_key);
         }
         else
         {
@@ -1921,7 +1932,14 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
 
         if(performance_logging_enabled)
         {
-            Print3DConvJsonLog("fwd-conv", "forward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes);
+            // Create ProblemDescription to get the db key
+            const auto problem = miopen::conv::ProblemDescription(
+                miopen::deref(inputTensor), miopen::deref(weightTensor), 
+                miopen::deref(outputTensor), miopen::deref(convDesc), 
+                miopen::conv::Direction::Forward);
+            const auto db_key = problem.MakeNetworkConfig();
+            
+            Print3DConvJsonLog("fwd-conv", "forward", kernel_average_time, solution, in_n, in_c, in_h, in_w, in_d, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key);
         }
         else
         {
@@ -2904,8 +2922,14 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, floa
 
         if(performance_logging_enabled)
         {
+            // Create ProblemDescription to get the db key
+            const auto problem = miopen::conv::ProblemDescription(
+                miopen::deref(outputTensor), miopen::deref(weightTensor), 
+                miopen::deref(inputTensor), miopen::deref(convDesc), 
+                miopen::conv::Direction::BackwardData);
+            const auto db_key = problem.MakeNetworkConfig();
             
-            Print2DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes);
+            Print2DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes, db_key);
         }
         else
         {
@@ -2955,7 +2979,14 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, floa
 
         if(performance_logging_enabled)
         {
-            Print3DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes);
+            // Create ProblemDescription to get the db key
+            const auto problem = miopen::conv::ProblemDescription(
+                miopen::deref(outputTensor), miopen::deref(weightTensor), 
+                miopen::deref(inputTensor), miopen::deref(convDesc), 
+                miopen::conv::Direction::BackwardData);
+            const auto db_key = problem.MakeNetworkConfig();
+            
+            Print3DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key);
         }
         else
         {
@@ -3161,8 +3192,14 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float
 
         if(performance_logging_enabled)
         {
+            // Create ProblemDescription to get the db key
+            const auto problem = miopen::conv::ProblemDescription(
+                miopen::deref(outputTensor), miopen::deref(weightTensor), 
+                miopen::deref(inputTensor), miopen::deref(convDesc), 
+                miopen::conv::Direction::BackwardWeights);
+            const auto db_key = problem.MakeNetworkConfig();
             
-            Print2DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes);
+            Print2DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes, db_key);
         }
         else
         {
@@ -3212,7 +3249,14 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float
 
         if(performance_logging_enabled)
         {
-            Print3DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes);
+            // Create ProblemDescription to get the db key
+            const auto problem = miopen::conv::ProblemDescription(
+                miopen::deref(outputTensor), miopen::deref(weightTensor), 
+                miopen::deref(inputTensor), miopen::deref(convDesc), 
+                miopen::conv::Direction::BackwardWeights);
+            const auto db_key = problem.MakeNetworkConfig();
+            
+            Print3DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key);
         }
         else
         {
