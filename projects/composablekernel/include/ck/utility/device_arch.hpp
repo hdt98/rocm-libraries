@@ -14,7 +14,7 @@ enum class DeviceArch
     Gfx950
 };
 
-std::ostream& operator<<(std::ostream& os, const DeviceArch& device_arch)
+inline std::ostream& operator<<(std::ostream& os, const DeviceArch& device_arch)
 {
   switch(device_arch)
   {    
@@ -43,7 +43,7 @@ consteval bool matches_with_compilation_target(DeviceArch device_arch)
 };
 
 // Runtime check if the device architecture is supported by the current device
-bool is_supported(DeviceArch device_arch)
+inline bool is_supported(DeviceArch device_arch)
 {
   const auto& device_name = get_device_name();
   switch(device_arch)
