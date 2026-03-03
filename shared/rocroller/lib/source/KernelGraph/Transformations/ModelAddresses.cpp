@@ -89,13 +89,12 @@ namespace rocRoller::KernelGraph
             ldsTag = *maybeParentLDS;
 
         const auto     varInfo     = DataTypeInfo::Get(info.varType);
+        const auto     segInfo     = DataTypeInfo::Get(varInfo.segmentVariableType);
         const auto     packedCount = std::max<uint32_t>(1u, varInfo.packing);
         const uint64_t numElements = info.m * info.n * packedCount;
-        const uint64_t numBits     = static_cast<uint64_t>(varInfo.elementBits);
+        const uint64_t segmentBits = static_cast<uint64_t>(segInfo.elementBits);
 
         AssertFatal(numElements > 0, "Invalid LDS tile element count.", ShowValue(numElements));
-
-        auto numBytes = (numBits * numElements + 7u) / 8u;
 
         auto coords = graph.buildTransformer(tag);
 
@@ -124,15 +123,13 @@ namespace rocRoller::KernelGraph
         auto index = (direction == LDSDirection::Load) ? coords.reverse({ldsTag})[0]
                                                        : coords.forward({ldsTag})[0];
 
-        Log::debug("{}: tag {}, numBits {}, numElements {}, numBytes {}",
+        Log::debug("{}: tag {}, segmentBits {}, numElements {}",
                    (direction == LDSDirection::Load) ? "LoadLDSTile" : "StoreLDSTile",
                    tag,
-                   numBits,
-                   numElements,
-                   numBytes);
+                   segmentBits,
+                   numElements);
 
-        const auto byteIndex
-            = index * Expression::literal(numBytes) / Expression::literal(numElements);
+        const auto byteIndex = index * Expression::literal(segmentBits) / Expression::literal(8u);
 
         Log::debug("Offset expression: {}", toString(byteIndex));
 
