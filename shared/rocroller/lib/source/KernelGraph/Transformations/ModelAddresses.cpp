@@ -133,33 +133,31 @@ namespace rocRoller::KernelGraph
 
         Log::debug("Offset expression: {}", toString(byteIndex));
 
-        for(uint wg = 0; wg < 1; ++wg)
+        setWorkgroup(0, 0);
+
+        for(uint wi = 0; wi < product(m_context->kernel()->workgroupSize()); ++wi)
         {
-            setWorkgroup(0, wg);
-            for(uint wi = 0; wi < 64; ++wi)
-            {
-                setWorkitem(0, wi);
+            setWorkitem(0, wi);
 
-                const auto offsetValue = Expression::evaluate(byteIndex, runtimeArguments);
+            const auto offsetValue = Expression::evaluate(byteIndex, runtimeArguments);
 
-                const auto offset = std::visit(
-                    [](auto&& x) {
-                        using T = std::decay_t<decltype(x)>;
-                        if constexpr(std::is_same_v<T, rocRoller::Buffer>)
-                        {
-                            Throw<FatalError>("Cannot extract LDS address from "
-                                              "rocRoller::Buffer");
-                            return size_t{0};
-                        }
-                        else
-                        {
-                            return (size_t)x;
-                        }
-                    },
-                    offsetValue);
+            const auto offset = std::visit(
+                [](auto&& x) {
+                    using T = std::decay_t<decltype(x)>;
+                    if constexpr(std::is_same_v<T, rocRoller::Buffer>)
+                    {
+                        Throw<FatalError>("Cannot extract LDS address from "
+                                          "rocRoller::Buffer");
+                        return size_t{0};
+                    }
+                    else
+                    {
+                        return (size_t)x;
+                    }
+                },
+                offsetValue);
 
-                co_yield offset;
-            }
+            co_yield offset;
         }
     }
 
