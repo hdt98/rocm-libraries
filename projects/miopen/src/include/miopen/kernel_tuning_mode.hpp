@@ -134,12 +134,14 @@ struct ExecIdAccumulator
 struct SolutionExecutionData
 {
     std::string solution_name;
+    uint64_t solver_id;
     std::string phase;
     std::vector<KernelExecutionData> kernels;
     
     void Clear()
     {
         solution_name.clear();
+        solver_id = 0;
         phase.clear();
         kernels.clear();
     }
@@ -296,6 +298,7 @@ inline void FlushJsonAccumulator()
     
     // Output JSON
     std::cerr << "{\"solution\":\"" << JsonEscape(data.solution_name) << "\","
+              << "\"solver_id\":" << data.solver_id << ","
               << "\"phase\":\"" << data.phase << "\","
               << "\"kernels\":[";
     
@@ -440,7 +443,7 @@ inline bool IsLoggingKernel(uint64_t log_level, bool is_tuning)
 
 /// Log solution name if appropriate for the current log level
 /// Only prints if the solution name has changed since the last call
-inline void LogSolutionName(const std::string& solution_name, uint64_t log_level)
+inline void LogSolutionName(const std::string& solution_name, uint64_t solver_id, uint64_t log_level)
 {
     const bool is_tuning_mode = GetKernelTuningMode();
     const bool logging_enabled = IsLoggingKernel(log_level, is_tuning_mode);
@@ -456,6 +459,7 @@ inline void LogSolutionName(const std::string& solution_name, uint64_t log_level
             // Set up new solution in accumulator
             auto& data = GetJsonAccumulator();
             data.solution_name = solution_name;
+            data.solver_id = solver_id;
             data.phase = is_tuning_mode ? "tuning" : "execution";
             last_solution = solution_name;
         }

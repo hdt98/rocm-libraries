@@ -286,8 +286,8 @@ std::vector<Solution> EvaluateConvSolutions(const ExecutionContext& ctx,
         const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
         if(IsPerformanceLoggingEnabled(log_level))
         {
-            std::string solution_name = std::to_string(id.Value()) + "/" + id.ToString();
-            LogSolutionName(solution_name, log_level);
+            std::string solution_name = id.ToString();
+            LogSolutionName(solution_name, id.Value(), log_level);
             IncrementKernelExecutionCounter();
         }
         
@@ -1103,10 +1103,9 @@ void ConvolutionDescriptor::ConvolutionForwardImmediate(const Handle& handle,
         if(IsPerformanceLoggingEnabled(log_level))
         {
             // Log the selected solver for execution phase kernel tracking
-            std::string solution_name = std::to_string(solver_id.Value()) + "/" +
-                                    ((solver_id.Value() != 0) ? solver_id.ToString()
-                                                                : std::string("UNKNOWN"));
-            LogSolutionName(solution_name, log_level);
+            std::string solution_name = (solver_id.Value() != 0) ? solver_id.ToString()
+                                                                : std::string("UNKNOWN");
+            LogSolutionName(solution_name, solver_id.Value(), log_level);
             IncrementKernelExecutionCounter();
         }
         invoker(handle, invoke_ctx);
@@ -1325,10 +1324,9 @@ void ConvolutionDescriptor::ConvolutionBackwardImmediate(const Handle& handle,
         if(IsPerformanceLoggingEnabled(log_level))
         {            
             // Log the selected solver for execution phase kernel tracking
-            std::string solution_name = std::to_string(solver_id.Value()) + "/" +
-                                    ((solver_id.Value() != 0) ? solver_id.ToString()
-                                                                : std::string("UNKNOWN"));
-            LogSolutionName(solution_name, log_level);
+            std::string solution_name = (solver_id.Value() != 0) ? solver_id.ToString()
+                                                                : std::string("UNKNOWN");
+            LogSolutionName(solution_name, solver_id.Value(), log_level);
             IncrementKernelExecutionCounter();
         }
         invoker(handle, invoke_ctx);
@@ -1541,7 +1539,7 @@ void ConvolutionDescriptor::ConvolutionWrwImmediate(const Handle& handle,
         const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
         if(IsPerformanceLoggingEnabled(log_level))
         {
-            LogSolutionName(solver_id.ToString(), log_level);
+            LogSolutionName(solver_id.ToString(), solver_id.Value(), log_level);
             IncrementKernelExecutionCounter();
         }
         invoker(handle, invoke_ctx);

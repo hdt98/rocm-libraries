@@ -267,7 +267,8 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
             
             // Log solution name for grouped kernel logging
             const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-            LogSolutionName(sol.solver_id, log_level);
+            const auto solver_id_obj = solver::Id{sol.solver_id};
+            LogSolutionName(sol.solver_id, solver_id_obj.Value(), log_level);
             
             // Run invoker max 8 times, with ~5 sec time limit.
             using elapsed_t                 = decltype(handle.GetKernelTime());

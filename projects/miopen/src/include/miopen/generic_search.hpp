@@ -559,7 +559,8 @@ auto GenericSearch(const Solver s,
                     // Log solution name for grouped kernel logging
                     const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
                     const auto solver_name = s.SolverDbId();
-                    LogSolutionName(solver_name, log_level);
+                    const auto solver_id = miopen::solver::Id(solver_name).Value();
+                    LogSolutionName(solver_name, solver_id, log_level);
 
                     // Warm-up run for every configuration to eliminate cold-start bias
                     IncrementKernelExecutionCounter();
