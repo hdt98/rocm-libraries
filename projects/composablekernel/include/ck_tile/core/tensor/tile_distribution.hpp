@@ -37,6 +37,22 @@ struct tile_distributed_span
     CK_TILE_HOST_DEVICE static constexpr bool is_static() { return true; }
 };
 
+template <index_t... Is>
+CK_TILE_HOST_DEVICE void print(const tile_distributed_span<Is...>)
+{
+    printf("tile_distributed_span<");
+    if constexpr(sizeof...(Is) > 0)
+    {
+        bool first = true;
+        (([&first](index_t value) {
+             printf("%s%d", first ? "" : ", ", value);
+             first = false;
+         }(Is)),
+         ...);
+    }
+    printf(">");
+}
+
 // distributed index
 template <index_t... PartialHsIndices>
 struct tile_distributed_index
