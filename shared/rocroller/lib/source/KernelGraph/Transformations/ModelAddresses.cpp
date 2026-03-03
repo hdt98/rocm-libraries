@@ -191,7 +191,9 @@ namespace rocRoller::KernelGraph
         }
         else
         {
-            Log::debug("Skipping LDS address annotations due to {}", toString(tile.memoryType));
+            Log::info("Skipping LDS address annotations due to {} and isLoad {}",
+                      toString(tile.memoryType),
+                      isLoad);
         }
     }
 

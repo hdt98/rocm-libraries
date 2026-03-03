@@ -126,6 +126,12 @@ namespace ModelAddressesTest
             for(auto inst : kernelInstructions(context.get(), command, graph))
             {
                 context.get()->schedule(inst);
+
+                if(GPUInstructionInfo::isLDS(inst.getOpCode()))
+                {
+                    REQUIRE(inst.getModelledAddresses().has_value());
+                }
+
                 if(inst.getModelledAddresses().has_value())
                 {
                     auto addresses = inst.getModelledAddresses().value();
