@@ -124,7 +124,7 @@ class GroupedGemmKernelBuilder(GemmKernelBuilder):
 
         HIP_CHECK_ERROR(hipMemcpyWithStream(kargs_ptr,
                                             kargs.data(),
-                                            gemm_descs.size() * sizeof(ck_tile::GemmTransKernelArg<>),
+                                            kargs.size() * sizeof(ck_tile::GemmTransKernelArg<>),
                                             hipMemcpyHostToDevice,
                                             stream.stream_id_));
 
@@ -141,7 +141,7 @@ class GroupedGemmKernelBuilder(GemmKernelBuilder):
             stream,
             ck_tile::make_kernel<kBlockPerCu>(Kernel{{}}, grids, blocks, 0,
                 ck_tile::cast_pointer_to_constant_address_space(kargs_ptr),
-                gemm_descs.size()));
+                kargs.size()));
 
         return ave_time;
     }}

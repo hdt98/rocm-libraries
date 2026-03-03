@@ -390,7 +390,7 @@ class GroupedGemmBenchmark:
                         n=n,
                         k=k,
                         kbatch=kbatch,
-                        verify=2 if verify else 0,
+                        verify=1 if verify else 0,
                         warmup=warmup,
                         repeat=repeat,
                         flush_cache=flush_cache,
