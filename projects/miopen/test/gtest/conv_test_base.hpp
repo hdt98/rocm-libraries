@@ -38,7 +38,7 @@ using Direction = miopen::conv::Direction;
 
 struct GroupConvTestConfigBase
 {
-    virtual ~GroupConvTestConfigBase() = default;
+    virtual ~GroupConvTestConfigBase()           = default;
     static constexpr size_t HUGE_SHAPE_MIN_BYTES = sizer::LOW_MEMORY_GPU_MAX_BYTES_PER_TENSOR;
 };
 
@@ -91,12 +91,10 @@ struct GroupConvTestConfig<2u> : GroupConvTestConfigBase
     {
     }
 
-    size_t GetSize()
-    {
-        return N * C * img.x * img.y;
-    }
+    size_t GetSize() { return N * C * img.x * img.y; }
 
-    static std::vector<GroupConvTestConfig> Sanitize(const std::vector<GroupConvTestConfig>& configs, const sizer::TestConfigSizer& sizer)
+    static std::vector<GroupConvTestConfig>
+    Sanitize(const std::vector<GroupConvTestConfig>& configs, const sizer::TestConfigSizer& sizer)
     {
         std::vector<GroupConvTestConfig> sanitized;
         for(auto config : configs)

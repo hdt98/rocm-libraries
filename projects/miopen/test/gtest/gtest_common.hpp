@@ -284,13 +284,12 @@ void invoke_with_params(Check&& check)
     }
 }
 
-namespace sizer
-{
+namespace sizer {
 static constexpr size_t LOW_MEMORY_GPU_MAX_BYTES_PER_TENSOR = 1ULL << 30;
 struct TestConfigSizer
 {
     virtual ~TestConfigSizer() {}
-    virtual bool CheckBytes(size_t bytes) const = 0;
+    virtual bool CheckBytes(size_t bytes) const    = 0;
     virtual bool CheckElements(size_t count) const = 0;
 };
 template <typename T, size_t MAX_BYTES>
@@ -305,7 +304,7 @@ struct Above : public TestConfigSizer
     bool CheckBytes(size_t bytes) const override { return bytes > MIN_BYTES; }
     bool CheckElements(size_t elements) const override { return CheckBytes(sizeof(T) * elements); }
 };
-}
+} // namespace sizer
 
 /// repalcement of gtest's FAIL() because FAIL() returns void and messes up the
 /// return type deduction
