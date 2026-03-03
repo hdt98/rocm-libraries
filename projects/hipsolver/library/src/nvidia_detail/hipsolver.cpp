@@ -4057,8 +4057,18 @@ try
     if(strideP != n)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    return hipsolver::cuda2hip_status(cublasSgetriBatched(
-        (cublasHandle_t)handle, n, A, lda, devIpiv, C, ldc, devInfo, batch_count));
+    cudaStream_t stream;
+    cusolverDnGetStream((cusolverDnHandle_t)handle, &stream);
+
+    cublasHandle_t cublas_handle;
+    cublasCreate(&cublas_handle);
+    cublasSetStream(cublas_handle, stream);
+
+    cublasStatus_t status
+        = cublasSgetriBatched(cublas_handle, n, A, lda, devIpiv, C, ldc, devInfo, batch_count);
+
+    cublasDestroy(cublas_handle);
+    return hipsolver::cuda2hip_status(status);
 }
 catch(...)
 {
@@ -4084,8 +4094,18 @@ try
     if(strideP != n)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    return hipsolver::cuda2hip_status(cublasDgetriBatched(
-        (cublasHandle_t)handle, n, A, lda, devIpiv, C, ldc, devInfo, batch_count));
+    cudaStream_t stream;
+    cusolverDnGetStream((cusolverDnHandle_t)handle, &stream);
+
+    cublasHandle_t cublas_handle;
+    cublasCreate(&cublas_handle);
+    cublasSetStream(cublas_handle, stream);
+
+    cublasStatus_t status
+        = cublasDgetriBatched(cublas_handle, n, A, lda, devIpiv, C, ldc, devInfo, batch_count);
+
+    cublasDestroy(cublas_handle);
+    return hipsolver::cuda2hip_status(status);
 }
 catch(...)
 {
@@ -4111,15 +4131,25 @@ try
     if(strideP != n)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    return hipsolver::cuda2hip_status(cublasCgetriBatched((cublasHandle_t)handle,
-                                                          n,
-                                                          (cuFloatComplex**)A,
-                                                          lda,
-                                                          devIpiv,
-                                                          (cuFloatComplex**)C,
-                                                          ldc,
-                                                          devInfo,
-                                                          batch_count));
+    cudaStream_t stream;
+    cusolverDnGetStream((cusolverDnHandle_t)handle, &stream);
+
+    cublasHandle_t cublas_handle;
+    cublasCreate(&cublas_handle);
+    cublasSetStream(cublas_handle, stream);
+
+    cublasStatus_t status = cublasCgetriBatched(cublas_handle,
+                                                n,
+                                                (cuFloatComplex**)A,
+                                                lda,
+                                                devIpiv,
+                                                (cuFloatComplex**)C,
+                                                ldc,
+                                                devInfo,
+                                                batch_count);
+
+    cublasDestroy(cublas_handle);
+    return hipsolver::cuda2hip_status(status);
 }
 catch(...)
 {
@@ -4145,15 +4175,25 @@ try
     if(strideP != n)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    return hipsolver::cuda2hip_status(cublasZgetriBatched((cublasHandle_t)handle,
-                                                          n,
-                                                          (cuDoubleComplex**)A,
-                                                          lda,
-                                                          devIpiv,
-                                                          (cuDoubleComplex**)C,
-                                                          ldc,
-                                                          devInfo,
-                                                          batch_count));
+    cudaStream_t stream;
+    cusolverDnGetStream((cusolverDnHandle_t)handle, &stream);
+
+    cublasHandle_t cublas_handle;
+    cublasCreate(&cublas_handle);
+    cublasSetStream(cublas_handle, stream);
+
+    cublasStatus_t status = cublasZgetriBatched(cublas_handle,
+                                                n,
+                                                (cuDoubleComplex**)A,
+                                                lda,
+                                                devIpiv,
+                                                (cuDoubleComplex**)C,
+                                                ldc,
+                                                devInfo,
+                                                batch_count);
+
+    cublasDestroy(cublas_handle);
+    return hipsolver::cuda2hip_status(status);
 }
 catch(...)
 {
