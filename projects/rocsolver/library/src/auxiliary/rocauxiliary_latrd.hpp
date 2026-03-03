@@ -2194,32 +2194,11 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
         hipError_t err = hipGetDeviceProperties(&deviceProp, 0);
         assert(err == hipSuccess);
         cuCount = deviceProp.multiProcessorCount;
-        HIP_CHECK(hipStreamSynchronize(stream));
 
-        // Tunable parameter: number of loop iterations to capture per graph
-        // Adjust this value based on performance profiling for different problem sizes
-        constexpr rocblas_int GRAPH_BLOCK_SIZE = 16;
+        for(rocblas_int j = n - 1; j >= n - k; --j)
+        {
+            jw = j - n + k;
 
-        // Calculate total iterations and blocking parameters
-        const rocblas_int total_iters = k;  // columns to process: n-1 down to n-k
-        const rocblas_int num_full_blocks = total_iters / GRAPH_BLOCK_SIZE;
-        const rocblas_int remainder = total_iters % GRAPH_BLOCK_SIZE;
-
-        auto graphCreated = false;
-        auto graphExec = hipGraphExec_t{};
-        auto graphStream = hipStream_t{};
-        HIP_CHECK(hipStreamCreate(&graphStream));
-        rocblas_set_stream(handle, graphStream);
-        // Helper lambda to capture and process a block of iterations
-        auto captureBlock = [&](rocblas_int startCol, rocblas_int blockSize) {
-            auto graph = hipGraph_t{};
-            HIP_CHECK(hipStreamBeginCapture(graphStream, hipStreamCaptureModeGlobal));
-
-            // Process blockSize iterations within this graph capture
-            for(rocblas_int iter = 0; iter < blockSize; ++iter)
-            {
-                rocblas_int j = startCol - iter;
-                jw = j - n + k;
                 // compute update_grid based on Cucount and problem size to ensure good occupancy without oversubscribing
                 // the product of x and y grid dims should not exceed 8x the cu count.
                 int totalGroups = grr_updates * grc_updates;
@@ -2251,7 +2230,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                                         update_grid,
                                         update_threads,
                                         lmemsize_updates,
-                                        graphStream,
+                                        stream,
                                         grr_updates, grc_updates,
                                         n, k, j, A, shiftA,
                                         lda, strideA, pW,
@@ -2280,7 +2259,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                                         gemvt_grid,
                                         gemvt_threads,
                                         0,
-                                        graphStream,
+                                        stream,
                                         blocksX,
                                         n, k, j, A, shiftA, lda, strideA, pW,
                                         shiftW, ldw, strideW, pW, shiftW + idx2D(0, jw, ldw), ldw,
@@ -2292,7 +2271,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                                         update_grid,
                                         update_threads,
                                         lmemsize_updates,
-                                        graphStream,
+                                        stream,
                                         grr_updates, grc_updates,
                                         n, k, j, A, shiftA, lda, strideA,
                                         pW, shiftW, ldw, strideW, pWork,
@@ -2302,68 +2281,13 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                                         dim3(1, 1, batch_count),
                                         dim3(1024, 1, 1),
                                         0,
-                                        graphStream,
+                                        stream,
                                         j, A, shiftA + idx2D(0, j, lda), strideA,
                                         pW, shiftW + idx2D(0, jw, ldw), strideW,
                                         pTau + j - 1, strideP);
-            }
-
-            HIP_CHECK(hipStreamEndCapture(graphStream, &graph));
-
-            if(!graphCreated)
-            {
-                HIP_CHECK(hipGraphInstantiate(&graphExec, graph, nullptr, nullptr, 0));
-                graphCreated = true;
-            }
-            else
-            {
-                auto result = hipGraphExecUpdateResult{};
-                auto errorNode = hipGraphNode_t{};
-                auto updateStatus = hipGraphExecUpdate(graphExec, graph, &errorNode, &result);
-
-                // If update fails (graph structure changed), recreate the executable graph
-                if(updateStatus != hipSuccess || result != hipGraphExecUpdateSuccess)
-                {
-                    // Wait for any pending work on the graph stream before destroying
-                    HIP_CHECK(hipStreamSynchronize(stream));
-                    HIP_CHECK(hipGraphExecDestroy(graphExec));
-                    HIP_CHECK(hipGraphInstantiate(&graphExec, graph, nullptr, nullptr, 0));
-                }
-            }
-
-            HIP_CHECK(hipGraphLaunch(graphExec, stream));
-            HIP_CHECK(hipGraphDestroy(graph));
-            return rocblas_status_success;
-        };
-
-        // Starting column index
-        rocblas_int currentCol = n - 1;
-
-        // Process remainder first (if any) to handle cases where k is not divisible by GRAPH_BLOCK_SIZE
-        //TODO: error handle captureBlock returns
-        if(remainder > 0)
-        {
-            captureBlock(currentCol, remainder);
-            currentCol -= remainder;
         }
-
-        // Process full blocks
-        for(rocblas_int block = 0; block < num_full_blocks; ++block)
-        {
-            captureBlock(currentCol, GRAPH_BLOCK_SIZE);
-            currentCol -= GRAPH_BLOCK_SIZE;
-        }
-
-        HIP_CHECK(hipStreamSynchronize(stream));
-        if(graphCreated)
-        {
-            HIP_CHECK(hipGraphExecDestroy(graphExec));
-        }
-        rocblas_set_stream(handle, stream);
-        HIP_CHECK(hipStreamDestroy(graphStream));
     }
 
-    roctxRangePop();
     return rocblas_status_success;
 }
 
