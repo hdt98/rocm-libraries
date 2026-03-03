@@ -285,6 +285,9 @@ private:
     }
 };
 
+// This is an adaptive sorting algorithm. We generate multiple block radix
+// sorters that sort different items per block. Whenever we need to sort
+// we check if the number of valid items fit into a smaller sorter.
 template<class Key,
          class Value,
          unsigned int BlockSize,
@@ -303,15 +306,23 @@ class segmented_radix_sort_single_block_helper
                                                      1,
                                                      8,
                                                      block_radix_rank_algorithm::match>;
+    using half_sized_sort = segmented_radix_sort_single_block_helper<Key,
+                                                                     Value,
+                                                                     BlockSize,
+                                                                     ItemsPerThread / 2,
+                                                                     Descending>;
 
     static constexpr bool with_values = !std::is_same<Value, ::rocprim::empty_type>::value;
 
 public:
+    static constexpr unsigned int items_per_block = BlockSize * ItemsPerThread;
     union storage_type
     {
-        typename sort_type::storage_type sort;
+        typename half_sized_sort::storage_type smaller;
+        typename sort_type::storage_type       sort;
     };
 
+    // Utility interface to handle input to tmp/output.
     template<class KeysInputIterator,
              class KeysOutputIterator,
              class ValuesInputIterator,
@@ -356,7 +367,7 @@ public:
         }
     }
 
-    // When all iterators are raw pointers, this overload is used to minimize code duplication in the kernel
+    // When all iterators are raw pointers, this overload is used to minimize code duplication in the kernel.
     ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
     void sort(Key*          keys_input,
               Key*          keys_tmp,
@@ -382,12 +393,13 @@ public:
              storage);
     }
 
+    // The actual implementation.
     template<class KeysInputIterator,
              class KeysOutputIterator,
              class ValuesInputIterator,
              class ValuesOutputIterator>
     ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
-    bool sort(KeysInputIterator    keys_input,
+    void sort(KeysInputIterator    keys_input,
               KeysOutputIterator   keys_output,
               ValuesInputIterator  values_input,
               ValuesOutputIterator values_output,
@@ -397,50 +409,36 @@ public:
               unsigned int         end_bit,
               storage_type&        storage)
     {
-        constexpr unsigned int items_per_block = BlockSize * ItemsPerThread;
+        const unsigned int valid_count = end_offset - begin_offset;
 
-        using shorter_single_block_helper
-            = segmented_radix_sort_single_block_helper<Key,
-                                                       Value,
-                                                       BlockSize,
-                                                       ItemsPerThread / 2,
-                                                       Descending>;
-
-        // Segment is longer than supported by this function
-        if(end_offset - begin_offset > items_per_block)
+        // Check if we can fit the valid items into a smaller sorter by
+        // reducing the items per thread.
+        if(valid_count <= half_sized_sort::items_per_block)
         {
-            return false;
+            half_sized_sort().sort(keys_input,
+                                   keys_output,
+                                   values_input,
+                                   values_output,
+                                   begin_offset,
+                                   end_offset,
+                                   begin_bit,
+                                   end_bit,
+                                   storage.smaller);
+            return;
         }
-
-        // Recursively check if it is possible to sort the segment using fewer items per thread
-        const bool processed_by_shorter = shorter_single_block_helper().sort(
-            keys_input,
-            keys_output,
-            values_input,
-            values_output,
-            begin_offset,
-            end_offset,
-            begin_bit,
-            end_bit,
-            reinterpret_cast<typename shorter_single_block_helper::storage_type&>(storage));
-        if(processed_by_shorter)
-        {
-            return true;
-        }
+        // Otherwise procede with the the current items per thread.
 
         const unsigned int flat_id = ::rocprim::flat_block_thread_id();
 
-        Key                keys[ItemsPerThread];
-        Value              values[ItemsPerThread];
-        const unsigned int valid_count = end_offset - begin_offset;
-        // Sort will leave "invalid" (out of size) items at the end of the sorted sequence
+        Key       keys[ItemsPerThread];
+        Value     values[ItemsPerThread];
         const Key out_of_bounds = key_codec::get_out_of_bounds_key();
         block_load_direct_warp_striped(flat_id,
                                        keys_input + begin_offset,
                                        keys,
                                        valid_count,
                                        out_of_bounds);
-        if(with_values)
+        if constexpr(with_values)
         {
             block_load_direct_warp_striped(flat_id,
                                            values_input + begin_offset,
@@ -469,8 +467,6 @@ public:
                                                   values,
                                                   valid_count);
         }
-
-        return true;
     }
 };
 
@@ -478,28 +474,15 @@ template<class Key, class Value, unsigned int BlockSize, bool Descending>
 class segmented_radix_sort_single_block_helper<Key, Value, BlockSize, 0, Descending>
 {
 public:
+    static constexpr unsigned int items_per_block = 0;
+
     struct storage_type
     {};
 
-    template<class KeysInputIterator,
-             class KeysOutputIterator,
-             class ValuesInputIterator,
-             class ValuesOutputIterator>
+    template<class... Args>
     ROCPRIM_DEVICE ROCPRIM_INLINE
-    bool sort(KeysInputIterator,
-              KeysOutputIterator,
-              ValuesInputIterator,
-              ValuesOutputIterator,
-              unsigned int,
-              unsigned int,
-              unsigned int,
-              unsigned int,
-              storage_type&)
-    {
-        // It can't sort anything because ItemsPerThread is 0.
-        // The segment will be sorted by the calles (i.e. using ItemsPerThread = 1)
-        return false;
-    }
+    void sort(Args... /* ignored */)
+    { }
 };
 
 template<unsigned int LogicalWarpSize, unsigned int ItemsPerThread, unsigned int BlockSize>
