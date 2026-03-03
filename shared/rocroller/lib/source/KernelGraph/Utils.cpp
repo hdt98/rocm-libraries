@@ -729,7 +729,9 @@ namespace rocRoller
             return std::visit(
                 rocRoller::overloaded{
                     [&](CIsAnyOf<CG::StoreTiled, CG::StoreVGPR, CG::StoreSGPR> auto const& op)
-                        -> result { return {kgraph.mapper.get<CT::User>(tag), GD::Upstream}; },
+                        -> result {
+                        return {kgraph.mapper.get<CT::User>(tag), GD::Upstream};
+                    },
                     [&](CIsAnyOf<CG::LoadTileDirect2LDS> auto const& op) -> result {
                         if(isStorePartOfBidirectionalOp)
                         {
@@ -738,7 +740,9 @@ namespace rocRoller
                         return {kgraph.mapper.get<CT::User>(tag), GD::Downstream};
                     },
                     [&](CIsAnyOf<CG::LoadTiled, CG::LoadVGPR, CG::LoadSGPR> auto const& op)
-                        -> result { return {kgraph.mapper.get<CT::User>(tag), GD::Downstream}; },
+                        -> result {
+                        return {kgraph.mapper.get<CT::User>(tag), GD::Downstream};
+                    },
                     [&](CG::StoreLDSTile const& op) -> result {
                         return {kgraph.mapper.get<CT::LDS>(tag), GD::Upstream};
                     },
