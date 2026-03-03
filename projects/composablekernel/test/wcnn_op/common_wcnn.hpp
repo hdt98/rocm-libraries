@@ -193,7 +193,7 @@ struct ExecutionConfig final
     int k                = 16;
 };
 
-static ExecutionConfig config;
+inline ExecutionConfig config;
 
 template <typename DataType>
 void dump_tensor(const Tensor<DataType>& tensor, const char* str)
@@ -663,6 +663,65 @@ inline bool parse_cmd_args(int argc, char* argv[], ExecutionConfig& cfg)
     else
     {
         print_help_msg();
+        return false;
+    }
+
+    return true;
+}
+
+inline void print_help_msg_gtest()
+{
+    std::cerr << "arg1: verification (0=no, 1=yes)\n"
+              << "arg2: dump tensor (0=no, 1=yes)\n"
+              << "arg3: initialization (0=no init, 1=integer value, 2=decimal value)\n"
+              << "arg4: time kernel (0=no, 1=yes)\n"
+              << "arg5-8: tensor size {H x W x C x K}" << std::endl;
+}
+
+inline bool parse_cmd_args_gtest(int argc, char* argv[], ExecutionConfig& cfg)
+{
+    if(argc == 1)
+    {
+        // use default
+    }
+    else if(argc <= 9)
+    {
+        if(argc > 1)
+        {
+            cfg.do_verification = std::stoi(argv[1]);
+        }
+        if(argc > 2)
+        {
+            cfg.dump_tensor = std::stoi(argv[2]);
+        }
+        if(argc > 3)
+        {
+            cfg.init_method = std::stoi(argv[3]);
+        }
+        if(argc > 4)
+        {
+            cfg.time_kernel = std::stoi(argv[4]);
+        }
+        if(argc > 5)
+        {
+            cfg.h = std::stoi(argv[5]);
+        }
+        if(argc > 6)
+        {
+            cfg.w = std::stoi(argv[6]);
+        }
+        if(argc > 7)
+        {
+            cfg.c = std::stoi(argv[7]);
+        }
+        if(argc > 8)
+        {
+            cfg.k = std::stoi(argv[8]);
+        }
+    }
+    else
+    {
+        print_help_msg_gtest();
         return false;
     }
 

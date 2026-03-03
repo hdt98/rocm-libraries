@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 #include "data_type.hpp"
@@ -7,6 +7,7 @@
 #if defined(__gfx1310__) || defined(__gfx1370__) || defined(__gfx130F__) || defined(__gfx131F__)
 #define __gfx13__
 #endif
+#include "ck/utility/amd_buffer_coherence.hpp"
 
 namespace ck {
 

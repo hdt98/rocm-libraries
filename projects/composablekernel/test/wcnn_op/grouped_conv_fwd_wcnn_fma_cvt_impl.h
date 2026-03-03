@@ -56,14 +56,9 @@ template <typename InDataType,
           bool EnableWaveGroup,
           int FmaMode,
           ck::index_t ActiveFun,
-          bool CvtToTensor,
-          uint32_t TestMask>
+          bool CvtToTensor>
 bool run_test()
 {
-    if((config.test_mask & 0xFFFF0000 & TestMask) == 0)
-    {
-        return true;
-    }
     constexpr FilterType Filter = Filter_1X1;
     constexpr bool Dilation     = false;
     constexpr ck::index_t FilterSize =
@@ -572,18 +567,14 @@ bool run_test()
     out_device_buf.FromDevice(out_device.mData.data());
     dump_tensor(out_device, "Out_Device");
 
-    std::cout <<
-#ifdef ENABLE_WAVEGROUP
-        "grouped_conv_fwd_wcnn_fma_wavegroup<In/Wei:"
-#else
-        "grouped_conv_fwd_wcnn_fma<In/Wei:"
-#endif
+    std::cout << (EnableWaveGroup ? "grouped_conv_fwd_wcnn_fma_wavegroup<In/Wei:"
+                                  : "grouped_conv_fwd_wcnn_fma<In/Wei:")
               << get_string<InDataType>() << ", Out:" << get_string<GPUAccType>() << ", "
               << get_string(Shape) << ", " << get_string(Filter) << ", Dilation:" << DilationSize
               << ", LdsMod:" << LdsMode << ", FmaMode:" << FmaMode << ", ActiveFun:" << ActiveFun
-              << ", CvtToTensor:" << CvtToTensor << ", WaveGroup:" << EnableWaveGroup << ", Id : 0x"
-              << std::hex << TestMask << " Size: { " << config.h << "x" << config.w << "x"
-              << config.c << "x" << config.k << " }>: Status: ";
+              << ", CvtToTensor:" << CvtToTensor << ", WaveGroup:" << EnableWaveGroup << " Size: { "
+              << config.h << "x" << config.w << "x" << config.c << "x" << config.k
+              << " }>: Status: ";
 
     if(config.time_kernel)
     {

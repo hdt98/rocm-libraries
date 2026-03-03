@@ -4,8 +4,6 @@
 #pragma once
 #include "common_wcnn.hpp"
 
-// #define ENABLE_WAVEGROUP 1
-
 #define DEFAULT_H_PERWAVE 8
 #define DEFAULT_W_PERWAVE 8
 #define DEFAULT_H_PERBLOCK 16
@@ -29,14 +27,9 @@ template <typename InDataType,
           bool EnableWaveGroup,
           int SbaMode,
           int ActiveFun,
-          bool CvtToTensor,
-          uint32_t TestMask>
+          bool CvtToTensor>
 bool run_test()
 {
-    if((config.test_mask & 0xFFFFFF00 & TestMask) == 0)
-    {
-        return true;
-    }
     constexpr ck::index_t FilterSize =
         (Filter == Filter_1X1) ? 1 : ((Filter == Filter_2X2) ? 2 : 3);
     constexpr ck::index_t HPerWcnn = (Shape == Shape_8X4) ? 8 : 4;
@@ -603,18 +596,14 @@ bool run_test()
     out_device_buf.FromDevice(out_device.mData.data());
     dump_tensor(out_device, "Out_Device");
 
-    std::cout <<
-#ifdef ENABLE_WAVEGROUP
-        "grouped_conv_fwd_wcnn_sba_cvt_wavegroup<In/Wei:"
-#else
-        "grouped_conv_fwd_wcnn_sba_cvt<In/Wei:"
-#endif
+    std::cout << (EnableWaveGroup ? "grouped_conv_fwd_wcnn_sba_cvt_wavegroup<In/Wei:"
+                                  : "grouped_conv_fwd_wcnn_sba_cvt<In/Wei:")
               << get_string<InDataType>() << ", Out:" << get_string<GPUAccType>() << ", "
               << get_string(Shape) << ", " << get_string(Filter) << ", Dilation:" << DilationSize
               << ", LdsMod:" << LdsMode << ", SbaMode:" << SbaMode << ", ActiveFun:" << ActiveFun
-              << ", CvtToTensor:" << CvtToTensor << ", WaveGroup:" << EnableWaveGroup << ", Id : 0x"
-              << std::hex << TestMask << " Size: { " << config.h << "x" << config.w << "x"
-              << config.c << "x" << config.k << " }>: Status: ";
+              << ", CvtToTensor:" << CvtToTensor << ", WaveGroup:" << EnableWaveGroup << " Size: { "
+              << config.h << "x" << config.w << "x" << config.c << "x" << config.k
+              << " }>: Status: ";
 
     if(config.time_kernel)
     {
