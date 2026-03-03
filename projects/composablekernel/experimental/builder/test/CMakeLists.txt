@@ -84,7 +84,8 @@ add_ck_builder_test(test_ckb_conv_builder
     unit_conv_tensor_layout.cpp
     unit_conv_tensor_type.cpp
     unit_conv_thread_block.cpp
-    unit_conv_tuning_params.cpp)
+    unit_conv_tuning_params.cpp
+    unit_make_packed_strides.cpp)
 target_link_libraries(test_ckb_conv_builder PRIVATE utility)
 
 # Tests the inline diff utility used for comparing strings in tests assertions
