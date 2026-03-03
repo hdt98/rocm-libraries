@@ -869,6 +869,11 @@ class Solution(collections.abc.Mapping):
         reject(state, printRejectionReason, "can't use DirectToLds for not EnableMatrixInstruction and GlobalReadVectorWidth%c * bpe%c * WavefrontSize > 256"%(tc,tc))
         return False
 
+    # DTL + TLDS=2 is not supported
+    if state["TransposeLDS"] == 2:
+      reject(state, printRejectionReason, "can't use DirectToLds for TLDS = 2")
+      return False
+
     if state["WaveSeparateGlobalRead%c" % tc]:
       if state["LSC%c"%tc] * state["LSP%c"%tc] * numBytesAB != state["WavefrontSize"] * state["GlobalReadVectorWidth%c"%tc] * numBytesAB:
         reject(state, printRejectionReason, "can't use DirectToLds for LSC%c and LSP%c * bpe!= WavefrontSize * GlobalReadVectorWidth%c * bpe%c > 4"%(tc, tc, tc, tc))
