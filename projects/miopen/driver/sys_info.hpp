@@ -76,16 +76,12 @@ public:
         }
         else
         {
-            std::cout << "Timestamp: " << timestamp << "; "
-                      << "Host Name: " << hostname << "; "
-                      << "Operating System: " << osInfo << "; "
-                      << "ROCm: " << hipVer << "; "
-                      << "MIOpen Driver: " << miopMajor << "." << miopMinor << "." << miopPatch << "; "
-                      << "CPU Vendor: " << cpuVendor << "; "
-                      << "CPU Model: " << cpuModel << "; "
-                      << "RAM Size: " << ramSize << "; "
-                      << "GPU Model: " << gpuInfo << "; "
-                      << "AMDGPU Driver: " << amdgpuVer << std::endl;
+            std::cout << "Timestamp: " << timestamp << "; " << "Host Name: " << hostname << "; "
+                  << "Operating System: " << osInfo << "; " << "ROCm: " << hipVer << "; "
+                  << "MIOpen Driver: " << miopMajor << "." << miopMinor << "." << miopPatch << "; "
+                  << "CPU Vendor: " << cpuVendor << "; " << "CPU Model: " << cpuModel << "; "
+                  << "RAM Size: " << ramSize << "; " << "GPU Model: " << gpuInfo << "; "
+                  << "AMDGPU Driver: " << amdgpuVer << std::endl;
         }
 #else
         miopMajor;

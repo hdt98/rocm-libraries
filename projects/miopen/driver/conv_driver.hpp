@@ -1,5 +1,6 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+
 #ifndef GUARD_MIOPEN_CONV_DRIVER_HPP
 #define GUARD_MIOPEN_CONV_DRIVER_HPP
 
@@ -19,6 +20,7 @@
 #include <miopen/conv_algo_name.hpp>
 #include <miopen/convolution.hpp>
 #include <miopen/env.hpp>
+#include <miopen/errors.hpp>
 #include <miopen/execution_context.hpp>
 #include <miopen/find_controls.hpp>
 #include <miopen/logger.hpp>
@@ -32,14 +34,13 @@
 #include <../test/tensor_holder.hpp>
 #include <../test/verify.hpp>
 
-#include <boost/range/adaptors.hpp>
-
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <memory>
 #include <optional>
+#include <ranges>
 #include <sstream>
 #include <type_traits>
 #include <vector>
@@ -98,10 +99,10 @@ struct AutoMiopenWarmupMode
         miopen::debug::FindEnforceDisable = true;
         miopen::debug::IsWarmupOngoing    = true;
     }
-    AutoMiopenWarmupMode(const AutoMiopenWarmupMode&) = delete;
-    AutoMiopenWarmupMode(AutoMiopenWarmupMode&&)      = delete;
+    AutoMiopenWarmupMode(const AutoMiopenWarmupMode&)            = delete;
+    AutoMiopenWarmupMode(AutoMiopenWarmupMode&&)                 = delete;
     AutoMiopenWarmupMode& operator=(const AutoMiopenWarmupMode&) = delete;
-    AutoMiopenWarmupMode& operator=(AutoMiopenWarmupMode&&) = delete;
+    AutoMiopenWarmupMode& operator=(AutoMiopenWarmupMode&&)      = delete;
     ~AutoMiopenWarmupMode()
     {
         miopen::debug::LoggingQuiet       = debug_logging_quiet_prev;
@@ -124,10 +125,10 @@ struct AutoPrepareForGpuReference
         miopen::debug::AlwaysEnableConvDirectNaive = true;
         miopen::debug::LoggingQuiet                = true;
     }
-    AutoPrepareForGpuReference(const AutoPrepareForGpuReference&) = delete;
-    AutoPrepareForGpuReference(AutoPrepareForGpuReference&&)      = delete;
+    AutoPrepareForGpuReference(const AutoPrepareForGpuReference&)            = delete;
+    AutoPrepareForGpuReference(AutoPrepareForGpuReference&&)                 = delete;
     AutoPrepareForGpuReference& operator=(const AutoPrepareForGpuReference&) = delete;
-    AutoPrepareForGpuReference& operator=(AutoPrepareForGpuReference&&) = delete;
+    AutoPrepareForGpuReference& operator=(AutoPrepareForGpuReference&&)      = delete;
     ~AutoPrepareForGpuReference()
     {
         miopen::debug::LoggingQuiet                = quiet_prev;
@@ -803,10 +804,9 @@ int ConvDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
 
     if(is_gpualloc && inflags.GetValueInt("verify") == 1)
     {
-        std::cerr << "Error: '--gpualloc 1' should not be used with enabled verification. Add "
-                     "'--verify 0' to options."
-                  << std::endl;
-        exit(EXIT_FAILURE);
+        MIOPEN_THROW(miopenStatusBadParm,
+                     "'--gpualloc 1' should not be used with enabled verification. "
+                     "Add '--verify 0' to options.");
     }
 
     in.SetGpuallocMode(is_gpualloc);
@@ -839,8 +839,8 @@ void ConvDriver<Tgpu, Tref>::ValidateLayoutInputParameters(std::string layout_va
 {
     if((ChkLayout_ShortName()))
     {
-        std::cerr << " Invalid Layout Short Name = " << ChkLayout_ShortName() << std::endl;
-        exit(EXIT_FAILURE);
+        MIOPEN_THROW(miopenStatusBadParm,
+                     "Invalid Layout Short Name = " + std::to_string(ChkLayout_ShortName()));
     }
     else
     {
@@ -852,8 +852,7 @@ void ConvDriver<Tgpu, Tref>::ValidateLayoutInputParameters(std::string layout_va
         }
         else
         {
-            std::cerr << "Invalid Layout Parameter Value - " << layout_value << std::endl;
-            exit(EXIT_FAILURE);
+            MIOPEN_THROW(miopenStatusBadParm, "Invalid Layout Parameter Value - " + layout_value);
         }
     }
 }
@@ -868,10 +867,10 @@ void ConvDriver<Tgpu, Tref>::ValidateVectorizedParameters(int vector_dim, int ve
     }
     else
     {
-        std::cerr << "Invalid Tensor Vectorization Parameter Value - "
-                  << "vector_dim:" << vector_dim << ", vector_length:" << vector_length
-                  << std::endl;
-        exit(EXIT_FAILURE);
+        MIOPEN_THROW(miopenStatusBadParm,
+                     "Invalid Tensor Vectorization Parameter Value - vector_dim:" +
+                         std::to_string(vector_dim) +
+                         ", vector_length:" + std::to_string(vector_length));
     }
 }
 
@@ -888,8 +887,7 @@ int ConvDriver<Tgpu, Tref>::ChkLayout_ShortName()
     }
     else
     {
-        std::cerr << "Error:Invalid Short Name!" << std::endl;
-        exit(EXIT_FAILURE);
+        MIOPEN_THROW(miopenStatusBadParm, "Invalid Short Name!");
     }
 }
 
@@ -1157,7 +1155,7 @@ std::vector<int> ConvDriver<Tgpu, Tref>::GetInputTensorLengthsFromCmdLine()
     in_lens[0] = inflags.GetValueInt("batchsize");
     in_lens[1] = inflags.GetValueInt("in_channels");
 
-    auto in_spatial_lens = boost::adaptors::slice(in_lens, 2, 2 + spatial_dim);
+    auto in_spatial_lens = in_lens | std::views::drop(2) | std::views::take(spatial_dim);
 
     if(spatial_dim == 2)
     {
@@ -1186,7 +1184,7 @@ std::vector<int> ConvDriver<Tgpu, Tref>::GetWeightTensorLengthsFromCmdLine()
     int spatial_dim = inflags.GetValueInt("spatial_dim");
     wei_lens.resize(2 + spatial_dim);
 
-    auto wei_spatial_lens = boost::adaptors::slice(wei_lens, 2, 2 + spatial_dim);
+    auto wei_spatial_lens = wei_lens | std::views::drop(2) | std::views::take(spatial_dim);
 
     int group_count = std::max(inflags.GetValueInt("group_count"), 1);
 
@@ -1306,8 +1304,7 @@ int ConvDriver<Tgpu, Tref>::SetConvDescriptorFromCmdLineArgs()
         if(in_c % group_count != 0 || out_c % group_count != 0 || group_count > in_c ||
            group_count > out_c)
         {
-            printf("Invalid group number\n");
-            exit(0); // NOLINT (concurrency-mt-unsafe)
+            MIOPEN_THROW(miopenStatusBadParm, "Invalid group number");
         }
     }
 
@@ -1643,8 +1640,7 @@ int ConvDriver<Tgpu, Tref>::AllocateBuffersAndCopy()
 
         if(!doutRead)
         {
-            auto gen = [&]() -> auto
-            {
+            auto gen = [&]() -> auto {
                 return is_fp8 ? prng::gen_A_to_B(Data_min, Data_max) : prng::gen_0_to_B(Data_scale);
             };
             dout.InitHostData(out_sz, is_bwd || is_wrw, gen);
@@ -3856,10 +3852,8 @@ std::string ConvDriver<Tgpu, Tref>::GetVerificationCacheFileName(
     miopen::LogRange(ss << "_", trans_output_pads, "x");
     ss << "_" << inflags.GetValueInt("pad_val");
     ss << "_" << inflags.GetValueInt("bias");
-    ss << "_"
-       << "GPU" << get_datatype_string(Tgpu{});
-    ss << "_"
-       << "REF" << get_datatype_string(Tref{});
+    ss << "_" << "GPU" << get_datatype_string(Tgpu{});
+    ss << "_" << "REF" << get_datatype_string(Tref{});
 
     return ss.str();
 }

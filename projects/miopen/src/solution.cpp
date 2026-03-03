@@ -8,6 +8,7 @@
 #include <miopen/conv/data_invoke_params.hpp>
 #include <miopen/conv/wrw_invoke_params.hpp>
 #include <miopen/env.hpp>
+#include <miopen/hof_match.hpp>
 #include <miopen/kernel.hpp>
 #include <miopen/kernel_tuning_mode.hpp>
 
@@ -20,7 +21,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include <boost/hof/match.hpp>
 #include "miopen/fusion/problem_description.hpp"
 #include "miopen/fusion/context.hpp"
 
@@ -49,10 +49,10 @@ void Solution::Run(const Handle& handle,
                          std::to_string(workspace_size) + " was provided");
     }
 
-    std::visit(boost::hof::match(
+    std::visit(miopen::hof_match(
                    [&](const Problem& problem_) {
                        std::visit(
-                           boost::hof::match(
+                           miopen::hof_match(
                                [&](const ConvolutionDescriptor& op_desc) {
                                    RunImpl(handle, inputs, workspace, workspace_size, op_desc);
                                },
@@ -113,7 +113,7 @@ void Solution::LogDriverCommand(const BatchnormDescriptor& desc) const
 
 void Solution::LogDriverCommand(const Problem& problem_) const
 {
-    std::visit(boost::hof::match(
+    std::visit(miopen::hof_match(
                    [&](const BiasDescriptor&) { /* \todo: think on how to log bias */ },
                    [&](const MhaDescriptor&) { /* \todo: think on how to log mha */ },
                    [&](const SoftmaxDescriptor&) { /* \todo: think on how to log softmax */ },
