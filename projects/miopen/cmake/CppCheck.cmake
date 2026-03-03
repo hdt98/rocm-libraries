@@ -90,9 +90,9 @@ macro(enable_cppcheck)
         file(GLOB_RECURSE GSRCS ${GLOBS})
         set(CPPCHECK_COMMAND
             ${CPPCHECK_EXE}
-            -q
-            # -v
-            # --report-progress
+            # -q  # TEMPORARILY DISABLED for PR 4945 debugging
+            -v
+            --report-progress
             ${CPPCHECK_FORCE}
             --cppcheck-build-dir=${CPPCHECK_BUILD_DIR}
             --platform=native
