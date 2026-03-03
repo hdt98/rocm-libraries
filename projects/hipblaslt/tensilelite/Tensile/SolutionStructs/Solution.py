@@ -1828,7 +1828,7 @@ class Solution(collections.abc.Mapping):
                 LdsStride = state["VectorWidthA"] * bpeA * state["DepthU"]
                 MinLdsBlockSizePerPadA = (state[f"GlobalReadVectorWidthA"] * bpeA) * state["WavefrontSize"]
                 isM0PadEnough = LdsStride >= MinLdsBlockSizePerPadA
-                ldsPadA = state["MatrixInstK"] if not isM0PadEnough else 2 * lrvw
+                ldsPadA = state["MatrixInstK"] if bpeA == 2 and not isM0PadEnough else 2 * lrvw
               else:
                 ldsPadA = 0
             else:
@@ -1858,7 +1858,7 @@ class Solution(collections.abc.Mapping):
                 LdsStride = state["VectorWidthB"] * bpeB * state["DepthU"]
                 MinLdsBlockSizePerPadB = (state[f"GlobalReadVectorWidthB"] * bpeB) * state["WavefrontSize"]
                 isM0PadEnough = LdsStride >= MinLdsBlockSizePerPadB
-                ldsPadB = state["MatrixInstK"] if not isM0PadEnough else 2 * lrvw
+                ldsPadB = state["MatrixInstK"] if bpeB == 2 and not isM0PadEnough else 2 * lrvw
               else:
                 ldsPadB = 0
             else:
@@ -2199,9 +2199,9 @@ class Solution(collections.abc.Mapping):
         reject(state, printRejectionReason, "VWB * DataType.numBytes() > 16")
 
       # reject - GRVW too big
-      if (state["GlobalReadVectorWidthA"] * state["ProblemType"]["DataTypeA"].numBytes()) > 16 and not state["UseF32XEmulation"]:
+      if (state["GlobalReadVectorWidthA"] * state["ProblemType"]["DataTypeA"].numBytes()) > 16:
         reject(state, printRejectionReason, "GRVWA * DataTypeA.numBytes() > 16")
-      if (state["GlobalReadVectorWidthB"] * state["ProblemType"]["DataTypeB"].numBytes()) > 16 and not state["UseF32XEmulation"]:
+      if (state["GlobalReadVectorWidthB"] * state["ProblemType"]["DataTypeB"].numBytes()) > 16:
         reject(state, printRejectionReason, "GRVWB * DataTypeB.numBytes() > 16")
 
       disableGNLC = False # Set to true to disable GNLC if needed
@@ -2447,9 +2447,13 @@ class Solution(collections.abc.Mapping):
         state["StoreVectorWidth"] = state["VectorWidthA"]
       else:
         if state["EnableMatrixInstruction"]:
-          state["StoreVectorWidth"] = state["MIOutputVectorWidth"]
-          if state["VectorWidthA"] * state["MIOutputVectorWidth"] <= 4 / state["ProblemType"]["DestDataType"].numRegisters():
-            state["StoreVectorWidth"] = state["VectorWidthA"] * state["MIOutputVectorWidth"]
+          # Adjusting StoreVectorWidth for larger CGEMM register count
+          if state["ProblemType"]["DestDataType"].isSingleComplex():
+            state["StoreVectorWidth"] = 4 // state["ProblemType"]["DestDataType"].numRegisters()
+          else:
+            state["StoreVectorWidth"] = state["MIOutputVectorWidth"]
+            if state["VectorWidthA"] * state["MIOutputVectorWidth"] <= 4 / state["ProblemType"]["DestDataType"].numRegisters():
+              state["StoreVectorWidth"] = state["VectorWidthA"] * state["MIOutputVectorWidth"]
           if state["LocalSplitU"] > 1:
             state["StoreVectorWidth"] = state["VectorWidthA"]
         else:
