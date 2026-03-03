@@ -4,9 +4,10 @@
 // CRITICAL MAINTENANCE NOTE:
 // Keep this template parameter list strictly in sync with:
 // ck/tensor_operation/gpu/device/impl/device_grouped_conv_bwd_data_multiple_d_xdl_cshuffle.hpp.
-// "In sync" means that the template parameter order, names, and types MUST EXACTLY MATCH. If they diverge, you may encounter
-// compilation errors, subtle template instantiation mismatches, or silent runtime bugs that are
-// difficult to diagnose. Always update both files together and review changes carefully.
+// "In sync" means that the template parameter order, names, and types MUST EXACTLY MATCH. If they
+// diverge, you may encounter compilation errors, subtle template instantiation mismatches, or
+// silent runtime bugs that are difficult to diagnose. Always update both files together and review
+// changes carefully.
 
 namespace ck_tile::reflect {
 

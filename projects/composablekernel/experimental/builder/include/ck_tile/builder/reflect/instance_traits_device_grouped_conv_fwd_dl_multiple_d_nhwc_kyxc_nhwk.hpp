@@ -7,9 +7,10 @@
 // CRITICAL MAINTENANCE NOTE:
 // Keep the specialization in the .inc file strictly in sync with:
 // ck/tensor_operation/gpu/device/impl/device_grouped_conv_fwd_dl_multiple_d_nhwc_kyxc_nhwk.hpp.
-// "In sync" means that the template parameter order, names, and types MUST EXACTLY MATCH. If they diverge, you may encounter
-// compilation errors, subtle template instantiation mismatches, or silent runtime bugs that are
-// difficult to diagnose. Always update both files together and review changes carefully.
+// "In sync" means that the template parameter order, names, and types MUST EXACTLY MATCH. If they
+// diverge, you may encounter compilation errors, subtle template instantiation mismatches, or
+// silent runtime bugs that are difficult to diagnose. Always update both files together and review
+// changes carefully.
 
 #pragma once
 
