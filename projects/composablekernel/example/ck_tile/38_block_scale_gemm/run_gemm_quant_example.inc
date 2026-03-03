@@ -199,8 +199,9 @@ float gemm_calc_quant(const ck_tile::QuantGemmHostArgs& args, const ck_tile::str
                                                   ABQuantPipeline,
                                                   BQuantPipeline>>>;
 
-        constexpr bool TiledPermuteN = 
-            (BQuantGroupSize::kN == 1 || BQuantGroupSize::kN == 128) ? GemmConfig::TiledMMAPermuteN : false;
+        constexpr bool TiledPermuteN = (BQuantGroupSize::kN == 1 || BQuantGroupSize::kN == 128)
+                                           ? GemmConfig::TiledMMAPermuteN
+                                           : false;
         if(s.log_level_ > 0)
         {
             printf(
@@ -663,7 +664,7 @@ int run_gemm_example_with_layouts(const ck_tile::ArgParser& arg_parser,
         if constexpr(QuantMode == ck_tile::QuantType::BQuantGrouped)
         {
             ck_tile::FillConstant<ADataType>{static_cast<ADataType>(0x38)}(a_m_k);
-            ck_tile::FillConstant<BDataType>{static_cast<BDataType>(0x48)}(b_k_n);
+            ck_tile::FillConstant<BDataType>{static_cast<BDataType>(0x22)}(b_k_n);
             ck_tile::FillConstant<BQDataType>{static_cast<BQDataType>(0.5f)}(*bq_tensor_ptr);
         }
         else if constexpr(QuantMode == ck_tile::QuantType::ABQuantGrouped)
@@ -692,7 +693,6 @@ int run_gemm_example_with_layouts(const ck_tile::ArgParser& arg_parser,
         b_k_n.SetZero();
         bq_tensor_ptr->SetZero();
     }
-
     ck_tile::DeviceMem a_m_k_dev_buf(a_m_k.get_element_space_size_in_bytes());
     ck_tile::DeviceMem b_k_n_dev_buf(b_k_n.get_element_space_size_in_bytes());
     ck_tile::DeviceMem c_m_n_dev_buf(c_m_n_dev_result.get_element_space_size_in_bytes());
@@ -748,7 +748,8 @@ int run_gemm_example_with_layouts(const ck_tile::ArgParser& arg_parser,
     ck_tile::HostTensor<BDataType> b_k_n_dev = b_k_n;
     if constexpr(GemmConfig::PreshuffleB)
     {
-        if constexpr(GemmConfig::TiledMMAPermuteN && (BQuantGroupSize::kN == 1 || BQuantGroupSize::kN == 128))
+        if constexpr(GemmConfig::TiledMMAPermuteN &&
+                     (BQuantGroupSize::kN == 1 || BQuantGroupSize::kN == 128))
         {
             printf("PreshuffleB with TiledMMAPermuteN\n");
             b_k_n_dev = ck_tile::shuffle_b_permuteN<GemmConfig>(b_k_n);

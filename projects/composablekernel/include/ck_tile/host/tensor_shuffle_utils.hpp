@@ -129,18 +129,12 @@ auto bq_permuteN(const ck_tile::HostTensor<T>& t, index_t group_n)
     int n_                = t.get_lengths()[1];
     int bqk_              = t.get_lengths()[0];
     constexpr int NRepeat = GemmConfig::N_Tile / GemmConfig::N_Warp_Tile / GemmConfig::N_Warp;
-    int dim = (group_n == 1)
-                  ? n_ / GemmConfig::N_Tile
-                  : n_ ;
-    
+    int dim               = (group_n == 1) ? n_ / GemmConfig::N_Tile : n_;
+
     ck_tile::HostTensor<T> t_view =
-        (group_n == 1)
-            ? ck_tile::HostTensor<T>({dim,
-                                      GemmConfig::N_Warp,
-                                      GemmConfig::N_Warp_Tile,
-                                      NRepeat,
-                                      bqk_})
-            : ck_tile::HostTensor<T>({dim, 1, 1, 1, bqk_});
+        (group_n == 1) ? ck_tile::HostTensor<T>(
+                             {dim, GemmConfig::N_Warp, GemmConfig::N_Warp_Tile, NRepeat, bqk_})
+                       : ck_tile::HostTensor<T>({dim, 1, 1, 1, bqk_});
 
     std::copy(t.begin(), t.end(), t_view.begin());
 

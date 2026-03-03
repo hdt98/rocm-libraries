@@ -178,8 +178,7 @@ struct BlockGemmWeightPreshuffleBQuantARegBRegCReg
                     if constexpr(BPreshuffleQuant)
                     {
                         constexpr index_t reg_offset = [&]() {
-                            if constexpr(BQuantGroupSize::kN >
-                                             (NWarp * WG::kN) &&
+                            if constexpr(BQuantGroupSize::kN > (NWarp * WG::kN) &&
                                          NPerBlock == BQuantGroupSize::kN)
                             {
                                 return kQScale; // prefill: one quant group per block

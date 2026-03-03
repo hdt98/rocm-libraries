@@ -646,6 +646,7 @@ struct CShuffleEpilogue
                                    const ScaleN& scale_n = {})
     {
         static constexpr int RowsPerLane = CWarpTensor::get_thread_buffer_size();
+
         static_assert(MPerXdl % RowsPerLane == 0,
                       "CShuffle (permuteN): MPerXdl must be divisible by per-lane row count.");
         constexpr int kM0 = MWave;
@@ -655,7 +656,7 @@ struct CShuffleEpilogue
         constexpr int kN0 = NWave;
         constexpr int kN1 = NPerXdl;
         constexpr int kN2 = NRepeat;
-       
+
         using IntrThreadShuffleEncode =
             tile_distribution_encoding<sequence<>,
                                        tuple<sequence<kM0, kM1, kM2>, sequence<kN0, kN1, kN2>>,
@@ -719,6 +720,7 @@ struct CShuffleEpilogue
             shuffle_acc.get_thread_buffer() = o_acc_tile.get_y_sliced_thread_data(
                 merge_sequences(sequence<mIter, 0>{}, c_warp_y_index_zeros),
                 merge_sequences(sequence<1, NRepeat>{}, c_warp_y_lengths));
+
             // If non-scalar scales provided, load them with identical distribution
             if constexpr(has_scales && !has_scalar_scales)
             {
@@ -736,6 +738,7 @@ struct CShuffleEpilogue
                     const int src = n_idx * plane + m_lane;   // source row in this N-plane
                     const int dst = n_idx + m_lane * NRepeat; // permuted N layout in output
                     AccDataType v = shuffle_acc.get_thread_buffer()[src];
+
                     if constexpr(has_scalar_scales)
                     {
                         v = static_cast<AccDataType>(v * scale_m * scale_n);
@@ -785,6 +788,7 @@ struct CShuffleEpilogue
                                    const ScaleN& scale_n = {})
     {
         constexpr auto LdsTileDistr = make_static_tile_distribution(MakeLdsDistributionEncode());
+
         auto lds_tile = make_static_distributed_tensor<AccDataType>(LdsTileDistr);
 
         constexpr auto lds_block_desc = MakeLdsBlockDescriptor<Problem>();
