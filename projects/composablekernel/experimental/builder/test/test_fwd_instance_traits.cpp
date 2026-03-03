@@ -84,7 +84,8 @@ TEST(InstanceTraits, V3ExtractsAllFieldsCorrectly)
             ck::half_t,                                // AComputeDataType
             ck::half_t,                                // BComputeDataType
             false,                                     // DirectLoad
-            1>;                                        // NumGroupsToMerge
+            1,                                         // NumGroupsToMerge
+            ck::DeviceArch::All>;                      // DeviceArch                 
 
     // Use InstanceTraits to extract compile-time information
     using Traits = ck_tile::reflect::InstanceTraits<DeviceInstance>;
@@ -227,7 +228,8 @@ TEST(InstanceTraits, V3InstanceStringReturnsCorrectFormat)
             ck::half_t,                                // AComputeDataType
             ck::half_t,                                // BComputeDataType
             false,                                     // DirectLoad
-            1>;                                        // NumGroupsToMerge
+            1,                                        // NumGroupsToMerge
+            ck::DeviceArch::All>;                      // DeviceArch
 
     std::string instance_str = ck_tile::reflect::instance_string<DeviceInstance>();
 
@@ -281,8 +283,8 @@ TEST(InstanceTraits, V3InstanceStringReturnsCorrectFormat)
                                ",fp16"          // AComputeDataType
                                ",fp16"          // BComputeDataType
                                ",false"         // DirectLoad
-                               ",1>";           // NumGroupsToMerge
-
+                               ",1"           // NumGroupsToMerge
+                               ",All>";        // DeviceArch
     EXPECT_EQ(instance_str, expected_str);
 }
 

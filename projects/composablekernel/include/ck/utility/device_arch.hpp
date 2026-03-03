@@ -4,6 +4,7 @@
 #pragma once
 
 #include <hip/hip_runtime.h>
+#include "ck/ck.hpp"
 #include "ck/host_utility/device_prop.hpp"
 
 namespace ck {

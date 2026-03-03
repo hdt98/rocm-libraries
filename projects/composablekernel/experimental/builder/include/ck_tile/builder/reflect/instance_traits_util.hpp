@@ -26,6 +26,7 @@
 #include "ck/utility/pipeline_enum.hpp"
 #include "ck/utility/scheduler_enum.hpp"
 #include "ck/utility/sequence.hpp"
+#include "ck/utility/device_arch.hpp"
 #include "ck_tile/core/container/tuple.hpp"
 #include "ck_tile/core/numeric/bfloat16.hpp"
 #include "ck_tile/core/numeric/float8.hpp"

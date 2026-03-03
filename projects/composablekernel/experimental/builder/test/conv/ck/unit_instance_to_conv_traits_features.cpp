@@ -44,6 +44,7 @@
 //    - O, MO, NO, KO, MNO, MKO, NKO, MNKO
 // ============================================================================
 
+#include "ck/utility/device_arch.hpp"
 #include "ck/utility/scheduler_enum.hpp"
 #include "ck_tile/builder/types.hpp"
 #include <gmock/gmock.h>
@@ -126,7 +127,8 @@ template <int NDimSpatial                  = 2,
               ck::tensor_operation::device::GemmSpecialization::Default,
           ck::BlockGemmPipelineScheduler BlkGemmPipeSched =
               ck::BlockGemmPipelineScheduler::Intrawave,
-          ck::BlockGemmPipelineVersion BlkGemmPipelineVer = ck::BlockGemmPipelineVersion::v1>
+          ck::BlockGemmPipelineVersion BlkGemmPipelineVer = ck::BlockGemmPipelineVersion::v1,
+          ck::DeviceArch Arch = ck::DeviceArch::All>
 using DeviceInstanceForTests_V3 =
     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<
         NDimSpatial,
@@ -178,7 +180,8 @@ using DeviceInstanceForTests_V3 =
         ADataType,
         BDataType,
         defaults::kDirectLoad,
-        defaults::kNumGroupsToMerge>;
+        defaults::kNumGroupsToMerge,
+        Arch>;
 
 // Test case helper for specialization testing
 template <ck::tensor_operation::device::ConvolutionForwardSpecialization Spec>

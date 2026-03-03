@@ -1,6 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
+#include "ck/utility/device_arch.hpp"
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <concepts>
@@ -1587,7 +1588,8 @@ TEST_F(ConvTraitsTest, ConvFwdTraitsExtraction)
             ck::half_t,                                // AComputeDataType
             ck::half_t,                                // BComputeDataType
             false,                                     // DirectLoad
-            1>;                                        // NumGroupsToMerge
+            1,                                        // NumGroupsToMerge
+            ck::DeviceArch::All>;                     // DeviceArch
 
     // Use ConvTraitsTmpl to extract compile-time information
     const auto traits = ck_tile::reflect::conv::instance_to_conv_traits<DeviceInstance>();

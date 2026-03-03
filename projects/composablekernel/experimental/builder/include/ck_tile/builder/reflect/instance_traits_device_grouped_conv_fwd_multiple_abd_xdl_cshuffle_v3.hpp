@@ -72,7 +72,8 @@ template <index_t NDimSpatial,
           typename AComputeDataType,
           typename BComputeDataType,
           bool DirectLoad,
-          index_t NumGroupsToMerge>
+          index_t NumGroupsToMerge,
+          ck::DeviceArch Arch>
 struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3;
 
 } // namespace ck::tensor_operation::device
@@ -134,7 +135,8 @@ template <ck::index_t NDimSpatial,
           typename AComputeDataType_,
           typename BComputeDataType_,
           bool DirectLoad,
-          index_t NumGroupsToMerge>
+          index_t NumGroupsToMerge,
+          ck::DeviceArch Arch>
 struct InstanceTraits<ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<
     NDimSpatial,
     ALayout_,
@@ -185,7 +187,8 @@ struct InstanceTraits<ck::tensor_operation::device::DeviceGroupedConvFwdMultiple
     AComputeDataType_,
     BComputeDataType_,
     DirectLoad,
-    NumGroupsToMerge>>
+    NumGroupsToMerge,
+    Arch>>
 {
     /// @brief Tag type identifying this device kernel variant
     using device_kernel_tag = DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3_Tag;
@@ -357,6 +360,7 @@ struct InstanceTraits<ck::tensor_operation::device::DeviceGroupedConvFwdMultiple
         oss << "," << detail::type_name<BComputeDataType>();               // 48. BComputeDataType
         oss << "," << (DirectLoad ? "true" : "false");                     // 49. DirectLoad
         oss << "," << kNumGroupsToMerge;                                   // 50. NumGroupsToMerge
+        oss << "," << Arch;                                                // 51. DeviceArch
         oss << ">";
 
         return oss.str();
