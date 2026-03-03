@@ -1300,3 +1300,7 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
 } // namespace device
 } // namespace tensor_operation
 } // namespace ck
+
+#ifdef CK_EXPERIMENTAL_BUILDER
+#include "ck_tile/builder/reflect/reflect_device_grouped_conv_fwd_multiple_d_xdl_large_tensor_cshuffle.inc"
+#endif

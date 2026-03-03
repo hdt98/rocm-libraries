@@ -2212,3 +2212,7 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
 } // namespace device
 } // namespace tensor_operation
 } // namespace ck
+
+#ifdef CK_EXPERIMENTAL_BUILDER
+#include "ck_tile/builder/reflect/reflect_device_grouped_conv_bwd_weight_two_stage_xdl_cshuffle.inc"
+#endif
