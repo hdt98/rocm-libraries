@@ -39,7 +39,7 @@ int main() {
 
   const char* codeGenOptions[]
       = {"-v", "-###",
-         "-mcode-object-version=5",
+         "-Xclang", "--amdhsa-code-object-version=5",
          "-mwavefrontsize64"};
   size_t codeGenOptionsCount = sizeof(codeGenOptions) / sizeof(codeGenOptions[0]);
 

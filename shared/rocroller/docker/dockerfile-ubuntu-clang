@@ -105,6 +105,7 @@ ENV LIBRARY_PATH="/opt/rocm/_rocm_sdk_core/lib:/opt/rocm/_rocm_sdk_core/lib/llvm
 # This command is executed as root to force the creaton of ROCm SDK metadata files.
 RUN rocm-sdk path --cmake
 RUN echo "$(rocm-sdk path --root)/lib" > /etc/ld.so.conf.d/rocm.conf && ldconfig
+RUN echo "$(rocm-sdk path --root)/lib/llvm/lib" > /etc/ld.so.conf.d/rocm-llvm.conf && ldconfig
 
 # codeql
 ADD codeql/install_codeql /tmp

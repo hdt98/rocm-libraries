@@ -128,7 +128,6 @@ else()
     set(msgpack_libs msgpackc-cxx)
 endif()
 
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 find_program(ROCM_SDK rocm-sdk)
 if(NOT ROCM_SDK)
   message(WANRNING "rocm-sdk not found in PATH. CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH} will be used to locate ROCm packages.")

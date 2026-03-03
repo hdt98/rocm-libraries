@@ -77,7 +77,7 @@ namespace rocRoller
         AssertFatal(!dataName.empty(), "InProcessAssembler needs a kernel name");
 
         const char* codeGenOptions[]
-            = {"-v", "-###", "-mcode-object-version=5",
+            = {"-v", "-Xclang", "--amdhsa-code-object-version=5",
                (wavefrontSize == 64) ? "-mwavefrontsize64" : "-mno-wavefrontsize64"};
         size_t codeGenOptionsCount = sizeof(codeGenOptions) / sizeof(codeGenOptions[0]);
 
@@ -104,6 +104,9 @@ namespace rocRoller
                                         dataAction,
                                         assemblyDataSet,
                                         relocatableDataSet));
+
+        COMGR_CHECK(
+            amd_comgr_action_info_set_option_list(dataAction, NULL, 0));
 
         COMGR_CHECK(amd_comgr_do_action(AMD_COMGR_ACTION_LINK_RELOCATABLE_TO_EXECUTABLE,
                                         dataAction,
