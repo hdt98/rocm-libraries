@@ -7,7 +7,7 @@
 #include "ck/tensor_operation/gpu/device/convolution_forward_specialization.hpp"
 #include "ck/tensor_operation/gpu/device/gemm_specialization.hpp"
 #include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
-#include "ck/host_utility/device_arch.hpp"
+#include "ck/utility/device_arch.hpp"
 
 namespace ck {
 namespace tensor_operation {

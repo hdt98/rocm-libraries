@@ -12,6 +12,7 @@
 #include "ck/library/utility/numeric.hpp"
 #include "ck/utility/common_header.hpp"
 #include "ck/utility/env.hpp"
+#include "ck/utility/device_arch.hpp"
 #include "ck/tensor_description/tensor_descriptor.hpp"
 #include "ck/tensor_description/tensor_descriptor_helper.hpp"
 #include "ck/tensor_operation/gpu/device/tensor_layout.hpp"
@@ -28,7 +29,6 @@
 #include "ck/host_utility/kernel_launch.hpp"
 #include "ck/host_utility/flush_cache.hpp"
 #include "ck/host_utility/io.hpp"
-#include "ck/host_utility/device_arch.hpp"
 #ifdef CK_EXPERIMENTAL_BUILDER
 #include "ck_tile/builder/reflect/conv_describe.hpp"
 #include "ck_tile/builder/reflect/instance_traits_device_grouped_conv_fwd_multiple_abd_xdl_cshuffle_v3.hpp"

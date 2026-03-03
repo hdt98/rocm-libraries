@@ -4,6 +4,7 @@
 #pragma once
 
 #include <hip/hip_runtime.h>
+#include "ck/host_utility/device_prop.hpp"
 
 namespace ck {
 
@@ -13,6 +14,7 @@ enum class DeviceArch
     Gfx950
 };
 
+// Compile-time check if the device architecture matches with the compilation target
 __device__
 consteval bool matches_with_compilation_target(DeviceArch device_arch)
 {
@@ -25,6 +27,18 @@ consteval bool matches_with_compilation_target(DeviceArch device_arch)
 #else      
       return false;
 #endif
+    default: return false;
+  }
+};
+
+// Runtime check if the device architecture is supported by the current device
+bool is_supported(DeviceArch device_arch)
+{
+  const auto& device_name = get_device_name();
+  switch(device_arch)
+  {    
+    case DeviceArch::All: return true;
+    case DeviceArch::Gfx950: return device_name == "gfx950";
     default: return false;
   }
 };
