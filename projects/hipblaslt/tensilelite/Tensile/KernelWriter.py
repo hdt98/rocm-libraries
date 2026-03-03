@@ -237,6 +237,8 @@ class StateValues:
   startVgprAlphaTmp: int                 = -1
   startVgprSerial: int                   = -1
   startVgprIdentityMatrix: int           = -1 
+  startVgprInfCheck: int                 = -1 
+  startVgprInf: int                      = -1 
 
   numSgprSizesSum: int                   = 0
   numSgprSizesFree: int                  = 0
@@ -3437,7 +3439,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if kernel["UseMFMAF32XEmulation"]:
       module.add(self.createNegIdentityMatrix(kernel))
       #module.add(VMovB32(vgpr(self.states.startVgprInfCheck), "0x207", comment="inf check for cmp_class"))
-      module.add(VMovB32(vgpr(self.states.startVgprInfCheck), "0x20", comment="inf check for cmp_class"))
+      module.add(VMovB32(vgpr(self.states.startVgprInfCheck), "0x204", comment="inf check for cmp_class"))
       module.add(VMovB32(vgpr(self.states.startVgprInf), "0x7F800000", comment="set to inf"))
 
     # Open persistent loop

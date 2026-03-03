@@ -488,39 +488,44 @@ class LocalReadMFMA(LocalRead):
                 # add comment for scheduling (__TF32_1_)
                 # UseMFMAF32XEmulation case, put the mark at second mfma4x4. Skip here
                 commentStr = commentForSchedule1 + ": "
-            # packCodeT.add(MFMAInstruction(instType=InstType.INST_BF16, accType=InstType.INST_F32, variant=[4,4,4,16], mfma1k=False,acc=vgpr(vTBase,4), a=idMat, b=vgpr(vHiBase,2), acc2=vgpr(vTBase,4),
-            # comment="Calculate low bits for TF32 emulation%s"%commentStr))
             packCodeT.add(MFMAInstruction(instType=InstType.INST_BF16, accType=InstType.INST_F32, variant=[4,4,4,16], mfma1k=False,acc=vgpr(vTBase,4), a=idMat, b=vgpr(vHiBase,2), acc2=vgpr(vTBase,4),
-            comment="Calculate low bits for TF32 emulation"))
-            # packCodeT.add(VMovB32(v0t, "0x7F800000", comment="vtBase"))
-            # packCodeT.add(VMovB32(v1t, "0x7F800000", comment="1"))
-            # packCodeT.add(VMovB32(v2t, "0x7F800000", comment="2"))
-            # packCodeT.add(VMovB32(v3t, "0x7F800000", comment="3%s"%commentStr))
+            comment="Calculate low bits for TF32 emulation%s"%commentStr))
+            # packCodeT.add(MFMAInstruction(instType=InstType.INST_BF16, accType=InstType.INST_F32, variant=[4,4,4,16], mfma1k=False,acc=vgpr(vTBase,4), a=idMat, b=vgpr(vHiBase,2), acc2=vgpr(vTBase,4),
+            # comment="Calculate low bits for TF32 emulation"))
 
             # tf32 inf check
-            # tmp = writer.vgprPool.checkOut(1, "tmp for inf")
+            tmp = writer.vgprPool.checkOut(1, "tmp for inf")
             # tmp2 = writer.vgprPool.checkOut(1, "tmp for inf value check")
             # packCodeT.add(SCmpKEQU32(src=sgpr("f32XEmuInf"), simm16=0))
             # packCodeT.add(SCBranchSCC1("TF32_InfCheck_Skip_%u"%(valuiIdx)))
             packCodeT.add(SNop(0))
-            packCodeT.add(SNop(0))
+            packCodeT.add(SNop(32))
             packCodeT.add(SNop(0))
             packCodeT.add(SNop(0))
             packCodeT.add(SNop(0))
             # packCodeT.add(VMovB32(vgpr(tmp2), "0x207", comment="inf check"))
+            # packCodeT.add(VMovB32(vgpr(tmp), "0x7F800000", comment="inf check"))
             # valOffset = baseValuiIdx + index
             # dstValOffset = baseValuiIdx + index // 2
             # v0, v1, v2, v3 = self.get4VgprForEmu(writer, kernel, tct, bufferIdx, valOffset, iui, lrvwTile, dst=False)
-            packCodeT.add(VCmpClassF32(dst=VCC(), src0=vHi0, src1=vgpr(writer.states.startVgprInfCheck), comment="Check if high bits are Inf"))
+            # packCodeT.add(VCmpClassF32(dst=VCC(), src0=vHi0, src1=vgpr(writer.states.startVgprInfCheck), comment="Check if high bits are Inf"))
             # packCodeT.add(VMovB32(vgpr(tmp), "0x7F800000", comment="set to inf"))
-            packCodeT.add(VCndMaskB32(dst=v0t, src0=vgpr(writer.states.startVgprInf), src1=v0t, src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
-            packCodeT.add(VCndMaskB32(dst=v1t, src0=vgpr(writer.states.startVgprInf), src1=v1t, src2=VCC(), comment=""))
-            packCodeT.add(VCndMaskB32(dst=v2t, src0=vgpr(writer.states.startVgprInf), src1=v2t, src2=VCC(), comment=""))
-            packCodeT.add(VCndMaskB32(dst=v3t, src0=vgpr(writer.states.startVgprInf), src1=v3t, src2=VCC(), comment="inf fix %s"%commentStr))
-            # writer.vgprPool.checkIn(tmp)
+            # packCodeT.add(VCndMaskB32(dst=v0t, src0=v0t, src1=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
+            # packCodeT.add(VCndMaskB32(dst=v1t, src0=v1t, src1=vgpr(writer.states.startVgprInf), src2=VCC(), comment=""))
+            # packCodeT.add(VCndMaskB32(dst=v2t, src0=v2t, src1=vgpr(writer.states.startVgprInf), src2=VCC(), comment=""))
+            # packCodeT.add(VCndMaskB32(dst=v3t, src0=v3t, src1=vgpr(writer.states.startVgprInf), src2=VCC(), comment="inf fix %s"%commentStr))
+            writer.vgprPool.checkIn(tmp)
             # writer.vgprPool.checkIn(tmp2)
             # packCodeT.add(Label("TF32_InfCheck_Skip_%u"%(valuiIdx), ""))
             # end tf32 inf check
+            # packCodeT.add(VMovB32(v0t, "0x7F800000", comment="vtBase"))
+            # packCodeT.add(VMovB32(v1t, "0x7F800000", comment="1"))
+            # packCodeT.add(VMovB32(v2t, "0x7F800000", comment="2"))
+            # packCodeT.add(VMovB32(v3t, "0x7F800000", comment="3%s"%commentStr))
+            # packCodeT.add(VMovB32(v0t, vgpr(writer.states.startVgprInf), comment="vtBase"))
+            # packCodeT.add(VMovB32(v1t, vgpr(writer.states.startVgprInf), comment="1"))
+            # packCodeT.add(VMovB32(v2t, vgpr(writer.states.startVgprInf), comment="2"))
+            # packCodeT.add(VMovB32(v3t, vgpr(writer.states.startVgprInf), comment="3%s"%commentStr))
 
         else:
             tmp = writer.vgprPool.checkOut(1, "x32f tmp mod 4")
@@ -567,6 +572,33 @@ class LocalReadMFMA(LocalRead):
             # however, we still need nop in tail loop case (A, B scheduling is not interleaved in tail loop) and CMS
             # we still need s_nop in main loop, NGLL, NLL if number MIWaveTileA/B are different.
             # s_nop insertion is handled in _interleavePackAB
+
+            # inf fix
+            index = bufferIdx
+            valOffset = baseValuiIdx + index
+            dstValOffset = baseValuiIdx + index // 2
+            v0H, v1H, v2H, v3H = self.get4VgprForEmu(writer, kernel, tc, index, valOffset, iui, lrvwTile, dst=True)
+            packCodeT.add(VCmpClassF32(dst=VCC(), src0=v0H, src1=vgpr(writer.states.startVgprInfCheck), comment="Check if high bits are Inf"))
+            # packCodeT.add(VMovB32(vgpr(tmp), "0x7F800000", comment="set to inf"))
+            packCodeT.add(VCndMaskB32(dst=v0, src1=v0, src0=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
+            # packCodeT.add(VCndMaskB32(dst=v1, src1=v1, src0=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
+            # packCodeT.add(VCndMaskB32(dst=v2, src1=v2, src0=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
+            # packCodeT.add(VCndMaskB32(dst=v3, src1=v3, src0=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
+            # packCodeT.add(VCndMaskB32(dst=v4, src1=v4, src0=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
+            # packCodeT.add(VCndMaskB32(dst=v5, src1=v5, src0=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
+            # packCodeT.add(VCndMaskB32(dst=v6, src1=v6, src0=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
+            # packCodeT.add(VCndMaskB32(dst=v7, src1=v7, src0=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
+            # packCodeT.add(VCndMaskB32(dst=v1t, src0=v1t, src1=vgpr(writer.states.startVgprInf), src2=VCC(), comment=""))
+            # packCodeT.add(VCndMaskB32(dst=v2t, src0=v2t, src1=vgpr(writer.states.startVgprInf), src2=VCC(), comment=""))
+            # packCodeT.add(VCndMaskB32(dst=v3t, src0=v3t, src1=vgpr(writer.states.startVgprInf), src2=VCC(), comment="inf fix %s"%commentStr))
+            # packCodeT.add(VMovB32(v0, vgpr(writer.states.startVgprInf), comment="vtBase"))
+            # packCodeT.add(VMovB32(v1, vgpr(writer.states.startVgprInf), comment="1"))
+            # packCodeT.add(VMovB32(v2, vgpr(writer.states.startVgprInf), comment="2"))
+            # packCodeT.add(VMovB32(v3, vgpr(writer.states.startVgprInf), comment="3"))
+            # packCodeT.add(VMovB32(v4, vgpr(writer.states.startVgprInf), comment="vtBase"))
+            # packCodeT.add(VMovB32(v5, vgpr(writer.states.startVgprInf), comment="1"))
+            # packCodeT.add(VMovB32(v6, vgpr(writer.states.startVgprInf), comment="2"))
+            # packCodeT.add(VMovB32(v7, vgpr(writer.states.startVgprInf), comment="3"))
             packCodeT.add(VCvtPkF32toBF16(dst=v7d, src0=v6, src1=v7, comment="pack final begin"))
             packCodeT.add(VCvtPkF32toBF16(dst=v6d, src0=v4, src1=v5))
             packCodeT.add(VCvtPkF32toBF16(dst=v5d, src0=v2, src1=v3))
