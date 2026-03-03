@@ -13,7 +13,8 @@
 #include "ck_tile/host/kernel_launch.hpp"
 #include "ck_tile/host/reference/reference_mhc.hpp"
 #include "ck_tile/host/check_err.hpp"
-#include "ck_tile/ops/mhc/pipeline/mhc_problem.hpp"
+#include "ck_tile/ops/mhc/pipeline/mhc_problem_small_tiles.hpp"
+#include "ck_tile/ops/mhc/kernel/mhc_kernel.hpp"
 
 // Parse command-line arguments for MHC benchmark
 auto create_args(int argc, char* argv[])
@@ -30,7 +31,9 @@ auto create_args(int argc, char* argv[])
         .insert("alpha_post", "2.5", "Alpha for post-activation")
         .insert("alpha_res", "3.5", "Alpha for residual")
         .insert("bias", "1.5", "Bias value")
-        .insert("sinkhorn_iters", "0", "Number of Sinkhorn iterations (0=disabled)");
+        .insert("sinkhorn_iters", "0", "Number of Sinkhorn iterations (0=disabled)")
+        .insert(
+            "low_lds", "0", "Use LowLDS (K=16); can hurt for large C (2x split-K). 0=no, 1=yes");
 
     bool result = arg_parser.parse(argc, argv);
     return std::make_tuple(result, arg_parser);
@@ -40,9 +43,9 @@ template <typename XDataType,
           typename PhiDataType,
           typename YDataType,
           typename ComputeDataType,
-          typename ActivationFunc = ck_tile::element_wise::Sigmoid,
-          ck_tile::index_t MTile  = 16> // Template parameter for M tile size
-bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
+          typename Problem,
+          typename ActivationFunc = ck_tile::element_wise::Sigmoid>
+bool run_mhc_benchmark(const ck_tile::ArgParser& arg_parser)
 {
     const int B = arg_parser.get_int("B");
     const int n = arg_parser.get_int("n");
@@ -63,9 +66,10 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
     const int sinkhorn_iters = arg_parser.get_int("sinkhorn_iters");
 
     std::cout << "\n========================================" << std::endl;
-    std::cout << "MHC Kernel V5 Benchmark (BF16) - Split-K" << std::endl;
+    std::cout << "MHC Kernel - Small Tiles" << std::endl;
     std::cout << "========================================" << std::endl;
     std::cout << "Configuration:" << std::endl;
+    std::cout << "  Problem: " << Problem::GetName() << std::endl;
     std::cout << "  Batch size (B): " << B << std::endl;
     std::cout << "  Expansion factor (n): " << n << std::endl;
     std::cout << "  Channels per stream (C): " << C << std::endl;
@@ -99,17 +103,14 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
     d_phi_mem.ToDevice(h_phi.data());
     d_output_mem.ToDevice(h_output.data());
 
-    // Use GEMM distribution version - reuses proven GEMM pipeline infrastructure
-    using Problem = ck_tile::MHCProblemV5GemmDist<XDataType, ComputeDataType, YDataType, MTile>;
-
-    // V5 kernel - split-K implementation with adaptive problem
+    // Problem is passed as template parameter (SmallTiles or SmallTilesLowLDS from main)
+    // Use baseline kernel (NOT low-register) to avoid split-K overhead
     using KernelV5 = ck_tile::MHCKernelV5<Problem, ck_tile::MHCDefaultPolicy, ActivationFunc>;
     using ReductionKernel = ck_tile::MHCReductionKernel<Problem, ActivationFunc>;
-    using SinkhornKernel  = ck_tile::MHCSinkhornKernel<float, float>; // YDataType, ComputeDataType
+    using SinkhornKernel  = ck_tile::MHCSinkhornKernel<float, float>;
 
     const ck_tile::index_t kBlockSize = KernelV5::BlockSize();
 
-    // 3D grid: (batch / kMTile) × (output_dim / kNTile) × (nC / kKTile)
     auto grid_size                   = KernelV5::GetGridSize(B, output_dim, nC);
     const ck_tile::index_t grid_m    = grid_size.at(ck_tile::number<0>{});
     const ck_tile::index_t grid_n    = grid_size.at(ck_tile::number<1>{});
@@ -130,7 +131,6 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
     ck_tile::DeviceMem d_workspace_mem(workspace_size);
     ck_tile::DeviceMem d_partial_norms_mem(partial_norms_size);
 
-    // Initialize workspace to zero
     (void)hipMemset(d_workspace_mem.GetDeviceBuffer(), 0, workspace_size);
     (void)hipMemset(d_partial_norms_mem.GetDeviceBuffer(), 0, partial_norms_size);
 
@@ -138,90 +138,14 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
 
     constexpr ck_tile::index_t kBlockPerCu = 1;
 
-    // Reduction kernel configuration
     const ck_tile::index_t reduction_threads = ReductionKernel::BlockSize();
     const ck_tile::index_t reduction_blocks =
         (B * output_dim + reduction_threads - 1) / reduction_threads;
 
-    // Sinkhorn kernel configuration
-    // Each thread processes one 4×4 matrix independently
     const ck_tile::index_t sinkhorn_threads = SinkhornKernel::BlockSize();
     const ck_tile::index_t sinkhorn_blocks  = (B + sinkhorn_threads - 1) / sinkhorn_threads;
 
-    // DEBUG: For Sinkhorn debugging, inject deterministic H^res values and test ONLY Sinkhorn
-    bool debug_sinkhorn = false;
-
-    if(debug_sinkhorn)
-    {
-        std::cout << "\n[DEBUG MODE] Testing Sinkhorn kernel in isolation" << std::endl;
-
-        // Inject deterministic values directly
-        for(int b = 0; b < B; ++b)
-        {
-            for(int i = 0; i < output_dim; ++i)
-            {
-                if(i >= 2 * n && i < 2 * n + n * n)
-                {
-                    // H^res section: Batch 0: all 1.0, Batch 1: all 2.0, etc.
-                    float base_value = static_cast<float>(b + 1 + i);
-                    h_output(b, i)   = static_cast<YDataType>(base_value);
-                }
-                else
-                {
-                    h_output(b, i) = static_cast<YDataType>(0.0f);
-                }
-            }
-        }
-
-        d_output_mem.ToDevice(h_output.data());
-
-        std::cout << "[DEBUG] Injected deterministic H^res values:" << std::endl;
-        for(int b = 0; b < std::min(4, B); ++b)
-        {
-            std::cout << "  Batch " << b << ": ";
-            for(int i = 0; i < n * n; ++i)
-            {
-                std::cout << static_cast<float>(h_output(b, 2 * n + i)) << " ";
-            }
-            std::cout << std::endl;
-        }
-
-        // Launch ONLY the Sinkhorn kernel
-        std::cout << "[DEBUG] Launching Sinkhorn kernel..." << std::endl;
-        ck_tile::launch_kernel(ck_tile::stream_config{nullptr, false},
-                               ck_tile::make_kernel<kBlockPerCu>(
-                                   SinkhornKernel{},
-                                   sinkhorn_blocks,
-                                   sinkhorn_threads,
-                                   0,
-                                   static_cast<YDataType*>(d_output_mem.GetDeviceBuffer()),
-                                   B,
-                                   output_dim,
-                                   n,
-                                   sinkhorn_iters));
-
-        // Get results
-        d_output_mem.FromDevice(h_output.data());
-
-        std::cout << "[DEBUG] After Sinkhorn, H^res values:" << std::endl;
-        for(int b = 0; b < std::min(4, B); ++b)
-        {
-            std::cout << "  Batch " << b << ": ";
-            for(int i = 0; i < n * n; ++i)
-            {
-                std::cout << static_cast<float>(h_output(b, 2 * n + i)) << " ";
-            }
-            std::cout << std::endl;
-        }
-
-        // For debug mode, skip the normal benchmark
-        return true;
-    }
-
-    // 3-stage kernel launch: GEMM -> Reduction -> Sinkhorn
-    // Use null stream (default stream) which provides implicit synchronization
     auto launch_combined = [&]() {
-        // Stage 1: Launch split-K GEMM kernel
         ck_tile::launch_kernel(
             ck_tile::stream_config{nullptr, false},
             ck_tile::make_kernel<kBlockPerCu>(
@@ -243,7 +167,6 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
                 alpha_res,
                 bias));
 
-        // Stage 2: Launch reduction kernel (combines split-K results, applies activation)
         ck_tile::launch_kernel(
             ck_tile::stream_config{nullptr, false},
             ck_tile::make_kernel<kBlockPerCu>(
@@ -263,9 +186,8 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
                 alpha_post,
                 alpha_res,
                 bias,
-                0)); // sinkhorn_iters=0 in reduction kernel (handled separately)
+                0));
 
-        // Stage 3: Launch Sinkhorn kernel if enabled (applies Sinkhorn to H^res)
         if(sinkhorn_iters > 0)
         {
             ck_tile::launch_kernel(ck_tile::stream_config{nullptr, false},
@@ -282,13 +204,11 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
         }
     };
 
-    // Warmup
     for(int i = 0; i < warmup; ++i)
     {
         launch_combined();
     }
 
-    // Benchmark with manual timing
     hipEvent_t start, stop;
     (void)hipEventCreate(&start);
     (void)hipEventCreate(&stop);
@@ -308,14 +228,11 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
     (void)hipEventDestroy(start);
     (void)hipEventDestroy(stop);
 
-    // Calculate performance metrics
-    std::size_t num_bytes = sizeof(XDataType) * B * nC +            // Input x
-                            sizeof(PhiDataType) * nC * output_dim + // Weights phi
-                            sizeof(YDataType) * B * output_dim;     // Output
+    std::size_t num_bytes = sizeof(XDataType) * B * nC + sizeof(PhiDataType) * nC * output_dim +
+                            sizeof(YDataType) * B * output_dim;
 
     float gb_per_sec = num_bytes / 1.E6 / ave_time;
 
-    // Calculate FLOPs: B * output_dim * (2*nC - 1) for GEMM + additional ops
     std::size_t num_flops = static_cast<std::size_t>(B) * output_dim * (2 * nC);
     float tflops          = num_flops / 1.E9 / ave_time;
 
@@ -334,9 +251,6 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
 
         d_output_mem.FromDevice(h_output.data());
 
-        // Compute reference - Full MHC (will fail validation due to formula mismatch)
-        // Our kernel: σ(GEMM/norm) for all outputs
-        // Reference: 3 different formulas for H^pre, H^post, H^res
         ck_tile::HostTensor<YDataType> h_output_ref({B, output_dim});
         h_output_ref.SetZero();
 
@@ -353,82 +267,16 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
             bias,
             sinkhorn_iters);
 
-        // Validate with appropriate tolerance for bf16
         float rtol = std::is_same_v<XDataType, ck_tile::bf16_t> ? 1e-2f : 1e-3f;
         float atol = std::is_same_v<XDataType, ck_tile::bf16_t> ? 1e-2f : 1e-3f;
 
         pass = ck_tile::check_err(
-            h_output, h_output_ref, "Error: MHC V5 kernel output mismatch!", rtol, atol);
+            h_output, h_output_ref, "Error: MHC small-tiles kernel output mismatch!", rtol, atol);
 
         std::cout << "Validation: " << (pass ? "PASS" : "FAIL") << std::endl;
     }
 
     return pass;
-}
-
-// Runtime dispatch wrapper for adaptive tile selection
-template <typename XDataType,
-          typename PhiDataType,
-          typename YDataType,
-          typename ComputeDataType,
-          typename ActivationFunc = ck_tile::element_wise::Sigmoid>
-bool run_mhc_benchmark(const ck_tile::ArgParser& arg_parser)
-{
-    const int B                  = arg_parser.get_int("B");
-    [[maybe_unused]] const int C = arg_parser.get_int("C"); // Used in commented multi-warp code
-
-    // Smart adaptive tile selection based on batch size AND problem size
-    // Strategy:
-    // - Small/Medium C: M=32 dominates (up to 10x faster than Triton!)
-    // - Large C + Very Large B: Use M=64 multi-warp to scale beyond 25 TFLOPS
-    // - Otherwise: M=32 single-warp (22-25 TFLOPS, matches Triton)
-
-    // Multi-warp PERMANENTLY DISABLED - All optimization attempts failed
-    //
-    // Tested optimizations (all resulted in 3.2x performance degradation):
-    // 1. Scoped sections for variable lifetime management
-    // 2. Reduced vectorization (VectorSize 4→2)
-    // 3. Reduced K dimension (256→128)
-    // 4. Combined: scoped + reduced vector + K=128
-    //
-    // Results: Still 5.1 TFLOPS vs 16.5 TFLOPS baseline (3.2x slower)
-    //
-    // Conclusion: The multi-warp overhead is fundamental and cannot be overcome
-    // - Warp synchronization cost
-    // - Poor work distribution
-    // - GEMM computation inefficiency with multi-warp layout
-    // - Infrastructure not optimized for this workload pattern
-    //
-    // M=32 single-warp remains optimal: 19.7 TFLOPS peak
-
-    // if(B >= 8192 && C >= 4096)
-    // {
-    //     std::cout << "[Adaptive] Using M=64 tile (2 warps) for very large batch+C (B=" << B << ",
-    //     C=" << C << ")" << std::endl; return run_mhc_benchmark_impl<XDataType, PhiDataType,
-    //     YDataType, ComputeDataType, ActivationFunc, 64>(arg_parser);
-    // }
-    // else
-    if(B >= 2048)
-    {
-        std::cout << "[Adaptive] Using M=32 tile (1 warp) for large batch (B=" << B << ")"
-                  << std::endl;
-        return run_mhc_benchmark_impl<XDataType,
-                                      PhiDataType,
-                                      YDataType,
-                                      ComputeDataType,
-                                      ActivationFunc,
-                                      32>(arg_parser);
-    }
-    else
-    {
-        std::cout << "[Adaptive] Using M=16 tile (1 warp) for batch (B=" << B << ")" << std::endl;
-        return run_mhc_benchmark_impl<XDataType,
-                                      PhiDataType,
-                                      YDataType,
-                                      ComputeDataType,
-                                      ActivationFunc,
-                                      16>(arg_parser);
-    }
 }
 
 int main(int argc, char* argv[])
@@ -440,13 +288,34 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    // Run with BF16 inputs, float output and compute
-    // Adaptive tile selection happens inside run_mhc_benchmark
-    bool pass = run_mhc_benchmark<ck_tile::bf16_t, // XDataType
-                                  ck_tile::bf16_t, // PhiDataType
-                                  float,           // YDataType
-                                  float,           // ComputeDataType
-                                  ck_tile::element_wise::Sigmoid>(arg_parser);
+    using XDataType       = ck_tile::bf16_t;
+    using PhiDataType     = ck_tile::bf16_t;
+    using YDataType       = float;
+    using ComputeDataType = float;
+    using ActivationFunc  = ck_tile::element_wise::Sigmoid;
+
+    const bool use_low_lds = (arg_parser.get_int("low_lds") != 0);
+    bool pass;
+    if(use_low_lds)
+    {
+        using Problem = ck_tile::MHCProblemSmallTilesLowLDS<XDataType, ComputeDataType, YDataType>;
+        pass          = run_mhc_benchmark<XDataType,
+                                          PhiDataType,
+                                          YDataType,
+                                          ComputeDataType,
+                                          Problem,
+                                          ActivationFunc>(arg_parser);
+    }
+    else
+    {
+        using Problem = ck_tile::MHCProblemSmallTiles<XDataType, ComputeDataType, YDataType>;
+        pass          = run_mhc_benchmark<XDataType,
+                                          PhiDataType,
+                                          YDataType,
+                                          ComputeDataType,
+                                          Problem,
+                                          ActivationFunc>(arg_parser);
+    }
 
     return pass ? 0 : -2;
 }

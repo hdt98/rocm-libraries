@@ -207,9 +207,10 @@ struct MHCKernelV5
         }
         block_sync_lds();
 
-        // Each batch element gets its own norm
-        const index_t k_range      = k_end - k_start;
-        constexpr index_t kVecSize = 4;
+        // Each batch element gets its own norm; 8-wide then 4-wide for better memory throughput
+        const index_t k_range       = k_end - k_start;
+        constexpr index_t kVecSize  = 4;
+        constexpr index_t kVecSize8 = 8;
 
         // Compute norms for each batch element
         for(index_t local_m = 0; local_m < kMTile; ++local_m)
@@ -221,33 +222,38 @@ struct MHCKernelV5
             ComputeDataType partial_sum = 0.0f;
             const XDataType* row_ptr    = p_x + global_m * nC + k_start;
 
-            for(index_t k = thread_id * kVecSize; k < k_range; k += kBlockSize * kVecSize)
+            index_t k = thread_id * kVecSize8;
+            for(; k + kVecSize8 <= k_range; k += kBlockSize * kVecSize8)
             {
-                if(k + kVecSize <= k_range)
-                {
-                    using VecType = ext_vector_t<XDataType, kVecSize>;
-                    VecType vec   = *c_style_pointer_cast<const VecType*>(row_ptr + k);
-
+                using VecType8 = ext_vector_t<XDataType, kVecSize8>;
+                VecType8 vec   = *c_style_pointer_cast<const VecType8*>(row_ptr + k);
 #pragma unroll
-                    for(index_t i = 0; i < kVecSize; ++i)
-                    {
-                        ComputeDataType val = type_convert<ComputeDataType>(vec[i]);
-                        partial_sum += val * val;
-                    }
-                }
-                else
+                for(index_t i = 0; i < kVecSize8; ++i)
                 {
-                    for(index_t i = 0; i < kVecSize && k + i < k_range; ++i)
-                    {
-                        ComputeDataType val = type_convert<ComputeDataType>(row_ptr[k + i]);
-                        partial_sum += val * val;
-                    }
+                    ComputeDataType val = type_convert<ComputeDataType>(vec[i]);
+                    partial_sum += val * val;
                 }
             }
-
-// Use warp-level reduction (AMD warp size = 64)
+            for(; k + kVecSize <= k_range; k += kBlockSize * kVecSize)
+            {
+                using VecType = ext_vector_t<XDataType, kVecSize>;
+                VecType vec   = *c_style_pointer_cast<const VecType*>(row_ptr + k);
 #pragma unroll
-            for(index_t offset = 32; offset > 0; offset >>= 1)
+                for(index_t i = 0; i < kVecSize; ++i)
+                {
+                    ComputeDataType val = type_convert<ComputeDataType>(vec[i]);
+                    partial_sum += val * val;
+                }
+            }
+            for(; k < k_range; ++k)
+            {
+                ComputeDataType val = type_convert<ComputeDataType>(row_ptr[k]);
+                partial_sum += val * val;
+            }
+
+            // Use warp-level reduction - adapt to actual warp size
+#pragma unroll
+            for(index_t offset = get_warp_size() / 2; offset > 0; offset >>= 1)
             {
                 partial_sum += __shfl_down(partial_sum, offset);
             }
@@ -279,6 +285,19 @@ struct MHCKernelV5
             const index_t k_current = k_start + k_tile_idx * kKTile;
             if(k_current >= k_end)
                 break;
+
+            // Prefetch next K-tile into L2 when enough iterations (avoid overhead on small shapes)
+            if(k_tiles_per_block >= 4 && k_tile_idx + 1 < k_tiles_per_block)
+            {
+                const index_t k_next = k_start + (k_tile_idx + 1) * kKTile;
+                if(k_next < nC)
+                {
+                    const XDataType* x_next     = p_x + batch_start * nC + k_next;
+                    const PhiDataType* phi_next = p_phi + out_start + k_next * output_dim;
+                    __builtin_prefetch(x_next, 0, 2);
+                    __builtin_prefetch(phi_next, 0, 2);
+                }
+            }
 
             // SCOPED SECTION 1: Load and process X tile
             // Limit x_tile lifetime to reduce register pressure
@@ -370,16 +389,19 @@ struct MHCReductionKernel
     using ComputeDataType = ck_tile::remove_cvref_t<typename Problem::ComputeDataType>;
     using YDataType       = ck_tile::remove_cvref_t<typename Problem::YDataType>;
 
-    static constexpr index_t kBlockSize = 256;
-    static constexpr index_t kVecSize   = 4; // Vectorized loads
+    static constexpr index_t kBlockSize =
+        256; // 512 can help large shapes but hurts small (fewer blocks)
+    static constexpr index_t kVecSize     = 4;
+    static constexpr index_t kVecSize8    = 8;   // 8-wide for workspace when grid_k allows
+    static constexpr index_t kMaxGridKLDS = 128; // max grid_k for LDS-backed norm load
 
     CK_TILE_HOST static constexpr auto BlockSize() { return kBlockSize; }
 
     CK_TILE_DEVICE void operator()(const ComputeDataType* p_workspace,
-                                   [[maybe_unused]] const ComputeDataType* p_partial_norms,
+                                   const ComputeDataType* p_partial_norms,
                                    YDataType* p_output,
                                    index_t batch,
-                                   [[maybe_unused]] index_t nC,
+                                   index_t nC,
                                    index_t output_dim,
                                    [[maybe_unused]] index_t n,
                                    index_t grid_k,
@@ -402,76 +424,97 @@ struct MHCReductionKernel
         if(global_idx >= total_elements)
             return;
 
-        // Step 2: Compute final norm from partial norms
         const index_t global_m = global_idx / output_dim;
-
-        ComputeDataType sum_squares = 0.0f;
-        const index_t norm_base     = global_m;
-
-        index_t k = 0;
-        for(; k + kVecSize <= grid_k; k += kVecSize)
-        {
-            using VecType = ext_vector_t<ComputeDataType, kVecSize>;
-            VecType vec_norms;
-
-#pragma unroll
-            for(index_t i = 0; i < kVecSize; ++i)
-            {
-                vec_norms[i] = p_partial_norms[(k + i) * batch + norm_base];
-            }
-
-#pragma unroll
-            for(index_t i = 0; i < kVecSize; ++i)
-            {
-                sum_squares += vec_norms[i];
-            }
-        }
-
-        for(; k < grid_k; ++k)
-        {
-            sum_squares += p_partial_norms[k * batch + norm_base];
-        }
-
-        const ComputeDataType sqrt_nC = ck_tile::sqrt(static_cast<ComputeDataType>(nC));
-        ComputeDataType norm          = ck_tile::sqrt(sum_squares) / sqrt_nC;
-        norm                          = (norm > 1e-12f) ? norm : 1.0f;
-
-        // Step 3: Reduce partial GEMM results and apply normalization (no activation yet)
-        // OPTIMIZED: New layout [batch][grid_k][output_dim] enables coalesced access
-        ComputeDataType value  = 0.0f;
         const index_t global_n = global_idx % output_dim;
 
-        // Base address for this batch element's data: [global_m][0][global_n]
-        const index_t workspace_base = global_m * (grid_k * output_dim) + global_n;
+        // Step 2: Compute final norm from partial norms
+        // Block-cooperative load: one thread per distinct global_m loads grid_k norms into LDS,
+        // then all threads with that global_m read from LDS. Cuts partial_norms global reads
+        // by ~output_dim (was 256*grid_k, now ~(256/output_dim)*grid_k).
+        ComputeDataType norm = 1.0f;
+        if(grid_k <= kMaxGridKLDS)
+        {
+            __shared__ ComputeDataType norms_lds[kMaxGridKLDS];
+            const index_t global_m_start = (block_id * block_size) / output_dim;
+            const index_t global_m_end   = (block_id * block_size + block_size - 1) / output_dim;
 
-        // Vectorized reduction for workspace - now with coalesced access!
-        k = 0;
+            for(index_t gm = global_m_start; gm <= global_m_end; ++gm)
+            {
+                // First thread in this block with global_m == gm (may be tid 0 when gm*output_dim <
+                // block_start)
+                const index_t first_global_idx_for_gm =
+                    ck_tile::max(gm * output_dim, block_id * block_size);
+                const index_t tid_loader = first_global_idx_for_gm - block_id * block_size;
+                if(tid_loader < block_size && tid == tid_loader)
+                {
+                    for(index_t k = 0; k < grid_k; ++k)
+                        norms_lds[k] = p_partial_norms[k * batch + gm];
+                }
+                block_sync_lds();
+
+                if(global_m == gm)
+                {
+                    ComputeDataType sum_squares = 0.0f;
+                    for(index_t k = 0; k < grid_k; ++k)
+                        sum_squares += norms_lds[k];
+                    const ComputeDataType sqrt_nC = ck_tile::sqrt(static_cast<ComputeDataType>(nC));
+                    norm                          = ck_tile::sqrt(sum_squares) / sqrt_nC;
+                    norm                          = (norm > 1e-12f) ? norm : 1.0f;
+                }
+                block_sync_lds();
+            }
+        }
+        else
+        {
+            ComputeDataType sum_squares = 0.0f;
+            index_t k                   = 0;
+            for(; k + kVecSize <= grid_k; k += kVecSize)
+            {
+                using VecType = ext_vector_t<ComputeDataType, kVecSize>;
+                VecType vec_norms;
+#pragma unroll
+                for(index_t i = 0; i < kVecSize; ++i)
+                    vec_norms[i] = p_partial_norms[(k + i) * batch + global_m];
+#pragma unroll
+                for(index_t i = 0; i < kVecSize; ++i)
+                    sum_squares += vec_norms[i];
+            }
+            for(; k < grid_k; ++k)
+                sum_squares += p_partial_norms[k * batch + global_m];
+            const ComputeDataType sqrt_nC = ck_tile::sqrt(static_cast<ComputeDataType>(nC));
+            norm                          = ck_tile::sqrt(sum_squares) / sqrt_nC;
+            norm                          = (norm > 1e-12f) ? norm : 1.0f;
+        }
+
+        // Step 3: Reduce partial GEMM results (workspace) - 8-wide then 4-wide then scalar
+        const index_t workspace_base = global_m * (grid_k * output_dim) + global_n;
+        ComputeDataType value        = 0.0f;
+        index_t k                    = 0;
+
+        for(; k + kVecSize8 <= grid_k; k += kVecSize8)
+        {
+            using VecType8 = ext_vector_t<ComputeDataType, kVecSize8>;
+            VecType8 vec_values;
+#pragma unroll
+            for(index_t i = 0; i < kVecSize8; ++i)
+                vec_values[i] = p_workspace[workspace_base + (k + i) * output_dim];
+#pragma unroll
+            for(index_t i = 0; i < kVecSize8; ++i)
+                value += vec_values[i];
+        }
         for(; k + kVecSize <= grid_k; k += kVecSize)
         {
             using VecType = ext_vector_t<ComputeDataType, kVecSize>;
             VecType vec_values;
-
 #pragma unroll
             for(index_t i = 0; i < kVecSize; ++i)
-            {
-                // Access pattern: [global_m][(k+i)][global_n]
-                const index_t workspace_idx = workspace_base + (k + i) * output_dim;
-                vec_values[i]               = p_workspace[workspace_idx];
-            }
-
+                vec_values[i] = p_workspace[workspace_base + (k + i) * output_dim];
 #pragma unroll
             for(index_t i = 0; i < kVecSize; ++i)
-            {
                 value += vec_values[i];
-            }
         }
-
-        // Handle remaining elements
         for(; k < grid_k; ++k)
-        {
-            const index_t workspace_idx = workspace_base + k * output_dim;
-            value += p_workspace[workspace_idx];
-        }
+            value += p_workspace[workspace_base + k * output_dim];
 
         // Step 4: Apply formulas - write H^pre and H^post directly, buffer H^res
         if(global_n < n)
