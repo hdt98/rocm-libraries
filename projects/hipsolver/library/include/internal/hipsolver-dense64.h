@@ -151,7 +151,7 @@ HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDnXtrtri_bufferSize(hipsolverDnHandl
                                                                 hipsolverDiagType_t diag,
                                                                 int64_t             n,
                                                                 hipDataType         dataTypeA,
-                                                                const void*         A,
+                                                                void*               A,
                                                                 int64_t             lda,
                                                                 size_t*             lworkOnDevice,
                                                                 size_t*             lworkOnHost);

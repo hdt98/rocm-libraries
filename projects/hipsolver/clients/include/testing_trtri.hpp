@@ -27,13 +27,7 @@
 
 #include "clientcommon.hpp"
 
-template <testAPI_t API,
-          typename I,
-          typename SIZE,
-          typename Td,
-          typename Th,
-          typename Ud,
-          typename Uh>
+template <testAPI_t API, typename I, typename SIZE, typename Td, typename Th, typename Ud>
 void trtri_checkBadArgs(const hipsolverHandle_t   handle,
                         const hipsolverFillMode_t uplo,
                         const hipsolverDiagType_t diag,
@@ -201,9 +195,9 @@ void trtri_initData(const int n, Td& dA, const int lda, Th& hA, const bool singu
 }
 
 template <testAPI_t API,
+          typename T,
           typename I,
           typename SIZE,
-          typename T,
           typename Td,
           typename Th,
           typename Ud,
@@ -260,9 +254,9 @@ void trtri_getError(const hipsolverHandle_t   handle,
 }
 
 template <testAPI_t API,
+          typename T,
           typename I,
           typename SIZE,
-          typename T,
           typename Td,
           typename Th,
           typename Ud,
@@ -442,27 +436,7 @@ void testing_trtri(Arguments& argus)
 
     // check computations
     if(argus.unit_check || argus.norm_check)
-        trtri_getError<API>(handle,
-                            uplo,
-                            diag,
-                            n,
-                            dA,
-                            lda,
-                            dWork,
-                            size_dW,
-                            hWork,
-                            size_hW,
-                            dInfo,
-                            hA,
-                            hARes,
-                            hInfo,
-                            hInfoRes,
-                            &max_error,
-                            singular);
-
-    // collect performance data
-    if(argus.timing)
-        trtri_getPerfData<API>(handle,
+        trtri_getError<API, T>(handle,
                                uplo,
                                diag,
                                n,
@@ -474,12 +448,32 @@ void testing_trtri(Arguments& argus)
                                size_hW,
                                dInfo,
                                hA,
+                               hARes,
                                hInfo,
-                               &gpu_time_used,
-                               &cpu_time_used,
-                               argus.perf ? 1 : argus.iters,
-                               argus.perf,
+                               hInfoRes,
+                               &max_error,
                                singular);
+
+    // collect performance data
+    if(argus.timing)
+        trtri_getPerfData<API, T>(handle,
+                                  uplo,
+                                  diag,
+                                  n,
+                                  dA,
+                                  lda,
+                                  dWork,
+                                  size_dW,
+                                  hWork,
+                                  size_hW,
+                                  dInfo,
+                                  hA,
+                                  hInfo,
+                                  &gpu_time_used,
+                                  &cpu_time_used,
+                                  argus.perf ? 1 : argus.iters,
+                                  argus.perf,
+                                  singular);
 
     // validate results for rocsolver-test
     // using n * machine_epsilon as tolerance
@@ -491,11 +485,15 @@ void testing_trtri(Arguments& argus)
     {
         if(!argus.perf)
         {
-            rocsolver_bench_header("Arguments:");
+            std::cerr << "\n============================================\n";
+            std::cerr << "Arguments:\n";
+            std::cerr << "============================================\n";
             rocsolver_bench_output("uplo", "diag", "n", "lda");
             rocsolver_bench_output(uploC, diagC, n, lda);
 
-            rocsolver_bench_header("Results:");
+            std::cerr << "\n============================================\n";
+            std::cerr << "Results:\n";
+            std::cerr << "============================================\n";
             if(argus.norm_check)
             {
                 rocsolver_bench_output("cpu_time_us", "gpu_time_us", "error");
@@ -506,7 +504,7 @@ void testing_trtri(Arguments& argus)
                 rocsolver_bench_output("cpu_time_us", "gpu_time_us");
                 rocsolver_bench_output(cpu_time_used, gpu_time_used);
             }
-            rocsolver_bench_endl();
+            std::cerr << std::endl;
         }
         else
         {
