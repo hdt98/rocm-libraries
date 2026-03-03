@@ -735,6 +735,12 @@ template struct MIOPEN_INTERNALS_EXPORT ConvMPBidirectWinograd<4, 3>;
 template struct MIOPEN_INTERNALS_EXPORT ConvMPBidirectWinograd<5, 3>;
 template struct MIOPEN_INTERNALS_EXPORT ConvMPBidirectWinograd<6, 3>;
 
+template struct MIOPEN_INTERNALS_EXPORT TransposedConvMPBidirectWinograd<2, 3>;
+template struct MIOPEN_INTERNALS_EXPORT TransposedConvMPBidirectWinograd<3, 3>;
+template struct MIOPEN_INTERNALS_EXPORT TransposedConvMPBidirectWinograd<4, 3>;
+template struct MIOPEN_INTERNALS_EXPORT TransposedConvMPBidirectWinograd<5, 3>;
+template struct MIOPEN_INTERNALS_EXPORT TransposedConvMPBidirectWinograd<6, 3>;
+
 // ExecutionContext and ProblemDescription transformation
 // for winograd buffers calculation using xdlops_convolution
 template <int WinoDataH, int WinoFilterH, int WinoDataW, int WinoFilterW>
@@ -961,6 +967,12 @@ template struct ConvMPBidirectWinograd_xdlops<3, 3>;
 template struct ConvMPBidirectWinograd_xdlops<4, 3>;
 template struct ConvMPBidirectWinograd_xdlops<5, 3>;
 template struct ConvMPBidirectWinograd_xdlops<6, 3>;
+
+template struct TransposedConvMPBidirectWinograd_xdlops<2, 3>;
+template struct TransposedConvMPBidirectWinograd_xdlops<3, 3>;
+template struct TransposedConvMPBidirectWinograd_xdlops<4, 3>;
+template struct TransposedConvMPBidirectWinograd_xdlops<5, 3>;
+template struct TransposedConvMPBidirectWinograd_xdlops<6, 3>;
 
 } // namespace conv
 } // namespace solver

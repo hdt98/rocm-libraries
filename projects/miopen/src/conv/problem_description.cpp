@@ -128,6 +128,11 @@ void ProblemDescription::HeuristicUpdateLayouts()
 
     static const auto strict = TensorDescriptor::LayoutValidationMode::StrictDecreasingStrides;
 
+    // Note: The order here is important, as we want to try and find a match with strict decreasing
+    // strides first.
+    static const std::vector<LayoutValidationMode> validation_modes = {
+        strict, LayoutValidationMode::IgnoreDegenerateStrides};
+
     // Early return optimization: if layouts are already consistent, skip recomputation
     if(!in_layout.empty() && in_layout == out_layout && in_layout == weights_layout &&
        std::find(supported_layouts.begin(), supported_layouts.end(), in_layout) !=
@@ -138,10 +143,6 @@ void ProblemDescription::HeuristicUpdateLayouts()
         return;
     }
 
-    // Note: The order here is important, as we want to try and find a match with strict decreasing
-    // strides first.
-    static const std::vector<LayoutValidationMode> validation_modes = {
-        strict, LayoutValidationMode::IgnoreDegenerateStrides};
     // Check if we can find a consistent layout across all tensors with the strict mode first,
     // then try ignoring degenerate strides afterwards.
     for(auto& mode : validation_modes)

@@ -509,6 +509,9 @@ ConvSolution ConvBinWinogradRxS::GetSolution(const ExecutionContext& ctx,
     return result;
 }
 
+template struct TransposedConvBinWinoRxS<2, 3>;
+template struct TransposedConvBinWinoRxS<3, 2>;
+
 } // namespace conv
 } // namespace solver
 } // namespace miopen

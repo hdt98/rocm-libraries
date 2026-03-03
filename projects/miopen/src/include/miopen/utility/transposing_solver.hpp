@@ -168,9 +168,11 @@ struct UniversalTransposeSolver : TransposePseudoSolver
 
             constexpr std::size_t max_block_size = 256;
             const auto local_size                = max_block_size;
+            // Note: std::max/min without explicit template params to avoid cppcheck false
+            // positives when testing with -Dmax/-Dmin preprocessor defines
             const auto num_blocks =
-                std::max<std::size_t>(1, (tensor_space + local_size - 1) / local_size);
-            const auto capped_blocks = std::min<std::size_t>(num_blocks, cus * 4);
+                std::max(std::size_t{1}, (tensor_space + local_size - 1) / local_size);
+            const auto capped_blocks = std::min(num_blocks, cus * 4);
             const auto global_size   = capped_blocks * local_size;
 
             auto transposeKernel = KernelInfo{};
@@ -553,13 +555,39 @@ struct TransposingSolverGetSolution<Derived, Base, Problem, InvokeParams, Inner,
     }
 };
 
-/// Tunable specialization: provides GetSolution(ctx, problem, config)
+/// Tunable specialization: provides GetSolution(ctx, problem, config) and delegates
+/// GetDefaultPerformanceConfig, IsValidPerformanceConfig, and Search to the inner solver.
 template <class Derived, class Base, class Problem, class InvokeParams, class Inner>
 struct TransposingSolverGetSolution<Derived, Base, Problem, InvokeParams, Inner, true> : Base
 {
+    using PerformanceConfigType = typename Inner::PerformanceConfigType;
+
+    PerformanceConfigType GetDefaultPerformanceConfig(const ExecutionContext& ctx,
+                                                      const Problem& problem) const override
+    {
+        auto transposed_problem = Derived::Transpose(problem);
+        return Inner{}.GetDefaultPerformanceConfig(ctx, transposed_problem);
+    }
+
+    bool IsValidPerformanceConfig(const ExecutionContext& ctx,
+                                  const Problem& problem,
+                                  const PerformanceConfigType& config) const override
+    {
+        auto transposed_problem = Derived::Transpose(problem);
+        return Inner{}.IsValidPerformanceConfig(ctx, transposed_problem, config);
+    }
+
+    PerformanceConfigType Search(const ExecutionContext& ctx,
+                                 const Problem& problem,
+                                 const AnyInvokeParams& invoke_ctx) const override
+    {
+        auto transposed_problem = Derived::Transpose(problem);
+        return Inner{}.Search(ctx, transposed_problem, invoke_ctx);
+    }
+
     ConvSolution GetSolution(const ExecutionContext& ctx,
                              const Problem& problem,
-                             const typename Inner::PerformanceConfigType& config) const override
+                             const PerformanceConfigType& config) const override
     {
         auto transposed_problem = Derived::Transpose(problem);
         ConvSolution sln        = Inner{}.GetSolution(ctx, transposed_problem, config);
