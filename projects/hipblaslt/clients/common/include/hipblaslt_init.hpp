@@ -1201,6 +1201,73 @@ inline void hipblaslt_init_zero(void* A, size_t start_offset, size_t end_offset,
 }
 
 template <typename T>
+inline void hipblaslt_init_one(
+    T* A, size_t M, size_t N, size_t lda, size_t stride = 0, size_t batch_count = 1)
+{
+    for(size_t i_batch = 0; i_batch < batch_count; i_batch++)
+        for(size_t i = 0; i < M; ++i)
+            for(size_t j = 0; j < N; ++j)
+                A[i + j * lda + i_batch * stride] = T(1);
+}
+
+inline void hipblaslt_init_one(void*       A,
+                               size_t      M,
+                               size_t      N,
+                               size_t      lda,
+                               hipDataType type,
+                               size_t      stride      = 0,
+                               size_t      batch_count = 1)
+{
+    switch(type)
+    {
+    case HIP_R_32F:
+        hipblaslt_init_one<float>(static_cast<float*>(A), M, N, lda, stride, batch_count);
+        break;
+    case HIP_R_64F:
+        hipblaslt_init_one<double>(static_cast<double*>(A), M, N, lda, stride, batch_count);
+        break;
+    case HIP_R_16F:
+        hipblaslt_init_one<hipblasLtHalf>(
+            static_cast<hipblasLtHalf*>(A), M, N, lda, stride, batch_count);
+        break;
+    case HIP_R_16BF:
+        hipblaslt_init_one<hip_bfloat16>(
+            static_cast<hip_bfloat16*>(A), M, N, lda, stride, batch_count);
+        break;
+#if HIP_FP8_TYPE_FNUZ
+    case HIP_R_8F_E4M3_FNUZ:
+        hipblaslt_init_one<hipblaslt_f8_fnuz>(
+            static_cast<hipblaslt_f8_fnuz*>(A), M, N, lda, stride, batch_count);
+        break;
+    case HIP_R_8F_E5M2_FNUZ:
+        hipblaslt_init_one<hipblaslt_bf8_fnuz>(
+            static_cast<hipblaslt_bf8_fnuz*>(A), M, N, lda, stride, batch_count);
+        break;
+#endif
+#if HIP_FP8_TYPE_OCP
+    case HIP_R_8F_E4M3:
+        hipblaslt_init_one<hipblaslt_f8>(
+            static_cast<hipblaslt_f8*>(A), M, N, lda, stride, batch_count);
+        break;
+    case HIP_R_8F_E5M2:
+        hipblaslt_init_one<hipblaslt_bf8>(
+            static_cast<hipblaslt_bf8*>(A), M, N, lda, stride, batch_count);
+        break;
+#endif
+    case HIP_R_32I:
+        hipblaslt_init_one<int32_t>(static_cast<int32_t*>(A), M, N, lda, stride, batch_count);
+        break;
+    case HIP_R_8I:
+        hipblaslt_init_one<hipblasLtInt8>(
+            static_cast<hipblasLtInt8*>(A), M, N, lda, stride, batch_count);
+        break;
+    default:
+        hipblaslt_cerr << "Error type in hipblaslt_init_one" << std::endl;
+        break;
+    }
+}
+
+template <typename T>
 inline void hipblaslt_init_alt_impl_big(
     std::vector<T>& A, size_t M, size_t N, size_t lda, size_t stride = 0, size_t batch_count = 1)
 {

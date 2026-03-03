@@ -243,6 +243,9 @@ void hipblaslt_init_device(ABC_dims                 abc,
         case hipblaslt_initialization::zero:
             fill_batch(A, M, N, lda, stride, batch_count, [](size_t idx) -> T { return T(0); });
             break;
+        case hipblaslt_initialization::ones:
+            fill_batch(A, M, N, lda, stride, batch_count, [](size_t idx) -> T { return T(1); });
+            break;
         case hipblaslt_initialization::norm_dist:
             {
                 std::random_device rd;
