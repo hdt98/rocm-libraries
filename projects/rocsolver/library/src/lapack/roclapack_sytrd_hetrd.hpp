@@ -39,6 +39,11 @@
 
 /* #include <rocprofiler-sdk-roctx/roctx.h> */
 #include <roctracer/roctx.h>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
+#include <vector>
 
 ROCSOLVER_BEGIN_NAMESPACE
 
@@ -219,6 +224,7 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
 
             // update trailing matrix
             // A = A - V*W' - W*V'
+            roctxRangePush("rocsolver gemms");
             rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_conjugate_transpose,
                            n - j - k, n - j - k, k, &minone, A, shiftA + idx2D(j + k, j, lda), lda,
                            strideA, tmptau_W, idx2D(k, 0, ldw), ldw, strideW, &one, A,
@@ -227,6 +233,7 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
                            n - j - k, n - j - k, k, &minone, tmptau_W, idx2D(k, 0, ldw), ldw,
                            strideW, A, shiftA + idx2D(j + k, j, lda), lda, strideA, &one, A,
                            shiftA + idx2D(j + k, j + k, lda), lda, strideA, batch_count, workArr);
+            roctxRangePop(); //"rocsolver gemms"
 
             j += k;
         }
@@ -245,23 +252,121 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
         // when the unreduced part is not large enough, switch to unblocked algorithm
         j = n - k;
         rocblas_int upkk = n - ((n - kk + k - 1) / k) * k;
-        while(j >= upkk)
+
+        // Pre-calculate all iteration values for parallel capture
+        std::vector<rocblas_int> jValues;
+        for(rocblas_int jval = n - k; jval >= upkk; jval -= k)
         {
-            // reduce columns j:j+k-1
-            rocsolver_latrd_forsytrd_template<T>(handle, uplo, j + k, k, A, shiftA, lda, strideA, E,
-                                                 strideE, tau, strideP, tmptau_W, 0, ldw, strideW,
-                                                 batch_count, scalars, work, norms, workArr);
+            jValues.push_back(jval);
+        }
 
-            // update trailing matrix
-            // A = A - V*W' - W*V'
-            rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_conjugate_transpose, j,
-                           j, k, &minone, A, shiftA + idx2D(0, j, lda), lda, strideA, tmptau_W, 0,
-                           ldw, strideW, &one, A, shiftA, lda, strideA, batch_count, workArr);
-            rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_conjugate_transpose, j,
-                           j, k, &minone, tmptau_W, 0, ldw, strideW, A, shiftA + idx2D(0, j, lda),
-                           lda, strideA, &one, A, shiftA, lda, strideA, batch_count, workArr);
+        const size_t numIterations = jValues.size();
 
-            j -= k;
+        if(numIterations > 0)
+        {
+            std::vector<hipGraphExec_t> graphExecs(numIterations);
+            std::vector<hipStream_t> captureStreams(numIterations);
+            std::vector<rocblas_handle> threadHandles(numIterations);
+            std::vector<std::thread> threads;
+
+            // Synchronization primitives
+            std::mutex mtx;
+            std::condition_variable cvInstantiated;
+            std::condition_variable cvLaunched;
+            std::atomic<size_t> instantiatedCount{0};
+            bool allLaunched = false;
+
+            // Create all streams and handles on main thread to avoid stream dependency issues
+            for(size_t i = 0; i < numIterations; i++)
+            {
+                HIP_CHECK(hipStreamCreate(&captureStreams[i]));
+                rocblas_create_handle(&threadHandles[i]);
+                rocblas_set_stream(threadHandles[i], captureStreams[i]);
+            }
+
+            // Parallel graph capture, instantiation, and cleanup
+            // Each thread handles its own capture and signals when done
+            for(size_t i = 0; i < numIterations; i++)
+            {
+                threads.emplace_back([&, i]() {
+                    hipGraph_t graph;
+
+                    rocblas_int jval = jValues[i];
+                    HIP_CHECK(hipStreamBeginCapture(captureStreams[i], hipStreamCaptureModeThreadLocal));
+
+                    // reduce columns j:j+k-1
+                    rocsolver_latrd_forsytrd_template<T>(threadHandles[i], uplo, jval + k, k, A,
+                                                         shiftA, lda, strideA, E, strideE, tau,
+                                                         strideP, tmptau_W, 0, ldw, strideW,
+                                                         batch_count, scalars, work, norms, workArr);
+
+                    // update trailing matrix
+                    // A = A - V*W' - W*V'
+                    rocsolver_gemm(threadHandles[i], rocblas_operation_none,
+                                   rocblas_operation_conjugate_transpose, jval, jval, k, &minone,
+                                   A, shiftA + idx2D(0, jval, lda), lda, strideA, tmptau_W, 0,
+                                   ldw, strideW, &one, A, shiftA, lda, strideA, batch_count, workArr);
+                    rocsolver_gemm(threadHandles[i], rocblas_operation_none,
+                                   rocblas_operation_conjugate_transpose, jval, jval, k, &minone,
+                                   tmptau_W, 0, ldw, strideW, A, shiftA + idx2D(0, jval, lda),
+                                   lda, strideA, &one, A, shiftA, lda, strideA, batch_count, workArr);
+
+                    HIP_CHECK(hipStreamEndCapture(captureStreams[i], &graph));
+
+                    // Instantiate the graph in parallel
+                    HIP_CHECK(hipGraphInstantiate(&graphExecs[i], graph, nullptr, nullptr, 0));
+
+                    // Signal that this thread's graph is instantiated
+                    {
+                        std::lock_guard<std::mutex> lock(mtx);
+                        instantiatedCount++;
+                    }
+                    cvInstantiated.notify_one();
+                    HIP_CHECK(hipGraphDestroy(graph));
+                    // Wait until all graphs have been launched
+                    {
+                        std::unique_lock<std::mutex> lock(mtx);
+                        cvLaunched.wait(lock, [&]() { return allLaunched; });
+                    }
+
+                    // Parallel cleanup - each thread destroys its own graph exec
+                    HIP_CHECK(hipGraphExecDestroy(graphExecs[i]));
+                });
+            }
+
+            // Wait for all graphs to be instantiated
+            {
+                std::unique_lock<std::mutex> lock(mtx);
+                cvInstantiated.wait(lock, [&]() { return instantiatedCount == numIterations; });
+            }
+
+            // Sequential graph launch only - preserves execution order
+            for(size_t i = 0; i < numIterations; i++)
+            {
+                roctxRangePush("rocsolver gemms");
+                HIP_CHECK(hipGraphLaunch(graphExecs[i], stream));
+                roctxRangePop(); //"rocsolver gemms"
+            }
+
+            // Signal all threads that launches are complete
+            {
+                std::lock_guard<std::mutex> lock(mtx);
+                allLaunched = true;
+            }
+            cvLaunched.notify_all();
+
+            // Wait for all threads to complete their cleanup
+            for(auto& t : threads)
+            {
+                t.join();
+            }
+
+            // Cleanup handles and streams on main thread (created on main thread)
+            for(size_t i = 0; i < numIterations; i++)
+            {
+                rocblas_destroy_handle(threadHandles[i]);
+                HIP_CHECK(hipStreamDestroy(captureStreams[i]));
+            }
         }
 
         // reduce first columns of A
@@ -284,7 +389,7 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
     }
 
     rocblas_set_pointer_mode(handle, old_mode);
-    roctxRangePop();
+    roctxRangePop(); //"rocsolver_sytrd_hetrd"
     return rocblas_status_success;
 }
 
