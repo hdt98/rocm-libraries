@@ -684,13 +684,19 @@ static bool IsApplicableBase(const ExecutionContext& ctx, const ProblemDescripti
     if(name == "gfx90a" && problem.IsGfx90aFp16altRequired())
         return false;
 
+    // Use IsPossibleLayout4D5D to check actual tensor strides rather than cached layout string
+    // This allows transposed solvers to work correctly when they modify tensor strides
+    static const auto strict = TensorDescriptor::LayoutValidationMode::StrictDecreasingStrides;
+
     // clang-format off
-    if (!((problem.GetKernelStrideW() == 1 || problem.GetKernelStrideW() == 2)
-        && problem.GetKernelStrideW() == problem.GetKernelStrideH()
-        && problem.GetDilationW() == 1
-        && problem.GetDilationH() == 1
-        && problem.GetBias() == 0
-        && problem.GetInLayout() == "NCHW"))
+    const bool stride_w_ok = (problem.GetKernelStrideW() == 1 || problem.GetKernelStrideW() == 2);
+    const bool stride_h_match = (problem.GetKernelStrideW() == problem.GetKernelStrideH());
+    const bool dilation_w_ok = (problem.GetDilationW() == 1);
+    const bool dilation_h_ok = (problem.GetDilationH() == 1);
+    const bool bias_ok = (problem.GetBias() == 0);
+    const bool layout_ok = problem.GetIn().IsPossibleLayout4D5D("NCHW", strict);
+
+    if (!(stride_w_ok && stride_h_match && dilation_w_ok && dilation_h_ok && bias_ok && layout_ok))
         return false;
         // clang-format on
 
@@ -1148,7 +1154,11 @@ bool ConvBinWinogradRxSf2x3g1::IsApplicable(const ExecutionContext& ctx,
 {
     if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS_F2X3_G1))
         return false;
-    return IsApplicableBase<2, 3>(ctx, problem) && problem.GetGroupCount() == 1;
+
+    if(problem.GetGroupCount() != 1)
+        return false;
+
+    return IsApplicableBase<2, 3>(ctx, problem);
 }
 
 float ConvBinWinogradRxSf2x3g1::GetWti(const ExecutionContext& ctx,

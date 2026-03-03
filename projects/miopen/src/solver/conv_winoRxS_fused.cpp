@@ -146,9 +146,16 @@ bool ConvBinWinogradRxSf2x3g1Fused::IsApplicable(const FusionContext& context,
                                                  const FusionDescription& problem) const
 {
     if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_RXS_F2X3_G1))
+    {
+        MIOPEN_LOG_I(
+            "ConvBinWinogradRxSf2x3g1Fused: Disabled by MIOPEN_DEBUG_AMD_WINOGRAD_RXS_F2X3_G1");
         return false;
+    }
     if(!WinoCommonIsApplicable(context, problem))
+    {
+        MIOPEN_LOG_I("ConvBinWinogradRxSf2x3g1Fused: WinoCommonIsApplicable failed");
         return false;
+    }
 
     const auto conv_problem = problem.GetConvProblem(0, miopen::conv::Direction::Forward);
     const auto conv_ctx     = context.GetConvContext(conv_problem);
@@ -156,28 +163,48 @@ bool ConvBinWinogradRxSf2x3g1Fused::IsApplicable(const FusionContext& context,
     const std::string name = conv_ctx.GetStream().GetDeviceName();
     if(!(StartsWith(name, "gfx9") || StartsWith(name, "gfx10") || StartsWith(name, "gfx11") ||
          StartsWith(name, "gfx12")))
+    {
+        MIOPEN_LOG_I("ConvBinWinogradRxSf2x3g1Fused: Unsupported device: " << name);
         return false;
+    }
 
     if(conv_problem.IsFp16() &&
        !(StartsWith(name, "gfx906") || StartsWith(name, "gfx908") || StartsWith(name, "gfx90a") ||
          StartsWith(name, "gfx942") || StartsWith(name, "gfx1011") || StartsWith(name, "gfx1012") ||
          StartsWith(name, "gfx103") || StartsWith(name, "gfx11") || StartsWith(name, "gfx12")))
+    {
+        MIOPEN_LOG_I("ConvBinWinogradRxSf2x3g1Fused: FP16 not supported on device: " << name);
         return false;
+    }
 
     // clang-format off
     if (!((conv_problem.GetKernelStrideW() == 1 || conv_problem.GetKernelStrideW() == 2)
         && conv_problem.GetKernelStrideW() == conv_problem.GetKernelStrideH()
         && conv_problem.GetDilationW() == 1
         && conv_problem.GetDilationH() == 1))
+    {
+        MIOPEN_LOG_I("ConvBinWinogradRxSf2x3g1Fused: Unsupported stride/dilation: "
+                     << "strideW=" << conv_problem.GetKernelStrideW()
+                     << " strideH=" << conv_problem.GetKernelStrideH()
+                     << " dilationW=" << conv_problem.GetDilationW()
+                     << " dilationH=" << conv_problem.GetDilationH());
         return false;
+    }
     // clang-format on
 
     if(conv_problem.IsTensorsCasted())
+    {
+        MIOPEN_LOG_I("ConvBinWinogradRxSf2x3g1Fused: Casted tensors not supported");
         return false;
+    }
 
     const auto group_count = conv_problem.GetGroupCount();
     if(group_count != 1)
+    {
+        MIOPEN_LOG_I("ConvBinWinogradRxSf2x3g1Fused: Grouped convolution not supported: groups="
+                     << group_count);
         return false;
+    }
 
     const auto W  = conv_problem.GetInWidth();
     const auto H  = conv_problem.GetInHeight();
@@ -189,9 +216,17 @@ bool ConvBinWinogradRxSf2x3g1Fused::IsApplicable(const FusionContext& context,
     const auto OH = conv_problem.GetOutHeight();
     const auto OW = conv_problem.GetOutWidth();
 
-    return IsWinogradV21Preferred<2, 3>(name, conv_problem)
-               ? IsShaderConstraintsMetV21(conv_problem, R, S, C, K, H, W, OH, OW, N)
-               : IsShaderConstraintsMetV30(conv_problem, R, S, C, K, H, W, OH, OW, N);
+    const bool use_v21 = IsWinogradV21Preferred<2, 3>(name, conv_problem);
+    const bool constraints_met =
+        use_v21 ? IsShaderConstraintsMetV21(conv_problem, R, S, C, K, H, W, OH, OW, N)
+                : IsShaderConstraintsMetV30(conv_problem, R, S, C, K, H, W, OH, OW, N);
+
+    MIOPEN_LOG_I("ConvBinWinogradRxSf2x3g1Fused: device="
+                 << name << " version=" << (use_v21 ? "V21" : "V30") << " N=" << N << " C=" << C
+                 << " H=" << H << " W=" << W << " K=" << K << " R=" << R << " S=" << S << " OH="
+                 << OH << " OW=" << OW << " constraints_met=" << (constraints_met ? "YES" : "NO"));
+
+    return constraints_met;
 }
 
 ConvSolution ConvBinWinogradRxSf2x3g1Fused::GetSolution(const FusionContext& context,

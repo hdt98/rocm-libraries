@@ -812,6 +812,20 @@ template struct MIOPEN_INTERNALS_EXPORT ConvWinograd3x3MultipassWrW<7, 3, 1, 1>;
 template struct MIOPEN_INTERNALS_EXPORT ConvWinograd3x3MultipassWrW<5, 3>;
 template struct MIOPEN_INTERNALS_EXPORT ConvWinograd3x3MultipassWrW<5, 4>;
 
+template struct TransposedConvWinograd3x3MultipassWrW<3, 2>;
+template struct TransposedConvWinograd3x3MultipassWrW<3, 3>;
+template struct TransposedConvWinograd3x3MultipassWrW<3, 4>;
+template struct TransposedConvWinograd3x3MultipassWrW<3, 5>;
+template struct TransposedConvWinograd3x3MultipassWrW<3, 6>;
+template struct TransposedConvWinograd3x3MultipassWrW<7, 2>;
+template struct TransposedConvWinograd3x3MultipassWrW<7, 3>;
+template struct TransposedConvWinograd3x3MultipassWrW<1, 1, 7, 2>;
+template struct TransposedConvWinograd3x3MultipassWrW<1, 1, 7, 3>;
+template struct TransposedConvWinograd3x3MultipassWrW<7, 2, 1, 1>;
+template struct TransposedConvWinograd3x3MultipassWrW<7, 3, 1, 1>;
+template struct TransposedConvWinograd3x3MultipassWrW<5, 3>;
+template struct TransposedConvWinograd3x3MultipassWrW<5, 4>;
+
 } // namespace conv
 } // namespace solver
 } // namespace miopen

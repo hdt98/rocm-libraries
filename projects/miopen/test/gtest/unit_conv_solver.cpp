@@ -461,6 +461,7 @@ void RunSolverFwd(const miopen::solver::conv::ConvSolverInterface& solv,
     {
         // Do not put GTEST_SKIP here.
         // The usage of non-applicable config should be considered as a bug in the test.
+
         GTEST_FAIL();
     }
 
@@ -893,7 +894,6 @@ void UnitTestConvSolverDevApplicabilityBase::RunTestImpl(
     for(const auto& [dev, dev_descr] : all_known_devs)
     {
         const auto supported = IsDeviceSupported(params.supported_devs, dev);
-        // std::cout << "Test " << dev_descr << " (supported: " << supported << ")" << std::endl;
 
         auto handle    = MockHandle{dev_descr, params.check_xnack_disabled};
         const auto ctx = [&] {
@@ -904,7 +904,6 @@ void UnitTestConvSolverDevApplicabilityBase::RunTestImpl(
         }();
 
         const auto is_applicable = solver.IsApplicable(ctx, problem);
-        // std::cout << "IsApplicable: " << is_applicable << std::endl;
         if(is_applicable != supported)
         {
             GTEST_FAIL() << dev_descr << " is" << (is_applicable ? "" : " not")

@@ -45,21 +45,34 @@ bool ConvBinWinograd3x3U::IsApplicable(const ExecutionContext& ctx,
                                        const ProblemDescription& problem) const
 {
     if(env::disabled(MIOPEN_DEBUG_AMD_WINOGRAD_3X3))
+    {
         return false;
+    }
     if(!problem.Is2d())
+    {
         return false;
+    }
     if(!(problem.IsDirectionForward() || problem.IsDirectionBackwardData()))
+    {
+        MIOPEN_LOG_I("ConvBinWinograd3x3U::IsApplicable: Direction is not Forward or BackwardData");
         return false;
+    }
     if(!(ctx.rmv.IsV2orV3() && ctx.use_asm_kernels))
+    {
         return false;
+    }
 
     const auto& target = ctx.GetStream().GetTargetProperties();
     if(target.isXnackEnabled())
+    {
         return false;
+    }
 
     const auto name = ctx.GetStream().GetDeviceName();
     if(!(name == "gfx803" || name == "gfx900" || name == "gfx906" || name == "gfx908"))
+    {
         return false;
+    }
 
     // Check if kernel is suitable for the problem description
     // and able to correctly run with given parameters.
@@ -67,18 +80,31 @@ bool ConvBinWinograd3x3U::IsApplicable(const ExecutionContext& ctx,
     const auto grid_workgroup_count_x = ctx.GetStream().GetMaxComputeUnits();
 
     if(problem.HasNonPackedTensors())
+    {
         return false;
+    }
     if(!problem.AllTensorsDimsFitIntoInt())
+    {
         return false;
+    }
 
-    if(!problem.IsLayoutDefault())
+    // Use IsPossibleLayout4D5D to check actual tensor strides rather than cached layout string
+    // This allows transposed solvers to work correctly when they modify tensor strides
+    static const auto strict = TensorDescriptor::LayoutValidationMode::StrictDecreasingStrides;
+    if(!(problem.GetIn().IsPossibleLayout4D5D("NCHW", strict) &&
+         problem.GetWeights().IsPossibleLayout4D5D("NCHW", strict) &&
+         problem.GetOut().IsPossibleLayout4D5D("NCHW", strict)))
+    {
         return false;
+    }
 
     if(problem.IsTensorsCasted())
+    {
         return false;
+    }
 
     // clang-format off
-    return problem.GetPadW() == 1
+    bool result = problem.GetPadW() == 1
         && problem.GetPadH() == 1
         && problem.GetWeightsWidth() == 3
         && problem.GetWeightsHeight() == 3
@@ -99,12 +125,10 @@ bool ConvBinWinograd3x3U::IsApplicable(const ExecutionContext& ctx,
         && problem.GetInChannels() % 2 == 0
         && problem.GetInChannels() >= (device_is_gfx8 ? 16 : 18)
         && problem.IsFp32()
-        && problem.GetGroupCount() == 1
-        && problem.GetInLayout() == "NCHW";
-        /// && (isForwardDirection() ? _weights_layout == "KCHW" : _weights_layout == "CKHW" )
-        /// Actually, K<->C flpping is controlled by separate flag, so we can support either
-        /// layout in both directions.
+        && problem.GetGroupCount() == 1;
     // clang-format on
+
+    return result;
 }
 
 ConvSolution ConvBinWinograd3x3U::GetSolution(const ExecutionContext& ctx,
