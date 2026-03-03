@@ -21,19 +21,30 @@ using BatchSize32 = ck_tile::sequence<32>;
 using N4          = ck_tile::sequence<4>;
 
 // Test configurations for different data types and input size
-using TestConfig_B1_N4_F16 = std::tuple<ck_tile::half_t, // XDataType
-                                        float,           // ComputeDataType
-                                        ck_tile::half_t, // YDataType
-                                        BatchSize32,     // Batch size (number of N x N matrices)
-                                        N4>;             // Size N of the N x N matrix
+using TestConfig_B32_N4_F16_F32_F32 =
+    std::tuple<ck_tile::half_t, // XDataType
+               float,           // ComputeDataType
+               float,           // YDataType
+               BatchSize32,     // Batch size (number of N x N matrices)
+               N4>;             // Size N of the N x N matrix
 
-using TestConfig_B1_N4_F32 = std::tuple<float,       // XDataType
-                                        float,       // ComputeDataType
-                                        float,       // YDataType
-                                        BatchSize32, // Batch size (number of N x N matrices)
-                                        N4>;         // Size N of the N x N matrix
+using TestConfig_B32_N4_F32_F32_F32 =
+    std::tuple<float,       // XDataType
+               float,       // ComputeDataType
+               float,       // YDataType
+               BatchSize32, // Batch size (number of N x N matrices)
+               N4>;         // Size N of the N x N matrix
 
-using TestTypes = ::testing::Types<TestConfig_B1_N4_F16, TestConfig_B1_N4_F32>;
+using TestConfig_B32_N4_F32_F64_F32 =
+    std::tuple<float,       // XDataType
+               double,      // ComputeDataType
+               float,       // YDataType
+               BatchSize32, // Batch size (number of N x N matrices)
+               N4>;         // Size N of the N x N matrix
+
+using TestTypes = ::testing::Types<TestConfig_B32_N4_F16_F32_F32,
+                                   TestConfig_B32_N4_F32_F32_F32,
+                                   TestConfig_B32_N4_F32_F64_F32>;
 
 TYPED_TEST_SUITE(TestCkTileSinkHorn, TestTypes);
 

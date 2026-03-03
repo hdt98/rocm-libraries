@@ -18,10 +18,6 @@ struct SinkhornKnoppArgs
 template <typename Problem, typename Policy>
 struct SinkhornKnoppNaiveKernel
 {
-    // TODO: Resolve why `double exp(double)` returns all zeroes and remove this
-    static_assert(!std::is_same_v<typename Problem::ComputeDataType, double>,
-                  "ComputeDataType == double is not supported");
-
     static constexpr index_t kBlockSize = Problem::BlockShape::BlockSize;
 
     CK_TILE_HOST static constexpr auto BlockSize()
