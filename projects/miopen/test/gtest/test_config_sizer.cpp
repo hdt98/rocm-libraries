@@ -55,16 +55,22 @@ struct Sizers : public SizerBase<T>
     std::unique_ptr<EqualOrBelow<T, MAX_BYTES>> eob;
     std::unique_ptr<Above<T, MAX_BYTES>> abv;
 
-    virtual const bool CheckEobElements(size_t _elements) const
+    virtual const bool CheckEobElements(size_t _elements) const override
     {
         return eob->CheckElements(_elements);
     }
-    virtual const bool CheckEobBytes(size_t _bytes) const { return eob->CheckBytes(_bytes); }
-    virtual const bool CheckAboveElements(size_t _elements) const
+    virtual const bool CheckEobBytes(size_t _bytes) const override
+    {
+        return eob->CheckBytes(_bytes);
+    }
+    virtual const bool CheckAboveElements(size_t _elements) const override
     {
         return abv->CheckElements(_elements);
     }
-    virtual const bool CheckAboveBytes(size_t _bytes) const { return abv->CheckBytes(_bytes); }
+    virtual const bool CheckAboveBytes(size_t _bytes) const override
+    {
+        return abv->CheckBytes(_bytes);
+    }
 };
 
 template <typename T>
