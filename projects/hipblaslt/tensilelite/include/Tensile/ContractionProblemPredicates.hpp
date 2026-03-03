@@ -1645,9 +1645,9 @@ namespace TensileLite
                 // The min operator is used to handle cases where size_N is smaller than the value(usually is MacroTile1)
                 virtual bool operator()(ContractionProblemGemm const& problem) const override
                 {
-                    const uint64_t TWO_POW_32 = 4294967296;
+                    const uint64_t BUFFER_OOB = 0x80000000ULL;
                     return problem.d().strides()[1] * problem.d().elementBytes() * min(value, problem.d().sizes()[1])
-                           < TWO_POW_32;
+                           < BUFFER_OOB;
                 }
 
                 virtual std::string toString() const override
@@ -1661,7 +1661,7 @@ namespace TensileLite
                     bool rv = (*this)(problem);
                     std::ostringstream details;
                     details << "D:" << problem.d().strides()[1] << "*"
-                            << problem.d().elementBytes() << "*" << value << "<2^32";
+                            << problem.d().elementBytes() << "*" << value << "<2^31";
                     PredicateDebugger::printRow(stream, rv, this->type(), details.str());
                     return rv;
                 }
