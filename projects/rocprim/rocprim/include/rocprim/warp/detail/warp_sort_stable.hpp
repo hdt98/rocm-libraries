@@ -74,19 +74,22 @@ private:
         // Unroll this loop on constexpr-level, since unroll-pragma results in
         // extra vgpr usage which may spill:
         // for(auto i = 0u; i < ItemsPerThread; ++i)
-        ::rocprim::detail::constexpr_for_lt<0u, ItemsPerThread, 1>([&](auto i)
-        {
-            // for(auto j = i & 1u; j < ItemsPerThread - 1u; j += 2u)
-            ::rocprim::detail::constexpr_for_lt<i & 1u, ItemsPerThread - 1, 2>(
-                [&](auto j)
-                {
-                    const auto     in_bounds = j + 1 < thread_input_size;
-                    constexpr auto method    = swap_method::ternary;
-                    const auto     cond
-                        = in_bounds && compare_function(thread_keys[j + 1], thread_keys[j]);
-                    ::rocprim::detail::swap_if<method>(cond, thread_keys[j + 1], thread_keys[j]);
-                });
-        });
+        ::rocprim::detail::constexpr_for_lt<0u, ItemsPerThread, 1>(
+            [&](auto i)
+            {
+                // for(auto j = i & 1u; j < ItemsPerThread - 1u; j += 2u)
+                ::rocprim::detail::constexpr_for_lt<i & 1u, ItemsPerThread - 1, 2>(
+                    [&](auto j)
+                    {
+                        const auto     in_bounds = j + 1 < thread_input_size;
+                        constexpr auto method    = swap_method::ternary;
+                        const auto     cond
+                            = in_bounds && compare_function(thread_keys[j + 1], thread_keys[j]);
+                        ::rocprim::detail::swap_if<method>(cond,
+                                                           thread_keys[j + 1],
+                                                           thread_keys[j]);
+                    });
+            });
     }
 
     /// Sort the keys and values of each thread separately.
@@ -102,22 +105,25 @@ private:
         // Unroll this loop on constexpr-level, since unroll-pragma results in
         // extra vgpr usage which may spill:
         // for(auto i = 0u; i < ItemsPerThread; ++i)
-        ::rocprim::detail::constexpr_for_lt<0u, ItemsPerThread, 1>([&](auto i)
-        {
-            // for(auto j = i & 1u; j < ItemsPerThread - 1u; j += 2u)
-            ::rocprim::detail::constexpr_for_lt<i & 1u, ItemsPerThread - 1, 2>(
-                [&](auto j)
-                {
-                    const auto     in_bounds = j + 1 < thread_input_size;
-                    constexpr auto method    = swap_method::ternary;
-                    const auto     cond
-                        = in_bounds && compare_function(thread_keys[j + 1], thread_keys[j]);
-                    ::rocprim::detail::swap_if<method>(cond, thread_keys[j + 1], thread_keys[j]);
-                    ::rocprim::detail::swap_if<method>(cond,
-                                                       thread_values[j + 1],
-                                                       thread_values[j]);
-                });
-        });
+        ::rocprim::detail::constexpr_for_lt<0u, ItemsPerThread, 1>(
+            [&](auto i)
+            {
+                // for(auto j = i & 1u; j < ItemsPerThread - 1u; j += 2u)
+                ::rocprim::detail::constexpr_for_lt<i & 1u, ItemsPerThread - 1, 2>(
+                    [&](auto j)
+                    {
+                        const auto     in_bounds = j + 1 < thread_input_size;
+                        constexpr auto method    = swap_method::ternary;
+                        const auto     cond
+                            = in_bounds && compare_function(thread_keys[j + 1], thread_keys[j]);
+                        ::rocprim::detail::swap_if<method>(cond,
+                                                           thread_keys[j + 1],
+                                                           thread_keys[j]);
+                        ::rocprim::detail::swap_if<method>(cond,
+                                                           thread_values[j + 1],
+                                                           thread_values[j]);
+                    });
+            });
     }
 
     template<bool is_incomplete, class BinaryFunction>

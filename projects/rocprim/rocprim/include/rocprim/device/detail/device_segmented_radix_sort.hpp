@@ -298,14 +298,14 @@ class segmented_radix_sort_single_block_helper
     using key_codec
         = decltype(::rocprim::traits::get<Key>().template radix_key_codec<Descending>());
     using bit_key_type = typename key_codec::bit_key_type;
-    using sort_type    = ::rocprim::block_radix_sort<Key,
-                                                     BlockSize,
-                                                     ItemsPerThread,
-                                                     Value,
-                                                     1,
-                                                     1,
-                                                     8,
-                                                     block_radix_rank_algorithm::match>;
+    using sort_type       = ::rocprim::block_radix_sort<Key,
+                                                        BlockSize,
+                                                        ItemsPerThread,
+                                                        Value,
+                                                        1,
+                                                        1,
+                                                        8,
+                                                        block_radix_rank_algorithm::match>;
     using half_sized_sort = segmented_radix_sort_single_block_helper<Key,
                                                                      Value,
                                                                      BlockSize,
@@ -1002,8 +1002,7 @@ struct medium_segment_config_extractor
 };
 
 template<class TargetConfig,
-         template<class>
-         class ConfigExtractor,
+         template<class> class ConfigExtractor,
          bool Descending,
          bool IsUnknownGridSize,
          class KeysInputIterator,

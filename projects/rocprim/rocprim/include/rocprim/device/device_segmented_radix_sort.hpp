@@ -532,17 +532,17 @@ inline hipError_t segmented_radix_sort_impl(
             auto segmented_sort_kernel = [=](auto target_config)
             {
                 segmented_sort<decltype(target_config), Descending>(keys_input,
-                                                                  keys_tmp,
-                                                                  keys_output,
-                                                                  values_input,
-                                                                  values_tmp,
-                                                                  values_output,
-                                                                  to_output,
-                                                                  begin_offsets,
-                                                                  end_offsets,
-                                                                  iterations,
-                                                                  begin_bit,
-                                                                  end_bit);
+                                                                    keys_tmp,
+                                                                    keys_output,
+                                                                    values_input,
+                                                                    values_tmp,
+                                                                    values_output,
+                                                                    to_output,
+                                                                    begin_offsets,
+                                                                    end_offsets,
+                                                                    iterations,
+                                                                    begin_bit,
+                                                                    end_bit);
             };
             return execute_launch_plan<Config, Selector>(current_target,
                                                          segmented_sort_kernel,
