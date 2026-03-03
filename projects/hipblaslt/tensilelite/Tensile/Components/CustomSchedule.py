@@ -4939,11 +4939,7 @@ def _get_schedule_128x160x64_TF32(kernel, useLDSTr, TLDS):
     gr_inc_step = 0
 
     if isTN(kernel) and not useLDSTr and TLDS==1:
-        # Force TF32 emulation mode for this schedule variant.
-        # Using MFMA-based pack path here triggers validator assumptions (groups-of-10) that don't
-        # match the generated pack stream for this kernel.
-        kernel["UseMFMAF32XEmulation"] = False
-        kernel["UseDot2F32XEmulation"] = False
+        kernel["UseMFMAF32XEmulation"] = True
         kernel["UsePLRPack"] = True
 
         grinca = [0,0,1,1,2,2,3,3,4]
