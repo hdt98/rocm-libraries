@@ -653,9 +653,15 @@ struct GridwiseGemm_wmma_cshuffle_v3_ab_scale
             constexpr auto b_scale_thread_desc = make_naive_tensor_descriptor_packed(
                 make_tuple(Number<ScaleSliceSizeN>{}, Number<ScaleSliceSizeK>{}));
 
+#if defined(__gfx13__)
+            auto b_thread_offset_n = (((get_thread_local_1d_id() % 32) >> 1) +
+                                      (get_thread_local_1d_id() / 32) % NWaves * NPerWmma) /
+                                     ScaleBlockN;
+#else
             auto b_thread_offset_n = (get_thread_local_1d_id() % NPerWmma +
                                       (get_thread_local_1d_id() / 32) % NWaves * NPerWmma) /
                                      ScaleBlockN;
+#endif
 
             constexpr index_t VectorDim =
                 is_same<tensor_layout::gemm::RowMajor, BScaleLayout>::value ? 0 : 1;
