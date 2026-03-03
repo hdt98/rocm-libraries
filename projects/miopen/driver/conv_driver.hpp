@@ -2979,7 +2979,7 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, floa
                 miopen::conv::Direction::BackwardData);
             const auto db_key = problem.MakeNetworkConfig();
             
-            Print3DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key);
+            Print3DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, in_d, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key);
         }
         else
         {
@@ -3248,7 +3248,7 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float
                 miopen::conv::Direction::BackwardWeights);
             const auto db_key = problem.MakeNetworkConfig();
             
-            Print3DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key);
+            Print3DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, in_d, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key);
         }
         else
         {
