@@ -21,3 +21,4 @@ if(result EQUAL 0)
   target_link_libraries(unit_tensor_descriptor_functors PRIVATE utility)
 endif()
 
+add_gtest_executable(device_arch_tests device_arch_tests.cpp)
