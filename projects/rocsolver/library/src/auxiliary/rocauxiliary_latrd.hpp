@@ -39,6 +39,13 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+// ASAN: cap at 256 threads (VGPR inflation limits gfx942 to 1 wave/SIMD)
+#define LATRD_DOT_THDS 256
+#else
+#define LATRD_DOT_THDS 1024
+#endif
+
 template <int MAX_THDS, typename T, typename I, typename U>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) latrd_dot_scale_axpy(const I n,
                                                                        U AA,
@@ -303,8 +310,8 @@ rocblas_status rocsolver_latrd_template(rocblas_handle handle,
             rocblasCall_scal<T>(handle, n - j - 1, (tau + j), strideP, W,
                                 shiftW + idx2D(j + 1, j, ldw), 1, strideW, batch_count);
 
-            ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<1024, T>), dim3(1, 1, batch_count),
-                                    dim3(1024, 1, 1), 0, stream, n - 1 - j, A,
+            ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<LATRD_DOT_THDS, T>), dim3(1, 1, batch_count),
+                                    dim3(LATRD_DOT_THDS, 1, 1), 0, stream, n - 1 - j, A,
                                     shiftA + idx2D(j + 1, j, lda), strideA, W,
                                     shiftW + idx2D(j + 1, j, ldw), strideW, tau + j, strideP);
         }
@@ -385,8 +392,8 @@ rocblas_status rocsolver_latrd_template(rocblas_handle handle,
             rocblasCall_scal<T>(handle, j, (tau + j - 1), strideP, W, shiftW + idx2D(0, jw, ldw), 1,
                                 strideW, batch_count);
 
-            ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<1024, T>), dim3(1, 1, batch_count),
-                                    dim3(1024, 1, 1), 0, stream, j, A, shiftA + idx2D(0, j, lda),
+            ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<LATRD_DOT_THDS, T>), dim3(1, 1, batch_count),
+                                    dim3(LATRD_DOT_THDS, 1, 1), 0, stream, j, A, shiftA + idx2D(0, j, lda),
                                     strideA, W, shiftW + idx2D(0, jw, ldw), strideW, tau + j - 1,
                                     strideP);
         }
@@ -395,5 +402,6 @@ rocblas_status rocsolver_latrd_template(rocblas_handle handle,
     rocblas_set_pointer_mode(handle, old_mode);
     return rocblas_status_success;
 }
+
 
 ROCSOLVER_END_NAMESPACE
