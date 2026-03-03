@@ -259,26 +259,72 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg : public BlockGemmQuantBase
                                                    c_warp_y_index_zeros)) /
                                CBlockTensor::PackedSize>{};
 
-                    index_t reg_offset = [&]() {
-                        if constexpr(BQuantGroupSize::kN >= (NWarp * WG::kN))
+                    if constexpr(Traits::BPreshuffleQuant)
+                    {
+                        constexpr index_t reg_offset = [&]() {
+                            if constexpr(BQuantGroupSize::kN >= (NWarp * WG::kN) &&
+                                         Traits::NPerBlock == BQuantGroupSize::kN)
+                            {
+                                return kQScale;
+                            }
+                            else
+                            {
+                                return nIter;
+                            }
+                        }();
+
+                        auto pull_from_lane = (__lane_id() & (WG::kN - 1)) * KPerBlockBQ + kQScale;
+                        auto& scale_reg     = bq_block_tensor.get_thread_buffer()[reg_offset];
+                        // cross lane ops
+                        uint32_t scale_reg_dword;
+
+                        if constexpr(std::is_same_v<BQDataType, float>)
                         {
-                            return (nIter * NWarp * WG::kN) / BQuantGroupSize::kN * KPerBlockBQ +
-                                   kQScale;
+                            scale_reg_dword = ck_tile::bit_cast<uint32_t>(scale_reg);
                         }
                         else
                         {
-                            return nIter * KPerBlockBQ + kQScale;
+                            scale_reg_dword = static_cast<uint32_t>(scale_reg);
                         }
-                    }();
-                    auto& scale_reg     = bq_block_tensor.get_thread_buffer()[reg_offset];
-                    float b_scale_reg_f = Base::cvt_scale_to_fp32<BQDataType>(scale_reg);
 
-                    static_for<0, WG::kM * WG::kN / warp_size, 1>{}([&](auto c_row) {
-                        float a_scale_reg_f = aq_picker.template pick<c_row>();
-                        auto& c_ref = c_block_tensor.get_thread_buffer()[tbuf_offset + c_row];
-                        const auto acc_val = c_acc(mIter)(nIter).get_thread_buffer()[c_row];
-                        c_ref              = c_ref + acc_val * b_scale_reg_f * a_scale_reg_f;
-                    });
+                        // cross lane ops to get the value of scale_reg.
+                        int gathered_scale_reg = __builtin_amdgcn_ds_bpermute(
+                            pull_from_lane << 2, __builtin_bit_cast(int, scale_reg_dword));
+
+                        float b_scale_reg_f =
+                            Base::cvt_scale_to_fp32<BQDataType>(gathered_scale_reg);
+
+                        static_for<0, WG::kM * WG::kN / warp_size, 1>{}([&](auto c_row) {
+                            float a_scale_reg_f = aq_picker.template pick<c_row>();
+                            auto& c_ref = c_block_tensor.get_thread_buffer()[tbuf_offset + c_row];
+                            const auto acc_val = c_acc(mIter)(nIter).get_thread_buffer()[c_row];
+                            c_ref              = c_ref + acc_val * b_scale_reg_f * a_scale_reg_f;
+                        });
+                    }
+                    else
+                    {
+                        index_t reg_offset = [&]() {
+                            if constexpr(BQuantGroupSize::kN >= (NWarp * WG::kN))
+                            {
+                                return (nIter * NWarp * WG::kN) / BQuantGroupSize::kN *
+                                           KPerBlockBQ +
+                                       kQScale;
+                            }
+                            else
+                            {
+                                return nIter * KPerBlockBQ + kQScale;
+                            }
+                        }();
+                        auto& scale_reg     = bq_block_tensor.get_thread_buffer()[reg_offset];
+                        float b_scale_reg_f = Base::cvt_scale_to_fp32<BQDataType>(scale_reg);
+
+                        static_for<0, WG::kM * WG::kN / warp_size, 1>{}([&](auto c_row) {
+                            float a_scale_reg_f = aq_picker.template pick<c_row>();
+                            auto& c_ref = c_block_tensor.get_thread_buffer()[tbuf_offset + c_row];
+                            const auto acc_val = c_acc(mIter)(nIter).get_thread_buffer()[c_row];
+                            c_ref              = c_ref + acc_val * b_scale_reg_f * a_scale_reg_f;
+                        });
+                    }
                 });
             });
         });
