@@ -25,10 +25,10 @@ int main(int argc, char* argv[])
         exit(0); // NOLINT (concurrency-mt-unsafe)
     }
 
+    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
+    const bool json_mode = miopen::IsPerformanceLoggingEnabled(performance_log_level);
     try
     {
-        const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-        const bool json_mode = miopen::IsPerformanceLoggingEnabled(performance_log_level);
 
         // show command
         if(!json_mode)
