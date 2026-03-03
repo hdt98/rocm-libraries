@@ -473,8 +473,7 @@ if [[ -n "${rocsparse_path+x}" ]]; then
 fi
 
 # Default cmake executable is called cmake
-# cmake_executable=cmake
-cmake_executable=/usr/bin/cmake # WA for /opt/venv/bin bad version
+cmake_executable=/usr/bin/cmake #
 
 case "${ID}" in
   centos|rhel)
@@ -632,7 +631,7 @@ fi
 # #################################################
 # installing through package manager, which makes uninstalling easy
 if [[ "${build_package}" == true ]]; then
-  make package
+  ${cmake_executable} --build . -j$(nproc) --target package
 
   if [[ "${install_package}" == true ]]; then
     case "${ID}" in
