@@ -1529,6 +1529,17 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
     {
         namespace ctc = tensor_layout::convolution;
 
+        if (!is_supported(Arch))
+        {
+            if (ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "This device does not support the architecture: " << Arch << "!"
+                          << " In " << __FILE__ << ":" << __LINE__ << ", in function: "
+                          << __func__ << std::endl;
+            }
+            return false;
+        }
+
         const index_t G = arg.b_g_k_c_xs_lengths_[I0];
         const index_t K = arg.b_g_k_c_xs_lengths_[I1];
         const index_t C = arg.b_g_k_c_xs_lengths_[I2];

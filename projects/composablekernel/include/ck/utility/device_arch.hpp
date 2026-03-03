@@ -14,6 +14,17 @@ enum class DeviceArch
     Gfx950
 };
 
+std::ostream& operator<<(std::ostream& os, const DeviceArch& device_arch)
+{
+  switch(device_arch)
+  {    
+    case DeviceArch::All: os << "All"; break;
+    case DeviceArch::Gfx950: os << "gfx950"; break;
+    default: os << "Unknown"; break;
+  }
+  return os;
+};
+
 // Compile-time check if the device architecture matches with the compilation target
 __device__
 consteval bool matches_with_compilation_target(DeviceArch device_arch)

@@ -90,3 +90,14 @@ TEST_F(IsSupportedTest, DeviceArch_Gfx950)
         EXPECT_FALSE(is_supported(DeviceArch::Gfx950));
     }
 }
+
+TEST(Printing, DeviceArch)
+{
+    std::stringstream ss;
+    ss << DeviceArch::All;
+    EXPECT_EQ(ss.str(), "All");
+
+    ss.str("");
+    ss << DeviceArch::Gfx950;
+    EXPECT_EQ(ss.str(), "gfx950");
+}
