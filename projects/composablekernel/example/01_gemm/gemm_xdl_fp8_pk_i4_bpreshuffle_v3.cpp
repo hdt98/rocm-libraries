@@ -161,29 +161,52 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
 
     // weight pre-shuffle
     int NLane = gemm.GetPreShuffleParameters();
-    int KLane = 64 / NLane;
+    int KLane = ck::get_warp_size() / NLane;
 
     int K0 = K / (KLane * KPack);
     // K -> K0 KLane KPack
     // N -> N0 NLane
     // N, K -> N0 K0 KLane NLane KPack
     int tempk;
-    for(int n = 0; n < N; ++n)
+    if(ck::is_gfx13_supported())
     {
-        for(int k = 0; k < K; ++k)
+        // K is continous in all KLanes on gfx13, so, swizzle in KLane are not needed.
+        for(int n = 0; n < N; ++n)
         {
-            int n0 = n / NLane;
-            int n1 = n % NLane;
+            for(int k = 0; k < K; ++k)
+            {
+                int n0 = n / NLane;
+                int n1 = n % NLane;
 
-            int k0 = k / (KLane * KPack);
-            tempk  = k % (KLane * KPack);
-            int k1 = tempk / KPack;
-            int k2 = tempk % KPack;
+                int k0 = k / (KLane * KPack);
+                int k1 = k % (KLane * KPack);
 
-            int outputIndex = n0 * KPack * NLane * KLane * K0 + k0 * KPack * NLane * KLane +
-                              k1 * KPack * NLane + n1 * KPack + k2;
+                int outputIndex = n0 * KPack * NLane * KLane * K0 + k0 * KPack * NLane * KLane +
+                                  n1 * KPack * KLane + k1;
 
-            b_k_n_preshuffled(outputIndex) = b_k_n(n * K + k);
+                b_k_n_preshuffled(outputIndex) = b_k_n(n * K + k);
+            }
+        }
+    }
+    else
+    {
+        for(int n = 0; n < N; ++n)
+        {
+            for(int k = 0; k < K; ++k)
+            {
+                int n0 = n / NLane;
+                int n1 = n % NLane;
+
+                int k0 = k / (KLane * KPack);
+                tempk  = k % (KLane * KPack);
+                int k1 = tempk / KPack;
+                int k2 = tempk % KPack;
+
+                int outputIndex = n0 * KPack * NLane * KLane * K0 + k0 * KPack * NLane * KLane +
+                                  k1 * KPack * NLane + n1 * KPack + k2;
+
+                b_k_n_preshuffled(outputIndex) = b_k_n(n * K + k);
+            }
         }
     }
 
