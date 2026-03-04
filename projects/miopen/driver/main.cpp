@@ -70,6 +70,13 @@ int main(int argc, char* argv[])
 
         drv->AddCmdLineArgs();
         int rc = drv->ParseCmdLineArgs(argc, argv);
+        
+        // Enable timing if performance logging is enabled (to populate average_time_ms in JSON output)
+        if(json_mode && drv->GetInputFlags().GetValueInt("time") != 1)
+        {
+            drv->GetInputFlags().SetValue("time", "1");
+        }
+        
         if(rc != 0)
         {
             if(!json_mode)
@@ -81,7 +88,7 @@ int main(int argc, char* argv[])
                 std::cout << "{\"error\":\"ParseCmdLineArgs() FAILED, rc = " << rc << "\"}" << std::endl;
             }
             return rc;
-        }
+        }        
         drv->GetandSetData();
         rc = drv->AllocateBuffersAndCopy();
         if(rc != 0)
