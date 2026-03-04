@@ -997,6 +997,10 @@ try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(n < 0 || lda < n)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+    if(n == 0)
+        return HIPSOLVER_STATUS_SUCCESS;
 
     if(workOnDevice && lworkOnDevice)
         CHECK_ROCBLAS_ERROR(
