@@ -5414,8 +5414,7 @@ def _get_schedule_160x128x64_TF32(kernel, useLDSTr, TLDS):
         nglshift = nllshift = 18
 
         opt1 = ScheduleInfo(1, n_mfma, optSchedule, syncCode, nglshift, nllshift)
-        opt1.disableValidation()
-        opt1.pretty_print()
+        opt1.disableValidation(reason="TF32 emulation mode for this schedule variant.")
     elif isTN(kernel) and not useLDSTr and TLDS==1:
         valid, opt = _get_schedule_128x160x64_TF32(kernel, useLDSTr, TLDS)
         if not valid:
