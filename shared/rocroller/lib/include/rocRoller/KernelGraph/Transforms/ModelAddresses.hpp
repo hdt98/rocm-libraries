@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include <rocRoller/CodeGen/LoadStoreTileGenerator.hpp>
 #include <rocRoller/KernelGraph/Transforms/GraphTransform.hpp>
 
@@ -34,17 +36,17 @@ namespace rocRoller
                 Store
             };
 
-            Generator<size_t>
+            std::vector<size_t>
                 getLDSAddressesImpl(KernelGraph&                                     graph,
                                     int                                              tag,
                                     LoadStoreTileGenerator::LoadStoreTileInfo const& info,
                                     LDSDirection                                     direction);
 
             template <typename Op>
-            Generator<size_t> getLDSAddresses(KernelGraph& graph, int tag, Op const& op);
-            void              setup();
-            void              setWorkgroup(uint dim, uint value);
-            void              setWorkitem(uint dim, uint value);
+            std::vector<size_t> getLDSAddresses(KernelGraph& graph, int tag, Op const& op);
+            void                setup();
+            void                setWorkgroup(uint dim, uint value);
+            void                setWorkitem(uint dim, uint value);
 
             ContextPtr                               m_context;
             KernelArguments                          arguments;

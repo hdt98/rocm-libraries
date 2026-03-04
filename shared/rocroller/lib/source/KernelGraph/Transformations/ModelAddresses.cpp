@@ -69,7 +69,7 @@ namespace rocRoller::KernelGraph
         std::memcpy(rawArguments.data() + workitemOffset[dim], &value, sizeof(value));
     }
 
-    Generator<size_t>
+    std::vector<size_t>
         ModelAddresses::getLDSAddressesImpl(KernelGraph&                                     graph,
                                             int                                              tag,
                                             LoadStoreTileGenerator::LoadStoreTileInfo const& info,
@@ -98,10 +98,7 @@ namespace rocRoller::KernelGraph
 
         auto coords = graph.buildTransformer(tag);
 
-        // Set the appropriate coordinate to 0 based on memory type.
-        // WAVE / WAVE_SWIZZLE / WAVE_FROM_GLOBAL use VGPR indexing (loadMacroTileWAVELDSInfo /
-        // storeMacroTileWAVELDSInfo).  VGPR / WAVE_SPLIT / LDS use ElementNumber indexing
-        // (loadMacroTileLDSInfo / storeMacroTileLDSInfo).
+        // Follows code in loadStoreTileGenerator
         if(tile.memoryType == MemoryType::WAVE || tile.memoryType == MemoryType::WAVE_SWIZZLE
            || tile.memoryType == MemoryType::WAVE_FROM_GLOBAL)
         {
@@ -119,7 +116,6 @@ namespace rocRoller::KernelGraph
 
         coords.fillExecutionCoordinates(kernelWorkgroupIndexes, kernelWorkitemIndexes);
 
-        // Use reverse for loads (downstream: LDS -> registers), forward for stores (upstream: registers -> LDS)
         auto index = (direction == LDSDirection::Load) ? coords.reverse({ldsTag})[0]
                                                        : coords.forward({ldsTag})[0];
 
@@ -135,6 +131,7 @@ namespace rocRoller::KernelGraph
 
         setWorkgroup(0, 0);
 
+        std::vector<size_t> addresses;
         for(uint wi = 0; wi < product(m_context->kernel()->workgroupSize()); ++wi)
         {
             setWorkitem(0, wi);
@@ -157,12 +154,13 @@ namespace rocRoller::KernelGraph
                 },
                 offsetValue);
 
-            co_yield offset;
+            addresses.push_back(offset);
         }
+        return addresses;
     }
 
     template <typename Op>
-    Generator<size_t> ModelAddresses::getLDSAddresses(KernelGraph& graph, int tag, Op const& op)
+    std::vector<size_t> ModelAddresses::getLDSAddresses(KernelGraph& graph, int tag, Op const& op)
     {
         constexpr bool isLoad    = std::is_same_v<Op, LoadLDSTile>;
         constexpr auto direction = isLoad ? LDSDirection::Load : LDSDirection::Store;
@@ -182,12 +180,12 @@ namespace rocRoller::KernelGraph
             info = tileGenerator.getStoreLDSTileInfo(tag, op);
         }
 
-        co_yield getLDSAddressesImpl(graph, tag, info, direction);
+        return getLDSAddressesImpl(graph, tag, info, direction);
     }
 
-    template Generator<size_t>
+    template std::vector<size_t>
         ModelAddresses::getLDSAddresses(KernelGraph&, int, LoadLDSTile const&);
-    template Generator<size_t>
+    template std::vector<size_t>
         ModelAddresses::getLDSAddresses(KernelGraph&, int, StoreLDSTile const&);
 
     KernelGraph ModelAddresses::apply(KernelGraph const& original)
@@ -202,10 +200,7 @@ namespace rocRoller::KernelGraph
 
         for(const auto node : allNodes)
         {
-            auto modelAddresses = [&](auto&& generator) {
-                const auto addresses
-                    = std::forward<decltype(generator)>(generator).template to<std::vector>();
-
+            auto modelAddresses = [&](std::vector<size_t> addresses) {
                 if(addresses.empty())
                     return;
 

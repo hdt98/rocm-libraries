@@ -31,40 +31,37 @@ namespace rocRoller
 
         void Transformer::fillExecutionCoordinates(ContextPtr context)
         {
-            if(context)
+            AssertFatal(context);
+
+            auto kernel = context->kernel();
+
+            auto const& kernelWorkgroupIndexes = kernel->workgroupIndex();
+            auto const& kernelWorkitemIndexes  = kernel->workitemIndex();
+
+            std::array<Expression::ExpressionPtr, 3> wgExprs, wiExprs;
+            for(size_t i = 0; i < 3; i++)
             {
-                auto kernel = context->kernel();
+                wgExprs[i]
+                    = kernelWorkgroupIndexes[i] ? kernelWorkgroupIndexes[i]->expression() : nullptr;
+                wiExprs[i]
+                    = kernelWorkitemIndexes[i] ? kernelWorkitemIndexes[i]->expression() : nullptr;
+            }
 
-                auto const& kernelWorkgroupIndexes = kernel->workgroupIndex();
-                auto const& kernelWorkitemIndexes  = kernel->workitemIndex();
+            fillExecutionCoordinates(wgExprs, wiExprs);
 
-                std::array<Expression::ExpressionPtr, 3> wgExprs, wiExprs;
-                for(size_t i = 0; i < 3; i++)
+            // TODO Remove this when Workgroup removed from RegisterTagManager
+            for(auto const& tag : m_graph->getNodes())
+            {
+                auto dimension = m_graph->getNode(tag);
+                if(std::holds_alternative<Workgroup>(dimension))
                 {
-                    wgExprs[i] = kernelWorkgroupIndexes[i] ? kernelWorkgroupIndexes[i]->expression()
-                                                           : nullptr;
-                    wiExprs[i] = kernelWorkitemIndexes[i] ? kernelWorkitemIndexes[i]->expression()
-                                                          : nullptr;
+                    auto dim = std::get<Workgroup>(dimension).dim;
+                    context->registerTagManager()->addRegister(tag, kernelWorkgroupIndexes.at(dim));
                 }
-
-                fillExecutionCoordinates(wgExprs, wiExprs);
-
-                // TODO Remove this when Workgroup removed from RegisterTagManager
-                for(auto const& tag : m_graph->getNodes())
+                if(std::holds_alternative<Workitem>(dimension))
                 {
-                    auto dimension = m_graph->getNode(tag);
-                    if(std::holds_alternative<Workgroup>(dimension))
-                    {
-                        auto dim = std::get<Workgroup>(dimension).dim;
-                        context->registerTagManager()->addRegister(tag,
-                                                                   kernelWorkgroupIndexes.at(dim));
-                    }
-                    if(std::holds_alternative<Workitem>(dimension))
-                    {
-                        auto dim = std::get<Workitem>(dimension).dim;
-                        context->registerTagManager()->addRegister(tag,
-                                                                   kernelWorkitemIndexes.at(dim));
-                    }
+                    auto dim = std::get<Workitem>(dimension).dim;
+                    context->registerTagManager()->addRegister(tag, kernelWorkitemIndexes.at(dim));
                 }
             }
         }
