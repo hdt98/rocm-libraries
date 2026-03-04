@@ -754,6 +754,36 @@ all_gather_matmul_prediction_result_t predict_latency(
   double weighted_gemm_lat_us = stage_gemm_latency_us(
       profile, gemm_sub, hardware, config);
 
+  // ── 6b. num_warps and group_size_m correction ─────────────────────
+  //
+  // num_warps: more warps per WG means better memory latency hiding in
+  // the Triton kernel.  nw=8 hides ~13% more latency than nw=4 based on
+  // kernel trace measurements.  Origami's core GEMM model doesn't model
+  // warp-level latency hiding, so we apply a post-hoc correction.
+  //
+  // group_size_m: controls the workgroup traversal order along M.  gm=1
+  // means column-first traversal → each B-matrix column tile stays in L2
+  // across all M-tiles, maximizing reuse.  Higher gm values stride across
+  // M, causing more L2 evictions of B.  compute_tile_latency() overrides
+  // workgroup_mapping internally, so we apply this correction here.
+  double nw = static_cast<double>(config.num_warps);
+  double nw_correction = 1.0 / (1.0 + 0.06 * (nw - 4.0) / 4.0);
+
+  double gm = std::min(static_cast<double>(config.group_size_m), 8.0);
+  double gm_correction = 1.0 - 0.04 * (1.0 - gm / 8.0);
+
+  weighted_gemm_lat_us *= nw_correction * gm_correction;
+
+  // Tile-shape (bm) correction: the per-tile GEMM latency has a systematic
+  // bias with the M-dimension of the tile.  bm=64 tiles are over-predicted
+  // (~+10%) and bm=256 tiles are under-predicted (~-11%).  This likely
+  // stems from the GEMM model's memory traffic or instruction scheduling
+  // not perfectly scaling with bm.  Apply a log-linear correction anchored
+  // at bm=128 (where the model is well-calibrated).
+  constexpr double bm_corr_k = 0.07;
+  double bm_log_ratio = std::log2(static_cast<double>(bm) / 128.0);
+  weighted_gemm_lat_us *= 1.0 + bm_corr_k * bm_log_ratio;
+
   // ── 7. Grid geometry ──────────────────────────────────────────────
   // Total WGs in the kernel launch grid.  Stage 0 uses fsf fetchers,
   // all other stages use nf.  Each stage has gemm_tiles_per_stage GEMM WGs.
@@ -767,14 +797,125 @@ all_gather_matmul_prediction_result_t predict_latency(
   // ── 8. Kernel time estimate ───────────────────────────────────────
   // CU-work-queue model: total WG microseconds / N_CU × scheduling_factor.
   // Uses weighted-average fetch time across stage 0 and later stages.
+  //
+  // GEMM WG time: use the wavefront-weighted tile latency which accounts
+  // for resource contention (reduced CUs, L2 pressure) across ramp-up,
+  // steady, and drain phases — rather than the unconstrained gemm_wg_us.
+  //
+  // Pipeline overlap discount: in stages > 0, fetch and GEMM WGs run
+  // concurrently on separate CUs.  The CU-work-queue model sums their
+  // work as if serial, double-counting the overlap.  We discount the
+  // later-stage fetch time to reflect that fetch occurs in parallel with
+  // GEMM and only adds net time when it's the bottleneck.
+  constexpr double overlap_discount = 0.30;
+  double discounted_fetch_rest_us = fetch_us_rest * (1.0 - overlap_discount);
+
   double avg_fetch_us_num = static_cast<double>(fsf) * fetch_us_stg0 +
-                            static_cast<double>(nf * rest_count) * fetch_us_rest;
+                            static_cast<double>(nf * rest_count) * discounted_fetch_rest_us;
   double avg_fetch_us = avg_fetch_us_num /
                         std::max(static_cast<double>(total_fetch_wgs), 1.0);
 
+  // Adaptive scheduling factor: the base scheduling_factor (4.5) was
+  // calibrated at a reference grid density.  Larger grids with more
+  // waves of WGs have better GPU utilization — the HW scheduler keeps
+  // CUs busy more efficiently when there are many WGs to dispatch.
+  // We apply a correction: sf_eff = sf_base × (ref_waves / waves)^alpha,
+  // clamped to [sf_floor, sf_base].
+  //
+  // We exclude excess first-stage fetchers (fsf - nf) from the effective
+  // grid because they're serial startup overhead, not parallel work that
+  // improves GPU utilization.  With fsf=N_CU, stage 0 has a full wave
+  // of pure fetch before any GEMM starts — this serial phase shouldn't
+  // reduce the scheduling factor.
+  //
+  // Reference point: ~3 waves (where 4.5 was originally calibrated).
+  // alpha=0.35 gives a moderate correction that doesn't over-swing.
+  std::size_t excess_fsf = (fsf > nf) ? (fsf - nf) : 0;
+  std::size_t effective_grid = grid_size - excess_fsf;
+  double num_waves = static_cast<double>(effective_grid) /
+                     std::max(static_cast<double>(num_cus), 1.0);
+  constexpr double ref_waves = 3.0;
+  constexpr double alpha     = 0.35;
+  constexpr double sf_floor  = 1.5;
+  double sf_correction = (num_waves > ref_waves)
+      ? std::pow(ref_waves / num_waves, alpha)
+      : 1.0;
+  double effective_sf = std::max(network.scheduling_factor * sf_correction,
+                                 sf_floor);
+
   double est_kernel_ms = estimate_kernel_time_ms(
-      total_gemm_wgs, gemm_wg_us, total_fetch_wgs, avg_fetch_us,
-      num_cus, network.scheduling_factor);
+      total_gemm_wgs, weighted_gemm_lat_us, total_fetch_wgs, avg_fetch_us,
+      num_cus, effective_sf);
+
+  // ── 8b. Fetch/compute CU imbalance correction ─────────────────────
+  //
+  // The CU-work-queue model sums all WG-microseconds and divides by N_CU,
+  // assuming work is fungible across CUs.  But fetch and GEMM WGs are
+  // distinct work types — fetcher CUs can't do GEMM and vice versa.
+  // When nf is large relative to N_CU, the model under-predicts because
+  // it distributes GEMM work across all 304 CUs, whereas in reality only
+  // (N_CU - nf) CUs are doing GEMM.
+  //
+  // The correction grows linearly beyond a threshold (nf > 50% of CUs):
+  //   penalty = 1 + k * max(0, nf/N_CU - threshold)
+  // Calibrated from MI300X traces: k=0.95 targets the 24% average
+  // under-prediction at nf=256 (nf_ratio=0.84).
+  double nf_ratio = static_cast<double>(nf) /
+                    std::max(static_cast<double>(num_cus), 1.0);
+  constexpr double nf_threshold = 0.5;
+  constexpr double nf_penalty_k = 0.95;
+  double nf_excess = std::max(nf_ratio - nf_threshold, 0.0);
+  // Pipeline overlap damps the CU imbalance: with more stages, fetch and
+  // GEMM phases overlap better, partially compensating for the non-fungible
+  // CU split.  Decay the penalty as stages^-0.20 (fs=1: full, fs=8: 0.66×).
+  double fs_damping = 1.0 / std::pow(
+      static_cast<double>(std::max(num_stages, std::size_t{1})), 0.20);
+  double imbalance_penalty = 1.0 + nf_penalty_k * fs_damping * nf_excess;
+  est_kernel_ms *= imbalance_penalty;
+
+  // ── 8c. Serial stage-0 startup penalty ──────────────────────────────
+  //
+  // When fsf ≥ N_CU, stage 0 is a full wave of pure fetch — all CUs
+  // fetch data, and GEMM WGs can't start until the fetch wave completes.
+  // This serial overhead is poorly captured by the CU-work-queue model
+  // which amortizes it across all CUs and stages.  We add the per-WG
+  // fetch time of stage 0 (≈ one wave of pure fetch) scaled by the
+  // serial fraction.
+  double serial_frac = std::max(0.0,
+      (static_cast<double>(fsf) - 0.5 * static_cast<double>(num_cus)) /
+      (0.5 * static_cast<double>(num_cus)));
+  serial_frac = std::min(serial_frac, 1.0);
+  double serial_startup_ms = serial_frac * fetch_us_stg0 / 1e3;
+  est_kernel_ms += serial_startup_ms;
+
+  // ── 8d. Within-stage GEMM under-utilization penalty ────────────────
+  //
+  // When gemm_tiles_per_stage < available GEMM CUs, some CUs sit idle
+  // within each stage.  The CU-work-queue model averages across all
+  // stages and doesn't see this per-stage waste.  This particularly
+  // affects large tiles (256×256) where only ~64 GEMM tiles per stage
+  // compete for ~176 GEMM CUs (36% utilization → 64% idle).
+  std::size_t gemm_cus_avail = (num_cus > nf) ? (num_cus - nf) : 1;
+  double stage_util = std::min(
+      static_cast<double>(gemm_tiles_per_stage) /
+      static_cast<double>(gemm_cus_avail), 1.0);
+  constexpr double util_threshold = 0.5;
+  constexpr double util_penalty_k = 0.70;
+  double util_penalty = (stage_util < util_threshold)
+      ? 1.0 + util_penalty_k * (util_threshold - stage_util)
+      : 1.0;
+  est_kernel_ms *= util_penalty;
+
+  // ── 8e. Low-fs serialization correction ─────────────────────────────
+  //
+  // With few pipeline stages (fs=1-2), the kernel has limited opportunity
+  // to overlap fetch and GEMM work across stages.  The CU-work-queue
+  // model assumes perfect interleaving of all WGs, but in reality the
+  // fetch→GEMM dependency within each stage creates serial phases that
+  // are under-counted.  The effect decays exponentially with more stages.
+  double low_fs_correction = 0.10 *
+      std::exp(-1.5 * static_cast<double>(num_stages - 1));
+  est_kernel_ms *= (1.0 + low_fs_correction);
 
   // ── 9. Pipeline estimate (alternative model) ──────────────────────
   // Simple pipeline model for cross-checking:
