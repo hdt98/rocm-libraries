@@ -249,6 +249,18 @@ void trtri_getError(const hipsolverHandle_t   handle,
     // using frobenius norm
     if(hInfoRes[0][0] == 0)
     {
+        // for unit diagonal, trtri does not define the output diagonal values,
+        // so zero them out in both results before comparing
+        // specifically cuSOLVER does not mention if they reference or do not reference the diagonal values
+        if(diag == HIPSOLVER_DIAG_UNIT)
+        {
+            for(I i = 0; i < n; i++)
+            {
+                hA[0][i + i * lda]    = T(0);
+                hARes[0][i + i * lda] = T(0);
+            }
+        }
+
         *max_err = norm_error('F', n, n, lda, hA[0], hARes[0]);
     }
 }
