@@ -909,7 +909,7 @@ hipsolverStatus_t hipsolverDnXtrtri_bufferSize(hipsolverDnHandle_t handle,
                                                hipsolverDiagType_t diag,
                                                int64_t             n,
                                                hipDataType         dataTypeA,
-                                               const void*         A,
+                                               void*               A,
                                                int64_t             lda,
                                                size_t*             lworkOnDevice,
                                                size_t*             lworkOnHost)
