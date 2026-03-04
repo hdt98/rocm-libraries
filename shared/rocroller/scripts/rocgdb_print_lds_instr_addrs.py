@@ -1,6 +1,7 @@
-import gdb
 import os
 import re
+
+import gdb
 
 FUNCTION = os.environ["KERNEL_NAME"]
 

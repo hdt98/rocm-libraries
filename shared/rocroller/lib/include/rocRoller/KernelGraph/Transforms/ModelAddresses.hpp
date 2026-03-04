@@ -43,8 +43,8 @@ namespace rocRoller
             template <typename Op>
             Generator<size_t> getLDSAddresses(KernelGraph& graph, int tag, Op const& op);
             void              setup();
-            void              setWorkgroup(uint offset, uint value);
-            void              setWorkitem(uint offset, uint value);
+            void              setWorkgroup(uint dim, uint value);
+            void              setWorkitem(uint dim, uint value);
 
             ContextPtr                               m_context;
             KernelArguments                          arguments;

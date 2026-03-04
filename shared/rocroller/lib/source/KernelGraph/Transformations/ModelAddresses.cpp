@@ -59,14 +59,14 @@ namespace rocRoller::KernelGraph
         runtimeArguments = RuntimeArguments(rawArguments.data(), rawArguments.size());
     }
 
-    void ModelAddresses::setWorkgroup(uint offset, uint value)
+    void ModelAddresses::setWorkgroup(uint dim, uint value)
     {
-        std::memcpy(rawArguments.data() + workgroupOffset[offset], &value, sizeof(value));
+        std::memcpy(rawArguments.data() + workgroupOffset[dim], &value, sizeof(value));
     }
 
-    void ModelAddresses::setWorkitem(uint offset, uint value)
+    void ModelAddresses::setWorkitem(uint dim, uint value)
     {
-        std::memcpy(rawArguments.data() + workitemOffset[offset], &value, sizeof(value));
+        std::memcpy(rawArguments.data() + workitemOffset[dim], &value, sizeof(value));
     }
 
     Generator<size_t>
@@ -117,7 +117,7 @@ namespace rocRoller::KernelGraph
             coords.setCoordinate(elemYTag, Expression::literal(0));
         }
 
-        coords.fillExecutionCoordinates(nullptr, kernelWorkgroupIndexes, kernelWorkitemIndexes);
+        coords.fillExecutionCoordinates(kernelWorkgroupIndexes, kernelWorkitemIndexes);
 
         // Use reverse for loads (downstream: LDS -> registers), forward for stores (upstream: registers -> LDS)
         auto index = (direction == LDSDirection::Load) ? coords.reverse({ldsTag})[0]
@@ -167,8 +167,8 @@ namespace rocRoller::KernelGraph
         constexpr bool isLoad    = std::is_same_v<Op, LoadLDSTile>;
         constexpr auto direction = isLoad ? LDSDirection::Load : LDSDirection::Store;
 
-        auto graphPtr = std::make_shared<KernelGraph>(graph);
-        // Use nullptr context to avoid modifying the real tag manager during modeling
+        // Use nullptr context to avoid modifying the real tag manager during modeling.
+        auto                   graphPtr = std::make_shared<KernelGraph>(graph);
         LoadStoreTileGenerator tileGenerator(
             graphPtr, nullptr, m_context->kernel()->max_flat_workgroup_size());
 

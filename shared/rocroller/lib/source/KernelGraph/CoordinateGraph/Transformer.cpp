@@ -47,7 +47,7 @@ namespace rocRoller
                                                           : nullptr;
                 }
 
-                fillExecutionCoordinates(nullptr, wgExprs, wiExprs);
+                fillExecutionCoordinates(wgExprs, wiExprs);
 
                 // TODO Remove this when Workgroup removed from RegisterTagManager
                 for(auto const& tag : m_graph->getNodes())
@@ -70,7 +70,6 @@ namespace rocRoller
         }
 
         void Transformer::fillExecutionCoordinates(
-            ContextPtr                                      context,
             std::array<Expression::ExpressionPtr, 3> const& kernelWorkgroupIndexes,
             std::array<Expression::ExpressionPtr, 3> const& kernelWorkitemIndexes)
         {
