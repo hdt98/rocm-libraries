@@ -1674,22 +1674,6 @@ void rocfft_plan_t::GatherScatterSingleDevicePlan(NodeMetaData& rootPlanData)
         }
     }
 
-    // Allocate another temp buf if FFT is not-in-place and outfield was specified
-    // TODO: this only needs to be done if there are multiple bricks in the output field.
-    const auto& outputLength
-        = rootPlanData.outputLength.empty() ? rootPlanData.length : rootPlanData.outputLength;
-    if(rootPlanData.placement == rocfft_placement_notinplace && !desc.outFields.empty())
-    {
-        const auto   out_elem_size = element_size(precision, desc.outArrayType);
-        const size_t out_elem_count
-            = compute_ptrdiff(outputLength, desc.outStrides, batch, desc.outDist);
-        fftOutBuf = std::make_shared<TempBufferLease>(tempBuffers,
-                                                      local_comm_rank,
-                                                      rocfft_location_t::rank0_current_device(),
-                                                      out_elem_count,
-                                                      out_elem_size);
-    }
-
     std::vector<size_t> gatherIndexes;
     for(const auto& inField : desc.inFields)
     {
@@ -1726,10 +1710,25 @@ void rocfft_plan_t::GatherScatterSingleDevicePlan(NodeMetaData& rootPlanData)
     else
         execPlan->inputPtr = BufferPtr::user_input(0, 0);
 
-    if(execPlan->rootPlan->placement == rocfft_placement_inplace)
-        execPlan->outputPtr = execPlan->inputPtr;
-    else if(fftOutBuf)
+    // Allocate another temp buf if FFT is not-in-place and outfield was specified
+    // TODO: this only needs to be done if there are multiple bricks in the output field.
+    const auto& outputLength
+        = rootPlanData.outputLength.empty() ? rootPlanData.length : rootPlanData.outputLength;
+    if(rootPlanData.placement == rocfft_placement_notinplace)
+    {
+        const auto   out_elem_size = element_size(precision, desc.outArrayType);
+        const size_t out_elem_count
+            = compute_ptrdiff(outputLength, desc.outStrides, batch, desc.outDist);
+        fftOutBuf           = std::make_shared<TempBufferLease>(tempBuffers,
+                                                      local_comm_rank,
+                                                      rocfft_location_t::rank0_current_device(),
+                                                      out_elem_count,
+                                                      out_elem_size);
         execPlan->outputPtr = BufferPtr::temp(fftOutBuf->data());
+    }
+    else
+        execPlan->outputPtr = execPlan->inputPtr;
+
     auto scatterSrcBuf = execPlan->outputPtr;
     auto fftIdx        = AddMultiPlanItem(std::move(execPlan), gatherIndexes);
 
