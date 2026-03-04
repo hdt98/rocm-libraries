@@ -14,6 +14,9 @@ GlobalParameters:
   EnqueuesPerSync: 1
   MinKForGSU: 1
   Architecture: gfx1250
+  CpuThreads: 1
+  ROCmAgentEnumeratorPath: rocm_agent_enumerator
+  ISA: [[12, 5, 0]]
 
 BenchmarkProblems:
   #######################################
