@@ -47,6 +47,13 @@ inline std::string& GetLastPrintedSolutionName()
     return last_solution;
 }
 
+/// Get the last printed solver ID
+inline uint64_t& GetLastPrintedSolverId()
+{
+    thread_local uint64_t last_solver_id = 0;
+    return last_solver_id;
+}
+
 /// Check if a kernel name indicates it's a transpose or transformation kernel
 inline bool IsTransposeOrTransformKernel(const std::string& kernel_name)
 {
@@ -442,16 +449,21 @@ inline bool IsLoggingKernel(uint64_t log_level, bool is_tuning)
 }
 
 /// Log solution name if appropriate for the current log level
-/// Only prints if the solution name has changed since the last call
+/// Only prints if the solution name or solver_id has changed since the last call
 inline void LogSolutionName(const std::string& solution_name, uint64_t solver_id, uint64_t log_level)
 {
     const bool is_tuning_mode = GetKernelTuningMode();
     const bool logging_enabled = IsLoggingKernel(log_level, is_tuning_mode);
-    if(logging_enabled && !solution_name.empty())
+    
+    // Always update tracking variables when solution/solver changes, regardless of logging state
+    // This prevents stale data from appearing when logging state changes
+    if(!solution_name.empty() && logging_enabled)
     {
         auto& last_solution = GetLastPrintedSolutionName();
-        // Only print if solution name has changed
-        if(solution_name != last_solution)
+        auto& last_solver_id = GetLastPrintedSolverId();
+        
+        // Check if solution name or solver_id has changed
+        if(solution_name != last_solution || solver_id != last_solver_id)
         {
             // Flush previous solution's JSON data
             FlushJsonAccumulator();
@@ -461,7 +473,10 @@ inline void LogSolutionName(const std::string& solution_name, uint64_t solver_id
             data.solution_name = solution_name;
             data.solver_id = solver_id;
             data.phase = is_tuning_mode ? "tuning" : "execution";
+            
+            // Always update tracking to prevent stale state
             last_solution = solution_name;
+            last_solver_id = solver_id;
         }
     }
 }
