@@ -253,6 +253,18 @@ class heuristics_database_t {
   void add_entry(const heuristic_key_t& key, const heuristic_params_t& params);
 
   /**
+   * @brief Return true if the database has a hand-optimized entry for the given (arch, dtype,
+   * layout, MT).
+   */
+  bool has_hand_optimized_entry(hardware_t::architecture_t arch,
+                                data_type_t mi_dtype,
+                                transpose_t transA,
+                                transpose_t transB,
+                                size_t mt_m,
+                                size_t mt_n,
+                                size_t mt_k) const;
+
+  /**
    * @brief Get the global heuristics database instance.
    */
   static heuristics_database_t& get_instance();
