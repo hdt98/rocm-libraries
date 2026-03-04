@@ -276,18 +276,21 @@ workgroup_mapping_t predict_workgroup_mapping(const problem_t& problem,
   // Build candidate list
   size_t wgm_cap = std::min(grid_n, numWGsPerXCD / 2);
   std::vector<size_t> candidates;
-  std::set<size_t> cset;
+  candidates.reserve(wgm_cap);
   for (size_t v : {1, 4, 6})
-    if (v <= wgm_cap) cset.insert(v);
+    if (v <= wgm_cap) candidates.push_back(v);
   for (size_t i = 1; i * i <= wgm_cap; ++i) {
     if (wgm_cap % i == 0) {
-      cset.insert(i);
-      cset.insert(wgm_cap / i);
+      candidates.push_back(i);
+      candidates.push_back(wgm_cap / i);
     }
   }
-  candidates.assign(cset.begin(), cset.end());
   if (candidates.empty())
     return {0, out_wgmxcc, 1};
+
+  std::sort(candidates.begin(), candidates.end());
+  auto last = std::unique(candidates.begin(), candidates.end());
+  candidates.erase(last, candidates.end());
 
   // Evaluate L2 cost for last XCD in the first timestep
   const size_t total = numMTs;
