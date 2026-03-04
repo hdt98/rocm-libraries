@@ -1,3 +1,5 @@
+// Copyright Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
 
 #include <rocRoller/KernelGraph/ControlGraph/DataDependenceDAG.hpp>
 #include <rocRoller/KernelGraph/ControlGraph/DataDependenceDAG_detail.hpp>
