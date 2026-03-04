@@ -178,7 +178,8 @@ bool hardware_t::has_MALL() const {
     case architecture_t::gfx950:
     case architecture_t::gfx1201:
     case architecture_t::gfx1100:
-    case architecture_t::gfx1151: return true;
+    case architecture_t::gfx1151:
+    case architecture_t::gfx1250: return true;
     case architecture_t::gfx1150:
     case architecture_t::gfx1152:
     case architecture_t::gfx1153: return false;
