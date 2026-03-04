@@ -1588,8 +1588,8 @@ TEST_F(ConvTraitsTest, ConvFwdTraitsExtraction)
             ck::half_t,                                // AComputeDataType
             ck::half_t,                                // BComputeDataType
             false,                                     // DirectLoad
-            1,                                        // NumGroupsToMerge
-            ck::DeviceArch::All>;                     // DeviceArch
+            1,                                         // NumGroupsToMerge
+            ck::DeviceArch::All>;                      // DeviceArch
 
     // Use ConvTraitsTmpl to extract compile-time information
     const auto traits = ck_tile::reflect::conv::instance_to_conv_traits<DeviceInstance>();

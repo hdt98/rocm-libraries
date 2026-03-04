@@ -65,11 +65,11 @@ TEST_F(MatchesWithCompilationTargetTest, DeviceArch_Gfx950_matches_compilation_t
     const auto& device_name = ck::get_device_name();
     if(device_name == "gfx950")
     {
-      EXPECT_TRUE(result);
+        EXPECT_TRUE(result);
     }
     else
     {
-      EXPECT_FALSE(result);
+        EXPECT_FALSE(result);
     }
 }
 
@@ -85,7 +85,7 @@ TEST_F(IsSupportedTest, DeviceArch_Gfx950)
     {
         EXPECT_TRUE(is_supported(DeviceArch::Gfx950));
     }
-    else 
+    else
     {
         EXPECT_FALSE(is_supported(DeviceArch::Gfx950));
     }

@@ -128,7 +128,7 @@ template <int NDimSpatial                  = 2,
           ck::BlockGemmPipelineScheduler BlkGemmPipeSched =
               ck::BlockGemmPipelineScheduler::Intrawave,
           ck::BlockGemmPipelineVersion BlkGemmPipelineVer = ck::BlockGemmPipelineVersion::v1,
-          ck::DeviceArch Arch = ck::DeviceArch::All>
+          ck::DeviceArch Arch                             = ck::DeviceArch::All>
 using DeviceInstanceForTests_V3 =
     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<
         NDimSpatial,
