@@ -34,6 +34,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 
 namespace rocisa
 {
@@ -340,6 +341,30 @@ namespace rocisa
         return module;
     }
 
+    // Compute magic number and shift for unsigned integer division by a constant divisor.
+    // Returns {magic, shift} where: quotient = mulhu(dividend, magic) >> shift
+    inline std::pair<unsigned int, int> computeUnsignedDivisionMagic(unsigned int divisor)
+    {
+        int l = 0;
+        {
+            unsigned int t = 1;
+            while(t < divisor)
+            {
+                t <<= 1;
+                l++;
+            }
+        }
+        unsigned long long m_low  = (1ULL << (32 + l)) / divisor;
+        unsigned long long m_high = ((1ULL << (32 + l)) + (1ULL << l)) / divisor;
+        while(m_low / 2 < m_high / 2 && l > 0)
+        {
+            m_low /= 2;
+            m_high /= 2;
+            l--;
+        }
+        return {static_cast<unsigned int>(m_high), l};
+    }
+
     // only used for loop unroll and GlobalSplitU
     // doRemainder==0 : compute quotient only
     // doRemainder==1 : compute quotient and remainder
@@ -420,33 +445,32 @@ namespace rocisa
             int  tmpSgprIdx = tmpSgprRes->idx;
             auto tmpSgpr    = sgpr(tmpSgprIdx);
             auto tmpSgpr1   = sgpr(tmpSgprIdx + 1);
-            auto tmp2Sgpr   = sgpr(tmpSgprIdx, 2);
-            /*
-            if divisor == 30:
-                shift = 32+2
-            elif divisor >= 14:
-                shift = 32+4
-            elif divisor >= 6:
-                shift = 32+3
-            elif divisor >= 5:
-                shift = 32+2
-            elif divisor >= 3:
-                shift = 32+1
-            */
-            int shift   = 32 + 1;
-            int magic   = ((1ULL << shift) / divisor) + 1;
-            int magicHi = magic >> 16;
-            int magicLo = magic & 0xFFFF;
 
-            module->addT<SMovB32>(tmpSgpr1, 0, "STATIC_DIV: divisor=" + std::to_string(divisor));
-            module->addT<SMulI32>(tmpSgpr, magicHi, dRegSgpr, "tmp1 = dividend * magic hi");
-            module->addT<SLShiftLeftB64>(tmp2Sgpr, 16, tmp2Sgpr, "left shift 16 bits");
-            module->addT<SMulI32>(qRegSgpr, dRegSgpr, magicLo, "tmp0 = dividend * magic lo");
-            module->addT<SAddU32>(tmpSgpr, qRegSgpr, tmpSgpr, "add lo");
-            module->addT<SAddCU32>(tmpSgpr1, tmpSgpr1, 0, "add hi");
-            module->addT<SLShiftRightB64>(
-                tmp2Sgpr, shift, tmp2Sgpr, "tmp1 = (dividend * magic) << shift");
-            module->addT<SMovB32>(qRegSgpr, tmpSgpr, "quotient");
+            auto [magic, shift]
+                = computeUnsignedDivisionMagic(static_cast<unsigned int>(divisor));
+
+            module->addT<SMovB32>(tmpSgpr,
+                                  static_cast<int>(magic),
+                                  "STATIC_DIV: magic for divisor=" + std::to_string(divisor));
+            module->addT<SMulHIU32>(tmpSgpr1, dRegSgpr, tmpSgpr, "hi(dividend * magic)");
+
+            if(shift > 0)
+            {
+                module->addT<SLShiftRightB32>(qRegSgpr,
+                                              shift,
+                                              tmpSgpr1,
+                                              qRegSgpr->toString() + " = "
+                                                  + dRegSgpr->toString() + " / "
+                                                  + std::to_string(divisor));
+            }
+            else
+            {
+                module->addT<SMovB32>(qRegSgpr,
+                                      tmpSgpr1,
+                                      qRegSgpr->toString() + " = "
+                                          + dRegSgpr->toString() + " / "
+                                          + std::to_string(divisor));
+            }
 
             if(doRemainder)
             {
@@ -514,32 +538,21 @@ namespace rocisa
             int  tmpSgprIdx = tmpSgprRes->idx;
             auto tmpSgpr    = sgpr(tmpSgprIdx);
             auto tmpSgpr1   = sgpr(tmpSgprIdx + 1);
-            auto tmp2Sgpr   = sgpr(tmpSgprIdx, 2);
-            /*
-            if divisor == 30:
-                shift = 32+2
-            elif divisor >= 14:
-                shift = 32+4
-            elif divisor >= 6:
-                shift = 32+3
-            elif divisor >= 5:
-                shift = 32+2
-            elif divisor >= 3:
-                shift = 32+1
-            */
-            int shift   = 32 + 1;
-            int magic   = ((1ULL << shift) / divisor) + 1;
-            int magicHi = magic >> 16;
-            int magicLo = magic & 0xFFFF;
 
-            module->addT<SMovB32>(tmpSgpr1, 0, "STATIC_DIV: divisor=" + std::to_string(divisor));
-            module->addT<SMulI32>(tmpSgpr, magicHi, dRegSgpr, "tmp1 = dividend * magic hi");
-            module->addT<SLShiftLeftB64>(tmp2Sgpr, 16, tmp2Sgpr, "left shift 16 bits");
-            module->addT<SMulI32>(qRegSgpr, dRegSgpr, magicLo, "tmp0 = dividend * magic lo");
-            module->addT<SAddU32>(tmpSgpr, qRegSgpr, tmpSgpr, "add lo");
-            module->addT<SAddCU32>(tmpSgpr1, tmpSgpr1, 0, "add hi");
-            module->addT<SLShiftRightB64>(tmp2Sgpr, shift, tmp2Sgpr, "tmp0 = quotient");
-            module->addT<SMulI32>(tmpSgpr1, tmpSgpr, divisor, "tmp1 = quotient * divisor");
+            auto [magic, shift]
+                = computeUnsignedDivisionMagic(static_cast<unsigned int>(divisor));
+
+            module->addT<SMovB32>(tmpSgpr,
+                                  static_cast<int>(magic),
+                                  "STATIC_DIV: magic for divisor=" + std::to_string(divisor));
+            module->addT<SMulHIU32>(tmpSgpr1, dRegSgpr, tmpSgpr, "hi(dividend * magic)");
+
+            if(shift > 0)
+                module->addT<SLShiftRightB32>(tmpSgpr, shift, tmpSgpr1, "quotient");
+            else
+                module->addT<SMovB32>(tmpSgpr, tmpSgpr1, "quotient");
+
+            module->addT<SMulI32>(tmpSgpr1, tmpSgpr, divisor, "quotient * divisor");
             module->addT<SCmpLgU32>(
                 tmpSgpr1, dRegSgpr, "if (quotient * divisor != dividend), result+=1");
             module->addT<SAddCU32>(
@@ -574,46 +587,24 @@ namespace rocisa
         {
             auto qRegSgpr = sgpr(qReg);
 
-            if(!tmpSgprRes || tmpSgprRes->size < 3)
+            if(!tmpSgprRes || tmpSgprRes->size < 2)
             {
-                throw std::runtime_error("Invalid tmpSgprRes, must be at least 3");
+                throw std::runtime_error("Invalid tmpSgprRes, must be at least 2");
             }
             int  tmpSgprIdx = tmpSgprRes->idx;
             auto tmpSgpr    = sgpr(tmpSgprIdx);
             auto tmpSgpr1   = sgpr(tmpSgprIdx + 1);
-            auto tmpSgpr2   = sgpr(tmpSgprIdx + 2);
-            auto tmp2Sgpr   = sgpr(tmpSgprIdx, 2);
-            /*
-            if divisor == 30:
-                shift = 32+2
-            elif divisor >= 14:
-                shift = 32+4
-            elif divisor >= 7:
-                shift = 32+3
-            elif divisor >= 6:
-                shift = 32+2 # this was 32+3 but divisor hex didn't fit into 32 bits
-            elif divisor >= 5:
-                shift = 32+2
-            elif divisor >= 3:
-                shift = 32+1
-            */
-            int shift = 32 + 1;
-            int magic = ((1ULL << shift) / divisor) + 1;
 
-            if(magic <= 64 && magic >= -16)
-            {
-                module->addT<SMulHIU32>(tmpSgpr1, dRegSgpr, magic, dComment);
-                module->addT<SMulI32>(tmpSgpr, dRegSgpr, magic, dComment);
-            }
+            auto [magic, shift]
+                = computeUnsignedDivisionMagic(static_cast<unsigned int>(divisor));
+
+            module->addT<SMovB32>(tmpSgpr, static_cast<int>(magic), dComment);
+            module->addT<SMulHIU32>(tmpSgpr1, dRegSgpr, tmpSgpr, dComment);
+
+            if(shift > 0)
+                module->addT<SLShiftRightB32>(qRegSgpr, shift, tmpSgpr1, dComment);
             else
-            {
-                module->addT<SMovB32>(tmpSgpr2, magic, dComment);
-                module->addT<SMulHIU32>(tmpSgpr1, dRegSgpr, tmpSgpr2, dComment);
-                module->addT<SMulI32>(tmpSgpr, dRegSgpr, tmpSgpr2, dComment);
-            }
-
-            module->addT<SLShiftRightB64>(tmp2Sgpr, shift, tmp2Sgpr, dComment);
-            module->addT<SMovB32>(qRegSgpr, tmpSgpr, dComment);
+                module->addT<SMovB32>(qRegSgpr, tmpSgpr1, dComment);
 
             if(divisor <= 64 && divisor >= -16)
             {
@@ -621,8 +612,8 @@ namespace rocisa
             }
             else
             {
-                module->addT<SMovB32>(tmpSgpr2, divisor, dComment);
-                module->addT<SMulI32>(tmpSgpr, qRegSgpr, tmpSgpr2, dComment);
+                module->addT<SMovB32>(tmpSgpr, divisor, dComment);
+                module->addT<SMulI32>(tmpSgpr, qRegSgpr, tmpSgpr, dComment);
             }
 
             module->addT<SSubU32>(rRegSgpr, dRegSgpr, tmpSgpr, dComment);
