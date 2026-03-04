@@ -527,7 +527,8 @@ struct BlockwiseGemmXdlops_pipeline_moe_blockscale_bpreshuffle_gufusion_v1<
 
                                     constexpr auto var = kscale0 * KRepeat / num_scale_k_block + k0;
 
-                                    auto loadA = load_thread_vec<decltype(a_thread_vec),
+                                    auto loadA =
+                                        thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                                  decltype(a_thread_buf),
                                                                  decltype(a_thread_desc_),
                                                                  ComputeDataType,
@@ -537,26 +538,24 @@ struct BlockwiseGemmXdlops_pipeline_moe_blockscale_bpreshuffle_gufusion_v1<
                                                                  decltype(var),
                                                                  Number<0>,
                                                                  Ik>{a_thread_vec, a_thread_buf};
-                                    auto loadB =
-                                        load_thread_vec<decltype(b_thread_vec),
-                                                        decltype(b_thread_bufs[mfma_reg_buf]),
-                                                        decltype(b_thread_desc_),
-                                                        ComputeDataType,
-                                                        decltype(n0),
-                                                        Number<0>,
-                                                        decltype(var),
-                                                        Ik>{b_thread_vec,
-                                                            b_thread_bufs[mfma_reg_buf]};
-                                    auto loadBUp =
-                                        load_thread_vec<decltype(b_thread_vec_up),
-                                                        decltype(b_thread_bufs_up[mfma_reg_buf]),
-                                                        decltype(b_thread_desc_),
-                                                        ComputeDataType,
-                                                        decltype(n0),
-                                                        Number<0>,
-                                                        decltype(var),
-                                                        Ik>{b_thread_vec,
-                                                            b_thread_bufs_up[mfma_reg_buf]};
+                                    auto loadB = thread_buf_to_vec_loader<
+                                        decltype(b_thread_vec),
+                                        decltype(b_thread_bufs[mfma_reg_buf]),
+                                        decltype(b_thread_desc_),
+                                        ComputeDataType,
+                                        decltype(n0),
+                                        Number<0>,
+                                        decltype(var),
+                                        Ik>{b_thread_vec, b_thread_bufs[mfma_reg_buf]};
+                                    auto loadBUp = thread_buf_to_vec_loader<
+                                        decltype(b_thread_vec_up),
+                                        decltype(b_thread_bufs_up[mfma_reg_buf]),
+                                        decltype(b_thread_desc_),
+                                        ComputeDataType,
+                                        decltype(n0),
+                                        Number<0>,
+                                        decltype(var),
+                                        Ik>{b_thread_vec, b_thread_bufs_up[mfma_reg_buf]};
 
                                     static_for<0, KPack, 1>{}(
                                         MakeFunctorInvoker(loadA, loadB, loadBUp));
@@ -766,32 +765,34 @@ struct BlockwiseGemmXdlops_pipeline_moe_blockscale_bpreshuffle_gufusion_v1<
 
                             constexpr auto var = kscale0 * KRepeat / num_scale_k_block + k0;
 
-                            auto loadA   = load_thread_vec<decltype(a_thread_vec),
-                                                           decltype(a_thread_buf),
-                                                           decltype(a_thread_desc_),
-                                                           ComputeDataType,
-                                                           decltype(m0),
-                                                           Number<0>,
-                                                           Number<0>,
-                                                           decltype(var),
-                                                           Number<0>,
-                                                           Ik>{a_thread_vec, a_thread_buf};
-                            auto loadB   = load_thread_vec<decltype(b_thread_vec),
-                                                           decltype(b_thread_bufs[I0]),
-                                                           decltype(b_thread_desc_),
-                                                           ComputeDataType,
-                                                           decltype(n0),
-                                                           Number<0>,
-                                                           decltype(var),
-                                                           Ik>{b_thread_vec, b_thread_bufs[I0]};
-                            auto loadBUp = load_thread_vec<decltype(b_thread_vec_up),
-                                                           decltype(b_thread_bufs_up[I0]),
-                                                           decltype(b_thread_desc_),
-                                                           ComputeDataType,
-                                                           decltype(n0),
-                                                           Number<0>,
-                                                           decltype(var),
-                                                           Ik>{b_thread_vec, b_thread_bufs_up[I0]};
+                            auto loadA = thread_buf_to_vec_loader<decltype(a_thread_vec),
+                                                                  decltype(a_thread_buf),
+                                                                  decltype(a_thread_desc_),
+                                                                  ComputeDataType,
+                                                                  decltype(m0),
+                                                                  Number<0>,
+                                                                  Number<0>,
+                                                                  decltype(var),
+                                                                  Number<0>,
+                                                                  Ik>{a_thread_vec, a_thread_buf};
+                            auto loadB =
+                                thread_buf_to_vec_loader<decltype(b_thread_vec),
+                                                         decltype(b_thread_bufs[I0]),
+                                                         decltype(b_thread_desc_),
+                                                         ComputeDataType,
+                                                         decltype(n0),
+                                                         Number<0>,
+                                                         decltype(var),
+                                                         Ik>{b_thread_vec, b_thread_bufs[I0]};
+                            auto loadBUp =
+                                thread_buf_to_vec_loader<decltype(b_thread_vec_up),
+                                                         decltype(b_thread_bufs_up[I0]),
+                                                         decltype(b_thread_desc_),
+                                                         ComputeDataType,
+                                                         decltype(n0),
+                                                         Number<0>,
+                                                         decltype(var),
+                                                         Ik>{b_thread_vec, b_thread_bufs_up[I0]};
 
                             static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB, loadBUp));
 
@@ -924,32 +925,34 @@ struct BlockwiseGemmXdlops_pipeline_moe_blockscale_bpreshuffle_gufusion_v1<
 
                             constexpr auto var = kscale0 * KRepeat / num_scale_k_block + k0;
 
-                            auto loadA   = load_thread_vec<decltype(a_thread_vec),
-                                                           decltype(a_thread_buf),
-                                                           decltype(a_thread_desc_),
-                                                           ComputeDataType,
-                                                           decltype(m0),
-                                                           Number<0>,
-                                                           Number<0>,
-                                                           decltype(var),
-                                                           Number<0>,
-                                                           Ik>{a_thread_vec, a_thread_buf};
-                            auto loadB   = load_thread_vec<decltype(b_thread_vec),
-                                                           decltype(b_thread_bufs[I1]),
-                                                           decltype(b_thread_desc_),
-                                                           ComputeDataType,
-                                                           decltype(n0),
-                                                           Number<0>,
-                                                           decltype(var),
-                                                           Ik>{b_thread_vec, b_thread_bufs[I1]};
-                            auto loadBUp = load_thread_vec<decltype(b_thread_vec_up),
-                                                           decltype(b_thread_bufs_up[I1]),
-                                                           decltype(b_thread_desc_),
-                                                           ComputeDataType,
-                                                           decltype(n0),
-                                                           Number<0>,
-                                                           decltype(var),
-                                                           Ik>{b_thread_vec, b_thread_bufs_up[I1]};
+                            auto loadA = thread_buf_to_vec_loader<decltype(a_thread_vec),
+                                                                  decltype(a_thread_buf),
+                                                                  decltype(a_thread_desc_),
+                                                                  ComputeDataType,
+                                                                  decltype(m0),
+                                                                  Number<0>,
+                                                                  Number<0>,
+                                                                  decltype(var),
+                                                                  Number<0>,
+                                                                  Ik>{a_thread_vec, a_thread_buf};
+                            auto loadB =
+                                thread_buf_to_vec_loader<decltype(b_thread_vec),
+                                                         decltype(b_thread_bufs[I1]),
+                                                         decltype(b_thread_desc_),
+                                                         ComputeDataType,
+                                                         decltype(n0),
+                                                         Number<0>,
+                                                         decltype(var),
+                                                         Ik>{b_thread_vec, b_thread_bufs[I1]};
+                            auto loadBUp =
+                                thread_buf_to_vec_loader<decltype(b_thread_vec_up),
+                                                         decltype(b_thread_bufs_up[I1]),
+                                                         decltype(b_thread_desc_),
+                                                         ComputeDataType,
+                                                         decltype(n0),
+                                                         Number<0>,
+                                                         decltype(var),
+                                                         Ik>{b_thread_vec, b_thread_bufs_up[I1]};
 
                             static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB, loadBUp));
 
@@ -1046,32 +1049,34 @@ struct BlockwiseGemmXdlops_pipeline_moe_blockscale_bpreshuffle_gufusion_v1<
 
                             constexpr auto var = kscale0 * KRepeat / num_scale_k_block + k0;
 
-                            auto loadA   = load_thread_vec<decltype(a_thread_vec),
-                                                           decltype(a_thread_buf),
-                                                           decltype(a_thread_desc_),
-                                                           ComputeDataType,
-                                                           decltype(m0),
-                                                           Number<0>,
-                                                           Number<0>,
-                                                           decltype(var),
-                                                           Number<0>,
-                                                           Ik>{a_thread_vec, a_thread_buf};
-                            auto loadB   = load_thread_vec<decltype(b_thread_vec),
-                                                           decltype(b_thread_bufs[I0]),
-                                                           decltype(b_thread_desc_),
-                                                           ComputeDataType,
-                                                           decltype(n0),
-                                                           Number<0>,
-                                                           decltype(var),
-                                                           Ik>{b_thread_vec, b_thread_bufs[I0]};
-                            auto loadBUp = load_thread_vec<decltype(b_thread_vec_up),
-                                                           decltype(b_thread_bufs_up[I0]),
-                                                           decltype(b_thread_desc_),
-                                                           ComputeDataType,
-                                                           decltype(n0),
-                                                           Number<0>,
-                                                           decltype(var),
-                                                           Ik>{b_thread_vec, b_thread_bufs_up[I0]};
+                            auto loadA = thread_buf_to_vec_loader<decltype(a_thread_vec),
+                                                                  decltype(a_thread_buf),
+                                                                  decltype(a_thread_desc_),
+                                                                  ComputeDataType,
+                                                                  decltype(m0),
+                                                                  Number<0>,
+                                                                  Number<0>,
+                                                                  decltype(var),
+                                                                  Number<0>,
+                                                                  Ik>{a_thread_vec, a_thread_buf};
+                            auto loadB =
+                                thread_buf_to_vec_loader<decltype(b_thread_vec),
+                                                         decltype(b_thread_bufs[I0]),
+                                                         decltype(b_thread_desc_),
+                                                         ComputeDataType,
+                                                         decltype(n0),
+                                                         Number<0>,
+                                                         decltype(var),
+                                                         Ik>{b_thread_vec, b_thread_bufs[I0]};
+                            auto loadBUp =
+                                thread_buf_to_vec_loader<decltype(b_thread_vec_up),
+                                                         decltype(b_thread_bufs_up[I0]),
+                                                         decltype(b_thread_desc_),
+                                                         ComputeDataType,
+                                                         decltype(n0),
+                                                         Number<0>,
+                                                         decltype(var),
+                                                         Ik>{b_thread_vec, b_thread_bufs_up[I0]};
 
                             static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB, loadBUp));
 

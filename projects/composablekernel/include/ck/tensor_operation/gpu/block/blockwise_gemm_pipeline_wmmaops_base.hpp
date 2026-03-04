@@ -9,7 +9,7 @@
 #include "ck/tensor_operation/gpu/thread/threadwise_tensor_slice_transfer.hpp"
 #include "ck/tensor_operation/gpu/warp/wmma_gemm.hpp"
 #include "ck/tensor_description/tensor_adaptor.hpp"
-#include "ck/utility/vector_load_functor.hpp"
+#include "ck/utility/thread_buf_to_vec_loader.hpp"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"

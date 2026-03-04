@@ -600,7 +600,8 @@ struct BlockwiseGemmXdlops_pipeline_v4
                             vector_type<FloatAB, KPack> a_thread_vec;
                             vector_type<FloatAB, KPack> b_thread_vec;
 
-                            auto loadA = load_thread_vec<decltype(a_thread_vec),
+                            auto loadA =
+                                thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                          decltype(a_thread_bufs[PingP1{}]),
                                                          decltype(a_thread_desc_),
                                                          FloatAB,
@@ -608,7 +609,8 @@ struct BlockwiseGemmXdlops_pipeline_v4
                                                          Number<0>,
                                                          decltype(k0),
                                                          Ik>{a_thread_vec, a_thread_bufs[PingP1{}]};
-                            auto loadB = load_thread_vec<decltype(b_thread_vec),
+                            auto loadB =
+                                thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                          decltype(b_thread_bufs[PingP1{}]),
                                                          decltype(b_thread_desc_),
                                                          FloatAB,
@@ -687,7 +689,8 @@ struct BlockwiseGemmXdlops_pipeline_v4
                             vector_type<FloatAB, KPack> a_thread_vec;
                             vector_type<FloatAB, KPack> b_thread_vec;
 
-                            auto loadA = load_thread_vec<decltype(a_thread_vec),
+                            auto loadA =
+                                thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                          decltype(a_thread_bufs[PingP2{}]),
                                                          decltype(a_thread_desc_),
                                                          FloatAB,
@@ -695,7 +698,8 @@ struct BlockwiseGemmXdlops_pipeline_v4
                                                          Number<0>,
                                                          decltype(k0),
                                                          Ik>{a_thread_vec, a_thread_bufs[PingP2{}]};
-                            auto loadB = load_thread_vec<decltype(b_thread_vec),
+                            auto loadB =
+                                thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                          decltype(b_thread_bufs[PingP2{}]),
                                                          decltype(b_thread_desc_),
                                                          FloatAB,
@@ -774,7 +778,8 @@ struct BlockwiseGemmXdlops_pipeline_v4
                         vector_type<FloatAB, KPack> a_thread_vec;
                         vector_type<FloatAB, KPack> b_thread_vec;
 
-                        auto loadA = load_thread_vec<decltype(a_thread_vec),
+                        auto loadA =
+                            thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                      decltype(a_thread_bufs[PingP1{}]),
                                                      decltype(a_thread_desc_),
                                                      FloatAB,
@@ -782,7 +787,8 @@ struct BlockwiseGemmXdlops_pipeline_v4
                                                      Number<0>,
                                                      decltype(k0),
                                                      Ik>{a_thread_vec, a_thread_bufs[PingP1{}]};
-                        auto loadB = load_thread_vec<decltype(b_thread_vec),
+                        auto loadB =
+                            thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                      decltype(b_thread_bufs[PingP1{}]),
                                                      decltype(b_thread_desc_),
                                                      FloatAB,
@@ -851,7 +857,8 @@ struct BlockwiseGemmXdlops_pipeline_v4
                         vector_type<FloatAB, KPack> a_thread_vec;
                         vector_type<FloatAB, KPack> b_thread_vec;
 
-                        auto loadA = load_thread_vec<decltype(a_thread_vec),
+                        auto loadA =
+                            thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                      decltype(a_thread_bufs[PingP2{}]),
                                                      decltype(a_thread_desc_),
                                                      FloatAB,
@@ -859,7 +866,8 @@ struct BlockwiseGemmXdlops_pipeline_v4
                                                      Number<0>,
                                                      decltype(k0),
                                                      Ik>{a_thread_vec, a_thread_bufs[PingP2{}]};
-                        auto loadB = load_thread_vec<decltype(b_thread_vec),
+                        auto loadB =
+                            thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                      decltype(b_thread_bufs[PingP2{}]),
                                                      decltype(b_thread_desc_),
                                                      FloatAB,
@@ -901,7 +909,8 @@ struct BlockwiseGemmXdlops_pipeline_v4
                         vector_type<FloatAB, KPack> a_thread_vec;
                         vector_type<FloatAB, KPack> b_thread_vec;
 
-                        auto loadA = load_thread_vec<decltype(a_thread_vec),
+                        auto loadA =
+                            thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                      decltype(a_thread_bufs[PingP2{}]),
                                                      decltype(a_thread_desc_),
                                                      FloatAB,
@@ -909,7 +918,8 @@ struct BlockwiseGemmXdlops_pipeline_v4
                                                      Number<0>,
                                                      decltype(k0),
                                                      Ik>{a_thread_vec, a_thread_bufs[PingP2{}]};
-                        auto loadB = load_thread_vec<decltype(b_thread_vec),
+                        auto loadB =
+                            thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                      decltype(b_thread_bufs[PingP2{}]),
                                                      decltype(b_thread_desc_),
                                                      FloatAB,
@@ -980,7 +990,8 @@ struct BlockwiseGemmXdlops_pipeline_v4
                         vector_type<FloatAB, KPack> a_thread_vec;
                         vector_type<FloatAB, KPack> b_thread_vec;
 
-                        auto loadA = load_thread_vec<decltype(a_thread_vec),
+                        auto loadA =
+                            thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                      decltype(a_thread_bufs[PingP1{}]),
                                                      decltype(a_thread_desc_),
                                                      FloatAB,
@@ -988,7 +999,8 @@ struct BlockwiseGemmXdlops_pipeline_v4
                                                      Number<0>,
                                                      decltype(k0),
                                                      Ik>{a_thread_vec, a_thread_bufs[PingP1{}]};
-                        auto loadB = load_thread_vec<decltype(b_thread_vec),
+                        auto loadB =
+                            thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                      decltype(b_thread_bufs[PingP1{}]),
                                                      decltype(b_thread_desc_),
                                                      FloatAB,
@@ -1036,7 +1048,8 @@ struct BlockwiseGemmXdlops_pipeline_v4
                         vector_type<FloatAB, KPack> a_thread_vec;
                         vector_type<FloatAB, KPack> b_thread_vec;
 
-                        auto loadA = load_thread_vec<decltype(a_thread_vec),
+                        auto loadA =
+                            thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                      decltype(a_thread_bufs[PingP2{}]),
                                                      decltype(a_thread_desc_),
                                                      FloatAB,
@@ -1044,7 +1057,8 @@ struct BlockwiseGemmXdlops_pipeline_v4
                                                      Number<0>,
                                                      decltype(k0),
                                                      Ik>{a_thread_vec, a_thread_bufs[PingP2{}]};
-                        auto loadB = load_thread_vec<decltype(b_thread_vec),
+                        auto loadB =
+                            thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                      decltype(b_thread_bufs[PingP2{}]),
                                                      decltype(b_thread_desc_),
                                                      FloatAB,

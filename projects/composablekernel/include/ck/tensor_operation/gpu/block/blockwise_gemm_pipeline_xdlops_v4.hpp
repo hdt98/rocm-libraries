@@ -375,23 +375,25 @@ struct BlockwiseGemmXdlops_pipeline_v4<BlockGemmPipelineScheduler::Intrawave,
                                 vector_type<ComputeDataTypeBuf, KPack> b_thread_vec;
 
                                 auto loadA =
-                                    load_thread_vec<decltype(a_thread_vec),
-                                                    decltype(a_thread_bufs[mfma_reg_buf]),
-                                                    decltype(a_thread_desc_),
-                                                    ComputeDataTypeBuf,
-                                                    decltype(m0),
-                                                    Number<0>,
-                                                    decltype(k0),
-                                                    Ik>{a_thread_vec, a_thread_bufs[mfma_reg_buf]};
+                                    thread_buf_to_vec_loader<decltype(a_thread_vec),
+                                                             decltype(a_thread_bufs[mfma_reg_buf]),
+                                                             decltype(a_thread_desc_),
+                                                             ComputeDataTypeBuf,
+                                                             decltype(m0),
+                                                             Number<0>,
+                                                             decltype(k0),
+                                                             Ik>{a_thread_vec,
+                                                                 a_thread_bufs[mfma_reg_buf]};
                                 auto loadB =
-                                    load_thread_vec<decltype(b_thread_vec),
-                                                    decltype(b_thread_bufs[mfma_reg_buf]),
-                                                    decltype(b_thread_desc_),
-                                                    ComputeDataTypeBuf,
-                                                    decltype(n0),
-                                                    Number<0>,
-                                                    decltype(k0),
-                                                    Ik>{b_thread_vec, b_thread_bufs[mfma_reg_buf]};
+                                    thread_buf_to_vec_loader<decltype(b_thread_vec),
+                                                             decltype(b_thread_bufs[mfma_reg_buf]),
+                                                             decltype(b_thread_desc_),
+                                                             ComputeDataTypeBuf,
+                                                             decltype(n0),
+                                                             Number<0>,
+                                                             decltype(k0),
+                                                             Ik>{b_thread_vec,
+                                                                 b_thread_bufs[mfma_reg_buf]};
 
                                 static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
@@ -465,7 +467,8 @@ struct BlockwiseGemmXdlops_pipeline_v4<BlockGemmPipelineScheduler::Intrawave,
                         vector_type<ComputeDataTypeBuf, KPack> a_thread_vec;
                         vector_type<ComputeDataTypeBuf, KPack> b_thread_vec;
 
-                        auto loadA = load_thread_vec<decltype(a_thread_vec),
+                        auto loadA =
+                            thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                      decltype(a_thread_bufs[mfma_reg_buf]),
                                                      decltype(a_thread_desc_),
                                                      ComputeDataTypeBuf,
@@ -473,7 +476,8 @@ struct BlockwiseGemmXdlops_pipeline_v4<BlockGemmPipelineScheduler::Intrawave,
                                                      Number<0>,
                                                      decltype(k0),
                                                      Ik>{a_thread_vec, a_thread_bufs[mfma_reg_buf]};
-                        auto loadB = load_thread_vec<decltype(b_thread_vec),
+                        auto loadB =
+                            thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                      decltype(b_thread_bufs[mfma_reg_buf]),
                                                      decltype(b_thread_desc_),
                                                      ComputeDataTypeBuf,
@@ -537,7 +541,8 @@ struct BlockwiseGemmXdlops_pipeline_v4<BlockGemmPipelineScheduler::Intrawave,
                         vector_type<ComputeDataTypeBuf, KPack> a_thread_vec;
                         vector_type<ComputeDataTypeBuf, KPack> b_thread_vec;
 
-                        auto loadA = load_thread_vec<decltype(a_thread_vec),
+                        auto loadA =
+                            thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                      decltype(a_thread_bufs[mfma_reg_buf]),
                                                      decltype(a_thread_desc_),
                                                      ComputeDataTypeBuf,
@@ -545,7 +550,8 @@ struct BlockwiseGemmXdlops_pipeline_v4<BlockGemmPipelineScheduler::Intrawave,
                                                      Number<0>,
                                                      decltype(k0),
                                                      Ik>{a_thread_vec, a_thread_bufs[mfma_reg_buf]};
-                        auto loadB = load_thread_vec<decltype(b_thread_vec),
+                        auto loadB =
+                            thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                      decltype(b_thread_bufs[mfma_reg_buf]),
                                                      decltype(b_thread_desc_),
                                                      ComputeDataTypeBuf,
@@ -588,7 +594,8 @@ struct BlockwiseGemmXdlops_pipeline_v4<BlockGemmPipelineScheduler::Intrawave,
                         vector_type<ComputeDataTypeBuf, KPack> a_thread_vec;
                         vector_type<ComputeDataTypeBuf, KPack> b_thread_vec;
 
-                        auto loadA = load_thread_vec<decltype(a_thread_vec),
+                        auto loadA =
+                            thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                      decltype(a_thread_bufs[mfma_reg_buf]),
                                                      decltype(a_thread_desc_),
                                                      ComputeDataTypeBuf,
@@ -596,7 +603,8 @@ struct BlockwiseGemmXdlops_pipeline_v4<BlockGemmPipelineScheduler::Intrawave,
                                                      Number<0>,
                                                      decltype(k0),
                                                      Ik>{a_thread_vec, a_thread_bufs[mfma_reg_buf]};
-                        auto loadB = load_thread_vec<decltype(b_thread_vec),
+                        auto loadB =
+                            thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                      decltype(b_thread_bufs[mfma_reg_buf]),
                                                      decltype(b_thread_desc_),
                                                      ComputeDataTypeBuf,
@@ -1003,23 +1011,25 @@ struct BlockwiseGemmXdlopsDirectLoad_pipeline_v4<BlockGemmPipelineScheduler::Int
                                 vector_type<ComputeDataTypeBuf, KPack> b_thread_vec;
 
                                 auto loadA =
-                                    load_thread_vec<decltype(a_thread_vec),
-                                                    decltype(a_thread_bufs[mfma_reg_buf]),
-                                                    decltype(a_thread_desc_),
-                                                    ComputeDataTypeBuf,
-                                                    decltype(m0),
-                                                    Number<0>,
-                                                    decltype(k0),
-                                                    Ik>{a_thread_vec, a_thread_bufs[mfma_reg_buf]};
+                                    thread_buf_to_vec_loader<decltype(a_thread_vec),
+                                                             decltype(a_thread_bufs[mfma_reg_buf]),
+                                                             decltype(a_thread_desc_),
+                                                             ComputeDataTypeBuf,
+                                                             decltype(m0),
+                                                             Number<0>,
+                                                             decltype(k0),
+                                                             Ik>{a_thread_vec,
+                                                                 a_thread_bufs[mfma_reg_buf]};
                                 auto loadB =
-                                    load_thread_vec<decltype(b_thread_vec),
-                                                    decltype(b_thread_bufs[mfma_reg_buf]),
-                                                    decltype(b_thread_desc_),
-                                                    ComputeDataTypeBuf,
-                                                    decltype(n0),
-                                                    Number<0>,
-                                                    decltype(k0),
-                                                    Ik>{b_thread_vec, b_thread_bufs[mfma_reg_buf]};
+                                    thread_buf_to_vec_loader<decltype(b_thread_vec),
+                                                             decltype(b_thread_bufs[mfma_reg_buf]),
+                                                             decltype(b_thread_desc_),
+                                                             ComputeDataTypeBuf,
+                                                             decltype(n0),
+                                                             Number<0>,
+                                                             decltype(k0),
+                                                             Ik>{b_thread_vec,
+                                                                 b_thread_bufs[mfma_reg_buf]};
 
                                 static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
@@ -1095,7 +1105,8 @@ struct BlockwiseGemmXdlopsDirectLoad_pipeline_v4<BlockGemmPipelineScheduler::Int
                         vector_type<ComputeDataTypeBuf, KPack> a_thread_vec;
                         vector_type<ComputeDataTypeBuf, KPack> b_thread_vec;
 
-                        auto loadA = load_thread_vec<decltype(a_thread_vec),
+                        auto loadA =
+                            thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                      decltype(a_thread_bufs[mfma_reg_buf]),
                                                      decltype(a_thread_desc_),
                                                      ComputeDataTypeBuf,
@@ -1103,7 +1114,8 @@ struct BlockwiseGemmXdlopsDirectLoad_pipeline_v4<BlockGemmPipelineScheduler::Int
                                                      Number<0>,
                                                      decltype(k0),
                                                      Ik>{a_thread_vec, a_thread_bufs[mfma_reg_buf]};
-                        auto loadB = load_thread_vec<decltype(b_thread_vec),
+                        auto loadB =
+                            thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                      decltype(b_thread_bufs[mfma_reg_buf]),
                                                      decltype(b_thread_desc_),
                                                      ComputeDataTypeBuf,
@@ -1167,7 +1179,8 @@ struct BlockwiseGemmXdlopsDirectLoad_pipeline_v4<BlockGemmPipelineScheduler::Int
                         vector_type<ComputeDataTypeBuf, KPack> a_thread_vec;
                         vector_type<ComputeDataTypeBuf, KPack> b_thread_vec;
 
-                        auto loadA = load_thread_vec<decltype(a_thread_vec),
+                        auto loadA =
+                            thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                      decltype(a_thread_bufs[mfma_reg_buf]),
                                                      decltype(a_thread_desc_),
                                                      ComputeDataTypeBuf,
@@ -1175,7 +1188,8 @@ struct BlockwiseGemmXdlopsDirectLoad_pipeline_v4<BlockGemmPipelineScheduler::Int
                                                      Number<0>,
                                                      decltype(k0),
                                                      Ik>{a_thread_vec, a_thread_bufs[mfma_reg_buf]};
-                        auto loadB = load_thread_vec<decltype(b_thread_vec),
+                        auto loadB =
+                            thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                      decltype(b_thread_bufs[mfma_reg_buf]),
                                                      decltype(b_thread_desc_),
                                                      ComputeDataTypeBuf,
@@ -1218,7 +1232,8 @@ struct BlockwiseGemmXdlopsDirectLoad_pipeline_v4<BlockGemmPipelineScheduler::Int
                         vector_type<ComputeDataTypeBuf, KPack> a_thread_vec;
                         vector_type<ComputeDataTypeBuf, KPack> b_thread_vec;
 
-                        auto loadA = load_thread_vec<decltype(a_thread_vec),
+                        auto loadA =
+                            thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                      decltype(a_thread_bufs[mfma_reg_buf]),
                                                      decltype(a_thread_desc_),
                                                      ComputeDataTypeBuf,
@@ -1226,7 +1241,8 @@ struct BlockwiseGemmXdlopsDirectLoad_pipeline_v4<BlockGemmPipelineScheduler::Int
                                                      Number<0>,
                                                      decltype(k0),
                                                      Ik>{a_thread_vec, a_thread_bufs[mfma_reg_buf]};
-                        auto loadB = load_thread_vec<decltype(b_thread_vec),
+                        auto loadB =
+                            thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                      decltype(b_thread_bufs[mfma_reg_buf]),
                                                      decltype(b_thread_desc_),
                                                      ComputeDataTypeBuf,

@@ -104,12 +104,12 @@ template <typename ThreadVec,
           typename ThreadDesc,
           typename ComputeType,
           typename... IdxWrapper>
-struct load_thread_vec
+struct thread_buf_to_vec_loader
 {
     ThreadVec& thread_vec;
     ThreadBuf& thread_buf;
 
-    __host__ __device__ constexpr load_thread_vec(ThreadVec& tv, ThreadBuf& tb)
+    __host__ __device__ constexpr thread_buf_to_vec_loader(ThreadVec& tv, ThreadBuf& tb)
         : thread_vec(tv), thread_buf(tb)
     {
     }

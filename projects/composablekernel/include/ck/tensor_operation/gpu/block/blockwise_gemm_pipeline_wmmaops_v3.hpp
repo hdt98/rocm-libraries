@@ -445,30 +445,30 @@ struct BlockwiseGemmWmmaops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                                 using KK =
                                     Add<Ik, Mult<ck::Number<k_inner>, ck::Number<KPerWaveBlock>>>;
 
-                                auto loadA = load_thread_vec<decltype(a_thread_vec),
-                                                             decltype(a_thread_buf),
-                                                             decltype(a_thread_desc_),
-                                                             ComputeTypeA,
-                                                             Div<KK, ck::Number<A_K1>>,
-                                                             decltype(m0),
-                                                             decltype(k0),
-                                                             Number<0>,
-                                                             Number<0>,
-                                                             Number<0>,
-                                                             Mod<KK, ck::Number<A_K1>>>(
+                                auto loadA = thread_buf_to_vec_loader<decltype(a_thread_vec),
+                                                                      decltype(a_thread_buf),
+                                                                      decltype(a_thread_desc_),
+                                                                      ComputeTypeA,
+                                                                      Div<KK, ck::Number<A_K1>>,
+                                                                      decltype(m0),
+                                                                      decltype(k0),
+                                                                      Number<0>,
+                                                                      Number<0>,
+                                                                      Number<0>,
+                                                                      Mod<KK, ck::Number<A_K1>>>(
                                     a_thread_vec, a_thread_buf);
 
-                                auto loadB = load_thread_vec<decltype(b_thread_vec),
-                                                             decltype(b_thread_buf),
-                                                             decltype(b_thread_desc_),
-                                                             ComputeTypeB,
-                                                             Div<KK, ck::Number<B_K1>>,
-                                                             decltype(n0),
-                                                             decltype(k0),
-                                                             Number<0>,
-                                                             Number<0>,
-                                                             Number<0>,
-                                                             Mod<KK, ck::Number<B_K1>>>(
+                                auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
+                                                                      decltype(b_thread_buf),
+                                                                      decltype(b_thread_desc_),
+                                                                      ComputeTypeB,
+                                                                      Div<KK, ck::Number<B_K1>>,
+                                                                      decltype(n0),
+                                                                      decltype(k0),
+                                                                      Number<0>,
+                                                                      Number<0>,
+                                                                      Number<0>,
+                                                                      Mod<KK, ck::Number<B_K1>>>(
                                     b_thread_vec, b_thread_buf);
 
                                 static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
@@ -523,31 +523,31 @@ struct BlockwiseGemmWmmaops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                             using KK =
                                 Add<Ik, Mult<ck::Number<k_inner>, ck::Number<KPerWaveBlock>>>;
 
-                            auto loadA = load_thread_vec<decltype(a_thread_vec),
-                                                         decltype(a_thread_buf),
-                                                         decltype(a_thread_desc_),
-                                                         ComputeTypeA,
-                                                         Div<KK, ck::Number<A_K1>>,
-                                                         decltype(m0),
-                                                         decltype(k0),
-                                                         Number<0>,
-                                                         Number<0>,
-                                                         Number<0>,
-                                                         Mod<KK, ck::Number<A_K1>>>(a_thread_vec,
-                                                                                    a_thread_buf);
+                            auto loadA = thread_buf_to_vec_loader<decltype(a_thread_vec),
+                                                                  decltype(a_thread_buf),
+                                                                  decltype(a_thread_desc_),
+                                                                  ComputeTypeA,
+                                                                  Div<KK, ck::Number<A_K1>>,
+                                                                  decltype(m0),
+                                                                  decltype(k0),
+                                                                  Number<0>,
+                                                                  Number<0>,
+                                                                  Number<0>,
+                                                                  Mod<KK, ck::Number<A_K1>>>(
+                                a_thread_vec, a_thread_buf);
 
-                            auto loadB = load_thread_vec<decltype(b_thread_vec),
-                                                         decltype(b_thread_buf),
-                                                         decltype(b_thread_desc_),
-                                                         ComputeTypeB,
-                                                         Div<KK, ck::Number<B_K1>>,
-                                                         decltype(n0),
-                                                         decltype(k0),
-                                                         Number<0>,
-                                                         Number<0>,
-                                                         Number<0>,
-                                                         Mod<KK, ck::Number<B_K1>>>(b_thread_vec,
-                                                                                    b_thread_buf);
+                            auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
+                                                                  decltype(b_thread_buf),
+                                                                  decltype(b_thread_desc_),
+                                                                  ComputeTypeB,
+                                                                  Div<KK, ck::Number<B_K1>>,
+                                                                  decltype(n0),
+                                                                  decltype(k0),
+                                                                  Number<0>,
+                                                                  Number<0>,
+                                                                  Number<0>,
+                                                                  Mod<KK, ck::Number<B_K1>>>(
+                                b_thread_vec, b_thread_buf);
 
                             static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
                             static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
@@ -588,31 +588,31 @@ struct BlockwiseGemmWmmaops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                             using KK =
                                 Add<Ik, Mult<ck::Number<k_inner>, ck::Number<KPerWaveBlock>>>;
 
-                            auto loadA = load_thread_vec<decltype(a_thread_vec),
-                                                         decltype(a_thread_buf),
-                                                         decltype(a_thread_desc_),
-                                                         ComputeTypeA,
-                                                         Div<KK, ck::Number<A_K1>>,
-                                                         decltype(m0),
-                                                         decltype(k0),
-                                                         Number<0>,
-                                                         Number<0>,
-                                                         Number<0>,
-                                                         Mod<KK, ck::Number<A_K1>>>(a_thread_vec,
-                                                                                    a_thread_buf);
+                            auto loadA = thread_buf_to_vec_loader<decltype(a_thread_vec),
+                                                                  decltype(a_thread_buf),
+                                                                  decltype(a_thread_desc_),
+                                                                  ComputeTypeA,
+                                                                  Div<KK, ck::Number<A_K1>>,
+                                                                  decltype(m0),
+                                                                  decltype(k0),
+                                                                  Number<0>,
+                                                                  Number<0>,
+                                                                  Number<0>,
+                                                                  Mod<KK, ck::Number<A_K1>>>(
+                                a_thread_vec, a_thread_buf);
 
-                            auto loadB = load_thread_vec<decltype(b_thread_vec),
-                                                         decltype(b_thread_buf),
-                                                         decltype(b_thread_desc_),
-                                                         ComputeTypeB,
-                                                         Div<KK, ck::Number<B_K1>>,
-                                                         decltype(n0),
-                                                         decltype(k0),
-                                                         Number<0>,
-                                                         Number<0>,
-                                                         Number<0>,
-                                                         Mod<KK, ck::Number<B_K1>>>(b_thread_vec,
-                                                                                    b_thread_buf);
+                            auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
+                                                                  decltype(b_thread_buf),
+                                                                  decltype(b_thread_desc_),
+                                                                  ComputeTypeB,
+                                                                  Div<KK, ck::Number<B_K1>>,
+                                                                  decltype(n0),
+                                                                  decltype(k0),
+                                                                  Number<0>,
+                                                                  Number<0>,
+                                                                  Number<0>,
+                                                                  Mod<KK, ck::Number<B_K1>>>(
+                                b_thread_vec, b_thread_buf);
 
                             static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
                             static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
@@ -782,7 +782,8 @@ struct BlockwiseGemmWmmaops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                                         Add<Ik,
                                             Mult<ck::Number<k_inner>, ck::Number<KPerWaveBlock>>>;
 
-                                    auto loadA = load_thread_vec<decltype(a_thread_vec),
+                                    auto loadA =
+                                        thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                                  decltype(a_thread_buf),
                                                                  decltype(a_thread_desc_),
                                                                  ComputeTypeA,
@@ -793,9 +794,10 @@ struct BlockwiseGemmWmmaops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                                                                  Number<0>,
                                                                  Number<0>,
                                                                  Mod<KK, ck::Number<A_K1>>>(
-                                        a_thread_vec, a_thread_buf);
+                                            a_thread_vec, a_thread_buf);
 
-                                    auto loadB = load_thread_vec<decltype(b_thread_vec),
+                                    auto loadB =
+                                        thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                                  decltype(b_thread_buf),
                                                                  decltype(b_thread_desc_),
                                                                  ComputeTypeB,
@@ -806,7 +808,7 @@ struct BlockwiseGemmWmmaops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                                                                  Number<0>,
                                                                  Number<0>,
                                                                  Mod<KK, ck::Number<B_K1>>>(
-                                        b_thread_vec, b_thread_buf);
+                                            b_thread_vec, b_thread_buf);
 
                                     static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
                                     static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
@@ -864,30 +866,30 @@ struct BlockwiseGemmWmmaops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                                 using KK =
                                     Add<Ik, Mult<ck::Number<k_inner>, ck::Number<KPerWaveBlock>>>;
 
-                                auto loadA = load_thread_vec<decltype(a_thread_vec),
-                                                             decltype(a_thread_buf),
-                                                             decltype(a_thread_desc_),
-                                                             ComputeTypeA,
-                                                             Div<KK, ck::Number<A_K1>>,
-                                                             decltype(m0),
-                                                             decltype(k_index),
-                                                             Number<0>,
-                                                             Number<0>,
-                                                             Number<0>,
-                                                             Mod<KK, ck::Number<A_K1>>>(
+                                auto loadA = thread_buf_to_vec_loader<decltype(a_thread_vec),
+                                                                      decltype(a_thread_buf),
+                                                                      decltype(a_thread_desc_),
+                                                                      ComputeTypeA,
+                                                                      Div<KK, ck::Number<A_K1>>,
+                                                                      decltype(m0),
+                                                                      decltype(k_index),
+                                                                      Number<0>,
+                                                                      Number<0>,
+                                                                      Number<0>,
+                                                                      Mod<KK, ck::Number<A_K1>>>(
                                     a_thread_vec, a_thread_buf);
 
-                                auto loadB = load_thread_vec<decltype(b_thread_vec),
-                                                             decltype(b_thread_buf),
-                                                             decltype(b_thread_desc_),
-                                                             ComputeTypeB,
-                                                             Div<KK, ck::Number<B_K1>>,
-                                                             decltype(n0),
-                                                             decltype(k_index),
-                                                             Number<0>,
-                                                             Number<0>,
-                                                             Number<0>,
-                                                             Mod<KK, ck::Number<B_K1>>>(
+                                auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
+                                                                      decltype(b_thread_buf),
+                                                                      decltype(b_thread_desc_),
+                                                                      ComputeTypeB,
+                                                                      Div<KK, ck::Number<B_K1>>,
+                                                                      decltype(n0),
+                                                                      decltype(k_index),
+                                                                      Number<0>,
+                                                                      Number<0>,
+                                                                      Number<0>,
+                                                                      Mod<KK, ck::Number<B_K1>>>(
                                     b_thread_vec, b_thread_buf);
 
                                 static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
@@ -934,30 +936,30 @@ struct BlockwiseGemmWmmaops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                                 using KK =
                                     Add<Ik, Mult<ck::Number<k_inner>, ck::Number<KPerWaveBlock>>>;
 
-                                auto loadA = load_thread_vec<decltype(a_thread_vec),
-                                                             decltype(a_thread_buf),
-                                                             decltype(a_thread_desc_),
-                                                             ComputeTypeA,
-                                                             Div<KK, ck::Number<A_K1>>,
-                                                             decltype(m0),
-                                                             decltype(k_index),
-                                                             Number<0>,
-                                                             Number<0>,
-                                                             Number<0>,
-                                                             Mod<KK, ck::Number<A_K1>>>(
+                                auto loadA = thread_buf_to_vec_loader<decltype(a_thread_vec),
+                                                                      decltype(a_thread_buf),
+                                                                      decltype(a_thread_desc_),
+                                                                      ComputeTypeA,
+                                                                      Div<KK, ck::Number<A_K1>>,
+                                                                      decltype(m0),
+                                                                      decltype(k_index),
+                                                                      Number<0>,
+                                                                      Number<0>,
+                                                                      Number<0>,
+                                                                      Mod<KK, ck::Number<A_K1>>>(
                                     a_thread_vec, a_thread_buf);
 
-                                auto loadB = load_thread_vec<decltype(b_thread_vec),
-                                                             decltype(b_thread_buf),
-                                                             decltype(b_thread_desc_),
-                                                             ComputeTypeB,
-                                                             Div<KK, ck::Number<B_K1>>,
-                                                             decltype(n0),
-                                                             decltype(k_index),
-                                                             Number<0>,
-                                                             Number<0>,
-                                                             Number<0>,
-                                                             Mod<KK, ck::Number<B_K1>>>(
+                                auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
+                                                                      decltype(b_thread_buf),
+                                                                      decltype(b_thread_desc_),
+                                                                      ComputeTypeB,
+                                                                      Div<KK, ck::Number<B_K1>>,
+                                                                      decltype(n0),
+                                                                      decltype(k_index),
+                                                                      Number<0>,
+                                                                      Number<0>,
+                                                                      Number<0>,
+                                                                      Mod<KK, ck::Number<B_K1>>>(
                                     b_thread_vec, b_thread_buf);
 
                                 static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);

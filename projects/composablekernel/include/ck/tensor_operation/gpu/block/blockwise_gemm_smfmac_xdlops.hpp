@@ -380,7 +380,8 @@ struct BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1
                     vector_type<ComputeTypeB, KPack> b_thread_vec;
                     vector_type<int32_t, KPack / elems_per_idx> idx_vec;
 
-                    auto loadA = load_thread_vec<decltype(a_thread_vec),
+                    auto loadA =
+                        thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                  decltype(a_thread_buf),
                                                  decltype(a_thread_desc_),
                                                  FloatAB,
@@ -388,14 +389,14 @@ struct BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1
                                                  0,
                                                  0,
                                                  Add<Ik, k / 2>>{a_thread_vec, a_thread_buf};
-                    auto loadB = load_thread_vec<decltype(b_thread_vec),
-                                                 decltype(b_thread_buf),
-                                                 decltype(b_thread_desc_),
-                                                 FloatAB,
-                                                 0,
-                                                 0,
-                                                 0,
-                                                 Add<Ik, k>>{b_thread_vec, b_thread_buf};
+                    auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
+                                                          decltype(b_thread_buf),
+                                                          decltype(b_thread_desc_),
+                                                          FloatAB,
+                                                          0,
+                                                          0,
+                                                          0,
+                                                          Add<Ik, k>>{b_thread_vec, b_thread_buf};
 
                     static_for<0, KPack / 2, 1>{}(loadA);
                     static_for<0, KPack, 1>{}(loadB);

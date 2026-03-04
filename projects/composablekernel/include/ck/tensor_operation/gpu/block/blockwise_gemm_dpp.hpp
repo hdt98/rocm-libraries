@@ -289,7 +289,8 @@ struct BlockwiseGemmDpp_ak0mak1_bk0nbk1_m0n0m1n1m2n2
                     vector_type<ABDataType, KPack> a_thread_vec;
                     vector_type<ABDataType, KPack> b_thread_vec;
 
-                    auto loadA = load_thread_vec<decltype(a_thread_vec),
+                    auto loadA =
+                        thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                  decltype(a_thread_buf),
                                                  decltype(a_thread_desc_),
                                                  ABDataType,
@@ -297,7 +298,8 @@ struct BlockwiseGemmDpp_ak0mak1_bk0nbk1_m0n0m1n1m2n2
                                                  Number<0>,
                                                  Number<0>,
                                                  Add<Number<k>, Ik>>{a_thread_vec, a_thread_buf};
-                    auto loadB = load_thread_vec<decltype(b_thread_vec),
+                    auto loadB =
+                        thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                  decltype(b_thread_buf),
                                                  decltype(b_thread_desc_),
                                                  ABDataType,
