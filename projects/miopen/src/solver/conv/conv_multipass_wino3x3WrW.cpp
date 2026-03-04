@@ -823,8 +823,11 @@ template struct TransposedConvWinograd3x3MultipassWrW<1, 1, 7, 2>;
 template struct TransposedConvWinograd3x3MultipassWrW<1, 1, 7, 3>;
 template struct TransposedConvWinograd3x3MultipassWrW<7, 2, 1, 1>;
 template struct TransposedConvWinograd3x3MultipassWrW<7, 3, 1, 1>;
+template struct TransposedConvWinograd3x3MultipassWrW<7, 2, 7, 2>;
+template struct TransposedConvWinograd3x3MultipassWrW<7, 3, 7, 3>;
 template struct TransposedConvWinograd3x3MultipassWrW<5, 3>;
 template struct TransposedConvWinograd3x3MultipassWrW<5, 4>;
+template struct TransposedConvWinograd3x3MultipassWrW<5, 4, 5, 4>;
 
 } // namespace conv
 } // namespace solver
