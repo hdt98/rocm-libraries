@@ -1913,7 +1913,14 @@ class Solution(collections.abc.Mapping):
                   ldsPadA = state["VectorWidthA"]
             else:
               if state["DirectToLdsA"]:
-                ldsPadA = max(lrvwA, optPadA) if not state["ProblemType"]["TLUA"] else 0
+                if not state["ProblemType"]["TLUA"]:
+                  bpeA = state["ProblemType"]["DataTypeA"].numBytes()
+                  LdsStride = state["VectorWidthA"] * bpeA * state["DepthU"]
+                  MinLdsBlockSizePerPadA = (state[f"GlobalReadVectorWidthA"] * bpeA) * state["WavefrontSize"]
+                  isM0PadEnough = LdsStride >= MinLdsBlockSizePerPadA
+                  ldsPadA = state["MatrixInstK"] if bpeA == 2 and not isM0PadEnough else 2 * lrvw
+                else:
+                  ldsPadA = 0
               else:
                 ldsPadA = max(state["GlobalReadVectorWidthA"],optPadA)
           assert(ldsPadA >= 0)
@@ -1939,7 +1946,14 @@ class Solution(collections.abc.Mapping):
                   ldsPadB = state["VectorWidthB"]
             else:
               if state["DirectToLdsB"]:
-                ldsPadB = max(lrvwB, optPadB) if not state["ProblemType"]["TLUB"] else 0
+                if not state["ProblemType"]["TLUB"]:
+                  bpeB = state["ProblemType"]["DataTypeB"].numBytes()
+                  LdsStride = state["VectorWidthB"] * bpeB * state["DepthU"]
+                  MinLdsBlockSizePerPadB = (state[f"GlobalReadVectorWidthB"] * bpeB) * state["WavefrontSize"]
+                  isM0PadEnough = LdsStride >= MinLdsBlockSizePerPadB
+                  ldsPadB = state["MatrixInstK"] if bpeB == 2 and not isM0PadEnough else 2 * lrvw
+                else:
+                  ldsPadB = 0
               else:
                 ldsPadB = max(state["GlobalReadVectorWidthB"],optPadB)
           assert(ldsPadB >= 0)
