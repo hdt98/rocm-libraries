@@ -3,8 +3,8 @@
 
 #include <rocRoller/KernelGraph/Transforms/RemoveImplicitScheduling.hpp>
 
+#include <rocRoller/KernelGraph/ControlGraph/DataDependenceDAG.hpp>
 #include <rocRoller/KernelGraph/NodeSchedulingUtils.hpp>
-
 #include <rocRoller/KernelGraph/Utils.hpp>
 
 namespace rocRoller::KernelGraph
@@ -51,7 +51,7 @@ namespace rocRoller::KernelGraph
 
             Log::debug("Got connections.");
 
-            auto dependenceDAG = NodeScheduling::ConstructDataDependenceDAG(graph);
+            auto dependenceDAG = DataDependenceDAG::ConstructDataDependenceDAG(graph);
 
             for(auto nodeA : nodes)
             {
