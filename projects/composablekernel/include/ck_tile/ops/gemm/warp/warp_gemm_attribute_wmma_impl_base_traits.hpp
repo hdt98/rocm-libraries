@@ -230,88 +230,31 @@ struct WmmaTraitsBase<gfx13_t, ADType, BDType, CDType, K, MixPrec, M, N>
     static constexpr index_t kAMLane = 16;
     static constexpr index_t kBNLane = 16;
 
-    static constexpr index_t kAK0PerLane = 1;
-    static constexpr index_t kBK0PerLane = 1;
-    static constexpr index_t kAK1PerLane = 8;
-    static constexpr index_t kBK1PerLane = 8;
+    static constexpr index_t K1PerLane   = sizeof(ADataType) == 2 ? 2 : 4;
     static constexpr index_t kABKLane    = 2;
+    static constexpr index_t kAK0PerLane = kK / kABKLane / K1PerLane;
+    static constexpr index_t kBK0PerLane = kK / kABKLane / K1PerLane;
+    static constexpr index_t kAK1PerLane = K1PerLane;
+    static constexpr index_t kBK1PerLane = K1PerLane;
 
     static constexpr index_t kCMLane     = 2;
     static constexpr index_t kCNLane     = 16;
-    static constexpr index_t kCM0PerLane = 1;
-    static constexpr index_t kCM1PerLane = 8;
-
-    using kABPs2RHssMajor = sequence<2, 1>;
-    using kABPs2RHssMinor = sequence<1, 0>;
-    using kABYs2RHsMajor  = sequence<2, 2>;
-    using kABYs2RHsMinor  = sequence<0, 2>;
-#if 0
-    using kCPs2RHssMajor = sequence<1, 2>;
-    using kCPs2RHssMinor = sequence<1, 0>;
-    using kCYs2RHsMajor  = sequence<1, 1>;
-    using kCYs2RHsMinor  = sequence<0, 2>;
-
-    using kCTPs2RHssMajor = sequence<2, 1>;
-    using kCTPs2RHssMinor = sequence<1, 0>;
-    using kCTYs2RHsMajor  = sequence<2, 2>;
-    using kCTYs2RHsMinor  = sequence<0, 2>;
-#endif
-    using kCPs2RHssMajor = sequence<1, 2>;
-    using kCPs2RHssMinor = sequence<2, 1>;
-    using kCYs2RHsMajor =
-        std::conditional_t<(kCMBlock == 1 && kCNBlock == 1), sequence<1, 1>, sequence<1, 2, 1, 1>>;
-    using kCYs2RHsMinor =
-        std::conditional_t<(kCMBlock == 1 && kCNBlock == 1), sequence<1, 3>, sequence<0, 0, 1, 3>>;
-
-    using kCTPs2RHssMajor = sequence<2, 1>;
-    using kCTPs2RHssMinor = sequence<2, 1>;
-    using kCTYs2RHsMajor =
-        std::conditional_t<(kCMBlock == 1 && kCNBlock == 1), sequence<2, 2>, sequence<2, 1, 2, 2>>;
-    using kCTYs2RHsMinor =
-        std::conditional_t<(kCMBlock == 1 && kCNBlock == 1), sequence<1, 3>, sequence<0, 0, 1, 3>>;
-    // OOXX need change here
-#if 0
-    using ADataType = ADType;
-    using BDataType = BDType;
-    using CDataType = CDType;
-
-    using AVecType = ext_vector_t<ADataType, 8>;
-    using BVecType = ext_vector_t<BDataType, 8>;
-    using CVecType = ext_vector_t<CDataType, 8>;
-
-    static constexpr index_t kM = 16;
-    static constexpr index_t kN = 16;
-    static constexpr index_t kK = 16;
-
-    static constexpr index_t kAMBlock = 1;
-    static constexpr index_t kBNBlock = 1;
-
-    static constexpr index_t kRepeat      = 1;
-    static constexpr index_t kAMLane      = 16;
-    static constexpr index_t kBNLane      = 16;
-    static constexpr index_t kABK0PerLane = 4;
-    static constexpr index_t kABKLane     = 2;
-    static constexpr index_t kABK1PerLane = 2;
-
-    static constexpr index_t kCMLane     = 2;
-    static constexpr index_t kCNLane     = 16;
-    static constexpr index_t kCM0PerLane = 4;
-    static constexpr index_t kCM1PerLane = 2;
+    static constexpr index_t kCM0PerLane = kK / kABKLane / K1PerLane;
+    static constexpr index_t kCM1PerLane = K1PerLane;
 
     using kABPs2RHssMajor = sequence<1, 2>;
-    using kABPs2RHssMinor = sequence<0, 1>;
+    using kABPs2RHssMinor = sequence<1, 1>;
     using kABYs2RHsMajor  = sequence<2, 2>;
     using kABYs2RHsMinor  = sequence<0, 2>;
 
-    using kCPs2RHssMajor = sequence<1, 2>;
-    using kCPs2RHssMinor = sequence<0, 1>;
-    using kCYs2RHsMajor  = sequence<2, 2>;
-    using kCYs2RHsMinor  = sequence<0, 2>;
+    using kCPs2RHssMajor = sequence<2, 1>;
+    using kCPs2RHssMinor = sequence<1, 2>;
+    using kCYs2RHsMajor  = sequence<1, 1>;
+    using kCYs2RHsMinor  = sequence<1, 3>;
 
-    using kCTPs2RHssMajor = sequence<2, 1>;
-    using kCTPs2RHssMinor = sequence<1, 0>;
+    using kCTPs2RHssMajor = sequence<1, 2>;
+    using kCTPs2RHssMinor = sequence<1, 2>;
     using kCTYs2RHsMajor  = sequence<2, 2>;
-    using kCTYs2RHsMinor  = sequence<0, 2>;
-#endif
+    using kCTYs2RHsMinor  = sequence<1, 3>;
 };
 } // namespace ck_tile
