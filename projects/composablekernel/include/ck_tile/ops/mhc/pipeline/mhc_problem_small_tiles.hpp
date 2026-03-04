@@ -133,7 +133,7 @@ struct MHCProblemSmallTilesLowLDS
     static constexpr index_t NumWaveGroups      = 1;
     static constexpr index_t VectorLoadSize     = 16;
     static constexpr index_t kBlockSize         = BlockShape::BlockSize;
-    static constexpr bool DoubleSmemBuffer      = true;
+    static constexpr bool DoubleSmemBuffer      = false;
     static constexpr bool UseStructuredSparsity = false;
     static constexpr bool FixedVectorSize       = false;
 
@@ -157,6 +157,82 @@ struct MHCProblemSmallTilesLowLDS
     {
         return GemmPipelineAGmemBGmemCRegV1DefaultPolicy::MakeBDramTileDistribution<
             MHCProblemSmallTilesLowLDS>();
+    }
+};
+
+// MHC Problem - Asymmetric tiles (M=16, N=32, K=32) for lower LDS and higher occupancy
+// Half the output tile (512 vs 1024 elements) → ~25% less LDS per block than 32×32.
+// Uses 2 warps (1 in M, 2 in N) with WarpTile 16×16×32 (bf16 dispatcher supports this).
+template <typename XDataType_, typename ComputeDataType_, typename YDataType_>
+struct MHCProblemSmallTilesAsymmetric
+{
+    using XDataType       = remove_cvref_t<XDataType_>;
+    using ComputeDataType = remove_cvref_t<ComputeDataType_>;
+    using YDataType       = remove_cvref_t<YDataType_>;
+
+    using PhiDataType = XDataType;
+    using ADataType   = XDataType;
+    using BDataType   = PhiDataType;
+    using CDataType   = ComputeDataType;
+
+    static constexpr index_t kMTile = 16;
+
+    // M=16, N=32, K=32 → LDS (16*32 + 32*32)*2 = 3KB vs 4KB for 32×32
+    // BlockWarps 1×2×1, WarpTile 16×16×32 (2 warps along N)
+    using BlockGemmShape =
+        TileGemmShape<sequence<16, 32, 32>, sequence<1, 2, 1>, sequence<16, 16, 32>>;
+
+    static constexpr index_t VectorSizeA = 4;
+    static constexpr index_t VectorSizeB = 4;
+
+    // 2 warps = 128 threads
+    using BlockShape = Generic2dBlockShape<sequence<1, 128>, sequence<1, 128>, sequence<1, 1>>;
+
+    using ALayout = ck_tile::tensor_layout::gemm::RowMajor;
+    using BLayout = ck_tile::tensor_layout::gemm::ColumnMajor;
+    using CLayout = ck_tile::tensor_layout::gemm::RowMajor;
+
+    using AsDataTypeTuple = tuple<ADataType>;
+    using BsDataTypeTuple = tuple<BDataType>;
+    using AsLayoutTuple   = tuple<ALayout>;
+    using BsLayoutTuple   = tuple<BLayout>;
+
+    using AElementWise = identity;
+    using BElementWise = identity;
+
+    static constexpr bool TransposeC            = false;
+    static constexpr bool kPadM                 = true;
+    static constexpr bool kPadN                 = true;
+    static constexpr bool kPadK                 = true;
+    static constexpr bool Preshuffle            = false;
+    static constexpr auto Scheduler             = GemmPipelineScheduler::Intrawave;
+    static constexpr index_t NumWaveGroups      = 1;
+    static constexpr index_t VectorLoadSize     = 16;
+    static constexpr index_t kBlockSize         = BlockShape::BlockSize;
+    static constexpr bool DoubleSmemBuffer      = false;
+    static constexpr bool UseStructuredSparsity = false;
+    static constexpr bool FixedVectorSize       = false;
+
+    struct Traits
+    {
+        static constexpr bool UsePersistentKernel = false;
+    };
+
+    CK_TILE_HOST static const std::string GetName()
+    {
+        return "MHCProblemSmallTilesAsymmetric_M16_N32_K32";
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr auto MakeXLoadTileDistribution()
+    {
+        return GemmPipelineAGmemBGmemCRegV1DefaultPolicy::MakeADramTileDistribution<
+            MHCProblemSmallTilesAsymmetric>();
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr auto MakePhiLoadTileDistribution()
+    {
+        return GemmPipelineAGmemBGmemCRegV1DefaultPolicy::MakeBDramTileDistribution<
+            MHCProblemSmallTilesAsymmetric>();
     }
 };
 

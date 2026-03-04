@@ -32,8 +32,10 @@ auto create_args(int argc, char* argv[])
         .insert("alpha_res", "3.5", "Alpha for residual")
         .insert("bias", "1.5", "Bias value")
         .insert("sinkhorn_iters", "0", "Number of Sinkhorn iterations (0=disabled)")
-        .insert(
-            "low_lds", "0", "Use LowLDS (K=16); can hurt for large C (2x split-K). 0=no, 1=yes");
+        .insert("low_lds", "0", "Use LowLDS (K=16); can hurt for large C (2x split-K). 0=no, 1=yes")
+        .insert("asymmetric",
+                "0",
+                "Use asymmetric tiles (M=16, N=32) for lower LDS / higher occupancy. 0=no, 1=yes");
 
     bool result = arg_parser.parse(argc, argv);
     return std::make_tuple(result, arg_parser);
@@ -294,9 +296,21 @@ int main(int argc, char* argv[])
     using ComputeDataType = float;
     using ActivationFunc  = ck_tile::element_wise::Sigmoid;
 
-    const bool use_low_lds = (arg_parser.get_int("low_lds") != 0);
+    const bool use_asymmetric = (arg_parser.get_int("asymmetric") != 0);
+    const bool use_low_lds    = (arg_parser.get_int("low_lds") != 0);
     bool pass;
-    if(use_low_lds)
+    if(use_asymmetric)
+    {
+        using Problem =
+            ck_tile::MHCProblemSmallTilesAsymmetric<XDataType, ComputeDataType, YDataType>;
+        pass = run_mhc_benchmark<XDataType,
+                                 PhiDataType,
+                                 YDataType,
+                                 ComputeDataType,
+                                 Problem,
+                                 ActivationFunc>(arg_parser);
+    }
+    else if(use_low_lds)
     {
         using Problem = ck_tile::MHCProblemSmallTilesLowLDS<XDataType, ComputeDataType, YDataType>;
         pass          = run_mhc_benchmark<XDataType,

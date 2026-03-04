@@ -38,16 +38,17 @@ CK_TILE_HOST void reference_mhc(const HostTensor<XDataType>& x_b_nc,       // [B
     // Process each batch element
     auto f_batch = [&](auto b) {
         // Step 1: Compute norm ||x_l||_2 / sqrt(nC)
-        ComputeDataType sum_squares = 0.0f;
-        for(int i = 0; i < nC; i++)
-        {
-            ComputeDataType val = type_convert<ComputeDataType>(x_b_nc(b, i));
-            sum_squares += val * val;
-        }
-        ComputeDataType norm = std::sqrt(sum_squares) / std::sqrt(static_cast<ComputeDataType>(nC));
-        // Avoid division by zero
-        if(norm < 1e-12f)
-            norm = 1.0f;
+        // EXPERIMENT: norm computation commented to match kernel experiment (measure norm cost).
+        // ComputeDataType sum_squares = 0.0f;
+        // for(int i = 0; i < nC; i++)
+        // {
+        //     ComputeDataType val = type_convert<ComputeDataType>(x_b_nc(b, i));
+        //     sum_squares += val * val;
+        // }
+        // ComputeDataType norm = std::sqrt(sum_squares) /
+        // std::sqrt(static_cast<ComputeDataType>(nC)); if(norm < 1e-12f)
+        //     norm = 1.0f;
+        ComputeDataType norm = 1.0f; // no normalization when norm computation is commented
 
         // Step 2 & 3: Perform GEMM and apply elementwise operations
 

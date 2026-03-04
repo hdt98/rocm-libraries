@@ -14,7 +14,7 @@ namespace ck_tile {
 struct MHCDefaultPolicy
 {
 
-    // Provide warp gemm configuration for various data types
+    // Provide warp gemm configuration for various data types and block shapes
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto GetWarpGemmMWarpNWarp()
     {
@@ -23,18 +23,55 @@ struct MHCDefaultPolicy
                      std::is_same_v<typename Problem::BDataType, bf16_t> &&
                      std::is_same_v<typename Problem::CDataType, float>)
         {
-            // Use MFMA warp gemm for bf16 inputs with float accumulation
-            using WG = WarpGemmDispatcher<bf16_t,
-                                          bf16_t,
-                                          float,
-                                          16,
-                                          16,
-                                          16, // M, N, K per warp (MFMA 16x16x16)
-                                          true,
-                                          false,
-                                          false,
-                                          WGAttrNumAccessEnum::Single>;
-            return make_tuple(WG{}, 1, 1); // 1 warp in M, 1 warp in N (K warps handled separately)
+            constexpr index_t kM = Problem::BlockGemmShape::kM;
+            constexpr index_t kN = Problem::BlockGemmShape::kN;
+            constexpr index_t kK = Problem::BlockGemmShape::kK;
+
+            // Asymmetric 16×32 block: 2 warps in N, WarpTile 16×16×32
+            if constexpr(kM == 16 && kN == 32 && kK == 32)
+            {
+                using WG = WarpGemmDispatcher<bf16_t,
+                                              bf16_t,
+                                              float,
+                                              16,
+                                              16,
+                                              32,
+                                              true,
+                                              false,
+                                              false,
+                                              WGAttrNumAccessEnum::Single>;
+                return make_tuple(WG{}, 1, 2); // 1 warp in M, 2 warps in N
+            }
+            // LowLDS 32×32×16 block: 1 warp, WarpTile 16×16×16 (1 K-iteration per warp)
+            else if constexpr(kM == 32 && kN == 32 && kK == 16)
+            {
+                using WG = WarpGemmDispatcher<bf16_t,
+                                              bf16_t,
+                                              float,
+                                              16,
+                                              16,
+                                              16, // M, N, K per warp
+                                              true,
+                                              false,
+                                              false,
+                                              WGAttrNumAccessEnum::Single>;
+                return make_tuple(WG{}, 1, 1); // 1 warp in M, 1 warp in N
+            }
+            // Default 32×32 block: 1 warp, WarpTile 16×16×16 (2 K-iterations per warp)
+            else
+            {
+                using WG = WarpGemmDispatcher<bf16_t,
+                                              bf16_t,
+                                              float,
+                                              16,
+                                              16,
+                                              16, // M, N, K per warp (MFMA 16x16x16)
+                                              true,
+                                              false,
+                                              false,
+                                              WGAttrNumAccessEnum::Single>;
+                return make_tuple(WG{}, 1, 1); // 1 warp in M, 1 warp in N
+            }
         }
         // For float x float -> float, provide a simple configuration
         else if constexpr(std::is_same_v<typename Problem::ADataType, float> &&
