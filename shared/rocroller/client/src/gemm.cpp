@@ -1920,7 +1920,7 @@ int main(int argc, const char* argv[])
         solution.loadPathA = SolutionParams::LoadPath::BufferToLDS;
         solution.loadPathB = SolutionParams::LoadPath::BufferToLDS;
 
-        solution.storeLDSD = false;
+        solution.storePath = SolutionParams::StorePath::VGPRToGlobalMemoryWithBuffer;
 
         solution.prefetch          = true;
         solution.prefetchInFlight  = 2;
@@ -1929,12 +1929,7 @@ int main(int argc, const char* argv[])
 
         solution.betaInFma = true;
 
-        solution.unrollX = 0;
-        solution.unrollY = 0;
-
-        solution.streamK               = false;
-        solution.streamKTwoTile        = false;
-        solution.streamKTwoTileDPFirst = false;
+        solution.streamK = StreamKMode::None;
 
         solution.loadPathAScale = SolutionParams::LoadPath::BufferToVGPR;
         solution.loadPathBScale = SolutionParams::LoadPath::BufferToVGPR;
@@ -1947,8 +1942,6 @@ int main(int argc, const char* argv[])
         solution.workgroupMappingDim    = 0;
         solution.workgroupRemapXCC      = true;
         solution.workgroupRemapXCCValue = -1;
-
-        solution.matchMemoryAccess = true;
     }
 
     updateSolutionFromArguments(solution, app);
