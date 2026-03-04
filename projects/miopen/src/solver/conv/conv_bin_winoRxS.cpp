@@ -32,6 +32,7 @@
 #include <miopen/kernel_build_params.hpp>
 #include <miopen/conv/data_invoke_params.hpp>
 #include <miopen/conv/tensors.hpp>
+#include <miopen/tensor.hpp>
 
 /// Global switch
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_AMD_WINOGRAD_RXS)
@@ -183,7 +184,13 @@ static inline bool IsShaderContraintsMet(const miopen::ExecutionContext& ctx,
             return false;
     }
     const auto grid_workgroup_count_x = ctx.GetStream().GetMaxComputeUnits();
-    if(!problem.IsLayoutDefault())
+
+    // Use IsPossibleLayout4D5D to check actual tensor strides rather than cached layout string
+    // This allows transposed solvers to work correctly when they modify tensor strides
+    static const auto strict2 = miopen::TensorDescriptor::LayoutValidationMode::StrictDecreasingStrides;
+    if(!(problem.GetIn().IsPossibleLayout4D5D("NCHW", strict2) &&
+         problem.GetWeights().IsPossibleLayout4D5D("NCHW", strict2) &&
+         problem.GetOut().IsPossibleLayout4D5D("NCHW", strict2)))
         return false;
 
     // clang-format off

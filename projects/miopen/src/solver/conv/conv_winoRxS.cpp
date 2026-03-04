@@ -310,8 +310,15 @@ inline bool IsShaderConstraintsMet(const ProblemDescription& problem,
             return false;
     }
 
-    if(!problem.IsLayoutDefault())
-        return false;
+    // Use IsPossibleLayout4D5D to check actual tensor strides rather than cached layout string
+    // This allows transposed solvers to work correctly when they modify tensor strides
+    {
+        static const auto strict = TensorDescriptor::LayoutValidationMode::StrictDecreasingStrides;
+        if(!(problem.GetIn().IsPossibleLayout4D5D("NCHW", strict) &&
+             problem.GetWeights().IsPossibleLayout4D5D("NCHW", strict) &&
+             problem.GetOut().IsPossibleLayout4D5D("NCHW", strict)))
+            return false;
+    }
 
     return IsWinogradV21Preferred<Winodata, Winofilter>(asic, problem)
                ? IsShaderConstraintsMetV21(problem, R, S, C, K, H, W, OH, OW, N)
@@ -1176,6 +1183,9 @@ ConvSolution ConvBinWinogradRxSf2x3g1::GetSolution(const ExecutionContext& ctx,
 
 template struct ConvBinWinoRxS<2, 3>;
 template struct ConvBinWinoRxS<3, 2>;
+
+template struct MIOPEN_INTERNALS_EXPORT TransposedConvBinWinoRxS<2, 3>;
+template struct MIOPEN_INTERNALS_EXPORT TransposedConvBinWinoRxS<3, 2>;
 
 } // namespace conv
 } // namespace solver
