@@ -8,7 +8,6 @@
 #include "origami/gemm.hpp"
 #include "origami/hardware.hpp"
 #include "origami/heuristics.hpp"
-#include "origami/logger.hpp"
 #include "origami/types.hpp"
 
 namespace origami {
@@ -19,16 +18,19 @@ namespace origami {
 
 void heuristic_params_t::merge_with(const heuristic_params_t& other) {
   // Latency component weights
-  weight_mem_l2        = other.weight_mem_l2;
-  weight_mem_mall      = other.weight_mem_mall;
-  weight_mem_dram      = other.weight_mem_dram;
-  weight_compute       = other.weight_compute;
-  weight_memory        = other.weight_memory;
-  weight_wg_setup      = other.weight_wg_setup;
-  weight_prologue      = other.weight_prologue;
-  weight_epilogue      = other.weight_epilogue;
-  weight_loop_overhead = other.weight_loop_overhead;
-  weight_tile_total    = other.weight_tile_total;
+  weight_mem_l2                     = other.weight_mem_l2;
+  weight_mem_mall                   = other.weight_mem_mall;
+  weight_mem_dram                   = other.weight_mem_dram;
+  weight_compute                    = other.weight_compute;
+  weight_memory                     = other.weight_memory;
+  weight_wg_setup                   = other.weight_wg_setup;
+  weight_prologue                   = other.weight_prologue;
+  weight_epilogue                   = other.weight_epilogue;
+  weight_loop_overhead              = other.weight_loop_overhead;
+  weight_tile_total                 = other.weight_tile_total;
+  weight_epilogue_initial           = other.weight_epilogue_initial;
+  weight_epilogue_compute           = other.weight_epilogue_compute;
+  weight_epilogue_k_split_reduction = other.weight_epilogue_k_split_reduction;
 
   // Empirical constants
   l2_min_hit_rate_default    = other.l2_min_hit_rate_default;
@@ -191,8 +193,8 @@ heuristic_params_t heuristics_database_t::lookup(const problem_t& problem,
     auto it = hand_optimized_map_.find(fast_key);
     if (it != hand_optimized_map_.end()) {
       if (origami::runtime_options::get().debug_enabled) {
-        OLOG_DEBUG("Hand-optimized kernel " << fast_key.to_string() << ", efficiency: "
-                   << it->second.main_loop_efficiency);
+        OLOG_DEBUG("Hand-optimized kernel " << fast_key.to_string()
+                                            << ", efficiency: " << it->second.main_loop_efficiency);
       }
       result = it->second;
     }
@@ -240,6 +242,17 @@ void heuristics_database_t::add_entry(const heuristic_key_t& key,
   } else {
     entries_.push_back({key, params});
   }
+}
+
+bool heuristics_database_t::has_hand_optimized_entry(hardware_t::architecture_t arch,
+                                                     data_type_t mi_dtype,
+                                                     transpose_t transA,
+                                                     transpose_t transB,
+                                                     size_t mt_m,
+                                                     size_t mt_n,
+                                                     size_t mt_k) const {
+  hand_optimized_kernel_key_t key{arch, mi_dtype, transA, transB, mt_m, mt_n, mt_k};
+  return hand_optimized_map_.find(key) != hand_optimized_map_.end();
 }
 
 void heuristics_database_t::initialize_defaults() {

@@ -50,33 +50,24 @@ struct epilogue_components_t {
 };
 
 /**
- * @brief Epilogue composition strategy selector.
- *
- * Determines how epilogue penalty blocks are combined.
- */
-enum class epilogue_composition_strategy_t {
-  DEFAULT                = 0,  // Original formula (before modularization)
-  GLOBAL_OCCUPANCY_DECAY = 1,  // Apply occupancy decay to all components
-  MEMORY_GROUPED         = 2,  // Group memory operations together
-  COMPUTE_PRIORITIZED    = 3,  // Apply occupancy decay primarily to compute
-};
-
-/**
  * @brief Default values for heuristic parameters.
  * Centralized location for all default constants.
  */
 struct heuristic_defaults_t {
   // Latency Component Weights
-  static constexpr double WEIGHT_MEM_L2        = 1.0;
-  static constexpr double WEIGHT_MEM_MALL      = 1.0;
-  static constexpr double WEIGHT_MEM_DRAM      = 1.0;
-  static constexpr double WEIGHT_COMPUTE       = 1.0;
-  static constexpr double WEIGHT_MEMORY        = 1.0;
-  static constexpr double WEIGHT_WG_SETUP      = 1.0;
-  static constexpr double WEIGHT_PROLOGUE      = 1.5;
-  static constexpr double WEIGHT_EPILOGUE      = 2.0;
-  static constexpr double WEIGHT_LOOP_OVERHEAD = 500.0;
-  static constexpr double WEIGHT_TILE_TOTAL    = 1.0;
+  static constexpr double WEIGHT_MEM_L2                     = 1.0;
+  static constexpr double WEIGHT_MEM_MALL                   = 1.0;
+  static constexpr double WEIGHT_MEM_DRAM                   = 1.0;
+  static constexpr double WEIGHT_COMPUTE                    = 1.0;
+  static constexpr double WEIGHT_MEMORY                     = 1.0;
+  static constexpr double WEIGHT_WG_SETUP                   = 1.0;
+  static constexpr double WEIGHT_PROLOGUE                   = 1.5;
+  static constexpr double WEIGHT_EPILOGUE                   = 2.0;
+  static constexpr double WEIGHT_LOOP_OVERHEAD              = 500.0;
+  static constexpr double WEIGHT_TILE_TOTAL                 = 1.0;
+  static constexpr double WEIGHT_EPILOGUE_INITIAL           = 1.0;
+  static constexpr double WEIGHT_EPILOGUE_COMPUTE           = 1.0;
+  static constexpr double WEIGHT_EPILOGUE_K_SPLIT_REDUCTION = 1.0;
 
   // Empirical Constants
   static constexpr double L2_MIN_HIT_RATE            = 0.5;
@@ -100,16 +91,20 @@ struct heuristic_defaults_t {
  */
 struct heuristic_params_t {
   // === Latency Component Weights ===
-  double weight_mem_l2        = heuristic_defaults_t::WEIGHT_MEM_L2;
-  double weight_mem_mall      = heuristic_defaults_t::WEIGHT_MEM_MALL;
-  double weight_mem_dram      = heuristic_defaults_t::WEIGHT_MEM_DRAM;
-  double weight_compute       = heuristic_defaults_t::WEIGHT_COMPUTE;
-  double weight_memory        = heuristic_defaults_t::WEIGHT_MEMORY;
-  double weight_wg_setup      = heuristic_defaults_t::WEIGHT_WG_SETUP;
-  double weight_prologue      = heuristic_defaults_t::WEIGHT_PROLOGUE;
-  double weight_epilogue      = heuristic_defaults_t::WEIGHT_EPILOGUE;
-  double weight_loop_overhead = heuristic_defaults_t::WEIGHT_LOOP_OVERHEAD;
-  double weight_tile_total    = heuristic_defaults_t::WEIGHT_TILE_TOTAL;
+  double weight_mem_l2           = heuristic_defaults_t::WEIGHT_MEM_L2;
+  double weight_mem_mall         = heuristic_defaults_t::WEIGHT_MEM_MALL;
+  double weight_mem_dram         = heuristic_defaults_t::WEIGHT_MEM_DRAM;
+  double weight_compute          = heuristic_defaults_t::WEIGHT_COMPUTE;
+  double weight_memory           = heuristic_defaults_t::WEIGHT_MEMORY;
+  double weight_wg_setup         = heuristic_defaults_t::WEIGHT_WG_SETUP;
+  double weight_prologue         = heuristic_defaults_t::WEIGHT_PROLOGUE;
+  double weight_epilogue         = heuristic_defaults_t::WEIGHT_EPILOGUE;
+  double weight_loop_overhead    = heuristic_defaults_t::WEIGHT_LOOP_OVERHEAD;
+  double weight_tile_total       = heuristic_defaults_t::WEIGHT_TILE_TOTAL;
+  double weight_epilogue_initial = heuristic_defaults_t::WEIGHT_EPILOGUE_INITIAL;
+  double weight_epilogue_compute = heuristic_defaults_t::WEIGHT_EPILOGUE_COMPUTE;
+  double weight_epilogue_k_split_reduction =
+      heuristic_defaults_t::WEIGHT_EPILOGUE_K_SPLIT_REDUCTION;
 
   // === Empirical Constants ===
   double l2_min_hit_rate_default    = heuristic_defaults_t::L2_MIN_HIT_RATE;
@@ -120,10 +115,6 @@ struct heuristic_params_t {
 
   // === Main Loop Efficiency ===
   double main_loop_efficiency = heuristic_defaults_t::MAIN_LOOP_EFFICIENCY;
-
-  // === Epilogue Composition Strategy ===
-  epilogue_composition_strategy_t epilogue_composition_strategy =
-      epilogue_composition_strategy_t::DEFAULT;
 
   /**
    * @brief Merge this parameter set with another (for hierarchical lookup).
@@ -262,6 +253,18 @@ class heuristics_database_t {
   void add_entry(const heuristic_key_t& key, const heuristic_params_t& params);
 
   /**
+   * @brief Return true if the database has a hand-optimized entry for the given (arch, dtype,
+   * layout, MT).
+   */
+  bool has_hand_optimized_entry(hardware_t::architecture_t arch,
+                                data_type_t mi_dtype,
+                                transpose_t transA,
+                                transpose_t transB,
+                                size_t mt_m,
+                                size_t mt_n,
+                                size_t mt_k) const;
+
+  /**
    * @brief Get the global heuristics database instance.
    */
   static heuristics_database_t& get_instance();
@@ -320,75 +323,27 @@ heuristic_key_t make_tile_key(size_t MT_M,
 heuristic_key_t make_arch_dtype_key(hardware_t::architecture_t arch, data_type_t mi_dtype);
 
 /**
- * @brief Epilogue composition strategy functions.
+ * @brief Epilogue composition
  *
- * These functions define how epilogue components are combined.
- * Select via heuristic_params_t::epilogue_composition_strategy.
- */
-// Default composition strategy
-inline double compose_epilogue_default(const epilogue_components_t& comp,
-                                       const heuristic_params_t& heuristic,
-                                       double occupancy_factor) {
-  // Original formula (before modularization):
-  // ((initial + compute) * occupancy_decay) + (k_split + overhead) + k_padding
-  return ((comp.initial_memory_write + comp.compute_iteration) * occupancy_factor) +
-         (comp.k_split_reduction + comp.k_split_overhead_const) + comp.k_padding;
-}
-
-// Global occupancy decay composition strategy (simple sum of all components)
-inline double compose_epilogue_global_occupancy_decay(const epilogue_components_t& comp,
-                                                      const heuristic_params_t& heuristic,
-                                                      double occupancy_factor) {
-  return (comp.initial_memory_write + comp.compute_iteration + comp.k_split_reduction +
-          comp.k_split_overhead_const + comp.k_padding) *
-         occupancy_factor;
-}
-
-// Memory grouped composition strategy: group memory operations together
-inline double compose_epilogue_memory_grouped(const epilogue_components_t& comp,
-                                              const heuristic_params_t& heuristic,
-                                              double occupancy_factor) {
-  double memory_ops = comp.initial_memory_write + comp.k_split_reduction;
-  double overheads  = comp.k_split_overhead_const + comp.k_padding;
-  return (memory_ops * occupancy_factor) + comp.compute_iteration + overheads;
-}
-
-// Compute prioritized composition strategy: prioritize compute impact
-inline double compose_epilogue_compute_prioritized(const epilogue_components_t& comp,
-                                                   const heuristic_params_t& heuristic,
-                                                   double occupancy_factor) {
-  double compute_ops = comp.compute_iteration * occupancy_factor;
-  double memory_ops  = comp.initial_memory_write + comp.k_split_reduction;
-  double overheads   = comp.k_split_overhead_const + comp.k_padding;
-  return compute_ops + memory_ops + overheads;
-}
-
-/**
- * @brief Main dispatcher for epilogue composition.
- *
- * Selects the appropriate composition strategy based on heuristic parameters.
- * This is the main entry point used by gemm.cpp.
- * Marked inline for performance in hot path.
+ * Formula: ((w_initial*initial + w_compute*compute) * occupancy_decay) +
+ *          (w_k_split_red*k_split_reduction + k_split_overhead_const) +
+ *          k_padding
  *
  * @param comp Epilogue components calculated in gemm.cpp
- * @param heuristic Heuristic parameters (includes strategy selector)
+ * @param heuristic Heuristic parameters (includes component weights)
  * @param occupancy_factor Occupancy decay factor (pow(decay_base, real_occupancy))
  * @return Composed epilogue latency
  */
 inline double compose_epilogue(const epilogue_components_t& comp,
                                const heuristic_params_t& heuristic,
                                double occupancy_factor) {
-  switch (heuristic.epilogue_composition_strategy) {
-    case epilogue_composition_strategy_t::DEFAULT:
-      return compose_epilogue_default(comp, heuristic, occupancy_factor);
-    case epilogue_composition_strategy_t::GLOBAL_OCCUPANCY_DECAY:
-      return compose_epilogue_global_occupancy_decay(comp, heuristic, occupancy_factor);
-    case epilogue_composition_strategy_t::MEMORY_GROUPED:
-      return compose_epilogue_memory_grouped(comp, heuristic, occupancy_factor);
-    case epilogue_composition_strategy_t::COMPUTE_PRIORITIZED:
-      return compose_epilogue_compute_prioritized(comp, heuristic, occupancy_factor);
-    default: return compose_epilogue_default(comp, heuristic, occupancy_factor);
-  }
+  double initial_compute = (heuristic.weight_epilogue_initial * comp.initial_memory_write +
+                            heuristic.weight_epilogue_compute * comp.compute_iteration) *
+                           occupancy_factor;
+  double k_split_part = (heuristic.weight_epilogue_k_split_reduction * comp.k_split_reduction) +
+                        comp.k_split_overhead_const;
+  double k_padding_part = comp.k_padding;
+  return initial_compute + k_split_part + k_padding_part;
 }
 
 }  // namespace origami

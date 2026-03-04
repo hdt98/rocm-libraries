@@ -565,7 +565,6 @@ double compute_memory_latency(const problem_t& problem,
                               const config_t& config,
                               size_t num_active_cus,
                               size_t splitting_factor) {
-  
   bool debug = runtime_options::get().debug_enabled;
 
   // Extract parameters from structured types
@@ -686,8 +685,7 @@ double compute_memory_latency(const problem_t& problem,
                            L_mem_mem_mall * heuristic.weight_mem_mall,
                            L_mem_mem_dram * heuristic.weight_mem_dram});
 
-  if(debug)
-  {
+  if (debug) {
     OLOG_DEBUG("Ld_CU_bytes: " << Ld_CU_bytes);
     OLOG_DEBUG("total_Ld: " << total_Ld);
     OLOG_DEBUG("H_mem_l2: " << H_mem_l2);
@@ -716,7 +714,6 @@ double compute_tile_latency(const problem_t& problem,
                             const config_t& config,
                             size_t num_active_cus,
                             size_t splitting_factor) {
-  
   bool debug = runtime_options::get().debug_enabled;
 
   // Extract parameters from structured types
@@ -782,8 +779,7 @@ double compute_tile_latency(const problem_t& problem,
   // Block 2: One compute iteration in the epilogue
   epilogue_comp.compute_iteration = L_compute * effective_tile_penalty;
 
-  if(debug)
-  {
+  if (debug) {
     OLOG_DEBUG("mem_bw_occ: " << mem_bw_occ);
     OLOG_DEBUG("mem_bw_occ_limited: " << mem_bw_occ_limited);
     OLOG_DEBUG("utilization: " << utilization);
@@ -818,20 +814,18 @@ double compute_tile_latency(const problem_t& problem,
     double L_reduce                      = partial_readwrite_bytes / (mem_bw_occ_limited);
     epilogue_comp.k_split_reduction      = L_reduce + partial_adds;
     epilogue_comp.k_split_overhead_const = heuristic.k_split_reduction_overhead;
-    if(debug)
-    {
-        OLOG_DEBUG("partial_read_bytes: " << partial_read_bytes);
-        OLOG_DEBUG("partial_write_bytes: " << partial_write_bytes);
-        OLOG_DEBUG("partial_readwrite_bytes: " << partial_readwrite_bytes);
-        OLOG_DEBUG("partial_adds: " << partial_adds);
-        OLOG_DEBUG("L_reduce: " << L_reduce);
+    if (debug) {
+      OLOG_DEBUG("partial_read_bytes: " << partial_read_bytes);
+      OLOG_DEBUG("partial_write_bytes: " << partial_write_bytes);
+      OLOG_DEBUG("partial_readwrite_bytes: " << partial_readwrite_bytes);
+      OLOG_DEBUG("partial_adds: " << partial_adds);
+      OLOG_DEBUG("L_reduce: " << L_reduce);
     }
   }
 
   // Block 4: K-padding penalty (if applicable)
-  double problem_k_quant = 0.0;
   if (K % MT_K != 0) {
-    problem_k_quant = static_cast<double>(K % MT_K) / static_cast<double>(K);
+    const double problem_k_quant = static_cast<double>(K % MT_K) / static_cast<double>(K);
     epilogue_comp.k_padding      = problem_k_quant * heuristic.k_padding_penalty;
   }
 
@@ -869,9 +863,8 @@ double compute_tile_latency(const problem_t& problem,
 
   // Apply final tile total weight
   L_tile_total *= heuristic.weight_tile_total;
-  
-  if(debug)
-  {
+
+  if (debug) {
     OLOG_DEBUG("L_mem: " << L_mem);
     OLOG_DEBUG("L_compute: " << L_compute);
     OLOG_DEBUG("L_cvt: " << L_cvt);
@@ -959,8 +952,7 @@ double compute_total_latency(const problem_t& problem,
       return std::numeric_limits<double>::max();
     }
   }
-  if(debug)
-  {
+  if (debug) {
     OLOG_DEBUG("======== Origami Debug Info ========");
     OLOG_DEBUG("Problem size: " << int(M) << "x" << int(N) << "x" << int(K));
     OLOG_DEBUG("batch: " << int(batch));
@@ -985,8 +977,7 @@ double compute_total_latency(const problem_t& problem,
 
   // Compute latency for all timesteps and return it as the latency for the MT/problem
   double total_latency = L_timestep * num_timesteps;
-  if (debug)
-  {
+  if (debug) {
     OLOG_DEBUG("num_timesteps: " << num_timesteps);
     OLOG_DEBUG("total_latency: " << total_latency);
     OLOG_DEBUG("=================================");
