@@ -40,7 +40,7 @@ namespace ModelAddressesTest
     {
         struct Patterns
         {
-            std::vector<std::vector<size_t>> load; // Multiple valid patterns (e.g., A vs B)
+            std::vector<std::vector<size_t>> load;
             std::vector<std::vector<size_t>> store;
         };
 
@@ -52,8 +52,6 @@ namespace ModelAddressesTest
             decltype(GEMMProblem::padB) padB = GEMMProblem{}.padB;
         };
 
-        // Load addresses (ds_read) and store addresses (ds_write) for one workgroup (256 workitems).
-        // No padding: A and B tile load patterns differ only in wave ordering (both valid).
         Patterns noPaddingPatterns{
             .load
             = {{0,     256,   512,   768,   1024,  1280,  1536,  1792,  2048,  2304,  2560,  2816,
@@ -124,7 +122,6 @@ namespace ModelAddressesTest
                 15360, 15376, 15392, 15408, 15424, 15440, 15456, 15472, 15488, 15504, 15520, 15536,
                 15552, 15568, 15584, 15600}}};
 
-        // Yes padding: A and B have different patterns due to different padding amounts.
         Patterns yesPaddingPatterns{
             .load
             = {{0,     256,   512,   768,   1024,  1280,  1536,  1792,  2052,  2308,  2564,  2820,
@@ -289,11 +286,8 @@ namespace ModelAddressesTest
             commandKernel.launchKernel(commandArgs.runtimeArguments());
 
             /*
-            Barring any kernel changes, this should work to get addresses
-            rocgdb -x script.gdb --args test/rocroller-tests-catch "LDS Address Modelling" -c "Yes padding"
-
-            For Yes padding:
-            rocgdb -x ../scripts/print_registers.py --args test/rocroller-tests-catch "LDS Address Modelling" -c "Yes padding" | python ../scripts/parse_gdb_arrays.py
+            KERNEL_NAME="LDS_Address_Modelling_Yes_padding" rocgdb -x ../scripts/rocgdb_print_lds_instr_addrs.py --args test/rocroller-tests-catch "LDS Address Modelling" -c "Yes padding" | python ../scripts/parse_rocgdb_registers.py
+            KERNEL_NAME="LDS_Address_Modelling_No_padding" rocgdb -x ../scripts/rocgdb_print_lds_instr_addrs.py --args test/rocroller-tests-catch "LDS Address Modelling" -c "No padding" | python ../scripts/parse_rocgdb_registers.py
             */
         }
     }
