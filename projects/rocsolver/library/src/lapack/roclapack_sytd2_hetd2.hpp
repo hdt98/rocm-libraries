@@ -641,7 +641,7 @@ rocblas_status rocsolver_sytd2_hetd2_template(rocblas_handle handle,
             rocblasCall_symv_hemv<T>(handle, uplo, n - 1 - j, tmptau, stridet, A,
                                      shiftA + idx2D(j + 1, j + 1, lda), lda, strideA, A,
                                      shiftA + idx2D(j + 1, j, lda), 1, strideA, scalars + 1, 0, tau,
-                                     j, 1, strideP, batch_count, work, workArr);
+                                     j, 1, strideP, batch_count, work, workArr); // KO TODO:: level 2 operation
 
             ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<64, T>), dim3(1, 1, batch_count),
                                     dim3(64, 1, 1), 0, stream, n - 1 - j, A,
@@ -650,10 +650,13 @@ rocblas_status rocsolver_sytd2_hetd2_template(rocblas_handle handle,
 
             // 3. apply the Householder reflector to A as a rank-2 update:
             // A = A - v*w' - w*v'
+            //KO todo:: scalars is alpha
+            //KO todo:: no beta?
+            //KO TODO:: returns: None
             rocblasCall_syr2_her2<T>(handle, uplo, n - 1 - j, scalars, A,
                                      shiftA + idx2D(j + 1, j, lda), 1, strideA, tau, j, 1, strideP,
                                      A, shiftA + idx2D(j + 1, j + 1, lda), lda, strideA,
-                                     batch_count, workArr);
+                                     batch_count, workArr); // KO TODO:: level 3 -- problematic
 
             // 4. Save the used householder scalar
             ROCSOLVER_LAUNCH_KERNEL(set_tau<T>, grid_b, threads, 0, stream, batch_count, tmptau,

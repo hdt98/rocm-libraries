@@ -37,7 +37,67 @@
 #include "roclapack_sytd2_hetd2.hpp"
 #include "rocsolver/rocsolver.h"
 
+#include <hip/hip_runtime.h>
+#include <chrono>
+#include <map>
+#include <tuple>
+
 ROCSOLVER_BEGIN_NAMESPACE
+
+// SYTRD-level graph caching (compile-time flag)
+// SYTRD_GRAPH_MODE controls whether to cache entire SYTRD calls:
+//   0 = disabled (default, use LATRD-level caching if enabled)
+//   1 = enabled (cache entire SYTRD call as single graph)
+#ifndef SYTRD_GRAPH_MODE
+    #define SYTRD_GRAPH_MODE 0
+#endif
+
+#if SYTRD_GRAPH_MODE != 0
+
+// Cache key for SYTRD-level graphs
+struct SytrdGraphCacheKey {
+    rocblas_fill uplo;
+    rocblas_int n;
+    rocblas_int batch_count;
+    
+    bool operator<(const SytrdGraphCacheKey& other) const {
+        return std::tie(uplo, n, batch_count) < 
+               std::tie(other.uplo, other.n, other.batch_count);
+    }
+    
+    bool operator==(const SytrdGraphCacheKey& other) const {
+        return uplo == other.uplo && n == other.n && batch_count == other.batch_count;
+    }
+};
+
+// Cache entry: the executable graph plus the device workspace buffer that was
+// pre-allocated before capture.  The workspace must remain alive for the
+// lifetime of the graph_exec because the captured kernels reference it.
+struct SytrdGraphCacheEntry {
+    hipGraphExec_t graph_exec = nullptr;
+    void*          workspace  = nullptr; // user-owned workspace passed via rocblas_set_workspace
+    size_t         workspace_size = 0;
+};
+
+// Global cache (thread-safe via static initialization)
+static std::map<SytrdGraphCacheKey, SytrdGraphCacheEntry>& get_sytrd_graph_cache() {
+    static std::map<SytrdGraphCacheKey, SytrdGraphCacheEntry> cache;
+    return cache;
+}
+
+// Cache statistics
+struct SytrdCacheStats {
+    uint64_t lookups = 0;
+    uint64_t hits = 0;
+    uint64_t misses = 0;
+};
+
+static SytrdCacheStats& get_sytrd_cache_stats() {
+    static SytrdCacheStats stats;
+    return stats;
+}
+
+#endif // SYTRD_GRAPH_MODE != 0
 
 template <bool BATCHED, typename T>
 void rocsolver_sytrd_hetrd_getMemorySize(const rocblas_int n,
@@ -123,6 +183,70 @@ rocblas_status rocsolver_sytrd_hetrd_argCheck(rocblas_handle handle,
     return rocblas_status_continue;
 }
 
+// ---------------------------------------------------------------------------
+// Capture-status probe helper (active only when SYTRD_CAPTURE_DEBUG is defined)
+// ---------------------------------------------------------------------------
+#ifdef SYTRD_CAPTURE_DEBUG
+static const char* sytrd_capture_status_str(hipStreamCaptureStatus s)
+{
+    switch(s)
+    {
+    case hipStreamCaptureStatusNone:        return "None";
+    case hipStreamCaptureStatusActive:      return "Active";
+    case hipStreamCaptureStatusInvalidated: return "Invalidated";
+    default:                                return "Unknown";
+    }
+}
+
+// Probe the capture status of 'stream'.  If it has become Invalidated (or any
+// non-Active state during an expected capture), print the stage label and
+// return rocblas_status_internal_error so the caller can abort immediately.
+// Pass j<0 to suppress the iteration field.
+static rocblas_status sytrd_check_capture(hipStream_t stream,
+                                          const char* stage,
+                                          int         j = -1)
+{
+    hipStreamCaptureStatus cap_status;
+    unsigned long long     cap_id = 0;
+    hipError_t hip_err = hipStreamGetCaptureInfo(stream, &cap_status, &cap_id);
+    if(hip_err != hipSuccess)
+    {
+        if(j >= 0)
+            fprintf(stderr,
+                    "[SYTRD_CAPTURE_DEBUG] hipStreamGetCaptureInfo failed (%d) at stage='%s' j=%d\n",
+                    (int)hip_err, stage, j);
+        else
+            fprintf(stderr,
+                    "[SYTRD_CAPTURE_DEBUG] hipStreamGetCaptureInfo failed (%d) at stage='%s'\n",
+                    (int)hip_err, stage);
+        return rocblas_status_internal_error;
+    }
+    if(j >= 0)
+        fprintf(stderr,
+                "[SYTRD_CAPTURE_DEBUG] stage='%s' j=%d  cap_status=%s(%d)  cap_id=%llu\n",
+                stage, j, sytrd_capture_status_str(cap_status), (int)cap_status,
+                (unsigned long long)cap_id);
+    else
+        fprintf(stderr,
+                "[SYTRD_CAPTURE_DEBUG] stage='%s'  cap_status=%s(%d)  cap_id=%llu\n",
+                stage, sytrd_capture_status_str(cap_status), (int)cap_status,
+                (unsigned long long)cap_id);
+
+    if(cap_status == hipStreamCaptureStatusInvalidated)
+        return rocblas_status_internal_error;
+    return rocblas_status_success;
+}
+// Convenience macro: calls the probe and returns from the enclosing function on failure.
+#define SYTRD_PROBE(stream_, stage_, j_)                                    \
+    do {                                                                    \
+        rocblas_status _probe_st = sytrd_check_capture(stream_, stage_, j_); \
+        if(_probe_st != rocblas_status_success) return _probe_st;           \
+    } while(0)
+#else
+#define SYTRD_PROBE(stream_, stage_, j_) (void)0
+#endif // SYTRD_CAPTURE_DEBUG
+// ---------------------------------------------------------------------------
+
 template <bool BATCHED, typename T, typename S, typename U>
 rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
                                               const rocblas_fill uplo,
@@ -145,6 +269,17 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
                                               T** workArr,
                                               bool recover_A = true)
 {
+    hipStream_t stream;
+    rocblas_get_stream(handle, &stream);
+
+// KO TODO:: REMOVE, or make sure not on by default. 
+#if SYTRD_GRAPH_MODE != 1
+    hipEvent_t launch_start, launch_end;
+    hipEventCreate(&launch_start);
+    hipEventCreate(&launch_end);
+    hipEventRecord(launch_start, stream); // KO TODO:: instrumenting the non graph path
+#endif 
+
     ROCSOLVER_ENTER("sytrd_hetrd", "uplo:", uplo, "n:", n, "shiftA:", shiftA, "lda:", lda,
                     "bc:", batch_count);
 
@@ -152,8 +287,7 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
     if(n == 0 || batch_count == 0)
         return rocblas_status_success;
 
-    hipStream_t stream;
-    rocblas_get_stream(handle, &stream);
+    
     rocblas_int k = xxTRD_BLOCKSIZE;
     rocblas_int kk = xxTRD_xxTD2_SWITCHSIZE;
 
@@ -163,13 +297,25 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
                                               E, strideE, tau, strideP, batch_count, scalars,
                                               work_Acpy, norms, tmptau_W, workArr);
 
-    // everything must be executed with scalars on the device
+    // Use host-side alpha/beta so that rocblas_copy_alpha_beta_to_host_if_on_device
+    // (which does hipMemcpy + hipStreamSynchronize when pointer_mode==device) is
+    // never triggered.  This keeps every operation on the stream fully capturable
+    // inside a HIP graph without requiring USE_INTERNAL_GEMM.
     rocblas_pointer_mode old_mode;
     rocblas_get_pointer_mode(handle, &old_mode);
     rocblas_set_pointer_mode(handle, rocblas_pointer_mode_host);
+    SYTRD_PROBE(stream, "set_pointer_mode_host", -1);
 
-    const T minone = T(-1);
-    const T one = T(1);
+    // Host-resident scalars: alpha = -1, beta = 1.
+    // These match scalars[0] and scalars[2] as initialized by init_scalars()
+    // via iota_n(scalars, 3, -1) → {-1, 0, 1}.  Using stack variables with
+    // pointer_mode_host avoids the hipMemcpy + hipStreamSynchronize that
+    // rocblas_copy_alpha_beta_to_host_if_on_device would inject when
+    // pointer_mode == device, keeping the stream fully capturable.
+    const T minone_h = T(-1);
+    const T one_h    = T(1);
+    const T* minone  = &minone_h;
+    const T* one     = &one_h;
 
     rocblas_int ldw = n;
     rocblas_stride strideW = n * k;
@@ -190,6 +336,7 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
         ROCSOLVER_LAUNCH_KERNEL((copy_mat<T>), dim3(blocks, blocks, batch_count), dim3(BS2, BS2, 1),
                                 0, stream, copymat_to_buffer, n, n, A, shiftA, lda, strideA, Acpy,
                                 no_mask{}, uplo2, rocblas_diagonal_unit);
+        SYTRD_PROBE(stream, "copy_mat_to_buffer", -1);
     }
     else
         work = work_Acpy;
@@ -198,6 +345,7 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
                             dim3(BS2, BS2, 1), 0, stream, rocblas_operation_conjugate_transpose, n,
                             n, A, shiftA, lda, strideA, A, shiftA, lda, strideA, no_mask{}, uplo,
                             rocblas_diagonal_unit);
+    SYTRD_PROBE(stream, "copy_trans_mat", -1);
 
     if(uplo == rocblas_fill_lower)
     {
@@ -212,17 +360,21 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
                                                  shiftA + idx2D(j, j, lda), lda, strideA, (E + j),
                                                  strideE, (tau + j), strideP, tmptau_W, 0, ldw,
                                                  strideW, batch_count, scalars, work, norms, workArr);
+            SYTRD_PROBE(stream, "lower_latrd", j);
 
             // update trailing matrix
             // A = A - V*W' - W*V'
             rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_conjugate_transpose,
-                           n - j - k, n - j - k, k, &minone, A, shiftA + idx2D(j + k, j, lda), lda,
-                           strideA, tmptau_W, idx2D(k, 0, ldw), ldw, strideW, &one, A,
+                           n - j - k, n - j - k, k, minone, A, shiftA + idx2D(j + k, j, lda), lda,
+                           strideA, tmptau_W, idx2D(k, 0, ldw), ldw, strideW, one, A,
                            shiftA + idx2D(j + k, j + k, lda), lda, strideA, batch_count, workArr);
+            SYTRD_PROBE(stream, "lower_gemm1", j);
+
             rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_conjugate_transpose,
-                           n - j - k, n - j - k, k, &minone, tmptau_W, idx2D(k, 0, ldw), ldw,
-                           strideW, A, shiftA + idx2D(j + k, j, lda), lda, strideA, &one, A,
+                           n - j - k, n - j - k, k, minone, tmptau_W, idx2D(k, 0, ldw), ldw,
+                           strideW, A, shiftA + idx2D(j + k, j, lda), lda, strideA, one, A,
                            shiftA + idx2D(j + k, j + k, lda), lda, strideA, batch_count, workArr);
+            SYTRD_PROBE(stream, "lower_gemm2", j);
 
             j += k;
         }
@@ -232,6 +384,7 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
                                           strideA, (D + j), strideD, (E + j), strideE, (tau + j),
                                           strideP, batch_count, scalars, work, norms, tmptau_W,
                                           workArr);
+        SYTRD_PROBE(stream, "lower_sytd2_tail", j);
     }
 
     else
@@ -247,15 +400,19 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
             rocsolver_latrd_forsytrd_template<T>(handle, uplo, j + k, k, A, shiftA, lda, strideA, E,
                                                  strideE, tau, strideP, tmptau_W, 0, ldw, strideW,
                                                  batch_count, scalars, work, norms, workArr);
+            SYTRD_PROBE(stream, "upper_latrd", j);
 
             // update trailing matrix
             // A = A - V*W' - W*V'
             rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_conjugate_transpose, j,
-                           j, k, &minone, A, shiftA + idx2D(0, j, lda), lda, strideA, tmptau_W, 0,
-                           ldw, strideW, &one, A, shiftA, lda, strideA, batch_count, workArr);
+                           j, k, minone, A, shiftA + idx2D(0, j, lda), lda, strideA, tmptau_W, 0,
+                           ldw, strideW, one, A, shiftA, lda, strideA, batch_count, workArr);
+            SYTRD_PROBE(stream, "upper_gemm1", j);
+
             rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_conjugate_transpose, j,
-                           j, k, &minone, tmptau_W, 0, ldw, strideW, A, shiftA + idx2D(0, j, lda),
-                           lda, strideA, &one, A, shiftA, lda, strideA, batch_count, workArr);
+                           j, k, minone, tmptau_W, 0, ldw, strideW, A, shiftA + idx2D(0, j, lda),
+                           lda, strideA, one, A, shiftA, lda, strideA, batch_count, workArr);
+            SYTRD_PROBE(stream, "upper_gemm2", j);
 
             j -= k;
         }
@@ -264,12 +421,14 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
         rocsolver_sytd2_hetd2_template<T>(handle, uplo, upkk, A, shiftA, lda, strideA, D, strideD,
                                           E, strideE, tau, strideP, batch_count, scalars, work,
                                           norms, tmptau_W, workArr);
+        SYTRD_PROBE(stream, "upper_sytd2_tail", j);
     }
 
     // Copy results (set tridiagonal form in A)
     blocks = (n - 1) / BS1 + 1;
     ROCSOLVER_LAUNCH_KERNEL(set_tridiag<T>, dim3(blocks, batch_count), dim3(BS1), 0, stream, uplo,
                             n, A, shiftA, lda, strideA, D, strideD, E, strideE);
+    SYTRD_PROBE(stream, "set_tridiag", -1);
 
     // recover non-referenced part of A if necessary
     if(recover_A)
@@ -277,10 +436,279 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
         ROCSOLVER_LAUNCH_KERNEL((copy_mat<T>), dim3(blocks, blocks, batch_count), dim3(BS2, BS2, 1),
                                 0, stream, copymat_from_buffer, n, n, A, shiftA, lda, strideA, Acpy,
                                 no_mask{}, uplo2, rocblas_diagonal_unit);
+        SYTRD_PROBE(stream, "copy_mat_from_buffer", -1);
     }
 
     rocblas_set_pointer_mode(handle, old_mode);
-    return rocblas_status_success;
+    
+#if SYTRD_GRAPH_MODE != 1
+    hipEventRecord(launch_end, stream);
+    float first_launch_hip_us;
+    hipEventSynchronize(launch_end);
+    hipEventElapsedTime(&first_launch_hip_us, launch_start, launch_end);
+    first_launch_hip_us = static_cast<double>(first_launch_hip_us) * 1000.0;
+    fprintf(stderr, "[SYTRD_GRAPH DISABLED] default run time: %10.2f us\n", first_launch_hip_us);
+    hipEventDestroy(launch_start);
+    hipEventDestroy(launch_end);
+#endif
+    return rocblas_status_success;  
 }
+
+#if SYTRD_GRAPH_MODE != 0
+
+// SYTRD-level cached wrapper. Must appear after rocsolver_sytrd_hetrd_template
+// so it can call it directly without a forward declaration.
+template <bool BATCHED, typename T, typename S, typename U> // KO TODO:: DELETE
+rocblas_status rocsolver_sytrd_hetrd_template_cached(rocblas_handle handle,
+                                                     const rocblas_fill uplo,
+                                                     const rocblas_int n,
+                                                     U A,
+                                                     const rocblas_int shiftA,
+                                                     const rocblas_int lda,
+                                                     const rocblas_stride strideA,
+                                                     S* D,
+                                                     const rocblas_stride strideD,
+                                                     S* E,
+                                                     const rocblas_stride strideE,
+                                                     T* tau,
+                                                     const rocblas_stride strideP,
+                                                     const rocblas_int batch_count,
+                                                     T* scalars,
+                                                     T* work_Acpy,
+                                                     T* norms,
+                                                     T* tmptau_W,
+                                                     T** workArr,
+                                                     bool recover_A = true)
+{
+    SytrdGraphCacheKey cache_key{uplo, n, batch_count};
+    auto& cache = get_sytrd_graph_cache();
+    auto& stats = get_sytrd_cache_stats();
+
+    stats.lookups++;
+
+    auto it = cache.find(cache_key);
+
+    if(it != cache.end())
+    {
+        // Cache HIT - reuse existing graph
+        stats.hits++;
+
+        hipGraphExec_t graph_exec = it->second.graph_exec;
+        hipStream_t stream;
+        rocblas_get_stream(handle, &stream);
+
+        #ifdef ROCSOLVER_SYTRD_GRAPH_DEBUG
+        fprintf(stderr, "[SYTRD CACHE HIT] uplo=%d, n=%d, batch=%d "
+                "(hits=%lu, misses=%lu, hit_rate=%.1f%%)\n",
+                (int)uplo, (int)n, (int)batch_count,
+                stats.hits, stats.misses, 100.0 * stats.hits / stats.lookups);
+        #endif
+
+        auto t0 = std::chrono::high_resolution_clock::now();
+        // HOT PATH
+        hipEvent_t launch_start, launch_end;
+        hipEventCreate(&launch_start);
+        hipEventCreate(&launch_end);
+        hipEventRecord(launch_start, stream);
+        
+        hipError_t hip_status = hipGraphLaunch(graph_exec, stream);
+        hipEventRecord(launch_end, stream);
+        float first_launch_hip_us;
+        hipEventSynchronize(launch_end);
+        hipEventElapsedTime(&first_launch_hip_us, launch_start, launch_end);
+        first_launch_hip_us = static_cast<double>(first_launch_hip_us) * 1000.0;
+        fprintf(stderr, "[SYTRD CACHE HIT] HIP graph launch time: %10.2f us\n", first_launch_hip_us);
+        hipEventDestroy(launch_start);
+        hipEventDestroy(launch_end);
+        
+
+        hipStreamSynchronize(stream);
+        auto t1 = std::chrono::high_resolution_clock::now();
+        double launch_us = std::chrono::duration<double, std::micro>(t1 - t0).count();
+        fprintf(stderr, "[SYTRD CACHE HIT] Graph launch time: %10.2f us\n", launch_us);
+
+        if(hip_status != hipSuccess)
+        {
+            fprintf(stderr, "[SYTRD CACHE ERROR] hipGraphLaunch failed: %d\n", hip_status);
+            return rocblas_status_internal_error;
+        }
+        return rocblas_status_success;
+    }
+    else
+    {
+        // Cache MISS - capture new graph
+        stats.misses++;
+
+        #ifdef ROCSOLVER_SYTRD_GRAPH_DEBUG
+        fprintf(stderr, "[SYTRD CACHE MISS] uplo=%d, n=%d, batch=%d - "
+                "Capturing new graph (entry #%zu)\n",
+                (int)uplo, (int)n, (int)batch_count, cache.size() + 1);
+        #endif
+
+        hipGraph_t     graph;
+        hipGraphExec_t graph_exec;
+        hipStream_t    original_stream;
+        rocblas_get_stream(handle, &original_stream);
+
+        // === WORKSPACE PRE-ALLOCATION ===
+        // rocBLAS's internal allocator uses hipMalloc (synchronous, non-capturable)
+        // to expand the handle's workspace buffer the first time a new problem size is
+        // encountered. We avoid this during capture by querying the required size first
+        // and calling rocblas_set_workspace with a hipMalloc'd buffer so that during
+        // capture the handle already has enough memory and will never call hipMalloc.
+        //
+        // The query runs no GPU kernels — it purely accumulates size arithmetic.
+        size_t ws_size = 0;
+        rocblas_start_device_memory_size_query(handle);
+        // Pass real args; null device pointers are fine in query mode.
+        rocsolver_sytrd_hetrd_template<BATCHED, T>(
+            handle, uplo, n, A, shiftA, lda, strideA,
+            D, strideD, E, strideE, tau, strideP,
+            batch_count, scalars, work_Acpy, norms, tmptau_W, workArr, recover_A);
+        rocblas_status query_status = rocblas_stop_device_memory_size_query(handle, &ws_size);
+        if(query_status != rocblas_status_success && query_status != rocblas_status_size_increased
+           && query_status != rocblas_status_size_unchanged)
+        {
+            fprintf(stderr, "[SYTRD CACHE ERROR] Workspace size query failed: %d\n", query_status);
+            return rocblas_status_internal_error;
+        }
+
+        // Allocate the workspace with hipMalloc (happens here, outside any capture region).
+        void* workspace = nullptr;
+        if(ws_size > 0)
+        {
+            hipError_t alloc_status = hipMalloc(&workspace, ws_size);
+            if(alloc_status != hipSuccess)
+            {
+                fprintf(stderr, "[SYTRD CACHE ERROR] hipMalloc workspace (%zu bytes) failed: %d\n",
+                        ws_size, alloc_status);
+                return rocblas_status_internal_error;
+            }
+        }
+        // Hand the buffer to rocBLAS. From this point forward, the handle will draw
+        // from 'workspace' instead of calling hipMalloc internally.
+        rocblas_set_workspace(handle, workspace, ws_size); // KO TODO:: REMOVE THIS OVERHEAD
+
+        // === CAPTURE PHASE ===
+        // Use hipStreamCaptureModeThreadLocal (same as LATRD): only operations on the
+        // explicitly captured stream are recorded — rocBLAS side-streams are not
+        // monitored, preventing false invalidations.
+        hipStream_t capture_stream;
+        hipError_t hip_status = hipStreamCreate(&capture_stream);
+        if(hip_status != hipSuccess)
+        {
+            rocblas_set_workspace(handle, nullptr, 0);
+            hipFree(workspace);
+            fprintf(stderr, "[SYTRD CACHE ERROR] hipStreamCreate failed: %d\n", hip_status);
+            return rocblas_status_internal_error;
+        }
+
+        // Ensure the stream is idle before beginning capture.
+        hipStreamSynchronize(capture_stream);
+
+        // Point the rocBLAS handle at the capture stream so all rocBLAS kernel
+        // launches go to capture_stream and are recorded into the graph.
+        rocblas_set_stream(handle, capture_stream);
+        
+        auto t_cap0 = std::chrono::high_resolution_clock::now();
+        hip_status = hipStreamBeginCapture(capture_stream, hipStreamCaptureModeThreadLocal);
+        if(hip_status != hipSuccess)
+        {
+            rocblas_set_stream(handle, original_stream);
+            hipStreamDestroy(capture_stream);
+            rocblas_set_workspace(handle, nullptr, 0);
+            hipFree(workspace);
+            fprintf(stderr, "[SYTRD CACHE ERROR] hipStreamBeginCapture failed: %d\n", hip_status);
+            return rocblas_status_internal_error;
+        }
+
+        // Capture run: workspace pre-allocated above → no hipMalloc → capture stays valid.
+        rocblas_status status = rocsolver_sytrd_hetrd_template<BATCHED, T>(
+            handle, uplo, n, A, shiftA, lda, strideA,
+            D, strideD, E, strideE, tau, strideP,
+            batch_count, scalars, work_Acpy, norms, tmptau_W, workArr, recover_A);
+
+        if(status != rocblas_status_success)
+        {
+            (void)hipStreamEndCapture(capture_stream, &graph);
+            rocblas_set_stream(handle, original_stream);
+            hipStreamDestroy(capture_stream);
+            rocblas_set_workspace(handle, nullptr, 0);
+            hipFree(workspace);
+            fprintf(stderr, "[SYTRD CACHE ERROR] Template call failed during capture: %d\n", status);
+            return status;
+        }
+
+        hip_status = hipStreamEndCapture(capture_stream, &graph);
+        rocblas_set_stream(handle, original_stream);
+        hipStreamDestroy(capture_stream);
+        // Restore automatic workspace management; the captured graph nodes still
+        // reference 'workspace' and will keep doing so at launch time.
+        rocblas_set_workspace(handle, nullptr, 0);
+
+        if(hip_status != hipSuccess)
+        {
+            hipFree(workspace);
+            fprintf(stderr, "[SYTRD CACHE ERROR] hipStreamEndCapture failed: %d\n", hip_status);
+            return rocblas_status_internal_error;
+        }
+
+        hip_status = hipGraphInstantiate(&graph_exec, graph, nullptr, nullptr, 0);
+        hipGraphDestroy(graph); // graph_exec is all we need for replay
+        if(hip_status != hipSuccess)
+        {
+            hipFree(workspace);
+            fprintf(stderr, "[SYTRD CACHE ERROR] hipGraphInstantiate failed: %d\n", hip_status);
+            return rocblas_status_internal_error;
+        }
+        auto t_cap1 = std::chrono::high_resolution_clock::now();
+        double capture_us = std::chrono::duration<double, std::micro>(t_cap1 - t_cap0).count();
+        fprintf(stderr, "[SYTRD CACHE MISS] Graph capture+instantiate time: %10.2f us\n", capture_us);
+
+        // Store entry — workspace must outlive graph_exec.
+        SytrdGraphCacheEntry entry;
+        entry.graph_exec     = graph_exec;
+        entry.workspace      = workspace;
+        entry.workspace_size = ws_size;
+        cache[cache_key] = entry;
+
+        #ifdef ROCSOLVER_SYTRD_GRAPH_DEBUG
+        fprintf(stderr, "[SYTRD CACHE] Stored graph for (uplo=%d, n=%d, batch=%d), "
+                "ws=%zu bytes. Cache size: %zu\n",
+                (int)uplo, (int)n, (int)batch_count, ws_size, cache.size());
+        #endif
+
+        // First launch of the freshly captured graph.
+        auto t_launch0 = std::chrono::high_resolution_clock::now();
+        hipEvent_t launch_start;
+        hipEvent_t launch_end;
+        hipEventCreate(&launch_start);
+        hipEventCreate(&launch_end);
+        hipEventRecord(launch_start, original_stream);
+        hip_status = hipGraphLaunch(graph_exec, original_stream);
+        hipEventRecord(launch_end, original_stream);
+        hipEventSynchronize(launch_end);
+        
+        float first_launch_hip_us;
+        hipEventElapsedTime(&first_launch_hip_us, launch_start, launch_end);
+        first_launch_hip_us = static_cast<double>(first_launch_hip_us) * 1000.0;
+        fprintf(stderr, "[SYTRD CACHE MISS] HIP Initial graph launch time: %10.2f us\n", first_launch_hip_us);
+        hipEventDestroy(launch_start);
+        hipEventDestroy(launch_end);
+        hipStreamSynchronize(original_stream); // KO TODO:: needed?
+        auto t_launch1 = std::chrono::high_resolution_clock::now(); // KO TODO:: DO NOT USE CHRONO
+        double first_launch_us = std::chrono::duration<double, std::micro>(t_launch1 - t_launch0).count();
+        fprintf(stderr, "[SYTRD CACHE MISS] Initial graph launch time: %10.2f us\n", first_launch_us);
+
+        if(hip_status != hipSuccess)
+        {
+            fprintf(stderr, "[SYTRD CACHE ERROR] Initial hipGraphLaunch failed: %d\n", hip_status);
+            return rocblas_status_internal_error;
+        }
+        return rocblas_status_success;
+    }
+}
+
+#endif // SYTRD_GRAPH_MODE != 0
 
 ROCSOLVER_END_NAMESPACE

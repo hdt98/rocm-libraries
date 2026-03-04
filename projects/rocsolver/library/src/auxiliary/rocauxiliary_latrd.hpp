@@ -2813,10 +2813,16 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
             HIP_CHECK(hipEventDestroy(timing_start));
             HIP_CHECK(hipEventDestroy(timing_end));
         }
-        
 #else
         // Original non-graph path
-        constexpr bool time_graphs = true;   // Match graph path timing
+        // When called from inside a SYTRD-level graph capture (SYTRD_GRAPH_MODE != 0),
+        // hipEventCreate/hipEventSynchronize are non-capturable and will invalidate the
+        // capture with error 901.  Disable LATRD timing in that scenario.
+#if SYTRD_GRAPH_MODE != 0
+        constexpr bool time_graphs = false;  // Must be false inside SYTRD graph capture
+#else
+        constexpr bool time_graphs = false;   // Enable for latrd_forsytrd graph timing prints.
+#endif
         
         // Timing infrastructure for non-graph path
         hipEvent_t timing_start, timing_end;

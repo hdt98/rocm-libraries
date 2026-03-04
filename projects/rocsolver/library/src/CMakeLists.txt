@@ -495,6 +495,13 @@ if(ROCSOLVER_USE_INTERNAL_BLAS)
   target_compile_definitions(rocsolver PRIVATE USE_INTERNAL_GEMM USE_INTERNAL_TRSM)
 endif()
 
+# SYTRD/HETRD HIP-graph caching: uses host-resident alpha/beta with
+# rocblas_pointer_mode_host so rocblas_copy_alpha_beta_to_host_if_on_device
+# is never triggered, keeping every operation on the capture stream fully capturable.
+if(ROCSOLVER_SYTRD_GRAPH_MODE)
+  target_compile_definitions(rocsolver PRIVATE SYTRD_GRAPH_MODE=1)
+endif()
+
 if(ROCSOLVER_USE_REFERENCE_SECULAR_EQUATIONS_SOLVER)
   target_compile_definitions(rocsolver PRIVATE ROCSOLVER_USE_REFERENCE_SECULAR_EQUATIONS_SOLVER)
 endif()

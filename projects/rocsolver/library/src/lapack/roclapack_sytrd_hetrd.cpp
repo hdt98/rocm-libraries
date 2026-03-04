@@ -91,9 +91,17 @@ rocblas_status rocsolver_sytrd_hetrd_impl(rocblas_handle handle,
         init_scalars(handle, (T*)scalars);
 
     // execution
+#if SYTRD_GRAPH_MODE != 0
+    // Use SYTRD-level graph caching
+    return rocsolver_sytrd_hetrd_template_cached<false, T>(
+        handle, uplo, n, A, shiftA, lda, strideA, D, strideD, E, strideE, tau, strideP, batch_count,
+        (T*)scalars, (T*)work, (T*)norms, (T*)tmptau_W, (T**)workArr);
+#else
+    // Standard path (may use LATRD-level caching if enabled)
     return rocsolver_sytrd_hetrd_template<false, T>(
         handle, uplo, n, A, shiftA, lda, strideA, D, strideD, E, strideE, tau, strideP, batch_count,
         (T*)scalars, (T*)work, (T*)norms, (T*)tmptau_W, (T**)workArr);
+#endif
 }
 
 ROCSOLVER_END_NAMESPACE
