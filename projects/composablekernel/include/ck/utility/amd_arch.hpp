@@ -29,6 +29,9 @@ struct gfx120_t
 struct gfx125_t
 {
 };
+struct gfx13_t
+{
+};
 struct gfx_invalid_t
 {
 };
@@ -47,6 +50,8 @@ static constexpr auto get_device_arch()
     return gfx125_t{};
 #elif defined(__gfx12__)
     return gfx120_t{};
+#elif defined(__gfx13__)
+    return gfx13_t{};
 #else
     return gfx_invalid_t{};
 #endif
@@ -67,7 +72,11 @@ constexpr index_t get_lds_size<gfx125_t>(gfx125_t)
 {
     return 320 * 1024;
 }
-
+template <>
+constexpr index_t get_lds_size<gfx13_t>(gfx13_t)
+{
+    return 192 * 1024;
+}
 template <typename DeviceArch>
 static constexpr index_t get_n_lds_banks(DeviceArch)
 {
@@ -101,6 +110,11 @@ constexpr index_t get_max_vgpr_count<gfx9_t>(gfx9_t)
 }
 template <>
 constexpr index_t get_max_vgpr_count<gfx125_t>(gfx125_t)
+{
+    return 1024;
+}
+template <>
+constexpr index_t get_max_vgpr_count<gfx13_t>(gfx13_t)
 {
     return 1024;
 }
