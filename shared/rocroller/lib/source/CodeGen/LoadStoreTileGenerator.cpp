@@ -964,10 +964,9 @@ namespace rocRoller
 
             if(m_context && m_context->registerTagManager()->hasRegister(ldsTag))
             {
-                result.ldsAllocation
-                    = m_context->registerTagManager()->getRegister(ldsTag); // stores offset
+                auto ldsAllocation = m_context->registerTagManager()->getRegister(ldsTag);
                 result.offset
-                    = Register::Value::Literal(result.ldsAllocation->getLDSAllocation()->offset());
+                    = Register::Value::Literal(ldsAllocation->getLDSAllocation()->offset());
             }
 
             auto [elemXTag, elemX] = m_graph->getDimension<ElementNumber>(tag, 0);
@@ -1070,9 +1069,9 @@ namespace rocRoller
             // the offset of the beginning of the allocation into ldsOffset.
             if(m_context && m_context->registerTagManager()->hasRegister(ldsTag))
             {
-                result.ldsAllocation = m_context->registerTagManager()->getRegister(ldsTag);
+                auto ldsAllocation = m_context->registerTagManager()->getRegister(ldsTag);
                 result.offset
-                    = Register::Value::Literal(result.ldsAllocation->getLDSAllocation()->offset());
+                    = Register::Value::Literal(ldsAllocation->getLDSAllocation()->offset());
             }
 
             uint numElements       = waveTile.sizes[0] * waveTile.sizes[1];
@@ -1279,10 +1278,17 @@ namespace rocRoller
                 return inst;
             };
 
-            if(info.ldsAllocation)
+            auto [ldsTag, _lds] = m_graph->getDimension<LDS>(tag);
+            ldsTag = only(m_graph->coordinates.getOutputNodeIndices(ldsTag, CT::isEdge<View>))
+                         .value_or(ldsTag);
+
+            if(m_context && m_context->registerTagManager()->hasRegister(ldsTag))
+            {
+                auto ldsAllocation = m_context->registerTagManager()->getRegister(ldsTag);
                 co_yield moveTile<MemoryInstructions::MemoryDirection::Load>(info, coords)
-                    .map(MemoryInstructions::addExtraSrc(info.ldsAllocation))
+                    .map(MemoryInstructions::addExtraSrc(ldsAllocation))
                     .map(applyAddresses);
+            }
             else
                 co_yield moveTile<MemoryInstructions::MemoryDirection::Load>(info, coords)
                     .map(applyAddresses);
@@ -1387,8 +1393,7 @@ namespace rocRoller
                 .offset  = ldsOffset,
                 .isTransposedTile = false,
                 .isPadded         = paddingBytes > 0};
-            info.comments      = {infoComment};
-            info.ldsAllocation = ldsAllocation;
+            info.comments = {infoComment};
             return info;
         }
 
@@ -1500,8 +1505,7 @@ namespace rocRoller
                                    .data    = agpr,
                                    .varType = varType,
                                    .offset  = ldsOffset};
-            info.comments      = {infoComment};
-            info.ldsAllocation = ldsAllocation;
+            info.comments = {infoComment};
 
             if(m_context)
             {
@@ -1658,10 +1662,15 @@ namespace rocRoller
                 return inst;
             };
 
-            if(info.ldsAllocation)
+            auto [ldsTag, _lds] = m_graph->getDimension<LDS>(tag);
+
+            if(m_context && m_context->registerTagManager()->hasRegister(ldsTag))
+            {
+                auto ldsAllocation = m_context->registerTagManager()->getRegister(ldsTag);
                 co_yield moveTile<MemoryInstructions::MemoryDirection::Store>(info, coords)
-                    .map(MemoryInstructions::addExtraDst(info.ldsAllocation))
+                    .map(MemoryInstructions::addExtraDst(ldsAllocation))
                     .map(applyAddresses);
+            }
             else
                 co_yield moveTile<MemoryInstructions::MemoryDirection::Store>(info, coords)
                     .map(applyAddresses);

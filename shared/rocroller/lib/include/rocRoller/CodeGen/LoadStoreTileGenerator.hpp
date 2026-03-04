@@ -121,9 +121,7 @@ namespace rocRoller
                 BufferInstructionOptions       bufOpts          = {};
                 bool                           isTransposedTile = false;
                 bool                           isPadded         = false;
-                // Optional extras for LDS loads
-                Register::ValuePtr       ldsAllocation = nullptr;
-                std::vector<std::string> comments;
+                std::vector<std::string>       comments;
             };
 
             LoadStoreTileInfo getLoadLDSTileInfo(int tag, ControlGraph::LoadLDSTile const& load);
