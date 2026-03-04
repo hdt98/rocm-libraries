@@ -1874,7 +1874,9 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
                 miopen::deref(inputTensor), miopen::deref(weightTensor), 
                 miopen::deref(outputTensor), miopen::deref(convDesc), 
                 miopen::conv::Direction::Forward);
-            const auto db_key = problem.MakeNetworkConfig();
+            std::ostringstream ss;
+            problem.Serialize(ss);
+            const auto db_key = ss.str();
             
             Print2DConvJsonLog("fwd-conv", "forward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes, db_key);
         }
@@ -1933,7 +1935,9 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
                 miopen::deref(inputTensor), miopen::deref(weightTensor), 
                 miopen::deref(outputTensor), miopen::deref(convDesc), 
                 miopen::conv::Direction::Forward);
-            const auto db_key = problem.MakeNetworkConfig();
+            std::ostringstream ss;
+            problem.Serialize(ss);
+            const auto db_key = ss.str();
             
             Print3DConvJsonLog("fwd-conv", "forward", kernel_average_time, solution, in_n, in_c, in_h, in_w, in_d, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key);
         }
@@ -2920,7 +2924,9 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, floa
                 miopen::deref(outputTensor), miopen::deref(weightTensor), 
                 miopen::deref(inputTensor), miopen::deref(convDesc), 
                 miopen::conv::Direction::BackwardData);
-            const auto db_key = problem.MakeNetworkConfig();
+            std::ostringstream ss;
+            problem.Serialize(ss);
+            const auto db_key = ss.str();
             
             Print2DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes, db_key);
         }
@@ -2977,7 +2983,9 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, floa
                 miopen::deref(outputTensor), miopen::deref(weightTensor), 
                 miopen::deref(inputTensor), miopen::deref(convDesc), 
                 miopen::conv::Direction::BackwardData);
-            const auto db_key = problem.MakeNetworkConfig();
+            std::ostringstream ss;
+            problem.Serialize(ss);
+            const auto db_key = ss.str();
             
             Print3DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, in_d, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key);
         }
@@ -3189,7 +3197,9 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float
                 miopen::deref(outputTensor), miopen::deref(weightTensor), 
                 miopen::deref(inputTensor), miopen::deref(convDesc), 
                 miopen::conv::Direction::BackwardWeights);
-            const auto db_key = problem.MakeNetworkConfig();
+            std::ostringstream ss;
+            problem.Serialize(ss);
+            const auto db_key = ss.str();
             
             Print2DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes, db_key);
         }
@@ -3246,7 +3256,9 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float
                 miopen::deref(outputTensor), miopen::deref(weightTensor), 
                 miopen::deref(inputTensor), miopen::deref(convDesc), 
                 miopen::conv::Direction::BackwardWeights);
-            const auto db_key = problem.MakeNetworkConfig();
+            std::ostringstream ss;
+            problem.Serialize(ss);
+            const auto db_key = ss.str();
             
             Print3DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, in_d, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key);
         }
