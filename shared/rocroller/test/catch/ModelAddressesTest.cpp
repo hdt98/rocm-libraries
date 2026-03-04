@@ -277,6 +277,12 @@ namespace ModelAddressesTest
                     {
                         CHECK(matchesAny(variants.patterns.store));
                     }
+                    else if(!opCode.empty())
+                    {
+                        FAIL("LDS instruction with modelled addresses not classified as ds_read or "
+                             "ds_write: "
+                             + opCode);
+                    }
                 }
             }
 
