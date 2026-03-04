@@ -310,15 +310,6 @@ struct BlockwiseGemmDpp_ak0mak1_bk0nbk1_m0n0m1n1m2n2
 
                     static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
-                    // static_for<0, KPack, 1>{}([&](auto i) {
-                    //     a_thread_vec.template AsType<ABDataType>()(i) = a_thread_buf
-                    //         [Number<a_thread_desc_.CalculateOffset(make_tuple(0, 0, 0, k +
-                    //         i))>{}];
-                    //     b_thread_vec.template AsType<ABDataType>()(i) = b_thread_buf
-                    //         [Number<b_thread_desc_.CalculateOffset(make_tuple(0, 0, 0, k +
-                    //         i))>{}];
-                    // });
-
                     using dpp_input_type =
                         typename vector_type<ABDataType, dpp_gemm.K1PerDpp>::type;
 

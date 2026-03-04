@@ -691,16 +691,6 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx_bprehuffle<BlockGemmPipelineScheduler:
 
                                 static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
-                                // static_for<0, KPack, 1>{}([&](auto ik) {
-                                //     a_thread_vec.template AsType<ComputeTypeA>()(ik) =
-                                //         a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                                //             make_tuple(I0, I0, im_minor, k0, ik))>{}];
-                                //     b_thread_vec.template AsType<ComputeTypeB>()(ik) =
-                                //     b_thread_bufs
-                                //         [scale_comp_buf][Number<b_thread_desc_.CalculateOffset(
-                                //             make_tuple(in_major, I0, in_minor, k0, ik))>{}];
-                                // });
-
                                 using mfma_input_type_a =
                                     typename vector_type<ComputeTypeA,
                                                          xdlops_gemm.K1PerXdlops /
@@ -881,15 +871,6 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx_bprehuffle<BlockGemmPipelineScheduler:
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
-                        // static_for<0, KPack, 1>{}([&](auto ik) {
-                        //     a_thread_vec.template AsType<ComputeTypeA>()(ik) =
-                        //         a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                        //             make_tuple(I0, I0, im_minor, k0, ik))>{}];
-                        //     b_thread_vec.template AsType<ComputeTypeB>()(ik) =
-                        //         b_thread_bufs[I0][Number<b_thread_desc_.CalculateOffset(
-                        //             make_tuple(in_major, I0, in_minor, k0, ik))>{}];
-                        // });
-
                         using mfma_input_type_a =
                             typename vector_type<ComputeTypeA,
                                                  xdlops_gemm.K1PerXdlops / APackedSize>::type;
@@ -1006,15 +987,6 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx_bprehuffle<BlockGemmPipelineScheduler:
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
-                        // static_for<0, KPack, 1>{}([&](auto ik) {
-                        //     a_thread_vec.template AsType<ComputeTypeA>()(ik) =
-                        //         a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                        //             make_tuple(I0, I0, im_minor, k0, ik))>{}];
-                        //     b_thread_vec.template AsType<ComputeTypeB>()(ik) =
-                        //         b_thread_bufs[I1][Number<b_thread_desc_.CalculateOffset(
-                        //             make_tuple(in_major, I0, in_minor, k0, ik))>{}];
-                        // });
-
                         using mfma_input_type_a =
                             typename vector_type<ComputeTypeA,
                                                  xdlops_gemm.K1PerXdlops / APackedSize>::type;
@@ -1130,15 +1102,6 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx_bprehuffle<BlockGemmPipelineScheduler:
                                                               Ik>{b_thread_vec, b_thread_bufs[I0]};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
-
-                        // static_for<0, KPack, 1>{}([&](auto ik) {
-                        //     a_thread_vec.template AsType<ComputeTypeA>()(ik) =
-                        //         a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                        //             make_tuple(I0, I0, im_minor, k0, ik))>{}];
-                        //     b_thread_vec.template AsType<ComputeTypeB>()(ik) =
-                        //         b_thread_bufs[I0][Number<b_thread_desc_.CalculateOffset(
-                        //             make_tuple(in_major, I0, in_minor, k0, ik))>{}];
-                        // });
 
                         using mfma_input_type_a =
                             typename vector_type<ComputeTypeA,

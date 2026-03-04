@@ -388,15 +388,6 @@ struct BlockwiseGemmXdlops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
 
                             static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
-                            // static_for<0, KPack, 1>{}([&](auto ik) {
-                            //     a_thread_vec.template AsType<ComputeDataTypeBuf>()(ik) =
-                            //         a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                            //             make_tuple(m0, I0, k0, ik))>{}];
-                            //     b_thread_vec.template AsType<ComputeDataTypeBuf>()(ik) =
-                            //         b_thread_buf[Number<b_thread_desc_.CalculateOffset(
-                            //             make_tuple(n0, I0, k0, ik))>{}];
-                            // });
-
                             using mfma_input_type =
                                 typename vector_type<ComputeDataTypeBuf,
                                                      xdlops_gemm.K1PerXdlops>::type;
@@ -466,15 +457,6 @@ struct BlockwiseGemmXdlops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                                                               Ik>{b_thread_vec, b_thread_buf};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
-
-                        // static_for<0, KPack, 1>{}([&](auto ik) {
-                        //     a_thread_vec.template AsType<ComputeDataTypeBuf>()(ik) =
-                        //         a_thread_buf[Number<a_thread_desc_.CalculateOffset(
-                        //             make_tuple(m0, I0, k0, ik))>{}];
-                        //     b_thread_vec.template AsType<ComputeDataTypeBuf>()(ik) =
-                        //         b_thread_buf[Number<b_thread_desc_.CalculateOffset(
-                        //             make_tuple(n0, I0, k0, ik))>{}];
-                        // });
 
                         using mfma_input_type =
                             typename vector_type<ComputeDataTypeBuf, xdlops_gemm.K1PerXdlops>::type;

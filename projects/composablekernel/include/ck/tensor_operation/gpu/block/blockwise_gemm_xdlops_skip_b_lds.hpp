@@ -290,14 +290,6 @@ struct BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1r1
 
                     static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
-                    // static_for<0, KPack, 1>{}([&](auto i) {
-                    //     a_thread_vec.template AsType<FloatAB>()(i) = a_thread_buf
-                    //         [Number<a_thread_desc_.CalculateOffset(make_tuple(0, 0, 0, k +
-                    //         i))>{}];
-                    //     b_thread_vec.template AsType<FloatAB>()(i) = b_thread_buf
-                    //         [Number<b_thread_desc_.CalculateOffset(make_tuple(k0, n0, i))>{}];
-                    // });
-
                     using mfma_input_type =
                         typename vector_type<FloatAB, xdlops_gemm.K1PerXdlops>::type;
 
