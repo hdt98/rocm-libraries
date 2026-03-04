@@ -1255,7 +1255,7 @@ class Solution(collections.abc.Mapping):
     state["LocalWriteUseSgprB"] = False
     state["StoreSwapAddr"] = False
 
-    if state["WorkGroupMappingXCC"] != 0 and state["StreamKXCCMapping"] != 0:
+    if state["WorkGroupMappingXCC"] != 1 and state["StreamKXCCMapping"] != 0:
       reject(state, printRejectionReason, "Cannot use WorkGroupMappingXCC and StreamKXCCMapping together.")
       return False
 
