@@ -108,15 +108,21 @@ bool run_test()
         return true;
     }
 
-    using Row                 = ck::tensor_layout::gemm::RowMajor;
-    using Col                 = ck::tensor_layout::gemm::ColumnMajor;
-    using PassThrough         = ck::tensor_operation::element_wise::PassThrough;
-    bool pass                 = true;
+    using Row         = ck::tensor_layout::gemm::RowMajor;
+    using Col         = ck::tensor_layout::gemm::ColumnMajor;
+    using PassThrough = ck::tensor_operation::element_wise::PassThrough;
+    bool pass         = true;
+#if defined(CK_USE_GFX1250)
+    const auto matmul_default =
+        ck::wmma_op_util::matmul_gfx1250<SrcAType, SrcBType, DstType, GPUAccType, KMultiplier>;
+    const auto matmul_swizzle_a = ck::wmma_op_util::
+        matmul_swizzle_a_gfx1250<SrcAType, SrcBType, DstType, GPUAccType, KMultiplier>;
+#else
     const auto matmul_default = ck::wmma_op_util::
         matmul_with_kMultiplier<SrcAType, SrcBType, DstType, GPUAccType, KMultiplier>;
     const auto matmul_swizzle_a = ck::wmma_op_util::
         matmul_swizzle_a_with_kMultiplier<SrcAType, SrcBType, DstType, GPUAccType, KMultiplier>;
-
+#endif
     const auto wmma_kernel_container = std::make_tuple(matmul_default, matmul_swizzle_a);
 
     ck::static_for<0, 2, 1>{}([&](auto i) {

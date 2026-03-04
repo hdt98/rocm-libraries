@@ -334,7 +334,7 @@ __device__ void builtin_wmma_naive_selector(
 }
 
 template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kValue>
-__global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
+__global__ void matmul_gfx1250(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
     static_assert(WMMAVecType<srcA_t, kValue>::template is_compatible<srcB_t>(),
                   "the data format for srcA and srcB is unsupported in gfx1250");
@@ -571,7 +571,7 @@ __global__ void matmul(const srcA_t* a, const srcB_t* b, dst_t* c)
 }
 
 template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, ck::index_t kValue>
-__global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
+__global__ void matmul_swizzle_a_gfx1250(const srcA_t* a, const srcB_t* b, dst_t* c)
 {
     static_assert(WMMAVecType<srcA_t, kValue>::template is_compatible<srcB_t>(),
                   "the data format for srcA and srcB is unsupported in gfx1250");
@@ -672,26 +672,6 @@ __global__ void matmul_swizzle_a(const srcA_t* a, const srcB_t* b, dst_t* c)
     });
 }
 
-// template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
-template <typename src_t, typename dst_t, typename acc_t>
-__global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
-{
-    ignore = a;
-    ignore = b;
-    ignore = c;
-    printf("---------- Running gfx1250 matmul - DISABLED original matmul ----------\n");
-}
-
-template <typename src_t, typename dst_t, typename acc_t>
-__global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
-{
-    ignore = a;
-    ignore = b;
-    ignore = c;
-    printf("---------- Running gfx1250 matmul - DISABLED original matmul_swizzle_a ----------\n");
-}
-
-// #endif
 #else
 template <typename src_vec, typename acc_vec>
 __device__ void builtin_wmma_naive_selector(const src_vec&, const src_vec&, acc_vec&)
@@ -1017,6 +997,8 @@ builtin_wmma_naive_selector<int4x16_t,
 }
 #endif
 
+#endif
+
 template <typename src_t, typename dst_t, typename acc_t, index_t acc_num>
 __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
 {
@@ -1091,7 +1073,7 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
         // store results from unpacked c_thread_buf_ output
         c[16 * r + lane] = ck::type_convert<dst_t>(c_thread_buf_[Number<ele * acc_num / 8>{}]);
     });
-#else
+#elif defined(__gfx120__)
     __shared__ src_t p_shared[16 * 16 * 2];
     const int lIdx = threadIdx.x;
 
@@ -1169,6 +1151,10 @@ __global__ void matmul(const src_t* a, const src_t* b, dst_t* c)
         c[16 * r + lane] = ck::type_convert<dst_t>(c_thread_buf_[Number<ele>{}]);
     });
 
+#else
+    ignore = a;
+    ignore = b;
+    ignore = c;
 #endif
 }
 
@@ -1207,7 +1193,7 @@ __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
         c[16 * 8 * blk + 16 * r + lane] =
             ck::type_convert<dst_t>(c_thread_buf_[Number<ele * acc_num / 8>{}]);
     });
-#else
+#elif defined(__gfx120__)
     const int lIdx = threadIdx.x;
 
     using src_vec  = typename vector_type<src_t, 8>::type;
@@ -1241,9 +1227,12 @@ __global__ void matmul_swizzle_a(const src_t* a, const src_t* b, dst_t* c)
         // store results from unpacked c_thread_buf_ output
         c[16 * r + lane] = ck::type_convert<dst_t>(c_thread_buf_[Number<ele>{}]);
     });
+#else
+    ignore = a;
+    ignore = b;
+    ignore = c;
 #endif
 }
-#endif
 
 template <typename srcA_t, typename srcB_t, typename dst_t, typename acc_t, index_t kMultiplier>
 __global__ void matmul_with_kMultiplier(const srcA_t* a, const srcB_t* b, dst_t* c)
