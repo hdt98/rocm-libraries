@@ -103,7 +103,8 @@ TEST(InstanceToConvTraits, TransformsFwdMultipleAbdXdlCShuffleV3)
             ck::half_t,                                // AComputeDataType
             ck::half_t,                                // BComputeDataType
             false,                                     // DirectLoad
-            1>;                                        // NumGroupsToMerge
+            1,                                        // NumGroupsToMerge
+            ck::DeviceArch::All>;                     // DeviceArch   
 
     using InstTraits  = ck_tile::reflect::InstanceTraits<DeviceInstance>;
     const auto traits = ck_tile::reflect::conv::instance_to_conv_traits<DeviceInstance>();
