@@ -1555,7 +1555,7 @@ struct DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3
             return false;
         }
 
-        if(!(ck::is_gfx11_supported() || ck::is_gfx12_supported()))
+        if(!(ck::is_gfx11_supported() || ck::is_gfx12_supported() || ck::is_gfx13_supported()))
         {
             if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
             {
