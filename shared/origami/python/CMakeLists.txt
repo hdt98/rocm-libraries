@@ -96,6 +96,7 @@ install(TARGETS _pyorigami LIBRARY DESTINATION "${PYTHON_INSTALL_DIR}")
 install(FILES 
     "${CMAKE_CURRENT_SOURCE_DIR}/src/origami/__init__.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/origami/selector.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/origami/all_gather_matmul_selector.py"
     DESTINATION "${PYTHON_INSTALL_DIR}"
 )
 
@@ -143,6 +144,21 @@ if(ORIGAMI_BUILD_TESTING OR BUILD_TESTING)
 
     set_tests_properties(
         "Python: test_hardware"
+        PROPERTIES
+            ENVIRONMENT
+            "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:$ENV{PYTHONPATH}"
+            DEPENDS _pyorigami
+    )
+
+    # Run all-gather GEMM model tests
+    add_test(
+        NAME "Python: test_all_gather_gemm"
+        COMMAND ${Python_EXECUTABLE} -m pytest tests/test_all_gather_gemm.py -v
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+
+    set_tests_properties(
+        "Python: test_all_gather_gemm"
         PROPERTIES
             ENVIRONMENT
             "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:$ENV{PYTHONPATH}"

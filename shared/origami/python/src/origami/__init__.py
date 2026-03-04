@@ -24,6 +24,10 @@ try:
         staggerU_t,
         problem_t,
         hardware_t,
+        # Resource constraint types
+        resource_constraints_t,
+        stage_phase_t,
+        stage_profile_t,
         # Hardware functions
         get_hardware_for_device,
         get_hardware_for_arch,
@@ -82,6 +86,10 @@ __all__ = [
     "workgroup_mapping_t",
     "problem_t",
     "hardware_t",
+    # Resource constraint types
+    "resource_constraints_t",
+    "stage_phase_t",
+    "stage_profile_t",
     # Hardware functions
     "get_hardware_for_device",
     "get_hardware_for_arch",
@@ -124,5 +132,11 @@ try:
 except ImportError:
     # Do not raise this error if import fails - compiled Origami bindings still
     # work without the dedicated Python selector
+    pass
+
+try:
+    from .all_gather_matmul_selector import OrigamiAllGatherMatmulSelector
+    __all__.append("OrigamiAllGatherMatmulSelector")
+except ImportError:
     pass
 

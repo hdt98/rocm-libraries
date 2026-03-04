@@ -13,6 +13,7 @@
 #include "origami/origami.hpp"
 #include "origami/streamk.hpp"
 #include "origami/types.hpp"
+#include "origami/algorithms/all_gather_gemm/all_gather_gemm.hpp"
 
 using hardware_t = origami::hardware_t;
 using namespace nanobind::literals;
@@ -165,7 +166,8 @@ NB_MODULE(origami, m) {
       .def_rw("compute_clock_ghz", &hardware_t::compute_clock_ghz)
       .def_rw("parallel_mi_cu", &hardware_t::parallel_mi_cu)
       .def_rw("mem_bw_per_wg_coefficients", &hardware_t::mem_bw_per_wg_coefficients)
-      .def_rw("NUM_XCD", &hardware_t::NUM_XCD);
+      .def_rw("NUM_XCD", &hardware_t::NUM_XCD)
+      .def_rw("arch", &hardware_t::arch);
 
   m.def("get_hardware_for_device",
         &hardware_t::get_hardware_for_device,
@@ -266,5 +268,103 @@ NB_MODULE(origami, m) {
   m.def("compute_number_of_output_tiles",
         &origami::streamk::compute_number_of_output_tiles,
         "Compute number of output tiles");
+
+  // ═══════════════════════════════════════════════════════════════════════
+  //  algorithms.all_gather_gemm submodule
+  // ═══════════════════════════════════════════════════════════════════════
+
+  namespace ag = origami::algorithms::all_gather_gemm;
+
+  auto algorithms = m.def_submodule("algorithms", "Algorithm-specific analytical models");
+  auto ag_gemm    = algorithms.def_submodule("all_gather_gemm",
+                        "Fused all-gather + GEMM analytical model");
+
+  // ── resource_constraints_t (top-level origami::) ──────────────────────
+  nanobind::class_<origami::resource_constraints_t>(m, "resource_constraints_t")
+      .def(nanobind::init<>())
+      .def_rw("available_cus",        &origami::resource_constraints_t::available_cus)
+      .def_rw("available_hbm_bw_gbps", &origami::resource_constraints_t::available_hbm_bw_gbps)
+      .def_rw("effective_l2_bytes",   &origami::resource_constraints_t::effective_l2_bytes)
+      .def_rw("effective_mall_bytes", &origami::resource_constraints_t::effective_mall_bytes)
+      .def_static("unconstrained",    &origami::resource_constraints_t::unconstrained);
+
+  // ── stage_phase_t ─────────────────────────────────────────────────────
+  nanobind::class_<origami::stage_phase_t>(m, "stage_phase_t")
+      .def(nanobind::init<>())
+      .def_rw("duration_us",      &origami::stage_phase_t::duration_us)
+      .def_rw("gemm_constraints", &origami::stage_phase_t::gemm_constraints)
+      .def_rw("comm_constraints", &origami::stage_phase_t::comm_constraints);
+
+  // ── stage_profile_t ───────────────────────────────────────────────────
+  nanobind::class_<origami::stage_profile_t>(m, "stage_profile_t")
+      .def(nanobind::init<>())
+      .def_rw("ramp_up", &origami::stage_profile_t::ramp_up)
+      .def_rw("steady",  &origami::stage_profile_t::steady)
+      .def_rw("drain",   &origami::stage_profile_t::drain)
+      .def_rw("effective_concurrent_gemm_wgs",
+              &origami::stage_profile_t::effective_concurrent_gemm_wgs);
+
+  // ── network_t ─────────────────────────────────────────────────────────
+  nanobind::class_<ag::network_t>(ag_gemm, "network_t")
+      .def(nanobind::init<>())
+      .def_rw("link_bw_gbps",         &ag::network_t::link_bw_gbps)
+      .def_rw("world_size",           &ag::network_t::world_size)
+      .def_rw("peak_hbm_bw_gbps",    &ag::network_t::peak_hbm_bw_gbps)
+      .def_rw("scheduling_factor",    &ag::network_t::scheduling_factor)
+      .def_rw("gather_overhead",      &ag::network_t::gather_overhead)
+      .def_rw("write_bw_per_wg_gbps", &ag::network_t::write_bw_per_wg_gbps)
+      .def_rw("flag_poll_us",         &ag::network_t::flag_poll_us)
+      .def_rw("flag_store_us",        &ag::network_t::flag_store_us)
+      .def_static("for_architecture",  &ag::network_t::for_architecture,
+                   nanobind::arg("arch"),
+                   nanobind::arg("link_bw_gbps"),
+                   nanobind::arg("world_size"))
+      .def_static("mi300x_defaults",  &ag::network_t::mi300x_defaults,
+                   nanobind::arg("link_bw") = 50.0,
+                   nanobind::arg("world_size") = 8);
+
+  // ── all_gather_matmul_problem_t ───────────────────────────────────────
+  nanobind::class_<ag::all_gather_matmul_problem_t, origami::problem_t>(
+          ag_gemm, "all_gather_matmul_problem_t")
+      .def(nanobind::init<>())
+      .def_rw("world_size",  &ag::all_gather_matmul_problem_t::world_size)
+      .def_rw("link_bw_gbps", &ag::all_gather_matmul_problem_t::link_bw_gbps)
+      .def("k_local",        &ag::all_gather_matmul_problem_t::k_local);
+
+  // ── all_gather_matmul_config_t ────────────────────────────────────────
+  nanobind::class_<ag::all_gather_matmul_config_t, origami::config_t>(
+          ag_gemm, "all_gather_matmul_config_t")
+      .def(nanobind::init<>())
+      .def_rw("num_fetch_sms",         &ag::all_gather_matmul_config_t::num_fetch_sms)
+      .def_rw("k_per_flag",            &ag::all_gather_matmul_config_t::k_per_flag)
+      .def_rw("num_fetch_stages",      &ag::all_gather_matmul_config_t::num_fetch_stages)
+      .def_rw("first_stage_fetch_sms", &ag::all_gather_matmul_config_t::first_stage_fetch_sms)
+      .def_rw("num_warps",             &ag::all_gather_matmul_config_t::num_warps)
+      .def_rw("group_size_m",          &ag::all_gather_matmul_config_t::group_size_m)
+      .def_rw("staged_a_layout",       &ag::all_gather_matmul_config_t::staged_a_layout);
+
+  // ── all_gather_matmul_prediction_result_t ──────────────────────────────
+  nanobind::class_<ag::all_gather_matmul_prediction_result_t>(
+          ag_gemm, "all_gather_matmul_prediction_result_t")
+      .def(nanobind::init<>())
+      .def_rw("total_latency_ms",   &ag::all_gather_matmul_prediction_result_t::total_latency_ms)
+      .def_rw("comm_time_ms",       &ag::all_gather_matmul_prediction_result_t::comm_time_ms)
+      .def_rw("compute_time_ms",    &ag::all_gather_matmul_prediction_result_t::compute_time_ms)
+      .def_rw("pipeline_ms",        &ag::all_gather_matmul_prediction_result_t::pipeline_ms)
+      .def_rw("est_kernel_ms",      &ag::all_gather_matmul_prediction_result_t::est_kernel_ms)
+      .def_rw("roofline_tflops",    &ag::all_gather_matmul_prediction_result_t::roofline_tflops)
+      .def_rw("comm_compute_ratio", &ag::all_gather_matmul_prediction_result_t::comm_compute_ratio)
+      .def_rw("config",             &ag::all_gather_matmul_prediction_result_t::config)
+      .def_rw("grid_size",          &ag::all_gather_matmul_prediction_result_t::grid_size)
+      .def_rw("total_fetch_wgs",    &ag::all_gather_matmul_prediction_result_t::total_fetch_wgs)
+      .def_rw("total_gemm_wgs",     &ag::all_gather_matmul_prediction_result_t::total_gemm_wgs);
+
+  // ── Top-level API functions ───────────────────────────────────────────
+  ag_gemm.def("select_config",   &ag::select_config,
+              "Select best fused all-gather + GEMM configuration");
+  ag_gemm.def("predict_latency", &ag::predict_latency,
+              "Predict latency for a specific fused configuration");
+  ag_gemm.def("rank_configs",    &ag::rank_configs,
+              "Rank candidate fused configurations by predicted latency");
 
 }
