@@ -1025,14 +1025,14 @@ class TestCustomScheduleTF32:
 
     @pytest.mark.parametrize(
         # fmt: off
-        "transA, transB, lds_tr_inst,  tr_lds, mt0, mt1", [
-        (  True,  False,       False,       1, 128, 160),  # TN (128x160x64)
-        ( False,  False,        True,       1, 160, 128),  # NN (160x128x64)
-        (  True,  False,       False,       1, 160, 128),  # TN (160x128x64)
-        ( False,   True,        True,       0, 160, 128),  # NT (160x128x64)
+        "transA, transB, lds_tr_inst,  tr_lds, mt0, mt1, vwa, vwb", [
+        (  True,  False,       False,       1, 128, 160, None, None),  # TN (128x160x64)
+        ( False,  False,        True,       1, 160, 128, None, None),  # NN (160x128x64)
+        (  True,  False,       False,       1, 160, 128, None, None),  # TN (160x128x64)
+        ( False,   True,        True,       0, 160, 128, 1,    4   ),  # NT (160x128x64)
         # fmt: on
         ])
-    def test_schedule_128x160x64_160x128x64(self, transA, transB, lds_tr_inst, tr_lds, mt0, mt1):
+    def test_schedule_128x160x64_160x128x64(self, transA, transB, lds_tr_inst, tr_lds, mt0, mt1, vwa, vwb):
         """Tests the 128x160x64 and 160x128x64 TF32 schedules (TN/NN/NT variants)."""
 
         kernel = create_base_kernel()
@@ -1053,6 +1053,12 @@ class TestCustomScheduleTF32:
             "MatrixInstruction": mi, "MIWaveGroup": mi_wave_group,
             "LDSTrInst": lds_tr_inst, "TransposeLDS": tr_lds, "MIWaveTileA": mi_wave_tile[0], "MIWaveTileB": mi_wave_tile[1],
         })
+
+        if vwa is not None:
+            kernel.update({"VectorWidthA": vwa})
+        if vwb is not None:
+            kernel.update({"VectorWidthB": vwb})
+
         has_schedule, schedule_info = hasCustomSchedule(kernel)
         assert has_schedule
         assert isinstance(schedule_info, ScheduleInfo)
