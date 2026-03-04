@@ -103,11 +103,123 @@ TEST(Fwd2DFp16_TileV3_NHWGC, EndToEnd)
     ckt::init_inputs(args, inputs.get());
 
     auto tile_conv = TileConv{};
-    EXPECT_THAT(ckt::run(tile_conv, args, inputs.get(), outputs.get()), 
+    EXPECT_THAT(ckt::run(tile_conv, args, inputs.get(), outputs.get()),
                 ck_tile::test::SuccessfulRun());
 
     auto ref_conv = Reference{};
-    EXPECT_THAT(ckt::run(ref_conv, args, inputs.get(), reference.get()), 
+    EXPECT_THAT(ckt::run(ref_conv, args, inputs.get(), reference.get()),
+                ck_tile::test::SuccessfulRun());
+
+    EXPECT_THAT(outputs.get(), MatchesReference(args, reference.get()));
+}
+
+TEST(Fwd2DFp16_TileV3_NHWGC, EndToEnd_ExplicitStrides)
+{
+    if(!ck_tile::get_device_name().starts_with("gfx9"))
+    {
+        GTEST_SKIP() << "unsupported architecture";
+    }
+
+    ckt::Args<SIGNATURE> args = {
+        .lengths =
+            {
+                .batch_size      = 16,
+                .groups          = 1,
+                .input_channels  = 32,
+                .output_channels = 48,
+                .image =
+                    {
+                        .width  = 56,
+                        .height = 64,
+                    },
+                .filter =
+                    {
+                        .width  = 3,
+                        .height = 5,
+                    },
+            },
+        .filter_strides     = {.width = 1, .height = 1},
+        .filter_dilation    = {.width = 1, .height = 1},
+        .input_left_pad     = {.width = 0, .height = 0},
+        .input_right_pad    = {.width = 0, .height = 0},
+        .a_elementwise_op   = {},
+        .b_elementwise_op   = {},
+        .cde_elementwise_op = {},
+    };
+
+    // Extract the strides that PackedOrderedLayout would auto-compute,
+    // then set them as explicit values to exercise the has_value() path.
+    args.input_strides  = args.make_input_descriptor().get_strides();
+    args.weight_strides = args.make_weight_descriptor().get_strides();
+    args.output_strides = args.make_output_descriptor().get_strides();
+
+    auto inputs    = ckt::alloc_inputs(args);
+    auto outputs   = ckt::alloc_outputs(args);
+    auto reference = ckt::alloc_outputs(args);
+
+    ckt::init_inputs(args, inputs.get());
+
+    auto tile_conv = TileConv{};
+    EXPECT_THAT(ckt::run(tile_conv, args, inputs.get(), outputs.get()),
+                ck_tile::test::SuccessfulRun());
+
+    auto ref_conv = Reference{};
+    EXPECT_THAT(ckt::run(ref_conv, args, inputs.get(), reference.get()),
+                ck_tile::test::SuccessfulRun());
+
+    EXPECT_THAT(outputs.get(), MatchesReference(args, reference.get()));
+}
+
+TEST(Fwd2DFp16_TileV3_NHWGC, EndToEnd_ExplicitStrides_Stride2)
+{
+    if(!ck_tile::get_device_name().starts_with("gfx9"))
+    {
+        GTEST_SKIP() << "unsupported architecture";
+    }
+
+    ckt::Args<SIGNATURE> args = {
+        .lengths =
+            {
+                .batch_size      = 16,
+                .groups          = 1,
+                .input_channels  = 32,
+                .output_channels = 48,
+                .image =
+                    {
+                        .width  = 56,
+                        .height = 64,
+                    },
+                .filter =
+                    {
+                        .width  = 3,
+                        .height = 5,
+                    },
+            },
+        .filter_strides     = {.width = 2, .height = 2},
+        .filter_dilation    = {.width = 1, .height = 1},
+        .input_left_pad     = {.width = 0, .height = 0},
+        .input_right_pad    = {.width = 0, .height = 0},
+        .a_elementwise_op   = {},
+        .b_elementwise_op   = {},
+        .cde_elementwise_op = {},
+    };
+
+    args.input_strides  = args.make_input_descriptor().get_strides();
+    args.weight_strides = args.make_weight_descriptor().get_strides();
+    args.output_strides = args.make_output_descriptor().get_strides();
+
+    auto inputs    = ckt::alloc_inputs(args);
+    auto outputs   = ckt::alloc_outputs(args);
+    auto reference = ckt::alloc_outputs(args);
+
+    ckt::init_inputs(args, inputs.get());
+
+    auto tile_conv = TileConv{};
+    EXPECT_THAT(ckt::run(tile_conv, args, inputs.get(), outputs.get()),
+                ck_tile::test::SuccessfulRun());
+
+    auto ref_conv = Reference{};
+    EXPECT_THAT(ckt::run(ref_conv, args, inputs.get(), reference.get()),
                 ck_tile::test::SuccessfulRun());
 
     EXPECT_THAT(outputs.get(), MatchesReference(args, reference.get()));
