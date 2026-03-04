@@ -1073,6 +1073,9 @@ TEST_CASE("Heuristics: Default parameters", "[heuristics]") {
   REQUIRE(defaults.weight_epilogue == 2.0);
   REQUIRE(defaults.weight_loop_overhead == 500.0);
   REQUIRE(defaults.weight_tile_total == 1.0);
+  REQUIRE(defaults.weight_epilogue_initial == 1.0);
+  REQUIRE(defaults.weight_epilogue_compute == 1.0);
+  REQUIRE(defaults.weight_epilogue_k_split_reduction == 1.0);
 
   // Check default empirical constants
   REQUIRE(defaults.l2_min_hit_rate_default == 0.5);
@@ -1085,6 +1088,27 @@ TEST_CASE("Heuristics: Default parameters", "[heuristics]") {
   REQUIRE(defaults.main_loop_efficiency == 1.0);
 }
 
+TEST_CASE("Heuristics: compose_epilogue", "[heuristics]") {
+  origami::epilogue_components_t comp;
+  comp.initial_memory_write   = 100.0;
+  comp.compute_iteration       = 200.0;
+  comp.k_split_reduction      = 50.0;
+  comp.k_split_overhead_const = 1000.0;
+  comp.k_padding              = 500.0;
+
+  origami::heuristic_params_t heuristic;
+  heuristic.weight_epilogue_initial           = 1.0;
+  heuristic.weight_epilogue_compute           = 1.0;
+  heuristic.weight_epilogue_k_split_reduction = 1.0;
+
+  const double occupancy_factor = 1.0;
+  double L_epilogue = origami::compose_epilogue(comp, heuristic, occupancy_factor);
+
+  // Formula: (w_initial*initial + w_compute*compute)*occupancy + (w_k_split_red*k_split_red + k_split_overhead_const) + k_padding
+  double expected = (100.0 + 200.0) * 1.0 + (50.0 + 1000.0) + 500.0;
+  REQUIRE(L_epilogue == Approx(expected).epsilon(1e-9));
+}
+
 TEST_CASE("Heuristics: Parameter merging", "[heuristics]") {
   origami::heuristic_params_t base;
   origami::heuristic_params_t override;
@@ -1095,6 +1119,10 @@ TEST_CASE("Heuristics: Parameter merging", "[heuristics]") {
   override.main_memory_load_latency = 300.0;
   override.main_loop_efficiency     = 0.8;
 
+  // Set epilogue sub-weights in override
+  override.weight_epilogue_initial           = 1.5;
+  override.weight_epilogue_k_split_reduction = 2.0;
+
   // Merge override into base
   base.merge_with(override);
 
@@ -1103,11 +1131,14 @@ TEST_CASE("Heuristics: Parameter merging", "[heuristics]") {
   REQUIRE(base.weight_memory == 3.0);
   REQUIRE(base.main_memory_load_latency == 300.0);
   REQUIRE(base.main_loop_efficiency == 0.8);
+  REQUIRE(base.weight_epilogue_initial == 1.5);
+  REQUIRE(base.weight_epilogue_k_split_reduction == 2.0);
 
   // Check that non-overridden values remain default
   REQUIRE(base.weight_mem_l2 == 1.0);
   REQUIRE(base.weight_prologue == 1.5);
   REQUIRE(base.l2_min_hit_rate_default == 0.5);
+  REQUIRE(base.weight_epilogue_compute == 1.0);
 }
 
 TEST_CASE("Heuristics: Key matching - exact match", "[heuristics]") {

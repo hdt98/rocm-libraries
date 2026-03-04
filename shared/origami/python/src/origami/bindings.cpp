@@ -10,6 +10,7 @@
 #include <nanobind/stl/vector.h>
 #include "origami/gemm.hpp"
 #include "origami/hardware.hpp"
+#include "origami/heuristics.hpp"
 #include "origami/origami.hpp"
 #include "origami/streamk.hpp"
 #include "origami/types.hpp"
@@ -132,6 +133,39 @@ NB_MODULE(origami, m) {
       .def_rw("a_mx_block_size", &origami::problem_t::a_mx_block_size)
       .def_rw("b_mx_block_size", &origami::problem_t::b_mx_block_size);
 
+  nanobind::class_<origami::epilogue_components_t>(m, "epilogue_components_t")
+      .def(nanobind::init<>())
+      .def_rw("initial_memory_write", &origami::epilogue_components_t::initial_memory_write)
+      .def_rw("compute_iteration", &origami::epilogue_components_t::compute_iteration)
+      .def_rw("k_split_reduction", &origami::epilogue_components_t::k_split_reduction)
+      .def_rw("k_split_overhead_const", &origami::epilogue_components_t::k_split_overhead_const)
+      .def_rw("k_padding", &origami::epilogue_components_t::k_padding);
+
+  nanobind::class_<origami::heuristic_params_t>(m, "heuristic_params_t")
+      .def(nanobind::init<>())
+      .def_rw("weight_mem_l2", &origami::heuristic_params_t::weight_mem_l2)
+      .def_rw("weight_mem_mall", &origami::heuristic_params_t::weight_mem_mall)
+      .def_rw("weight_mem_dram", &origami::heuristic_params_t::weight_mem_dram)
+      .def_rw("weight_compute", &origami::heuristic_params_t::weight_compute)
+      .def_rw("weight_memory", &origami::heuristic_params_t::weight_memory)
+      .def_rw("weight_wg_setup", &origami::heuristic_params_t::weight_wg_setup)
+      .def_rw("weight_prologue", &origami::heuristic_params_t::weight_prologue)
+      .def_rw("weight_epilogue", &origami::heuristic_params_t::weight_epilogue)
+      .def_rw("weight_loop_overhead", &origami::heuristic_params_t::weight_loop_overhead)
+      .def_rw("weight_tile_total", &origami::heuristic_params_t::weight_tile_total)
+      .def_rw("weight_epilogue_initial", &origami::heuristic_params_t::weight_epilogue_initial)
+      .def_rw("weight_epilogue_compute", &origami::heuristic_params_t::weight_epilogue_compute)
+      .def_rw("weight_epilogue_k_split_reduction",
+              &origami::heuristic_params_t::weight_epilogue_k_split_reduction)
+      .def_rw("l2_min_hit_rate_default", &origami::heuristic_params_t::l2_min_hit_rate_default)
+      .def_rw("main_memory_load_latency", &origami::heuristic_params_t::main_memory_load_latency)
+      .def_rw("occupancy_decay_base", &origami::heuristic_params_t::occupancy_decay_base)
+      .def_rw("k_split_reduction_overhead",
+              &origami::heuristic_params_t::k_split_reduction_overhead)
+      .def_rw("k_padding_penalty", &origami::heuristic_params_t::k_padding_penalty)
+      .def_rw("main_loop_efficiency", &origami::heuristic_params_t::main_loop_efficiency)
+      .def("merge_with", &origami::heuristic_params_t::merge_with, "Merge with another heuristic params.");
+
   nanobind::class_<origami::staggerU_t>(m, "staggerU_t")
       .def(nanobind::init<>())
       .def_rw("staggerUMapping", &origami::staggerU_t::staggerUMapping)
@@ -220,6 +254,20 @@ NB_MODULE(origami, m) {
   m.def("select_topk_configs",
         &origami::select_topk_configs,
         "Select topk configurations");
+
+  m.def("get_heuristic_params",
+        &origami::get_heuristic_params,
+        nanobind::arg("problem"),
+        nanobind::arg("hardware"),
+        nanobind::arg("config"),
+        "Get heuristic parameters for problem/hardware/config.");
+
+  m.def("compose_epilogue",
+        &origami::compose_epilogue,
+        nanobind::arg("comp"),
+        nanobind::arg("heuristic"),
+        nanobind::arg("occupancy_factor"),
+        "Compose epilogue latency from components and heuristic weights.");
 
   m.def("compute_perf_gflops",
         &origami::compute_perf_gflops,
