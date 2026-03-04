@@ -8,6 +8,7 @@
 #include "origami/gemm.hpp"
 #include "origami/hardware.hpp"
 #include "origami/heuristics.hpp"
+#include "origami/logger.hpp"
 #include "origami/types.hpp"
 
 namespace origami {

@@ -824,9 +824,18 @@ double compute_tile_latency(const problem_t& problem,
   }
 
   // Block 4: K-padding penalty (if applicable)
+  double problem_k_quant = 0.0;
   if (K % MT_K != 0) {
-    const double problem_k_quant = static_cast<double>(K % MT_K) / static_cast<double>(K);
-    epilogue_comp.k_padding      = problem_k_quant * heuristic.k_padding_penalty;
+    problem_k_quant         = static_cast<double>(K % MT_K) / static_cast<double>(K);
+    epilogue_comp.k_padding = problem_k_quant * heuristic.k_padding_penalty;
+  }
+
+  if (debug) {
+    OLOG_DEBUG("epilogue_comp.initial_memory_write: " << epilogue_comp.initial_memory_write);
+    OLOG_DEBUG("epilogue_comp.compute_iteration: " << epilogue_comp.compute_iteration);
+    OLOG_DEBUG("epilogue_comp.k_split_reduction: " << epilogue_comp.k_split_reduction);
+    OLOG_DEBUG("epilogue_comp.k_split_overhead_const: " << epilogue_comp.k_split_overhead_const);
+    OLOG_DEBUG("epilogue_comp.k_padding: " << epilogue_comp.k_padding);
   }
 
   double L_epilogue = compose_epilogue(epilogue_comp, heuristic, occupancy_factor);
