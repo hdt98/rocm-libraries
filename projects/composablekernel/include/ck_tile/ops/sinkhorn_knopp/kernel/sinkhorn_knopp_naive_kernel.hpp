@@ -36,10 +36,7 @@ struct SinkhornKnoppNaiveKernel
 
     CK_TILE_DEVICE void operator()(const SinkhornKnoppArgs& args) const
     {
-        using S               = Problem::BlockShape;
-        using InDataType      = typename Problem::InDataType;
-        using ComputeDataType = typename Problem::ComputeDataType;
-        using OutDataType     = typename Problem::OutDataType;
+        using S = Problem::BlockShape;
 
         auto* p_in  = static_cast<const Problem::InDataType*>(args.p_in);
         auto* p_out = static_cast<Problem::OutDataType*>(args.p_out);
@@ -51,15 +48,7 @@ struct SinkhornKnoppNaiveKernel
                                                               number<1>{});
 
         const auto input_window = [&]() {
-            // We require exp(input) > 0, and exp(padding) == 0
-            const InDataType input_padding_value = -ck_tile::numeric<InDataType>::infinity();
-
-            auto buffer_view = make_buffer_view<address_space_enum::global>(
-                p_in, in_out_desc.get_element_space_size(), input_padding_value);
-
-            const auto in_tensor =
-                tensor_view<decltype(buffer_view), decltype(in_out_desc)>{buffer_view, in_out_desc};
-
+            auto in_tensor = make_tensor_view<address_space_enum::global>(p_in, in_out_desc);
             return make_tile_window(
                 in_tensor,
                 make_tuple(number<S::BatchSize>{}, number<S::N * S::N>{}),
@@ -68,13 +57,7 @@ struct SinkhornKnoppNaiveKernel
         }();
 
         auto out_window = [&]() {
-            const OutDataType out_padding_value = static_cast<ComputeDataType>(0.0);
-            auto out_buffer_view                = make_buffer_view<address_space_enum::global>(
-                p_out, in_out_desc.get_element_space_size(), out_padding_value);
-
-            auto out_tensor = tensor_view<decltype(out_buffer_view), decltype(in_out_desc)>{
-                out_buffer_view, in_out_desc};
-
+            auto out_tensor = make_tensor_view<address_space_enum::global>(p_out, in_out_desc);
             return make_tile_window(
                 out_tensor,
                 make_tuple(number<S::BatchSize>{}, number<S::N * S::N>{}),
