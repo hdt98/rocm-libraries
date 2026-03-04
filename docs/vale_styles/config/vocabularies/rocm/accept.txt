@@ -966,8 +966,9 @@ OpenXLA
 Optim
 # optimizer
 [Oo]ptimizer('s|s|s')?
-# OR
-OR('s|'d)?
+# or
+(or|OR)('s|'d)?
+# os
 OS|os
 OSS
 OSU
