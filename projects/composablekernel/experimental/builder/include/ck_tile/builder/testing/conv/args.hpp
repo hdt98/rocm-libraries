@@ -85,6 +85,21 @@ Extent<RANK> make_packed_strides_for_order(const Extent<RANK>& lengths,
     return strides;
 }
 
+/// @brief Stride generator for tensors with custom dimension ordering.
+///
+/// Satisfies TensorStridesGenerator so it can be passed directly to
+/// TensorDescriptor, matching the pattern of PackedRightLayout / PackedLeftLayout.
+template <size_t RANK>
+struct PackedOrderedLayout
+{
+    std::array<size_t, RANK> order;
+
+    Extent<RANK> operator()(const Extent<RANK>& lengths) const
+    {
+        return make_packed_strides_for_order<RANK>(lengths, order);
+    }
+};
+
 template <int SPATIAL_DIM>
 std::array<long_index_t, SPATIAL_DIM>
 compute_output_spatial(const std::array<long_index_t, SPATIAL_DIM>& input_spatial,
@@ -297,16 +312,12 @@ struct Args<SIGNATURE>
         const auto image = this->lengths.image.template to_array<size_t>();
         std::copy(image.begin(), image.end(), lens.begin() + 3);
 
-        const auto make_default_strides = [&] {
-            constexpr auto layout = SIGNATURE.input.config.layout;
-            constexpr auto order  = detail::get_layout_order<layout, SPATIAL_DIM>();
-            return detail::make_packed_strides_for_order<INPUT_RANK>(lens, order);
-        };
+        if(this->input_strides.has_value())
+            return InputDescriptor(lens, *this->input_strides);
 
-        const Extent strides =
-            this->input_strides.has_value() ? *this->input_strides : make_default_strides();
-
-        return InputDescriptor(lens, strides);
+        constexpr auto layout = SIGNATURE.input.config.layout;
+        constexpr auto order  = detail::get_layout_order<layout, SPATIAL_DIM>();
+        return InputDescriptor(lens, detail::PackedOrderedLayout<INPUT_RANK>{order});
     }
 
     /// This function returns the `TensorDescriptor` corresponding to
@@ -323,16 +334,12 @@ struct Args<SIGNATURE>
         const auto filter = this->lengths.filter.template to_array<size_t>();
         std::copy(filter.begin(), filter.end(), lens.begin() + 3);
 
-        const auto make_default_strides = [&] {
-            constexpr auto layout = SIGNATURE.weight.config.layout;
-            constexpr auto order  = detail::get_layout_order<layout, SPATIAL_DIM>();
-            return detail::make_packed_strides_for_order<WEIGHT_RANK>(lens, order);
-        };
+        if(this->weight_strides.has_value())
+            return WeightDescriptor(lens, *this->weight_strides);
 
-        const Extent strides =
-            this->weight_strides.has_value() ? *this->weight_strides : make_default_strides();
-
-        return WeightDescriptor(lens, strides);
+        constexpr auto layout = SIGNATURE.weight.config.layout;
+        constexpr auto order  = detail::get_layout_order<layout, SPATIAL_DIM>();
+        return WeightDescriptor(lens, detail::PackedOrderedLayout<WEIGHT_RANK>{order});
     }
 
     /// This function returns the `TensorDescriptor` corresponding to
@@ -351,16 +358,12 @@ struct Args<SIGNATURE>
         const auto spatial = output_spatial.template to_array<size_t>();
         std::copy(spatial.begin(), spatial.end(), lens.begin() + 3);
 
-        const auto make_default_strides = [&] {
-            constexpr auto layout = SIGNATURE.output.config.layout;
-            constexpr auto order  = detail::get_layout_order<layout, SPATIAL_DIM>();
-            return detail::make_packed_strides_for_order<OUTPUT_RANK>(lens, order);
-        };
+        if(this->output_strides.has_value())
+            return OutputDescriptor(lens, *this->output_strides);
 
-        const Extent strides =
-            this->output_strides.has_value() ? *this->output_strides : make_default_strides();
-
-        return OutputDescriptor(lens, strides);
+        constexpr auto layout = SIGNATURE.output.config.layout;
+        constexpr auto order  = detail::get_layout_order<layout, SPATIAL_DIM>();
+        return OutputDescriptor(lens, detail::PackedOrderedLayout<OUTPUT_RANK>{order});
     }
 
     /// Convert the Args structure into a CK Tile conv_param structure.
