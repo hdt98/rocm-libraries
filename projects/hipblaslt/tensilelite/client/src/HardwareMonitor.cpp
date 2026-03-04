@@ -178,8 +178,11 @@ namespace TensileLite
 
         HardwareMonitor::~HardwareMonitor()
         {
-            m_stop = true;
-            m_exit = true;
+	    {
+	       std::scoped_lock lock(m_mutex);
+               m_stop = true;
+               m_exit = true;
+	    }
 
             m_cv.notify_all();
             m_thread.join();
@@ -187,6 +190,8 @@ namespace TensileLite
 
         void HardwareMonitor::initThread()
         {
+	    // This might not be strictly needed, though keeping it is harmless.
+	    std::scoped_lock lock(m_mutex);
             m_stop   = false;
             m_exit   = false;
             m_thread = std::thread([this]() { this->runLoop(); });
@@ -320,7 +325,7 @@ namespace TensileLite
         {
             assertNotActive();
             {
-                std::unique_lock<std::mutex> lock(m_mutex);
+                std::scoped_lock<std::mutex> lock(m_mutex);
 
                 m_hasStopEvent = stopEvent != nullptr;
 
@@ -536,8 +541,8 @@ namespace TensileLite
                     return;
                 }
 
-                m_task();
-                m_task = std::move(Task());
+		m_task();
+		m_task = std::move(Task());
             }
         }
 
