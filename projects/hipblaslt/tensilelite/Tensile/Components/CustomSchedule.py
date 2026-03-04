@@ -4245,6 +4245,7 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
     optSchedule = dict()
     syncCode = []
     nglshift = nllshift = 0 # vmcnt shift for ngl and nll
+    disable_validation = False
     if isTN(kernel) and useLDSTr and TLDS==1:
 
         kernel["UsePLRPack"] = True
@@ -4459,13 +4460,15 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
 
         syncCode = syncTable[1::2]
         nglshift = nllshift = len(optSchedule['GRA'][0])//2 + len(optSchedule['GRB'][0])//2
+        disable_validation = True
     else:
         return False, None
 
     kernel["MfmaInitCVgprs"] = True
     opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
     opt1.pretty_print()
-    opt1.disableValidation()
+    # if disable_validation:
+    #     opt1.disableValidation("4x4MFMA with wider loads is not yet supported by validator")
     return True, opt1
 
 @RegisterSchedule(
