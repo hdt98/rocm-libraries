@@ -133,7 +133,8 @@ void ProblemDescription::HeuristicUpdateLayouts()
     static const std::vector<LayoutValidationMode> validation_modes = {
         strict, LayoutValidationMode::IgnoreDegenerateStrides};
 
-    // Early return optimization: if layouts are already consistent, skip recomputation
+    // If we have preset layouts that are valid, and they are consistent with each other, then we do
+    // not need to change them.
     if(!in_layout.empty() && in_layout == out_layout && in_layout == weights_layout &&
        std::find(supported_layouts.begin(), supported_layouts.end(), in_layout) !=
            supported_layouts.end() &&

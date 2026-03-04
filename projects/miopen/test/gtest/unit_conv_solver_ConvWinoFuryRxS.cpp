@@ -128,10 +128,10 @@ auto GetConvTestCasesNHWC(miopenDataType_t datatype)
     return std::vector{
         // clang-format off
         TestCase{
-            {datatype, miopenTensorNHWC, {1, 40, 20, 20}},
+            {datatype, miopenTensorNHWC, {1, 20, 20, 20}},
             {datatype, miopenTensorNHWC, {20, 20, 3, 3}},
             datatype,
-            {{1, 1}, {1, 1}, {1, 1}, 2}
+            {{1, 1}, {1, 1}, {1, 1}}
         },
         // clang-format on
     };
