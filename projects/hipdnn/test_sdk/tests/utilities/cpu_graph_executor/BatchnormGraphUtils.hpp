@@ -76,7 +76,7 @@ static std::tuple<std::shared_ptr<hipdnn_frontend::graph::Graph>,
         auto prevRunningMeanAttr = hipdnn_frontend::graph::makeTensorAttributes(
             "prev_running_mean",
             hipdnn_frontend::fromSdkType(meanVarianceDataType),
-            tensorBundle.prevRunningMeanTensor.value());
+            *tensorBundle.prevRunningMeanTensor);
         prevRunningMeanAttr.set_uid(uid++);
         prevRunningMeanTensorAttr = std::make_shared<hipdnn_frontend::graph::TensorAttributes>(
             std::move(prevRunningMeanAttr));
@@ -84,7 +84,7 @@ static std::tuple<std::shared_ptr<hipdnn_frontend::graph::Graph>,
         auto prevRunningVarianceAttr = hipdnn_frontend::graph::makeTensorAttributes(
             "prev_running_variance",
             hipdnn_frontend::fromSdkType(meanVarianceDataType),
-            tensorBundle.prevRunningVarianceTensor.value());
+            *tensorBundle.prevRunningVarianceTensor);
         prevRunningVarianceAttr.set_uid(uid++);
         prevRunningVarianceTensorAttr = std::make_shared<hipdnn_frontend::graph::TensorAttributes>(
             std::move(prevRunningVarianceAttr));

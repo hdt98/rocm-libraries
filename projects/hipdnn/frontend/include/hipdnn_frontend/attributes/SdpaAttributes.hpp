@@ -633,21 +633,21 @@ public:
             optUid(get_rng_dump()),
             optUid(get_amax_s()),
             optUid(get_amax_o()),
-            generate_stats.has_value() ? flatbuffers::Optional<bool>(*generate_stats)
+            generate_stats.has_value() ? flatbuffers::Optional<bool>(generate_stats)
                                        : flatbuffers::nullopt,
             alibi_mask,
             padding_mask,
             causal_mask,
             causal_mask_bottom_right,
-            dropout_probability.has_value() ? flatbuffers::Optional<float>(*dropout_probability)
+            dropout_probability.has_value() ? flatbuffers::Optional<float>(dropout_probability)
                                             : flatbuffers::nullopt,
-            attn_scale_value.has_value() ? flatbuffers::Optional<float>(*attn_scale_value)
+            attn_scale_value.has_value() ? flatbuffers::Optional<float>(attn_scale_value)
                                          : flatbuffers::nullopt,
-            left_bound.has_value() ? flatbuffers::Optional<int64_t>(*left_bound)
+            left_bound.has_value() ? flatbuffers::Optional<int64_t>(left_bound)
                                    : flatbuffers::nullopt,
-            right_bound.has_value() ? flatbuffers::Optional<int64_t>(*right_bound)
+            right_bound.has_value() ? flatbuffers::Optional<int64_t>(right_bound)
                                     : flatbuffers::nullopt,
-            max_seq_len_kv.has_value() ? flatbuffers::Optional<int32_t>(*max_seq_len_kv)
+            max_seq_len_kv.has_value() ? flatbuffers::Optional<int32_t>(max_seq_len_kv)
                                        : flatbuffers::nullopt,
             toSdkType(diagonal_alignment),
             toSdkType(mma_core_mode),
@@ -764,7 +764,7 @@ public:
 
         if(fb->generate_stats().has_value())
         {
-            attr.generate_stats = fb->generate_stats().value();
+            attr.generate_stats = fb->generate_stats();
         }
         attr.alibi_mask = fb->alibi_mask();
         attr.padding_mask = fb->padding_mask();
@@ -773,23 +773,23 @@ public:
 
         if(fb->dropout_probability().has_value())
         {
-            attr.dropout_probability = fb->dropout_probability().value();
+            attr.dropout_probability = fb->dropout_probability();
         }
         if(fb->attn_scale_value().has_value())
         {
-            attr.attn_scale_value = fb->attn_scale_value().value();
+            attr.attn_scale_value = fb->attn_scale_value();
         }
         if(fb->left_bound().has_value())
         {
-            attr.left_bound = fb->left_bound().value();
+            attr.left_bound = fb->left_bound();
         }
         if(fb->right_bound().has_value())
         {
-            attr.right_bound = fb->right_bound().value();
+            attr.right_bound = fb->right_bound();
         }
         if(fb->max_seq_len_kv().has_value())
         {
-            attr.max_seq_len_kv = fb->max_seq_len_kv().value();
+            attr.max_seq_len_kv = fb->max_seq_len_kv();
         }
 
         attr.diagonal_alignment = fromSdkType(fb->diagonal_alignment());

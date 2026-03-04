@@ -80,8 +80,12 @@ TEST(TestRMSNormNode, PreValidateNodeMissingValues)
     auto error = node.pre_validate_node();
     EXPECT_EQ(error.code, ErrorCode::ATTRIBUTE_NOT_SET);
 
-    rmsnormAttributes.set_x(std::make_shared<TensorAttributes>());
-    rmsnormAttributes.set_forward_phase(NormFwdPhase::TRAINING);
+    rmsnormAttributes.set_x(
+        std::make_shared<
+            TensorAttributes>()); // NOLINT(bugprone-use-after-move) - Testing incremental attribute setting
+    rmsnormAttributes.set_forward_phase(
+        NormFwdPhase::
+            TRAINING); // NOLINT(bugprone-use-after-move) - Testing incremental attribute setting
     auto rmsnormAttributesCopy = rmsnormAttributes;
     RMSNormNode nodeWithX(std::move(rmsnormAttributesCopy), graphAttributes);
 
@@ -396,7 +400,7 @@ TEST(TestRMSNormNode, PackNodeWithBias)
 
     ASSERT_NE(packedAttributes, nullptr);
     EXPECT_TRUE(packedAttributes->bias_tensor_uid().has_value());
-    EXPECT_EQ(packedAttributes->bias_tensor_uid().value(), biasTensor->get_uid());
+    EXPECT_EQ(*packedAttributes->bias_tensor_uid(), biasTensor->get_uid());
 }
 
 TEST(TestRMSNormNode, GatherHipdnnTensors)

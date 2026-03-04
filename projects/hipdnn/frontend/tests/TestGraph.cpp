@@ -5927,7 +5927,7 @@ TEST_F(TestGraph, SetPreferredEngineIdByName)
     // Verify it was converted to the correct ID
     auto expectedId = hipdnn_data_sdk::utilities::engineNameToId(testEngineName);
     EXPECT_TRUE(graph.get_preferred_engine_id_ext().has_value());
-    EXPECT_EQ(graph.get_preferred_engine_id_ext().value(), expectedId);
+    EXPECT_EQ(*graph.get_preferred_engine_id_ext(), expectedId);
 }
 
 TEST_F(TestGraph, SetPreferredEngineIdByEmptyStringClearsPreference)
@@ -5962,7 +5962,7 @@ TEST_F(TestGraph, SetPreferredEngineIdByNameThenById)
 
     // Verify the ID overload took precedence
     EXPECT_TRUE(graph.get_preferred_engine_id_ext().has_value());
-    EXPECT_EQ(graph.get_preferred_engine_id_ext().value(), overrideId);
+    EXPECT_EQ(*graph.get_preferred_engine_id_ext(), overrideId);
 }
 
 TEST_F(TestGraph, SetPreferredEngineIdByIdThenByName)
@@ -5980,7 +5980,7 @@ TEST_F(TestGraph, SetPreferredEngineIdByIdThenByName)
 
     // Verify the name overload took precedence
     EXPECT_TRUE(graph.get_preferred_engine_id_ext().has_value());
-    EXPECT_EQ(graph.get_preferred_engine_id_ext().value(), expectedId);
+    EXPECT_EQ(*graph.get_preferred_engine_id_ext(), expectedId);
 }
 
 TEST_F(TestGraph, MethodChaining)
@@ -6010,13 +6010,13 @@ TEST_F(TestGraph, MethodChaining)
     EXPECT_EQ(graph.get_intermediate_data_type(), DataType::HALF);
     EXPECT_EQ(graph.get_io_data_type(), DataType::BFLOAT16);
     EXPECT_TRUE(graph.get_preferred_engine_id_ext().has_value());
-    EXPECT_EQ(graph.get_preferred_engine_id_ext().value(), 12345);
+    EXPECT_EQ(*graph.get_preferred_engine_id_ext(), 12345);
 
     // Test chaining with string overload
     auto& ref6 = graph.set_preferred_engine_id_ext(testEngineName);
     EXPECT_EQ(&graph, &ref6);
     EXPECT_TRUE(graph.get_preferred_engine_id_ext().has_value());
-    EXPECT_EQ(graph.get_preferred_engine_id_ext().value(), expectedEngineId);
+    EXPECT_EQ(*graph.get_preferred_engine_id_ext(), expectedEngineId);
 }
 
 // Test that create_execution_plan_ext handles deprecated knobs correctly.
@@ -6252,8 +6252,10 @@ TEST_F(TestGraph, MoveConstruction)
     EXPECT_EQ(movedGraph.get_compute_data_type(), DataType::FLOAT);
     EXPECT_EQ(movedGraph.get_intermediate_data_type(), DataType::HALF);
     EXPECT_EQ(movedGraph.get_io_data_type(), DataType::FLOAT);
-    EXPECT_EQ(originalGraph.get_name(), "");
-    EXPECT_TRUE(originalGraph.getTensorsByName().empty());
+    EXPECT_EQ(originalGraph.get_name(),
+              ""); // NOLINT(bugprone-use-after-move) - Testing move semantics
+    EXPECT_TRUE(originalGraph.getTensorsByName()
+                    .empty()); // NOLINT(bugprone-use-after-move) - Testing move semantics
 }
 
 TEST_F(TestGraph, MoveAssignment)
@@ -6344,14 +6346,14 @@ TEST_F(TestGraph, MoveConstructionWithPreferredEngineId)
         .set_preferred_engine_id_ext(42);
 
     EXPECT_TRUE(originalGraph.get_preferred_engine_id_ext().has_value());
-    EXPECT_EQ(originalGraph.get_preferred_engine_id_ext().value(), 42);
+    EXPECT_EQ(*originalGraph.get_preferred_engine_id_ext(), 42);
 
     // Move construct
     Graph movedGraph(std::move(originalGraph));
 
     // Verify preferred engine id was moved
     EXPECT_TRUE(movedGraph.get_preferred_engine_id_ext().has_value());
-    EXPECT_EQ(movedGraph.get_preferred_engine_id_ext().value(), 42);
+    EXPECT_EQ(*movedGraph.get_preferred_engine_id_ext(), 42);
 }
 
 TEST_F(TestGraph, MoveAssignmentToEmptyGraph)
@@ -6419,7 +6421,7 @@ TEST_F(TestGraph, EngineOverrideDoesNotReplaceExplicitlySetEngineId)
     EXPECT_TRUE(graph.build_operation_graph(_handle).is_good());
 
     ASSERT_TRUE(graph.get_preferred_engine_id_ext().has_value());
-    EXPECT_EQ(graph.get_preferred_engine_id_ext().value(), EXPLICIT_ENGINE_ID);
+    EXPECT_EQ(*graph.get_preferred_engine_id_ext(), EXPLICIT_ENGINE_ID);
 }
 
 // Test 2: EngineOverrideConfig::matchOperation identifies conv_fprop tensors
@@ -6692,7 +6694,7 @@ TEST_F(TestGraph, BuildAndSerializeSdpaFpropGraphWithStats)
     EXPECT_EQ(deserializedSdpaAttributes->v_tensor_uid, v->get_uid());
     EXPECT_EQ(deserializedSdpaAttributes->o_tensor_uid, o->get_uid());
     ASSERT_TRUE(deserializedSdpaAttributes->stats_tensor_uid.has_value());
-    EXPECT_EQ(deserializedSdpaAttributes->stats_tensor_uid.value(), stats->get_uid());
+    EXPECT_EQ(*deserializedSdpaAttributes->stats_tensor_uid, stats->get_uid());
     ASSERT_TRUE(deserializedSdpaAttributes->generate_stats.has_value());
-    EXPECT_TRUE(deserializedSdpaAttributes->generate_stats.value());
+    EXPECT_TRUE(*deserializedSdpaAttributes->generate_stats);
 }

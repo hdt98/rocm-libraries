@@ -52,6 +52,13 @@ template <typename DerivedT>
 class Attributes
 {
 private:
+    Attributes() = default;
+
+    friend DerivedT;
+
+    template <typename>
+    friend class Attributes;
+
     /**
      * @brief Get mutable reference to derived class
      * @return Reference to *this cast to DerivedT&

@@ -49,7 +49,7 @@ struct BatchnormTrainSignatureKey
         }
 
         auto xTensorAttr = tensorMap.at(nodeAttributes->x_tensor_uid());
-        auto meanTensorAttr = tensorMap.at(nodeAttributes->mean_tensor_uid().value());
+        auto meanTensorAttr = tensorMap.at(*nodeAttributes->mean_tensor_uid());
         auto scaleTensorAttr = tensorMap.at(nodeAttributes->scale_tensor_uid());
         auto yTensorAttr = tensorMap.at(nodeAttributes->y_tensor_uid());
 

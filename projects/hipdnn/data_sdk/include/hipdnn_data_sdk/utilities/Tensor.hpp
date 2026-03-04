@@ -342,8 +342,15 @@ public:
                                         + std::to_string(strides().size()) + ")");
         }
 
-        return throwIfOutOfBounds(
-            std::inner_product(indices.begin(), indices.end(), strides().begin(), int64_t{0}));
+        return throwIfOutOfBounds(std::inner_product(indices.begin(),
+                                                     indices.end(),
+                                                     strides().begin(),
+                                                     int64_t{0},
+                                                     std::plus<int64_t>{},
+                                                     [](const auto& idx, const auto& stride) {
+                                                         return static_cast<int64_t>(idx)
+                                                                * static_cast<int64_t>(stride);
+                                                     }));
     }
 
     virtual ITensorIterator<false> begin() = 0;
@@ -520,7 +527,7 @@ protected:
             std::inner_product(dims.begin(),
                                dims.end(),
                                strides.begin(),
-                               1,
+                               size_t{1},
                                std::plus<>(),
                                [](size_t len, size_t stride) { return (len - 1) * stride; }));
     }
@@ -533,7 +540,7 @@ protected:
         }
 
         return static_cast<size_t>(
-            std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<>()));
+            std::accumulate(dims.begin(), dims.end(), int64_t{1}, std::multiplies<>()));
     }
 };
 

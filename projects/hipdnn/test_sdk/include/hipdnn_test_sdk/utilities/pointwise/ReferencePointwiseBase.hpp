@@ -104,6 +104,7 @@ private:
     {
         DeviceExecutor policy;
 
+        // NOLINTBEGIN(bugprone-branch-clone) - Branches appear identical but use different functor types
         switch(operation)
         {
         case hipdnn_data_sdk::data_objects::PointwiseMode::RELU_FWD:
@@ -137,6 +138,7 @@ private:
             throw std::runtime_error("Unsupported unary pointwise operation: "
                                      + std::to_string(static_cast<int>(operation)));
         }
+        // NOLINTEND(bugprone-branch-clone)
 
         policy.markOutputModified(output);
     }
@@ -153,6 +155,7 @@ private:
     {
         DeviceExecutor policy;
 
+        // NOLINTBEGIN(bugprone-branch-clone) - Branches appear identical but use different functor types
         switch(operation)
         {
         case hipdnn_data_sdk::data_objects::PointwiseMode::RELU_FWD:
@@ -173,6 +176,7 @@ private:
             throw std::runtime_error("Unsupported parameterized pointwise operation: "
                                      + std::to_string(static_cast<int>(operation)));
         }
+        // NOLINTEND(bugprone-branch-clone)
 
         policy.markOutputModified(output);
     }
@@ -197,6 +201,7 @@ private:
         case hipdnn_data_sdk::data_objects::PointwiseMode::MUL:
             policy.executeBinaryBroadcast(input1, input2, output, pointwise::Multiply{});
             break;
+        // NOLINTBEGIN(bugprone-branch-clone) - different functor types
         case hipdnn_data_sdk::data_objects::PointwiseMode::RELU_BWD:
             policy.executeBinaryBroadcast(
                 input1, input2, output, pointwise::ReluBackward<ComputeType>{});
@@ -209,6 +214,7 @@ private:
             policy.executeBinaryBroadcast(
                 input1, input2, output, pointwise::TanhBackward<ComputeType>{});
             break;
+        // NOLINTEND(bugprone-branch-clone)
         default:
             throw std::runtime_error("Unsupported binary pointwise operation: "
                                      + std::to_string(static_cast<int>(operation)));

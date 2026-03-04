@@ -45,7 +45,14 @@ struct PlanRegistrySignatureKeyHash
 {
     std::size_t operator()(const PlanRegistrySignatureKey& k) const noexcept
     {
-        return std::visit([](auto const& x) { return x.hashSelf(); }, k);
+        try
+        {
+            return std::visit([](auto const& x) { return x.hashSelf(); }, k);
+        }
+        catch(...)
+        {
+            return 0;
+        }
     }
 };
 
@@ -67,7 +74,14 @@ struct PlanRegistrySignatureKeyEqual
     bool operator()(const PlanRegistrySignatureKey& a,
                     const PlanRegistrySignatureKey& b) const noexcept
     {
-        return std::visit(*this, a, b);
+        try
+        {
+            return std::visit(*this, a, b);
+        }
+        catch(...)
+        {
+            return false;
+        }
     }
 };
 

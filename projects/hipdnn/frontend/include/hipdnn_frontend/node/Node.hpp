@@ -155,6 +155,13 @@ template <typename DerivedT>
 class BaseNode : public INode
 {
 private:
+    BaseNode() = default;
+
+    friend DerivedT;
+
+    template <typename>
+    friend class BaseNode;
+
     DerivedT& self()
     {
         return static_cast<DerivedT&>(*this);

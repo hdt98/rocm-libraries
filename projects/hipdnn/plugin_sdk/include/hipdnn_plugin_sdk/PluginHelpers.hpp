@@ -9,10 +9,12 @@
 
 #include <iostream>
 
+// NOLINTBEGIN(bugprone-macro-parentheses) - msg is a stream expression, cannot be parenthesized
 // Logging macros for plugin API entry/exit (stream-style)
 #define LOG_API_ENTRY(msg) HIPDNN_PLUGIN_LOG_INFO("API called: [" << __func__ << "] " << msg)
 #define LOG_API_SUCCESS(func_name, msg) \
-    HIPDNN_PLUGIN_LOG_INFO("API success: [" << func_name << "] " << msg)
+    HIPDNN_PLUGIN_LOG_INFO("API success: [" << (func_name) << "] " << msg)
+// NOLINTEND(bugprone-macro-parentheses)
 
 namespace hipdnn_plugin_sdk
 {

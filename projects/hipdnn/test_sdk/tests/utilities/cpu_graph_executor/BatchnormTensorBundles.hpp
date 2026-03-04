@@ -143,31 +143,31 @@ struct BatchnormTrainTensorBundle
         //optionals
         if(momentumTensorAttr != nullptr)
         {
-            variantPack[momentumTensorAttr->get_uid()] = momentumTensor.value().memory().hostData();
+            variantPack[momentumTensorAttr->get_uid()] = momentumTensor->memory().hostData();
         }
 
         if(prevRunningMeanTensorAttr != nullptr)
         {
             variantPack[prevRunningMeanTensorAttr->get_uid()]
-                = prevRunningMeanTensor.value().memory().hostData();
+                = prevRunningMeanTensor->memory().hostData();
         }
 
         if(prevRunningVarianceTensorAttr != nullptr)
         {
             variantPack[prevRunningVarianceTensorAttr->get_uid()]
-                = prevRunningVarianceTensor.value().memory().hostData();
+                = prevRunningVarianceTensor->memory().hostData();
         }
 
         if(nextRunningMeanTensorAttr != nullptr)
         {
             variantPack[nextRunningMeanTensorAttr->get_uid()]
-                = nextRunningMeanTensor.value().memory().hostData();
+                = nextRunningMeanTensor->memory().hostData();
         }
 
         if(nextRunningVarianceTensorAttr != nullptr)
         {
             variantPack[nextRunningVarianceTensorAttr->get_uid()]
-                = nextRunningVarianceTensor.value().memory().hostData();
+                = nextRunningVarianceTensor->memory().hostData();
         }
 
         return variantPack;

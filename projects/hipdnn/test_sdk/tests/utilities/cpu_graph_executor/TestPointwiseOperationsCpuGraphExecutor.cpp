@@ -113,7 +113,7 @@ public:
 
         tensorBundle.tensors[attributes.in_0_tensor_uid()]->fillTensorWithValue(
             params.in0TensorValue);
-        tensorBundle.tensors[attributes.in_1_tensor_uid().value()]->fillTensorWithValue(
+        tensorBundle.tensors[*attributes.in_1_tensor_uid()]->fillTensorWithValue(
             params.in1TensorValue);
 
         CpuReferenceGraphExecutor().execute(
@@ -132,6 +132,7 @@ public:
         input0.fillTensorWithValue(params.in0TensorValue);
         Tensor<InputType> output(params.outputDims);
 
+        // NOLINTNEXTLINE(bugprone-branch-clone) - branches have different arg counts
         if(params.reluLowerClip.has_value() || params.reluUpperClip.has_value()
            || params.reluLowerClipSlope.has_value())
         {
@@ -139,10 +140,10 @@ public:
                 PointwiseMode::RELU_FWD,
                 output,
                 input0,
-                params.reluLowerClip.has_value() ? params.reluLowerClip.value() : 0.0f,
-                params.reluUpperClip.has_value() ? params.reluUpperClip.value()
+                params.reluLowerClip.has_value() ? *params.reluLowerClip : 0.0f,
+                params.reluUpperClip.has_value() ? *params.reluUpperClip
                                                  : std::numeric_limits<float>::max(),
-                params.reluLowerClipSlope.has_value() ? params.reluLowerClipSlope.value() : 0.0f);
+                params.reluLowerClipSlope.has_value() ? *params.reluLowerClipSlope : 0.0f);
         }
         else
         {
@@ -164,6 +165,7 @@ public:
 
         Tensor<InputType> output(params.outputDims);
 
+        // NOLINTNEXTLINE(bugprone-branch-clone) - branches have different arg counts
         if(params.reluLowerClip.has_value() || params.reluUpperClip.has_value()
            || params.reluLowerClipSlope.has_value())
         {
@@ -172,10 +174,10 @@ public:
                 output,
                 input0,
                 input1,
-                params.reluLowerClip.has_value() ? params.reluLowerClip.value() : 0.0f,
-                params.reluUpperClip.has_value() ? params.reluUpperClip.value()
+                params.reluLowerClip.has_value() ? *params.reluLowerClip : 0.0f,
+                params.reluUpperClip.has_value() ? *params.reluUpperClip
                                                  : std::numeric_limits<float>::max(),
-                params.reluLowerClipSlope.has_value() ? params.reluLowerClipSlope.value() : 0.0f);
+                params.reluLowerClipSlope.has_value() ? *params.reluLowerClipSlope : 0.0f);
         }
         else
         {

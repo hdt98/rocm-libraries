@@ -263,7 +263,9 @@ TEST(TestEngineOverrideConfig, ExactStrideMatchSelectsEngine)
     EXPECT_EQ(*result, MIOPEN_ENGINE_ID);
 
     // Different stride must not match
-    auto wrongStride = makeTensorWithStride({1, 3, 224, 224}, {1, 224, 224 * 3, 224 * 3 * 224});
+    auto wrongStride = makeTensorWithStride(
+        {1, 3, 224, 224},
+        {1, 224, static_cast<int64_t>(224) * 3, static_cast<int64_t>(224) * 3 * 224});
     EXPECT_FALSE(config.matchOperation("conv_fprop", {wrongStride}).has_value());
 }
 
@@ -409,7 +411,9 @@ TEST(TestEngineOverrideConfig, JsonWithStrideConstraint)
     EXPECT_EQ(*r1, MIOPEN_ENGINE_ID);
 
     // Wrong stride must not match
-    auto xWrong = makeTensorWithStride({1, 3, 224, 224}, {1, 224, 224 * 3, 224 * 3 * 224});
+    auto xWrong = makeTensorWithStride(
+        {1, 3, 224, 224},
+        {1, 224, static_cast<int64_t>(224) * 3, static_cast<int64_t>(224) * 3 * 224});
     EXPECT_FALSE(config->matchOperation("conv_fprop", {xWrong, w}).has_value());
 }
 

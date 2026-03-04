@@ -124,15 +124,14 @@ public:
         if(_params.meanTensor.has_value())
         {
             mean = createShallowTensor<MeanVarianceDataType>(
-                _params.meanTensor.value(), variantPack.at(_params.meanTensor.value().uid));
+                *_params.meanTensor, variantPack.at(_params.meanTensor->uid));
             meanPtr = mean.get();
         }
 
         if(_params.invVarianceTensor.has_value())
         {
             invVariance = createShallowTensor<MeanVarianceDataType>(
-                _params.invVarianceTensor.value(),
-                variantPack.at(_params.invVarianceTensor.value().uid));
+                *_params.invVarianceTensor, variantPack.at(_params.invVarianceTensor->uid));
             invVariancePtr = invVariance.get();
         }
 
@@ -157,35 +156,33 @@ public:
         if(_params.momentumTensor.has_value())
         {
             momentumValue = hipdnn_data_sdk::utilities::extractDoubleFromTensorValue(
-                _params.momentumTensor.value(), "Momentum");
+                *_params.momentumTensor, "Momentum");
         }
 
         if(_params.prevRunningMeanTensor.has_value())
         {
             prevRunningMean = createShallowTensor<MeanVarianceDataType>(
-                _params.prevRunningMeanTensor.value(),
-                variantPack.at(_params.prevRunningMeanTensor.value().uid));
+                *_params.prevRunningMeanTensor, variantPack.at(_params.prevRunningMeanTensor->uid));
             prevRunningMeanPtr = prevRunningMean.get();
         }
         if(_params.prevRunningVarianceTensor.has_value())
         {
             prevRunningVariance = createShallowTensor<MeanVarianceDataType>(
-                _params.prevRunningVarianceTensor.value(),
-                variantPack.at(_params.prevRunningVarianceTensor.value().uid));
+                *_params.prevRunningVarianceTensor,
+                variantPack.at(_params.prevRunningVarianceTensor->uid));
             prevRunningVariancePtr = prevRunningVariance.get();
         }
         if(_params.nextRunningMeanTensor.has_value())
         {
             nextRunningMean = createShallowTensor<MeanVarianceDataType>(
-                _params.nextRunningMeanTensor.value(),
-                variantPack.at(_params.nextRunningMeanTensor.value().uid));
+                *_params.nextRunningMeanTensor, variantPack.at(_params.nextRunningMeanTensor->uid));
             nextRunningMeanPtr = nextRunningMean.get();
         }
         if(_params.nextRunningVarianceTensor.has_value())
         {
             nextRunningVariance = createShallowTensor<MeanVarianceDataType>(
-                _params.nextRunningVarianceTensor.value(),
-                variantPack.at(_params.nextRunningVarianceTensor.value().uid));
+                *_params.nextRunningVarianceTensor,
+                variantPack.at(_params.nextRunningVarianceTensor->uid));
             nextRunningVariancePtr = nextRunningVariance.get();
         }
 
@@ -330,17 +327,17 @@ public:
 
         if(nodeAttributes->mean_tensor_uid().has_value())
         {
-            mean = tensorMap.at(nodeAttributes->mean_tensor_uid().value());
+            mean = tensorMap.at(*nodeAttributes->mean_tensor_uid());
         }
 
         if(nodeAttributes->inv_variance_tensor_uid().has_value())
         {
-            invVariance = tensorMap.at(nodeAttributes->inv_variance_tensor_uid().value());
+            invVariance = tensorMap.at(*nodeAttributes->inv_variance_tensor_uid());
         }
 
         if(nodeAttributes->momentum_tensor_uid())
         {
-            momentum = tensorMap.at(nodeAttributes->momentum_tensor_uid().value());
+            momentum = tensorMap.at(*nodeAttributes->momentum_tensor_uid());
         }
 
         if(nodeAttributes->prev_running_mean_tensor_uid()
@@ -348,12 +345,10 @@ public:
            && nodeAttributes->next_running_mean_tensor_uid()
            && nodeAttributes->next_running_variance_tensor_uid())
         {
-            prevRunningMean = tensorMap.at(nodeAttributes->prev_running_mean_tensor_uid().value());
-            prevRunningVariance
-                = tensorMap.at(nodeAttributes->prev_running_variance_tensor_uid().value());
-            nextRunningMean = tensorMap.at(nodeAttributes->next_running_mean_tensor_uid().value());
-            nextRunningVariance
-                = tensorMap.at(nodeAttributes->next_running_variance_tensor_uid().value());
+            prevRunningMean = tensorMap.at(*nodeAttributes->prev_running_mean_tensor_uid());
+            prevRunningVariance = tensorMap.at(*nodeAttributes->prev_running_variance_tensor_uid());
+            nextRunningMean = tensorMap.at(*nodeAttributes->next_running_mean_tensor_uid());
+            nextRunningVariance = tensorMap.at(*nodeAttributes->next_running_variance_tensor_uid());
         }
 
         BatchnormTrainParams<MeanVarianceDataType> params(

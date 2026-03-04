@@ -54,19 +54,19 @@ TEST(TestPointwiseAttributes, CreatePointwiseAttributes)
 
     EXPECT_EQ(pointwiseAttributes.get_mode(), PointwiseMode::RELU_FWD);
     EXPECT_TRUE(pointwiseAttributes.get_relu_lower_clip().has_value());
-    EXPECT_EQ(pointwiseAttributes.get_relu_lower_clip().value(), 0.1f);
+    EXPECT_EQ(*pointwiseAttributes.get_relu_lower_clip(), 0.1f);
     EXPECT_TRUE(pointwiseAttributes.get_relu_upper_clip().has_value());
-    EXPECT_EQ(pointwiseAttributes.get_relu_upper_clip().value(), 6.0f);
+    EXPECT_EQ(*pointwiseAttributes.get_relu_upper_clip(), 6.0f);
     EXPECT_TRUE(pointwiseAttributes.get_relu_lower_clip_slope().has_value());
-    EXPECT_EQ(pointwiseAttributes.get_relu_lower_clip_slope().value(), 0.01f);
+    EXPECT_EQ(*pointwiseAttributes.get_relu_lower_clip_slope(), 0.01f);
     EXPECT_TRUE(pointwiseAttributes.get_axis().has_value());
-    EXPECT_EQ(pointwiseAttributes.get_axis().value(), 1);
+    EXPECT_EQ(*pointwiseAttributes.get_axis(), 1);
     EXPECT_TRUE(pointwiseAttributes.get_swish_beta().has_value());
-    EXPECT_EQ(pointwiseAttributes.get_swish_beta().value(), 1.5f);
+    EXPECT_EQ(*pointwiseAttributes.get_swish_beta(), 1.5f);
     EXPECT_TRUE(pointwiseAttributes.get_elu_alpha().has_value());
-    EXPECT_EQ(pointwiseAttributes.get_elu_alpha().value(), 0.9f);
+    EXPECT_EQ(*pointwiseAttributes.get_elu_alpha(), 0.9f);
     EXPECT_TRUE(pointwiseAttributes.get_softplus_beta().has_value());
-    EXPECT_EQ(pointwiseAttributes.get_softplus_beta().value(), 2.0f);
+    EXPECT_EQ(*pointwiseAttributes.get_softplus_beta(), 2.0f);
 }
 
 TEST(TestPointwiseAttributes, CreatePointwiseAttributesWithTwoInputs)

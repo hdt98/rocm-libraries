@@ -78,6 +78,7 @@ public:
 
     iterator begin()
     {
+        // NOLINTNEXTLINE(bugprone-branch-clone) - Different constness requires separate branches
         if constexpr(IsConst)
         {
             return iterator(_tensor.cbegin());
@@ -90,6 +91,7 @@ public:
 
     iterator end()
     {
+        // NOLINTNEXTLINE(bugprone-branch-clone) - Different constness requires separate branches
         if constexpr(IsConst)
         {
             return iterator(_tensor.cend());

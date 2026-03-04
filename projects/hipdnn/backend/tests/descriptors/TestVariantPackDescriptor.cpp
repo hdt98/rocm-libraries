@@ -31,13 +31,17 @@ TEST_F(TestVariantPackDescriptorWhenInitialized, ValidSetAttributes)
     _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_DATA_POINTERS,
                              HIPDNN_TYPE_VOID_PTR,
                              devPtrs.size(),
-                             devPtrs.data());
+                             static_cast<const void*>(devPtrs.data()));
 
-    _descriptor.setAttribute(
-        HIPDNN_ATTR_VARIANT_PACK_UNIQUE_IDS, HIPDNN_TYPE_INT64, uids.size(), uids.data());
+    _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_UNIQUE_IDS,
+                             HIPDNN_TYPE_INT64,
+                             uids.size(),
+                             static_cast<const void*>(uids.data()));
 
-    _descriptor.setAttribute(
-        HIPDNN_ATTR_VARIANT_PACK_WORKSPACE, HIPDNN_TYPE_VOID_PTR, 1, &workspace);
+    _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_WORKSPACE,
+                             HIPDNN_TYPE_VOID_PTR,
+                             1,
+                             static_cast<const void*>(&workspace));
 
     ASSERT_NO_THROW(_descriptor.finalize());
     EXPECT_TRUE(_descriptor.isFinalized());
@@ -54,23 +58,28 @@ TEST_F(TestVariantPackDescriptorWhenInitialized, ValidSetAndGetBeforeFinalAttrib
     _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_DATA_POINTERS,
                              HIPDNN_TYPE_VOID_PTR,
                              devPtrs.size(),
-                             devPtrs.data());
+                             static_cast<const void*>(devPtrs.data()));
 
-    _descriptor.setAttribute(
-        HIPDNN_ATTR_VARIANT_PACK_UNIQUE_IDS, HIPDNN_TYPE_INT64, uids.size(), uids.data());
+    _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_UNIQUE_IDS,
+                             HIPDNN_TYPE_INT64,
+                             uids.size(),
+                             static_cast<const void*>(uids.data()));
 
-    _descriptor.setAttribute(
-        HIPDNN_ATTR_VARIANT_PACK_WORKSPACE, HIPDNN_TYPE_VOID_PTR, 1, &workspace);
+    _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_WORKSPACE,
+                             HIPDNN_TYPE_VOID_PTR,
+                             1,
+                             static_cast<const void*>(&workspace));
     // getting before finalized
     std::array<void*, 3> retrievedDevPtrs;
     int64_t elementCount = 0;
 
-    ASSERT_THROW_HIPDNN_STATUS(_descriptor.getAttribute(HIPDNN_ATTR_VARIANT_PACK_DATA_POINTERS,
-                                                        HIPDNN_TYPE_VOID_PTR,
-                                                        retrievedDevPtrs.size(),
-                                                        &elementCount,
-                                                        retrievedDevPtrs.data()),
-                               HIPDNN_STATUS_NOT_INITIALIZED);
+    ASSERT_THROW_HIPDNN_STATUS(
+        _descriptor.getAttribute(HIPDNN_ATTR_VARIANT_PACK_DATA_POINTERS,
+                                 HIPDNN_TYPE_VOID_PTR,
+                                 retrievedDevPtrs.size(),
+                                 &elementCount,
+                                 static_cast<void*>(retrievedDevPtrs.data())),
+        HIPDNN_STATUS_NOT_INITIALIZED);
 }
 
 TEST_F(TestVariantPackDescriptorWhenInitialized, InvalidSetAttributes)
@@ -114,13 +123,17 @@ TEST_F(TestVariantPackDescriptorWhenInitialized, InvalidFinalizeCounts)
     _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_DATA_POINTERS,
                              HIPDNN_TYPE_VOID_PTR,
                              devPtrs.size(),
-                             devPtrs.data());
+                             static_cast<const void*>(devPtrs.data()));
 
-    _descriptor.setAttribute(
-        HIPDNN_ATTR_VARIANT_PACK_UNIQUE_IDS, HIPDNN_TYPE_INT64, uids.size(), uids.data());
+    _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_UNIQUE_IDS,
+                             HIPDNN_TYPE_INT64,
+                             uids.size(),
+                             static_cast<const void*>(uids.data()));
 
-    _descriptor.setAttribute(
-        HIPDNN_ATTR_VARIANT_PACK_WORKSPACE, HIPDNN_TYPE_VOID_PTR, 1, &workspace);
+    _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_WORKSPACE,
+                             HIPDNN_TYPE_VOID_PTR,
+                             1,
+                             static_cast<const void*>(&workspace));
 
     ASSERT_THROW(_descriptor.finalize(), HipdnnException);
     EXPECT_FALSE(_descriptor.isFinalized());
@@ -137,12 +150,13 @@ TEST_F(TestVariantPackDescriptorWhenInitialized, InvalidGetAttributeNotFinalized
     std::array<void*, 3> retrievedDevPtrs;
     int64_t elementCount = 0;
 
-    ASSERT_THROW_HIPDNN_STATUS(_descriptor.getAttribute(HIPDNN_ATTR_VARIANT_PACK_DATA_POINTERS,
-                                                        HIPDNN_TYPE_VOID_PTR,
-                                                        retrievedDevPtrs.size(),
-                                                        &elementCount,
-                                                        retrievedDevPtrs.data()),
-                               HIPDNN_STATUS_NOT_INITIALIZED);
+    ASSERT_THROW_HIPDNN_STATUS(
+        _descriptor.getAttribute(HIPDNN_ATTR_VARIANT_PACK_DATA_POINTERS,
+                                 HIPDNN_TYPE_VOID_PTR,
+                                 retrievedDevPtrs.size(),
+                                 &elementCount,
+                                 static_cast<void*>(retrievedDevPtrs.data())),
+        HIPDNN_STATUS_NOT_INITIALIZED);
 }
 
 class TestVariantPackDescriptorWhenFinalized : public ::testing::Test
@@ -160,15 +174,17 @@ protected:
         _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_DATA_POINTERS,
                                  HIPDNN_TYPE_VOID_PTR,
                                  static_cast<int64_t>(_devPtrs.size()),
-                                 _devPtrs.data());
+                                 static_cast<const void*>(_devPtrs.data()));
 
         _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_UNIQUE_IDS,
                                  HIPDNN_TYPE_INT64,
                                  static_cast<int64_t>(_uids.size()),
-                                 _uids.data());
+                                 static_cast<const void*>(_uids.data()));
 
-        _descriptor.setAttribute(
-            HIPDNN_ATTR_VARIANT_PACK_WORKSPACE, HIPDNN_TYPE_VOID_PTR, 1, &_workspace);
+        _descriptor.setAttribute(HIPDNN_ATTR_VARIANT_PACK_WORKSPACE,
+                                 HIPDNN_TYPE_VOID_PTR,
+                                 1,
+                                 static_cast<const void*>(&_workspace));
 
         ASSERT_NO_THROW(_descriptor.finalize());
         EXPECT_TRUE(_descriptor.isFinalized());
@@ -195,16 +211,18 @@ TEST_F(TestVariantPackDescriptorWhenFinalized, ValidGetAttributes)
                              HIPDNN_TYPE_VOID_PTR,
                              retrievedDevPtrs.size(),
                              &elementCount,
-                             retrievedDevPtrs.data());
+                             static_cast<void*>(retrievedDevPtrs.data()));
     EXPECT_EQ(elementCount, _devPtrs.size());
-    EXPECT_EQ(
-        std::memcmp(retrievedDevPtrs.data(), _devPtrs.data(), _devPtrs.size() * sizeof(void*)), 0);
+    EXPECT_EQ(std::memcmp(static_cast<const void*>(retrievedDevPtrs.data()),
+                          static_cast<const void*>(_devPtrs.data()),
+                          _devPtrs.size() * sizeof(void*)),
+              0);
 
     _descriptor.getAttribute(HIPDNN_ATTR_VARIANT_PACK_UNIQUE_IDS,
                              HIPDNN_TYPE_INT64,
                              retrievedUids.size(),
                              &elementCount,
-                             retrievedUids.data());
+                             static_cast<void*>(retrievedUids.data()));
     EXPECT_EQ(elementCount, _uids.size());
     EXPECT_EQ(std::memcmp(retrievedUids.data(), _uids.data(), _uids.size() * sizeof(int64_t)), 0);
 
@@ -212,7 +230,7 @@ TEST_F(TestVariantPackDescriptorWhenFinalized, ValidGetAttributes)
                              HIPDNN_TYPE_VOID_PTR,
                              1,
                              &elementCount,
-                             &retrievedWorkspace);
+                             static_cast<void*>(&retrievedWorkspace));
     EXPECT_EQ(elementCount, 1);
     EXPECT_EQ(retrievedWorkspace, _workspace);
 }
@@ -224,12 +242,13 @@ TEST_F(TestVariantPackDescriptorWhenFinalized, InvalidGetAttributes)
     void* retrievedWorkspace = nullptr;
     int64_t elementCount = 0;
 
-    ASSERT_THROW_HIPDNN_STATUS(_descriptor.getAttribute(HIPDNN_ATTR_VARIANT_PACK_DATA_POINTERS,
-                                                        HIPDNN_TYPE_INT64,
-                                                        retrievedDevPtrs.size(),
-                                                        &elementCount,
-                                                        retrievedDevPtrs.data()),
-                               HIPDNN_STATUS_BAD_PARAM);
+    ASSERT_THROW_HIPDNN_STATUS(
+        _descriptor.getAttribute(HIPDNN_ATTR_VARIANT_PACK_DATA_POINTERS,
+                                 HIPDNN_TYPE_INT64,
+                                 retrievedDevPtrs.size(),
+                                 &elementCount,
+                                 static_cast<void*>(retrievedDevPtrs.data())),
+        HIPDNN_STATUS_BAD_PARAM);
 
     ASSERT_THROW_HIPDNN_STATUS(_descriptor.getAttribute(HIPDNN_ATTR_VARIANT_PACK_UNIQUE_IDS,
                                                         HIPDNN_TYPE_VOID_PTR,
@@ -252,12 +271,13 @@ TEST_F(TestVariantPackDescriptorWhenFinalized, InvalidGetAttributes)
                                                         nullptr),
                                HIPDNN_STATUS_BAD_PARAM_NULL_POINTER);
 
-    ASSERT_THROW_HIPDNN_STATUS(_descriptor.getAttribute(HIPDNN_ATTR_VARIANT_PACK_DATA_POINTERS,
-                                                        HIPDNN_TYPE_VOID_PTR,
-                                                        retrievedDevPtrs.size(),
-                                                        nullptr,
-                                                        retrievedDevPtrs.data()),
-                               HIPDNN_STATUS_BAD_PARAM_NULL_POINTER);
+    ASSERT_THROW_HIPDNN_STATUS(
+        _descriptor.getAttribute(HIPDNN_ATTR_VARIANT_PACK_DATA_POINTERS,
+                                 HIPDNN_TYPE_VOID_PTR,
+                                 retrievedDevPtrs.size(),
+                                 nullptr,
+                                 static_cast<void*>(retrievedDevPtrs.data())),
+        HIPDNN_STATUS_BAD_PARAM_NULL_POINTER);
 }
 
 } // namespace hipdnn_backend

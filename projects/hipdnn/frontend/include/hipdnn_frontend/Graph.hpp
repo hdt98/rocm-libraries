@@ -239,12 +239,13 @@ private:
         auto engineConfigDesc = std::make_unique<detail::ScopedHipdnnBackendDescriptor>(
             HIPDNN_BACKEND_ENGINECFG_DESCRIPTOR);
 
+        auto engineDescPtr = engineDesc.get();
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
             detail::hipdnnBackend()->backendSetAttribute(engineConfigDesc->get(),
                                                          HIPDNN_ATTR_ENGINECFG_ENGINE,
                                                          HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                                                          1,
-                                                         &engineDesc.get()),
+                                                         static_cast<void*>(&engineDescPtr)),
             "Failed to set engine on the engine config descriptor.");
 
         _engineConfigDesc = std::move(engineConfigDesc);
@@ -489,7 +490,7 @@ private:
 
         if(fbGraph->preferred_engine_id().has_value())
         {
-            _preferredEngineId = fbGraph->preferred_engine_id().value();
+            _preferredEngineId = fbGraph->preferred_engine_id();
         }
 
         // Build tensorMap from FlatBuffer tensors
@@ -873,7 +874,7 @@ public:
                                                          HIPDNN_ATTR_OPERATIONGRAPH_HANDLE,
                                                          HIPDNN_TYPE_HANDLE,
                                                          1,
-                                                         &handle),
+                                                         static_cast<const void*>(&handle)),
             "Failed to set handle on the graph.");
 
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
@@ -1322,13 +1323,14 @@ public:
     {
         HIPDNN_FE_LOG_INFO("Building plans for graph " << graph_attributes.get_name());
 
-        HIPDNN_RETURN_ON_BACKEND_FAILURE(
-            detail::hipdnnBackend()->backendSetAttribute(_executionPlanDesc->get(),
-                                                         HIPDNN_ATTR_EXECUTION_PLAN_ENGINE_CONFIG,
-                                                         HIPDNN_TYPE_BACKEND_DESCRIPTOR,
-                                                         1,
-                                                         &_engineConfigDesc->get()),
-            "Failed to set the engine config on execution plan.");
+        auto engineConfigDescPtr = _engineConfigDesc->get();
+        HIPDNN_RETURN_ON_BACKEND_FAILURE(detail::hipdnnBackend()->backendSetAttribute(
+                                             _executionPlanDesc->get(),
+                                             HIPDNN_ATTR_EXECUTION_PLAN_ENGINE_CONFIG,
+                                             HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                             1,
+                                             static_cast<const void*>(&engineConfigDescPtr)),
+                                         "Failed to set the engine config on execution plan.");
 
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
             detail::hipdnnBackend()->backendFinalize(_executionPlanDesc->get()),
@@ -1485,7 +1487,7 @@ public:
                                              HIPDNN_ATTR_VARIANT_PACK_DATA_POINTERS,
                                              HIPDNN_TYPE_VOID_PTR,
                                              static_cast<int64_t>(variantPackValues.size()),
-                                             variantPackValues.data()),
+                                             static_cast<void*>(variantPackValues.data())),
                                          "failed to set the variant pack data pointers.");
 
         HIPDNN_RETURN_ON_BACKEND_FAILURE(detail::hipdnnBackend()->backendSetAttribute(
@@ -1493,7 +1495,7 @@ public:
                                              HIPDNN_ATTR_VARIANT_PACK_UNIQUE_IDS,
                                              HIPDNN_TYPE_INT64,
                                              static_cast<int64_t>(variantPackKeys.size()),
-                                             variantPackKeys.data()),
+                                             static_cast<void*>(variantPackKeys.data())),
                                          "failed to set the variant pack unique ids.");
 
         HIPDNN_RETURN_ON_BACKEND_FAILURE(
@@ -1501,7 +1503,7 @@ public:
                                                          HIPDNN_ATTR_VARIANT_PACK_WORKSPACE,
                                                          HIPDNN_TYPE_VOID_PTR,
                                                          1,
-                                                         &workspace),
+                                                         static_cast<void*>(&workspace)),
             "failed to set the variant pack unique ids.");
 
         HIPDNN_RETURN_ON_BACKEND_FAILURE(

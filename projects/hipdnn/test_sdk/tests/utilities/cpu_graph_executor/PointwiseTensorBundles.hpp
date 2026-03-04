@@ -43,7 +43,7 @@ struct PointwiseBinaryTensorBundle : public hipdnn_test_sdk::utilities::GraphTen
             = node.attributesAs<hipdnn_data_sdk::data_objects::PointwiseAttributes>();
 
         randomizeTensor(attributes.in_0_tensor_uid(), -1.0f, 1.0f, seed);
-        randomizeTensor(attributes.in_1_tensor_uid().value(), -1.0f, 1.0f, seed + 1);
+        randomizeTensor(*attributes.in_1_tensor_uid(), -1.0f, 1.0f, seed + 1);
         // Output tensor not randomized - computed by operation
     }
 };

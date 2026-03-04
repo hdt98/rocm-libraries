@@ -225,13 +225,19 @@ TEST_F(TestEngineConfigDescriptor, GetEngineConfigDescriptorEngine)
             HIPDNN_ATTR_ENGINECFG_ENGINE, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 1, nullptr, nullptr),
         HIPDNN_STATUS_BAD_PARAM_NULL_POINTER);
 
-    ASSERT_NO_THROW(engineConfig->getAttribute(
-        HIPDNN_ATTR_ENGINECFG_ENGINE, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 1, nullptr, engine.getPtr()));
+    ASSERT_NO_THROW(engineConfig->getAttribute(HIPDNN_ATTR_ENGINECFG_ENGINE,
+                                               HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                               1,
+                                               nullptr,
+                                               static_cast<void*>(engine.getPtr())));
     ASSERT_EQ(*engine.get(), *(_mockEngineWrapper.get()));
 
     int64_t count;
-    ASSERT_NO_THROW(engineConfig->getAttribute(
-        HIPDNN_ATTR_ENGINECFG_ENGINE, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 1, &count, engine2.getPtr()));
+    ASSERT_NO_THROW(engineConfig->getAttribute(HIPDNN_ATTR_ENGINECFG_ENGINE,
+                                               HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                               1,
+                                               &count,
+                                               static_cast<void*>(engine2.getPtr())));
     ASSERT_EQ(count, 1);
 }
 

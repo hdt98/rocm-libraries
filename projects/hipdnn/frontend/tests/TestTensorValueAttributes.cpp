@@ -28,7 +28,7 @@ TEST(TestTensorValueAttributes, SetGetClearFloat)
 
     auto opt = tensor.get_pass_by_value<float>();
     ASSERT_TRUE(opt.has_value());
-    EXPECT_FLOAT_EQ(opt.value(), TEST_VALUE);
+    EXPECT_FLOAT_EQ(*opt, TEST_VALUE);
 
     tensor.clear_value();
     EXPECT_FALSE(tensor.get_pass_by_value());
@@ -42,7 +42,7 @@ TEST(TestTensorValueAttributes, ConstructorValues)
 
     auto opt = tensor.get_pass_by_value<float>();
     ASSERT_TRUE(opt.has_value());
-    EXPECT_EQ(opt.value(), TEST_VALUE);
+    EXPECT_EQ(*opt, TEST_VALUE);
 }
 
 TEST(TestTensorValueAttributes, PackUnpackFloatValue)
@@ -269,7 +269,7 @@ TEST(TestTensorValueAttributes, TypeSafety)
 
     auto floatOpt = tensor.get_pass_by_value<float>();
     ASSERT_TRUE(floatOpt.has_value());
-    EXPECT_FLOAT_EQ(floatOpt.value(), 42.0f);
+    EXPECT_FLOAT_EQ(*floatOpt, 42.0f);
 
     EXPECT_FALSE(tensor.get_pass_by_value<half>().has_value());
     EXPECT_FALSE(tensor.get_pass_by_value<bfloat16>().has_value());
@@ -283,7 +283,7 @@ TEST(TestTensorValueAttributes, TypeSafety)
 
     auto intOpt = tensor.get_pass_by_value<int32_t>();
     ASSERT_TRUE(intOpt.has_value());
-    EXPECT_EQ(intOpt.value(), 123);
+    EXPECT_EQ(*intOpt, 123);
 }
 
 TEST(TestTensorValueAttributes, NumericLimits)
@@ -293,17 +293,17 @@ TEST(TestTensorValueAttributes, NumericLimits)
     tensor.set_value(std::numeric_limits<float>::max());
     auto floatOpt = tensor.get_pass_by_value<float>();
     ASSERT_TRUE(floatOpt.has_value());
-    EXPECT_FLOAT_EQ(floatOpt.value(), std::numeric_limits<float>::max());
+    EXPECT_FLOAT_EQ(*floatOpt, std::numeric_limits<float>::max());
 
     tensor.set_value(std::numeric_limits<int32_t>::min());
     auto intOpt = tensor.get_pass_by_value<int32_t>();
     ASSERT_TRUE(intOpt.has_value());
-    EXPECT_EQ(intOpt.value(), std::numeric_limits<int32_t>::min());
+    EXPECT_EQ(*intOpt, std::numeric_limits<int32_t>::min());
 
     tensor.set_value(std::numeric_limits<uint8_t>::max());
     auto uint8Opt = tensor.get_pass_by_value<uint8_t>();
     ASSERT_TRUE(uint8Opt.has_value());
-    EXPECT_EQ(uint8Opt.value(), std::numeric_limits<uint8_t>::max());
+    EXPECT_EQ(*uint8Opt, std::numeric_limits<uint8_t>::max());
 
     tensor.set_value(std::numeric_limits<double>::infinity());
 

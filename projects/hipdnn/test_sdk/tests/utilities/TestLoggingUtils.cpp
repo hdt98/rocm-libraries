@@ -84,35 +84,45 @@ TEST(TestStringToSeverity, ValidOffReturnsOptionalWithOff)
 {
     auto result = detail::stringToSeverity("off");
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), HIPDNN_SEV_OFF);
+    EXPECT_EQ(
+        *result,
+        HIPDNN_SEV_OFF); // NOLINT(bugprone-unchecked-optional-access) - checked by ASSERT_TRUE
 }
 
 TEST(TestStringToSeverity, ValidInfoReturnsOptionalWithInfo)
 {
     auto result = detail::stringToSeverity("info");
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), HIPDNN_SEV_INFO);
+    EXPECT_EQ(
+        *result,
+        HIPDNN_SEV_INFO); // NOLINT(bugprone-unchecked-optional-access) - checked by ASSERT_TRUE
 }
 
 TEST(TestStringToSeverity, ValidWarnReturnsOptionalWithWarn)
 {
     auto result = detail::stringToSeverity("warn");
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), HIPDNN_SEV_WARN);
+    EXPECT_EQ(
+        *result,
+        HIPDNN_SEV_WARN); // NOLINT(bugprone-unchecked-optional-access) - checked by ASSERT_TRUE
 }
 
 TEST(TestStringToSeverity, ValidErrorReturnsOptionalWithError)
 {
     auto result = detail::stringToSeverity("error");
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), HIPDNN_SEV_ERROR);
+    EXPECT_EQ(
+        *result,
+        HIPDNN_SEV_ERROR); // NOLINT(bugprone-unchecked-optional-access) - checked by ASSERT_TRUE
 }
 
 TEST(TestStringToSeverity, ValidFatalReturnsOptionalWithFatal)
 {
     auto result = detail::stringToSeverity("fatal");
     ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result.value(), HIPDNN_SEV_FATAL);
+    EXPECT_EQ(
+        *result,
+        HIPDNN_SEV_FATAL); // NOLINT(bugprone-unchecked-optional-access) - checked by ASSERT_TRUE
 }
 
 TEST(TestStringToSeverity, InvalidStringReturnsNullopt)
@@ -133,45 +143,67 @@ TEST(TestStringToSeverity, CaseInsensitiveMatching)
 {
     // Uppercase
     ASSERT_TRUE(detail::stringToSeverity("OFF").has_value());
-    EXPECT_EQ(detail::stringToSeverity("OFF").value(), HIPDNN_SEV_OFF);
+    EXPECT_EQ(
+        *detail::stringToSeverity("OFF"),
+        HIPDNN_SEV_OFF); // NOLINT(bugprone-unchecked-optional-access) - checked by ASSERT_TRUE
 
     ASSERT_TRUE(detail::stringToSeverity("INFO").has_value());
-    EXPECT_EQ(detail::stringToSeverity("INFO").value(), HIPDNN_SEV_INFO);
+    EXPECT_EQ(
+        *detail::stringToSeverity("INFO"),
+        HIPDNN_SEV_INFO); // NOLINT(bugprone-unchecked-optional-access) - checked by ASSERT_TRUE
 
     ASSERT_TRUE(detail::stringToSeverity("WARN").has_value());
-    EXPECT_EQ(detail::stringToSeverity("WARN").value(), HIPDNN_SEV_WARN);
+    EXPECT_EQ(
+        *detail::stringToSeverity("WARN"),
+        HIPDNN_SEV_WARN); // NOLINT(bugprone-unchecked-optional-access) - checked by ASSERT_TRUE
 
     ASSERT_TRUE(detail::stringToSeverity("ERROR").has_value());
-    EXPECT_EQ(detail::stringToSeverity("ERROR").value(), HIPDNN_SEV_ERROR);
+    EXPECT_EQ(
+        *detail::stringToSeverity("ERROR"),
+        HIPDNN_SEV_ERROR); // NOLINT(bugprone-unchecked-optional-access) - checked by ASSERT_TRUE
 
     ASSERT_TRUE(detail::stringToSeverity("FATAL").has_value());
-    EXPECT_EQ(detail::stringToSeverity("FATAL").value(), HIPDNN_SEV_FATAL);
+    EXPECT_EQ(
+        *detail::stringToSeverity("FATAL"),
+        HIPDNN_SEV_FATAL); // NOLINT(bugprone-unchecked-optional-access) - checked by ASSERT_TRUE
 
     // Mixed case
     ASSERT_TRUE(detail::stringToSeverity("Info").has_value());
-    EXPECT_EQ(detail::stringToSeverity("Info").value(), HIPDNN_SEV_INFO);
+    EXPECT_EQ(
+        *detail::stringToSeverity("Info"),
+        HIPDNN_SEV_INFO); // NOLINT(bugprone-unchecked-optional-access) - checked by ASSERT_TRUE
 
     ASSERT_TRUE(detail::stringToSeverity("WaRn").has_value());
-    EXPECT_EQ(detail::stringToSeverity("WaRn").value(), HIPDNN_SEV_WARN);
+    EXPECT_EQ(
+        *detail::stringToSeverity("WaRn"),
+        HIPDNN_SEV_WARN); // NOLINT(bugprone-unchecked-optional-access) - checked by ASSERT_TRUE
 }
 
 TEST(TestStringToSeverity, TrimsWhitespace)
 {
     // Leading whitespace
     ASSERT_TRUE(detail::stringToSeverity("  info").has_value());
-    EXPECT_EQ(detail::stringToSeverity("  info").value(), HIPDNN_SEV_INFO);
+    EXPECT_EQ(
+        *detail::stringToSeverity("  info"),
+        HIPDNN_SEV_INFO); // NOLINT(bugprone-unchecked-optional-access) - checked by ASSERT_TRUE
 
     // Trailing whitespace
     ASSERT_TRUE(detail::stringToSeverity("warn  ").has_value());
-    EXPECT_EQ(detail::stringToSeverity("warn  ").value(), HIPDNN_SEV_WARN);
+    EXPECT_EQ(
+        *detail::stringToSeverity("warn  "),
+        HIPDNN_SEV_WARN); // NOLINT(bugprone-unchecked-optional-access) - checked by ASSERT_TRUE
 
     // Both ends
     ASSERT_TRUE(detail::stringToSeverity("  error  ").has_value());
-    EXPECT_EQ(detail::stringToSeverity("  error  ").value(), HIPDNN_SEV_ERROR);
+    EXPECT_EQ(
+        *detail::stringToSeverity("  error  "),
+        HIPDNN_SEV_ERROR); // NOLINT(bugprone-unchecked-optional-access) - checked by ASSERT_TRUE
 
     // Tabs and newlines
     ASSERT_TRUE(detail::stringToSeverity("\tfatal\n").has_value());
-    EXPECT_EQ(detail::stringToSeverity("\tfatal\n").value(), HIPDNN_SEV_FATAL);
+    EXPECT_EQ(
+        *detail::stringToSeverity("\tfatal\n"),
+        HIPDNN_SEV_FATAL); // NOLINT(bugprone-unchecked-optional-access) - checked by ASSERT_TRUE
 
     // Whitespace-only still invalid
     EXPECT_FALSE(detail::stringToSeverity("   ").has_value());

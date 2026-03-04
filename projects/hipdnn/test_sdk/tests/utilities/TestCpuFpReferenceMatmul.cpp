@@ -355,7 +355,7 @@ TYPED_TEST(CpuFpReferenceMatmulBasic, MatmulBatch3D)
     for(int i = 0; i < tensorAElementCount; ++i)
     {
         tensorA.memory().hostData()[i] = static_cast<typename TypeParam::ADataType>(
-            static_cast<float>(i - tensorAElementCount / 2));
+            static_cast<float>(i - static_cast<double>(tensorAElementCount) / 2));
     }
     for(int i = 0; i < tensorBElementCount; ++i)
     {
@@ -393,12 +393,12 @@ TYPED_TEST(CpuFpReferenceMatmulBasic, Matmul3DBroadcast)
     for(int i = 0; i < tensorAElementCount; ++i)
     {
         tensorA.memory().hostData()[i] = static_cast<typename TypeParam::ADataType>(
-            static_cast<float>(i - tensorAElementCount / 2));
+            static_cast<float>(i - static_cast<double>(tensorAElementCount) / 2));
     }
     for(int i = 0; i < tensorBElementCount; ++i)
     {
         tensorB.memory().hostData()[i] = static_cast<typename TypeParam::BDataType>(
-            static_cast<float>(i + tensorAElementCount / 2));
+            static_cast<float>(i + static_cast<double>(tensorAElementCount) / 2));
     }
 
     hipdnn_test_sdk::utilities::CpuFpReferenceMatmul::matmul<typename TypeParam::ADataType,
@@ -464,12 +464,12 @@ TYPED_TEST(CpuFpReferenceMatmulBasic, Matmul4DBroadcast)
     for(int i = 0; i < tensorAElementCount; ++i)
     {
         tensorA.memory().hostData()[i] = static_cast<typename TypeParam::ADataType>(
-            static_cast<float>(i - tensorAElementCount / 2));
+            static_cast<float>(i - static_cast<double>(tensorAElementCount) / 2));
     }
     for(int i = 0; i < tensorBElementCount; ++i)
     {
         tensorB.memory().hostData()[i] = static_cast<typename TypeParam::BDataType>(
-            static_cast<float>(i + tensorAElementCount / 2));
+            static_cast<float>(i + static_cast<double>(tensorAElementCount) / 2));
     }
 
     hipdnn_test_sdk::utilities::CpuFpReferenceMatmul::matmul<typename TypeParam::ADataType,

@@ -74,6 +74,7 @@ public:
 
     void execute(const std::unordered_map<int64_t, void*>& variantPack) override
     {
+        // NOLINTNEXTLINE(bugprone-branch-clone) - Different parameter presence requires different code paths
         if(_params.reluLowerClip.has_value() || _params.reluUpperClip.has_value()
            || _params.reluLowerClipSlope.has_value() || _params.swishBeta.has_value())
         {
@@ -107,7 +108,7 @@ private:
             }
 
             auto shallowIn1Tensor = createShallowTensor<Input1Type>(
-                _params.in1Tensor.value(), variantPack.at(_params.in1Tensor.value().uid));
+                *_params.in1Tensor, variantPack.at(_params.in1Tensor->uid));
 
             utilities::CpuReferencePointwiseImpl<OutputType, Input0Type, Input1Type>::
                 pointwiseCompute(
@@ -152,7 +153,7 @@ private:
             }
 
             auto shallowIn1Tensor = createShallowTensor<Input1Type>(
-                _params.in1Tensor.value(), variantPack.at(_params.in1Tensor.value().uid));
+                *_params.in1Tensor, variantPack.at(_params.in1Tensor->uid));
 
             utilities::CpuReferencePointwiseImpl<OutputType, Input0Type, Input1Type>::
                 pointwiseCompute(_params.mode,

@@ -9,8 +9,7 @@
 # readability-math-missing-parentheses
 Checks: >
   -*,
-  bugprone-*
-  misc-*,
+  bugprone-*,
   modernize-*,
   performance-*,
   portability-*,
@@ -32,7 +31,9 @@ Checks: >
   -portability-avoid-pragma-once,
   -modernize-use-scoped-lock,
   -readability-use-concise-preprocessor-directives,
-  -readability-math-missing-parentheses
+  -readability-math-missing-parentheses,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-unchecked-optional-access
 
 WarningsAsErrors: "*"
 HeaderFileExtensions: ['h','hpp']

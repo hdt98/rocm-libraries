@@ -97,7 +97,9 @@ TEST(TestBatchnormInferenceNodeVarianceExt, PreValidateNodeMissingValues)
     auto error = node.pre_validate_node();
     EXPECT_EQ(error.code, ErrorCode::ATTRIBUTE_NOT_SET);
 
-    batchnormAttributes.set_x(std::make_shared<TensorAttributes>());
+    batchnormAttributes.set_x(
+        std::make_shared<
+            TensorAttributes>()); // NOLINT(bugprone-use-after-move) - Testing incremental attribute setting
     auto batchnormAttributesCopy = batchnormAttributes;
     BatchnormInferenceNodeVarianceExt nodeWithX(std::move(batchnormAttributesCopy),
                                                 graphAttributes);
