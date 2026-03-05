@@ -4323,6 +4323,15 @@ try
                                                 batch_count);
 
     cublasDestroy(cublas_handle);
+
+    if(devInfo)
+    {
+        if(info != 0)
+            hipMemcpy(devInfo, &info, sizeof(int), hipMemcpyHostToDevice);
+        else
+            hipMemset(devInfo, 0, sizeof(int));
+    }
+
     return hipsolver::cuda2hip_status(status);
 }
 catch(...)
@@ -4374,6 +4383,15 @@ try
                                                 batch_count);
 
     cublasDestroy(cublas_handle);
+
+    if(devInfo)
+    {
+        if(info != 0)
+            hipMemcpy(devInfo, &info, sizeof(int), hipMemcpyHostToDevice);
+        else
+            hipMemset(devInfo, 0, sizeof(int));
+    }
+
     return hipsolver::cuda2hip_status(status);
 }
 catch(...)
@@ -4425,6 +4443,15 @@ try
                                                 batch_count);
 
     cublasDestroy(cublas_handle);
+
+    if(devInfo)
+    {
+        if(info != 0)
+            hipMemcpy(devInfo, &info, sizeof(int), hipMemcpyHostToDevice);
+        else
+            hipMemset(devInfo, 0, sizeof(int));
+    }
+
     return hipsolver::cuda2hip_status(status);
 }
 catch(...)
@@ -4476,6 +4503,15 @@ try
                                                 batch_count);
 
     cublasDestroy(cublas_handle);
+
+    if(devInfo)
+    {
+        if(info != 0)
+            hipMemcpy(devInfo, &info, sizeof(int), hipMemcpyHostToDevice);
+        else
+            hipMemset(devInfo, 0, sizeof(int));
+    }
+
     return hipsolver::cuda2hip_status(status);
 }
 catch(...)
