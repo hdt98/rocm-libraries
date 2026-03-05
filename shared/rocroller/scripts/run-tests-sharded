@@ -356,7 +356,9 @@ def main():
     gpu_arch = get_gpu_arch()
     if gpu_arch and "gfx1201" in gpu_arch:
         if max_concurrent > 8:
-            print(f"Detected {gpu_arch}, capping max concurrent shards to 8 (was {max_concurrent})")
+            print(
+                f"Detected {gpu_arch}, capping max concurrent shards to 8 (was {max_concurrent})"
+            )
             max_concurrent = 8
 
     # Cap to 48 maximum
@@ -434,10 +436,10 @@ def main():
     # Values taken from CI run timing summaries
     FRAMEWORK_TOTAL_TIMES_BY_ARCH = {
         # fmt: off
-        "gfx942":  {"gtest": 6801, "catch2": 843},
-        "gfx950":  {"gtest": 14243, "catch2": 1154},
-        "gfx908":  {"gtest": 13974, "catch2": 1513},
-        "gfx1201": {"gtest": 1212, "catch2": 801},
+        "gfx942":  {"gtest": 7218, "catch2": 1064},
+        "gfx950":  {"gtest": 15769, "catch2": 1035},
+        "gfx908":  {"gtest": 14935, "catch2": 1757},
+        "gfx1201": {"gtest": 1421, "catch2": 852},
         # fmt: on
     }
     _default_times = {"gtest": 18380, "catch2": 987}
@@ -463,10 +465,14 @@ def main():
 
     # Largest-remainder apportionment: floor each quota, then award remaining
     # shards to frameworks with the largest fractional remainders.
-    quotas = {fw: t / total_time * total_shards for fw, t in FRAMEWORK_TOTAL_TIMES.items()}
+    quotas = {
+        fw: t / total_time * total_shards for fw, t in FRAMEWORK_TOTAL_TIMES.items()
+    }
     framework_num_shards = {fw: max(1, int(q)) for fw, q in quotas.items()}
     remaining = total_shards - sum(framework_num_shards.values())
-    for fw in sorted(quotas, key=lambda fw: quotas[fw] % 1, reverse=True)[: max(0, remaining)]:
+    for fw in sorted(quotas, key=lambda fw: quotas[fw] % 1, reverse=True)[
+        : max(0, remaining)
+    ]:
         framework_num_shards[fw] += 1
 
     framework_num_shards["ctest"] = ctest_shards
@@ -486,7 +492,9 @@ def main():
         else:
             detail = ""
         print(f"  {fw}: {n} shards{detail}")
-    print(f"  Total: {sum(framework_num_shards.values())} shards across {max_concurrent} concurrent slots")
+    print(
+        f"  Total: {sum(framework_num_shards.values())} shards across {max_concurrent} concurrent slots"
+    )
 
     # Build per-framework spec lists, then interleave round-robin
     failed_shards = []
@@ -518,7 +526,9 @@ def main():
             if specs:
                 pending_specs.append(specs.pop(0))
 
-    mixed_failures, mixed_timing = run_shards(pending_specs, max_concurrent=max_concurrent)
+    mixed_failures, mixed_timing = run_shards(
+        pending_specs, max_concurrent=max_concurrent
+    )
     failed_shards.extend(mixed_failures)
     all_timing_info.extend(mixed_timing)
 
