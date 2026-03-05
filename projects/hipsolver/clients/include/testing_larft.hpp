@@ -665,9 +665,10 @@ void testing_larft(Arguments& argus)
     I                      k       = argus.get<rocblas_int>("k", n);
     I                      ldv     = argus.get<rocblas_int>("ldv", n);
     I                      ldt     = argus.get<rocblas_int>("ldt", k);
-    I                      stV     = argus.get<rocblas_int>("strideV", ldv * k);
-    I                      stTau   = argus.get<rocblas_int>("strideTau", k);
-    I                      stT     = argus.get<rocblas_int>("strideT", ldt * k);
+    I                      stV
+        = argus.get<rocblas_int>("strideV", (storevC == 'C' || storevC == 'c') ? ldv * k : ldv * n);
+    I stTau = argus.get<rocblas_int>("strideTau", k);
+    I stT   = argus.get<rocblas_int>("strideT", ldt * k);
 
     hipsolverDirectMode_t direct
         = (directC == 'F' || directC == 'f') ? HIPSOLVER_DIRECT_FORWARD : HIPSOLVER_DIRECT_BACKWARD;
@@ -682,10 +683,68 @@ void testing_larft(Arguments& argus)
     I stTRes   = (argus.unit_check || argus.norm_check) ? stT : 0;
 
     // check non-supported values
-    // N/A
+#if !defined(__HIP_PLATFORM_HCC__) && !defined(__HIP_PLATFORM_AMD__)
+    if(storev != HIPSOLVER_STOREV_COLUMNWISE)
+    {
+        if(BATCHED)
+        {
+            // EXPECT_ROCBLAS_STATUS(hipsolver_larft(API,
+            //                                       handle,
+            //                                       params,
+            //                                       direct,
+            //                                       storev,
+            //                                       n,
+            //                                       k,
+            //                                       (T*)nullptr,
+            //                                       ldv,
+            //                                       stV,
+            //                                       (T*)nullptr,
+            //                                       stTau,
+            //                                       (T*)nullptr,
+            //                                       ldt,
+            //                                       stT,
+            //                                       (T*)nullptr,
+            //                                       0,
+            //                                       (T*)nullptr,
+            //                                       0,
+            //                                       bc),
+            //                       HIPSOLVER_STATUS_NOT_SUPPORTED);
+        }
+        else
+        {
+            EXPECT_ROCBLAS_STATUS(hipsolver_larft(API,
+                                                  handle,
+                                                  params,
+                                                  direct,
+                                                  storev,
+                                                  n,
+                                                  k,
+                                                  (T*)nullptr,
+                                                  ldv,
+                                                  stV,
+                                                  (T*)nullptr,
+                                                  stTau,
+                                                  (T*)nullptr,
+                                                  ldt,
+                                                  stT,
+                                                  (T*)nullptr,
+                                                  0,
+                                                  (T*)nullptr,
+                                                  0,
+                                                  bc),
+                                  HIPSOLVER_STATUS_NOT_SUPPORTED);
+        }
+
+        if(argus.timing)
+            rocsolver_bench_inform(inform_invalid_args);
+
+        return;
+    }
+#endif
 
     // determine sizes
-    size_t size_V    = size_t(ldv) * k;
+    bool   col       = (storev == HIPSOLVER_STOREV_COLUMNWISE);
+    size_t size_V    = col ? size_t(ldv) * k : size_t(ldv) * n;
     size_t size_Tau  = size_t(k);
     size_t size_T    = size_t(ldt) * k;
     double max_error = 0, gpu_time_used = 0, cpu_time_used = 0;
@@ -695,7 +754,8 @@ void testing_larft(Arguments& argus)
     size_t size_TRes   = (argus.unit_check || argus.norm_check) ? size_T : 0;
 
     // check invalid sizes
-    bool invalid_size = (n < 0 || k < 0 || k > n || ldv < n || ldt < k || bc < 0);
+    bool invalid_size = col ? (n < 0 || k < 0 || k > n || ldv < n || ldt < k || bc < 0)
+                            : (n < 0 || k < 0 || k > n || ldv < k || ldt < k || bc < 0);
     if(invalid_size)
     {
         if(BATCHED)
