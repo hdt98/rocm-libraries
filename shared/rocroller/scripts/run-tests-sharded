@@ -348,20 +348,21 @@ def main():
     args = parser.parse_args()
 
     # Auto-detect number of available CPUs (respecting cgroups) and use half
-    num_cores = get_available_cpus()
-    num_shards = max(1, num_cores // 2)
+    # as the max number of shards to run concurrently.
+    available_cpus = get_available_cpus()
+    max_concurrent = max(1, available_cpus // 2)
 
     # Cap shards to 8 on gfx1201 due to hanging issues
     gpu_arch = get_gpu_arch()
     if gpu_arch and "gfx1201" in gpu_arch:
-        if num_shards > 8:
-            print(f"Detected {gpu_arch}, capping shards to 8 (was {num_shards})")
-            num_shards = 8
+        if max_concurrent > 8:
+            print(f"Detected {gpu_arch}, capping max concurrent shards to 8 (was {max_concurrent})")
+            max_concurrent = 8
 
-    # Cap shards to 48 maximum
-    if num_shards > 48:
-        print(f"Capping shards to 48 (was {num_shards})")
-        num_shards = 48
+    # Cap to 48 maximum
+    if max_concurrent > 48:
+        print(f"Capping max concurrent shards to 48 (was {max_concurrent})")
+        max_concurrent = 48
 
     # Resolve build directory
     build_dir = Path(args.build_dir).resolve()
@@ -382,11 +383,11 @@ def main():
     print("Running sharded tests" + (" [DRY RUN]" if args.dry_run else ""))
     print(f"Build directory: {build_dir}")
     print(f"Test profile: {args.profile}")
-    print(f"Available cores: {num_cores}")
+    print(f"Available CPUs: {available_cpus}")
     if gpu_arch:
         print(f"GPU architecture: {gpu_arch}")
     if not args.dry_run:
-        print(f"Number of shards: {num_shards} (auto-detected)")
+        print(f"Max concurrent shards: {max_concurrent} (auto-detected)")
         shuffle_seed, from_env = get_shuffle_seed()
         if from_env:
             print(
@@ -458,7 +459,7 @@ def main():
 
     for framework, cmd_list in commands.items():
         for cmd in cmd_list:
-            n = framework_num_shards.get(framework, num_shards)
+            n = framework_num_shards.get(framework, max_concurrent)
             seed = shuffle_seed if framework in ("gtest", "catch2") else None
 
             specs = [
@@ -481,7 +482,7 @@ def main():
             if specs:
                 pending_specs.append(specs.pop(0))
 
-    mixed_failures, mixed_timing = run_shards(pending_specs, max_concurrent=num_shards)
+    mixed_failures, mixed_timing = run_shards(pending_specs, max_concurrent=max_concurrent)
     failed_shards.extend(mixed_failures)
     all_timing_info.extend(mixed_timing)
 
