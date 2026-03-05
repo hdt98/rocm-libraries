@@ -2030,8 +2030,7 @@ try
     if(!lwork)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    // cuBLAS gelsBatched requires workspace for info parameter
-    *lwork = sizeof(int);
+    *lwork = 0;
     return HIPSOLVER_STATUS_SUCCESS;
 }
 catch(...)
@@ -2058,8 +2057,7 @@ try
     if(!lwork)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    // cuBLAS gelsBatched requires workspace for info parameter
-    *lwork = sizeof(int);
+    *lwork = 0;
     return HIPSOLVER_STATUS_SUCCESS;
 }
 catch(...)
@@ -2086,8 +2084,7 @@ try
     if(!lwork)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    // cuBLAS gelsBatched requires workspace for info parameter
-    *lwork = sizeof(int);
+    *lwork = 0;
     return HIPSOLVER_STATUS_SUCCESS;
 }
 catch(...)
@@ -2114,8 +2111,7 @@ try
     if(!lwork)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    // cuBLAS gelsBatched requires workspace for info parameter
-    *lwork = sizeof(int);
+    *lwork = 0;
     return HIPSOLVER_STATUS_SUCCESS;
 }
 catch(...)
@@ -2150,12 +2146,7 @@ try
     if(B != X)
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
 
-    // cuBLAS needs workspace for info parameter
-    if(!work || lwork < sizeof(int))
-        return HIPSOLVER_STATUS_INVALID_VALUE;
-
-    // Use work buffer as info pointer (cuBLAS info parameter for input validation)
-    int* info = static_cast<int*>(work);
+    int hInfo = 0;
 
     cudaStream_t stream;
     cusolverDnGetStream((cusolverDnHandle_t)handle, &stream);
@@ -2164,21 +2155,21 @@ try
     cublasCreate(&cublas_handle);
     cublasSetStream(cublas_handle, stream);
 
-    cublasStatus_t status = cublasSgelsBatched(cublas_handle,
-                                               CUBLAS_OP_N,
-                                               m,
-                                               n,
-                                               nrhs,
-                                               (float* const*)A,
-                                               lda,
-                                               (float**)B,
-                                               ldb,
-                                               devInfo,
-                                               info,
-                                               batch_count);
+    auto status = hipsolver::cuda2hip_status(cublasSgelsBatched(cublas_handle,
+                                                                CUBLAS_OP_N,
+                                                                m,
+                                                                n,
+                                                                nrhs,
+                                                                (float* const*)A,
+                                                                lda,
+                                                                (float**)B,
+                                                                ldb,
+                                                                &hInfo,
+                                                                devInfo,
+                                                                batch_count));
 
     cublasDestroy(cublas_handle);
-    return hipsolver::cuda2hip_status(status);
+    return status;
 }
 catch(...)
 {
@@ -2212,12 +2203,7 @@ try
     if(B != X)
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
 
-    // cuBLAS needs workspace for info parameter
-    if(!work || lwork < sizeof(int))
-        return HIPSOLVER_STATUS_INVALID_VALUE;
-
-    // Use work buffer as info pointer (cuBLAS info parameter for input validation)
-    int* info = static_cast<int*>(work);
+    int hInfo = 0;
 
     cudaStream_t stream;
     cusolverDnGetStream((cusolverDnHandle_t)handle, &stream);
@@ -2226,21 +2212,21 @@ try
     cublasCreate(&cublas_handle);
     cublasSetStream(cublas_handle, stream);
 
-    cublasStatus_t status = cublasDgelsBatched(cublas_handle,
-                                               CUBLAS_OP_N,
-                                               m,
-                                               n,
-                                               nrhs,
-                                               (double* const*)A,
-                                               lda,
-                                               (double**)B,
-                                               ldb,
-                                               devInfo,
-                                               info,
-                                               batch_count);
+    auto status = hipsolver::cuda2hip_status(cublasDgelsBatched(cublas_handle,
+                                                                CUBLAS_OP_N,
+                                                                m,
+                                                                n,
+                                                                nrhs,
+                                                                (double* const*)A,
+                                                                lda,
+                                                                (double**)B,
+                                                                ldb,
+                                                                &hInfo,
+                                                                devInfo,
+                                                                batch_count));
 
     cublasDestroy(cublas_handle);
-    return hipsolver::cuda2hip_status(status);
+    return status;
 }
 catch(...)
 {
@@ -2272,12 +2258,7 @@ try
     if(B != X)
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
 
-    // cuBLAS needs workspace for info parameter
-    if(!work || lwork < sizeof(int))
-        return HIPSOLVER_STATUS_INVALID_VALUE;
-
-    // Use work buffer as info pointer (cuBLAS info parameter for input validation)
-    int* info = static_cast<int*>(work);
+    int hInfo = 0;
 
     cudaStream_t stream;
     cusolverDnGetStream((cusolverDnHandle_t)handle, &stream);
@@ -2286,21 +2267,21 @@ try
     cublasCreate(&cublas_handle);
     cublasSetStream(cublas_handle, stream);
 
-    cublasStatus_t status = cublasCgelsBatched(cublas_handle,
-                                               CUBLAS_OP_N,
-                                               m,
-                                               n,
-                                               nrhs,
-                                               (cuComplex* const*)A,
-                                               lda,
-                                               (cuComplex**)B,
-                                               ldb,
-                                               devInfo,
-                                               info,
-                                               batch_count);
+    auto status = hipsolver::cuda2hip_status(cublasCgelsBatched(cublas_handle,
+                                                                CUBLAS_OP_N,
+                                                                m,
+                                                                n,
+                                                                nrhs,
+                                                                (cuComplex* const*)A,
+                                                                lda,
+                                                                (cuComplex**)B,
+                                                                ldb,
+                                                                &hInfo,
+                                                                devInfo,
+                                                                batch_count));
 
     cublasDestroy(cublas_handle);
-    return hipsolver::cuda2hip_status(status);
+    return status;
 }
 catch(...)
 {
@@ -2332,12 +2313,7 @@ try
     if(B != X)
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
 
-    // cuBLAS needs workspace for info parameter
-    if(!work || lwork < sizeof(int))
-        return HIPSOLVER_STATUS_INVALID_VALUE;
-
-    // Use work buffer as info pointer (cuBLAS info parameter for input validation)
-    int* info = static_cast<int*>(work);
+    int hInfo = 0;
 
     cudaStream_t stream;
     cusolverDnGetStream((cusolverDnHandle_t)handle, &stream);
@@ -2346,21 +2322,21 @@ try
     cublasCreate(&cublas_handle);
     cublasSetStream(cublas_handle, stream);
 
-    cublasStatus_t status = cublasZgelsBatched(cublas_handle,
-                                               CUBLAS_OP_N,
-                                               m,
-                                               n,
-                                               nrhs,
-                                               (cuDoubleComplex* const*)A,
-                                               lda,
-                                               (cuDoubleComplex**)B,
-                                               ldb,
-                                               devInfo,
-                                               info,
-                                               batch_count);
+    auto status = hipsolver::cuda2hip_status(cublasZgelsBatched(cublas_handle,
+                                                                CUBLAS_OP_N,
+                                                                m,
+                                                                n,
+                                                                nrhs,
+                                                                (cuDoubleComplex* const*)A,
+                                                                lda,
+                                                                (cuDoubleComplex**)B,
+                                                                ldb,
+                                                                &hInfo,
+                                                                devInfo,
+                                                                batch_count));
 
     cublasDestroy(cublas_handle);
-    return hipsolver::cuda2hip_status(status);
+    return status;
 }
 catch(...)
 {
