@@ -157,12 +157,11 @@ def start_shard(
             ]
         )
     elif test_type == "ctest":
-        # CTest doesn't have built-in sharding.  Let CTest use threads instead.
-        num_threads = 4
+        # Use stride-based sharding: shard i of n gets tests i+1, i+1+n, i+1+2n, ...
         cmd.extend(
             [
-                "--parallel",
-                str(num_threads),
+                "-I",
+                f"{shard_index + 1},,{num_shards}",
                 "--output-on-failure",
                 "--output-junit",
                 f"test_report/ctest_shard_{shard_index}.xml",
@@ -444,32 +443,31 @@ def main():
     # Values taken from CI run timing summaries
     FRAMEWORK_TOTAL_TIMES_BY_ARCH = {
         # fmt: off
-        "gfx942":  {"gtest": 7218, "catch2": 1064},
-        "gfx950":  {"gtest": 15769, "catch2": 1035},
-        "gfx908":  {"gtest": 14935, "catch2": 1757},
-        "gfx1201": {"gtest": 1421, "catch2": 852},
+        "gfx942":  {"gtest": 7218, "catch2": 1064, "ctest": 763},
+        "gfx950":  {"gtest": 15769, "catch2": 1035, "ctest": 763},
+        "gfx908":  {"gtest": 14935, "catch2": 1757, "ctest": 763},
+        "gfx1201": {"gtest": 1421, "catch2": 852,  "ctest": 763},
         # fmt: on
     }
-    _default_times = {"gtest": 18380, "catch2": 987}
-    FRAMEWORK_TOTAL_TIMES = FRAMEWORK_TOTAL_TIMES_BY_ARCH.get(
-        gpu_arch or "", _default_times
-    )
+    _default_times = {"gtest": 18380, "catch2": 987, "ctest": 763}
+    FRAMEWORK_TOTAL_TIMES = {
+        fw: t
+        for fw, t in FRAMEWORK_TOTAL_TIMES_BY_ARCH.get(
+            gpu_arch or "", _default_times
+        ).items()
+        if fw in commands
+    }
+
     # Compute per-framework shard counts proportionally to runtimes.
     # Use the largest-remainder (Hamilton) apportionment method so that the
     # total shard count equals exactly max_concurrent, keeping all slots busy
     # with no leftover stragglers in the final wave.
-    #
-    # ctest always gets exactly 1 shard (it manages its own parallelism), so
-    # reserve that slot first and apportion the rest among timed frameworks.
-    ctest_shards = 1 if "ctest" in commands else 0
-    apportionment_slots = max_concurrent - ctest_shards
-
     total_time = sum(FRAMEWORK_TOTAL_TIMES.values())
     n_frameworks = len(FRAMEWORK_TOTAL_TIMES)
 
-    # Smallest multiple of apportionment_slots that allows >= 1 shard per framework
-    k = max(1, -(-n_frameworks // apportionment_slots))
-    total_shards = k * apportionment_slots
+    # Smallest multiple of max_concurrent that allows >= 1 shard per framework
+    k = max(1, -(-n_frameworks // max_concurrent))
+    total_shards = k * max_concurrent
 
     # Largest-remainder apportionment: floor each quota, then award remaining
     # shards to frameworks with the largest fractional remainders.
@@ -482,8 +480,6 @@ def main():
         : max(0, remaining)
     ]:
         framework_num_shards[fw] += 1
-
-    framework_num_shards["ctest"] = ctest_shards
 
     print("Shard allocation:", file=sys.stderr)
     min_shards = min(framework_num_shards[fw] for fw in FRAMEWORK_TOTAL_TIMES)
