@@ -18,6 +18,8 @@ ROCSOLVER_BEGIN_NAMESPACE
 
 // Fills the given range with sequentially increasing values.
 // The name and interface is based on std::iota
+
+// Device overload — launched as a kernel; fills [first, first+count) on the GPU.
 template <typename T>
 ROCSOLVER_KERNEL void __launch_bounds__(IOTA_MAX_THDS) iota_n(T* first, uint32_t count, T value)
 {
@@ -26,6 +28,15 @@ ROCSOLVER_KERNEL void __launch_bounds__(IOTA_MAX_THDS) iota_n(T* first, uint32_t
     {
         first[idx] = T(idx) + value;
     }
+}
+
+// Host overload — fills a caller-supplied stack/host array with the same
+// arithmetic as the device kernel, without any GPU interaction.
+template <typename T>
+void iota_n(T* first, uint32_t count, T value, /*host_tag*/ std::nullptr_t)
+{
+    for(uint32_t idx = 0; idx < count; ++idx)
+        first[idx] = T(idx) + value;
 }
 
 // Initializes scalars on the device.

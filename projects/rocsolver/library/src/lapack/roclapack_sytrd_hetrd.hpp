@@ -307,16 +307,14 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
     rocblas_set_pointer_mode(handle, rocblas_pointer_mode_host);
     SYTRD_PROBE(stream, "set_pointer_mode_host", -1);
 
-    // Host-resident scalars: alpha = -1, beta = 1.
-    // These match scalars[0] and scalars[2] as initialized by init_scalars()
-    // via iota_n(scalars, 3, -1) → {-1, 0, 1}.  Using stack variables with
-    // pointer_mode_host avoids the hipMemcpy + hipStreamSynchronize that
+    // Host-resident scalars: {-1, 0, 1} — derived with the host overload of
+    // iota_n() 
     // rocblas_copy_alpha_beta_to_host_if_on_device would inject when
     // pointer_mode == device, keeping the stream fully capturable.
-    const T minone_h = T(-1);
-    const T one_h    = T(1);
-    const T* minone  = &minone_h;
-    const T* one     = &one_h;
+    T scalars_h[3];
+    iota_n(scalars_h, 3, T(-1), nullptr);   // → {-1, 0, 1}
+    const T* minone = &scalars_h[0];        // scalars_h[0] == -1
+    const T* one    = &scalars_h[2];        // scalars_h[2] ==  1
 
     rocblas_int ldw = n;
     rocblas_stride strideW = n * k;
