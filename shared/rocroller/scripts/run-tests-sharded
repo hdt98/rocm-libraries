@@ -112,8 +112,9 @@ def start_shard(
     # Extract executable name from command
     executable = base_cmd[0]
 
-    # Generate shard tag prefix from framework name (first letter uppercase)
-    test_prefix = test_type[0].upper()
+    # Generate shard tag prefix from framework name
+    FRAMEWORK_PREFIXES = {"gtest": "GT", "catch2": "CA", "ctest": "CT"}
+    test_prefix = FRAMEWORK_PREFIXES.get(test_type, test_type[:2].upper())
     shard_tag = f"[{test_prefix}{shard_index:02d}]"
     print(f"{shard_tag} Starting shard", flush=True, file=sys.stderr)
 
@@ -352,26 +353,25 @@ def main():
 
     args = parser.parse_args()
 
-    # Auto-detect number of available CPUs (respecting cgroups) and use half
-    # as the max number of shards to run concurrently.
+    # Auto-detect number of available CPUs (respecting cgroups).
+    # Subtract the 1-minute load average to account for other work on the
+    # machine, then use RESOURCE_FRACTION of the remaining headroom as max_concurrent.
+    RESOURCE_FRACTION = 2 / 3
     available_cpus = get_available_cpus()
-    max_concurrent = max(1, available_cpus // 2)
+    try:
+        load1 = float(open("/proc/loadavg").read().split()[0])
+    except Exception:
+        load1 = 0.0
+    headroom = max(0, available_cpus - load1)
+    max_concurrent = max(1, int(headroom * RESOURCE_FRACTION))
+    cap_msg = None
 
-    # Cap shards to 8 on gfx1201 due to hanging issues
+    # Cap slots to 8 on gfx1201 due to hanging issues
     gpu_arch = get_gpu_arch()
     if gpu_arch and "gfx1201" in gpu_arch:
         if max_concurrent > 8:
-            print(
-                f"Detected {gpu_arch}, capping max concurrent shards to 8 (was {max_concurrent})"
-            )
+            cap_msg = f"Detected {gpu_arch}, capping slots to 8 (was {max_concurrent})"
             max_concurrent = 8
-
-    MAX_CONCURRENT_LIMIT = 128
-    if max_concurrent > MAX_CONCURRENT_LIMIT:
-        print(
-            f"Capping max concurrent shards to {MAX_CONCURRENT_LIMIT} (was {max_concurrent})"
-        )
-        max_concurrent = MAX_CONCURRENT_LIMIT
 
     # Resolve build directory
     build_dir = Path(args.build_dir).resolve()
@@ -382,31 +382,48 @@ def main():
     # Get test commands from profile using rrtest library
     try:
         commands = get_test_commands(args.profile)
-        print(f"Using test profile: {args.profile}")
-        print(f"Frameworks: {', '.join(commands.keys())}")
     except Exception as e:
         print(f"ERROR: Failed to load test profile '{args.profile}': {e}")
         sys.exit(1)
 
-    print("=" * 50)
-    print("Running sharded tests" + (" [DRY RUN]" if args.dry_run else ""))
-    print(f"Build directory: {build_dir}")
-    print(f"Test profile: {args.profile}")
-    print(f"Available CPUs: {available_cpus}")
+    print(
+        f"Available CPUs: {available_cpus} (1-min load avg: {load1:.1f}, headroom: {headroom:.1f})",
+        file=sys.stderr,
+    )
     if gpu_arch:
-        print(f"GPU architecture: {gpu_arch}")
+        print(f"GPU architecture: {gpu_arch}", file=sys.stderr)
     if not args.dry_run:
-        print(f"Max concurrent shards: {max_concurrent} (auto-detected)")
+        print(
+            f"Taking {RESOURCE_FRACTION:.0%} of headroom ({headroom:.1f}) = {max_concurrent} slots",
+            file=sys.stderr,
+        )
+        if cap_msg:
+            print(cap_msg, file=sys.stderr)
+    print("=" * 50, file=sys.stderr)
+    print(
+        "Running sharded tests" + (" [DRY RUN]" if args.dry_run else ""),
+        file=sys.stderr,
+    )
+    print(f"Build directory: {build_dir}", file=sys.stderr)
+    print(
+        f"Test profile: {args.profile} (frameworks: {', '.join(commands.keys())})",
+        file=sys.stderr,
+    )
+    if not args.dry_run:
         shuffle_seed, from_env = get_shuffle_seed()
         if from_env:
             print(
-                f"Shuffle seed: {shuffle_seed} (from TEST_SHUFFLE_SEED, reproducible)"
+                f"Shuffle seed: {shuffle_seed} (from TEST_SHUFFLE_SEED, reproducible)",
+                file=sys.stderr,
             )
         else:
-            print(f"Shuffle seed: {shuffle_seed} (set TEST_SHUFFLE_SEED to reproduce)")
+            print(
+                f"Shuffle seed: {shuffle_seed} (set TEST_SHUFFLE_SEED to reproduce)",
+                file=sys.stderr,
+            )
     if args.dry_run:
-        print("Mode: DRY RUN - listing tests only")
-    print("=" * 50)
+        print("Mode: DRY RUN - listing tests only", file=sys.stderr)
+    print("=" * 50, file=sys.stderr)
 
     # Create test report directory
     test_report_dir = build_dir / "test_report"
@@ -443,13 +460,13 @@ def main():
     # Values taken from CI run timing summaries
     FRAMEWORK_TOTAL_TIMES_BY_ARCH = {
         # fmt: off
-        "gfx942":  {"gtest": 7218, "catch2": 1064, "ctest": 763},
-        "gfx950":  {"gtest": 15769, "catch2": 1035, "ctest": 763},
-        "gfx908":  {"gtest": 14935, "catch2": 1757, "ctest": 763},
-        "gfx1201": {"gtest": 1421, "catch2": 852,  "ctest": 763},
+        "gfx942":  {"gtest": 7218, "catch2": 1064, "ctest": 531},
+        "gfx950":  {"gtest": 15769, "catch2": 1035, "ctest": 640},
+        "gfx908":  {"gtest": 14935, "catch2": 1757, "ctest": 1231},
+        "gfx1201": {"gtest": 1421, "catch2": 852,  "ctest": 515},
         # fmt: on
     }
-    _default_times = {"gtest": 18380, "catch2": 987, "ctest": 763}
+    _default_times = {"gtest": 12000, "catch2": 1200, "ctest": 750}
     FRAMEWORK_TOTAL_TIMES = {
         fw: t
         for fw, t in FRAMEWORK_TOTAL_TIMES_BY_ARCH.get(
@@ -497,7 +514,7 @@ def main():
             detail = ""
         print(f"  {fw}: {n} shards{detail}", file=sys.stderr)
     print(
-        f"  Total: {sum(framework_num_shards.values())} shards across {max_concurrent} concurrent slots",
+        f"  Total: {sum(framework_num_shards.values())} shards across {max_concurrent} slots",
         file=sys.stderr,
     )
 
@@ -537,13 +554,13 @@ def main():
     failed_shards.extend(mixed_failures)
     all_timing_info.extend(mixed_timing)
 
-    print()
+    print(file=sys.stderr)
 
     # Print timing summary
     if all_timing_info:
-        print("=" * 50)
-        print("TIMING SUMMARY")
-        print("=" * 50)
+        print("=" * 50, file=sys.stderr)
+        print("TIMING SUMMARY", file=sys.stderr)
+        print("=" * 50, file=sys.stderr)
 
         # Group timings by executable
         executable_timings = {}
@@ -557,22 +574,24 @@ def main():
             data = executable_timings[executable]
             timings = data["timings"]
             framework = data["framework"]
-            prefix = framework[0].upper()
+            FRAMEWORK_PREFIXES = {"gtest": "GT", "catch2": "CA", "ctest": "CT"}
+            prefix = FRAMEWORK_PREFIXES.get(framework, framework[:2].upper())
 
-            print(f"\n{executable} ({framework}):")
+            print(f"\n{executable} ({framework}):", file=sys.stderr)
             for idx, elapsed in sorted(timings):
-                print(f"  [{prefix}{idx:02d}] {elapsed:6.1f}s")
+                print(f"  [{prefix}{idx:02d}] {elapsed:6.1f}s", file=sys.stderr)
 
             total = sum(t for _, t in timings)
             avg = total / len(timings)
             min_time = min(t for _, t in timings)
             max_time = max(t for _, t in timings)
             print(
-                f"  Total: {total:.1f}s, Avg: {avg:.1f}s, Min: {min_time:.1f}s, Max: {max_time:.1f}s"
+                f"  Total: {total:.1f}s, Avg: {avg:.1f}s, Min: {min_time:.1f}s, Max: {max_time:.1f}s",
+                file=sys.stderr,
             )
 
-        print("=" * 50)
-        print()
+        print("=" * 50, file=sys.stderr)
+        print(file=sys.stderr)
 
     # Report results
     if failed_shards:
