@@ -80,7 +80,9 @@ static std::map<SytrdGraphCacheKey, SytrdGraphCacheEntry>& get_sytrd_graph_cache
     return cache;
 }
 
-// Cache statistics
+// Cache statistics — only compiled when ROCSOLVER_SYTRD_GRAPH_DEBUG is defined.
+// When disabled, no counter struct, no static, and no increments exist in the binary.
+#ifdef ROCSOLVER_SYTRD_GRAPH_DEBUG
 struct SytrdCacheStats {
     uint64_t lookups = 0;
     uint64_t hits = 0;
@@ -91,6 +93,7 @@ static SytrdCacheStats& get_sytrd_cache_stats() {
     static SytrdCacheStats stats;
     return stats;
 }
+#endif // ROCSOLVER_SYTRD_GRAPH_DEBUG
 
 #endif // SYTRD_GRAPH_MODE != 0
 
@@ -482,16 +485,19 @@ rocblas_status rocsolver_sytrd_hetrd_template_cached(rocblas_handle handle,
 {
     SytrdGraphCacheKey cache_key{uplo, n, batch_count};
     auto& cache = get_sytrd_graph_cache();
+#ifdef ROCSOLVER_SYTRD_GRAPH_DEBUG
     auto& stats = get_sytrd_cache_stats();
-
     stats.lookups++;
+#endif
 
     auto it = cache.find(cache_key);
 
     if(it != cache.end())
     {
         // Cache HIT - reuse existing graph
+#ifdef ROCSOLVER_SYTRD_GRAPH_DEBUG
         stats.hits++;
+#endif
 
         hipGraphExec_t graph_exec = it->second.graph_exec;
         hipStream_t stream;
@@ -535,7 +541,9 @@ rocblas_status rocsolver_sytrd_hetrd_template_cached(rocblas_handle handle,
     else
     {
         // Cache MISS - capture new graph
+#ifdef ROCSOLVER_SYTRD_GRAPH_DEBUG
         stats.misses++;
+#endif
 
         #ifdef ROCSOLVER_SYTRD_GRAPH_DEBUG
         fprintf(stderr, "[SYTRD CACHE MISS] uplo=%d, n=%d, batch=%d - "

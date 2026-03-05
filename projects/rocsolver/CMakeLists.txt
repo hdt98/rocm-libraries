@@ -66,6 +66,8 @@ option(ROCSOLVER_FIND_PACKAGE_LAPACK_CONFIG "Skip module mode search for LAPACK"
 option(ROCSOLVER_USE_INTERNAL_BLAS "Use internal implementation of GEMM and TRSM for debugging." OFF)
 option(ROCSOLVER_SYTRD_GRAPH_MODE "Enable HIP-graph caching in SYTRD/HETRD." OFF)
 option(ROCSOLVER_SYTRD_GRAPH_TIMING "Enable hipEvent timing instrumentation for SYTRD HIP-graph cache (requires ROCSOLVER_SYTRD_GRAPH_MODE=ON)." OFF)
+option(ROCSOLVER_SYTRD_GRAPH_DEBUG "Enable SYTRD HIP-graph cache hit/miss statistics (zero overhead when OFF)." OFF)
+option(ROCSOLVER_LATRD_GRAPH_DEBUG "Enable LATRD HIP-graph cache hit/miss statistics (zero overhead when OFF)." OFF)
 option(ROCSOLVER_USE_REFERENCE_SECULAR_EQUATIONS_SOLVER "Use LAPACK like implementation of secular equations solver" ON)
 
 # Add our CMake helper files to the lookup path
