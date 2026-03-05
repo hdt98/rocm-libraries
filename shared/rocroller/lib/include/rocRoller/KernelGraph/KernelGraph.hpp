@@ -61,7 +61,7 @@ namespace rocRoller
             CoordinateGraph::CoordinateGraph coordinates;
             ControlToCoordinateMapper        mapper;
 
-            std::map<int, std::vector<size_t>> modelledAddresses;
+            std::unordered_map<int, std::vector<size_t>> modelledAddresses;
 
             /**
             * Set up the coordinate graph and transducer for existing transformers.
