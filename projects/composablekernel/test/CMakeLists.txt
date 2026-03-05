@@ -153,9 +153,16 @@ endfunction()
 
 function(add_gtest_executable TEST_NAME)
     message(DEBUG "adding gtest ${TEST_NAME}")
+
+    # Parse optional EXCLUDE_FROM_ALL keyword
+    cmake_parse_arguments(ARG "EXCLUDE_FROM_ALL" "" "" ${ARGN})
+
+    # ARG_UNPARSED_ARGUMENTS now contains the source files
+    # ARG_EXCLUDE_FROM_ALL is TRUE if the keyword was present
+
     set(result 1)
     if(DEFINED DTYPES)
-        foreach(source IN LISTS ARGN)
+        foreach(source IN LISTS ARG_UNPARSED_ARGUMENTS)
             get_filename_component(source_name ${source} NAME)
             set(test 0)
             if((source_name MATCHES "_fp16|_f16") AND NOT "fp16" IN_LIST DTYPES)
@@ -184,40 +191,40 @@ function(add_gtest_executable TEST_NAME)
             endif()
             if(test EQUAL 1)
                 message(DEBUG "removing gtest ${source} ")
-                list(REMOVE_ITEM ARGN "${source}")
+                list(REMOVE_ITEM ARG_UNPARSED_ARGUMENTS "${source}")
             endif()
         endforeach()
     endif()
 
     set(TEST_TARGETS ${SUPPORTED_GPU_TARGETS})
 
-    foreach(source IN LISTS ARGN)
+    foreach(source IN LISTS ARG_UNPARSED_ARGUMENTS)
         get_filename_component(source_name ${source} NAME)
         if(NOT DEFINED DL_KERNELS AND source_name MATCHES "_dl")
             message(DEBUG "removing dl test ${source} ")
-            list(REMOVE_ITEM ARGN "${source}")
+            list(REMOVE_ITEM ARG_UNPARSED_ARGUMENTS "${source}")
         endif()
         if(NOT TEST_TARGETS MATCHES "gfx9|gfx11|gfx12" AND source_name MATCHES "xdl")
             message(DEBUG "removing xdl test ${source} ")
-            list(REMOVE_ITEM ARGN "${source}")
+            list(REMOVE_ITEM ARG_UNPARSED_ARGUMENTS "${source}")
         endif()
         if(NOT TEST_TARGETS MATCHES "gfx95" AND source_name MATCHES "mx_")
             message(DEBUG "removing microscaling test ${source} ")
-            list(REMOVE_ITEM ARGN "${source}")
+            list(REMOVE_ITEM ARG_UNPARSED_ARGUMENTS "${source}")
         endif()
         if(NOT TEST_TARGETS MATCHES "gfx11|gfx12" AND source_name MATCHES "wmma")
             message(DEBUG "removing wmma test ${source} ")
-            list(REMOVE_ITEM ARGN "${source}")
+            list(REMOVE_ITEM ARG_UNPARSED_ARGUMENTS "${source}")
         endif()
     endforeach()
 
     #only continue if there are some source files left on the list
     set(source_name_list "")
-    foreach(source IN LISTS ARGN)
+    foreach(source IN LISTS ARG_UNPARSED_ARGUMENTS)
         get_filename_component(source_name ${source} NAME)
         list(APPEND source_name_list ${source_name})
     endforeach()
-    if(ARGN)
+    if(ARG_UNPARSED_ARGUMENTS)
         if(source_name_list MATCHES "_xdl")
              list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx1030 gfx10-3-generic)
         elseif(source_name_list MATCHES "_wmma")
@@ -227,9 +234,17 @@ function(add_gtest_executable TEST_NAME)
         elseif(source_name_list MATCHES "_mx") #only build mx example for gfx950
              list(REMOVE_ITEM TEST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack+ gfx908:xnack- gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1153 gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic)
         endif()
-        set_source_files_properties(${ARGN} PROPERTIES LANGUAGE HIP)
-        add_executable(${TEST_NAME} ${ARGN})
+        set_source_files_properties(${ARG_UNPARSED_ARGUMENTS} PROPERTIES LANGUAGE HIP)
+
+        # Conditionally add EXCLUDE_FROM_ALL
+        if(ARG_EXCLUDE_FROM_ALL)
+            add_executable(${TEST_NAME} EXCLUDE_FROM_ALL ${ARG_UNPARSED_ARGUMENTS})
+        else()
+            add_executable(${TEST_NAME} ${ARG_UNPARSED_ARGUMENTS})
+        endif()
+
         set_property(TARGET ${TEST_NAME} PROPERTY HIP_ARCHITECTURES ${TEST_TARGETS} )
+
         add_dependencies(tests ${TEST_NAME})
         add_dependencies(check ${TEST_NAME})
 
@@ -237,7 +252,12 @@ function(add_gtest_executable TEST_NAME)
         target_compile_options(${TEST_NAME} PRIVATE -Wno-global-constructors -Wno-undef)
         target_link_libraries(${TEST_NAME} PRIVATE gtest_main getopt::getopt)
         add_test(NAME ${TEST_NAME} COMMAND $<TARGET_FILE:${TEST_NAME}>)
-        rocm_install(TARGETS ${TEST_NAME} COMPONENT tests)
+
+        # Only install if not excluded from all
+        if(NOT ARG_EXCLUDE_FROM_ALL)
+            rocm_install(TARGETS ${TEST_NAME} COMPONENT tests)
+        endif()
+
         set(result 0)
     endif()
     message(DEBUG "add_gtest returns ${result}")

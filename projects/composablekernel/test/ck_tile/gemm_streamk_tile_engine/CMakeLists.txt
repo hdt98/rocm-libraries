@@ -55,7 +55,7 @@ function(create_individual_gemm_test_target datatype layout config_name trait ti
 
 
     # Create GTest executable for this kernel configuration
-    add_gtest_executable(${target_name}
+    add_gtest_executable(${target_name} EXCLUDE_FROM_ALL
         ${CMAKE_CURRENT_SOURCE_DIR}/test_gemm_streamk_simple.cpp
     )
 
