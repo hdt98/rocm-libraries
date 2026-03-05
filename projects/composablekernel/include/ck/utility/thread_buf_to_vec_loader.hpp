@@ -4,7 +4,6 @@
 #pragma once
 
 #include "ck/utility/common_header.hpp"
-#include "ck/utility/type_convert.hpp"
 #include "ck/utility/data_type.hpp"
 
 namespace ck {
@@ -12,9 +11,9 @@ namespace ck {
 template <typename... Funcs>
 struct FunctorInvoker
 {
-    std::tuple<Funcs...> funcs;
+    ck::Tuple<Funcs...> funcs;
 
-    __host__ __device__ constexpr FunctorInvoker(Funcs... fs) : funcs(fs...) {}
+    __host__ __device__ constexpr FunctorInvoker(Funcs... fs) : funcs(ck::forward<Funcs>(fs)...) {}
 
     template <index_t I>
     __host__ __device__ constexpr void operator()(ck::Number<I> i) const
@@ -25,7 +24,7 @@ struct FunctorInvoker
     template <index_t I, std::size_t... Is>
     __host__ __device__ constexpr void invoke(ck::Number<I> i, std::index_sequence<Is...>) const
     {
-        (std::get<Is>(funcs)(i), ...);
+        (funcs[ck::Number<static_cast<index_t>(Is)>{}](i), ...);
     }
 };
 
@@ -33,10 +32,10 @@ struct FunctorInvoker
 template <typename... Fs>
 __host__ __device__ constexpr auto MakeFunctorInvoker(Fs&&... fs)
 {
-    return FunctorInvoker<Fs...>{static_cast<Fs&&>(fs)...};
+    return FunctorInvoker<Fs...>{ck::forward<Fs&&>(fs)...};
 }
 
-template <typename T, index_t ik>
+template <typename T, index_t ik, typename Enable = void>
 struct IndexEval;
 
 struct Ik
@@ -64,37 +63,54 @@ struct Mod
 };
 
 template <typename T, index_t ik>
-struct IndexEval
+struct IndexEval<T, ik, std::enable_if_t<!std::is_same_v<decltype(T::value), void>, void>>
 {
     static constexpr index_t value = T::value;
 };
 
 template <index_t ik>
-struct IndexEval<Ik, ik>
+struct IndexEval<Ik, ik, void>
 {
     static constexpr index_t value = ik;
 };
 
 template <typename L, typename R, index_t ik>
-struct IndexEval<Add<L, R>, ik>
+struct IndexEval<Add<L, R>,
+                 ik,
+                 std::enable_if_t<!std::is_same_v<decltype(IndexEval<L, ik>::value), void> &&
+                                      !std::is_same_v<decltype(IndexEval<R, ik>::value), void>,
+                                  void>>
 {
     static constexpr index_t value = IndexEval<L, ik>::value + IndexEval<R, ik>::value;
 };
 
 template <typename L, typename R, index_t ik>
-struct IndexEval<Mult<L, R>, ik>
+struct IndexEval<Mult<L, R>,
+                 ik,
+                 std::enable_if_t<!std::is_same_v<decltype(IndexEval<L, ik>::value), void> &&
+                                      !std::is_same_v<decltype(IndexEval<R, ik>::value), void>,
+                                  void>>
 {
     static constexpr index_t value = IndexEval<L, ik>::value * IndexEval<R, ik>::value;
 };
 
 template <typename L, typename R, index_t ik>
-struct IndexEval<Div<L, R>, ik>
+struct IndexEval<Div<L, R>,
+                 ik,
+                 std::enable_if_t<!std::is_same_v<decltype(IndexEval<L, ik>::value), void> &&
+                                      !std::is_same_v<decltype(IndexEval<R, ik>::value), void> &&
+                                      (IndexEval<R, ik>::value != 0),
+                                  void>>
 {
     static constexpr index_t value = IndexEval<L, ik>::value / IndexEval<R, ik>::value;
 };
 
 template <typename L, typename R, index_t ik>
-struct IndexEval<Mod<L, R>, ik>
+struct IndexEval<Mod<L, R>,
+                 ik,
+                 std::enable_if_t<!std::is_same_v<decltype(IndexEval<L, ik>::value), void> &&
+                                      !std::is_same_v<decltype(IndexEval<R, ik>::value), void>,
+                                  void>>
 {
     static constexpr index_t value = IndexEval<L, ik>::value % IndexEval<R, ik>::value;
 };
