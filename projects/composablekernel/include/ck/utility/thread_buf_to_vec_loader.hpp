@@ -63,7 +63,7 @@ struct Mod
 };
 
 template <typename T, index_t ik>
-struct IndexEval<T, ik, std::enable_if_t<!std::is_same_v<decltype(T::value), void>, void>>
+struct IndexEval<T, ik, std::enable_if_t<!std::is_same_v<decltype(T::value), void>>>
 {
     static constexpr index_t value = T::value;
 };
@@ -78,8 +78,7 @@ template <typename L, typename R, index_t ik>
 struct IndexEval<Add<L, R>,
                  ik,
                  std::enable_if_t<!std::is_same_v<decltype(IndexEval<L, ik>::value), void> &&
-                                      !std::is_same_v<decltype(IndexEval<R, ik>::value), void>,
-                                  void>>
+                                  !std::is_same_v<decltype(IndexEval<R, ik>::value), void>>>
 {
     static constexpr index_t value = IndexEval<L, ik>::value + IndexEval<R, ik>::value;
 };
@@ -88,8 +87,7 @@ template <typename L, typename R, index_t ik>
 struct IndexEval<Mult<L, R>,
                  ik,
                  std::enable_if_t<!std::is_same_v<decltype(IndexEval<L, ik>::value), void> &&
-                                      !std::is_same_v<decltype(IndexEval<R, ik>::value), void>,
-                                  void>>
+                                  !std::is_same_v<decltype(IndexEval<R, ik>::value), void>>>
 {
     static constexpr index_t value = IndexEval<L, ik>::value * IndexEval<R, ik>::value;
 };
@@ -98,9 +96,8 @@ template <typename L, typename R, index_t ik>
 struct IndexEval<Div<L, R>,
                  ik,
                  std::enable_if_t<!std::is_same_v<decltype(IndexEval<L, ik>::value), void> &&
-                                      !std::is_same_v<decltype(IndexEval<R, ik>::value), void> &&
-                                      (IndexEval<R, ik>::value != 0),
-                                  void>>
+                                  !std::is_same_v<decltype(IndexEval<R, ik>::value), void> &&
+                                  (IndexEval<R, ik>::value != 0)>>
 {
     static constexpr index_t value = IndexEval<L, ik>::value / IndexEval<R, ik>::value;
 };
@@ -109,8 +106,7 @@ template <typename L, typename R, index_t ik>
 struct IndexEval<Mod<L, R>,
                  ik,
                  std::enable_if_t<!std::is_same_v<decltype(IndexEval<L, ik>::value), void> &&
-                                      !std::is_same_v<decltype(IndexEval<R, ik>::value), void>,
-                                  void>>
+                                  !std::is_same_v<decltype(IndexEval<R, ik>::value), void>>>
 {
     static constexpr index_t value = IndexEval<L, ik>::value % IndexEval<R, ik>::value;
 };
