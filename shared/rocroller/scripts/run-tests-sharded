@@ -444,13 +444,49 @@ def main():
     FRAMEWORK_TOTAL_TIMES = FRAMEWORK_TOTAL_TIMES_BY_ARCH.get(
         gpu_arch or "", _default_times
     )
-    MULTIPLIER = 2  # Helps with variance between shards
-    min_time = min(FRAMEWORK_TOTAL_TIMES.values())
-    framework_num_shards = {
-        fw: max(1, round(t / min_time)) * MULTIPLIER
-        for fw, t in FRAMEWORK_TOTAL_TIMES.items()
-    }
-    framework_num_shards["ctest"] = 1
+    # Compute per-framework shard counts proportionally to runtimes.
+    # Use the largest-remainder (Hamilton) apportionment method so that the
+    # total shard count equals exactly max_concurrent, keeping all slots busy
+    # with no leftover stragglers in the final wave.
+    #
+    # ctest always gets exactly 1 shard (it manages its own parallelism), so
+    # reserve that slot first and apportion the rest among timed frameworks.
+    ctest_shards = 1 if "ctest" in commands else 0
+    apportionment_slots = max_concurrent - ctest_shards
+
+    total_time = sum(FRAMEWORK_TOTAL_TIMES.values())
+    n_frameworks = len(FRAMEWORK_TOTAL_TIMES)
+
+    # Smallest multiple of apportionment_slots that allows >= 1 shard per framework
+    k = max(1, -(-n_frameworks // apportionment_slots))
+    total_shards = k * apportionment_slots
+
+    # Largest-remainder apportionment: floor each quota, then award remaining
+    # shards to frameworks with the largest fractional remainders.
+    quotas = {fw: t / total_time * total_shards for fw, t in FRAMEWORK_TOTAL_TIMES.items()}
+    framework_num_shards = {fw: max(1, int(q)) for fw, q in quotas.items()}
+    remaining = total_shards - sum(framework_num_shards.values())
+    for fw in sorted(quotas, key=lambda fw: quotas[fw] % 1, reverse=True)[: max(0, remaining)]:
+        framework_num_shards[fw] += 1
+
+    framework_num_shards["ctest"] = ctest_shards
+
+    print("Shard allocation:")
+    min_shards = min(framework_num_shards[fw] for fw in FRAMEWORK_TOTAL_TIMES)
+    min_runtime = min(FRAMEWORK_TOTAL_TIMES.values())
+    for fw, n in framework_num_shards.items():
+        ideal = quotas.get(fw)
+        t = FRAMEWORK_TOTAL_TIMES.get(fw)
+        if ideal is not None and t is not None:
+            detail = (
+                f"  (ideal shards {ideal:.2f},"
+                f" shard ratio {n / min_shards:.2f}x,"
+                f" ideal ratio {t / min_runtime:.2f}x)"
+            )
+        else:
+            detail = ""
+        print(f"  {fw}: {n} shards{detail}")
+    print(f"  Total: {sum(framework_num_shards.values())} shards across {max_concurrent} concurrent slots")
 
     # Build per-framework spec lists, then interleave round-robin
     failed_shards = []
