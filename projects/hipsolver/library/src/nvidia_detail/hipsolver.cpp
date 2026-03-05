@@ -4326,10 +4326,9 @@ try
 
     if(devInfo)
     {
+        hipMemset(devInfo, 0, batch_count * sizeof(int));
         if(info != 0)
-            hipMemcpy(devInfo, &info, sizeof(int), hipMemcpyHostToDevice);
-        else
-            hipMemset(devInfo, 0, sizeof(int));
+            hipMemcpy(devInfo + ((-info) - 1), &info, sizeof(int), hipMemcpyHostToDevice);
     }
 
     return hipsolver::cuda2hip_status(status);
@@ -4386,10 +4385,9 @@ try
 
     if(devInfo)
     {
+        hipMemset(devInfo, 0, batch_count * sizeof(int));
         if(info != 0)
-            hipMemcpy(devInfo, &info, sizeof(int), hipMemcpyHostToDevice);
-        else
-            hipMemset(devInfo, 0, sizeof(int));
+            hipMemcpy(devInfo + ((-info) - 1), &info, sizeof(int), hipMemcpyHostToDevice);
     }
 
     return hipsolver::cuda2hip_status(status);
@@ -4446,10 +4444,9 @@ try
 
     if(devInfo)
     {
+        hipMemset(devInfo, 0, batch_count * sizeof(int));
         if(info != 0)
-            hipMemcpy(devInfo, &info, sizeof(int), hipMemcpyHostToDevice);
-        else
-            hipMemset(devInfo, 0, sizeof(int));
+            hipMemcpy(devInfo + ((-info) - 1), &info, sizeof(int), hipMemcpyHostToDevice);
     }
 
     return hipsolver::cuda2hip_status(status);
@@ -4506,10 +4503,9 @@ try
 
     if(devInfo)
     {
+        hipMemset(devInfo, 0, batch_count * sizeof(int));
         if(info != 0)
-            hipMemcpy(devInfo, &info, sizeof(int), hipMemcpyHostToDevice);
-        else
-            hipMemset(devInfo, 0, sizeof(int));
+            hipMemcpy(devInfo + ((-info) - 1), &info, sizeof(int), hipMemcpyHostToDevice);
     }
 
     return hipsolver::cuda2hip_status(status);
