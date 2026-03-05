@@ -42,6 +42,9 @@ TEST(TestHipKernelEngine, WorkspaceSizeReturnsPlanBuilderWorkspace)
     auto mockPlanBuilder = std::make_unique<MockPlanBuilder>();
     EXPECT_CALL(*mockPlanBuilder, isApplicable(::testing::_, ::testing::_))
         .WillOnce(::testing::Return(true));
+    EXPECT_CALL(*mockPlanBuilder,
+                initializeExecutionSettings(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .Times(1);
     EXPECT_CALL(*mockPlanBuilder, getMaxWorkspaceSize(::testing::_, ::testing::_, ::testing::_))
         .WillOnce(::testing::Return(1337u));
 
@@ -62,10 +65,16 @@ TEST(TestHipKernelEngine, WorkspaceSizeReturnsMaxPlanBuilderWorkspace)
 
     EXPECT_CALL(*mockPlanBuilder, isApplicable(::testing::_, ::testing::_))
         .WillOnce(::testing::Return(true));
+    EXPECT_CALL(*mockPlanBuilder,
+                initializeExecutionSettings(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .Times(1);
     EXPECT_CALL(*mockPlanBuilder, getMaxWorkspaceSize(::testing::_, ::testing::_, ::testing::_))
         .WillOnce(::testing::Return(1337u));
     EXPECT_CALL(*mockPlanBuilder2, isApplicable(::testing::_, ::testing::_))
         .WillOnce(::testing::Return(true));
+    EXPECT_CALL(*mockPlanBuilder2,
+                initializeExecutionSettings(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .Times(1);
     EXPECT_CALL(*mockPlanBuilder2, getMaxWorkspaceSize(::testing::_, ::testing::_, ::testing::_))
         .WillOnce(::testing::Return(45000u));
 
@@ -85,6 +94,11 @@ TEST(TestHipKernelEngine, WorkspaceSizeReturnsZeroIfNoPlanBuilderApplicable)
     auto mockPlanBuilder = std::make_unique<MockPlanBuilder>();
     EXPECT_CALL(*mockPlanBuilder, isApplicable(::testing::_, ::testing::_))
         .WillOnce(::testing::Return(false));
+    EXPECT_CALL(*mockPlanBuilder,
+                initializeExecutionSettings(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .Times(0);
+    EXPECT_CALL(*mockPlanBuilder, getMaxWorkspaceSize(::testing::_, ::testing::_, ::testing::_))
+        .Times(0);
 
     HipKernelEngine engine(1);
     engine.addPlanBuilder(std::move(mockPlanBuilder));
@@ -359,6 +373,69 @@ TEST(TestHipKernelEngine, InitializeExecutionContextSetsBenchmarkingDisabled)
     EXPECT_FALSE(ctx.executionSettings().benchmarkingEnabled());
 }
 
+TEST(TestHipKernelEngine, InitializeExecutionContextInvalidBenchmarkingKnobTypeDoesNotThrow)
+{
+    HipKernelEngine engine(1);
+    MockGraph mockGraph;
+    HipdnnHipKernelHandle dummyHandle;
+    MockHipdnnHipKernelContext ctx;
+
+    flatbuffers::FlatBufferBuilder builder;
+    auto knobIdOffset = builder.CreateString("global.benchmarking");
+    auto stringValueOffset = builder.CreateString("invalid_value");
+    auto knobValue = hipdnn_data_sdk::data_objects::CreateStringValue(builder, stringValueOffset);
+    hipdnn_data_sdk::data_objects::KnobSettingBuilder knobSettingBuilder(builder);
+    knobSettingBuilder.add_knob_id(knobIdOffset);
+    knobSettingBuilder.add_value_type(hipdnn_data_sdk::data_objects::KnobValue::StringValue);
+    knobSettingBuilder.add_value(knobValue.Union());
+    auto knobSetting = knobSettingBuilder.Finish();
+
+    std::vector<flatbuffers::Offset<hipdnn_data_sdk::data_objects::KnobSetting>> knobsVector;
+    knobsVector.push_back(knobSetting);
+    auto knobs = builder.CreateVector(knobsVector);
+
+    auto engineConfig = hipdnn_data_sdk::data_objects::CreateEngineConfig(builder, 1, knobs);
+    builder.Finish(engineConfig);
+
+    auto buffer = builder.Release();
+    hipdnn_data_sdk::flatbuffer_utilities::EngineConfigWrapper configWrapper(buffer.data(),
+                                                                             buffer.size());
+
+    EXPECT_NO_THROW(engine.initializeExecutionContext(dummyHandle, mockGraph, configWrapper, ctx));
+    EXPECT_FALSE(ctx.executionSettings().benchmarkingEnabled());
+}
+
+TEST(TestHipKernelEngine, InitializeExecutionContextIgnoresUnknownKnobAndKeepsBenchmarkingDisabled)
+{
+    HipKernelEngine engine(1);
+    MockGraph mockGraph;
+    HipdnnHipKernelHandle dummyHandle;
+    MockHipdnnHipKernelContext ctx;
+
+    flatbuffers::FlatBufferBuilder builder;
+    auto knobIdOffset = builder.CreateString("custom.unknown_knob");
+    auto knobValue = hipdnn_data_sdk::data_objects::CreateIntValue(builder, 1);
+    hipdnn_data_sdk::data_objects::KnobSettingBuilder knobSettingBuilder(builder);
+    knobSettingBuilder.add_knob_id(knobIdOffset);
+    knobSettingBuilder.add_value_type(hipdnn_data_sdk::data_objects::KnobValue::IntValue);
+    knobSettingBuilder.add_value(knobValue.Union());
+    auto knobSetting = knobSettingBuilder.Finish();
+
+    std::vector<flatbuffers::Offset<hipdnn_data_sdk::data_objects::KnobSetting>> knobsVector;
+    knobsVector.push_back(knobSetting);
+    auto knobs = builder.CreateVector(knobsVector);
+
+    auto engineConfig = hipdnn_data_sdk::data_objects::CreateEngineConfig(builder, 1, knobs);
+    builder.Finish(engineConfig);
+
+    auto buffer = builder.Release();
+    hipdnn_data_sdk::flatbuffer_utilities::EngineConfigWrapper configWrapper(buffer.data(),
+                                                                             buffer.size());
+
+    EXPECT_NO_THROW(engine.initializeExecutionContext(dummyHandle, mockGraph, configWrapper, ctx));
+    EXPECT_FALSE(ctx.executionSettings().benchmarkingEnabled());
+}
+
 TEST(TestHipKernelEngine, InitializeExecutionContextDefaultsBenchmarkingDisabledWhenConfigInvalid)
 {
     HipKernelEngine engine(1);
@@ -424,17 +501,50 @@ TEST(TestHipKernelEngine, InitializeExecutionContextSkipsNonApplicableBuilders)
     engine.initializeExecutionContext(dummyHandle, mockGraph, mockConfig, ctx);
 }
 
+TEST(TestHipKernelEngine, InitializeExecutionContextWithApplicableSecondBuilderBuildsOnlySecond)
+{
+    auto mockPlanBuilder1 = std::make_unique<MockPlanBuilder>();
+    auto mockPlanBuilder2 = std::make_unique<MockPlanBuilder>();
+
+    EXPECT_CALL(*mockPlanBuilder1, isApplicable(::testing::_, ::testing::_))
+        .Times(1)
+        .WillOnce(::testing::Return(false));
+    EXPECT_CALL(*mockPlanBuilder1,
+                buildPlan(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .Times(0);
+    EXPECT_CALL(*mockPlanBuilder2, isApplicable(::testing::_, ::testing::_))
+        .Times(1)
+        .WillOnce(::testing::Return(true));
+    EXPECT_CALL(*mockPlanBuilder2,
+                buildPlan(::testing::_, ::testing::_, ::testing::_, ::testing::_))
+        .Times(1);
+
+    HipKernelEngine engine(1);
+    engine.addPlanBuilder(std::move(mockPlanBuilder1));
+    engine.addPlanBuilder(std::move(mockPlanBuilder2));
+
+    MockGraph mockGraph;
+    HipdnnHipKernelHandle dummyHandle;
+    MockHipdnnHipKernelContext ctx;
+    MockEngineConfig mockConfig;
+    EXPECT_CALL(mockConfig, isValid()).WillRepeatedly(::testing::Return(false));
+
+    engine.initializeExecutionContext(dummyHandle, mockGraph, mockConfig, ctx);
+}
+
 TEST(TestHipKernelEngine, InitializeExecutionContextDoesNotCallBuildPlanIfNoApplicableBuilders)
 {
     auto mockPlanBuilder1 = std::make_unique<MockPlanBuilder>();
     auto mockPlanBuilder2 = std::make_unique<MockPlanBuilder>();
 
     EXPECT_CALL(*mockPlanBuilder1, isApplicable(::testing::_, ::testing::_))
+        .Times(1)
         .WillOnce(::testing::Return(false));
     EXPECT_CALL(*mockPlanBuilder1,
                 buildPlan(::testing::_, ::testing::_, ::testing::_, ::testing::_))
         .Times(0);
     EXPECT_CALL(*mockPlanBuilder2, isApplicable(::testing::_, ::testing::_))
+        .Times(1)
         .WillOnce(::testing::Return(false));
     EXPECT_CALL(*mockPlanBuilder2,
                 buildPlan(::testing::_, ::testing::_, ::testing::_, ::testing::_))

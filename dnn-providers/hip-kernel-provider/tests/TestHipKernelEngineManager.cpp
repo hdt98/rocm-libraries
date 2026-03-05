@@ -232,3 +232,59 @@ TEST(TestHipKernelEngineManager, InitializeExecutionContextThrowsOnInvalidEngine
         manager.initializeExecutionContext(dummyHandle, mockGraph, mockEngineConfig, execCtx),
         hipdnn_plugin_sdk::HipdnnPluginException);
 }
+
+TEST(TestHipKernelEngineManager, GetAllEngineIdsReturnsEmptyWhenNoEngines)
+{
+    hipdnn_plugin_sdk::
+        EngineManager<HipdnnHipKernelHandle, HipdnnHipKernelSettings, HipdnnHipKernelContext>
+            manager;
+
+    auto ids = manager.getAllEngineIds();
+    EXPECT_TRUE(ids.empty());
+}
+
+TEST(TestHipKernelEngineManager, GetAllEngineIdsReturnsAddedIds)
+{
+    hipdnn_plugin_sdk::
+        EngineManager<HipdnnHipKernelHandle, HipdnnHipKernelSettings, HipdnnHipKernelContext>
+            manager;
+
+    auto mockEngine1 = std::make_unique<MockEngine>();
+    auto mockEngine2 = std::make_unique<MockEngine>();
+    EXPECT_CALL(*mockEngine1, id()).WillRepeatedly(Return(101));
+    EXPECT_CALL(*mockEngine2, id()).WillRepeatedly(Return(202));
+
+    manager.addEngine(std::move(mockEngine1));
+    manager.addEngine(std::move(mockEngine2));
+
+    auto ids = manager.getAllEngineIds();
+    EXPECT_EQ(ids.size(), 2u);
+    EXPECT_TRUE(std::find(ids.begin(), ids.end(), 101) != ids.end());
+    EXPECT_TRUE(std::find(ids.begin(), ids.end(), 202) != ids.end());
+}
+
+TEST(TestHipKernelEngineManager, DuplicateEngineIdKeepsFirstEngine)
+{
+    hipdnn_plugin_sdk::
+        EngineManager<HipdnnHipKernelHandle, HipdnnHipKernelSettings, HipdnnHipKernelContext>
+            manager;
+
+    auto firstEngine = std::make_unique<MockEngine>();
+    EXPECT_CALL(*firstEngine, id()).WillRepeatedly(Return(77));
+    EXPECT_CALL(*firstEngine, isApplicable(::testing::_, ::testing::_))
+        .WillRepeatedly(Return(true));
+
+    auto duplicateIdEngine = std::make_unique<MockEngine>();
+    EXPECT_CALL(*duplicateIdEngine, id()).WillRepeatedly(Return(77));
+    EXPECT_CALL(*duplicateIdEngine, isApplicable(::testing::_, ::testing::_)).Times(0);
+
+    manager.addEngine(std::move(firstEngine));
+    manager.addEngine(std::move(duplicateIdEngine));
+
+    MockGraph mockGraph;
+    HipdnnHipKernelHandle dummyHandle;
+    auto applicable = manager.getApplicableEngineIds(dummyHandle, mockGraph);
+
+    EXPECT_EQ(applicable.size(), 1u);
+    EXPECT_EQ(applicable[0], 77);
+}
