@@ -401,6 +401,12 @@ struct PassThrough
     }
 
     template <>
+    __host__ __device__ void operator()<int32_t, float>(int32_t& y, const float& x) const
+    {
+        y = static_cast<int32_t>(x);
+    }
+
+    template <>
     __host__ __device__ void operator()<bhalf_t, bhalf_t>(bhalf_t& y, const bhalf_t& x) const
     {
         y = x;
@@ -1041,7 +1047,7 @@ struct FastGelu
     template <>
     __device__ void operator()<float, float>(float& y, const float& x) const
     {
-#if defined(__gfx13__)
+#if defined(__gfx125__) || defined(__gfx13__)
         const float c1 = 0.035677f;
         const float c2 = 0.797885f;
         const float u  = x * (c1 * x * x + c2);
@@ -1071,7 +1077,7 @@ struct FastGelu
     template <>
     __device__ void operator()<half_t, half_t>(half_t& y, const half_t& x) const
     {
-#if defined(__gfx13__)
+#if defined(__gfx125__) || defined(__gfx13__)
         const half_t c1 = type_convert<half_t>(0.035677f);
         const half_t c2 = type_convert<half_t>(0.797885f);
         const half_t u  = x * (c1 * x * x + c2);
@@ -1100,7 +1106,7 @@ struct FastGelu
     template <>
     __device__ void operator()<half_t, float>(half_t& y, const float& x) const
     {
-#if defined(__gfx13__)
+#if defined(__gfx125__) || defined(__gfx13__)
         const float c1 = 0.035677f;
         const float c2 = 0.797885f;
         const float u  = x * (c1 * x * x + c2);
@@ -1128,7 +1134,7 @@ struct FastGelu
     template <>
     __device__ void operator()<bhalf_t, float>(bhalf_t& y, const float& x) const
     {
-#if defined(__gfx13__)
+#if defined(__gfx125__) || defined(__gfx13__)
         const float c1 = 0.035677f;
         const float c2 = 0.797885f;
         const float u  = x * (c1 * x * x + c2);
@@ -1146,7 +1152,7 @@ struct FastGelu
     template <>
     __device__ void operator()<bhalf_t, bhalf_t>(bhalf_t& y, const bhalf_t& x) const
     {
-#if defined(__gfx13__) && !defined(__gfx130F__)
+#if defined(__gfx125__) || (defined(__gfx13__) && !defined(__gfx130F__))
         const bhalf_t c1 = type_convert<bhalf_t>(0.035677f);
         const bhalf_t c2 = type_convert<bhalf_t>(0.797885f);
         const bhalf_t u  = x * (c1 * x * x + c2);

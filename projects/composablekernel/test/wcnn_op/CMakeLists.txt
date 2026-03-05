@@ -1,3 +1,6 @@
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+
 #unit test
 add_test_executable(test_wcnn_conv_op wcnn_conv_op.cpp)
 target_link_libraries(test_wcnn_conv_op PRIVATE utility)
