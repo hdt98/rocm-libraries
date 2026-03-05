@@ -27,17 +27,13 @@
 
 #pragma once
 
+#include "asan_helpers.hpp"
 #include "rocblas.hpp"
 #include "rocsolver_run_specialized_kernels.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
-// ASAN: cap total threads per block at 256 (VGPR inflation limits gfx942 to 1 wave/SIMD)
-#define ROCSOLVER_TRSM_MAX_THREADS 256
-#else
-#define ROCSOLVER_TRSM_MAX_THREADS 1024
-#endif
+#define ROCSOLVER_TRSM_MAX_THREADS ROCSOLVER_ASAN_VALUE(256, 1024)
 
 #ifdef USE_INTERNAL_TRSM
 #define ROCSOLVER_INTERNAL_TRSM 1

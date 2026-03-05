@@ -29,6 +29,7 @@
 
 #include <algorithm>
 
+#include "asan_helpers.hpp"
 #include "lapack/roclapack_syevj_heevj.hpp"
 #include "lapack_device_functions.hpp"
 #include "rocblas.hpp"
@@ -36,12 +37,8 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
-// ASAN: cap at 256 threads (VGPR inflation limits gfx942 to 1 wave/SIMD)
-#define STEDCJ_BDIM 256
-#else
-#define STEDCJ_BDIM 512 // Number of threads per thread-block used in main stedc kernels
-#endif
+#define STEDCJ_BDIM \
+    ROCSOLVER_ASAN_VALUE(256, 512) // Number of threads per thread-block used in main stedc kernels
 #define MAXSWEEPS 20 // Max number of sweeps for Jacobi solver (when used)
 
 // TODO: using macro STEDCJ_EXTERNAL_GEMM = false for now. We can enable the use of

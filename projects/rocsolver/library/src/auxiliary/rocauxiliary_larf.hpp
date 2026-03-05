@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include "asan_helpers.hpp"
 #include "rocblas.hpp"
 #include "rocsolver/rocsolver.h"
 #include "rocsolver_run_specialized_kernels.hpp"
@@ -319,12 +320,7 @@ rocblas_status rocsolver_larf_template(rocblas_handle handle,
     // determine side
     bool leftside = (side == rocblas_side_left);
 
-#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
-    // ASAN: cap at 256 threads (VGPR inflation limits gfx942 to 1 wave/SIMD)
-    static constexpr int NB = 256;
-#else
-    static constexpr int NB = 1024;
-#endif
+    static constexpr int NB = ROCSOLVER_ASAN_VALUE(256, 1024);
     const int lds_size = leftside ? (m + (NB / props->warpSize)) * sizeof(T)
                                   : (n + (NB / props->warpSize)) * sizeof(T);
 

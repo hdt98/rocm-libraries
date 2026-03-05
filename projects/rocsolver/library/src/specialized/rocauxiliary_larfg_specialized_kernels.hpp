@@ -33,6 +33,7 @@
 #pragma once
 
 #include "../auxiliary/rocauxiliary_larfg.hpp"
+#include "asan_helpers.hpp"
 #include "lib_device_helpers.hpp"
 #include "rocblas.hpp"
 #include "rocsolver_run_specialized_kernels.hpp"
@@ -154,28 +155,21 @@ rocblas_status larfg_run_small(rocblas_handle handle,
                                 stream, n, alpha, shiftA, strideA, beta, shiftB, strideB, x, shiftX,
                                 incX, strideX, tau, strideP);
     }
-#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
-    // ASAN: cap at 256 threads (VGPR inflation limits gfx942 to 1 wave/SIMD)
     else
     {
-        ROCSOLVER_LAUNCH_KERNEL((larfg_kernel_small<256, T>), dim3(1, 1, batch_count), dim3(256), 0,
-                                stream, n, alpha, shiftA, strideA, beta, shiftB, strideB, x, shiftX,
-                                incX, strideX, tau, strideP);
+        if constexpr(rocsolver_enable_asan)
+            ROCSOLVER_LAUNCH_KERNEL((larfg_kernel_small<256, T>), dim3(1, 1, batch_count),
+                                    dim3(256), 0, stream, n, alpha, shiftA, strideA, beta, shiftB,
+                                    strideB, x, shiftX, incX, strideX, tau, strideP);
+        else if(n <= 512)
+            ROCSOLVER_LAUNCH_KERNEL((larfg_kernel_small<512, T>), dim3(1, 1, batch_count),
+                                    dim3(512), 0, stream, n, alpha, shiftA, strideA, beta, shiftB,
+                                    strideB, x, shiftX, incX, strideX, tau, strideP);
+        else
+            ROCSOLVER_LAUNCH_KERNEL((larfg_kernel_small<1024, T>), dim3(1, 1, batch_count),
+                                    dim3(1024), 0, stream, n, alpha, shiftA, strideA, beta, shiftB,
+                                    strideB, x, shiftX, incX, strideX, tau, strideP);
     }
-#else
-    else if(n <= 512)
-    {
-        ROCSOLVER_LAUNCH_KERNEL((larfg_kernel_small<512, T>), dim3(1, 1, batch_count), dim3(512), 0,
-                                stream, n, alpha, shiftA, strideA, beta, shiftB, strideB, x, shiftX,
-                                incX, strideX, tau, strideP);
-    }
-    else
-    {
-        ROCSOLVER_LAUNCH_KERNEL((larfg_kernel_small<1024, T>), dim3(1, 1, batch_count), dim3(1024),
-                                0, stream, n, alpha, shiftA, strideA, beta, shiftB, strideB, x,
-                                shiftX, incX, strideX, tau, strideP);
-    }
-#endif
 
     return rocblas_status_success;
 }

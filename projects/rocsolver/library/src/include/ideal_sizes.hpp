@@ -27,19 +27,16 @@
 
 #pragma once
 
+#include "asan_helpers.hpp"
+
 /*! \file
     \brief ideal_sizes.hpp gathers all constants that can be tuned for performance.
  *********************************************************************************/
 
 #define BS1 256 // generic 1 dimensional thread-block size used to call common kernels
-#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
-// ASAN: 16*16=256 threads max (VGPR inflation limits gfx942 to 1 wave/SIMD)
-#define BS2 16
-#define ROCSOLVER_BS2_2D 16
-#else
-#define BS2 32 // generic 2 dimensional thread-block size used to call common kernels
-#define ROCSOLVER_BS2_2D 32
-#endif
+#define BS2 \
+    ROCSOLVER_ASAN_VALUE(16, 32) // generic 2 dimensional thread-block size used to call common kernels
+#define ROCSOLVER_BS2_2D ROCSOLVER_ASAN_VALUE(16, 32)
 
 /******************************* larf ****************************************
 *******************************************************************************/
@@ -373,12 +370,7 @@
 #define GETF2_SPKER_MAX_N 256 //always <= 256
 #endif
 #ifndef GETF2_SSKER_MAX_M
-#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
-// ASAN: cap at 256 to prevent small-kernel launches with >256 threads
-#define GETF2_SSKER_MAX_M 256
-#else
-#define GETF2_SSKER_MAX_M 512 //always <= 512 and <= GETF2_SPKER_MAX_M
-#endif
+#define GETF2_SSKER_MAX_M ROCSOLVER_ASAN_VALUE(256, 512) //always <= 512 and <= GETF2_SPKER_MAX_M
 #endif
 #ifndef GETF2_SSKER_MAX_N
 #define GETF2_SSKER_MAX_N 64 //always <= wavefront and <= GETF2_SPKER_MAX_N

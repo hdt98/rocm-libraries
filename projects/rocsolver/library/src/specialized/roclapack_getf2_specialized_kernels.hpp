@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "asan_helpers.hpp"
 #include "rocblas.hpp"
 #include "rocsolver_run_specialized_kernels.hpp"
 
@@ -683,9 +684,8 @@ rocblas_status getf2_run_panel(rocblas_handle handle,
     using S = decltype(std::real(T{}));
 
     // determine sizes
+    constexpr I max_threads = ROCSOLVER_ASAN_VALUE(256, 1024);
     I dimy, dimx;
-#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
-    // ASAN: cap total threads at 256 (VGPR inflation limits gfx942 to 1 wave/SIMD)
     if(m <= 8)
         dimx = 8;
     else if(m <= 16)
@@ -696,28 +696,18 @@ rocblas_status getf2_run_panel(rocblas_handle handle,
         dimx = 64;
     else if(m <= 128)
         dimx = 128;
+    else if constexpr(!rocsolver_enable_asan)
+    {
+        if(m <= 256)
+            dimx = 256;
+        else if(m <= 512)
+            dimx = 512;
+        else
+            dimx = 1024;
+    }
     else
         dimx = 256;
-    dimy = I(256) / dimx;
-#else
-    if(m <= 8)
-        dimx = 8;
-    else if(m <= 16)
-        dimx = 16;
-    else if(m <= 32)
-        dimx = 32;
-    else if(m <= 64)
-        dimx = 64;
-    else if(m <= 128)
-        dimx = 128;
-    else if(m <= 256)
-        dimx = 256;
-    else if(m <= 512)
-        dimx = 512;
-    else
-        dimx = 1024;
-    dimy = I(1024) / dimx;
-#endif
+    dimy = I(max_threads) / dimx;
 
     // prepare kernel launch
     dim3 grid(1, 1, batch_count);
