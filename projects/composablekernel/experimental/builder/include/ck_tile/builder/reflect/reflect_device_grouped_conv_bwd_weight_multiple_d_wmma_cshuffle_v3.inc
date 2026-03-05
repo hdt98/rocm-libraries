@@ -9,8 +9,7 @@
 // silent runtime bugs that are difficult to diagnose. Always update both files together and review
 // changes carefully.
 
-namespace ck_tile {
-namespace reflect {
+namespace ck_tile::reflect {
 
 template <ck::index_t NDimSpatial,
           typename InLayout_,
@@ -262,5 +261,4 @@ struct InstanceTraits<
     }
 };
 
-} // namespace reflect
-} // namespace ck_tile
+} // namespace ck_tile::reflect
