@@ -940,6 +940,12 @@ try
         return HIPSOLVER_STATUS_INVALID_VALUE;
     if(!lworkOnDevice || !lworkOnHost)
         return HIPSOLVER_STATUS_INVALID_VALUE;
+    if(n < 0 || k < 0 || k > n || ldt < k)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+    if(storev == HIPSOLVER_STOREV_COLUMNWISE && ldv < n)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+    if(storev == HIPSOLVER_STOREV_ROWWISE && ldv < k)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
 
     *lworkOnDevice = 0;
     *lworkOnHost   = 0;
@@ -1044,6 +1050,12 @@ try
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
     if(!params)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+    if(n < 0 || k < 0 || k > n || ldt < k)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+    if(storev == HIPSOLVER_STOREV_COLUMNWISE && ldv < n)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+    if(storev == HIPSOLVER_STOREV_ROWWISE && ldv < k)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
     if(workOnDevice && lworkOnDevice)
