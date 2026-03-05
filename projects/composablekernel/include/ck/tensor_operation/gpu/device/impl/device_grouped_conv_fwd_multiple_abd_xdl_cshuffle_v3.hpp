@@ -2225,3 +2225,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
 } // namespace device
 } // namespace tensor_operation
 } // namespace ck
+
+#ifdef CK_EXPERIMENTAL_BUILDER
+#include "ck_tile/builder/reflect/reflect_device_grouped_conv_fwd_multiple_abd_xdl_cshuffle_v3.inc"
+#endif

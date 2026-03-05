@@ -1076,3 +1076,7 @@ struct DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK
 } // namespace device
 } // namespace tensor_operation
 } // namespace ck
+
+#ifdef CK_EXPERIMENTAL_BUILDER
+#include "ck_tile/builder/reflect/reflect_device_grouped_conv_fwd_dl_multiple_d_nhwc_kyxc_nhwk.inc"
+#endif
