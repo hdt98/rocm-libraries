@@ -4297,10 +4297,10 @@ try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(n < 0 || nrhs < 0 || lda < std::max(1, n) || ldb < std::max(1, n) || batch_count < 0)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
     if(strideP != n)
         return HIPSOLVER_STATUS_INVALID_VALUE;
-
-    CHECK_HIPSOLVER_ERROR(hipsolverZeroInfo(handle, devInfo, batch_count));
 
     cudaStream_t stream;
     cusolverDnGetStream((cusolverDnHandle_t)handle, &stream);
@@ -4309,6 +4309,7 @@ try
     cublasCreate(&cublas_handle);
     cublasSetStream(cublas_handle, stream);
 
+    int            info   = 0;
     cublasStatus_t status = cublasSgetrsBatched(cublas_handle,
                                                 hipsolver::hip2cuda_operation(trans),
                                                 n,
@@ -4318,7 +4319,7 @@ try
                                                 devIpiv,
                                                 B,
                                                 ldb,
-                                                devInfo,
+                                                &info,
                                                 batch_count);
 
     cublasDestroy(cublas_handle);
@@ -4347,10 +4348,10 @@ try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(n < 0 || nrhs < 0 || lda < std::max(1, n) || ldb < std::max(1, n) || batch_count < 0)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
     if(strideP != n)
         return HIPSOLVER_STATUS_INVALID_VALUE;
-
-    CHECK_HIPSOLVER_ERROR(hipsolverZeroInfo(handle, devInfo, batch_count));
 
     cudaStream_t stream;
     cusolverDnGetStream((cusolverDnHandle_t)handle, &stream);
@@ -4359,6 +4360,7 @@ try
     cublasCreate(&cublas_handle);
     cublasSetStream(cublas_handle, stream);
 
+    int            info   = 0;
     cublasStatus_t status = cublasDgetrsBatched(cublas_handle,
                                                 hipsolver::hip2cuda_operation(trans),
                                                 n,
@@ -4368,7 +4370,7 @@ try
                                                 devIpiv,
                                                 B,
                                                 ldb,
-                                                devInfo,
+                                                &info,
                                                 batch_count);
 
     cublasDestroy(cublas_handle);
@@ -4397,10 +4399,10 @@ try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(n < 0 || nrhs < 0 || lda < std::max(1, n) || ldb < std::max(1, n) || batch_count < 0)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
     if(strideP != n)
         return HIPSOLVER_STATUS_INVALID_VALUE;
-
-    CHECK_HIPSOLVER_ERROR(hipsolverZeroInfo(handle, devInfo, batch_count));
 
     cudaStream_t stream;
     cusolverDnGetStream((cusolverDnHandle_t)handle, &stream);
@@ -4409,6 +4411,7 @@ try
     cublasCreate(&cublas_handle);
     cublasSetStream(cublas_handle, stream);
 
+    int            info   = 0;
     cublasStatus_t status = cublasCgetrsBatched(cublas_handle,
                                                 hipsolver::hip2cuda_operation(trans),
                                                 n,
@@ -4418,7 +4421,7 @@ try
                                                 devIpiv,
                                                 (cuComplex**)B,
                                                 ldb,
-                                                devInfo,
+                                                &info,
                                                 batch_count);
 
     cublasDestroy(cublas_handle);
@@ -4447,10 +4450,10 @@ try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
+    if(n < 0 || nrhs < 0 || lda < std::max(1, n) || ldb < std::max(1, n) || batch_count < 0)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
     if(strideP != n)
         return HIPSOLVER_STATUS_INVALID_VALUE;
-
-    CHECK_HIPSOLVER_ERROR(hipsolverZeroInfo(handle, devInfo, batch_count));
 
     cudaStream_t stream;
     cusolverDnGetStream((cusolverDnHandle_t)handle, &stream);
@@ -4459,6 +4462,7 @@ try
     cublasCreate(&cublas_handle);
     cublasSetStream(cublas_handle, stream);
 
+    int            info   = 0;
     cublasStatus_t status = cublasZgetrsBatched(cublas_handle,
                                                 hipsolver::hip2cuda_operation(trans),
                                                 n,
@@ -4468,7 +4472,7 @@ try
                                                 devIpiv,
                                                 (cuDoubleComplex**)B,
                                                 ldb,
-                                                devInfo,
+                                                &info,
                                                 batch_count);
 
     cublasDestroy(cublas_handle);
