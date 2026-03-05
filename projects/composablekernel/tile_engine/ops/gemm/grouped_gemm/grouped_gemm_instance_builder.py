@@ -119,7 +119,7 @@ class GroupedGemmKernelBuilder(GemmKernelBuilder):
         }}
 
         // Get grid and block sizes
-        const dim3 grids = {"Kernel::MaxOccupancyGridSize(stream)" if persistent in [True, "true"] else "Kernel::GridSize(gemm_descs)"};
+        const dim3 grids = {"Kernel::MaxOccupancyGridSize(stream)" if persistent in [True, "true"] else "dim3(kargs.empty() ? 0 : kargs.back().block_end, 1, 1)"};
         const dim3 blocks = Kernel::BlockSize();
 
         HIP_CHECK_ERROR(hipMemcpyWithStream(kargs_ptr,
