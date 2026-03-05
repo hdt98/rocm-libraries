@@ -256,9 +256,9 @@ cusolverDirectMode_t hip2cuda_direct(hipsolverDirectMode_t direct)
     switch(direct)
     {
     case HIPSOLVER_DIRECT_FORWARD:
-        return CUSOLVER_DIRECT_FORWARD;
+        return CUBLAS_DIRECT_FORWARD;
     case HIPSOLVER_DIRECT_BACKWARD:
-        return CUSOLVER_DIRECT_BACKWARD;
+        return CUBLAS_DIRECT_BACKWARD;
     default:
         throw HIPSOLVER_STATUS_INVALID_ENUM;
     }
