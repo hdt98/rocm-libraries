@@ -326,13 +326,12 @@ struct CShuffleEpilogue
             };
             constexpr index_t BaseWords  = ToWords(BaseStrideElems);
 
-            // Enhanced logic to eliminate bank conflicts for small data types
-            // FP16 (2B) and FP8 (1B) with 16xN tiles show conflicts when BaseWords aligns with 8
+            // Enhanced logic for 16x16x16 FP16 tiles to eliminate bank conflicts
             constexpr bool NeedsExtraPadding = (MPerXdl == 16 && NPerXdl == 16 &&
-                                                DataTypeSize <= 2 && BaseWords % 8 == 0);
+                                                KPerXdl == 16 && DataTypeSize == 2);
 
             constexpr index_t PadWords = NeedsExtraPadding
-                ? 2  // 2-word padding breaks 8-phase alignment
+                ? ((BaseWords % 8 == 0) ? 2 : ((BaseWords % 4 == 0) ? 1 : 0))
                 : ((BaseWords % 2 == 0) ? 1 : 0);
 
             constexpr auto PaddingAmount = PadWords * ElemsPer4B;
@@ -389,13 +388,12 @@ struct CShuffleEpilogue
             };
             constexpr index_t BaseWords  = ToWords(BaseStrideElems);
 
-            // Enhanced logic to eliminate bank conflicts for small data types
-            // FP16 (2B) and FP8 (1B) with 16xN tiles show conflicts when BaseWords aligns with 8
+            // Enhanced logic for 16x16x16 FP16 tiles to eliminate bank conflicts
             constexpr bool NeedsExtraPadding = (MPerXdl == 16 && NPerXdl == 16 &&
-                                                DataTypeSize <= 2 && BaseWords % 8 == 0);
+                                                KPerXdl == 16 && DataTypeSize == 2);
 
             constexpr index_t PadWords = NeedsExtraPadding
-                ? 2  // 2-word padding breaks 8-phase alignment
+                ? ((BaseWords % 8 == 0) ? 2 : ((BaseWords % 4 == 0) ? 1 : 0))
                 : ((BaseWords % 2 == 0) ? 1 : 0);
 
             constexpr auto PaddingAmount = PadWords * ElemsPer4B;
