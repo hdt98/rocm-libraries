@@ -1,0 +1,6 @@
+{
+    "claudeCode.claudeProcessWrapper": "/usr/local/bin/claude",
+    "claudeCode.disableLoginPrompt": true,
+    "claudeCode.environmentVariables": [],
+    "claudeCode.allowDangerouslySkipPermissions": false
+}
