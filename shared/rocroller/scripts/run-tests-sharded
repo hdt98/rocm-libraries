@@ -119,8 +119,8 @@ def start_shard(
 
     # Set environment variables
     env = os.environ.copy()
-    env["OPENBLAS_NUM_THREADS"] = "2"
-    env["OMP_NUM_THREADS"] = "2"
+    env["OPENBLAS_NUM_THREADS"] = "1"
+    env["OMP_NUM_THREADS"] = "1"
 
     # Start with base command from profile and add framework-specific sharding arguments
     cmd = base_cmd.copy()
@@ -366,7 +366,7 @@ def main():
             )
             max_concurrent = 8
 
-    MAX_CONCURRENT_LIMIT = 32
+    MAX_CONCURRENT_LIMIT = 128
     if max_concurrent > MAX_CONCURRENT_LIMIT:
         print(
             f"Capping max concurrent shards to {MAX_CONCURRENT_LIMIT} (was {max_concurrent})"
