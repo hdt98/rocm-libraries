@@ -225,7 +225,10 @@ static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
 
     S const radix = get_lamch('B');
 
-    auto const npow = (std::log(safmin / eps) / std::log(radix) / two);
+    // --------------------------------------
+    // NOTE: npow is integer type to follow lapack
+    // --------------------------------------
+    int const npow = static_cast<int>((std::log(safmin / eps) / std::log(radix) / two));
     auto const safmn2 = std::pow(radix, npow);
     auto const safmx2 = one / safmn2;
 
