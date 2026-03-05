@@ -70,13 +70,9 @@ struct SytrdGraphCacheKey {
     }
 };
 
-// Cache entry: the executable graph plus the device workspace buffer that was
-// pre-allocated before capture.  The workspace must remain alive for the
-// lifetime of the graph_exec because the captured kernels reference it.
+// Cache entry: the executable graph ready for replay.
 struct SytrdGraphCacheEntry {
     hipGraphExec_t graph_exec = nullptr;
-    void*          workspace  = nullptr; // user-owned workspace passed via rocblas_set_workspace
-    size_t         workspace_size = 0;
 };
 
 // Global cache (thread-safe via static initialization)
@@ -550,55 +546,13 @@ rocblas_status rocsolver_sytrd_hetrd_template_cached(rocblas_handle handle,
         hipStream_t    original_stream;
         rocblas_get_stream(handle, &original_stream);
 
-        // === WORKSPACE PRE-ALLOCATION ===
-        // rocBLAS's internal allocator uses hipMalloc (synchronous, non-capturable)
-        // to expand the handle's workspace buffer the first time a new problem size is
-        // encountered. We avoid this during capture by querying the required size first
-        // and calling rocblas_set_workspace with a hipMalloc'd buffer so that during
-        // capture the handle already has enough memory and will never call hipMalloc.
-        //
-        // The query runs no GPU kernels — it purely accumulates size arithmetic.
-        size_t ws_size = 0;
-        rocblas_start_device_memory_size_query(handle);
-        // Pass real args; null device pointers are fine in query mode.
-        rocsolver_sytrd_hetrd_template<BATCHED, T>(
-            handle, uplo, n, A, shiftA, lda, strideA,
-            D, strideD, E, strideE, tau, strideP,
-            batch_count, scalars, work_Acpy, norms, tmptau_W, workArr, recover_A);
-        rocblas_status query_status = rocblas_stop_device_memory_size_query(handle, &ws_size);
-        if(query_status != rocblas_status_success && query_status != rocblas_status_size_increased
-           && query_status != rocblas_status_size_unchanged)
-        {
-            fprintf(stderr, "[SYTRD CACHE ERROR] Workspace size query failed: %d\n", query_status);
-            return rocblas_status_internal_error;
-        }
-
-        // Allocate the workspace with hipMalloc (happens here, outside any capture region).
-        void* workspace = nullptr;
-        if(ws_size > 0)
-        {
-            hipError_t alloc_status = hipMalloc(&workspace, ws_size);
-            if(alloc_status != hipSuccess)
-            {
-                fprintf(stderr, "[SYTRD CACHE ERROR] hipMalloc workspace (%zu bytes) failed: %d\n",
-                        ws_size, alloc_status);
-                return rocblas_status_internal_error;
-            }
-        }
-        // Hand the buffer to rocBLAS. From this point forward, the handle will draw
-        // from 'workspace' instead of calling hipMalloc internally.
-        rocblas_set_workspace(handle, workspace, ws_size); // KO TODO:: REMOVE THIS OVERHEAD
-
         // === CAPTURE PHASE ===
-        // Use hipStreamCaptureModeThreadLocal (same as LATRD): only operations on the
-        // explicitly captured stream are recorded — rocBLAS side-streams are not
-        // monitored, preventing false invalidations.
+        // Use hipStreamCaptureModeThreadLocal so that rocBLAS internal side-streams
+        // are not monitored, preventing false invalidations.
         hipStream_t capture_stream;
         hipError_t hip_status = hipStreamCreate(&capture_stream);
         if(hip_status != hipSuccess)
         {
-            rocblas_set_workspace(handle, nullptr, 0);
-            hipFree(workspace);
             fprintf(stderr, "[SYTRD CACHE ERROR] hipStreamCreate failed: %d\n", hip_status);
             return rocblas_status_internal_error;
         }
@@ -609,20 +563,17 @@ rocblas_status rocsolver_sytrd_hetrd_template_cached(rocblas_handle handle,
         // Point the rocBLAS handle at the capture stream so all rocBLAS kernel
         // launches go to capture_stream and are recorded into the graph.
         rocblas_set_stream(handle, capture_stream);
-        
+
         auto t_cap0 = std::chrono::high_resolution_clock::now();
         hip_status = hipStreamBeginCapture(capture_stream, hipStreamCaptureModeThreadLocal);
         if(hip_status != hipSuccess)
         {
             rocblas_set_stream(handle, original_stream);
             hipStreamDestroy(capture_stream);
-            rocblas_set_workspace(handle, nullptr, 0);
-            hipFree(workspace);
             fprintf(stderr, "[SYTRD CACHE ERROR] hipStreamBeginCapture failed: %d\n", hip_status);
             return rocblas_status_internal_error;
         }
 
-        // Capture run: workspace pre-allocated above → no hipMalloc → capture stays valid.
         rocblas_status status = rocsolver_sytrd_hetrd_template<BATCHED, T>(
             handle, uplo, n, A, shiftA, lda, strideA,
             D, strideD, E, strideE, tau, strideP,
@@ -633,8 +584,6 @@ rocblas_status rocsolver_sytrd_hetrd_template_cached(rocblas_handle handle,
             (void)hipStreamEndCapture(capture_stream, &graph);
             rocblas_set_stream(handle, original_stream);
             hipStreamDestroy(capture_stream);
-            rocblas_set_workspace(handle, nullptr, 0);
-            hipFree(workspace);
             fprintf(stderr, "[SYTRD CACHE ERROR] Template call failed during capture: %d\n", status);
             return status;
         }
@@ -642,13 +591,9 @@ rocblas_status rocsolver_sytrd_hetrd_template_cached(rocblas_handle handle,
         hip_status = hipStreamEndCapture(capture_stream, &graph);
         rocblas_set_stream(handle, original_stream);
         hipStreamDestroy(capture_stream);
-        // Restore automatic workspace management; the captured graph nodes still
-        // reference 'workspace' and will keep doing so at launch time.
-        rocblas_set_workspace(handle, nullptr, 0);
 
         if(hip_status != hipSuccess)
         {
-            hipFree(workspace);
             fprintf(stderr, "[SYTRD CACHE ERROR] hipStreamEndCapture failed: %d\n", hip_status);
             return rocblas_status_internal_error;
         }
@@ -657,7 +602,6 @@ rocblas_status rocsolver_sytrd_hetrd_template_cached(rocblas_handle handle,
         hipGraphDestroy(graph); // graph_exec is all we need for replay
         if(hip_status != hipSuccess)
         {
-            hipFree(workspace);
             fprintf(stderr, "[SYTRD CACHE ERROR] hipGraphInstantiate failed: %d\n", hip_status);
             return rocblas_status_internal_error;
         }
@@ -665,11 +609,9 @@ rocblas_status rocsolver_sytrd_hetrd_template_cached(rocblas_handle handle,
         double capture_us = std::chrono::duration<double, std::micro>(t_cap1 - t_cap0).count();
         fprintf(stderr, "[SYTRD CACHE MISS] Graph capture+instantiate time: %10.2f us\n", capture_us);
 
-        // Store entry — workspace must outlive graph_exec.
+        // Store entry.
         SytrdGraphCacheEntry entry;
-        entry.graph_exec     = graph_exec;
-        entry.workspace      = workspace;
-        entry.workspace_size = ws_size;
+        entry.graph_exec = graph_exec;
         cache[cache_key] = entry;
 
         #ifdef ROCSOLVER_SYTRD_GRAPH_DEBUG
