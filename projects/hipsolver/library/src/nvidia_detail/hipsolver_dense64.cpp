@@ -408,6 +408,15 @@ try
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
     if(!params)
         return HIPSOLVER_STATUS_INVALID_VALUE;
+    if(!lworkOnDevice || !lworkOnHost)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+    if(storev != HIPSOLVER_STOREV_COLUMNWISE)
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    if(n < 0 || k < 0 || k > n || ldv < n || ldt < k)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    *lworkOnDevice = 0;
+    *lworkOnHost   = 0;
 
     return hipsolver::cuda2hip_status(
         cusolverDnXlarft_bufferSize((cusolverDnHandle_t)handle,
@@ -457,6 +466,10 @@ try
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
     if(!params)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+    if(storev != HIPSOLVER_STOREV_COLUMNWISE)
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    if(n < 0 || k < 0 || k > n || ldv < n || ldt < k)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
     return hipsolver::cuda2hip_status(cusolverDnXlarft((cusolverDnHandle_t)handle,
