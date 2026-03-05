@@ -38,7 +38,6 @@
 #include "rocsolver/rocsolver.h"
 
 #include <hip/hip_runtime.h>
-#include <chrono>
 #include <map>
 #include <tuple>
 
@@ -268,13 +267,16 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
     hipStream_t stream;
     rocblas_get_stream(handle, &stream);
 
-// KO TODO:: REMOVE, or make sure not on by default. 
+    // Time the non-graph (direct) execution path when SYTRD_GRAPH_TIMING is enabled.
+    // Gated on SYTRD_GRAPH_MODE != 1 so it never fires inside a graph capture.
 #if SYTRD_GRAPH_MODE != 1
+#ifdef SYTRD_GRAPH_TIMING
     hipEvent_t launch_start, launch_end;
     hipEventCreate(&launch_start);
     hipEventCreate(&launch_end);
-    hipEventRecord(launch_start, stream); // KO TODO:: instrumenting the non graph path
-#endif 
+    hipEventRecord(launch_start, stream);
+#endif
+#endif
 
     ROCSOLVER_ENTER("sytrd_hetrd", "uplo:", uplo, "n:", n, "shiftA:", shiftA, "lda:", lda,
                     "bc:", batch_count);
@@ -436,16 +438,18 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
     }
 
     rocblas_set_pointer_mode(handle, old_mode);
-    
+
 #if SYTRD_GRAPH_MODE != 1
+#ifdef SYTRD_GRAPH_TIMING
     hipEventRecord(launch_end, stream);
-    float first_launch_hip_us;
     hipEventSynchronize(launch_end);
-    hipEventElapsedTime(&first_launch_hip_us, launch_start, launch_end);
-    first_launch_hip_us = static_cast<double>(first_launch_hip_us) * 1000.0;
-    fprintf(stderr, "[SYTRD_GRAPH DISABLED] default run time: %10.2f us\n", first_launch_hip_us);
+    float direct_run_us;
+    hipEventElapsedTime(&direct_run_us, launch_start, launch_end);
+    direct_run_us *= 1000.0f;
+    fprintf(stderr, "[SYTRD_GRAPH DISABLED] default run time: %10.2f us\n", direct_run_us);
     hipEventDestroy(launch_start);
     hipEventDestroy(launch_end);
+#endif
 #endif
     return rocblas_status_success;  
 }
@@ -454,7 +458,7 @@ rocblas_status rocsolver_sytrd_hetrd_template(rocblas_handle handle,
 
 // SYTRD-level cached wrapper. Must appear after rocsolver_sytrd_hetrd_template
 // so it can call it directly without a forward declaration.
-template <bool BATCHED, typename T, typename S, typename U> // KO TODO:: DELETE
+template <bool BATCHED, typename T, typename S, typename U>
 rocblas_status rocsolver_sytrd_hetrd_template_cached(rocblas_handle handle,
                                                      const rocblas_fill uplo,
                                                      const rocblas_int n,
@@ -500,28 +504,26 @@ rocblas_status rocsolver_sytrd_hetrd_template_cached(rocblas_handle handle,
                 stats.hits, stats.misses, 100.0 * stats.hits / stats.lookups);
         #endif
 
-        auto t0 = std::chrono::high_resolution_clock::now();
         // HOT PATH
+#ifdef SYTRD_GRAPH_TIMING
         hipEvent_t launch_start, launch_end;
         hipEventCreate(&launch_start);
         hipEventCreate(&launch_end);
         hipEventRecord(launch_start, stream);
-        
+#endif
+
         hipError_t hip_status = hipGraphLaunch(graph_exec, stream);
+
+#ifdef SYTRD_GRAPH_TIMING
         hipEventRecord(launch_end, stream);
-        float first_launch_hip_us;
         hipEventSynchronize(launch_end);
-        hipEventElapsedTime(&first_launch_hip_us, launch_start, launch_end);
-        first_launch_hip_us = static_cast<double>(first_launch_hip_us) * 1000.0;
-        fprintf(stderr, "[SYTRD CACHE HIT] HIP graph launch time: %10.2f us\n", first_launch_hip_us);
+        float launch_hip_us;
+        hipEventElapsedTime(&launch_hip_us, launch_start, launch_end);
+        launch_hip_us *= 1000.0f;
+        fprintf(stderr, "[SYTRD CACHE HIT] HIP graph launch time: %10.2f us\n", launch_hip_us);
         hipEventDestroy(launch_start);
         hipEventDestroy(launch_end);
-        
-
-        hipStreamSynchronize(stream);
-        auto t1 = std::chrono::high_resolution_clock::now();
-        double launch_us = std::chrono::duration<double, std::micro>(t1 - t0).count();
-        fprintf(stderr, "[SYTRD CACHE HIT] Graph launch time: %10.2f us\n", launch_us);
+#endif
 
         if(hip_status != hipSuccess)
         {
@@ -546,6 +548,18 @@ rocblas_status rocsolver_sytrd_hetrd_template_cached(rocblas_handle handle,
         hipStream_t    original_stream;
         rocblas_get_stream(handle, &original_stream);
 
+        // Time the full capture+instantiate sequence on original_stream.
+        // Both events live on original_stream (which is never destroyed during
+        // this scope), so hipEventElapsedTime is always valid.
+#ifdef SYTRD_GRAPH_TIMING
+        hipEvent_t cap_start, cap_end;
+        hipEventCreate(&cap_start);
+        hipEventCreate(&cap_end);
+        hipEventRecord(cap_start, original_stream);
+        // Synchronize so cap_start is committed before we touch capture_stream.
+        hipEventSynchronize(cap_start);
+#endif
+
         // === CAPTURE PHASE ===
         // Use hipStreamCaptureModeThreadLocal so that rocBLAS internal side-streams
         // are not monitored, preventing false invalidations.
@@ -564,7 +578,6 @@ rocblas_status rocsolver_sytrd_hetrd_template_cached(rocblas_handle handle,
         // launches go to capture_stream and are recorded into the graph.
         rocblas_set_stream(handle, capture_stream);
 
-        auto t_cap0 = std::chrono::high_resolution_clock::now();
         hip_status = hipStreamBeginCapture(capture_stream, hipStreamCaptureModeThreadLocal);
         if(hip_status != hipSuccess)
         {
@@ -605,9 +618,17 @@ rocblas_status rocsolver_sytrd_hetrd_template_cached(rocblas_handle handle,
             fprintf(stderr, "[SYTRD CACHE ERROR] hipGraphInstantiate failed: %d\n", hip_status);
             return rocblas_status_internal_error;
         }
-        auto t_cap1 = std::chrono::high_resolution_clock::now();
-        double capture_us = std::chrono::duration<double, std::micro>(t_cap1 - t_cap0).count();
-        fprintf(stderr, "[SYTRD CACHE MISS] Graph capture+instantiate time: %10.2f us\n", capture_us);
+
+#ifdef SYTRD_GRAPH_TIMING
+        hipEventRecord(cap_end, original_stream);
+        hipEventSynchronize(cap_end);
+        float cap_us;
+        hipEventElapsedTime(&cap_us, cap_start, cap_end);
+        cap_us *= 1000.0f;
+        fprintf(stderr, "[SYTRD CACHE MISS] Graph capture+instantiate time: %10.2f us\n", cap_us);
+        hipEventDestroy(cap_start);
+        hipEventDestroy(cap_end);
+#endif
 
         // Store entry.
         SytrdGraphCacheEntry entry;
@@ -615,32 +636,31 @@ rocblas_status rocsolver_sytrd_hetrd_template_cached(rocblas_handle handle,
         cache[cache_key] = entry;
 
         #ifdef ROCSOLVER_SYTRD_GRAPH_DEBUG
-        fprintf(stderr, "[SYTRD CACHE] Stored graph for (uplo=%d, n=%d, batch=%d), "
-                "ws=%zu bytes. Cache size: %zu\n",
-                (int)uplo, (int)n, (int)batch_count, ws_size, cache.size());
+        fprintf(stderr, "[SYTRD CACHE] Stored graph for (uplo=%d, n=%d, batch=%d). "
+                "Cache size: %zu\n",
+                (int)uplo, (int)n, (int)batch_count, cache.size());
         #endif
 
         // First launch of the freshly captured graph.
-        auto t_launch0 = std::chrono::high_resolution_clock::now();
-        hipEvent_t launch_start;
-        hipEvent_t launch_end;
+#ifdef SYTRD_GRAPH_TIMING
+        hipEvent_t launch_start, launch_end;
         hipEventCreate(&launch_start);
         hipEventCreate(&launch_end);
         hipEventRecord(launch_start, original_stream);
+#endif
+
         hip_status = hipGraphLaunch(graph_exec, original_stream);
+
+#ifdef SYTRD_GRAPH_TIMING
         hipEventRecord(launch_end, original_stream);
         hipEventSynchronize(launch_end);
-        
         float first_launch_hip_us;
         hipEventElapsedTime(&first_launch_hip_us, launch_start, launch_end);
-        first_launch_hip_us = static_cast<double>(first_launch_hip_us) * 1000.0;
+        first_launch_hip_us *= 1000.0f;
         fprintf(stderr, "[SYTRD CACHE MISS] HIP Initial graph launch time: %10.2f us\n", first_launch_hip_us);
         hipEventDestroy(launch_start);
         hipEventDestroy(launch_end);
-        hipStreamSynchronize(original_stream); // KO TODO:: needed?
-        auto t_launch1 = std::chrono::high_resolution_clock::now(); // KO TODO:: DO NOT USE CHRONO
-        double first_launch_us = std::chrono::duration<double, std::micro>(t_launch1 - t_launch0).count();
-        fprintf(stderr, "[SYTRD CACHE MISS] Initial graph launch time: %10.2f us\n", first_launch_us);
+#endif
 
         if(hip_status != hipSuccess)
         {

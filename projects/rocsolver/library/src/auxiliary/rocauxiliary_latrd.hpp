@@ -2492,7 +2492,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
         }
         
         // Print cache statistics
-        constexpr bool print_cache_stats = true;
+        constexpr bool print_cache_stats = false;
         if(print_cache_stats) {
             fprintf(stderr, "\n[GRAPH CACHE] Call #%d to latrd_forsytrd (n=%d, k=%d, batch=%d)\n",
                     total_cache_lookups, (int)n, (int)k, (int)batch_count);
