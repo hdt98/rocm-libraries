@@ -430,17 +430,20 @@ def main():
         print("=== DRY RUN COMPLETE ===")
         sys.exit(0)
 
-    # Per-framework shard counts derived from observed total runtimes.
-    # Each framework gets shards proportional to its total runtime, so each
-    # shard targets the same average duration.  The MULTIPLIER increases shard
-    # count beyond the minimum ratio to reduce variance (more shards = better
-    # load balancing across concurrent slots).
-    # CTest manages its own parallelism internally, so it always gets 1 shard.
-    FRAMEWORK_TOTAL_TIMES = {
-        "gtest": 20000,
-        "catch2": 1000,
+    # Values taken from CI run timing summaries
+    FRAMEWORK_TOTAL_TIMES_BY_ARCH = {
+        # fmt: off
+        "gfx942":  {"gtest": 6801, "catch2": 843},
+        "gfx950":  {"gtest": 14243, "catch2": 1154},
+        "gfx908":  {"gtest": 13974, "catch2": 1513},
+        "gfx1201": {"gtest": 1212, "catch2": 801},
+        # fmt: on
     }
-    MULTIPLIER = 3  # Reduce variance between shards
+    _default_times = {"gtest": 18380, "catch2": 987}
+    FRAMEWORK_TOTAL_TIMES = FRAMEWORK_TOTAL_TIMES_BY_ARCH.get(
+        gpu_arch or "", _default_times
+    )
+    MULTIPLIER = 2  # Helps with variance between shards
     min_time = min(FRAMEWORK_TOTAL_TIMES.values())
     framework_num_shards = {
         fw: max(1, round(t / min_time)) * MULTIPLIER
