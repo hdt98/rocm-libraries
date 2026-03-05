@@ -115,7 +115,7 @@ def start_shard(
     # Generate shard tag prefix from framework name (first letter uppercase)
     test_prefix = test_type[0].upper()
     shard_tag = f"[{test_prefix}{shard_index:02d}]"
-    print(f"{shard_tag} Starting shard", flush=True)
+    print(f"{shard_tag} Starting shard", flush=True, file=sys.stderr)
 
     # Set environment variables
     env = os.environ.copy()
@@ -183,8 +183,8 @@ def start_shard(
 
     # Log the command being executed
     cmd_str = " ".join(cmd)
-    print(f"{shard_tag} Running command in {build_dir}:", flush=True)
-    print(f"{shard_tag}   {cmd_str}", flush=True)
+    print(f"{shard_tag} Running command in {build_dir}:", flush=True, file=sys.stderr)
+    print(f"{shard_tag}   {cmd_str}", flush=True, file=sys.stderr)
 
     # Use pseudo-TTY to ensure line-buffered output from subprocess
     master_fd, slave_fd = pty.openpty()
@@ -241,7 +241,11 @@ def run_shards(pending_specs, max_concurrent=None):
             except Exception as e:
                 idx = spec.get("shard_index", 0)
                 fw = spec.get("test_type", "?")
-                print(f"ERROR: Failed to start {fw} shard {idx}: {e}", flush=True)
+                print(
+                    f"ERROR: Failed to start {fw} shard {idx}: {e}",
+                    flush=True,
+                    file=sys.stderr,
+                )
                 failed_shards.append((idx, fw, 1))
 
         if not active_shards:
@@ -311,11 +315,13 @@ def run_shards(pending_specs, max_concurrent=None):
                 print(
                     f"{info.shard_tag} Completed successfully in {elapsed_time:.1f}s",
                     flush=True,
+                    file=sys.stderr,
                 )
             else:
                 print(
                     f"{info.shard_tag} Failed with exit code {return_code} after {elapsed_time:.1f}s",
                     flush=True,
+                    file=sys.stderr,
                 )
                 failed_shards.append((info.shard_index, info.test_type, return_code))
 
@@ -361,10 +367,12 @@ def main():
             )
             max_concurrent = 8
 
-    # Cap to 48 maximum
-    if max_concurrent > 48:
-        print(f"Capping max concurrent shards to 48 (was {max_concurrent})")
-        max_concurrent = 48
+    MAX_CONCURRENT_LIMIT = 32
+    if max_concurrent > MAX_CONCURRENT_LIMIT:
+        print(
+            f"Capping max concurrent shards to {MAX_CONCURRENT_LIMIT} (was {max_concurrent})"
+        )
+        max_concurrent = MAX_CONCURRENT_LIMIT
 
     # Resolve build directory
     build_dir = Path(args.build_dir).resolve()
@@ -477,7 +485,7 @@ def main():
 
     framework_num_shards["ctest"] = ctest_shards
 
-    print("Shard allocation:")
+    print("Shard allocation:", file=sys.stderr)
     min_shards = min(framework_num_shards[fw] for fw in FRAMEWORK_TOTAL_TIMES)
     min_runtime = min(FRAMEWORK_TOTAL_TIMES.values())
     for fw, n in framework_num_shards.items():
@@ -491,9 +499,10 @@ def main():
             )
         else:
             detail = ""
-        print(f"  {fw}: {n} shards{detail}")
+        print(f"  {fw}: {n} shards{detail}", file=sys.stderr)
     print(
-        f"  Total: {sum(framework_num_shards.values())} shards across {max_concurrent} concurrent slots"
+        f"  Total: {sum(framework_num_shards.values())} shards across {max_concurrent} concurrent slots",
+        file=sys.stderr,
     )
 
     # Build per-framework spec lists, then interleave round-robin
