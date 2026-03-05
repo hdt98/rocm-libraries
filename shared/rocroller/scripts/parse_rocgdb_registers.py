@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+
 """
 Parse rocgdb output. For each instruction line followed by 4 thread arrays,
 prints the instruction, register, and the concatenated 256-element array.
