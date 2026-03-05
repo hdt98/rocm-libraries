@@ -325,7 +325,15 @@ struct CShuffleEpilogue
                 return (elems * DataTypeSize) / BytesPerBank;
             };
             constexpr index_t BaseWords  = ToWords(BaseStrideElems);
-            constexpr index_t PadWords   = ((BaseWords % 2) == 0) ? 1 : 0;
+
+            // Enhanced logic for 16x16x16 FP16 tiles to eliminate bank conflicts
+            constexpr bool NeedsExtraPadding = (MPerXdl == 16 && NPerXdl == 16 &&
+                                                KPerXdl == 16 && DataTypeSize == 2);
+
+            constexpr index_t PadWords = NeedsExtraPadding
+                ? ((BaseWords % 8 == 0) ? 2 : ((BaseWords % 4 == 0) ? 1 : 0))
+                : ((BaseWords % 2 == 0) ? 1 : 0);
+
             constexpr auto PaddingAmount = PadWords * ElemsPer4B;
 #else
             constexpr auto PaddingAmount = 0;
@@ -379,7 +387,15 @@ struct CShuffleEpilogue
                 return (elems * DataTypeSize) / BytesPerBank;
             };
             constexpr index_t BaseWords  = ToWords(BaseStrideElems);
-            constexpr index_t PadWords   = ((BaseWords % 2) == 0) ? 1 : 0;
+
+            // Enhanced logic for 16x16x16 FP16 tiles to eliminate bank conflicts
+            constexpr bool NeedsExtraPadding = (MPerXdl == 16 && NPerXdl == 16 &&
+                                                KPerXdl == 16 && DataTypeSize == 2);
+
+            constexpr index_t PadWords = NeedsExtraPadding
+                ? ((BaseWords % 8 == 0) ? 2 : ((BaseWords % 4 == 0) ? 1 : 0))
+                : ((BaseWords % 2 == 0) ? 1 : 0);
+
             constexpr auto PaddingAmount = PadWords * ElemsPer4B;
 #else
             constexpr auto PaddingAmount = 0;
