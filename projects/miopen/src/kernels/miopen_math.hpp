@@ -147,7 +147,8 @@ __forceinline__ __device__ ushort cos(ushort x)
 }
 __forceinline__ __device__ ushort fabs(ushort x)
 {
-    return float_to_bfloat16(__habs(static_cast<float>(bfloat16_to_float(x))));
+    __hip_bfloat16_raw res = __habs(__hip_bfloat16_raw{x}));
+    return res.x;
 }
 __forceinline__ __device__ ushort fmax(ushort x, ushort y)
 {
