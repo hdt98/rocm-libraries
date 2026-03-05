@@ -1326,3 +1326,7 @@ struct DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffleV3
 } // namespace device
 } // namespace tensor_operation
 } // namespace ck
+
+#ifdef CK_EXPERIMENTAL_BUILDER
+#include "ck_tile/builder/reflect/reflect_device_grouped_conv_bwd_weight_multiple_d_wmma_cshuffle_v3.inc"
+#endif

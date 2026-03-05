@@ -1255,3 +1255,7 @@ struct DeviceGroupedConvBwdWeight_Dl : public DeviceGroupedConvBwdWeight<NDimSpa
 } // namespace device
 } // namespace tensor_operation
 } // namespace ck
+
+#ifdef CK_EXPERIMENTAL_BUILDER
+#include "ck_tile/builder/reflect/reflect_device_grouped_conv_bwd_weight_dl.inc"
+#endif
