@@ -8,6 +8,7 @@
 
 #include "GEMMTestBase.hpp"
 #include <rocRoller/GPUArchitecture/GPUCapability.hpp>
+#include <rocRoller/Utilities/Timer.hpp>
 
 namespace GEMMTests
 {
@@ -20,7 +21,7 @@ namespace GEMMTests
 
     /**
      * GEMMBasicTestGPU: Consolidated basic tests for smoke tests.
-     * 
+     *
      * These tests exercise core GEMM features with minimal
      * parameterization (only GPU architecture).
      */
@@ -66,6 +67,7 @@ namespace GEMMTests
         gemm.macN  = 256;
         gemm.macK  = 128;
         basicGEMM<FP8, FP8, float>(gemm);
+        std::cout << rocRoller::TimerPool::summary() << std::endl;
     }
 
     TEST_P(GEMMBasicTestSuite, GPU_BasicGEMM_StreamK)
