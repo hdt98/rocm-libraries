@@ -269,9 +269,9 @@ cusolverStorevMode_t hip2cuda_storev(hipsolverStorevMode_t storev)
     switch(storev)
     {
     case HIPSOLVER_STOREV_COLUMNWISE:
-        return CUSOLVER_STOREV_COLUMNWISE;
+        return CUBLAS_STOREV_COLUMNWISE;
     case HIPSOLVER_STOREV_ROWWISE:
-        return CUSOLVER_STOREV_ROWWISE;
+        return CUBLAS_STOREV_ROWWISE;
     default:
         throw HIPSOLVER_STATUS_INVALID_ENUM;
     }
