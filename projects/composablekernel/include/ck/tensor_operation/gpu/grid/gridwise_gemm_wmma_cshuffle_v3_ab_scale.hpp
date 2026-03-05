@@ -559,6 +559,8 @@ struct GridwiseGemm_wmma_cshuffle_v3_ab_scale
             constexpr auto a_scale_thread_desc = make_naive_tensor_descriptor_packed(
                 make_tuple(Number<ScaleSliceSizeM>{}, Number<ScaleSliceSizeK>{}));
 
+            // Todo: Need to update the a_thread_offset_m for gfx13 when enable the
+            // example_gemm_multiply_multiply_wmma_fp8_blockscale_bpreshuffle the case.
             auto a_thread_offset_m =
                 ((get_thread_local_1d_id() % 32) / MPerWmma * RegSizePerWmma) /
                     math::integer_divide_ceil(ScaleBlockM, RegSizePerWmmaFull) +
