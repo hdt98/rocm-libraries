@@ -213,18 +213,39 @@ def start_shard(
     )
 
 
-def run_shards(shard_infos):
-    """Run multiple shards and multiplex their I/O using select.
+def run_shards(pending_specs, max_concurrent=None):
+    """Run shards from pending_specs, starting at most max_concurrent at a time.
+
+    Args:
+        pending_specs: list of kwarg dicts to pass to start_shard
+        max_concurrent: max number of shards to run simultaneously (None = unlimited)
 
     Returns: (failed_shards, timing_info)
         failed_shards: list of (shard_index, test_type, exit_code) tuples
         timing_info: list of (shard_index, test_type, executable, elapsed_seconds) tuples
     """
-    active_shards = {info.master_fd: info for info in shard_infos}
+    pending = list(pending_specs)
+    active_shards = {}
     failed_shards = []
     timing_info = []
 
-    while active_shards:
+    while active_shards or pending:
+        # Start new shards up to max_concurrent
+        while pending and (
+            max_concurrent is None or len(active_shards) < max_concurrent
+        ):
+            spec = pending.pop(0)
+            try:
+                info = start_shard(**spec)
+                active_shards[info.master_fd] = info
+            except Exception as e:
+                idx = spec.get("shard_index", 0)
+                fw = spec.get("test_type", "?")
+                print(f"ERROR: Failed to start {fw} shard {idx}: {e}", flush=True)
+                failed_shards.append((idx, fw, 1))
+
+        if not active_shards:
+            break
         fds = list(active_shards.keys())
 
         ready, _, _ = select.select(fds, [], [], 0.1)
@@ -409,42 +430,57 @@ def main():
         print("=== DRY RUN COMPLETE ===")
         sys.exit(0)
 
-    # Run all shards for each framework
+    # Per-framework shard counts derived from observed total runtimes.
+    # Each framework gets shards proportional to its total runtime, so each
+    # shard targets the same average duration.  The MULTIPLIER increases shard
+    # count beyond the minimum ratio to reduce variance (more shards = better
+    # load balancing across concurrent slots).
+    # CTest manages its own parallelism internally, so it always gets 1 shard.
+    FRAMEWORK_TOTAL_TIMES = {
+        "gtest": 20000,
+        "catch2": 1000,
+    }
+    MULTIPLIER = 3  # Reduce variance between shards
+    min_time = min(FRAMEWORK_TOTAL_TIMES.values())
+    framework_num_shards = {
+        fw: max(1, round(t / min_time)) * MULTIPLIER
+        for fw, t in FRAMEWORK_TOTAL_TIMES.items()
+    }
+    framework_num_shards["ctest"] = 1
+
+    # Build per-framework spec lists, then interleave round-robin
     failed_shards = []
     all_timing_info = []
+    framework_spec_lists = []
 
-    # Process each framework in order
     for framework, cmd_list in commands.items():
         for cmd in cmd_list:
-            # Determine number of shards based on framework
-            # CTest runs tests in parallel internally, so only run 1 "shard"
-            framework_num_shards = 1 if framework == "ctest" else num_shards
+            n = framework_num_shards.get(framework, num_shards)
+            seed = shuffle_seed if framework in ("gtest", "catch2") else None
 
-            print(f"\n--- Running {framework.upper()} shards ---")
-            shard_infos = []
+            specs = [
+                dict(
+                    shard_index=i,
+                    base_cmd=cmd,
+                    test_type=framework,
+                    num_shards=n,
+                    build_dir=build_dir,
+                    shard_seed=seed,
+                )
+                for i in range(n)
+            ]
+            framework_spec_lists.append(specs)
 
-            for i in range(framework_num_shards):
-                try:
-                    seed = shuffle_seed if framework in ("gtest", "catch2") else None
-                    info = start_shard(
-                        i,
-                        cmd,
-                        framework,
-                        framework_num_shards,
-                        build_dir,
-                        shard_seed=seed,
-                    )
-                    shard_infos.append(info)
-                except Exception as e:
-                    print(
-                        f"ERROR: Failed to start {framework} shard {i}: {e}", flush=True
-                    )
-                    failed_shards.append((i, framework, 1))
+    # Interleave specs round-robin across frameworks
+    pending_specs = []
+    while any(framework_spec_lists):
+        for specs in framework_spec_lists:
+            if specs:
+                pending_specs.append(specs.pop(0))
 
-            # Run all shards for this framework and wait for completion
-            framework_failures, framework_timing = run_shards(shard_infos)
-            failed_shards.extend(framework_failures)
-            all_timing_info.extend(framework_timing)
+    mixed_failures, mixed_timing = run_shards(pending_specs, max_concurrent=num_shards)
+    failed_shards.extend(mixed_failures)
+    all_timing_info.extend(mixed_timing)
 
     print()
 
