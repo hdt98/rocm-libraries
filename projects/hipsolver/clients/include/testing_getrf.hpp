@@ -154,7 +154,8 @@ void testing_getrf_bad_arg()
 
         int size_W;
         hipsolver_getrfBatched_bufferSize(handle, m, n, dA.data(), lda, stP, &size_W, bc);
-        device_strided_batch_vector<T> dWork(size_W, 1, size_W, 1);
+        int                            size_W_elems = (size_W + sizeof(T) - 1) / sizeof(T);
+        device_strided_batch_vector<T> dWork(size_W_elems, 1, size_W_elems, 1);
         if(size_W)
             CHECK_HIP_ERROR(dWork.memcheck());
 
@@ -862,6 +863,7 @@ void testing_getrf(Arguments& argus)
     {
         int size_W;
         hipsolver_getrfBatched_bufferSize(handle, m, n, (T**)nullptr, lda, stP, &size_W, bc);
+        int size_W_elems = (size_W + sizeof(T) - 1) / sizeof(T);
 
         // memory allocations
         host_batch_vector<T>             hA(size_A, 1, bc);
@@ -873,7 +875,7 @@ void testing_getrf(Arguments& argus)
         device_batch_vector<T>           dA(size_A, 1, bc);
         device_strided_batch_vector<int> dIpiv(size_P, 1, stP, bc);
         device_strided_batch_vector<int> dInfo(1, 1, 1, bc);
-        device_strided_batch_vector<T>   dWork(size_W, 1, size_W, 1);
+        device_strided_batch_vector<T>   dWork(size_W_elems, 1, size_W_elems, 1);
         if(size_A)
             CHECK_HIP_ERROR(dA.memcheck());
         CHECK_HIP_ERROR(dInfo.memcheck());
