@@ -152,8 +152,8 @@ namespace rocRoller::KernelGraph::ControlGraph
     }
 
     template <typename T>
-        requires(std::constructible_from<Operation, T>)
-    inline std::set<std::pair<int, int>> ControlGraph::ambiguousNodes() const
+    requires(std::constructible_from<Operation, T>) inline std::set<
+        std::pair<int, int>> ControlGraph::ambiguousNodes() const
     {
         std::set<std::pair<int, int>> badNodes;
 
@@ -173,8 +173,8 @@ namespace rocRoller::KernelGraph::ControlGraph
     }
 
     template <typename T>
-        requires(std::constructible_from<ControlGraph::Element, T>)
-    inline std::optional<T> ControlGraph::get(int tag) const
+    requires(std::constructible_from<ControlGraph::Element,
+                                     T>) inline std::optional<T> ControlGraph::get(int tag) const
     {
         auto x = getElement(tag);
         if constexpr(CIsAnyOf<T, Operation, ControlEdge>)
@@ -220,8 +220,7 @@ namespace rocRoller::KernelGraph::ControlGraph
     }
 
     template <typename T>
-        requires(std::constructible_from<Operation, T>)
-    inline bool isOperation(auto const& x)
+    requires(std::constructible_from<Operation, T>) inline bool isOperation(auto const& x)
     {
         if(std::holds_alternative<Operation>(x))
         {
@@ -233,8 +232,7 @@ namespace rocRoller::KernelGraph::ControlGraph
     }
 
     template <typename T>
-        requires(std::constructible_from<ControlEdge, T>)
-    inline bool isEdge(auto const& x)
+    requires(std::constructible_from<ControlEdge, T>) inline bool isEdge(auto const& x)
     {
         if(std::holds_alternative<ControlEdge>(x))
         {

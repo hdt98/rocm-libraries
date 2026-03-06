@@ -269,14 +269,14 @@ AcceptableError
                 fudge *= arch.gfx == rocRoller::GPUArchitectureGFX::GFX950 ? 7.58 : 6.0;
                 ss << " Increase fudge for mixed BF8: " << fudge;
             }
-            else if constexpr(std::is_same_v<TA, rocRoller::FP8>
-                              || std::is_same_v<TB, rocRoller::FP8>)
+            else if constexpr(std::is_same_v<TA,
+                                             rocRoller::FP8> || std::is_same_v<TB, rocRoller::FP8>)
             {
                 fudge *= 4.95;
                 ss << " Increase fudge for mixed FP8: " << fudge;
             }
-            else if constexpr(std::is_same_v<TA, rocRoller::BF6>
-                              || std::is_same_v<TB, rocRoller::BF6>)
+            else if constexpr(std::is_same_v<TA,
+                                             rocRoller::BF6> || std::is_same_v<TB, rocRoller::BF6>)
             {
                 fudge *= 3;
                 ss << " Increase fudge for mixed BF6: " << fudge;
@@ -516,8 +516,8 @@ namespace rocRoller
     }
 
     template <typename F6x16>
-        requires(CIsAnyOf<F6x16, FP6x16, BF6x16>) //
-    inline void SetIdentityMatrix(std::vector<F6x16>& mat, size_t cols, size_t rows)
+    requires(CIsAnyOf<F6x16, FP6x16, BF6x16>) //
+        inline void SetIdentityMatrix(std::vector<F6x16>& mat, size_t cols, size_t rows)
     {
         std::fill(mat.begin(), mat.end(), F6x16()); // zero out the matrix
 

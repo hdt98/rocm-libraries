@@ -120,8 +120,9 @@ namespace rocRoller
              * @param tag Graph tag/index.
              */
             template <typename T>
-                requires(std::constructible_from<ControlGraph::Element, T>)
-            std::optional<T> get(int tag) const;
+            requires(std::constructible_from<ControlGraph::Element, T>) std::optional<T> get(
+                int tag)
+            const;
 
             /**
              * Returns the relative ordering of nodeA and nodeB according to the graph rules.
@@ -189,8 +190,9 @@ namespace rocRoller
             std::unordered_map<int, std::unordered_map<int, NodeOrdering>> nodeOrderTable() const;
 
             template <typename T>
-                requires(std::constructible_from<Operation, T>)
-            std::set<std::pair<int, int>> ambiguousNodes() const;
+            requires(std::constructible_from<Operation, T>)
+                std::set<std::pair<int, int>> ambiguousNodes()
+            const;
 
             /**
              * @brief Given two control stacks, add the necessary sequence edge such that the final nodes in the stack are relatively ordered.

@@ -142,8 +142,8 @@ namespace rocRoller::KernelGraph::ControlGraph
             return std::visit(
                 [](auto&& arg) {
                     using OpType = std::decay_t<decltype(arg)>;
-                    return !(std::is_same_v<OpType, ForLoopOp>
-                             or std::is_same_v<OpType, SetCoordinate>);
+                    return !(
+                        std::is_same_v<OpType, ForLoopOp> or std::is_same_v<OpType, SetCoordinate>);
                 },
                 std::get<Operation>(el));
         }

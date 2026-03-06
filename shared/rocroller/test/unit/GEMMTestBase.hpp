@@ -22,8 +22,8 @@ namespace GEMMTests
     concept isF8 = std::is_same_v<T, rocRoller::FP8> || std::is_same_v<T, rocRoller::BF8>;
 
     template <typename T>
-    concept isF6F4 = std::is_same_v<T, rocRoller::FP6> || std::is_same_v<T, rocRoller::BF6>
-                     || std::is_same_v<T, rocRoller::FP4>;
+    concept isF6F4 = std::is_same_v<T, rocRoller::FP6> || std::is_same_v<T, rocRoller::BF6> || std::
+        is_same_v<T, rocRoller::FP4>;
 
     template <typename... Ts>
     class BaseGEMMContextFixture
@@ -75,7 +75,7 @@ namespace GEMMTests
                 REQUIRE_ARCH_CAP(GPUCapability::HasMFMA_f8f6f4);
             }
 
-            if((isF8<TA> || isF8<TB>) && (gemm.waveK >= 64))
+            if((isF8<TA> || isF8<TB>)&&(gemm.waveK >= 64))
             {
                 REQUIRE_ARCH_CAP(GPUCapability::HasMFMA_f8f6f4);
             }
@@ -551,7 +551,7 @@ namespace GEMMTests
                 auto tagCvt
                     = srCvtSeed.has_value()
                           ? cvtOp.addXOp(rocRoller::Operations::E_StochasticRoundingCvt(
-                                tagStoreD, tagLoadSeed, dataTypeD))
+                              tagStoreD, tagLoadSeed, dataTypeD))
                           : cvtOp.addXOp(rocRoller::Operations::E_Cvt(tagStoreD, dataTypeD));
                 tagStoreD = command->addOperation(std::move(cvtOp));
                 command->addOperation(rocRoller::Operations::T_Store_Tiled(tagCvt, tagTensorD));
@@ -760,9 +760,9 @@ namespace GEMMTests
                 auto const tileK = gemm.pretileB[0];
                 auto const tileN = gemm.pretileB[1];
                 descB            = TensorDescriptor(dataTypeB,
-                                                    {static_cast<size_t>(K), static_cast<size_t>(N)},
-                                                    {static_cast<size_t>(tileK * tileN),
-                                                     static_cast<size_t>((K / tileK) * tileK * tileN)});
+                                         {static_cast<size_t>(K), static_cast<size_t>(N)},
+                                         {static_cast<size_t>(tileK * tileN),
+                                          static_cast<size_t>((K / tileK) * tileK * tileN)});
             }
 
             setCommandTensorArg(commandArgs, tagTensorA, descA, deviceA.get());
@@ -787,7 +787,7 @@ namespace GEMMTests
                         gemm.scaleTypeA,
                         {static_cast<size_t>(M_scale), static_cast<size_t>(K_scale)},
                         {static_cast<size_t>((K_scale / tileK) * tileM * tileK),
-                                 static_cast<size_t>(tileM * tileK)});
+                         static_cast<size_t>(tileM * tileK)});
                 }
                 else
                 {
@@ -821,7 +821,7 @@ namespace GEMMTests
                         gemm.scaleTypeB,
                         {static_cast<size_t>(K_scale), static_cast<size_t>(N_scale)},
                         {static_cast<size_t>(tileK * tileN),
-                                 static_cast<size_t>((K_scale / tileK) * tileK * tileN)});
+                         static_cast<size_t>((K_scale / tileK) * tileK * tileN)});
                 }
                 else
                 {
