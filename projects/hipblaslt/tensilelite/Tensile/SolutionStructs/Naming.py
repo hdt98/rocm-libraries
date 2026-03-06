@@ -21,7 +21,6 @@
 # SOFTWARE.
 #
 ################################################################################
-from copy import deepcopy
 from functools import lru_cache
 
 from Tensile.Common.Constants import MAX_FILENAME_LENGTH
@@ -31,22 +30,7 @@ from .Problem import ProblemType
 
 
 def getKeyNoInternalArgs(state, splitGSU: bool):
-  state_copy = deepcopy(state)
-  state_copy["ProblemType"]["GroupedGemm"] = False
-  if splitGSU:
-    state_copy["GlobalSplitU"] = "M" if (state_copy["GlobalSplitU"] > 1 or state_copy["GlobalSplitU"] == -1) else state_copy["GlobalSplitU"]
-  elif state["GlobalSplitU"] != 0:
-    state_copy["GlobalSplitU"] = "M"
-  state_copy["WorkGroupMapping"] = "M"
-  state_copy["WorkGroupMappingXCC"] = "M"
-  state_copy["WorkGroupMappingXCCGroup"] = "M"
-  state_copy["StaggerU"] = "M"
-  state_copy["StaggerUStride"] = "M"
-  state_copy["StaggerUMapping"] = "M"
-  state_copy["GlobalSplitUCoalesced"] = "M"
-  state_copy["GlobalSplitUWorkGroupMappingRoundRobin"] = "M"
-  state_copy["SFCWGM"] = "M"
-  return state_copy
+  return _getName(state, getRequiredParametersFull(), splitGSU, True)
 
 
 @lru_cache(maxsize=None)
@@ -109,8 +93,14 @@ def _getName(state, requiredParameters: frozenset, splitGSU: bool, ignoreInterna
   requiredParametersTemp = set(requiredParameters.union(["GlobalSplitU"]))
 
   if ignoreInternalArgs:
-    if state["GlobalSplitU"] > 0 or state["GlobalSplitU"] == -1:
+    if gsuBackup > 0 or gsuBackup == -1:
       requiredParametersTemp.discard("GlobalSplitU")
+    requiredParametersTemp -= {"WorkGroupMapping", "WorkGroupMappingXCC",
+                               "WorkGroupMappingXCCGroup", "StaggerU",
+                               "StaggerUStride", "StaggerUMapping",
+                               "GlobalSplitUCoalesced",
+                               "GlobalSplitUWorkGroupMappingRoundRobin",
+                               "SFCWGM"}
   else:
     requiredParametersTemp = requiredParametersTemp.union(["WorkGroupMapping",
                                                            "WorkGroupMappingXCC",
