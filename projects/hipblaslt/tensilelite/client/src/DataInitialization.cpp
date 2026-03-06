@@ -1987,24 +1987,25 @@ namespace TensileLite
                 auto it = m_vdata[i].pristine.find(desc.dataType());
                 if(it != m_vdata[i].pristine.end())
                 {
-                    auto& p = it->second;
+                    auto&  p            = it->second;
+                    size_t copyElements = desc.totalAllocatedElements();
                     if(kind == hipMemcpyHostToHost)
                         ptr = copyInputBuffers(desc,
                                                p.cpuInput.current.get(),
                                                p.cpuInput.valid.get(),
-                                               p.maxElements,
+                                               copyElements,
                                                kind);
                     else if(kind == hipMemcpyHostToDevice)
                         ptr = copyInputBuffers(desc,
                                                p.gpuInput.current.get(),
                                                p.cpuInput.valid.get(),
-                                               p.maxElements,
+                                               copyElements,
                                                kind);
                     else if(kind == hipMemcpyDeviceToDevice)
                         ptr = copyInputBuffers(desc,
                                                p.gpuInput.current.get(),
                                                p.gpuInput.valid.get(),
-                                               p.maxElements,
+                                               copyElements,
                                                kind);
                     if(ptr == nullptr)
                     {
@@ -2012,7 +2013,7 @@ namespace TensileLite
                     }
                     ptrs[i]        = ptr;
                     batchPtrs[i]   = p.getInputByKind(kind).batch.get();
-                    maxElements[i] = p.maxElements;
+                    maxElements[i] = copyElements;
                     offsets[i]     = p.groupedGemmOffsets;
                 }
                 else
