@@ -231,10 +231,12 @@ namespace TensileLite
             // A temporarily wrapper
             std::shared_ptr<ProblemInputs> prepareGPUInputs(ContractionProblem const* problem)
             {
-                // If an async reset completed, return the pre-prepared inputs
-                // (sync was already done by syncAsyncReset before benchmark_runs)
                 if(m_asyncResetPending)
                 {
+                    // The async reset was for the same problem (intra-solution
+                    // reset). Sync and return the pre-prepared inputs.
+                    ScopedTimer t("gpu_input_reset");
+                    syncCopyStream();
                     m_asyncResetPending = false;
                     return m_cachedGPUInputs;
                 }
@@ -252,22 +254,23 @@ namespace TensileLite
                     throw std::runtime_error("Failed to cast to any ContractionProblem.");
             }
 
-            // Sync any pending async reset. Call before benchmark_runs to
-            // ensure copies on m_copyStream are complete. The copies overlap
-            // with kernel_solving + warmup + validate (which use the current
-            // buffer set, not the alt set being reset).
-            void syncAsyncReset()
+            // Cancel any pending async reset (e.g., when switching to a new
+            // problem whose data differs from what was async-prepared).
+            void cancelAsyncReset()
             {
                 if(m_asyncResetPending)
                 {
-                    ScopedTimer t("gpu_input_reset");
                     syncCopyStream();
+                    // Swap back to undo the beginAsyncReset swap, restoring
+                    // the primary buffer set as current.
+                    swapBufferSets();
+                    m_asyncResetPending = false;
                 }
             }
 
             // Double-buffer: kick off async reset on m_copyStream.
-            // Call after benchmark_runs so copies overlap with the next
-            // iteration's kernel_solving + warmup + validate_warmups.
+            // Copies overlap with the inter-solution gap (postSolution,
+            // preSolution) and are synced at the next prepareGPUInputs call.
             void beginAsyncReset(ContractionProblem const* problem)
             {
                 if(!m_hasAltBuffers || !m_copyStream)

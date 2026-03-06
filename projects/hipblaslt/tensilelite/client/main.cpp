@@ -1064,6 +1064,9 @@ int main(int argc, const char* argv[])
                     ScopedTimer timer("pre_problem");
                     listeners.preProblem(problem);
                 }
+                // Discard any pending async reset from the previous problem —
+                // it prepared buffers for a different problem's data.
+                dataInit->cancelAsyncReset();
                 std::shared_ptr<ProblemInputs> inputs;
                 {
                     ScopedTimer timer("gpu_input_preparation");
@@ -1171,12 +1174,6 @@ int main(int argc, const char* argv[])
                                     }
                                 }
 
-                                // Sync any pending async reset before benchmark_runs.
-                                // Copies on m_copyStream overlapped with kernel_solving
-                                // + warmup + validate above (no contention since those
-                                // use the current buffer set, not the alt set being reset).
-                                dataInit->syncAsyncReset();
-
 #if TENSILELITE_CLIENT_ENABLE_ROCPROFSDK
                                 TimingEvents ProfilerStartEvents(1, warmupEventCount);
                                 TimingEvents ProfilerStopEvents(1, warmupEventCount);
@@ -1227,15 +1224,15 @@ int main(int argc, const char* argv[])
                                 {
                                     solution->relaseDeviceUserArgs(dUA, dUAHost);
                                 }
+                            }
 
-                                // Kick off async reset after benchmark_runs.
-                                // Copies overlap with next iteration's kernel_solving
-                                // + warmup + validate (contention-free: they use the
-                                // current buffer set, copies target the alt set).
-                                {
-                                    ScopedTimer timer("async_reset_submit");
-                                    dataInit->beginAsyncReset(problem);
-                                }
+                            // Kick off async reset in the inter-solution gap.
+                            // Copies on m_copyStream overlap with postSolution
+                            // + preSolution and are synced at the next
+                            // prepareGPUInputs call.
+                            {
+                                ScopedTimer timer("async_reset_submit");
+                                dataInit->beginAsyncReset(problem);
                             }
                         }
                         catch(std::runtime_error const& err)
