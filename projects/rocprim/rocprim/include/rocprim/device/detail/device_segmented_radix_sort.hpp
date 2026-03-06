@@ -482,7 +482,7 @@ public:
     template<class... Args>
     ROCPRIM_DEVICE ROCPRIM_INLINE
     void sort(Args... /* ignored */)
-    { }
+    {}
 };
 
 template<unsigned int LogicalWarpSize, unsigned int ItemsPerThread, unsigned int BlockSize>
@@ -1002,7 +1002,8 @@ struct medium_segment_config_extractor
 };
 
 template<class TargetConfig,
-         template<class> class ConfigExtractor,
+         template<class>
+         class ConfigExtractor,
          bool Descending,
          bool IsUnknownGridSize,
          class KeysInputIterator,
