@@ -19,36 +19,16 @@ using namespace instance;
 // All functions return empty arrays as stubs.
 // Commented-out instances below document what the original CK source provides.
 
-template <std::size_t NumDTensor = 0>
-constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bf16_generic_instances(
+template <std::size_t NumDTensor = 1>
+constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bilinear_bf16_instances_part1(
     std::size_t spatial_dim,
     ckb::TensorLayout input_layout,
     ckb::TensorLayout weight_layout,
     const std::array<ckb::TensorLayout, NumDTensor>& ds_layouts,
     ckb::TensorLayout output_layout,
     ckb::ConvSpecialization conv_spec,
-    const std::array<ckb::DataType, NumDTensor>& ds_types = {},
-    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::PASS_THROUGH)
-{
-    // UNSUPPORTED: DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3
-    // return std::array{
-    //     // clang-format off
-    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,BF16,BF16,F32,BF16,ds_types,BF16,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,64,64,64,32,8,8,16,16,4,2,{4,16,1},{1,0,2},{1,0,2},2,1,8,true,{4,16,1},{1,0,2},{1,0,2},2,1,8,true,1,1,{1,16,1,4},1,Intrawave,PipeV1)
-    //     // clang-format on
-    // };
-    return std::array<int, 0>{};
-}
-
-template <std::size_t NumDTensor = 0>
-constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bf16_instances_part1(
-    std::size_t spatial_dim,
-    ckb::TensorLayout input_layout,
-    ckb::TensorLayout weight_layout,
-    const std::array<ckb::TensorLayout, NumDTensor>& ds_layouts,
-    ckb::TensorLayout output_layout,
-    ckb::ConvSpecialization conv_spec,
-    const std::array<ckb::DataType, NumDTensor>& ds_types = {},
-    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::PASS_THROUGH)
+    const std::array<ckb::DataType, NumDTensor>& ds_types = {BF16},
+    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::BILINEAR)
 {
     // UNSUPPORTED: DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3
     // return std::array{
@@ -68,16 +48,16 @@ constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bf16_instances_part1(
     return std::array<int, 0>{};
 }
 
-template <std::size_t NumDTensor = 0>
-constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bf16_instances_part2(
+template <std::size_t NumDTensor = 1>
+constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bilinear_bf16_instances_part2(
     std::size_t spatial_dim,
     ckb::TensorLayout input_layout,
     ckb::TensorLayout weight_layout,
     const std::array<ckb::TensorLayout, NumDTensor>& ds_layouts,
     ckb::TensorLayout output_layout,
     ckb::ConvSpecialization conv_spec,
-    const std::array<ckb::DataType, NumDTensor>& ds_types = {},
-    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::PASS_THROUGH)
+    const std::array<ckb::DataType, NumDTensor>& ds_types = {BF16},
+    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::BILINEAR)
 {
     // UNSUPPORTED: DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3
     // return std::array{
@@ -96,16 +76,16 @@ constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bf16_instances_part2(
     return std::array<int, 0>{};
 }
 
-template <std::size_t NumDTensor = 0>
-constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bf16_instances_part3(
+template <std::size_t NumDTensor = 1>
+constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bilinear_bf16_instances_part3(
     std::size_t spatial_dim,
     ckb::TensorLayout input_layout,
     ckb::TensorLayout weight_layout,
     const std::array<ckb::TensorLayout, NumDTensor>& ds_layouts,
     ckb::TensorLayout output_layout,
     ckb::ConvSpecialization conv_spec,
-    const std::array<ckb::DataType, NumDTensor>& ds_types = {},
-    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::PASS_THROUGH)
+    const std::array<ckb::DataType, NumDTensor>& ds_types = {BF16},
+    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::BILINEAR)
 {
     // UNSUPPORTED: DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3
     // return std::array{
@@ -124,16 +104,16 @@ constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bf16_instances_part3(
     return std::array<int, 0>{};
 }
 
-template <std::size_t NumDTensor = 0>
-constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bf16_instances_part4(
+template <std::size_t NumDTensor = 1>
+constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bilinear_bf16_instances_part4(
     std::size_t spatial_dim,
     ckb::TensorLayout input_layout,
     ckb::TensorLayout weight_layout,
     const std::array<ckb::TensorLayout, NumDTensor>& ds_layouts,
     ckb::TensorLayout output_layout,
     ckb::ConvSpecialization conv_spec,
-    const std::array<ckb::DataType, NumDTensor>& ds_types = {},
-    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::PASS_THROUGH)
+    const std::array<ckb::DataType, NumDTensor>& ds_types = {BF16},
+    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::BILINEAR)
 {
     // UNSUPPORTED: DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3
     // return std::array{
@@ -152,36 +132,16 @@ constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bf16_instances_part4(
     return std::array<int, 0>{};
 }
 
-template <std::size_t NumDTensor = 0>
-constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_f16_generic_instances(
+template <std::size_t NumDTensor = 1>
+constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bilinear_f16_instances_part1(
     std::size_t spatial_dim,
     ckb::TensorLayout input_layout,
     ckb::TensorLayout weight_layout,
     const std::array<ckb::TensorLayout, NumDTensor>& ds_layouts,
     ckb::TensorLayout output_layout,
     ckb::ConvSpecialization conv_spec,
-    const std::array<ckb::DataType, NumDTensor>& ds_types = {},
-    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::PASS_THROUGH)
-{
-    // UNSUPPORTED: DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3
-    // return std::array{
-    //     // clang-format off
-    //     DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,F16,F16,F32,F16,ds_types,F16,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,64,64,64,32,8,8,16,16,4,2,{4,16,1},{1,0,2},{1,0,2},2,1,8,true,{4,16,1},{1,0,2},{1,0,2},2,1,8,true,1,1,{1,16,1,4},1,Intrawave,PipeV1)
-    //     // clang-format on
-    // };
-    return std::array<int, 0>{};
-}
-
-template <std::size_t NumDTensor = 0>
-constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_f16_instances_part1(
-    std::size_t spatial_dim,
-    ckb::TensorLayout input_layout,
-    ckb::TensorLayout weight_layout,
-    const std::array<ckb::TensorLayout, NumDTensor>& ds_layouts,
-    ckb::TensorLayout output_layout,
-    ckb::ConvSpecialization conv_spec,
-    const std::array<ckb::DataType, NumDTensor>& ds_types = {},
-    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::PASS_THROUGH)
+    const std::array<ckb::DataType, NumDTensor>& ds_types = {F16},
+    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::BILINEAR)
 {
     // UNSUPPORTED: DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3
     // return std::array{
@@ -200,16 +160,16 @@ constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_f16_instances_part1(
     return std::array<int, 0>{};
 }
 
-template <std::size_t NumDTensor = 0>
-constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_f16_instances_part2(
+template <std::size_t NumDTensor = 1>
+constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bilinear_f16_instances_part2(
     std::size_t spatial_dim,
     ckb::TensorLayout input_layout,
     ckb::TensorLayout weight_layout,
     const std::array<ckb::TensorLayout, NumDTensor>& ds_layouts,
     ckb::TensorLayout output_layout,
     ckb::ConvSpecialization conv_spec,
-    const std::array<ckb::DataType, NumDTensor>& ds_types = {},
-    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::PASS_THROUGH)
+    const std::array<ckb::DataType, NumDTensor>& ds_types = {F16},
+    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::BILINEAR)
 {
     // UNSUPPORTED: DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3
     // return std::array{
@@ -229,16 +189,16 @@ constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_f16_instances_part2(
     return std::array<int, 0>{};
 }
 
-template <std::size_t NumDTensor = 0>
-constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_f16_instances_part3(
+template <std::size_t NumDTensor = 1>
+constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bilinear_f16_instances_part3(
     std::size_t spatial_dim,
     ckb::TensorLayout input_layout,
     ckb::TensorLayout weight_layout,
     const std::array<ckb::TensorLayout, NumDTensor>& ds_layouts,
     ckb::TensorLayout output_layout,
     ckb::ConvSpecialization conv_spec,
-    const std::array<ckb::DataType, NumDTensor>& ds_types = {},
-    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::PASS_THROUGH)
+    const std::array<ckb::DataType, NumDTensor>& ds_types = {F16},
+    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::BILINEAR)
 {
     // UNSUPPORTED: DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3
     // return std::array{
@@ -257,16 +217,16 @@ constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_f16_instances_part3(
     return std::array<int, 0>{};
 }
 
-template <std::size_t NumDTensor = 0>
-constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_f16_instances_part4(
+template <std::size_t NumDTensor = 1>
+constexpr auto device_grouped_conv_fwd_wmma_cshufflev3_bilinear_f16_instances_part4(
     std::size_t spatial_dim,
     ckb::TensorLayout input_layout,
     ckb::TensorLayout weight_layout,
     const std::array<ckb::TensorLayout, NumDTensor>& ds_layouts,
     ckb::TensorLayout output_layout,
     ckb::ConvSpecialization conv_spec,
-    const std::array<ckb::DataType, NumDTensor>& ds_types = {},
-    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::PASS_THROUGH)
+    const std::array<ckb::DataType, NumDTensor>& ds_types = {F16},
+    ckb::ElementwiseOperation output_op                   = ckb::ElementwiseOperation::BILINEAR)
 {
     // UNSUPPORTED: DeviceGroupedConvFwdMultipleABD_Wmma_CShuffle_V3
     // return std::array{

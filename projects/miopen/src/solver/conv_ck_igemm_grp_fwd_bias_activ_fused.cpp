@@ -39,6 +39,10 @@
 #include <miopen/solver/ck_utility_common.hpp>
 #include <miopen/solver/implicitgemm_ck_util.hpp>
 #include "ck/library/tensor_operation_instance/gpu/grouped_convolution_forward_bias_clamp.hpp"
+#ifdef CK_EXPERIMENTAL_BUILDER
+#include <miopen/ck_builder/factories/grouped_convolution_forward_bias_clamp.hpp>
+#endif
+#include <miopen/ck_builder/factories/meta_device_operation_instance_factory.hpp>
 #endif
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_CK_IGEMM_GRP_FWD_BIAS_ACTIV)
@@ -127,7 +131,7 @@ template <ck::index_t NumDimSpatial,
           typename WeiLayout,
           typename OutLayout>
 using DeviceOpGFwdBiasActivPtrs =
-    ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
+    miopen::conv::ck_builder::instance::MetaDeviceOperationInstanceFactory<
         DeviceOpGFwdBiasActiv<NumDimSpatial,
                               DataType,
                               DataType,

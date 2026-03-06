@@ -112,7 +112,7 @@ constexpr auto device_grouped_conv_fwd_xdl_large_tensor_f32_tf32_instances(
     //     DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,F32,F32,F32,F32,ds_types,F32,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,256,256,128,16,4,4,32,32,4,2,{4,64,1},{1,0,2},{1,0,2},2,4,4,true,{4,64,1},{1,0,2},{1,0,2},2,4,4,true,1,1,{1,16,1,16},4,TF32,TF32)
     //     // clang-format on
     // };
-    return std::array<XdlLargeTensorInstance, 0>{};
+    return std::array<XdlLargeTensorInstance<NumDTensor>, 0>{};
 }
 
 // ========================================================================================

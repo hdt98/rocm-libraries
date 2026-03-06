@@ -55,9 +55,10 @@ struct XdlV3Algorithm
 static_assert(ckb::factory::FwdXdlV3Algorithm<XdlV3Algorithm>);
 
 // V3 Instance struct
+template <std::size_t NumDTensor = 0>
 struct XdlV3Instance
 {
-    XdlSignature signature;
+    XdlSignature<NumDTensor> signature;
     XdlV3Algorithm algorithm;
 };
 
@@ -65,7 +66,7 @@ struct XdlV3Instance
 // DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3 template parameters. Parameters are in the same
 // order as the template parameters, with V3-specific additions.
 template <std::size_t NumDTensor>
-constexpr XdlV3Instance DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3(
+constexpr XdlV3Instance<NumDTensor> DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3(
     // 1. NDimSpatial
     std::size_t spatial_dim,
     // 2-5. Layouts
@@ -134,21 +135,13 @@ constexpr XdlV3Instance DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3(
     // 51. Direct load flag (V3-specific)
     bool direct_load = false)
 {
-    // TODO: ds_layouts and ds_data_types are not yet stored in the instance data but will be used
-    // in future work. They are present now so that the parameter list aligns with the original CK
-    // template this function is based on.
-    static_assert(NumDTensor == 0,
-                  "ds_layouts and ds_data_types are not yet stored in instance data");
-    (void)ds_layouts;
-    (void)ds_data_types;
-
     // cshuffle_data_type is not stored because CK Builder derives it internally from the primary
     // data type (see TileConvTensorTypes in conv_tile_tensor_type.hpp).
     (void)cshuffle_data_type;
 
     // Our project auto-formatting makes this initializer hard to read
     // clang-format off
-    return XdlV3Instance{
+    return XdlV3Instance<NumDTensor>{
         .signature = {
             .spatial_dim            = spatial_dim,
             .direction              = ckb::ConvDirection::FORWARD,
@@ -171,6 +164,10 @@ constexpr XdlV3Instance DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3(
                     .layout       = output_layout,
                     .data_type    = output_data_type,
                     .compute_type = output_data_type
+                },
+                .operation = {
+                    .elementwise_operation    = output_elementwise_op,
+                    .auxiliary_operand_configs = make_aux_configs<NumDTensor>(ds_layouts, ds_data_types)
                 }
             },
             .data_type              = input_data_type,
@@ -245,7 +242,7 @@ constexpr XdlV3Instance DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3(
                     },
                     .epilogue = {
                         .m_xdl_per_wave_per_shuffle = c_shuffle_m_xdl_per_wave_per_shuffle,
-                        .n_per_wave_per_shuffle     = c_shuffle_n_xdl_per_wave_per_shuffle,
+                        .n_xdl_per_wave_per_shuffle     = c_shuffle_n_xdl_per_wave_per_shuffle,
                         .scalar_per_vector          = c_block_transfer_scalar_per_vector
                     }
                 }
