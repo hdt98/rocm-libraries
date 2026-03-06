@@ -98,6 +98,12 @@ namespace TensileLite
             return "DebugPattern";
         case CustomArgSemantic::Expression:
             return "Expression";
+        case CustomArgSemantic::NumWGs:
+            return "NumWGs";
+        case CustomArgSemantic::Workspace:
+            return "Workspace";
+        case CustomArgSemantic::Synchronizer:
+            return "Synchronizer";
         case CustomArgSemantic::CustomArgSemantic_Count:
             break;
         }
@@ -108,50 +114,16 @@ namespace TensileLite
 
     CustomArgSemantic fromStringCustomArgSemantic(std::string& str)
     {
-
-        if(str == toString(CustomArgSemantic::SizeFree0))
-            return CustomArgSemantic::SizeFree0;
-        else if(str == toString(CustomArgSemantic::SizeFree1))
-            return CustomArgSemantic::SizeFree1;
-        else if(str == toString(CustomArgSemantic::SizeFree2))
-            return CustomArgSemantic::SizeFree2;
-        else if(str == toString(CustomArgSemantic::SizeSum))
-            return CustomArgSemantic::SizeSum;
-        else if(str == toString(CustomArgSemantic::AddressA))
-            return CustomArgSemantic::AddressA;
-        else if(str == toString(CustomArgSemantic::AddressB))
-            return CustomArgSemantic::AddressB;
-        else if(str == toString(CustomArgSemantic::AddressC))
-            return CustomArgSemantic::AddressC;
-        else if(str == toString(CustomArgSemantic::AddressD))
-            return CustomArgSemantic::AddressD;
-        else if(str == toString(CustomArgSemantic::StrideA0))
-            return CustomArgSemantic::StrideA0;
-        else if(str == toString(CustomArgSemantic::StrideA1))
-            return CustomArgSemantic::StrideA1;
-        else if(str == toString(CustomArgSemantic::StrideB0))
-            return CustomArgSemantic::StrideB0;
-        else if(str == toString(CustomArgSemantic::StrideB1))
-            return CustomArgSemantic::StrideB1;
-        else if(str == toString(CustomArgSemantic::StrideC0))
-            return CustomArgSemantic::StrideC0;
-        else if(str == toString(CustomArgSemantic::StrideC1))
-            return CustomArgSemantic::StrideC1;
-        else if(str == toString(CustomArgSemantic::StrideD0))
-            return CustomArgSemantic::StrideD0;
-        else if(str == toString(CustomArgSemantic::StrideD1))
-            return CustomArgSemantic::StrideD1;
-        else if(str == toString(CustomArgSemantic::Alpha))
-            return CustomArgSemantic::Alpha;
-        else if(str == toString(CustomArgSemantic::Beta))
-            return CustomArgSemantic::Beta;
-        else if(str == toString(CustomArgSemantic::Expression))
-            return CustomArgSemantic::Expression;
-        else if(str == toString(CustomArgSemantic::DebugPattern))
-            return CustomArgSemantic::DebugPattern;
-        else
-            throw std::runtime_error(concatenate("Invalid argument type: ", str));
-        return CustomArgSemantic::CustomArgSemantic_Count;
+        using myInt   = std::underlying_type_t<CustomArgSemantic>;
+        auto maxValue = static_cast<myInt>(CustomArgSemantic::CustomArgSemantic_Count);
+        for(myInt i = 0; i < maxValue; ++i)
+        {
+            auto val = static_cast<CustomArgSemantic>(i);
+            if(toString(val) == str)
+                return val;
+        }
+        throw std::runtime_error(concatenate("Invalid argument type: ", str));
+        return CustomArgSemantic::CustomArgSemantic_Count; // Unreachable
     }
 
     std::ostream& operator<<(std::ostream& stream, const CustomArgSemantic& t)
@@ -1551,32 +1523,41 @@ namespace TensileLite
         uint32_t debugPattern = 0xDB000001;
 
         // NOTE: CustomArgSemantic::DebugPattern, CustomArgSemantic::Expression, and pointers are not added to this collection
-        std::unordered_map<CustomArgSemantic, std::any> argValues = {
-            {CustomArgSemantic::SizeFree0, problem.problemSizes()[0]},
-            {CustomArgSemantic::SizeFree1, problem.problemSizes()[1]},
-            {CustomArgSemantic::SizeFree2, problem.problemSizes()[2]},
-            {CustomArgSemantic::SizeSum, problem.problemSizes()[3]},
-            {CustomArgSemantic::StrideA0, problem.a().strides()[1]},
-            {CustomArgSemantic::StrideA1, problem.a().strides()[2]},
-            {CustomArgSemantic::StrideB0, problem.b().strides()[1]},
-            {CustomArgSemantic::StrideB1, problem.b().strides()[2]},
-            {CustomArgSemantic::StrideC0, problem.c().strides()[1]},
-            {CustomArgSemantic::StrideC1, problem.c().strides()[2]},
-            {CustomArgSemantic::StrideD0, problem.d().strides()[1]},
-            {CustomArgSemantic::StrideD1, problem.d().strides()[2]},
-            {CustomArgSemantic::Alpha, inputs.alpha},
-            {CustomArgSemantic::Beta, inputs.beta},
-        };
+        std::unordered_map<CustomArgSemantic, ConstantVariant> argValues;
+        argValues[CustomArgSemantic::SizeFree0] = static_cast<int64_t>(problem.problemSizes()[0]);
+        argValues[CustomArgSemantic::SizeFree1] = static_cast<int64_t>(problem.problemSizes()[1]);
+        argValues[CustomArgSemantic::SizeFree2] = static_cast<int64_t>(problem.problemSizes()[2]);
+        argValues[CustomArgSemantic::SizeSum]   = static_cast<int64_t>(problem.problemSizes()[3]);
+        argValues[CustomArgSemantic::StrideA0]  = static_cast<int64_t>(problem.a().strides()[1]);
+        argValues[CustomArgSemantic::StrideA1]  = static_cast<int64_t>(problem.a().strides()[2]);
+        argValues[CustomArgSemantic::StrideB0]  = static_cast<int64_t>(problem.b().strides()[1]);
+        argValues[CustomArgSemantic::StrideB1]  = static_cast<int64_t>(problem.b().strides()[2]);
+        argValues[CustomArgSemantic::StrideC0]  = static_cast<int64_t>(problem.c().strides()[1]);
+        argValues[CustomArgSemantic::StrideC1]  = static_cast<int64_t>(problem.c().strides()[2]);
+        argValues[CustomArgSemantic::StrideD0]  = static_cast<int64_t>(problem.d().strides()[1]);
+        argValues[CustomArgSemantic::StrideD1]  = static_cast<int64_t>(problem.d().strides()[2]);
+        argValues[CustomArgSemantic::Alpha]     = inputs.alpha;
+        argValues[CustomArgSemantic::Beta]      = inputs.beta;
+        argValues[CustomArgSemantic::NumWGs]    = getNumWorkGroups(rv);
 
-        std::vector<std::tuple<std::string, std::any>> argValuesForExpressions;
+        std::unordered_map<CustomArgSemantic, void const*> ptrArgValues;
+        ptrArgValues[CustomArgSemantic::AddressA]     = inputs.a;
+        ptrArgValues[CustomArgSemantic::AddressB]     = inputs.b;
+        ptrArgValues[CustomArgSemantic::AddressC]     = inputs.c;
+        ptrArgValues[CustomArgSemantic::AddressD]     = inputs.d;
+        ptrArgValues[CustomArgSemantic::Workspace]    = inputs.ws;
+        ptrArgValues[CustomArgSemantic::Synchronizer] = inputs.Synchronizer;
+
+        std::vector<std::tuple<std::string, expression_compute_t>> argValuesForExpressions;
         argValuesForExpressions.reserve(argValues.size());
 
         std::transform(argValues.begin(),
                        argValues.end(),
                        std::back_inserter(argValuesForExpressions),
                        [](auto const& entry) {
-                           return std::make_tuple(toString(entry.first),
-                                                  static_cast<expression_compute_t>(entry.second));
+                           return std::make_tuple(
+                               toString(entry.first),
+                               constVariantCast<expression_compute_t>(entry.second));
                        });
 
         if(T_Debug)
@@ -1590,38 +1571,24 @@ namespace TensileLite
                           << " Semantic: " << toString(arg.semantic) << std::endl;
             }
 
-            switch(arg.semantic)
+            if(argValues.count(arg.semantic) > 0)
             {
-            case CustomArgSemantic::AddressA:
-                rv.args.template append<void const*>("AddressA", inputs.a);
-                break;
-            case CustomArgSemantic::AddressB:
-                rv.args.template append<void const*>("AddressB", inputs.b);
-                break;
-            case CustomArgSemantic::AddressC:
-                rv.args.template append<void const*>("AddressC", inputs.c);
-                break;
-            case CustomArgSemantic::AddressD:
-                rv.args.template append<void const*>("AddressD", inputs.d);
-                break;
-            case CustomArgSemantic::DebugPattern:
+                rv.args.appendCustomType(
+                    toString(arg.semantic), argValues.at(arg.semantic), arg.type);
+            }
+            else if(ptrArgValues.count(arg.semantic) > 0)
+            {
+                rv.args.template append<void const*>(toString(arg.semantic),
+                                                     ptrArgValues.at(arg.semantic));
+            }
+            else if(arg.semantic == CustomArgSemantic::DebugPattern)
+            {
                 rv.args.template append<uint32_t>("DebugPattern", debugPattern);
                 ++debugPattern;
-                break;
-            case CustomArgSemantic::Expression:
-                auto computedValue = processExpression(arg.expression, argValuesForExpressions);
-                rv.args.appendCustomType("Expression", computedValue, arg.type);
-                break;
-            default:
-                if(argValues.contains(arg.semantic))
-                {
-                    rv.args.appendCustomType(
-                        toString(arg.semantic), argValues.at(arg.semantic), arg.type);
-                }
-                else
-                {
-                    throw std::runtime_error(concatenate("Invalid kernel argument type: ", arg));
-                }
+            }
+            else
+            {
+                throw std::runtime_error(concatenate("Invalid kernel argument type: ", arg));
             }
         }
         return rv;

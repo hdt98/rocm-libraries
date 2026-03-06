@@ -34,8 +34,13 @@ if(TENSILELITE_ENABLE_HOST)
         target_compile_definitions(tensilelite-host PUBLIC $<BUILD_INTERFACE:TENSILE_MSGPACK>)
     endif()
 
-    add_subdirectory(exprtk)
-    target_link_libraries(tensilelite-host PRIVATE exprtk::exprtk)
+    add_subdirectory(thirdparty/exprtk)
+    add_subdirectory(thirdparty/libdivide)
+    target_link_libraries(tensilelite-host
+        PRIVATE
+            exprtk::exprtk
+            libdivide::libdivide
+    )
 
     target_include_directories(tensilelite-host
         PUBLIC

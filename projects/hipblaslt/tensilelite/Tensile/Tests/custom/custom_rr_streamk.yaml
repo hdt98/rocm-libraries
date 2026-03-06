@@ -47,14 +47,14 @@ BenchmarkProblems:
                     { type: int64, semantic: StrideB0 },
                     { type: float32, semantic: Beta },
                     { type: float32, semantic: Alpha },
-                    { type: uint32, semantic: Expression, expression: floor(((((floor(((SizeFree0 + 64) - 1) / 64) * floor(((SizeFree1 + 64) - 1) / 64)) * (SizeSum / 64)) + numWGs) - 1) / numWGs) }, # numSKTilesPerWG
+                    { type: uint32, semantic: Expression, expression: floor(((((floor(((SizeFree0 + 64) - 1) / 64) * floor(((SizeFree1 + 64) - 1) / 64)) * (SizeSum / 64)) + NumWGs) - 1) / NumWGs) }, # numSKTilesPerWG
                     { type: uint32, semantic: Expression, expression: ((floor(((SizeFree0 + 64) - 1) / 64) * floor(((SizeFree1 + 64) - 1) / 64)) * floor(SizeSum / 64)) }, # numSKTiles
-                    { type: int32, semantic: Expression }, # MagicShifts_4 = MagicShifts(numTiles1:U32)
-                    { type: uint32, semantic: Expression }, # MagicMultiple_30 = MagicMultiple(Convert(ArithmeticShiftR(Tensor_0_size_1_21:I64, 6:U32)I64)U32)
-                    { type: int32, semantic: Expression }, # MagicShifts_31 = MagicShifts(Convert(ArithmeticShiftR(Tensor_0_size_1_21:I64, 6:U32)I64)U32) 
-                    { type: uint32, semantic: Expression }, # MagicMultiple_3 = MagicMultiple(numTiles1) 
+                    { type: int32, semantic: Expression, expression: magic_shifts(floor((((SizeFree1) + 64) - 1) / 64)) }, # MagicShifts_4 = MagicShifts(numTiles1:U32)
+                    { type: uint32, semantic: Expression, expression: magic_multiple_uint32(floor(SizeSum / 64)) }, # MagicMultiple_30 = MagicMultiple(Convert(ArithmeticShiftR(Tensor_0_size_1_21:I64, 6:U32)I64)U32)
+                    { type: int32, semantic: Expression, expression: magic_shifts(floor(SizeSum / 64)) }, # MagicShifts_31 = MagicShifts(Convert(ArithmeticShiftR(Tensor_0_size_1_21:I64, 6:U32)I64)U32)
+                    { type: uint32, semantic: Expression, expression: magic_multiple_uint32(floor((((SizeFree1) + 64) - 1) / 64)) }, # MagicMultiple_3 = MagicMultiple(numTiles1:U32)U32
                     { type: uint32, semantic: Expression, expression: floor((((SizeFree1) + 64) - 1) / 64) }, # numTiles1
-                    { type: uint32, semantic: numWGs },
+                    { type: uint32, semantic: NumWGs },
                     { type: address, semantic: AddressC },
                     { type: int64, semantic: StrideC1 },
                     { type: int64, semantic: StrideA0 },
@@ -63,8 +63,8 @@ BenchmarkProblems:
                     { type: int64, semantic: StrideB0 },
                     { type: address, semantic: AddressB },
                     { type: int64, semantic: StrideB1 },
-                    { type: address, semantic: SCRATCH_None },
-                    { type: address, semantic: SCRATCH_ZeroedBeforeAndAfter },
+                    { type: address, semantic: Workspace },
+                    { type: address, semantic: Synchronizer },
                     { type: int64, semantic: StrideD0 },
                     { type: address, semantic: AddressB },
                     { type: int64, semantic: StrideD1 } ]

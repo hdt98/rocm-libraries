@@ -579,8 +579,6 @@ namespace TensileLite
         std::visit(visitor, value);
     }
 
-    
-
     template <typename T>
     inline void KernelArguments::bind(std::string const& name, T value)
     {

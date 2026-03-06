@@ -50,8 +50,6 @@
 
 namespace TensileLite
 {
-    
-
     enum CustomArgSemantic
     {
         SizeFree0,  // 0
@@ -72,9 +70,12 @@ namespace TensileLite
         StrideD1,   // 15
         Alpha,      // 16
         Beta,       // 17
-        DebugPattern,      // 18
-        Expression, // 19
-        CustomArgSemantic_Count,      // 20
+        DebugPattern,   // 18
+        NumWGs,     // 19
+        Workspace,  // 20
+        Synchronizer,   // 21
+        Expression, // 22
+        CustomArgSemantic_Count,    // 23
     };
     
     std::string toString(CustomArgSemantic arg);
