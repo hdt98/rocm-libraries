@@ -72,11 +72,7 @@ def get_build_dir() -> Path:
     varname = "ROCROLLER_BUILD_DIR"
     if varname in os.environ:
         return Path(os.environ[varname])
-    default = rrperf.git.top() / "shared" / "rocroller" / "build"
-    if default.is_dir():
-        return default
-
-    raise RuntimeError(f"Build directory not found.  Set {varname} to override.")
+    return Path.cwd()
 
 
 def get_dataclass_id(obj):
