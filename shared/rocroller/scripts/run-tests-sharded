@@ -37,6 +37,7 @@ class ShardInfo:
     test_type: str
     executable: str
     output_buffer: str = ""
+    full_output: str = ""
     start_time: float = 0.0
 
 
@@ -257,6 +258,7 @@ def run_shards(pending_specs, max_concurrent=None):
                         line = line.rstrip("\r")
                         if line:
                             print(f"{info.shard_tag} {line}", flush=True)
+                            info.full_output += line + "\n"
             except OSError:
                 # File descriptor closed or error
                 pass
@@ -287,6 +289,7 @@ def run_shards(pending_specs, max_concurrent=None):
                     line = line.rstrip("\r")
                     if line:
                         print(f"{info.shard_tag} {line}", flush=True)
+                        info.full_output += line + "\n"
 
             # Close file descriptor
             os.close(fd)
@@ -312,6 +315,11 @@ def run_shards(pending_specs, max_concurrent=None):
                     flush=True,
                     file=sys.stderr,
                 )
+                if info.full_output:
+                    print(f"{info.shard_tag} --- failure output ---", file=sys.stderr)
+                    for line in info.full_output.splitlines():
+                        print(f"{info.shard_tag} {line}", file=sys.stderr)
+                    print(f"{info.shard_tag} --- end failure output ---", file=sys.stderr)
                 failed_shards.append((info.shard_index, info.test_type, return_code))
 
             # Remove from active shards
