@@ -13,23 +13,12 @@ namespace TensileLite
     using parser_t       = exprtk::parser<expression_compute_t>;
     using symbol_table_t = exprtk::symbol_table<expression_compute_t>;
 
-    struct custom_function : public function_t
-    {
-        custom_function(std::string const& name, size_t nArgs)
-            : function_t(nArgs)
-            , name(name)
-        {
-            exprtk::disable_has_side_effects(*this);
-        }
-
-        std::string const name;
-    };
-
-    struct magic_shifts final : public custom_function
+    struct magic_shifts final : public function_t
     {
         magic_shifts()
-            : custom_function("magic_shifts", 1)
+            : function_t(1)
         {
+            exprtk::disable_has_side_effects(*this);
         }
 
         inline expression_compute_t operator()(expression_compute_t const& arg) override
@@ -46,13 +35,16 @@ namespace TensileLite
 
             return magic.more & libdivide::LIBDIVIDE_32_SHIFT_MASK;
         }
+
+        std::string const name = "magic_shifts";
     };
 
-    struct magic_multiple_uint32 final : public custom_function
+    struct magic_multiple_uint32 final : public function_t
     {
         magic_multiple_uint32()
-            : custom_function("magic_multiple_uint32", 1)
+            : function_t(1)
         {
+            exprtk::disable_has_side_effects(*this);
         }
 
         inline expression_compute_t operator()(expression_compute_t const& arg) override
@@ -68,6 +60,8 @@ namespace TensileLite
 
             return magic.magic;
         }
+
+        std::string const name = "magic_multiple_uint32";
     };
 
     expression_compute_t processExpression(
@@ -80,11 +74,10 @@ namespace TensileLite
             symbolTable.add_constant(std::get<0>(entry), std::get<1>(entry));
         }
 
-        std::vector<custom_function> functions{magic_shifts(), magic_multiple_uint32()};
-        for(auto& fn : functions)
-        {
-            symbolTable.add_function(fn.name, fn);
-        }
+        magic_multiple_uint32 fn0;
+        symbolTable.add_function(fn0.name, fn0);
+        magic_shifts fn1;
+        symbolTable.add_function(fn1.name, fn1);
 
         expression_t expression;
         expression.register_symbol_table(symbolTable);
