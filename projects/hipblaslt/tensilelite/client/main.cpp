@@ -1104,7 +1104,9 @@ int main(int argc, const char* argv[])
                                 if(resetInput)
                                 {
                                     ScopedTimer timer("gpu_input_reset");
-                                    auto inputs = dataInit->prepareGPUInputs(problem);
+                                    // Syncs pending async reset if any, or does
+                                    // synchronous reset
+                                    inputs = dataInit->prepareGPUInputs(problem);
                                     inputArr[0] = inputs;
                                 }
                                 resetInput = true;
@@ -1169,6 +1171,11 @@ int main(int argc, const char* argv[])
                                             warmupStartEvents, warmupStopEvents, stream);
                                     }
                                 }
+
+                                // Kick off async reset before benchmark_runs so the
+                                // m_copyStream reset overlaps with kernel execution
+                                // on the main stream.
+                                dataInit->beginAsyncReset(problem);
 
 #if TENSILELITE_CLIENT_ENABLE_ROCPROFSDK
                                 TimingEvents ProfilerStartEvents(1, warmupEventCount);
