@@ -25,6 +25,11 @@ namespace rocRoller::KernelGraph
             DataDependenceDAGDetail::DataDependenceDAGDetail(KernelGraph const& graph)
                 : m_graph(graph)
             {
+                // Insert all control graph nodes into the data dependence DAG
+                for(auto node : m_graph.control.getNodes())
+                {
+                    m_dependenceDAG.setElement(node, m_graph.control.getElement(node));
+                }
             }
 
             ControlGraph::ControlGraph DataDependenceDAGDetail::getDataDependenceDAG()
@@ -34,12 +39,6 @@ namespace rocRoller::KernelGraph
 
             void DataDependenceDAGDetail::constructDataDependenceDAG()
             {
-                // Insert all control graph nodes into the data dependence DAG
-                for(auto node : m_graph.control.getNodes())
-                {
-                    m_dependenceDAG.setElement(node, m_graph.control.getElement(node));
-                }
-
                 auto tracer  = ControlFlowRWTracer(m_graph);
                 auto records = tracer.coordinatesReadWrite();
 
