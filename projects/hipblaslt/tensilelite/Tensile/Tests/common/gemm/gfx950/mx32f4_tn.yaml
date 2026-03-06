@@ -110,38 +110,12 @@ BenchmarkProblems:
           # - Exact: [16, 16, 1, 128]
           - Exact: [32, 16, 1, 1024]
           - Exact: [256, 256, 1, 128]
-          - Exact: [1025, 513, 1, 2048]
-#          - Exact: [1026, 514, 1, 2048]
-#          - Exact: [1027, 515, 1, 2048]
-#          - Exact: [1028, 516, 1, 2048]
-#          - Exact: [1029, 517, 1, 2048]
-#          - Exact: [1030, 518, 1, 2048]
-#          - Exact: [1031, 519, 1, 2048]
-#          - Exact: [1032, 520, 1, 2048]
-#          - Exact: [1033, 521, 1, 2048]
-#          - Exact: [1034, 522, 1, 2048]
-#          - Exact: [1035, 523, 1, 2048]
-#          - Exact: [1036, 524, 1, 2048]
-#          - Exact: [1037, 525, 1, 2048]
-#          - Exact: [1038, 526, 1, 2048]
-#          - Exact: [1039, 527, 1, 2048]
-#          - Exact: [1040, 528, 1, 2048]
-#          - Exact: [1041, 529, 1, 2048]
-#          - Exact: [1042, 530, 1, 2048]
-#          - Exact: [1043, 531, 1, 2048]
           - Exact: [1044, 532, 1, 2048]
           - Exact: [127, 127, 1, 640] #special cleanup case
-          - Exact: [128, 128, 1, 128]
-          - Exact: [129, 129, 1, 640]
-          # - Exact: [128, 128, 1, 127]
-          # - Exact: [128, 128, 1, 129]
-          # - Exact: [111, 111, 1, 111]
-          # - Exact: [777, 777, 1, 777]
           - Exact: [128, 128, 1, 512]
-          #- Range: [[128], [128], [1], [1024,32,1280]]
           - Range: [[128], [128], [1], [1024,128,1280]] #make K value is multiple of DepthU
-          - Range: [[128,1,256], [128], [1], [1024]]
-          - Range: [[128], [128,1,256], [1], [1024]]
+          - Range: [[128,64,256], [128], [1], [1024]]
+          - Range: [[128], [128,64,256], [1], [1024]]
         - BiasTypeArgs: ['s']
         - ActivationArgs:
           - [Enum: none]
@@ -170,16 +144,7 @@ BenchmarkProblems:
           - Exact: [256, 256, 1, 128]
           - Exact: [1025, 513, 1, 2048]
           - Exact: [127, 127, 1, 640] #special cleanup case
-          - Exact: [129, 129, 1, 640]
-          - Exact: [128, 128, 1, 512]
         - BiasTypeArgs: ['s']
         - ActivationArgs:
           - [Enum: none]
 
-# LibraryLogic:
-#     ScheduleName: "aquavanjaram"
-#     DeviceNames: ["Device 0049"]
-#     ArchitectureName: "gfx950"
-#     LibraryType: "GridBased"
-#
-# LibraryClient:

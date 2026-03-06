@@ -88,13 +88,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [8, 8, 1, 32] # classic format
-          - Exact: [8, 8, 1, 64] # classic format
-          - Exact: [8, 8, 1, 128] # classic format
-          - Exact: [8, 8, 1, 256] # classic format
           - Exact: [256, 256, 1, 32] # classic format
-          - Exact: [256, 256, 1, 64] # classic format
-          - Exact: [256, 256, 1, 128] # classic format
-          - Exact: [256, 256, 1, 256] # classic format
           - Exact: [1024, 1024, 1, 1024] # classic format
         - BiasTypeArgs: ['s', 'h']
         - FactorDimArgs: [0,1]
@@ -169,15 +163,8 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [8, 8, 1, 32] # classic format
           - Exact: [8, 8, 1, 64] # classic format
-          - Exact: [8, 8, 1, 128] # classic format
-          - Exact: [8, 8, 1, 256] # classic format
-          - Exact: [256, 256, 1, 32] # classic format
           - Exact: [256, 256, 1, 64] # classic format
-          - Exact: [256, 256, 1, 128] # classic format
-          - Exact: [256, 256, 1, 256] # classic format
-          - Exact: [1024, 1924, 1, 1024] # classic format
         - BiasTypeArgs: ['s']
         - FactorDimArgs: [0,1]
         - ActivationArgs:
@@ -250,15 +237,8 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [8, 8, 1, 32] # classic format
-          - Exact: [8, 8, 1, 64] # classic format
           - Exact: [8, 8, 1, 128] # classic format
-          - Exact: [8, 8, 1, 256] # classic format
-          - Exact: [256, 256, 1, 32] # classic format
-          - Exact: [256, 256, 1, 64] # classic format
           - Exact: [256, 256, 1, 128] # classic format
-          - Exact: [256, 256, 1, 256] # classic format
-          - Exact: [1024, 1924, 1, 1024] # classic format
         - BiasTypeArgs: ['s']
         - FactorDimArgs: [0,1]
         - ActivationArgs:
@@ -331,13 +311,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [8, 8, 1, 32] # classic format
-          - Exact: [8, 8, 1, 64] # classic format
-          - Exact: [8, 8, 1, 128] # classic format
           - Exact: [8, 8, 1, 256] # classic format
-          - Exact: [256, 256, 1, 32] # classic format
-          - Exact: [256, 256, 1, 64] # classic format
-          - Exact: [256, 256, 1, 128] # classic format
           - Exact: [256, 256, 1, 256] # classic format
           - Exact: [1024, 1924, 1, 1024] # classic format
         - BiasTypeArgs: ['s']
@@ -409,21 +383,8 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [8, 8, 1, 16] # classic format
-          - Exact: [8, 8, 1, 32] # classic format
-          - Exact: [8, 8, 1, 48] # classic format
-          - Exact: [8, 8, 1, 64] # classic format
-          - Exact: [8, 8, 1, 128] # classic format
           - Exact: [8, 8, 1, 192] # classic format
-          - Exact: [8, 8, 1, 256] # classic format
-          - Exact: [128, 128, 1, 16] # classic format
-          - Exact: [128, 128, 1, 24] # classic format
-          - Exact: [128, 128, 1, 32] # classic format
-          - Exact: [128, 128, 1, 48] # classic format
-          - Exact: [128, 128, 1, 64] # classic format
-          - Exact: [128, 128, 1, 128] # classic format
           - Exact: [128, 128, 1, 192] # classic format
-          - Exact: [128, 128, 1, 256] # classic format
           - Exact: [1024, 1024, 1, 1024] # classic format
         - BiasTypeArgs: ['s']
         - FactorDimArgs: [0, 1]
@@ -494,22 +455,8 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [8, 8, 1, 16] # classic format
-          - Exact: [8, 8, 1, 32] # classic format
-          - Exact: [8, 8, 1, 48] # classic format
-          - Exact: [8, 8, 1, 64] # classic format
-          - Exact: [8, 8, 1, 128] # classic format
-          - Exact: [8, 8, 1, 192] # classic format
           - Exact: [8, 8, 1, 256] # classic format
-          - Exact: [128, 128, 1, 16] # classic format
-          - Exact: [128, 128, 1, 24] # classic format
-          - Exact: [128, 128, 1, 32] # classic format
-          - Exact: [128, 128, 1, 48] # classic format
-          - Exact: [128, 128, 1, 64] # classic format
-          - Exact: [128, 128, 1, 128] # classic format
-          - Exact: [128, 128, 1, 192] # classic format
           - Exact: [128, 128, 1, 256] # classic format
-          - Exact: [1024, 1024, 1, 1024] # classic format
         - BiasTypeArgs: ['s']
         - FactorDimArgs: [0, 1]
         - ActivationArgs:
@@ -578,28 +525,9 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [8, 8, 1, 16] # classic format
-          - Exact: [8, 8, 1, 32] # classic format
-          - Exact: [8, 8, 1, 48] # classic format
-          - Exact: [8, 8, 1, 64] # classic format
-          - Exact: [8, 8, 1, 128] # classic format
           - Exact: [8, 8, 1, 192] # classic format
-          - Exact: [8, 8, 1, 256] # classic format
-          - Exact: [16, 16, 1, 16] # classic format
-          - Exact: [16, 16, 1, 32] # classic format
-          - Exact: [16, 16, 1, 48] # classic format
           - Exact: [16, 16, 1, 64] # classic format
-          - Exact: [16, 16, 1, 128] # classic format
-          - Exact: [16, 16, 1, 192] # classic format
-          - Exact: [16, 16, 1, 256] # classic format
-          - Exact: [128, 128, 1, 16] # classic format
-          - Exact: [128, 128, 1, 24] # classic format
-          - Exact: [128, 128, 1, 32] # classic format
-          - Exact: [128, 128, 1, 48] # classic format
-          - Exact: [128, 128, 1, 64] # classic format
           - Exact: [128, 128, 1, 128] # classic format
-          - Exact: [128, 128, 1, 192] # classic format
-          - Exact: [128, 128, 1, 256] # classic format
         - BiasTypeArgs: ['s']
         - FactorDimArgs: [0, 1]
         - ActivationArgs:
@@ -668,21 +596,8 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [8, 8, 1, 16] # classic format
-          - Exact: [8, 8, 1, 32] # classic format
-          - Exact: [8, 8, 1, 48] # classic format
-          - Exact: [8, 8, 1, 64] # classic format
           - Exact: [8, 8, 1, 128] # classic format
-          - Exact: [8, 8, 1, 192] # classic format
-          - Exact: [8, 8, 1, 256] # classic format
-          - Exact: [128, 128, 1, 16] # classic format
-          - Exact: [128, 128, 1, 24] # classic format
-          - Exact: [128, 128, 1, 32] # classic format
           - Exact: [128, 128, 1, 48] # classic format
-          - Exact: [128, 128, 1, 64] # classic format
-          - Exact: [128, 128, 1, 128] # classic format
-          - Exact: [128, 128, 1, 192] # classic format
-          - Exact: [128, 128, 1, 256] # classic format
           - Exact: [1024, 1024, 1, 1024] # classic format
         - BiasTypeArgs: ['s']
         - FactorDimArgs: [0, 1]

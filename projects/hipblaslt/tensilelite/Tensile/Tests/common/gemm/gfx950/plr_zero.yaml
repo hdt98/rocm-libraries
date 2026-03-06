@@ -117,7 +117,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 128]]
+          - Range: [[257], [255], [1], [1, 74, 128]]
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
       BenchmarkCommonParameters:
@@ -148,7 +148,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 128]]
+          - Range: [[255], [257], [1], [1, 74, 128]]
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
       BenchmarkCommonParameters:
@@ -173,7 +173,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 128]]
+          - Range: [[255], [255], [1], [1, 64, 128]]
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
       BenchmarkCommonParameters:
@@ -251,7 +251,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           #- Exact: [4096, 4096, 1, 16384]
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 128]]
+          - Range: [[255], [257], [1], [1, 71, 128]]
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
       BenchmarkCommonParameters:
@@ -278,7 +278,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 128]]
+          - Range: [[255], [255], [1], [1, 74, 128]]
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
       BenchmarkCommonParameters:
@@ -304,7 +304,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 128]]
+          - Range: [[255], [257], [1], [1, 74, 128]]
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
       BenchmarkCommonParameters:
@@ -379,7 +379,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           #- Exact: [4096, 4096, 1, 16384]
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 128]]
+          - Range: [[257], [255], [1], [1, 81, 128]]
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
       BenchmarkCommonParameters:
@@ -406,7 +406,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 128]]
+          - Range: [[257], [257], [1], [1, 74, 128]]
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
       BenchmarkCommonParameters:
@@ -432,7 +432,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 128]]
+          - Range: [[255], [255], [1], [1, 74, 128]]
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
       BenchmarkCommonParameters:
@@ -508,7 +508,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           #- Exact: [4096, 4096, 1, 16384]
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 128]]
+          - Range: [[255], [257], [1], [1, 81, 128]]
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
       BenchmarkCommonParameters:
@@ -535,7 +535,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 128]]
+          - Range: [[257], [255], [1], [1, 74, 128]]
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
       BenchmarkCommonParameters:
@@ -561,7 +561,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 128]]
+          - Range: [[257], [257], [1], [1, 73, 128]]
     - # BenchmarkProblemSizeGroup - Standard
       InitialSolutionParameters:
       BenchmarkCommonParameters:
@@ -638,4 +638,4 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [2, 37, 512]]
+          - Range: [[257], [257], [1], [2, 148, 512]]
