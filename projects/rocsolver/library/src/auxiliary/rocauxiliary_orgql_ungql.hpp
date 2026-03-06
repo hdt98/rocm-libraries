@@ -174,8 +174,8 @@ rocblas_status rocsolver_orgql_ungql_template(rocblas_handle handle,
         {
             blocksx = (k - j - jb - 1) / BS2 + 1;
             blocksy = (jb - 1) / BS2 + 1;
-            ROCSOLVER_LAUNCH_KERNEL(set_zero<T>, dim3(blocksx, blocksy, batch_count), dim3(BS2, BS2),
-                                    0, stream, k - j - jb, jb, A,
+            ROCSOLVER_LAUNCH_KERNEL(set_zero<T>, dim3(blocksx, blocksy, batch_count),
+                                    dim3(BS2, BS2), 0, stream, k - j - jb, jb, A,
                                     shiftA + idx2D(m - k + j + jb, n - k + j, lda), lda, strideA);
         }
         rocsolver_org2l_ung2l_template<T>(handle, m - k + j + jb, jb, jb, A,

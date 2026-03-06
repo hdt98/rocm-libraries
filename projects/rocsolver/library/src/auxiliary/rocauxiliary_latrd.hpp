@@ -307,8 +307,8 @@ rocblas_status rocsolver_latrd_template(rocblas_handle handle,
                                 shiftW + idx2D(j + 1, j, ldw), 1, strideW, batch_count);
 
             ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<LATRD_DOT_THREADS, T>),
-                                    dim3(1, 1, batch_count), dim3(LATRD_DOT_THREADS, 1, 1), 0, stream,
-                                    n - 1 - j, A, shiftA + idx2D(j + 1, j, lda), strideA, W,
+                                    dim3(1, 1, batch_count), dim3(LATRD_DOT_THREADS, 1, 1), 0,
+                                    stream, n - 1 - j, A, shiftA + idx2D(j + 1, j, lda), strideA, W,
                                     shiftW + idx2D(j + 1, j, ldw), strideW, tau + j, strideP);
         }
     }
@@ -389,8 +389,8 @@ rocblas_status rocsolver_latrd_template(rocblas_handle handle,
                                 strideW, batch_count);
 
             ROCSOLVER_LAUNCH_KERNEL((latrd_dot_scale_axpy<LATRD_DOT_THREADS, T>),
-                                    dim3(1, 1, batch_count), dim3(LATRD_DOT_THREADS, 1, 1), 0, stream,
-                                    j, A, shiftA + idx2D(0, j, lda), strideA, W,
+                                    dim3(1, 1, batch_count), dim3(LATRD_DOT_THREADS, 1, 1), 0,
+                                    stream, j, A, shiftA + idx2D(0, j, lda), strideA, W,
                                     shiftW + idx2D(0, jw, ldw), strideW, tau + j - 1, strideP);
         }
     }

@@ -267,8 +267,8 @@ rocblas_status rocsolver_gels_template(rocblas_handle handle,
 
             // save elements of B that will be overwritten in cases where info is nonzero
             ROCSOLVER_LAUNCH_KERNEL((copy_mat<T, U>), dim3(copyblocksmin, copyblocksy, batch_count),
-                                    dim3(BS2, BS2), 0, stream, copymat_to_buffer, n, nrhs, B, shiftB,
-                                    ldb, strideB, ipiv_savedB, info_mask(info));
+                                    dim3(BS2, BS2), 0, stream, copymat_to_buffer, n, nrhs, B,
+                                    shiftB, ldb, strideB, ipiv_savedB, info_mask(info));
 
             // solve RX = Q'B, overwriting B with X
             rocsolver_trsm_upper<BATCHED, STRIDED, T>(
@@ -290,8 +290,8 @@ rocblas_status rocsolver_gels_template(rocblas_handle handle,
 
             // save elements of B that will be overwritten in cases where info is nonzero
             ROCSOLVER_LAUNCH_KERNEL((copy_mat<T, U>), dim3(copyblocksmax, copyblocksy, batch_count),
-                                    dim3(BS2, BS2), 0, stream, copymat_to_buffer, m, nrhs, B, shiftB,
-                                    ldb, strideB, ipiv_savedB, info_mask(info));
+                                    dim3(BS2, BS2), 0, stream, copymat_to_buffer, m, nrhs, B,
+                                    shiftB, ldb, strideB, ipiv_savedB, info_mask(info));
 
             // solve R'Y = B overwriting B with Y (here Y = Q'X)
             rocsolver_trsm_upper<BATCHED, STRIDED, T>(
@@ -334,8 +334,8 @@ rocblas_status rocsolver_gels_template(rocblas_handle handle,
 
             // save elements of B that will be overwritten in cases where info is nonzero
             ROCSOLVER_LAUNCH_KERNEL((copy_mat<T, U>), dim3(copyblocksmax, copyblocksy, batch_count),
-                                    dim3(BS2, BS2), 0, stream, copymat_to_buffer, n, nrhs, B, shiftB,
-                                    ldb, strideB, ipiv_savedB, info_mask(info));
+                                    dim3(BS2, BS2), 0, stream, copymat_to_buffer, n, nrhs, B,
+                                    shiftB, ldb, strideB, ipiv_savedB, info_mask(info));
 
             // solve LY = B overwriting B with Y (here Y = QX)
             rocsolver_trsm_lower<BATCHED, STRIDED, T>(
@@ -375,8 +375,8 @@ rocblas_status rocsolver_gels_template(rocblas_handle handle,
 
             // save elements of B that will be overwritten in cases where info is nonzero
             ROCSOLVER_LAUNCH_KERNEL((copy_mat<T, U>), dim3(copyblocksmin, copyblocksy, batch_count),
-                                    dim3(BS2, BS2), 0, stream, copymat_to_buffer, m, nrhs, B, shiftB,
-                                    ldb, strideB, ipiv_savedB, info_mask(info));
+                                    dim3(BS2, BS2), 0, stream, copymat_to_buffer, m, nrhs, B,
+                                    shiftB, ldb, strideB, ipiv_savedB, info_mask(info));
 
             // solve L'X = QB, overwriting B with X
             rocsolver_trsm_lower<BATCHED, STRIDED, T>(

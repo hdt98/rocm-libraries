@@ -222,8 +222,8 @@ rocblas_status rocsolver_gels_outofplace_template(rocblas_handle handle,
         {
             // save B in savedB
             ROCSOLVER_LAUNCH_KERNEL((copy_mat<T, U>), dim3(copyblocksmax, copyblocksy, batch_count),
-                                    dim3(BS2, BS2), 0, stream, copymat_to_buffer, m, nrhs, B, shiftB,
-                                    ldb, strideB, savedB);
+                                    dim3(BS2, BS2), 0, stream, copymat_to_buffer, m, nrhs, B,
+                                    shiftB, ldb, strideB, savedB);
 
             rocsolver_ormqr_unmqr_template<BATCHED, STRIDED>(
                 handle, rocblas_side_left, rocblas_operation_conjugate_transpose, m, nrhs, n, A,
@@ -319,8 +319,8 @@ rocblas_status rocsolver_gels_outofplace_template(rocblas_handle handle,
         {
             // save B in savedB
             ROCSOLVER_LAUNCH_KERNEL((copy_mat<T, U>), dim3(copyblocksmax, copyblocksy, batch_count),
-                                    dim3(BS2, BS2), 0, stream, copymat_to_buffer, n, nrhs, B, shiftB,
-                                    ldb, strideB, savedB);
+                                    dim3(BS2, BS2), 0, stream, copymat_to_buffer, n, nrhs, B,
+                                    shiftB, ldb, strideB, savedB);
 
             rocsolver_ormlq_unmlq_template<BATCHED, STRIDED>(
                 handle, rocblas_side_left, rocblas_operation_none, n, nrhs, m, A, shiftA, lda,

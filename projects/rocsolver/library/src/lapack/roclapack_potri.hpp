@@ -153,8 +153,8 @@ rocblas_status rocsolver_potri_template(rocblas_handle handle,
     T one = 1;
 
     // copy elements of A to serve as B matrix for TRMM
-    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocks, copyblocks, batch_count), dim3(BS2, BS2), 0,
-                            stream, copymat_to_buffer, n, n, A, shiftA, lda, strideA, tmpcopy,
+    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocks, copyblocks, batch_count), dim3(BS2, BS2),
+                            0, stream, copymat_to_buffer, n, n, A, shiftA, lda, strideA, tmpcopy,
                             no_mask{}, uplo);
 
     // compute inv(U) * inv(U)' or inv(L)' * inv(L) and store in tmpcopy
@@ -164,8 +164,8 @@ rocblas_status rocsolver_potri_template(rocblas_handle handle,
                      n, n * n, batch_count, workArr);
 
     // copy elements of tmpcopy into A in cases where info is zero
-    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocks, copyblocks, batch_count), dim3(BS2, BS2), 0,
-                            stream, copymat_from_buffer, n, n, A, shiftA, lda, strideA, tmpcopy,
+    ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(copyblocks, copyblocks, batch_count), dim3(BS2, BS2),
+                            0, stream, copymat_from_buffer, n, n, A, shiftA, lda, strideA, tmpcopy,
                             info_mask(info, info_mask::negate), uplo, rocblas_diagonal_non_unit);
 
     rocblas_set_pointer_mode(handle, old_mode);
