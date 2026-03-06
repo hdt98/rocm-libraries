@@ -899,12 +899,12 @@ void sort_block_sized_segments(
         const unsigned int begin_offset      = begin_offsets[segment_id];
         const unsigned int end_offset        = end_offsets[segment_id];
 
-        const bool use_long_radix_sort = end_offset - begin_offset > items_per_block;
         if(end_offset <= begin_offset)
         {
             return;
         }
 
+        const bool use_long_radix_sort = end_offset - begin_offset > items_per_block;
         if(use_long_radix_sort)
         {
             for(unsigned int bit = begin_bit; bit < end_bit; bit += radix_bits)
