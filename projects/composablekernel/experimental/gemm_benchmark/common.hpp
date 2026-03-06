@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -548,23 +548,46 @@ void preShuffleBuffer(const T* src, T* dst, int N, int K, int NXdl, int KPack)
     // K -> K0 KLane KPack
     // N -> N0 NLane
     // N, K -> N0 K0 KLane NLane KPack
-    int tempk;
-    for(int n = 0; n < N; ++n)
+    if(ck::is_gfx13_supported())
     {
-        for(int k = 0; k < K_pk; ++k)
+        // K is continous in all KLanes on gfx13, so, swizzle in KLane are not needed.
+        for(int n = 0; n < N; ++n)
         {
-            int n0 = n / NLane;
-            int n1 = n % NLane;
+            for(int k = 0; k < K_pk; ++k)
+            {
+                int n0 = n / NLane;
+                int n1 = n % NLane;
 
-            int k0 = k / (KLane * KPack);
-            tempk  = k % (KLane * KPack);
-            int k1 = tempk / KPack;
-            int k2 = tempk % KPack;
+                int k0 = k / (KLane * KPack);
+                int k1 = k % (KLane * KPack);
 
-            int outputIndex = n0 * KPack * NLane * KLane * K0 + k0 * KPack * NLane * KLane +
-                              k1 * KPack * NLane + n1 * KPack + k2;
+                int outputIndex = n0 * KPack * NLane * KLane * K0 + k0 * KPack * NLane * KLane +
+                                  n1 * KPack * KLane + k1;
 
-            dst[outputIndex] = src[n * K_pk + k];
+                dst[outputIndex] = src[n * K_pk + k];
+            }
+        }
+    }
+    else
+    {
+        int tempk;
+        for(int n = 0; n < N; ++n)
+        {
+            for(int k = 0; k < K_pk; ++k)
+            {
+                int n0 = n / NLane;
+                int n1 = n % NLane;
+
+                int k0 = k / (KLane * KPack);
+                tempk  = k % (KLane * KPack);
+                int k1 = tempk / KPack;
+                int k2 = tempk % KPack;
+
+                int outputIndex = n0 * KPack * NLane * KLane * K0 + k0 * KPack * NLane * KLane +
+                                  k1 * KPack * NLane + n1 * KPack + k2;
+
+                dst[outputIndex] = src[n * K_pk + k];
+            }
         }
     }
 }

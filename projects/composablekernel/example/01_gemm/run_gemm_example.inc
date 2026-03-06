@@ -150,6 +150,9 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
             StrideA,
             StrideB,
             StrideC,
+#ifdef GEMM_CONFIG_ENABLEXDL
+            1,
+#endif
             a_element_op,
             b_element_op,
             c_element_op);
