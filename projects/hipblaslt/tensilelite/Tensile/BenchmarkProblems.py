@@ -28,7 +28,6 @@ import sys
 import time
 import itertools
 
-from copy import deepcopy
 from joblib import Parallel, delayed
 from pathlib import Path
 from typing import Dict
@@ -63,7 +62,7 @@ def _generate_single_solution(perm, problemType, constantParams, assembler, debu
     """Helper function to generate a single solution from a permutation."""
     try:
         solution = {
-            "ProblemType": deepcopy(problemType.state),
+            "ProblemType": dict(problemType.state),
             "ISA": next(iter(isaInfoMap.keys()))
         }
         solution.update(constantParams)

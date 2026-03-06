@@ -355,16 +355,25 @@ def writeSolutionsAndKernels(
         numAsmKernels = len(asmKernels)
         numKernels = len(asmKernels)
         assert numKernels == numAsmKernels, "Only assembly kernels are supported in TensileLite"
+
+        # Only generate code for unique kernels, then map results back
+        uniqueKernels = [k for k in asmKernels if not k.duplicate]
         asmIter = zip(
             itertools.repeat(kernelWriterAssembly),
             itertools.repeat(rocisa.rocIsa.getInstance().getData()),
             itertools.repeat(outOptions),
             itertools.repeat(splitGSU),
-            asmKernels
+            uniqueKernels
         )
         memcompress = numAsmKernels > 10000
     with timing_context("python_kernel_codegen"):
-        asmResults = ParallelMap2(functools.partial(processKernelSource, compress=memcompress), asmIter, "Generating assembly kernels", return_as="list")
+        uniqueResults = ParallelMap2(functools.partial(processKernelSource, compress=memcompress), asmIter, "Generating assembly kernels", return_as="list")
+        # Map results back to full kernel list (duplicates get their original's result)
+        resultByName = {r.name: r for r in uniqueResults}
+        asmResults = []
+        for k in asmKernels:
+            base = getKernelFileBase(splitGSU, k)
+            asmResults.append(resultByName[base])
     with timing_context("python_kernel_validate"):
         removeInvalidSolutionsAndKernels(
             asmResults, asmKernels, solutions, errorTolerant, getVerbosity(), splitGSU
