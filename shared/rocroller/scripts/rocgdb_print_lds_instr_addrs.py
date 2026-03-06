@@ -33,24 +33,37 @@ for line in disasm.splitlines():
         raise ValueError(f"Unhandled ds_ instruction: {mnemonic}")
     ds_instructions.append({"offset": offset, "reg": addr_reg, "mnemonic": mnemonic})
 
-THREADS = None
+
+class WG0Breakpoint(gdb.Breakpoint):
+    """Breakpoint that only stops when the current wave is in workgroup (0,0,0)."""
+
+    def stop(self):
+        pos = str(gdb.parse_and_eval("$_dispatch_pos"))
+        return "(0,0,0)/" in pos
+
 
 for instr in ds_instructions:
-    gdb.Breakpoint(f"*{FUNCTION}+{instr['offset']}", temporary=True)
-    gdb.execute("continue")
-    gdb.execute("x/i $pc")
+    spec = f"*{FUNCTION}+{instr['offset']}"
     print(f"# ${instr['reg']} ({instr['mnemonic']} @ +{instr['offset']})")
 
-    if THREADS is None:
-        # Discover threads from whichever thread stopped, plus the next 3
-        # Generally this is the next 3 waves in the workgroup
-        hit_thread = gdb.selected_thread().num
-        all_threads = sorted(t.num for t in gdb.inferiors()[0].threads())
-        idx = all_threads.index(hit_thread)
-        THREADS = all_threads[idx : idx + 4]
+    WG0Breakpoint(spec, temporary=True)
+    gdb.execute("continue")
 
-    for t in THREADS:
+    # Discover the 4 wave threads of workgroup (0,0,0) by iterating all threads
+    # and checking $_dispatch_pos.
+    threads = []
+    current = gdb.selected_thread()
+    for t in gdb.inferiors()[0].threads():
+        t.switch()
+        if "(0,0,0)/" in str(gdb.parse_and_eval("$_dispatch_pos")):
+            threads.append(t.num)
+        if len(threads) == 4:
+            break
+    current.switch()
+
+    for t in sorted(threads):
         gdb.execute(f"thread {t}")
+        gdb.execute("x/i $pc")
         gdb.execute(f"p ${instr['reg']}")
 
 gdb.execute("set confirm off")

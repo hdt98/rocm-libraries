@@ -42,20 +42,22 @@ def main():  # noqa: C901
     current_arrays = []
 
     for _, kind, value in events:
-        if kind == "instr":
-            current_instr = value
-            current_reg = None
-            current_arrays = []
-        elif kind == "reg":
+        if kind == "reg":
             current_reg = value
+            current_instr = None
+            current_arrays = []
+        elif kind == "instr":
+            if current_instr is None:
+                current_instr = value
         elif kind == "array":
-            current_arrays.append(value)
-            if len(current_arrays) == 4:
-                joined = [v for a in current_arrays for v in a]
-                groups.append((current_instr, current_reg, joined))
-                current_instr = None
-                current_reg = None
-                current_arrays = []
+            if current_reg is not None:
+                current_arrays.append(value)
+                if len(current_arrays) == 4:
+                    joined = [v for a in current_arrays for v in a]
+                    groups.append((current_instr, current_reg, joined))
+                    current_reg = None
+                    current_instr = None
+                    current_arrays = []
 
     # Group instructions that share identical address arrays
     seen = {}  # tuple(values) -> index in ordered_groups
