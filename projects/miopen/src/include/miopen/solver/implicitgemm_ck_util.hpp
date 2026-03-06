@@ -42,7 +42,13 @@
 #include <ck/library/tensor_operation_instance/gpu/grouped_convolution_backward_weight_bilinear.hpp>
 #include <ck/library/tensor_operation_instance/gpu/grouped_convolution_backward_weight_scale.hpp>
 #include <ck/library/tensor_operation_instance/gpu/grouped_convolution_backward_data.hpp>
-#endif // MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
+#include <miopen/ck_builder/factories/meta_device_operation_instance_factory.hpp>
+#if CK_EXPERIMENTAL_BUILDER
+#include <miopen/ck_builder/factories/grouped_convolution_backward_weight.hpp>
+#include <miopen/ck_builder/factories/grouped_convolution_backward_weight_scale.hpp>
+#include <miopen/ck_builder/factories/grouped_convolution_backward_weight_bilinear.hpp>
+#endif // CK_EXPERIMENTAL_BUILDER
+#endif // MIOPEN_USE_COMPOSABLEKERNEL
 
 namespace miopen {
 
@@ -90,7 +96,7 @@ using DeviceOpGWrw = ck::tensor_operation::device::DeviceGroupedConvBwdWeight<
     ck::tensor_operation::element_wise::PassThrough,
     ComputeType>;
 template <typename DataType, typename ComputeType = DataType>
-using DeviceOpGWrwPtrs = ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
+using DeviceOpGWrwPtrs = miopen::conv::ck_builder::instance::MetaDeviceOperationInstanceFactory<
     DeviceOpGWrw<DataType, ComputeType>>;
 
 template <typename DataType, typename ComputeType = DataType>
@@ -168,17 +174,17 @@ using DeviceOpGBwdWeightScale =
 
 template <typename DataType, typename ComputeType = DataType>
 using DeviceOpGBwdWeightDefaultPtrs =
-    ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
+    miopen::conv::ck_builder::instance::MetaDeviceOperationInstanceFactory<
         DeviceOpGBwdWeightDefault<DataType, ComputeType>>;
 
 template <typename DataType, typename ComputeType = DataType>
 using DeviceOpGBwdWeightBilinearPtrs =
-    ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
+    miopen::conv::ck_builder::instance::MetaDeviceOperationInstanceFactory<
         DeviceOpGBwdWeightBilinear<DataType, ComputeType>>;
 
 template <typename DataType, typename ComputeType = DataType>
 using DeviceOpGBwdWeightScalePtrs =
-    ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
+    miopen::conv::ck_builder::instance::MetaDeviceOperationInstanceFactory<
         DeviceOpGBwdWeightScale<DataType, ComputeType>>;
 
 } // namespace conv
