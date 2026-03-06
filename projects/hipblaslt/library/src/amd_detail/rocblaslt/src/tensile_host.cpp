@@ -2323,9 +2323,16 @@ namespace
             std::visit(
                 [&inputs, &prob](auto val) {
                     using T_compute = decltype(val);
-
-                    inputs.activationArgs.push_back(T_compute(prob.act0));
-                    inputs.activationArgs.push_back(T_compute(prob.act1));
+                    if constexpr(std::is_constructible_v<T_compute, float>)
+                    {
+                        inputs.activationArgs.push_back(T_compute(prob.act0));
+                        inputs.activationArgs.push_back(T_compute(prob.act1));
+                    }
+                    else
+                    {
+                        throw std::runtime_error(
+                            "[GetTensileInputs] unsupported compute type for activation");
+                    }
                 },
                 it->second);
         }
