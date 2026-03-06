@@ -365,8 +365,7 @@ struct CShuffleEpilogue
             // When XorShift=0, fall back to simple padding (no XOR transform)
             if constexpr(XorShift == 0)
             {
-                // Simple descriptor without XOR - just use padding
-                constexpr index_t BaseStrideElems = NPerIterationShuffle * MLdsLayer;
+                // Simple descriptor without XOR - just use padding (reuses BaseStrideElems from line 318)
                 constexpr auto ToWords = [](index_t elems) constexpr {
                     return (elems * DataTypeSize) / BytesPerBank;
                 };
