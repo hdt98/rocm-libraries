@@ -137,15 +137,13 @@ namespace TensileLite
             if((m_probOnlyRunSolIdx != -1) && (m_probOnlyRunSolIdx != m_currSolutionIdx))
                 m_skiprun_from_map = true;
 
-            ContractionSolution::ProjectedPerformance pp;
-
             if(auto problem = dynamic_cast<ContractionProblemGroupedGemm*>(m_problem))
             {
-                pp = solution->projectedPerformance(problem->gemms[0], m_hardware);
+                m_cachedPP = solution->projectedPerformance(problem->gemms[0], m_hardware);
             }
             else if(auto problem = dynamic_cast<ContractionProblemGemm*>(m_problem))
             {
-                pp = solution->projectedPerformance(*problem, m_hardware);
+                m_cachedPP = solution->projectedPerformance(*problem, m_hardware);
             }
             else
             {
@@ -155,16 +153,16 @@ namespace TensileLite
 
             m_solution = solution;
 
-            m_reporter->report(ResultKey::Tile0Granularity, pp.granularities.tile0Granularity);
-            m_reporter->report(ResultKey::Tile1Granularity, pp.granularities.tile1Granularity);
-            m_reporter->report(ResultKey::CuGranularity, pp.granularities.cuGranularity);
-            m_reporter->report(ResultKey::WaveGranularity, pp.granularities.waveGranularity);
-            m_reporter->report(ResultKey::TotalGranularity, pp.granularities.totalGranularity);
+            m_reporter->report(ResultKey::Tile0Granularity, m_cachedPP.granularities.tile0Granularity);
+            m_reporter->report(ResultKey::Tile1Granularity, m_cachedPP.granularities.tile1Granularity);
+            m_reporter->report(ResultKey::CuGranularity, m_cachedPP.granularities.cuGranularity);
+            m_reporter->report(ResultKey::WaveGranularity, m_cachedPP.granularities.waveGranularity);
+            m_reporter->report(ResultKey::TotalGranularity, m_cachedPP.granularities.totalGranularity);
 
             m_reporter->report(ResultKey::NumCus, perf.CUs);
-            m_reporter->report(ResultKey::TilesPerCu, pp.granularities.tilesPerCu);
-            m_reporter->report(ResultKey::MemReadBytes, pp.staticModel.memReadBytes);
-            m_reporter->report(ResultKey::MemWriteBytes, pp.staticModel.memWriteBytesD);
+            m_reporter->report(ResultKey::TilesPerCu, m_cachedPP.granularities.tilesPerCu);
+            m_reporter->report(ResultKey::MemReadBytes, m_cachedPP.staticModel.memReadBytes);
+            m_reporter->report(ResultKey::MemWriteBytes, m_cachedPP.staticModel.memWriteBytesD);
         }
 
         void BenchmarkTimer::postSolution()
@@ -181,16 +179,13 @@ namespace TensileLite
                                                                  - m_flushTimeUs
                                                            : std::numeric_limits<double>::quiet_NaN();
 
-                ContractionSolution::ProjectedPerformance pp;
-                double                                    flopCount = 0;
+                double flopCount = 0;
                 if(auto problem = dynamic_cast<ContractionProblemGroupedGemm*>(m_problem))
                 {
-                    pp        = m_solution->projectedPerformance(problem->gemms[0], m_hardware);
                     flopCount = problem->gemms[0].flopCount();
                 }
                 else if(auto problem = dynamic_cast<ContractionProblemGemm*>(m_problem))
                 {
-                    pp        = m_solution->projectedPerformance(*problem, m_hardware);
                     flopCount = problem->flopCount();
                 }
                 else
@@ -200,7 +195,7 @@ namespace TensileLite
                 }
 
                 gflops      = !sol_is_skipped ? flopCount / (timePerEnqueue_us) / 1000.0 : 0;
-                int    tiles       = pp.granularities.tilesPerCu * perf.CUs;
+                int    tiles       = m_cachedPP.granularities.tilesPerCu * perf.CUs;
                 int    usedCus     = std::min(tiles, perf.CUs);
                 gflopsPerCu = gflops / usedCus;
             }

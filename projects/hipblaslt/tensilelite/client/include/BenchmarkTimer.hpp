@@ -124,6 +124,8 @@ namespace TensileLite
             hipEvent_t start = nullptr;
             hipEvent_t stop  = nullptr;
 
+            ContractionSolution::ProjectedPerformance m_cachedPP;
+
             using double_millis = std::chrono::duration<double, std::milli>;
             using double_micros = std::chrono::duration<double, std::micro>;
             using double_nanos  = std::chrono::duration<double, std::nano>;
