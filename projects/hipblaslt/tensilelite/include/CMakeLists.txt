@@ -52,6 +52,7 @@ target_sources(tensilelite-host
         "${CMAKE_CURRENT_SOURCE_DIR}/Tensile/DistinctType.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Tensile/EmbeddedData.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Tensile/EmbeddedLibrary.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Tensile/Expression.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Tensile/ExactLogicLibrary.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Tensile/FreeSizeLibrary.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Tensile/GranularitySelectionLibrary.hpp"

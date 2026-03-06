@@ -20,6 +20,7 @@ target_sources(tensilelite-host
         "${CMAKE_CURRENT_SOURCE_DIR}/Debug.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/EmbeddedData.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/EmbeddedLibrary.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Expression.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/KernelArguments.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/KernelLanguageTypes.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/MLFeatures.cpp"

@@ -73,7 +73,8 @@ namespace TensileLite
         Alpha,      // 16
         Beta,       // 17
         DebugPattern,      // 18
-        CustomArgSemantic_Count,      // 19
+        Expression, // 19
+        CustomArgSemantic_Count,      // 20
     };
     
     std::string toString(CustomArgSemantic arg);
@@ -85,6 +86,7 @@ namespace TensileLite
     {
         CustomArgType type;
         CustomArgSemantic semantic;
+        std::string expression = "";
     };
 
     std::string toString(CustomArgDefinition arg);

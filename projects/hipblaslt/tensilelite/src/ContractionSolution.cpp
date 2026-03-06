@@ -30,12 +30,12 @@
 
 #include <Tensile/AMDGPU.hpp>
 #include <Tensile/ContractionProblem.hpp>
+#include <Tensile/Expression.hpp>
 #include <Tensile/Task.hpp>
 #include <Tensile/Utils.hpp>
 #include <Tensile/UtilsOrigami.hpp>
 #include <Tensile/hip/HipHardware.hpp>
 
-#include <Tensile/UtilsOrigami.hpp>
 #include <origami/streamk.hpp>
 
 #include <algorithm>
@@ -43,6 +43,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <random>
+#include <unordered_map>
 
 #ifdef ENABLE_ROCTX
 #include <roctracer/roctx.h>
@@ -95,6 +96,8 @@ namespace TensileLite
             return "Beta";
         case CustomArgSemantic::DebugPattern:
             return "DebugPattern";
+        case CustomArgSemantic::Expression:
+            return "Expression";
         case CustomArgSemantic::CustomArgSemantic_Count:
             break;
         }
@@ -105,7 +108,7 @@ namespace TensileLite
 
     CustomArgSemantic fromStringCustomArgSemantic(std::string& str)
     {
-        
+
         if(str == toString(CustomArgSemantic::SizeFree0))
             return CustomArgSemantic::SizeFree0;
         else if(str == toString(CustomArgSemantic::SizeFree1))
@@ -142,6 +145,8 @@ namespace TensileLite
             return CustomArgSemantic::Alpha;
         else if(str == toString(CustomArgSemantic::Beta))
             return CustomArgSemantic::Beta;
+        else if(str == toString(CustomArgSemantic::Expression))
+            return CustomArgSemantic::Expression;
         else if(str == toString(CustomArgSemantic::DebugPattern))
             return CustomArgSemantic::DebugPattern;
         else
@@ -177,7 +182,7 @@ namespace TensileLite
         std::string strType;
         std::string strSemantic;
         stream >> strType >> strSemantic;
-        t.type = fromStringCustomArgType(strType);
+        t.type     = fromStringCustomArgType(strType);
         t.semantic = fromStringCustomArgSemantic(strSemantic);
         return stream;
     }
@@ -889,7 +894,7 @@ namespace TensileLite
                     // then no Stream-K tiles are needed, all data-parallel
                     uint32_t skTiles = sk.grid;
                     // If not evenly divisible, determine number of Stream-K tiles
-                    if(tiles % sk.grid != 0) 
+                    if(tiles % sk.grid != 0)
                     {
                         // Number of data-parallel tiles on each workgroup would be:
                         // dpTilesPerWG = bigEnough ? (tiles - skTiles) / skGrid : 0;
@@ -1508,19 +1513,20 @@ namespace TensileLite
         numWorkGroups.x = CeilDivide(numWorkGroups.x, sizeMapping.macroTile.x);
         numWorkGroups.y = CeilDivide(numWorkGroups.y, sizeMapping.macroTile.y);
     }
-    
+
     template <bool T_Debug>
-    KernelInvocation ContractionSolution::generateCustomCall(ContractionSolution::Problem const& problem,
+    KernelInvocation
+        ContractionSolution::generateCustomCall(ContractionSolution::Problem const& problem,
                                                 ContractionInputs const&            inputs,
                                                 Hardware const&                     hardware,
                                                 StreamKSettings const&              sk) const
     {
         KernelInvocation rv;
         rv.isSingleCall = true;
-        rv.args = KernelArguments(T_Debug);
+        rv.args         = KernelArguments(T_Debug);
         rv.args.reserve(1024, 128);
         rv.kernelName = kernelName;
-        
+
         calculateGrid(rv.workGroupSize, rv.numWorkGroups, problem);
         // rv.numWorkGroups.x *= (rv.numWorkGroups.y * rv.numWorkGroups.z);
         // rv.numWorkGroups.y = 1;
@@ -1544,76 +1550,78 @@ namespace TensileLite
 
         uint32_t debugPattern = 0xDB000001;
 
+        // NOTE: CustomArgSemantic::DebugPattern, CustomArgSemantic::Expression, and pointers are not added to this collection
+        std::unordered_map<CustomArgSemantic, std::any> argValues = {
+            {CustomArgSemantic::SizeFree0, problem.problemSizes()[0]},
+            {CustomArgSemantic::SizeFree1, problem.problemSizes()[1]},
+            {CustomArgSemantic::SizeFree2, problem.problemSizes()[2]},
+            {CustomArgSemantic::SizeSum, problem.problemSizes()[3]},
+            {CustomArgSemantic::StrideA0, problem.a().strides()[1]},
+            {CustomArgSemantic::StrideA1, problem.a().strides()[2]},
+            {CustomArgSemantic::StrideB0, problem.b().strides()[1]},
+            {CustomArgSemantic::StrideB1, problem.b().strides()[2]},
+            {CustomArgSemantic::StrideC0, problem.c().strides()[1]},
+            {CustomArgSemantic::StrideC1, problem.c().strides()[2]},
+            {CustomArgSemantic::StrideD0, problem.d().strides()[1]},
+            {CustomArgSemantic::StrideD1, problem.d().strides()[2]},
+            {CustomArgSemantic::Alpha, inputs.alpha},
+            {CustomArgSemantic::Beta, inputs.beta},
+        };
+
+        std::vector<std::tuple<std::string, std::any>> argValuesForExpressions;
+        argValuesForExpressions.reserve(argValues.size());
+
+        std::transform(argValues.begin(),
+                       argValues.end(),
+                       std::back_inserter(argValuesForExpressions),
+                       [](auto const& entry) {
+                           return std::make_tuple(toString(entry.first),
+                                                  static_cast<expression_compute_t>(entry.second));
+                       });
+
         if(T_Debug)
             std::cout << "Custom call arguments:" << std::endl;
 
         for(auto arg : sizeMapping.customKernel.args)
         {
             if(T_Debug)
-                std::cout << "Type: " << toString(arg.type) << " Semantic: " << toString(arg.semantic) << std::endl;
+            {
+                std::cout << "Type: " << toString(arg.type)
+                          << " Semantic: " << toString(arg.semantic) << std::endl;
+            }
 
             switch(arg.semantic)
             {
-                case CustomArgSemantic::SizeFree0:
-                    rv.args.appendCustomType("SizeFree0", problem.problemSizes()[0], arg.type);
-                    break;
-                case CustomArgSemantic::SizeFree1:
-                    rv.args.appendCustomType("SizeFree1", problem.problemSizes()[1], arg.type);
-                    break;
-                case CustomArgSemantic::SizeFree2:
-                    rv.args.appendCustomType("SizeFree2", problem.problemSizes()[2], arg.type);
-                    break;
-                case CustomArgSemantic::SizeSum:
-                    rv.args.appendCustomType("SizeSum", problem.problemSizes()[3], arg.type);
-                    break;
-                case CustomArgSemantic::AddressA:
-                    rv.args.template append<void const*>("AddressA", inputs.a);
-                    break;
-                case CustomArgSemantic::AddressB:
-                    rv.args.template append<void const*>("AddressB", inputs.b);
-                    break;
-                case CustomArgSemantic::AddressC:
-                    rv.args.template append<void const*>("AddressC", inputs.c);
-                    break;
-                case CustomArgSemantic::AddressD:
-                    rv.args.template append<void const*>("AddressD", inputs.d);
-                    break;
-                case CustomArgSemantic::StrideA0:
-                    rv.args.appendCustomType("StrideA0", problem.a().strides()[1], arg.type);
-                    break;
-                case CustomArgSemantic::StrideA1:
-                    rv.args.appendCustomType("StrideA1", problem.a().strides()[2], arg.type);
-                    break;
-                case CustomArgSemantic::StrideB0:
-                    rv.args.appendCustomType("StrideB0", problem.b().strides()[1], arg.type);
-                    break;
-                case CustomArgSemantic::StrideB1:
-                    rv.args.appendCustomType("StrideB1", problem.b().strides()[2], arg.type);
-                    break;
-                case CustomArgSemantic::StrideC0:
-                    rv.args.appendCustomType("StrideC0", problem.c().strides()[1], arg.type);
-                    break;
-                case CustomArgSemantic::StrideC1:
-                    rv.args.appendCustomType("StrideC1", problem.c().strides()[2], arg.type);
-                    break;
-                case CustomArgSemantic::StrideD0:
-                    rv.args.appendCustomType("StrideD0", problem.d().strides()[1], arg.type);
-                    break;
-                case CustomArgSemantic::StrideD1:
-                    rv.args.appendCustomType("StrideD1", problem.d().strides()[2], arg.type);
-                    break;
-                case CustomArgSemantic::Alpha:
-                    rv.args.appendCustomType("Alpha", inputs.alpha, arg.type);
-                    break;
-                case CustomArgSemantic::Beta:
-                    rv.args.appendCustomType("Beta", inputs.beta, arg.type);
-                    break;
-                case CustomArgSemantic::DebugPattern:
-                    rv.args.template append<uint32_t>("DebugPattern", debugPattern);
-                    ++debugPattern;
-                    break;
-                default:
+            case CustomArgSemantic::AddressA:
+                rv.args.template append<void const*>("AddressA", inputs.a);
+                break;
+            case CustomArgSemantic::AddressB:
+                rv.args.template append<void const*>("AddressB", inputs.b);
+                break;
+            case CustomArgSemantic::AddressC:
+                rv.args.template append<void const*>("AddressC", inputs.c);
+                break;
+            case CustomArgSemantic::AddressD:
+                rv.args.template append<void const*>("AddressD", inputs.d);
+                break;
+            case CustomArgSemantic::DebugPattern:
+                rv.args.template append<uint32_t>("DebugPattern", debugPattern);
+                ++debugPattern;
+                break;
+            case CustomArgSemantic::Expression:
+                auto computedValue = processExpression(arg.expression, argValuesForExpressions);
+                rv.args.appendCustomType("Expression", computedValue, arg.type);
+                break;
+            default:
+                if(argValues.contains(arg.semantic))
+                {
+                    rv.args.appendCustomType(
+                        toString(arg.semantic), argValues.at(arg.semantic), arg.type);
+                }
+                else
+                {
                     throw std::runtime_error(concatenate("Invalid kernel argument type: ", arg));
+                }
             }
         }
         return rv;
@@ -1911,7 +1919,7 @@ namespace TensileLite
                                          rv.numWorkItems.x / rv.workGroupSize.x / rv.workGroupSize.y
                                              / rv.workGroupSize.z);
                 kernelArgs<T_Debug, true>(0,
-                    (uint32_t)KERNELARGTYPE::NORMAL,
+                                          (uint32_t)KERNELARGTYPE::NORMAL,
                                           rv.args,
                                           0,
                                           &hardware,
@@ -2289,7 +2297,7 @@ namespace TensileLite
         if(sizeMapping.streamK > 0)
         {
             auto tiles = problem.getNumTiles(sizeMapping, 1);
-            gsu = (tiles > 0) ? (sk.grid / tiles) : 0;        
+            gsu        = (tiles > 0) ? (sk.grid / tiles) : 0;
         }
 
         args.template append<uint32_t>(concatenate_if<T_Debug>("gsu"), gsu);
@@ -3014,8 +3022,6 @@ namespace TensileLite
             else
                 rv.push_back(generateCustomCall<false>(problem, inputs, hardware, sk));
         }
-
-        
 
         if(((sizeMapping.globalAccumulation != 3) && gsu > 1 && sizeMapping.globalAccumulation)
            || sk.reduction == origami::reduction_t::parallel)

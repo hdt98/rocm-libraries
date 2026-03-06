@@ -34,6 +34,9 @@ if(TENSILELITE_ENABLE_HOST)
         target_compile_definitions(tensilelite-host PUBLIC $<BUILD_INTERFACE:TENSILE_MSGPACK>)
     endif()
 
+    add_subdirectory(exprtk)
+    target_link_libraries(tensilelite-host PRIVATE exprtk::exprtk)
+
     target_include_directories(tensilelite-host
         PUBLIC
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -47,6 +50,7 @@ if(TENSILELITE_ENABLE_HOST)
             $<BUILD_INTERFACE:rocisa::rocisa-cpp>
             roc::origami
         PRIVATE
+            exprtk::exprtk
             hip::device
     )
 
