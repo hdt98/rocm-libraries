@@ -2,19 +2,18 @@
 // SPDX-License-Identifier: MIT
 
 #include <iostream>
-#include <cstring>
 #include <cstdlib>
 #include <hip/hip_runtime.h>
 
-// Use CK_Tile host utilities for tensor management and verification
+// Use CK_Tile host utilities
 #include "ck_tile/host.hpp"
-#include "gemm_mint.hpp"
+#include "practice_gemm.hpp"
 
-// Reference GEMM implementation for verification
+// CPU reference implementation
 template <typename ADataType, typename BDataType, typename AccDataType, typename CDataType>
-void reference_gemm_mint(const ck_tile::HostTensor<ADataType>& a,
-                         const ck_tile::HostTensor<BDataType>& b,
-                         ck_tile::HostTensor<CDataType>& c)
+void reference_gemm_practice(const ck_tile::HostTensor<ADataType>& a,
+                             const ck_tile::HostTensor<BDataType>& b,
+                             ck_tile::HostTensor<CDataType>& c)
 {
     auto M = a.mDesc.get_lengths()[0];
     auto K = a.mDesc.get_lengths()[1];
@@ -48,7 +47,7 @@ int main(int argc, char* argv[])
     ck_tile::index_t K = 2048;
     ck_tile::index_t verification = 0;
 
-    // Parse command line arguments
+    // Parse command line
     if(argc == 2)
     {
         verification = std::stoi(argv[1]);
@@ -61,8 +60,18 @@ int main(int argc, char* argv[])
         K            = std::stoi(argv[4]);
     }
 
-    std::cout << "=== MINT Naive GEMM Example ===" << std::endl;
+    std::cout << "=== MINT Hierarchical GEMM Tutorial ===" << std::endl;
     std::cout << "Problem size: M=" << M << ", N=" << N << ", K=" << K << std::endl;
+
+    // Create problem definition
+    using Problem = mint_gemm::GemmProblem<ADataType,
+                                           BDataType,
+                                           CDataType,
+                                           AccDataType,
+                                           128, // kMPerBlock
+                                           128, // kNPerBlock
+                                           16,  // kKPerBlock
+                                           256>; // kBlockSize
 
     // Matrix strides (row-major)
     const ck_tile::index_t stride_a = K;
@@ -98,28 +107,25 @@ int main(int argc, char* argv[])
     a_device.ToDevice(a_host.mData.data());
     b_device.ToDevice(b_host.mData.data());
 
-    // Kernel configuration
-    constexpr ck_tile::index_t kMPerBlock  = 128;
-    constexpr ck_tile::index_t kNPerBlock  = 128;
-    constexpr ck_tile::index_t kKPerBlock  = 16;
-
     // Grid dimensions
+    constexpr ck_tile::index_t kMPerBlock = Problem::BlockGemmShape::kM;
+    constexpr ck_tile::index_t kNPerBlock = Problem::BlockGemmShape::kN;
+
     const ck_tile::index_t grid_m = (M + kMPerBlock - 1) / kMPerBlock;
     const ck_tile::index_t grid_n = (N + kNPerBlock - 1) / kNPerBlock;
+    const ck_tile::index_t grid_size_val = grid_m * grid_n;
 
-    std::cout << "Launching kernel with grid (" << grid_m << ", " << grid_n
-              << "), block MxN tile (" << kMPerBlock << ", " << kNPerBlock << ")" << std::endl;
+    std::cout << "Launching kernel:" << std::endl;
+    std::cout << "  Grid: " << grid_size_val << " blocks (" << grid_m << " x " << grid_n << ")" << std::endl;
+    std::cout << "  Block: " << Problem::kBlockSize << " threads" << std::endl;
+    std::cout << "  Block tile: " << kMPerBlock << " x " << kNPerBlock << std::endl;
 
     // Launch configuration
-    dim3 grid_size(grid_m, grid_n, 1);
-    dim3 block_size(16, 16, 1);  // 256 threads total
+    dim3 grid_size(grid_size_val, 1, 1);
+    dim3 block_size(Problem::kBlockSize, 1, 1);
 
     // Warmup
-    hipLaunchKernelGGL((mint_gemm::MintGemmKernel<kMPerBlock,
-                                                    kNPerBlock,
-                                                    kKPerBlock,
-                                                    ADataType,
-                                                    AccDataType>),
+    hipLaunchKernelGGL((mint_gemm::gemm_kernel<Problem>),
                        grid_size,
                        block_size,
                        0,
@@ -129,12 +135,17 @@ int main(int argc, char* argv[])
                        static_cast<CDataType*>(c_device.GetDeviceBuffer()),
                        M,
                        N,
-                       K,
-                       stride_a,
-                       stride_b,
-                       stride_c);
+                       K);
 
     hipDeviceSynchronize();
+
+    // Check for launch errors
+    hipError_t err = hipGetLastError();
+    if(err != hipSuccess)
+    {
+        std::cerr << "Kernel launch failed: " << hipGetErrorString(err) << std::endl;
+        return 1;
+    }
 
     // Timing runs
     const int num_runs = 10;
@@ -145,11 +156,7 @@ int main(int argc, char* argv[])
     hipEventRecord(start);
     for(int i = 0; i < num_runs; ++i)
     {
-        hipLaunchKernelGGL((mint_gemm::MintGemmKernel<kMPerBlock,
-                                                        kNPerBlock,
-                                                        kKPerBlock,
-                                                        ADataType,
-                                                        AccDataType>),
+        hipLaunchKernelGGL((mint_gemm::gemm_kernel<Problem>),
                            grid_size,
                            block_size,
                            0,
@@ -159,10 +166,7 @@ int main(int argc, char* argv[])
                            static_cast<CDataType*>(c_device.GetDeviceBuffer()),
                            M,
                            N,
-                           K,
-                           stride_a,
-                           stride_b,
-                           stride_c);
+                           K);
     }
     hipEventRecord(stop);
     hipEventSynchronize(stop);
@@ -178,9 +182,9 @@ int main(int argc, char* argv[])
     bool pass = true;
     if(verification)
     {
-        std::cout << "Running CPU reference..." << std::endl;
+        std::cout << "\nRunning CPU reference..." << std::endl;
         ck_tile::HostTensor<CDataType> c_host_ref(c_lengths, c_strides);
-        reference_gemm_mint<ADataType, BDataType, AccDataType, CDataType>(a_host, b_host, c_host_ref);
+        reference_gemm_practice<ADataType, BDataType, AccDataType, CDataType>(a_host, b_host, c_host_ref);
 
         // Copy results back from device
         c_device.FromDevice(c_host_dev.mData.data());
