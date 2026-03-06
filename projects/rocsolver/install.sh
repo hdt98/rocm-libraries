@@ -632,7 +632,7 @@ fi
 # #################################################
 # installing through package manager, which makes uninstalling easy
 if [[ "${build_package}" == true ]]; then
-  make package
+  ${cmake_executable} --build . -j$(nproc) --target package
 
   if [[ "${install_package}" == true ]]; then
     case "${ID}" in
