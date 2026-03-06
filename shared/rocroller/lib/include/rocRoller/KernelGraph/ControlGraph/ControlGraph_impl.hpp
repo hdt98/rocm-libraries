@@ -101,121 +101,59 @@ namespace rocRoller::KernelGraph::ControlGraph
         Throw<FatalError>("Invalid NodeOrdering");
     }
 
-    inline void ControlGraph::checkOrderCache() const
-    {
-        if(m_orderCache.empty())
-            populateOrderCache();
-    }
-
     inline NodeOrdering ControlGraph::lookupOrder(CacheOnlyPolicy const, int nodeA, int nodeB) const
     {
-        if(nodeA > nodeB)
-            return opposite(lookupOrder(CacheOnly, nodeB, nodeA));
-
-        if(not m_orderCache.contains(nodeA))
+        auto it = m_orderCache.find(nodeA);
+        if(it == m_orderCache.end())
             return NodeOrdering::Undefined;
-
-        auto const& nodeOrderPairs = m_orderCache.at(nodeA);
-        return nodeOrderPairs.contains(nodeB) ? nodeOrderPairs.at(nodeB) : NodeOrdering::Undefined;
+        auto const& orders = it->second;
+        if(std::ranges::binary_search(orders.after, nodeB))
+            return NodeOrdering::LeftFirst;
+        if(std::ranges::binary_search(orders.before, nodeB))
+            return NodeOrdering::RightFirst;
+        if(std::ranges::binary_search(orders.inBody, nodeB))
+            return NodeOrdering::RightInBodyOfLeft;
+        if(std::ranges::binary_search(orders.containing, nodeB))
+            return NodeOrdering::LeftInBodyOfRight;
+        return NodeOrdering::Undefined;
     }
 
     inline Generator<int> ControlGraph::nodesAfter(int node) const
     {
         populateOrderCache();
-
-        if(m_orderCache.contains(node))
-        {
-            for(auto const& [otherNode, order] : m_orderCache.at(node))
-            {
-                if(order == NodeOrdering::LeftFirst)
-                    co_yield otherNode;
-            }
-        }
-
-        for(auto const& [otherNode, nodeOrderPairs] : m_orderCache)
-        {
-            if(otherNode >= node)
-                continue;
-
-            if(nodeOrderPairs.contains(node) && nodeOrderPairs.at(node) == NodeOrdering::RightFirst)
-                co_yield otherNode;
-        }
+        auto it = m_orderCache.find(node);
+        if(it != m_orderCache.end())
+            for(int n : it->second.after)
+                co_yield n;
     }
-
     inline Generator<int> ControlGraph::nodesBefore(int node) const
     {
         populateOrderCache();
-
-        if(m_orderCache.contains(node))
-        {
-            for(auto const& [otherNode, order] : m_orderCache.at(node))
-            {
-                if(order == NodeOrdering::RightFirst)
-                    co_yield otherNode;
-            }
-        }
-
-        for(auto const& [otherNode, nodeOrderPairs] : m_orderCache)
-        {
-            if(otherNode >= node)
-                continue;
-
-            if(nodeOrderPairs.contains(node) && nodeOrderPairs.at(node) == NodeOrdering::LeftFirst)
-                co_yield otherNode;
-        }
+        auto it = m_orderCache.find(node);
+        if(it != m_orderCache.end())
+            for(int n : it->second.before)
+                co_yield n;
     }
-
     inline Generator<int> ControlGraph::nodesInBody(int node) const
     {
         populateOrderCache();
-
-        if(m_orderCache.contains(node))
-        {
-            for(auto const& [otherNode, order] : m_orderCache.at(node))
-            {
-                if(order == NodeOrdering::RightInBodyOfLeft)
-                    co_yield otherNode;
-            }
-        }
-
-        for(auto const& [otherNode, nodeOrderPairs] : m_orderCache)
-        {
-            if(otherNode >= node)
-                continue;
-
-            if(nodeOrderPairs.contains(node)
-               && nodeOrderPairs.at(node) == NodeOrdering::LeftInBodyOfRight)
-                co_yield otherNode;
-        }
+        auto it = m_orderCache.find(node);
+        if(it != m_orderCache.end())
+            for(int n : it->second.inBody)
+                co_yield n;
     }
-
     inline Generator<int> ControlGraph::nodesContaining(int node) const
     {
         populateOrderCache();
-
-        if(m_orderCache.contains(node))
-        {
-            for(auto const& [otherNode, order] : m_orderCache.at(node))
-            {
-                if(order == NodeOrdering::LeftInBodyOfRight)
-                    co_yield otherNode;
-            }
-        }
-
-        for(auto const& [otherNode, nodeOrderPairs] : m_orderCache)
-        {
-            if(otherNode >= node)
-                continue;
-
-            if(nodeOrderPairs.contains(node)
-               && nodeOrderPairs.at(node) == NodeOrdering::RightInBodyOfLeft)
-                co_yield otherNode;
-        }
+        auto it = m_orderCache.find(node);
+        if(it != m_orderCache.end())
+            for(int n : it->second.containing)
+                co_yield n;
     }
 
     template <typename T>
-    requires(std::constructible_from<Operation, T>) inline std::set<
-        std::pair<int, int>> ControlGraph::ambiguousNodes() const
+        requires(std::constructible_from<Operation, T>)
+    inline std::set<std::pair<int, int>> ControlGraph::ambiguousNodes() const
     {
         std::set<std::pair<int, int>> badNodes;
 
@@ -235,8 +173,8 @@ namespace rocRoller::KernelGraph::ControlGraph
     }
 
     template <typename T>
-    requires(std::constructible_from<ControlGraph::Element,
-                                     T>) inline std::optional<T> ControlGraph::get(int tag) const
+        requires(std::constructible_from<ControlGraph::Element, T>)
+    inline std::optional<T> ControlGraph::get(int tag) const
     {
         auto x = getElement(tag);
         if constexpr(CIsAnyOf<T, Operation, ControlEdge>)
@@ -282,7 +220,8 @@ namespace rocRoller::KernelGraph::ControlGraph
     }
 
     template <typename T>
-    requires(std::constructible_from<Operation, T>) inline bool isOperation(auto const& x)
+        requires(std::constructible_from<Operation, T>)
+    inline bool isOperation(auto const& x)
     {
         if(std::holds_alternative<Operation>(x))
         {
@@ -294,7 +233,8 @@ namespace rocRoller::KernelGraph::ControlGraph
     }
 
     template <typename T>
-    requires(std::constructible_from<ControlEdge, T>) inline bool isEdge(auto const& x)
+        requires(std::constructible_from<ControlEdge, T>)
+    inline bool isEdge(auto const& x)
     {
         if(std::holds_alternative<ControlEdge>(x))
         {

@@ -53,9 +53,9 @@ namespace rocRoller
         E8M0*>;
 
     template <typename T>
-    concept CCommandArgumentValue = requires(T& val)
-    {
-        {CommandArgumentValue(val)};
+    concept CCommandArgumentValue = requires(T& val) {
+        { CommandArgumentValue(val) };
+        { !std::same_as<T, CommandArgumentValue> };
     };
 
     static_assert(!CCommandArgumentValue<bool*>);

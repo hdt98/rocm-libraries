@@ -39,7 +39,7 @@ namespace rocRoller
         AssertFatal(lhs != nullptr);
         AssertFatal(rhs != nullptr);
 
-        co_yield(Instruction::Lock(Scheduling::Dependency::VCC, "Start of Modulo"));
+        co_yield (Instruction::Lock(Scheduling::Dependency::VCC, "Start of Modulo"));
 
         // Allocate temporary registers
         auto s_1 = std::make_shared<Register::Value>(
@@ -97,7 +97,7 @@ namespace rocRoller
         co_yield_(Instruction(
             "v_readlane_b32", {dest}, {v_1, Register::Value::Literal(0)}, {}, "Move value"));
 
-        co_yield(Instruction::Unlock("End of Modulo"));
+        co_yield (Instruction::Unlock("End of Modulo"));
     }
 
     template <>
@@ -113,7 +113,7 @@ namespace rocRoller
         AssertFatal(lhs != nullptr);
         AssertFatal(rhs != nullptr);
 
-        co_yield(Instruction::Lock(Scheduling::Dependency::VCC, "Start of Modulo"));
+        co_yield (Instruction::Lock(Scheduling::Dependency::VCC, "Start of Modulo"));
 
         // Allocate temporary registers
 
@@ -172,7 +172,7 @@ namespace rocRoller
         co_yield_(Instruction("v_xor_b32", {v_2}, {v_2, v_4}, {}, ""));
         co_yield VectorSubUInt32(m_context, dest, v_2, v_4);
 
-        co_yield(Instruction::Unlock("End of Modulo"));
+        co_yield (Instruction::Unlock("End of Modulo"));
     }
 
     template <>
@@ -192,7 +192,7 @@ namespace rocRoller
                                 toString(Register::Type::Scalar),
                                 toString(DataType::Int64)));
 
-        // Generated using the assembly_to_instructions.py script with the following HIP code:
+        // Adapted from the following HIP code:
         //  extern "C"
         //  __global__ void hello_world(long int * ptr, long int value1, long int value2)
         //  {
@@ -201,8 +201,8 @@ namespace rocRoller
         //
         // Generated code was modified to use the provided dest, lhs and rhs registers and
         // to save the result in the dest register instead of memory.
-        co_yield(Instruction::Lock(Scheduling::Dependency::VCC, "Start of Modulo64(VCC)"));
-        co_yield(Instruction::Lock(Scheduling::Dependency::SCC, "Start of Modulo64(SCC)"));
+        co_yield (Instruction::Lock(Scheduling::Dependency::VCC, "Start of Modulo64(VCC)"));
+        co_yield (Instruction::Lock(Scheduling::Dependency::SCC, "Start of Modulo64(SCC)"));
         co_yield describeOpArgs("dest", dest, "lhs", lhs, "rhs", rhs);
         Register::ValuePtr l0, l1, r0, r1;
         co_yield get2DwordsScalar(l0, l1, lhs);
@@ -497,8 +497,8 @@ namespace rocRoller
                               {v_8, Register::Value::Literal(0)},
                               {},
                               "Move value"));
-        co_yield(Instruction::Unlock("End of Modulo64(SCC)"));
-        co_yield(Instruction::Unlock("End of Modulo64(VCC)"));
+        co_yield (Instruction::Unlock("End of Modulo64(SCC)"));
+        co_yield (Instruction::Unlock("End of Modulo64(VCC)"));
     }
 
     template <>
@@ -521,7 +521,7 @@ namespace rocRoller
         auto VCC  = m_context->getVCC();
         auto EXEC = m_context->getExec();
 
-        // Generated using the assembly_to_instructions.py script with the following HIP code:
+        // Adapted from the following HIP code:
         //  extern "C"
         //  __global__ void hello_world(long int * ptr, long int *value1, long int *value2)
         //  {
@@ -531,8 +531,8 @@ namespace rocRoller
         //
         // Generated code was modified to use the provided dest, lhs and rhs registers and
         // to save the result in the dest register instead of memory.
-        co_yield(Instruction::Lock(Scheduling::Dependency::VCC, "Start of Modulo64(VCC)"));
-        co_yield(Instruction::Lock(Scheduling::Dependency::SCC, "Start of Modulo64(SCC)"));
+        co_yield (Instruction::Lock(Scheduling::Dependency::VCC, "Start of Modulo64(VCC)"));
+        co_yield (Instruction::Lock(Scheduling::Dependency::SCC, "Start of Modulo64(SCC)"));
         co_yield describeOpArgs("dest", dest, "lhs", lhs, "rhs", rhs);
 
         Register::ValuePtr l0, l1, r0, r1;
@@ -853,7 +853,7 @@ namespace rocRoller
         {
             co_yield_(Instruction("s_or_b32", {EXEC}, {EXEC, s_5}, {}, ""));
         }
-        co_yield(Instruction::Unlock("End of Modulo64(SCC)"));
-        co_yield(Instruction::Unlock("End of Modulo64(VCC)"));
+        co_yield (Instruction::Unlock("End of Modulo64(SCC)"));
+        co_yield (Instruction::Unlock("End of Modulo64(VCC)"));
     }
 }

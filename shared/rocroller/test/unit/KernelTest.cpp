@@ -93,7 +93,6 @@ namespace rocRollerTest
             .amdhsa_kernel hello_world
             .amdhsa_next_free_vgpr 0
             .amdhsa_next_free_sgpr .amdgcn.next_free_sgpr
-            .amdhsa_user_sgpr_kernarg_segment_ptr 1
             .amdhsa_system_sgpr_workgroup_id_x 1
             .amdhsa_system_sgpr_workgroup_id_y 1
             .amdhsa_system_sgpr_workgroup_id_z 1
@@ -260,7 +259,7 @@ amdhsa.kernels:
 
             auto v_ptr   = Register::Value::Placeholder(m_context,
                                                       Register::Type::Vector,
-                                                      {DataType::Float, PointerType::PointerGlobal},
+                                                        {DataType::Float, PointerType::PointerGlobal},
                                                       1);
             auto v_value = Register::Value::Placeholder(
                 m_context, Register::Type::Vector, DataType::Float, 1);
@@ -392,7 +391,7 @@ amdhsa.kernels:
 
             auto v_ptr   = Register::Value::Placeholder(m_context,
                                                       Register::Type::Vector,
-                                                      {DataType::Float, PointerType::PointerGlobal},
+                                                        {DataType::Float, PointerType::PointerGlobal},
                                                       1);
             auto v_value = Register::Value::Placeholder(
                 m_context, Register::Type::Vector, DataType::Float, 1);

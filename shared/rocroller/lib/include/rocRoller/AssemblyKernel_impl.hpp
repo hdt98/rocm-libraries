@@ -42,7 +42,7 @@ namespace rocRoller
     }
 
     inline AssemblyKernel& AssemblyKernel::operator=(AssemblyKernel const& rhs) = default;
-    inline AssemblyKernel& AssemblyKernel::operator=(AssemblyKernel&& rhs) = default;
+    inline AssemblyKernel& AssemblyKernel::operator=(AssemblyKernel&& rhs)      = default;
 
     inline std::string AssemblyKernel::kernelName() const
     {
@@ -86,6 +86,8 @@ namespace rocRoller
             r.reset();
         for(auto& r : m_workitemIndex)
             r.reset();
+
+        m_preloadedArgs.reset();
     }
 
     inline bool AssemblyKernel::startedCodeGeneration() const

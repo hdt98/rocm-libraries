@@ -21,7 +21,6 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
 
 from rrtest import get_test_commands
 
@@ -30,7 +29,7 @@ from rrtest import get_test_commands
 class TestResult:
     """Results from running a test command."""
 
-    command: List[str]
+    command: list[str]
     returncode: int
     duration_seconds: float
     stdout: str
@@ -38,7 +37,7 @@ class TestResult:
     success: bool
 
 
-def run_test_command(command: List[str], cwd: Optional[Path] = None) -> TestResult:
+def run_test_command(command: list[str], cwd: Path | None = None) -> TestResult:
     """
     Run a test command and capture timing and results.
 
@@ -67,7 +66,7 @@ def run_test_command(command: List[str], cwd: Optional[Path] = None) -> TestResu
 
         duration = time.time() - start_time
 
-        print(f"✓ Completed in {duration:.2f}s (exit code: {result.returncode})")
+        print(f"? Completed in {duration:.2f}s (exit code: {result.returncode})")
 
         return TestResult(
             command=command,
@@ -80,7 +79,7 @@ def run_test_command(command: List[str], cwd: Optional[Path] = None) -> TestResu
 
     except Exception as e:
         duration = time.time() - start_time
-        print(f"✗ Failed after {duration:.2f}s: {e}")
+        print(f"? Failed after {duration:.2f}s: {e}")
 
         return TestResult(
             command=command,
@@ -104,7 +103,7 @@ def format_duration(seconds: float) -> str:
         return f"{minutes}m {secs:.1f}s"
 
 
-def print_summary(results: List[TestResult], sort_by: str = "order"):
+def print_summary(results: list[TestResult], sort_by: str = "order"):
     """
     Print a summary of test results.
 
@@ -137,7 +136,7 @@ def print_summary(results: List[TestResult], sort_by: str = "order"):
 
     # Print individual results
     for i, result in enumerate(sorted_results, 1):
-        status = "✓" if result.success else "✗"
+        status = "?" if result.success else "?"
         print(
             f"{i:2d}. {status} {result.command[0]:40s} {format_duration(result.duration_seconds):>10s}"
         )
@@ -201,7 +200,7 @@ Examples:
             # Check if we've exceeded max time
             if args.max_time and total_test_time > args.max_time:
                 print(
-                    f"\n⚠ Skipping remaining tests (exceeded --max-time {args.max_time}s)"
+                    f"\n? Skipping remaining tests (exceeded --max-time {args.max_time}s)"
                 )
                 break
 

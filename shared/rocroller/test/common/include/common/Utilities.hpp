@@ -21,6 +21,7 @@
 #include <rocRoller/DataTypes/DataTypes_Utils.hpp>
 #include <rocRoller/GPUArchitecture/GPUArchitectureTarget.hpp>
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
+#include <rocRoller/Operations/CommandArgument_fwd.hpp>
 #include <rocRoller/Utilities/Logging.hpp>
 #include <rocRoller/Utilities/Random.hpp>
 #include <rocRoller/Utilities/Settings.hpp>
@@ -78,6 +79,11 @@ auto make_shared_device(std::ranges::range auto const& init, size_t padding = 0)
     using T = std::remove_cvref_t<decltype(init.front())>;
     return make_shared_device<T, T>(init, padding);
 }
+
+/**
+ * Return a new device array that contains the value stored in `arg`.
+ */
+std::shared_ptr<void> make_shared_device(rocRoller::CommandArgumentValue const& arg);
 
 template <typename T>
 double normL2(std::vector<T> a)
@@ -263,14 +269,14 @@ AcceptableError
                 fudge *= arch.gfx == rocRoller::GPUArchitectureGFX::GFX950 ? 7.58 : 6.0;
                 ss << " Increase fudge for mixed BF8: " << fudge;
             }
-            else if constexpr(std::is_same_v<TA,
-                                             rocRoller::FP8> || std::is_same_v<TB, rocRoller::FP8>)
+            else if constexpr(std::is_same_v<TA, rocRoller::FP8>
+                              || std::is_same_v<TB, rocRoller::FP8>)
             {
                 fudge *= 4.95;
                 ss << " Increase fudge for mixed FP8: " << fudge;
             }
-            else if constexpr(std::is_same_v<TA,
-                                             rocRoller::BF6> || std::is_same_v<TB, rocRoller::BF6>)
+            else if constexpr(std::is_same_v<TA, rocRoller::BF6>
+                              || std::is_same_v<TB, rocRoller::BF6>)
             {
                 fudge *= 3;
                 ss << " Increase fudge for mixed BF6: " << fudge;
@@ -510,8 +516,8 @@ namespace rocRoller
     }
 
     template <typename F6x16>
-    requires(CIsAnyOf<F6x16, FP6x16, BF6x16>) //
-        inline void SetIdentityMatrix(std::vector<F6x16>& mat, size_t cols, size_t rows)
+        requires(CIsAnyOf<F6x16, FP6x16, BF6x16>) //
+    inline void SetIdentityMatrix(std::vector<F6x16>& mat, size_t cols, size_t rows)
     {
         std::fill(mat.begin(), mat.end(), F6x16()); // zero out the matrix
 

@@ -68,37 +68,39 @@ namespace rocRoller
         {
 
             template <typename Op>
-            requires CIsAnyOf<Op,
-                              ControlGraph::AssertOp,
-                              ControlGraph::Assign,
-                              ControlGraph::Barrier,
-                              ControlGraph::Block,
-                              ControlGraph::ConditionalOp,
-                              ControlGraph::Deallocate,
-                              ControlGraph::DoWhileOp,
-                              ControlGraph::Exchange,
-                              ControlGraph::ForLoopOp,
-                              ControlGraph::Kernel,
-                              ControlGraph::LoadLDSTile,
-                              ControlGraph::LoadLinear,
-                              ControlGraph::LoadSGPR,
-                              ControlGraph::LoadTiled,
-                              ControlGraph::LoadVGPR,
-                              ControlGraph::LoadTileDirect2LDS,
-                              ControlGraph::Multiply,
-                              ControlGraph::NOP,
-                              ControlGraph::Scope,
-                              ControlGraph::SeedPRNG,
-                              ControlGraph::SetCoordinate,
-                              ControlGraph::StoreLDSTile,
-                              ControlGraph::StoreLinear,
-                              ControlGraph::StoreSGPR,
-                              //   ControlGraph::StoreTiled,
-                              ControlGraph::StoreVGPR,
-                              //   ControlGraph::TensorContraction,
-                              ControlGraph::UnrollOp,
-                              ControlGraph::WaitZero>
-            void operator()(int nodeID, Op const& op) {}
+                requires CIsAnyOf<Op,
+                                  ControlGraph::AssertOp,
+                                  ControlGraph::Assign,
+                                  ControlGraph::Barrier,
+                                  ControlGraph::Block,
+                                  ControlGraph::ConditionalOp,
+                                  ControlGraph::Deallocate,
+                                  ControlGraph::DoWhileOp,
+                                  ControlGraph::Exchange,
+                                  ControlGraph::ForLoopOp,
+                                  ControlGraph::Kernel,
+                                  ControlGraph::LoadLDSTile,
+                                  ControlGraph::LoadLinear,
+                                  ControlGraph::LoadSGPR,
+                                  ControlGraph::LoadTiled,
+                                  ControlGraph::LoadVGPR,
+                                  ControlGraph::LoadTileDirect2LDS,
+                                  ControlGraph::Multiply,
+                                  ControlGraph::NOP,
+                                  ControlGraph::Scope,
+                                  ControlGraph::SeedPRNG,
+                                  ControlGraph::SetCoordinate,
+                                  ControlGraph::StoreLDSTile,
+                                  ControlGraph::StoreLinear,
+                                  ControlGraph::StoreSGPR,
+                                  //   ControlGraph::StoreTiled,
+                                  ControlGraph::StoreVGPR,
+                                  //   ControlGraph::TensorContraction,
+                                  ControlGraph::UnrollOp,
+                                  ControlGraph::WaitZero>
+            void operator()(int nodeID, Op const& op)
+            {
+            }
 
             void operator()(int nodeID, ControlGraph::StoreTiled const& op)
             {
@@ -144,9 +146,17 @@ namespace rocRoller
                 auto isConstructMacroTile
                     = CoordinateGraph::isEdge<CoordinateGraph::ConstructMacroTile>;
 
+                auto notFixedSize = [&](int tag) -> bool {
+                    auto size = getSize(graph.coordinates.getNode(tag));
+                    return !Expression::evaluationTimes(
+                        size)[Expression::EvaluationTime::Translate];
+                };
+
                 auto aTileDims = graph.coordinates.getInputNodeIndices(A, isConstructMacroTile)
+                                     .filter(notFixedSize)
                                      .to<std::vector>();
                 auto bTileDims = graph.coordinates.getInputNodeIndices(B, isConstructMacroTile)
+                                     .filter(notFixedSize)
                                      .to<std::vector>();
 
                 AssertFatal(aTileDims.size() == bTileDims.size());
