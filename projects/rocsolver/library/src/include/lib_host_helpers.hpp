@@ -181,8 +181,13 @@ static bool is_device_pointer(void* ptr)
     auto istat = hipPointerGetAttributes(&dev_attributes, ptr);
     if(istat != hipSuccess)
     {
+#ifndef NDEBUG
+        // ----------------------------------------------------------
+        // a host malloc pointer is passed to hipPointerGetAttributes
+        // ----------------------------------------------------------
         fmt::print(stderr, "is_device_pointer: istat = {} {}\n", static_cast<std::int32_t>(istat),
                    hipGetErrorName(istat));
+#endif
         return (false);
     }
 
