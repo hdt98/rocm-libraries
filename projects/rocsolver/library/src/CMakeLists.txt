@@ -447,11 +447,15 @@ if(USE_HIPCXX)
   target_compile_options(rocsolver PRIVATE
     "$<$<COMPILE_LANGUAGE:HIP>:SHELL:-mllvm -amdgpu-early-inline-all=true>"
     "$<$<COMPILE_LANGUAGE:HIP>:SHELL:-mllvm -amdgpu-function-calls=false>"
+    "$<$<COMPILE_LANGUAGE:HIP>:SHELL:-mllvm -amdgpu-kernarg-preload-count=32>"
+    "$<$<COMPILE_LANGUAGE:HIP>:SHELL:-mllvm -amdgpu-kernarg-preload=1>"
   )
 elseif(CMAKE_CXX_COMPILER MATCHES ".*clang\\+\\+.*")
   target_compile_options(rocsolver PRIVATE
     "SHELL:-mllvm -amdgpu-early-inline-all=true"
     "SHELL:-mllvm -amdgpu-function-calls=false"
+    "SHELL:-mllvm -amdgpu-kernarg-preload-count=32"
+    "SHELL:-mllvm -amdgpu-kernarg-preload=1"
   )
 endif()
 
