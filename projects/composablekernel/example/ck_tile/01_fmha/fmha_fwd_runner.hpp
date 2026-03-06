@@ -526,7 +526,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
 
     quant_scale_info qscale = quant_scale_info::decode(qscale_str);
 
-    if(is_mx && qscale.type != quant_scale_enum::mx)
+    if(is_mx && !is_sageattnv3 && qscale.type != quant_scale_enum::mx)
     {
         std::cerr << "The value of qscale_str must be 'mx' for MX data types" << std::endl;
         return fwd_result::invalid_args;
@@ -550,8 +550,12 @@ fwd_result fmha_fwd_run(mode_enum mode,
     }
     if(is_sageattnv3 && mode == mode_enum::group)
     {
-        std::cerr << "SageAttention V3 only supports batch mode in this example" << std::endl;
-        return fwd_result::invalid_args;
+        return fwd_result::no_instance;
+    }
+    if(is_sageattnv3 && (hdim_q != 128 || hdim_v != 128))
+    {
+        // SA3 only has kernels for hdim=128; other shapes have no applicable instance
+        return fwd_result::no_instance;
     }
 
     if(p_drop < 0.0f || p_drop > 1.0f)

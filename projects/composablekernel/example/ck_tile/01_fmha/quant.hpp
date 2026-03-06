@@ -65,7 +65,7 @@ struct quant_scale_info
         {
             info.type = quant_scale_enum::mx;
         }
-        else if(str == "sav3" || str == "5")
+        else if(str == "sav3" || str == "sageattnv3" || str == "5")
         {
             info.type = quant_scale_enum::sageattnv3;
         }

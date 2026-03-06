@@ -837,6 +837,18 @@ auto fmha_fwd_create_kargs_and_grids(fmha_fwd_args args)
         }
     }();
 
+    // SA3-specific fields are not passed through MakeKargsImpl; set them directly.
+    if constexpr(FmhaKernel::QScaleEnum ==
+                 ck_tile::BlockAttentionQuantScaleEnum::SAGEATTN_V3)
+    {
+        kargs.delta_s_ptr            = reinterpret_cast<const float*>(args.delta_s_ptr);
+        kargs.p_scale_factor         = args.p_scale_factor;
+        kargs.stride_delta_s         = args.stride_delta_s;
+        kargs.nhead_stride_delta_s   = args.nhead_stride_delta_s;
+        kargs.batch_stride_delta_s   = args.batch_stride_delta_s;
+        kargs.q_block_stride_delta_s = args.q_block_stride_delta_s;
+    }
+
     if constexpr(FmhaKernel::kIsGroupMode)
     {
         dim3 grids = FmhaKernel::GridSize(

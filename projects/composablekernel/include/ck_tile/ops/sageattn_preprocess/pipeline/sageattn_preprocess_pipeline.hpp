@@ -193,8 +193,8 @@ struct SageAttnPreprocessPipeline
                 (bit_cast<uint32_t>(max_abs * rcp_dst_max) + numeric_traits<float>::mant_mask) &
                 numeric_traits<float>::head_mask);
 
-            // Store e8m0 scale byte
-            dst_scale_ptr[g] = bit_cast<uint8_t>(bit_cast<uint32_t>(scale) >> 23);
+            // Store e8m0 scale byte (exponent field: bits [30:23])
+            dst_scale_ptr[g] = static_cast<uint8_t>(bit_cast<uint32_t>(scale) >> 23);
 
             // Pack 32 floats -> 16 bytes (pairs of FP4 into bytes) of pk_fp4_t
             uint8_t* hat_group = dst_hat_ptr + g * (kScaleGranularity / 2);
