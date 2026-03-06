@@ -19,15 +19,52 @@ jobs:
     name: 'docs-vale-linting'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out this repository
+        uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
       - run: npm install -g mdx2vast
 
-      - name: install_docutils_for_vale_linting
+      - name: Install docutils for Vale linting
         run: pip install docutils
 
-      - uses: errata-ai/vale-action@v2.1.1
+      - name: Setup Vale
+        uses: errata-ai/vale-action@v2.1.1
         with:
-          fail_on_error: true
+          # Don't fail on error. This action allows us to see all errors (handy), but more importantly downloads vale.
+          fail_on_error: false
           vale_flags: "--minAlertLevel=error"
+
+      - name: Create temporary directory for changed files
+        run: mkdir -p /tmp/pr_changed_files
+
+      - name: Download changed files of interest
+        run: |
+          chmod +x docs/get_files_changed_by_pr.sh
+
+          # Interesting files are:
+          #     *.md
+          #     *.rst
+          #     .vale.ini
+          declare interesting_file_paths_regex='^(.*(\.md|\.rst)|\.vale\.ini)$'
+
+          docs/get_files_changed_by_pr.sh \
+              -o "${{ github.repository_owner }}" \
+              -r "${{ github.event.repository.name }}" \
+              -p "${{ github.event.pull_request.number }}" \
+              -l "/tmp/pr_changed_files" \
+              -d "${interesting_file_paths_regex}" \
+              -T "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Run Vale on changed files
+        run: |
+          # Check if any files were downloaded that we wish to lint.
+          if [[ -z "$(ls -A "/tmp/pr_changed_files")" ]]; then
+              echo "No files of interest were changed in this PR."
+              exit 0
+          fi
+
+          echo "===== START VALE LINTING ON CHANGED FILES ====="
+          # Run Vale on the changed files. This command will exit with a non-zero code if any errors are found.
+          vale --output=line "/tmp/pr_changed_files"
+          echo "===== END VALE LINTING ON CHANGED FILES ====="
