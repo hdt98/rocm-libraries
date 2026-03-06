@@ -71,7 +71,8 @@ template <typename AsDataType,
           index_t CDEShuffleBlockTransferScalarPerVector_NPerBlock,
           LoopScheduler LoopSched,
           PipelineVersion PipelineVer = PipelineVersion::v1,
-          typename BComputeDataType_  = AComputeDataType_>
+          typename BComputeDataType_  = AComputeDataType_,
+          bool CacheSrcOffsets         = true>
 struct GridwiseGemmMultipleABD_xdl_cshuffle
     : public GridwiseGemm_xdl_cshuffle_base<
           tensor_layout::gemm::RowMajor,
@@ -661,7 +662,9 @@ struct GridwiseGemmMultipleABD_xdl_cshuffle
             ABlockTransferSrcScalarPerVector,
             ABlockTransferDstScalarPerVector_AK1,
             uniform_sequence_gen_t<NumATensor, AThreadTransferSrcResetCoordinateAfterRun>,
-            Sequence<true>>{as_grid_desc_ak0_m_ak1,
+            Sequence<true>,
+            1,
+            CacheSrcOffsets>{as_grid_desc_ak0_m_ak1,
                             idx_as_block_begin,
                             tie(a_block_desc_ak0_m_ak1),
                             make_tuple(make_multi_index(0, 0, 0)),
@@ -689,7 +692,9 @@ struct GridwiseGemmMultipleABD_xdl_cshuffle
             BBlockTransferSrcScalarPerVector,
             BBlockTransferDstScalarPerVector_BK1,
             uniform_sequence_gen_t<NumBTensor, BThreadTransferSrcResetCoordinateAfterRun>,
-            Sequence<true>>{bs_grid_desc_bk0_n_bk1,
+            Sequence<true>,
+            1,
+            CacheSrcOffsets>{bs_grid_desc_bk0_n_bk1,
                             idx_bs_block_begin,
                             tie(b_block_desc_bk0_n_bk1),
                             make_tuple(make_multi_index(0, 0, 0)),

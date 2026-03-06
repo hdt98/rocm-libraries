@@ -43,7 +43,8 @@ template <typename SrcDatas,
           index_t DstScalarPerVector,
           typename SrcResetCoordinateAfterRunFlags, // Sequence<bool ...>
           typename DstResetCoordinateAfterRunFlags, // Sequence<bool ...>
-          index_t NumThreadScratch = 1>
+          index_t NumThreadScratch = 1,
+          bool CacheSrcOffsets = false>
 struct ThreadwiseTensorSliceTransfer_v7r2
 {
     static constexpr auto I0 = Number<0>{};
@@ -110,6 +111,11 @@ struct ThreadwiseTensorSliceTransfer_v7r2
         static_for<0, nSrc, 1>{}([&](auto i) {
             src_coords_(i) = make_tensor_coordinate(src_descs[i], src_slice_origin_idxs[i]);
         });
+
+        if constexpr(CacheSrcOffsets)
+        {
+            PrecomputeSrcOffsets(src_descs);
+        }
     }
 
     template <typename Indices, enable_if_t<DstDescs::Size() == Indices::Size(), bool> = false>
@@ -146,6 +152,12 @@ struct ThreadwiseTensorSliceTransfer_v7r2
                             const SrcBuffers& src_bufs,
                             Number<ThreadScratchId> thread_scratch_id = Number<ThreadScratchId>{})
     {
+        if constexpr(CacheSrcOffsets)
+        {
+            RunReadCached(src_descs, src_bufs, thread_scratch_id);
+            return;
+        }
+
         // loop over space-filling curve
         static_for<0, src_num_access, 1>{}([&](auto iAccess) {
             auto src_vectors = generate_vectors<SrcDatas, SrcScalarPerVector>();
@@ -583,6 +595,11 @@ struct ThreadwiseTensorSliceTransfer_v7r2
         const auto adjusted_step = make_tensor_coordinate_step(src_descs[iSrc], adjusted_step_idx);
 
         move_tensor_coordinate(src_descs[iSrc], src_coords_(iSrc), adjusted_step);
+
+        if constexpr(CacheSrcOffsets)
+        {
+            PrecomputeSrcOffsets(src_descs);
+        }
     }
 
     // dst_slice_origin_step_idx need to be known at compile-time, for performance reason
@@ -603,6 +620,116 @@ struct ThreadwiseTensorSliceTransfer_v7r2
         move_tensor_coordinate(dst_descs[iDst], dst_coords_(iDst), adjusted_step);
     }
 
+    // Precompute offsets and validity for all src access points into register arrays.
+    // This walks the SFC once from the current src_coords_ origin, storing
+    // the offset (or -1 if invalid) for each access point.
+    __device__ void PrecomputeSrcOffsets(const SrcDescs& src_descs)
+    {
+        // Use a temporary copy of coordinates to walk the SFC
+        auto tmp_coords = src_coords_;
+
+        static_for<0, src_num_access, 1>{}([&](auto iAccess) {
+            static_for<0, nSrc, 1>{}([&](auto i) {
+                const bool is_valid =
+                    coordinate_has_valid_offset_assuming_visible_index_is_valid(
+                        src_descs[i], tmp_coords[i]);
+                // Store offset; use -1 sentinel for invalid
+                src_cached_offsets_(i)(iAccess) =
+                    is_valid ? tmp_coords[i].GetOffset() : -1;
+            });
+
+            // move temporary coordinate along SFC (except after last access)
+            if constexpr(iAccess.value != src_num_access - 1)
+            {
+                constexpr auto forward_step =
+                    SrcSpaceFillingCurve::GetForwardStep(iAccess);
+
+                static_for<0, nSrc, 1>{}([&](auto i) {
+                    move_tensor_coordinate(
+                        src_descs[i],
+                        tmp_coords(i),
+                        make_tensor_coordinate_step(src_descs[i], forward_step));
+                });
+            }
+        });
+    }
+
+    // Cached RunRead: uses precomputed offsets instead of incremental coordinate moves.
+    // The SFC walk and move_tensor_coordinate calls are completely eliminated.
+    template <typename SrcBuffers, index_t ThreadScratchId = 0>
+    __device__ void RunReadCached(const SrcDescs&  /* src_descs */,
+                                  const SrcBuffers& src_bufs,
+                                  Number<ThreadScratchId> thread_scratch_id = Number<ThreadScratchId>{})
+    {
+        // loop over space-filling curve using cached offsets
+        static_for<0, src_num_access, 1>{}([&](auto iAccess) {
+            auto src_vectors = generate_vectors<SrcDatas, SrcScalarPerVector>();
+            auto elm_vectors = generate_vectors<DstDatas, SrcScalarPerVector>();
+
+            bool oob_val = true;
+
+            // copy data from src_bufs using precomputed offsets
+            static_for<0, nSrc, 1>{}([&](auto i) {
+                using src_vector_t = typename remove_cvref_t<decltype(src_vectors[i])>::type;
+
+                const index_t cached_offset = src_cached_offsets_[i][iAccess];
+                const bool is_src_valid = (cached_offset != index_t{-1});
+
+                oob_val = oob_val & is_src_valid;
+
+                src_vectors(i).template AsType<src_vector_t>()(I0) =
+                    src_bufs[i].template Get<src_vector_t>(cached_offset, true);
+            });
+
+            constexpr auto get_elem_op_vec_len = []() {
+                if constexpr(is_detected<is_pack8_invocable_t, decltype(element_op_)>::value)
+                {
+                    if constexpr(decltype(element_op_)::is_pack8_invocable)
+                        return math::min(8, SrcScalarPerVector);
+                }
+                if constexpr(is_detected<is_pack4_invocable_t, decltype(element_op_)>::value)
+                {
+                    if constexpr(decltype(element_op_)::is_pack4_invocable)
+                        return math::min(4, SrcScalarPerVector);
+                }
+                if constexpr(is_detected<is_pack2_invocable_t, decltype(element_op_)>::value)
+                {
+                    if constexpr(decltype(element_op_)::is_pack2_invocable)
+                        return math::min(2, SrcScalarPerVector);
+                }
+                return 1;
+            };
+
+            constexpr index_t elem_op_vec_len = get_elem_op_vec_len();
+
+            // apply pointwise function
+            static_for<0, SrcScalarPerVector / elem_op_vec_len, 1>{}([&](auto i) {
+                const auto src_data_refs = generate_tie(
+                    [&](auto iSrc) -> const auto& {
+                        using SrcData = remove_cvref_t<tuple_element_t<iSrc.value, SrcDatas>>;
+                        using elem_op_vec_t = typename vector_type<SrcData, elem_op_vec_len>::type;
+                        return src_vectors[iSrc].template AsType<elem_op_vec_t>()[i];
+                    },
+                    Number<nSrc>{});
+
+                auto dst_data_refs = generate_tie(
+                    [&](auto iDst) -> auto& {
+                        using DstData = remove_cvref_t<tuple_element_t<iDst.value, DstDatas>>;
+                        using elem_op_vec_t = typename vector_type<DstData, elem_op_vec_len>::type;
+                        return elm_vectors(iDst).template AsType<elem_op_vec_t>()(i);
+                    },
+                    Number<nDst>{});
+
+                unpack2(element_op_, dst_data_refs, src_data_refs);
+            });
+
+            elm_vectors_tuple_(thread_scratch_id)(iAccess) = elm_vectors;
+            oob_vectors_tuple_(thread_scratch_id)(iAccess) = oob_val;
+            // No move_tensor_coordinate needed - offsets are precomputed
+        });
+
+        // No coordinate reset needed - coordinates are not moved during cached read
+    }
     private:
     using SrcVectorsType = decltype(generate_vectors<SrcDatas, SrcScalarPerVector>());
     using ElmVectorsType = decltype(generate_vectors<DstDatas, SrcScalarPerVector>());
@@ -623,6 +750,11 @@ struct ThreadwiseTensorSliceTransfer_v7r2
     SrcCoords src_coords_;
     DstCoords dst_coords_;
     const ElementwiseOperation element_op_;
+
+    // Precomputed src offset cache: per-src-tensor array of offsets per access point.
+    // offset == -1 encodes invalid (OOB). Only populated when CacheSrcOffsets == true.
+    using SrcOffsetArray = StaticallyIndexedArray<index_t, src_num_access>;
+    StaticallyIndexedArray<SrcOffsetArray, nSrc> src_cached_offsets_;
 };
 
 } // namespace ck

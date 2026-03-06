@@ -41,7 +41,8 @@ template <typename SliceLengths,
           bool DstResetCoordinateAfterRun, // control whether to move back dst coordinate after each
                                            // RunWrite(),  will be fused with MoveDstSliceWindow to
                                            // save addr computation
-          index_t NumThreadScratch = 1>
+          index_t NumThreadScratch = 1,
+          bool CacheSrcOffsets = false>
 struct ThreadwiseTensorSliceTransfer_v3r1
 {
     static constexpr index_t nDim = SliceLengths::Size();
@@ -78,6 +79,13 @@ struct ThreadwiseTensorSliceTransfer_v3r1
     static constexpr auto SrcScalarPerVector = Number<SrcScalarPerVector_ / PackedSize>{};
     static constexpr auto DstScalarPerVector = Number<DstScalarPerVector_ / PackedSize>{};
 
+    // Compile-time total number of source accesses (for offset caching)
+    static constexpr auto src_scalar_per_access_ct_ = generate_sequence(
+        detail::lambda_scalar_per_access<SrcVectorDim, SrcScalarPerVector_>{}, Number<nDim>{});
+    static constexpr auto src_access_lengths_ct_ = SliceLengths{} / src_scalar_per_access_ct_;
+    static constexpr index_t TotalSrcAccesses =
+        reduce_on_sequence(src_access_lengths_ct_, math::multiplies{}, Number<1>{});
+
     __device__ constexpr ThreadwiseTensorSliceTransfer_v3r1(
         const SrcDesc& src_desc,
         const Index& src_slice_origin,
@@ -107,6 +115,10 @@ struct ThreadwiseTensorSliceTransfer_v3r1
     __device__ void SetSrcSliceOrigin(const SrcDesc& src_desc, const Index& src_slice_origin_idx)
     {
         src_coord_ = make_tensor_coordinate(src_desc, src_slice_origin_idx);
+        if constexpr(CacheSrcOffsets)
+        {
+            PrecomputeSrcOffsets(src_desc);
+        }
     }
 
     __device__ void SetDstSliceOrigin(const DstDesc& dst_desc, const Index& dst_slice_origin_idx)
@@ -114,11 +126,221 @@ struct ThreadwiseTensorSliceTransfer_v3r1
         dst_coord_ = make_tensor_coordinate(dst_desc, dst_slice_origin_idx);
     }
 
+
+    // Pre-compute source offsets for all access points in the traversal.
+    // Walks the same static_ford traversal as RunRead, recording offsets.
+    __device__ void PrecomputeSrcOffsets(const SrcDesc& src_desc)
+    {
+        constexpr auto src_scalar_per_access = generate_sequence(
+            detail::lambda_scalar_per_access<SrcVectorDim, SrcScalarPerVector_>{}, Number<nDim>{});
+
+        constexpr auto src_access_lengths = SliceLengths{} / src_scalar_per_access;
+        constexpr auto src_dim_access_order = SrcDimAccessOrder{};
+        constexpr auto ordered_src_access_lengths =
+            container_reorder_given_new2old(src_access_lengths, src_dim_access_order);
+
+        const auto src_forward_steps  = ComputeForwardSteps(src_desc, src_scalar_per_access);
+        const auto src_backward_steps = ComputeBackwardSteps(src_desc, src_scalar_per_access);
+
+        using OrderedLengths = decltype(ordered_src_access_lengths);
+        using FordDecomposer =
+            detail::index_decomposer<remove_cvref_t<OrderedLengths>,
+                                     make_index_sequence<nDim>>;
+
+        static_for<0, TotalSrcAccesses, 1>{}([&](auto linear_idx) {
+            using OrderedIdx = typename FordDecomposer::template decompose<linear_idx.value>;
+            constexpr auto ordered_src_access_idx = OrderedIdx{};
+
+            const bool is_valid =
+                coordinate_has_valid_offset_assuming_visible_index_is_valid(src_desc, src_coord_);
+            src_cached_offsets_(linear_idx) = is_valid ? src_coord_.GetOffset() : -1;
+
+            constexpr auto forward_sweep =
+                ComputeForwardSweep(ordered_src_access_idx, ordered_src_access_lengths);
+            constexpr auto move_on_dim =
+                ComputeMoveOnDim(ordered_src_access_idx, ordered_src_access_lengths);
+
+            static_for<0, nDim, 1>{}([&](auto i) {
+                if constexpr(move_on_dim[i])
+                {
+                    if constexpr(forward_sweep[i])
+                    {
+                        move_tensor_coordinate(
+                            src_desc, src_coord_, src_forward_steps[src_dim_access_order[i]]);
+                    }
+                    else
+                    {
+                        move_tensor_coordinate(
+                            src_desc, src_coord_, src_backward_steps[src_dim_access_order[i]]);
+                    }
+                }
+            });
+        });
+
+        // Always reset coordinate back to slice origin after precomputation
+        const auto src_reset_step =
+            make_tensor_coordinate_step(src_desc, GetSrcCoordinateResetStep());
+        move_tensor_coordinate(src_desc, src_coord_, src_reset_step);
+    }
+
+    // Read using pre-computed offsets, bypassing move_tensor_coordinate in the hot loop.
+    template <typename SrcBuffer, index_t ThreadScratchId = 0>
+    __device__ void RunReadCached(const SrcDesc& /* src_desc */,
+                                  const SrcBuffer& src_buf,
+                                  Number<ThreadScratchId> thread_scratch_id = Number<ThreadScratchId>{})
+    {
+        static_assert(SrcBuffer::GetAddressSpace() == AddressSpaceEnum::Global or
+                          SrcBuffer::GetAddressSpace() == AddressSpaceEnum::Lds,
+                      "wrong!");
+
+        static_assert(
+            is_same<remove_cvref_t<typename SrcBuffer::type>, remove_cvref_t<SrcData>>::value,
+            "wrong! SrcBuffer and SrcData data type are inconsistent");
+
+        constexpr auto src_scalar_per_access = generate_sequence(
+            detail::lambda_scalar_per_access<SrcVectorDim, SrcScalarPerVector_>{}, Number<nDim>{});
+
+        constexpr auto src_access_lengths = SliceLengths{} / src_scalar_per_access;
+        constexpr auto src_dim_access_order = SrcDimAccessOrder{};
+        constexpr auto ordered_src_access_lengths =
+            container_reorder_given_new2old(src_access_lengths, src_dim_access_order);
+
+        using OrderedLengths = decltype(ordered_src_access_lengths);
+        using FordDecomposer =
+            detail::index_decomposer<remove_cvref_t<OrderedLengths>,
+                                     make_index_sequence<nDim>>;
+
+        static_for<0, TotalSrcAccesses, 1>{}([&](auto linear_idx) {
+            using OrderedIdx = typename FordDecomposer::template decompose<linear_idx.value>;
+            constexpr auto ordered_src_access_idx = OrderedIdx{};
+
+            constexpr auto forward_sweep =
+                ComputeForwardSweep(ordered_src_access_idx, ordered_src_access_lengths);
+
+            constexpr auto src_data_idx = ComputeDataIndex(ordered_src_access_idx,
+                                                           ordered_src_access_lengths,
+                                                           forward_sweep,
+                                                           src_dim_access_order,
+                                                           src_scalar_per_access);
+
+            constexpr auto src_data_idx_seq = generate_sequence_v2(
+                [&](auto i) { return Number<src_data_idx[i]>{}; }, Number<src_data_idx.Size()>{});
+
+            const index_t cached_offset = src_cached_offsets_[linear_idx];
+            const bool is_src_valid = (cached_offset != -1);
+
+            src_oob_thread_scratch_tuple_(thread_scratch_id)
+                .template SetAsType<bool>(src_data_idx_seq, is_src_valid);
+
+            using dst_vector_type = vector_type_maker_t<DstData, SrcScalarPerVector>;
+            using dst_vector_t    = typename dst_vector_type::type;
+            dst_vector_type op_r_v;
+
+            constexpr auto get_elem_op_vec_len = []() {
+                if constexpr(is_detected<is_pack8_invocable_t, decltype(src_element_op_)>::value)
+                {
+                    if constexpr(decltype(src_element_op_)::is_pack8_invocable)
+                        return math::min(8, SrcScalarPerVector);
+                }
+                else if constexpr(is_detected<is_pack4_invocable_t,
+                                              decltype(src_element_op_)>::value)
+                {
+                    if constexpr(decltype(src_element_op_)::is_pack4_invocable)
+                        return math::min(4, SrcScalarPerVector);
+                }
+                else if constexpr(is_detected<is_pack2_invocable_t,
+                                              decltype(src_element_op_)>::value)
+                {
+                    if constexpr(decltype(src_element_op_)::is_pack2_invocable)
+                        return math::min(2, SrcScalarPerVector);
+                }
+                else
+                {
+                    return 1;
+                }
+            };
+
+            constexpr index_t elem_op_vec_len = get_elem_op_vec_len();
+
+            using src_elem_op_vec_t = typename vector_type<SrcData, elem_op_vec_len>::type;
+            using dst_elem_op_vec_t = typename vector_type<DstData, elem_op_vec_len>::type;
+
+            using VectorSizeLookupTable    = Tuple<Sequence<>,
+                                                   Sequence<I1>,
+                                                   Sequence<I2>,
+                                                   Sequence<I2, I1>,
+                                                   Sequence<I4>,
+                                                   Sequence<I4, I1>,
+                                                   Sequence<I4, I2>,
+                                                   Sequence<I4, I2, I1>,
+                                                   Sequence<I8>,
+                                                   Sequence<I8, I1>,
+                                                   Sequence<I8, I2>,
+                                                   Sequence<I8, I2, I1>,
+                                                   Sequence<I8, I4>,
+                                                   Sequence<I8, I4, I1>,
+                                                   Sequence<I8, I4, I2>,
+                                                   Sequence<I8, I4, I2, I1>,
+                                                   Sequence<I16>>;
+            using VectorOffsetsLookupTable = Tuple<Sequence<>,
+                                                   Sequence<I0>,
+                                                   Sequence<I0>,
+                                                   Sequence<I0, I2>,
+                                                   Sequence<I0>,
+                                                   Sequence<I0, I4>,
+                                                   Sequence<I0, I4>,
+                                                   Sequence<I0, I4, I6>,
+                                                   Sequence<I0>,
+                                                   Sequence<I0, I8>,
+                                                   Sequence<I0, I8>,
+                                                   Sequence<I0, I8, I10>,
+                                                   Sequence<I0, I8>,
+                                                   Sequence<I0, I8, I12>,
+                                                   Sequence<I0, I8, I12>,
+                                                   Sequence<I0, I8, I12, I14>,
+                                                   Sequence<I0>>;
+
+            static_for<0, tuple_element_t<SrcScalarPerVector, VectorSizeLookupTable>::Size(), 1>{}(
+                [&](auto v_idx) {
+                    constexpr auto VectorLoadSize =
+                        tuple_element_t<SrcScalarPerVector, VectorSizeLookupTable>::At(v_idx);
+                    constexpr auto LoadOffset =
+                        tuple_element_t<SrcScalarPerVector, VectorOffsetsLookupTable>::At(v_idx);
+
+                    using src_vector_container   = vector_type_maker_t<SrcData, VectorLoadSize>;
+                    using src_vector_container_t = typename src_vector_container::type;
+
+                    src_vector_container src_vector =
+                        src_vector_container{src_buf.template Get<src_vector_container_t>(
+                            cached_offset / PackedSize + LoadOffset, is_src_valid)};
+
+                    static_for<0, VectorLoadSize / elem_op_vec_len, 1>{}([&](auto idx) {
+                        src_element_op_(
+                            op_r_v.template AsType<dst_elem_op_vec_t>()(idx + LoadOffset),
+                            src_vector.template AsType<src_elem_op_vec_t>()[idx]);
+                    });
+                });
+
+            src_thread_scratch_tuple_(thread_scratch_id)
+                .template SetAsType<dst_vector_t>(src_data_idx_seq,
+                                                  op_r_v.template AsType<dst_vector_t>()[I0]);
+
+            // No move_tensor_coordinate needed - offsets are pre-computed
+        });
+
+        // No coordinate reset needed - coordinate stays at slice origin
+    }
+
     template <typename SrcBuffer, index_t ThreadScratchId = 0>
     __device__ void RunRead(const SrcDesc& src_desc,
                             const SrcBuffer& src_buf,
                             Number<ThreadScratchId> thread_scratch_id = Number<ThreadScratchId>{})
     {
+        if constexpr(CacheSrcOffsets)
+        {
+            return RunReadCached(src_desc, src_buf, thread_scratch_id);
+        }
+
         static_assert(SrcBuffer::GetAddressSpace() == AddressSpaceEnum::Global or
                           SrcBuffer::GetAddressSpace() == AddressSpaceEnum::Lds,
                       "wrong!");
@@ -557,8 +779,17 @@ struct ThreadwiseTensorSliceTransfer_v3r1
     __device__ void MoveSrcSliceWindow(const SrcDesc& src_desc,
                                        const Index& src_slice_origin_step_idx)
     {
-        MoveSliceWindow<SrcDesc, SrcCoord, SrcResetCoordinateAfterRun>(
-            src_desc, src_coord_, src_slice_origin_step_idx, GetSrcCoordinateResetStep);
+        if constexpr(CacheSrcOffsets)
+        {
+            const auto step = make_tensor_coordinate_step(src_desc, src_slice_origin_step_idx);
+            move_tensor_coordinate(src_desc, src_coord_, step);
+            PrecomputeSrcOffsets(src_desc);
+        }
+        else
+        {
+            MoveSliceWindow<SrcDesc, SrcCoord, SrcResetCoordinateAfterRun>(
+                src_desc, src_coord_, src_slice_origin_step_idx, GetSrcCoordinateResetStep);
+        }
     }
 
     // dst_slice_origin_step_idx need to be known at compile-time, for performance reason
@@ -843,6 +1074,7 @@ struct ThreadwiseTensorSliceTransfer_v3r1
     DstThreadScratch dst_thread_scratch_;
 
     SrcCoord src_coord_;
+    StaticallyIndexedArray<index_t, CacheSrcOffsets ? TotalSrcAccesses : 1> src_cached_offsets_;
     DstCoord dst_coord_;
     const SrcElementwiseOperation src_element_op_;
     const DstElementwiseOperation dst_element_op_;

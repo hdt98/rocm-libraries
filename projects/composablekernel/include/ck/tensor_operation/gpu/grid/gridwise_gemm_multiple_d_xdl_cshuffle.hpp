@@ -73,7 +73,8 @@ template <typename ADataType,
           LoopScheduler LoopSched,
           PipelineVersion PipelineVer      = PipelineVersion::v1,
           typename BComputeDataType_       = AComputeDataType_,
-          bool DoElementwiseBeforeCShuffle = false>
+          bool DoElementwiseBeforeCShuffle = false,
+          bool CacheSrcOffsets = true>
 struct GridwiseGemmMultipleD_xdl_cshuffle
     : public GridwiseGemm_xdl_cshuffle_base<
           tensor_layout::gemm::RowMajor,
@@ -684,7 +685,8 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
                                                 1,
                                                 AThreadTransferSrcResetCoordinateAfterRun,
                                                 true,
-                                                NumGemmKPrefetchStage>(
+                                                NumGemmKPrefetchStage,
+                                                CacheSrcOffsets>(
                 a_grid_desc_ak0_m_ak1,
                 make_multi_index(num_ak0_per_block * k_idx, m_block_data_idx_on_grid, 0),
                 a_element_op,
@@ -715,7 +717,8 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
                                                 1,
                                                 BThreadTransferSrcResetCoordinateAfterRun,
                                                 true,
-                                                NumGemmKPrefetchStage>(
+                                                NumGemmKPrefetchStage,
+                                                CacheSrcOffsets>(
                 b_grid_desc_bk0_n_bk1,
                 make_multi_index(num_bk0_per_block * k_idx, n_block_data_idx_on_grid, 0),
                 b_element_op,
