@@ -426,7 +426,7 @@ public:
                                    storage.smaller);
             return;
         }
-        // Otherwise procede with the the current items per thread.
+        // Otherwise proceed with the the current items per thread.
 
         const unsigned int flat_id = ::rocprim::flat_block_thread_id();
 
