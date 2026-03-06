@@ -236,4 +236,86 @@ struct MHCProblemSmallTilesAsymmetric
     }
 };
 
+// MHC Problem - N=24 Exact (Priority 2 optimization)
+// Reduces wasted work: output_dim=24, so we use N=32 in warp GEMM but only load/store 24 columns
+// Strategy: Use standard N=32 warp GEMM, but allocate only 24 columns in LDS for B (phi)
+// Benefits:
+// - LDS for B: 24×32 × 2 bytes = 1.5KB vs 2KB for N=32 (25% reduction)
+// - Only write 24 columns to output (no wasted stores)
+// - Warp GEMM still uses N=32 internally (8 columns computed but not stored)
+// Uses single warp with M=32, N=32 (warp), but N=24 (LDS/output)
+template <typename XDataType_, typename ComputeDataType_, typename YDataType_>
+struct MHCProblemN24
+{
+    using XDataType       = remove_cvref_t<XDataType_>;
+    using ComputeDataType = remove_cvref_t<ComputeDataType_>;
+    using YDataType       = remove_cvref_t<YDataType_>;
+
+    using PhiDataType = XDataType;
+    using ADataType   = XDataType;
+    using BDataType   = PhiDataType;
+    using CDataType   = ComputeDataType;
+
+    static constexpr index_t kMTile         = 32;
+    static constexpr index_t kNTileLogical  = 24; // Actual output dimension
+    static constexpr index_t kNTilePhysical = 32; // Warp GEMM requires power of 2
+
+    // M=32, N=32, K=32 for warp GEMM compatibility
+    // But we'll only load/store 24 columns for B and output
+    using BlockGemmShape =
+        TileGemmShape<sequence<32, 32, 32>, sequence<1, 1, 1>, sequence<32, 32, 16>>;
+
+    static constexpr index_t VectorSizeA = 4;
+    static constexpr index_t VectorSizeB = 4;
+
+    using BlockShape = Generic2dBlockShape<sequence<1, 64>, sequence<1, 64>, sequence<1, 1>>;
+
+    using ALayout = ck_tile::tensor_layout::gemm::RowMajor;
+    using BLayout = ck_tile::tensor_layout::gemm::ColumnMajor;
+    using CLayout = ck_tile::tensor_layout::gemm::RowMajor;
+
+    using AsDataTypeTuple = tuple<ADataType>;
+    using BsDataTypeTuple = tuple<BDataType>;
+    using AsLayoutTuple   = tuple<ALayout>;
+    using BsLayoutTuple   = tuple<BLayout>;
+
+    using AElementWise = identity;
+    using BElementWise = identity;
+
+    static constexpr bool TransposeC            = false;
+    static constexpr bool kPadM                 = true;
+    static constexpr bool kPadN                 = true;
+    static constexpr bool kPadK                 = true;
+    static constexpr bool Preshuffle            = false;
+    static constexpr auto Scheduler             = GemmPipelineScheduler::Intrawave;
+    static constexpr index_t NumWaveGroups      = 1;
+    static constexpr index_t VectorLoadSize     = 16;
+    static constexpr index_t kBlockSize         = BlockShape::BlockSize;
+    static constexpr bool DoubleSmemBuffer      = false;
+    static constexpr bool UseStructuredSparsity = false;
+    static constexpr bool FixedVectorSize       = false;
+
+    struct Traits
+    {
+        static constexpr bool UsePersistentKernel = false;
+    };
+
+    CK_TILE_HOST static const std::string GetName()
+    {
+        return "MHCProblemN24_M32_N24logical_N32physical_K32";
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr auto MakeXLoadTileDistribution()
+    {
+        return GemmPipelineAGmemBGmemCRegV1DefaultPolicy::MakeADramTileDistribution<
+            MHCProblemN24>();
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr auto MakePhiLoadTileDistribution()
+    {
+        return GemmPipelineAGmemBGmemCRegV1DefaultPolicy::MakeBDramTileDistribution<
+            MHCProblemN24>();
+    }
+};
+
 } // namespace ck_tile

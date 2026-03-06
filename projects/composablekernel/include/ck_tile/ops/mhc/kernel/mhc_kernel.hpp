@@ -46,6 +46,24 @@ struct MHCKernelV5
     static constexpr index_t kNTile = Problem::BlockGemmShape::kN; // Output tile (32)
     static constexpr index_t kKTile = Problem::BlockGemmShape::kK; // K tile for C dimension (64)
 
+    // Check if problem has logical N (for N=24 optimization)
+    template <typename T, typename = void>
+    struct has_kNTileLogical : std::false_type
+    {
+    };
+
+    template <typename T>
+    struct has_kNTileLogical<T, std::void_t<decltype(T::kNTileLogical)>> : std::true_type
+    {
+    };
+
+    static constexpr index_t kNTileLogical = []() {
+        if constexpr(has_kNTileLogical<Problem>::value)
+            return Problem::kNTileLogical;
+        else
+            return kNTile;
+    }();
+
     static constexpr index_t kBlockSize = Problem::kBlockSize;
 
     // Adaptive K-tiles per block based on C dimension
@@ -69,7 +87,6 @@ struct MHCKernelV5
 
     CK_TILE_HOST_DEVICE static constexpr index_t GetSmemSize()
     {
-        // Use GEMM pipeline's smem size calculation (handles swizzled layout correctly)
         using GemmPolicy = GemmPipelineAGmemBGmemCRegV1DefaultPolicy;
         return GemmPolicy::GetSmemSizeA<Problem>() + GemmPolicy::GetSmemSizeB<Problem>();
     }
@@ -128,228 +145,226 @@ struct MHCKernelV5
 
         constexpr auto a_lds_block_desc = GemmPolicy::MakeALdsBlockDescriptor<Problem>();
         constexpr auto b_lds_block_desc = GemmPolicy::MakeBLdsBlockDescriptor<Problem>();
-
-        constexpr index_t smem_size_a = GemmPolicy::GetSmemSizeA<Problem>();
-        constexpr index_t smem_size_b = GemmPolicy::GetSmemSizeB<Problem>();
+        constexpr index_t smem_size_a   = GemmPolicy::GetSmemSizeA<Problem>();
+        constexpr index_t smem_size_b   = GemmPolicy::GetSmemSizeB<Problem>();
 
         __shared__ char smem_ptr[smem_size_a + smem_size_b];
         XDataType* x_lds     = reinterpret_cast<XDataType*>(smem_ptr);
         PhiDataType* phi_lds = reinterpret_cast<PhiDataType*>(smem_ptr + smem_size_a);
 
-        // Use BlockGemmARegBSmemCRegV2 for multi-warp (like FMHA), ASmemBSmem for single-warp
         constexpr index_t NumWarps = Problem::BlockGemmShape::NumWarps;
-
-        using BlockGemm = std::conditional_t<NumWarps == 1,
-                                             BlockGemmASmemBSmemCRegV1<Problem, Policy>,
-                                             BlockGemmARegBSmemCRegV2<Problem, Policy>>;
+        using BlockGemm            = std::conditional_t<NumWarps == 1,
+                                                        BlockGemmASmemBSmemCRegV1<Problem, Policy>,
+                                                        BlockGemmARegBSmemCRegV2<Problem, Policy>>;
 
         auto result_tile = BlockGemm::MakeCBlockTile();
         set_tile(result_tile, 0.0f);
 
-        // Create tensor views for X and Phi
         auto x_tensor_full = make_naive_tensor_view<address_space_enum::global>(
             p_x, make_tuple(batch, nC), make_tuple(nC, 1), number<1>{}, number<1>{});
-
         auto x_tensor_padded = pad_tensor_view(x_tensor_full,
                                                make_tuple(number<kMTile>{}, number<kKTile>{}),
                                                sequence<false, Problem::kPadK>{});
 
-        // CRITICAL: For multi-warp, use BlockGemm's expected distribution (like FMHA)
-        // For single-warp, use Problem's load distribution
         constexpr auto x_load_tile_dist = []() {
             if constexpr(NumWarps == 1)
-            {
                 return Problem::MakeXLoadTileDistribution();
-            }
             else
-            {
                 return BlockGemm::template MakeABlockTileDistribution<kMTile, kKTile>();
-            }
         }();
-
         auto x_dram_window = make_tile_window(x_tensor_padded,
                                               make_tuple(number<kMTile>{}, number<kKTile>{}),
                                               {batch_start, k_start},
                                               x_load_tile_dist);
 
-        // Use GEMM's swizzled LDS descriptor for X
         auto x_lds_tensor = make_tensor_view<address_space_enum::lds>(x_lds, a_lds_block_desc);
         auto x_lds_window =
             make_tile_window(x_lds_tensor, make_tuple(number<kMTile>{}, number<kKTile>{}), {0, 0});
 
-        // Create Phi tensor view and window
+        // For N=24 optimization: load only kNTileLogical columns from phi
+        // This reduces LDS usage and eliminates wasted GEMM work
         auto phi_tensor_full = make_naive_tensor_view<address_space_enum::global>(
             p_phi, make_tuple(output_dim, nC), make_tuple(1, output_dim), number<1>{}, number<1>{});
-
-        auto phi_tensor_padded = pad_tensor_view(phi_tensor_full,
-                                                 make_tuple(number<kNTile>{}, number<kKTile>{}),
-                                                 sequence<false, Problem::kPadK>{});
+        auto phi_tensor_padded =
+            pad_tensor_view(phi_tensor_full,
+                            make_tuple(number<kNTileLogical>{}, number<kKTile>{}),
+                            sequence<false, Problem::kPadK>{});
 
         constexpr auto phi_load_tile_dist = Problem::MakePhiLoadTileDistribution();
-        auto phi_dram_window              = make_tile_window(phi_tensor_padded,
-                                                make_tuple(number<kNTile>{}, number<kKTile>{}),
-                                                             {out_start, k_start},
-                                                phi_load_tile_dist);
+        auto phi_dram_window =
+            make_tile_window(phi_tensor_padded,
+                             make_tuple(number<kNTileLogical>{}, number<kKTile>{}),
+                             {out_start, k_start},
+                             phi_load_tile_dist);
 
-        // Use GEMM's swizzled LDS descriptor for Phi
         auto phi_lds_tensor = make_tensor_view<address_space_enum::lds>(phi_lds, b_lds_block_desc);
+        // Use kNTileLogical for LDS window to match actual loaded data
         auto phi_lds_window = make_tile_window(
-            phi_lds_tensor, make_tuple(number<kNTile>{}, number<kKTile>{}), {0, 0});
+            phi_lds_tensor, make_tuple(number<kNTileLogical>{}, number<kKTile>{}), {0, 0});
 
-        // Step 1: Compute partial norms - one per batch element in this tile
-        __shared__ ComputeDataType norm_sums[kMTile];
+        // Step 1: Dedicated norm phase — one pass over p_x, then K-loop (best for large C).
+        // EXPERIMENT: norm computation commented to measure its cost; write 0 so reduction uses
+        // norm=1.
+        // __shared__ ComputeDataType norm_sums[kMTile];
         const index_t thread_id = get_thread_id();
-
-        // Initialize
-        for(index_t i = thread_id; i < kMTile; i += kBlockSize)
-        {
-            norm_sums[i] = 0.0f;
-        }
-        block_sync_lds();
-
-        // Each batch element gets its own norm; 8-wide then 4-wide for better memory throughput
-        const index_t k_range       = k_end - k_start;
-        constexpr index_t kVecSize  = 4;
-        constexpr index_t kVecSize8 = 8;
-
-        // Compute norms for each batch element
-        for(index_t local_m = 0; local_m < kMTile; ++local_m)
-        {
-            const index_t global_m = batch_start + local_m;
-            if(global_m >= batch)
-                continue;
-
-            ComputeDataType partial_sum = 0.0f;
-            const XDataType* row_ptr    = p_x + global_m * nC + k_start;
-
-            index_t k = thread_id * kVecSize8;
-            for(; k + kVecSize8 <= k_range; k += kBlockSize * kVecSize8)
-            {
-                using VecType8 = ext_vector_t<XDataType, kVecSize8>;
-                VecType8 vec   = *c_style_pointer_cast<const VecType8*>(row_ptr + k);
-#pragma unroll
-                for(index_t i = 0; i < kVecSize8; ++i)
-                {
-                    ComputeDataType val = type_convert<ComputeDataType>(vec[i]);
-                    partial_sum += val * val;
-                }
-            }
-            for(; k + kVecSize <= k_range; k += kBlockSize * kVecSize)
-            {
-                using VecType = ext_vector_t<XDataType, kVecSize>;
-                VecType vec   = *c_style_pointer_cast<const VecType*>(row_ptr + k);
-#pragma unroll
-                for(index_t i = 0; i < kVecSize; ++i)
-                {
-                    ComputeDataType val = type_convert<ComputeDataType>(vec[i]);
-                    partial_sum += val * val;
-                }
-            }
-            for(; k < k_range; ++k)
-            {
-                ComputeDataType val = type_convert<ComputeDataType>(row_ptr[k]);
-                partial_sum += val * val;
-            }
-
-            // Use warp-level reduction - adapt to actual warp size
-#pragma unroll
-            for(index_t offset = get_warp_size() / 2; offset > 0; offset >>= 1)
-            {
-                partial_sum += __shfl_down(partial_sum, offset);
-            }
-
-            // First thread in warp writes to shared memory (only 1 atomic per warp!)
-            if((thread_id % get_warp_size()) == 0 && partial_sum != 0.0f)
-            {
-                atomicAdd(&norm_sums[local_m], partial_sum);
-            }
-        }
-
-        block_sync_lds();
-
-        // Write partial norms
+        // for(index_t i = thread_id; i < kMTile; i += kBlockSize)
+        //     norm_sums[i] = 0.0f;
+        // block_sync_lds();
+        //
+        // const index_t k_range       = k_end - k_start;
+        // constexpr index_t kVecSize  = 4;
+        // constexpr index_t kVecSize8 = 8;
+        // for(index_t local_m = 0; local_m < kMTile; ++local_m)
+        // {
+        //     const index_t global_m = batch_start + local_m;
+        //     if(global_m >= batch)
+        //         continue;
+        //     ComputeDataType partial_sum = 0.0f;
+        //     const XDataType* row_ptr    = p_x + global_m * nC + k_start;
+        //     index_t k = thread_id * kVecSize8;
+        //     for(; k + kVecSize8 <= k_range; k += kBlockSize * kVecSize8)
+        //     {
+        //         using VecType8 = ext_vector_t<XDataType, kVecSize8>;
+        //         VecType8 vec  = *c_style_pointer_cast<const VecType8*>(row_ptr + k);
+        // #pragma unroll
+        //         for(index_t i = 0; i < kVecSize8; ++i)
+        //         {
+        //             ComputeDataType val = type_convert<ComputeDataType>(vec[i]);
+        //             partial_sum += val * val;
+        //         }
+        //     }
+        //     for(; k + kVecSize <= k_range; k += kBlockSize * kVecSize)
+        //     {
+        //         using VecType = ext_vector_t<XDataType, kVecSize>;
+        //         VecType vec   = *c_style_pointer_cast<const VecType*>(row_ptr + k);
+        // #pragma unroll
+        //         for(index_t i = 0; i < kVecSize; ++i)
+        //         {
+        //             ComputeDataType val = type_convert<ComputeDataType>(vec[i]);
+        //             partial_sum += val * val;
+        //         }
+        //     }
+        //     for(; k < k_range; ++k)
+        //     {
+        //         ComputeDataType val = type_convert<ComputeDataType>(row_ptr[k]);
+        //         partial_sum += val * val;
+        //     }
+        // #pragma unroll
+        //     for(index_t offset = get_warp_size() / 2; offset > 0; offset >>= 1)
+        //         partial_sum += __shfl_down(partial_sum, offset);
+        //     if((thread_id % get_warp_size()) == 0 && partial_sum != 0.0f)
+        //         atomicAdd(&norm_sums[local_m], partial_sum);
+        // }
+        // block_sync_lds();
         for(index_t i = thread_id; i < kMTile; i += kBlockSize)
         {
             const index_t global_m = batch_start + i;
             if(global_m < batch)
-            {
-                p_partial_norms[block_k * batch + global_m] = norm_sums[i];
-            }
+                p_partial_norms[block_k * batch + global_m] = 0.0f; // was: norm_sums[i]
         }
-
         block_sync_lds();
 
-        // Loop over K-tiles within this block's K-range (adaptive count)
+        // Step 2: K-loop — GEMM over tiles with GEMM pipeline scheduling pattern
+        // Pattern: load next → sync → GEMM current → sync → store next → move
+        // This overlaps "load next" with "GEMM current" at instruction level
+
+        // Prologue: Load tile 0 into registers and store to LDS
+        auto x_tile   = make_static_distributed_tensor<XDataType>(x_load_tile_dist);
+        auto phi_tile = make_static_distributed_tensor<PhiDataType>(phi_load_tile_dist);
+
+        if(k_tiles_per_block > 0 && k_start < k_end)
+        {
+            // Load tile 0
+            load_tile(x_tile, x_dram_window);
+            load_tile(phi_tile, phi_dram_window);
+
+            // Store tile 0 to LDS
+            if constexpr(NumWarps == 1)
+                store_tile(x_lds_window, x_tile);
+            store_tile(phi_lds_window, phi_tile);
+
+            // Move to tile 1
+            move_tile_window(x_dram_window, {0, kKTile});
+            move_tile_window(phi_dram_window, {0, kKTile});
+        }
+
+        // Main loop: Process tiles 0 to k_tiles_per_block-1
         for(index_t k_tile_idx = 0; k_tile_idx < k_tiles_per_block; ++k_tile_idx)
         {
             const index_t k_current = k_start + k_tile_idx * kKTile;
             if(k_current >= k_end)
                 break;
 
-            // Prefetch next K-tile into L2 when enough iterations (avoid overhead on small shapes)
-            if(k_tiles_per_block >= 4 && k_tile_idx + 1 < k_tiles_per_block)
+            const bool has_next_tile = (k_tile_idx + 1 < k_tiles_per_block) &&
+                                       (k_start + (k_tile_idx + 1) * kKTile < k_end);
+
+            // Single-warp path: load next → sync → GEMM → sync → store next
+            if constexpr(NumWarps == 1)
             {
-                const index_t k_next = k_start + (k_tile_idx + 1) * kKTile;
-                if(k_next < nC)
+                if(has_next_tile)
                 {
-                    const XDataType* x_next     = p_x + batch_start * nC + k_next;
-                    const PhiDataType* phi_next = p_phi + out_start + k_next * output_dim;
-                    __builtin_prefetch(x_next, 0, 2);
-                    __builtin_prefetch(phi_next, 0, 2);
-                }
-            }
-
-            // SCOPED SECTION 1: Load and process X tile
-            // Limit x_tile lifetime to reduce register pressure
-            {
-                auto x_tile = make_static_distributed_tensor<XDataType>(x_load_tile_dist);
-                load_tile(x_tile, x_dram_window);
-
-                // For multi-warp (BlockGemmARegBSmemCRegV2): X stays in registers
-                // For single-warp (BlockGemmASmemBSmemCRegV1): X goes to LDS
-                if constexpr(NumWarps == 1)
-                {
-                    store_tile(x_lds_window, x_tile);
-                    // x_tile goes out of scope here for single-warp, freeing registers
-                }
-                // For multi-warp, x_tile must stay alive for GEMM below
-
-                // SCOPED SECTION 2: Load and process Phi tile
-                // Limit phi_tile lifetime to reduce register pressure
-                {
-                    auto phi_tile = make_static_distributed_tensor<PhiDataType>(phi_load_tile_dist);
+                    // Load next tile (tile i+1) into registers FIRST
+                    load_tile(x_tile, x_dram_window);
                     load_tile(phi_tile, phi_dram_window);
-                    store_tile(phi_lds_window, phi_tile);
-                    // phi_tile goes out of scope here, freeing registers
                 }
 
+                // Sync before GEMM
                 block_sync_lds();
 
-                // Accumulate GEMM
-                if constexpr(NumWarps == 1)
+                // GEMM on current tile (tile i) from LDS
+                BlockGemm{}(result_tile, x_lds_window, phi_lds_window);
+
+                if(has_next_tile)
                 {
-                    // Single-warp: both from LDS (x_tile already freed)
-                    BlockGemm{}(result_tile, x_lds_window, phi_lds_window);
+                    // Sync before storing next tile
+                    block_sync_lds();
+
+                    // Store next tile (tile i+1) to LDS
+                    store_tile(x_lds_window, x_tile);
+                    store_tile(phi_lds_window, phi_tile);
+
+                    // Move to tile i+2
+                    move_tile_window(x_dram_window, {0, kKTile});
+                    move_tile_window(phi_dram_window, {0, kKTile});
                 }
-                else
-                {
-                    // Multi-warp: X from registers, Phi from LDS
-                    BlockGemm{}(result_tile, x_tile, phi_lds_window);
-                }
-                // x_tile goes out of scope here for multi-warp, freeing registers
             }
+            else
+            {
+                // Multi-warp path: x_tile holds current data from previous iteration
+                // Save current x_tile before potentially loading next
+                auto x_tile_current = x_tile;
 
-            // Move windows to next K-tile
-            move_tile_window(x_dram_window, {0, kKTile});
-            move_tile_window(phi_dram_window, {0, kKTile});
+                if(has_next_tile)
+                {
+                    // Load next tile into x_tile (overwrites it)
+                    load_tile(x_tile, x_dram_window);
+                    load_tile(phi_tile, phi_dram_window);
+                }
 
-            // NOTE: No sync needed here! Next iteration will sync before GEMM anyway
-            // Removing this sync cuts multi-warp overhead in half
+                // Sync before GEMM
+                block_sync_lds();
+
+                // GEMM uses the saved current tile from registers
+                BlockGemm{}(result_tile, x_tile_current, phi_lds_window);
+
+                if(has_next_tile)
+                {
+                    // Sync before storing next tile
+                    block_sync_lds();
+
+                    // Store next tile to LDS (x_tile already has next data)
+                    store_tile(phi_lds_window, phi_tile);
+
+                    // Move to tile i+2
+                    move_tile_window(x_dram_window, {0, kKTile});
+                    move_tile_window(phi_dram_window, {0, kKTile});
+                }
+            }
         }
 
         // Store partial results to workspace buffer
         // OPTIMIZED LAYOUT: [batch][grid_k][output_dim] for coalesced reduction access
-        // Old layout [grid_k][batch][output_dim] caused strided access in reduction kernel
+        // For N=24: only store the first kNTileLogical columns (skip padding)
         const index_t grid_k_total = (nC + k_per_block - 1) / k_per_block;
 
         constexpr auto result_spans = decltype(result_tile)::get_distributed_spans();
@@ -363,14 +378,11 @@ struct MHCKernelV5
                 const index_t global_m = batch_start + local_m;
                 const index_t global_n = out_start + local_n;
 
-                if(global_m < batch && global_n < output_dim)
+                // For N=24 optimization: only write columns within kNTileLogical
+                if(global_m < batch && global_n < output_dim && local_n < kNTileLogical)
                 {
                     constexpr auto i_j_idx = make_tuple(idx0, idx1);
                     ComputeDataType value  = result_tile[i_j_idx];
-
-                    // Store to workspace: [global_m][block_k][global_n]
-                    // This layout ensures consecutive threads in reduction kernel access
-                    // consecutive memory
                     const index_t workspace_idx =
                         global_m * (grid_k_total * output_dim) + block_k * output_dim + global_n;
                     p_workspace[workspace_idx] = value;
