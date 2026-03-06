@@ -5,7 +5,6 @@
 
 #include "ck_tile/host/concat.hpp"
 #include "ck_tile/core.hpp"
-#include "ck_tile/core/utility/lds_bank_conflict_analysis.hpp"
 #include "ck_tile/ops/common/utils.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm_dispatcher.hpp"
 #include "ck_tile/ops/common/tensor_layout.hpp"
