@@ -1187,13 +1187,12 @@ int main(int argc, const char* argv[])
 
                                 {
                                     ScopedTimer timer("benchmark_runs");
+                                    TimingEvents startEvents(enq, eventCount);
+                                    TimingEvents stopEvents(enq, eventCount);
                                     listeners.preSyncs();
                                     if(enq)
                                         for(int i = 0; i < syncs; i++)
                                         {
-                                            TimingEvents startEvents(enq, eventCount);
-                                            TimingEvents stopEvents(enq, eventCount);
-
                                             listeners.preEnqueues(stream);
 
                                             for(int j = 0; j < enq; j++)

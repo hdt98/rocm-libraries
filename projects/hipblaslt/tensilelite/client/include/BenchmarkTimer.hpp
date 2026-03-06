@@ -49,6 +49,7 @@ namespace TensileLite
             BenchmarkTimer(po::variables_map const& args,
                            Hardware const&          hardware,
                            float                    flushTimeUs);
+            ~BenchmarkTimer();
 
             virtual bool needMoreBenchmarkRuns() const override;
             virtual void preBenchmarkRun() override;

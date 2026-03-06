@@ -69,6 +69,14 @@ namespace TensileLite
         {
         }
 
+        BenchmarkTimer::~BenchmarkTimer()
+        {
+            if(start)
+                static_cast<void>(hipEventDestroy(start));
+            if(stop)
+                static_cast<void>(hipEventDestroy(stop));
+        }
+
         bool BenchmarkTimer::needMoreBenchmarkRuns() const
         {
             return m_numBenchmarksRun < m_numBenchmarks;
@@ -340,8 +348,11 @@ namespace TensileLite
             }
             else
             {
-                static_cast<void>(hipEventCreate(&start));
-                static_cast<void>(hipEventCreate(&stop));
+                if(start == nullptr)
+                {
+                    static_cast<void>(hipEventCreate(&start));
+                    static_cast<void>(hipEventCreate(&stop));
+                }
                 static_cast<void>(hipEventRecord(start, stream));
             }
         }
@@ -387,8 +398,6 @@ namespace TensileLite
                     float eventMs = 0.0f;
                     static_cast<void>(hipEventElapsedTime(&eventMs, start, stop));
                     totalTime = double_millis(eventMs);
-                    static_cast<void>(hipEventDestroy(start));
-                    static_cast<void>(hipEventDestroy(stop));
                 }
             }
             else
