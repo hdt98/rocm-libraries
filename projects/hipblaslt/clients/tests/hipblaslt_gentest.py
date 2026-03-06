@@ -119,6 +119,11 @@ Expand hipBLASLt YAML test data file into binary Arguments records
                         default=[])
     parser.add_argument('-t', '--template',
                         type=argparse.FileType('r'))
+    parser.add_argument(
+        '--list',
+        action='store_true',
+        help='Print one line per test: category<tab>name (for counting by row/filter)',
+    )
     return parser.parse_args()
 
 
@@ -355,6 +360,13 @@ def write_test(test):
     byt = bytes(param['Arguments'](*arg))
     if byt not in testcases:
         testcases.add(byt)
+        if args.get('list'):
+            # Print category and name for counting (e.g. by filter and row)
+            print(
+                test.get('category', '') + '\t' + test.get('name', ''),
+                flush=True,
+            )
+            return
         write_signature(args['outfile'])
         args['outfile'].write(byt)
 
