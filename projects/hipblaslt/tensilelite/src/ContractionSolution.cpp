@@ -1581,6 +1581,11 @@ namespace TensileLite
                 rv.args.template append<void const*>(toString(arg.semantic),
                                                      ptrArgValues.at(arg.semantic));
             }
+            else if(arg.semantic == CustomArgSemantic::Expression)
+            {
+                auto computedValue = processExpression(arg.expression, argValuesForExpressions);
+                rv.args.appendCustomType("Expression", computedValue, arg.type);
+            }
             else if(arg.semantic == CustomArgSemantic::DebugPattern)
             {
                 rv.args.template append<uint32_t>("DebugPattern", debugPattern);
