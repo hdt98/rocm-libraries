@@ -42,6 +42,22 @@ namespace TensileLite
 {
     namespace Client
     {
+        void DataInitialization::setSeed(unsigned int seed)
+        {
+            initSeedValue() = seed;
+            initSeedIsSet() = true;
+        }
+
+        unsigned int DataInitialization::getSeed()
+        {
+            return initSeedValue();
+        }
+
+        bool DataInitialization::seedSet()
+        {
+            return initSeedIsSet();
+        }
+
         template <typename K, typename T, std::size_t MaxNumEntries = 128>
         class LRUCache
         {

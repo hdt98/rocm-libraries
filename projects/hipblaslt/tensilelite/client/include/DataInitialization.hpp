@@ -35,6 +35,7 @@
 #include "Rotating.hpp"
 
 #include <cstddef>
+#include <omp.h>
 #include <random>
 
 #include "RunListener.hpp"
@@ -78,9 +79,26 @@ namespace TensileLite
             Count
         };
 
+        // Namespace-scoped seed storage for deterministic random init.
+        // Set via DataInitialization::setSeed() before any init occurs.
+        inline unsigned int& initSeedValue()
+        {
+            static unsigned int seed = 0;
+            return seed;
+        }
+        inline bool& initSeedIsSet()
+        {
+            static bool isSet = false;
+            return isSet;
+        }
+
         static int getThreadLocalRandInt()
         {
-            thread_local std::mt19937          generator(std::random_device{}());
+            thread_local std::mt19937 generator(
+                initSeedIsSet()
+                    ? (initSeedValue()
+                       + static_cast<unsigned int>(omp_get_thread_num()))
+                    : std::random_device{}());
             std::uniform_int_distribution<int> distribution;
             return distribution(generator);
         }
@@ -130,6 +148,10 @@ namespace TensileLite
         class DataInitialization : public RunListener
         {
         public:
+            static void         setSeed(unsigned int seed);
+            static unsigned int getSeed();
+            static bool         seedSet();
+
             static double GetRepresentativeBetaValue(po::variables_map const& args);
 
             DataInitialization(po::variables_map const&    args,
@@ -679,7 +701,7 @@ namespace TensileLite
             template <typename T, InitMode Mode>
             void initArray(T* array, size_t elements)
             {
-#pragma omp parallel for
+#pragma omp parallel for schedule(static)
                 for(size_t i = 0; i < elements; i++)
                 {
                     array[i] = getValue<T, Mode>();
@@ -689,7 +711,7 @@ namespace TensileLite
             template <typename T>
             void initArrayConvert(T* array, size_t elements)
             {
-#pragma omp parallel for
+#pragma omp parallel for schedule(static)
                 for(size_t i = 0; i < elements; i++)
                 {
                     array[i] = ConvertTo<T>(i);
@@ -771,7 +793,7 @@ namespace TensileLite
             {
                 auto const& sizes = tensor.sizes();
                 auto        count = CoordCount(sizes.begin(), sizes.end());
-#pragma omp parallel for
+#pragma omp parallel for schedule(static)
                 for(size_t idx = 0; idx < count; idx++)
                 {
                     std::vector<size_t> coord(tensor.dimensions(), 0);
@@ -783,7 +805,7 @@ namespace TensileLite
             template <typename T, bool useCos, bool useAbs>
             void initArrayTrig(T* array, size_t elements)
             {
-#pragma omp parallel for
+#pragma omp parallel for schedule(static)
                 for(size_t i = 0; i < elements; i++)
                 {
                     array[i] = getTrigValue<T>(i, useCos, useAbs);
@@ -2465,7 +2487,7 @@ namespace TensileLite
             using typename rocm_random_common<T>::random_fp_int_dist;
             __attribute__((flatten)) T operator()()
             {
-                static std::mt19937 rng;
+                static std::mt19937 rng(initSeedValue());
                 int                 exp = std::uniform_int_distribution<int>{}(rng);
                 exp                     = exp % (HIGH_EXP - LOW_EXP + 1) + LOW_EXP;
                 return this->signsig_exp(random_fp_int_dist{}(rng), exp);
