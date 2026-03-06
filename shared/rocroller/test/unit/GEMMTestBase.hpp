@@ -9,6 +9,7 @@
 
 #include "GPUContextFixture.hpp"
 
+#include <common/CommonGraphs.hpp>
 #include <common/GEMMProblem.hpp>
 #include <common/mxDataGen.hpp>
 #include <mxDataGenerator/PreSwizzle.hpp>
@@ -199,442 +200,49 @@ namespace GEMMTests
                 numWorkgroupY = N / gemm.macN;
             }
 
-            m_kernelOptions->scaleSkipPermlane = gemm.scaleSkipPermlane;
-
-            // Host data
-            using PackedTypeA = typename PackedTypeOf<TA>::type;
-            using PackedTypeB = typename PackedTypeOf<TB>::type;
-            std::vector<PackedTypeA> hostA;
-            std::vector<PackedTypeB> hostB;
-            std::vector<TC>          hostC;
-
-            std::vector<uint8_t> hostScaleA, hostScaleB;
-
-            TensorDescriptor descA(dataTypeA, {size_t(M), size_t(K)}, gemm.transA);
-            TensorDescriptor descB(dataTypeB, {size_t(K), size_t(N)}, gemm.transB);
-            TensorDescriptor descC(dataTypeD, {size_t(M), size_t(N)}, "N");
-            TensorDescriptor descD(dataTypeD, {size_t(M), size_t(N)}, "N");
-
-            auto seed = 31415u;
-            if(gemm.scaleAMode == Operations::ScaleMode::Separate
-               || gemm.scaleBMode == Operations::ScaleMode::Separate)
-            {
-                auto const& arch = m_context->targetArchitecture();
-
-                auto scaleBlockSize = gemm.scaleBlockSize;
-                AssertFatal(scaleBlockSize > 0, "scaleBlockSize must be set to scale A or B.");
-                AssertFatal(
-                    arch.isSupportedScaleBlockSize(scaleBlockSize),
-                    fmt::format("Architecture {} does not support block scaling (size: {}).",
-                                arch.target().toString(),
-                                scaleBlockSize));
-                AssertFatal(gemm.k % scaleBlockSize == 0,
-                            fmt::format("K: {} must be a multiple of the scale block size: {}",
-                                        gemm.k,
-                                        scaleBlockSize));
-                DGenInput(seed,
-                          hostA,
-                          descA,
-                          hostB,
-                          descB,
-                          hostC,
-                          descC,
-                          hostScaleA,
-                          hostScaleB,
-                          gemm.scaleAMode == Operations::ScaleMode::Separate,
-                          gemm.scaleBMode == Operations::ScaleMode::Separate,
-                          -1.f,
-                          1.f,
-                          static_cast<uint>(scaleBlockSize));
-            }
-            else
-            {
-                DGenInput(seed, hostA, descA, hostB, descB, hostC, descC);
-            }
-
-            if(setIdentity)
-            {
-                SetIdentityMatrix(hostA, K, M);
-                SetIdentityMatrix(hostB, N, K);
-
-                std::fill(hostC.begin(), hostC.end(), static_cast<TD>(0.0));
-            }
-
-            // Pre-tile B on the host when pretileB is set (kernel expects pre-tiled layout)
-            std::vector<PackedTypeB> hostBForKernel(hostB);
-            if(!gemm.pretileB.empty() && gemm.pretileB.size() == 2)
-            {
-                auto const packing = TypeInfo<PackedTypeB>::ElementBits / TypeInfo<TB>::ElementBits;
-                std::vector<size_t> sizes       = descB.sizes();
-                std::vector<size_t> preTileSize = gemm.pretileB;
-                AssertFatal(K % preTileSize[0] == 0,
-                            "B matrix dimension K must be divisible by pretileB tile size in K.",
-                            ShowValue(K),
-                            ShowValue(preTileSize[0]));
-                AssertFatal(N % preTileSize[1] == 0,
-                            "B matrix dimension N must be divisible by pretileB tile size in N.",
-                            ShowValue(N),
-                            ShowValue(preTileSize[1]));
-                if(packing > 1)
-                {
-                    AssertFatal(sizes[0] % packing == 0,
-                                "pretileB: K dimension must be a multiple of packing factor (",
-                                packing,
-                                ") for packed type B.");
-                    AssertFatal(preTileSize[0] % packing == 0,
-                                "pretileB: tile K must be a multiple of packing factor (",
-                                packing,
-                                ") for packed type B.");
-                    sizes[0] /= packing;
-                    preTileSize[0] /= packing;
-                }
-                hostBForKernel = DGen::preSwizzle(hostB, sizes, {}, preTileSize);
-            }
-
-            auto deviceA = make_shared_device<TA>(hostA);
-            auto deviceB = make_shared_device<TB>(hostBForKernel);
-
-            std::shared_ptr<TC> deviceC = (notSetC) ? nullptr : make_shared_device(hostC);
-            std::shared_ptr<TD> deviceD = make_shared_device<TD>(M * N, TD{});
-
-            std::shared_ptr<uint8_t> deviceScaleA, deviceScaleB;
-
-            if(gemm.scaleAMode == Operations::ScaleMode::Separate)
-            {
-                if((gemm.scaleSkipPermlane == ScaleSkipPermlaneMode::PreSwizzleScale)
-                   || (!gemm.scalePretileA.empty()))
-                {
-                    auto descScaleA = descA.withNormalizedDimensions();
-                    {
-                        auto scaleSizes = descScaleA.sizes();
-                        scaleSizes[0] /= gemm.scaleBlockSize;
-                        descScaleA = TensorDescriptor(descScaleA.dataType(), std::move(scaleSizes));
-                    }
-                    std::vector<size_t> preSwizzleSize;
-                    if(gemm.scaleSkipPermlane == ScaleSkipPermlaneMode::PreSwizzleScale)
-                    {
-                        AssertFatal(gemm.scaleShuffleTileA.size() == 3);
-                        preSwizzleSize = gemm.scaleShuffleTileA;
-                    }
-                    std::vector<size_t> preTileSize;
-                    if(!gemm.scalePretileA.empty())
-                    {
-                        AssertFatal(gemm.transA == "T",
-                                    "Can only pre-tile scale A if A is TransposeType::T");
-                        preTileSize = {gemm.scalePretileA[1], gemm.scalePretileA[0]};
-                    }
-                    auto tmpScaleA = DGen::preSwizzle(
-                        hostScaleA, descScaleA.sizes(), preSwizzleSize, preTileSize);
-                    deviceScaleA = make_shared_device(tmpScaleA);
-                }
-                else
-                {
-                    deviceScaleA = make_shared_device(hostScaleA);
-                }
-            }
-            if(gemm.scaleBMode == Operations::ScaleMode::Separate)
-            {
-                if((gemm.scaleSkipPermlane == ScaleSkipPermlaneMode::PreSwizzleScale)
-                   || (!gemm.scalePretileB.empty()))
-                {
-                    auto descScaleB = descB.withNormalizedDimensions();
-                    {
-                        auto scaleSizes = descScaleB.sizes();
-                        scaleSizes[0] /= gemm.scaleBlockSize;
-                        descScaleB = TensorDescriptor(descScaleB.dataType(), std::move(scaleSizes));
-                    }
-                    std::vector<size_t> preSwizzleSize;
-                    if(gemm.scaleSkipPermlane == ScaleSkipPermlaneMode::PreSwizzleScale)
-                    {
-                        AssertFatal(gemm.scaleShuffleTileB.size() == 3);
-                        preSwizzleSize = gemm.scaleShuffleTileB;
-                    }
-                    std::vector<size_t> preTileSize;
-                    if(!gemm.scalePretileB.empty())
-                    {
-                        AssertFatal(gemm.transB == "N",
-                                    "Can only pre-tile scale B if B is TransposeType::N");
-                        preTileSize = {gemm.scalePretileB[0], gemm.scalePretileB[1]};
-                    }
-                    auto tmpScaleB = DGen::preSwizzle(
-                        hostScaleB, descScaleB.sizes(), preSwizzleSize, preTileSize);
-                    deviceScaleB = make_shared_device(tmpScaleB);
-                }
-                else
-                {
-                    deviceScaleB = make_shared_device(hostScaleB);
-                }
-            }
-
-            // In SingleScale mode, don't need to copy to device
-            if(gemm.scaleAMode == Operations::ScaleMode::SingleScale)
-                hostScaleA = std::vector<uint8_t>{rotatingSingleScaleValue(gemm.scaleTypeA)};
-
-            if(gemm.scaleBMode == Operations::ScaleMode::SingleScale)
-                hostScaleB = std::vector<uint8_t>{rotatingSingleScaleValue(gemm.scaleTypeB)};
-
-            auto command = std::make_shared<Command>();
-
-            std::vector<size_t> oneStridesN
-                = gemm.literalStrides ? std::vector<size_t>({(size_t)1}) : std::vector<size_t>({});
-
-            std::vector<size_t> oneStridesT = gemm.literalStrides
-                                                  ? std::vector<size_t>({(size_t)0, (size_t)1})
-                                                  : std::vector<size_t>({});
-
-            auto tagTensorA = command->addOperation(rocRoller::Operations::Tensor(
-                2, dataTypeA, {}, gemm.transA == "N" ? oneStridesN : oneStridesT)); // A
-            auto tagLoadA = command->addOperation(rocRoller::Operations::T_Load_Tiled(tagTensorA));
-
-            bool pretileB   = !gemm.pretileB.empty();
-            auto stridesB   = pretileB ? std::vector<size_t>{}
-                                       : (gemm.transB == "N" ? oneStridesN : oneStridesT);
-            auto tagTensorB = command->addOperation(
-                rocRoller::Operations::Tensor(2, dataTypeB, {}, stridesB)); // B
-            auto loadInputB = tagTensorB;
-            if(pretileB)
-                loadInputB = command->addOperation(
-                    rocRoller::Operations::SubTileTranspose(loadInputB, gemm.pretileB));
-            auto tagLoadB = command->addOperation(rocRoller::Operations::T_Load_Tiled(loadInputB));
-
-            auto mulInputA = tagLoadA;
-            auto mulInputB = tagLoadB;
-
-            std::optional<Operations::OperationTag> tagTensorScaleA, tagLoadScaleA, tagBlockScaleA,
-                tagTensorScaleB, tagLoadScaleB, tagBlockScaleB;
-
-            if(gemm.scaleAMode == Operations::ScaleMode::Separate)
-            {
-                bool scalePreTiledA  = !gemm.scalePretileA.empty();
-                tagTensorScaleA      = command->addOperation(rocRoller::Operations::Tensor(
-                    2,
-                    gemm.scaleTypeA,
-                    {},
-                    scalePreTiledA ? std::vector<size_t>{}
-                                        : (gemm.transA == "N" ? oneStridesN : oneStridesT)));
-                auto scaleLoadInputA = *tagTensorScaleA;
-                if(scalePreTiledA)
-                {
-                    AssertFatal(gemm.transA == "T");
-                    AssertFatal(gemm.scalePretileA.size() == 2);
-                    scaleLoadInputA = command->addOperation(rocRoller::Operations::SubTileTranspose(
-                        scaleLoadInputA, gemm.scalePretileA, true));
-                }
-                tagLoadScaleA
-                    = command->addOperation(rocRoller::Operations::T_Load_Tiled(scaleLoadInputA));
-                auto scaleInputA = *tagLoadScaleA;
-                if(gemm.scaleSkipPermlane == ScaleSkipPermlaneMode::PreSwizzleScale)
-                {
-                    AssertFatal(gemm.scaleShuffleTileA.size() == 3);
-                    scaleInputA = command->addOperation(rocRoller::Operations::SubTileTranspose(
-                        scaleInputA, gemm.scaleShuffleTileA));
-                }
-                tagBlockScaleA = mulInputA
-                    = command->addOperation(rocRoller::Operations::BlockScale(
-                        tagLoadA,
-                        2,
-                        scaleInputA,
-                        {1, static_cast<unsigned int>(gemm.scaleBlockSize)}));
-            }
-            else if(gemm.scaleAMode == Operations::ScaleMode::SingleScale)
-            {
-                tagTensorScaleA
-                    = command->addOperation(rocRoller::Operations::Scalar(gemm.scaleTypeA));
-                tagLoadScaleA
-                    = command->addOperation(rocRoller::Operations::T_Load_Scalar(*tagTensorScaleA));
-                tagBlockScaleA = mulInputA = command->addOperation(
-                    rocRoller::Operations::BlockScale(tagLoadA, 0, tagLoadScaleA));
-            }
-
-            if(gemm.scaleBMode == Operations::ScaleMode::Separate)
-            {
-                bool scalePreTiledB  = !gemm.scalePretileB.empty();
-                tagTensorScaleB      = command->addOperation(rocRoller::Operations::Tensor(
-                    2,
-                    gemm.scaleTypeB,
-                    {},
-                    scalePreTiledB ? std::vector<size_t>{}
-                                        : (gemm.transB == "N" ? oneStridesN : oneStridesT)));
-                auto scaleLoadInputB = *tagTensorScaleB;
-                if(scalePreTiledB)
-                {
-                    AssertFatal(gemm.transB == "N");
-                    AssertFatal(gemm.scalePretileB.size() == 2);
-                    scaleLoadInputB = command->addOperation(rocRoller::Operations::SubTileTranspose(
-                        scaleLoadInputB, gemm.scalePretileB, false));
-                }
-                tagLoadScaleB
-                    = command->addOperation(rocRoller::Operations::T_Load_Tiled(scaleLoadInputB));
-                auto scaleInputB = *tagLoadScaleB;
-                if(gemm.scaleSkipPermlane == ScaleSkipPermlaneMode::PreSwizzleScale)
-                {
-                    AssertFatal(gemm.scaleShuffleTileB.size() == 3);
-                    scaleInputB = command->addOperation(rocRoller::Operations::SubTileTranspose(
-                        scaleInputB, gemm.scaleShuffleTileB));
-                }
-                tagBlockScaleB = mulInputB
-                    = command->addOperation(rocRoller::Operations::BlockScale(
-                        tagLoadB,
-                        2,
-                        scaleInputB,
-                        {static_cast<unsigned int>(gemm.scaleBlockSize), 1}));
-            }
-            else if(gemm.scaleBMode == Operations::ScaleMode::SingleScale)
-            {
-                tagTensorScaleB
-                    = command->addOperation(rocRoller::Operations::Scalar(gemm.scaleTypeB));
-                tagLoadScaleB
-                    = command->addOperation(rocRoller::Operations::T_Load_Scalar(*tagTensorScaleB));
-                tagBlockScaleB = mulInputB = command->addOperation(
-                    rocRoller::Operations::BlockScale(tagLoadB, 0, tagLoadScaleB));
-            }
-
-            auto tagTensorC = command->addOperation(
-                rocRoller::Operations::Tensor(2, dataTypeC, {}, oneStridesN)); // C
-            auto tagLoadC = command->addOperation(rocRoller::Operations::T_Load_Tiled(tagTensorC));
-
-            auto tagScalarAlpha
-                = command->addOperation(rocRoller::Operations::Scalar(DataType::Float)); // alpha
-            auto tagLoadAlpha
-                = command->addOperation(rocRoller::Operations::T_Load_Scalar(tagScalarAlpha));
-
-            auto tagScalarBeta
-                = command->addOperation(rocRoller::Operations::Scalar(DataType::Float)); // beta
-            auto tagLoadBeta
-                = command->addOperation(rocRoller::Operations::T_Load_Scalar(tagScalarBeta));
-
-            auto tagAB = command->addOperation(
-                rocRoller::Operations::T_Mul(mulInputA, mulInputB, dataTypeAcc)); // A * B
-
-            rocRoller::Operations::T_Execute execute(command->getNextTag());
-            auto                             tagBetaC
-                = execute.addXOp(rocRoller::Operations::E_Mul(tagLoadBeta, tagLoadC)); // beta * C
-
-            auto tagAlphaAB = execute.addXOp(
-                rocRoller::Operations::E_Mul(tagLoadAlpha, tagAB)); // alpha * (A * B)
-
-            rocRoller::Operations::OperationTag tagStoreD;
-            if(gemm.betaInFma)
-            {
-                tagStoreD = execute.addXOp(rocRoller::Operations::E_Add(
-                    tagBetaC, tagAlphaAB)); // beta * C + alpha * (A * B)
-            }
-            else
-            {
-                tagStoreD = execute.addXOp(rocRoller::Operations::E_Add(
-                    tagAlphaAB, tagBetaC)); // alpha * (A * B) + beta * C
-            }
-
-            command->addOperation(std::make_shared<rocRoller::Operations::Operation>(execute));
-
-            auto tagTensorD = command->addOperation(
-                rocRoller::Operations::Tensor(2, dataTypeD, {}, oneStridesN)); // D
+            // Build command using the shared GEMM helper.
+            // GEMM::createCommand() covers all standard cases.
+            // TC != TD: append a type-conversion op after getCommand().
+            rocRollerTest::Graphs::GEMM gemmGraph(dataTypeA, dataTypeB, dataTypeC, dataTypeD);
+            gemmGraph.setProblem(gemm);
+            auto command = gemmGraph.getCommand();
             Operations::OperationTag tagScalarSeed;
-            if constexpr(std::is_same_v<TC, TD>)
+            Operations::OperationTag tagTensorDCvt;
+            Operations::OperationTag tagCvtExecute;
+            if constexpr(!std::is_same_v<TC, TD>)
             {
-                command->addOperation(rocRoller::Operations::T_Store_Tiled(tagStoreD, tagTensorD));
-            }
-            else
-            {
+                auto [tagA, tagB, tagC, tagD] = gemmGraph.getOperationTags();
                 Operations::OperationTag tagLoadSeed;
-                // If Matrix C and D are of different types, an explicit type conversion is required
                 if(srCvtSeed.has_value())
                 {
-                    tagScalarSeed = command->addOperation(
-                        rocRoller::Operations::Scalar(DataType::UInt32)); // alpha
+                    tagScalarSeed
+                        = command->addOperation(rocRoller::Operations::Scalar(DataType::UInt32));
                     tagLoadSeed = command->addOperation(
                         rocRoller::Operations::T_Load_Scalar(tagScalarSeed));
                 }
 
-                auto cvtOp = rocRoller::Operations::T_Execute(command->getNextTag());
-                // (SR)Convert( alpha * (A * B) + beta * C )
-                auto tagCvt
-                    = srCvtSeed.has_value()
-                          ? cvtOp.addXOp(rocRoller::Operations::E_StochasticRoundingCvt(
-                              tagStoreD, tagLoadSeed, dataTypeD))
-                          : cvtOp.addXOp(rocRoller::Operations::E_Cvt(tagStoreD, dataTypeD));
-                tagStoreD = command->addOperation(std::move(cvtOp));
-                command->addOperation(rocRoller::Operations::T_Store_Tiled(tagCvt, tagTensorD));
+                auto cvtOp    = rocRoller::Operations::T_Execute(command->getNextTag());
+                auto tagCvt   = srCvtSeed.has_value()
+                                    ? cvtOp.addXOp(rocRoller::Operations::E_StochasticRoundingCvt(
+                                      tagD, tagLoadSeed, dataTypeD))
+                                    : cvtOp.addXOp(rocRoller::Operations::E_Cvt(tagD, dataTypeD));
+                tagCvtExecute = command->addOperation(std::move(cvtOp));
+                tagTensorDCvt = command->addOperation(rocRoller::Operations::Tensor(2, dataTypeD));
+                command->addOperation(rocRoller::Operations::T_Store_Tiled(tagCvt, tagTensorDCvt));
             }
 
-            std::map<Operations::ScratchPolicy, Operations::OperationTag> scratchTags;
-            Operations::OperationTag                                      tagNumWGs;
-            if(gemm.streamK)
+            auto params = gemmGraph.getCommandParameters();
+
+            if constexpr(!std::is_same_v<TC, TD>)
             {
-                tagNumWGs      = command->allocateTag();
-                auto numWGsArg = command->allocateArgument(DataType::UInt32,
-                                                           tagNumWGs,
-                                                           ArgumentType::Value,
-                                                           DataDirection::ReadOnly,
-                                                           rocRoller::NUMWGS);
-
-                scratchTags[Operations::ScratchPolicy::None] = command->allocateTag();
-                command->addOperation(
-                    rocRoller::Operations::Scratch(scratchTags.at(Operations::ScratchPolicy::None),
-                                                   Operations::ScratchPolicy::None));
-                command->allocateArgument(
-                    VariableType(DataType::UInt32, PointerType::PointerGlobal),
-                    scratchTags.at(Operations::ScratchPolicy::None),
-                    ArgumentType::Value,
-                    DataDirection::ReadWrite,
-                    getScratchName(Operations::ScratchPolicy::None));
-
-                scratchTags[Operations::ScratchPolicy::ZeroedBeforeAndAfter]
-                    = command->allocateTag();
-                command->addOperation(rocRoller::Operations::Scratch(
-                    scratchTags.at(Operations::ScratchPolicy::ZeroedBeforeAndAfter),
-                    Operations::ScratchPolicy::ZeroedBeforeAndAfter));
-                command->allocateArgument(
-                    VariableType(DataType::UInt32, PointerType::PointerGlobal),
-                    scratchTags.at(Operations::ScratchPolicy::ZeroedBeforeAndAfter),
-                    ArgumentType::Value,
-                    DataDirection::ReadWrite,
-                    getScratchName(Operations::ScratchPolicy::ZeroedBeforeAndAfter));
-            }
-
-            Operations::OperationTag tagWGM;
-            if(gemm.workgroupMappingDim != -1)
-            {
-                tagWGM      = command->allocateTag();
-                auto wgmArg = command->allocateArgument(DataType::Int32,
-                                                        tagWGM,
-                                                        ArgumentType::Value,
-                                                        DataDirection::ReadOnly,
-                                                        rocRoller::WGM);
-            }
-
-            auto params = std::make_shared<CommandParameters>();
-            params->setManualKernelDimension(2);
-            params->setManualWorkgroupSize({workgroupSizeX, workgroupSizeY, 1});
-
-            // TODO: Calculate these values internally based on workgroup sizes.
-            params->setManualWavefrontCount(
-                {static_cast<uint>(gemm.macM / gemm.waveM / wavetilePerWavefrontM),
-                 static_cast<uint>(gemm.macN / gemm.waveN / wavetilePerWavefrontN)});
-            params->setWaveTilesPerWavefront(wavetilePerWavefrontM, wavetilePerWavefrontN);
-            params->setSplitStoreTileIntoWaveBlocks(gemm.splitStoreTileIntoWaveBlocks);
-
-            // Set LDS padding for MATRIX_A and MATRIX_B
-            params->ldsPadding[LayoutType::MATRIX_A] = gemm.padA;
-            params->ldsPadding[LayoutType::MATRIX_B] = gemm.padB;
-
-            params->swizzleScale                  = gemm.swizzleScale;
-            params->prefetchScale                 = gemm.prefetchScale;
-            params->fuseLoops                     = gemm.fuseLoops;
-            params->tailLoops                     = gemm.tailLoops;
-            params->allowAmbiguousMemoryNodes     = gemm.allowAmbiguousMemoryNodes;
-            params->unrollK                       = gemm.unrollK;
-            params->packMultipleElementsInto1VGPR = gemm.packMultipleElementsInto1VGPR;
-            params->prefetch                      = gemm.prefetch;
-            params->prefetchInFlight              = gemm.prefetchInFlight;
-            params->prefetchLDSFactor             = gemm.prefetchLDSFactor;
-            params->prefetchMixMemOps             = gemm.prefetchMixMemOps;
-            params->transposeMemoryAccess.set(LayoutType::MATRIX_A, gemm.transA == "T");
-            params->transposeMemoryAccess.set(LayoutType::MATRIX_B, gemm.transB == "T");
-
-            if(gemm.workgroupMappingDim != -1)
-            {
-                params->workgroupMappingDim = gemm.workgroupMappingDim;
+                auto macTileD = KernelGraph::CoordinateGraph::MacroTile(
+                    {gemm.macM, gemm.macN},
+                    LayoutType::MATRIX_ACCUMULATOR,
+                    {gemm.waveM, gemm.waveN, gemm.waveK, gemm.waveB},
+                    gemm.storePath == SolutionParams::StorePath::VGPRToGlobalMemoryViaLDSWithBuffer
+                        ? MemoryType::WAVE_LDS
+                        : MemoryType::WAVE);
+                params->setDimensionInfo(tagCvtExecute, macTileD);
             }
 
             if(gemm.workgroupRemapXCC)
@@ -644,101 +252,12 @@ namespace GEMMTests
                     GPUCapability::DefaultRemapXCCValue);
             }
 
-            if(gemm.loopOverTiles > 0)
-            {
-                params->loopOverOutputTilesDimensions = {0, 1};
-                params->loopOverOutputTilesCoordSizes
-                    = {static_cast<uint>(M / gemm.macM), static_cast<uint>(N / gemm.macN)};
-                params->loopOverOutputTilesIteratedTiles = 2;
-            }
-
             if(gemm.streamK)
             {
                 AssertFatal(
                     numWorkgroupY == 1,
                     "Current scratch space implementation assumes that the kernel is launched "
                     "with numWorkgroupY == 1");
-
-                params->loopOverOutputTilesDimensions = {0, 1};
-                params->streamK                       = gemm.streamK;
-            }
-
-            auto memoryTypeA = GetMemoryType(gemm.loadPathA);
-            auto memoryTypeB = GetMemoryType(gemm.loadPathB);
-
-            {
-                auto macTileA = KernelGraph::CoordinateGraph::MacroTile(
-                    {gemm.macM, gemm.macK},
-                    LayoutType::MATRIX_A,
-                    {gemm.waveM, gemm.waveN, gemm.waveK, gemm.waveB},
-                    memoryTypeA);
-                params->setDimensionInfo(tagLoadA, macTileA);
-            }
-
-            if(gemm.scaleAMode == Operations::ScaleMode::Separate)
-            {
-                AssertFatal(gemm.waveK % gemm.scaleBlockSize == 0,
-                            fmt::format("waveK: {} must be a multiple of the scale block size: {}",
-                                        gemm.waveK,
-                                        gemm.scaleBlockSize));
-                AssertFatal(gemm.loadScalePathA != SolutionParams::LoadPath::BufferToLDS
-                                || gemm.swizzleScale,
-                            "If loadScalePathA is BufferToLDS, swizzleScale must be enabled");
-                auto macTileAScale = KernelGraph::CoordinateGraph::MacroTile(
-                    {gemm.macM, gemm.macK / gemm.scaleBlockSize},
-                    LayoutType::MATRIX_A,
-                    {gemm.waveM, gemm.waveN, gemm.waveK / gemm.scaleBlockSize, gemm.waveB},
-                    GetMemoryType(gemm.loadScalePathA),
-                    {gemm.waveM, gemm.waveN, gemm.waveK / gemm.scaleBlockSize, gemm.waveB},
-                    {gemm.swizzleM, gemm.swizzleN, gemm.swizzleK, gemm.swizzleB});
-                params->setDimensionInfo(*tagLoadScaleA, macTileAScale);
-            }
-
-            {
-                auto macTileB = KernelGraph::CoordinateGraph::MacroTile(
-                    {gemm.macK, gemm.macN},
-                    LayoutType::MATRIX_B,
-                    {gemm.waveM, gemm.waveN, gemm.waveK, gemm.waveB},
-                    memoryTypeB);
-                params->setDimensionInfo(tagLoadB, macTileB);
-            }
-
-            if(gemm.scaleBMode == Operations::ScaleMode::Separate)
-            {
-                AssertFatal(gemm.waveK % gemm.scaleBlockSize == 0,
-                            fmt::format("waveK: {} must be a multiple of the scale block size: {}",
-                                        gemm.waveK,
-                                        gemm.scaleBlockSize));
-                AssertFatal(gemm.loadScalePathB != SolutionParams::LoadPath::BufferToLDS
-                                || gemm.swizzleScale,
-                            "If loadScalePathB is BufferToLDS, swizzleScale must be enabled");
-                auto macTileBScale = KernelGraph::CoordinateGraph::MacroTile(
-                    {gemm.macK / gemm.scaleBlockSize, gemm.macN},
-                    LayoutType::MATRIX_B,
-                    {gemm.waveM, gemm.waveN, gemm.waveK / gemm.scaleBlockSize, gemm.waveB},
-                    GetMemoryType(gemm.loadScalePathB),
-                    {gemm.waveM, gemm.waveN, gemm.waveK / gemm.scaleBlockSize, gemm.waveB},
-                    {gemm.swizzleM, gemm.swizzleN, gemm.swizzleK, gemm.swizzleB});
-                params->setDimensionInfo(*tagLoadScaleB, macTileBScale);
-            }
-
-            {
-                auto macTileC = KernelGraph::CoordinateGraph::MacroTile(
-                    {gemm.macM, gemm.macN},
-                    LayoutType::MATRIX_ACCUMULATOR,
-                    {gemm.waveM, gemm.waveN, gemm.waveK, gemm.waveB});
-                params->setDimensionInfo(tagLoadC, macTileC);
-            }
-
-            {
-                auto macTileD = KernelGraph::CoordinateGraph::MacroTile(
-                    {gemm.macM, gemm.macN},
-                    LayoutType::MATRIX_ACCUMULATOR,
-                    {gemm.waveM, gemm.waveN, gemm.waveK, gemm.waveB},
-                    gemm.storePath == SolutionParams::StorePath::VGPRToGlobalMemoryViaLDSWithBuffer
-                        ? MemoryType::WAVE_LDS
-                        : MemoryType::WAVE);
-                params->setDimensionInfo(tagStoreD, macTileD);
             }
 
             CommandKernel commandKernel(command, testKernelName());
@@ -750,98 +269,79 @@ namespace GEMMTests
             commandKernel.setCommandParameters(params);
             commandKernel.generateKernel();
 
-            CommandArguments commandArgs = command->createArguments();
+            using PackedTypeA = typename PackedTypeOf<TA>::type;
+            using PackedTypeB = typename PackedTypeOf<TB>::type;
 
-            // When pretileB is set, use the same tensor descriptor as the client: explicit
-            // strides for the pre-tiled layout (see DataParallelGEMMSolution.hpp).
-            if(!gemm.pretileB.empty() && gemm.pretileB.size() == 2)
+            auto [commandArgs,
+                  deviceA,
+                  deviceB,
+                  deviceC,
+                  deviceD,
+                  deviceScaleA,
+                  deviceScaleB,
+                  hostScaleA,
+                  hostScaleB,
+                  hostA,
+                  hostB,
+                  hostC]
+                = gemmGraph.getCommandArguments<TA, TB, TC, TD, ACC>();
+
+            // SingleScale: override with rotating values for more coverage
+            if(gemm.scaleAMode == Operations::ScaleMode::SingleScale)
             {
-                AssertFatal(gemm.transB == "N", "Pre-tiling B only supported for TransposeType::N");
-                auto const tileK = gemm.pretileB[0];
-                auto const tileN = gemm.pretileB[1];
-                descB            = TensorDescriptor(dataTypeB,
-                                         {static_cast<size_t>(K), static_cast<size_t>(N)},
-                                         {static_cast<size_t>(tileK * tileN),
-                                          static_cast<size_t>((K / tileK) * tileK * tileN)});
+                auto scaledVal      = rotatingSingleScaleValue(gemm.scaleTypeA);
+                hostScaleA          = {scaledVal};
+                auto [sTagA, sTagB] = gemmGraph.getABScaleTags();
+                commandArgs.setArgument(sTagA.value(), ArgumentType::Value, scaledVal);
+            }
+            if(gemm.scaleBMode == Operations::ScaleMode::SingleScale)
+            {
+                auto scaledVal      = rotatingSingleScaleValue(gemm.scaleTypeB);
+                hostScaleB          = {scaledVal};
+                auto [sTagA, sTagB] = gemmGraph.getABScaleTags();
+                commandArgs.setArgument(sTagB.value(), ArgumentType::Value, scaledVal);
             }
 
-            setCommandTensorArg(commandArgs, tagTensorA, descA, deviceA.get());
-            setCommandTensorArg(commandArgs, tagTensorB, descB, deviceB.get());
-            setCommandTensorArg(commandArgs, tagTensorC, descC, deviceC.get());
-            setCommandTensorArg(commandArgs, tagTensorD, descD, deviceD.get());
-
-            if(gemm.scaleAMode == Operations::ScaleMode::Separate)
+            // notSetC: clear the C tensor arg
+            if(notSetC)
             {
-                AssertFatal(K % gemm.scaleBlockSize == 0,
-                            fmt::format("K: {} must be a multiple of the scale block size: {}",
-                                        K,
-                                        gemm.scaleBlockSize));
-                TensorDescriptor descAScale;
-                if(!gemm.scalePretileA.empty())
-                {
-                    auto const M_scale = M;
-                    auto const K_scale = K / gemm.scaleBlockSize;
-                    auto const tileM   = gemm.scalePretileA[0];
-                    auto const tileK   = gemm.scalePretileA[1];
-                    descAScale         = TensorDescriptor(
-                        gemm.scaleTypeA,
-                        {static_cast<size_t>(M_scale), static_cast<size_t>(K_scale)},
-                        {static_cast<size_t>((K_scale / tileK) * tileM * tileK),
-                         static_cast<size_t>(tileM * tileK)});
-                }
-                else
-                {
-                    descAScale = TensorDescriptor(
-                        gemm.scaleTypeA,
-                        {static_cast<size_t>(M), size_t(K / gemm.scaleBlockSize)},
-                        gemm.transA);
-                }
-                setCommandTensorArg(
-                    commandArgs, tagTensorScaleA.value(), descAScale, deviceScaleA.get());
-            }
-            else if(gemm.scaleAMode == Operations::ScaleMode::SingleScale)
-            {
-                commandArgs.setArgument(*tagTensorScaleA, ArgumentType::Value, hostScaleA[0]);
+                auto [tA, tB, tC, tD] = gemmGraph.getOperationTags();
+                TensorDescriptor descC_null(dataTypeD, {size_t(M), size_t(N)}, "N");
+                setCommandTensorArg(commandArgs, tC, descC_null, (TC*)nullptr);
+                deviceC = nullptr;
             }
 
-            if(gemm.scaleBMode == Operations::ScaleMode::Separate)
+            // setIdentity: overwrite data and re-upload
+            if(setIdentity)
             {
-                AssertFatal(K % gemm.scaleBlockSize == 0,
-                            fmt::format("K: {} must be a multiple of the scale block size: {}",
-                                        K,
-                                        gemm.scaleBlockSize));
-                TensorDescriptor descBScale;
-                if(!gemm.scalePretileB.empty())
-                {
-                    auto const K_scale = K / gemm.scaleBlockSize;
-                    auto const N_scale = N;
-                    auto const tileK   = gemm.scalePretileB[0];
-                    auto const tileN   = gemm.scalePretileB[1];
-                    descBScale         = TensorDescriptor(
-                        gemm.scaleTypeB,
-                        {static_cast<size_t>(K_scale), static_cast<size_t>(N_scale)},
-                        {static_cast<size_t>(tileK * tileN),
-                         static_cast<size_t>((K_scale / tileK) * tileK * tileN)});
-                }
-                else
-                {
-                    descBScale = TensorDescriptor(
-                        gemm.scaleTypeB,
-                        {size_t(K / gemm.scaleBlockSize), static_cast<size_t>(N)},
-                        gemm.transB);
-                }
-                setCommandTensorArg(
-                    commandArgs, tagTensorScaleB.value(), descBScale, deviceScaleB.get());
-            }
-            else if(gemm.scaleBMode == Operations::ScaleMode::SingleScale)
-            {
-                commandArgs.setArgument(*tagTensorScaleB, ArgumentType::Value, hostScaleB[0]);
+                SetIdentityMatrix(hostA, K, M);
+                SetIdentityMatrix(hostB, N, K);
+                std::fill(hostC.begin(), hostC.end(), static_cast<TD>(0.0));
+                ASSERT_THAT(hipMemcpy(deviceA.get(),
+                                      hostA.data(),
+                                      hostA.size() * sizeof(PackedTypeA),
+                                      hipMemcpyHostToDevice),
+                            HasHipSuccess(0));
+                ASSERT_THAT(hipMemcpy(deviceB.get(),
+                                      hostB.data(),
+                                      hostB.size() * sizeof(PackedTypeB),
+                                      hipMemcpyHostToDevice),
+                            HasHipSuccess(0));
+                if(deviceC)
+                    ASSERT_THAT(hipMemcpy(deviceC.get(),
+                                          hostC.data(),
+                                          hostC.size() * sizeof(TC),
+                                          hipMemcpyHostToDevice),
+                                HasHipSuccess(0));
             }
 
-            commandArgs.setArgument(tagScalarAlpha, ArgumentType::Value, alpha);
-            commandArgs.setArgument(tagScalarBeta, ArgumentType::Value, beta);
-            if(srCvtSeed.has_value())
-                commandArgs.setArgument(tagScalarSeed, ArgumentType::Value, srCvtSeed.value());
+            if constexpr(!std::is_same_v<TC, TD>)
+            {
+                TensorDescriptor descD(dataTypeD, {size_t(M), size_t(N)}, "N");
+                setCommandTensorArg(commandArgs, tagTensorDCvt, descD, deviceD.get());
+                if(srCvtSeed.has_value())
+                    commandArgs.setArgument(tagScalarSeed, ArgumentType::Value, srCvtSeed.value());
+            }
 
             // Create scratch space
             size_t scratchSpaceRequired[static_cast<int>(Operations::ScratchPolicy::Count)];
@@ -851,7 +351,8 @@ namespace GEMMTests
             std::fill(std::begin(deviceScratch), std::end(deviceScratch), nullptr);
             if(gemm.streamK)
             {
-                commandArgs.setArgument(tagNumWGs, ArgumentType::Value, gemm.numWGs);
+                commandArgs.setArgument(gemmGraph.getNumWGsTag(), ArgumentType::Value, gemm.numWGs);
+                auto scratchTags = gemmGraph.getScratchTags();
                 for(int i = 0; i < static_cast<int>(Operations::ScratchPolicy::Count); ++i)
                 {
                     auto policy             = static_cast<Operations::ScratchPolicy>(i);
@@ -868,7 +369,8 @@ namespace GEMMTests
 
             if(gemm.workgroupMappingDim != -1)
             {
-                commandArgs.setArgument(tagWGM, ArgumentType::Value, gemm.workgroupMappingValue);
+                commandArgs.setArgument(
+                    gemmGraph.getWGMTag(), ArgumentType::Value, gemm.workgroupMappingValue);
             }
 
             // Host result

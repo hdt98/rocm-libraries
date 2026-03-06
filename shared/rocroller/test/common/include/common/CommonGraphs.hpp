@@ -12,6 +12,7 @@
 
 #include <rocRoller/CommandSolution.hpp>
 #include <rocRoller/Context_fwd.hpp>
+#include <rocRoller/DataTypes/DataTypes_Utils.hpp>
 #include <rocRoller/KernelArguments.hpp>
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/Operations/BlockScale_fwd.hpp>
@@ -278,23 +279,82 @@ namespace rocRollerTest
                     DGenInput(seed, hostA, descA, hostB, descB, hostC, descC);
                 }
 
+                if(m_problem.scaleAMode == Operations::ScaleMode::SingleScale)
+                    hostScaleA = {rocRoller::floatToScale(m_problem.scaleTypeA, 1.0f)};
+                if(m_problem.scaleBMode == Operations::ScaleMode::SingleScale)
+                    hostScaleB = {rocRoller::floatToScale(m_problem.scaleTypeB, 1.0f)};
+
                 auto deviceA = make_shared_device<TA>(hostA);
                 auto deviceB = make_shared_device<TB>(hostB);
 
                 std::shared_ptr<TC> deviceC = make_shared_device(hostC);
                 std::shared_ptr<TD> deviceD = make_shared_device<TD>(M * N, TD{});
 
+                std::shared_ptr<uint8_t> deviceScaleA, deviceScaleB;
+                if(m_problem.scaleAMode == Operations::ScaleMode::Separate)
+                    deviceScaleA = make_shared_device(hostScaleA);
+                if(m_problem.scaleBMode == Operations::ScaleMode::Separate)
+                    deviceScaleB = make_shared_device(hostScaleB);
+
                 CommandArguments commandArgs = m_command->createArguments();
 
                 setCommandTensorArg(commandArgs, m_tagTensorA, descA, deviceA.get());
                 setCommandTensorArg(commandArgs, m_tagTensorB, descB, deviceB.get());
                 setCommandTensorArg(commandArgs, m_tagTensorC, descC, deviceC.get());
-                setCommandTensorArg(commandArgs, m_tagTensorD, descD, deviceD.get());
+                // For TC != TD, m_tagTensorD is an intermediate float tensor not the final output;
+                // the caller must set args for its own output tensor after appending conversion.
+                if constexpr(std::is_same_v<TC, TD>)
+                    setCommandTensorArg(commandArgs, m_tagTensorD, descD, deviceD.get());
 
                 commandArgs.setArgument(m_tagScalarAlpha, ArgumentType::Value, alpha);
                 commandArgs.setArgument(m_tagScalarBeta, ArgumentType::Value, beta);
 
-                return std::make_tuple(commandArgs, deviceA, deviceB, deviceC, deviceD);
+                if(m_problem.scaleAMode == Operations::ScaleMode::Separate)
+                {
+                    AssertFatal(K % m_problem.scaleBlockSize == 0,
+                                fmt::format("K: {} must be a multiple of the scale block size: {}",
+                                            K,
+                                            m_problem.scaleBlockSize));
+                    TensorDescriptor descAScale(dataTypeA,
+                                                {size_t(M), size_t(K / m_problem.scaleBlockSize)},
+                                                m_problem.transA);
+                    setCommandTensorArg(
+                        commandArgs, m_tagTensorScaleA, descAScale, deviceScaleA.get());
+                }
+                else if(m_problem.scaleAMode == Operations::ScaleMode::SingleScale)
+                {
+                    commandArgs.setArgument(m_tagTensorScaleA, ArgumentType::Value, hostScaleA[0]);
+                }
+
+                if(m_problem.scaleBMode == Operations::ScaleMode::Separate)
+                {
+                    AssertFatal(K % m_problem.scaleBlockSize == 0,
+                                fmt::format("K: {} must be a multiple of the scale block size: {}",
+                                            K,
+                                            m_problem.scaleBlockSize));
+                    TensorDescriptor descBScale(dataTypeB,
+                                                {size_t(K / m_problem.scaleBlockSize), size_t(N)},
+                                                m_problem.transB);
+                    setCommandTensorArg(
+                        commandArgs, m_tagTensorScaleB, descBScale, deviceScaleB.get());
+                }
+                else if(m_problem.scaleBMode == Operations::ScaleMode::SingleScale)
+                {
+                    commandArgs.setArgument(m_tagTensorScaleB, ArgumentType::Value, hostScaleB[0]);
+                }
+
+                return std::make_tuple(commandArgs,
+                                       deviceA,
+                                       deviceB,
+                                       deviceC,
+                                       deviceD,
+                                       deviceScaleA,
+                                       deviceScaleB,
+                                       hostScaleA,
+                                       hostScaleB,
+                                       hostA,
+                                       hostB,
+                                       hostC);
             }
 
             std::tuple<rocRoller::Operations::OperationTag,
@@ -307,6 +367,22 @@ namespace rocRollerTest
                       std::optional<rocRoller::Operations::OperationTag>>
                 getABScaleTags() const;
 
+            rocRoller::Operations::OperationTag getWGMTag() const
+            {
+                return m_tagWGM;
+            }
+
+            rocRoller::Operations::OperationTag getNumWGsTag() const
+            {
+                return m_tagNumWGs;
+            }
+
+            std::map<rocRoller::Operations::ScratchPolicy, rocRoller::Operations::OperationTag>
+                getScratchTags() const
+            {
+                return m_scratchTags;
+            }
+
         private:
             void createCommand();
 
@@ -318,8 +394,10 @@ namespace rocRollerTest
             rocRoller::Operations::OperationTag m_tagTensorA, m_tagTensorB, m_tagTensorC,
                 m_tagTensorD;
             rocRoller::Operations::OperationTag m_tagScaleA, m_tagScaleB;
+            rocRoller::Operations::OperationTag m_tagTensorScaleA, m_tagTensorScaleB;
             rocRoller::Operations::OperationTag m_tagScalarAlpha, m_tagScalarBeta;
             rocRoller::Operations::OperationTag m_tagNumWGs;
+            rocRoller::Operations::OperationTag m_tagWGM;
 
             std::map<rocRoller::Operations::ScratchPolicy, rocRoller::Operations::OperationTag>
                 m_scratchTags;

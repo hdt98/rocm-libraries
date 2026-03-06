@@ -287,7 +287,18 @@ namespace ModelAddressesTest
             }
 
             // Kernel best be launchable to inspect registers in rocgdb
-            auto [commandArgs, deviceA, deviceB, deviceC, deviceD]
+            auto [commandArgs,
+                  deviceA,
+                  deviceB,
+                  deviceC,
+                  deviceD,
+                  deviceScaleA,
+                  deviceScaleB,
+                  hostScaleA,
+                  hostScaleB,
+                  hostA,
+                  hostB,
+                  hostC]
                 = example.getCommandArguments<float>();
             commandKernel.launchKernel(commandArgs.runtimeArguments());
 

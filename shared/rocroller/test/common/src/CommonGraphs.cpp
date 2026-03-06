@@ -214,12 +214,21 @@ namespace rocRollerTest::Graphs
 
         if(m_problem.scaleAMode == Operations::ScaleMode::Separate)
         {
-            auto scaleA
-                = m_command->addOperation(rocRoller::Operations::Tensor(2, m_problem.scaleTypeA));
-            m_tagScaleA = m_command->addOperation(rocRoller::Operations::T_Load_Tiled(scaleA));
+            m_tagTensorScaleA = m_command->addOperation(rocRoller::Operations::Tensor(
+                2, m_problem.scaleTypeA, {}, m_problem.transA == "N" ? oneStridesN : oneStridesT));
+            m_tagScaleA
+                = m_command->addOperation(rocRoller::Operations::T_Load_Tiled(m_tagTensorScaleA));
 
             tagA = m_command->addOperation(rocRoller::Operations::BlockScale(
                 tagA, 2, m_tagScaleA, {1ul, static_cast<size_t>(m_problem.scaleBlockSize)}));
+        }
+        else if(m_problem.scaleAMode == Operations::ScaleMode::SingleScale)
+        {
+            m_tagTensorScaleA
+                = m_command->addOperation(rocRoller::Operations::Scalar(m_problem.scaleTypeA));
+            m_tagScaleA
+                = m_command->addOperation(rocRoller::Operations::T_Load_Scalar(m_tagTensorScaleA));
+            tagA = m_command->addOperation(rocRoller::Operations::BlockScale(tagA, 0, m_tagScaleA));
         }
 
         m_tagTensorB = m_command->addOperation(rocRoller::Operations::Tensor(
@@ -229,12 +238,21 @@ namespace rocRollerTest::Graphs
 
         if(m_problem.scaleBMode == Operations::ScaleMode::Separate)
         {
-            auto scaleB
-                = m_command->addOperation(rocRoller::Operations::Tensor(2, m_problem.scaleTypeB));
-            m_tagScaleB = m_command->addOperation(rocRoller::Operations::T_Load_Tiled(scaleB));
+            m_tagTensorScaleB = m_command->addOperation(rocRoller::Operations::Tensor(
+                2, m_problem.scaleTypeB, {}, m_problem.transB == "N" ? oneStridesN : oneStridesT));
+            m_tagScaleB
+                = m_command->addOperation(rocRoller::Operations::T_Load_Tiled(m_tagTensorScaleB));
 
             tagB = m_command->addOperation(rocRoller::Operations::BlockScale(
                 tagB, 2, m_tagScaleB, {static_cast<size_t>(m_problem.scaleBlockSize), 1ul}));
+        }
+        else if(m_problem.scaleBMode == Operations::ScaleMode::SingleScale)
+        {
+            m_tagTensorScaleB
+                = m_command->addOperation(rocRoller::Operations::Scalar(m_problem.scaleTypeB));
+            m_tagScaleB
+                = m_command->addOperation(rocRoller::Operations::T_Load_Scalar(m_tagTensorScaleB));
+            tagB = m_command->addOperation(rocRoller::Operations::BlockScale(tagB, 0, m_tagScaleB));
         }
 
         m_tagTensorC
@@ -246,7 +264,8 @@ namespace rocRollerTest::Graphs
         auto tagLoadAlpha
             = m_command->addOperation(rocRoller::Operations::T_Load_Scalar(m_tagScalarAlpha));
 
-        m_tagScalarBeta  = m_command->addOperation(rocRoller::Operations::Scalar(m_tc)); // beta
+        m_tagScalarBeta
+            = m_command->addOperation(rocRoller::Operations::Scalar(DataType::Float)); // beta
         auto tagLoadBeta = m_command->addOperation(
             rocRoller::Operations::T_Load_Scalar(m_tagScalarBeta)); // beta
 
@@ -274,7 +293,13 @@ namespace rocRollerTest::Graphs
 
         m_tagTensorD
             = m_command->addOperation(rocRoller::Operations::Tensor(2, m_td, {}, oneStridesN)); // D
-        m_command->addOperation(rocRoller::Operations::T_Store_Tiled(m_tagD, m_tagTensorD)); // D
+        if(m_tc == m_td)
+        {
+            m_command->addOperation(
+                rocRoller::Operations::T_Store_Tiled(m_tagD, m_tagTensorD)); // D
+        }
+        // If TC != TD, the caller (e.g. basicGEMM) must append a type-conversion op
+        // and its own T_Store_Tiled after calling getCommand().
 
         if(m_problem.streamK)
         {
@@ -304,6 +329,16 @@ namespace rocRollerTest::Graphs
             ArgumentType::Value,
             DataDirection::ReadWrite,
             getScratchName(Operations::ScratchPolicy::ZeroedBeforeAndAfter));
+
+        if(m_problem.workgroupMappingDim != -1)
+        {
+            m_tagWGM    = m_command->allocateTag();
+            auto wgmArg = m_command->allocateArgument(DataType::Int32,
+                                                      m_tagWGM,
+                                                      ArgumentType::Value,
+                                                      DataDirection::ReadOnly,
+                                                      rocRoller::WGM);
+        }
     }
 
     CommandPtr GEMM::getCommand()
@@ -415,10 +450,12 @@ namespace rocRollerTest::Graphs
         std::optional<Operations::OperationTag> scaleA;
         std::optional<Operations::OperationTag> scaleB;
 
-        if(m_problem.scaleAMode == Operations::ScaleMode::Separate)
+        if(m_problem.scaleAMode == Operations::ScaleMode::Separate
+           || m_problem.scaleAMode == Operations::ScaleMode::SingleScale)
             scaleA = m_tagScaleA;
 
-        if(m_problem.scaleBMode == Operations::ScaleMode::Separate)
+        if(m_problem.scaleBMode == Operations::ScaleMode::Separate
+           || m_problem.scaleBMode == Operations::ScaleMode::SingleScale)
             scaleB = m_tagScaleB;
 
         return {scaleA, scaleB};
@@ -617,6 +654,22 @@ namespace rocRollerTest::Graphs
         params->transposeMemoryAccess.set(LayoutType::MATRIX_A, m_problem.transA == "T");
         params->transposeMemoryAccess.set(LayoutType::MATRIX_B, m_problem.transB == "T");
         // params->transposeMemoryAccess[LayoutType::None]     = false;
+
+        params->setSplitStoreTileIntoWaveBlocks(m_problem.splitStoreTileIntoWaveBlocks);
+
+        if(m_problem.workgroupMappingDim != -1)
+        {
+            params->workgroupMappingDim = m_problem.workgroupMappingDim;
+        }
+
+        if(m_problem.loopOverTiles)
+        {
+            params->loopOverOutputTilesDimensions = {0, 1};
+            params->loopOverOutputTilesCoordSizes
+                = {static_cast<uint>(m_problem.m / m_problem.macM),
+                   static_cast<uint>(m_problem.n / m_problem.macN)};
+            params->loopOverOutputTilesIteratedTiles = 2;
+        }
 
         if(m_problem.streamK)
         {
