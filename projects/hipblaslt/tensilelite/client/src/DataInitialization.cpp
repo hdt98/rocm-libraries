@@ -1444,20 +1444,23 @@ namespace TensileLite
                             throw std::runtime_error("out of batch gpu memory");
                         pUnit.gpuInput.batch = batch_ptr;
 
-                        // Allocate alternate buffers for double-buffering
+                        // Allocate alternate buffers for triple-buffering
                         if(m_hasAltBuffers && !pUnit.gpuInput.currentAlt)
                         {
                             auto altPtr = allocNewGPUBuffer<void>(
                                 (it.name + "_alt").c_str(), size);
-                            if(altPtr)
+                            auto altPtr2 = allocNewGPUBuffer<void>(
+                                (it.name + "_alt2").c_str(), size);
+                            auto altBatch = allocNewGPUBuffer<void*>(
+                                (n + "_alt").c_str(), sizeof(uint8_t*) * m_maxBatch);
+                            auto altBatch2 = allocNewGPUBuffer<void*>(
+                                (n + "_alt2").c_str(), sizeof(uint8_t*) * m_maxBatch);
+                            if(altPtr && altPtr2 && altBatch && altBatch2)
                             {
                                 pUnit.gpuInput.currentAlt = altPtr;
-                                auto altBatch = allocNewGPUBuffer<void*>(
-                                    (n + "_alt").c_str(), sizeof(uint8_t*) * m_maxBatch);
-                                if(altBatch)
-                                    pUnit.gpuInput.batchAlt = altBatch;
-                                else
-                                    m_hasAltBuffers = false;
+                                pUnit.gpuInput.batchAlt   = altBatch;
+                                pUnit.gpuInput.currentAlt2 = altPtr2;
+                                pUnit.gpuInput.batchAlt2   = altBatch2;
                             }
                             else
                             {
@@ -2809,49 +2812,61 @@ namespace TensileLite
             if(!m_hasAltBuffers || !m_gpuPtrsAlt.empty())
                 return;
 
-            // Save primary working vectors
-            auto savePtrs      = std::move(m_gpuPtrs);
-            auto saveBatch     = std::move(m_gpuBatchPtrs);
-            auto saveCached    = std::move(m_cachedGPUInputs);
-            auto saveMax       = std::move(m_maxElements);
-            auto saveOffsets   = std::move(m_groupedOffsets);
+            // Helper: initialize one alt buffer set by targeting it via
+            // pristine pointer swap, then restoring.
+            auto initOneAltSet = [&](auto swapFn,
+                                     std::vector<void*>&             dstPtrs,
+                                     std::vector<void**>&            dstBatch,
+                                     std::shared_ptr<ProblemInputs>& dstCached) {
+                auto savePtrs    = std::move(m_gpuPtrs);
+                auto saveBatch   = std::move(m_gpuBatchPtrs);
+                auto saveCached  = std::move(m_cachedGPUInputs);
+                auto saveMax     = std::move(m_maxElements);
+                auto saveOffsets = std::move(m_groupedOffsets);
 
-            // Swap pristine unit pointers to alt set
-            for(auto& vd : m_vdata)
-                for(auto& [dt, pu] : vd.pristine)
-                {
-                    std::swap(pu.gpuInput.current, pu.gpuInput.currentAlt);
-                    std::swap(pu.gpuInput.batch, pu.gpuInput.batchAlt);
-                }
+                swapFn();
 
-            // Initialize alt buffers (copies valid → currentAlt for all tensors)
-            copyInputs(m_gpuPtrs,
-                       m_gpuBatchPtrs,
-                       m_maxElements,
-                       m_groupedOffsets,
-                       problem,
-                       hipMemcpyDeviceToDevice);
-            initializeGPUBatchedInputs(problem);
-            m_cachedGPUInputsAlt = ConvertToProblemInputs(problem, true);
+                copyInputs(m_gpuPtrs,
+                           m_gpuBatchPtrs,
+                           m_maxElements,
+                           m_groupedOffsets,
+                           problem,
+                           hipMemcpyDeviceToDevice);
+                initializeGPUBatchedInputs(problem);
+                dstCached = ConvertToProblemInputs(problem, true);
+                dstPtrs   = std::move(m_gpuPtrs);
+                dstBatch  = std::move(m_gpuBatchPtrs);
 
-            // Store as alt vectors
-            m_gpuPtrsAlt      = std::move(m_gpuPtrs);
-            m_gpuBatchPtrsAlt = std::move(m_gpuBatchPtrs);
+                swapFn();
 
-            // Swap pristine unit pointers back to primary
-            for(auto& vd : m_vdata)
-                for(auto& [dt, pu] : vd.pristine)
-                {
-                    std::swap(pu.gpuInput.current, pu.gpuInput.currentAlt);
-                    std::swap(pu.gpuInput.batch, pu.gpuInput.batchAlt);
-                }
+                m_gpuPtrs        = std::move(savePtrs);
+                m_gpuBatchPtrs   = std::move(saveBatch);
+                m_cachedGPUInputs = std::move(saveCached);
+                m_maxElements    = std::move(saveMax);
+                m_groupedOffsets = std::move(saveOffsets);
+            };
 
-            // Restore primary working vectors
-            m_gpuPtrs        = std::move(savePtrs);
-            m_gpuBatchPtrs   = std::move(saveBatch);
-            m_cachedGPUInputs = std::move(saveCached);
-            m_maxElements    = std::move(saveMax);
-            m_groupedOffsets = std::move(saveOffsets);
+            initOneAltSet(
+                [&]() {
+                    for(auto& vd : m_vdata)
+                        for(auto& [dt, pu] : vd.pristine)
+                        {
+                            std::swap(pu.gpuInput.current, pu.gpuInput.currentAlt);
+                            std::swap(pu.gpuInput.batch, pu.gpuInput.batchAlt);
+                        }
+                },
+                m_gpuPtrsAlt, m_gpuBatchPtrsAlt, m_cachedGPUInputsAlt);
+
+            initOneAltSet(
+                [&]() {
+                    for(auto& vd : m_vdata)
+                        for(auto& [dt, pu] : vd.pristine)
+                        {
+                            std::swap(pu.gpuInput.current, pu.gpuInput.currentAlt2);
+                            std::swap(pu.gpuInput.batch, pu.gpuInput.batchAlt2);
+                        }
+                },
+                m_gpuPtrsAlt2, m_gpuBatchPtrsAlt2, m_cachedGPUInputsAlt2);
         }
 
         DataInitialization::~DataInitialization()
