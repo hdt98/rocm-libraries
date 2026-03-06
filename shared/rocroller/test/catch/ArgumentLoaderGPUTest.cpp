@@ -119,7 +119,7 @@ namespace ArgumentLoaderGPUTest
      * arguments, preloaded, eagerly loaded, and lazily loaded.
      *
      * The kernels optionally:
-     *
+     * 
      * - Shuffle the arguments to test the ArgumentLoader's ability to handle alignment padding.
      * - Preload a subset of the arguments to test that feature.
      * - Load the arguments lazily to test that feature.

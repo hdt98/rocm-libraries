@@ -62,7 +62,7 @@ namespace rocRoller
 
         /**
          * Allocates the block of registers that will be preloaded with kernel arguments at the
-         * beginning of the kernel execution. This must be called at the correct time within
+         * beginning of the kernel execution. This must be called at the correct time within 
          * AllocateInitialRegisters as it is part of the initial register state.
          *
          * Returns the appropriate values for the kernel description fields
@@ -77,7 +77,7 @@ namespace rocRoller
         /**
          * Decides which if any kernel arguments can be preloaded based on architecture and
          * kernel options.
-         *
+         * 
          * The priority is to pick the earliest arguments first, but it will pick out-of-order
          * arguments if alignment prevents earlier arguments from being preloaded.
          *
@@ -88,7 +88,7 @@ namespace rocRoller
 
         /**
          * Splits the block allocations of kernel arguments into individual registers and clears
-         * the block allocations so that individual kernel arguments can be deallocated individually.
+         * the block allocations so that individual kernel arguments can be deallocated individually. 
          */
         Generator<Instruction> splitOutArgumentRegisters();
 
