@@ -1179,10 +1179,13 @@ struct GridwiseGemmMultiD_blockscale_xdl_cshuffle_v3_b_preshuffle
         constexpr index_t MWaves   = MPerBlock / (MXdlPerWave * MPerXdl);
         constexpr index_t NWaves   = NPerBlock / (NXdlPerWave * NPerXdl);
         constexpr index_t WaveSize = BlockSize / (MWaves * NWaves);
-
+#if defined(__gfx13__)
+        auto a_thread_offset = ((get_thread_local_1d_id() % WaveSize) >> 1) +
+                               (get_thread_local_1d_id() / WaveSize) / NWaves * MPerXdl;
+#else
         auto a_thread_offset = get_thread_local_1d_id() % MPerXdl +
                                (get_thread_local_1d_id() / WaveSize) / NWaves * MPerXdl;
-
+#endif
         constexpr auto b_scale_thread_desc = make_naive_tensor_descriptor_packed(
             make_tuple(Number<ScaleSliceSizeN>{}, Number<ScaleSliceSizeK>{}));
 
@@ -1446,9 +1449,13 @@ struct GridwiseGemmMultiD_blockscale_xdl_cshuffle_v3_b_preshuffle
         constexpr index_t MWaves   = MPerBlock / (MXdlPerWave * MPerXdl);
         constexpr index_t NWaves   = NPerBlock / (NXdlPerWave * NPerXdl);
         constexpr index_t WaveSize = BlockSize / (MWaves * NWaves);
-        auto a_thread_offset       = get_thread_local_1d_id() % MPerXdl +
+#if defined(__gfx13__)
+        auto a_thread_offset = ((get_thread_local_1d_id() % WaveSize) >> 1) +
                                (get_thread_local_1d_id() / WaveSize) / NWaves * MPerXdl;
-
+#else
+        auto a_thread_offset = get_thread_local_1d_id() % MPerXdl +
+                               (get_thread_local_1d_id() / WaveSize) / NWaves * MPerXdl;
+#endif
         constexpr auto b_scale_thread_desc = make_naive_tensor_descriptor_packed(
             make_tuple(Number<ScaleSliceSizeN>{}, Number<ScaleSliceSizeK>{}));
 
