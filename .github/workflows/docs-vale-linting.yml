@@ -66,5 +66,5 @@ jobs:
 
           echo "===== START VALE LINTING ON CHANGED FILES ====="
           # Run Vale on the changed files. This command will exit with a non-zero code if any errors are found.
-          vale --output=line "/tmp/pr_changed_files"
+          /github/workspace/bin/vale --output=line "/tmp/pr_changed_files"
           echo "===== END VALE LINTING ON CHANGED FILES ====="
