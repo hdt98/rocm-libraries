@@ -1105,9 +1105,6 @@ int main(int argc, const char* argv[])
                             {
                                 if(resetInput)
                                 {
-                                    ScopedTimer timer("gpu_input_reset");
-                                    // Syncs pending async reset if any, or does
-                                    // synchronous reset
                                     inputs = dataInit->prepareGPUInputs(problem);
                                     inputArr[0] = inputs;
                                 }
