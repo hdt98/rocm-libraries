@@ -1171,10 +1171,11 @@ int main(int argc, const char* argv[])
                                     }
                                 }
 
-                                // Kick off async reset before benchmark_runs so the
-                                // m_copyStream reset overlaps with kernel execution
-                                // on the main stream.
-                                dataInit->beginAsyncReset(problem);
+                                // Sync any pending async reset before benchmark_runs.
+                                // Copies on m_copyStream overlapped with kernel_solving
+                                // + warmup + validate above (no contention since those
+                                // use the current buffer set, not the alt set being reset).
+                                dataInit->syncAsyncReset();
 
 #if TENSILELITE_CLIENT_ENABLE_ROCPROFSDK
                                 TimingEvents ProfilerStartEvents(1, warmupEventCount);
@@ -1225,6 +1226,15 @@ int main(int argc, const char* argv[])
                                 if(useUserArgs)
                                 {
                                     solution->relaseDeviceUserArgs(dUA, dUAHost);
+                                }
+
+                                // Kick off async reset after benchmark_runs.
+                                // Copies overlap with next iteration's kernel_solving
+                                // + warmup + validate (contention-free: they use the
+                                // current buffer set, copies target the alt set).
+                                {
+                                    ScopedTimer timer("async_reset_submit");
+                                    dataInit->beginAsyncReset(problem);
                                 }
                             }
                         }

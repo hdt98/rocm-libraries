@@ -231,10 +231,10 @@ namespace TensileLite
             // A temporarily wrapper
             std::shared_ptr<ProblemInputs> prepareGPUInputs(ContractionProblem const* problem)
             {
+                // If an async reset completed, return the pre-prepared inputs
+                // (sync was already done by syncAsyncReset before benchmark_runs)
                 if(m_asyncResetPending)
                 {
-                    ScopedTimer t("gpu_input_reset");
-                    syncCopyStream();
                     m_asyncResetPending = false;
                     return m_cachedGPUInputs;
                 }
@@ -252,9 +252,22 @@ namespace TensileLite
                     throw std::runtime_error("Failed to cast to any ContractionProblem.");
             }
 
+            // Sync any pending async reset. Call before benchmark_runs to
+            // ensure copies on m_copyStream are complete. The copies overlap
+            // with kernel_solving + warmup + validate (which use the current
+            // buffer set, not the alt set being reset).
+            void syncAsyncReset()
+            {
+                if(m_asyncResetPending)
+                {
+                    ScopedTimer t("gpu_input_reset");
+                    syncCopyStream();
+                }
+            }
+
             // Double-buffer: kick off async reset on m_copyStream.
-            // Overlaps with subsequent GPU work on the main stream.
-            // The next prepareGPUInputs call will sync and return the result.
+            // Call after benchmark_runs so copies overlap with the next
+            // iteration's kernel_solving + warmup + validate_warmups.
             void beginAsyncReset(ContractionProblem const* problem)
             {
                 if(!m_hasAltBuffers || !m_copyStream)
@@ -930,7 +943,8 @@ namespace TensileLite
 
             hipStream_t m_copyStream = nullptr;
 
-            size_t m_maxBatch;
+            size_t    m_maxBatch;
+            uint8_t** m_pinnedBatchStaging = nullptr;
 
             size_t m_workspaceSize;
 
