@@ -48,24 +48,7 @@ protected:
         return v;
     }
 
-    // Check tensors element-wise with tolerance
-    static bool AllClose(const std::vector<float>& a,
-                          const std::vector<float>& b,
-                          float atol = 1e-4f,
-                          float rtol = 1e-3f)
-    {
-        if(a.size() != b.size()) return false;
-        for(size_t i = 0; i < a.size(); i++)
-        {
-            const float diff = std::abs(a[i] - b[i]);
-            const float tol  = atol + rtol * std::abs(b[i]);
-            if(diff > tol)
-            {
-                return false;
-            }
-        }
-        return true;
-    }
+
 };
 
 // ---------------------------------------------------------------------------

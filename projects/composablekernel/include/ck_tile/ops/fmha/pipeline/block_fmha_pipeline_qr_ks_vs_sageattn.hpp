@@ -82,9 +82,6 @@ struct BlockFmhaPipelineQRKSVSSageAttn
     static constexpr ck_tile::index_t kQKScaleGranularity = Problem::kQKScaleGranularity;
     static constexpr ck_tile::index_t kVScaleGranularity  = Problem::kVScaleGranularity;
 
-    static constexpr uint32_t DS_READ = 0x100;
-    static constexpr uint32_t MFMA    = 0x008;
-
     static_assert((CK_TILE_FMHA_FWD_FAST_EXP2 &&
                    (kHasLogitsSoftCap && Problem::BiasEnum == BlockAttentionBiasEnum::NO_BIAS ||
                     !kHasLogitsSoftCap)) ||
@@ -313,16 +310,8 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                     auto lse =
                         make_static_distributed_tensor<LSEDataType>(m.get_tile_distribution());
 
-                    if(__builtin_isinf_sign(sink_v) >= 0)
-                    {
-                        set_tile(lse, SMPLComputeDataType{sink_v * scale_s});
-                        store_tile(lse_dram_window_tmp, tile_elementwise_in(lse_element_func, lse));
-                    }
-                    else
-                    {
-                        set_tile(lse, SMPLComputeDataType{sink_v * scale_s});
-                        store_tile(lse_dram_window_tmp, tile_elementwise_in(lse_element_func, lse));
-                    }
+                    set_tile(lse, SMPLComputeDataType{sink_v * scale_s});
+                    store_tile(lse_dram_window_tmp, tile_elementwise_in(lse_element_func, lse));
                 }
                 return o_acc;
             }
@@ -383,32 +372,6 @@ struct BlockFmhaPipelineQRKSVSSageAttn
         index_t i_total_loops      = 0;
         constexpr index_t k0_loops = kQKHeaddim / kK0;
         constexpr index_t k1_loops = kN0 / kK1;
-
-        [[maybe_unused]] auto schedule_gemm_0 = [] {
-            using BlockGemm0 = remove_cvref_t<decltype(gemm_0)>;
-            constexpr auto WarpGemmConfig =
-                BlockGemm0::Policy::template GetWarpGemmMWarpNWarp<Problem>();
-            using WarpGemm0 = remove_cvref_t<decltype(WarpGemmConfig.template at<0>())>;
-            constexpr index_t Gemm0MWarp   = WarpGemmConfig.template at<1>();
-            constexpr index_t Gemm0NWarp   = WarpGemmConfig.template at<2>();
-            constexpr index_t WarpGemm0M   = WarpGemm0::WarpGemmAttribute::Impl::kM;
-            constexpr index_t WarpGemm0N   = WarpGemm0::WarpGemmAttribute::Impl::kN;
-            constexpr index_t WarpGemm0K   = WarpGemm0::WarpGemmAttribute::Impl::kK;
-            constexpr index_t NumMfmaInsts = (kM0 / WarpGemm0M) * (kN0 / WarpGemm0N) *
-                                             (kK0 / WarpGemm0K) / (Gemm0MWarp * Gemm0NWarp);
-            if constexpr(get_warp_size() == 64 && kQKHeaddim == 256)
-            {
-                static_assert(NumMfmaInsts % 8 == 0);
-                static_for<0, NumMfmaInsts / 8, 1>{}([&](auto) {
-                    __builtin_amdgcn_sched_group_barrier(DS_READ, 2, 0);
-                    __builtin_amdgcn_sched_group_barrier(MFMA, 2, 0);
-                    __builtin_amdgcn_sched_group_barrier(DS_READ, 1, 0);
-                    __builtin_amdgcn_sched_group_barrier(MFMA, 2, 0);
-                    __builtin_amdgcn_sched_group_barrier(DS_READ, 1, 0);
-                    __builtin_amdgcn_sched_group_barrier(MFMA, 4, 0);
-                });
-            }
-        };
 
         static_assert(2 <= k0_loops);
         static_assert(1 <= k1_loops);
