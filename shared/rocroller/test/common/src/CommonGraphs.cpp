@@ -550,7 +550,12 @@ namespace rocRollerTest::Graphs
         }
 
         params->setDimensionInfo(m_tagC, macTileC);
-        params->setDimensionInfo(m_tagD, macTileD);
+        // When TC != TD the caller appends a conversion T_Execute and its own T_Store_Tiled.
+        // m_tagD is an xop result inside the MFMA T_Execute, not a LoadTiled/StoreTiled, so
+        // AddLDS cannot process a WAVE_LDS tile set on it.  The caller sets dimension info on
+        // the conversion T_Execute instead.
+        if(m_tc == m_td)
+            params->setDimensionInfo(m_tagD, macTileD);
 
         if(m_problem.scaleAMode == Operations::ScaleMode::Separate)
         {
@@ -688,5 +693,14 @@ namespace rocRollerTest::Graphs
         GEMM::getOperationTags() const
     {
         return {m_tagA, m_tagB, m_tagC, m_tagD};
+    }
+
+    std::tuple<rocRoller::Operations::OperationTag,
+               rocRoller::Operations::OperationTag,
+               rocRoller::Operations::OperationTag,
+               rocRoller::Operations::OperationTag>
+        GEMM::getTensorTags() const
+    {
+        return {m_tagTensorA, m_tagTensorB, m_tagTensorC, m_tagTensorD};
     }
 }

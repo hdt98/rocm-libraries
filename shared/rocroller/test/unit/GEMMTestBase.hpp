@@ -305,7 +305,7 @@ namespace GEMMTests
             // notSetC: clear the C tensor arg
             if(notSetC)
             {
-                auto [tA, tB, tC, tD] = gemmGraph.getOperationTags();
+                auto [tA, tB, tC, tD] = gemmGraph.getTensorTags();
                 TensorDescriptor descC_null(dataTypeD, {size_t(M), size_t(N)}, "N");
                 setCommandTensorArg(commandArgs, tC, descC_null, (TC*)nullptr);
                 deviceC = nullptr;

@@ -363,6 +363,13 @@ namespace rocRollerTest
                        rocRoller::Operations::OperationTag>
                 getOperationTags() const;
 
+            // Returns the Tensor-level operation tags (suitable for setCommandTensorArg).
+            std::tuple<rocRoller::Operations::OperationTag,
+                       rocRoller::Operations::OperationTag,
+                       rocRoller::Operations::OperationTag,
+                       rocRoller::Operations::OperationTag>
+                getTensorTags() const;
+
             std::pair<std::optional<rocRoller::Operations::OperationTag>,
                       std::optional<rocRoller::Operations::OperationTag>>
                 getABScaleTags() const;
