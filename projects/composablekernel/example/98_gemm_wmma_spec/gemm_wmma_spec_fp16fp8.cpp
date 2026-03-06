@@ -11,8 +11,8 @@
 using ADataType = ck::f8_t;
 using BDataType = ck::f8_t;
 #else
-using ADataType        = ck::half_t;
-using BDataType        = ck::half_t;
+using ADataType = ck::half_t;
+using BDataType = ck::half_t;
 #endif
 
 using AccDataType      = float;
@@ -711,17 +711,16 @@ using DeviceGemmInstance =
 using ReferenceGemmInstance = ck::tensor_operation::host::
     ReferenceGemm<ADataType, BDataType, CDataType, AccDataType, AElementOp, BElementOp, CElementOp>;
 
-using ReferenceGemmInstanceGPU = ck::tensor_operation::device::ReferenceGemm<
-    ALayout,
-    BLayout,
-    CLayout,
-    ADataType,
-    BDataType,
-    CDataType,
-    AccDataType,
-    AElementOp,
-    BElementOp,
-    CElementOp>;
+using ReferenceGemmInstanceGPU = ck::tensor_operation::device::ReferenceGemm<ALayout,
+                                                                             BLayout,
+                                                                             CLayout,
+                                                                             ADataType,
+                                                                             BDataType,
+                                                                             CDataType,
+                                                                             AccDataType,
+                                                                             AElementOp,
+                                                                             BElementOp,
+                                                                             CElementOp>;
 
 #include "run_gemm_example.inc"
 
