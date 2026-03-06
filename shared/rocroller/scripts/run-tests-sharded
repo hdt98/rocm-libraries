@@ -450,13 +450,13 @@ def main():
     # Values taken from CI run timing summaries
     FRAMEWORK_TOTAL_TIMES_BY_ARCH = {
         # fmt: off
-        "gfx942":  {"gtest": 7218, "catch2": 1064, "ctest": 531},
-        "gfx950":  {"gtest": 15769, "catch2": 1035 * 1.5, "ctest": 640 * 2},
-        "gfx908":  {"gtest": 14935, "catch2": 1757, "ctest": 1231},
-        "gfx1201": {"gtest": 1421, "catch2": 852,  "ctest": 515},
+        "gfx942":  {"ctest": 82,  "gtest": 10230,  "catch2": 1335},
+        "gfx950":  {"ctest": 2084, "gtest": 22540, "catch2": 1654},
+        "gfx908":  {"ctest": 3608, "gtest": 22600, "catch2": 2639},
+        "gfx1201": {"ctest": 1047,  "gtest": 1444,  "catch2": 847},
         # fmt: on
     }
-    _default_times = {"gtest": 12000, "catch2": 1200, "ctest": 750}
+    _default_times = {"ctest": 750, "gtest": 12000, "catch2": 1200}
     FRAMEWORK_TOTAL_TIMES = {
         fw: t
         for fw, t in FRAMEWORK_TOTAL_TIMES_BY_ARCH.get(
