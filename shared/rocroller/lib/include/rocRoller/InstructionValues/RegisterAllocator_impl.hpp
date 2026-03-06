@@ -334,8 +334,16 @@ namespace rocRoller
 
             auto const chunkWidth = options.contiguousChunkWidth;
 
-            // Remaining number of registers left to handle
-            int currentCount = count;
+            auto const searchStart
+                = (arch.HasCapability(GPUCapability::HasVGPRIndexing)
+                   && regType() == Register::Type::Vector && not(options.forceReservedRegion))
+                      ? ReservedRegionSize()
+                      : 0;
+            auto const searchStop
+                = (arch.HasCapability(GPUCapability::HasVGPRIndexing)
+                   && regType() == Register::Type::Vector && options.forceReservedRegion)
+                      ? ReservedRegionSize()
+                      : static_cast<int>(m_registers.size());
 
             // Free blocks that can be used. {start, size}
             std::vector<std::pair<int, int>> candidates;
@@ -348,16 +356,10 @@ namespace rocRoller
             if(arch.HasCapability(GPUCapability::HasVGPRIndexing)
                and regType() == Register::Type::Vector)
             {
-                if(options.forceReservedRegion)
-                {
-                    last = ReservedRegionSize();
-                }
-                else
-                {
-                    candidateIdx = ReservedRegionSize();
-                    first        = ReservedRegionSize();
-                }
-            }
+                auto [start, blockSize]
+                    = findContiguousRange(searchPos, chunkWidth, options, arch, rv);
+                if(start < 0)
+                    break;
 
             while(candidateIdx >= first && candidateIdx < last)
             {

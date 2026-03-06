@@ -155,6 +155,22 @@ namespace GEMMTests
                 ::testing::Values(SolutionParams::LoadPath::BufferToLDSViaVGPR,
                                   SolutionParams::LoadPath::GlobalToLDSViaVGPR))));
 
+    INSTANTIATE_TEST_SUITE_P(
+        GEMMTestWMMA1250,
+        GEMMWMMATestSuite,
+        ::testing::Combine(
+            currentGPUISA(),
+            ::testing::Combine(
+                ::testing::Values(std::make_pair(rocRoller::DataType::Half, /*waveK*/ 32),
+                                  std::make_pair(rocRoller::DataType::BFloat16, /*waveK*/ 32),
+                                  std::make_pair(rocRoller::DataType::Float, /*waveK*/ 4)),
+                ::testing::Values(std::pair<std::string, std::string>("N", "N"),
+                                  std::pair<std::string, std::string>("N", "T"),
+                                  std::pair<std::string, std::string>("T", "N"),
+                                  std::pair<std::string, std::string>("T", "T")),
+                ::testing::Values(SolutionParams::LoadPath::BufferToLDSViaVGPR),
+                ::testing::Values(SolutionParams::LoadPath::BufferToLDSViaVGPR))));
+
     // ========================================================================
     // GEMMWMMAF16AccumTestSuite
     // ========================================================================
