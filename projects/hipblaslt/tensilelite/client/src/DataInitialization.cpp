@@ -26,6 +26,7 @@
 
 #include "DataInitialization.hpp"
 #include "TensorDataManipulation.hpp"
+#include "TimingInstrumentation.hpp"
 #include "Utility.hpp"
 // #include "DataInitializationTyped.hpp"
 
@@ -725,7 +726,9 @@ namespace TensileLite
         void initGPUBatchedInput(void*                      base,
                                  void**                     array,
                                  TensorDescriptor const&    tensor,
-                                 const std::vector<size_t>& batchIdx)
+                                 const std::vector<size_t>& batchIdx,
+                                 uint8_t**                  pinnedStaging,
+                                 hipStream_t                stream = nullptr)
         {
             std::vector<size_t> batchSizes;
             std::vector<size_t> batchStrides;
@@ -736,22 +739,24 @@ namespace TensileLite
             }
             std::vector<size_t> coord(batchSizes.size(), 0);
 
-            auto      count    = CoordCount(batchSizes.begin(), batchSizes.end());
-            uint8_t** cpuArray = (uint8_t**)std::malloc(count * sizeof(void*));
+            auto count = CoordCount(batchSizes.begin(), batchSizes.end());
             for(size_t idx = 0; idx < count; idx++)
             {
                 CoordNumbered(
                     idx, coord.begin(), coord.end(), batchSizes.begin(), batchSizes.end());
-                cpuArray[idx] = (uint8_t*)base;
+                pinnedStaging[idx] = (uint8_t*)base;
                 for(size_t i = 0; i < batchSizes.size(); i++)
                 {
-                    cpuArray[idx] += coord[i] * batchStrides[i];
+                    pinnedStaging[idx] += coord[i] * batchStrides[i];
                 }
             }
 
-            HIP_CHECK_EXC(hipMemcpy(array, cpuArray, count * sizeof(void*), hipMemcpyHostToDevice));
-
-            std::free(cpuArray);
+            if(stream)
+                HIP_CHECK_EXC(hipMemcpyAsync(
+                    array, pinnedStaging, count * sizeof(void*), hipMemcpyHostToDevice, stream));
+            else
+                HIP_CHECK_EXC(
+                    hipMemcpy(array, pinnedStaging, count * sizeof(void*), hipMemcpyHostToDevice));
         }
 
         void* copyBadInputBuffers(const TensorDescriptor& descriptor,
@@ -759,18 +764,18 @@ namespace TensileLite
                                   void*                   src,
                                   void*                   bad,
                                   size_t                  totalElements,
-                                  hipMemcpyKind           kind)
+                                  hipMemcpyKind           kind,
+                                  hipStream_t             stream = nullptr)
         {
-            HIP_CHECK_EXC(
-                hipMemcpy(dst,
-                          src,
-                          multiplyElementSize(totalElements,
-                                              DataTypeInfo::Get(descriptor.dataType()).elementSize),
-                          kind));
+            auto bytes = multiplyElementSize(totalElements,DataTypeInfo::Get(descriptor.dataType()).elementSize);
+            if(stream)
+                HIP_CHECK_EXC(hipMemcpyAsync(dst, src, bytes, kind, stream));
+            else
+                HIP_CHECK_EXC(hipMemcpy(dst, src, bytes, kind));
             ptrdiff_t dPadding = totalElements - descriptor.totalAllocatedElements();
             dPadding           = multiplyElementSize(dPadding, descriptor.elementBytes());
             void* dstOffset    = (void*)((uint8_t*)dst + dPadding / 2);
-            TensileLite::hip::CopyTensorVoid(dstOffset, src, descriptor, kind);
+            TensileLite::hip::CopyTensorVoid(dstOffset, src, descriptor, kind, stream);
             return dstOffset;
         }
 
@@ -779,7 +784,8 @@ namespace TensileLite
                                   void*                   src,
                                   size_t                  totalElements,
                                   hipMemcpyKind           kind,
-                                  ptrdiff_t               customPadding = -1)
+                                  ptrdiff_t               customPadding = -1,
+                                  hipStream_t             stream        = nullptr)
         {
             const ptrdiff_t dPadding = (customPadding == -1)
                                            ? totalElements - descriptor.totalAllocatedElements()
@@ -789,11 +795,11 @@ namespace TensileLite
                                         : (descriptor.totalAllocatedElements() + customPadding);
             uint8_t* dstOffset
                 = (uint8_t*)dst + multiplyElementSize(dPadding, descriptor.elementBytes());
-            HIP_CHECK_EXC(
-                hipMemcpy(dstOffset,
-                          src,
-                          multiplyElementSize(numElementsToCopy, descriptor.elementBytes()),
-                          kind));
+            auto     bytes     = descriptor.elementBytes() * numElementsToCopy;
+            if(stream)
+                HIP_CHECK_EXC(hipMemcpyAsync(dstOffset, src, bytes, kind, stream));
+            else
+                HIP_CHECK_EXC(hipMemcpy(dstOffset, src, bytes, kind));
             return dstOffset;
         }
 
@@ -801,10 +807,14 @@ namespace TensileLite
                                void*                   dst,
                                void*                   src,
                                size_t                  totalElements,
-                               hipMemcpyKind           kind)
+                               hipMemcpyKind           kind,
+                               hipStream_t             stream = nullptr)
         {
-            HIP_CHECK_EXC(hipMemcpy(
-                dst, src, multiplyElementSize(totalElements, descriptor.elementBytes()), kind));
+            auto bytes = multiplyElementSize(totalElements, descriptor.elementBytes());
+            if(stream)
+                HIP_CHECK_EXC(hipMemcpyAsync(dst, src, bytes, kind, stream));
+            else
+                HIP_CHECK_EXC(hipMemcpy(dst, src, bytes, kind));
             return dst;
         }
 
@@ -911,6 +921,20 @@ namespace TensileLite
 
         {
             HIP_CHECK_EXC(hipStreamCreate(&m_copyStream));
+            for(size_t i = 0; i < MAX_BUFFER_SETS; i++)
+                HIP_CHECK_EXC(
+                    hipEventCreateWithFlags(&m_copyDoneEvents[i], hipEventDisableTiming));
+
+            // Determine whether to use triple-buffering (no benchmark runs)
+            {
+                int numBenchmarks    = args["num-benchmarks"].as<int>();
+                int numEnqPerSync    = args["num-enqueues-per-sync"].as<int>();
+                int numSyncsPerBench = args["num-syncs-per-benchmark"].as<int>();
+                bool noBenchmarkRuns = (numBenchmarks == 0 || numEnqPerSync == 0
+                                        || numSyncsPerBench == 0);
+                m_numActiveBuffers   = noBenchmarkRuns ? 3 : 2;
+            }
+
             m_rotatingBuffer
                 = args["rotating-buffer-size"].as<int32_t>() * 1024 * 1024; // Change to bytes
             m_rotatingMode   = args["rotating-buffer-mode"].as<int32_t>();
@@ -1350,7 +1374,12 @@ namespace TensileLite
                     auto allocPinned = [](size_t bytes) {
                         void* raw = nullptr;
                         HIP_CHECK_EXC(hipHostMalloc(&raw, bytes, 0));
-                        return std::shared_ptr<void>(raw, [](auto p) { hipHostFree(p); });
+                        return std::shared_ptr<void>(raw, [](auto p) {
+                            hipError_t e = hipHostFree(p);
+                            if(e)
+                                std::cerr << "hipHostFree failed: "
+                                          << hipGetErrorString(e) << std::endl;
+                        });
                     };
 
                     if(!pUnit.cpuInput.current)
@@ -1393,6 +1422,13 @@ namespace TensileLite
 
         void DataInitialization::allocNewGPUInputs()
         {
+            m_hasAltBuffers = true;
+
+            // Allocate reusable pinned staging buffer for batch pointer setup
+            if(!m_pinnedBatchStaging && m_maxBatch > 0)
+                HIP_CHECK_EXC(
+                    hipHostMalloc(&m_pinnedBatchStaging, m_maxBatch * sizeof(void*), 0));
+
             std::vector<std::shared_ptr<void>> guardPage;
             void*                              guardPagePtr;
             bool enableGuardPage = (m_curBoundsCheck == BoundsCheckMode::GuardPageFront
@@ -1445,13 +1481,40 @@ namespace TensileLite
                             s << "[input gpu]" << ss.str();
                             throw std::runtime_error(s.str().c_str());
                         }
-                        pUnit.gpuInput.current = ptr;
-                        std::string n          = "batch" + it.name;
+                        pUnit.gpuInput.current    = ptr;
+                        pUnit.gpuInput.buffers[0] = ptr;
+                        std::string n             = "batch" + it.name;
                         auto        batch_ptr
                             = allocNewGPUBuffer<void*>(n.c_str(), sizeof(uint8_t*) * m_maxBatch);
                         if(batch_ptr == nullptr)
                             throw std::runtime_error("out of batch gpu memory");
-                        pUnit.gpuInput.batch = batch_ptr;
+                        pUnit.gpuInput.batch       = batch_ptr;
+                        pUnit.gpuInput.batchBufs[0] = batch_ptr;
+
+                        // Allocate alternate buffers for multi-buffering
+                        for(size_t slot = 1;
+                            m_hasAltBuffers && slot < MAX_BUFFER_SETS;
+                            slot++)
+                        {
+                            if(!pUnit.gpuInput.buffers[slot])
+                            {
+                                auto altSuffix = "_alt" + std::to_string(slot);
+                                auto altPtr    = allocNewGPUBuffer<void>(
+                                    (it.name + altSuffix).c_str(), size);
+                                auto altBatch = allocNewGPUBuffer<void*>(
+                                    (n + altSuffix).c_str(),
+                                    sizeof(uint8_t*) * m_maxBatch);
+                                if(altPtr && altBatch)
+                                {
+                                    pUnit.gpuInput.buffers[slot]   = altPtr;
+                                    pUnit.gpuInput.batchBufs[slot] = altBatch;
+                                }
+                                else
+                                {
+                                    m_hasAltBuffers = false;
+                                }
+                            }
+                        }
                     }
                     if(!pUnit.gpuInput.valid)
                     {
@@ -1503,7 +1566,8 @@ namespace TensileLite
             }
         }
 
-        void DataInitialization::initializeGPUBatchedInputs(ContractionProblemGemm const& problem)
+        void DataInitialization::initializeGPUBatchedInputs(ContractionProblemGemm const& problem,
+                                                            hipStream_t                   asyncStream)
         {
             auto batchIdxs = problem.batchIndices();
             // FIXME: batch not supported for bias
@@ -1560,7 +1624,9 @@ namespace TensileLite
                 initGPUBatchedInput((void*)(offset + padding),
                                     pUnit.gpuInput.batch.get(),
                                     problem.tensors()[i],
-                                    batchIdx);
+                                    batchIdx,
+                                    m_pinnedBatchStaging,
+                                    asyncStream);
 
                 if(problem.useBias() && problem.biasSrc() == i)
                 {
@@ -1588,7 +1654,9 @@ namespace TensileLite
                     initGPUBatchedInput((void*)(offset + padding),
                                         pUnitBias.gpuInput.batch.get(),
                                         problem.tensors()[ContractionProblemGemm::TENSOR::BIAS],
-                                        batchIdx);
+                                        batchIdx,
+                                        m_pinnedBatchStaging,
+                                        asyncStream);
                 }
 
                 if((problem.sparse() == 1 && i == ContractionProblemGemm::TENSOR::A)
@@ -1619,7 +1687,9 @@ namespace TensileLite
                     initGPUBatchedInput((void*)(offset + padding),
                                         pUnitM.gpuInput.batch.get(),
                                         problem.tensors()[ContractionProblemGemm::TENSOR::METADATA],
-                                        batchIdx);
+                                        batchIdx,
+                                        m_pinnedBatchStaging,
+                                        asyncStream);
 
                     auto& pUnitCp = m_vdata[ContractionProblemGemm::TENSOR::COMPRESSED]
                                         .pristine[problem.compressed().dataType()];
@@ -1632,7 +1702,9 @@ namespace TensileLite
                         (void*)(offset + padding),
                         pUnitCp.gpuInput.batch.get(),
                         problem.tensors()[ContractionProblemGemm::TENSOR::COMPRESSED],
-                        batchIdx);
+                        batchIdx,
+                        m_pinnedBatchStaging,
+                        asyncStream);
                 }
             }
         }
@@ -1857,7 +1929,8 @@ namespace TensileLite
                                             std::vector<size_t>&              maxElements,
                                             std::vector<std::vector<size_t>>& offsets,
                                             ContractionProblemGemm const&     problem,
-                                            hipMemcpyKind                     kind)
+                                            hipMemcpyKind                     kind,
+                                            hipStream_t                       asyncStream)
         {
             ptrs.clear();
             batchPtrs.clear();
@@ -1892,7 +1965,8 @@ namespace TensileLite
                                                       p.gpuInput.valid.get(),
                                                       p.gpuInput.bad.get(),
                                                       p.maxElements,
-                                                      kind);
+                                                      kind,
+                                                      asyncStream);
                         ptrs.push_back(ptr);
                         batchPtrs.push_back(p.getInputByKind(kind).batch.get());
                         maxElements.push_back(p.maxElements);
@@ -1951,7 +2025,8 @@ namespace TensileLite
                                                       p.gpuInput.valid.get(),
                                                       p.maxElements,
                                                       kind,
-                                                      swizzlePadding);
+                                                      swizzlePadding,
+                                                      asyncStream);
                         ptrs.push_back(ptr);
                         batchPtrs.push_back(p.getInputByKind(kind).batch.get());
                         maxElements.push_back(p.maxElements);
@@ -1993,10 +2068,11 @@ namespace TensileLite
                                                    p.gpuInput.current.get(),
                                                    p.gpuInput.valid.get(),
                                                    p.maxElements,
-                                                   kind);
+                                                   kind,
+                                                   asyncStream);
                         if(ptr == nullptr)
                         {
-                            std::runtime_error("output ptr is null when copy input");
+                            throw std::runtime_error("output ptr is null when copy input");
                         }
                         ptrs.push_back(ptr);
                         batchPtrs.push_back(p.getInputByKind(kind).batch.get());
@@ -2019,11 +2095,12 @@ namespace TensileLite
                                              std::vector<size_t>&              maxElements,
                                              std::vector<std::vector<size_t>>& offsets,
                                              ContractionProblemGemm const&     problem,
-                                             hipMemcpyKind                     kind)
+                                             hipMemcpyKind                     kind,
+                                             hipStream_t                       asyncStream)
         {
-            bool useAsync = (kind == hipMemcpyDeviceToDevice) && m_copyStream;
+            hipStream_t copyStream = asyncStream ? asyncStream : m_copyStream;
+            bool        useAsync   = (kind == hipMemcpyDeviceToDevice) && copyStream;
             {
-                ScopedTimer t("gpu_input_reset.reset_output.copy_loop");
                 for(size_t i = 0; i < m_vdata.size(); i++)
                 {
                     void* ptr  = nullptr;
@@ -2054,7 +2131,7 @@ namespace TensileLite
                                                              p.gpuInput.valid.get(),
                                                              desc.elementBytes() * p.maxElements,
                                                              kind,
-                                                             m_copyStream));
+                                                             copyStream));
                                 ptr = p.gpuInput.current.get();
                             }
                             else
@@ -2066,7 +2143,7 @@ namespace TensileLite
                         }
                         if(ptr == nullptr)
                         {
-                            std::runtime_error("output ptr is null when copy input");
+                            throw std::runtime_error("output ptr is null when copy input");
                         }
                         ptrs[i]        = ptr;
                         batchPtrs[i]   = p.getInputByKind(kind).batch.get();
@@ -2082,14 +2159,12 @@ namespace TensileLite
                     }
                 }
             }
-            if(useAsync)
-            {
-                ScopedTimer t("gpu_input_reset.reset_output.sync");
-                HIP_CHECK_EXC(hipStreamSynchronize(m_copyStream));
-            }
+            if(useAsync && !asyncStream)
+                HIP_CHECK_EXC(hipStreamSynchronize(copyStream));
         }
 
-        void DataInitialization::copyValidToGPUBuffer(ContractionProblemGemm const& problem)
+        void DataInitialization::copyValidToGPUBuffer(ContractionProblemGemm const& problem,
+                                                      hipStream_t                   asyncStream)
         {
             for(size_t i = 0; i < m_vdata.size(); i++)
             {
@@ -2122,7 +2197,7 @@ namespace TensileLite
                                             hipMemcpyHostToDevice));
                 }
             }
-            if(m_copyStream)
+            if(m_copyStream && !asyncStream)
                 HIP_CHECK_EXC(hipStreamSynchronize(m_copyStream));
         }
 
@@ -2356,63 +2431,89 @@ namespace TensileLite
             }
         }
 
-        // For GEMM only
+        // Build a ProblemInputs from explicit pointer/size vectors (GPU path).
         std::shared_ptr<ProblemInputs>
-            DataInitialization::ConvertToProblemInputs(ContractionProblemGemm const& problem,
-                                                       bool                          isGPU)
+            DataInitialization::buildGPUProblemInputs(
+                std::vector<void*>&                    ptrs,
+                std::vector<void**>&                   batchPtrs,
+                std::vector<size_t>&                   maxElements,
+                std::vector<std::vector<size_t>> const& offsets,
+                ContractionProblemGemm const&          problem)
         {
             using std::static_pointer_cast;
             std::shared_ptr<ProblemInputs> result;
-            if(m_groupedOffsets[0].empty())
+            if(offsets.empty() || offsets[0].empty())
             {
                 auto inputs = new ContractionInputs();
-                if(isGPU)
-                    setContractionInputs(m_gpuPtrs,
-                                         m_gpuBatchPtrs,
-                                         m_workspacePristine.get(),
-                                         m_cdata,
-                                         m_maxElements,
-                                         isGPU,
-                                         inputs);
-                else
-                {
-                    auto dummyBatchPtrs = std::vector<void**>(
-                        ContractionProblemGemm::TENSOR::TENSOR_COUNT, nullptr);
-                    setContractionInputs(m_cpuPtrs,
-                                         dummyBatchPtrs,
-                                         m_workspacePristine.get(),
-                                         m_cdata,
-                                         m_maxElements,
-                                         isGPU,
-                                         inputs);
-                }
+                setContractionInputs(ptrs,
+                                     batchPtrs,
+                                     m_workspacePristine.get(),
+                                     m_cdata,
+                                     maxElements,
+                                     /*isGPU=*/true,
+                                     inputs);
                 result = static_pointer_cast<ProblemInputs>(
                     std::shared_ptr<ContractionInputs>(inputs));
             }
             else
             {
                 auto inputs = new ContractionGroupedInputs();
-                // Currently grouped gemm does not support batch, so we use a dummy batch vector here.
                 auto dummyBatchPtrs
                     = std::vector<void**>(ContractionProblemGemm::TENSOR::TENSOR_COUNT, nullptr);
-                if(isGPU)
-                    setContractionGroupedInputs(m_gpuPtrs,
-                                                dummyBatchPtrs,
-                                                m_workspacePristine.get(),
-                                                m_cdata,
-                                                isGPU,
-                                                problem,
-                                                m_groupedOffsets,
-                                                inputs);
-                else
-                    setContractionGroupedInputs(m_cpuPtrs,
-                                                dummyBatchPtrs,
-                                                m_workspacePristine.get(),
-                                                m_cdata,
-                                                isGPU,
-                                                problem,
-                                                m_groupedOffsets,
-                                                inputs);
+                setContractionGroupedInputs(ptrs,
+                                            dummyBatchPtrs,
+                                            m_workspacePristine.get(),
+                                            m_cdata,
+                                            /*isGPU=*/true,
+                                            problem,
+                                            offsets,
+                                            inputs);
+                result = static_pointer_cast<ProblemInputs>(
+                    std::shared_ptr<ContractionGroupedInputs>(inputs));
+            }
+            return result;
+        }
+
+        // For GEMM only
+        std::shared_ptr<ProblemInputs>
+            DataInitialization::ConvertToProblemInputs(ContractionProblemGemm const& problem,
+                                                       bool                          isGPU)
+        {
+            if(isGPU)
+                return buildGPUProblemInputs(
+                    m_gpuPtrs, m_gpuBatchPtrs, m_maxElements, m_groupedOffsets, problem);
+
+            // CPU path — uses m_cpuPtrs with dummy batch pointers
+            using std::static_pointer_cast;
+            std::shared_ptr<ProblemInputs> result;
+            if(m_groupedOffsets[0].empty())
+            {
+                auto inputs = new ContractionInputs();
+                auto dummyBatchPtrs = std::vector<void**>(
+                    ContractionProblemGemm::TENSOR::TENSOR_COUNT, nullptr);
+                setContractionInputs(m_cpuPtrs,
+                                     dummyBatchPtrs,
+                                     m_workspacePristine.get(),
+                                     m_cdata,
+                                     m_maxElements,
+                                     isGPU,
+                                     inputs);
+                result = static_pointer_cast<ProblemInputs>(
+                    std::shared_ptr<ContractionInputs>(inputs));
+            }
+            else
+            {
+                auto inputs = new ContractionGroupedInputs();
+                auto dummyBatchPtrs
+                    = std::vector<void**>(ContractionProblemGemm::TENSOR::TENSOR_COUNT, nullptr);
+                setContractionGroupedInputs(m_cpuPtrs,
+                                            dummyBatchPtrs,
+                                            m_workspacePristine.get(),
+                                            m_cdata,
+                                            isGPU,
+                                            problem,
+                                            m_groupedOffsets,
+                                            inputs);
                 result = static_pointer_cast<ProblemInputs>(
                     std::shared_ptr<ContractionGroupedInputs>(inputs));
             }
@@ -2707,10 +2808,234 @@ namespace TensileLite
             return inputArr;
         }
 
+        std::shared_ptr<ProblemInputs>
+            DataInitialization::prepareGPUInputsInternal(
+                ContractionProblemGemm const& problem,
+                hipStream_t                   asyncStream)
+        {
+            hipMemcpyKind kind;
+
+            bool needSwizzle = problem.swizzleTensorA() || problem.swizzleTensorB();
+
+            if(m_keepPristineCopyOnGPU && !m_problemDependentData)
+            {
+                kind = hipMemcpyDeviceToDevice;
+            }
+            else
+            {
+                kind = hipMemcpyHostToDevice;
+            }
+
+            if(m_gpuInit && m_curBoundsCheck == BoundsCheckMode::Disable
+               && !m_problemDependentData && !needSwizzle)
+            {
+                if(m_elementsToValidate)
+                {
+                    ScopedTimer t("async_reset_resetoutput");
+                    resetOutput(m_gpuPtrs,
+                                m_gpuBatchPtrs,
+                                m_maxElements,
+                                m_groupedOffsets,
+                                problem,
+                                kind,
+                                asyncStream);
+                }
+                return m_cachedGPUInputs;
+            }
+            else
+            {
+                {
+                    ScopedTimer t("async_reset_probdep");
+                    if(m_cpuPtrs.empty() && m_problemDependentData)
+                    {
+                        ScopedTimer t2("async_reset_cpuinit");
+                        initializeCPUInputs(problem);
+                    }
+                    if(m_problemDependentData)
+                    {
+                        ScopedTimer t2("async_reset_copyvalid");
+                        copyValidToGPUBuffer(problem, asyncStream);
+                    }
+                    if(needSwizzle)
+                    {
+                        ScopedTimer t2("async_reset_swizzle");
+                        copySwizzledToGPUBuffer(problem);
+                    }
+                }
+
+                {
+                    ScopedTimer t("async_reset_copyinputs");
+                    copyInputs(m_gpuPtrs,
+                               m_gpuBatchPtrs,
+                               m_maxElements,
+                               m_groupedOffsets,
+                               problem,
+                               hipMemcpyDeviceToDevice,
+                               asyncStream);
+                }
+                if(m_rotatingMode == 1 && m_rotatingBuffer > 0)
+                {
+                    auto mem = m_rm->getRotatingMemory();
+                    for(size_t j = 1; j < mem.size(); j++)
+                        for(size_t i = 0; i < m_vdata.size(); i++)
+                        {
+                            auto& desc = problem.tensors()[i];
+                            auto  it   = m_vdata[i].pristine.find(desc.dataType());
+                            if(it != m_vdata[i].pristine.end())
+                            {
+                                auto& p = it->second;
+                                if(i <= ContractionProblemGemm::TENSOR::METADATA)
+                                    HIP_CHECK_EXC(hipMemcpy(mem[j][i].data.get(),
+                                                            p.gpuInput.current.get(),
+                                                            mem[j][i].size,
+                                                            hipMemcpyDeviceToDevice));
+                            }
+                        }
+                }
+                m_gpuInit = true;
+                {
+                    ScopedTimer t("async_reset_batchedinit");
+                    initializeGPUBatchedInputs(problem, asyncStream);
+                }
+            }
+
+            if(m_cpuPtrs.empty())
+                initializeConstantInputs(problem);
+
+            m_cachedGPUInputs = ConvertToProblemInputs(problem, true);
+
+            // Store active slot state in ring[0] only on initial
+            // preparation (asyncStream == nullptr), not when called
+            // from beginAsyncReset where m_gpuPtrs has been moved away.
+            if(!asyncStream)
+            {
+                m_gpuPtrsRing[0]      = m_gpuPtrs;
+                m_gpuBatchPtrsRing[0] = m_gpuBatchPtrs;
+                m_cachedInputsRing[0] = m_cachedGPUInputs;
+
+                initializeAltBufferSets(problem);
+            }
+            return m_cachedGPUInputs;
+        }
+
+        void DataInitialization::fillSlot(
+            size_t                        slotIdx,
+            ContractionProblemGemm const& problem,
+            hipStream_t                   asyncStream)
+        {
+            // RAII: point gpuInput.current/batch at target slot, restore on exit
+            SlotGuard guard(m_vdata, slotIdx);
+
+            hipMemcpyKind kind = (m_keepPristineCopyOnGPU && !m_problemDependentData)
+                                     ? hipMemcpyDeviceToDevice
+                                     : hipMemcpyHostToDevice;
+
+            bool needSwizzle = problem.swizzleTensorA() || problem.swizzleTensorB();
+
+            // Local copies — critical: copyInputs doesn't clear offsets (only
+            // ptrs/batchPtrs/maxElements), so reusing m_groupedOffsets across
+            // repeated fillSlot calls would cause unbounded growth.
+            // resetOutput uses indexing, so locals must be pre-sized.
+            auto localMaxElements = m_maxElements;
+            auto localOffsets     = m_groupedOffsets;
+
+            bool slotInitialized = !m_gpuPtrsRing[slotIdx].empty();
+
+            if(slotInitialized && m_gpuInit
+               && m_curBoundsCheck == BoundsCheckMode::Disable
+               && !m_problemDependentData && !needSwizzle)
+            {
+                // Fast path: slot already has data, only reset output D
+                if(m_elementsToValidate)
+                {
+                    resetOutput(m_gpuPtrsRing[slotIdx],
+                                m_gpuBatchPtrsRing[slotIdx],
+                                localMaxElements,
+                                localOffsets,
+                                problem,
+                                kind,
+                                asyncStream);
+                    m_cachedInputsRing[slotIdx] = buildGPUProblemInputs(
+                        m_gpuPtrsRing[slotIdx],
+                        m_gpuBatchPtrsRing[slotIdx],
+                        localMaxElements,
+                        localOffsets,
+                        problem);
+                }
+                // else: pointers unchanged, reuse existing m_cachedInputsRing[slotIdx]
+            }
+            else
+            {
+                // Full path: initialize all tensors into target slot
+                if(m_cpuPtrs.empty() && m_problemDependentData)
+                    initializeCPUInputs(problem);
+                if(m_problemDependentData)
+                    copyValidToGPUBuffer(problem, asyncStream);
+                if(needSwizzle)
+                    copySwizzledToGPUBuffer(problem);
+
+                // Clear offsets before copyInputs (it push_back's, doesn't clear)
+                localOffsets.clear();
+                copyInputs(m_gpuPtrsRing[slotIdx],
+                           m_gpuBatchPtrsRing[slotIdx],
+                           localMaxElements,
+                           localOffsets,
+                           problem,
+                           kind,
+                           asyncStream);
+                initializeGPUBatchedInputs(problem, asyncStream);
+
+                m_cachedInputsRing[slotIdx] = buildGPUProblemInputs(
+                    m_gpuPtrsRing[slotIdx],
+                    m_gpuBatchPtrsRing[slotIdx],
+                    localMaxElements,
+                    localOffsets,
+                    problem);
+            }
+        }
+
+        void DataInitialization::initializeAltBufferSets(
+            ContractionProblemGemm const& problem)
+        {
+            if(!m_hasAltBuffers || !m_gpuPtrsRing[1].empty())
+                return;
+
+            for(size_t slot = 1; slot < m_numActiveBuffers; slot++)
+                fillSlot(slot, problem, /*asyncStream=*/nullptr);
+
+            m_ringBufferWarm = true;
+        }
+
         DataInitialization::~DataInitialization()
         {
+            for(size_t i = 0; i < MAX_BUFFER_SETS; i++)
+            {
+                if(m_copyDoneEvents[i])
+                {
+                    hipError_t e = hipEventDestroy(m_copyDoneEvents[i]);
+                    if(e)
+                        std::cerr << "~DataInitialization: hipEventDestroy failed: "
+                                  << hipGetErrorString(e) << std::endl;
+                }
+            }
             if(m_copyStream)
-                hipStreamDestroy(m_copyStream);
+            {
+                hipError_t e = hipStreamSynchronize(m_copyStream);
+                if(e)
+                    std::cerr << "~DataInitialization: hipStreamSynchronize failed: "
+                              << hipGetErrorString(e) << std::endl;
+                e = hipStreamDestroy(m_copyStream);
+                if(e)
+                    std::cerr << "~DataInitialization: hipStreamDestroy failed: "
+                              << hipGetErrorString(e) << std::endl;
+            }
+            if(m_pinnedBatchStaging)
+            {
+                hipError_t e = hipHostFree(m_pinnedBatchStaging);
+                if(e)
+                    std::cerr << "~DataInitialization: hipHostFree failed: "
+                              << hipGetErrorString(e) << std::endl;
+            }
         }
     } // namespace Client
 } // namespace TensileLite
