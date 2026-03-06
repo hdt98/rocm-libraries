@@ -37,7 +37,7 @@ class ShardInfo:
     test_type: str
     executable: str
     output_buffer: str = ""
-    full_output: str = ""
+    report_path: str = ""
     start_time: float = 0.0
 
 
@@ -105,7 +105,7 @@ def start_shard(
 
     # Generate shard tag prefix from first two letters of framework name
     test_prefix = test_type[:2].upper()
-    shard_tag = f"[{test_prefix}{shard_index:02d}]"
+    shard_tag = f"[{test_prefix}{shard_index}]"
     print(f"{shard_tag} Starting shard", flush=True, file=sys.stderr)
 
     # Set environment variables
@@ -116,6 +116,9 @@ def start_shard(
     # Start with base command from profile and add framework-specific sharding arguments
     cmd = base_cmd.copy()
 
+    report_name = f"{test_prefix}{shard_index}.xml"
+    report_path = build_dir / "test_report" / report_name
+
     if test_type == "gtest":
         if shard_seed is None:
             raise ValueError("shard_seed is required for gtest")
@@ -125,7 +128,7 @@ def start_shard(
             [
                 "--gtest_shuffle",
                 f"--gtest_random_seed={shard_seed}",
-                f"--gtest_output=xml:test_report/gtest_shard_{shard_index}.xml",
+                f"--gtest_output=xml:test_report/{report_name}",
             ]
         )
     elif test_type == "catch2":
@@ -142,7 +145,7 @@ def start_shard(
                 "--rng-seed",
                 str(shard_seed),
                 "--reporter",
-                f"junit::out=test_report/catch2_shard_{shard_index}.xml",
+                f"junit::out=test_report/{report_name}",
                 "--reporter",
                 "console::out=-::colour-mode=ansi",
             ]
@@ -155,7 +158,7 @@ def start_shard(
                 f"{shard_index + 1},,{num_shards}",
                 "--output-on-failure",
                 "--output-junit",
-                f"test_report/ctest_shard_{shard_index}.xml",
+                f"test_report/{report_name}",
             ]
         )
 
@@ -198,7 +201,7 @@ def start_shard(
         shard_index=shard_index,
         test_type=test_type,
         executable=executable,
-        output_buffer="",
+        report_path=str(report_path),
         start_time=time.time(),
     )
 
@@ -258,7 +261,6 @@ def run_shards(pending_specs, max_concurrent=None):
                         line = line.rstrip("\r")
                         if line:
                             print(f"{info.shard_tag} {line}", flush=True)
-                            info.full_output += line + "\n"
             except OSError:
                 # File descriptor closed or error
                 pass
@@ -289,7 +291,6 @@ def run_shards(pending_specs, max_concurrent=None):
                     line = line.rstrip("\r")
                     if line:
                         print(f"{info.shard_tag} {line}", flush=True)
-                        info.full_output += line + "\n"
 
             # Close file descriptor
             os.close(fd)
@@ -315,11 +316,7 @@ def run_shards(pending_specs, max_concurrent=None):
                     flush=True,
                     file=sys.stderr,
                 )
-                if info.full_output:
-                    print(f"{info.shard_tag} --- failure output ---", file=sys.stderr)
-                    for line in info.full_output.splitlines():
-                        print(f"{info.shard_tag} {line}", file=sys.stderr)
-                    print(f"{info.shard_tag} --- end failure output ---", file=sys.stderr)
+                print(f"{info.shard_tag} Report: {info.report_path}", file=sys.stderr)
                 failed_shards.append((info.shard_index, info.test_type, return_code))
 
             # Remove from active shards
@@ -349,7 +346,8 @@ def main():
     )
     available_cpus = get_available_cpus()
     parser.add_argument(
-        "-j", "--parallel",
+        "-j",
+        "--parallel",
         nargs="?",
         type=int,
         const=available_cpus,
@@ -453,7 +451,7 @@ def main():
     FRAMEWORK_TOTAL_TIMES_BY_ARCH = {
         # fmt: off
         "gfx942":  {"gtest": 7218, "catch2": 1064, "ctest": 531},
-        "gfx950":  {"gtest": 15769, "catch2": 1035, "ctest": 640},
+        "gfx950":  {"gtest": 15769, "catch2": 1035 * 1.5, "ctest": 640 * 2},
         "gfx908":  {"gtest": 14935, "catch2": 1757, "ctest": 1231},
         "gfx1201": {"gtest": 1421, "catch2": 852,  "ctest": 515},
         # fmt: on
@@ -570,7 +568,7 @@ def main():
 
             print(f"\n{executable} ({framework}):", file=sys.stderr)
             for idx, elapsed in sorted(timings):
-                print(f"  [{prefix}{idx:02d}] {elapsed:6.1f}s", file=sys.stderr)
+                print(f"  [{prefix}{idx}] {elapsed:6.1f}s", file=sys.stderr)
 
             times = [t for _, t in timings]
             total = sum(times)
