@@ -2,3 +2,4 @@
 # SPDX-License-Identifier: MIT
 
 add_subdirectory(00_copy_kernel)
+add_subdirectory(01_naive_gemm)
