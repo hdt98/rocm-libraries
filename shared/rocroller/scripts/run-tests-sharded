@@ -170,9 +170,9 @@ def start_shard(
         if k not in orig_env or orig_env.get(k) != env[k]
     ]
     if set_vars:
-        print(f"{shard_tag} Environment:", flush=True)
+        print(f"{shard_tag} Environment:", flush=True, file=sys.stderr)
         for k, v in set_vars:
-            print(f"{shard_tag}   {k}={v}", flush=True)
+            print(f"{shard_tag}   {k}={v}", flush=True, file=sys.stderr)
 
     # Log the command being executed
     cmd_str = " ".join(cmd)
