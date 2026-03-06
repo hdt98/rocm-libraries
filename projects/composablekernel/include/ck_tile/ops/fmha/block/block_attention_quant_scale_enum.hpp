@@ -15,6 +15,7 @@ enum class BlockAttentionQuantScaleEnum
     BLOCKSCALE    = 2,
     KV_BLOCKSCALE = 3, // Q per-tensor, K/V per-page block scale
     MX            = 4, // Microscaling
+    SAGEATTN_V3   = 5, // SageAttention V3: MXFP4 with delta_s smoothing
 };
 
 template <BlockAttentionQuantScaleEnum>
@@ -44,6 +45,11 @@ template <>
 struct BlockAttentionQuantScaleEnumToStr<BlockAttentionQuantScaleEnum::MX>
 {
     static constexpr const char* name = "mx";
+};
+template <>
+struct BlockAttentionQuantScaleEnumToStr<BlockAttentionQuantScaleEnum::SAGEATTN_V3>
+{
+    static constexpr const char* name = "sageattnv3";
 };
 
 } // namespace ck_tile

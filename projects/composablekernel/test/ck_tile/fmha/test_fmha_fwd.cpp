@@ -103,6 +103,26 @@ struct TestConfigs<FmhaFwdMxFp4>
 };
 
 template <>
+struct TestConfigs<FmhaFwdSageAttnV3>
+{
+    // SA3 only supports hdim=128 in the first codegen receipt
+    static constexpr auto HDimValues         = std::array{std::tuple{128, -1}};
+    static constexpr auto SplitKVHDimValues  = std::array<std::tuple<int, int>, 0>{};
+    static constexpr auto AppendKVHDimValues = std::array<std::tuple<int, int>, 0>{};
+    // SA3 only supports batch mode in the runner
+    static constexpr auto ModeValues        = std::array{mode_enum::batch};
+    static constexpr auto IsVRowmajorValues = std::array{false};
+    static constexpr auto qscale_str        = "sageattnv3";
+    static constexpr bool def_lse           = true;
+    static constexpr bool def_is_v_rowmajor = false;
+    static constexpr auto init_method       = "3";
+    static int adjust_seqlen(int seqlen)
+    {
+        return seqlen < 0 ? seqlen : ck_tile::integer_least_multiple(seqlen, 2);
+    }
+};
+
+template <>
 struct TestConfigs<FmhaFwdFp32>
 {
     static constexpr auto HDimValues = std::array{
@@ -163,7 +183,7 @@ const ck_tile::stream_config stream_config{
 
 #define COMMON_ARGS                                                                              \
     init_method, static_cast<uint32_t>(ck_tile::EnvValue(CK_TILE_ENV(CK_TILE_TEST_SEED))), 1, 0, \
-        stream_config
+        6.0f, stream_config
 
 auto EnableTestIf(bool condition)
 {
@@ -296,7 +316,8 @@ TEST(TestCkTileFmhaFwd, AppendKvWithBatchEffLensShouldFail)
         init_method,
         static_cast<uint32_t>(ck_tile::EnvValue(CK_TILE_ENV(CK_TILE_TEST_SEED))),
         0,
-        1, // init_sink
+        1,    // init_sink
+        6.0f, // p_scale_factor
         stream_config);
     ASSERT_EQ(result, fwd_result::invalid_args);
 }
@@ -341,7 +362,8 @@ TEST(TestCkTileFmhaFwd, SplitKvWithGroupPaddingShouldFail)
         init_method,
         static_cast<uint32_t>(ck_tile::EnvValue(CK_TILE_ENV(CK_TILE_TEST_SEED))),
         0,
-        1, // init_sink
+        1,    // init_sink
+        6.0f, // p_scale_factor
         stream_config);
     ASSERT_EQ(result, fwd_result::invalid_args);
 }
@@ -385,7 +407,8 @@ TEST(TestCkTileFmhaFwd, PagedKvWithGroupPaddingShouldFail)
         init_method,
         static_cast<uint32_t>(ck_tile::EnvValue(CK_TILE_ENV(CK_TILE_TEST_SEED))),
         0,
-        1, // init_sink
+        1,    // init_sink
+        6.0f, // p_scale_factor
         stream_config);
     ASSERT_EQ(result, fwd_result::invalid_args);
 }

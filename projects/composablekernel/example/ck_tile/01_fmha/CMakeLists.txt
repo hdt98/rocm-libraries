@@ -48,7 +48,9 @@ set(FMHA_FWD_CODE_GEN_COMMON_ARGS
   --targets ${FMHA_TARGETS_ARG}
   --api ${FMHA_FWD_APIS}
   --optdim 32,64,80,128,256
-  # --filter fmha_fwd...
+  # DEV: Uncomment to build only sageattnv3 instances (much faster for SA3 development):
+  --filter *sageattn*
+  # --filter fmha_fwd...  (original placeholder)
 )
 set(FMHA_BWD_CODE_GEN_COMMON_ARGS
   ${CMAKE_CURRENT_LIST_DIR}/generate.py
@@ -98,6 +100,7 @@ add_custom_command(
   --output_dir ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${CODE_GEN_SCRIPTS}
   COMMENT "Generate CK Tile FMHA FWD kernels"
+  VERBATIM
 )
 
 add_custom_command(

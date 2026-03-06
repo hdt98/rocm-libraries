@@ -58,6 +58,10 @@ struct FmhaFwdMxFp4
 {
 };
 
+struct FmhaFwdSageAttnV3
+{
+};
+
 template <typename DataType>
 struct FmhaFwdTypeConfig;
 
@@ -221,6 +225,30 @@ struct FmhaFwdTypeConfig<FmhaFwdMxFp4>
     static constexpr ck_tile::index_t kVScaleGranularity  = 32;
 };
 
+template <>
+struct FmhaFwdTypeConfig<FmhaFwdSageAttnV3>
+{
+    using QDataType             = ck_tile::pk_fp4_t;
+    using KDataType             = ck_tile::pk_fp4_t;
+    using VDataType             = ck_tile::pk_fp4_t;
+    using BiasDataType          = float;
+    using RandValOutputDataType = uint8_t;
+    using LSEDataType           = float; // data type for lse(logsumexp L_j = max_j + log(l_j))
+    using SaccDataType          = float; // data type for first gemm accumulation
+    using SMPLComputeDataType   = float; // data type for reduction, softmax
+    using PDataType             = ck_tile::pk_fp4_t; // data type for A matrix of second gemm
+    using OaccDataType          = float;             // data type for second gemm accumulation
+    using ODataType             = float;
+
+    using QScaleDataType = ck_tile::e8m0_t;
+    using KScaleDataType = ck_tile::e8m0_t;
+    using VScaleDataType = ck_tile::e8m0_t;
+    using PScaleDataType = ck_tile::e8m0_t;
+
+    static constexpr ck_tile::index_t kQKScaleGranularity = 32;
+    static constexpr ck_tile::index_t kVScaleGranularity  = 32;
+};
+
 struct FmhaMasks
 {
     using NoMask      = ck_tile::GenericAttentionMask<false>;
@@ -238,6 +266,16 @@ struct fmha_fwd_args
     const void* q_descale_ptr;
     const void* k_descale_ptr;
     const void* v_descale_ptr;
+    // SageAttention V3 specific fields (unused for other modes, default to safe values)
+    const void* delta_s_ptr = nullptr; // [B, H, num_q_blocks, seqlen_k] float32
+    // p_scale_factor: Level-1 P pre-scaling. Default = 6.0f = FP4 E2M1 max value.
+    // Cancels cast_tile_mx's internal rcp_dst_max=1/6 factor so e8m0 rounding is applied
+    // directly to P~_max without the non-power-of-2 distortion from 1/6.
+    float p_scale_factor                    = 6.0f;
+    ck_tile::index_t stride_delta_s         = 0; // innermost stride (along seqlen_k)
+    ck_tile::index_t nhead_stride_delta_s   = 0;
+    ck_tile::index_t batch_stride_delta_s   = 0;
+    ck_tile::index_t q_block_stride_delta_s = 0;
     void* rand_val_ptr;
     void* lse_ptr;
     void* o_ptr;

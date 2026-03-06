@@ -108,7 +108,8 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ true>
                 return ck_tile::BlockAttentionQuantScaleEnum::NO_SCALE;
         }();
 
-        if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+        if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX ||
+                     QScaleEnum == BlockAttentionQuantScaleEnum::SAGEATTN_V3)
         {
             constexpr auto warp_gemm = []() {
                 static_assert(std::is_same_v<typename Problem::QDataType, pk_fp4_t> ==
@@ -1109,7 +1110,8 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
                 return ck_tile::BlockAttentionQuantScaleEnum::NO_SCALE;
         }();
 
-        if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+        if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX ||
+                     QScaleEnum == BlockAttentionQuantScaleEnum::SAGEATTN_V3)
         {
             constexpr auto warp_gemm = []() {
                 static_assert(std::is_same_v<typename Problem::PDataType, pk_fp4_t> ==

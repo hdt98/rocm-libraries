@@ -5,6 +5,7 @@
 
 #include "ck_tile/host.hpp"
 #include "ck_tile/ref/naive_attention.hpp"
+#include "ck_tile/host/reference/reference_sageattn_preprocess.hpp"
 #include "fmha_fwd.hpp"
 #include "utils.hpp"
 #include "ck_tile/utility/json_dump.hpp"
@@ -94,6 +95,14 @@ auto get_elimit<FmhaFwdMxFp8>(std::string /*init_method*/)
 
 template <>
 auto get_elimit<FmhaFwdMxFp4>(std::string /*init_method*/)
+{
+    double rtol = 1e-1;
+    double atol = 2.6e-1;
+    return ck_tile::make_tuple(rtol, atol);
+}
+
+template <>
+auto get_elimit<FmhaFwdSageAttnV3>(std::string /*init_method*/)
 {
     double rtol = 1e-1;
     double atol = 2.6e-1;
@@ -245,12 +254,15 @@ fwd_result fmha_fwd_run(mode_enum mode,
                         uint32_t seed,
                         int do_validation,
                         int init_sink_value,
+                        float p_scale_factor,
                         const ck_tile::stream_config& stream_config,
                         std::optional<std::string> json = std::nullopt)
 {
     using TypeConfig = FmhaFwdTypeConfig<DataTypeConfig>;
 
-    constexpr bool is_mx = ck_tile::is_any_of<DataTypeConfig, FmhaFwdMxFp8, FmhaFwdMxFp4>::value;
+    constexpr bool is_mx =
+        ck_tile::is_any_of<DataTypeConfig, FmhaFwdMxFp8, FmhaFwdMxFp4, FmhaFwdSageAttnV3>::value;
+    constexpr bool is_sageattnv3 = std::is_same_v<DataTypeConfig, FmhaFwdSageAttnV3>;
 
     using QDataType             = typename TypeConfig::QDataType;
     using KDataType             = typename TypeConfig::KDataType;
@@ -297,6 +309,8 @@ fwd_result fmha_fwd_run(mode_enum mode,
             return "mxfp8";
         else if constexpr(std::is_same_v<DataTypeConfig, FmhaFwdMxFp4>)
             return "mxfp4";
+        else if constexpr(std::is_same_v<DataTypeConfig, FmhaFwdSageAttnV3>)
+            return "sageattnv3";
         else
             static_assert(false);
     }();
@@ -321,10 +335,11 @@ fwd_result fmha_fwd_run(mode_enum mode,
         hdim_q =
             ck_tile::integer_least_multiple(hdim_q, ck_tile::numeric_traits<KDataType>::PackedSize);
     }
-    if(is_mx && !seqlen_kpads.empty() && seqlen_kpads[0] > 0)
+    if((is_mx || is_sageattnv3) && !seqlen_kpads.empty() && seqlen_kpads[0] > 0)
     {
         std::cerr
-            << "seqlen_kpads is not supported with MX types. ignoring the 'seqlen_kpads' option"
+            << "seqlen_kpads is not supported with MX/SageAttnV3 types. ignoring the "
+               "'seqlen_kpads' option"
             << std::endl;
         seqlen_kpads = {-1};
     }
@@ -516,14 +531,26 @@ fwd_result fmha_fwd_run(mode_enum mode,
         std::cerr << "The value of qscale_str must be 'mx' for MX data types" << std::endl;
         return fwd_result::invalid_args;
     }
-    else if(!is_mx && qscale.type == quant_scale_enum::mx)
+    else if(is_sageattnv3 && qscale.type != quant_scale_enum::sageattnv3)
+    {
+        std::cerr << "The value of qscale_str must be 'sageattnv3' for SageAttnV3 data type"
+                  << std::endl;
+        return fwd_result::invalid_args;
+    }
+    else if(!is_mx && !is_sageattnv3 && qscale.type == quant_scale_enum::mx)
     {
         std::cerr << "The value of qscale_str cannot be 'mx' for non-MX data types" << std::endl;
         return fwd_result::invalid_args;
     }
-    if(is_mx && is_v_rowmajor)
+    if((is_mx || is_sageattnv3) && is_v_rowmajor)
     {
-        std::cerr << "The value of is_v_rowmajor must be 'false' for MX data types" << std::endl;
+        std::cerr << "The value of is_v_rowmajor must be 'false' for MX/SageAttnV3 data types"
+                  << std::endl;
+        return fwd_result::invalid_args;
+    }
+    if(is_sageattnv3 && mode == mode_enum::group)
+    {
+        std::cerr << "SageAttention V3 only supports batch mode in this example" << std::endl;
         return fwd_result::invalid_args;
     }
 
@@ -609,7 +636,8 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 block_scale_seqstart_q_host.push_back(i_block_scale_q);
                 block_scale_seqstart_k_host.push_back(i_block_scale_k);
             }
-            else if(qscale.type == quant_scale_enum::mx)
+            else if(qscale.type == quant_scale_enum::mx ||
+                    qscale.type == quant_scale_enum::sageattnv3)
             {
                 i_seqstart_v_scale +=
                     ck_tile::integer_divide_ceil(real_seqlen_k, kVScaleGranularity);
@@ -737,6 +765,16 @@ fwd_result fmha_fwd_run(mode_enum mode,
                                                                         shape_seqlen_q,
                                                                         hdim_v}
                                       : std::array<ck_tile::index_t, 5>{1, 1, 1, 1, 1});
+
+    // SA3: delta_s = Q_mean @ K^T, shape [batch, nhead, num_q_blocks, seqlen_k]
+    // kM0 = 64 matches the FMHA pipeline Q tile size
+    constexpr ck_tile::index_t kM0_sa3 = 64;
+    const ck_tile::index_t num_q_blocks_sa3 =
+        ck_tile::integer_divide_ceil(shape_seqlen_q, kM0_sa3);
+    ck_tile::HostTensor<float> delta_s_host(
+        is_sageattnv3
+            ? std::array<ck_tile::index_t, 4>{shape_batch, nhead, num_q_blocks_sa3, shape_seqlen_k}
+            : std::array<ck_tile::index_t, 4>{1, 1, 1, 1});
 
     const ck_tile::index_t hdim_q_scale = ck_tile::integer_divide_ceil(hdim_q, kQKScaleGranularity);
     const ck_tile::index_t shape_seqlen_v_scale = seqstart_v_scale_host.back();
@@ -937,6 +975,11 @@ fwd_result fmha_fwd_run(mode_enum mode,
         ck_tile::FillUniformDistributionIntegerValue<SMPLComputeDataType>{30.f, 60.f, next_seed()}(
             sink_host);
     }
+    if constexpr(is_sageattnv3)
+    {
+        // delta_s = Q_mean @ K^T, small random values matching typical scale of attention scores
+        ck_tile::FillUniformDistribution<float>{-0.5f, 0.5f, next_seed()}(delta_s_host);
+    }
     ck_tile::DeviceMem q_buf(q_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem k_buf(k_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem v_buf(v_host.get_element_space_size_in_bytes());
@@ -947,6 +990,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
     ck_tile::DeviceMem q_descale_buf(q_descale_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem k_descale_buf(k_descale_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem v_descale_buf(v_descale_host.get_element_space_size_in_bytes());
+    ck_tile::DeviceMem delta_s_buf(delta_s_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem block_scale_seqstart_q_buf(block_scale_seqstart_q_host.size() *
                                                   sizeof(int32_t));
     ck_tile::DeviceMem block_scale_seqstart_k_buf(block_scale_seqstart_k_host.size() *
@@ -997,6 +1041,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
     q_descale_buf.ToDevice(q_descale_host.data());
     k_descale_buf.ToDevice(k_descale_host.data());
     v_descale_buf.ToDevice(v_descale_host.data());
+    delta_s_buf.ToDevice(delta_s_host.data());
     block_scale_seqstart_q_buf.ToDevice(block_scale_seqstart_q_host.data());
     block_scale_seqstart_k_buf.ToDevice(block_scale_seqstart_k_host.data());
     scale_seqstart_v_buf.ToDevice(seqstart_v_scale_host.data());
@@ -1341,7 +1386,8 @@ fwd_result fmha_fwd_run(mode_enum mode,
                     args.block_scale_size_q  = block_scale_size_q_;
                     args.block_scale_size_kv = block_scale_size_kv_;
                 }
-                else if(qscale.type == quant_scale_enum::mx)
+                else if(qscale.type == quant_scale_enum::mx ||
+                        qscale.type == quant_scale_enum::sageattnv3)
                 {
                     args.q_descale_ptr = q_descale_buf.GetDeviceBuffer();
                     args.k_descale_ptr = k_descale_buf.GetDeviceBuffer();
@@ -1366,6 +1412,18 @@ fwd_result fmha_fwd_run(mode_enum mode,
                         args.batch_stride_q_descale = (nhead * shape_seqlen_q * hdim_q_scale);
                         args.batch_stride_k_descale = (nhead_k * shape_seqlen_k * hdim_q_scale);
                         args.batch_stride_v_descale = (nhead_k * hdim_v * shape_seqlen_v_scale);
+                    }
+
+                    // SA3: fill delta_s fields (no-op for plain MX types)
+                    if constexpr(is_sageattnv3)
+                    {
+                        args.delta_s_ptr      = delta_s_buf.GetDeviceBuffer();
+                        args.p_scale_factor   = p_scale_factor;
+                        // delta_s layout: [batch, nhead, num_q_blocks, seqlen_k]
+                        args.stride_delta_s         = shape_seqlen_k;
+                        args.q_block_stride_delta_s = shape_seqlen_k;
+                        args.nhead_stride_delta_s   = num_q_blocks_sa3 * shape_seqlen_k;
+                        args.batch_stride_delta_s   = nhead * num_q_blocks_sa3 * shape_seqlen_k;
                     }
                 }
 
@@ -1910,6 +1968,26 @@ fwd_result fmha_fwd_run(mode_enum mode,
                                                                      ck_tile::identity{},
                                                                      ck_tile::identity{},
                                                                      ck_tile::scales(scale_s_host));
+
+                // SA3: add delta_s correction to s_host_ref
+                if constexpr(is_sageattnv3)
+                {
+                    // s_host_ref shape: [nhead, real_seqlen_q, real_seqlen_k]
+                    // delta_s layout:   [batch, nhead, num_q_blocks, seqlen_k]
+                    const ck_tile::index_t ds_batch_offset =
+                        b_idx * nhead * num_q_blocks_sa3 * shape_seqlen_k;
+                    s_host_ref.ForEach([&](auto& self, auto idx) {
+                        const ck_tile::index_t h_idx  = idx[0];
+                        const ck_tile::index_t q_idx  = idx[1];
+                        const ck_tile::index_t k_idx  = idx[2];
+                        const ck_tile::index_t qi_blk = q_idx / kM0_sa3;
+                        const ck_tile::index_t ds_off = ds_batch_offset +
+                                                         h_idx * num_q_blocks_sa3 * shape_seqlen_k +
+                                                         qi_blk * shape_seqlen_k + key_offset + k_idx;
+                        self(idx) += static_cast<SMPLComputeDataType>(
+                            delta_s_host.data()[ds_off] * scale_s_host);
+                    });
+                }
             }
             else if(qscale.type == quant_scale_enum::blockscale)
             {
@@ -2270,12 +2348,13 @@ fwd_result fmha_fwd_run(mode_enum mode,
     if(json)
     {
         const std::string qscale_name =
-            (qscale.type == quant_scale_enum::no_scale        ? "no_scale"
-             : qscale.type == quant_scale_enum::pertensor     ? "pertensor"
-             : qscale.type == quant_scale_enum::blockscale    ? "blockscale"
-             : qscale.type == quant_scale_enum::kv_blockscale ? "kv_blockscale"
-             : qscale.type == quant_scale_enum::mx            ? "mx"
-                                                              : "unknown");
+            (qscale.type == quant_scale_enum::no_scale          ? "no_scale"
+             : qscale.type == quant_scale_enum::pertensor       ? "pertensor"
+             : qscale.type == quant_scale_enum::blockscale      ? "blockscale"
+             : qscale.type == quant_scale_enum::kv_blockscale   ? "kv_blockscale"
+             : qscale.type == quant_scale_enum::mx              ? "mx"
+             : qscale.type == quant_scale_enum::sageattnv3      ? "sageattnv3"
+                                                                : "unknown");
         dump_fmha_fwd_json_results(*json,
                                    data_type,
                                    mode == mode_enum::batch ? "batch" : "group",

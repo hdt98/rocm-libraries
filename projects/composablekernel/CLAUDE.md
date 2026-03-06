@@ -30,6 +30,30 @@ There are two programming models in the codebase:
 - **编译 timeout**：CK 项目编译耗时较长，编译和测试命令一律使用 `run_in_background=true` 后台运行，再用 `TaskOutput(block=true, timeout=600000)` 轮询结果。若 `TaskOutput` 超时（任务仍在运行），继续调用 `TaskOutput` 等待，直到任务完成。不要用 Bash tool 的 timeout 参数来等编译。
 - **构建命令**：使用 `cmake --build . --target <target_name> -j$(nproc)` 而非 `make <target>`，后者在 CMake 生成的 Makefile 中可能找不到目标。
 
+### SA3 开发加速：只生成 sageattnv3 实例
+
+FMHA kernel 实例数量庞大，全量编译极慢。开发 SageAttention V3 时，在 CMake 配置阶段加 filter 只生成 SA3 相关实例：
+
+```bash
+# 步骤1：取消注释 CMakeLists.txt 中的 --filter 行
+# 编辑 example/ck_tile/01_fmha/CMakeLists.txt，将:
+#   # --filter \\*sageattn\\*
+# 改为:
+#   --filter \\*sageattn\\*
+# 注意：\\* 是为了防止 ninja 运行时 shell 展开 glob 通配符
+
+# 步骤2：重新运行 cmake（只针对 gfx950，只生成 sageattnv3 实例）
+cd /root/rocm-libraries/projects/composablekernel/build
+cmake -DGPU_TARGETS="gfx950" -DBUILD_TESTING=OFF ..
+
+# 步骤3：编译 SA3 目标
+cmake --build . --target tile_fmha_fwd_instances -j$(nproc)
+
+# 完成后记得恢复 CMakeLists.txt 中的注释，避免影响完整构建
+```
+
+> 注意：`BUILD_TESTING=OFF` 可避免生成测试实例的额外 filter，进一步减少实例数量。
+
 ## Build Commands
 
 ### Setup

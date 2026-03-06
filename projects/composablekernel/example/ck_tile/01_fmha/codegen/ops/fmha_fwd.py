@@ -40,6 +40,7 @@ DTYPE_BITS = {
     "bf8": 8,
     "mxfp8": 8,
     "mxfp4": 4,
+    "sageattnv3": 4,
 }
 
 K0_MAX_SUBMAX_MAP = {
@@ -308,7 +309,7 @@ class FmhaFwdApiTrait:
                 return "true"  # always support
             else:
                 return "true"
-        elif self.pipeline_tag in ["qr", "qs"]:
+        elif self.pipeline_tag in ["qr", "qs", "qr_sageattn"]:
             if self.spad == "t":
                 return f"true /*a.seqlen_q % {self.bm0} != 0*/"  # TODO: order of get_pipelines() matters! (ugly)
             else:
@@ -331,7 +332,7 @@ class FmhaFwdApiTrait:
                 return f"(a.cu_seqlen_k_ptr != nullptr) || (a.seqlen_k == 0 || a.seqlen_k % {self.bn0} != 0)"
             else:
                 return f"(a.cu_seqlen_k_ptr == nullptr) && (a.seqlen_k != 0 && a.seqlen_k % {self.bn0} == 0)"
-        elif self.pipeline_tag in ["qr", "qs"]:
+        elif self.pipeline_tag in ["qr", "qs", "qr_sageattn"]:
             if self.skpad == "t":
                 return f"true /*a.seqlen_k % {self.bn0} != 0*/"  # TODO: order of get_pipelines() matters! (ugly)
             else:
@@ -352,7 +353,7 @@ class FmhaFwdApiTrait:
                 return f"a.hdim_q % {vec} == 0"
             else:
                 assert False
-        elif self.pipeline_tag in ["qr", "qs", "qr_async_trload", "qr_async_trload_v3"]:
+        elif self.pipeline_tag in ["qr", "qs", "qr_async_trload", "qr_async_trload_v3", "qr_sageattn"]:
             bk0submax = K0_MAX_SUBMAX_MAP[self.bk0max]
             if self.dpad == "t":
                 return f"true /*a.hdim_q % {bk0submax} != 0*/"  # TODO: order of get_pipelines() matters! (ugly)
@@ -369,7 +370,7 @@ class FmhaFwdApiTrait:
                 return f"a.hdim_v % {vec} == 0"
             else:
                 assert False
-        elif self.pipeline_tag in ["qr", "qs", "qr_async_trload", "qr_async_trload_v3"]:
+        elif self.pipeline_tag in ["qr", "qs", "qr_async_trload", "qr_async_trload_v3", "qr_sageattn"]:
             bk0submax = K0_MAX_SUBMAX_MAP[self.bk0max]
             if self.dvpad == "t":
                 return f"true /*a.hdim_v % {bk0submax} != 0*/"  # TODO: order of get_pipelines() matters! (ugly)
@@ -839,7 +840,7 @@ class CompatibilityRuleFactoryGfx9(CompatibilityRuleFactory):
             problem_ctx: ProblemContext, kernel_ctx: KernelContext
         ) -> bool:
             # FIX: too confusing that it has to know about mx types
-            if problem_ctx.dtype not in ("fp32", "mxfp8", "mxfp4"):
+            if problem_ctx.dtype not in ("fp32", "mxfp8", "mxfp4", "sageattnv3"):
                 # TODO: update if >=gfx11 archs get qr_async and qr_async_trload support
                 if kernel_ctx.pipeline.tag in cls._AVAILABLE_PIPELINES and (
                     (
@@ -868,7 +869,7 @@ class CompatibilityRuleFactoryGfx9(CompatibilityRuleFactory):
 class CompatibilityRuleFactoryGfx950(CompatibilityRuleFactoryGfx9):
     _AVAILABLE_PIPELINES = (
         CompatibilityRuleFactoryGfx9._AVAILABLE_PIPELINES
-        | frozenset({"qr_async_trload", "qr_async_trload_v3"})
+        | frozenset({"qr_async_trload", "qr_async_trload_v3", "qr_sageattn"})
     )
 
     @classmethod
@@ -1046,6 +1047,7 @@ class KernelComponentFactoryGfx950(
 
     _DT_MXFP8 = ("mxfp8",)
     _DT_MXFP4 = ("mxfp4",)
+    _DT_SAGEATTN_V3 = ("sageattnv3",)
 
     @classmethod
     def supported_dtypes(cls) -> Tuple[str]:
@@ -1053,6 +1055,7 @@ class KernelComponentFactoryGfx950(
             KernelComponentFactoryGfx9.supported_dtypes()
             + cls._DT_MXFP8
             + cls._DT_MXFP4
+            + cls._DT_SAGEATTN_V3
         )
 
     @classmethod
@@ -1074,6 +1077,12 @@ class KernelComponentFactoryGfx950(
                 #                             bm0, bn0, bk0, bn1, bk1,
                 (128, 128) : [FmhaFwdTileSize(128, 128,  64, 128,  64, 128,  4, 1, 1,  4, 1, 1,  32, 32,  64,  32, 32,  64,  -1)],
                 (256, 256) : [FmhaFwdTileSize(128, 128, 128, 256, 128, 256,  4, 1, 1,  4, 1, 1,  16, 16, 128,  16, 16, 128,  -1)],
+            }  # fmt: skip
+        elif dtype in cls._DT_SAGEATTN_V3:
+            # SA3 uses the same MXFP4 tile layout (pk_fp4_t Q/K/V, e8m0_t scales)
+            return {
+                #                             bm0, bn0, bk0, bn1, bk1,
+                (128, 128) : [FmhaFwdTileSize(128, 128,  64, 128,  64, 128,  4, 1, 1,  4, 1, 1,  32, 32,  64,  32, 32,  64,  -1)],
             }  # fmt: skip
         return result
 
@@ -1125,6 +1134,19 @@ class KernelComponentFactoryGfx950(
             ):
                 pipelines.append(FmhaFwdPipeline("qr", "col", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, "f", "f", sink))  # fmt: skip
                 pipelines.append(FmhaFwdPipeline("qr", "col", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, "f", "f", sink))  # fmt: skip
+        elif dtype in cls._DT_SAGEATTN_V3:
+            # SA3: same pipeline config as MXFP4 but uses sageattnv3 qscale token and dedicated pipeline
+            lse = "t"
+            dropout = "f"
+            for logits, qscale, mask, bias, sink in itertools.product(
+                ["f"],
+                ["sageattnv3"],
+                get_mask_map(mask_impl).keys(),
+                ["no"],
+                ["f", "t"],
+            ):
+                pipelines.append(FmhaFwdPipeline("qr_sageattn", "col", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, "f", "f", sink))  # fmt: skip
+                pipelines.append(FmhaFwdPipeline("qr_sageattn", "col", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, "f", "f", sink))  # fmt: skip
         return pipelines
 
 
