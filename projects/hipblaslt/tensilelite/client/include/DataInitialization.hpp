@@ -263,6 +263,12 @@ namespace TensileLite
                     kind = hipMemcpyHostToDevice;
                 }
 
+                if(!m_batchInit)
+                {
+                    initializeGPUBatchedInputs(problem.gemms[0]);
+                    m_batchInit = true;
+                }
+
                 if(m_gpuInit && m_curBoundsCheck == BoundsCheckMode::Disable
                    && !m_problemDependentData)
                 {
@@ -293,7 +299,6 @@ namespace TensileLite
                                hipMemcpyDeviceToDevice);
                     m_gpuInit = true;
                 }
-                initializeGPUBatchedInputs(problem.gemms[0]);
 
                 if(m_cpuPtrs.empty())
                     initializeConstantInputs(problem.gemms[0]);
@@ -320,6 +325,12 @@ namespace TensileLite
                 {
                     // use cpu pristine
                     kind = hipMemcpyHostToDevice;
+                }
+
+                if(!m_batchInit)
+                {
+                    initializeGPUBatchedInputs(problem);
+                    m_batchInit = true;
                 }
 
                 if(m_gpuInit && m_curBoundsCheck == BoundsCheckMode::Disable
@@ -374,7 +385,6 @@ namespace TensileLite
                     }
                     m_gpuInit = true;
                 }
-                initializeGPUBatchedInputs(problem);
 
                 if(m_cpuPtrs.empty())
                     initializeConstantInputs(problem);
@@ -843,7 +853,10 @@ namespace TensileLite
             }
             virtual void preBenchmarkRun() override {}
             virtual void postBenchmarkRun() override {}
-            virtual void preProblem(ContractionProblem* const problem) override {}
+            virtual void preProblem(ContractionProblem* const problem) override
+            {
+                m_batchInit = false;
+            }
             virtual void postProblem() override {}
             virtual void preSolution(ContractionSolution* const solution) override {}
             virtual void postSolution() override {}
@@ -1006,8 +1019,9 @@ namespace TensileLite
             std::shared_ptr<void>                 m_workspacePristine;
             std::vector<ConstDataInitProperties>  m_cdata;
 
-            bool m_cpuInit = false;
-            bool m_gpuInit = false;
+            bool m_cpuInit   = false;
+            bool m_gpuInit   = false;
+            bool m_batchInit = false;
 
             size_t m_maxBatch;
 
