@@ -17,6 +17,7 @@ add_executable(
     main.cpp
     utilities/TestCpuFpReferenceBatchnorm.cpp
     utilities/TestCpuFpReferenceBatchnormWithVariance.cpp
+    utilities/TestCpuFpReferenceRMSNorm.cpp
     utilities/TestCpuFpReferenceConvolution.cpp
     utilities/TestCpuFpReferenceMatmul.cpp
     utilities/TestCpuFpReferenceMiopenRmsValidation.cpp
@@ -24,11 +25,11 @@ add_executable(
     utilities/TestCpuFpReferenceValidation.cpp
     utilities/TestCpuReferencePointwise.cpp
     utilities/TestDynamicTolerances.cpp
-    utilities/TestNumericLimits.cpp
     utilities/TestFlatbufferDatatypeMapping.cpp
     utilities/TestFlatbufferTensorAttributesUtils.cpp
     utilities/TestLoadGraphAndTensors.cpp
     utilities/TestLoggingUtils.cpp
+    utilities/TestLogRecorder.cpp
     utilities/TestScopedDirectory.cpp
     utilities/TestScopedEnvironmentVariableSetter.cpp
     utilities/TestSeeds.cpp
@@ -55,9 +56,12 @@ add_executable(
     utilities/cpu_graph_executor/TestPlanRegistrySignatureKey.cpp
     utilities/cpu_graph_executor/TestPointwisePlan.cpp
     utilities/cpu_graph_executor/TestPointwiseSignatureKey.cpp
+    utilities/cpu_graph_executor/TestRMSNormFwdPlan.cpp
+    utilities/cpu_graph_executor/TestRMSNormFwdSignatureKey.cpp
 )
 
 target_compile_options(hipdnn_test_sdk_tests PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})
+
 target_link_libraries(
     hipdnn_test_sdk_tests GTest::gtest GTest::gmock Threads::Threads hipdnn_test_sdk hipdnn_plugin_sdk hip::host
 )
