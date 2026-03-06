@@ -14,6 +14,7 @@ import os
 import pty
 import random
 import select
+import statistics
 import subprocess
 import sys
 import time
@@ -75,20 +76,9 @@ def get_available_cpus():
     return os.cpu_count() or 4
 
 
-def get_shuffle_seed():
-    """Return one random seed for all shards (gtest and catch2).
-
-    Uses TEST_SHUFFLE_SEED env var if set (for reproducibility);
-    otherwise picks a random seed.
-
-    Returns:
-        (seed, from_env): seed is an int in [1, 2**31-1]; from_env is True if
-        the seed came from TEST_SHUFFLE_SEED.
-    """
-    master = os.environ.get("TEST_SHUFFLE_SEED")
-    if master is not None:
-        return int(master), True
-    return random.SystemRandom().randint(1, 2**31 - 1), False
+def random_shuffle_seed():
+    """Return a random seed for test shuffling."""
+    return random.SystemRandom().randint(1, 2**31 - 1)
 
 
 def start_shard(
@@ -112,9 +102,8 @@ def start_shard(
     # Extract executable name from command
     executable = base_cmd[0]
 
-    # Generate shard tag prefix from framework name
-    FRAMEWORK_PREFIXES = {"gtest": "GT", "catch2": "CA", "ctest": "CT"}
-    test_prefix = FRAMEWORK_PREFIXES.get(test_type, test_type[:2].upper())
+    # Generate shard tag prefix from first two letters of framework name
+    test_prefix = test_type[:2].upper()
     shard_tag = f"[{test_prefix}{shard_index:02d}]"
     print(f"{shard_tag} Starting shard", flush=True, file=sys.stderr)
 
@@ -350,20 +339,25 @@ def main():
         action="store_true",
         help="List tests that would run with the given profile, but don't execute them",
     )
+    available_cpus = get_available_cpus()
+    parser.add_argument(
+        "-j", "--parallel",
+        nargs="?",
+        type=int,
+        const=available_cpus,
+        default=max(1, available_cpus // 2),
+        metavar="N",
+        help="Concurrent slots: -j N uses N, -j alone uses nproc, omitting uses nproc/2",
+    )
+    parser.add_argument(
+        "--shuffle-seed",
+        type=int,
+        default=None,
+        help="Seed for test shuffling (default: random, or TEST_SHUFFLE_SEED env var)",
+    )
 
     args = parser.parse_args()
-
-    # Auto-detect number of available CPUs (respecting cgroups).
-    # Subtract the 1-minute load average to account for other work on the
-    # machine, then use RESOURCE_FRACTION of the remaining headroom as max_concurrent.
-    RESOURCE_FRACTION = 2 / 3
-    available_cpus = get_available_cpus()
-    try:
-        load1 = float(open("/proc/loadavg").read().split()[0])
-    except Exception:
-        load1 = 0.0
-    headroom = max(0, available_cpus - load1)
-    max_concurrent = max(1, int(headroom * RESOURCE_FRACTION))
+    max_concurrent = args.parallel
     cap_msg = None
 
     # Cap slots to 8 on gfx1201 due to hanging issues
@@ -386,19 +380,11 @@ def main():
         print(f"ERROR: Failed to load test profile '{args.profile}': {e}")
         sys.exit(1)
 
-    print(
-        f"Available CPUs: {available_cpus} (1-min load avg: {load1:.1f}, headroom: {headroom:.1f})",
-        file=sys.stderr,
-    )
+    print(f"Available CPUs: {available_cpus}, slots: {max_concurrent}", file=sys.stderr)
     if gpu_arch:
         print(f"GPU architecture: {gpu_arch}", file=sys.stderr)
-    if not args.dry_run:
-        print(
-            f"Taking {RESOURCE_FRACTION:.0%} of headroom ({headroom:.1f}) = {max_concurrent} slots",
-            file=sys.stderr,
-        )
-        if cap_msg:
-            print(cap_msg, file=sys.stderr)
+    if cap_msg:
+        print(cap_msg, file=sys.stderr)
     print("=" * 50, file=sys.stderr)
     print(
         "Running sharded tests" + (" [DRY RUN]" if args.dry_run else ""),
@@ -410,15 +396,13 @@ def main():
         file=sys.stderr,
     )
     if not args.dry_run:
-        shuffle_seed, from_env = get_shuffle_seed()
-        if from_env:
-            print(
-                f"Shuffle seed: {shuffle_seed} (from TEST_SHUFFLE_SEED, reproducible)",
-                file=sys.stderr,
-            )
+        if args.shuffle_seed is not None:
+            shuffle_seed = args.shuffle_seed
+            print(f"Shuffle seed: {shuffle_seed} (reproducible)", file=sys.stderr)
         else:
+            shuffle_seed = random_shuffle_seed()
             print(
-                f"Shuffle seed: {shuffle_seed} (set TEST_SHUFFLE_SEED to reproduce)",
+                f"Shuffle seed: {shuffle_seed} (pass --shuffle-seed {shuffle_seed} to reproduce)",
                 file=sys.stderr,
             )
     if args.dry_run:
@@ -574,19 +558,20 @@ def main():
             data = executable_timings[executable]
             timings = data["timings"]
             framework = data["framework"]
-            FRAMEWORK_PREFIXES = {"gtest": "GT", "catch2": "CA", "ctest": "CT"}
-            prefix = FRAMEWORK_PREFIXES.get(framework, framework[:2].upper())
+            prefix = framework[:2].upper()
 
             print(f"\n{executable} ({framework}):", file=sys.stderr)
             for idx, elapsed in sorted(timings):
                 print(f"  [{prefix}{idx:02d}] {elapsed:6.1f}s", file=sys.stderr)
 
-            total = sum(t for _, t in timings)
-            avg = total / len(timings)
-            min_time = min(t for _, t in timings)
-            max_time = max(t for _, t in timings)
+            times = [t for _, t in timings]
+            total = sum(times)
+            avg = statistics.mean(times)
+            stdev = statistics.stdev(times) if len(times) > 1 else 0.0
+            min_time = min(times)
+            max_time = max(times)
             print(
-                f"  Total: {total:.1f}s, Avg: {avg:.1f}s, Min: {min_time:.1f}s, Max: {max_time:.1f}s",
+                f"  Total: {total:.1f}s, Avg: {avg:.1f}s, Stdev: {stdev:.1f}s, Min: {min_time:.1f}s, Max: {max_time:.1f}s",
                 file=sys.stderr,
             )
 
