@@ -386,6 +386,7 @@ def writeSolutionsAndKernels(
             "Writing assembly kernels",
             return_as="list",
             multiArg=False,
+            prefer="threads",
         )
 
     with timing_context("python_kernel_write_helpers"):

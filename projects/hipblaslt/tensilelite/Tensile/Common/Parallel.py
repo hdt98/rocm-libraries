@@ -198,7 +198,7 @@ def ParallelMapReturnAsGenerator(function, objects, message="", enable=True, mul
 
 
 def ParallelMap2(
-    function, objects, message="", enable=True, multiArg=True, return_as="list", procs=None
+    function, objects, message="", enable=True, multiArg=True, return_as="list", procs=None, prefer=None
 ):
     """
     Generally equivalent to list(map(function, objects)), possibly executing in parallel.
@@ -233,15 +233,23 @@ def ParallelMap2(
     sys.stdout.flush()
     currentTime = time.time()
 
-    pcall = pcallWithGlobalParamsMultiArg if multiArg else pcallWithGlobalParamsSingleArg
-    pargs = zip(objects, itertools.repeat(globalParameters))
-
+    parallel_kwargs = dict(n_jobs=threadCount, timeout=99999)
+    if prefer:
+        parallel_kwargs["prefer"] = prefer
     if joblibParallelSupportsGenerator():
-        rv = Parallel(n_jobs=threadCount, timeout=99999, return_as=return_as)(
-            delayed(pcall)(function, a, params) for a, params in pargs
-        )
+        parallel_kwargs["return_as"] = return_as
+
+    if prefer == "threads":
+        # Threads share the process's globalParameters — no need to copy/restore.
+        # OverwriteGlobalParameters does clear()+update() which races with other threads.
+        if multiArg:
+            rv = Parallel(**parallel_kwargs)(delayed(function)(*a) for a in objects)
+        else:
+            rv = Parallel(**parallel_kwargs)(delayed(function)(a) for a in objects)
     else:
-        rv = Parallel(n_jobs=threadCount, timeout=99999)(
+        pcall = pcallWithGlobalParamsMultiArg if multiArg else pcallWithGlobalParamsSingleArg
+        pargs = zip(objects, itertools.repeat(globalParameters))
+        rv = Parallel(**parallel_kwargs)(
             delayed(pcall)(function, a, params) for a, params in pargs
         )
 
