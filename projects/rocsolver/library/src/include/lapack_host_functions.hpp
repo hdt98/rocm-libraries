@@ -233,21 +233,21 @@ static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
     auto const safmx2 = one / safmn2;
 
     auto scale = std::max(abs1(f), abs1(g));
-    auto fs = f;
-    auto gs = g;
+    T fs = f;
+    T gs = g;
     int count = 0;
 
     if(scale >= safmx2)
     {
-        bool has_work = false;
+        bool has_work_count = false;
         do
         {
             count = count + 1;
             fs = fs * safmn2;
             gs = gs * safmn2;
             scale = scale * safmn2;
-            has_work = ((scale >= safmx2) && (count < 20));
-        } while(has_work);
+            has_work_count = ((scale >= safmx2) && (count < 20));
+        } while(has_work_count);
     }
     else
     {
@@ -261,15 +261,15 @@ static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
                 return;
             }
 
-            bool has_work = false;
+            bool has_work_scale = false;
             do
             {
                 count = count - 1;
                 fs = fs * safmx2;
                 gs = gs * safmx2;
                 scale = scale * safmx2;
-                has_work = (scale <= safmn2);
-            } while(has_work);
+                has_work_scale = (scale <= safmn2);
+            } while(has_work_scale);
         }
 
         S const f2 = abssq(fs);
@@ -304,7 +304,7 @@ static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
             //        make sure abs(ff) = 1
             //        do complex/real division explicitly with 2 real divisions
 
-            S ff = 0;
+            T ff = 0;
             if(abs1(f) > one)
             {
                 auto const d = dlapy2(dble(f), dimag(f));
