@@ -233,6 +233,7 @@ namespace TensileLite
             {
                 if(m_asyncResetPending)
                 {
+                    ScopedTimer t("gpu_input_reset");
                     syncCopyStream();
                     m_asyncResetPending = false;
                     return m_cachedGPUInputs;
