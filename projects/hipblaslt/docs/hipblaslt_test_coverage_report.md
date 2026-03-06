@@ -145,9 +145,13 @@ Only tests with `category: quick` in matmul_gtest.yaml. Used by TheRock on Windo
 |------------------------|-----------------------------|--------------------|-----|-------------|---------|--------|------|------------------|-------------|
 | **matmul core/sizes**  | core / bad-arg / NaN        | O,S                | O,S | O           | —       | O      | —    | —                | 14,408      |
 |                        | sizes / fixed shapes         | F                  | —   | —           | —       | —      | —    | —                | 144         |
-|                        | (other rows)                | —                  | —   | —           | —       | —      | —    | —                | 0           |
-| **matmul bias/activation** | (all)                    | —                  | —   | —           | —       | —      | —    | —                | 0           |
-| **matmul grouped/ext** | (all)                        | —                  | —   | —           | —       | —      | —    | —                | 0           |
+|                        | algo / heuristic / MX       | —                  | —   | —           | —       | —      | —    | —                | 0           |
+|                        | stress / nightly shapes     | —                  | —   | —           | —       | —      | —    | —                | 0           |
+| **matmul bias/activation** | bias (relu, gelu, swish, …) | —            | —   | —           | —       | —      | —    | —                | 0           |
+|                        | gradients (dgelu, drelu, bgradb) | —             | —   | —           | —       | —      | —    | —                | 0           |
+|                        | bias_gelu_aux / equality    | —                | —   | —           | —       | —      | —    | —                | 0           |
+| **matmul grouped/ext** | grouped gemm                | —                  | —   | —           | —       | —      | —    | —                | 0           |
+|                        | extended API (algo, swizzle) | —                 | —   | —           | —       | —      | —    | —                | 0           |
 
 **Auxiliary and rocroller (quick):**
 
@@ -163,10 +167,14 @@ Only tests from smoke_gtest.yaml (`category: smoke`). Used by TheRock presubmit 
 | Operation group        | Sub-item                    | real (f16/bf16/f32) | f64 | 1b (f8/bf8) | 1b fnuz | int i8 | xf32 | mixed / swizzle | Total tests |
 |------------------------|-----------------------------|--------------------|-----|-------------|---------|--------|------|------------------|-------------|
 | **matmul core/sizes**  | core / bad-arg / NaN        | E                  | E   | E           | E       | E      | E    | —                | 992         |
-|                        | (other rows)                | —                  | —   | —           | —       | —      | —    | —                | 0           |
+|                        | sizes / fixed shapes         | —                  | —   | —           | —       | —      | —    | —                | 0           |
+|                        | algo / heuristic / MX       | —                  | —   | —           | —       | —      | —    | —                | 0           |
+|                        | stress / nightly shapes     | —                  | —   | —           | —       | —      | —    | —                | 0           |
 | **matmul bias/activation** | bias (relu, gelu, swish, …) | E              | —   | —           | —       | —      | —    | —                | 552         |
-|                        | (other rows)                | —                  | —   | —           | —       | —      | —    | —                | 0           |
-| **matmul grouped/ext** | (all)                        | —                  | —   | —           | —       | —      | —    | —                | 0           |
+|                        | gradients (dgelu, drelu, bgradb) | —             | —   | —           | —       | —      | —    | —                | 0           |
+|                        | bias_gelu_aux / equality    | —                | —   | —           | —       | —      | —    | —                | 0           |
+| **matmul grouped/ext** | grouped gemm                | —                  | —   | —           | —       | —      | —    | —                | 0           |
+|                        | extended API (algo, swizzle) | —                 | —   | —           | —       | —      | —    | —                | 0           |
 
 **Auxiliary and rocroller (smoke):**
 
