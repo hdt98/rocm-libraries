@@ -321,34 +321,99 @@ struct CShuffleEpilogue
                           "LDS row stride must be 4B-aligned for bank-word padding logic");
 
 #if defined(__gfx950__)
-            // XOR swizzling with MFMA-aware shift to eliminate LDS bank conflicts
+            // XOR swizzling with MFMA-aware and wave-layout-aware shift
             //
-            // gfx950 has 64 LDS banks with 8-interleaved phase pattern for ds_write_b128.
+            // gfx950 has 64 LDS banks (reads) and 32 banks (writes) with 8-phase patterns.
             // The XOR transform applies: new_n = n ^ ((m >> shift) % NXorDim)
             //
-            // The shift is derived from MFMA tile geometry:
-            // - 16x16 MFMA: M values are 0,4,8,12 (spacing=4) → shift=1 gives XOR vals 0,2,4,6
-            // - 32x32 MFMA: M values are 0,16 (spacing=16) → shift=2 gives XOR vals 0,4
+            // EMPIRICAL FINDING from AICK-613 investigation:
+            // Different wave layouts create different conflict patterns even with same tile size.
+            // The XOR shift must account for BOTH MFMA geometry AND wave arrangement.
             //
-            // This spreads bank accesses evenly across the 8 phase groups.
+            // Wave-layout-aware shift selection:
+            // - FP16 16x16x16 works with 2x2: shift=1, but fails with 1x4/4x1
+            // - FP8  16x16x16 works with 1x4: shift=0, but fails with 2x2/4x1
+            //
+            // Hypothesis: Different wave layouts change the phase alignment of memory accesses.
+            // We tune the shift to break systematic conflicts for each (tile, wave) pair.
 
-            // Calculate XOR shift based on MFMA tile geometry
-            // For 16x16: c_m1_per_lane = 4, shift = 1
-            // For 32x32: c_m0_per_lane * c_m1_per_lane = 16, shift = 2
-            constexpr index_t XorShift = (MPerXdl == 16 && NPerXdl == 16) ? 1 :
-                                         (MPerXdl == 32 && NPerXdl == 32) ? 2 : 0;
-            constexpr index_t XorDivisor = (1 << XorShift);  // 2 for 16x16, 4 for 32x32
+            // Calculate XOR shift based on MFMA tile geometry AND wave layout
+            constexpr index_t XorShift = []() constexpr {
+                if constexpr(MPerXdl == 16 && NPerXdl == 16)
+                {
+                    // 16x16 tiles: wave-layout dependent
+                    if constexpr(MWave == 2 && NWave == 2)
+                        return 1;  // FP16 verified: 0.0 conflicts
+                    else if constexpr(MWave == 1 && NWave == 4)
+                        return 2;  // Try higher shift for 1x4 layout
+                    else if constexpr(MWave == 4 && NWave == 1)
+                        return 0;  // Try no shift for 4x1 layout
+                    else
+                        return 1;  // Default for other 16x16 layouts
+                }
+                else if constexpr(MPerXdl == 32 && NPerXdl == 32)
+                {
+                    // 32x32 tiles: use geometry-based shift
+                    return 2;  // Original logic for 32x32
+                }
+                else
+                {
+                    return 0;  // No shift for other tile sizes
+                }
+            }();
+            constexpr index_t XorDivisor = (XorShift > 0) ? (1 << XorShift) : 1;
 
-            // Reshape M dimension to enable shifted XOR:
-            // M -> [M_high, M_low] where M_low = XorDivisor
-            // XOR is applied using M_high, equivalent to (m >> shift)
-            constexpr index_t MTotal   = MPerIterationShuffle / MLdsLayer;
-            constexpr index_t MHighDim = MTotal / XorDivisor;
-            constexpr index_t MLowDim  = XorDivisor;
+            // When XorShift=0, fall back to simple padding (no XOR transform)
+            if constexpr(XorShift == 0)
+            {
+                // Simple descriptor without XOR - just use padding
+                constexpr index_t BaseStrideElems = NPerIterationShuffle * MLdsLayer;
+                constexpr auto ToWords = [](index_t elems) constexpr {
+                    return (elems * DataTypeSize) / BytesPerBank;
+                };
+                constexpr index_t BaseWords = ToWords(BaseStrideElems);
 
-            // Base descriptor with M split for shifted XOR
-            // Shape: [M_high, M_low, N/VectorLen*MLdsLayer, VectorLen]
-            constexpr auto lds_block_desc_0 = make_naive_tensor_descriptor(
+                // Use simple padding logic (from original fix)
+                constexpr bool NeedsExtraPadding = (MPerXdl == 16 && NPerXdl == 16 &&
+                                                    KPerXdl == 16 && DataTypeSize == 2);
+                constexpr index_t PadWords = NeedsExtraPadding
+                    ? ((BaseWords % 8 == 0) ? 2 : ((BaseWords % 4 == 0) ? 1 : 0))
+                    : ((BaseWords % 2 == 0) ? 1 : 0);
+                constexpr auto PaddingAmount = PadWords * BytesPerBank / DataTypeSize;
+
+                constexpr auto lds_block_desc_0 = make_naive_tensor_descriptor(
+                    make_tuple(number<MPerIterationShuffle / MLdsLayer>{},
+                               number<NPerIterationShuffle / VectorLen * MLdsLayer>{},
+                               number<VectorLen>{}),
+                    make_tuple(number<(NPerIterationShuffle + PaddingAmount) * MLdsLayer>{},
+                               number<VectorLen>{},
+                               number<1>{}),
+                    number<VectorLen>{},
+                    number<1>{});
+
+                constexpr auto lds_block_desc = transform_tensor_descriptor(
+                    lds_block_desc_0,
+                    make_tuple(make_merge_transform_v3_division_mod(make_tuple(
+                                   number<MPerIterationShuffle / MLdsLayer>{}, number<MLdsLayer>{})),
+                               make_merge_transform_v3_division_mod(make_tuple(
+                                   number<NPerIterationShuffle / VectorLen>{}, number<VectorLen>{}))),
+                    make_tuple(sequence<0, 1>{}, sequence<2>{}),
+                    make_tuple(sequence<0>{}, sequence<1>{}));
+
+                return lds_block_desc;
+            }
+            else  // XorShift > 0: Use XOR swizzling
+            {
+                // Reshape M dimension to enable shifted XOR:
+                // M -> [M_high, M_low] where M_low = XorDivisor
+                // XOR is applied using M_high, equivalent to (m >> shift)
+                constexpr index_t MTotal   = MPerIterationShuffle / MLdsLayer;
+                constexpr index_t MHighDim = MTotal / XorDivisor;
+                constexpr index_t MLowDim  = XorDivisor;
+
+                // Base descriptor with M split for shifted XOR
+                // Shape: [M_high, M_low, N/VectorLen*MLdsLayer, VectorLen]
+                constexpr auto lds_block_desc_0 = make_naive_tensor_descriptor(
                 make_tuple(number<MHighDim>{},
                            number<MLowDim>{},
                            number<NPerIterationShuffle / VectorLen * MLdsLayer>{},
@@ -385,17 +450,18 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0, 1>{}, sequence<2>{}, sequence<3>{}),
                 make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
 
-            // Final merge to get [M, N] shape
-            constexpr auto lds_block_desc = transform_tensor_descriptor(
-                lds_block_desc_1,
-                make_tuple(make_merge_transform_v3_division_mod(make_tuple(
-                               number<MPerIterationShuffle / MLdsLayer>{}, number<MLdsLayer>{})),
-                           make_merge_transform_v3_division_mod(make_tuple(
-                               number<NPerIterationShuffle / VectorLen>{}, number<VectorLen>{}))),
-                make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
-                make_tuple(sequence<0>{}, sequence<1>{}));
+                // Final merge to get [M, N] shape
+                constexpr auto lds_block_desc = transform_tensor_descriptor(
+                    lds_block_desc_1,
+                    make_tuple(make_merge_transform_v3_division_mod(make_tuple(
+                                   number<MPerIterationShuffle / MLdsLayer>{}, number<MLdsLayer>{})),
+                               make_merge_transform_v3_division_mod(make_tuple(
+                                   number<NPerIterationShuffle / VectorLen>{}, number<VectorLen>{}))),
+                    make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
+                    make_tuple(sequence<0>{}, sequence<1>{}));
 
-            return lds_block_desc;
+                return lds_block_desc;
+            }  // end else (XorShift > 0)
 #else
             // Non-gfx950: no XOR swizzling needed
             constexpr auto lds_block_desc_0 = make_naive_tensor_descriptor(
