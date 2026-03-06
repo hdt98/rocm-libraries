@@ -107,3 +107,27 @@ add_cpu_gemm_test(FastPath_On
 add_cpu_gemm_test(FastPath_Off
     ARGS --M 256 --N 256 --K 256 --tryFastPath 0 --validate 1 --type f32
 )
+
+#################################################
+#   Tests for deterministic random init          #
+#################################################
+
+# These tests require a built tensilelite-client and a .ini config file
+# pointing to valid library/code-object artifacts. They are only added
+# when TENSILELITE_DETERMINISTIC_INIT_CONFIG is set to the path of a
+# ClientParameters.ini file (e.g. from a Tensile benchmark build).
+
+if(DEFINED TENSILELITE_DETERMINISTIC_INIT_CONFIG)
+    set(DETERM_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/test_deterministic_init.sh")
+
+    foreach(MODE Random RandomNarrow RandomNegPosLimited)
+        add_test(
+            NAME "DeterministicInit.${MODE}"
+            COMMAND bash ${DETERM_SCRIPT}
+                --client $<TARGET_FILE:tensilelite-client>
+                --config ${TENSILELITE_DETERMINISTIC_INIT_CONFIG}
+                --mode ${MODE}
+        )
+        set_tests_properties("DeterministicInit.${MODE}" PROPERTIES TIMEOUT 120)
+    endforeach()
+endif()

@@ -2487,7 +2487,11 @@ namespace TensileLite
             using typename rocm_random_common<T>::random_fp_int_dist;
             __attribute__((flatten)) T operator()()
             {
-                static std::mt19937 rng(initSeedValue());
+                thread_local std::mt19937 rng(
+                    initSeedIsSet()
+                        ? (initSeedValue()
+                           + static_cast<unsigned int>(omp_get_thread_num()))
+                        : std::random_device{}());
                 int                 exp = std::uniform_int_distribution<int>{}(rng);
                 exp                     = exp % (HIGH_EXP - LOW_EXP + 1) + LOW_EXP;
                 return this->signsig_exp(random_fp_int_dist{}(rng), exp);
