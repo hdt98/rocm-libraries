@@ -2,7 +2,7 @@
 
 Full documentation for hipCUB is available at [https://rocm.docs.amd.com/projects/hipCUB/en/latest/](https://rocm.docs.amd.com/projects/hipCUB/en/latest/).
 
-## hipCUB-4.3.0 for ROCm 7.12
+## hipCUB-5.0.0 for ROCm 8.0
 
 ### Added
 
@@ -30,6 +30,7 @@ Full documentation for hipCUB is available at [https://rocm.docs.amd.com/project
 * Removed `hipcub:max` and `hipcub:min`, which were deprecated. Use `hip::std::max` and `hip::std::min` instead.
 * Deprecated `hipcub::Swap`, use `rocprim::swap` instead.
 * Deprecated `HIPCUB_IS_INT128_ENABLED`, use `_CCCL_HAS_INT128()` instead.
+* Deprecated `hipcub::Equality`, `hipcub::Inequality`, `hipcub::InequalityWrapper`, `hipcub::Sum`, `hipcub::Difference`, `hipcub::Division`, `hipcub::Max` and `hipcub::Min` operators. Use `hip::std::equal_to`, `hip::std::not_equal_to`, `hip::std::plus`, `hip::std::minus`, `hip::std::divides`, `hip::maximum` and `hip:minimum` operators instead.
 
 ## hipCUB-4.2.0 for ROCm 7.2
  
