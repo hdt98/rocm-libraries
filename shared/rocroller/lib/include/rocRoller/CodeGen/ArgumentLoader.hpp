@@ -23,35 +23,35 @@ namespace rocRollerTest
 namespace rocRoller
 {
     /**
-     * Generates code to load argument values from the kernel argument buffer into SGPRs.
-     * Supports two main strategies: all-at-once, and on-demand.
-     *
-     * All-at-once can be faster since we can use wider load instructions, but so far this
-     * requires allocating all the argument SGPRs in one block so they can't be freed one by one
-     * to allow reuse.
-     *
-     * On-demand is more flexible, but also potentially slower as it will require more load
-     * instructions as well as possibly more synchronization.
-     *
-     */
+      * Generates code to load argument values from the kernel argument buffer into SGPRs.
+      * Supports two main strategies: all-at-once, and on-demand.
+      *
+      * All-at-once can be faster since we can use wider load instructions, but so far this
+      * requires allocating all the argument SGPRs in one block so they can't be freed one by one
+      * to allow reuse.
+      *
+      * On-demand is more flexible, but also potentially slower as it will require more load
+      * instructions as well as possibly more synchronization.
+      *
+      */
     class ArgumentLoader
     {
     public:
         ArgumentLoader(AssemblyKernelPtr kernel);
 
         /**
-         * Loads all manually loaded arguments into a single allocation of SGPRs.  Uses the
-         * widest load instructions possible given alignment constraints.
-         */
+          * Loads all manually loaded arguments into a single allocation of SGPRs.  Uses the
+          * widest load instructions possible given alignment constraints.
+          */
         Generator<Instruction> eagerLoadArguments();
 
         /**
-         * Obtain the `Value` for a given argument.  If the argument has not been loaded yet,
-         * emits instructions to load it into SGPRs.
-         *
-         * @param argName
-         * @param value
-         */
+          * Obtain the `Value` for a given argument.  If the argument has not been loaded yet,
+          * emits instructions to load it into SGPRs.
+          *
+          * @param argName
+          * @param value
+          */
         Generator<Instruction> getValue(std::string const& argName, Register::ValuePtr& value);
 
         void releaseArgument(std::string const& argName);
@@ -61,35 +61,35 @@ namespace rocRoller
             loadRange(int offset, int sizeBytes, Register::ValuePtr& value) const;
 
         /**
-         * Allocates the block of registers that will be preloaded with kernel arguments at the
-         * beginning of the kernel execution. This must be called at the correct time within
-         * AllocateInitialRegisters as it is part of the initial register state.
-         *
-         * Returns the appropriate values for the kernel description fields
-         * kernarg_preload_offset and kernarg_preload_length through preloadOffset and
-         * preloadLength respectively.
-         */
+          * Allocates the block of registers that will be preloaded with kernel arguments at the
+          * beginning of the kernel execution. This must be called at the correct time within
+          * AllocateInitialRegisters as it is part of the initial register state.
+          *
+          * Returns the appropriate values for the kernel description fields
+          * kernarg_preload_offset and kernarg_preload_length through preloadOffset and
+          * preloadLength respectively.
+          */
         Generator<Instruction> allocatePreloadedRegisters(int& preloadOffset, int& preloadLength);
 
         bool anyPreloadedArguments() const;
         bool anyManuallyLoadedArguments() const;
 
         /**
-         * Decides which if any kernel arguments can be preloaded based on architecture and
-         * kernel options.
-         *
-         * The priority is to pick the earliest arguments first, but it will pick out-of-order
-         * arguments if alignment prevents earlier arguments from being preloaded.
-         *
-         * `args` will be partitioned into preloaded and non-preloaded arguments, and then
-         * sorted descending by size.
-         */
+          * Decides which if any kernel arguments can be preloaded based on architecture and
+          * kernel options.
+          *
+          * The priority is to pick the earliest arguments first, but it will pick out-of-order
+          * arguments if alignment prevents earlier arguments from being preloaded.
+          *
+          * `args` will be partitioned into preloaded and non-preloaded arguments, and then
+          * sorted descending by size.
+          */
         void decidePreloadedKernargs(std::vector<AssemblyKernelArgument>& args);
 
         /**
-         * Splits the block allocations of kernel arguments into individual registers and clears
-         * the block allocations so that individual kernel arguments can be deallocated individually.
-         */
+          * Splits the block allocations of kernel arguments into individual registers and clears
+          * the block allocations so that individual kernel arguments can be deallocated individually.
+          */
         Generator<Instruction> splitOutArgumentRegisters();
 
     private:
@@ -120,18 +120,18 @@ namespace rocRoller
     };
 
     /**
-     * Picks the widest load instruction to load some of argPtr[offset:endOffset]
-     * into s[*beginReg:*endReg]. Returns the width of that load instruction in
-     * bytes, or 0 if offset == endOffset.
-     *
-     * Reasons to decrease the width of the load:
-     *  - offset is not aligned to the width of the load
-     *  - endOffset-offset is less than the width of the load
-     *  - *beginReg is not aligned to the width of the load
-     *  - destination registers are not contiguous
-     *
-     * @return int Width of the load in bytes
-     */
+      * Picks the widest load instruction to load some of argPtr[offset:endOffset]
+      * into s[*beginReg:*endReg]. Returns the width of that load instruction in
+      * bytes, or 0 if offset == endOffset.
+      *
+      * Reasons to decrease the width of the load:
+      *  - offset is not aligned to the width of the load
+      *  - endOffset-offset is less than the width of the load
+      *  - *beginReg is not aligned to the width of the load
+      *  - destination registers are not contiguous
+      *
+      * @return int Width of the load in bytes
+      */
     template <typename Iter, typename End>
     inline int PickInstructionWidthBytes(int offset, int endOffset, Iter beginReg, End endReg);
 
