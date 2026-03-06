@@ -706,6 +706,7 @@ namespace TensileLite
                                  void**                     array,
                                  TensorDescriptor const&    tensor,
                                  const std::vector<size_t>& batchIdx,
+                                 uint8_t**                  pinnedStaging,
                                  hipStream_t                stream = nullptr)
         {
             std::vector<size_t> batchSizes;
@@ -717,28 +718,24 @@ namespace TensileLite
             }
             std::vector<size_t> coord(batchSizes.size(), 0);
 
-            auto      count    = CoordCount(batchSizes.begin(), batchSizes.end());
-            uint8_t** cpuArray = nullptr;
-            HIP_CHECK_EXC(hipHostMalloc(&cpuArray, count * sizeof(void*), 0));
+            auto count = CoordCount(batchSizes.begin(), batchSizes.end());
             for(size_t idx = 0; idx < count; idx++)
             {
                 CoordNumbered(
                     idx, coord.begin(), coord.end(), batchSizes.begin(), batchSizes.end());
-                cpuArray[idx] = (uint8_t*)base;
+                pinnedStaging[idx] = (uint8_t*)base;
                 for(size_t i = 0; i < batchSizes.size(); i++)
                 {
-                    cpuArray[idx] += coord[i] * batchStrides[i];
+                    pinnedStaging[idx] += coord[i] * batchStrides[i];
                 }
             }
 
             if(stream)
                 HIP_CHECK_EXC(hipMemcpyAsync(
-                    array, cpuArray, count * sizeof(void*), hipMemcpyHostToDevice, stream));
+                    array, pinnedStaging, count * sizeof(void*), hipMemcpyHostToDevice, stream));
             else
                 HIP_CHECK_EXC(
-                    hipMemcpy(array, cpuArray, count * sizeof(void*), hipMemcpyHostToDevice));
-
-            HIP_CHECK_EXC(hipHostFree(cpuArray));
+                    hipMemcpy(array, pinnedStaging, count * sizeof(void*), hipMemcpyHostToDevice));
         }
 
         void* copyBadInputBuffers(const TensorDescriptor& descriptor,
@@ -1382,6 +1379,12 @@ namespace TensileLite
         void DataInitialization::allocNewGPUInputs()
         {
             m_hasAltBuffers = true;
+
+            // Allocate reusable pinned staging buffer for batch pointer setup
+            if(!m_pinnedBatchStaging && m_maxBatch > 0)
+                HIP_CHECK_EXC(
+                    hipHostMalloc(&m_pinnedBatchStaging, m_maxBatch * sizeof(void*), 0));
+
             std::vector<std::shared_ptr<void>> guardPage;
             void*                              guardPagePtr;
             bool enableGuardPage = (m_curBoundsCheck == BoundsCheckMode::GuardPageFront
@@ -1570,6 +1573,7 @@ namespace TensileLite
                                     pUnit.gpuInput.batch.get(),
                                     problem.tensors()[i],
                                     batchIdx,
+                                    m_pinnedBatchStaging,
                                     asyncStream);
 
                 if(problem.useBias() && problem.biasSrc() == i)
@@ -1598,6 +1602,7 @@ namespace TensileLite
                                         pUnitBias.gpuInput.batch.get(),
                                         problem.tensors()[ContractionProblemGemm::TENSOR::BIAS],
                                         batchIdx,
+                                        m_pinnedBatchStaging,
                                         asyncStream);
                 }
 
@@ -1630,6 +1635,7 @@ namespace TensileLite
                                         pUnitM.gpuInput.batch.get(),
                                         problem.tensors()[ContractionProblemGemm::TENSOR::METADATA],
                                         batchIdx,
+                                        m_pinnedBatchStaging,
                                         asyncStream);
 
                     auto& pUnitCp = m_vdata[ContractionProblemGemm::TENSOR::COMPRESSED]
@@ -1644,6 +1650,7 @@ namespace TensileLite
                         pUnitCp.gpuInput.batch.get(),
                         problem.tensors()[ContractionProblemGemm::TENSOR::COMPRESSED],
                         batchIdx,
+                        m_pinnedBatchStaging,
                         asyncStream);
                 }
             }
@@ -2858,6 +2865,13 @@ namespace TensileLite
                 e = hipStreamDestroy(m_copyStream);
                 if(e)
                     std::cerr << "~DataInitialization: hipStreamDestroy failed: "
+                              << hipGetErrorString(e) << std::endl;
+            }
+            if(m_pinnedBatchStaging)
+            {
+                hipError_t e = hipHostFree(m_pinnedBatchStaging);
+                if(e)
+                    std::cerr << "~DataInitialization: hipHostFree failed: "
                               << hipGetErrorString(e) << std::endl;
             }
         }
