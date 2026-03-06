@@ -89,6 +89,7 @@ def start_shard(
     num_shards,
     build_dir,
     shard_seed=None,
+    threads_per_shard=1,
 ):
     """Start a shard of tests and return process info.
 
@@ -110,8 +111,8 @@ def start_shard(
 
     # Set environment variables
     env = os.environ.copy()
-    env["OPENBLAS_NUM_THREADS"] = "1"
-    env["OMP_NUM_THREADS"] = "1"
+    env["OPENBLAS_NUM_THREADS"] = str(threads_per_shard)
+    env["OMP_NUM_THREADS"] = str(threads_per_shard)
 
     # Start with base command from profile and add framework-specific sharding arguments
     cmd = base_cmd.copy()
@@ -169,15 +170,11 @@ def start_shard(
         for k in sorted(env.keys())
         if k not in orig_env or orig_env.get(k) != env[k]
     ]
-    if set_vars:
-        print(f"{shard_tag} Environment:", flush=True, file=sys.stderr)
-        for k, v in set_vars:
-            print(f"{shard_tag}   {k}={v}", flush=True, file=sys.stderr)
-
-    # Log the command being executed
+    # Log the command being executed with env vars prefixed
+    env_str = " ".join(f"{k}={v}" for k, v in set_vars)
     cmd_str = " ".join(cmd)
-    print(f"{shard_tag} Running command in {build_dir}:", flush=True, file=sys.stderr)
-    print(f"{shard_tag}   {cmd_str}", flush=True, file=sys.stderr)
+    full_cmd_str = f"{env_str} {cmd_str}" if env_str else cmd_str
+    print(f"{shard_tag} {build_dir}$ {full_cmd_str}", flush=True, file=sys.stderr)
 
     # Use pseudo-TTY to ensure line-buffered output from subprocess
     master_fd, slave_fd = pty.openpty()
@@ -206,12 +203,12 @@ def start_shard(
     )
 
 
-def run_shards(pending_specs, max_concurrent=None):
-    """Run shards from pending_specs, starting at most max_concurrent at a time.
+def run_shards(pending_specs, slots=None):
+    """Run shards from pending_specs, starting at most slots at a time.
 
     Args:
         pending_specs: list of kwarg dicts to pass to start_shard
-        max_concurrent: max number of shards to run simultaneously (None = unlimited)
+        slots: max number of shards to run simultaneously (None = unlimited)
 
     Returns: (failed_shards, timing_info)
         failed_shards: list of (shard_index, test_type, exit_code) tuples
@@ -223,10 +220,8 @@ def run_shards(pending_specs, max_concurrent=None):
     timing_info = []
 
     while active_shards or pending:
-        # Start new shards up to max_concurrent
-        while pending and (
-            max_concurrent is None or len(active_shards) < max_concurrent
-        ):
+        # Start new shards up to slots
+        while pending and (slots is None or len(active_shards) < slots):
             spec = pending.pop(0)
             try:
                 info = start_shard(**spec)
@@ -344,34 +339,52 @@ def main():
         action="store_true",
         help="List tests that would run with the given profile, but don't execute them",
     )
-    available_cpus = get_available_cpus()
+    nproc = get_available_cpus()
     parser.add_argument(
         "-j",
         "--parallel",
         nargs="?",
         type=int,
-        const=available_cpus,
-        default=max(1, available_cpus // 2),
+        const=nproc,
+        default=max(1, nproc // 2),
         metavar="N",
         help="Concurrent slots: -j N uses N, -j alone uses nproc, omitting uses nproc/2",
+    )
+    parser.add_argument(
+        "--max-slots",
+        type=int,
+        default=64,
+        help="Max concurrent shards to limit simultaneous AMDGPU HSA accesses; excess parallel becomes threads/shard",
+    )
+    parser.add_argument(
+        "--shard-multiplier",
+        type=int,
+        default=8,
+        metavar="K",
+        help="Run K*slots total shards for better load balancing at the cost of more waves (default: 1)",
     )
     parser.add_argument(
         "--shuffle-seed",
         type=int,
         default=None,
-        help="Seed for test shuffling (default: random, or TEST_SHUFFLE_SEED env var)",
+        help="Seed for test shuffling (default: random)",
     )
 
     args = parser.parse_args()
-    max_concurrent = args.parallel
+
+    # Cap concurrent shards; excess CPUs become threads per shard.
     cap_msg = None
 
     # Cap slots to 8 on gfx1201 due to hanging issues
     gpu_arch = get_gpu_arch()
+    max_slots = args.max_slots
     if gpu_arch and "gfx1201" in gpu_arch:
-        if max_concurrent > 8:
-            cap_msg = f"Detected {gpu_arch}, capping slots to 8 (was {max_concurrent})"
-            max_concurrent = 8
+        if max_slots > 8:
+            cap_msg = f"Detected {gpu_arch}, capping slots to 8 (was {max_slots})"
+            max_slots = 8
+
+    slots = min(args.parallel, max_slots)
+    threads_per_shard = max(1, args.parallel // slots)
 
     # Resolve build directory
     build_dir = Path(args.build_dir).resolve()
@@ -386,7 +399,10 @@ def main():
         print(f"ERROR: Failed to load test profile '{args.profile}': {e}")
         sys.exit(1)
 
-    print(f"Available CPUs: {available_cpus}, slots: {max_concurrent}", file=sys.stderr)
+    print(
+        f"nproc: {nproc}, parallel (pass -j/--parallel): {args.parallel}, slots: {slots}, threads/shard: {threads_per_shard}",
+        file=sys.stderr,
+    )
     if gpu_arch:
         print(f"GPU architecture: {gpu_arch}", file=sys.stderr)
     if cap_msg:
@@ -451,7 +467,7 @@ def main():
     FRAMEWORK_TOTAL_TIMES_BY_ARCH = {
         # fmt: off
         "gfx942":  {"ctest": 82,  "gtest": 10230,  "catch2": 1335},
-        "gfx950":  {"ctest": 2084, "gtest": 22540, "catch2": 1654},
+        "gfx950":  {"ctest": 1842, "gtest": 15140, "catch2": 1294},
         "gfx908":  {"ctest": 3608, "gtest": 22600, "catch2": 2639},
         "gfx1201": {"ctest": 1047,  "gtest": 1444,  "catch2": 847},
         # fmt: on
@@ -467,14 +483,14 @@ def main():
 
     # Compute per-framework shard counts proportionally to runtimes.
     # Use the largest-remainder (Hamilton) apportionment method so that the
-    # total shard count equals exactly max_concurrent, keeping all slots busy
+    # total shard count equals exactly slots, keeping all slots busy
     # with no leftover stragglers in the final wave.
     total_time = sum(FRAMEWORK_TOTAL_TIMES.values())
     n_frameworks = len(FRAMEWORK_TOTAL_TIMES)
 
-    # Smallest multiple of max_concurrent that allows >= 1 shard per framework
-    k = max(1, -(-n_frameworks // max_concurrent))
-    total_shards = k * max_concurrent
+    # Smallest multiple of slots that allows >= 1 shard per framework, scaled by multiplier
+    k = max(args.shard_multiplier, -(-n_frameworks // slots))
+    total_shards = k * slots
 
     # Largest-remainder apportionment: floor each quota, then award remaining
     # shards to frameworks with the largest fractional remainders.
@@ -488,7 +504,7 @@ def main():
     ]:
         framework_num_shards[fw] += 1
 
-    print("Shard allocation:", file=sys.stderr)
+    print(f"Shard allocation (pass --shard-multiplier {k}):", file=sys.stderr)
     min_shards = min(framework_num_shards[fw] for fw in FRAMEWORK_TOTAL_TIMES)
     min_runtime = min(FRAMEWORK_TOTAL_TIMES.values())
     for fw, n in framework_num_shards.items():
@@ -504,7 +520,7 @@ def main():
             detail = ""
         print(f"  {fw}: {n} shards{detail}", file=sys.stderr)
     print(
-        f"  Total: {sum(framework_num_shards.values())} shards across {max_concurrent} slots",
+        f"  Total: {sum(framework_num_shards.values())} shards across {slots} slots ({k} wave(s))",
         file=sys.stderr,
     )
 
@@ -515,7 +531,7 @@ def main():
 
     for framework, cmd_list in commands.items():
         for cmd in cmd_list:
-            n = framework_num_shards.get(framework, max_concurrent)
+            n = framework_num_shards.get(framework, slots)
             seed = shuffle_seed if framework in ("gtest", "catch2") else None
 
             specs = [
@@ -526,6 +542,7 @@ def main():
                     num_shards=n,
                     build_dir=build_dir,
                     shard_seed=seed,
+                    threads_per_shard=threads_per_shard,
                 )
                 for i in range(n)
             ]
@@ -538,9 +555,7 @@ def main():
             if specs:
                 pending_specs.append(specs.pop(0))
 
-    mixed_failures, mixed_timing = run_shards(
-        pending_specs, max_concurrent=max_concurrent
-    )
+    mixed_failures, mixed_timing = run_shards(pending_specs, slots=slots)
     failed_shards.extend(mixed_failures)
     all_timing_info.extend(mixed_timing)
 
