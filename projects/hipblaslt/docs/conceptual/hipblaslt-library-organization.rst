@@ -30,6 +30,11 @@ Here are the subdirectories within the ``library`` directory:
 *  ``library/src/include``
 
    Contains internal include files for converting C++ exceptions to hipBLAS statuses.
+   
+.. note::
+   
+   For important information about handle management, see the API reference information for the
+   :ref:`hipblaslthandle_t structure <hipblaslthandle_t_desc>`.
 
 The clients directory
 -----------------------
