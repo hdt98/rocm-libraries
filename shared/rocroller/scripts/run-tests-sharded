@@ -342,26 +342,26 @@ def main():
     nproc = get_available_cpus()
     parser.add_argument(
         "-j",
-        "--parallel",
+        "--cpus",
         nargs="?",
         type=int,
         const=nproc,
         default=max(1, nproc // 2),
         metavar="N",
-        help="Concurrent slots: -j N uses N, -j alone uses nproc, omitting uses nproc/2",
+        help="CPUs to allocate: -j N uses N, -j alone uses nproc, omitting uses nproc/2",
     )
     parser.add_argument(
         "--max-slots",
         type=int,
         default=64,
-        help="Max concurrent shards to limit simultaneous AMDGPU HSA accesses; excess parallel becomes threads/shard",
+        help="Max concurrent shards to limit simultaneous AMDGPU HSA accesses; excess cpus becomes threads per shard",
     )
     parser.add_argument(
-        "--shard-multiplier",
+        "--shards-per-slot",
         type=int,
         default=8,
         metavar="K",
-        help="Run K*slots total shards for better load balancing at the cost of more waves (default: 1)",
+        help="Run K*slots total shards for better load balancing at the cost of more shards per slot (default: 8)",
     )
     parser.add_argument(
         "--shuffle-seed",
@@ -383,8 +383,8 @@ def main():
             cap_msg = f"Detected {gpu_arch}, capping slots to 8 (was {max_slots})"
             max_slots = 8
 
-    slots = min(args.parallel, max_slots)
-    threads_per_shard = max(1, args.parallel // slots)
+    slots = min(args.cpus, max_slots)
+    threads_per_shard = max(1, args.cpus // slots)
 
     # Resolve build directory
     build_dir = Path(args.build_dir).resolve()
@@ -399,15 +399,47 @@ def main():
         print(f"ERROR: Failed to load test profile '{args.profile}': {e}")
         sys.exit(1)
 
-    print(
-        f"nproc: {nproc}, parallel (pass -j/--parallel): {args.parallel}, slots: {slots}, threads/shard: {threads_per_shard}",
-        file=sys.stderr,
-    )
-    if gpu_arch:
-        print(f"GPU architecture: {gpu_arch}", file=sys.stderr)
-    if cap_msg:
-        print(cap_msg, file=sys.stderr)
-    print("=" * 50, file=sys.stderr)
+    # Values taken from CI run timing summaries
+    FRAMEWORK_TOTAL_TIMES_BY_ARCH = {
+        # fmt: off
+        "gfx942":  {"ctest": 1492,  "gtest": 8821,  "catch2": 1623},
+        "gfx950":  {"ctest": 15030, "gtest": 22300, "catch2": 1516},
+        "gfx908":  {"ctest": 382,   "gtest": 20227, "catch2": 3447},
+        "gfx1201": {"ctest": 1812,  "gtest": 1480,  "catch2": 901},
+        # fmt: on
+    }
+    _default_times = {"ctest": 750, "gtest": 1500, "catch2": 1200}
+    FRAMEWORK_TOTAL_TIMES = {
+        fw: t
+        for fw, t in FRAMEWORK_TOTAL_TIMES_BY_ARCH.get(
+            gpu_arch or "", _default_times
+        ).items()
+        if fw in commands
+    }
+
+    # Compute per-framework shard counts proportionally to runtimes.
+    # Use the largest-remainder (Hamilton) apportionment method so that the
+    # total shard count equals exactly slots, keeping all slots busy
+    # with no leftover stragglers.
+    total_time = sum(FRAMEWORK_TOTAL_TIMES.values())
+    n_frameworks = len(FRAMEWORK_TOTAL_TIMES)
+
+    # Smallest multiple of slots that allows >= 1 shard per framework, scaled by multiplier
+    k = max(args.shards_per_slot, -(-n_frameworks // slots))
+    total_shards = k * slots
+
+    # Largest-remainder apportionment: floor each quota, then award remaining
+    # shards to frameworks with the largest fractional remainders.
+    quotas = {
+        fw: t / total_time * total_shards for fw, t in FRAMEWORK_TOTAL_TIMES.items()
+    }
+    framework_num_shards = {fw: max(1, int(q)) for fw, q in quotas.items()}
+    remaining = total_shards - sum(framework_num_shards.values())
+    for fw in sorted(quotas, key=lambda fw: quotas[fw] % 1, reverse=True)[
+        : max(0, remaining)
+    ]:
+        framework_num_shards[fw] += 1
+
     print(
         "Running sharded tests" + (" [DRY RUN]" if args.dry_run else ""),
         file=sys.stderr,
@@ -429,6 +461,33 @@ def main():
             )
     if args.dry_run:
         print("Mode: DRY RUN - listing tests only", file=sys.stderr)
+    if gpu_arch:
+        print(f"GPU architecture: {gpu_arch}", file=sys.stderr)
+    if cap_msg:
+        print(cap_msg, file=sys.stderr)
+    print(
+        f"nproc: {nproc}, cpus (-j/--cpus): {args.cpus}, max-slots (--max-slots): {args.max_slots}, slots: {slots}, threads per shard: {threads_per_shard}",
+        file=sys.stderr,
+    )
+    print(f"Shard allocation (--shards-per-slot {k}):", file=sys.stderr)
+    min_shards = min(framework_num_shards[fw] for fw in FRAMEWORK_TOTAL_TIMES)
+    min_runtime = min(FRAMEWORK_TOTAL_TIMES.values())
+    for fw, n in framework_num_shards.items():
+        ideal = quotas.get(fw)
+        t = FRAMEWORK_TOTAL_TIMES.get(fw)
+        if ideal is not None and t is not None:
+            detail = (
+                f"  (ideal shards {ideal:.2f},"
+                f" shard ratio {n / min_shards:.2f}x,"
+                f" ideal ratio {t / min_runtime:.2f}x)"
+            )
+        else:
+            detail = ""
+        print(f"  {fw}: {n} shards{detail}", file=sys.stderr)
+    print(
+        f"  Total: {sum(framework_num_shards.values())} shards across {slots} slots ({k} shards per slot)",
+        file=sys.stderr,
+    )
     print("=" * 50, file=sys.stderr)
 
     # Create test report directory
@@ -462,67 +521,6 @@ def main():
 
         print("=== DRY RUN COMPLETE ===")
         sys.exit(0)
-
-    # Values taken from CI run timing summaries
-    FRAMEWORK_TOTAL_TIMES_BY_ARCH = {
-        # fmt: off
-        "gfx942":  {"ctest": 1492,  "gtest": 8821,  "catch2": 1623},
-        "gfx950":  {"ctest": 15030, "gtest": 22300, "catch2": 1516},
-        "gfx908":  {"ctest": 382, "gtest": 20227, "catch2": 3447},
-        "gfx1201": {"ctest": 1812,  "gtest": 1480,  "catch2": 901},
-        # fmt: on
-    }
-    _default_times = {"ctest": 750, "gtest": 1500, "catch2": 1200}
-    FRAMEWORK_TOTAL_TIMES = {
-        fw: t
-        for fw, t in FRAMEWORK_TOTAL_TIMES_BY_ARCH.get(
-            gpu_arch or "", _default_times
-        ).items()
-        if fw in commands
-    }
-
-    # Compute per-framework shard counts proportionally to runtimes.
-    # Use the largest-remainder (Hamilton) apportionment method so that the
-    # total shard count equals exactly slots, keeping all slots busy
-    # with no leftover stragglers in the final wave.
-    total_time = sum(FRAMEWORK_TOTAL_TIMES.values())
-    n_frameworks = len(FRAMEWORK_TOTAL_TIMES)
-
-    # Smallest multiple of slots that allows >= 1 shard per framework, scaled by multiplier
-    k = max(args.shard_multiplier, -(-n_frameworks // slots))
-    total_shards = k * slots
-
-    # Largest-remainder apportionment: floor each quota, then award remaining
-    # shards to frameworks with the largest fractional remainders.
-    quotas = {
-        fw: t / total_time * total_shards for fw, t in FRAMEWORK_TOTAL_TIMES.items()
-    }
-    framework_num_shards = {fw: max(1, int(q)) for fw, q in quotas.items()}
-    remaining = total_shards - sum(framework_num_shards.values())
-    for fw in sorted(quotas, key=lambda fw: quotas[fw] % 1, reverse=True)[
-        : max(0, remaining)
-    ]:
-        framework_num_shards[fw] += 1
-
-    print(f"Shard allocation (pass --shard-multiplier {k}):", file=sys.stderr)
-    min_shards = min(framework_num_shards[fw] for fw in FRAMEWORK_TOTAL_TIMES)
-    min_runtime = min(FRAMEWORK_TOTAL_TIMES.values())
-    for fw, n in framework_num_shards.items():
-        ideal = quotas.get(fw)
-        t = FRAMEWORK_TOTAL_TIMES.get(fw)
-        if ideal is not None and t is not None:
-            detail = (
-                f"  (ideal shards {ideal:.2f},"
-                f" shard ratio {n / min_shards:.2f}x,"
-                f" ideal ratio {t / min_runtime:.2f}x)"
-            )
-        else:
-            detail = ""
-        print(f"  {fw}: {n} shards{detail}", file=sys.stderr)
-    print(
-        f"  Total: {sum(framework_num_shards.values())} shards across {slots} slots ({k} wave(s))",
-        file=sys.stderr,
-    )
 
     # Build per-framework spec lists, then interleave round-robin
     failed_shards = []
