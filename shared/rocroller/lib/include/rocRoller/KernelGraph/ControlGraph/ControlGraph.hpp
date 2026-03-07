@@ -6,6 +6,9 @@
 #include <functional>
 #include <variant>
 
+#include <bit>
+#include <cstdint>
+
 #include <rocRoller/KernelGraph/ControlGraph/ControlGraph_fwd.hpp>
 
 #include <rocRoller/Graph/Hypergraph.hpp>
@@ -43,6 +46,58 @@ namespace rocRoller
      */
     namespace KernelGraph::ControlGraph
     {
+        using Bitset = std::vector<uint64_t>;
+
+        inline void bitsetSet(Bitset& bs, int id)
+        {
+            size_t word = static_cast<size_t>(id) >> 6;
+            if(word >= bs.size())
+                bs.resize(word + 1, 0);
+            bs[word] |= uint64_t(1) << (id & 63);
+        }
+        inline bool bitsetTest(Bitset const& bs, int id)
+        {
+            size_t word = static_cast<size_t>(id) >> 6;
+            return word < bs.size() && ((bs[word] >> (id & 63)) & 1);
+        }
+        inline void bitsetOr(Bitset& dst, Bitset const& src)
+        {
+            if(dst.size() < src.size())
+                dst.resize(src.size(), 0);
+            for(size_t i = 0; i < src.size(); ++i)
+                dst[i] |= src[i];
+        }
+        inline bool bitsetAny(Bitset const& bs)
+        {
+            for(auto w : bs)
+                if(w)
+                    return true;
+            return false;
+        }
+        inline bool bitsetOverlaps(Bitset const& a, Bitset const& b)
+        {
+            size_t n = std::min(a.size(), b.size());
+            for(size_t i = 0; i < n; ++i)
+                if(a[i] & b[i])
+                    return true;
+            return false;
+        }
+        inline std::vector<int> bitsetToSortedVec(Bitset const& bs)
+        {
+            std::vector<int> result;
+            for(size_t w = 0; w < bs.size(); ++w)
+            {
+                uint64_t bits = bs[w];
+                while(bits)
+                {
+                    int bit = std::countr_zero(bits);
+                    result.push_back(static_cast<int>(w * 64 + bit));
+                    bits &= bits - 1;
+                }
+            }
+            return result;
+        }
+
         enum class NodeOrdering
         {
             LeftFirst = 0,
@@ -85,11 +140,11 @@ namespace rocRoller
 
         struct NodeOrders
         {
-            std::vector<int> after;
-            std::vector<int> before;
-            std::vector<int> inBody;
-            std::vector<int> containing;
-            void             clear()
+            Bitset after;
+            Bitset before;
+            Bitset inBody;
+            Bitset containing;
+            void   clear()
             {
                 after.clear();
                 before.clear();
@@ -253,35 +308,43 @@ namespace rocRoller
              * startingNodes.
              */
             template <CForwardRangeOf<int> Range>
-            std::vector<int> populateOrderCache(Range const& startingNodes) const;
+            Bitset populateOrderCache(Range const& startingNodes) const;
 
             /**
              * Populates m_orderCache for startingNode relative to its descendents, and the
              * descendents relative to each other. Returns the descendents of startingNode.
              */
-            std::vector<int> populateOrderCache(int startingNode) const;
+            Bitset populateOrderCache(int startingNode) const;
 
             virtual void clearCache(Graph::GraphModification modification) override;
             void         populateOrderCache() const;
-            void         sortOrderCache() const;
+            //void         sortOrderCache() const;
+            void validateOrderCache() const;
 
             NodeOrdering lookupOrder(CacheOnlyPolicy const, int nodeA, int nodeB) const;
             NodeOrdering lookupOrder(IgnoreCachePolicy const, int nodeA, int nodeB) const;
 
+            void writeOrderCache(Bitset const& nodesA,
+                                 Bitset const& nodesB,
+                                 NodeOrdering  order) const;
+            // Single-node-to-bitset convenience overload
+            void writeOrderCache(int nodeA, Bitset const& nodesB, NodeOrdering order) const;
+
             void writeOrderCache(int nodeA, int nodeB, NodeOrdering order) const;
 
-            template <CForwardRangeOf<int> ARange = std::initializer_list<int>,
-                      CForwardRangeOf<int> BRange = std::initializer_list<int>>
-            void writeOrderCache(ARange const& nodesA,
-                                 BRange const& nodesB,
-                                 NodeOrdering  order) const;
+            //template <CForwardRangeOf<int> ARange = std::initializer_list<int>,
+            //          CForwardRangeOf<int> BRange = std::initializer_list<int>>
+            //void writeOrderCache(ARange const& nodesA,
+            //                     BRange const& nodesB,
+            //                     NodeOrdering  order) const;
 
             mutable std::unordered_map<int, NodeOrders> m_orderCache;
             /**
              * If an entry is present, the value will be the IDs of every descendent from the key,
              * following every kind of edge.
              */
-            mutable std::unordered_map<int, std::vector<int>> m_descendentCache;
+            //mutable std::unordered_map<int, std::vector<int>> m_descendentCache;
+            mutable std::unordered_map<int, Bitset> m_descendentCache;
 
             mutable CacheStatus m_cacheStatus = CacheStatus::Invalid;
 
