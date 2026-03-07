@@ -511,47 +511,6 @@ namespace rocRoller::KernelGraph
         }
     }
 
-    void removeRedundantBarrier(KernelGraph& kg, int node)
-    {
-        AssertFatal(node != -1, "An invalid node= -1");
-
-        for(auto childNode : kg.control.getOutputNodeIndices<Sequence>(node))
-            removeRedundantBarrier(kg, childNode);
-
-        if(not isOperation<Barrier>(kg.control.getElement(node)))
-            return;
-
-        auto const upEdges = kg.control.getNeighbours<GD::Upstream>(node);
-        if(upEdges.size() != 1)
-            return;
-
-        auto const downEdges = kg.control.getNeighbours<GD::Downstream>(node);
-        if(downEdges.size() > 1)
-            return;
-
-        auto parentNode = kg.control.getNeighbours<GD::Upstream>(upEdges.at(0)).at(0);
-        if(isOperation<Barrier>(kg.control.getElement(parentNode)))
-        {
-            if(not downEdges.empty())
-            {
-                auto childNode = kg.control.getNeighbours<GD::Downstream>(downEdges.at(0)).at(0);
-                auto edgeType  = kg.control.getElement(upEdges.at(0));
-                kg.control.addElement(edgeType, {parentNode}, {childNode});
-            }
-
-            kg.control.deleteElement(upEdges.at(0));
-            if(not downEdges.empty())
-                kg.control.deleteElement(downEdges.at(0));
-            kg.control.deleteElement(node);
-        }
-    }
-
-    void removeRedundantBarrier(KernelGraph& kg)
-    {
-        for(auto root : kg.control.roots())
-            removeRedundantBarrier(kg, root);
-    }
-
     // Remove removeRedundantNOPs is not fully tested.
     //
     // Note: if we remove enough NOPs, some edges might become

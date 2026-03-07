@@ -1595,9 +1595,8 @@ namespace rocRoller
             //   1. Pulls a value from a CommandArgument
             //   2. Is a literal (for testing)
 
-            //argInfo.numWGs = k->addArgument(
-            //    {rocRoller::NUMWGS, numWGsDT, DataDirection::ReadOnly, convert(numWGsDT, numWGs)});
-            argInfo.numWGs = convert(numWGsDT, numWGs);
+            argInfo.numWGs = k->addArgument(
+                {rocRoller::NUMWGS, numWGsDT, DataDirection::ReadOnly, convert(numWGsDT, numWGs)});
 
             // Fill number-of-tiles using MacroTileNumber sizes
             // from load operations (store operations are missing
@@ -1649,20 +1648,18 @@ namespace rocRoller
                 if(argInfo.numTileArgExprs[d] == nullptr)
                     continue;
 
-                argInfo.numTiles.push_back(argInfo.numTileArgExprs[d]);
-                //argInfo.numTiles.push_back(k->addArgument({concatenate("numTiles", d),
-                //                                           numTilesDT,
-                //                                           DataDirection::ReadOnly,
-                //                                           argInfo.numTileArgExprs[d]}));
+                argInfo.numTiles.push_back(k->addArgument({concatenate("numTiles", d),
+                                                           numTilesDT,
+                                                           DataDirection::ReadOnly,
+                                                           argInfo.numTileArgExprs[d]}));
                 if(d > 0)
                     enableDivideBy(argInfo.numTiles.back(), context);
             }
 
-            argInfo.numTiles.push_back(argInfo.numTileArgExprs.back());
-            //argInfo.numTiles.push_back(k->addArgument({"numTilesAcc",
-            //                                           numTilesDT,
-            //                                           DataDirection::ReadOnly,
-            //                                           argInfo.numTileArgExprs.back()}));
+            argInfo.numTiles.push_back(k->addArgument({"numTilesAcc",
+                                                       numTilesDT,
+                                                       DataDirection::ReadOnly,
+                                                       argInfo.numTileArgExprs.back()}));
 
             ExpressionPtr numSKTilesArgExpr, numDPTilesArgExpr;
             ExpressionPtr numSKTilesPerWGArgExpr, numDPTilesPerWGArgExpr;
@@ -1704,29 +1701,21 @@ namespace rocRoller
                 }
             }
 
-            argInfo.numSKTiles = numSKTilesArgExpr;
+            argInfo.numSKTiles = k->addArgument(
+                {"numSKTiles", numTilesDT, DataDirection::ReadOnly, numSKTilesArgExpr});
 
-            argInfo.numSKTilesPerWG = numSKTilesPerWGArgExpr;
-
-            //argInfo.numSKTiles = k->addArgument(
-            //    {"numSKTiles", numTilesDT, DataDirection::ReadOnly, numSKTilesArgExpr});
-
-            //argInfo.numSKTilesPerWG = k->addArgument(
-            //    {"numSKTilesPerWG", numTilesDT, DataDirection::ReadOnly, numSKTilesPerWGArgExpr});
+            argInfo.numSKTilesPerWG = k->addArgument(
+                {"numSKTilesPerWG", numTilesDT, DataDirection::ReadOnly, numSKTilesPerWGArgExpr});
 
             if(params->streamK.isTwoTileMode())
             {
-                argInfo.numDPTiles = numDPTilesArgExpr;
+                argInfo.numDPTiles = k->addArgument(
+                    {"numDPTiles", numTilesDT, DataDirection::ReadOnly, numDPTilesArgExpr});
 
-                argInfo.numDPTilesPerWG = numDPTilesPerWGArgExpr;
-
-                //argInfo.numDPTiles = k->addArgument(
-                //    {"numDPTiles", numTilesDT, DataDirection::ReadOnly, numDPTilesArgExpr});
-
-                //argInfo.numDPTilesPerWG = k->addArgument({"numDPTilesPerWG",
-                //                                          numTilesDT,
-                //                                          DataDirection::ReadOnly,
-                //                                          numDPTilesPerWGArgExpr});
+                argInfo.numDPTilesPerWG = k->addArgument({"numDPTilesPerWG",
+                                                          numTilesDT,
+                                                          DataDirection::ReadOnly,
+                                                          numDPTilesPerWGArgExpr});
             }
             else
             {
