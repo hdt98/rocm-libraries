@@ -336,6 +336,7 @@ class StateValues:
   doPackPreSchedulingThisLoop: bool      = False
   doPackPreSchedulingNextLoop: bool      = False
   doFullPackCodePrefetch: bool           = False
+  useCommonSgprSwap: bool                = False
 
   # Epilogue states
   preloadScaleA = False
@@ -4921,6 +4922,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.oneBufferScheduling = (kernel["1LDSBuffer"]) or \
                                       ((kernel["DirectToLdsA"] or kernel["DirectToLdsB"]) and \
                                        self.states.numLDSBlk == kernel["PrefetchGlobalRead"])
+    # common sgprSwap
+    # enable it for the following case.
+    #  DTLA+B + StoreSwapAddr + numLDSBlk==2 + (not EPS) + (not sparse) + (MX or non CMS)
+    self.states.useCommonSgprSwap = False
+    if kernel["DirectToLds"] == 1 and kernel["StoreSwapAddr"] and self.states.numLDSBlk == 2 and \
+       (not kernel["ExpandPointerSwap"]) and (not kernel["ProblemType"]["Sparse"]) and \
+       (kernel["ProblemType"]["MXBlockA"] or kernel["ProblemType"]["MXBlockB"] or not kernel["UseCustomMainLoopSchedule"]):
+      self.states.useCommonSgprSwap = True
 
     # NamedTuple is immutable
     class intermediateTPValues(NamedTuple):
@@ -6656,16 +6665,19 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     # Allocate registers to swap between lds buffers
     if kernel["StoreSwapAddr"]:
-      if kernel["LocalWriteUseSgprA"]:
-        self.defineSgpr("SwapA", 1)
-      if kernel["LocalWriteUseSgprB"]:
-        self.defineSgpr("SwapB", 1)
-      if kernel["ProblemType"]["MXBlockA"] and kernel["LocalWriteUseSgprMXSA"]:
-          self.defineSgpr("SwapMXSA", 1)
-      if kernel["ProblemType"]["MXBlockB"] and kernel["LocalWriteUseSgprMXSB"]:
-          self.defineSgpr("SwapMXSB", 1)
-      if kernel["ProblemType"]["Sparse"] and kernel["LocalWriteUseSgprMetadata"]:
-        self.defineSgpr("SwapMetadata", 1)
+      if self.states.useCommonSgprSwap:
+        self.defineSgpr("SwapCommon", 1)
+      else:
+        if kernel["LocalWriteUseSgprA"]:
+          self.defineSgpr("SwapA", 1)
+        if kernel["LocalWriteUseSgprB"]:
+          self.defineSgpr("SwapB", 1)
+        if kernel["ProblemType"]["MXBlockA"] and kernel["LocalWriteUseSgprMXSA"]:
+            self.defineSgpr("SwapMXSA", 1)
+        if kernel["ProblemType"]["MXBlockB"] and kernel["LocalWriteUseSgprMXSB"]:
+            self.defineSgpr("SwapMXSB", 1)
+        if kernel["ProblemType"]["Sparse"] and kernel["LocalWriteUseSgprMetadata"]:
+          self.defineSgpr("SwapMetadata", 1)
 
     if kernel["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel':
       self.defineSgpr("AddressTD", numSgprAddressD, align=2)
