@@ -83,10 +83,6 @@ namespace rocRoller
                 if(!m_allowNewArgs)
                     return nullptr;
 
-                LaunchTimeExpressionVisitor sub(m_context, false);
-                auto                        ex2    = sub.call(expr);
-                auto                        myComp = complexity(ex2);
-
                 if(ignoreComplexity || !evalTimes[EvaluationTime::KernelExecute]
                    || complexity(expr) >= m_minComplexity)
                     return addLaunchEval(expr);
