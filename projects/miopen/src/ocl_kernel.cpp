@@ -9,7 +9,6 @@
 namespace miopen {
 
 MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DEVICE_ARCH)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_PERFORMANCE_LOGS)
 
 static std::string DimToFormattedString(const size_t* dims, size_t count)
 {
@@ -67,9 +66,8 @@ void OCLKernelInvoke::run() const
         clWaitForEvents(1, &ev);
         // Profiling is enable when Performance Logs are see `Run` in handleocl.cpp so this is nested in callback
         // Log to JSON accumulator
-        const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
         const bool is_tuning_mode = GetKernelTuningMode();
-        if(IsLoggingKernel(base_level, is_tuning_mode))
+        if(IsLoggingKernel(is_tuning_mode))
         {
             // Match handleocl.cpp `SetProfilingResult`
             size_t st, end;
@@ -80,7 +78,7 @@ void OCLKernelInvoke::run() const
             auto kernel_name = GetName();
             const bool is_transpose = IsTransposeOrTransformKernel(kernel_name);
             const auto exec_id = GetKernelExecutionCounter();
-            AddKernelToJsonAccumulator(exec_id, kernel_name, elapsed_time, is_transpose, base_level);
+            AddKernelToJsonAccumulator(exec_id, kernel_name, elapsed_time, is_transpose);
         }
         callback(ev);
     }

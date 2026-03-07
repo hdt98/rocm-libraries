@@ -25,7 +25,6 @@ MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_FIND_CONV_INSUFFICIENT_WORKSPACE_ALLOW_FINDDB
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_SEARCH_CUTOFF, false)
 MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_FIND_SKIP_PCT, 130)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_PERFORMANCE_LOGS)
 
 namespace miopen {
 
@@ -266,9 +265,8 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
             ScopedKernelTuningMode tuning_mode_scope;
             
             // Log solution name for grouped kernel logging
-            const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
             const auto solver_id_obj = solver::Id{sol.solver_id};
-            LogSolutionName(sol.solver_id, solver_id_obj.Value(), log_level);
+            LogSolutionName(sol.solver_id, solver_id_obj.Value());
             
             // Run invoker max 8 times, with ~5 sec time limit.
             using elapsed_t                 = decltype(handle.GetKernelTime());

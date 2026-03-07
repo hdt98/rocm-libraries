@@ -197,13 +197,12 @@ void Solution::RunImpl(const Handle& handle,
         }
     };
 
-    const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
     const auto solver_name = GetSolver().ToString();
     const auto solver_id = GetSolver().Value();
     
     if(invoker)
     {
-        LogSolutionName(solver_name, solver_id, log_level);
+        LogSolutionName(solver_name, solver_id);
         IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
         checkNumericsOutput_();
@@ -222,7 +221,7 @@ void Solution::RunImpl(const Handle& handle,
         auto kernel_handles = std::vector<Kernel>{std::begin(kernels), std::end(kernels)};
 
         invoker = invoker_factory(kernel_handles);
-        LogSolutionName(solver_name, solver_id, log_level);
+        LogSolutionName(solver_name, solver_id);
         IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
         checkNumericsOutput_();
@@ -235,7 +234,7 @@ void Solution::RunImpl(const Handle& handle,
     if(found_invoker)
     {
         invoker = *found_invoker;
-        LogSolutionName(solver_name, solver_id, log_level);
+        LogSolutionName(solver_name, solver_id);
         IncrementKernelExecutionCounter();
         (*found_invoker)(handle, invoke_ctx);
         checkNumericsOutput_();
@@ -255,7 +254,7 @@ void Solution::RunImpl(const Handle& handle,
         invoker = handle.PrepareInvoker(*conv_solution.invoker_factory,
                                         conv_solution.construction_params);
         handle.RegisterInvoker(*invoker, net_cfg, GetSolver().ToString());
-        LogSolutionName(solver_name, solver_id, log_level);
+        LogSolutionName(solver_name, solver_id);
         IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
         checkNumericsOutput_();
@@ -270,9 +269,8 @@ void Solution::RunImpl(const Handle& handle,
                        const std::unordered_map<miopenTensorArgumentId_t, RunInput>& inputs,
                        Data_t workspace,
                        std::size_t workspace_size,
-                       [[maybe_unused]] const MhaDescriptor& mha_desc)
+    [[maybe_unused]] const MhaDescriptor& mha_desc)
 {
-    const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
     const auto solver_name = GetSolver().ToString();
     const auto solver_id = GetSolver().Value();
     
@@ -427,7 +425,7 @@ void Solution::RunImpl(const Handle& handle,
         if(mha_solution.invoker_factory.has_value())
         {
             invoker = (*mha_solution.invoker_factory)(kernel_handles);
-            LogSolutionName(solver_name, solver_id, log_level);
+            LogSolutionName(solver_name, solver_id);
             IncrementKernelExecutionCounter();
             (*invoker)(handle, invoke_ctx);
         }
@@ -444,7 +442,7 @@ void Solution::RunImpl(const Handle& handle,
 
     if(invoker)
     {
-        LogSolutionName(solver_name, solver_id, log_level);
+        LogSolutionName(solver_name, solver_id);
         IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
         return;
@@ -461,7 +459,7 @@ void Solution::RunImpl(const Handle& handle,
         invoker =
             handle.PrepareInvoker(*mha_solution.invoker_factory, mha_solution.construction_params);
         handle.RegisterInvoker(*invoker, net_cfg, GetSolver().ToString());
-        LogSolutionName(solver_name, solver_id, log_level);
+        LogSolutionName(solver_name, solver_id);
         IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
     }
@@ -477,7 +475,6 @@ void Solution::RunImpl(const Handle& handle,
                        std::size_t /*workspace_size*/,
                        const SoftmaxDescriptor& softmax_desc)
 {
-    const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
     const auto solver_name = GetSolver().ToString();
     const auto solver_id = GetSolver().Value();
 
@@ -554,7 +551,7 @@ void Solution::RunImpl(const Handle& handle,
         if(softmax_solution.invoker_factory.has_value())
         {
             invoker = (*softmax_solution.invoker_factory)(kernel_handles);
-            LogSolutionName(solver_name, solver_id, log_level);
+            LogSolutionName(solver_name, solver_id);
             IncrementKernelExecutionCounter();
             (*invoker)(handle, invoke_ctx);
         }
@@ -571,7 +568,7 @@ void Solution::RunImpl(const Handle& handle,
 
     if(invoker)
     {
-        LogSolutionName(solver_name, solver_id, log_level);
+        LogSolutionName(solver_name, solver_id);
         IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
         return;
@@ -588,7 +585,7 @@ void Solution::RunImpl(const Handle& handle,
         invoker = handle.PrepareInvoker(*softmax_solution.invoker_factory,
                                         softmax_solution.construction_params);
         handle.RegisterInvoker(*invoker, net_cfg, GetSolver().ToString());
-        LogSolutionName(solver_name, solver_id, log_level);
+        LogSolutionName(solver_name, solver_id);
         IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
     }
@@ -604,7 +601,6 @@ void Solution::RunImpl(const Handle& handle,
                        std::size_t workspace_size,
                        const FusedProblem& problem_)
 {
-    const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
     const auto solver_name = GetSolver().ToString();
     const auto solver_id = GetSolver().Value();
     
@@ -645,7 +641,7 @@ void Solution::RunImpl(const Handle& handle,
         if(solution.invoker_factory.has_value())
         {
             invoker = (*solution.invoker_factory)(kernel_handles);
-            LogSolutionName(solver_name, solver_id, log_level);
+            LogSolutionName(solver_name, solver_id);
             IncrementKernelExecutionCounter();
             (*invoker)(handle, invoke_params);
         }
@@ -662,7 +658,7 @@ void Solution::RunImpl(const Handle& handle,
     invoker = handle.GetInvoker(net_cfg, GetSolver());
     if(invoker)
     {
-        LogSolutionName(solver_name, solver_id, log_level);
+        LogSolutionName(solver_name, solver_id);
         IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_params);
         return;
@@ -675,7 +671,7 @@ void Solution::RunImpl(const Handle& handle,
     {
         invoker = handle.PrepareInvoker(*solution.invoker_factory, solution.construction_params);
         handle.RegisterInvoker(*invoker, net_cfg, GetSolver().ToString());
-        LogSolutionName(solver_name, solver_id, log_level);
+        LogSolutionName(solver_name, solver_id);
         IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_params);
     }

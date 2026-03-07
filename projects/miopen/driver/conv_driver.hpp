@@ -452,7 +452,8 @@ private:
                             size_t flopCnt,
                             size_t readBytes,
                             size_t outputBytes,
-                            const std::string& db_key) const
+                            const std::string& db_key,
+                            const std::string& perf_db_key) const
     {
         std::cout << "{\"performance\":{"
                   << "\"name\":\"" << operation_name << wei_h << "x" << wei_w << "u" << miopen::deref(convDesc).GetConvStrides()[0] << "\","
@@ -471,6 +472,7 @@ private:
                   << "\"x\":" << wei_w << ","
                   << "\"k\":" << out_c << ","
                   << "\"db_key\":\"" << db_key << "\","
+                  << "\"perf_db_key\":\"" << perf_db_key << "\","
                   << "\"results\":{"
                   << "\"average_time_ms\":" << kernel_average_time << ","
                   << "\"flop_count\":" << flopCnt << ","
@@ -491,7 +493,8 @@ private:
                             size_t flopCnt,
                             size_t readBytes,
                             size_t outputBytes,
-                            const std::string& db_key) const
+                            const std::string& db_key,
+                            const std::string& perf_db_key) const
     {
         std::cout << "{\"performance\":{"
                     << "\"name\":\"" << operation_name << wei_d << "x" << wei_h << "x" << wei_w << "u" <<  miopen::deref(convDesc).GetConvStrides()[0] << "\","
@@ -512,6 +515,7 @@ private:
                     << "\"x\":" << wei_w << ","
                     << "\"k\":" << out_c << ","
                     << "\"db_key\":\"" << db_key << "\","
+                    << "\"perf_db_key\":\"" << perf_db_key << "\","
                     << "\"results\":{"
                     << "\"average_time_ms\":" << kernel_average_time << ","
                     << "\"flop_count\":" << flopCnt << ","
@@ -1877,8 +1881,9 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
             std::ostringstream ss;
             problem.Serialize(ss);
             const auto db_key = ss.str();
+            const auto perf_db_key = problem.MakeNetworkConfig();
             
-            Print2DConvJsonLog("fwd-conv", "forward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes, db_key);
+            Print2DConvJsonLog("fwd-conv", "forward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes, db_key, perf_db_key);
         }
         else
         {
@@ -1938,8 +1943,9 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
             std::ostringstream ss;
             problem.Serialize(ss);
             const auto db_key = ss.str();
+            const auto perf_db_key = problem.MakeNetworkConfig();
             
-            Print3DConvJsonLog("fwd-conv", "forward", kernel_average_time, solution, in_n, in_c, in_h, in_w, in_d, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key);
+            Print3DConvJsonLog("fwd-conv", "forward", kernel_average_time, solution, in_n, in_c, in_h, in_w, in_d, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key, perf_db_key);
         }
         else
         {
@@ -2269,6 +2275,13 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
                                                              : std::string("UNKNOWN");
     miopen::LogSolutionName(solution_name, found_solution.solution_id, performance_log_level);
     
+    // Prepare to collect timing samples
+    std::vector<float> time_samples;
+    if(time_enabled || performance_logging_enabled)
+    {
+        time_samples.reserve(num_iterations);
+    }
+    
     wall.start(wall_enabled);
 
     for(int i = 0; i < num_iterations; i++)
@@ -2300,14 +2313,25 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
         if(wall_enabled && i == 0)
             wall_first_time = wall.interim_time_ms();
 
-        if(time_enabled)
+        if(time_enabled || performance_logging_enabled)
         {
             float time = 0.0;
             miopenGetKernelTime(GetHandle(), &time);
-            kernel_total_time += time;
-            if(i == 0)
-                kernel_first_time = time;
+            time_samples.push_back(time);
+            if(time_enabled)
+            {
+                kernel_total_time += time;
+                if(i == 0)
+                    kernel_first_time = time;
+            }
         }
+    }
+    
+    // Pass collected samples to performance logging
+    if(performance_logging_enabled && !time_samples.empty())
+    {        
+        // Pass solution name as config_name, empty string as config_descriptor (execution phase doesn't have config details)
+        miopen::AddPerformanceConfig(solution_name, "", time_samples);
     }
 
     if(wall_enabled)
@@ -2439,6 +2463,13 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuImmed(const bool is_transform)
                                                              : std::string("UNKNOWN");
     miopen::LogSolutionName(solution_name, selected->solution_id, performance_log_level);
 
+    // Prepare to collect timing samples
+    std::vector<float> time_samples;
+    if(time_enabled || performance_logging_enabled)
+    {
+        time_samples.reserve(num_iterations);
+    }
+
     wall.start(wall_enabled);
 
     for(int i = 0; i < num_iterations; i++)
@@ -2469,14 +2500,25 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuImmed(const bool is_transform)
         if(wall_enabled && i == 0)
             wall_first_time = wall.interim_time_ms();
 
-        if(time_enabled)
+        if(time_enabled || performance_logging_enabled)
         {
             float time = 0.0;
             miopenGetKernelTime(GetHandle(), &time);
-            kernel_total_time += time;
-            if(i == 0)
-                kernel_first_time = time;
+            time_samples.push_back(time);
+            if(time_enabled)
+            {
+                kernel_total_time += time;
+                if(i == 0)
+                    kernel_first_time = time;
+            }
         }
+    }
+
+    // Pass collected samples to performance logging
+    if(performance_logging_enabled && !time_samples.empty())
+    {
+        // Pass solution name as config_name, empty string as config_descriptor (execution phase doesn't have config details)
+        miopen::AddPerformanceConfig(solution_name, "", time_samples);
     }
 
     if(wall_enabled)
@@ -2805,6 +2847,13 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuFind()
                                                              : std::string("UNKNOWN");
     miopen::LogSolutionName(solution_name, found_solution.solution_id, performance_log_level);
     
+    // Prepare to collect timing samples
+    std::vector<float> time_samples;
+    if(time_enabled || performance_logging_enabled)
+    {
+        time_samples.reserve(num_iterations);
+    }
+    
     wall.start(wall_enabled);
 
     for(int i = 0; i < num_iterations; i++)
@@ -2837,14 +2886,24 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuFind()
         if(wall_enabled && i == 0)
             wall_first_time = wall.interim_time_ms();
 
-        if(time_enabled)
+        if(time_enabled || performance_logging_enabled)
         {
             float time = 0.0;
             miopenGetKernelTime(GetHandle(), &time);
-            kernel_total_time += time;
-            if(i == 0)
-                kernel_first_time = time;
+            time_samples.push_back(time);
+            if(time_enabled)
+            {
+                kernel_total_time += time;
+                if(i == 0)
+                    kernel_first_time = time;
+            }
         }
+    }
+    
+    // Pass collected samples to performance logging
+    if(performance_logging_enabled && !time_samples.empty())
+    {
+        miopen::AddPerformanceConfig(solution_name, time_samples);
     }
 
     if(wall_enabled)
@@ -2927,8 +2986,9 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, floa
             std::ostringstream ss;
             problem.Serialize(ss);
             const auto db_key = ss.str();
+            const auto perf_db_key = problem.MakeNetworkConfig();
             
-            Print2DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes, db_key);
+            Print2DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes, db_key, perf_db_key);
         }
         else
         {
@@ -2986,8 +3046,9 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, floa
             std::ostringstream ss;
             problem.Serialize(ss);
             const auto db_key = ss.str();
+            const auto perf_db_key = problem.MakeNetworkConfig();
             
-            Print3DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, in_d, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key);
+            Print3DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, in_d, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key, perf_db_key);
         }
         else
         {
@@ -3077,6 +3138,13 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuFind()
                                                              : std::string("UNKNOWN");
     miopen::LogSolutionName(solution_name, found_solution.solution_id, performance_log_level);
     
+    // Prepare to collect timing samples
+    std::vector<float> time_samples;
+    if(time_enabled || performance_logging_enabled)
+    {
+        time_samples.reserve(num_iterations);
+    }
+    
     wall.start(wall_enabled);
 
     for(int i = 0; i < num_iterations; i++)
@@ -3109,14 +3177,24 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuFind()
         if(wall_enabled && i == 0)
             wall_first_time = wall.interim_time_ms();
 
-        if(time_enabled)
+        if(time_enabled || performance_logging_enabled)
         {
             float time = 0.0;
             miopenGetKernelTime(GetHandle(), &time);
-            kernel_total_time += time;
-            if(i == 0)
-                kernel_first_time = time;
+            time_samples.push_back(time);
+            if(time_enabled)
+            {
+                kernel_total_time += time;
+                if(i == 0)
+                    kernel_first_time = time;
+            }
         }
+    }
+    
+    // Pass collected samples to performance logging
+    if(performance_logging_enabled && !time_samples.empty())
+    {
+        miopen::AddPerformanceConfig(solution_name, time_samples);
     }
 
     if(wall_enabled)
@@ -3200,8 +3278,9 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float
             std::ostringstream ss;
             problem.Serialize(ss);
             const auto db_key = ss.str();
+            const auto perf_db_key = problem.MakeNetworkConfig();
             
-            Print2DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes, db_key);
+            Print2DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes, db_key, perf_db_key);
         }
         else
         {
@@ -3259,8 +3338,9 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float
             std::ostringstream ss;
             problem.Serialize(ss);
             const auto db_key = ss.str();
+            const auto perf_db_key = problem.MakeNetworkConfig();
             
-            Print3DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, in_d, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key);
+            Print3DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, in_d, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key, perf_db_key);
         }
         else
         {
@@ -3378,6 +3458,13 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuImmed()
                                                              : std::string("UNKNOWN");
     miopen::LogSolutionName(solution_name, selected->solution_id, performance_log_level);
 
+    // Prepare to collect timing samples
+    std::vector<float> time_samples;
+    if(time_enabled || performance_logging_enabled)
+    {
+        time_samples.reserve(num_iterations);
+    }
+
     wall.start(wall_enabled);
 
     for(int i = 0; i < num_iterations; i++)
@@ -3407,14 +3494,24 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuImmed()
         if(wall_enabled && i == 0)
             wall_first_time = wall.interim_time_ms();
 
-        if(time_enabled)
+        if(time_enabled || performance_logging_enabled)
         {
             float time = 0.0;
             miopenGetKernelTime(GetHandle(), &time);
-            kernel_total_time += time;
-            if(i == 0)
-                kernel_first_time = time;
+            time_samples.push_back(time);
+            if(time_enabled)
+            {
+                kernel_total_time += time;
+                if(i == 0)
+                    kernel_first_time = time;
+            }
         }
+    }
+
+    // Pass collected samples to performance logging
+    if(performance_logging_enabled && !time_samples.empty())
+    {
+        miopen::AddPerformanceConfig(solution_name, time_samples);
     }
 
     if(wall_enabled)
@@ -3526,6 +3623,13 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuImmed()
                                                              : std::string("UNKNOWN");
     miopen::LogSolutionName(solution_name, selected->solution_id, performance_log_level);
 
+    // Prepare to collect timing samples
+    std::vector<float> time_samples;
+    if(time_enabled || performance_logging_enabled)
+    {
+        time_samples.reserve(num_iterations);
+    }
+
     wall.start(wall_enabled);
 
     for(int i = 0; i < num_iterations; i++)
@@ -3555,14 +3659,24 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuImmed()
         if(wall_enabled && i == 0)
             wall_first_time = wall.interim_time_ms();
 
-        if(time_enabled)
+        if(time_enabled || performance_logging_enabled)
         {
             float time = 0.0;
             miopenGetKernelTime(GetHandle(), &time);
-            kernel_total_time += time;
-            if(i == 0)
-                kernel_first_time = time;
+            time_samples.push_back(time);
+            if(time_enabled)
+            {
+                kernel_total_time += time;
+                if(i == 0)
+                    kernel_first_time = time;
+            }
         }
+    }
+
+    // Pass collected samples to performance logging
+    if(performance_logging_enabled && !time_samples.empty())
+    {
+        miopen::AddPerformanceConfig(solution_name, time_samples);
     }
 
     if(wall_enabled)

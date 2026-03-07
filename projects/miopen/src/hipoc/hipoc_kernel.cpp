@@ -15,7 +15,6 @@
 #define WORKAROUND_SWDEV_448157 1
 
 MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_DEVICE_ARCH)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_PERFORMANCE_LOGS)
 
 namespace miopen {
 
@@ -122,16 +121,15 @@ void HIPOCKernelInvoke::run(void* args, std::size_t size) const
 #else
         hipEventSynchronize(stop.get());
 #endif
-        const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
         const bool is_tuning_mode = GetKernelTuningMode();
-        if(IsLoggingKernel(base_level, is_tuning_mode))
+        if(IsLoggingKernel(is_tuning_mode))
         {
             float elapsed_time = 0.0f;
             hipEventElapsedTime(&elapsed_time, start.get(), stop.get());
             
             const bool is_transpose = IsTransposeOrTransformKernel(GetName());
             const auto exec_id = GetKernelExecutionCounter();
-            AddKernelToJsonAccumulator(exec_id, GetName(), elapsed_time, is_transpose, base_level);
+            AddKernelToJsonAccumulator(exec_id, GetName(), elapsed_time, is_transpose);
         }
         callback(start.get(), stop.get());
     }
@@ -206,16 +204,15 @@ void HIPOCKernelInvoke::run_cooperative(void** kern_args) const
     if(callback)
     {
         hipEventSynchronize(stop.get());
-        const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
         const bool is_tuning_mode = GetKernelTuningMode();
-        if(IsLoggingKernel(base_level, is_tuning_mode))
+        if(IsLoggingKernel(is_tuning_mode))
         {
             float elapsed_time = 0.0f;
             hipEventElapsedTime(&elapsed_time, start.get(), stop.get());
             
             const bool is_transpose = IsTransposeOrTransformKernel(GetName());
             const auto exec_id = GetKernelExecutionCounter();
-            AddKernelToJsonAccumulator(exec_id, GetName(), elapsed_time, is_transpose, base_level);
+            AddKernelToJsonAccumulator(exec_id, GetName(), elapsed_time, is_transpose);
         }
         callback(start.get(), stop.get());
     }

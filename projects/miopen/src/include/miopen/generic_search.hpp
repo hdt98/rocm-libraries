@@ -556,11 +556,31 @@ auto GenericSearch(const Solver s,
                     // Set tuning mode flag for kernel logging - extends to all runs in this scope
                     ScopedKernelTuningMode tuning_mode_scope;
                     
-                    // Log solution name for grouped kernel logging
+                    // Log solution name for grouped kernel logging (only once per solution)
                     const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
                     const auto solver_name = s.SolverDbId();
                     const auto solver_id = miopen::solver::Id(solver_name).Value();
+                    
+                    // LogSolutionName only sets up the solution context once
                     LogSolutionName(solver_name, solver_id, log_level);
+                    
+                    // Add this specific performance config with kernel name extracted from solution
+                    const auto config_string = current_config.ToString();
+                    
+                    // Extract kernel name from first kernel in solution (if available)
+                    std::string kernel_name;
+                    if(!current_solution.construction_params.empty() && 
+                       !current_solution.construction_params[0].kernel_name.empty())
+                    {
+                        kernel_name = current_solution.construction_params[0].kernel_name;
+                    }
+                    else
+                    {
+                        kernel_name = solver_name;  // Fallback to solver name
+                    }
+                    
+                    // Pass kernel name and config string as descriptor
+                    AddPerformanceConfig(kernel_name, config_string);
 
                     // Warm-up run for every configuration to eliminate cold-start bias
                     IncrementKernelExecutionCounter();
@@ -636,6 +656,26 @@ auto GenericSearch(const Solver s,
                     if(ret == 0)
                     {
                         is_passed = true;
+                        
+                        // Update the performance config with the collected samples
+                        // This updates the existing config with actual timing samples
+                        const auto config_string = current_config.ToString();
+                        
+                        // Extract kernel name from first kernel in solution (if available)
+                        std::string kernel_name;
+                        if(!current_solution.construction_params.empty() && 
+                           !current_solution.construction_params[0].kernel_name.empty())
+                        {
+                            kernel_name = current_solution.construction_params[0].kernel_name;
+                        }
+                        else
+                        {
+                            const auto solver_name = s.SolverDbId();
+                            kernel_name = solver_name;  // Fallback to solver name
+                        }
+                        
+                        // Pass kernel name, config string as descriptor, and samples
+                        AddPerformanceConfig(kernel_name, config_string, samples);
 
                         // Remove outliers that are more than 2 positive modified z-score's away,
                         // and get the mean.
