@@ -4620,7 +4620,7 @@ class KernelWriterAssembly(KernelWriter):
         self.vgprPool.checkIn(tmpv)
       self.vgprPool.checkIn(destVgpr)
 
-    if kernel["StoreSwapAddr"]:
+    if kernel["StoreSwapAddr"] or self.states.useCommonSgprSwap:
       if kernel["LocalWriteUseSgpr%s"%tc]:
         if self.states.useCommonSgprSwap:
           # Need only once. Generate the code for "A" only
