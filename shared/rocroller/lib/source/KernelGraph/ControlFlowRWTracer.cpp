@@ -426,8 +426,8 @@ namespace rocRoller::KernelGraph
         // aren't there yet.
         //
 
-        // auto init = m_graph.control.getOutputNodeIndices<Initialize>(tag).to<std::set>();
-        // generate(init);
+        auto init = m_graph.control.getOutputNodeIndices<Initialize>(tag).to<std::set>();
+        generate(init);
 
         auto incr = m_graph.control.getOutputNodeIndices<ForLoopIncrement>(tag).to<std::set>();
         generate(incr);
