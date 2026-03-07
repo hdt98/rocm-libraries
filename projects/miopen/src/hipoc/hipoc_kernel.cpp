@@ -25,7 +25,7 @@ HipEventProfiler::HipEventProfiler(const Handle& handle_)
     {
         start = make_hip_event();
         stop  = make_hip_event();
-        hipEventRecord(start.get(), handle.GetStream());
+        (void)hipEventRecord(start.get(), handle.GetStream());
     }
 }
 
@@ -33,10 +33,10 @@ HipEventProfiler::~HipEventProfiler()
 {
     if(start)
     {
-        hipEventRecord(stop.get(), handle.GetStream());
-        hipEventSynchronize(stop.get());
+        (void)hipEventRecord(stop.get(), handle.GetStream());
+        (void)hipEventSynchronize(stop.get());
         float event_time = 0.0f;
-        hipEventElapsedTime(&event_time, start.get(), stop.get());
+        (void)hipEventElapsedTime(&event_time, start.get(), stop.get());
         handle.ResetKernelTime();
         handle.AccumKernelTime(event_time);
     }
@@ -119,7 +119,7 @@ void HIPOCKernelInvoke::run(void* args, std::size_t size) const
             }
         }
 #else
-        hipEventSynchronize(stop.get());
+        (void)hipEventSynchronize(stop.get());
 #endif
         const bool is_tuning_mode = GetKernelTuningMode();
         if(IsLoggingKernel(is_tuning_mode))
@@ -203,7 +203,9 @@ void HIPOCKernelInvoke::run_cooperative(void** kern_args) const
 
     if(callback)
     {
-        hipEventSynchronize(stop.get());
+        status = hipEventSynchronize(stop.get());
+        if(status != hipSuccess)
+            MIOPEN_THROW_HIP_STATUS(status, "hipEventSynchronize() failed");
         const bool is_tuning_mode = GetKernelTuningMode();
         if(IsLoggingKernel(is_tuning_mode))
         {
