@@ -769,6 +769,62 @@ namespace rocRoller
                 // arg into dest
                 bool const isUnpacking = argInfo.packing > destInfo.packing;
 
+                // ============================================================
+                // NEW: Optimize Convert from 64-bit integer to 32-bit integer.
+                //
+                // Instead of allocating a fresh 32-bit register and copying the
+                // low half into it, split the 64-bit register pair: take
+                // ownership of the low half as dest and free the high half.
+                //
+                // Guard: only do this when results[0] is not shared by another
+                // consumer (CSE). use_count() == 2 means only this handler and
+                // the expression tree hold a reference; no other node needs it.
+                // ============================================================
+                //
+                // This is the use case of this code snippet:
+                //  // (op 5012) BitwiseAnd(Convert(ArithmeticShiftR({Tensor_0_size_1_14: s[54:55]:I64}, 8:U32)I64)U32, 4294967292:U32)U32
+                //  // (op 5012) ArithmeticShiftR({Tensor_0_size_1_14: s[54:55]:I64}, 8:U32)I64
+                // // Allocated : 2 SGPRs (Value: Int64) (op 5012): s80, s81
+                // s_ashr_i64 s[80:81], s[54:55], 8 // (op 5012)
+                // // Allocated : 1 SGPR (Value: UInt32) (op 5012): s82
+                // s_mov_b32 s82, s80 // (op 5012) convert
+                //  // Freeing : 2 SGPRs (Value: Int64) (op 5012): s80, s81
+                //
+                // The s_mov_b32 is generated in Convert.cpp: generateUInt32 by using copy
+                // lower part to dest.
+                //
+                // With this optimization, the s_mov_b32 gets removed.
+                //
+                // client/rocroller-gemm --mac_m=128 --mac_n=128 --mac_k=256 --wave_m=16 --wave_n=16 --wave_k=128 --wave_b=1 --workgroup_size_x=128 --workgroup_size_y=2 --workgroupRemapXCC=False --workgroupRemapXCCValue=-1 --load_A=BufferToLDS --load_B=BufferToLDS --store=VGPRToGlobalMemoryWithBuffer --betaInFma=True --padLDS_A=0,0 --padLDS_B=0,0 --scheduler=Priority --schedulerCost=LinearWeightedSimple --prefetch=True --prefetchInFlight=4 --prefetchLDSFactor=1 --prefetchMixMemOps=True --loadScale_A=BufferToVGPR --loadScale_B=BufferToVGPR --swizzleScale=True --sts=32x8/32x8 --prefetchScale=True --pretileScale=False --streamK=None --numWGs=0 --tailLoops=True --M=4096 --N=4096 --K=32768 --alpha=2.0 --beta=0.0 --type_A=fp4 --type_B=fp4 --type_C=half --type_D=half --type_acc=float --trans_A=T --trans_B=N --scale_A=Separate --scaleType_A=E8M0 --scale_B=Separate --scaleType_B=E8M0 --scaleBlockSize=32 --scaleSkipPermlane=None --scaleValue_A=1.0 --scaleValue_B=1.0 --initMode_A=Bounded --initMode_B=Bounded --initMode_C=Bounded --workgroupMappingDim=0 --workgroupMappingValue=2 --num_warmup=1000 --num_outer=1 --num_inner=1000 --noCheck=False --visualize=False
+
+                if constexpr(std::same_as<Operation, Convert>)
+                {
+                    if(dest == nullptr
+                       && (expr.destinationType == DataType::UInt32
+                           || expr.destinationType == DataType::Int32)
+                       && results[0]->registerCount() == 2
+                       && results[0]->allocationState() == Register::AllocationState::Allocated
+                       && results[0].use_count() <= 2)
+                    {
+                        auto srcDataType = getArithDataType(results[0]);
+                        if(srcDataType == DataType::Int64 || srcDataType == DataType::UInt64)
+                        {
+                            auto parts = results[0]->split({{0}, {1}});
+                            // parts[0] = low half (new allocation, takes ownership)
+                            // parts[1] = high half (new allocation, freed at end of scope)
+                            dest = parts[0];
+                            dest->setVariableType(expr.destinationType);
+                            while(schedulerLockCount > 0)
+                            {
+                                schedulerLockCount--;
+                                co_yield Instruction::Unlock(
+                                    "Expression temporary in special register");
+                            }
+                            co_return;
+                        }
+                    }
+                }
+
                 if(dest == nullptr)
                 {
                     if(destType.regType == rocRoller::Register::Type::Accumulator)
