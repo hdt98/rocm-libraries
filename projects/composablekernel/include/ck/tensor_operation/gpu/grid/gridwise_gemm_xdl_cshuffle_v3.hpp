@@ -32,7 +32,11 @@ template <typename GridwiseGemm,
           TailNumber TailNum       = TailNumber::Full>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
-__launch_bounds__(GridwiseGemm::MaxBlockSize, MinimumOccupancy)
+#ifdef GEMM_WMMA_SPEC_KERNEL
+__launch_bounds__(GridwiseGemm::MaxBlockSize, 1)
+#else
+__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
+#endif
 #endif
     // __attribute__((amdgpu_waves_per_eu(1, 1)))
     kernel_gemm_xdl_cshuffle_v3(typename GridwiseGemm::Argument karg)
@@ -63,7 +67,11 @@ template <typename GridwiseGemm,
           TailNumber TailNum       = TailNumber::Full>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
-__launch_bounds__(GridwiseGemm::MaxBlockSize, MinimumOccupancy)
+#ifdef GEMM_WMMA_SPEC_KERNEL
+__launch_bounds__(GridwiseGemm::MaxBlockSize, 1)
+#else
+__launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
+#endif
 #endif
     // __attribute__((amdgpu_waves_per_eu(1, 1)))
     kernel_gemm_xdl_cshuffle_v3_2lds(typename GridwiseGemm::Argument karg)
@@ -352,7 +360,9 @@ struct GridwiseGemm_xdl_cshuffle_v3
     using Base::I1;
     using Base::I2;
     using ThisThreadBlock = typename Base::ThisThreadBlock;
-
+#ifdef GEMM_WMMA_SPEC_KERNEL
+    static constexpr index_t MaxBlockSize = BlockSize;
+#endif
 #if defined(__gfx12__)
     static constexpr index_t TransposeC = true;
 #else

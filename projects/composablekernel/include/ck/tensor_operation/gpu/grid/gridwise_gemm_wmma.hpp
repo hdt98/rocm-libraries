@@ -33,7 +33,11 @@ template <typename GridwiseGemm,
           bool HasMainKBlockLoop>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
+#ifdef GEMM_WMMA_SPEC_KERNEL
+__launch_bounds__(GridwiseGemm::MaxBlockSize, 1)
+#else
 __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, CK_MIN_BLOCK_PER_CU)
+#endif
 #endif
     kernel_gemm_wmma(const ADataType* __restrict__ p_a_grid,
                      const BDataType* __restrict__ p_b_grid,
@@ -132,6 +136,9 @@ struct GridwiseGemm_Wmma
     static constexpr auto I6 = Number<6>{};
     static constexpr auto I7 = Number<7>{};
 
+#ifdef GEMM_WMMA_SPEC_KERNEL
+    static constexpr index_t MaxBlockSize = BlockSize;
+#endif
     // FIX ME: To be deprecated
     static constexpr auto K1 = Number<K1Value>{};
 

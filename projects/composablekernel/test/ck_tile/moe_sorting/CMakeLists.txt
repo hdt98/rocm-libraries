@@ -10,7 +10,7 @@ if(GPU_TARGETS MATCHES "gfx942|gfx950|gfx90a|gfx11|gfx12|gfx13")
 
         set(EXAMPLE_MOE_SORTING_COMPILE_OPTIONS)
         # NOTE: we turn off undefined-func-template to let source compile without explicit declare function specializations
-        list(APPEND EXAMPLE_MOE_SORTING_COMPILE_OPTIONS -Wno-undefined-func-template -Wno-float-equal -DMOE_SORTING_FMOE_2D_BUF=${USE_2D_BUF})
+        list(APPEND EXAMPLE_MOE_SORTING_COMPILE_OPTIONS -Wno-undefined-func-template -Wno-float-equal -Wno-c2y-extensions -DMOE_SORTING_FMOE_2D_BUF=${USE_2D_BUF})
         target_compile_options(${EXECUTABLE} PRIVATE ${EXAMPLE_MOE_SORTING_COMPILE_OPTIONS})
 
     endfunction(add_moe_sorting_test EXECUTABLE USE_2D_BUF)

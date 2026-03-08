@@ -128,6 +128,8 @@ add_example_executable(example_gemm_xdl_fp16_fp8 gemm_xdl_fp16_fp8.cpp)
 add_example_dependencies(example_gemm_xdl example_gemm_xdl_fp16_fp8)
 
 add_custom_target(example_gemm_wmma)
+
+# Original target for backwards compatibility (uses default config 1 with MNKPadding)
 add_example_executable(example_gemm_wmma_fp16 gemm_wmma_fp16.cpp)
 add_example_dependencies(example_gemm_wmma example_gemm_wmma_fp16)
 add_example_executable(example_gemm_wmma_bf16 gemm_wmma_bf16.cpp)

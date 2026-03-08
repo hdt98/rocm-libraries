@@ -641,6 +641,10 @@ struct GridwiseGemm_wmma_cshuffle_v3
             {
                 return get_max_vgpr_count(gfx11_t{});
             }
+            else if(ck::is_gfx13_supported())
+            {
+                return get_max_vgpr_count(gfx13_t{});
+            }
             else
             {
                 return get_max_vgpr_count(gfx_invalid_t{});

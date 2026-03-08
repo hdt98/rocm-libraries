@@ -182,7 +182,7 @@ inline bool is_xdl_wmma_k_supported()
         }
         return true;
     }
-    else if(is_gfx120_supported())
+    else if(is_gfx120_supported() || is_gfx13_supported())
     {
         return (KPerBlock % 16 == 0) && (KPack % 8 == 0);
     }
