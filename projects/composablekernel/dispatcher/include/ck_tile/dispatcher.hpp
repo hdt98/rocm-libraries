@@ -25,6 +25,7 @@
 #include "ck_tile/dispatcher/arch_filter.hpp"
 #include "ck_tile/dispatcher/backends/tile_backend.hpp"
 #include "ck_tile/dispatcher/backends/generated_tile_backend.hpp"
+#include "ck_tile/dispatcher/backends/generated_fmha_backend.hpp"
 #include "ck_tile/dispatcher/utils.hpp"
 
 // Grouped Convolution
@@ -33,3 +34,11 @@
 #include "ck_tile/dispatcher/grouped_conv_kernel_decl.hpp"
 #include "ck_tile/dispatcher/grouped_conv_registry.hpp"
 #include "ck_tile/dispatcher/grouped_conv_utils.hpp"
+
+// FMHA support
+#include "ck_tile/dispatcher/fmha_problem.hpp"
+#include "ck_tile/dispatcher/fmha_kernel_key.hpp"
+#include "ck_tile/dispatcher/fmha_kernel_instance.hpp"
+#include "ck_tile/dispatcher/fmha_registry.hpp"
+#include "ck_tile/dispatcher/fmha_dispatcher.hpp"
+#include "ck_tile/dispatcher/fmha_kernel_decl.hpp"

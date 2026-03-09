@@ -21,6 +21,8 @@ endif()
 add_library(ck_tile_dispatcher
     src/registry.cpp
     src/dispatcher.cpp
+    src/fmha_registry.cpp
+    src/fmha_dispatcher.cpp
 )
 
 # Enable PIC for Python bindings
@@ -38,6 +40,7 @@ target_include_directories(ck_tile_dispatcher
 target_include_directories(ck_tile_dispatcher
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
         $<INSTALL_INTERFACE:include>
 )
 
