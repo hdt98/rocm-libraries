@@ -40,7 +40,7 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-#define LATRD_DOT_THREADS ROCSOLVER_ASAN_VALUE(256, 1024)
+static constexpr int LATRD_DOT_THREADS = ROCSOLVER_ASAN_VALUE(256, 1024);
 
 template <int MAX_THDS, typename T, typename I, typename U>
 ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS) latrd_dot_scale_axpy(const I n,
