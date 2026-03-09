@@ -4,49 +4,36 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
-#include "ck_tile/ops/reduce/block/block_reduce.hpp"
 
 namespace ck_tile {
 
-// Preprocessing mode enum for the unified SageAttention V3 preprocessing kernel.
-enum class SageAttnPreprocessMode
-{
-    Q = 0, // Per-Q-block channel-mean subtraction + MXFP4 quantization + store q_mean
-    K = 1, // Global channel-mean subtraction + MXFP4 quantization
-    V = 2, // Transpose [seqlen_k, hdim_v] -> [hdim_v, seqlen_k] + MXFP4 quantization
-};
-
-// SageAttnPreprocessPipeline: thread-parallel preprocessing for one (B, H, tile) block.
+// SageAttnPreprocessPipeline: per-CTA computation for one tile of Q, K, and V.
 //
-// Grid mapping (set by the kernel layer):
-//   mode=Q: gridDim = (num_q_tiles, nhead, batch), blockDim = kBlockSize
-//           Each CTA processes one Q tile of kM0 rows, all hdim cols.
-//   mode=K: gridDim = (num_k_tiles, nhead, batch), blockDim = kBlockSize
-//           Each CTA processes one K tile of kN0 rows, all hdim cols.
-//   mode=V: gridDim = (hdim_v, nhead, batch), blockDim = kBlockSize
-//           Each CTA processes one row of V_T (one hdim_v channel across all seqlen_k).
-//           Input tile: [1, seqlen_k] floats -> output: [1, seqlen_k/2] pk_fp4_t + [1, seqlen_k/32] e8m0_t.
-//           But V transpose means we actually need to process [kN0, 1] input cols for each hdim row.
-//           Reinterpret: gridDim = (hdim_v, nhead, batch), each CTA handles one hdim_v row,
-//           looping over seqlen_k in chunks of kN0*32 (MXFP4 group-of-32 along seqlen_k).
+// Each CTA (identified by tile_x, head, batch) performs ALL of Q, K, V work
+// for its tile index, in the following order:
 //
-// This pipeline uses raw pointer arithmetic and scalar/vector loads for maximum simplicity.
-// MXFP4 quantization is done per group of 32 elements along the innermost quantization axis:
-//   - Q/K: innermost axis is hdim (each row quantized in groups of 32 hdim elements)
-//   - V:   innermost axis is seqlen_k (each hdim_v row quantized in groups of 32 seqlen_k elems)
+//   1. RunQMean:      compute column mean of Q tile → store in smem + global q_mean
+//   2. RunDeltaS:     delta_s[tile_x, kj] = dot(q_mean, K[kj]) for all kj  (float)
+//   3. RunQQuantize:  Q_smooth = Q - q_mean (using smem) → MXFP4
+//   4. RunKQuantize:  K_smooth = K - k_mean (inline) → MXFP4
+//   5. RunV:          V[:, channel] transpose → MXFP4
 //
 // Template parameters:
-//   kRows:             number of rows per tile (kM0 for Q, kN0 for K; 1 for V)
-//   kCols:             number of cols per tile (hdim for Q/K; seqlen_k for V mode)
-//   kScaleGranularity: MXFP4 group size, must be 32
-//   kBlockSize:        threads per CTA
+//   InputT_:           input element type (float or fp16_t)
+//   kRows_:            tile rows (kM0 == kN0, used for Q and K tiles)
+//   kCols_:            tile cols (hdim)
+//   kScaleGranularity: MXFP4 group size (must be 32)
+//   kBlockSize_:       threads per CTA
 
-template <index_t kRows_,
+template <typename InputT_,
+          index_t kRows_,
           index_t kCols_,
           index_t kScaleGranularity_ = 32,
           index_t kBlockSize_        = 256>
 struct SageAttnPreprocessPipeline
 {
+    using InputT = InputT_;
+
     static constexpr index_t kRows             = kRows_;
     static constexpr index_t kCols             = kCols_;
     static constexpr index_t kScaleGranularity = kScaleGranularity_;
@@ -56,183 +43,160 @@ struct SageAttnPreprocessPipeline
     static_assert(kCols % kScaleGranularity == 0,
                   "kCols must be divisible by kScaleGranularity for MXFP4");
 
-    // Total elements in this tile: kRows * kCols
-    // Shared memory: kCols floats for broadcasting column mean (Q/K modes)
+    // Shared memory: kCols floats for q_mean broadcast
     CK_TILE_HOST_DEVICE static constexpr index_t GetSmemSize()
     {
         return kCols * sizeof(float);
     }
 
     // -------------------------------------------------------------------------
-    // Q mode: compute column mean of [kRows, kCols] src tile, subtract, quantize.
-    //
-    // Parameters:
-    //   src_ptr:         float32 pointer to [kRows, kCols] tile (row-major, stride=kCols)
-    //   dst_hat_ptr:     pk_fp4_t pointer to [kRows, kCols/2] output (byte-packed fp4)
-    //   dst_scale_ptr:   e8m0_t pointer to [kRows, kCols/32] output
-    //   q_mean_ptr:      float32 pointer to [kCols] output (this block's column mean)
-    //   smem:            shared memory (kCols floats)
+    // Step 1: compute column mean of [kRows, kCols] Q tile.
+    //   smem[0..kCols) receives q_mean (float).
+    //   q_mean_ptr: global output [kCols] for this Q tile.
     // -------------------------------------------------------------------------
-    CK_TILE_DEVICE void RunQ(const float* __restrict__ src_ptr,
-                             uint8_t* __restrict__ dst_hat_ptr,
-                             uint8_t* __restrict__ dst_scale_ptr,
-                             float* __restrict__ q_mean_ptr,
-                             void* smem) const
+    CK_TILE_DEVICE void RunQMean(const InputT* __restrict__ src_ptr,
+                                 float* __restrict__ q_mean_ptr,
+                                 void* smem) const
     {
-        float* smem_col_mean = reinterpret_cast<float*>(smem);
-        const index_t tid    = get_thread_id();
+        float* smem_mean  = reinterpret_cast<float*>(smem);
+        const index_t tid = get_thread_id();
 
-        // Step 1: Zero shared column accumulators
-        for(index_t d = tid; d < kCols; d += kBlockSize)
-            smem_col_mean[d] = 0.0f;
-        block_sync_lds();
-
-        // Step 2: Each thread sums its rows into smem (atomic float add)
-        // Thread tid owns rows [tid*kRows/kBlockSize .. (tid+1)*kRows/kBlockSize) (if evenly split)
-        // Simpler: each thread iterates over all kRows for its assigned cols
-        // Thread tid handles cols: tid, tid+kBlockSize, tid+2*kBlockSize, ...
+        // Each thread owns columns [tid, tid+kBlockSize, ...] and sums all kRows rows.
         for(index_t d = tid; d < kCols; d += kBlockSize)
         {
             float sum = 0.0f;
             for(index_t r = 0; r < kRows; r++)
-                sum += src_ptr[r * kCols + d];
-            smem_col_mean[d] = sum / static_cast<float>(kRows);
+                sum += static_cast<float>(src_ptr[r * kCols + d]);
+            smem_mean[d] = sum / static_cast<float>(kRows);
         }
         block_sync_lds();
 
-        // Step 3: Store column mean to output
+        // Write q_mean to global memory
         for(index_t d = tid; d < kCols; d += kBlockSize)
-            q_mean_ptr[d] = smem_col_mean[d];
+            q_mean_ptr[d] = smem_mean[d];
+        // Note: no sync after this; smem_mean remains valid for subsequent steps.
+    }
 
-        // Step 4: For each row, subtract mean and MXFP4-quantize
-        // Each thread handles one or more complete rows
-        // We partition rows across threads: thread tid handles rows where (row % kBlockSize == tid)
-        // This is less efficient but correct for any kRows and kBlockSize.
-        // For performance, kRows should be small (e.g., 64 or 128) and kBlockSize should be chosen
-        // so each thread handles exactly kRows/kBlockSize rows.
-        for(index_t r = tid; r < kRows; r += kBlockSize)
+    // -------------------------------------------------------------------------
+    // Step 2: delta_s[kj] = dot(q_mean_smem, K_smooth[kj]) for all kj in seqlen_k.
+    //   K_smooth[kj, d] = K[kj, d] - k_mean[d]  (computed inline, not stored).
+    //   Reads q_mean from smem (set by RunQMean).
+    //   k_base_ptr: base of this (batch, head)'s K: [seqlen_k, kCols] row-major.
+    //   k_mean_ptr: per-head channel mean [kCols] for this (batch, head).
+    //   delta_s_ptr: global output [seqlen_k] for this Q tile.
+    // -------------------------------------------------------------------------
+    CK_TILE_DEVICE void RunDeltaS(const InputT* __restrict__ k_base_ptr,
+                                  index_t seqlen_k,
+                                  index_t stride_k,
+                                  const float* __restrict__ k_mean_ptr,
+                                  float* __restrict__ delta_s_ptr,
+                                  const void* smem) const
+    {
+        const float*  smem_mean = reinterpret_cast<const float*>(smem);
+        const index_t tid       = get_thread_id();
+
+        for(index_t kj = tid; kj < seqlen_k; kj += kBlockSize)
         {
-            QuantizeRowMXFP4(src_ptr + r * kCols,
-                             smem_col_mean,
-                             dst_hat_ptr + r * (kCols / 2),
-                             dst_scale_ptr + r * (kCols / kScaleGranularity),
-                             kCols);
+            const InputT* k_row = k_base_ptr + kj * stride_k;
+            float dot           = 0.0f;
+            for(index_t d = 0; d < kCols; d++)
+            {
+                const float k_smooth = static_cast<float>(k_row[d]) - k_mean_ptr[d];
+                dot += smem_mean[d] * k_smooth;
+            }
+            delta_s_ptr[kj] = dot;
         }
     }
 
     // -------------------------------------------------------------------------
-    // K mode: subtract provided k_mean, then MXFP4-quantize.
-    //
-    // Parameters:
-    //   src_ptr:         float32 [kRows, kCols] tile
-    //   dst_hat_ptr:     pk_fp4_t [kRows, kCols/2] output
-    //   dst_scale_ptr:   e8m0_t [kRows, kCols/32] output
-    //   k_mean_ptr:      float32 [kCols] global channel mean
+    // Step 3: quantize Q_smooth = Q_tile - q_mean (smem) → MXFP4.
+    //   Reads q_mean from smem.
     // -------------------------------------------------------------------------
-    CK_TILE_DEVICE void RunK(const float* __restrict__ src_ptr,
-                             uint8_t* __restrict__ dst_hat_ptr,
-                             uint8_t* __restrict__ dst_scale_ptr,
-                             const float* __restrict__ k_mean_ptr) const
+    CK_TILE_DEVICE void RunQQuantize(const InputT* __restrict__ src_ptr,
+                                     uint8_t* __restrict__ dst_hat_ptr,
+                                     uint8_t* __restrict__ dst_scale_ptr,
+                                     const void* smem) const
+    {
+        const float*  smem_mean = reinterpret_cast<const float*>(smem);
+        const index_t tid       = get_thread_id();
+
+        for(index_t r = tid; r < kRows; r += kBlockSize)
+        {
+            QuantizeRowSubMean(src_ptr + r * kCols,
+                               smem_mean,
+                               dst_hat_ptr + r * (kCols / 2),
+                               dst_scale_ptr + r * (kCols / kScaleGranularity));
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Step 4: quantize K_smooth = K_tile - k_mean_ptr (inline) → MXFP4.
+    //   k_mean_ptr: [kCols] per-head channel mean for this (batch, head).
+    // -------------------------------------------------------------------------
+    CK_TILE_DEVICE void RunKQuantize(const InputT* __restrict__ src_ptr,
+                                     const float* __restrict__ k_mean_ptr,
+                                     uint8_t* __restrict__ dst_hat_ptr,
+                                     uint8_t* __restrict__ dst_scale_ptr) const
     {
         const index_t tid = get_thread_id();
         for(index_t r = tid; r < kRows; r += kBlockSize)
         {
-            QuantizeRowMXFP4(src_ptr + r * kCols,
-                             k_mean_ptr,
-                             dst_hat_ptr + r * (kCols / 2),
-                             dst_scale_ptr + r * (kCols / kScaleGranularity),
-                             kCols);
+            QuantizeRowSubMean(src_ptr + r * kCols,
+                               k_mean_ptr,
+                               dst_hat_ptr + r * (kCols / 2),
+                               dst_scale_ptr + r * (kCols / kScaleGranularity));
         }
     }
 
     // -------------------------------------------------------------------------
-    // V mode: process one hdim_v channel (row index = blockIdx.x in the grid).
-    // Input is column-major [hdim_v, seqlen_k] logically, but stored as row-major
-    // [seqlen_k, hdim_v] in memory.
-    //
-    // This CTA handles ONE hdim_v row of the transposed V tensor, i.e., all seqlen_k
-    // elements V[:, hdim_channel]. Quantize in groups of 32 along seqlen_k.
-    //
-    // Parameters:
-    //   src_ptr:        float32 pointer to V[0, hdim_channel] in [seqlen_k, hdim_v] layout
-    //   seqlen_k:       number of tokens
-    //   hdim_v:         V head dim
-    //   dst_hat_ptr:    pk_fp4_t pointer to V_hat[hdim_channel, 0] in [hdim_v, seqlen_k/2] layout
-    //   dst_scale_ptr:  e8m0_t pointer to V_scale[hdim_channel, 0] in [hdim_v, seqlen_k/32] layout
+    // Step 5: one hdim_v channel of V → transpose + MXFP4 quantize.
+    //   src_ptr:      V[0, hdim_ch] in [seqlen_k, hdim_v] layout (stride hdim_v per row)
+    //   dst_hat_ptr:  V_hat[hdim_ch, 0] in [hdim_v, seqlen_k/2] layout
+    //   dst_scale_ptr:V_scale[hdim_ch, 0] in [hdim_v, seqlen_k/32] layout
     // -------------------------------------------------------------------------
-    CK_TILE_DEVICE void RunV(const float* __restrict__ src_ptr,
+    CK_TILE_DEVICE void RunV(const InputT* __restrict__ src_ptr,
                              index_t seqlen_k,
                              index_t hdim_v,
                              uint8_t* __restrict__ dst_hat_ptr,
                              uint8_t* __restrict__ dst_scale_ptr) const
     {
-        const index_t tid = get_thread_id();
-
-        // Each thread processes groups of kScaleGranularity seqlen_k elements.
-        // Total groups = seqlen_k / 32; distribute groups across threads.
+        const index_t tid       = get_thread_id();
         const index_t num_groups = seqlen_k / kScaleGranularity;
         constexpr float rcp_dst_max = 1.0f / 6.0f;
 
         for(index_t g = tid; g < num_groups; g += kBlockSize)
         {
             const index_t k_start = g * kScaleGranularity;
-
-            // Load 32 consecutive seqlen_k elements for this hdim_v channel
             float group_data[kScaleGranularity];
             float max_abs = 0.0f;
+
             for(index_t j = 0; j < kScaleGranularity; j++)
             {
-                // V is stored as [seqlen_k, hdim_v] row-major; accessing column hdim_channel
-                // src_ptr already points to V[0, hdim_channel], stride hdim_v between rows
-                group_data[j] = src_ptr[(k_start + j) * hdim_v];
+                group_data[j] = static_cast<float>(src_ptr[(k_start + j) * hdim_v]);
                 max_abs       = max(max_abs, abs(group_data[j]));
             }
 
-            // e8m0 scale: exp2(ceil(log2(max_abs/6)))
             const float scale = bit_cast<float>(
                 (bit_cast<uint32_t>(max_abs * rcp_dst_max) + numeric_traits<float>::mant_mask) &
                 numeric_traits<float>::head_mask);
 
-            // Store e8m0 scale byte (exponent field: bits [30:23])
             dst_scale_ptr[g] = static_cast<uint8_t>(bit_cast<uint32_t>(scale) >> 23);
 
-            // Pack 32 floats -> 16 bytes (pairs of FP4 into bytes) of pk_fp4_t
             uint8_t* hat_group = dst_hat_ptr + g * (kScaleGranularity / 2);
-            for(index_t j = 0; j < kScaleGranularity / 8; j++)
-            {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wuninitialized"
-                uint32_t x;
-                x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                    x, group_data[8 * j + 0], group_data[8 * j + 1], scale, 0);
-                x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                    x, group_data[8 * j + 2], group_data[8 * j + 3], scale, 1);
-                x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                    x, group_data[8 * j + 4], group_data[8 * j + 5], scale, 2);
-                x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                    x, group_data[8 * j + 6], group_data[8 * j + 7], scale, 3);
-#pragma clang diagnostic pop
-                // Write 4 bytes (8 FP4 values) to dst_hat
-                *reinterpret_cast<uint32_t*>(hat_group + j * 4) = x;
-            }
+            PackFP4Group(group_data, hat_group, scale);
         }
     }
 
 private:
-    // Quantize one row of `ncols` float32 values using per-group-of-32 MXFP4.
-    // col_mean[d] is subtracted before quantization (pass nullptr for no subtraction).
-    // Output:
-    //   dst_hat_row:   ncols/2 bytes (packed FP4 pairs)
-    //   dst_scale_row: ncols/32 e8m0 scale bytes
-    CK_TILE_DEVICE void QuantizeRowMXFP4(const float* __restrict__ src_row,
-                                          const float* __restrict__ col_mean,
-                                          uint8_t* __restrict__ dst_hat_row,
-                                          uint8_t* __restrict__ dst_scale_row,
-                                          index_t ncols) const
+    // Quantize one row of kCols InputT values: val = src[d] - mean[d], then MXFP4.
+    CK_TILE_DEVICE void QuantizeRowSubMean(const InputT* __restrict__ src_row,
+                                            const float* __restrict__ mean,
+                                            uint8_t* __restrict__ dst_hat_row,
+                                            uint8_t* __restrict__ dst_scale_row) const
     {
-        constexpr float rcp_dst_max = 1.0f / 6.0f;
+        constexpr float rcp_dst_max  = 1.0f / 6.0f;
+        const index_t   num_groups   = kCols / kScaleGranularity;
 
-        const index_t num_groups = ncols / kScaleGranularity;
         for(index_t g = 0; g < num_groups; g++)
         {
             const index_t d_start = g * kScaleGranularity;
@@ -241,7 +205,7 @@ private:
 
             for(index_t j = 0; j < kScaleGranularity; j++)
             {
-                const float val = src_row[d_start + j] - col_mean[d_start + j];
+                const float val = static_cast<float>(src_row[d_start + j]) - mean[d_start + j];
                 group_data[j]   = val;
                 max_abs         = max(max_abs, abs(val));
             }
@@ -250,26 +214,33 @@ private:
                 (bit_cast<uint32_t>(max_abs * rcp_dst_max) + numeric_traits<float>::mant_mask) &
                 numeric_traits<float>::head_mask);
 
-            // Store e8m0: upper 8 bits of the float scale exponent+sign
             dst_scale_row[g] = static_cast<uint8_t>(bit_cast<uint32_t>(scale) >> 23);
 
             uint8_t* hat_group = dst_hat_row + g * (kScaleGranularity / 2);
-            for(index_t j = 0; j < kScaleGranularity / 8; j++)
-            {
+            PackFP4Group(group_data, hat_group, scale);
+        }
+    }
+
+    // Pack 32 floats into 16 bytes (packed FP4) using AMD CVT intrinsic.
+    CK_TILE_DEVICE void PackFP4Group(const float* __restrict__ group_data,
+                                      uint8_t* __restrict__ hat_group,
+                                      float scale) const
+    {
+        for(index_t j = 0; j < kScaleGranularity / 8; j++)
+        {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wuninitialized"
-                uint32_t x;
-                x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                    x, group_data[8 * j + 0], group_data[8 * j + 1], scale, 0);
-                x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                    x, group_data[8 * j + 2], group_data[8 * j + 3], scale, 1);
-                x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                    x, group_data[8 * j + 4], group_data[8 * j + 5], scale, 2);
-                x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                    x, group_data[8 * j + 6], group_data[8 * j + 7], scale, 3);
+            uint32_t x;
+            x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
+                x, group_data[8 * j + 0], group_data[8 * j + 1], scale, 0);
+            x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
+                x, group_data[8 * j + 2], group_data[8 * j + 3], scale, 1);
+            x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
+                x, group_data[8 * j + 4], group_data[8 * j + 5], scale, 2);
+            x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
+                x, group_data[8 * j + 6], group_data[8 * j + 7], scale, 3);
 #pragma clang diagnostic pop
-                *reinterpret_cast<uint32_t*>(hat_group + j * 4) = x;
-            }
+            *reinterpret_cast<uint32_t*>(hat_group + j * 4) = x;
         }
     }
 };

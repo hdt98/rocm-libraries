@@ -8,149 +8,264 @@
 
 namespace ck_tile {
 
-// Host-side args for SageAttnPreprocessKernel
+// Host-side args for SageAttnPreprocessKernel.
+//
+// Grid: (num_tiles, nhead, batch)
+//   num_tiles = max(num_q_tiles, num_k_tiles, hdim)
+//
+// Each CTA at tile_x processes (with bounds checking):
+//   - Q tile[tile_x]:      Q smooth → delta_s → Q quantize
+//   - K tile[tile_x]:      K smooth + quantize (inline)
+//   - V channel[tile_x]:   V transpose + quantize
+//
+// Computation order within each CTA:
+//   1. Q mean (smem)  2. delta_s (float)  3. Q quantize
+//   4. K quantize     5. V quantize
 struct SageAttnPreprocessHostArgs
 {
-    SageAttnPreprocessMode mode;
+    // --- Q: [batch, nhead, seqlen_q, hdim] InputT ---
+    const void* q_ptr;         // InputT elements
+    index_t     seqlen_q;
+    index_t     hdim;          // == hdim_v (shared head dim)
+    index_t     stride_q;      // = hdim
+    index_t     nhead_stride_q;
+    index_t     batch_stride_q;
 
-    // Input tensor: float32
-    //   mode=Q,K: [batch, nhead, seqlen, hdim] (i_perm=true layout)
-    //   mode=V:   [batch, nhead, seqlen_k, hdim_v]
-    const float* src_ptr;
-    index_t      batch;
-    index_t      nhead;
-    index_t      seqlen;       // seqlen_q for Q, seqlen_k for K/V
-    index_t      hdim;         // head dim (hdim for Q/K, hdim_v for V)
+    // Q hat: [batch, nhead, seqlen_q, hdim/2] uint8
+    uint8_t* q_hat_ptr;
+    index_t  stride_q_hat;
+    index_t  nhead_stride_q_hat;
+    index_t  batch_stride_q_hat;
 
-    index_t stride_src;        // row stride of src (= hdim for Q/K/V)
-    index_t nhead_stride_src;  // stride between heads (= seqlen * hdim)
-    index_t batch_stride_src;  // stride between batches (= nhead * seqlen * hdim)
+    // Q scale: [batch, nhead, seqlen_q, hdim/32] uint8
+    uint8_t* q_scale_ptr;
+    index_t  stride_q_scale;
+    index_t  nhead_stride_q_scale;
+    index_t  batch_stride_q_scale;
 
-    // Output hat tensor: pk_fp4_t (stored as uint8_t, 2 FP4 per byte)
-    //   mode=Q,K: [batch, nhead, seqlen, hdim/2]
-    //   mode=V:   [batch, nhead, hdim_v, seqlen/2]
-    uint8_t* dst_hat_ptr;
-    index_t  stride_dst_hat;        // innermost stride of dst_hat (in bytes)
-    index_t  nhead_stride_dst_hat;
-    index_t  batch_stride_dst_hat;
-
-    // Output scale tensor: e8m0_t (stored as uint8_t)
-    //   mode=Q,K: [batch, nhead, seqlen, hdim/32]
-    //   mode=V:   [batch, nhead, hdim_v, seqlen/32]
-    uint8_t* dst_scale_ptr;
-    index_t  stride_dst_scale;
-    index_t  nhead_stride_dst_scale;
-    index_t  batch_stride_dst_scale;
-
-    // mode=Q only: output q_mean [batch, nhead, num_q_blocks, hdim] float32
+    // Q mean: [batch, nhead, num_q_tiles, hdim] float
     float*   q_mean_ptr;
-    index_t  q_block_size;         // = kM0 (Q tile size, must match FMHA pipeline)
-    index_t  stride_q_mean;        // hdim (innermost)
-    index_t  nhead_stride_q_mean;
+    index_t  q_tile_size;          // kM0
+    index_t  stride_q_mean;        // = hdim
+    index_t  nhead_stride_q_mean;  // = num_q_tiles * hdim
     index_t  batch_stride_q_mean;
-    index_t  q_block_stride_q_mean; // stride between q_blocks
 
-    // mode=K only: input k_mean [hdim] float32 (global channel mean)
+    // --- K: [batch, nhead, seqlen_k, hdim] InputT ---
+    const void* k_ptr;
+    index_t     seqlen_k;
+    index_t     stride_k;
+    index_t     nhead_stride_k;
+    index_t     batch_stride_k;
+
+    // K hat: [batch, nhead, seqlen_k, hdim/2] uint8
+    uint8_t* k_hat_ptr;
+    index_t  stride_k_hat;
+    index_t  nhead_stride_k_hat;
+    index_t  batch_stride_k_hat;
+
+    // K scale: [batch, nhead, seqlen_k, hdim/32] uint8
+    uint8_t* k_scale_ptr;
+    index_t  stride_k_scale;
+    index_t  nhead_stride_k_scale;
+    index_t  batch_stride_k_scale;
+
+    // K mean: [batch, nhead, hdim] float — per-head mean over seqlen_k
     const float* k_mean_ptr;
+    index_t      nhead_stride_k_mean; // = hdim
+    index_t      batch_stride_k_mean; // = nhead * hdim
+
+    // --- delta_s: [batch, nhead, num_q_tiles, seqlen_k] float ---
+    float*   delta_s_ptr;
+    index_t  stride_delta_s;       // = seqlen_k
+    index_t  nhead_stride_delta_s; // = num_q_tiles * seqlen_k
+    index_t  batch_stride_delta_s;
+
+    // --- V: [batch, nhead, seqlen_k, hdim] InputT ---
+    const void* v_ptr;
+    index_t     nhead_stride_v;  // = seqlen_k * hdim
+    index_t     batch_stride_v;
+
+    // V hat: [batch, nhead, hdim, seqlen_k/2] uint8 (transposed)
+    uint8_t* v_hat_ptr;
+    index_t  stride_v_hat;       // = seqlen_k/2 (row stride in transposed layout)
+    index_t  nhead_stride_v_hat;
+    index_t  batch_stride_v_hat;
+
+    // V scale: [batch, nhead, hdim, seqlen_k/32] uint8
+    uint8_t* v_scale_ptr;
+    index_t  stride_v_scale;
+    index_t  nhead_stride_v_scale;
+    index_t  batch_stride_v_scale;
+
+    // --- Dimensions ---
+    index_t batch;
+    index_t nhead;
+    index_t num_q_tiles; // = ceil(seqlen_q / q_tile_size)
+    index_t num_k_tiles; // = ceil(seqlen_k / kRows)
+    // num_tiles = max(num_q_tiles, num_k_tiles, hdim) — used for GridSize
 };
 
-// Kernel argument struct (device-side)
+// Device-side args (mirrors Hargs, typed pointers resolved by InputT)
+template <typename InputT>
 struct SageAttnPreprocessKargs
 {
-    SageAttnPreprocessMode mode;
+    const InputT* q_ptr;
+    index_t       seqlen_q;
+    index_t       hdim;
+    index_t       stride_q;
+    index_t       nhead_stride_q;
+    index_t       batch_stride_q;
 
-    const float* src_ptr;
-    index_t      seqlen;
-    index_t      hdim;
-    index_t      stride_src;
-    index_t      nhead_stride_src;
-    index_t      batch_stride_src;
+    uint8_t* q_hat_ptr;
+    index_t  stride_q_hat;
+    index_t  nhead_stride_q_hat;
+    index_t  batch_stride_q_hat;
 
-    uint8_t* dst_hat_ptr;
-    index_t  stride_dst_hat;
-    index_t  nhead_stride_dst_hat;
-    index_t  batch_stride_dst_hat;
+    uint8_t* q_scale_ptr;
+    index_t  stride_q_scale;
+    index_t  nhead_stride_q_scale;
+    index_t  batch_stride_q_scale;
 
-    uint8_t* dst_scale_ptr;
-    index_t  stride_dst_scale;
-    index_t  nhead_stride_dst_scale;
-    index_t  batch_stride_dst_scale;
-
-    // Q-mode specific
     float*   q_mean_ptr;
-    index_t  q_block_size;
+    index_t  q_tile_size;
     index_t  stride_q_mean;
     index_t  nhead_stride_q_mean;
     index_t  batch_stride_q_mean;
-    index_t  q_block_stride_q_mean;
 
-    // K-mode specific
+    const InputT* k_ptr;
+    index_t       seqlen_k;
+    index_t       stride_k;
+    index_t       nhead_stride_k;
+    index_t       batch_stride_k;
+
+    uint8_t* k_hat_ptr;
+    index_t  stride_k_hat;
+    index_t  nhead_stride_k_hat;
+    index_t  batch_stride_k_hat;
+
+    uint8_t* k_scale_ptr;
+    index_t  stride_k_scale;
+    index_t  nhead_stride_k_scale;
+    index_t  batch_stride_k_scale;
+
     const float* k_mean_ptr;
+    index_t      nhead_stride_k_mean;
+    index_t      batch_stride_k_mean;
+
+    float*   delta_s_ptr;
+    index_t  stride_delta_s;
+    index_t  nhead_stride_delta_s;
+    index_t  batch_stride_delta_s;
+
+    const InputT* v_ptr;
+    index_t       nhead_stride_v;
+    index_t       batch_stride_v;
+
+    uint8_t* v_hat_ptr;
+    index_t  stride_v_hat;
+    index_t  nhead_stride_v_hat;
+    index_t  batch_stride_v_hat;
+
+    uint8_t* v_scale_ptr;
+    index_t  stride_v_scale;
+    index_t  nhead_stride_v_scale;
+    index_t  batch_stride_v_scale;
+
+    index_t num_q_tiles;
+    index_t num_k_tiles;
+    // hdim is used as the V channel count (num_v_channels = hdim)
 };
 
-// SageAttnPreprocessKernel: unified Q/K/V preprocessing for SageAttention V3.
+// SageAttnPreprocessKernel
 //
-// Grid:
-//   mode=Q: (num_q_tiles, nhead, batch)  — one CTA per [kM0, hdim] Q tile
-//   mode=K: (num_k_tiles, nhead, batch)  — one CTA per [kN0, hdim] K tile
-//   mode=V: (hdim_v, nhead, batch)       — one CTA per hdim_v channel row
-//
-// Template parameter kRows is the tile size along seqlen (kM0 for Q, kN0 for K).
-// For V mode kRows is unused (single hdim_v channel per CTA, iterate over seqlen_k).
-
-template <index_t kRows_, index_t kCols_, index_t kBlockSize_ = 256>
+// Template parameters:
+//   InputT_:    input element type (float or fp16_t)
+//   kRows_:     tile rows (kM0 == kN0)
+//   kCols_:     hdim (tile columns)
+//   kBlockSize_:threads per CTA
+template <typename InputT_, index_t kRows_, index_t kCols_, index_t kBlockSize_ = 256>
 struct SageAttnPreprocessKernel
 {
+    using InputT = InputT_;
+
     static constexpr index_t kRows      = kRows_;
     static constexpr index_t kCols      = kCols_;
     static constexpr index_t kBlockSize = kBlockSize_;
 
     using Pipeline =
-        SageAttnPreprocessPipeline<kRows, kCols, /*kScaleGranularity=*/32, kBlockSize>;
+        SageAttnPreprocessPipeline<InputT, kRows, kCols, /*kScaleGranularity=*/32, kBlockSize>;
 
-    using Kargs = SageAttnPreprocessKargs;
+    using Kargs = SageAttnPreprocessKargs<InputT>;
     using Hargs = SageAttnPreprocessHostArgs;
 
-    CK_TILE_HOST static constexpr Kargs MakeKargs(const Hargs& h)
+    CK_TILE_HOST static Kargs MakeKargs(const Hargs& h)
     {
         Kargs k{};
-        k.mode                  = h.mode;
-        k.src_ptr               = h.src_ptr;
-        k.seqlen                = h.seqlen;
-        k.hdim                  = h.hdim;
-        k.stride_src            = h.stride_src;
-        k.nhead_stride_src      = h.nhead_stride_src;
-        k.batch_stride_src      = h.batch_stride_src;
-        k.dst_hat_ptr           = h.dst_hat_ptr;
-        k.stride_dst_hat        = h.stride_dst_hat;
-        k.nhead_stride_dst_hat  = h.nhead_stride_dst_hat;
-        k.batch_stride_dst_hat  = h.batch_stride_dst_hat;
-        k.dst_scale_ptr         = h.dst_scale_ptr;
-        k.stride_dst_scale      = h.stride_dst_scale;
-        k.nhead_stride_dst_scale = h.nhead_stride_dst_scale;
-        k.batch_stride_dst_scale = h.batch_stride_dst_scale;
-        k.q_mean_ptr            = h.q_mean_ptr;
-        k.q_block_size          = h.q_block_size;
-        k.stride_q_mean         = h.stride_q_mean;
-        k.nhead_stride_q_mean   = h.nhead_stride_q_mean;
-        k.batch_stride_q_mean   = h.batch_stride_q_mean;
-        k.q_block_stride_q_mean = h.q_block_stride_q_mean;
-        k.k_mean_ptr            = h.k_mean_ptr;
+        k.q_ptr                = static_cast<const InputT*>(h.q_ptr);
+        k.seqlen_q             = h.seqlen_q;
+        k.hdim                 = h.hdim;
+        k.stride_q             = h.stride_q;
+        k.nhead_stride_q       = h.nhead_stride_q;
+        k.batch_stride_q       = h.batch_stride_q;
+        k.q_hat_ptr            = h.q_hat_ptr;
+        k.stride_q_hat         = h.stride_q_hat;
+        k.nhead_stride_q_hat   = h.nhead_stride_q_hat;
+        k.batch_stride_q_hat   = h.batch_stride_q_hat;
+        k.q_scale_ptr          = h.q_scale_ptr;
+        k.stride_q_scale       = h.stride_q_scale;
+        k.nhead_stride_q_scale = h.nhead_stride_q_scale;
+        k.batch_stride_q_scale = h.batch_stride_q_scale;
+        k.q_mean_ptr           = h.q_mean_ptr;
+        k.q_tile_size          = h.q_tile_size;
+        k.stride_q_mean        = h.stride_q_mean;
+        k.nhead_stride_q_mean  = h.nhead_stride_q_mean;
+        k.batch_stride_q_mean  = h.batch_stride_q_mean;
+
+        k.k_ptr                = static_cast<const InputT*>(h.k_ptr);
+        k.seqlen_k             = h.seqlen_k;
+        k.stride_k             = h.stride_k;
+        k.nhead_stride_k       = h.nhead_stride_k;
+        k.batch_stride_k       = h.batch_stride_k;
+        k.k_hat_ptr            = h.k_hat_ptr;
+        k.stride_k_hat         = h.stride_k_hat;
+        k.nhead_stride_k_hat   = h.nhead_stride_k_hat;
+        k.batch_stride_k_hat   = h.batch_stride_k_hat;
+        k.k_scale_ptr          = h.k_scale_ptr;
+        k.stride_k_scale       = h.stride_k_scale;
+        k.nhead_stride_k_scale = h.nhead_stride_k_scale;
+        k.batch_stride_k_scale = h.batch_stride_k_scale;
+        k.k_mean_ptr           = h.k_mean_ptr;
+        k.nhead_stride_k_mean  = h.nhead_stride_k_mean;
+        k.batch_stride_k_mean  = h.batch_stride_k_mean;
+
+        k.delta_s_ptr          = h.delta_s_ptr;
+        k.stride_delta_s       = h.stride_delta_s;
+        k.nhead_stride_delta_s = h.nhead_stride_delta_s;
+        k.batch_stride_delta_s = h.batch_stride_delta_s;
+
+        k.v_ptr                = static_cast<const InputT*>(h.v_ptr);
+        k.nhead_stride_v       = h.nhead_stride_v;
+        k.batch_stride_v       = h.batch_stride_v;
+        k.v_hat_ptr            = h.v_hat_ptr;
+        k.stride_v_hat         = h.stride_v_hat;
+        k.nhead_stride_v_hat   = h.nhead_stride_v_hat;
+        k.batch_stride_v_hat   = h.batch_stride_v_hat;
+        k.v_scale_ptr          = h.v_scale_ptr;
+        k.stride_v_scale       = h.stride_v_scale;
+        k.nhead_stride_v_scale = h.nhead_stride_v_scale;
+        k.batch_stride_v_scale = h.batch_stride_v_scale;
+
+        k.num_q_tiles = h.num_q_tiles;
+        k.num_k_tiles = h.num_k_tiles;
         return k;
     }
 
-    // Grid size helpers for each mode
-    CK_TILE_HOST static dim3 GridSizeQ(const Hargs& h)
+    // Grid: (num_tiles, nhead, batch)
+    // num_tiles = max(num_q_tiles, num_k_tiles, hdim)
+    CK_TILE_HOST static dim3 GridSize(const Hargs& h)
     {
-        return dim3(integer_divide_ceil(h.seqlen, h.q_block_size), h.nhead, h.batch);
-    }
-    CK_TILE_HOST static dim3 GridSizeK(const Hargs& h)
-    {
-        return dim3(integer_divide_ceil(h.seqlen, kRows), h.nhead, h.batch);
-    }
-    CK_TILE_HOST static dim3 GridSizeV(const Hargs& h)
-    {
-        return dim3(h.hdim, h.nhead, h.batch);
+        const index_t num_tiles = max(max(h.num_q_tiles, h.num_k_tiles), h.hdim);
+        return dim3(num_tiles, h.nhead, h.batch);
     }
 
     CK_TILE_HOST static constexpr dim3 BlockSize() { return dim3(kBlockSize); }
@@ -162,81 +277,125 @@ struct SageAttnPreprocessKernel
 
     CK_TILE_DEVICE void operator()(Kargs kargs) const
     {
-        const index_t tile_idx  = get_block_id();   // blockIdx.x
+        const index_t tile_x    = get_block_id();
         const index_t head_idx  = blockIdx.y;
         const index_t batch_idx = blockIdx.z;
+
+        const bool do_q = tile_x < kargs.num_q_tiles;
+        const bool do_k = tile_x < kargs.num_k_tiles;
+        const bool do_v = tile_x < kargs.hdim;
 
         __shared__ char smem[GetSmemSize()];
 
         Pipeline pipeline{};
 
-        if(kargs.mode == SageAttnPreprocessMode::Q)
+        // ---- Step 1: Q mean ------------------------------------------------
+        if(do_q)
         {
-            // Q tile: [kM0, hdim], starting at seqlen row = tile_idx * kM0
-            const index_t row_start = tile_idx * kargs.q_block_size;
-            if(row_start >= kargs.seqlen)
-                return;
+            const index_t row_start = tile_x * kargs.q_tile_size;
+            if(row_start < kargs.seqlen_q)
+            {
+                const InputT* src_q =
+                    kargs.q_ptr + batch_idx * kargs.batch_stride_q +
+                    head_idx * kargs.nhead_stride_q + row_start * kargs.stride_q;
 
-            const float* src = kargs.src_ptr + batch_idx * kargs.batch_stride_src +
-                               head_idx * kargs.nhead_stride_src + row_start * kargs.stride_src;
+                float* q_mean =
+                    kargs.q_mean_ptr + batch_idx * kargs.batch_stride_q_mean +
+                    head_idx * kargs.nhead_stride_q_mean + tile_x * kargs.stride_q_mean;
 
-            uint8_t* dst_hat = kargs.dst_hat_ptr + batch_idx * kargs.batch_stride_dst_hat +
-                               head_idx * kargs.nhead_stride_dst_hat +
-                               row_start * kargs.stride_dst_hat;
-
-            uint8_t* dst_scale = kargs.dst_scale_ptr + batch_idx * kargs.batch_stride_dst_scale +
-                                 head_idx * kargs.nhead_stride_dst_scale +
-                                 row_start * kargs.stride_dst_scale;
-
-            float* q_mean = kargs.q_mean_ptr + batch_idx * kargs.batch_stride_q_mean +
-                            head_idx * kargs.nhead_stride_q_mean +
-                            tile_idx * kargs.q_block_stride_q_mean;
-
-            pipeline.RunQ(src, dst_hat, dst_scale, q_mean, smem);
+                pipeline.RunQMean(src_q, q_mean, smem);
+            }
         }
-        else if(kargs.mode == SageAttnPreprocessMode::K)
+        block_sync_lds(); // smem[q_mean] visible to all steps below
+
+        // ---- Step 2: delta_s -----------------------------------------------
+        if(do_q)
         {
-            const index_t row_start = tile_idx * kRows;
-            if(row_start >= kargs.seqlen)
-                return;
+            const index_t row_start = tile_x * kargs.q_tile_size;
+            if(row_start < kargs.seqlen_q)
+            {
+                const InputT* k_base =
+                    kargs.k_ptr + batch_idx * kargs.batch_stride_k +
+                    head_idx * kargs.nhead_stride_k;
 
-            const float* src = kargs.src_ptr + batch_idx * kargs.batch_stride_src +
-                               head_idx * kargs.nhead_stride_src + row_start * kargs.stride_src;
+                const float* k_mean =
+                    kargs.k_mean_ptr + batch_idx * kargs.batch_stride_k_mean +
+                    head_idx * kargs.nhead_stride_k_mean;
 
-            uint8_t* dst_hat = kargs.dst_hat_ptr + batch_idx * kargs.batch_stride_dst_hat +
-                               head_idx * kargs.nhead_stride_dst_hat +
-                               row_start * kargs.stride_dst_hat;
+                float* delta_s =
+                    kargs.delta_s_ptr + batch_idx * kargs.batch_stride_delta_s +
+                    head_idx * kargs.nhead_stride_delta_s + tile_x * kargs.stride_delta_s;
 
-            uint8_t* dst_scale = kargs.dst_scale_ptr + batch_idx * kargs.batch_stride_dst_scale +
-                                 head_idx * kargs.nhead_stride_dst_scale +
-                                 row_start * kargs.stride_dst_scale;
-
-            pipeline.RunK(src, dst_hat, dst_scale, kargs.k_mean_ptr);
+                pipeline.RunDeltaS(k_base, kargs.seqlen_k, kargs.stride_k, k_mean, delta_s, smem);
+            }
         }
-        else // mode == V
+
+        // ---- Step 3: Q quantize --------------------------------------------
+        if(do_q)
         {
-            // tile_idx = hdim_v channel index
-            const index_t hdim_ch = tile_idx;
-            if(hdim_ch >= kargs.hdim)
-                return;
+            const index_t row_start = tile_x * kargs.q_tile_size;
+            if(row_start < kargs.seqlen_q)
+            {
+                const InputT* src_q =
+                    kargs.q_ptr + batch_idx * kargs.batch_stride_q +
+                    head_idx * kargs.nhead_stride_q + row_start * kargs.stride_q;
 
-            // V source: [seqlen_k, hdim_v] row-major.
-            // Access V[:, hdim_ch]: stride hdim_v between consecutive seqlen_k rows.
-            const float* src = kargs.src_ptr + batch_idx * kargs.batch_stride_src +
-                               head_idx * kargs.nhead_stride_src + hdim_ch;
+                uint8_t* dst_q_hat =
+                    kargs.q_hat_ptr + batch_idx * kargs.batch_stride_q_hat +
+                    head_idx * kargs.nhead_stride_q_hat + row_start * kargs.stride_q_hat;
 
-            // V_hat output: [hdim_v, seqlen_k/2] row-major.
-            // Row hdim_ch, stride_dst_hat = seqlen_k/2 bytes.
-            uint8_t* dst_hat = kargs.dst_hat_ptr + batch_idx * kargs.batch_stride_dst_hat +
-                               head_idx * kargs.nhead_stride_dst_hat +
-                               hdim_ch * kargs.stride_dst_hat;
+                uint8_t* dst_q_scale =
+                    kargs.q_scale_ptr + batch_idx * kargs.batch_stride_q_scale +
+                    head_idx * kargs.nhead_stride_q_scale + row_start * kargs.stride_q_scale;
 
-            // V_scale output: [hdim_v, seqlen_k/32] row-major.
-            uint8_t* dst_scale = kargs.dst_scale_ptr + batch_idx * kargs.batch_stride_dst_scale +
-                                 head_idx * kargs.nhead_stride_dst_scale +
-                                 hdim_ch * kargs.stride_dst_scale;
+                pipeline.RunQQuantize(src_q, dst_q_hat, dst_q_scale, smem);
+            }
+        }
 
-            pipeline.RunV(src, kargs.seqlen, kargs.hdim, dst_hat, dst_scale);
+        // ---- Step 4: K quantize (K smooth inline) --------------------------
+        if(do_k)
+        {
+            const index_t row_start = tile_x * kRows;
+            if(row_start < kargs.seqlen_k)
+            {
+                const InputT* src_k =
+                    kargs.k_ptr + batch_idx * kargs.batch_stride_k +
+                    head_idx * kargs.nhead_stride_k + row_start * kargs.stride_k;
+
+                const float* k_mean =
+                    kargs.k_mean_ptr + batch_idx * kargs.batch_stride_k_mean +
+                    head_idx * kargs.nhead_stride_k_mean;
+
+                uint8_t* dst_k_hat =
+                    kargs.k_hat_ptr + batch_idx * kargs.batch_stride_k_hat +
+                    head_idx * kargs.nhead_stride_k_hat + row_start * kargs.stride_k_hat;
+
+                uint8_t* dst_k_scale =
+                    kargs.k_scale_ptr + batch_idx * kargs.batch_stride_k_scale +
+                    head_idx * kargs.nhead_stride_k_scale + row_start * kargs.stride_k_scale;
+
+                pipeline.RunKQuantize(src_k, k_mean, dst_k_hat, dst_k_scale);
+            }
+        }
+
+        // ---- Step 5: V transpose + quantize --------------------------------
+        if(do_v)
+        {
+            const index_t hdim_ch = tile_x;
+
+            const InputT* src_v =
+                kargs.v_ptr + batch_idx * kargs.batch_stride_v +
+                head_idx * kargs.nhead_stride_v + hdim_ch;
+
+            uint8_t* dst_v_hat =
+                kargs.v_hat_ptr + batch_idx * kargs.batch_stride_v_hat +
+                head_idx * kargs.nhead_stride_v_hat + hdim_ch * kargs.stride_v_hat;
+
+            uint8_t* dst_v_scale =
+                kargs.v_scale_ptr + batch_idx * kargs.batch_stride_v_scale +
+                head_idx * kargs.nhead_stride_v_scale + hdim_ch * kargs.stride_v_scale;
+
+            pipeline.RunV(src_v, kargs.seqlen_k, kargs.hdim, dst_v_hat, dst_v_scale);
         }
     }
 };
