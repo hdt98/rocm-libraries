@@ -179,6 +179,16 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
         // clang-format on
     }
 
+    [[nodiscard]] CK_TILE_HOST static const std::string GetName()
+    {
+        // clang-format off
+        return concat('_', "pipeline_AgBgCrCompAsync",
+                      concat('x', MPerBlock, NPerBlock, KPerBlock, BlockSize),
+                      concat('x', GetVectorSizeA(), GetVectorSizeB(), GetVectorSizeC()),
+                      concat('x', kPadM, kPadN, kPadK));
+        // clang-format on
+    }
+
     CK_TILE_HOST_DEVICE static constexpr index_t GetSmemSize()
     {
         constexpr index_t smem_size = Policy::template GetSmemSize<Problem>();
@@ -592,6 +602,31 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
         return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
     }
 
+    // 6-arg overload for GroupedConvolutionBackwardDataKernel (has_hot_loop, tail_number passed in)
+    template <typename AsDramBlockWindowTmp,
+              typename BsDramBlockWindowTmp,
+              typename std::enable_if_t<is_detected<is_tuple, AsDramBlockWindowTmp>::value &&
+                                            is_detected<is_tuple, BsDramBlockWindowTmp>::value,
+                                        bool>* = nullptr>
+    CK_TILE_DEVICE auto operator()(const AsDramBlockWindowTmp& a_dram_block_window_tmp,
+                                   const BsDramBlockWindowTmp& b_dram_block_window_tmp,
+                                   index_t num_loop,
+                                   bool has_hot_loop,
+                                   TailNumber tail_number,
+                                   void* __restrict__ p_smem) const
+    {
+        const auto RunPipeline = [&](auto hot_loop_, auto tail_num_) {
+            return PipelineImpl<Scheduler>{}.template operator()<hot_loop_.value, tail_num_.value>(
+                a_dram_block_window_tmp,
+                element_wise::PassThrough{},
+                b_dram_block_window_tmp,
+                element_wise::PassThrough{},
+                num_loop,
+                p_smem);
+        };
+        return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
+    }
+
     template <typename ADramBlockWindowTmp,
               typename BDramBlockWindowTmp,
               typename AElementFunction,
@@ -646,6 +681,26 @@ struct GemmPipelineAgBgCrCompAsync : public BaseGemmPipelineAgBgCrCompAsync<Prob
         };
 
         return Base::TailHandler(RunPipeline, has_hot_loop, tail_number);
+    }
+
+    template <typename ADramBlockWindowTmp,
+              typename BDramBlockWindowTmp,
+              typename std::enable_if_t<!is_detected<is_tuple, ADramBlockWindowTmp>::value &&
+                                            !is_detected<is_tuple, BDramBlockWindowTmp>::value,
+                                        bool>* = nullptr>
+    CK_TILE_DEVICE auto operator()(const ADramBlockWindowTmp& a_dram_block_window_tmp,
+                                   const BDramBlockWindowTmp& b_dram_block_window_tmp,
+                                   index_t num_loop,
+                                   bool has_hot_loop,
+                                   TailNumber tail_number,
+                                   void* __restrict__ p_smem) const
+    {
+        return operator()(ck_tile::make_tuple(a_dram_block_window_tmp),
+                         ck_tile::make_tuple(b_dram_block_window_tmp),
+                         num_loop,
+                         has_hot_loop,
+                         tail_number,
+                         p_smem);
     }
 };
 } // namespace ck_tile

@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+// Forward and backward_weight kernels use ExplicitBatchedGemmKernel (BatchedGemmKernel)
+#include "ck_tile/ops/gemm/kernel/batched_gemm_kernel.hpp"
+
 #include "ck_tile/ops/grouped_convolution/kernel/grouped_convolution_backward_data_kernel.hpp"
 #include "ck_tile/ops/grouped_convolution/kernel/grouped_convolution_backward_weight_kernel.hpp"
 #include "ck_tile/ops/grouped_convolution/kernel/grouped_convolution_forward_kernel.hpp"

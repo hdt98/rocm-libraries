@@ -339,3 +339,35 @@ struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_V6>
     template <typename PipelineProblem>
     using UniversalGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompV6<PipelineProblem>;
 };
+
+template <>
+struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_ASYNC>
+{
+    template <typename PipelineProblem>
+    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompAsync<PipelineProblem>;
+    template <typename PipelineProblem>
+    using UniversalGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompAsync<PipelineProblem>;
+};
+
+// Async config: uses amd_async_buffer_load (gfx950). Same tile shape as V4 (async is based on V4).
+// gfx950 amd_async_buffer_load allows only 4, 12, or 16 bytes; fp16 VectorSizeA=4 would be 8 bytes
+// (invalid). Override VectorSizeA=8 so A loads use 16 bytes; B already 8 -> 16 bytes.
+template <typename PrecType>
+struct ConvConfigComputeAsync : public ConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 256;
+    static constexpr ck_tile::index_t N_Tile = 256;
+    static constexpr ck_tile::index_t K_Tile = 64 / sizeof(PrecType);
+
+    static constexpr ck_tile::index_t M_Warp = 2;
+    static constexpr ck_tile::index_t N_Warp = 2;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 32;
+    static constexpr ck_tile::index_t N_Warp_Tile = 32;
+    static constexpr ck_tile::index_t K_Warp_Tile = 16;
+
+    static constexpr ck_tile::index_t VectorSizeA   = 8; // 16 bytes for gfx950 async load (4/12/16 only)
+    static constexpr bool DoubleSmemBuffer          = true;
+    static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_ASYNC;
+};
