@@ -595,6 +595,52 @@ struct BlockFmhaV3PipelineDefaultPolicy
     {
         return 4 * GetSmemSizeKV<Problem>();
     }
+
+    template <typename Problem>
+    CK_TILE_DEVICE static constexpr ck_tile::index_t GetSmemSizeK()
+    {
+        using KDataType = remove_cvref_t<typename Problem::KDataType>;
+
+        static_assert(MakeKLdsLoadBlockDescriptor<Problem>().get_element_space_size() ==
+                      MakeKLdsStoreBlockDescriptor<Problem>().get_element_space_size());
+
+        if constexpr(std::is_same_v<KDataType, fp8_t>)
+        {
+            static_assert(std::is_same_v<KDataType, typename Problem::VDataType>);
+            constexpr index_t kv_size =
+                GetSingleSmemElementSpaceSize<Problem>() * sizeof(KDataType);
+            return kv_size;
+        }
+        else
+        {
+            return MakeKLdsLoadBlockDescriptor<Problem>().get_element_space_size() *
+                       sizeof(KDataType) +
+                   kKLdsPadInBytes;
+        }
+    }
+
+    template <typename Problem>
+    CK_TILE_DEVICE static constexpr ck_tile::index_t GetSmemSizeV()
+    {
+        using VDataType = remove_cvref_t<typename Problem::VDataType>;
+
+        static_assert(MakeVLdsLoadBlockDescriptor<Problem>().get_element_space_size() ==
+                      MakeVLdsStoreBlockDescriptor<Problem>().get_element_space_size());
+
+        if constexpr(std::is_same_v<VDataType, fp8_t>)
+        {
+            static_assert(std::is_same_v<VDataType, typename Problem::KDataType>);
+            constexpr index_t kv_size =
+                GetSingleSmemElementSpaceSize<Problem>() * sizeof(VDataType);
+            return kv_size;
+        }
+        else
+        {
+            return MakeVLdsLoadBlockDescriptor<Problem>().get_element_space_size() *
+                       sizeof(VDataType) +
+                   kVLdsPadInBytes;
+        }
+    }
 };
 
 } // namespace ck_tile
