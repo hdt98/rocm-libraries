@@ -5,6 +5,7 @@
 
 #include "ck/utility/common_header.hpp"
 #include "ck/utility/data_type.hpp"
+#include "ck/utility/index_expression.hpp"
 
 namespace ck {
 
@@ -35,87 +36,32 @@ __host__ __device__ constexpr auto MakeFunctorInvoker(Fs&&... fs)
     return FunctorInvoker<Fs...>{ck::forward<Fs&&>(fs)...};
 }
 
+
+using Ik = index_expr::Ik;
+
+template <typename L, typename R>
+using Add = index_expr::Add<L, R>;
+
+template <typename L, typename R>
+using Mult = index_expr::Mult<L, R>;
+
+template <typename L, typename R>
+using Div = index_expr::Div<L, R>;
+
+template <typename L, typename R>
+using Mod = index_expr::Mod<L, R>;
+
 template <typename T, index_t ik, typename Enable = void>
-struct IndexEval;
-
-struct Ik
+struct IndexEval
 {
-};
-
-template <typename L, typename R>
-struct Add
-{
-};
-
-template <typename L, typename R>
-struct Mult
-{
-};
-
-template <typename L, typename R>
-struct Div
-{
-};
-
-template <typename L, typename R>
-struct Mod
-{
-};
-
-template <typename T, index_t ik>
-struct IndexEval<T, ik, std::enable_if_t<!std::is_same_v<decltype(T::value), void>>>
-{
-    static constexpr index_t value = T::value;
-};
-
-template <index_t ik>
-struct IndexEval<Ik, ik, void>
-{
-    static constexpr index_t value = ik;
-};
-
-template <typename L, typename R, index_t ik>
-struct IndexEval<Add<L, R>,
-                 ik,
-                 std::enable_if_t<!std::is_same_v<decltype(IndexEval<L, ik>::value), void> &&
-                                  !std::is_same_v<decltype(IndexEval<R, ik>::value), void>>>
-{
-    static constexpr index_t value = IndexEval<L, ik>::value + IndexEval<R, ik>::value;
-};
-
-template <typename L, typename R, index_t ik>
-struct IndexEval<Mult<L, R>,
-                 ik,
-                 std::enable_if_t<!std::is_same_v<decltype(IndexEval<L, ik>::value), void> &&
-                                  !std::is_same_v<decltype(IndexEval<R, ik>::value), void>>>
-{
-    static constexpr index_t value = IndexEval<L, ik>::value * IndexEval<R, ik>::value;
-};
-
-template <typename L, typename R, index_t ik>
-struct IndexEval<Div<L, R>,
-                 ik,
-                 std::enable_if_t<!std::is_same_v<decltype(IndexEval<L, ik>::value), void> &&
-                                  !std::is_same_v<decltype(IndexEval<R, ik>::value), void> &&
-                                  (IndexEval<R, ik>::value != 0)>>
-{
-    static constexpr index_t value = IndexEval<L, ik>::value / IndexEval<R, ik>::value;
-};
-
-template <typename L, typename R, index_t ik>
-struct IndexEval<Mod<L, R>,
-                 ik,
-                 std::enable_if_t<!std::is_same_v<decltype(IndexEval<L, ik>::value), void> &&
-                                  !std::is_same_v<decltype(IndexEval<R, ik>::value), void>>>
-{
-    static constexpr index_t value = IndexEval<L, ik>::value % IndexEval<R, ik>::value;
+    static constexpr index_t value = index_expr::eval_v<T, ik>;
 };
 
 template <typename ThreadVec,
           typename ThreadBuf,
           typename ThreadDesc,
           typename ComputeType,
-          typename... IdxWrapper>
+          typename... IdxExpr>
 struct thread_buf_to_vec_loader
 {
     ThreadVec& thread_vec;
@@ -130,9 +76,12 @@ struct thread_buf_to_vec_loader
     __host__ __device__ constexpr void operator()(Number<ik>) const
     {
         constexpr auto thread_desc = ThreadDesc{};
-        thread_vec.template AsType<ComputeType>()(Number<ik>{}) =
-            thread_buf[Number<thread_desc.CalculateOffset(
-                ck::make_tuple(Number<IndexEval<IdxWrapper, ik>::value>{}...))>{}];
+        constexpr auto idx_tuple = ck::make_tuple(Number<index_expr::eval_v<IdxExpr, ik>>{}...);
+        constexpr auto offset    = thread_desc.CalculateOffset(idx_tuple);
+
+        auto& target = thread_vec.template AsType<ComputeType>()(Number<ik>{});
+        target       = thread_buf[Number<offset>{}];
     }
 };
 } // namespace ck
+
