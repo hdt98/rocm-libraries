@@ -37,10 +37,17 @@ from fmha_utils import (
 )
 
 
+# FmhaKernelSpec fields:
+#   name      -- human-readable kernel identifier
+#   hdim      -- head dimension (hdim_q = hdim_v)
+#   pipeline  -- "qr_async" (async prefetch) or "qr" (synchronous)
+#   tile_m0   -- Stage 0 tile along seqlen_q  (Q*K^T M dimension)
+#   tile_n0   -- Stage 0 tile along seqlen_k  (Q*K^T N dimension)
+#   tile_k0   -- Stage 0 tile along hdim_q    (Q*K^T K dimension)
 KERNEL_SPECS: List[FmhaKernelSpec] = [
     # qr_async pipeline -- various tile sizes
     FmhaKernelSpec(
-        "qr_async_h128_t128",
+        name="qr_async_h128_t128",
         hdim=128,
         pipeline="qr_async",
         tile_m0=128,
@@ -48,7 +55,7 @@ KERNEL_SPECS: List[FmhaKernelSpec] = [
         tile_k0=32,
     ),
     FmhaKernelSpec(
-        "qr_async_h128_t64",
+        name="qr_async_h128_t64",
         hdim=128,
         pipeline="qr_async",
         tile_m0=64,
@@ -56,7 +63,7 @@ KERNEL_SPECS: List[FmhaKernelSpec] = [
         tile_k0=32,
     ),
     FmhaKernelSpec(
-        "qr_async_h64_t128",
+        name="qr_async_h64_t128",
         hdim=64,
         pipeline="qr_async",
         tile_m0=128,
@@ -64,7 +71,7 @@ KERNEL_SPECS: List[FmhaKernelSpec] = [
         tile_k0=32,
     ),
     FmhaKernelSpec(
-        "qr_async_h64_t64",
+        name="qr_async_h64_t64",
         hdim=64,
         pipeline="qr_async",
         tile_m0=64,
@@ -73,16 +80,21 @@ KERNEL_SPECS: List[FmhaKernelSpec] = [
     ),
     # qr pipeline -- various tile sizes
     FmhaKernelSpec(
-        "qr_h128_t128", hdim=128, pipeline="qr", tile_m0=128, tile_n0=128, tile_k0=32
+        name="qr_h128_t128",
+        hdim=128,
+        pipeline="qr",
+        tile_m0=128,
+        tile_n0=128,
+        tile_k0=32,
     ),
     FmhaKernelSpec(
-        "qr_h128_t64", hdim=128, pipeline="qr", tile_m0=64, tile_n0=128, tile_k0=32
+        name="qr_h128_t64", hdim=128, pipeline="qr", tile_m0=64, tile_n0=128, tile_k0=32
     ),
     FmhaKernelSpec(
-        "qr_h64_t128", hdim=64, pipeline="qr", tile_m0=128, tile_n0=64, tile_k0=32
+        name="qr_h64_t128", hdim=64, pipeline="qr", tile_m0=128, tile_n0=64, tile_k0=32
     ),
     FmhaKernelSpec(
-        "qr_h64_t64", hdim=64, pipeline="qr", tile_m0=64, tile_n0=64, tile_k0=32
+        name="qr_h64_t64", hdim=64, pipeline="qr", tile_m0=64, tile_n0=64, tile_k0=32
     ),
 ]
 

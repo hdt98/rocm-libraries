@@ -64,7 +64,14 @@ Examples:
     # Step 1: Setup dispatcher with compute-optimized config
     print("\nStep 1: Setup Dispatcher")
 
-    spec = FmhaKernelSpec("benchmark", hdim=128, pipeline="qr_async")
+    # FmhaKernelSpec fields:
+    #   name      -- human-readable kernel identifier
+    #   hdim      -- head dimension (hdim_q = hdim_v)
+    #   pipeline  -- "qr_async" (async prefetch) or "qr" (synchronous)
+    #   tile_m0   -- Stage 0 tile along seqlen_q  (Q*K^T M dimension)
+    #   tile_n0   -- Stage 0 tile along seqlen_k  (Q*K^T N dimension)
+    #   tile_k0   -- Stage 0 tile along hdim_q    (Q*K^T K dimension)
+    spec = FmhaKernelSpec(name="benchmark", hdim=128, pipeline="qr_async")
     config = spec_to_config(spec, dtype="fp16", arch=args.arch)
 
     setup = setup_fmha_dispatcher(config, verbose=True)
