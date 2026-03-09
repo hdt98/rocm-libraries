@@ -447,11 +447,11 @@ try
          value<char>(&arg.transB)->default_value('N'),
          "N = no transpose, T = transpose, C = conjugate transpose")
 
-        ("swizzleA",
+        ("swizzle_a",
          value<bool>(&arg.swizzle_a)->default_value(false),
          "Enable tensor swizzling for A")
 
-        ("swizzleB",
+        ("swizzle_b",
          value<bool>(&arg.swizzle_b)->default_value(false),
          "Enable tensor swizzling for B")
 
