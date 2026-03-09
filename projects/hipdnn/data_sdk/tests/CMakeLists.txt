@@ -30,7 +30,6 @@ add_executable(
     types/TestPortableTypes.cpp
     types/TestUserDefinedLiterals.cpp
     utilities/TestAllocators.cpp
-    utilities/TestCallbackLogger.cpp
     utilities/TestEngineNames.cpp
     utilities/TestFloats.cpp
     utilities/TestJson.cpp
@@ -41,11 +40,12 @@ add_executable(
     utilities/TestShallowHostOnlyMigratableMemory.cpp
     utilities/TestShallowTensor.cpp
     utilities/TestShapeUtilities.cpp
-    utilities/TestStaticCast.cpp
     utilities/TestStringUtil.cpp
     utilities/TestTensor.cpp
     utilities/TestTensorIterator.cpp
     utilities/TestTensorView.cpp
+    utilities/TestVersionUtils.cpp
+    utilities/TestVersion.cpp
     utilities/TestVisitor.cpp
 )
 
