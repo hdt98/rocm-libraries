@@ -10,13 +10,7 @@ option(ENABLE_CCACHE_GEMM_UNIVERSAL "Enable ccache for GEMM Universal ops compil
 set(GEMM_UNIVERSAL_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR})
 
 # Function to create individual GEMM Universal targets
-function(create_individual_gemm_universal_target datatype layout trait tile_config config_json)
-    # Use the parent scope GEMM_UNIVERSAL_GPU_TARGETS_INDIVIDUAL variable
-    if(NOT GEMM_UNIVERSAL_GPU_TARGETS_INDIVIDUAL)
-        message(WARNING "Skipping individual GEMM Universal target ${datatype}_${layout}_${trait}_${tile_config}: No supported GPU targets")
-        return()
-    endif()
-
+function(create_individual_gemm_universal_target gpu_arch datatype layout trait tile_config config_json)
     # Parse tile configuration: format is tile_mxtile_nxtile_k_warp_mxwarp_nxwarp_k_warp_tile_mxwarp_tile_nxwarp_tile_k
     # First split by underscore to get three groups
     string(REPLACE "_" ";" config_groups ${tile_config})
@@ -42,8 +36,13 @@ function(create_individual_gemm_universal_target datatype layout trait tile_conf
     list(GET warp_tile_parts 1 warp_tile_n)
     list(GET warp_tile_parts 2 warp_tile_k)
 
-    set(target_name "benchmark_gemm_universal_${datatype}_${layout}_${trait}_${tile_config}")
-    set(working_path "${CMAKE_CURRENT_BINARY_DIR}/${datatype}/${layout}")
+    if(_num_gpu_targets GREATER 1)
+        set(target_name "benchmark_gemm_universal_${gpu_arch}_${datatype}_${layout}_${trait}_${tile_config}")
+        set(working_path "${CMAKE_CURRENT_BINARY_DIR}/${gpu_arch}/${datatype}/${layout}")
+    else()
+        set(target_name "benchmark_gemm_universal_${datatype}_${layout}_${trait}_${tile_config}")
+        set(working_path "${CMAKE_CURRENT_BINARY_DIR}/${datatype}/${layout}")
+    endif()
 
     # Generate the single instance header for this kernel
     set(instance_header "${working_path}/gemm_universal_single_${datatype}_${layout}_${trait}_${tile_config}.hpp")
@@ -53,6 +52,7 @@ function(create_individual_gemm_universal_target datatype layout trait tile_conf
         OUTPUT ${instance_header}
         COMMAND ${Python3_EXECUTABLE} ${GEMM_UNIVERSAL_SOURCE_DIR}/gemm_universal_instance_builder.py
                 --working_path ${working_path}
+                --gpu_target "${gpu_arch}"
                 --datatype ${datatype}
                 --layout ${layout}
                 --config_json ${config_json}
@@ -60,7 +60,6 @@ function(create_individual_gemm_universal_target datatype layout trait tile_conf
                 --kernel_name "gemm_universal_${datatype}_${layout}_${trait}_${tile_config}"
                 --tile_config "${tile_config}"
                 --trait_combo "${trait}"
-                --gpu_target "${GEMM_UNIVERSAL_GPU_TARGETS_INDIVIDUAL}"
         DEPENDS ${GEMM_UNIVERSAL_SOURCE_DIR}/gemm_universal_instance_builder.py ${config_json}
         COMMENT "Generating ${instance_header}"
     )
@@ -72,8 +71,8 @@ function(create_individual_gemm_universal_target datatype layout trait tile_conf
         ${instance_header}
     )
 
-    # Set GPU architectures
-    set_property(TARGET ${target_name} PROPERTY HIP_ARCHITECTURES ${GEMM_UNIVERSAL_GPU_TARGETS_INDIVIDUAL})
+    # Set GPU architectures (always single arch)
+    set_property(TARGET ${target_name} PROPERTY HIP_ARCHITECTURES ${gpu_arch})
 
     # Set compile definitions
     target_compile_definitions(${target_name} PRIVATE
@@ -100,6 +99,10 @@ function(create_individual_gemm_universal_target datatype layout trait tile_conf
     add_dependencies(benchmark_gemm_universal_${layout} ${target_name})
     add_dependencies(benchmark_gemm_universal_${datatype}_${layout} ${target_name})
 
+    if(_num_gpu_targets GREATER 1)
+        add_dependencies(benchmark_gemm_universal_${gpu_arch} ${target_name})
+    endif()
+
     # Add to trait-specific targets
     string(REPLACE "_" ";" trait_parts ${trait})
     list(GET trait_parts 0 pipeline)
@@ -112,8 +115,12 @@ function(create_individual_gemm_universal_target datatype layout trait tile_conf
 endfunction()
 
 # Function to build individual GEMM Universal targets
-function(build_individual_gemm_universal_targets datatype layout)
-    set(working_path "${CMAKE_CURRENT_BINARY_DIR}/${datatype}/${layout}")
+function(build_individual_gemm_universal_targets gpu_arch datatype layout)
+    if(_num_gpu_targets GREATER 1)
+        set(working_path "${CMAKE_CURRENT_BINARY_DIR}/${gpu_arch}/${datatype}/${layout}")
+    else()
+        set(working_path "${CMAKE_CURRENT_BINARY_DIR}/${datatype}/${layout}")
+    endif()
 
     # Choose config file
     # Priority order:
@@ -154,7 +161,7 @@ function(build_individual_gemm_universal_targets datatype layout)
     endif()
 
     # Generate individual kernel files using parallel version
-    message(VERBOSE "Generating individual kernels for ${datatype} ${layout} using ${num_workers} workers...")
+    message(VERBOSE "Generating individual kernels for ${gpu_arch}/${datatype}/${layout} using ${num_workers} workers...")
     message(VERBOSE "  Working path: ${working_path}")
     message(VERBOSE "  Config file: ${json_blob}")
     message(VERBOSE "  Python executable: ${Python3_EXECUTABLE}")
@@ -163,24 +170,17 @@ function(build_individual_gemm_universal_targets datatype layout)
     # Create working directory first
     file(MAKE_DIRECTORY ${working_path})
 
-    message(VERBOSE "COMMAND: ${Python3_EXECUTABLE} -u ${CMAKE_CURRENT_LIST_DIR}/gemm_universal_instance_builder.py
-                --working_path ${working_path}
-                --datatype ${datatype}
-                --layout ${layout}
-                --config_json ${json_blob}
-                --gpu_target ${GEMM_UNIVERSAL_GPU_TARGETS_INDIVIDUAL}
-                --list_kernels ")
+    message(VERBOSE "  Listing kernel configurations (--gpu_target ${gpu_arch})...")
 
     # First, just list the kernels (fast operation)
-    message(VERBOSE "  Listing kernel configurations...")
     execute_process(
         COMMAND ${Python3_EXECUTABLE} -u ${CMAKE_CURRENT_LIST_DIR}/gemm_universal_instance_builder.py
                 --working_path ${working_path}
+                --gpu_target "${gpu_arch}"
                 --datatype ${datatype}
                 --layout ${layout}
                 --config_json ${json_blob}
-                --gpu_target ${GEMM_UNIVERSAL_GPU_TARGETS_INDIVIDUAL}
-                --list_kernels  
+                --list_kernels
         WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
         RESULT_VARIABLE ret
         OUTPUT_VARIABLE list_output
@@ -188,7 +188,7 @@ function(build_individual_gemm_universal_targets datatype layout)
     )
 
     if(NOT ret EQUAL 0)
-        message(FATAL_ERROR "Failed to list kernels for ${datatype} ${layout}: ${list_error}")
+        message(FATAL_ERROR "Failed to list kernels for ${gpu_arch}/${datatype}/${layout}: ${list_error}")
     endif()
 
     # Read kernel count
@@ -211,7 +211,7 @@ function(build_individual_gemm_universal_targets datatype layout)
             list(GET parts 2 trait_combo)
 
             # Create individual target
-            create_individual_gemm_universal_target("${datatype}" "${layout}" "${trait_combo}" "${tile_config}" "${json_blob}")
+            create_individual_gemm_universal_target("${gpu_arch}" "${datatype}" "${layout}" "${trait_combo}" "${tile_config}" "${json_blob}")
         endforeach()
     else()
         message(FATAL_ERROR "Kernel list file not found")
@@ -234,6 +234,8 @@ foreach(target IN LISTS SUPPORTED_GPU_TARGETS)
         message(VERBOSE "  Adding GPU target: ${target}")
     endif()
 endforeach()
+
+list(LENGTH GEMM_UNIVERSAL_GPU_TARGETS_INDIVIDUAL _num_gpu_targets)
 
 # Skip build if no matching targets found
 if(NOT GEMM_UNIVERSAL_GPU_TARGETS_INDIVIDUAL)
@@ -264,6 +266,13 @@ else()
 
     # Create master collection targets
     add_custom_target(benchmark_gemm_universal_all)
+
+    # Create per-arch collection targets (only for multi-arch builds)
+    if(_num_gpu_targets GREATER 1)
+        foreach(arch IN LISTS GEMM_UNIVERSAL_GPU_TARGETS_INDIVIDUAL)
+            add_custom_target(benchmark_gemm_universal_${arch})
+        endforeach()
+    endif()
 
     # Create datatype collection targets
     foreach(dt IN LISTS GEMM_UNIVERSAL_DATATYPE)
@@ -300,10 +309,12 @@ else()
         add_custom_target(benchmark_gemm_universal_${scheduler}_scheduler)
     endforeach()
 
-    # Build individual targets for each datatype/layout combination
-    foreach(dt IN LISTS GEMM_UNIVERSAL_DATATYPE)
-        foreach(l IN LISTS GEMM_UNIVERSAL_LAYOUT)
-            build_individual_gemm_universal_targets(${dt} ${l})
+    # Build individual targets for each arch/datatype/layout combination
+    foreach(arch IN LISTS GEMM_UNIVERSAL_GPU_TARGETS_INDIVIDUAL)
+        foreach(dt IN LISTS GEMM_UNIVERSAL_DATATYPE)
+            foreach(l IN LISTS GEMM_UNIVERSAL_LAYOUT)
+                build_individual_gemm_universal_targets(${arch} ${dt} ${l})
+            endforeach()
         endforeach()
     endforeach()
 endif()

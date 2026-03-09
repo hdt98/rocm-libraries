@@ -4,6 +4,13 @@
 import logging
 from typing import Tuple, List
 
+
+def _normalize_gpu_target(gpu_target: str) -> str:
+    """Extract the first architecture from a potentially semicolon-separated
+    CMake target list (e.g. ``"gfx90a;gfx942"`` -> ``"gfx90a"``)."""
+    return gpu_target.split(";")[0].strip() if ";" in gpu_target else gpu_target
+
+
 GEMM_PIPELINES = ["mem", "compv3", "compv4"]
 
 GEMM_PRESHUFFLE_PIPELINES = ["preshufflev2"]
@@ -226,6 +233,7 @@ def validate_warp_configuration(
     gpu_name: str,
 ) -> bool:
     """Validate warp configuration."""
+    gpu_name = _normalize_gpu_target(gpu_name)
 
     current_combination = [warp_m, warp_n, warp_k]
 
@@ -309,8 +317,8 @@ def validate_gemm_warp_tile_combination(
     gpu_name: str,
 ) -> Tuple[bool, str]:
     """Validate warp tile combination against GPU-specific supported combinations."""
+    gpu_name = _normalize_gpu_target(gpu_name)
 
-    # Construct the key for looking up supported combinations
     warp_tile_key = f"{a_datatype}_{b_datatype}_{c_datatype}"
     current_combination = [warp_tile_m, warp_tile_n, warp_tile_k]
 
@@ -351,8 +359,8 @@ def validate_gemm_preshuffle_warp_tile_combination(
     gpu_name: str,
 ) -> Tuple[bool, str]:
     """Validate warp tile combination against GPU-specific supported combinations."""
+    gpu_name = _normalize_gpu_target(gpu_name)
 
-    # Construct the key for looking up supported combinations
     warp_tile_key = f"{a_datatype}_{b_datatype}_{c_datatype}"
     current_combination = [warp_tile_m, warp_tile_n, warp_tile_k]
 

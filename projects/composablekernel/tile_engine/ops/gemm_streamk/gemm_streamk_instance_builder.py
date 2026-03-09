@@ -21,8 +21,9 @@ logging.basicConfig(level=logging.INFO)
 
 
 class GemmKernelBuilder:
-    def __init__(self, working_path, datatype, layout, config_json=None):
+    def __init__(self, working_path, gpu_target, datatype, layout, config_json=None):
         self.working_path = Path(working_path)
+        self.gpu_target = gpu_target
         self.datatype = datatype
         self.layout = layout
         self.config_json = config_json
@@ -238,6 +239,7 @@ class GemmKernelBuilder:
                 b_datatype,
                 c_datatype,
                 pipeline,
+                self.gpu_target,
             )
 
     def _generate_trait_combinations(self):
@@ -521,7 +523,7 @@ struct SelectedKernel {{
             using GemmKernel = ck_tile::StreamKKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
             
             // Make kernel arguments
-            auto kargs = GemmKernel::MakeKernelArgs(args);
+            auto kargs = GemmKernel::MakeKernelArgs(args, stream);
             const auto workspace_size = GemmKernel::GetWorkSpaceSize(kargs);
             ck_tile::DeviceMem workspace_data(workspace_size);
             workspace_data.SetZero();
@@ -598,6 +600,7 @@ struct SelectedKernel {{
                         tile_config,
                         trait_combo,
                         self.working_path,
+                        self.gpu_target,
                         self.datatype,
                         self.layout,
                     )
@@ -753,10 +756,10 @@ struct SelectedKernel {{
 
 def _generate_single_kernel_individual(work_item):
     """Worker function to generate a single individual kernel file"""
-    tile_config, trait_combo, working_path, datatype, layout = work_item
+    tile_config, trait_combo, working_path, gpu_target, datatype, layout = work_item
 
     # Create a temporary builder instance for this worker
-    builder = GemmKernelBuilder(working_path, datatype, layout)
+    builder = GemmKernelBuilder(working_path, gpu_target, datatype, layout)
 
     try:
         kernel_name, instance_code = builder._generate_kernel_instance(
@@ -785,6 +788,11 @@ def main():
         description="GEMM kernel instance builder with parallel support"
     )
     parser.add_argument("--working_path", required=True, help="Working directory path")
+    parser.add_argument(
+        "--gpu_target",
+        required=True,
+        help="GPU target architecture (e.g. gfx90a, gfx942)",
+    )
     parser.add_argument(
         "--datatype",
         required=True,
@@ -824,7 +832,7 @@ def main():
 
     # Create builder
     builder = GemmKernelBuilder(
-        args.working_path, args.datatype, args.layout, args.config_json
+        args.working_path, args.gpu_target, args.datatype, args.layout, args.config_json
     )
 
     if args.list_kernels:

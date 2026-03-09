@@ -6,6 +6,7 @@
 #include "ck_tile/ops/gemm/kernel/gemm_kernel.hpp"
 #include "ck_tile/ops/common.hpp"
 #include "ck_tile/host/concat.hpp"
+#include "ck_tile/host/stream_utils.hpp"
 #include "streamk_gemm_coherency.hpp"
 
 namespace ck_tile {
@@ -196,18 +197,27 @@ struct StreamKKernel
     /**
      * @brief Constructs kernel arguments for the Stream-K kernel.
      * @param host_args Stream-K host arguments.
-     * @param num_cu Number of compute units (CUs). The default is the number of CUs on the device.
-     * The caller may select their own to assist with test reproducibility, etc.
-     * @param occupancy The maximum number of active blocks per CU for this kernel. The caller may
-     * select their own to assist with test reproducibility, etc.
+     * @param s Stream configuration used to query available CUs (respects CU masking).
      * @return The kernel arguments for Stream-K.
      */
     CK_TILE_HOST static StreamKKernelArgs MakeKernelArgs(const StreamKHostArgs& host_args,
-                                                         int num_cu    = NumCU(),
-                                                         int occupancy = Occupancy())
+                                                         const stream_config& s)
+    {
+        const index_t grid = get_available_compute_units(s) * Occupancy();
+        return StreamKKernelArgs{host_args, grid};
+    }
+
+    /**
+     * @brief Constructs kernel arguments for the Stream-K kernel with explicit CU/occupancy.
+     * @param host_args Stream-K host arguments.
+     * @param num_cu Number of compute units (CUs). Allows overriding for test reproducibility.
+     * @param occupancy Maximum active blocks per CU. Allows overriding for test reproducibility.
+     * @return The kernel arguments for Stream-K.
+     */
+    CK_TILE_HOST static StreamKKernelArgs
+    MakeKernelArgs(const StreamKHostArgs& host_args, int num_cu, int occupancy)
     {
         const index_t grid = num_cu * occupancy;
-
         return StreamKKernelArgs{host_args, grid};
     }
 
@@ -836,17 +846,6 @@ struct StreamKKernel
         index_t base_offset = iter_offset * TilePartitioner::KPerBlock;
 
         return make_tuple(base_offset * stride_offset_a, base_offset * stride_offset_b);
-    }
-
-    CK_TILE_HOST static int NumCU()
-    {
-        hipDeviceProp_t dev_prop;
-        hipDevice_t dev;
-        ck_tile::hip_check_error(hipGetDevice(&dev));
-        ck_tile::hip_check_error(hipGetDeviceProperties(&dev_prop, dev));
-        int num_cu = dev_prop.multiProcessorCount;
-
-        return num_cu;
     }
 
     /**

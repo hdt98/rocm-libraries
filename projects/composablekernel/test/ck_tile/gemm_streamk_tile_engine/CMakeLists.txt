@@ -26,6 +26,7 @@ endif()
 # Mirrors tile_engine's create_individual_gemm_target function for consistency.
 #
 # Parameters:
+#   gpu_arch     - GPU architecture (gfx90a, gfx942, etc.)
 #   datatype     - Data type (fp16, bf16, fp32, etc.)
 #   layout       - Matrix layout (rcr, rrr, ccr, crr)
 #   config_name  - Configuration file name without .json extension
@@ -33,9 +34,14 @@ endif()
 #   tile_config  - Tile configuration parameters
 #   config_json  - Full path to JSON configuration file
 # ============================================================================
-function(create_individual_gemm_test_target datatype layout config_name trait tile_config config_json)
-    set(target_name "test_gemm_streamk_tile_engine_${datatype}_${layout}_${config_name}_${trait}_${tile_config}")
-    set(working_path "${CMAKE_CURRENT_BINARY_DIR}/${datatype}/${layout}/${config_name}")
+function(create_individual_gemm_test_target gpu_arch datatype layout config_name trait tile_config config_json)
+    if(_num_gpu_targets GREATER 1)
+        set(working_path "${CMAKE_CURRENT_BINARY_DIR}/${gpu_arch}/${datatype}/${layout}/${config_name}")
+        set(target_name "test_gemm_streamk_tile_engine_${gpu_arch}_${datatype}_${layout}_${config_name}_${trait}_${tile_config}")
+    else()
+        set(working_path "${CMAKE_CURRENT_BINARY_DIR}/${datatype}/${layout}/${config_name}")
+        set(target_name "test_gemm_streamk_tile_engine_${datatype}_${layout}_${config_name}_${trait}_${tile_config}")
+    endif()
     
     # Generated header path (already created during cmake configuration)
     set(test_header "${working_path}/gemm_streamk_single_${datatype}_${layout}_${trait}_${tile_config}.hpp")
@@ -59,8 +65,8 @@ function(create_individual_gemm_test_target datatype layout config_name trait ti
         ${CMAKE_CURRENT_SOURCE_DIR}/test_gemm_streamk_simple.cpp
     )
 
-    # Configure GPU architectures for HIP compilation
-    set_property(TARGET ${target_name} PROPERTY HIP_ARCHITECTURES ${GEMM_TEST_GPU_TARGETS})
+    # Configure GPU architectures for HIP compilation (always single arch)
+    set_property(TARGET ${target_name} PROPERTY HIP_ARCHITECTURES ${gpu_arch})
 
     # Define preprocessor macros for generated header location and test parameters
     target_compile_definitions(${target_name} PRIVATE
@@ -73,6 +79,7 @@ function(create_individual_gemm_test_target datatype layout config_name trait ti
         ${PROJECT_SOURCE_DIR}/include
         ${PROJECT_BINARY_DIR}/include
         ${PROJECT_SOURCE_DIR}  # Root directory for tile_engine access
+        ${working_path}
         ${GTEST_INCLUDE_DIRS}
     )
 
@@ -95,16 +102,22 @@ endfunction()
 # ============================================================================
 # build_gemm_test_targets
 #
-# Builds all test targets for a specific datatype/layout/config combination.
+# Builds all test targets for a specific arch/datatype/layout/config combination.
 # Uses tile_engine's two-step process: list kernels, then generate tests.
 #
 # Parameters:
-#   datatype     - Data type (fp16, bf16, fp32, etc.)
-#   layout       - Matrix layout (rcr, rrr, ccr, crr)
-#   config_name  - Configuration file name without .json extension
+#   gpu_arch         - GPU architecture (gfx90a, gfx942, etc.)
+#   datatype         - Data type (fp16, bf16, fp32, etc.)
+#   layout           - Matrix layout (rcr, rrr, ccr, crr)
+#   config_name      - Configuration file name without .json extension
+#   configs_dir_path - Directory containing config JSON files
 # ============================================================================
-function(build_gemm_test_targets datatype layout config_name configs_dir_path)
-    set(working_path "${CMAKE_CURRENT_BINARY_DIR}/${datatype}/${layout}/${config_name}")
+function(build_gemm_test_targets gpu_arch datatype layout config_name configs_dir_path)
+    if(_num_gpu_targets GREATER 1)
+        set(working_path "${CMAKE_CURRENT_BINARY_DIR}/${gpu_arch}/${datatype}/${layout}/${config_name}")
+    else()
+        set(working_path "${CMAKE_CURRENT_BINARY_DIR}/${datatype}/${layout}/${config_name}")
+    endif()
 
     # Locate and validate configuration file
     set(config_filename "${config_name}.json")
@@ -122,6 +135,7 @@ function(build_gemm_test_targets datatype layout config_name configs_dir_path)
     execute_process(
         COMMAND ${Python3_EXECUTABLE} -u ${TILE_ENGINE_GEMM_DIR}/gemm_streamk_instance_builder.py
                 --working_path ${working_path}
+                --gpu_target "${gpu_arch}"
                 --datatype ${datatype}
                 --layout ${layout}
                 --config_json ${json_blob}
@@ -133,17 +147,17 @@ function(build_gemm_test_targets datatype layout config_name configs_dir_path)
     )
 
     if(NOT ret EQUAL 0)
-        message(WARNING "Failed to list kernels for ${datatype}_${layout}_${config_name}: ${list_error}")
+        message(WARNING "Failed to list kernels for ${gpu_arch}/${datatype}_${layout}_${config_name}: ${list_error}")
         return()
     endif()
 
     # Verify kernel list file was generated
     if(NOT EXISTS ${working_path}/gemm_kernel_list.txt)
-        message(DEBUG "No kernels found for ${datatype}_${layout}_${config_name} (validation filtered out all combinations)")
+        message(DEBUG "No kernels found for ${gpu_arch}/${datatype}_${layout}_${config_name} (validation filtered out all combinations)")
         return()
     endif()
 
-    message(DEBUG "Building tests for ${datatype}_${layout}_${config_name}")
+    message(DEBUG "Building tests for ${gpu_arch}/${datatype}_${layout}_${config_name}")
 
     # STEP 2a: Extract test parameters from config
     set(test_params_file "${working_path}/test_params.hpp")
@@ -158,7 +172,7 @@ function(build_gemm_test_targets datatype layout config_name configs_dir_path)
     )
 
     if(NOT extract_ret EQUAL 0)
-        message(WARNING "Failed to extract test parameters for ${datatype}_${layout}: ${extract_error}")
+        message(WARNING "Failed to extract test parameters for ${gpu_arch}/${datatype}_${layout}: ${extract_error}")
         return()
     endif()
 
@@ -169,61 +183,64 @@ function(build_gemm_test_targets datatype layout config_name configs_dir_path)
     set(gen_count 0)
     
     foreach(line IN LISTS kernel_lines)
-                # Parse kernel specification format: kernel_name|tile_config|trait_combo
-                string(REPLACE "|" ";" parts "${line}")
-                list(LENGTH parts parts_len)
-                if(parts_len EQUAL 3)
-                    list(GET parts 0 kernel_name)
-                    list(GET parts 1 tile_config)
-                    list(GET parts 2 trait_combo)
-                    
-                    # Generate header using --gen_single
-                    execute_process(
-                        COMMAND ${Python3_EXECUTABLE} -u ${TILE_ENGINE_GEMM_DIR}/gemm_streamk_instance_builder.py
-                                --working_path ${working_path}
-                                --datatype ${datatype}
-                                --layout ${layout}
-                                --config_json ${json_blob}
-                                --gen_single
-                                --kernel_name "${kernel_name}"
-                                --tile_config "${tile_config}"
-                                --trait_combo "${trait_combo}"
-                        WORKING_DIRECTORY ${TILE_ENGINE_GEMM_DIR}
-                        RESULT_VARIABLE gen_ret
-                        OUTPUT_VARIABLE gen_output
-                        ERROR_VARIABLE gen_error
-                    )
-                    
-                    if(NOT gen_ret EQUAL 0)
-                        message(WARNING "Failed to generate header for ${kernel_name}: ${gen_error}")
-                    else()
-                    math(EXPR gen_count "${gen_count} + 1")
-                endif()
+        # Parse kernel specification format: kernel_name|tile_config|trait_combo
+        string(REPLACE "|" ";" parts "${line}")
+        list(LENGTH parts parts_len)
+        if(parts_len EQUAL 3)
+            list(GET parts 0 kernel_name)
+            list(GET parts 1 tile_config)
+            list(GET parts 2 trait_combo)
+            
+            # Generate header using --gen_single
+            execute_process(
+                COMMAND ${Python3_EXECUTABLE} -u ${TILE_ENGINE_GEMM_DIR}/gemm_streamk_instance_builder.py
+                        --working_path ${working_path}
+                        --gpu_target "${gpu_arch}"
+                        --datatype ${datatype}
+                        --layout ${layout}
+                        --config_json ${json_blob}
+                        --gen_single
+                        --kernel_name "${kernel_name}"
+                        --tile_config "${tile_config}"
+                        --trait_combo "${trait_combo}"
+                WORKING_DIRECTORY ${TILE_ENGINE_GEMM_DIR}
+                RESULT_VARIABLE gen_ret
+                OUTPUT_VARIABLE gen_output
+                ERROR_VARIABLE gen_error
+            )
+            
+            if(NOT gen_ret EQUAL 0)
+                message(WARNING "Failed to generate header for ${kernel_name}: ${gen_error}")
+            else()
+                math(EXPR gen_count "${gen_count} + 1")
             endif()
-        endforeach()
-        
-        message(STATUS "  Generated ${gen_count} headers for ${datatype}_${layout}")
+        endif()
+    endforeach()
+    
+    message(STATUS "  Generated ${gen_count} headers for ${gpu_arch}/${datatype}_${layout}")
 
     # STEP 3: Target creation phase - create test targets
     message(STATUS "  Creating test targets...")
     file(STRINGS ${working_path}/gemm_kernel_list.txt kernel_lines)
     set(test_count 0)
     foreach(line IN LISTS kernel_lines)
-                # Parse kernel specification format: kernel_name|tile_config|trait_combo
-                string(REPLACE "|" ";" parts "${line}")
-                list(LENGTH parts parts_len)
-                if(parts_len EQUAL 3)
-                    list(GET parts 0 kernel_name)
-                    list(GET parts 1 tile_config)
-                    list(GET parts 2 trait_combo)
+        # Parse kernel specification format: kernel_name|tile_config|trait_combo
+        string(REPLACE "|" ";" parts "${line}")
+        list(LENGTH parts parts_len)
+        if(parts_len EQUAL 3)
+            list(GET parts 0 kernel_name)
+            list(GET parts 1 tile_config)
+            list(GET parts 2 trait_combo)
 
-                # Generate test target for this kernel configuration
-                create_individual_gemm_test_target("${datatype}" "${layout}" "${config_name}" "${trait_combo}" "${tile_config}" "${json_blob}")
-                math(EXPR test_count "${test_count} + 1")
-            endif()
-        endforeach()
-        message(STATUS "  Created ${test_count} test targets for ${datatype}_${layout}")
-endfunction()# ============================================================================
+            # Generate test target for this kernel configuration
+            create_individual_gemm_test_target("${gpu_arch}" "${datatype}" "${layout}" "${config_name}" "${trait_combo}" "${tile_config}" "${json_blob}")
+            math(EXPR test_count "${test_count} + 1")
+        endif()
+    endforeach()
+    message(STATUS "  Created ${test_count} test targets for ${gpu_arch}/${datatype}_${layout}")
+endfunction()
+
+# ============================================================================
 # MAIN EXECUTION - Test Target Generation
 # ============================================================================
 
@@ -241,35 +258,37 @@ foreach(target IN LISTS SUPPORTED_GPU_TARGETS)
     endif()
 endforeach()
 
+list(LENGTH GEMM_TEST_GPU_TARGETS _num_gpu_targets)
+
 # Early exit if no compatible GPU architectures are available
 if(NOT GEMM_TEST_GPU_TARGETS)
-	message(WARNING "Skipping StreamK GEMM Tile Engine tests: No supported GPU targets (gfx90a, gfx942, gfx950) found in SUPPORTED_GPU_TARGETS: ${SUPPORTED_GPU_TARGETS}")
+    message(WARNING "Skipping StreamK GEMM Tile Engine tests: No supported GPU targets (gfx90a, gfx942, gfx950) found in SUPPORTED_GPU_TARGETS: ${SUPPORTED_GPU_TARGETS}")
     return()
 endif()
 
 message(STATUS "Building StreamK GEMM tile engine tests for GPU targets: ${GEMM_TEST_GPU_TARGETS}")
 
-    # Enable parallel compilation optimizations
-    # Set up job pools for better parallel compilation control
-    set_property(GLOBAL PROPERTY JOB_POOLS
-        compile_heavy=4    # Limit heavy compilations to prevent OOM
-        compile_normal=16  # Allow more parallel normal compilations
-    )
+# Enable parallel compilation optimizations
+# Set up job pools for better parallel compilation control
+set_property(GLOBAL PROPERTY JOB_POOLS
+    compile_heavy=4    # Limit heavy compilations to prevent OOM
+    compile_normal=16  # Allow more parallel normal compilations
+)
 
-    # Enable compiler cache if available and explicitly requested
-    # Disabled by default due to permission issues in CI environments
-    option(ENABLE_CCACHE_TESTS "Enable ccache for test compilation" OFF)
-    if(ENABLE_CCACHE_TESTS)
-        find_program(CCACHE_PROGRAM ccache)
-        if(CCACHE_PROGRAM)
-            set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
-            message(STATUS "Using ccache for faster test compilation")
-        else()
-            message(WARNING "ccache requested but not found")
-        endif()
+# Enable compiler cache if available and explicitly requested
+# Disabled by default due to permission issues in CI environments
+option(ENABLE_CCACHE_TESTS "Enable ccache for test compilation" OFF)
+if(ENABLE_CCACHE_TESTS)
+    find_program(CCACHE_PROGRAM ccache)
+    if(CCACHE_PROGRAM)
+        set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+        message(STATUS "Using ccache for faster test compilation")
     else()
-        message(STATUS "ccache disabled for tests (use -DENABLE_CCACHE_TESTS=ON to enable)")
+        message(WARNING "ccache requested but not found")
     endif()
+else()
+    message(STATUS "ccache disabled for tests (use -DENABLE_CCACHE_TESTS=ON to enable)")
+endif()
 
 # ============================================================================
 # Test Configuration Matrix - Clean Focused Design
@@ -295,18 +314,17 @@ set(GENERATED_CONFIG_PATH ${CMAKE_CURRENT_BINARY_DIR}/configs)
 get_cu_count(CU_COUNT)
 
 message(STATUS "Generating and processing configs for Stream-K tests")
-foreach(datatype IN LISTS SMALL_DATATYPES)
-
-    if(datatype IN_LIST SIXTEEN_BIT_DATATYPES)
-        generate_test_configs(${CU_COUNT} ${LARGE_TILES} ${datatype} CONFIG_LIST ${GENERATED_CONFIG_PATH})
-    else()
-        generate_test_configs(${CU_COUNT} ${SMALL_TILES} ${datatype} CONFIG_LIST ${GENERATED_CONFIG_PATH})
-    endif()
-
-    foreach(config IN LISTS CONFIG_LIST)
-    # testing all layouts (rcr, rrr, ccr, crr)
-        foreach(layout IN LISTS TEST_LAYOUTS)
-            build_gemm_test_targets("${datatype}" "${layout}" "${config}" "${GENERATED_CONFIG_PATH}")
+foreach(arch IN LISTS GEMM_TEST_GPU_TARGETS)
+    foreach(datatype IN LISTS SMALL_DATATYPES)
+        if(datatype IN_LIST SIXTEEN_BIT_DATATYPES)
+            generate_test_configs(${CU_COUNT} ${LARGE_TILES} ${datatype} CONFIG_LIST ${GENERATED_CONFIG_PATH})
+        else()
+            generate_test_configs(${CU_COUNT} ${SMALL_TILES} ${datatype} CONFIG_LIST ${GENERATED_CONFIG_PATH})
+        endif()
+        foreach(config IN LISTS CONFIG_LIST)
+            foreach(layout IN LISTS TEST_LAYOUTS)
+                build_gemm_test_targets("${arch}" "${datatype}" "${layout}" "${config}" "${GENERATED_CONFIG_PATH}")
+            endforeach()
         endforeach()
     endforeach()
 endforeach()
