@@ -45,6 +45,17 @@ namespace TensileLite
 {
     namespace Client
     {
+        inline bool isMXFP4Tensor(const TensorDescriptor& tensor, size_t mxBlock)
+        {
+            return tensor.dataType() == rocisa::DataType::Float4 && mxBlock > 0;
+        }
+
+        inline bool isMXFP4Problem(const ContractionProblemGemm& problem)
+        {
+            return isMXFP4Tensor(problem.a(), problem.mxBlockA())
+                || isMXFP4Tensor(problem.b(), problem.mxBlockB());
+        }
+
         // Problem-indept. from 0~7, and 16, and 23~26 (fixed values for every problem)
         // And problem-dept. from 8~15 (values depend on problem)
         // RandomNegPosLimited: integer -128~128. fp -1.0~1.0
@@ -832,9 +843,35 @@ namespace TensileLite
             }
             virtual void preBenchmarkRun() override {}
             virtual void postBenchmarkRun() override {}
-            virtual void preProblem(ContractionProblem* const problem) override {}
+            virtual void preProblem(ContractionProblem* const problem) override
+            {
+                m_currentGemmProblem
+                    = dynamic_cast<ContractionProblemGemm const*>(problem);
+            }
             virtual void postProblem() override {}
-            virtual void preSolution(ContractionSolution* const solution) override {}
+            virtual void preSolution(ContractionSolution* const solution) override
+            {
+                m_currentSolution = solution;
+                // Re-init MX scale with preSwizzle now that solution (useScaleAB) is available
+                if(m_currentSolution != nullptr
+                   && !m_currentSolution->problemType.useScaleAB.empty()
+                   && m_currentGemmProblem != nullptr
+                   && !m_gpuPtrs.empty())
+                {
+                    bool isMXFP4 = isMXFP4Problem(*m_currentGemmProblem);
+                    if(isMXFP4)
+                    {
+                        initializeMXDataForFP4(*m_currentGemmProblem);
+                        copyValidToGPUBuffer(*m_currentGemmProblem);
+                        copyInputs(m_gpuPtrs,
+                                   m_gpuBatchPtrs,
+                                   m_maxElements,
+                                   m_groupedOffsets,
+                                   *m_currentGemmProblem,
+                                   hipMemcpyDeviceToDevice);
+                    }
+                }
+            }
             virtual void postSolution() override {}
             virtual bool needMoreRunsInSolution() const override
             {
@@ -1044,6 +1081,11 @@ namespace TensileLite
             int64_t                         m_rotatingBuffer = 0;
             std::shared_ptr<RotatingMemory> m_rm;
             int32_t                         m_rotatingMode = 0;
+
+            ContractionSolution const*  m_currentSolution   = nullptr;
+            ContractionProblemGemm const* m_currentGemmProblem = nullptr;
+
+            int m_mxScaleFormat = 0;
         };
 
         template <>
