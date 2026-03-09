@@ -79,6 +79,30 @@ TEST_CASE("Simplify ExpressionTransformation works", "[expression][expression-tr
         CHECK_THAT(simplify(v / one), IdenticalTo(v));
         CHECK_THAT(simplify(v / a), IdenticalTo(v / a));
         CHECK_THAT(simplify(b / v), IdenticalTo(b / v));
+
+        // 0 / a = 0
+        CHECK_THAT(simplify(zero / v), IdenticalTo(zero));
+        CHECK_THAT(simplify(zero / a), IdenticalTo(zero));
+
+        // a / a = 1
+        CHECK_THAT(simplify(v / v), IdenticalTo(one));
+        CHECK_THAT(simplify(a / a), IdenticalTo(one));
+
+        // (a / b) / c = a / (b * c) - division chain flattening
+        CHECK_THAT(simplify((v / a) / b), IdenticalTo(v / literal(3300)));
+        CHECK_THAT(simplify((v / literal(3)) / literal(11)), IdenticalTo(v / literal(33)));
+
+        // Division chain flattening should NOT occur with negative constants (signed types)
+        auto negTwo = literal(-2);
+        CHECK_THAT(simplify((v / a) / negTwo), IdenticalTo((v / a) / negTwo));
+
+        // (a * b) / b = a
+        CHECK_THAT(simplify((v * a) / a), IdenticalTo(v));
+        CHECK_THAT(simplify((a * v) / a), IdenticalTo(v));
+
+        // (a * b) / a = b
+        CHECK_THAT(simplify((v * a) / v), IdenticalTo(a));
+        CHECK_THAT(simplify((a * v) / v), IdenticalTo(a));
     }
 
     SECTION("Modulo")
@@ -87,6 +111,40 @@ TEST_CASE("Simplify ExpressionTransformation works", "[expression][expression-tr
         CHECK_THAT(simplify(v % one), IdenticalTo(zero));
         CHECK_THAT(simplify(v % a), IdenticalTo(v % a));
         CHECK_THAT(simplify(b % v), IdenticalTo(b % v));
+
+        // 0 % a = 0
+        CHECK_THAT(simplify(zero % v), IdenticalTo(zero));
+        CHECK_THAT(simplify(zero % a), IdenticalTo(zero));
+
+        // a % a = 0
+        CHECK_THAT(simplify(v % v), IdenticalTo(zero));
+        CHECK_THAT(simplify(a % a), IdenticalTo(zero));
+
+        // (a * b) % b = 0
+        CHECK_THAT(simplify((v * a) % a), IdenticalTo(zero));
+        CHECK_THAT(simplify((a * v) % a), IdenticalTo(zero));
+
+        // (a * b) % a = 0
+        CHECK_THAT(simplify((v * a) % v), IdenticalTo(zero));
+        CHECK_THAT(simplify((a * v) % v), IdenticalTo(zero));
+
+        // (a % b) % b = a % b - redundant double modulo
+        CHECK_THAT(simplify((v % a) % a), IdenticalTo(v % a));
+        CHECK_THAT(simplify((a % v) % v), IdenticalTo(a % v));
+
+        // (a % b) % c = a % c when c divides b
+        // Example: (v % 12) % 3 = v % 3  (since 3 divides 12)
+        auto twelve = literal(12);
+        auto three  = literal(3);
+        auto four   = literal(4);
+        auto six    = literal(6);
+        CHECK_THAT(simplify((v % twelve) % three), IdenticalTo(v % three));
+        CHECK_THAT(simplify((v % twelve) % four), IdenticalTo(v % four));
+        CHECK_THAT(simplify((v % twelve) % six), IdenticalTo(v % six));
+
+        // When c does NOT divide b, no simplification
+        auto five = literal(5);
+        CHECK_THAT(simplify((v % twelve) % five), IdenticalTo((v % twelve) % five));
     }
 
     SECTION("Bitwise And")

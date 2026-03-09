@@ -792,6 +792,224 @@ namespace rocRoller
                 return std::make_shared<Expression>(Expr({lhs, rhs, expr.comment}));
             }
 
+            // Helper: returns true if the value is positive
+            static bool isPositiveValue(ExpressionPtr const& expr)
+            {
+                auto type = resultVariableType(expr);
+                if(type.dataType == DataType::UInt32 || type.dataType == DataType::UInt64)
+                    return true;
+
+                if(evaluationTimes(expr)[EvaluationTime::Translate])
+                {
+                    auto val = evaluate(expr);
+                    return std::visit(
+                        [](auto&& v) -> bool {
+                            using T = std::decay_t<decltype(v)>;
+                            if constexpr(CIntegral<T>)
+                                return v > T(0);
+                            return false;
+                        },
+                        val);
+                }
+
+                return false;
+            }
+
+            ExpressionPtr operator()(Divide const& expr) const
+            {
+                auto resultVarType = resultVariableType(expr);
+
+                auto lhs = call(expr.lhs);
+                auto rhs = call(expr.rhs);
+
+                bool eval_lhs = evaluationTimes(lhs)[EvaluationTime::Translate];
+                bool eval_rhs = evaluationTimes(rhs)[EvaluationTime::Translate];
+
+                // Simplification: a / a = 1 (when expressions are identical)
+                if(identical(lhs, rhs))
+                {
+                    auto rv = literal(1, resultVarType);
+                    copyComment(rv, expr);
+                    return rv;
+                }
+
+                // Apply constant-based simplifications
+                auto simplifier = SimplifyByConstant<Divide>{resultVarType};
+
+                ExpressionPtr rv = nullptr;
+
+                if(eval_lhs && eval_rhs)
+                {
+                    rv = literal(evaluate(Divide({lhs, rhs})));
+                }
+                else if(eval_lhs)
+                {
+                    auto simplifierLHS = SimplifyByConstantLHS<Divide>{resultVarType};
+                    rv                 = simplifierLHS.call(evaluate(lhs), rhs);
+                }
+                else if(eval_rhs)
+                {
+                    rv = simplifier.call(lhs, evaluate(rhs));
+                }
+
+                if(rv != nullptr)
+                {
+                    if(resultVariableType(rv) != resultVarType)
+                    {
+                        AssertFatal(!resultVarType.isPointer(),
+                                    ShowValue(expr),
+                                    ShowValue(rv),
+                                    ShowValue(resultVarType));
+                        rv = convert(resultVarType.dataType, rv);
+                    }
+                    copyComment(rv, expr);
+                    return rv;
+                }
+
+                // Simplification: (a / b) / c = a / (b * c) (divide chain flattening)
+                // Valid for integers when both b and c are positive
+                if(lhs && std::holds_alternative<Divide>(*lhs))
+                {
+                    auto const& innerDiv = std::get<Divide>(*lhs);
+
+                    if(isPositiveValue(innerDiv.rhs) && isPositiveValue(rhs))
+                    {
+                        auto rv = innerDiv.lhs / (innerDiv.rhs * rhs);
+                        copyComment(rv, expr);
+                        return call(rv); // Recursively simplify in case of deeper chains
+                    }
+                }
+
+                // Simplification: (a * b) / b = a or (a * b) / a = b
+                if(lhs && std::holds_alternative<Multiply>(*lhs))
+                {
+                    auto const& mul = std::get<Multiply>(*lhs);
+                    if(identical(mul.rhs, rhs))
+                    {
+                        auto rv = mul.lhs;
+                        copyComment(rv, expr);
+                        return rv;
+                    }
+                    if(identical(mul.lhs, rhs))
+                    {
+                        auto rv = mul.rhs;
+                        copyComment(rv, expr);
+                        return rv;
+                    }
+                }
+
+                return std::make_shared<Expression>(Divide({lhs, rhs, expr.comment}));
+            }
+
+            ExpressionPtr operator()(Modulo const& expr) const
+            {
+                auto resultVarType = resultVariableType(expr);
+
+                auto lhs = call(expr.lhs);
+                auto rhs = call(expr.rhs);
+
+                bool eval_lhs = evaluationTimes(lhs)[EvaluationTime::Translate];
+                bool eval_rhs = evaluationTimes(rhs)[EvaluationTime::Translate];
+
+                // Simplification: a % a = 0 (when expressions are identical)
+                if(identical(lhs, rhs))
+                {
+                    auto rv = literal(0, resultVarType);
+                    copyComment(rv, expr);
+                    return rv;
+                }
+
+                // Simplification: (a * b) % b = 0 or (a * b) % a = 0
+                if(lhs && std::holds_alternative<Multiply>(*lhs))
+                {
+                    auto const& mul = std::get<Multiply>(*lhs);
+                    if(identical(mul.rhs, rhs) || identical(mul.lhs, rhs))
+                    {
+                        auto rv = literal(0, resultVarType);
+                        copyComment(rv, expr);
+                        return rv;
+                    }
+                }
+
+                // Apply constant-based simplifications
+                auto simplifier = SimplifyByConstant<Modulo>{resultVarType};
+
+                ExpressionPtr rv = nullptr;
+
+                if(eval_lhs && eval_rhs)
+                {
+                    rv = literal(evaluate(Modulo({lhs, rhs})));
+                }
+                else if(eval_rhs)
+                {
+                    rv = simplifier.call(lhs, evaluate(rhs));
+                }
+                else if(eval_lhs)
+                {
+                    auto simplifierLHS = SimplifyByConstantLHS<Modulo>{resultVarType};
+                    rv                 = simplifierLHS.call(evaluate(lhs), rhs);
+                }
+
+                if(rv != nullptr)
+                {
+                    if(resultVariableType(rv) != resultVarType)
+                    {
+                        AssertFatal(!resultVarType.isPointer(),
+                                    ShowValue(expr),
+                                    ShowValue(rv),
+                                    ShowValue(resultVarType));
+                        rv = convert(resultVarType.dataType, rv);
+                    }
+                    copyComment(rv, expr);
+                    return rv;
+                }
+
+                // Simplification: (a % b) % b = a % b (double modulo by same value)
+                if(lhs && std::holds_alternative<Modulo>(*lhs))
+                {
+                    auto const& innerMod = std::get<Modulo>(*lhs);
+                    if(identical(innerMod.rhs, rhs))
+                    {
+                        copyComment(lhs, expr);
+                        return lhs;
+                    }
+
+                    // Simplification: (a % b) % c = a % c when c divides b
+                    // Valid for integers: if b = k*c for integer k, then (a % b) % c = a % c
+                    // Proof: a % b gives remainder r where 0 <= r < b
+                    //        r % c = (a - q*b) % c = (a - q*k*c) % c = a % c
+                    if(evaluationTimes(innerMod.rhs)[EvaluationTime::Translate]
+                       && evaluationTimes(rhs)[EvaluationTime::Translate])
+                    {
+                        auto b_val = evaluate(innerMod.rhs);
+                        auto c_val = evaluate(rhs);
+
+                        // Check if both are integral types and c divides b
+                        bool canSimplify = std::visit(
+                            [](auto&& b, auto&& c) -> bool {
+                                using B_Type = std::decay_t<decltype(b)>;
+                                using C_Type = std::decay_t<decltype(c)>;
+
+                                if constexpr(CIntegral<B_Type> && CIntegral<C_Type>)
+                                    return c != C_Type(0) && b % c == B_Type(0);
+                                return false;
+                            },
+                            b_val,
+                            c_val);
+
+                        if(canSimplify)
+                        {
+                            auto rv = innerMod.lhs % rhs;
+                            copyComment(rv, expr);
+                            // Recursively simplify in case of deeper nesting
+                            return call(rv);
+                        }
+                    }
+                }
+
+                return std::make_shared<Expression>(Modulo({lhs, rhs, expr.comment}));
+            }
+
             ExpressionPtr operator()(BitfieldCombine const& expr) const
             {
                 auto cpy        = expr;
