@@ -358,6 +358,9 @@ def check_arch_name(){
     else if ( runShell('grep -n "gfx125" rocminfo.log') ) {
         return "gfx125"
     }
+    else if ( runShell('grep -n "gfx13" rocminfo.log') ) {
+        return "gfx13"
+    }
     else if ( runShell('grep -n "gfx908" rocminfo.log') ) {
         return "gfx908"
     }
@@ -525,6 +528,9 @@ def cmake_build(Map conf=[:]){
             cd build
         """
     def invocation_tag=""
+    if (setup_args.contains("gfx13")){
+        invocation_tag="gfx13"
+    }
     if (setup_args.contains("gfx120|gfx12-generic")){
         invocation_tag="gfx120"
     }
@@ -672,7 +678,7 @@ def cmake_build(Map conf=[:]){
         }
 
         //run tests except when NO_CK_BUILD is set
-        if(!setup_args.contains("NO_CK_BUILD")  && !setup_args.contains("gfx1250")){
+        if(!setup_args.contains("NO_CK_BUILD")  && !setup_args.contains("gfx1250") && !setup_args.contains("gfx13")){
             sh "python3 ../script/ninja_json_converter.py .ninja_log --legacy-format --output ck_build_trace_${arch_name}.json"
             archiveArtifacts "ck_build_trace_${arch_name}.json"
             sh "python3 ../script/parse_ninja_trace.py ck_build_trace_${arch_name}.json"
@@ -1230,6 +1236,10 @@ pipeline {
             defaultValue: true,
             description: "Build CK for gfx1250 (default: ON)")
         booleanParam(
+            name: "BUILD_GFX1310",
+            defaultValue: true,
+            description: "Build CK for gfx1310 (default: ON)")
+        booleanParam(
             name: "BUILD_GFX101",
             defaultValue: false,
             description: "Build CK and run tests on gfx101 (default: OFF)")
@@ -1781,6 +1791,21 @@ pipeline {
                     agent{ label rocmnode("gfx90a") }
                     environment{
                         setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx1250" -DDISABLE_DL_KERNELS="ON" """
+                    }
+                    steps{
+                        Build_CK_and_Reboot(setup_args: setup_args, docker_name: "${env.CK_DOCKERHUB_PRIVATE}:npi-mi450-latest", config_targets: "install", no_reboot:true, build_type: 'Release', prefixpath: '/usr/local')
+                        cleanWs()
+                    }
+                }
+                stage("Build CK for gfx1310")
+                {
+                    when {
+                        beforeAgent true
+                        expression { params.BUILD_GFX1310.toBoolean() && !params.BUILD_INSTANCES_ONLY.toBoolean() }
+                    }
+                    agent{ label rocmnode("gfx90a") }
+                    environment{
+                        setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx1310" -DDISABLE_DL_KERNELS="ON" """
                     }
                     steps{
                         Build_CK_and_Reboot(setup_args: setup_args, docker_name: "${env.CK_DOCKERHUB_PRIVATE}:npi-mi450-latest", config_targets: "install", no_reboot:true, build_type: 'Release', prefixpath: '/usr/local')
