@@ -113,6 +113,15 @@ namespace rocRoller::KernelGraph
             coords.setCoordinate(elemXTag, Expression::literal(0));
             coords.setCoordinate(elemYTag, Expression::literal(0));
         }
+        else if(tile.memoryType == MemoryType::WAVE_Direct2LDS)
+        {
+            // For LoadTileDirect2LDS, the LDS store codegen coordinates are at ElementNumber
+            // dims 2 and 3 (shifted from StoreLDSTile's dims 0 and 1 by AddDirect2LDS).
+            auto [elemXTag, elemX] = graph.getDimension<ElementNumber>(tag, 2);
+            auto [elemYTag, elemY] = graph.getDimension<ElementNumber>(tag, 3);
+            coords.setCoordinate(elemXTag, Expression::literal(0));
+            coords.setCoordinate(elemYTag, Expression::literal(0));
+        }
 
         coords.fillExecutionCoordinates(kernelWorkgroupIndexes, kernelWorkitemIndexes);
 
@@ -162,8 +171,9 @@ namespace rocRoller::KernelGraph
     template <typename Op>
     std::vector<size_t> ModelAddresses::getLDSAddresses(KernelGraph& graph, int tag, Op const& op)
     {
-        constexpr bool isLoad    = std::is_same_v<Op, LoadLDSTile>;
-        constexpr auto direction = isLoad ? LDSDirection::Load : LDSDirection::Store;
+        constexpr bool isLoadLDS    = std::is_same_v<Op, LoadLDSTile>;
+        constexpr bool isDirect2LDS = std::is_same_v<Op, LoadTileDirect2LDS>;
+        constexpr auto direction    = isLoadLDS ? LDSDirection::Load : LDSDirection::Store;
 
         // Use nullptr context to avoid modifying the real tag manager during modeling.
         auto                   graphPtr = std::make_shared<KernelGraph>(graph);
@@ -171,9 +181,13 @@ namespace rocRoller::KernelGraph
             graphPtr, nullptr, m_context->kernel()->max_flat_workgroup_size());
 
         LoadStoreTileGenerator::LoadStoreTileInfo info;
-        if constexpr(isLoad)
+        if constexpr(isLoadLDS)
         {
             info = tileGenerator.getLoadLDSTileInfo(tag, op);
+        }
+        else if constexpr(isDirect2LDS)
+        {
+            info = tileGenerator.getLoadTileDirect2LDSInfo(tag, op);
         }
         else
         {
@@ -187,6 +201,8 @@ namespace rocRoller::KernelGraph
         ModelAddresses::getLDSAddresses(KernelGraph&, int, LoadLDSTile const&);
     template std::vector<size_t>
         ModelAddresses::getLDSAddresses(KernelGraph&, int, StoreLDSTile const&);
+    template std::vector<size_t>
+        ModelAddresses::getLDSAddresses(KernelGraph&, int, LoadTileDirect2LDS const&);
 
     KernelGraph ModelAddresses::apply(KernelGraph const& original)
     {
@@ -214,11 +230,11 @@ namespace rocRoller::KernelGraph
                 graph.modelledAddresses[node] = std::move(normalizedAddresses);
             };
 
-            auto visitor
-                = rocRoller::overloaded{[&](CIsAnyOf<LoadLDSTile, StoreLDSTile> auto op) {
-                                            modelAddresses(getLDSAddresses(graph, node, op));
-                                        },
-                                        [&](auto op) {}};
+            auto visitor = rocRoller::overloaded{
+                [&](CIsAnyOf<LoadLDSTile, StoreLDSTile, LoadTileDirect2LDS> auto op) {
+                    modelAddresses(getLDSAddresses(graph, node, op));
+                },
+                [&](auto op) {}};
 
             std::visit(visitor, graph.control.getNode(node));
         }

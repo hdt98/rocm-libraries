@@ -987,6 +987,45 @@ namespace rocRoller
             return result;
         }
 
+        LoadStoreTileGenerator::LoadStoreTileInfo
+            LoadStoreTileGenerator::getLoadTileDirect2LDSInfo(int                       tag,
+                                                              LoadTileDirect2LDS const& load)
+        {
+            auto [ldsTag, _lds]   = m_graph->getDimension<LDS>(tag);
+            auto [tileTag, _tile] = m_graph->getDimension<MacroTile>(tag);
+
+            rocRoller::Log::getLogger()->debug(
+                "KernelGraph::LoadStoreTileGenerator::getLoadTileDirect2LDSInfo: OP {} LDS {} "
+                "MacroTile {}",
+                tag,
+                ldsTag,
+                tileTag);
+
+            auto packing = DataTypeInfo::Get(load.varType).packing;
+
+            auto [elemXTag, elemX] = m_graph->getDimension<ElementNumber>(tag, 0);
+            auto [elemYTag, elemY] = m_graph->getDimension<ElementNumber>(tag, 1);
+            auto const m           = getUnsignedInt(evaluate(elemX.size));
+            auto       n           = getUnsignedInt(evaluate(elemY.size));
+
+            AssertFatal(n % packing == 0,
+                        ShowValue(m),
+                        ShowValue(n),
+                        ShowValue(packing),
+                        ShowValue(load.varType));
+            n /= packing;
+
+            LoadStoreTileInfo result;
+            result.tag     = tag;
+            result.kind    = MemoryInstructions::MemoryKind::Buffer2LDS;
+            result.m       = m;
+            result.n       = n;
+            result.data    = nullptr;
+            result.varType = load.varType;
+            result.bufOpts = {};
+            return result;
+        }
+
         Generator<Instruction> LoadStoreTileGenerator::loadMacroTileDirect2LDS(
             int tag, LoadTileDirect2LDS const& load, Transformer coords)
         {
@@ -1297,7 +1336,19 @@ namespace rocRoller
         Generator<Instruction> LoadStoreTileGenerator::genLoadTileDirect2LDS(
             int tag, LoadTileDirect2LDS const& load, Transformer coords)
         {
-            co_yield loadMacroTileDirect2LDS(tag, load, coords);
+            auto modelledAddresses = m_graph->modelledAddresses.find(tag);
+            auto applyAddresses    = [&](Instruction inst) {
+                if(modelledAddresses != m_graph->modelledAddresses.end())
+                {
+                    inst.setModelledAddresses(modelledAddresses->second);
+                    if(GPUInstructionInfo::isVMEMRead(inst.getOpCode()))
+                        inst.addComment(
+                            fmt::format("Modelled addresses: {}", modelledAddresses->second));
+                }
+                return inst;
+            };
+
+            co_yield loadMacroTileDirect2LDS(tag, load, coords).map(applyAddresses);
         }
 
         LoadStoreTileGenerator::LoadStoreTileInfo

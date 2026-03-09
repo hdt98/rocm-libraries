@@ -126,6 +126,8 @@ namespace rocRoller
 
             LoadStoreTileInfo getLoadLDSTileInfo(int tag, ControlGraph::LoadLDSTile const& load);
             LoadStoreTileInfo getStoreLDSTileInfo(int tag, ControlGraph::StoreLDSTile const& store);
+            LoadStoreTileInfo
+                getLoadTileDirect2LDSInfo(int tag, ControlGraph::LoadTileDirect2LDS const& load);
 
         private:
             ContextPtr                       m_context;
