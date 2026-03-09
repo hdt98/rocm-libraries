@@ -165,3 +165,91 @@ INSTANTIATE_TEST_SUITE_P(
         std::make_tuple(1024u, 213u, 32, true,  true)   // M=213, non-32-aligned (was failing)
     )
 );
+
+// ============================================================================
+// PreSwizzle scale tests
+//
+// Verify generateMXInput with preSwizzle produces scale data that is a
+// permutation of the unswizzled layout. gfx950 FP4 MX kernels expect:
+//   preSwizzle = {swizzleTileMN=32, tileK=8, subTileK=MiK/mxBlock}
+//   preTile    = {tileK=8, swizzleTileMN=32}
+// swizzleTileMN=32 is fixed (2 SIMDs * 16 lanes); subTileK=4 for MiK=128, mxBlock=32.
+// ============================================================================
+
+// Params: {rows, cols, mxBlock, isTranspose, isMatrixA}
+class MXPreSwizzleTest
+    : public ::testing::TestWithParam<std::tuple<uint64_t, uint64_t, int, bool, bool>>
+{
+};
+
+/** @brief Verify preSwizzle produces a non-trivial permutation of scale data. */
+TEST_P(MXPreSwizzleTest, ScaleIsPermutationOfUnswizzled)
+{
+    auto [rows, cols, mxBlock, isTranspose, isMatrixA] = GetParam();
+
+    const std::vector<size_t> preSwizzle = {32, 8, 4};
+    const std::vector<size_t> preTile    = {8, 32};
+
+    const uint64_t numElements  = rows * cols;
+    const uint64_t numPacked    = (numElements + 1) / 2;
+    const size_t   numScales    = ((rows + mxBlock - 1) / mxBlock) * cols;
+
+    std::vector<uint8_t> dataNoShuf(numPacked, 0);
+    std::vector<uint8_t> scaleNoShuf(numScales, 0);
+    std::vector<uint8_t> dataShuf(numPacked, 0);
+    std::vector<uint8_t> scaleShuf(numScales, 0);
+
+    // Generate without preSwizzle
+    generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                    dataNoShuf.data(),
+                    scaleNoShuf.data(),
+                    rows, cols, rows,
+                    isTranspose,
+                    {}, {},
+                    mxBlock, 1, isMatrixA,
+                    "Bounded", -1.0f, 1.0f);
+
+    // Generate with preSwizzle
+    generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                    dataShuf.data(),
+                    scaleShuf.data(),
+                    rows, cols, rows,
+                    isTranspose,
+                    preSwizzle, preTile,
+                    mxBlock, 1, isMatrixA,
+                    "Bounded", -1.0f, 1.0f);
+
+    // The scale buffers must be different
+    EXPECT_NE(scaleNoShuf, scaleShuf)
+        << "Scale data was not shuffled for " << rows << "x" << cols
+        << " (transpose=" << isTranspose << ", isMatrixA=" << isMatrixA << ")";
+
+    // The shuffled scale must be a permutation: same multiset of bytes
+    std::vector<uint8_t> sortedNoShuf = scaleNoShuf;
+    std::vector<uint8_t> sortedShuf   = scaleShuf;
+    std::sort(sortedNoShuf.begin(), sortedNoShuf.end());
+    std::sort(sortedShuf.begin(), sortedShuf.end());
+    EXPECT_EQ(sortedNoShuf, sortedShuf)
+        << "Pre-shuffled scale is not a permutation of the unshuffled scale for "
+        << rows << "x" << cols;
+
+    // Data buffer must be identical (preSwizzle only affects scale, not data)
+    EXPECT_EQ(dataNoShuf, dataShuf)
+        << "Data buffer changed unexpectedly with preSwizzle for "
+        << rows << "x" << cols;
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    FP4PreSwizzle,
+    MXPreSwizzleTest,
+    ::testing::Values(
+        // rows, cols, mxBlock, isTranspose, isMatrixA
+        // Test size constraints for preSwizzle {32,8,4} + preTile {8,32}:
+        //   rows % 256 == 0  (scaleRows = rows/mxBlock must be divisible by tileK=8)
+        //   cols % 32  == 0  (scaleCols must be divisible by swizzleTileMN=32)        std::make_tuple(256u,  256u,  32, true,  true),   // scale A transposed
+        std::make_tuple(256u,  256u,  32, false, false),  // scale B non-transposed
+        std::make_tuple(512u,  256u,  32, true,  true),   // larger scale A
+        std::make_tuple(256u,  512u,  32, false, false),  // larger scale B
+        std::make_tuple(4096u, 16384u, 32, true, true)    // benchmark-scale problem
+    )
+);

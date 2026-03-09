@@ -887,6 +887,7 @@ namespace TensileLite
             , m_keepPristineCopyOnGPU(args["pristine-on-gpu"].as<bool>())
             , m_workspaceSize(problemFactory.workspaceSize())
             , m_pruneMode(args["prune-mode"].as<PruneSparseMode>())
+            , m_mxScaleFormat(args["mx-scale-format"].as<int>())
 
         {
             m_rotatingBuffer
@@ -1697,8 +1698,7 @@ namespace TensileLite
 
         void DataInitialization::initializeCPUInputs(ContractionProblemGemm const& problem)
         {
-            bool useMXGenerator = (problem.a().dataType() == rocisa::DataType::Float4 && problem.mxBlockA() > 0)
-                                  || (problem.b().dataType() == rocisa::DataType::Float4 && problem.mxBlockB() > 0);
+            bool useMXGenerator = isMXFP4Problem(problem);
             if(useMXGenerator)
                 initializeMXDataForFP4(problem);
 
@@ -1774,10 +1774,49 @@ namespace TensileLite
 
         void DataInitialization::initializeMXDataForFP4(ContractionProblemGemm const& problem)
         {
-            std::vector<size_t> emptySwizzle;
-            std::vector<size_t> emptyTile;
+            // Compute preSwizzle parameters from the solution's matrix instruction to rearrange
+            // the scale tensor into the GPU kernel's expected memory layout
+            std::vector<size_t> preSwizzleA, preTileA, preSwizzleB, preTileB;
 
-            if(problem.mxBlockA() > 0 && problem.a().dataType() == rocisa::DataType::Float4)
+            if(m_mxScaleFormat > 0 && m_currentSolution != nullptr
+               && !m_currentSolution->problemType.useScaleAB.empty())
+            {
+                auto const&      mi            = m_currentSolution->sizeMapping.matrixInstruction;
+                size_t           MiK           = static_cast<size_t>(mi[2]);
+                constexpr size_t swizzleTileMN = 32; // 2 SIMDs * 16 lanes per wave for MN access
+                constexpr size_t tileK         = 256 / swizzleTileMN; // scale blocks per wave in K
+
+                if(MiK > 0)
+                {
+                    if(problem.mxBlockA() > 0 && MiK % problem.mxBlockA() == 0)
+                    {
+                        // scale tensor: scaleRows = sizes[0]/mxBlock, scaleCols = sizes[1]
+                        // preSwizzle requires both to be multiples of their tile dimensions
+                        size_t scaleRowsA = problem.a().sizes()[0] / problem.mxBlockA();
+                        size_t scaleColsA = problem.a().sizes()[1];
+                        if(scaleRowsA % tileK == 0 && scaleColsA % swizzleTileMN == 0)
+                        {
+                            size_t subTileK = MiK / problem.mxBlockA();
+                            preSwizzleA     = {swizzleTileMN, tileK, subTileK};
+                            preTileA        = {tileK, swizzleTileMN};
+                        }
+                    }
+
+                    if(problem.mxBlockB() > 0 && MiK % problem.mxBlockB() == 0)
+                    {
+                        size_t scaleRowsB = problem.b().sizes()[0] / problem.mxBlockB();
+                        size_t scaleColsB = problem.b().sizes()[1];
+                        if(scaleRowsB % tileK == 0 && scaleColsB % swizzleTileMN == 0)
+                        {
+                            size_t subTileK = MiK / problem.mxBlockB();
+                            preSwizzleB     = {swizzleTileMN, tileK, subTileK};
+                            preTileB        = {tileK, swizzleTileMN};
+                        }
+                    }
+                }
+            }
+
+            if(isMXFP4Tensor(problem.a(), problem.mxBlockA()))
             {
                 auto const& tensorA = problem.a();
                 auto        rows    = tensorA.sizes()[0];
@@ -1796,8 +1835,8 @@ namespace TensileLite
                                 cols,
                                 stride,
                                 problem.transA(),
-                                emptySwizzle,
-                                emptyTile,
+                                preSwizzleA,
+                                preTileA,
                                 problem.mxBlockA(),
                                 1,
                                 true,
@@ -1806,7 +1845,7 @@ namespace TensileLite
                                 1.0f);
             }
 
-            if(problem.mxBlockB() > 0 && problem.b().dataType() == rocisa::DataType::Float4)
+            if(isMXFP4Tensor(problem.b(), problem.mxBlockB()))
             {
                 auto const& tensorB = problem.b();
                 auto        rows    = tensorB.sizes()[0];
@@ -1825,8 +1864,8 @@ namespace TensileLite
                                 cols,
                                 stride,
                                 problem.transB(),
-                                emptySwizzle,
-                                emptyTile,
+                                preSwizzleB,
+                                preTileB,
                                 problem.mxBlockB(),
                                 1,
                                 false,
