@@ -68,10 +68,15 @@ endif()
 if( CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT )
   set( CMAKE_INSTALL_PREFIX "/opt/rocm" CACHE PATH "Install path prefix, prepended onto install directories" FORCE )
 endif()
-if( NOT CPACK_PACKAGING_INSTALL_PREFIX )
-  set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}" CACHE PATH "Install path prefix for packages.")
+
+if(NOT WIN32)
+  if( NOT CPACK_PACKAGING_INSTALL_PREFIX )
+    set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}" CACHE PATH "Install path prefix for packages.")
+  endif()
+else()
   set(CPACK_SET_DESTDIR OFF)
 endif()
+
 set(BUILD_SHARED_LIBS ON)
 
 # This helps cmake properly find hip-config.cmake
@@ -80,7 +85,27 @@ list( APPEND CMAKE_PREFIX_PATH $ENV{ROCM_PATH} ${ROCM_PATH} /opt/rocm )
 # Users may override HIP path by specifying their own in CMAKE_MODULE_PATH
 list( APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake )
 
-find_package(ROCmCMakeBuildTools 0.7 CONFIG REQUIRED)
+find_package(ROCmCMakeBuildTools QUIET CONFIG)
+
+if(NOT ROCmCMakeBuildTools_FOUND)
+    message(STATUS "ROCmCMakeBuildTools not found. Fetching from source...")
+    include(FetchContent)
+    FetchContent_Declare(
+        rocm-cmake GIT_REPOSITORY https://github.com/ROCm/rocm-cmake.git GIT_TAG rocm-6.4.3
+        GIT_SHALLOW TRUE
+    )
+
+    FetchContent_GetProperties(rocm-cmake)
+    if(NOT rocm-cmake_POPULATED)
+        FetchContent_Populate(rocm-cmake)
+        message(
+            STATUS
+                "Added ROCm CMake modules path: ${rocm-cmake_SOURCE_DIR}/share/rocmcmakebuildtools/cmake"
+        )
+        list(APPEND CMAKE_MODULE_PATH ${rocm-cmake_SOURCE_DIR}/share/rocmcmakebuildtools/cmake)
+    endif()
+endif()
+
 include(ROCMSetupVersion)
 include(ROCMCreatePackage)
 include(ROCMInstallTargets)
