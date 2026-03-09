@@ -67,7 +67,7 @@ auto create_args(int argc, char* argv[])
                 "a(libi) or 2, alibi with 1*h. a:1, b*h")
         .insert("prec",
                 "fp16",
-                "data type: fp32/fp16/bf16/fp8/fp8bf16/fp8fp32/mxfp8/mxfp4/sageattnv3")
+                "data type: fp32/fp16/bf16/fp8/fp8bf16/fp8fp32/mxfp8/mxfp4/sageattnv3/sageattnv3fp16")
         .insert("mask",
                 "0",
                 "0: no mask, 1: top-left(same as 't'), 2:bottom-right(same as 'b')\n"
@@ -265,6 +265,10 @@ int main(int argc, char* argv[])
         else if(data_type == "sageattnv3")
         {
             return run<FmhaFwdSageAttnV3>(arg_parser) == fwd_result::success ? 0 : -2;
+        }
+        else if(data_type == "sageattnv3fp16")
+        {
+            return run<FmhaFwdSageAttnV3Fp16>(arg_parser) == fwd_result::success ? 0 : -2;
         }
         std::cerr << "Unsupported precision: " << data_type << std::endl;
         return -1;

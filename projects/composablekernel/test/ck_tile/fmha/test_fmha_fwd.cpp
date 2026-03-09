@@ -105,8 +105,30 @@ struct TestConfigs<FmhaFwdMxFp4>
 template <>
 struct TestConfigs<FmhaFwdSageAttnV3>
 {
-    // SA3 only supports hdim=128 in the first codegen receipt
-    static constexpr auto HDimValues         = std::array{std::tuple{128, -1}};
+    // SA3 supports hdim=128 and hdim=256
+    static constexpr auto HDimValues =
+        std::array{std::tuple{128, -1}, std::tuple{256, -1}};
+    static constexpr auto SplitKVHDimValues  = std::array<std::tuple<int, int>, 0>{};
+    static constexpr auto AppendKVHDimValues = std::array<std::tuple<int, int>, 0>{};
+    // SA3 only supports batch mode in the runner
+    static constexpr auto ModeValues        = std::array{mode_enum::batch};
+    static constexpr auto IsVRowmajorValues = std::array{false};
+    static constexpr auto qscale_str        = "sageattnv3";
+    static constexpr bool def_lse           = true;
+    static constexpr bool def_is_v_rowmajor = false;
+    static constexpr auto init_method       = "3";
+    static int adjust_seqlen(int seqlen)
+    {
+        return seqlen < 0 ? seqlen : ck_tile::integer_least_multiple(seqlen, 2);
+    }
+};
+
+template <>
+struct TestConfigs<FmhaFwdSageAttnV3Fp16>
+{
+    // SA3 fp16 output: supports hdim=128 and hdim=256
+    static constexpr auto HDimValues =
+        std::array{std::tuple{128, -1}, std::tuple{256, -1}};
     static constexpr auto SplitKVHDimValues  = std::array<std::tuple<int, int>, 0>{};
     static constexpr auto AppendKVHDimValues = std::array<std::tuple<int, int>, 0>{};
     // SA3 only supports batch mode in the runner

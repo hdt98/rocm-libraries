@@ -109,6 +109,14 @@ auto get_elimit<FmhaFwdSageAttnV3>(std::string /*init_method*/)
     return ck_tile::make_tuple(rtol, atol);
 }
 
+template <>
+auto get_elimit<FmhaFwdSageAttnV3Fp16>(std::string /*init_method*/)
+{
+    double rtol = 1e-1;
+    double atol = 2.6e-1;
+    return ck_tile::make_tuple(rtol, atol);
+}
+
 int num_splits_heuristic(int batch_nhead_mblocks, int num_SMs, int max_splits)
 {
     // If we have enough to almost fill the SMs, then just use 1 split
@@ -261,8 +269,13 @@ fwd_result fmha_fwd_run(mode_enum mode,
     using TypeConfig = FmhaFwdTypeConfig<DataTypeConfig>;
 
     constexpr bool is_mx =
-        ck_tile::is_any_of<DataTypeConfig, FmhaFwdMxFp8, FmhaFwdMxFp4, FmhaFwdSageAttnV3>::value;
-    constexpr bool is_sageattnv3 = std::is_same_v<DataTypeConfig, FmhaFwdSageAttnV3>;
+        ck_tile::is_any_of<DataTypeConfig,
+                           FmhaFwdMxFp8,
+                           FmhaFwdMxFp4,
+                           FmhaFwdSageAttnV3,
+                           FmhaFwdSageAttnV3Fp16>::value;
+    constexpr bool is_sageattnv3 =
+        ck_tile::is_any_of<DataTypeConfig, FmhaFwdSageAttnV3, FmhaFwdSageAttnV3Fp16>::value;
 
     using QDataType             = typename TypeConfig::QDataType;
     using KDataType             = typename TypeConfig::KDataType;
@@ -311,6 +324,8 @@ fwd_result fmha_fwd_run(mode_enum mode,
             return "mxfp4";
         else if constexpr(std::is_same_v<DataTypeConfig, FmhaFwdSageAttnV3>)
             return "sageattnv3";
+        else if constexpr(std::is_same_v<DataTypeConfig, FmhaFwdSageAttnV3Fp16>)
+            return "sageattnv3fp16";
         else
             static_assert(false);
     }();
@@ -552,9 +567,9 @@ fwd_result fmha_fwd_run(mode_enum mode,
     {
         return fwd_result::no_instance;
     }
-    if(is_sageattnv3 && (hdim_q != 128 || hdim_v != 128))
+    if(is_sageattnv3 && !((hdim_q == 128 && hdim_v == 128) || (hdim_q == 256 && hdim_v == 256)))
     {
-        // SA3 only has kernels for hdim=128; other shapes have no applicable instance
+        // SA3 only has kernels for hdim=128 and hdim=256; other shapes have no applicable instance
         return fwd_result::no_instance;
     }
 

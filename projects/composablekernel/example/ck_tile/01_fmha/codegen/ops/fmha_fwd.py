@@ -840,7 +840,7 @@ class CompatibilityRuleFactoryGfx9(CompatibilityRuleFactory):
             problem_ctx: ProblemContext, kernel_ctx: KernelContext
         ) -> bool:
             # FIX: too confusing that it has to know about mx types
-            if problem_ctx.dtype not in ("fp32", "mxfp8", "mxfp4", "sageattnv3"):
+            if problem_ctx.dtype not in ("fp32", "mxfp8", "mxfp4", "sageattnv3", "sageattnv3fp16"):
                 # TODO: update if >=gfx11 archs get qr_async and qr_async_trload support
                 if kernel_ctx.pipeline.tag in cls._AVAILABLE_PIPELINES and (
                     (
@@ -1047,7 +1047,7 @@ class KernelComponentFactoryGfx950(
 
     _DT_MXFP8 = ("mxfp8",)
     _DT_MXFP4 = ("mxfp4",)
-    _DT_SAGEATTN_V3 = ("sageattnv3",)
+    _DT_SAGEATTN_V3 = ("sageattnv3", "sageattnv3fp16")
 
     @classmethod
     def supported_dtypes(cls) -> Tuple[str]:
@@ -1083,6 +1083,7 @@ class KernelComponentFactoryGfx950(
             return {
                 #                             bm0, bn0, bk0, bn1, bk1,
                 (128, 128) : [FmhaFwdTileSize(128, 128,  64, 128,  64, 128,  4, 1, 1,  4, 1, 1,  32, 32,  64,  32, 32,  64,  -1)],
+                (256, 256) : [FmhaFwdTileSize(128, 128, 128, 256, 128, 256,  4, 1, 1,  4, 1, 1,  16, 16, 128,  16, 16, 128,  -1)],
             }  # fmt: skip
         return result
 
@@ -1135,7 +1136,9 @@ class KernelComponentFactoryGfx950(
                 pipelines.append(FmhaFwdPipeline("qr", "col", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, "f", "f", sink))  # fmt: skip
                 pipelines.append(FmhaFwdPipeline("qr", "col", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, "f", "f", sink))  # fmt: skip
         elif dtype in cls._DT_SAGEATTN_V3:
-            # SA3: same pipeline config as MXFP4 but uses sageattnv3 qscale token and dedicated pipeline
+            # SA3: same pipeline config as MXFP4 but uses sageattnv3 qscale token and dedicated pipeline.
+            # Both "sageattnv3" (float output) and "sageattnv3fp16" (fp16 output) share the same pipeline;
+            # output type differs only via FmhaFwdTypeConfig<dtype>::ODataType → epilogue type cast.
             lse = "t"
             dropout = "f"
             for logits, qscale, mask, bias, sink in itertools.product(
