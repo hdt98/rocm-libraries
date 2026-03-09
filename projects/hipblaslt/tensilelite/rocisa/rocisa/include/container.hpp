@@ -690,6 +690,24 @@ namespace rocisa
         RegName() {}
     };
 
+    enum class RegLH : uint8_t
+    {
+        NONE = 0,
+        LO,
+        HI
+    };
+
+    inline std::string regLHtoString(RegLH r)
+    {
+        switch(r)
+        {
+        case RegLH::LO:  return ".l";
+        case RegLH::HI:  return ".h";
+        case RegLH::NONE:
+        default:         return "";
+        }
+    }
+
     struct RegisterContainer : public Container
     {
         std::string            regType;
@@ -701,6 +719,7 @@ namespace rocisa
         bool                   isAbs;
         bool                   isMacro;
         bool                   isOff;
+        RegLH                  regLH;   // NEW: carry .l / .h / none
 
         RegisterContainer(const std::string&            regType,
                           const std::optional<RegName>& regName,
@@ -716,6 +735,7 @@ namespace rocisa
             , isAbs(false)
             , isMacro(false)
             , isOff(false)
+            , regLH(RegLH::NONE)
         {
         }
 
@@ -736,6 +756,7 @@ namespace rocisa
             , isAbs(isAbs)
             , isMacro(isMacro)
             , isOff(isOff)
+            , regLH(RegLH::NONE)
         {
         }
 
@@ -750,6 +771,7 @@ namespace rocisa
             , isAbs(other.isAbs)
             , isMacro(other.isMacro)
             , isOff(other.isOff)
+            , regLH(other.regLH)               // copy new field
         {
         }
 
@@ -774,6 +796,7 @@ namespace rocisa
             , isAbs(other.isAbs)
             , isMacro(other.isMacro)
             , isOff(other.isOff)
+            , regLH(other.regLH)               // move/copy
         {
         }
 
@@ -790,6 +813,7 @@ namespace rocisa
                 isAbs       = other.isAbs;
                 isMacro     = other.isMacro;
                 isOff       = other.isOff;
+                regLH       = other.regLH;      // copy new field
             }
             return *this;
         }
@@ -807,6 +831,7 @@ namespace rocisa
                 isAbs       = other.isAbs;
                 isMacro     = other.isMacro;
                 isOff       = other.isOff;
+                regLH       = other.regLH;      // move/copy
             }
             return *this;
         }
@@ -825,6 +850,10 @@ namespace rocisa
         {
             this->isAbs = isAbs;
         }
+
+        void setRegLH(RegLH m) { regLH = m; }     // new setter
+
+        RegLH getRegLH() const { return regLH; }  // new getter
 
         RegisterContainer getMinus() const
         {
@@ -902,13 +931,14 @@ namespace rocisa
             seed ^= std::hash<int>{}(regNum) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
             if(regName)
                 seed ^= regName->hash() + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            seed ^= std::hash<uint8_t>{}(static_cast<uint8_t>(regLH)) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
             return seed;
         }
 
         bool operator==(const RegisterContainer& other) const
         {
             return regType == other.regType && regIdx == other.regIdx && regNum == other.regNum
-                   && regName == other.regName;
+                   && regName == other.regName && regLH == other.regLH;
         }
 
         bool operator!=(const RegisterContainer& other) const
@@ -931,13 +961,15 @@ namespace rocisa
                 return minusStr + "%" + std::to_string(regIdx) + absStr;
             }
 
+            const std::string lhSuffix = regLHtoString(regLH); // ".l", ".h", or ""
+
             if(regName)
             {
                 std::string macroSlash = isMacro ? "\\" : "";
                 if(regNum == 1)
                 {
                     return minusStr + regType + "[" + macroSlash + regType + "gpr"
-                           + regName->toString() + "]" + absStr;
+                           + regName->toString() + "]" + lhSuffix + absStr;
                 }
                 else
                 {
@@ -951,7 +983,7 @@ namespace rocisa
             {
                 if(regNum == 1)
                 {
-                    return minusStr + regType + std::to_string(regIdx) + absStr;
+                    return minusStr + regType + std::to_string(regIdx) + lhSuffix + absStr;
                 }
                 else
                 {
