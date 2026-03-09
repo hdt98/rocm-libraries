@@ -262,10 +262,24 @@ add_wcnn_splited_target(
 )
 
 add_wcnn_splited_target(
-    test_grouped_conv_fwd_wcnn_wg      # TARGET_NAME
+    test_grouped_conv_fwd_wcnn_wg    # TARGET_NAME
+    "grouped_conv_fwd_wcnn.cpp"      # SOURCE_FILE
+    OFF
+    "^grouped_conv_fwd_wcnn_wg__.+"  # TEST_FILTER
+)
+
+add_wcnn_splited_target(
+    test_grouped_conv_fwd_wcnn_wg_sc   # TARGET_NAME
     "grouped_conv_fwd_wcnn.cpp"        # SOURCE_FILE
     OFF
-    "^grouped_conv_fwd_wcnn_wg.*__.+"  # TEST_FILTER
+    "^grouped_conv_fwd_wcnn_wg_sc__.+" # TEST_FILTER
+)
+
+add_wcnn_splited_target(
+    test_grouped_conv_fwd_wcnn_wg_sc_mc   # TARGET_NAME
+    "grouped_conv_fwd_wcnn.cpp"           # SOURCE_FILE
+    OFF
+    "^grouped_conv_fwd_wcnn_wg_sc_mc__.+" # TEST_FILTER
 )
 
 add_wcnn_splited_target(
@@ -369,6 +383,8 @@ message(STATUS "[WCNN] Configuration Summary:")
 message(STATUS "[WCNN]   Splited executables:")
 message(STATUS "[WCNN]     - test_grouped_conv_fwd_wcnn")
 message(STATUS "[WCNN]     - test_grouped_conv_fwd_wcnn_wg")
+message(STATUS "[WCNN]     - test_grouped_conv_fwd_wcnn_wg_sc")
+message(STATUS "[WCNN]     - test_grouped_conv_fwd_wcnn_wg_sc_mc")
 message(STATUS "[WCNN]     - test_grouped_conv_fwd_wcnn_fma")
 message(STATUS "[WCNN]     - test_grouped_conv_fwd_wcnn_fma_cvt")
 message(STATUS "[WCNN]     - test_grouped_conv_fwd_wcnn_fma_wg")
