@@ -38,19 +38,93 @@ from fmha_utils import (
 )
 
 
+# FmhaKernelSpec fields:
+#   name      -- human-readable kernel identifier
+#   hdim      -- head dimension (hdim_q = hdim_v for symmetric attention)
+#   pipeline  -- "qr_async" (async prefetch) or "qr" (synchronous)
+#   tile_m0   -- Stage 0 tile along seqlen_q  (Q*K^T M dimension)
+#   tile_n0   -- Stage 0 tile along seqlen_k  (Q*K^T N dimension)
+#   tile_k0   -- Stage 0 tile along hdim_q    (Q*K^T K dimension)
+#
+# spec_to_config() fills in Stage 1 automatically:
+#   tile_n1 = hdim, tile_k1 = tile_k0, tile_k0max = hdim
+#   wave/warp use sensible defaults (4x1x1 wave, 32x32x16 warp)
 KERNEL_SPECS = [
-    # Standard async pipelines
-    FmhaKernelSpec("async_128x128_k32", 128, "qr_async", 128, 128, 32),
-    FmhaKernelSpec("async_128x64_k32", 128, "qr_async", 128, 64, 32),
-    FmhaKernelSpec("async_64x128_k32", 128, "qr_async", 64, 128, 32),
-    FmhaKernelSpec("async_64x64_k32", 128, "qr_async", 64, 64, 32),
+    # Async pipelines -- different tile_m0 x tile_n0 combos
+    FmhaKernelSpec(
+        name="async_128x128_k32",
+        hdim=128,
+        pipeline="qr_async",
+        tile_m0=128,
+        tile_n0=128,
+        tile_k0=32,
+    ),
+    FmhaKernelSpec(
+        name="async_128x64_k32",
+        hdim=128,
+        pipeline="qr_async",
+        tile_m0=128,
+        tile_n0=64,
+        tile_k0=32,
+    ),
+    FmhaKernelSpec(
+        name="async_64x128_k32",
+        hdim=128,
+        pipeline="qr_async",
+        tile_m0=64,
+        tile_n0=128,
+        tile_k0=32,
+    ),
+    FmhaKernelSpec(
+        name="async_64x64_k32",
+        hdim=128,
+        pipeline="qr_async",
+        tile_m0=64,
+        tile_n0=64,
+        tile_k0=32,
+    ),
     # Synchronous pipelines
-    FmhaKernelSpec("sync_128x128_k32", 128, "qr", 128, 128, 32),
-    FmhaKernelSpec("sync_64x128_k32", 128, "qr", 64, 128, 32),
-    FmhaKernelSpec("sync_128x64_k32", 128, "qr", 128, 64, 32),
-    # Different tile_k
-    FmhaKernelSpec("async_128x128_k64", 128, "qr_async", 128, 128, 64),
-    FmhaKernelSpec("async_64x128_k64", 128, "qr_async", 64, 128, 64),
+    FmhaKernelSpec(
+        name="sync_128x128_k32",
+        hdim=128,
+        pipeline="qr",
+        tile_m0=128,
+        tile_n0=128,
+        tile_k0=32,
+    ),
+    FmhaKernelSpec(
+        name="sync_64x128_k32",
+        hdim=128,
+        pipeline="qr",
+        tile_m0=64,
+        tile_n0=128,
+        tile_k0=32,
+    ),
+    FmhaKernelSpec(
+        name="sync_128x64_k32",
+        hdim=128,
+        pipeline="qr",
+        tile_m0=128,
+        tile_n0=64,
+        tile_k0=32,
+    ),
+    # Different tile_k0 (K dimension of Q*K^T)
+    FmhaKernelSpec(
+        name="async_128x128_k64",
+        hdim=128,
+        pipeline="qr_async",
+        tile_m0=128,
+        tile_n0=128,
+        tile_k0=64,
+    ),
+    FmhaKernelSpec(
+        name="async_64x128_k64",
+        hdim=128,
+        pipeline="qr_async",
+        tile_m0=64,
+        tile_n0=128,
+        tile_k0=64,
+    ),
 ]
 
 
