@@ -1083,13 +1083,16 @@ TEST(TestCalculateConvFpropTolerance, DetectsFailure)
     auto validator = hipdnn_test_sdk::utilities::createAllCloseValidator(
         hipdnn_data_sdk::data_objects::DataType::FLOAT, tol, 0.0f);
 
-    bool valid = validator->allClose(*baseline, *actualPassing);
-    SCOPED_TRACE("Validator should have passed");
-    EXPECT_TRUE(valid);
-
-    valid = validator->allClose(*baseline, *actualFailing);
-    SCOPED_TRACE("Validator should have failed");
-    EXPECT_FALSE(valid);
+    {
+        SCOPED_TRACE("Validator should have passed");
+        bool valid = validator->allClose(*baseline, *actualPassing);
+        EXPECT_TRUE(valid);
+    }
+    {
+        SCOPED_TRACE("Validator should have failed");
+        bool valid = validator->allClose(*baseline, *actualFailing);
+        EXPECT_FALSE(valid);
+    }
 }
 
 // Test that calculateConvFpropTolerance throws when nU >= 1.0 (singularity)

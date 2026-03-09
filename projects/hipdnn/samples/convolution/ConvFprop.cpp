@@ -108,8 +108,8 @@ bool SampleRunner::operator()(const TensorLayout& layout)
             calculateConvFpropTolerance<InputType, InputType, float>(
                 0.0, 1.0, 0.0, 1.0, wAttr->get_dim());
 
-        auto yValidator = hipdnn_test_sdk::utilities::CpuFpReferenceValidation<InputType>(
-            static_cast<float>(tolerance), static_cast<float>(tolerance));
+        auto yValidator
+            = hipdnn_test_sdk::utilities::CpuFpReferenceValidation<InputType>(tolerance, tolerance);
 
         bool yValid = yValidator.allClose(yRefTensor, yTensor);
 
