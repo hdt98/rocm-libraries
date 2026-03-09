@@ -394,38 +394,6 @@ namespace rocRoller::KernelGraph
 
     void ControlFlowRWTracer::operator()(ForLoopOp const& op, int tag)
     {
-        //
-        // Don't examine for loop intialize or increment operations.
-        //
-        // Assign operations within loop initialisation operations
-        // are scoped already.
-        //
-        // Assign operations within loop increment operations
-        // typically involve: incrementing loop counters and
-        // offsets.  Loop counters are scoped already.
-        //
-        // Offsets are created by AssignIndexExpressions and are
-        // used in other nodes like LoadTiled.  These
-        // references do not explicitly appear in the graph.
-        //
-        // If we examine loop increment operations and "track" an
-        // offset increment, but don't track it during loads, then
-        // a Deallocate node would be mis-placed.
-        //
-        // A few solutions:
-        //
-        // 1. Don't examine loop increment operations.  They
-        // already appear in Scopes so are deallocated regardless.
-        // Fairly easy but perhaps we miss an opporunity to free
-        // up registers early.
-        //
-        // 2. Teach the tracker how to dig into all nodes.  Very
-        // tedious and not future-proof.
-        //
-        // 3. Expose all references in the graph.  Ideal but we
-        // aren't there yet.
-        //
-
         auto init = m_graph.control.getOutputNodeIndices<Initialize>(tag).to<std::set>();
         generate(init);
 

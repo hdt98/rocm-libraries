@@ -175,8 +175,9 @@ TEST_CASE("hoist loop invariant", "[kernel-graph][hoist-loop-invariant]")
                 if(std::holds_alternative<Connections::JustNaryArgument>(c.connection))
                 {
                     CAPTURE(c.coordinate);
-                    // KLoop's for loop variable is only written in the KLoop, not in KLoopTail
-                    CHECK(countCoordinateWritesInLoop(graph, kLoop, c.coordinate, tracer) == 1);
+                    // KLoop's loop variable is written in the KLoop for initialization
+                    // and increment, not in KLoopTail
+                    CHECK(countCoordinateWritesInLoop(graph, kLoop, c.coordinate, tracer) == 2);
                     CHECK(countCoordinateWritesInLoop(graph, kLoopTail, c.coordinate, tracer) == 0);
                     didACheck = true;
                 }
