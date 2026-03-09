@@ -60,6 +60,7 @@ globalParameters["PinClocks"] = False  # T=pin gpu clocks and fan, F=don't
 globalParameters["HardwareMonitor"] = (
     True  # False: disable benchmarking client monitoring clocks using rocm-smi.
 )
+globalParameters["BenchmarkTimer"] = True  # False: disable benchmark timing for correctness-only runs.
 globalParameters["MinFlopsPerSync"] = (
     1  # Minimum number of flops per sync to increase stability for small problems
 )
