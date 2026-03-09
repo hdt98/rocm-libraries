@@ -278,7 +278,7 @@ From `Arguments`: `a_type`, `b_type`, `c_type`, `d_type`, `compute_type`, `scale
 
 - **Real:** `real_precisions` (f16, bf16, f32), `real_precisions_gemm_only` (+ f64), `real_precisions_1b`, `real_precisions_1b_fnuz`, `real_precisions_2b`, `real_precisions_swizzleA/B_support`, `real_precisions_intermeddiate*`, `real_precisions_mx`, etc.
 - **Integer:** `integer_precisions_i8`
-- **Complex:** conjugate tests use `conjugate_transA_transB_range`; complex-specific precision sets if any
+- **Complex:** `complex_precisions` (f32_c, f64_c; compute c_f32_r, c_f64_r) are used by matmul_*_complex tests (matmul_medium_complex, matmul_batch_medium_complex, matmul_16/32_8_128/96/256_8_16_complex, and large fixed-shape complex). Conjugate transposition uses `complex_transA_transB_range`. **Arch:** complex GEMM is supported and tested on **gfx942 and gfx950 only** (library support added in hipBLASLt 1.2.1); all complex tests are pre_checkin and not in smoke or quick.
 
 So “complex vs real” and “precision family” can be derived from the type fields (and from test name suffix, which includes datatype strings).
 

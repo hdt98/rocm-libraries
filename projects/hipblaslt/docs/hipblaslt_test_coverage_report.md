@@ -4,7 +4,7 @@ This page is the main reference for how **hipBLASLt** is tested: what runs in CI
 
 ## Coverage at a glance (for stakeholders)
 
-**What is covered:** The test suite exercises the full **matmul (GEMM) API** across all supported precisions (including half, single, double, 8‑bit float, and mixed) and a wide range of matrix sizes—from 1×1×1 up to large and workload-specific shapes. **Descriptor and helper APIs** (handles, preferences, algorithms, plans) are covered by dedicated auxiliary tests. **Rocroller** integration is covered by one configuration. When a PR changes hipblaslt code, TheRock CI runs the **full** suite (no filter); Math CI runs the full suite on precheckin.
+**What is covered:** The test suite exercises the full **matmul (GEMM) API** across all supported precisions (including half, single, double, 8‑bit float, mixed, and **complex** f32_c/f64_c on gfx942 and gfx950) and a wide range of matrix sizes—from 1×1×1 up to large and workload-specific shapes. **Descriptor and helper APIs** (handles, preferences, algorithms, plans) are covered by dedicated auxiliary tests. **Rocroller** integration is covered by one configuration. When a PR changes hipblaslt code, TheRock CI runs the **full** suite (no filter); Math CI runs the full suite on precheckin.
 
 **Scale:** The full suite is on the order of **tens of thousands** of test instances (see §4 for counts by operation group). A fast **smoke** subset (~1.5k tests) runs when only CI/workflow files change, so presubmit stays quick when hipblaslt itself is not modified.
 
@@ -42,7 +42,7 @@ The **sources** are four YAML files included by `hipblaslt_gtest.yaml`: **matmul
 
 The **size letters** (O, S, M, E, C, G, D, W, F, R) summarize *which* matrix shapes are exercised in each cell. Different kernels and code paths are used for tiny vs large vs skinny matrices; the suite deliberately spans from 1×1×1 to grid_limit and workload-specific shapes so that core, stress, and real-world shapes are all hit.
 
-**Precision** (real, f64, 1b, 1b fnuz, int i8, xf32, mixed) matters because the library has different code paths and numerical behavior per type; the tables show which operation groups are tested at which precisions so gaps (e.g. no f64 in bias) are visible.
+**Precision** (real, f64, 1b, 1b fnuz, int i8, xf32, mixed, **complex** f32_c/f64_c) matters because the library has different code paths and numerical behavior per type; the tables show which operation groups are tested at which precisions so gaps (e.g. no f64 in bias) are visible. Complex GEMM is supported and tested on **gfx942 and gfx950 only** (see CHANGELOG 1.2.1); complex tests run in the **full** suite (pre_checkin) but are not in smoke or quick.
 
 ---
 
@@ -112,23 +112,25 @@ So a PR that only touches `projects/hipblaslt/` (e.g. library or test code) will
 
 ## 4. Coverage tables (full, quick, smoke)
 
-Below are the three coverage views: **full** (no filter), **quick** (`*quick*`), and **smoke** (`*smoke*`). Each cell is the **size-group letters** for array sizes (M×N×K) exercised at that (operation, precision); **Total tests** is the number of test instances in that row (from the test generator). **—** = no tests; **·** = N/A (no GEMM sizes). Size letters are defined in the legend after the tables.
+Below are the three coverage views: **full** (no filter), **quick** (`*quick*`), and **smoke** (`*smoke*`). Each cell is the **size-group letters** for array sizes (M×N×K) exercised at that (operation, precision); **Total tests** is the number of test instances in that row from the test generator (run `count_hipblaslt_tests_by_row.py` from `clients/tests` to refresh). **—** = no tests; **·** = N/A (no GEMM sizes). Size letters are defined in the legend after the tables.
 
 ### 4.1 Full (no filter)
 
 Used by TheRock CI when test_type=full and by Math CI precheckin. All tests from matmul, auxiliary, smoke, and rocroller YAML. Suite size on the order of tens of thousands of tests.
 
-| Operation group        | Sub-item                    | real (f16/bf16/f32) | f64 | 1b (f8/bf8) | 1b fnuz | int i8 | xf32 | mixed / swizzle | Total tests |
-|------------------------|-----------------------------|--------------------|-----|-------------|---------|--------|------|------------------|-------------|
-| **matmul core/sizes**  | core / bad-arg / NaN        | O,S,M,C            | O,S,M,C | O,S,M,C   | O,S,M,C | O,S,M,C | O,S,M,C | O,S,M,C          | 15,843      |
-|                        | sizes / fixed shapes         | F                  | F   | F           | F       | F      | F    | F                | 3,057       |
-|                        | algo / heuristic / MX       | S,M,F              | S,M,F | S,M,F     | S,M,F   | S,M,F  | S,M,F | S,M,F            | 1,499       |
-|                        | stress / nightly shapes     | G,D,W              | G,D,W | D,W        | D,W     | —      | D,W  | —                | 3,616       |
-| **matmul bias/activation** | bias (relu, gelu, swish, …) | S,E            | —   | S,E         | S,E     | —      | —    | —                | 3,496       |
-|                        | gradients (dgelu, drelu, bgradb) | S,E         | —   | S,E         | S,E     | —      | —    | —                | 1,664       |
-|                        | bias_gelu_aux / equality    | S,E                | —   | S,E         | S,E     | —      | —    | —                | 1,920       |
-| **matmul grouped/ext** | grouped gemm                | S,M,F              | —   | S,M,F       | S,M,F   | —      | S,M,F | —                | 154         |
-|                        | extended API (algo, swizzle) | S,M,F             | —   | S,M,F       | S,M,F   | —      | S,M,F | —                | 6,708       |
+| Operation group        | Sub-item                    | real (f16/bf16/f32) | f64 | 1b (f8/bf8) | 1b fnuz | int i8 | xf32 | mixed / swizzle | complex (f32_c/f64_c)¹ | Total tests |
+|------------------------|-----------------------------|--------------------|-----|-------------|---------|--------|------|------------------|------------------------|-------------|
+| **matmul core/sizes**  | core / bad-arg / NaN        | O,S,M,C            | O,S,M,C | O,S,M,C   | O,S,M,C | O,S,M,C | O,S,M,C | O,S,M,C          | M                       | 16,431      |
+|                        | sizes / fixed shapes         | F                  | F   | F           | F       | F      | F    | F                | F                       | 4,747       |
+|                        | algo / heuristic / MX       | S,M,F              | S,M,F | S,M,F     | S,M,F   | S,M,F  | S,M,F | S,M,F            | —                       | 1,500       |
+|                        | stress / nightly shapes     | G,D,W              | G,D,W | D,W        | D,W     | —      | D,W  | —                | —                       | 3,616       |
+| **matmul bias/activation** | bias (relu, gelu, swish, …) | S,E            | —   | S,E         | S,E     | —      | —    | —                | —                       | 3,496       |
+|                        | gradients (dgelu, drelu, bgradb) | S,E         | —   | S,E         | S,E     | —      | —    | —                | —                       | 1,664       |
+|                        | bias_gelu_aux / equality    | S,E                | —   | S,E         | S,E     | —      | —    | —                | —                       | 1,920       |
+| **matmul grouped/ext** | grouped gemm                | S,M,F              | —   | S,M,F       | S,M,F   | —      | S,M,F | —                | —                       | 154         |
+|                        | extended API (algo, swizzle) | S,M,F             | —   | S,M,F       | S,M,F   | —      | S,M,F | —                | —                       | 6,708       |
+
+¹ *Complex (f32_c/f64_c) is supported and tested on **gfx942 and gfx950 only**. In the full suite there are **~2,300 complex test instances** (from 9 test templates × precisions/trans/sizes); all are pre_checkin and not in smoke or quick. So complex coverage is sparse relative to real/f64/1b.*
 
 **Auxiliary and rocroller (full):**
 
@@ -141,17 +143,17 @@ Used by TheRock CI when test_type=full and by Math CI precheckin. All tests from
 
 Only tests with `category: quick` in matmul_gtest.yaml. Used by TheRock on Windows (gfx1151). No aux, no rocroller.
 
-| Operation group        | Sub-item                    | real (f16/bf16/f32) | f64 | 1b (f8/bf8) | 1b fnuz | int i8 | xf32 | mixed / swizzle | Total tests |
-|------------------------|-----------------------------|--------------------|-----|-------------|---------|--------|------|------------------|-------------|
-| **matmul core/sizes**  | core / bad-arg / NaN        | O,S                | O,S | O           | —       | O      | —    | —                | 14,408      |
-|                        | sizes / fixed shapes         | F                  | —   | —           | —       | —      | —    | —                | 144         |
-|                        | algo / heuristic / MX       | —                  | —   | —           | —       | —      | —    | —                | 0           |
-|                        | stress / nightly shapes     | —                  | —   | —           | —       | —      | —    | —                | 0           |
-| **matmul bias/activation** | bias (relu, gelu, swish, …) | —            | —   | —           | —       | —      | —    | —                | 0           |
-|                        | gradients (dgelu, drelu, bgradb) | —             | —   | —           | —       | —      | —    | —                | 0           |
-|                        | bias_gelu_aux / equality    | —                | —   | —           | —       | —      | —    | —                | 0           |
-| **matmul grouped/ext** | grouped gemm                | —                  | —   | —           | —       | —      | —    | —                | 0           |
-|                        | extended API (algo, swizzle) | —                 | —   | —           | —       | —      | —    | —                | 0           |
+| Operation group        | Sub-item                    | real (f16/bf16/f32) | f64 | 1b (f8/bf8) | 1b fnuz | int i8 | xf32 | mixed / swizzle | complex (f32_c/f64_c) | Total tests |
+|------------------------|-----------------------------|--------------------|-----|-------------|---------|--------|------|------------------|------------------------|-------------|
+| **matmul core/sizes**  | core / bad-arg / NaN        | O,S                | O,S | O           | —       | O      | —    | —                | —                       | 14,408      |
+|                        | sizes / fixed shapes         | F                  | —   | —           | —       | —      | —    | —                | —                       | 144         |
+|                        | algo / heuristic / MX       | —                  | —   | —           | —       | —      | —    | —                | —                       | 0           |
+|                        | stress / nightly shapes     | —                  | —   | —           | —       | —      | —    | —                | —                       | 0           |
+| **matmul bias/activation** | bias (relu, gelu, swish, …) | —            | —   | —           | —       | —      | —    | —                | —                       | 0           |
+|                        | gradients (dgelu, drelu, bgradb) | —             | —   | —           | —       | —      | —    | —                | —                       | 0           |
+|                        | bias_gelu_aux / equality    | —                | —   | —           | —       | —      | —    | —                | —                       | 0           |
+| **matmul grouped/ext** | grouped gemm                | —                  | —   | —           | —       | —      | —    | —                | —                       | 0           |
+|                        | extended API (algo, swizzle) | —                 | —   | —           | —       | —      | —    | —                | —                       | 0           |
 
 **Auxiliary and rocroller (quick):**
 
@@ -164,17 +166,17 @@ Only tests with `category: quick` in matmul_gtest.yaml. Used by TheRock on Windo
 
 Only tests from smoke_gtest.yaml (`category: smoke`). Used by TheRock presubmit by default. Small sizes (E) or fixed 128; no aux, no rocroller.
 
-| Operation group        | Sub-item                    | real (f16/bf16/f32) | f64 | 1b (f8/bf8) | 1b fnuz | int i8 | xf32 | mixed / swizzle | Total tests |
-|------------------------|-----------------------------|--------------------|-----|-------------|---------|--------|------|------------------|-------------|
-| **matmul core/sizes**  | core / bad-arg / NaN        | E                  | E   | E           | E       | E      | E    | —                | 992         |
-|                        | sizes / fixed shapes         | —                  | —   | —           | —       | —      | —    | —                | 0           |
-|                        | algo / heuristic / MX       | —                  | —   | —           | —       | —      | —    | —                | 0           |
-|                        | stress / nightly shapes     | —                  | —   | —           | —       | —      | —    | —                | 0           |
-| **matmul bias/activation** | bias (relu, gelu, swish, …) | E              | —   | —           | —       | —      | —    | —                | 552         |
-|                        | gradients (dgelu, drelu, bgradb) | —             | —   | —           | —       | —      | —    | —                | 0           |
-|                        | bias_gelu_aux / equality    | —                | —   | —           | —       | —      | —    | —                | 0           |
-| **matmul grouped/ext** | grouped gemm                | —                  | —   | —           | —       | —      | —    | —                | 0           |
-|                        | extended API (algo, swizzle) | —                 | —   | —           | —       | —      | —    | —                | 0           |
+| Operation group        | Sub-item                    | real (f16/bf16/f32) | f64 | 1b (f8/bf8) | 1b fnuz | int i8 | xf32 | mixed / swizzle | complex (f32_c/f64_c) | Total tests |
+|------------------------|-----------------------------|--------------------|-----|-------------|---------|--------|------|------------------|------------------------|-------------|
+| **matmul core/sizes**  | core / bad-arg / NaN        | E                  | E   | E           | E       | E      | E    | —                | —                       | 992         |
+|                        | sizes / fixed shapes         | —                  | —   | —           | —       | —      | —    | —                | —                       | 0           |
+|                        | algo / heuristic / MX       | —                  | —   | —           | —       | —      | —    | —                | —                       | 0           |
+|                        | stress / nightly shapes     | —                  | —   | —           | —       | —      | —    | —                | —                       | 0           |
+| **matmul bias/activation** | bias (relu, gelu, swish, …) | E              | —   | —           | —       | —      | —    | —                | —                       | 552         |
+|                        | gradients (dgelu, drelu, bgradb) | —             | —   | —           | —       | —      | —    | —                | —                       | 0           |
+|                        | bias_gelu_aux / equality    | —                | —   | —           | —       | —      | —    | —                | —                       | 0           |
+| **matmul grouped/ext** | grouped gemm                | —                  | —   | —           | —       | —      | —    | —                | —                       | 0           |
+|                        | extended API (algo, swizzle) | —                 | —   | —           | —       | —      | —    | —                | —                       | 0           |
 
 **Auxiliary and rocroller (smoke):**
 
@@ -234,6 +236,8 @@ Matrix and vector data are filled by an **initialization** mode (implementation 
 
 So today the suite is mostly **deterministic pseudo-random in [-0.5, 0.5]** (hpl). The modes **zero**, **special**, **norm_dist**, and **uniform_01** exist in code but are not exercised by the GTest YAML.
 
+**Complex data types** use the same initialization modes. The device init code has explicit branches for `std::complex<float>` and `std::complex<double>` for **hpl**, **trig_float**, **rand_int**, and **zero**: real and imaginary parts are filled separately (e.g. for **hpl**, each component gets the same deterministic pseudo-random in [-0.5, 0.5] with an offset seed for the imaginary part). The matmul complex tests do not override `initialization` in the YAML, so they use the default **hpl** like most of the suite. Modes **special**, **norm_dist**, and **uniform_01** are not defined in a complex-specific way in the current init code (they target real or half types).
+
 ### 5.3 Multithreaded and multi-stream tests
 
 The main **hipblaslt-test** suite does **not** run any tests with multiple CPU threads or multiple HIP streams. The test harness supports it: YAML can set `threads` and `streams`, and the code uses `launch_test_on_threads` / `RUN_TEST_ON_THREADS_STREAMS` to run the same test on multiple threads and streams. In `hipblaslt_common.yaml`, however, the only active combination is **threads: 0, streams: 0** (single-thread, single-stream). All other combinations (e.g. threads: 3, streams: 3) are commented out. So concurrent execution of GEMM or API calls from multiple threads is not exercised in CI.
@@ -244,17 +248,21 @@ The main **hipblaslt-test** suite does **not** run any tests with multiple CPU t
 
 The codebase supports **AddressSanitizer (ASAN)** and **ThreadSanitizer (TSAN)** via CMake options (`HIPBLASLT_ENABLE_ASAN`, `HIPBLASLT_ENABLE_TSAN`) and `install.sh --address-sanitizer`. The test binary can be built and run with these sanitizers enabled for local or one-off use. **CI does not** run the hipblaslt-test suite with ASAN or TSAN builds. So we do not get regular coverage for memory errors (ASAN) or data races (TSAN) from the standard TheRock or Math CI pipelines. *(Epic: AIHPBLAS-1003; sanitizer CI infrastructure: ROCM-658.)*
 
-### 5.5 Architecture coverage
+### 5.5 Complex data type and tier coverage
+
+**Complex (f32_c/f64_c)** GEMM is tested only in the **full** suite (pre_checkin), on **gfx942 and gfx950**. There are no complex tests in the **smoke** or **quick** filters. So presubmit (smoke) and Windows/quick runs do not exercise complex GEMM; only full runs on nodes with gfx942 or gfx950 do. If complex regressions are a concern for a change, run the full suite or a filter that includes the matmul_*_complex tests on an appropriate arch.
+
+### 5.6 Architecture coverage
 
 Tests run on a **limited set of GPU architectures**. TheRock CI typically runs on **gfx94X** and **gfx1151** (and optionally gfx950; the gfx950 test job has been disabled in the past due to capacity). Math CI runs on **gfx950, gfx1200, gfx1201, gfx942, gfx90a** across its nodes. So in practice we cover a small number of CDNA/consumer families. We do **not** run the full test suite on a wide matrix of older or alternate architectures (e.g. other gfx9xx, gfx10xx, or additional gfx11/gfx12 variants). Gaps here mean bugs that are architecture-specific may go undetected until later in the release cycle or in the field. *(Epic: AIHPBLAS-1003; multi-GPU/production issues: SWDEV-484012, SWDEV-574692.)*
 
-### 5.6 Out of scope for this report
+### 5.7 Out of scope for this report
 
 - **Code coverage (line/branch %):** This document describes *test* coverage (scenarios, operations, precisions, sizes). It does not report code coverage metrics; those would require a separate instrumentation and reporting setup.
 - **TensileLite:** The TensileLite library under `projects/hipblaslt/tensilelite/` has its own C++ GTest, Python tests, and CPU driver tests. They are separate from the main hipblaslt-test suite and are not summarized here.
 - **Samples:** The `clients/samples/` programs are demos; they are not part of the automated regression suite described in this report.
 
-### 5.7 Improvement opportunities (summary)
+### 5.8 Improvement opportunities (summary)
 
 All of the below align with Epic **AIHPBLAS-1003** and its child work; production issues (e.g. SWDEV-576540, SWDEV-484012, SWDEV-568258, SWDEV-553776, SWDEV-565755) are linked in the Epic.
 
