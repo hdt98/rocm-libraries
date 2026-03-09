@@ -4234,11 +4234,11 @@ def _get_schedule_256x256x32_TF32(kernel, useLDSTr, TLDS):
     return True, opt1
 
 @RegisterSchedule(
-    tile_config=TileConfig(192, 128, 32, 2, 1, 1, False, 0, 0),
+    tile_config=TileConfig(192, 128, 32, 2, 0, 1, False, 0, 0),
     dtype_predicate=isTF32,
     vector_widths=[4, 4, 4],
     matrix_inst=[16, 16, 32, 1],
-    mfma_wave_group=[2, 2]
+    mfma_wave_group=[4, 1]
 )
 def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
     numMfma = 72
@@ -4339,20 +4339,11 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
         # - having extra latency when switching between MFMA types
         packAOffset = [
             1, 1, 1, 1,
-            5, 5,
-            6, 6, 6, 6,
+            3, 3,
+            4, 4, 4, 4,
 
             2, 2, 2, 2, 
-            5, 5,
-            7, 7, 7, 7,
-
-            3, 3, 3, 3, 
-            5, 5,
-            8, 8, 8, 8,
-            
-            4, 4, 4, 4,
-            5, 5,
-            9
+            3
         ]
 
         packA0 = [x + startPACKA0 for x in packAOffset]
@@ -4369,14 +4360,26 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
         startPACKB0 = waitLRB0+4
         packBOffset = [
             1, 1, 1, 1,
-            4, 4,
-            5, 5, 5, 5,
+            7, 7,
+            8, 8, 8, 8,
 
             2, 2, 2, 2, 
-            4, 4,
-            6, 6, 6, 6,
+            7, 7,
+            9, 9, 9, 9,
             
-            3, 3, 3, 3
+            3, 3, 3, 3,
+            7, 7,
+            10, 10, 10, 10,
+            
+            4, 4, 4, 4, 
+            7, 7,
+            11, 11, 11, 11,
+            
+            5, 5, 5, 5,
+            7, 7,   
+            12, 12, 12, 12,
+            
+            6, 6,
         ]
         packB0 = [x + startPACKB0 for x in packBOffset]
 
@@ -4466,9 +4469,8 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
 
     kernel["MfmaInitCVgprs"] = True
     opt1 = ScheduleInfo(2, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    opt1.pretty_print()
-    # if disable_validation:
-    #     opt1.disableValidation("4x4MFMA with wider loads is not yet supported by validator")
+    if disable_validation:
+        opt1.disableValidation("4x4MFMA with wider loads is not yet supported by validator")
     return True, opt1
 
 @RegisterSchedule(
