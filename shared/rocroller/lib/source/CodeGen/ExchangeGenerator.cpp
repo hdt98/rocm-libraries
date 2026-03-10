@@ -113,7 +113,7 @@ namespace rocRoller
 
             auto packedVariableType = DataTypeInfo::Get(exchange.varType).packedVariableType();
 
-            if(packedVariableType && vgpr->registerCount() == 1
+            if(packedVariableType
                && m_context->kernelOptions()->scaleSkipPermlane
                       == rocRoller::ScaleSkipPermlaneMode::None)
             {
@@ -128,16 +128,10 @@ namespace rocRoller
                     temp = Register::Value::Placeholder(
                         m_context, Register::Type::Vector, exchange.varType, numVgpr, allocOptions);
                 }
-                // Reinterpret vgpr as the packed type so that BitFieldExtract sees
-                // elementBits == 32 (the physical register width) rather than the
-                // element type's narrower elementBits (e.g. 8 for E8M0).
-                auto coords     = vgpr->allocationCoord();
-                auto packedVgpr = std::make_shared<Register::Value>(
-                    vgpr->allocation(), vgpr->regType(), packedVariableType.value(), coords);
                 for(auto index = 0; index < numVgpr; index++)
                     co_yield generateOp<Expression::BitFieldExtract>(
                         temp->element({index}),
-                        packedVgpr,
+                        vgpr,
                         Expression::BitFieldExtract{
                             {}, exchange.varType.dataType, static_cast<uint32_t>(index * 8), 8});
                 vgpr = temp;
