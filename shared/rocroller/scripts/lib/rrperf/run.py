@@ -6,7 +6,9 @@
 import argparse
 import datetime
 import importlib.util
+import json
 import os
+import statistics
 import subprocess
 from dataclasses import fields
 from itertools import chain
@@ -33,6 +35,32 @@ def submit_directory(suite: str, wrkdir: Path, ptsdir: Path) -> None:
     # TODO: add call to SOMEWHERE to submit
 
 
+def parse_bc_counters(output_yaml: Path, counters_dir: Path) -> None:
+    """Parse LDSBankConflict from rocprofv3 --pmc output and append to benchmark YAML.
+
+    LDSBankConflict is a derived counter representing the percentage of GPU time
+    LDS is stalled by bank conflicts (0% optimal, 100% bad).
+    Reports the mean across all kernel dispatches.
+    """
+    import yaml as _yaml
+
+    values = []
+    for results_file in counters_dir.glob("*/*_results.json"):
+        data = json.loads(results_file.read_text())
+        for record in data.get("rocprofiler-sdk-tool", []):
+            for entry in record.get("callback_records", {}).get("counter_collection", []):
+                for r in entry.get("records", []):
+                    if r["value"] > 0:
+                        values.append(r["value"])
+
+    median_bc = statistics.median(values) if values else None
+
+    docs = list(_yaml.load_all(output_yaml.read_text(), Loader=_yaml.SafeLoader))
+    if docs:
+        docs[0]["lds_bank_conflict_pct"] = median_bc
+    output_yaml.write_text(_yaml.dump_all(docs, default_flow_style=False))
+
+
 def from_token(token: str):
     yield rrperf.problems.upcast_to_run(eval(token, rrperf.problems.__dict__))
 
@@ -44,6 +72,7 @@ def run_problems(
     env: dict[str, str],
     id_filter: list[str],
     l2: bool,
+    bc: bool,
 ) -> bool:
 
     SOLUTION_NOT_SUPPORTED_ON_ARCH = 3
@@ -79,6 +108,16 @@ def run_problems(
                 "--",
             ] + cmd
 
+        if bc:
+            counters = str(yaml.resolve().parent / yaml.stem)
+            cmd = [
+                "rocprofv3",
+                "--pmc=LDSBankConflict",
+                "--output-directory=" + counters,
+                "--output-format=json",
+                "--",
+            ] + cmd
+
         with log.open("w") as f:
             scmd = " ".join(cmd)
             print(f"# env: {rr_env_str}", file=f, flush=True)
@@ -93,6 +132,8 @@ def run_problems(
             status = None
             if p.returncode == 0:
                 status = "ok"
+                if bc:
+                    parse_bc_counters(yaml, Path(counters))
             elif p.returncode == SOLUTION_NOT_SUPPORTED_ON_ARCH:
                 status = "skipped (not supported on " + rrperf.utils.rocm_gfx() + ")"
             else:
@@ -204,6 +245,11 @@ def get_args(parser: argparse.ArgumentParser):
         help="Collect L2 performance counters (TCC_HIT and TCC_MISS).",
     )
     parser.add_argument(
+        "--bc",
+        action="store_true",
+        help="Collect LDS bank conflict performance counters (SQ_LDS_BANK_CONFLICT).",
+    )
+    parser.add_argument(
         "--dump_csv",
         help="Dump benchmark CSV with included headers.",
         action="store_true",
@@ -227,6 +273,7 @@ def run_cli(  # noqa: C901
     pin_clocks: bool = False,
     recast: bool = False,
     l2: bool = False,
+    bc: bool = False,
     **kwargs,
 ) -> tuple[bool, Path]:
     """Run benchmarks!
@@ -277,7 +324,7 @@ def run_cli(  # noqa: C901
     timestamp = rundir / "timestamp.txt"
     timestamp.write_text(str(datetime.datetime.now().timestamp()) + "\n")
 
-    result = run_problems(generator, build_dir, rundir, env, id_filter, l2)
+    result = run_problems(generator, build_dir, rundir, env, id_filter, l2, bc)
 
     if submit:
         ptsdir = rundir / "rocRoller"
