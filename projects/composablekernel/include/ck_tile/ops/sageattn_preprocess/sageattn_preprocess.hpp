@@ -33,8 +33,9 @@ namespace ck_tile {
 //   Launch 1b: SageAttnVPreprocessKernel
 //     V: LDS-based 2-D tile transpose + quantize → MXFP4.
 //     Grid: (seqlen_k/32, hdim/32, batch*nhead), BlockSize: 32.
-//     Each CTA loads a [32, 32] tile of V coalesced into float LDS (bank-
-//     conflict-free with 1-element padding), then quantizes column-wise.
+//     Each CTA loads a [32, 32] tile of V coalesced into float32 LDS with
+//     1 float32 padding per row (bank-conflict-free for ds_read_b32 on
+//     gfx950 where effective bank count = 32), then quantizes column-wise.
 //
 //   Launch 2: BatchedGemmKernel
 //     delta_s = q_mean @ K'^T

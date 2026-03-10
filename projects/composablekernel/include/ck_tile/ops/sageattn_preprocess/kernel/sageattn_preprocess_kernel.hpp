@@ -527,12 +527,18 @@ struct SageAttnKMeanKernel
 //   3. Computes MXFP4 scale and packs the group, then writes to V_hat /
 //      V_scale in transposed layout [hdim, seqlen_k/2|seqlen_k/32].
 //
-// LDS bank conflict analysis (gfx950: 64 banks × 4 B each):
+// LDS bank conflict analysis (gfx950 / MI350):
+//   gfx950 has 64 physical banks, but ds_read_b32 conflict resolution acts
+//   as-if there are 32 banks (64 banks only matter for ds_read_b64/b128).
+//   Reference: "LDS Analysis gfx942/950" (Kerry Wang, internal Confluence).
+//
 //   smem[kVGroup][kVHdimTile + kLDSPad] as float32, kLDSPad = 1.
-//   bank(j, d) = (j*(kVHdimTile+1) + d) % 64.
-//   gcd(kVHdimTile+1, 64) = gcd(33, 64) = 1 → all 32 rows in a column
-//   access 32 distinct banks → zero bank conflicts for both row and column
-//   access patterns.
+//   bank(j, d) = (j*(kVHdimTile+1) + d) % 32
+//             = (j*33 + d) % 32  = (j*1 + d) % 32   [since 33 % 32 = 1]
+//   Column access (fixed d, j = 0..31):
+//     bank = (j + d) % 32 → 32 distinct banks → zero bank conflicts ✓
+//   Row access (fixed j, d = 0..kVHdimTile-1):
+//     bank = (j + d) % 32 → kVHdimTile consecutive (mod 32) → distinct ✓
 //
 // Caller requirements:
 //   seqlen_k % kVGroup    == 0
@@ -595,8 +601,9 @@ struct SageAttnVPreprocessKernel
     static constexpr index_t kVHdimTile      = kVHdimTile_;
     static constexpr index_t kScaleGranularity = 32;
     static constexpr index_t kBlockSize      = kVGroup;
-    // Pad LDS rows by 1 float32 to make column stride coprime with bank count.
-    //   gcd(kVHdimTile + 1, 64) = gcd(33, 64) = 1 → zero bank conflicts.
+    // Pad LDS rows by 1 float32. For ds_read_b32 on gfx950 the effective bank
+    // count is 32. Column stride = (kVHdimTile+1) % 32 = 1 → coprime with 32
+    // → zero bank conflicts (see struct comment for full derivation).
     static constexpr index_t kLDSPad        = 1;
 
     static_assert(kVGroup == kScaleGranularity,
@@ -650,8 +657,8 @@ struct SageAttnVPreprocessKernel
         const index_t batch_idx = bh_idx / kargs.nhead;
         const index_t tid       = get_thread_id();     // 0 .. kVGroup-1
 
-        // bank(j, d) = (j*(kVHdimTile+kLDSPad) + d) % 64
-        //   gcd(kVHdimTile+kLDSPad, 64) = gcd(33, 64) = 1 → zero bank conflicts.
+        // ds_read_b32 on gfx950: effective 32 banks.
+        // bank(j,d) = (j*33+d)%32 = (j+d)%32 → 32 distinct banks per column ✓
         __shared__ float smem[kVGroup][kVHdimTile + kLDSPad];
 
         // ---- Step 1: coalesced load [kVGroup, kVHdimTile] from V → float LDS ----
