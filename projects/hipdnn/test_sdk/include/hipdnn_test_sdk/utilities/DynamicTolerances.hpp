@@ -328,7 +328,6 @@ float calculateConvDgradTolerance(
     return static_cast<float>(totalTolerance);
 }
 
-} // namespace hipdnn_test_sdk::utilities::conv
 /**
  * @brief Calculates the expected tolerance for Convolution Forward Propagation (fprop) operations.
  *
@@ -355,10 +354,10 @@ float calculateConvDgradTolerance(
  * @param wMin The minimum value in the weight/filter tensor.
  * @param wMax The maximum value in the weight/filter tensor.
  * @param wDims The dimensions of the weight/filter tensor (w).
- * @return The calculated tolerance value as float.
+ * @return The calculated tolerance value cast to `OutputType`.
  */
 template <typename OutputType, typename InputType, typename ComputeType = float>
-float calculateConvFpropTolerance(
+OutputType calculateConvFpropTolerance(
     double inputMin, double inputMax, double wMin, double wMax, const std::vector<int64_t>& wDims)
 {
     // Validate ComputeType
@@ -478,7 +477,7 @@ float calculateConvFpropTolerance(
             "Calculated tolerance exceeds the maximum representable value of the output type.");
     }
 
-    return static_cast<float>(totalTolerance);
+    return static_cast<OutputType>(totalTolerance);
 }
 
 } // namespace hipdnn_test_sdk::utilities::conv
