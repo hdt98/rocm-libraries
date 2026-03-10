@@ -4350,9 +4350,9 @@ class KernelWriterAssembly(KernelWriter):
 
         tmp = self.vgprPool.checkOut(2)
         with self.allocTmpSgpr(1) as tmpSgprInfo:
-          module.add(vectorStaticDivide(tmp, rReg, tP["bpeGR"]*8, tmpVgprRes, comment="%s: %s = %s / %s"%(swizzledOrTrName, vgpr(tmp), vgpr(rReg), tP["bpeGR"]*8)))
-          module.add(vectorStaticMultiply(vgpr(tmp), vgpr(tmp), tP["bpeGR"]*4, tmpSgprInfo, comment="%s: %s = %s * %s"%(swizzledOrTrName, vgpr(tmp), vgpr(tmp), tP["bpeGR"]*4)))
-        module.add(vectorStaticRemainder(tmp+1, rReg, rReg, tP["bpeGR"]*4, tmpVgprRes, tmpSgprInfo, comment="%s: %s = %s %% %s"%(swizzledOrTrName, vgpr(tmp), vgpr(rReg), tP["bpeGR"]*4)))
+          module.add(vectorStaticDivide(tmp, rReg, int(tP["bpeGR"])*8, tmpVgprRes, comment="%s: %s = %s / %s"%(swizzledOrTrName, vgpr(tmp), vgpr(rReg), int(tP["bpeGR"])*8)))
+          module.add(vectorStaticMultiply(vgpr(tmp), vgpr(tmp), int(tP["bpeGR"])*4, tmpSgprInfo, comment="%s: %s = %s * %s"%(swizzledOrTrName, vgpr(tmp), vgpr(tmp), int(tP["bpeGR"])*4)))
+        module.add(vectorStaticRemainder(tmp+1, rReg, rReg, int(tP["bpeGR"])*4, tmpVgprRes, tmpSgprInfo, comment="%s: %s = %s %% %s"%(swizzledOrTrName, vgpr(tmp), vgpr(rReg), int(tP["bpeGR"])*4)))
         module.add(VAddU32(dst=vgpr(rReg), src0=vgpr(tmp), src1=vgpr(rReg), comment="%s: %s = %s + %s"%(swizzledOrTrName, vgpr(rReg), vgpr(rReg), vgpr(tmp))))
 
       WvG_M = kernel["MIWaveGroup"][0]
