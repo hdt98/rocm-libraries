@@ -175,7 +175,7 @@ struct SageAttnPreprocessKargs
     index_t num_k_tiles;
 };
 
-template <typename InputT_, index_t kRows_, index_t kCols_, index_t kBlockSize_ = 256>
+template <typename InputT_, index_t kRows_, index_t kCols_, index_t kBlockSize_ = kCols_>
 struct SageAttnPreprocessKernel
 {
     using InputT = InputT_;
@@ -515,15 +515,22 @@ struct SageAttnKMeanKernel
 // Quantises V (transposed layout) using an LDS-based 2-D tile transpose that
 // avoids the non-coalesced column reads of the old per-channel approach.
 //
-// Grid:      (seqlen_k / kVGroup, hdim / kVHdimTile, batch * nhead)
-// BlockSize: kVGroup  (one thread per seqlen row in the group)
+// Grid:      (seqlen_k / (kVGroup * kVGroupsPerBlock), hdim / kVHdimTile, batch * nhead)
+// BlockSize: kVGroup * kVGroupsPerBlock  (kVGroupsPerBlock = 2 by default → 64 threads,
+//            filling one complete WAVE64 wavefront on gfx950)
 //
-// Algorithm per CTA (g_idx, d_idx, bh_idx):
-//   1. Each thread tid loads one row of V:
-//        V[g_idx*kVGroup + tid, d_idx*kVHdimTile .. +kVHdimTile]
-//      into LDS as float32 → coalesced HBM reads.
-//   2. After __syncthreads, thread tid owns channel d_local=tid from LDS and
-//      reads the 32-row column smem[0..kVGroup-1][d_local] → no HBM access.
+// Each CTA processes kVGroupsPerBlock consecutive seqlen groups.
+// Thread layout within the CTA:
+//   grp_local = tid / kVGroup       (0 .. kVGroupsPerBlock-1)
+//   row_local = tid % kVGroup       (0 .. kVGroup-1)
+//   g_abs     = blockIdx.x * kVGroupsPerBlock + grp_local
+//
+// Algorithm per CTA (blockIdx.x, d_idx, bh_idx):
+//   1. Each thread loads one row of V:
+//        V[g_abs*kVGroup + row_local, d_idx*kVHdimTile .. +kVHdimTile]
+//      into smem[grp_local][row_local][0..kVHdimTile-1] as float32 → coalesced.
+//   2. After __syncthreads, thread row_local owns channel d_local=row_local
+//      and reads column smem[grp_local][0..kVGroup-1][d_local] from LDS.
 //   3. Computes MXFP4 scale and packs the group, then writes to V_hat /
 //      V_scale in transposed layout [hdim, seqlen_k/2|seqlen_k/32].
 //
@@ -532,17 +539,16 @@ struct SageAttnKMeanKernel
 //   as-if there are 32 banks (64 banks only matter for ds_read_b64/b128).
 //   Reference: "LDS Analysis gfx942/950" (Kerry Wang, internal Confluence).
 //
-//   smem[kVGroup][kVHdimTile + kLDSPad] as float32, kLDSPad = 1.
-//   bank(j, d) = (j*(kVHdimTile+1) + d) % 32
-//             = (j*33 + d) % 32  = (j*1 + d) % 32   [since 33 % 32 = 1]
-//   Column access (fixed d, j = 0..31):
-//     bank = (j + d) % 32 → 32 distinct banks → zero bank conflicts ✓
-//   Row access (fixed j, d = 0..kVHdimTile-1):
-//     bank = (j + d) % 32 → kVHdimTile consecutive (mod 32) → distinct ✓
+//   smem[kVGroupsPerBlock][kVGroup][kVHdimTile + kLDSPad] as float32, kLDSPad = 1.
+//   Within each group slice, row stride = kVHdimTile + 1 = 33 floats.
+//   bank(j, d) = (j * 33 + d) % 32 = (j + d) % 32   [since 33 % 32 = 1]
+//   Column access (fixed d, j = 0..31): bank = (j + d) % 32 → 32 distinct banks ✓
+//   Between group slices the offset is kVGroup*(kVHdimTile+1) = 32*33 = 1056 floats,
+//   which is 1056 % 32 = 0 → same bank pattern per slice, still conflict-free ✓
 //
 // Caller requirements:
-//   seqlen_k % kVGroup    == 0
-//   hdim     % kVHdimTile == 0
+//   seqlen_k % (kVGroup * kVGroupsPerBlock) == 0
+//   hdim     % kVHdimTile                   == 0
 // ============================================================================
 
 struct SageAttnVPreprocessHostArgs
@@ -592,24 +598,30 @@ struct SageAttnVPreprocessKargs
     index_t nhead;
 };
 
-template <typename InputT_, index_t kVGroup_ = 32, index_t kVHdimTile_ = 32>
+template <typename InputT_,
+          index_t kVGroup_          = 32,
+          index_t kVHdimTile_       = 32,
+          index_t kVGroupsPerBlock_ = 2>
 struct SageAttnVPreprocessKernel
 {
     using InputT = InputT_;
 
-    static constexpr index_t kVGroup         = kVGroup_;
-    static constexpr index_t kVHdimTile      = kVHdimTile_;
+    static constexpr index_t kVGroup          = kVGroup_;
+    static constexpr index_t kVHdimTile       = kVHdimTile_;
+    static constexpr index_t kVGroupsPerBlock = kVGroupsPerBlock_;
     static constexpr index_t kScaleGranularity = 32;
-    static constexpr index_t kBlockSize      = kVGroup;
+    // kVGroupsPerBlock groups per CTA → full WAVE64 wavefronts on gfx950.
+    static constexpr index_t kBlockSize       = kVGroup * kVGroupsPerBlock;
     // Pad LDS rows by 1 float32. For ds_read_b32 on gfx950 the effective bank
     // count is 32. Column stride = (kVHdimTile+1) % 32 = 1 → coprime with 32
     // → zero bank conflicts (see struct comment for full derivation).
-    static constexpr index_t kLDSPad        = 1;
+    static constexpr index_t kLDSPad         = 1;
 
     static_assert(kVGroup == kScaleGranularity,
                   "kVGroup must equal kScaleGranularity (32) for MXFP4");
     static_assert(kVHdimTile % kVGroup == 0 || kVGroup % kVHdimTile == 0,
                   "kVHdimTile and kVGroup must be multiples of each other");
+    static_assert(kVGroupsPerBlock >= 1, "kVGroupsPerBlock must be at least 1");
 
     using Kargs = SageAttnVPreprocessKargs<InputT>;
     using Hargs = SageAttnVPreprocessHostArgs;
@@ -634,36 +646,43 @@ struct SageAttnVPreprocessKernel
         return k;
     }
 
-    // Grid: (seqlen_k/kVGroup, hdim/kVHdimTile, batch*nhead)
+    // Grid: (seqlen_k / (kVGroup * kVGroupsPerBlock), hdim / kVHdimTile, batch * nhead)
     CK_TILE_HOST static dim3 GridSize(const Hargs& h)
     {
-        return dim3(h.seqlen_k / kVGroup, h.hdim / kVHdimTile, h.batch * h.nhead);
+        return dim3(h.seqlen_k / (kVGroup * kVGroupsPerBlock),
+                    h.hdim / kVHdimTile,
+                    h.batch * h.nhead);
     }
 
     CK_TILE_HOST static constexpr dim3 BlockSize() { return dim3(kBlockSize); }
 
-    // Static LDS: kVGroup × (kVHdimTile + kLDSPad) float32.
+    // LDS: kVGroupsPerBlock × kVGroup × (kVHdimTile + kLDSPad) float32.
     CK_TILE_HOST_DEVICE static constexpr index_t GetSmemSize()
     {
-        return kVGroup * (kVHdimTile + kLDSPad) * sizeof(float);
+        return kVGroupsPerBlock * kVGroup * (kVHdimTile + kLDSPad) * sizeof(float);
     }
 
     CK_TILE_DEVICE void operator()(Kargs kargs) const
     {
-        const index_t g_idx    = blockIdx.x;           // seqlen group index
-        const index_t d_idx    = blockIdx.y;           // hdim tile index
-        const index_t bh_idx   = blockIdx.z;           // batch * nhead (linear)
+        const index_t d_idx     = blockIdx.y;
+        const index_t bh_idx    = blockIdx.z;
         const index_t head_idx  = bh_idx % kargs.nhead;
         const index_t batch_idx = bh_idx / kargs.nhead;
-        const index_t tid       = get_thread_id();     // 0 .. kVGroup-1
+        const index_t tid       = get_thread_id();     // 0 .. kBlockSize-1
 
-        // ds_read_b32 on gfx950: effective 32 banks.
-        // bank(j,d) = (j*33+d)%32 = (j+d)%32 → 32 distinct banks per column ✓
-        __shared__ float smem[kVGroup][kVHdimTile + kLDSPad];
+        // Map thread to its seqlen group within the CTA and its row within that group.
+        const index_t grp_local = tid / kVGroup;       // 0 .. kVGroupsPerBlock-1
+        const index_t row_local = tid % kVGroup;       // 0 .. kVGroup-1
+        const index_t g_abs     = blockIdx.x * kVGroupsPerBlock + grp_local;
+
+        const index_t col_start = d_idx * kVHdimTile;
+
+        // LDS: smem[kVGroupsPerBlock][kVGroup][kVHdimTile + kLDSPad].
+        // bank(j, d) = (j * 33 + d) % 32 = (j + d) % 32 → zero bank conflicts ✓
+        __shared__ float smem[kVGroupsPerBlock][kVGroup][kVHdimTile + kLDSPad];
 
         // ---- Step 1: coalesced load [kVGroup, kVHdimTile] from V → float LDS ----
-        const index_t row       = g_idx * kVGroup + tid;
-        const index_t col_start = d_idx * kVHdimTile;
+        const index_t row = g_abs * kVGroup + row_local;
 
         const InputT* v_base =
             kargs.v_ptr + batch_idx * kargs.batch_stride_v +
@@ -671,20 +690,18 @@ struct SageAttnVPreprocessKernel
 
         if(row < kargs.seqlen_k)
         {
-            // Each thread reads kVHdimTile consecutive elements — coalesced.
             const InputT* v_row = v_base + row * kargs.hdim + col_start;
             for(index_t d = 0; d < kVHdimTile; d++)
-                smem[tid][d] = static_cast<float>(v_row[d]);
+                smem[grp_local][row_local][d] = static_cast<float>(v_row[d]);
         }
         else
         {
             for(index_t d = 0; d < kVHdimTile; d++)
-                smem[tid][d] = 0.0f;
+                smem[grp_local][row_local][d] = 0.0f;
         }
         block_sync_lds();
 
         // ---- Step 2: quantize per hdim channel from LDS ----
-        // With kVHdimTile == kVGroup each thread handles exactly one channel.
         constexpr float rcp_dst_max = 1.0f / 6.0f;
 
         uint8_t* v_hat_base =
@@ -695,17 +712,17 @@ struct SageAttnVPreprocessKernel
             kargs.v_scale_ptr + batch_idx * kargs.batch_stride_v_scale +
             head_idx * kargs.nhead_stride_v_scale;
 
-        for(index_t d_local = tid; d_local < kVHdimTile; d_local += kVGroup)
+        // row_local acts as the channel index within each group (kVHdimTile == kVGroup).
+        for(index_t d_local = row_local; d_local < kVHdimTile; d_local += kVGroup)
         {
             const index_t d_global = col_start + d_local;
 
-            // Read one column of the LDS tile → kVGroup float values.
-            // bank(j, d_local) distinct for j=0..kVGroup-1 (no conflict).
+            // Read one column of the LDS tile for this group (no bank conflicts).
             float group_data[kVGroup];
             float max_abs = 0.0f;
             for(index_t j = 0; j < kVGroup; j++)
             {
-                group_data[j] = smem[j][d_local];
+                group_data[j] = smem[grp_local][j][d_local];
                 max_abs       = max(max_abs, abs(group_data[j]));
             }
 
@@ -714,13 +731,13 @@ struct SageAttnVPreprocessKernel
                 (bit_cast<uint32_t>(max_abs * rcp_dst_max) + numeric_traits<float>::mant_mask) &
                 numeric_traits<float>::head_mask);
 
-            // V_scale[d_global, g_idx]  (transposed layout)
-            v_scale_base[d_global * kargs.stride_v_scale + g_idx] =
+            // V_scale[d_global, g_abs]  (transposed layout)
+            v_scale_base[d_global * kargs.stride_v_scale + g_abs] =
                 static_cast<uint8_t>(bit_cast<uint32_t>(scale) >> 23);
 
-            // V_hat[d_global, g_idx*(kVGroup/2) ..]
+            // V_hat[d_global, g_abs*(kVGroup/2) ..]
             uint8_t* hat_ptr =
-                v_hat_base + d_global * kargs.stride_v_hat + g_idx * (kVGroup / 2);
+                v_hat_base + d_global * kargs.stride_v_hat + g_abs * (kVGroup / 2);
             PackFP4Group(group_data, hat_ptr, scale);
         }
     }
