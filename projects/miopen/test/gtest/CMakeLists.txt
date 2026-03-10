@@ -32,7 +32,7 @@ endif()
 if(MIOPEN_CK_BUILDER_EXPERIMENTAL)
     add_definitions(-DCK_EXPERIMENTAL_BUILDER)
 else()
-    list(APPEND SKIP_TESTS ck_builder_xdl.cpp ck_builder_shared.cpp)
+    list(APPEND SKIP_TESTS ck_builder_grouped_fwd_conv2d.cpp ck_builder_grouped_fwd_conv3d.cpp ck_builder_grouped_fwd_conv2d_clamp.cpp ck_builder_grouped_fwd_conv3d_clamp.cpp ck_builder_grouped_fwd_conv2d_bias_clamp.cpp ck_builder_grouped_fwd_conv3d_bias_clamp.cpp ck_builder_shared.cpp)
 endif()
 
 # Add files to SKIP_TESTS when ASAN packaging is enabled.  These are temporary until a fix is found for
