@@ -32,10 +32,12 @@ jobs:
       - name: Install mdx2vast for Vale to parse MDX files
         id: install_mdx2vast
         run: |
-          # Fixed package.json and package-lock.json prevent supply chain attacks
+          echo "Installing mdx2vast..."
           cd "docs/vale/mdx2vast"
           npm ci
-          cd "node_modules"
+
+          echo "Linking mdx2vast..."
+          cd "node_modules/mdx2vast"
           npm link
 
       - name: Install docutils for Vale to parse RST files

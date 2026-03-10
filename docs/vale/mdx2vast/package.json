@@ -1,1 +1,5 @@
-{"dependencies": {"mdx2vast": "0.3.1"}}
+{
+    "name": "mdx2vast_pseudopackage",
+    "version": "0",
+    "dependencies": {"mdx2vast": "0.3.1"}
+}
