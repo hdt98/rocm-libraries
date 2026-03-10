@@ -125,8 +125,9 @@ def worker_lock_instance(worker_lock_path):
 @pytest.fixture
 def tensile_args(pytestconfig, builddir, worker_lock_path):
     rv = []
-    if worker_lock_path:
-        rv += ["--client-lock", str(worker_lock_path)]
+    # Client lock disabled to allow parallel test execution
+    #if worker_lock_path:
+    #    rv += ["--client-lock", str(worker_lock_path)]
 
     extraOptions = pytestconfig.getoption("--tensile-options")
     if extraOptions is not None:
