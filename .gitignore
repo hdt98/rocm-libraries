@@ -7,6 +7,9 @@ build/
 # User-specific CMake presets
 CMakeUserPresets.json
 
+# Personal Claude Code notes (use projects/composablekernel/CLAUDE.local.md)
+CLAUDE.local.md
+
 # Miscellanous tools
 .cline_storage/
 
