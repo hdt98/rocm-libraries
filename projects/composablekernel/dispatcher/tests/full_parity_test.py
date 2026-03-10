@@ -309,11 +309,15 @@ MASK_INT = {"0": 0, "1": 1, "2": 2}
 BIAS_INT = {"n": 0, "e": 1, "a": 2}
 
 
-def run_dispatcher_test(so_path: str, case: TestCase, arch: str) -> Tuple[bool, str]:
+def run_dispatcher_test(
+    so_path: str, case: TestCase, key: tuple, arch: str
+) -> Tuple[bool, str]:
     """Run one test in an isolated subprocess -- never touches our process's HIP."""
     dq = case.hdim_q
     dv = case.effective_hdim_v()
     nk = case.effective_nhead_k()
+    traits_dq = key[1]  # tile-rounded hdim for kernel matching
+    traits_dv = key[2]
 
     if case.seqlen_k <= 0 or case.seqlen_q <= 0:
         return (True, "edge-case-ok")
@@ -333,6 +337,7 @@ lib.fmha_dispatcher_run_fwd.argtypes = [
     ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_int,
     ctypes.c_int,ctypes.c_int,ctypes.c_float,
     ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_int,
+    ctypes.c_int,ctypes.c_int,
     ctypes.POINTER(ctypes.c_float)]
 lib.fmha_dispatcher_run_fwd.restype = ctypes.c_int
 lib.fmha_dispatcher_cleanup.argtypes = []
@@ -347,7 +352,7 @@ O=np.ascontiguousarray(np.zeros(({case.batch},{case.nhead_q},{case.seqlen_q},{dv
 t=ctypes.c_float(0.0)
 rc=lib.fmha_dispatcher_run_fwd(Q.ctypes.data,K.ctypes.data,V.ctypes.data,O.ctypes.data,\
 {case.batch},{case.nhead_q},{nk},{case.seqlen_q},{case.seqlen_k},{dq},{dv},\
-{scale},{mi},{bi},{case.lse},{int(case.p_drop > 0)},ctypes.byref(t))
+{scale},{mi},{bi},{case.lse},{int(case.p_drop > 0)},{traits_dq},{traits_dv},ctypes.byref(t))
 lib.fmha_dispatcher_cleanup()
 if rc!=0: print(f"RC{{rc}}"); sys.exit(1)
 nz=int(np.count_nonzero(O))
@@ -493,7 +498,7 @@ def main():
         key = case_key.get(i)
         so = lib_for.get(key) if key else None
         if so:
-            d_ok, d_msg = run_dispatcher_test(so, case, args.arch)
+            d_ok, d_msg = run_dispatcher_test(so, case, key, args.arch)
         else:
             d_ok, d_msg = None, "no-lib"
 

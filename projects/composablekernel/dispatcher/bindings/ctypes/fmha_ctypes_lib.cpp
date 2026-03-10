@@ -68,6 +68,8 @@ int fmha_dispatcher_run_fwd(const void* q_host,
                             int bias_type_int,
                             int has_lse,
                             int has_dropout,
+                            int traits_hdim_q,
+                            int traits_hdim_v,
                             float* time_ms_out)
 {
     if(!g_initialized)
@@ -113,8 +115,8 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     }
 
     fmha_fwd_traits traits{};
-    traits.hdim_q        = hdim_q;
-    traits.hdim_v        = hdim_v;
+    traits.hdim_q        = (traits_hdim_q > 0) ? traits_hdim_q : hdim_q;
+    traits.hdim_v        = (traits_hdim_v > 0) ? traits_hdim_v : hdim_v;
     traits.data_type     = "fp16";
     traits.is_group_mode = false;
     traits.is_v_rowmajor = true;
