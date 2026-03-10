@@ -970,21 +970,21 @@ protected:
 
         if(params.expectThrow)
         {
-            SCOPED_TRACE("Failed to throw for dims size: " + std::to_string(params.wDims.size()));
             EXPECT_THROW(
                 (calculateConvFpropTolerance<Out, In, Comp>(
                     params.inputMin, params.inputMax, params.wMin, params.wMax, params.wDims)),
-                std::invalid_argument);
+                std::invalid_argument)
+                << "Failed to throw for dims size: " << params.wDims.size();
         }
         else
         {
             auto tol = calculateConvFpropTolerance<Out, In, Comp>(
                 params.inputMin, params.inputMax, params.wMin, params.wMax, params.wDims);
 
-            auto expected = static_cast<float>(params.expectedTolerance);
+            auto expected = static_cast<Out>(params.expectedTolerance);
 
-            SCOPED_TRACE("Failed for dims size: " + std::to_string(params.wDims.size()));
-            EXPECT_NEAR(tol, expected, 1e-5f);
+            EXPECT_NEAR(static_cast<float>(tol), static_cast<float>(expected), 1e-5f)
+                << "Failed for dims size: " << params.wDims.size();
         }
     }
 };
@@ -1077,11 +1077,11 @@ TEST(TestCalculateConvFpropTolerance, DetectsFailure)
     auto tol = calculateConvFpropTolerance<half, half, float>(-1.0, 1.0, -1.0, 1.0, dims);
 
     // tol approx 0.1
-    EXPECT_LT(tol, 0.15f);
-    EXPECT_GT(tol, 0.09f);
+    EXPECT_LT(tol, 0.15_h);
+    EXPECT_GT(tol, 0.09_h);
 
     auto validator = hipdnn_test_sdk::utilities::createAllCloseValidator(
-        hipdnn_data_sdk::data_objects::DataType::FLOAT, tol, 0.0f);
+        hipdnn_data_sdk::data_objects::DataType::FLOAT, static_cast<float>(tol), 0);
 
     {
         SCOPED_TRACE("Validator should have passed");
