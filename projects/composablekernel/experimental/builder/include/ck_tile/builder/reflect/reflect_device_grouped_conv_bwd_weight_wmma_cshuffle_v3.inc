@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 /// @file
-/// @brief Reflection `InstanceTraits` specialization for `device_grouped_conv_bwd_weight_wmma_cshuffle_v3`.
-
+/// @brief Reflection `InstanceTraits` specialization for
+/// `device_grouped_conv_bwd_weight_wmma_cshuffle_v3`.
 
 // CRITICAL MAINTENANCE NOTE:
 // Keep this template parameter list strictly in sync with:

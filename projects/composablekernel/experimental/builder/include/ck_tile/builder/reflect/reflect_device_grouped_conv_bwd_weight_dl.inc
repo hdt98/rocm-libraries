@@ -4,7 +4,6 @@
 /// @file
 /// @brief Reflection `InstanceTraits` specialization for `device_grouped_conv_bwd_weight_dl`.
 
-
 // CRITICAL MAINTENANCE NOTE:
 // Keep this template parameter list strictly in sync with:
 // ck/tensor_operation/gpu/device/impl/device_grouped_conv_bwd_weight_dl.hpp.
