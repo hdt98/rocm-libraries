@@ -222,9 +222,11 @@ double rms_range(RefType&& ref, ObsType&& obs)
             return 0;
         double square_difference = range_product(ref, obs, 0.0, sum_fn{}, square_diff);
         double mag1 = static_cast<double>(*std::max_element(ref.begin(), ref.end(), compare_mag));
-        // If reference is all 0, avoid dividing by 0 when normalizing
-        mag1              = (mag1 == 0.0) ? 1.0 : std::fabs(mag1);
-        double normalizer = std::max(mag1, std::numeric_limits<double>::min());
+        // Clamp reference scale to 1.0:
+        // - For |ref|max >= 1, this is relative RMS (scale-aware).
+        // - For |ref|max < 1, this becomes absolute RMS, preventing near-zero
+        //   reference tensors from producing inflated relative errors.
+        double normalizer = std::max(std::fabs(mag1), 1.0);
 
         return std::sqrt(square_difference) / (std::sqrt(n) * normalizer);
     }
