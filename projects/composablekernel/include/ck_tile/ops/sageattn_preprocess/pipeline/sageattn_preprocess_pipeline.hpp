@@ -75,7 +75,8 @@ struct SageAttnPreprocessPipeline
     // -------------------------------------------------------------------------
     CK_TILE_DEVICE void RunQMean(const InputT* __restrict__ src_ptr,
                                  InputT* __restrict__ q_mean_ptr,
-                                 void* smem) const
+                                 void* smem,
+                                 index_t n_rows_valid) const
     {
         float*        smem_f = reinterpret_cast<float*>(smem);
         const index_t tid    = get_thread_id();
@@ -83,13 +84,13 @@ struct SageAttnPreprocessPipeline
         for(index_t d = tid; d < kCols; d += kBlockSize)
         {
             float sum = 0.0f;
-            for(index_t r = 0; r < kRows; r++)
+            for(index_t r = 0; r < n_rows_valid; r++)
                 sum += static_cast<float>(src_ptr[r * kCols + d]);
-            const float mean = sum / static_cast<float>(kRows);
+            const float mean = sum / static_cast<float>(n_rows_valid);
             smem_f[d]     = mean;
             q_mean_ptr[d] = static_cast<InputT>(mean);
         }
-        // Caller (kernel) issues block_sync_lds() before RunQQuantize.
+        // Caller issues block_sync_lds() before RunQQuantize.
     }
 
     // -------------------------------------------------------------------------
@@ -104,9 +105,9 @@ struct SageAttnPreprocessPipeline
     CK_TILE_DEVICE void RunQQuantize(const InputT* __restrict__ src_ptr,
                                      uint8_t* __restrict__ dst_hat_ptr,
                                      uint8_t* __restrict__ dst_scale_ptr,
-                                     const void* smem) const
+                                     const void* smem,
+                                     index_t n_rows_valid) const
     {
-        // smem holds float32 means written by RunQMean — read directly, no cast.
         const float*  smem_mean_f = reinterpret_cast<const float*>(smem);
         const index_t tid         = get_thread_id();
 
@@ -114,6 +115,17 @@ struct SageAttnPreprocessPipeline
         const index_t     row_idx    = tid / kNumGroups;
         const index_t     grp_idx    = tid % kNumGroups;
         const index_t     d_start    = grp_idx * kScaleGranularity;
+
+        if(row_idx >= n_rows_valid)
+        {
+            // pad row — zero hat and scale
+            dst_scale_ptr[row_idx * kNumGroups + grp_idx] = 0;
+            uint8_t* hat_dst = dst_hat_ptr + row_idx * (kCols / 2) +
+                               grp_idx * (kScaleGranularity / 2);
+            for(index_t j = 0; j < kScaleGranularity / 2; j++)
+                hat_dst[j] = 0;
+            return;
+        }
 
         constexpr float rcp_dst_max = 1.0f / 6.0f;
 
@@ -158,7 +170,8 @@ struct SageAttnPreprocessPipeline
                                               InputT* __restrict__ k_prime_ptr,
                                               index_t k_prime_stride,
                                               uint8_t* __restrict__ dst_hat_ptr,
-                                              uint8_t* __restrict__ dst_scale_ptr) const
+                                              uint8_t* __restrict__ dst_scale_ptr,
+                                              index_t n_rows_valid) const
     {
         const index_t tid = get_thread_id();
 
@@ -166,6 +179,20 @@ struct SageAttnPreprocessPipeline
         const index_t     row_idx    = tid / kNumGroups;
         const index_t     grp_idx    = tid % kNumGroups;
         const index_t     d_start    = grp_idx * kScaleGranularity;
+
+        if(row_idx >= n_rows_valid)
+        {
+            // pad row — zero k_prime, hat, scale
+            InputT* dst_row = k_prime_ptr + row_idx * k_prime_stride;
+            for(index_t j = 0; j < kScaleGranularity; j++)
+                dst_row[d_start + j] = static_cast<InputT>(0);
+            dst_scale_ptr[row_idx * kNumGroups + grp_idx] = 0;
+            uint8_t* hat_dst = dst_hat_ptr + row_idx * (kCols / 2) +
+                               grp_idx * (kScaleGranularity / 2);
+            for(index_t j = 0; j < kScaleGranularity / 2; j++)
+                hat_dst[j] = 0;
+            return;
+        }
 
         constexpr float rcp_dst_max = 1.0f / 6.0f;
 
@@ -178,9 +205,9 @@ struct SageAttnPreprocessPipeline
         {
             const float val = static_cast<float>(src_row[d_start + j]) -
                               static_cast<float>(k_mean_ptr[d_start + j]);
-            group_data[j]       = val;
+            group_data[j]        = val;
             dst_row[d_start + j] = static_cast<InputT>(val);
-            max_abs             = max(max_abs, abs(val));
+            max_abs              = max(max_abs, abs(val));
         }
 
         const float scale = bit_cast<float>(

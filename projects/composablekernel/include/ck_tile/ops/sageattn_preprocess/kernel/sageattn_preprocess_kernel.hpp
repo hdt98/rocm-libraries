@@ -289,18 +289,18 @@ struct SageAttnPreprocessKernel
         if(do_q)
         {
             const index_t row_start = tile_x * kargs.q_tile_size;
-            if(row_start < kargs.seqlen_q)
-            {
-                const InputT* src_q =
-                    kargs.q_ptr + batch_idx * kargs.batch_stride_q +
-                    head_idx * kargs.nhead_stride_q + row_start * kargs.stride_q;
+            const index_t n_rows_q  = min(static_cast<index_t>(kRows),
+                                          kargs.seqlen_q - row_start);
 
-                InputT* q_mean =
-                    kargs.q_mean_ptr + batch_idx * kargs.batch_stride_q_mean +
-                    head_idx * kargs.nhead_stride_q_mean + tile_x * kargs.stride_q_mean;
+            const InputT* src_q =
+                kargs.q_ptr + batch_idx * kargs.batch_stride_q +
+                head_idx * kargs.nhead_stride_q + row_start * kargs.stride_q;
 
-                pipeline.RunQMean(src_q, q_mean, smem);
-            }
+            InputT* q_mean =
+                kargs.q_mean_ptr + batch_idx * kargs.batch_stride_q_mean +
+                head_idx * kargs.nhead_stride_q_mean + tile_x * kargs.stride_q_mean;
+
+            pipeline.RunQMean(src_q, q_mean, smem, n_rows_q);
         }
         block_sync_lds(); // smem q_mean visible for step 2
 
@@ -308,56 +308,55 @@ struct SageAttnPreprocessKernel
         if(do_q)
         {
             const index_t row_start = tile_x * kargs.q_tile_size;
-            if(row_start < kargs.seqlen_q)
-            {
-                const InputT* src_q =
-                    kargs.q_ptr + batch_idx * kargs.batch_stride_q +
-                    head_idx * kargs.nhead_stride_q + row_start * kargs.stride_q;
+            const index_t n_rows_q  = min(static_cast<index_t>(kRows),
+                                          kargs.seqlen_q - row_start);
 
-                uint8_t* dst_q_hat =
-                    kargs.q_hat_ptr + batch_idx * kargs.batch_stride_q_hat +
-                    head_idx * kargs.nhead_stride_q_hat + row_start * kargs.stride_q_hat;
+            const InputT* src_q =
+                kargs.q_ptr + batch_idx * kargs.batch_stride_q +
+                head_idx * kargs.nhead_stride_q + row_start * kargs.stride_q;
 
-                uint8_t* dst_q_scale =
-                    kargs.q_scale_ptr + batch_idx * kargs.batch_stride_q_scale +
-                    head_idx * kargs.nhead_stride_q_scale + row_start * kargs.stride_q_scale;
+            uint8_t* dst_q_hat =
+                kargs.q_hat_ptr + batch_idx * kargs.batch_stride_q_hat +
+                head_idx * kargs.nhead_stride_q_hat + row_start * kargs.stride_q_hat;
 
-                pipeline.RunQQuantize(src_q, dst_q_hat, dst_q_scale, smem);
-            }
+            uint8_t* dst_q_scale =
+                kargs.q_scale_ptr + batch_idx * kargs.batch_stride_q_scale +
+                head_idx * kargs.nhead_stride_q_scale + row_start * kargs.stride_q_scale;
+
+            pipeline.RunQQuantize(src_q, dst_q_hat, dst_q_scale, smem, n_rows_q);
         }
 
         // ---- Step 3: K smooth + quantize -----------------------------------
         if(do_k)
         {
             const index_t row_start = tile_x * kRows;
-            if(row_start < kargs.seqlen_k)
-            {
-                const InputT* src_k =
-                    kargs.k_ptr + batch_idx * kargs.batch_stride_k +
-                    head_idx * kargs.nhead_stride_k + row_start * kargs.stride_k;
+            const index_t n_rows_k  = min(static_cast<index_t>(kRows),
+                                          kargs.seqlen_k - row_start);
 
-                const InputT* k_mean =
-                    kargs.k_mean_ptr + batch_idx * kargs.batch_stride_k_mean +
-                    head_idx * kargs.nhead_stride_k_mean;
+            const InputT* src_k =
+                kargs.k_ptr + batch_idx * kargs.batch_stride_k +
+                head_idx * kargs.nhead_stride_k + row_start * kargs.stride_k;
 
-                // k_prime stored in natural layout: [batch, nhead, seqlen_k, hdim] row-major.
-                InputT* k_prime =
-                    kargs.k_prime_ptr + batch_idx * kargs.batch_stride_k_prime +
-                    head_idx * kargs.nhead_stride_k_prime + row_start * kargs.stride_k_prime;
+            const InputT* k_mean =
+                kargs.k_mean_ptr + batch_idx * kargs.batch_stride_k_mean +
+                head_idx * kargs.nhead_stride_k_mean;
 
-                uint8_t* dst_k_hat =
-                    kargs.k_hat_ptr + batch_idx * kargs.batch_stride_k_hat +
-                    head_idx * kargs.nhead_stride_k_hat + row_start * kargs.stride_k_hat;
+            InputT* k_prime =
+                kargs.k_prime_ptr + batch_idx * kargs.batch_stride_k_prime +
+                head_idx * kargs.nhead_stride_k_prime + row_start * kargs.stride_k_prime;
 
-                uint8_t* dst_k_scale =
-                    kargs.k_scale_ptr + batch_idx * kargs.batch_stride_k_scale +
-                    head_idx * kargs.nhead_stride_k_scale + row_start * kargs.stride_k_scale;
+            uint8_t* dst_k_hat =
+                kargs.k_hat_ptr + batch_idx * kargs.batch_stride_k_hat +
+                head_idx * kargs.nhead_stride_k_hat + row_start * kargs.stride_k_hat;
 
-                pipeline.RunKSmoothAndQuantize(
-                    src_k, k_mean, k_prime, kargs.stride_k_prime, dst_k_hat, dst_k_scale);
-            }
+            uint8_t* dst_k_scale =
+                kargs.k_scale_ptr + batch_idx * kargs.batch_stride_k_scale +
+                head_idx * kargs.nhead_stride_k_scale + row_start * kargs.stride_k_scale;
+
+            pipeline.RunKSmoothAndQuantize(
+                src_k, k_mean, k_prime, kargs.stride_k_prime,
+                dst_k_hat, dst_k_scale, n_rows_k);
         }
-
     }
 };
 
@@ -562,6 +561,7 @@ struct SageAttnVPreprocessHostArgs
     // V source: [batch, nhead, seqlen_k, hdim] InputT row-major
     const void* v_ptr;
     index_t     seqlen_k;
+    index_t     seqlen_k_real;
     index_t     hdim;              // also the row stride of V
     index_t     nhead_stride_v;    // = seqlen_k * hdim
     index_t     batch_stride_v;    // = nhead * seqlen_k * hdim
@@ -587,6 +587,7 @@ struct SageAttnVPreprocessKargs
 {
     const InputT* v_ptr;
     index_t       seqlen_k;
+    index_t       seqlen_k_real;
     index_t       hdim;
     index_t       nhead_stride_v;
     index_t       batch_stride_v;
@@ -637,6 +638,7 @@ struct SageAttnVPreprocessKernel
         Kargs k{};
         k.v_ptr                = static_cast<const InputT*>(h.v_ptr);
         k.seqlen_k             = h.seqlen_k;
+        k.seqlen_k_real        = h.seqlen_k_real;
         k.hdim                 = h.hdim;
         k.nhead_stride_v       = h.nhead_stride_v;
         k.batch_stride_v       = h.batch_stride_v;
@@ -694,7 +696,7 @@ struct SageAttnVPreprocessKernel
             kargs.v_ptr + batch_idx * kargs.batch_stride_v +
             head_idx * kargs.nhead_stride_v;
 
-        if(row < kargs.seqlen_k)
+        if(row < kargs.seqlen_k_real)
         {
             const InputT* v_row = v_base + row * kargs.hdim + col_start;
             for(index_t d = 0; d < kVHdimTile; d++)
