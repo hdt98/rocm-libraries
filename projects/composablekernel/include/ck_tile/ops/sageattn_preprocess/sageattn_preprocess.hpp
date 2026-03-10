@@ -16,7 +16,7 @@ namespace ck_tile {
 // ============================================================================
 // sageattn_preprocess_run
 //
-// Host-side wrapper that launches the three kernels required for SA3
+// Host-side wrapper that launches the four kernels required for SA3
 // preprocessing on a single HIP stream:
 //
 //   Launch 0: SageAttnKMeanKernel
@@ -28,8 +28,13 @@ namespace ck_tile {
 //   Launch 1: SageAttnPreprocessKernel
 //     Q: mean → quantize (MXFP4, stores q_mean as InputT)
 //     K: smooth (K' = K - k_mean) → k_prime_buf; quantize K' → MXFP4
-//     V: transpose + quantize → MXFP4
-//     Grid: (max(num_q_tiles, num_k_tiles, hdim), nhead, batch).
+//     Grid: (max(num_q_tiles, num_k_tiles), nhead, batch).
+//
+//   Launch 1b: SageAttnVPreprocessKernel
+//     V: LDS-based 2-D tile transpose + quantize → MXFP4.
+//     Grid: (seqlen_k/32, hdim/32, batch*nhead), BlockSize: 32.
+//     Each CTA loads a [32, 32] tile of V coalesced into float LDS (bank-
+//     conflict-free with 1-element padding), then quantizes column-wise.
 //
 //   Launch 2: BatchedGemmKernel
 //     delta_s = q_mean @ K'^T
@@ -144,6 +149,38 @@ void sageattn_preprocess_run(
 
         stream_config sc{stream};
         launch_and_check(sc, make_kernel(PrepKernel{}, grids, blocks, smem, kargs));
+    }
+
+    // ------------------------------------------------------------------ //
+    // Launch 1b: V preprocess — LDS-based tile transpose + MXFP4 quantize
+    // ------------------------------------------------------------------ //
+    {
+        using VKernel = SageAttnVPreprocessKernel<InputT>;
+
+        SageAttnVPreprocessHostArgs v_hargs{};
+        v_hargs.v_ptr                = prep_args.v_ptr;
+        v_hargs.seqlen_k             = seqlen_k;
+        v_hargs.hdim                 = hdim;
+        v_hargs.nhead_stride_v       = prep_args.nhead_stride_v;
+        v_hargs.batch_stride_v       = prep_args.batch_stride_v;
+        v_hargs.v_hat_ptr            = prep_args.v_hat_ptr;
+        v_hargs.stride_v_hat         = prep_args.stride_v_hat;
+        v_hargs.nhead_stride_v_hat   = prep_args.nhead_stride_v_hat;
+        v_hargs.batch_stride_v_hat   = prep_args.batch_stride_v_hat;
+        v_hargs.v_scale_ptr          = prep_args.v_scale_ptr;
+        v_hargs.stride_v_scale       = prep_args.stride_v_scale;
+        v_hargs.nhead_stride_v_scale = prep_args.nhead_stride_v_scale;
+        v_hargs.batch_stride_v_scale = prep_args.batch_stride_v_scale;
+        v_hargs.nhead                = nhead;
+        v_hargs.batch                = batch;
+
+        auto kargs         = VKernel::MakeKargs(v_hargs);
+        const dim3 grids   = VKernel::GridSize(v_hargs);
+        const dim3 blocks  = VKernel::BlockSize();
+        const index_t smem = VKernel::GetSmemSize();
+
+        stream_config sc{stream};
+        launch_and_check(sc, make_kernel(VKernel{}, grids, blocks, smem, kargs));
     }
 
     // ------------------------------------------------------------------ //

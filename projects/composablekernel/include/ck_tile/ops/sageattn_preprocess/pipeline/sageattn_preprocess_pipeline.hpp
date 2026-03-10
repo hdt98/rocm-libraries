@@ -137,45 +137,6 @@ struct SageAttnPreprocessPipeline
     }
 
     // -------------------------------------------------------------------------
-    // Step 4: one hdim_v channel of V → transpose + MXFP4 quantize.
-    //   src_ptr:      V[0, hdim_ch] in [seqlen_k, hdim_v] layout (stride hdim_v per row)
-    //   dst_hat_ptr:  V_hat[hdim_ch, 0] in [hdim_v, seqlen_k/2] layout
-    //   dst_scale_ptr:V_scale[hdim_ch, 0] in [hdim_v, seqlen_k/32] layout
-    // -------------------------------------------------------------------------
-    CK_TILE_DEVICE void RunV(const InputT* __restrict__ src_ptr,
-                             index_t seqlen_k,
-                             index_t hdim_v,
-                             uint8_t* __restrict__ dst_hat_ptr,
-                             uint8_t* __restrict__ dst_scale_ptr) const
-    {
-        const index_t tid        = get_thread_id();
-        const index_t num_groups = seqlen_k / kScaleGranularity;
-        constexpr float rcp_dst_max = 1.0f / 6.0f;
-
-        for(index_t g = tid; g < num_groups; g += kBlockSize)
-        {
-            const index_t k_start = g * kScaleGranularity;
-            float group_data[kScaleGranularity];
-            float max_abs = 0.0f;
-
-            for(index_t j = 0; j < kScaleGranularity; j++)
-            {
-                group_data[j] = static_cast<float>(src_ptr[(k_start + j) * hdim_v]);
-                max_abs       = max(max_abs, abs(group_data[j]));
-            }
-
-            const float scale = bit_cast<float>(
-                (bit_cast<uint32_t>(max_abs * rcp_dst_max) + numeric_traits<float>::mant_mask) &
-                numeric_traits<float>::head_mask);
-
-            dst_scale_ptr[g] = static_cast<uint8_t>(bit_cast<uint32_t>(scale) >> 23);
-
-            uint8_t* hat_group = dst_hat_ptr + g * (kScaleGranularity / 2);
-            PackFP4Group(group_data, hat_group, scale);
-        }
-    }
-
-    // -------------------------------------------------------------------------
     // RunKMeanPartial: called from SageAttnKMeanKernel (BlockSize = kCols).
     //   Each thread d accumulates K[row_start..row_end, d] into k_mean_partial[d]
     //   via float atomicAdd.
