@@ -72,7 +72,7 @@ template <typename AsDataType,
           LoopScheduler LoopSched,
           PipelineVersion PipelineVer = PipelineVersion::v1,
           typename BComputeDataType_  = AComputeDataType_,
-          bool CacheSrcOffsets         = true>
+          bool CacheSrcOffsets         = false>
 struct GridwiseGemmMultipleABD_xdl_cshuffle
     : public GridwiseGemm_xdl_cshuffle_base<
           tensor_layout::gemm::RowMajor,
