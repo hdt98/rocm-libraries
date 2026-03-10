@@ -47,75 +47,76 @@ bool operator!=(const NodeT &lhs, const NodeT &rhs);
 bool operator==(const GraphT &lhs, const GraphT &rhs);
 bool operator!=(const GraphT &lhs, const GraphT &rhs);
 
-enum class NodeAttributes : uint8_t
-{
-    NONE = 0,
-    BatchnormInferenceAttributes = 1,
-    PointwiseAttributes = 2,
-    BatchnormBackwardAttributes = 3,
-    BatchnormAttributes = 4,
-    ConvolutionFwdAttributes = 5,
-    ConvolutionBwdAttributes = 6,
-    ConvolutionWrwAttributes = 7,
-    BatchnormInferenceAttributesVarianceExt = 8,
-    MatmulAttributes = 9,
-    RMSNormAttributes = 10,
-    LayernormAttributes = 11,
-    SdpaAttributes = 12,
-    BlockScaleDequantizeAttributes = 13,
-    BlockScaleQuantizeAttributes = 14,
-    SdpaBackwardAttributes = 15,
-    MIN = NONE,
-    MAX = SdpaBackwardAttributes
+enum class NodeAttributes : uint8_t {
+  NONE = 0,
+  BatchnormInferenceAttributes = 1,
+  PointwiseAttributes = 2,
+  BatchnormBackwardAttributes = 3,
+  BatchnormAttributes = 4,
+  ConvolutionFwdAttributes = 5,
+  ConvolutionBwdAttributes = 6,
+  ConvolutionWrwAttributes = 7,
+  BatchnormInferenceAttributesVarianceExt = 8,
+  MatmulAttributes = 9,
+  RMSNormAttributes = 10,
+  LayernormAttributes = 11,
+  SdpaAttributes = 12,
+  BlockScaleDequantizeAttributes = 13,
+  BlockScaleQuantizeAttributes = 14,
+  SdpaBackwardAttributes = 15,
+  MIN = NONE,
+  MAX = SdpaBackwardAttributes
 };
 
-inline const NodeAttributes (&EnumValuesNodeAttributes())[16]
-{
-    static const NodeAttributes values[] = {NodeAttributes::NONE,
-                                            NodeAttributes::BatchnormInferenceAttributes,
-                                            NodeAttributes::PointwiseAttributes,
-                                            NodeAttributes::BatchnormBackwardAttributes,
-                                            NodeAttributes::BatchnormAttributes,
-                                            NodeAttributes::ConvolutionFwdAttributes,
-                                            NodeAttributes::ConvolutionBwdAttributes,
-                                            NodeAttributes::ConvolutionWrwAttributes,
-                                            NodeAttributes::BatchnormInferenceAttributesVarianceExt,
-                                            NodeAttributes::MatmulAttributes,
-                                            NodeAttributes::RMSNormAttributes,
-                                            NodeAttributes::LayernormAttributes,
-                                            NodeAttributes::SdpaAttributes,
-                                            NodeAttributes::BlockScaleDequantizeAttributes,
-                                            NodeAttributes::BlockScaleQuantizeAttributes,
-                                            NodeAttributes::SdpaBackwardAttributes};
-    return values;
+inline const NodeAttributes (&EnumValuesNodeAttributes())[16] {
+  static const NodeAttributes values[] = {
+    NodeAttributes::NONE,
+    NodeAttributes::BatchnormInferenceAttributes,
+    NodeAttributes::PointwiseAttributes,
+    NodeAttributes::BatchnormBackwardAttributes,
+    NodeAttributes::BatchnormAttributes,
+    NodeAttributes::ConvolutionFwdAttributes,
+    NodeAttributes::ConvolutionBwdAttributes,
+    NodeAttributes::ConvolutionWrwAttributes,
+    NodeAttributes::BatchnormInferenceAttributesVarianceExt,
+    NodeAttributes::MatmulAttributes,
+    NodeAttributes::RMSNormAttributes,
+    NodeAttributes::LayernormAttributes,
+    NodeAttributes::SdpaAttributes,
+    NodeAttributes::BlockScaleDequantizeAttributes,
+    NodeAttributes::BlockScaleQuantizeAttributes,
+    NodeAttributes::SdpaBackwardAttributes
+  };
+  return values;
 }
 
 inline const char * const *EnumNamesNodeAttributes() {
-    static const char* const names[17] = {"NONE",
-                                          "BatchnormInferenceAttributes",
-                                          "PointwiseAttributes",
-                                          "BatchnormBackwardAttributes",
-                                          "BatchnormAttributes",
-                                          "ConvolutionFwdAttributes",
-                                          "ConvolutionBwdAttributes",
-                                          "ConvolutionWrwAttributes",
-                                          "BatchnormInferenceAttributesVarianceExt",
-                                          "MatmulAttributes",
-                                          "RMSNormAttributes",
-                                          "LayernormAttributes",
-                                          "SdpaAttributes",
-                                          "BlockScaleDequantizeAttributes",
-                                          "BlockScaleQuantizeAttributes",
-                                          "SdpaBackwardAttributes",
-                                          nullptr};
-    return names;
+  static const char * const names[17] = {
+    "NONE",
+    "BatchnormInferenceAttributes",
+    "PointwiseAttributes",
+    "BatchnormBackwardAttributes",
+    "BatchnormAttributes",
+    "ConvolutionFwdAttributes",
+    "ConvolutionBwdAttributes",
+    "ConvolutionWrwAttributes",
+    "BatchnormInferenceAttributesVarianceExt",
+    "MatmulAttributes",
+    "RMSNormAttributes",
+    "LayernormAttributes",
+    "SdpaAttributes",
+    "BlockScaleDequantizeAttributes",
+    "BlockScaleQuantizeAttributes",
+    "SdpaBackwardAttributes",
+    nullptr
+  };
+  return names;
 }
 
 inline const char *EnumNameNodeAttributes(NodeAttributes e) {
-    if(::flatbuffers::IsOutRange(e, NodeAttributes::NONE, NodeAttributes::SdpaBackwardAttributes))
-        return "";
-    const size_t index = static_cast<size_t>(e);
-    return EnumNamesNodeAttributes()[index];
+  if (::flatbuffers::IsOutRange(e, NodeAttributes::NONE, NodeAttributes::SdpaBackwardAttributes)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesNodeAttributes()[index];
 }
 
 template<typename T> struct NodeAttributesTraits {
@@ -178,10 +179,8 @@ template<> struct NodeAttributesTraits<hipdnn_data_sdk::data_objects::BlockScale
   static const NodeAttributes enum_value = NodeAttributes::BlockScaleQuantizeAttributes;
 };
 
-template <>
-struct NodeAttributesTraits<hipdnn_data_sdk::data_objects::SdpaBackwardAttributes>
-{
-    static const NodeAttributes enum_value = NodeAttributes::SdpaBackwardAttributes;
+template<> struct NodeAttributesTraits<hipdnn_data_sdk::data_objects::SdpaBackwardAttributes> {
+  static const NodeAttributes enum_value = NodeAttributes::SdpaBackwardAttributes;
 };
 
 template<typename T> struct NodeAttributesUnionTraits {
@@ -244,10 +243,8 @@ template<> struct NodeAttributesUnionTraits<hipdnn_data_sdk::data_objects::Block
   static const NodeAttributes enum_value = NodeAttributes::BlockScaleQuantizeAttributes;
 };
 
-template <>
-struct NodeAttributesUnionTraits<hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT>
-{
-    static const NodeAttributes enum_value = NodeAttributes::SdpaBackwardAttributes;
+template<> struct NodeAttributesUnionTraits<hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT> {
+  static const NodeAttributes enum_value = NodeAttributes::SdpaBackwardAttributes;
 };
 
 struct NodeAttributesUnion {
@@ -392,18 +389,13 @@ struct NodeAttributesUnion {
     return type == NodeAttributes::BlockScaleQuantizeAttributes ?
       reinterpret_cast<const hipdnn_data_sdk::data_objects::BlockScaleQuantizeAttributesT *>(value) : nullptr;
   }
-  hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT* AsSdpaBackwardAttributes()
-  {
-      return type == NodeAttributes::SdpaBackwardAttributes
-                 ? reinterpret_cast<hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT*>(value)
-                 : nullptr;
+  hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT *AsSdpaBackwardAttributes() {
+    return type == NodeAttributes::SdpaBackwardAttributes ?
+      reinterpret_cast<hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT *>(value) : nullptr;
   }
-  const hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT* AsSdpaBackwardAttributes() const
-  {
-      return type == NodeAttributes::SdpaBackwardAttributes
-                 ? reinterpret_cast<const hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT*>(
-                       value)
-                 : nullptr;
+  const hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT *AsSdpaBackwardAttributes() const {
+    return type == NodeAttributes::SdpaBackwardAttributes ?
+      reinterpret_cast<const hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT *>(value) : nullptr;
   }
 };
 
@@ -470,12 +462,9 @@ inline bool operator==(const NodeAttributesUnion &lhs, const NodeAttributesUnion
       return *(reinterpret_cast<const hipdnn_data_sdk::data_objects::BlockScaleQuantizeAttributesT *>(lhs.value)) ==
              *(reinterpret_cast<const hipdnn_data_sdk::data_objects::BlockScaleQuantizeAttributesT *>(rhs.value));
     }
-    case NodeAttributes::SdpaBackwardAttributes:
-    {
-        return *(reinterpret_cast<const hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT*>(
-                   lhs.value))
-               == *(reinterpret_cast<const hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT*>(
-                   rhs.value));
+    case NodeAttributes::SdpaBackwardAttributes: {
+      return *(reinterpret_cast<const hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT *>(lhs.value)) ==
+             *(reinterpret_cast<const hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT *>(rhs.value));
     }
     default: {
       return false;
@@ -567,14 +556,8 @@ struct Node FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const hipdnn_data_sdk::data_objects::BlockScaleQuantizeAttributes *attributes_as_BlockScaleQuantizeAttributes() const {
     return attributes_type() == hipdnn_data_sdk::data_objects::NodeAttributes::BlockScaleQuantizeAttributes ? static_cast<const hipdnn_data_sdk::data_objects::BlockScaleQuantizeAttributes *>(attributes()) : nullptr;
   }
-  const hipdnn_data_sdk::data_objects::SdpaBackwardAttributes*
-      attributes_as_SdpaBackwardAttributes() const
-  {
-      return attributes_type()
-                     == hipdnn_data_sdk::data_objects::NodeAttributes::SdpaBackwardAttributes
-                 ? static_cast<const hipdnn_data_sdk::data_objects::SdpaBackwardAttributes*>(
-                       attributes())
-                 : nullptr;
+  const hipdnn_data_sdk::data_objects::SdpaBackwardAttributes *attributes_as_SdpaBackwardAttributes() const {
+    return attributes_type() == hipdnn_data_sdk::data_objects::NodeAttributes::SdpaBackwardAttributes ? static_cast<const hipdnn_data_sdk::data_objects::SdpaBackwardAttributes *>(attributes()) : nullptr;
   }
   void *mutable_attributes() {
     return GetPointer<void *>(VT_ATTRIBUTES);
@@ -650,11 +633,8 @@ template<> inline const hipdnn_data_sdk::data_objects::BlockScaleQuantizeAttribu
   return attributes_as_BlockScaleQuantizeAttributes();
 }
 
-template <>
-inline const hipdnn_data_sdk::data_objects::SdpaBackwardAttributes*
-    Node::attributes_as<hipdnn_data_sdk::data_objects::SdpaBackwardAttributes>() const
-{
-    return attributes_as_SdpaBackwardAttributes();
+template<> inline const hipdnn_data_sdk::data_objects::SdpaBackwardAttributes *Node::attributes_as<hipdnn_data_sdk::data_objects::SdpaBackwardAttributes>() const {
+  return attributes_as_SdpaBackwardAttributes();
 }
 
 struct NodeBuilder {
@@ -1079,11 +1059,9 @@ inline bool VerifyNodeAttributes(::flatbuffers::Verifier &verifier, const void *
       auto ptr = reinterpret_cast<const hipdnn_data_sdk::data_objects::BlockScaleQuantizeAttributes *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case NodeAttributes::SdpaBackwardAttributes:
-    {
-        auto ptr
-            = reinterpret_cast<const hipdnn_data_sdk::data_objects::SdpaBackwardAttributes*>(obj);
-        return verifier.VerifyTable(ptr);
+    case NodeAttributes::SdpaBackwardAttributes: {
+      auto ptr = reinterpret_cast<const hipdnn_data_sdk::data_objects::SdpaBackwardAttributes *>(obj);
+      return verifier.VerifyTable(ptr);
     }
     default: return true;
   }
@@ -1160,11 +1138,9 @@ inline void *NodeAttributesUnion::UnPack(const void *obj, NodeAttributes type, c
       auto ptr = reinterpret_cast<const hipdnn_data_sdk::data_objects::BlockScaleQuantizeAttributes *>(obj);
       return ptr->UnPack(resolver);
     }
-    case NodeAttributes::SdpaBackwardAttributes:
-    {
-        auto ptr
-            = reinterpret_cast<const hipdnn_data_sdk::data_objects::SdpaBackwardAttributes*>(obj);
-        return ptr->UnPack(resolver);
+    case NodeAttributes::SdpaBackwardAttributes: {
+      auto ptr = reinterpret_cast<const hipdnn_data_sdk::data_objects::SdpaBackwardAttributes *>(obj);
+      return ptr->UnPack(resolver);
     }
     default: return nullptr;
   }
@@ -1229,11 +1205,9 @@ inline ::flatbuffers::Offset<void> NodeAttributesUnion::Pack(::flatbuffers::Flat
       auto ptr = reinterpret_cast<const hipdnn_data_sdk::data_objects::BlockScaleQuantizeAttributesT *>(value);
       return CreateBlockScaleQuantizeAttributes(_fbb, ptr, _rehasher).Union();
     }
-    case NodeAttributes::SdpaBackwardAttributes:
-    {
-        auto ptr = reinterpret_cast<const hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT*>(
-            value);
-        return CreateSdpaBackwardAttributes(_fbb, ptr, _rehasher).Union();
+    case NodeAttributes::SdpaBackwardAttributes: {
+      auto ptr = reinterpret_cast<const hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT *>(value);
+      return CreateSdpaBackwardAttributes(_fbb, ptr, _rehasher).Union();
     }
     default: return 0;
   }
@@ -1297,11 +1271,9 @@ inline NodeAttributesUnion::NodeAttributesUnion(const NodeAttributesUnion &u) : 
       value = new hipdnn_data_sdk::data_objects::BlockScaleQuantizeAttributesT(*reinterpret_cast<hipdnn_data_sdk::data_objects::BlockScaleQuantizeAttributesT *>(u.value));
       break;
     }
-    case NodeAttributes::SdpaBackwardAttributes:
-    {
-        value = new hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT(
-            *reinterpret_cast<hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT*>(u.value));
-        break;
+    case NodeAttributes::SdpaBackwardAttributes: {
+      value = new hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT(*reinterpret_cast<hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT *>(u.value));
+      break;
     }
     default:
       break;
@@ -1380,11 +1352,10 @@ inline void NodeAttributesUnion::Reset() {
       delete ptr;
       break;
     }
-    case NodeAttributes::SdpaBackwardAttributes:
-    {
-        auto ptr = reinterpret_cast<hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT*>(value);
-        delete ptr;
-        break;
+    case NodeAttributes::SdpaBackwardAttributes: {
+      auto ptr = reinterpret_cast<hipdnn_data_sdk::data_objects::SdpaBackwardAttributesT *>(value);
+      delete ptr;
+      break;
     }
     default: break;
   }
