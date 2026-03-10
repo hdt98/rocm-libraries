@@ -672,7 +672,8 @@ void CommRCCLAllToAll::ExecuteAsync(const rocfft_plan     plan,
         log_plan("CommRCCLAllToAll\n");
     }
 
-    const size_t elem_size = element_size(precision, arrayType);
+    const size_t base_size  = real_type_size(precision);
+    const bool   is_complex = array_type_is_complex(arrayType);
 
     // collect all device data pointers first
     std::vector<void*> data_ptrs(locations.size(), nullptr);
@@ -704,13 +705,13 @@ void CommRCCLAllToAll::ExecuteAsync(const rocfft_plan     plan,
             {
                 rocfft_scoped_device dev(loc.device);
 
-                // call alltoall for this device (grouped with other devices)
                 bool success = rccl.alltoall(data_ptrs[i],
                                              data_ptrs[i],
                                              count_per_rank,
                                              loc.device,
                                              streams[stream_idx],
-                                             elem_size);
+                                             base_size,
+                                             is_complex);
 
                 if(!success)
                 {
@@ -767,7 +768,8 @@ void CommRCCLGrouped::ExecuteAsync(const rocfft_plan     plan,
     if(transfers.empty())
         return;
 
-    const size_t elem_size = element_size(precision, arrayType);
+    const size_t base_size  = real_type_size(precision);
+    const bool   is_complex = array_type_is_complex(arrayType);
 
     // group all operations - ncclGroupStart called in constructor
     rocfft_rccl::Group group;
@@ -786,13 +788,23 @@ void CommRCCLGrouped::ExecuteAsync(const rocfft_plan     plan,
             bool success;
             if(t.is_send)
             {
-                success = rccl.send(
-                    data_ptr, t.count, t.peer_rank, t.local_location.device, t.stream, elem_size);
+                success = rccl.send(data_ptr,
+                                    t.count,
+                                    t.peer_rank,
+                                    t.local_location.device,
+                                    t.stream,
+                                    base_size,
+                                    is_complex);
             }
             else
             {
-                success = rccl.recv(
-                    data_ptr, t.count, t.peer_rank, t.local_location.device, t.stream, elem_size);
+                success = rccl.recv(data_ptr,
+                                    t.count,
+                                    t.peer_rank,
+                                    t.local_location.device,
+                                    t.stream,
+                                    base_size,
+                                    is_complex);
             }
 
             if(!success)

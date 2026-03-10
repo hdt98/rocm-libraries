@@ -1,4 +1,4 @@
-// Copyright (C) 2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2026 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -60,15 +60,18 @@ namespace rocfft_rccl
         // NCCL rank assigned to the given device, or -1 if not found
         int get_rank(int device_id) const;
 
-        // all-to-all with uniform counts
+        // all-to-all with uniform counts.
+        // base_type_size is the size of one real component (2/4/8).
         bool alltoall(const void* sendbuf,
                       void*       recvbuf,
                       size_t      count,
                       int         device_id,
                       hipStream_t stream,
-                      size_t      elem_size);
+                      size_t      base_type_size,
+                      bool        is_complex);
 
-        // all-to-all with variable counts
+        // all-to-all with variable counts.
+        // base_type_size is the size of one real component (2/4/8).
         bool alltoallv(const void*                sendbuf,
                        void*                      recvbuf,
                        const std::vector<size_t>& sendcounts,
@@ -77,23 +80,28 @@ namespace rocfft_rccl
                        const std::vector<size_t>& rdispls,
                        int                        device_id,
                        hipStream_t                stream,
-                       size_t                     elem_size);
+                       size_t                     base_type_size,
+                       bool                       is_complex);
 
-        // point-to-point send
+        // point-to-point send.
+        // base_type_size is the size of one real component (2/4/8).
         bool send(const void* sendbuf,
                   size_t      count,
                   int         peer_rank,
                   int         device_id,
                   hipStream_t stream,
-                  size_t      elem_size);
+                  size_t      base_type_size,
+                  bool        is_complex);
 
-        // point-to-point receive
+        // point-to-point receive.
+        // base_type_size is the size of one real component (2/4/8).
         bool recv(void*       recvbuf,
                   size_t      count,
                   int         peer_rank,
                   int         device_id,
                   hipStream_t stream,
-                  size_t      elem_size);
+                  size_t      base_type_size,
+                  bool        is_complex);
 
     private:
         // non-copyable

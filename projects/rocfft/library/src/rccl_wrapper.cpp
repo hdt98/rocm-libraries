@@ -1,4 +1,4 @@
-// Copyright (C) 2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2026 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -33,27 +33,35 @@ namespace rocfft_rccl
 
 #ifdef ROCFFT_RCCL_ENABLE
 
-    // RCCL data type mapping - returns base NCCL type for given element size.
-    // for complex types (8 or 16 bytes), callers must double the count.
-    static ncclDataType_t get_nccl_datatype(size_t elem_size)
+    struct NcclTypeInfo
     {
-        switch(elem_size)
+        ncclDataType_t dtype;
+        size_t         count_multiplier; // 1 for real, 2 for complex
+    };
+
+    // Map (base_type_size, is_complex) to the NCCL datatype and a count
+    // multiplier.  base_type_size is the size of one real component
+    // (2 for half, 4 for float, 8 for double).  Complex data is
+    // transferred as 2x the real component type.
+    static NcclTypeInfo get_nccl_type_info(size_t base_type_size, bool is_complex)
+    {
+        ncclDataType_t dtype;
+        switch(base_type_size)
         {
-        case 1:
-            return ncclInt8;
         case 2:
-            return ncclFloat16;
+            dtype = ncclFloat16;
+            break;
         case 4:
-            return ncclFloat32;
+            dtype = ncclFloat32;
+            break;
         case 8:
-            // complex<float> (8 bytes) - use float32, caller doubles count
-            return ncclFloat32;
-        case 16:
-            // complex<double> (16 bytes) - use float64, caller doubles count
-            return ncclFloat64;
+            dtype = ncclFloat64;
+            break;
         default:
-            return ncclInt8;
+            dtype = ncclInt8;
+            break;
         }
+        return {dtype, is_complex ? size_t{2} : size_t{1}};
     }
 
     // implementation details
@@ -236,31 +244,18 @@ namespace rocfft_rccl
                                 size_t      count,
                                 int         device_id,
                                 hipStream_t stream,
-                                size_t      elem_size)
+                                size_t      base_type_size,
+                                bool        is_complex)
     {
 #ifdef ROCFFT_RCCL_ENABLE
         ncclComm_t* comm_ptr = static_cast<ncclComm_t*>(get_comm(device_id));
         if(!comm_ptr)
             return false;
 
-        ncclDataType_t dtype = get_nccl_datatype(elem_size);
+        auto [dtype, multiplier] = get_nccl_type_info(base_type_size, is_complex);
 
-        // for complex types, adjust count
-        size_t nccl_count = count;
-        if(elem_size == 8)
-        {
-            // complex float: treat as 2x float
-            nccl_count = count * 2;
-            dtype      = ncclFloat32;
-        }
-        else if(elem_size == 16)
-        {
-            // complex double: treat as 2x double
-            nccl_count = count * 2;
-            dtype      = ncclFloat64;
-        }
-
-        ncclResult_t result = ncclAllToAll(sendbuf, recvbuf, nccl_count, dtype, *comm_ptr, stream);
+        ncclResult_t result
+            = ncclAllToAll(sendbuf, recvbuf, count * multiplier, dtype, *comm_ptr, stream);
 
         if(result != ncclSuccess)
         {
@@ -282,46 +277,32 @@ namespace rocfft_rccl
                                  const std::vector<size_t>& rdispls,
                                  int                        device_id,
                                  hipStream_t                stream,
-                                 size_t                     elem_size)
+                                 size_t                     base_type_size,
+                                 bool                       is_complex)
     {
 #ifdef ROCFFT_RCCL_ENABLE
         ncclComm_t* comm_ptr = static_cast<ncclComm_t*>(get_comm(device_id));
         if(!comm_ptr)
             return false;
 
-        ncclDataType_t dtype = get_nccl_datatype(elem_size);
+        auto [dtype, multiplier] = get_nccl_type_info(base_type_size, is_complex);
 
-        // for complex types, adjust counts and displacements
+        // scale counts and displacements by the multiplier (2x for complex)
         std::vector<size_t> adj_sendcounts = sendcounts;
         std::vector<size_t> adj_recvcounts = recvcounts;
         std::vector<size_t> adj_sdispls    = sdispls;
         std::vector<size_t> adj_rdispls    = rdispls;
 
-        if(elem_size == 8)
+        if(multiplier > 1)
         {
-            // complex float
-            dtype = ncclFloat32;
             for(auto& c : adj_sendcounts)
-                c *= 2;
+                c *= multiplier;
             for(auto& c : adj_recvcounts)
-                c *= 2;
+                c *= multiplier;
             for(auto& d : adj_sdispls)
-                d *= 2;
+                d *= multiplier;
             for(auto& d : adj_rdispls)
-                d *= 2;
-        }
-        else if(elem_size == 16)
-        {
-            // complex double
-            dtype = ncclFloat64;
-            for(auto& c : adj_sendcounts)
-                c *= 2;
-            for(auto& c : adj_recvcounts)
-                c *= 2;
-            for(auto& d : adj_sdispls)
-                d *= 2;
-            for(auto& d : adj_rdispls)
-                d *= 2;
+                d *= multiplier;
         }
 
         ncclResult_t result = ncclAllToAllv(sendbuf,
@@ -351,28 +332,18 @@ namespace rocfft_rccl
                             int         peer_rank,
                             int         device_id,
                             hipStream_t stream,
-                            size_t      elem_size)
+                            size_t      base_type_size,
+                            bool        is_complex)
     {
 #ifdef ROCFFT_RCCL_ENABLE
         ncclComm_t* comm_ptr = static_cast<ncclComm_t*>(get_comm(device_id));
         if(!comm_ptr)
             return false;
 
-        ncclDataType_t dtype      = get_nccl_datatype(elem_size);
-        size_t         nccl_count = count;
+        auto [dtype, multiplier] = get_nccl_type_info(base_type_size, is_complex);
 
-        if(elem_size == 8)
-        {
-            nccl_count = count * 2;
-            dtype      = ncclFloat32;
-        }
-        else if(elem_size == 16)
-        {
-            nccl_count = count * 2;
-            dtype      = ncclFloat64;
-        }
-
-        ncclResult_t result = ncclSend(sendbuf, nccl_count, dtype, peer_rank, *comm_ptr, stream);
+        ncclResult_t result
+            = ncclSend(sendbuf, count * multiplier, dtype, peer_rank, *comm_ptr, stream);
 
         if(result != ncclSuccess)
         {
@@ -391,28 +362,18 @@ namespace rocfft_rccl
                             int         peer_rank,
                             int         device_id,
                             hipStream_t stream,
-                            size_t      elem_size)
+                            size_t      base_type_size,
+                            bool        is_complex)
     {
 #ifdef ROCFFT_RCCL_ENABLE
         ncclComm_t* comm_ptr = static_cast<ncclComm_t*>(get_comm(device_id));
         if(!comm_ptr)
             return false;
 
-        ncclDataType_t dtype      = get_nccl_datatype(elem_size);
-        size_t         nccl_count = count;
+        auto [dtype, multiplier] = get_nccl_type_info(base_type_size, is_complex);
 
-        if(elem_size == 8)
-        {
-            nccl_count = count * 2;
-            dtype      = ncclFloat32;
-        }
-        else if(elem_size == 16)
-        {
-            nccl_count = count * 2;
-            dtype      = ncclFloat64;
-        }
-
-        ncclResult_t result = ncclRecv(recvbuf, nccl_count, dtype, peer_rank, *comm_ptr, stream);
+        ncclResult_t result
+            = ncclRecv(recvbuf, count * multiplier, dtype, peer_rank, *comm_ptr, stream);
 
         if(result != ncclSuccess)
         {
