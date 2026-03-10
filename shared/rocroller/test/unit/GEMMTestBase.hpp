@@ -205,7 +205,7 @@ namespace GEMMTests
             // TC != TD: append a type-conversion op after getCommand().
             rocRollerTest::Graphs::GEMM gemmGraph(dataTypeA, dataTypeB, dataTypeC, dataTypeD);
             gemmGraph.setProblem(gemm);
-            auto command = gemmGraph.getCommand();
+            auto                     command = gemmGraph.getCommand();
             Operations::OperationTag tagScalarSeed;
             Operations::OperationTag tagTensorDCvt;
             Operations::OperationTag tagCvtExecute;
