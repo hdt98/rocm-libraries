@@ -11,13 +11,13 @@ import concurrent.futures
 
 
 def _import_gemm_kernel_builder():
-    """Import the base GemmKernelBuilder from the parent directory."""
+    """Import the base GemmKernelBuilder from the gemm directory."""
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    parent_dir = os.path.dirname(current_dir)
+    gemm_dir = os.path.dirname(os.path.dirname(current_dir))
 
     spec = importlib.util.spec_from_file_location(
         "gemm_instance_builder",
-        os.path.join(parent_dir, "gemm_instance_builder.py"),
+        os.path.join(gemm_dir, "gemm_instance_builder.py"),
     )
     gemm_builder_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(gemm_builder_module)
@@ -26,13 +26,13 @@ def _import_gemm_kernel_builder():
 
 
 def _import_validation_utils():
-    """Import validation utilities from parent directory."""
+    """Import validation utilities from the gemm directory."""
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    parent_dir = os.path.dirname(current_dir)
+    gemm_dir = os.path.dirname(os.path.dirname(current_dir))
 
     spec = importlib.util.spec_from_file_location(
         "validation_utils",
-        os.path.join(parent_dir, "gemm_validation_utils.py"),
+        os.path.join(gemm_dir, "gemm_validation_utils.py"),
     )
     validation_utils = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(validation_utils)
