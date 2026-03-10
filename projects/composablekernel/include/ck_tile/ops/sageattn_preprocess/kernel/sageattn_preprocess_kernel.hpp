@@ -175,7 +175,13 @@ struct SageAttnPreprocessKargs
     index_t num_k_tiles;
 };
 
-template <typename InputT_, index_t kRows_, index_t kCols_, index_t kBlockSize_ = kCols_>
+// kBlockSize = kRows * (kCols / 32): one thread per (row, MXFP4-group) pair.
+// RunQQuantize and RunKSmoothAndQuantize achieve 100% thread utilisation.
+// RunQMean uses only kCols of the kBlockSize threads (column-per-thread reduction).
+template <typename InputT_,
+          index_t kRows_,
+          index_t kCols_,
+          index_t kBlockSize_ = kRows_ * (kCols_ / 32)>
 struct SageAttnPreprocessKernel
 {
     using InputT = InputT_;

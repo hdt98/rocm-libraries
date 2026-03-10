@@ -7,28 +7,39 @@
 
 namespace ck_tile {
 
-// SageAttnPreprocessPipeline: per-CTA computation for one tile of Q, K, and V.
+// SageAttnPreprocessPipeline: per-CTA computation for one tile of Q and K.
 //
-// Each CTA (identified by tile_x, head, batch) performs ALL of Q, K, V work
-// for its tile index, in the following order:
+// Each CTA (identified by tile_x, head, batch) performs:
 //
-//   1. RunQMean:             compute column mean of Q tile → store in smem + global q_mean (InputT)
-//   2. RunQQuantize:         Q_smooth = Q - q_mean (using smem) → MXFP4
+//   1. RunQMean:              compute column mean of Q tile → smem + global q_mean (InputT)
+//   2. RunQQuantize:          Q_smooth = Q - q_mean → MXFP4
 //   3. RunKSmoothAndQuantize: K' = K - k_mean → write k_prime; K' → MXFP4
-//   4. RunV:                 V[:, channel] transpose → MXFP4
 //
 // delta_s = q_mean @ K'^T is computed separately via a batched GEMM kernel.
+// V preprocessing is handled by SageAttnVPreprocessKernel (separate launch).
 //
 // RunKMeanPartial: used by SageAttnKMeanKernel (separate launch, different grid).
 //   Each CTA accumulates a partial column-sum of its K tile into k_mean_partial (float atomicAdd).
 //   The last CTA to finish normalises and stores k_mean as InputT.
 //
+// Thread layout (Steps 2 & 3 — quantize):
+//   kNumGroups = kCols / kScaleGranularity
+//   kBlockSize = kRows * kNumGroups   ← one thread per (row, group) pair
+//   row_idx    = tid / kNumGroups     (0 .. kRows-1)
+//   grp_idx    = tid % kNumGroups     (0 .. kNumGroups-1)
+//   Each thread processes one MXFP4 group of kScaleGranularity(=32) elements.
+//   → 100% thread utilisation for Steps 2 and 3.
+//
+// Thread layout (Step 1 — mean):
+//   thread d (d < kCols) computes mean of column d over kRows rows.
+//   Threads d >= kCols are idle during this step (kBlockSize > kCols when kRows > 1).
+//
 // Template parameters:
-//   InputT_:           input element type (fp16_t or bf16_t)
+//   InputT_:           input element type (fp16_t, bf16_t, or float)
 //   kRows_:            tile rows (kM0 == kN0, used for Q and K tiles)
 //   kCols_:            tile cols (hdim)
 //   kScaleGranularity: MXFP4 group size (must be 32)
-//   kBlockSize_:       threads per CTA (preprocess kernel)
+//   kBlockSize_:       threads per CTA; default = kRows * (kCols / kScaleGranularity)
 
 template <typename InputT_,
           index_t kRows_,
@@ -83,6 +94,11 @@ struct SageAttnPreprocessPipeline
     // -------------------------------------------------------------------------
     // Step 2: quantize Q_smooth = Q_tile - q_mean (smem) → MXFP4.
     //   Reads q_mean from smem (set by RunQMean).
+    //
+    //   Thread layout: one thread per (row, group) pair.
+    //     row_idx = tid / kNumGroups  (0 .. kRows-1)
+    //     grp_idx = tid % kNumGroups  (0 .. kNumGroups-1)
+    //   → 100% thread utilisation.
     // -------------------------------------------------------------------------
     CK_TILE_DEVICE void RunQQuantize(const InputT* __restrict__ src_ptr,
                                      uint8_t* __restrict__ dst_hat_ptr,
@@ -92,21 +108,48 @@ struct SageAttnPreprocessPipeline
         const InputT* smem_mean = reinterpret_cast<const InputT*>(smem);
         const index_t tid       = get_thread_id();
 
-        for(index_t r = tid; r < kRows; r += kBlockSize)
+        constexpr index_t kNumGroups = kCols / kScaleGranularity;
+        const index_t     row_idx    = tid / kNumGroups;
+        const index_t     grp_idx    = tid % kNumGroups;
+        const index_t     d_start    = grp_idx * kScaleGranularity;
+
+        constexpr float rcp_dst_max = 1.0f / 6.0f;
+
+        const InputT* src_row = src_ptr + row_idx * kCols;
+
+        float group_data[kScaleGranularity];
+        float max_abs = 0.0f;
+        for(index_t j = 0; j < kScaleGranularity; j++)
         {
-            QuantizeRowSubMean(src_ptr + r * kCols,
-                               smem_mean,
-                               dst_hat_ptr + r * (kCols / 2),
-                               dst_scale_ptr + r * (kCols / kScaleGranularity));
+            const float val = static_cast<float>(src_row[d_start + j]) -
+                              static_cast<float>(smem_mean[d_start + j]);
+            group_data[j] = val;
+            max_abs       = max(max_abs, abs(val));
         }
+
+        const float scale = bit_cast<float>(
+            (bit_cast<uint32_t>(max_abs * rcp_dst_max) + numeric_traits<float>::mant_mask) &
+            numeric_traits<float>::head_mask);
+
+        dst_scale_ptr[row_idx * kNumGroups + grp_idx] =
+            static_cast<uint8_t>(bit_cast<uint32_t>(scale) >> 23);
+
+        PackFP4Group(group_data,
+                     dst_hat_ptr + row_idx * (kCols / 2) + grp_idx * (kScaleGranularity / 2),
+                     scale);
     }
 
     // -------------------------------------------------------------------------
     // Step 3: compute K' = K_tile - k_mean, write to k_prime_ptr in natural
     //   row-major layout [kRows, kCols], then quantize K' → MXFP4.
-    //   k_mean_ptr:   [kCols] InputT per-head channel mean for this (batch, head).
-    //   k_prime_ptr:  pointer to K'[row_start, 0] in [seqlen_k, hdim] global layout.
+    //   k_mean_ptr:     [kCols] InputT per-head channel mean for this (batch, head).
+    //   k_prime_ptr:    pointer to K'[row_start, 0] in [seqlen_k, hdim] global layout.
     //   k_prime_stride: hdim (row stride of K').
+    //
+    //   Thread layout: one thread per (row, group) pair.
+    //     row_idx = tid / kNumGroups  (0 .. kRows-1)
+    //     grp_idx = tid % kNumGroups  (0 .. kNumGroups-1)
+    //   → 100% thread utilisation. No kprime_row[kCols] stack array needed.
     // -------------------------------------------------------------------------
     CK_TILE_DEVICE void RunKSmoothAndQuantize(const InputT* __restrict__ src_ptr,
                                               const InputT* __restrict__ k_mean_ptr,
@@ -116,24 +159,38 @@ struct SageAttnPreprocessPipeline
                                               uint8_t* __restrict__ dst_scale_ptr) const
     {
         const index_t tid = get_thread_id();
-        InputT kprime_row[kCols]; // kCols is constexpr — stack array.
-        for(index_t r = tid; r < kRows; r += kBlockSize)
+
+        constexpr index_t kNumGroups = kCols / kScaleGranularity;
+        const index_t     row_idx    = tid / kNumGroups;
+        const index_t     grp_idx    = tid % kNumGroups;
+        const index_t     d_start    = grp_idx * kScaleGranularity;
+
+        constexpr float rcp_dst_max = 1.0f / 6.0f;
+
+        const InputT* src_row = src_ptr + row_idx * kCols;
+        InputT*       dst_row = k_prime_ptr + row_idx * k_prime_stride;
+
+        float group_data[kScaleGranularity];
+        float max_abs = 0.0f;
+        for(index_t j = 0; j < kScaleGranularity; j++)
         {
-            const InputT* src_row  = src_ptr + r * kCols;
-            InputT*       dst_row  = k_prime_ptr + r * k_prime_stride;
-
-            for(index_t d = 0; d < kCols; d++)
-            {
-                kprime_row[d] =
-                    static_cast<InputT>(static_cast<float>(src_row[d]) -
-                                        static_cast<float>(k_mean_ptr[d]));
-                dst_row[d] = kprime_row[d];
-            }
-
-            QuantizeRow(kprime_row,
-                        dst_hat_ptr + r * (kCols / 2),
-                        dst_scale_ptr + r * (kCols / kScaleGranularity));
+            const float val = static_cast<float>(src_row[d_start + j]) -
+                              static_cast<float>(k_mean_ptr[d_start + j]);
+            group_data[j]       = val;
+            dst_row[d_start + j] = static_cast<InputT>(val);
+            max_abs             = max(max_abs, abs(val));
         }
+
+        const float scale = bit_cast<float>(
+            (bit_cast<uint32_t>(max_abs * rcp_dst_max) + numeric_traits<float>::mant_mask) &
+            numeric_traits<float>::head_mask);
+
+        dst_scale_ptr[row_idx * kNumGroups + grp_idx] =
+            static_cast<uint8_t>(bit_cast<uint32_t>(scale) >> 23);
+
+        PackFP4Group(group_data,
+                     dst_hat_ptr + row_idx * (kCols / 2) + grp_idx * (kScaleGranularity / 2),
+                     scale);
     }
 
     // -------------------------------------------------------------------------
@@ -162,78 +219,7 @@ struct SageAttnPreprocessPipeline
     }
 
 private:
-    // -------------------------------------------------------------------------
-    // Quantize one row of kCols InputT values after subtracting mean: MXFP4.
-    //   val = src[d] - mean[d]
-    // -------------------------------------------------------------------------
-    CK_TILE_DEVICE void QuantizeRowSubMean(const InputT* __restrict__ src_row,
-                                            const InputT* __restrict__ mean,
-                                            uint8_t* __restrict__ dst_hat_row,
-                                            uint8_t* __restrict__ dst_scale_row) const
-    {
-        constexpr float rcp_dst_max = 1.0f / 6.0f;
-        const index_t   num_groups  = kCols / kScaleGranularity;
-
-        for(index_t g = 0; g < num_groups; g++)
-        {
-            const index_t d_start = g * kScaleGranularity;
-            float group_data[kScaleGranularity];
-            float max_abs = 0.0f;
-
-            for(index_t j = 0; j < kScaleGranularity; j++)
-            {
-                const float val = static_cast<float>(src_row[d_start + j]) -
-                                  static_cast<float>(mean[d_start + j]);
-                group_data[j] = val;
-                max_abs       = max(max_abs, abs(val));
-            }
-
-            const float scale = bit_cast<float>(
-                (bit_cast<uint32_t>(max_abs * rcp_dst_max) + numeric_traits<float>::mant_mask) &
-                numeric_traits<float>::head_mask);
-
-            dst_scale_row[g] = static_cast<uint8_t>(bit_cast<uint32_t>(scale) >> 23);
-
-            uint8_t* hat_group = dst_hat_row + g * (kScaleGranularity / 2);
-            PackFP4Group(group_data, hat_group, scale);
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Quantize one row of kCols InputT values (already smooth) → MXFP4.
-    //   Used by RunKSmoothAndQuantize after K' has been computed.
-    // -------------------------------------------------------------------------
-    CK_TILE_DEVICE void QuantizeRow(const InputT* __restrict__ src_row,
-                                     uint8_t* __restrict__ dst_hat_row,
-                                     uint8_t* __restrict__ dst_scale_row) const
-    {
-        constexpr float rcp_dst_max = 1.0f / 6.0f;
-        const index_t   num_groups  = kCols / kScaleGranularity;
-
-        for(index_t g = 0; g < num_groups; g++)
-        {
-            const index_t d_start = g * kScaleGranularity;
-            float group_data[kScaleGranularity];
-            float max_abs = 0.0f;
-
-            for(index_t j = 0; j < kScaleGranularity; j++)
-            {
-                group_data[j] = static_cast<float>(src_row[d_start + j]);
-                max_abs       = max(max_abs, abs(group_data[j]));
-            }
-
-            const float scale = bit_cast<float>(
-                (bit_cast<uint32_t>(max_abs * rcp_dst_max) + numeric_traits<float>::mant_mask) &
-                numeric_traits<float>::head_mask);
-
-            dst_scale_row[g] = static_cast<uint8_t>(bit_cast<uint32_t>(scale) >> 23);
-
-            uint8_t* hat_group = dst_hat_row + g * (kScaleGranularity / 2);
-            PackFP4Group(group_data, hat_group, scale);
-        }
-    }
-
-    // Pack 32 floats into 16 bytes (packed FP4) using AMD CVT intrinsic.
+    // Pack kScaleGranularity floats into kScaleGranularity/2 bytes using AMD CVT intrinsic.
     CK_TILE_DEVICE void PackFP4Group(const float* __restrict__ group_data,
                                       uint8_t* __restrict__ hat_group,
                                       float scale) const
