@@ -1,6 +1,10 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
+/// @file
+/// @brief Reflection `InstanceTraits` specialization for
+/// `DeviceGroupedConvFwdDlMultipleD_NHWC_KYXC_NHWK`.
+
 // CRITICAL MAINTENANCE NOTE:
 // Keep this template parameter list strictly in sync with:
 // ck/tensor_operation/gpu/device/impl/device_grouped_conv_fwd_dl_multiple_d_nhwc_kyxc_nhwk.hpp.

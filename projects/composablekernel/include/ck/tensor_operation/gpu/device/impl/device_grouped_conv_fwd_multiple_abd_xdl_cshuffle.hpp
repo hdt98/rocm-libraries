@@ -2101,7 +2101,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                       "Specialization of instance_traits not found. Please check that a "
                       "specialization exists in file "
                       "ck_tile/builder/reflect/"
-                      "instance_traits_device_grouped_conv_fwd_multiple_abd_xdl_cshuffle.hpp "
+                      "reflect_device_grouped_conv_fwd_multiple_abd_xdl_cshuffle.inc "
                       "for the given template parameters.");
         return ck_tile::reflect::instance_string<DeviceOp>();
     }
@@ -2115,7 +2115,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                       "ck_tile/builder/reflect/conv_traits.hpp is updated to match, or that "
                       "InstanceTraits in "
                       "ck_tile/builder/reflect/"
-                      "instance_traits_device_grouped_conv_fwd_multiple_abd_xdl_cshuffle.hpp "
+                      "reflect_device_grouped_conv_fwd_multiple_abd_xdl_cshuffle.inc "
                       "provides all required members for ConvTraits to work.");
         return std::make_unique<ck_tile::reflect::conv::ConvDescription>(
             ck_tile::reflect::describe<DeviceOp>());
