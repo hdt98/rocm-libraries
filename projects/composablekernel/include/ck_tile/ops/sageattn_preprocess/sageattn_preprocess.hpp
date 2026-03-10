@@ -56,18 +56,20 @@ namespace ck_tile {
 //   N = seqlen_k    (large)
 //   K = hdim        (128 or 256)
 //
-// Shape: BlockTile<32,64,32>, BlockWarps<1,2,1>, WarpTile<32,32,16>
-//   → MWarp=1, NWarp=2 → 2 wavefronts = 128 threads.
-//   WarpGemm: mfma_f32_32x32x8f16 (kM=32,kN=32,kK=8) → KIterPerWarp=32/8=4 ✓
-//   Both A and B are RowMajor; K' stored transposed [hdim,seqlen_k] so B[k,n]=K'[k,n].
-//   kPadM=true to handle num_q_tiles not divisible by 32.
-using DeltaSGemmShape = TileGemmShape<sequence<32, 64, 32>,  // BlockTile M,N,K
-                                      sequence<1, 2, 1>,      // BlockWarps
-                                      sequence<32, 32, 16>>;  // WarpTile
+// BlockTile<32,64,32>, BlockWarps<1,2,1>: MWarp=1, NWarp=2 → 128 threads.
+// WarpTile K dimension differs by input type:
+//   fp16/bf16: WarpTile<32,32,16> → mfma_f32_32x32x8f16 × 2 iters  (kK=16)
+//   float:     WarpTile<32,32, 8> → mfma_f32_32x32x2f32 × 4 iters  (kK= 8)
+// kPadM=true to handle num_q_tiles not divisible by 32.
+template <typename InputT>
+using DeltaSGemmShape = std::conditional_t<
+    std::is_same_v<InputT, float>,
+    TileGemmShape<sequence<32, 64, 32>, sequence<1, 2, 1>, sequence<32, 32,  8>>,
+    TileGemmShape<sequence<32, 64, 32>, sequence<1, 2, 1>, sequence<32, 32, 16>>>;
 
 template <typename InputT, index_t kRows, index_t kCols>
 void sageattn_preprocess_run(
-    // InputT must be fp16_t or bf16_t — float is not a valid MFMA input for the GEMM stage.
+    // InputT: fp16_t, bf16_t, or float.
     // ---- preprocess args ----
     const SageAttnPreprocessHostArgs& prep_args,
     // ---- delta_s output ----
@@ -164,10 +166,12 @@ void sageattn_preprocess_run(
                                                    ALayout, BLayout, CLayout,
                                                    TransposeC>;
 
+        using Shape = DeltaSGemmShape<InputT>;
+
         using GemmProblem = UniversalGemmPipelineProblem<InputT,  // ADataType
                                                          InputT,  // BDataType
                                                          float,   // AccDataType
-                                                         DeltaSGemmShape,
+                                                         Shape,
                                                          GemmTraits,
                                                          GemmPipelineScheduler::Intrawave>;
 
@@ -182,16 +186,16 @@ void sageattn_preprocess_run(
                                     tuple<>,  // DsLayout
                                     CLayout,
                                     element_wise::PassThrough,
-                                    DeltaSGemmShape::kM,
-                                    DeltaSGemmShape::kN,
+                                    Shape::kM,
+                                    Shape::kN,
                                     /*MWarp=*/1,
                                     /*NWarp=*/2,
                                     /*MWarpTile=*/32,
                                     /*NWarpTile=*/32,
-                                    /*KWarpTile=*/16,
+                                    Shape::WarpTile::at(number<2>{}),  // 16 for fp16/bf16, 8 for float
                                     TransposeC>>;
 
-        using GemmTilePartitioner = GemmSpatiallyLocalTilePartitioner<DeltaSGemmShape,
+        using GemmTilePartitioner = GemmSpatiallyLocalTilePartitioner<Shape,
                                                                        /*GroupNum=*/8,
                                                                        /*M01=*/4>;
         using GemmKernel = BatchedGemmKernel<GemmTilePartitioner, GemmPipeline, GemmEpilogue>;

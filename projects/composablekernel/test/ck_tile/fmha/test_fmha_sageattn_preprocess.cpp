@@ -453,11 +453,14 @@ void SageAttnPreprocessTest::RunGPUTest()
 // ---------------------------------------------------------------------------
 // Test entry points
 // ---------------------------------------------------------------------------
-// Note: sageattn_preprocess_run requires fp16_t or bf16_t (MFMA constraint for
-// the delta_s GEMM). Float32 input is not supported by this three-kernel path.
 TEST_P(SageAttnPreprocessTest, Fp16Input)
 {
     RunGPUTest<ck_tile::fp16_t>();
+}
+
+TEST_P(SageAttnPreprocessTest, Float32Input)
+{
+    RunGPUTest<float>();
 }
 
 // ---------------------------------------------------------------------------
@@ -468,11 +471,9 @@ INSTANTIATE_TEST_SUITE_P(
     Shapes,
     SageAttnPreprocessTest,
     ::testing::Values(
-        // fp16 inputs, hdim=128
         std::make_tuple(1, 1, 64,  128, 128, true),
         std::make_tuple(2, 4, 128, 128, 128, true),
         std::make_tuple(1, 2, 128, 256, 128, true),
-        // fp16 inputs, hdim=256
         std::make_tuple(1, 1, 128, 128, 256, true),
         std::make_tuple(1, 2, 128, 256, 256, true)));
 
