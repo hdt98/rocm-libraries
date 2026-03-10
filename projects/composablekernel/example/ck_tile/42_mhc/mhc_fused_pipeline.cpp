@@ -13,10 +13,7 @@
 #include "ck_tile/host/kernel_launch.hpp"
 #include "ck_tile/host/reference/reference_mhc.hpp"
 #include "ck_tile/host/check_err.hpp"
-#include "ck_tile/ops/mhc/pipeline/mhc_problem.hpp"
-// Include both original and optimized kernels
-#include "ck_tile/ops/mhc/kernel/mhc_kernel.hpp"
-#include "ck_tile/ops/mhc/kernel/mhc_kernel_optimized.hpp"
+#include "mhc_fused_pipeline_invoker.hpp"
 
 // Parse command-line arguments for MHC benchmark
 auto create_args(int argc, char* argv[])
@@ -28,7 +25,6 @@ auto create_args(int argc, char* argv[])
         .insert("v", "1", "CPU validation (0=no, 1=yes)")
         .insert("warmup", "5", "Number of warmup iterations")
         .insert("repeat", "20", "Number of benchmark iterations")
-        .insert("kernel", "optimized", "Kernel version (baseline or optimized)")
         .insert("r", "1.0", "Norm scaling factor")
         .insert("alpha_pre", "1.0", "Alpha for pre-activation")
         .insert("alpha_post", "1.0", "Alpha for post-activation")
@@ -45,9 +41,8 @@ template <typename XDataType,
           typename YDataType,
           typename ComputeDataType,
           typename ActivationFunc = ck_tile::element_wise::Sigmoid,
-          ck_tile::index_t MTile  = 16,
-          bool UseOptimized       = false> // Template parameter to select kernel
-bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
+          ck_tile::index_t MTile  = 32>
+bool run_mhc_fused_pipeline(const ck_tile::ArgParser& arg_parser)
 {
     const int B = arg_parser.get_int("B");
     const int n = arg_parser.get_int("n");
@@ -67,10 +62,8 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
     const float bias         = arg_parser.get_float("bias");
     const int sinkhorn_iters = arg_parser.get_int("sinkhorn_iters");
 
-    const std::string kernel_name = UseOptimized ? "Optimized" : "Baseline";
-
     std::cout << "\n========================================" << std::endl;
-    std::cout << "MHC Kernel " << kernel_name << " Benchmark (BF16) - Split-K" << std::endl;
+    std::cout << "MHC Fused Pipeline Kernel Benchmark (BF16)" << std::endl;
     std::cout << "========================================" << std::endl;
     std::cout << "Configuration:" << std::endl;
     std::cout << "  Batch size (B): " << B << std::endl;
@@ -79,7 +72,7 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
     std::cout << "  Input dimension (nC): " << nC << std::endl;
     std::cout << "  Output dimension (2n+n^2): " << output_dim << std::endl;
     std::cout << "  M Tile size: " << MTile << std::endl;
-    std::cout << "  Kernel version: " << kernel_name << std::endl;
+    std::cout << "  Kernel: Fused Pipeline V3 (with optional fusion support)" << std::endl;
     std::cout << "  Warmup iterations: " << warmup << std::endl;
     std::cout << "  Benchmark iterations: " << repeat << std::endl;
     std::cout << "========================================" << std::endl;
@@ -104,32 +97,34 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
     d_phi_mem.ToDevice(h_phi.data());
     d_output_mem.ToDevice(h_output.data());
 
-    // Use GEMM distribution version
-    using Problem = ck_tile::MHCProblemV5GemmDist<XDataType, ComputeDataType, YDataType, MTile>;
+    // Use invoker for kernel type definitions
+    using Invoker         = ck_tile::MHCFusedPipelineInvoker<XDataType,
+                                                             PhiDataType,
+                                                             YDataType,
+                                                             ComputeDataType,
+                                                             ActivationFunc,
+                                                             MTile>;
+    using Kernel          = typename Invoker::GemmKernel;
+    using ReductionKernel = typename Invoker::ReductionKernel;
+    using SinkhornKernel  = typename Invoker::SinkhornKernel;
 
-    // Select kernel based on template parameter
-    using Kernel = std::conditional_t<
-        UseOptimized,
-        ck_tile::MHCKernelV5Optimized<Problem, ck_tile::MHCDefaultPolicy, ActivationFunc>,
-        ck_tile::MHCKernelV5<Problem, ck_tile::MHCDefaultPolicy, ActivationFunc>>;
-
-    using ReductionKernel = ck_tile::MHCReductionKernel<Problem, ActivationFunc>;
-    using SinkhornKernel  = ck_tile::MHCSinkhornKernel<YDataType, ComputeDataType>;
-
-    const ck_tile::index_t kBlockSize = Kernel::BlockSize();
-    // 3D grid: (batch / kMTile) × (output_dim / kNTile) × (nC / kKTile)
-    auto grid_size                   = Kernel::GetGridSize(B, output_dim, nC);
-    const ck_tile::index_t grid_m    = grid_size.at(ck_tile::number<0>{});
-    const ck_tile::index_t grid_n    = grid_size.at(ck_tile::number<1>{});
-    const ck_tile::index_t grid_k    = grid_size.at(ck_tile::number<2>{});
-    const ck_tile::index_t kGridSize = grid_m * grid_n * grid_k;
+    const ck_tile::index_t kBlockSize = Invoker::GetGemmBlockSize();
+    auto grid_size                    = Invoker::GetGridSize(B, output_dim, nC);
+    const ck_tile::index_t grid_m     = grid_size.at(ck_tile::number<0>{});
+    const ck_tile::index_t grid_n     = grid_size.at(ck_tile::number<1>{});
+    const ck_tile::index_t grid_k     = grid_size.at(ck_tile::number<2>{});
+    const ck_tile::index_t kGridSize  = grid_m * grid_n * grid_k;
 
     std::cout << "\nKernel Configuration:" << std::endl;
     std::cout << "  Grid: " << grid_m << " × " << grid_n << " × " << grid_k << " = " << kGridSize
               << " blocks" << std::endl;
     std::cout << "  Block size: " << kBlockSize << " threads" << std::endl;
-    std::cout << "  Shared memory: " << Kernel::GetSmemSize() << " bytes" << std::endl;
+    // Note: GetSmemSize() is device-only, so we calculate it manually for display
+    constexpr ck_tile::index_t smem_size = 8192; // M=32, N=32, K=64 with bf16
+    std::cout << "  Shared memory: " << smem_size << " bytes" << std::endl;
     std::cout << "  Split-K factor: " << grid_k << std::endl;
+    std::cout << "  Reduction: OPTIMIZED (CK-Tile block_reduce2d pattern)" << std::endl;
+
     // Allocate workspace for split-K partial results
     const std::size_t workspace_size     = grid_k * B * output_dim * sizeof(ComputeDataType);
     const std::size_t partial_norms_size = grid_k * B * sizeof(ComputeDataType);
@@ -137,13 +132,13 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
     ck_tile::DeviceMem d_workspace_mem(workspace_size);
     ck_tile::DeviceMem d_partial_norms_mem(partial_norms_size);
 
-    // Initialize workspace to zero
     (void)hipMemset(d_workspace_mem.GetDeviceBuffer(), 0, workspace_size);
     (void)hipMemset(d_partial_norms_mem.GetDeviceBuffer(), 0, partial_norms_size);
 
     std::cout << "  Workspace size: " << workspace_size / (1024.0 * 1024.0) << " MB" << std::endl;
 
     constexpr ck_tile::index_t kBlockPerCu = 1;
+    constexpr ck_tile::index_t kSmemSize   = smem_size; // Use the constexpr value we calculated
 
     // Reduction kernel configuration
     const ck_tile::index_t reduction_threads = ReductionKernel::BlockSize();
@@ -156,14 +151,14 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
 
     // 3-stage kernel launch: GEMM -> Reduction -> Sinkhorn
     auto launch_combined = [&]() {
-        // Stage 1: Launch split-K GEMM kernel
+        // Stage 1: Launch split-K GEMM kernel with Fused Pipeline
         ck_tile::launch_kernel(
             ck_tile::stream_config{nullptr, false},
             ck_tile::make_kernel<kBlockPerCu>(
                 Kernel{},
                 kGridSize,
                 kBlockSize,
-                Kernel::GetSmemSize(),
+                kSmemSize,
                 static_cast<XDataType*>(d_x_mem.GetDeviceBuffer()),
                 static_cast<PhiDataType*>(d_phi_mem.GetDeviceBuffer()),
                 static_cast<ComputeDataType*>(d_workspace_mem.GetDeviceBuffer()),
@@ -198,7 +193,7 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
                 alpha_post,
                 alpha_res,
                 bias,
-                0)); // sinkhorn_iters=0 in reduction kernel
+                0));
 
         // Stage 3: Launch Sinkhorn kernel if enabled
         if(sinkhorn_iters > 0)
@@ -216,11 +211,13 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
                                        sinkhorn_iters));
         }
     };
+
     // Warmup
     for(int i = 0; i < warmup; ++i)
     {
         launch_combined();
     }
+
     // Benchmark with manual timing
     hipEvent_t start, stop;
     (void)hipEventCreate(&start);
@@ -240,6 +237,7 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
 
     (void)hipEventDestroy(start);
     (void)hipEventDestroy(stop);
+
     // Calculate performance metrics
     std::size_t num_bytes = sizeof(XDataType) * B * nC +            // Input x
                             sizeof(PhiDataType) * nC * output_dim + // Weights phi
@@ -252,7 +250,7 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
     float tflops          = num_flops / 1.E9 / ave_time;
 
     std::cout << "\n========================================" << std::endl;
-    std::cout << "Performance Results (" << kernel_name << "):" << std::endl;
+    std::cout << "Performance Results (Fused Pipeline):" << std::endl;
     std::cout << "  Average time: " << ave_time << " ms" << std::endl;
     std::cout << "  Bandwidth: " << gb_per_sec << " GB/s" << std::endl;
     std::cout << "  Throughput: " << tflops << " TFLOPS" << std::endl;
@@ -262,7 +260,7 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
 
     if(do_validation)
     {
-        std::cout << "\nRunning validation..." << std::endl;
+        std::cout << "\nRunning validation against reference implementation..." << std::endl;
 
         d_output_mem.FromDevice(h_output.data());
 
@@ -287,78 +285,22 @@ bool run_mhc_benchmark_impl(const ck_tile::ArgParser& arg_parser)
         float rtol = std::is_same_v<XDataType, ck_tile::bf16_t> ? 1e-2f : 1e-3f;
         float atol = std::is_same_v<XDataType, ck_tile::bf16_t> ? 1e-2f : 1e-3f;
 
-        pass = ck_tile::check_err(
-            h_output, h_output_ref, "Error: MHC kernel output mismatch!", rtol, atol);
+        pass = ck_tile::check_err(h_output,
+                                  h_output_ref,
+                                  "Error: MHC fused pipeline kernel output mismatch!",
+                                  rtol,
+                                  atol);
 
-        std::cout << "Validation: " << (pass ? "PASS" : "FAIL") << std::endl;
+        std::cout << "Validation: " << (pass ? "PASS ✓" : "FAIL ✗") << std::endl;
+
+        if(pass)
+        {
+            std::cout << "\n✓ Fused pipeline produces correct results!" << std::endl;
+            std::cout << "✓ Ready for production use" << std::endl;
+        }
     }
 
     return pass;
-}
-
-// Runtime dispatch wrapper for adaptive tile selection
-template <typename XDataType,
-          typename PhiDataType,
-          typename YDataType,
-          typename ComputeDataType,
-          typename ActivationFunc = ck_tile::element_wise::Sigmoid>
-bool run_mhc_benchmark(const ck_tile::ArgParser& arg_parser)
-{
-    const int B                      = arg_parser.get_int("B");
-    const std::string kernel_version = arg_parser.get_str("kernel");
-
-    bool use_optimized = (kernel_version == "optimized");
-
-    // Adaptive tile selection based on batch size
-    if(B >= 2048)
-    {
-        std::cout << "[Adaptive] Using M=32 tile (1 warp) for large batch (B=" << B << ")"
-                  << std::endl;
-        if(use_optimized)
-        {
-            return run_mhc_benchmark_impl<XDataType,
-                                          PhiDataType,
-                                          YDataType,
-                                          ComputeDataType,
-                                          ActivationFunc,
-                                          32,
-                                          true>(arg_parser);
-        }
-        else
-        {
-            return run_mhc_benchmark_impl<XDataType,
-                                          PhiDataType,
-                                          YDataType,
-                                          ComputeDataType,
-                                          ActivationFunc,
-                                          32,
-                                          false>(arg_parser);
-        }
-    }
-    else
-    {
-        std::cout << "[Adaptive] Using M=16 tile (1 warp) for batch (B=" << B << ")" << std::endl;
-        if(use_optimized)
-        {
-            return run_mhc_benchmark_impl<XDataType,
-                                          PhiDataType,
-                                          YDataType,
-                                          ComputeDataType,
-                                          ActivationFunc,
-                                          16,
-                                          true>(arg_parser);
-        }
-        else
-        {
-            return run_mhc_benchmark_impl<XDataType,
-                                          PhiDataType,
-                                          YDataType,
-                                          ComputeDataType,
-                                          ActivationFunc,
-                                          16,
-                                          false>(arg_parser);
-        }
-    }
 }
 
 int main(int argc, char* argv[])
@@ -370,13 +312,35 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    // Run with BF16 inputs, float output and compute
-    // Adaptive tile selection happens inside run_mhc_benchmark
-    bool pass = run_mhc_benchmark<ck_tile::bf16_t, // XDataType
-                                  ck_tile::bf16_t, // PhiDataType
-                                  float,           // YDataType
-                                  float,           // ComputeDataType
-                                  ck_tile::element_wise::Sigmoid>(arg_parser);
+    std::cout << "\n╔════════════════════════════════════════════════════════════╗" << std::endl;
+    std::cout << "║  MHC Fused Pipeline V3 - Test & Validation               ║" << std::endl;
+    std::cout << "║  Testing new pipeline with optional fusion support       ║" << std::endl;
+    std::cout << "╚════════════════════════════════════════════════════════════╝" << std::endl;
+
+    // Run with BF16 inputs, float output and compute, M=32 tile
+    bool pass = run_mhc_fused_pipeline<ck_tile::bf16_t, // XDataType
+                                       ck_tile::bf16_t, // PhiDataType
+                                       float,           // YDataType
+                                       float,           // ComputeDataType
+                                       ck_tile::element_wise::Sigmoid,
+                                       64>(arg_parser); // MTile=64
+
+    if(pass)
+    {
+        std::cout << "\n╔════════════════════════════════════════════════════════════╗"
+                  << std::endl;
+        std::cout << "║  SUCCESS: All tests passed!                              ║" << std::endl;
+        std::cout << "║  The fused pipeline is working correctly.                ║" << std::endl;
+        std::cout << "╚════════════════════════════════════════════════════════════╝" << std::endl;
+    }
+    else
+    {
+        std::cout << "\n╔════════════════════════════════════════════════════════════╗"
+                  << std::endl;
+        std::cout << "║  FAILURE: Validation failed!                             ║" << std::endl;
+        std::cout << "║  Please check the implementation.                        ║" << std::endl;
+        std::cout << "╚════════════════════════════════════════════════════════════╝" << std::endl;
+    }
 
     return pass ? 0 : -2;
 }

@@ -9,13 +9,9 @@
 
 namespace ck_tile {
 
-// MHC Problem Optimized - Single-Pass GEMM (No Split-K)
-// Key optimizations:
-// 1. Large K tile to process entire C dimension in one pass
-// 2. Larger M tiles (64/128) for more work per block
-// 3. N=24 to match exact output dimension (no padding)
-template <typename XDataType_, typename ComputeDataType_, typename YDataType_, index_t MTile_ = 64>
-struct MHCProblemOptimized
+// MHC Problem for Fused Kernel - Simplified version without gemm_pipeline dependency
+template <typename XDataType_, typename ComputeDataType_, typename YDataType_, index_t MTile_ = 16>
+struct MHCProblemV6Fused
 {
     using XDataType       = remove_cvref_t<XDataType_>;
     using ComputeDataType = remove_cvref_t<ComputeDataType_>;
@@ -27,23 +23,28 @@ struct MHCProblemOptimized
 
     static constexpr index_t kMTile = MTile_;
 
-    // Optimized GEMM with larger M tiles
-    // Keep K=64 and WarpGemm same as baseline
-    // Use NumWarps=1 to avoid multi-warp accumulation issues
+    // BlockGemmShape - same as V5 baseline
     using BlockGemmShape = std::conditional_t<
-        MTile_ == 64,
-        TileGemmShape<sequence<64, 32, 64>, sequence<1, 1, 1>, sequence<64, 32, 16>>,
+        MTile_ == 16,
+        TileGemmShape<sequence<16, 16, 64>, sequence<1, 1, 1>, sequence<16, 16, 32>>,
         std::conditional_t<
-            MTile_ == 128,
-            TileGemmShape<sequence<128, 32, 64>, sequence<1, 1, 1>, sequence<128, 32, 16>>,
-            TileGemmShape<sequence<32, 32, 64>, sequence<1, 1, 1>, sequence<32, 32, 16>>>>;
+            MTile_ == 32,
+            TileGemmShape<sequence<32, 32, 64>, sequence<1, 1, 1>, sequence<32, 32, 16>>,
+            std::conditional_t<
+                MTile_ == 64,
+                TileGemmShape<sequence<64, 32, 64>, sequence<2, 1, 1>, sequence<32, 32, 16>>,
+                TileGemmShape<sequence<128, 32, 64>, sequence<4, 1, 1>, sequence<32, 32, 16>>>>>;
 
     static constexpr index_t VectorSizeA = 4;
     static constexpr index_t VectorSizeB = 4;
 
-    // Keep BlockSize=64 (1 warp) for all M tiles to avoid multi-warp issues
-    // Larger M tiles will use M0 (grid/repeat) dimension instead
-    using BlockShape = Generic2dBlockShape<sequence<1, 64>, sequence<1, 64>, sequence<1, 1>>;
+    using BlockShape = std::conditional_t<
+        MTile_ == 16 || MTile_ == 32,
+        Generic2dBlockShape<sequence<1, 64>, sequence<1, 64>, sequence<1, 1>>,
+        std::conditional_t<
+            MTile_ == 64,
+            Generic2dBlockShape<sequence<1, 128>, sequence<1, 128>, sequence<1, 1>>,
+            Generic2dBlockShape<sequence<1, 256>, sequence<1, 256>, sequence<1, 1>>>>;
 
     using ALayout = ck_tile::tensor_layout::gemm::RowMajor;
     using BLayout = ck_tile::tensor_layout::gemm::ColumnMajor;
@@ -77,9 +78,10 @@ struct MHCProblemOptimized
 
     CK_TILE_HOST static const std::string GetName()
     {
-        return MTile_ == 32   ? "MHCProblemOptimized_M32_SinglePass"
-               : MTile_ == 64 ? "MHCProblemOptimized_M64_SinglePass"
-                              : "MHCProblemOptimized_M128_SinglePass";
+        return MTile_ == 16   ? "MHCProblemV6Fused_M16"
+               : MTile_ == 32 ? "MHCProblemV6Fused_M32"
+               : MTile_ == 64 ? "MHCProblemV6Fused_M64"
+                              : "MHCProblemV6Fused_M128";
     }
 
     // LDS block descriptors (3D + padding)
@@ -143,9 +145,10 @@ struct MHCProblemOptimized
         return smem_size_b;
     }
 
-    // Tile distributions optimized for larger tiles
+    // Simple tile distributions for single-warp only
     CK_TILE_HOST_DEVICE static constexpr auto MakeXLoadTileDistribution()
     {
+        // Simple row-major distribution for M×K tile
         constexpr index_t kMPerBlock = BlockGemmShape::kM;
         constexpr index_t kKPerBlock = BlockGemmShape::kK;
         constexpr index_t K1         = 16 / sizeof(XDataType);
@@ -165,6 +168,7 @@ struct MHCProblemOptimized
 
     CK_TILE_HOST_DEVICE static constexpr auto MakePhiLoadTileDistribution()
     {
+        // Simple column-major distribution for N×K tile
         constexpr index_t kNPerBlock = BlockGemmShape::kN;
         constexpr index_t kKPerBlock = BlockGemmShape::kK;
         constexpr index_t K1         = VectorLoadSize / sizeof(PhiDataType);

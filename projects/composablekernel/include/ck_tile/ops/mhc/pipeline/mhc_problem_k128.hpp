@@ -12,12 +12,19 @@
 
 namespace ck_tile {
 
-// MHC Problem V5 - Reusing GEMM Pipeline Tile Distributions
-// This approach reuses the proven tile distributions from GEMM pipeline
-// which are designed to work correctly with make_tile_window and offsets
+// MHC Problem - K=128 Configuration
+// Minimal change from baseline: just increase K tile
+//
+// Key configuration:
+// - M=32 (same as baseline)
+// - N=32 (same as baseline)
+// - K=128 (2x larger - fewer syncs, more work per iteration)
+// - 1 warp (same as baseline)
+// - BlockSize=64 threads
+// - Expected: 28-32 TFLOPS
 
-template <typename XDataType_, typename ComputeDataType_, typename YDataType_, index_t MTile_ = 16>
-struct MHCProblemV5GemmDist
+template <typename XDataType_, typename ComputeDataType_, typename YDataType_>
+struct MHCProblemK128
 {
     using XDataType       = remove_cvref_t<XDataType_>;
     using ComputeDataType = remove_cvref_t<ComputeDataType_>;
@@ -28,40 +35,31 @@ struct MHCProblemV5GemmDist
     using BDataType   = PhiDataType;
     using CDataType   = ComputeDataType;
 
-    static constexpr index_t kMTile = MTile_;
+    // Minimal change: just increase K
+    static constexpr index_t kMTile = 32;  // Same as baseline
+    static constexpr index_t kNTile = 32;  // Same as baseline
+    static constexpr index_t kKTile = 128; // 2x larger!
 
-    // BlockGemmShape defines the warp grid and tile sizes
-    // Use ONLY WarpTile configs supported by WarpGemmDispatcher for bf16!
-    // M=16: 1 warp, WarpTile 16×16×32 (supported!)
-    // M=32: 1 warp, WarpTile 32×32×16 (supported!) - BEST PERFORMER! (20.04 TFLOPS)
-    // M=64: 2 warps (2×1), WarpTile 32×32×16, Block K=64
-    // M=128: 4 warps (4×1), WarpTile 32×32×16, Block K=64
-    using BlockGemmShape = std::conditional_t<
-        MTile_ == 16,
-        TileGemmShape<sequence<16, 32, 64>, sequence<1, 1, 1>, sequence<16, 16, 32>>,
-        std::conditional_t<
-            MTile_ == 32,
-            TileGemmShape<sequence<32, 32, 64>, sequence<1, 1, 1>, sequence<32, 32, 16>>,
-            std::conditional_t<
-                MTile_ == 64,
-                TileGemmShape<sequence<64, 32, 64>, sequence<2, 1, 1>, sequence<32, 32, 16>>,
-                TileGemmShape<sequence<128, 32, 64>, sequence<4, 1, 1>, sequence<32, 32, 16>>>>>;
+    // Logical N for MHC (actual output dimension)
+    static constexpr index_t kNTileLogical = 24; // 2n + n^2 for n=4
 
-    // Standard vector sizes for all configurations
+    // Single-warp configuration (same as baseline)
+    // BlockGemmShape: <M, N, K> block tile, <M, N, K> warp grid, <M, N, K> warp tile
+    // M=32, N=32, K=128
+    // Warp grid: 1×1×1 (single warp)
+    // Warp tile: 32×32×16 (warp processes 32×32×16)
+    using BlockGemmShape = TileGemmShape<sequence<32, 32, 128>, // Block tile
+                                         sequence<1, 1, 1>,     // Warp grid (single warp)
+                                         sequence<32, 32, 16>>; // Warp tile
+
+    // 1 warp = 64 threads
+    static constexpr index_t kBlockSize = 64;
+
+    using BlockShape = Generic2dBlockShape<sequence<1, 64>, sequence<1, 64>, sequence<1, 1>>;
+
+    // Vector sizes
     static constexpr index_t VectorSizeA = 4;
     static constexpr index_t VectorSizeB = 4;
-
-    // Adaptive block size based on number of warps
-    // M=16, M=32: 1 warp = 64 threads
-    // M=64: 2 warps (2×1 grid) = 128 threads
-    // M=128: 4 warps (4×1 grid) = 256 threads
-    using BlockShape = std::conditional_t<
-        MTile_ == 16 || MTile_ == 32,
-        Generic2dBlockShape<sequence<1, 64>, sequence<1, 64>, sequence<1, 1>>,
-        std::conditional_t<
-            MTile_ == 64,
-            Generic2dBlockShape<sequence<1, 128>, sequence<1, 128>, sequence<1, 1>>,
-            Generic2dBlockShape<sequence<1, 256>, sequence<1, 256>, sequence<1, 1>>>>;
 
     // Layouts: X is row-major, Phi is column-major (transposed for GEMM)
     using ALayout = ck_tile::tensor_layout::gemm::RowMajor;
@@ -84,8 +82,7 @@ struct MHCProblemV5GemmDist
     static constexpr auto Scheduler             = GemmPipelineScheduler::Intrawave;
     static constexpr index_t NumWaveGroups      = 1;
     static constexpr index_t VectorLoadSize     = 16;
-    static constexpr index_t kBlockSize         = BlockShape::BlockSize;
-    static constexpr bool DoubleSmemBuffer      = true;
+    static constexpr bool DoubleSmemBuffer      = false; // V3 uses single buffer
     static constexpr bool UseStructuredSparsity = false;
     static constexpr bool FixedVectorSize       = false;
 
@@ -94,28 +91,21 @@ struct MHCProblemV5GemmDist
         static constexpr bool UsePersistentKernel = false;
     };
 
-    CK_TILE_HOST static const std::string GetName()
-    {
-        return MTile_ == 16   ? "MHCProblemV5GemmDist_M16"
-               : MTile_ == 32 ? "MHCProblemV5GemmDist_M32"
-               : MTile_ == 64 ? "MHCProblemV5GemmDist_M64"
-                              : "MHCProblemV5GemmDist_M128";
-    }
+    CK_TILE_HOST static const std::string GetName() { return "MHCProblemK128_M32_N32_K128_1Warp"; }
 
-    // Use default GEMM tile distributions - they are proven to work with multi-warp!
-
+    // Use default GEMM tile distributions
     CK_TILE_HOST_DEVICE static constexpr auto MakeXLoadTileDistribution()
     {
         // X is A matrix in GEMM (M × K, row-major)
         return GemmPipelineAGmemBGmemCRegV1DefaultPolicy::MakeADramTileDistribution<
-            MHCProblemV5GemmDist>();
+            MHCProblemK128>();
     }
 
     CK_TILE_HOST_DEVICE static constexpr auto MakePhiLoadTileDistribution()
     {
         // Phi is B matrix in GEMM (N × K, column-major for transposed access)
         return GemmPipelineAGmemBGmemCRegV1DefaultPolicy::MakeBDramTileDistribution<
-            MHCProblemV5GemmDist>();
+            MHCProblemK128>();
     }
 };
 

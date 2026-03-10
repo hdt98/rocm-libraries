@@ -203,64 +203,62 @@ struct MHCKernelV5
             phi_lds_tensor, make_tuple(number<kNTileLogical>{}, number<kKTile>{}), {0, 0});
 
         // Step 1: Dedicated norm phase — one pass over p_x, then K-loop (best for large C).
-        // EXPERIMENT: norm computation commented to measure its cost; write 0 so reduction uses
-        // norm=1.
-        // __shared__ ComputeDataType norm_sums[kMTile];
+        __shared__ ComputeDataType norm_sums[kMTile];
         const index_t thread_id = get_thread_id();
-        // for(index_t i = thread_id; i < kMTile; i += kBlockSize)
-        //     norm_sums[i] = 0.0f;
-        // block_sync_lds();
-        //
-        // const index_t k_range       = k_end - k_start;
-        // constexpr index_t kVecSize  = 4;
-        // constexpr index_t kVecSize8 = 8;
-        // for(index_t local_m = 0; local_m < kMTile; ++local_m)
-        // {
-        //     const index_t global_m = batch_start + local_m;
-        //     if(global_m >= batch)
-        //         continue;
-        //     ComputeDataType partial_sum = 0.0f;
-        //     const XDataType* row_ptr    = p_x + global_m * nC + k_start;
-        //     index_t k = thread_id * kVecSize8;
-        //     for(; k + kVecSize8 <= k_range; k += kBlockSize * kVecSize8)
-        //     {
-        //         using VecType8 = ext_vector_t<XDataType, kVecSize8>;
-        //         VecType8 vec  = *c_style_pointer_cast<const VecType8*>(row_ptr + k);
-        // #pragma unroll
-        //         for(index_t i = 0; i < kVecSize8; ++i)
-        //         {
-        //             ComputeDataType val = type_convert<ComputeDataType>(vec[i]);
-        //             partial_sum += val * val;
-        //         }
-        //     }
-        //     for(; k + kVecSize <= k_range; k += kBlockSize * kVecSize)
-        //     {
-        //         using VecType = ext_vector_t<XDataType, kVecSize>;
-        //         VecType vec   = *c_style_pointer_cast<const VecType*>(row_ptr + k);
-        // #pragma unroll
-        //         for(index_t i = 0; i < kVecSize; ++i)
-        //         {
-        //             ComputeDataType val = type_convert<ComputeDataType>(vec[i]);
-        //             partial_sum += val * val;
-        //         }
-        //     }
-        //     for(; k < k_range; ++k)
-        //     {
-        //         ComputeDataType val = type_convert<ComputeDataType>(row_ptr[k]);
-        //         partial_sum += val * val;
-        //     }
-        // #pragma unroll
-        //     for(index_t offset = get_warp_size() / 2; offset > 0; offset >>= 1)
-        //         partial_sum += __shfl_down(partial_sum, offset);
-        //     if((thread_id % get_warp_size()) == 0 && partial_sum != 0.0f)
-        //         atomicAdd(&norm_sums[local_m], partial_sum);
-        // }
-        // block_sync_lds();
+        for(index_t i = thread_id; i < kMTile; i += kBlockSize)
+            norm_sums[i] = 0.0f;
+        block_sync_lds();
+
+        const index_t k_range       = k_end - k_start;
+        constexpr index_t kVecSize  = 4;
+        constexpr index_t kVecSize8 = 8;
+        for(index_t local_m = 0; local_m < kMTile; ++local_m)
+        {
+            const index_t global_m = batch_start + local_m;
+            if(global_m >= batch)
+                continue;
+            ComputeDataType partial_sum = 0.0f;
+            const XDataType* row_ptr    = p_x + global_m * nC + k_start;
+            index_t k                   = thread_id * kVecSize8;
+            for(; k + kVecSize8 <= k_range; k += kBlockSize * kVecSize8)
+            {
+                using VecType8 = ext_vector_t<XDataType, kVecSize8>;
+                VecType8 vec   = *c_style_pointer_cast<const VecType8*>(row_ptr + k);
+#pragma unroll
+                for(index_t i = 0; i < kVecSize8; ++i)
+                {
+                    ComputeDataType val = type_convert<ComputeDataType>(vec[i]);
+                    partial_sum += val * val;
+                }
+            }
+            for(; k + kVecSize <= k_range; k += kBlockSize * kVecSize)
+            {
+                using VecType = ext_vector_t<XDataType, kVecSize>;
+                VecType vec   = *c_style_pointer_cast<const VecType*>(row_ptr + k);
+#pragma unroll
+                for(index_t i = 0; i < kVecSize; ++i)
+                {
+                    ComputeDataType val = type_convert<ComputeDataType>(vec[i]);
+                    partial_sum += val * val;
+                }
+            }
+            for(; k < k_range; ++k)
+            {
+                ComputeDataType val = type_convert<ComputeDataType>(row_ptr[k]);
+                partial_sum += val * val;
+            }
+#pragma unroll
+            for(index_t offset = get_warp_size() / 2; offset > 0; offset >>= 1)
+                partial_sum += __shfl_down(partial_sum, offset);
+            if((thread_id % get_warp_size()) == 0 && partial_sum != 0.0f)
+                atomicAdd(&norm_sums[local_m], partial_sum);
+        }
+        block_sync_lds();
         for(index_t i = thread_id; i < kMTile; i += kBlockSize)
         {
             const index_t global_m = batch_start + i;
             if(global_m < batch)
-                p_partial_norms[block_k * batch + global_m] = 0.0f; // was: norm_sums[i]
+                p_partial_norms[block_k * batch + global_m] = norm_sums[i];
         }
         block_sync_lds();
 
