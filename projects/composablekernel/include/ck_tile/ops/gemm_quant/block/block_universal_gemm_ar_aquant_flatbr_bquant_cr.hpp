@@ -15,7 +15,7 @@ namespace ck_tile {
 // B is block window on block distributed tensor.
 // C is block distributed tensor
 template <typename Problem_, typename BlockPolicy_>
-struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
+struct BlockGemmWeightPreshuffleABQuantARegBRegCReg : public BlockGemmQuantBase
 {
     private:
     template <typename PipelineProblem_, typename GemmPolicy_>
@@ -101,9 +101,11 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
         // 4. i4,  bf8, (fp8/fp32) -> f32
         static_assert(
             (std::is_same_v<ADataType, fp8_t> || std::is_same_v<ADataType, bf8_t> ||
-             std::is_same_v<ADataType, ck_tile::pk_int4_t>) &&
+             std::is_same_v<ADataType, ck_tile::pk_int4_t> ||
+             std::is_same_v<ADataType, ck_tile::pk_fp4_t>) &&
             (std::is_same_v<BDataType, fp8_t> || std::is_same_v<BDataType, bf8_t> ||
-             std::is_same_v<BDataType, ck_tile::pk_int4_t>) &&
+             std::is_same_v<BDataType, ck_tile::pk_int4_t> ||
+             std::is_same_v<BDataType, ck_tile::pk_fp4_t>) &&
             (std::is_same_v<AQDataType, float> || std::is_same_v<AQDataType, ck_tile::fp8_t> ||
              std::is_same_v<AQDataType, ck_tile::bf8_t>) &&
             (std::is_same_v<BQDataType, float> || std::is_same_v<BQDataType, ck_tile::fp8_t> ||
@@ -119,6 +121,7 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
     };
 
     public:
+    using Base            = BlockGemmQuantBase;
     using Traits          = GemmTraits_<Problem_, BlockPolicy_>;
     using Problem         = remove_cvref_t<Problem_>;
     using BlockPolicy     = remove_cvref_t<BlockPolicy_>;
@@ -189,7 +192,8 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
               typename BFlatBlockTensor,
               typename AQBlockTensor,
               typename BQBlockTensor,
-              typename ABlockWindow>
+              typename ABlockWindow,
+              index_t UnaryOpSize = 8>
     CK_TILE_DEVICE void operator()(CBlockTensor& c_block_tensor,
                                    ABlockTensor& a_warp_tensor,
                                    BFlatBlockTensor& b_warp_tensor,
@@ -214,22 +218,6 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
                 });
             });
         };
-
-        auto q_block_tensor = aq_block_tensor;
-        constexpr bool SimpleDequant =
-            Traits::NQPerBlock == 1 &&
-            AccTensor::get_distributed_spans()[I0].impl_.size() == 0; // c_transpose
-        if constexpr(SimpleDequant)
-        {
-            constexpr auto aq_spans = AQBlockTensor::get_distributed_spans();
-            sweep_tile_span(aq_spans[I0], [&](auto im) {
-                sweep_tile_span(aq_spans[I1], [&](auto ik) {
-                    q_block_tensor(make_tuple(im, ik)) *=
-                        bq_block_tensor(make_tuple(tile_distributed_index<0>{}, ik));
-                });
-            });
-        }
-        // hot loop:
         static_for<0, QScalesPerBlockRow, 1>{}([&](auto kQScale) {
             zero_accumulators();
             static_for<0, KIterPerQScale, 1>{}([&](auto kIterInQScale) {
@@ -249,8 +237,10 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
                     {
                         constexpr auto AmIter = (mIter + m_preload) % MIterPerWarp;
                         constexpr auto AkIter = (kIter + (mIter + m_preload) / MIterPerWarp);
-                        a_warp_tensor(number<AwarpIter>{}) =
-                            load_tile(a_warp_windows(number<AmIter>{})(number<AkIter>{}));
+
+                        load_and_convert_tile<UnaryOpSize>(
+                            a_warp_tensor(number<AwarpIter>{}),
+                            a_warp_windows(number<AmIter>{})(number<AkIter>{}));
                     }
                     // barrier
                     // Could be deleted
@@ -260,29 +250,9 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
                     }
                 });
             });
-            static_for_product<number<MIterPerWarp>, number<NIterPerWarp>>{}([&](auto mIter,
-                                                                                 auto nIter) {
-                if constexpr(SimpleDequant)
-                {
-                    constexpr auto tbuf_offset =
-                        number<typename CBlockTensor::ThreadTensorDesc{}.calculate_offset(
-                                   merge_sequences(sequence<mIter, nIter>{},
-                                                   c_warp_y_index_zeros)) /
-                               CBlockTensor::PackedSize>{};
-
-                    constexpr auto block_idx_m  = tile_distributed_index<mIter>{};
-                    constexpr auto block_idx_kq = tile_distributed_index<kQScale>{};
-
-                    static_for<0, WG::kM * WG::kN / warp_size, 1>{}([&](auto c_row) {
-                        auto& c_ref = c_block_tensor.get_thread_buffer()[tbuf_offset + c_row];
-                        const auto acc_val = c_acc(mIter)(nIter).get_thread_buffer()[c_row];
-                        c_ref += acc_val * q_block_tensor(make_tuple(block_idx_m, block_idx_kq));
-                    });
-                }
-                else
-                {
-                    AQPickerCommon<AQBlockTensor, Traits, mIter, kQScale> aq_picker(
-                        aq_block_tensor);
+            static_for<0, MIterPerWarp, 1>{}([&](auto mIter) {
+                AQPickerCommon<AQBlockTensor, Traits, mIter, kQScale> aq_picker(aq_block_tensor);
+                static_for<0, NIterPerWarp, 1>{}([&](auto nIter) {
                     constexpr auto tbuf_offset =
                         number<typename CBlockTensor::ThreadTensorDesc{}.calculate_offset(
                                    merge_sequences(sequence<mIter, nIter>{},
@@ -300,9 +270,8 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
                             return nIter * KPerBlockBQ + kQScale;
                         }
                     }();
-                    auto& scale_reg = bq_block_tensor.get_thread_buffer()[reg_offset];
-                    float b_scale_reg_f =
-                        aq_picker.template cvt_scale_to_fp32<BQDataType>(scale_reg);
+                    auto& scale_reg     = bq_block_tensor.get_thread_buffer()[reg_offset];
+                    float b_scale_reg_f = Base::cvt_scale_to_fp32<BQDataType>(scale_reg);
 
                     static_for<0, WG::kM * WG::kN / warp_size, 1>{}([&](auto c_row) {
                         float a_scale_reg_f = aq_picker.template pick<c_row>();
@@ -310,7 +279,7 @@ struct BlockGemmWeightPreshuffleABQuantARegBRegCReg
                         const auto acc_val = c_acc(mIter)(nIter).get_thread_buffer()[c_row];
                         c_ref              = c_ref + acc_val * b_scale_reg_f * a_scale_reg_f;
                     });
-                }
+                });
             });
         });
     }
