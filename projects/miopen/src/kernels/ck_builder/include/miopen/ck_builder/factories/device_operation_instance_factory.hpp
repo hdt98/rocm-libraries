@@ -143,6 +143,7 @@ using AddMultiply               = ck::tensor_operation::element_wise::AddMultipl
 using MultiplyAdd               = ck::tensor_operation::element_wise::MultiplyAdd;
 using MultiplyMultiply          = ck::tensor_operation::element_wise::MultiplyMultiply;
 using ScaleAdd                  = ck::tensor_operation::element_wise::ScaleAdd;
+using ScaleAddScaleAddRelu      = ck::tensor_operation::element_wise::ScaleAddScaleAddRelu;
 using Gelu                      = ck::tensor_operation::element_wise::Gelu;
 using Swish                     = ck::tensor_operation::element_wise::Swish;
 using Add                       = ck::tensor_operation::element_wise::Add;

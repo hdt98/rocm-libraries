@@ -33,7 +33,7 @@ constexpr auto device_grouped_conv_fwd_xdl_bf16_comp_instances_2x(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,BF16,BF16,F32,BF16,ds_types,BF16,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,256,128,128,64,16,16,32,32,2,2,{4,64,1},{1,0,2},{1,0,2},2,8,8,true,{4,64,1},{1,0,2},{1,0,2},2,8,8,true,1,1,{1,32,1,8},8,BF16,BF16,Interwave,PipeV1)
     //     // clang-format on
     // };
-    return std::array<XdlV3Instance, 0>{};
+    return std::array<XdlV3Instance<NumDTensor>, 0>{};
 }
 
 template <std::size_t NumDTensor = 0>
@@ -64,7 +64,7 @@ constexpr auto device_grouped_conv_fwd_xdl_bf16_comp_instances(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,BF16,BF16,F32,BF16,ds_types,BF16,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,256,64,64,64,8,8,32,32,1,1,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,32,1,8},8,BF16,BF16,Intrawave,PipeV3)
     //     // clang-format on
     // };
-    return std::array<XdlV3Instance, 0>{};
+    return std::array<XdlV3Instance<NumDTensor>, 0>{};
 }
 
 // instances not working on gfx950
@@ -90,7 +90,7 @@ constexpr auto device_grouped_conv_fwd_xdl_bf16_comp_instances_part2(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,BF16,BF16,F32,BF16,ds_types,BF16,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,256,128,128,64,8,8,32,32,2,2,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,32,1,8},8,BF16,BF16,Intrawave,PipeV5)
     //     // clang-format on
     // };
-    return std::array<XdlV3Instance, 0>{};
+    return std::array<XdlV3Instance<NumDTensor>, 0>{};
 }
 
 // double rate mfma instances on gfx950
@@ -111,7 +111,7 @@ constexpr auto device_grouped_conv_fwd_xdl_f16_comp_instances_2x(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,F16,F16,F32,F16,ds_types,F16,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,256,128,128,64,16,16,32,32,2,2,{4,64,1},{1,0,2},{1,0,2},2,8,8,true,{4,64,1},{1,0,2},{1,0,2},2,8,8,true,1,1,{1,32,1,8},8,F16,F16,Interwave,PipeV1)
     //     // clang-format on
     // };
-    return std::array<XdlV3Instance, 0>{};
+    return std::array<XdlV3Instance<NumDTensor>, 0>{};
 }
 
 template <std::size_t NumDTensor = 0>
@@ -131,7 +131,7 @@ constexpr auto device_grouped_conv_fwd_xdl_f16_comp_instances(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,F16,F16,F32,F16,ds_types,F16,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,256,128,128,64,8,8,32,32,2,2,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,32,1,8},8,F16,F16,Intrawave,PipeV4)
     //     // clang-format on
     // };
-    return std::array<XdlV3Instance, 0>{};
+    return std::array<XdlV3Instance<NumDTensor>, 0>{};
 }
 
 // instances not working on gfx950
@@ -164,7 +164,7 @@ constexpr auto device_grouped_conv_fwd_xdl_f16_comp_instances_part2(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,F16,F16,F32,F16,ds_types,F16,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,256,128,128,64,8,8,32,32,2,2,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,32,1,8},8,F16,F16,Interwave,PipeV1)
     //     // clang-format on
     // };
-    return std::array<XdlV3Instance, 0>{};
+    return std::array<XdlV3Instance<NumDTensor>, 0>{};
 }
 
 template <std::size_t NumDTensor = 0>
@@ -187,7 +187,7 @@ constexpr auto device_grouped_conv_fwd_xdl_f32_comp_instances(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,F32,F32,F32,F32,ds_types,F32,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,256,128,128,64,8,8,32,32,2,2,{8,32,1},{1,0,2},{1,0,2},2,4,4,false,{8,32,1},{1,0,2},{1,0,2},2,4,4,false,1,1,{1,32,1,8},8,F32,F32,Interwave,PipeV1)
     //     // clang-format on
     // };
-    return std::array<XdlV3Instance, 0>{};
+    return std::array<XdlV3Instance<NumDTensor>, 0>{};
 }
 
 template <std::size_t NumDTensor = 0>
@@ -211,7 +211,7 @@ constexpr auto device_grouped_conv_fwd_xdl_f32_tf32_comp_instances(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,F32,F32,F32,F32,ds_types,F32,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,256,128,128,64,8,8,32,32,2,2,{8,32,1},{1,0,2},{1,0,2},2,4,4,false,{8,32,1},{1,0,2},{1,0,2},2,4,4,false,1,1,{1,32,1,8},8,TF32,TF32,Interwave,PipeV1)
     //     // clang-format on
     // };
-    return std::array<XdlV3Instance, 0>{};
+    return std::array<XdlV3Instance<NumDTensor>, 0>{};
 }
 
 // double rate mfma instances on gfx950
@@ -232,7 +232,7 @@ constexpr auto device_grouped_conv_fwd_xdl_int8_comp_instances_2x(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,I8,I8,I32,I8,ds_types,I8,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,256,128,128,128,32,32,32,32,2,2,{4,64,1},{1,0,2},{1,0,2},2,16,16,true,{4,64,1},{1,0,2},{1,0,2},2,16,16,true,1,1,{1,64,1,4},16,I8,I8,Interwave,PipeV1)
     //     // clang-format on
     // };
-    return std::array<XdlV3Instance, 0>{};
+    return std::array<XdlV3Instance<NumDTensor>, 0>{};
 }
 
 template <std::size_t NumDTensor = 0>
@@ -252,7 +252,7 @@ constexpr auto device_grouped_conv_fwd_xdl_int8_comp_instances(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,I8,I8,I32,I8,ds_types,I8,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,256,128,128,32,8,8,32,32,2,2,{4,64,1},{1,0,2},{1,0,2},2,8,8,false,{4,64,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,32,1,8},8,I8,I8,Intrawave,PipeV4)
     //     // clang-format on
     // };
-    return std::array<XdlV3Instance, 0>{};
+    return std::array<XdlV3Instance<NumDTensor>, 0>{};
 }
 
 // instances not working on gfx950
@@ -281,7 +281,7 @@ constexpr auto device_grouped_conv_fwd_xdl_int8_comp_instances_part2(
     //     DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<NumDTensor>(spatial_dim,input_layout,weight_layout,ds_layouts,output_layout,I8,I8,I32,I8,ds_types,I8,PassThrough,PassThrough,output_op,conv_spec,GemmMNKPadding,1,256,128,128,64,8,8,32,32,2,2,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,{8,32,1},{1,0,2},{1,0,2},2,8,8,false,1,1,{1,32,1,8},8,I8,I8,Interwave,PipeV1)
     //     // clang-format on
     // };
-    return std::array<XdlV3Instance, 0>{};
+    return std::array<XdlV3Instance<NumDTensor>, 0>{};
 }
 
 } // namespace grouped_conv_fwd
