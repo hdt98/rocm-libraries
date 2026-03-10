@@ -318,21 +318,46 @@ class FmhaDispatcherLib:
         lib.fmha_dispatcher_initialize.argtypes = [ctypes.c_char_p]
         lib.fmha_dispatcher_initialize.restype = ctypes.c_int
         lib.fmha_dispatcher_run_fwd.argtypes = [
-            ctypes.c_void_p,
-            ctypes.c_void_p,
-            ctypes.c_void_p,
-            ctypes.c_void_p,
-            ctypes.c_int,
-            ctypes.c_int,
-            ctypes.c_int,
-            ctypes.c_int,
-            ctypes.c_int,
-            ctypes.c_int,
-            ctypes.c_int,
-            ctypes.c_float,
-            ctypes.POINTER(ctypes.c_float),
+            ctypes.c_void_p,  # q
+            ctypes.c_void_p,  # k
+            ctypes.c_void_p,  # v
+            ctypes.c_void_p,  # o
+            ctypes.c_int,  # batch
+            ctypes.c_int,  # nhead_q
+            ctypes.c_int,  # nhead_k
+            ctypes.c_int,  # seqlen_q
+            ctypes.c_int,  # seqlen_k
+            ctypes.c_int,  # hdim_q
+            ctypes.c_int,  # hdim_v
+            ctypes.c_float,  # scale
+            ctypes.c_int,  # mask_type
+            ctypes.c_int,  # bias_type
+            ctypes.c_int,  # has_lse
+            ctypes.c_int,  # has_dropout
+            ctypes.POINTER(ctypes.c_float),  # time_ms_out
         ]
         lib.fmha_dispatcher_run_fwd.restype = ctypes.c_int
+        lib.fmha_dispatcher_run_bwd.argtypes = [
+            ctypes.c_void_p,  # q
+            ctypes.c_void_p,  # k
+            ctypes.c_void_p,  # v
+            ctypes.c_void_p,  # o
+            ctypes.c_void_p,  # lse
+            ctypes.c_void_p,  # do
+            ctypes.c_void_p,  # dq
+            ctypes.c_void_p,  # dk
+            ctypes.c_void_p,  # dv
+            ctypes.c_int,  # batch
+            ctypes.c_int,  # nhead_q
+            ctypes.c_int,  # nhead_k
+            ctypes.c_int,  # seqlen_q
+            ctypes.c_int,  # seqlen_k
+            ctypes.c_int,  # hdim_q
+            ctypes.c_int,  # hdim_v
+            ctypes.c_float,  # scale
+            ctypes.POINTER(ctypes.c_float),  # time_ms_out
+        ]
+        lib.fmha_dispatcher_run_bwd.restype = ctypes.c_int
         lib.fmha_dispatcher_kernel_count.argtypes = []
         lib.fmha_dispatcher_kernel_count.restype = ctypes.c_int
         lib.fmha_dispatcher_cleanup.argtypes = []
@@ -366,6 +391,10 @@ class FmhaDispatcherLib:
         v: ctypes.c_void_p,
         o: ctypes.c_void_p,
         prob: FmhaProblem,
+        mask_type: int = 0,
+        bias_type: int = 0,
+        has_lse: int = 0,
+        has_dropout: int = 0,
     ) -> Tuple[int, float]:
         time_ms = ctypes.c_float(0.0)
         rc = self._lib.fmha_dispatcher_run_fwd(
@@ -373,6 +402,46 @@ class FmhaDispatcherLib:
             k,
             v,
             o,
+            prob.batch,
+            prob.nhead_q,
+            prob.nhead_k,
+            prob.seqlen_q,
+            prob.seqlen_k,
+            prob.hdim_q,
+            prob.hdim_v,
+            prob.scale,
+            mask_type,
+            bias_type,
+            has_lse,
+            has_dropout,
+            ctypes.byref(time_ms),
+        )
+        return rc, time_ms.value
+
+    def run_bwd(
+        self,
+        q: ctypes.c_void_p,
+        k: ctypes.c_void_p,
+        v: ctypes.c_void_p,
+        o: ctypes.c_void_p,
+        lse: ctypes.c_void_p,
+        do_grad: ctypes.c_void_p,
+        dq: ctypes.c_void_p,
+        dk: ctypes.c_void_p,
+        dv: ctypes.c_void_p,
+        prob: FmhaProblem,
+    ) -> Tuple[int, float]:
+        time_ms = ctypes.c_float(0.0)
+        rc = self._lib.fmha_dispatcher_run_bwd(
+            q,
+            k,
+            v,
+            o,
+            lse,
+            do_grad,
+            dq,
+            dk,
+            dv,
             prob.batch,
             prob.nhead_q,
             prob.nhead_k,
@@ -457,7 +526,15 @@ class FmhaRunner:
         return cls(FmhaDispatcherLib.load(path), arch)
 
     def run(
-        self, Q: np.ndarray, K: np.ndarray, V: np.ndarray, prob: FmhaProblem
+        self,
+        Q: np.ndarray,
+        K: np.ndarray,
+        V: np.ndarray,
+        prob: FmhaProblem,
+        mask_type: int = 0,
+        bias_type: int = 0,
+        has_lse: int = 0,
+        has_dropout: int = 0,
     ) -> FmhaResult:
         """Run FMHA forward on GPU with automatic HIP memory management.
 
@@ -501,6 +578,10 @@ class FmhaRunner:
                 prob.hdim_q,
                 prob.hdim_v,
                 prob.scale,
+                mask_type,
+                bias_type,
+                has_lse,
+                has_dropout,
                 ctypes.byref(time_ms),
             )
 

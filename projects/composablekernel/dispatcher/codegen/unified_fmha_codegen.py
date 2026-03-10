@@ -1126,9 +1126,11 @@ def render_wrapper_header(
     return f"""// SPDX-License-Identifier: MIT
 #pragma once
 
-// Kernel header first so example types are defined before fmha_types.hpp,
-// allowing fmha_types.hpp guards to skip its redundant definitions.
+// Kernel header first: includes example fmha_fwd.hpp or fmha_bwd.hpp
+// which defines all necessary types (enums, args, traits).
 #include "{rel_path}"
+// Signal to fmha_types.hpp which types are already defined.
+#define CK_TILE_FMHA_{"BWD" if family.startswith("bwd") else "FWD"}_TYPES_FROM_EXAMPLE 1
 #include "ck_tile/dispatcher/fmha_dispatcher.hpp"
 #include "ck_tile/dispatcher/backends/generated_fmha_backend.hpp"
 

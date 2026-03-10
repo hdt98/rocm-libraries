@@ -3,13 +3,14 @@
 
 // FMHA type definitions for the dispatcher.
 //
-// Strategy: if the upstream example headers are available, include fmha_fwd.hpp
-// as the single source of truth for forward types. Backward types are always
-// provided here (fmha_bwd.hpp cannot be co-included with fmha_fwd.hpp due to
-// a FmhaMasks redefinition in the upstream code).
+// Fine-grained guards prevent redefinition when example headers are present:
+//   CK_TILE_FMHA_FWD_TYPES_FROM_EXAMPLE -- set by fwd kernel wrappers
+//   CK_TILE_FMHA_BWD_TYPES_FROM_EXAMPLE -- set by bwd kernel wrappers
 //
-// When building standalone (without the example tree), all types are provided
-// as fallback definitions identical to the upstream.
+// fmha_fwd.hpp provides: mask_enum, bias_enum, quant_scale_enum, rope_enum,
+//                         all fwd args/traits, FmhaMasks
+// fmha_bwd.hpp provides: mask_enum, bias_enum, bwd args/traits, FmhaMasks
+//                         (but NOT quant_scale_enum, rope_enum)
 
 #pragma once
 
@@ -21,16 +22,12 @@
 #include <utility>
 #include <variant>
 
-// --- Detect example headers ---
-#if __has_include("example/ck_tile/01_fmha/fmha_fwd.hpp")
-#include "example/ck_tile/01_fmha/fmha_fwd.hpp"
-#define CK_TILE_FMHA_TYPES_FROM_EXAMPLE 1
-#endif
-
 // =========================================================================
-// Fallback definitions: only compiled when example headers are NOT available
+// Shared enums: mask_enum and bias_enum
+// Provided by both fmha_fwd.hpp and fmha_bwd.hpp (via mask.hpp, bias.hpp).
+// Skipped when EITHER example header was included.
 // =========================================================================
-#ifndef CK_TILE_FMHA_TYPES_FROM_EXAMPLE
+#if !defined(CK_TILE_FMHA_FWD_TYPES_FROM_EXAMPLE) && !defined(CK_TILE_FMHA_BWD_TYPES_FROM_EXAMPLE)
 
 enum class mask_enum
 {
@@ -47,6 +44,15 @@ enum class bias_enum
     alibi            = 2,
 };
 
+#endif // shared enums
+
+// =========================================================================
+// Fwd-only enums: quant_scale_enum, rope_enum
+// Only provided by fmha_fwd.hpp (via quant.hpp, rotary.hpp).
+// Skipped when fmha_fwd.hpp was included; always provided in bwd-only TUs.
+// =========================================================================
+#ifndef CK_TILE_FMHA_FWD_TYPES_FROM_EXAMPLE
+
 enum class quant_scale_enum
 {
     no_scale      = 0,
@@ -61,6 +67,13 @@ enum class rope_enum
     interleaved  = 1,
     half_rotated = 2,
 };
+
+#endif // fwd-only enums
+
+// =========================================================================
+// Forward args + traits: skipped when fmha_fwd.hpp was included
+// =========================================================================
+#ifndef CK_TILE_FMHA_FWD_TYPES_FROM_EXAMPLE
 
 struct fmha_fwd_args
 {
@@ -462,16 +475,12 @@ struct fmha_batch_prefill_traits : public fmha_fwd_traits
     int page_size = 1;
 };
 
-#endif // CK_TILE_FMHA_TYPES_FROM_EXAMPLE
+#endif // CK_TILE_FMHA_FWD_TYPES_FROM_EXAMPLE
 
 // =========================================================================
-// Backward types: always provided here.
-// fmha_bwd.hpp is NOT included via __has_include because it redefines
-// FmhaMasks (also in fmha_fwd.hpp). These definitions are identical to
-// the upstream and are harmless when fmha_bwd.hpp is not in the TU.
-// In bwd kernel TUs (which include fmha_bwd.hpp directly), these types
-// would conflict -- but bwd kernel TUs never include fmha_types.hpp.
+// Backward args + traits: skipped when fmha_bwd.hpp was included
 // =========================================================================
+#ifndef CK_TILE_FMHA_BWD_TYPES_FROM_EXAMPLE
 
 struct fmha_bwd_args
 {
@@ -572,3 +581,5 @@ struct fmha_bwd_traits
     bool is_store_randval;
     bool is_deterministic;
 };
+
+#endif // CK_TILE_FMHA_BWD_TYPES_FROM_EXAMPLE

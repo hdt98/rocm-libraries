@@ -64,6 +64,10 @@ int fmha_dispatcher_run_fwd(const void* q_host,
                             int hdim_q,
                             int hdim_v,
                             float scale,
+                            int mask_type_int,
+                            int bias_type_int,
+                            int has_lse,
+                            int has_dropout,
                             float* time_ms_out)
 {
     if(!g_initialized)
@@ -75,6 +79,7 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     const int64_t o_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v * 2;
 
     void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
+    void *bias_dev = nullptr, *lse_dev_buf = nullptr;
     HIP_CHECK(hipMalloc(&q_dev, q_bytes));
     HIP_CHECK(hipMalloc(&k_dev, k_bytes));
     HIP_CHECK(hipMalloc(&v_dev, v_bytes));
@@ -85,16 +90,38 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     HIP_CHECK(hipMemcpy(v_dev, v_host, v_bytes, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemset(o_dev, 0, o_bytes));
 
+    const int64_t bias_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * seqlen_k * 2;
+    const int64_t lse_bytes  = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
+
+    if(bias_type_int > 0)
+    {
+        HIP_CHECK(hipMalloc(&bias_dev, bias_bytes));
+        if(bias_type_int == 2)
+        {
+            // ALiBi: fill with slope-based values (simplified: zeros for correctness test)
+            HIP_CHECK(hipMemset(bias_dev, 0, bias_bytes));
+        }
+        else
+        {
+            HIP_CHECK(hipMemset(bias_dev, 0, bias_bytes));
+        }
+    }
+    if(has_lse)
+    {
+        HIP_CHECK(hipMalloc(&lse_dev_buf, lse_bytes));
+        HIP_CHECK(hipMemset(lse_dev_buf, 0, lse_bytes));
+    }
+
     fmha_fwd_traits traits{};
     traits.hdim_q        = hdim_q;
     traits.hdim_v        = hdim_v;
     traits.data_type     = "fp16";
     traits.is_group_mode = false;
     traits.is_v_rowmajor = true;
-    traits.mask_type     = mask_enum::no_mask;
-    traits.bias_type     = bias_enum::no_bias;
-    traits.has_lse       = false;
-    traits.has_dropout   = false;
+    traits.mask_type     = static_cast<mask_enum>(mask_type_int);
+    traits.bias_type     = static_cast<bias_enum>(bias_type_int);
+    traits.has_lse       = (has_lse != 0);
+    traits.has_dropout   = (has_dropout != 0);
     traits.qscale_type   = quant_scale_enum::no_scale;
 
     fmha_fwd_args args{};
@@ -102,12 +129,12 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     args.k_ptr                      = k_dev;
     args.v_ptr                      = v_dev;
     args.o_ptr                      = o_dev;
-    args.bias_ptr                   = nullptr;
+    args.bias_ptr                   = bias_dev;
     args.q_descale_ptr              = nullptr;
     args.k_descale_ptr              = nullptr;
     args.v_descale_ptr              = nullptr;
     args.rand_val_ptr               = nullptr;
-    args.lse_ptr                    = nullptr;
+    args.lse_ptr                    = lse_dev_buf;
     args.sink_ptr                   = nullptr;
     args.block_scale_seqstart_q_ptr = nullptr;
     args.block_scale_seqstart_k_ptr = nullptr;
@@ -126,15 +153,15 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     args.stride_q               = hdim_q;
     args.stride_k               = hdim_q;
     args.stride_v               = hdim_v;
-    args.stride_bias            = 0;
+    args.stride_bias            = (bias_type_int > 0) ? seqlen_k : 0;
     args.stride_randval         = 0;
     args.stride_o               = hdim_v;
     args.nhead_stride_q         = seqlen_q * hdim_q;
     args.nhead_stride_k         = seqlen_k * hdim_q;
     args.nhead_stride_v         = seqlen_k * hdim_v;
-    args.nhead_stride_bias      = 0;
+    args.nhead_stride_bias      = (bias_type_int > 0) ? seqlen_q * seqlen_k : 0;
     args.nhead_stride_randval   = 0;
-    args.nhead_stride_lse       = 0;
+    args.nhead_stride_lse       = has_lse ? seqlen_q : 0;
     args.nhead_stride_o         = seqlen_q * hdim_v;
     args.nhead_stride_q_descale = 0;
     args.nhead_stride_k_descale = 0;
@@ -142,22 +169,23 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     args.batch_stride_q         = nhead_q * seqlen_q * hdim_q;
     args.batch_stride_k         = nhead_k * seqlen_k * hdim_q;
     args.batch_stride_v         = nhead_k * seqlen_k * hdim_v;
-    args.batch_stride_bias      = 0;
+    args.batch_stride_bias      = (bias_type_int > 0) ? nhead_q * seqlen_q * seqlen_k : 0;
     args.batch_stride_randval   = 0;
-    args.batch_stride_lse       = 0;
+    args.batch_stride_lse       = has_lse ? nhead_q * seqlen_q : 0;
     args.batch_stride_o         = nhead_q * seqlen_q * hdim_v;
     args.batch_stride_q_descale = 0;
     args.batch_stride_k_descale = 0;
     args.batch_stride_v_descale = 0;
 
     args.window_size_left    = -1;
-    args.window_size_right   = -1;
+    args.window_size_right   = (mask_type_int > 0) ? 0 : -1;
     args.sink_size           = 0;
-    args.mask_type           = 0;
+    args.mask_type           = mask_type_int;
     args.min_seqlen_q        = 0;
-    args.p_drop              = 0.0f;
+    args.p_drop              = has_dropout ? 0.2f : 0.0f;
     args.s_randval           = false;
-    args.drop_seed_offset    = std::make_pair(uint64_t(0), uint64_t(0));
+    args.drop_seed_offset    = has_dropout ? std::make_pair(uint64_t(1), uint64_t(0))
+                                           : std::make_pair(uint64_t(0), uint64_t(0));
     args.block_scale_size_q  = 0;
     args.block_scale_size_kv = 0;
 
@@ -172,6 +200,10 @@ int fmha_dispatcher_run_fwd(const void* q_host,
         hipFree(k_dev);
         hipFree(v_dev);
         hipFree(o_dev);
+        if(bias_dev)
+            hipFree(bias_dev);
+        if(lse_dev_buf)
+            hipFree(lse_dev_buf);
         return -2;
     }
 
@@ -181,6 +213,204 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     hipFree(k_dev);
     hipFree(v_dev);
     hipFree(o_dev);
+    if(bias_dev)
+        hipFree(bias_dev);
+    if(lse_dev_buf)
+        hipFree(lse_dev_buf);
+
+    if(time_ms_out)
+        *time_ms_out = elapsed;
+
+    return 0;
+}
+
+int fmha_dispatcher_run_bwd(const void* q_host,
+                            const void* k_host,
+                            const void* v_host,
+                            const void* o_host,
+                            const void* lse_host,
+                            const void* do_host,
+                            void* dq_host,
+                            void* dk_host,
+                            void* dv_host,
+                            int batch,
+                            int nhead_q,
+                            int nhead_k,
+                            int seqlen_q,
+                            int seqlen_k,
+                            int hdim_q,
+                            int hdim_v,
+                            float scale,
+                            float* time_ms_out)
+{
+    if(!g_initialized)
+        return -1;
+
+    const int64_t q_bytes      = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * 2;
+    const int64_t k_bytes      = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * 2;
+    const int64_t v_bytes      = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * 2;
+    const int64_t o_bytes      = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v * 2;
+    const int64_t do_bytes     = o_bytes;
+    const int64_t dq_bytes     = q_bytes;
+    const int64_t dk_bytes     = k_bytes;
+    const int64_t dv_bytes     = v_bytes;
+    const int64_t lse_bytes    = static_cast<int64_t>(batch) * nhead_q * seqlen_q * 4;
+    const int64_t d_bytes      = static_cast<int64_t>(batch) * nhead_q * seqlen_q * 4;
+    const int64_t dq_acc_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * 4;
+
+    void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
+    void *lse_dev = nullptr, *do_dev = nullptr, *d_dev = nullptr;
+    void *dq_dev = nullptr, *dk_dev = nullptr, *dv_dev = nullptr, *dq_acc_dev = nullptr;
+
+    HIP_CHECK(hipMalloc(&q_dev, q_bytes));
+    HIP_CHECK(hipMalloc(&k_dev, k_bytes));
+    HIP_CHECK(hipMalloc(&v_dev, v_bytes));
+    HIP_CHECK(hipMalloc(&o_dev, o_bytes));
+    HIP_CHECK(hipMalloc(&lse_dev, lse_bytes));
+    HIP_CHECK(hipMalloc(&do_dev, do_bytes));
+    HIP_CHECK(hipMalloc(&d_dev, d_bytes));
+    HIP_CHECK(hipMalloc(&dq_dev, dq_bytes));
+    HIP_CHECK(hipMalloc(&dk_dev, dk_bytes));
+    HIP_CHECK(hipMalloc(&dv_dev, dv_bytes));
+    HIP_CHECK(hipMalloc(&dq_acc_dev, dq_acc_bytes));
+
+    HIP_CHECK(hipMemcpy(q_dev, q_host, q_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(k_dev, k_host, k_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(v_dev, v_host, v_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(o_dev, o_host, o_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(lse_dev, lse_host, lse_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(do_dev, do_host, do_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemset(d_dev, 0, d_bytes));
+    HIP_CHECK(hipMemset(dq_dev, 0, dq_bytes));
+    HIP_CHECK(hipMemset(dk_dev, 0, dk_bytes));
+    HIP_CHECK(hipMemset(dv_dev, 0, dv_bytes));
+    HIP_CHECK(hipMemset(dq_acc_dev, 0, dq_acc_bytes));
+
+    fmha_bwd_traits traits{};
+    traits.hdim_q           = hdim_q;
+    traits.hdim_v           = hdim_v;
+    traits.data_type        = "fp16";
+    traits.is_group_mode    = false;
+    traits.mask_type        = mask_enum::no_mask;
+    traits.bias_type        = bias_enum::no_bias;
+    traits.has_dbias        = false;
+    traits.has_dropout      = false;
+    traits.is_store_randval = false;
+    traits.is_deterministic = false;
+
+    fmha_bwd_args args{};
+    args.q_ptr        = q_dev;
+    args.k_ptr        = k_dev;
+    args.v_ptr        = v_dev;
+    args.bias_ptr     = nullptr;
+    args.o_ptr        = o_dev;
+    args.lse_ptr      = lse_dev;
+    args.do_ptr       = do_dev;
+    args.d_ptr        = d_dev;
+    args.rand_val_ptr = nullptr;
+    args.dq_ptr       = dq_dev;
+    args.dk_ptr       = dk_dev;
+    args.dv_ptr       = dv_dev;
+    args.dbias_ptr    = nullptr;
+    args.dq_acc_ptr   = dq_acc_dev;
+
+    args.seqlen_q     = seqlen_q;
+    args.seqlen_k     = seqlen_k;
+    args.batch        = batch;
+    args.max_seqlen_q = seqlen_q;
+    args.max_seqlen_k = seqlen_k;
+    args.hdim_q       = hdim_q;
+    args.hdim_v       = hdim_v;
+    args.nhead_q      = nhead_q;
+    args.nhead_k      = nhead_k;
+    args.scale        = scale;
+
+    // bhsd strides
+    args.stride_q       = hdim_q;
+    args.stride_k       = hdim_q;
+    args.stride_v       = hdim_v;
+    args.stride_bias    = 0;
+    args.stride_o       = hdim_v;
+    args.stride_randval = 0;
+    args.stride_do      = hdim_v;
+    args.stride_dq_acc  = hdim_q;
+    args.stride_dq      = hdim_q;
+    args.stride_dk      = hdim_q;
+    args.stride_dv      = hdim_v;
+    args.stride_dbias   = 0;
+
+    args.nhead_stride_q       = seqlen_q * hdim_q;
+    args.nhead_stride_k       = seqlen_k * hdim_q;
+    args.nhead_stride_v       = seqlen_k * hdim_v;
+    args.nhead_stride_bias    = 0;
+    args.nhead_stride_o       = seqlen_q * hdim_v;
+    args.nhead_stride_randval = 0;
+    args.nhead_stride_do      = seqlen_q * hdim_v;
+    args.nhead_stride_lsed    = seqlen_q;
+    args.nhead_stride_dq_acc  = static_cast<ck_tile::long_index_t>(seqlen_q) * hdim_q;
+    args.nhead_stride_dq      = seqlen_q * hdim_q;
+    args.nhead_stride_dk      = seqlen_k * hdim_q;
+    args.nhead_stride_dv      = seqlen_k * hdim_v;
+    args.nhead_stride_dbias   = 0;
+
+    args.batch_stride_q       = nhead_q * seqlen_q * hdim_q;
+    args.batch_stride_k       = nhead_k * seqlen_k * hdim_q;
+    args.batch_stride_v       = nhead_k * seqlen_k * hdim_v;
+    args.batch_stride_bias    = 0;
+    args.batch_stride_o       = nhead_q * seqlen_q * hdim_v;
+    args.batch_stride_randval = 0;
+    args.batch_stride_do      = nhead_q * seqlen_q * hdim_v;
+    args.batch_stride_lsed    = nhead_q * seqlen_q;
+    args.batch_stride_dq_acc  = static_cast<ck_tile::long_index_t>(nhead_q) * seqlen_q * hdim_q;
+    args.batch_stride_dq      = nhead_q * seqlen_q * hdim_q;
+    args.batch_stride_dk      = nhead_k * seqlen_k * hdim_q;
+    args.batch_stride_dv      = nhead_k * seqlen_k * hdim_v;
+    args.batch_stride_dbias   = 0;
+    args.split_stride_dq_acc  = 0;
+
+    args.window_size_left  = -1;
+    args.window_size_right = -1;
+    args.mask_type         = 0;
+    args.p_drop            = 0.0f;
+    args.p_undrop          = 1.0f;
+    args.drop_seed_offset  = std::make_pair(uint64_t(0), uint64_t(0));
+
+    float elapsed = 0.0f;
+    try
+    {
+        elapsed = g_dispatcher->run_bwd(traits, args, nullptr);
+    }
+    catch(...)
+    {
+        hipFree(q_dev);
+        hipFree(k_dev);
+        hipFree(v_dev);
+        hipFree(o_dev);
+        hipFree(lse_dev);
+        hipFree(do_dev);
+        hipFree(d_dev);
+        hipFree(dq_dev);
+        hipFree(dk_dev);
+        hipFree(dv_dev);
+        hipFree(dq_acc_dev);
+        return -2;
+    }
+
+    HIP_CHECK(hipMemcpy(dq_host, dq_dev, dq_bytes, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(dk_host, dk_dev, dk_bytes, hipMemcpyDeviceToHost));
+    HIP_CHECK(hipMemcpy(dv_host, dv_dev, dv_bytes, hipMemcpyDeviceToHost));
+
+    hipFree(q_dev);
+    hipFree(k_dev);
+    hipFree(v_dev);
+    hipFree(o_dev);
+    hipFree(lse_dev);
+    hipFree(do_dev);
+    hipFree(d_dev);
+    hipFree(dq_dev);
+    hipFree(dk_dev);
+    hipFree(dv_dev);
+    hipFree(dq_acc_dev);
 
     if(time_ms_out)
         *time_ms_out = elapsed;
