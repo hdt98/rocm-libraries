@@ -96,41 +96,17 @@ def assign_gpu_to_worker(worker_id):
         # Single worker or master process - use all GPUs
         return
 
-    # Detect number of available GPUs
-    import subprocess
     import re
+    from Tensile.ParallelExecution import detectAvailableGpus
 
-    num_gpus = 1  # default to 1 GPU
-    try:
-        # Try using rocm-smi to detect GPUs
-        result = subprocess.run(['rocm-smi', '--showid'],
-                              capture_output=True, text=True, timeout=5)
-        if result.returncode == 0:
-            # Count GPU entries in rocm-smi output
-            gpu_count = len([line for line in result.stdout.split('\n')
-                           if 'GPU[' in line or 'GPU' in line and 'device' in line.lower()])
-            if gpu_count > 0:
-                num_gpus = gpu_count
-    except (FileNotFoundError, subprocess.TimeoutExpired, Exception):
-        # rocm-smi not available, try checking HIP_VISIBLE_DEVICES
-        if 'HIP_VISIBLE_DEVICES' in os.environ:
-            devices = os.environ['HIP_VISIBLE_DEVICES'].split(',')
-            num_gpus = len(devices)
-        else:
-            # Fallback: try counting /dev/kfd nodes or default to 1
-            import glob
-            kfd_nodes = glob.glob('/sys/class/kfd/kfd/topology/nodes/*/gpu_id')
-            if kfd_nodes:
-                num_gpus = len([f for f in kfd_nodes
-                              if open(f).read().strip() != '0'])
-
+    num_gpus = detectAvailableGpus()
     # Extract numeric ID from worker_id (e.g., 'gw0' -> 0, 'gw1' -> 1)
     match = re.search(r'\d+', worker_id)
     if match:
         worker_num = int(match.group())
         gpu_id = worker_num % num_gpus  # Use modulo to wrap around available GPUs
         os.environ['HIP_VISIBLE_DEVICES'] = str(gpu_id)
-        print(f"Worker {worker_id} (worker #{worker_num}) assigned to GPU {gpu_id} (total GPUs: {num_gpus})")
+        print(f"Worker {worker_id} assigned to GPU {gpu_id} (total GPUs: {num_gpus})")
     else:
         print(f"Warning: Could not parse worker_id '{worker_id}' for GPU assignment")
 
