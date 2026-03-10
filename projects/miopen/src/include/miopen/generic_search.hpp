@@ -30,8 +30,6 @@
 #include <thread>
 #include <vector>
 
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_PERFORMANCE_LOGS)
-
 namespace miopen {
 namespace solver {
 
@@ -557,12 +555,11 @@ auto GenericSearch(const Solver s,
                     ScopedKernelTuningMode tuning_mode_scope;
                     
                     // Log solution name for grouped kernel logging (only once per solution)
-                    const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
                     const auto solver_name = s.SolverDbId();
                     const auto solver_id = miopen::solver::Id(solver_name).Value();
                     
                     // LogSolutionName only sets up the solution context once
-                    LogSolutionName(solver_name, solver_id, log_level);
+                    LogSolutionName(solver_name, solver_id);
                     
                     // Add this specific performance config with kernel name extracted from solution
                     const auto config_string = current_config.ToString();
@@ -674,8 +671,8 @@ auto GenericSearch(const Solver s,
                             kernel_name = solver_name;  // Fallback to solver name
                         }
                         
-                        // Pass kernel name, config string as descriptor, and samples
-                        AddPerformanceConfig(kernel_name, config_string, samples);
+                        // Add the timing samples to the current performance config
+                        AddInvokerTimes(samples);
 
                         // Remove outliers that are more than 2 positive modified z-score's away,
                         // and get the mean.

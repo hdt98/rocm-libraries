@@ -112,8 +112,6 @@ struct KernelExecutionData
     size_t exec_id;
     std::string kernel_name;
     float time_ms;
-    int transformation_count;
-    std::vector<std::string> transformation_kernel_names; // Collected transformation kernel names
     bool is_transformation;
 };
 
@@ -142,26 +140,6 @@ struct GroupedKernelData
     bool is_transformation;
 };
 
-/// Structure to accumulate kernels by exec_id
-struct ExecIdAccumulator
-{
-    size_t exec_id = 0;
-    std::string main_kernel_name;
-    float total_time_ms      = 0.0f;
-    int transformation_count = 0;
-    std::vector<std::string> transformation_kernel_names; // Track transformation kernel names
-    bool has_data = false;
-
-    void Reset()
-    {
-        exec_id = 0;
-        main_kernel_name.clear();
-        total_time_ms        = 0.0f;
-        transformation_count = 0;
-        transformation_kernel_names.clear();
-        has_data = false;
-    }
-};
 
 /// Structure to hold solution data for JSON output
 struct SolutionExecutionData
@@ -185,7 +163,9 @@ struct SolutionExecutionData
     
     void FinalizeCurrentConfig()
     {
-        if(!current_config.config_name.empty() && !current_config.kernels.empty())
+        // Finalize if we have a config name and either kernels OR invoker times
+        if(!current_config.config_name.empty() && 
+           (!current_config.kernels.empty() || !current_config.invoker_times_ms.empty()))
         {
             performance_configs.push_back(current_config);
             current_config.Clear();
@@ -230,62 +210,87 @@ inline SolutionExecutionData& GetJsonAccumulator()
     return accumulator;
 }
 
-/// Thread-local exec_id accumulator for kernel grouping
-inline ExecIdAccumulator& GetCurrentExecIdAccumulator()
+/// Check if this kernel should be logged
+/// - When log_level <= 2: Only log execution phase kernels (not tuning)
+/// - When log_level > 2: Log both tuning and execution phase kernels
+inline bool IsLoggingKernel(bool is_tuning)
 {
-    thread_local ExecIdAccumulator accumulator;
-    return accumulator;
+    const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+    if(log_level > 2)
+    {
+        // Log all kernels (both tuning and execution) when log_level > 2
+        return true;
+    }
+    else if(log_level > 0)
+    {
+        // Only log execution phase kernels when 0 < log_level <= 2
+        return !is_tuning;
+    }
+    return false;
 }
 
-
-/// Finalize the current exec_id accumulator and add it to the current config's kernels
-inline void FinalizeCurrentExecId()
-{
-    auto& exec_accum = GetCurrentExecIdAccumulator();
-
-    if(!exec_accum.has_data)
-        return;
-
-    auto& data = GetJsonAccumulator();
-    data.current_config.kernels.push_back({
-        exec_accum.exec_id,
-        exec_accum.main_kernel_name,
-        exec_accum.total_time_ms,
-        exec_accum.transformation_count,
-        exec_accum.transformation_kernel_names, // Pass transformation kernel names
-        false // is_transformation - this is the accumulated main kernel
-    });
-
-    exec_accum.Reset();
-}
-
-/// Add a new performance config with its name, descriptor and optional invoker timings
+/// Add a new performance config with its name and descriptor
+/// This creates a new performance config entry. Call AddInvokerTimes() afterwards
+/// to add timing samples to this config.
 inline void AddPerformanceConfig(const std::string& config_name,
-                                  const std::string& config_descriptor = "",
-                                  const std::vector<float>& invoker_times_ms = {})
+                                  const std::string& config_descriptor = "")
 {
+    const bool is_tuning_mode  = GetKernelTuningMode();
+    const bool logging_enabled = IsLoggingKernel(is_tuning_mode);
+    if(logging_enabled)
+    {
+        auto& data = GetJsonAccumulator();
+        
+        // Finalize the previous config if it exists
+        data.FinalizeCurrentConfig();
+        
+        // Start a new config
+        data.current_config.config_name = config_name;
+        data.current_config.config_descriptor = config_descriptor;
+    }
+}
+
+/// Add invoker timing samples to the current performance config
+/// This should be called after AddPerformanceConfig() and after kernel execution completes
+inline void AddInvokerTimes(const std::vector<float>& invoker_times_ms)
+{
+    const bool is_tuning_mode  = GetKernelTuningMode();
+    const bool logging_enabled = IsLoggingKernel(is_tuning_mode);
+    if(!logging_enabled)
+        return;
+    
     auto& data = GetJsonAccumulator();
     
-    // Finalize the previous config if it exists
-    data.FinalizeCurrentConfig();
+    if(data.current_config.config_name.empty())
+    {
+        std::cerr << "WARNING: AddInvokerTimes called but no performance config exists" << std::endl;
+        return;
+    }
     
-    // Start a new config
-    data.current_config.config_name = config_name;
-    data.current_config.config_descriptor = config_descriptor;
+    // Add times to the current performance config
     data.current_config.invoker_times_ms = invoker_times_ms;
 }
 
 /// Output accumulated JSON data
 inline void FlushJsonAccumulator()
 {
-    // Finalize any pending exec_id and config
-    FinalizeCurrentExecId();
-    
     auto& data = GetJsonAccumulator();
     data.FinalizeCurrentConfig();
 
     if(data.performance_configs.empty())
         return;
+
+    // Always write to logs if performance logging is enabled (log_level > 0)
+    const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+    if(log_level == 0)
+    {
+        data.Clear();
+        return;
+    }
+
+    // Determine if we should show individual kernels
+    // Show kernels for log_level 2 and 4, hide for 1 and 3
+    const bool show_kernels = (log_level == 2 || log_level == 4);
 
     // Output JSON with solution-level metrics
     std::cerr << "{\"solution\":\"" << JsonEscape(data.solution_name) << "\","
@@ -343,15 +348,6 @@ inline void FlushJsonAccumulator()
         {
             all_exec_times = config.invoker_times_ms;
             min_exec_number = 1;  // Invoker timings start from execution 1
-            
-            // Still count transformations from kernels if available
-            for(const auto& k : config.kernels)
-            {
-                if(k.is_transformation || k.transformation_count > 0)
-                {
-                    total_transformations += k.transformation_count;
-                }
-            }
         }
         else
         {
@@ -373,10 +369,15 @@ inline void FlushJsonAccumulator()
                 // Accumulate for config-level stats
                 all_exec_times.push_back(k.time_ms);
                 min_exec_number = std::min(min_exec_number, k.exec_id);
-                if(k.is_transformation || k.transformation_count > 0)
-                {
-                    total_transformations += k.transformation_count;
-                }
+            }
+        }
+        
+        // Count transformations based on grouped kernels (not individual executions)
+        for(const auto& entry : grouped_kernels)
+        {
+            if(entry.second.is_transformation)
+            {
+                total_transformations++;
             }
         }
         
@@ -435,133 +436,80 @@ inline void FlushJsonAccumulator()
                   << "\"time_std_ms\":" << config_time_std << ","
                   << "\"time_min_ms\":" << config_time_min << ","
                   << "\"time_max_ms\":" << config_time_max << ","
-                  << "\"number_of_transformations\":" << total_transformations << ",";
+                  << "\"number_of_transformations\":" << total_transformations;
         
-        // Output simplified kernels array
-        std::cerr << "\"kernels\":[";
-        bool first_kernel = true;
-        for(const auto& entry : grouped_kernels)
+        // Only output kernels array if show_kernels is true (log_level 2 or 4)
+        if(show_kernels)
         {
-            const auto& g = entry.second;
-            if(!first_kernel)
-                std::cerr << ",";
-            first_kernel = false;
-
-            std::cerr << "{\"kernel_name\":\"" << JsonEscape(g.kernel_name) << "\","
-                      << "\"time_executions_ms\":[";
-
-            for(size_t i = 0; i < g.time_executions_ms.size(); ++i)
+            std::cerr << ",\"kernels\":[";
+            bool first_kernel = true;
+            for(const auto& entry : grouped_kernels)
             {
-                if(i > 0)
+                const auto& g = entry.second;
+                if(!first_kernel)
                     std::cerr << ",";
-                std::cerr << g.time_executions_ms[i];
-            }
+                first_kernel = false;
 
-            std::cerr << "],";
-            std::cerr << "\"is_transformation\":" << (g.is_transformation ? "true" : "false") << "}";
+                std::cerr << "{\"kernel_name\":\"" << JsonEscape(g.kernel_name) << "\","
+                          << "\"time_executions_ms\":[";
+
+                for(size_t i = 0; i < g.time_executions_ms.size(); ++i)
+                {
+                    if(i > 0)
+                        std::cerr << ",";
+                    std::cerr << g.time_executions_ms[i];
+                }
+
+                std::cerr << "],";
+                std::cerr << "\"is_transformation\":" << (g.is_transformation ? "true" : "false") << "}";
+            }
+            
+            std::cerr << "]"; // Close kernels array
+        }else
+        {
+            std::cerr << ",\"kernels\":null";
         }
         
-        std::cerr << "]}"; // Close kernels array and config object
+        std::cerr << "}"; // Close config object
     }
     
     std::cerr << "]}" << std::endl; // Close performance_configs array and root object
-    data.Clear();
+    
+    // Only clear the performance configs, preserve solution-level metadata
+    // This ensures solution_name, solver_id, and phase remain available until overwritten
+    data.performance_configs.clear();
 }
 
 /// Manually flush any pending JSON data (call at program end or context switch)
 inline void FinalizeJsonLogging() { FlushJsonAccumulator(); }
 
-/// Check if we should list kernels individually without exec_id accumulation
-/// This is enabled when MIOPEN_PERFORMANCE_LOGS is 2 or 4
-inline bool IsIndividualKernelListingMode(uint64_t log_level)
-{
-    return log_level == 2 || log_level == 4;
-}
-
-/// Add kernel to JSON accumulator with optional exec_id grouping
-/// If in individual kernel listing mode (log_level 2 or 4), kernels are added individually
-/// Otherwise, kernels are accumulated by exec_id
+/// Add kernel to JSON accumulator
+/// All kernels are stored individually when logging is enabled
 inline void AddKernelToJsonAccumulator(size_t exec_id,
                                        const std::string& kernel_name,
                                        float time_ms,
                                        bool is_transform)
 {
-    const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-    // Check if we should list kernels individually
-    if(IsIndividualKernelListingMode(log_level))
-    {
-        // Individual kernel listing mode - add directly to current config without exec_id accumulation
-        auto& data = GetJsonAccumulator();
-        data.current_config.kernels.push_back({exec_id,
-                                               kernel_name,
-                                               time_ms,
-                                               0,  // transformation_count is 0 for individual kernels
-                                               {}, // transformation_kernel_names - empty for individual kernels
-                                               is_transform});
-    }
-    else
-    {
-        // Standard mode - accumulate by exec_id
-        auto& exec_accum = GetCurrentExecIdAccumulator();
+    const bool is_tuning_mode  = GetKernelTuningMode();
+    const bool logging_enabled = IsLoggingKernel(is_tuning_mode);
+    if(!logging_enabled)
+        return;
 
-        // Check if we've moved to a new exec_id
-        if(exec_accum.has_data && exec_accum.exec_id != exec_id)
-        {
-            // Finalize the previous exec_id before starting a new one
-            FinalizeCurrentExecId();
-        }
-
-        // Initialize or update the current exec_id accumulator
-        if(!exec_accum.has_data)
-        {
-            exec_accum.exec_id  = exec_id;
-            exec_accum.has_data = true;
-        }
-
-        // Add timing to total
-        exec_accum.total_time_ms += time_ms;
-
-        // Track transformation kernels or set main kernel name
-        if(is_transform)
-        {
-            exec_accum.transformation_count++;
-            exec_accum.transformation_kernel_names.push_back(kernel_name);
-        }
-        else
-        {
-            // This is a main kernel - use it as the representative kernel name
-            // If there are multiple non-transform kernels, the last one wins
-            exec_accum.main_kernel_name = kernel_name;
-            exec_accum.transformation_kernel_names.push_back(kernel_name);
-        }
-    }
+    // Always store kernels individually
+    auto& data = GetJsonAccumulator();
+    data.current_config.kernels.push_back({
+        exec_id,
+        kernel_name,
+        time_ms,
+        is_transform
+    });
 }
 
-/// Check if JSON mode is enabled (bit flag in MIOPEN_PERFORMANCE_LOGS)
-/// JSON mode is enabled when bit 8 is set (value >= 256)
+/// Check if Performance Logs are enabled mode is enabled
 inline bool IsPerformanceLoggingEnabled() 
 { 
     const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
     return log_level > 0; 
-}
-
-/// Check if this kernel should be logged
-/// - When log_level <= 2: Only log execution phase kernels (not tuning)
-/// - When log_level > 2: Log both tuning and execution phase kernels
-inline bool IsLoggingKernel(bool is_tuning)
-{
-    const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-    if(log_level > 2)
-    {
-        // Log all kernels (both tuning and execution) when log_level > 2
-        return true;
-    }
-    else if(log_level > 0)
-    {
-        // Only log execution phase kernels when 0 < log_level <= 2
-        return !is_tuning;
-    }
-    return false;
 }
 
 /// Log solution name if appropriate for the current log level

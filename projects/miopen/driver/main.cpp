@@ -25,8 +25,7 @@ int main(int argc, char* argv[])
         exit(0); // NOLINT (concurrency-mt-unsafe)
     }
 
-    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool json_mode = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    const bool json_mode = miopen::IsPerformanceLoggingEnabled();
     try
     {
 
@@ -82,14 +81,17 @@ int main(int argc, char* argv[])
             }
             return rc;
         }        
-        drv->GetandSetData();
+
+
+
+        drv->GetandSetData();       
         
         // Enable timing if performance logging is enabled (to populate average_time_ms in JSON output)
         if(json_mode && drv->GetInputFlags().GetValueInt("time") != 1)
         {
             drv->GetInputFlags().SetValue("time", "1");
         }
-        
+
         rc = drv->AllocateBuffersAndCopy();
         
         if(rc != 0)
@@ -165,10 +167,16 @@ int main(int argc, char* argv[])
                 cumulative_rc |= drv->VerifyBackward();
         }
 
+        // Flush any accumulated performance logging data before exiting
+        miopen::FinalizeJsonLogging();
+
         return cumulative_rc;
     }
     catch(const miopen::Exception& ex)
     {
+        // Flush any accumulated performance logging data before exiting
+        miopen::FinalizeJsonLogging();
+        
         if(!json_mode)
         {
             std::cerr << "Error: " << ex.what() << std::endl;
@@ -181,6 +189,9 @@ int main(int argc, char* argv[])
     }
     catch(const std::exception& ex)
     {
+        // Flush any accumulated performance logging data before exiting
+        miopen::FinalizeJsonLogging();
+        
         if(!json_mode)
         {
             std::cerr << "Error: " << ex.what() << std::endl;

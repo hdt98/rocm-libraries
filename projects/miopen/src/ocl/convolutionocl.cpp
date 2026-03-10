@@ -286,7 +286,7 @@ std::vector<Solution> EvaluateConvSolutions(const ExecutionContext& ctx,
         if(IsPerformanceLoggingEnabled())
         {
             std::string solution_name = id.ToString();
-            LogSolutionName(solution_name, id.Value(), log_level);
+            LogSolutionName(solution_name, id.Value());
             IncrementKernelExecutionCounter();
         }
         
@@ -1112,7 +1112,7 @@ void ConvolutionDescriptor::ConvolutionForwardImmediate(const Handle& handle,
             // Log the selected solver for execution phase kernel tracking
             std::string solution_name = (solver_id.Value() != 0) ? solver_id.ToString()
                                                                 : std::string("UNKNOWN");
-            LogSolutionName(solution_name, solver_id.Value(), log_level);
+            LogSolutionName(solution_name, solver_id.Value());
             IncrementKernelExecutionCounter();
         }
         invoker(handle, invoke_ctx);
@@ -1332,7 +1332,7 @@ void ConvolutionDescriptor::ConvolutionBackwardImmediate(const Handle& handle,
             // Log the selected solver for execution phase kernel tracking
             std::string solution_name = (solver_id.Value() != 0) ? solver_id.ToString()
                                                                 : std::string("UNKNOWN");
-            LogSolutionName(solution_name, solver_id.Value(), log_level);
+            LogSolutionName(solution_name, solver_id.Value());
             IncrementKernelExecutionCounter();
         }
         invoker(handle, invoke_ctx);
@@ -1544,7 +1544,7 @@ void ConvolutionDescriptor::ConvolutionWrwImmediate(const Handle& handle,
             tensors, workSpace, workSpaceSize, this->attribute.gfx90aFp16alt.GetWrW()};
         if(IsPerformanceLoggingEnabled())
         {
-            LogSolutionName(solver_id.ToString(), solver_id.Value(), log_level);
+            LogSolutionName(solver_id.ToString(), solver_id.Value());
             IncrementKernelExecutionCounter();
         }
         invoker(handle, invoke_ctx);

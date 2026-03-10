@@ -407,12 +407,11 @@ ConvSolution InitAnyInvokerFactory(const ProblemDescriptionType& problem,
                     float elapsed_time = handle.GetKernelTime();
                     
                     // Kernel logging for CK kernels
-                    const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
                     const bool is_tuning_mode = GetKernelTuningMode();
-                    if(IsLoggingKernel(base_level, is_tuning_mode))
+                    if(IsLoggingKernel(is_tuning_mode))
                     {                   
                         const auto exec_id = GetKernelExecutionCounter();
-                        AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed_time, false, base_level);
+                        AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed_time, false);
                     }
                     handle.ResetKernelTime();
                     handle.AccumKernelTime(elapsed_time);
@@ -1277,12 +1276,11 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
                 elapsed += handle.GetKernelTime();
                     
                 // Kernel logging for CK kernels
-                const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
                 const bool is_tuning_mode = GetKernelTuningMode();
-                if(IsLoggingKernel(base_level, is_tuning_mode))
+                if(IsLoggingKernel(is_tuning_mode))
                 {
                     const auto exec_id = GetKernelExecutionCounter();
-                    AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false, base_level);
+                    AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false);
                 }
                 handle.ResetKernelTime();
                 handle.AccumKernelTime(elapsed);
@@ -1398,12 +1396,11 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     elapsed += handle.GetKernelTime();
                     
                     // Kernel logging for CK kernels
-                    const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
                     const bool is_tuning_mode = GetKernelTuningMode();
-                    if(IsLoggingKernel(base_level, is_tuning_mode))
+                    if(IsLoggingKernel(is_tuning_mode))
                     {
                         const auto exec_id = GetKernelExecutionCounter();
-                        AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false, base_level);
+                        AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false);
                     }
                     handle.ResetKernelTime();
                     handle.AccumKernelTime(elapsed);
@@ -1462,12 +1459,11 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     elapsed += handle.GetKernelTime();
                     
                     // Kernel logging for CK kernels
-                    const auto base_level = env::value(MIOPEN_PERFORMANCE_LOGS);
                     const bool is_tuning_mode = GetKernelTuningMode();
-                    if(IsLoggingKernel(base_level, is_tuning_mode))
+                    if(IsLoggingKernel(is_tuning_mode))
                     {
                         const auto exec_id = GetKernelExecutionCounter();
-                        AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false, base_level);
+                        AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false);
                     }
 
                     handle.ResetKernelTime();

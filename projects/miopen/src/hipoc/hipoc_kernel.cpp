@@ -125,7 +125,7 @@ void HIPOCKernelInvoke::run(void* args, std::size_t size) const
         if(IsLoggingKernel(is_tuning_mode))
         {
             float elapsed_time = 0.0f;
-            hipEventElapsedTime(&elapsed_time, start.get(), stop.get());
+            (void)hipEventElapsedTime(&elapsed_time, start.get(), stop.get());
             
             const bool is_transpose = IsTransposeOrTransformKernel(GetName());
             const auto exec_id = GetKernelExecutionCounter();
@@ -210,7 +210,7 @@ void HIPOCKernelInvoke::run_cooperative(void** kern_args) const
         if(IsLoggingKernel(is_tuning_mode))
         {
             float elapsed_time = 0.0f;
-            hipEventElapsedTime(&elapsed_time, start.get(), stop.get());
+            (void)hipEventElapsedTime(&elapsed_time, start.get(), stop.get());
             
             const bool is_transpose = IsTransposeOrTransformKernel(GetName());
             const auto exec_id = GetKernelExecutionCounter();

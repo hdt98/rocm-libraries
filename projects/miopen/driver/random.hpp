@@ -11,7 +11,6 @@
 #include <random>
 
 MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_DRIVER_PRNG_SEED, 12345678)
-MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_PERFORMANCE_LOGS)
 
 namespace env = miopen::env;
 
@@ -29,7 +28,7 @@ inline std::random_device::result_type get_default_seed()
                         : static_cast<std::random_device::result_type>(external_seed);
         
         // Check if JSON mode is enabled in MIOPEN_PERFORMANCE_LOGS        
-        if(miopen::IsPerformanceLoggingEnabled(env::value(MIOPEN_PERFORMANCE_LOGS)))
+        if(miopen::IsPerformanceLoggingEnabled())
         {
             std::cout << "{\"prng_seed\":" << seed << "}" << std::endl;
         }

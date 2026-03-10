@@ -751,8 +751,7 @@ int ConvDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
         }
     }
 
-    const auto performance_log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-    if(time_enabled || miopen::IsPerformanceLoggingEnabled(performance_log_level))
+    if(time_enabled || miopen::IsPerformanceLoggingEnabled())
     {
         miopenEnableProfiling(GetHandle(), true);
     }
@@ -1796,8 +1795,7 @@ int ConvDriver<Tgpu, Tref>::FindForward(int& ret_algo_count,
     ResizeWorkspaceDev(ctx, ws_sizeof_find_fwd);
     Timer find_time;
     find_time.start();
-    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
     const auto rc = miopenFindConvolutionForwardAlgorithm(
         GetHandle(),
         (is_transform ? inputTensor_vect4 : inputTensor),
@@ -1829,8 +1827,7 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
 {
     float kernel_average_time = ComputeAverageTime(kernel_total_time, kernel_first_time);
     
-    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
     
     if(!performance_logging_enabled)
     {
@@ -2268,12 +2265,12 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
         perf_results[0], Direction::Fwd, in_tens, wei_tens, outputTensor, found_solution);
     
     // Get performance_log_level once at the start to avoid shadow variable warnings
-    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
     // Log the selected solver for execution phase kernel tracking
     std::string solution_name = (found_solution.solution_id != 0) ? miopen::solver::Id(found_solution.solution_id).ToString()
                                                              : std::string("UNKNOWN");
-    miopen::LogSolutionName(solution_name, found_solution.solution_id, performance_log_level);
+    miopen::LogSolutionName(solution_name, found_solution.solution_id);
+    miopen::AddPerformanceConfig(solution_name, "");
     
     // Prepare to collect timing samples
     std::vector<float> time_samples;
@@ -2330,8 +2327,8 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
     // Pass collected samples to performance logging
     if(performance_logging_enabled && !time_samples.empty())
     {        
-        // Pass solution name as config_name, empty string as config_descriptor (execution phase doesn't have config details)
-        miopen::AddPerformanceConfig(solution_name, "", time_samples);
+        // Add timing samples to the current performance config
+        miopen::AddInvokerTimes(time_samples);
     }
 
     if(wall_enabled)
@@ -2457,11 +2454,11 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuImmed(const bool is_transform)
     float wall_first_time   = 0.f;
 
     // Log the selected solver for execution phase kernel tracking
-    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
     std::string solution_name = (selected->solution_id != 0) ? miopen::solver::Id(selected->solution_id).ToString()
                                                              : std::string("UNKNOWN");
-    miopen::LogSolutionName(solution_name, selected->solution_id, performance_log_level);
+    miopen::LogSolutionName(solution_name, selected->solution_id);
+    miopen::AddPerformanceConfig(solution_name, "");
 
     // Prepare to collect timing samples
     std::vector<float> time_samples;
@@ -2517,8 +2514,8 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuImmed(const bool is_transform)
     // Pass collected samples to performance logging
     if(performance_logging_enabled && !time_samples.empty())
     {
-        // Pass solution name as config_name, empty string as config_descriptor (execution phase doesn't have config details)
-        miopen::AddPerformanceConfig(solution_name, "", time_samples);
+        // Add timing samples to the current performance config
+        miopen::AddInvokerTimes(time_samples);
     }
 
     if(wall_enabled)
@@ -2663,8 +2660,7 @@ int ConvDriver<Tgpu, Tref>::FindBackwardData(int& ret_algo_count,
 {
     bwd_auxiliary.resume(wall_enabled);
     ResizeWorkspaceDev(ctx, ws_sizeof_find_bwd);
-    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
     Timer find_time;
     find_time.start();
     const auto rc = miopenFindConvolutionBackwardDataAlgorithm(
@@ -2699,8 +2695,7 @@ int ConvDriver<Tgpu, Tref>::FindBackwardWeights(int& ret_algo_count,
 {
     wrw_auxiliary.resume(wall_enabled);
     ResizeWorkspaceDev(ctx, ws_sizeof_find_wrw);
-    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
     Timer find_time;
     find_time.start();
     const auto rc = miopenFindConvolutionBackwardWeightsAlgorithm(
@@ -2832,8 +2827,7 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuFind()
     ResizeWorkspaceDev(ctx, ws_size);
     
     // Get the actual solution details to log the correct solver name
-    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
     miopenConvSolution_t found_solution;
     GetSolutionAfterFind(perf_results_data[0],
                          Direction::Bwd,
@@ -2845,7 +2839,8 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuFind()
     // Log the selected solver for execution phase kernel tracking
     std::string solution_name = (found_solution.solution_id != 0) ? miopen::solver::Id(found_solution.solution_id).ToString()
                                                              : std::string("UNKNOWN");
-    miopen::LogSolutionName(solution_name, found_solution.solution_id, performance_log_level);
+    miopen::LogSolutionName(solution_name, found_solution.solution_id);
+    miopen::AddPerformanceConfig(solution_name, "");
     
     // Prepare to collect timing samples
     std::vector<float> time_samples;
@@ -2903,7 +2898,7 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuFind()
     // Pass collected samples to performance logging
     if(performance_logging_enabled && !time_samples.empty())
     {
-        miopen::AddPerformanceConfig(solution_name, time_samples);
+        miopen::AddInvokerTimes(time_samples);
     }
 
     if(wall_enabled)
@@ -2935,8 +2930,7 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, floa
 {
     float kernel_average_time = ComputeAverageTime(kernel_total_time, kernel_first_time);
     
-    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
     
     if(!performance_logging_enabled)
     {
@@ -3094,8 +3088,7 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuFind()
     float alpha = static_cast<float>(1), beta = static_cast<float>(0);
     std::vector<miopenConvAlgoPerf_t> perf_results_weights(request_algo_count);
 
-    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
 
     DEFINE_CONTEXT(ctx);
 #if MIOPEN_BACKEND_OPENCL
@@ -3136,7 +3129,8 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuFind()
     // Log the selected solver for execution phase kernel tracking
     std::string solution_name = (found_solution.solution_id != 0) ? miopen::solver::Id(found_solution.solution_id).ToString()
                                                              : std::string("UNKNOWN");
-    miopen::LogSolutionName(solution_name, found_solution.solution_id, performance_log_level);
+    miopen::LogSolutionName(solution_name, found_solution.solution_id);
+    miopen::AddPerformanceConfig(solution_name, "");
     
     // Prepare to collect timing samples
     std::vector<float> time_samples;
@@ -3194,7 +3188,7 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuFind()
     // Pass collected samples to performance logging
     if(performance_logging_enabled && !time_samples.empty())
     {
-        miopen::AddPerformanceConfig(solution_name, time_samples);
+        miopen::AddInvokerTimes(time_samples);
     }
 
     if(wall_enabled)
@@ -3226,8 +3220,7 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float
 {
     float kernel_average_time = ComputeAverageTime(kernel_total_time, kernel_first_time);
     
-    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
     
     if(!performance_logging_enabled)
     {
@@ -3452,11 +3445,11 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuImmed()
     float wall_first_time   = 0.f;
 
     // Log the selected solver for execution phase kernel tracking
-    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
     std::string solution_name = (selected->solution_id != 0) ? miopen::solver::Id(selected->solution_id).ToString()
                                                              : std::string("UNKNOWN");
-    miopen::LogSolutionName(solution_name, selected->solution_id, performance_log_level);
+    miopen::LogSolutionName(solution_name, selected->solution_id);
+    miopen::AddPerformanceConfig(solution_name, "");
 
     // Prepare to collect timing samples
     std::vector<float> time_samples;
@@ -3511,7 +3504,7 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuImmed()
     // Pass collected samples to performance logging
     if(performance_logging_enabled && !time_samples.empty())
     {
-        miopen::AddPerformanceConfig(solution_name, time_samples);
+        miopen::AddInvokerTimes(time_samples);
     }
 
     if(wall_enabled)
@@ -3617,11 +3610,11 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuImmed()
     float wall_first_time   = 0.f;
 
     // Log the selected solver for execution phase kernel tracking
-    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
     std::string solution_name = (selected->solution_id != 0) ? miopen::solver::Id(selected->solution_id).ToString()
                                                              : std::string("UNKNOWN");
-    miopen::LogSolutionName(solution_name, selected->solution_id, performance_log_level);
+    miopen::LogSolutionName(solution_name, selected->solution_id);
+    miopen::AddPerformanceConfig(solution_name, "");
 
     // Prepare to collect timing samples
     std::vector<float> time_samples;
@@ -3676,7 +3669,7 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuImmed()
     // Pass collected samples to performance logging
     if(performance_logging_enabled && !time_samples.empty())
     {
-        miopen::AddPerformanceConfig(solution_name, time_samples);
+        miopen::AddInvokerTimes(time_samples);
     }
 
     if(wall_enabled)
@@ -4050,8 +4043,7 @@ int ConvDriver<Tgpu, Tref>::VerifyForward()
     if(is_fwd_igemm)
         tolerance = tolerance * 10;
 
-    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
     
     if(!std::isfinite(error) || error > tolerance)
     {
@@ -4097,8 +4089,7 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
 
     MIOPEN_THROW_IF(is_gpualloc, "'-G 1' and '-V 1' are incompatible");
 
-    const auto performance_log_level = miopen::env::value(MIOPEN_PERFORMANCE_LOGS);
-    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled(performance_log_level);
+    const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
 
     int cumulative_rc = 0;
     if(is_bwd)
