@@ -4334,6 +4334,10 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
         kernel["UsePLRPack"] = True
         kernel["UseMFMAF32XEmulation"] = True
         kernel["UseDot2F32XEmulation"] = False
+        
+        status:
+            last commit: claude's version of moving certain instr to resolve numric issues
+            todo: revert last commit and swap LR1 and Pack1 before LR0s and pack0s
 
         # Used the following constrains to create schedule
         #  - LRA0 + PACKA0 needs to be done before 1/4 MFMAs / 18
