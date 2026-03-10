@@ -23,7 +23,7 @@
 //            K_hat [B,H,Sk,D/2], K_scale [B,H,Sk,D/G], K' [B,H,Sk,D]
 //            V_hat [B,H,D,Sk/2], V_scale [B,H,D,Sk/G]
 //            delta_s [B,H,T_q,Sk] (float32)
-//   where G=32 (MXFP4 scale granularity), T_q = ceil(Sq/64).
+//   where G=32 (MXFP4 scale granularity), T_q = ceil(Sq/128).
 
 #include <cstdint>
 #include <cstring>
@@ -252,7 +252,7 @@ static void print_result(const BenchArgs& a, float ave_ms, bool csv_mode)
     const int sk = a.seqlen_k;
     const int hd = a.hdim;
     constexpr int kG   = 32;
-    constexpr int kM0  = 64;
+    constexpr int kM0  = 128;
     const int num_q_tiles = (sq + kM0 - 1) / kM0;
 
     const std::size_t elem_bytes =
@@ -312,16 +312,16 @@ static float dispatch(const BenchArgs& a)
     if(a.dtype == "fp16")
     {
         if(a.hdim == 128)
-            return run_benchmark<ck_tile::fp16_t, 64, 128>(a);
+            return run_benchmark<ck_tile::fp16_t, 128, 128>(a);
         if(a.hdim == 256)
-            return run_benchmark<ck_tile::fp16_t, 64, 256>(a);
+            return run_benchmark<ck_tile::fp16_t, 128, 256>(a);
     }
     else if(a.dtype == "fp32")
     {
         if(a.hdim == 128)
-            return run_benchmark<float, 64, 128>(a);
+            return run_benchmark<float, 128, 128>(a);
         if(a.hdim == 256)
-            return run_benchmark<float, 64, 256>(a);
+            return run_benchmark<float, 128, 256>(a);
     }
     throw std::runtime_error("Unsupported dtype/hdim: " + a.dtype +
                              " d=" + std::to_string(a.hdim));
