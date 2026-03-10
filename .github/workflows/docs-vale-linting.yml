@@ -111,7 +111,9 @@ jobs:
         run: |
           set -e
 
-          chmod +x docs/get_files_changed_by_pr.sh
+          declare GET_FILES_CHANGED_BY_PR_PATH="docs/vale/get_files_changed_by_pr.sh"
+
+          chmod +x "${GET_FILES_CHANGED_BY_PR_PATH}"
 
           # Interesting files are:
           #     *.md
@@ -119,7 +121,7 @@ jobs:
           #     .vale.ini
           declare interesting_file_paths_regex='^(.*(\.md|\.rst)|\.vale\.ini)$'
 
-          docs/get_files_changed_by_pr.sh \
+          "${GET_FILES_CHANGED_BY_PR_PATH}" \
               -o "${{ github.repository_owner }}" \
               -r "${{ github.event.repository.name }}" \
               -p "${{ github.event.pull_request.number }}" \
