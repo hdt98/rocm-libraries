@@ -59,36 +59,37 @@ struct SageAttnPreprocessPipeline
     static_assert(kCols % kScaleGranularity == 0,
                   "kCols must be divisible by kScaleGranularity for MXFP4");
 
-    // Shared memory: kCols InputT elements for q_mean broadcast.
+    // Shared memory: kCols float32 elements for q_mean broadcast.
+    // Stored as float (not InputT) so RunQQuantize can read it directly without
+    // an InputT→float cast, and to accommodate the float mean computation.
     CK_TILE_HOST_DEVICE static constexpr index_t GetSmemSize()
     {
-        return kCols * sizeof(InputT);
+        return kCols * sizeof(float);
     }
 
     // -------------------------------------------------------------------------
     // Step 1: compute column mean of [kRows, kCols] Q tile.
-    //   Accumulates in InputT; smem[0..kCols) and q_mean_ptr receive the result.
+    //   Thread d (d < kCols) accumulates src[0..kRows-1][d] in float, stores
+    //   the mean as float in smem and as InputT in q_mean_ptr.
+    //   Threads d >= kCols are idle (kBlockSize = kRows*kCols/32 > kCols).
     // -------------------------------------------------------------------------
     CK_TILE_DEVICE void RunQMean(const InputT* __restrict__ src_ptr,
                                  InputT* __restrict__ q_mean_ptr,
                                  void* smem) const
     {
-        InputT*       smem_mean = reinterpret_cast<InputT*>(smem);
-        const index_t tid       = get_thread_id();
+        float*        smem_f = reinterpret_cast<float*>(smem);
+        const index_t tid    = get_thread_id();
 
         for(index_t d = tid; d < kCols; d += kBlockSize)
         {
-            InputT sum = InputT(0);
+            float sum = 0.0f;
             for(index_t r = 0; r < kRows; r++)
-                sum += src_ptr[r * kCols + d];
-            // Divide in float for precision, cast back to InputT.
-            smem_mean[d] = static_cast<InputT>(static_cast<float>(sum) / static_cast<float>(kRows));
+                sum += static_cast<float>(src_ptr[r * kCols + d]);
+            const float mean = sum / static_cast<float>(kRows);
+            smem_f[d]     = mean;
+            q_mean_ptr[d] = static_cast<InputT>(mean);
         }
-        block_sync_lds();
-
-        for(index_t d = tid; d < kCols; d += kBlockSize)
-            q_mean_ptr[d] = smem_mean[d];
-        // smem_mean remains valid for RunQQuantize (no sync needed after write-to-global).
+        // Caller (kernel) issues block_sync_lds() before RunQQuantize.
     }
 
     // -------------------------------------------------------------------------
@@ -105,8 +106,9 @@ struct SageAttnPreprocessPipeline
                                      uint8_t* __restrict__ dst_scale_ptr,
                                      const void* smem) const
     {
-        const InputT* smem_mean = reinterpret_cast<const InputT*>(smem);
-        const index_t tid       = get_thread_id();
+        // smem holds float32 means written by RunQMean — read directly, no cast.
+        const float*  smem_mean_f = reinterpret_cast<const float*>(smem);
+        const index_t tid         = get_thread_id();
 
         constexpr index_t kNumGroups = kCols / kScaleGranularity;
         const index_t     row_idx    = tid / kNumGroups;
@@ -122,7 +124,7 @@ struct SageAttnPreprocessPipeline
         for(index_t j = 0; j < kScaleGranularity; j++)
         {
             const float val = static_cast<float>(src_row[d_start + j]) -
-                              static_cast<float>(smem_mean[d_start + j]);
+                              smem_mean_f[d_start + j];
             group_data[j] = val;
             max_abs       = max(max_abs, abs(val));
         }
