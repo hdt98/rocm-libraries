@@ -1955,7 +1955,7 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                       "Specialization of instance_traits not found. Please check that a "
                       "specialization exists in file "
                       "ck_tile/builder/reflect/"
-                      "instance_traits_device_grouped_conv_bwd_data_multiple_d_xdl_cshuffle.hpp "
+                      "reflect_device_grouped_conv_bwd_data_multiple_d_xdl_cshuffle.inc "
                       "for the given template parameters.");
         return ck_tile::reflect::instance_string<DeviceOp>();
     }
