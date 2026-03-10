@@ -439,6 +439,9 @@ add_declarative_gpu_example(fmha_24_per_receipt_registries fmha/cpp/24_per_recei
 add_declarative_gpu_example(fmha_25_gpu_appendkv_prefill fmha/cpp/25_gpu_appendkv_batchprefill_fmha.cpp)
 add_declarative_gpu_example(fmha_26_dtypes_hdims fmha/cpp/26_dtypes_hdims_fmha.cpp)
 add_declarative_gpu_example(fmha_27_padding_permutation fmha/cpp/27_padding_permutation_fmha.cpp)
+add_declarative_gpu_example(fmha_28_bwd_masks fmha/cpp/28_bwd_masks_fmha.cpp)
+add_declarative_gpu_example(fmha_29_bwd_bias_dropout fmha/cpp/29_bwd_bias_dropout_fmha.cpp)
+add_declarative_gpu_example(fmha_30_bwd_benchmark fmha/cpp/30_bwd_benchmark_fmha.cpp)
 
 # =============================================================================
 # Grouped Convolution Python Library - Multi-Kernel (fwd/bwdd/bwdw x 2D/3D)

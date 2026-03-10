@@ -66,6 +66,9 @@ class FmhaDispatcher
     [[nodiscard]] float run_batch_prefill(fmha_batch_prefill_traits traits,
                                           fmha_batch_prefill_args args,
                                           void* stream = nullptr) const;
+    // run_bwd is available when bwd types exist (library builds, bwd kernel TUs,
+    // or any TU that doesn't set CK_TILE_FMHA_BWD_TYPES_FROM_EXAMPLE).
+    // In fwd-only TUs, bwd types come from the fallback in fmha_types.hpp.
     [[nodiscard]] float
     run_bwd(fmha_bwd_traits traits, fmha_bwd_args args, void* stream = nullptr) const;
 

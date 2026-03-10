@@ -67,6 +67,10 @@ inline std::string to_string(FmhaKernelFamily family)
     }
 }
 
+// Combined variants containing both forward and backward types.
+// Both fwd and bwd types are always available via fallback definitions
+// in fmha_types.hpp (they are conditionally guarded but the fallback
+// provides them when the example headers don't).
 using FmhaTraitsVariant = std::variant<fmha_fwd_traits,
                                        fmha_fwd_pagedkv_traits,
                                        fmha_fwd_splitkv_traits,
