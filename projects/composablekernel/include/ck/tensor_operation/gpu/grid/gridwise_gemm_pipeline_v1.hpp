@@ -65,18 +65,17 @@ struct GridwiseGemmDoubleBufferPipeline_v1
         // Prologue - load data into buffer 0
         // Read from global mem to registers (I0 scratch)
         a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf, I0);
-        b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf, I0);
-
         // Move source slice window for next read (I1 scratch)
         a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+        // Write from I0 registers to LDS buffer 0
+        a_blockwise_copy.RunWrite(a_block_desc, a_block_buf_0, I0);
+
+        b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf, I0);
         b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+        b_blockwise_copy.RunWrite(b_block_desc, b_block_buf_0, I0);
 
         // Initialize C
         c_thread_buf.Clear();
-
-        // Write from I0 registers to LDS buffer 0
-        a_blockwise_copy.RunWrite(a_block_desc, a_block_buf_0, I0);
-        b_blockwise_copy.RunWrite(b_block_desc, b_block_buf_0, I0);
 
         // Main body
         if constexpr(HasMainLoop)
@@ -87,10 +86,10 @@ struct GridwiseGemmDoubleBufferPipeline_v1
             {
                 // Read from global mem to registers (I1 scratch)
                 a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf, I1);
-                b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf, I1);
-
-                // Move source slice window for next read (I0 scratch)
+                 // Move source slice window for next read (I0 scratch)
                 a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+
+                b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf, I1);
                 b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
 
                 // Sync LDS to ensure buffer 0 is ready
@@ -99,17 +98,16 @@ struct GridwiseGemmDoubleBufferPipeline_v1
                 // Run GEMM on buffer 0 while buffer 1 is loading
                 blockwise_gemm.Run(a_block_buf_0, b_block_buf_0, c_thread_buf);
 
-                // Write from registers (I1 scratch) to LDS buffer 1
-                a_blockwise_copy.RunWrite(a_block_desc, a_block_buf_1, I1);
-                b_blockwise_copy.RunWrite(b_block_desc, b_block_buf_1, I1);
-
                 // Read from global mem to registers (I0 scratch)
                 a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf, I0);
-                b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf, I0);
-
                 // Move source slice window for next read (I1 scratch)
                 a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
+                // Write from registers (I1 scratch) to LDS buffer 1
+                a_blockwise_copy.RunWrite(a_block_desc, a_block_buf_1, I1);
+                
+                b_blockwise_copy.RunRead(b_grid_desc, b_grid_buf, I0);
                 b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
+                b_blockwise_copy.RunWrite(b_block_desc, b_block_buf_1, I1);
 
                 // Sync LDS to ensure buffer 1 is ready
                 block_sync_lds();
