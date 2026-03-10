@@ -8,6 +8,8 @@ GEMM_PIPELINES = ["mem", "compv3", "compv4"]
 
 GEMM_PRESHUFFLE_PIPELINES = ["preshufflev2"]
 
+# Note: AQuant pipelines are a subset of GEMM_PIPELINES, so they are
+# already validated through the GEMM_PIPELINES branch in is_tile_config_valid().
 GEMM_AQUANT_PIPELINES = ["mem", "compv3"]
 
 LAYOUT_MAP = {

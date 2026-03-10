@@ -663,19 +663,9 @@ def _generate_single_kernel_individual(work_item):
     )
 
     try:
-        kernel_name, instance_code = builder._generate_kernel_instance(
-            tile_config, trait_combo
-        )
-
-        simplified_name = kernel_name
-        if simplified_name.startswith(f"{kernel_name_prefix}_"):
-            simplified_name = simplified_name[len(kernel_name_prefix) + 1 :]
-
-        header_file = (
-            working_path / f"{kernel_name_prefix}_single_{simplified_name}.hpp"
-        )
-        with open(header_file, "w") as f:
-            f.write(instance_code)
+        # _generate_kernel_instance() already writes the header file to disk,
+        # so no need to write again here.
+        kernel_name, _ = builder._generate_kernel_instance(tile_config, trait_combo)
 
         return (kernel_name, trait_combo, tile_config)
     except Exception as e:
