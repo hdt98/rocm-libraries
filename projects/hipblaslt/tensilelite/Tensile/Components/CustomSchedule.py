@@ -4318,6 +4318,7 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
     elif isNT(kernel) and not useLDSTr and TLDS==0:
         kernel["UsePLRPack"] = True
         kernel["UseMFMAF32XEmulation"] = True
+        kernel["UseDot2F32XEmulation"] = False
 
         # Used the following constrains to create schedule
         #  - LRA0 + PACKA0 needs to be done before 1/4 MFMAs / 18
