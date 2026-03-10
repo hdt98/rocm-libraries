@@ -555,7 +555,9 @@ void CommPointToPoint::ExecuteAsync(const rocfft_plan     plan,
 
     if(LOG_PLAN_ENABLED())
     {
-        log_plan("CommPointToPoint\n");
+        log_plan("CommPointToPoint: " + std::to_string(numElems) + " elems, src device "
+                 + std::to_string(srcLocation.device) + " -> dst device "
+                 + std::to_string(destLocation.device) + "\n");
     }
 
     auto srcWithOffset = ptr_offset(
@@ -669,7 +671,9 @@ void CommRCCLAllToAll::ExecuteAsync(const rocfft_plan     plan,
 {
     if(LOG_PLAN_ENABLED())
     {
-        log_plan("CommRCCLAllToAll\n");
+        log_plan("CommRCCLAllToAll: count_per_rank=" + std::to_string(count_per_rank)
+                 + ", ndevices=" + std::to_string(locations.size()) + ", "
+                 + precision_name(precision) + " " + PrintArrayType(arrayType) + "\n");
     }
 
     const size_t base_size  = real_type_size(precision);
@@ -762,7 +766,16 @@ void CommRCCLGrouped::ExecuteAsync(const rocfft_plan     plan,
 {
     if(LOG_PLAN_ENABLED())
     {
-        log_plan("CommRCCLGrouped\n");
+        size_t nsends = 0, nrecvs = 0;
+        for(const auto& t : transfers)
+        {
+            if(t.is_send)
+                ++nsends;
+            else
+                ++nrecvs;
+        }
+        log_plan("CommRCCLGrouped: " + std::to_string(nsends) + " sends, " + std::to_string(nrecvs)
+                 + " recvs, " + precision_name(precision) + " " + PrintArrayType(arrayType) + "\n");
     }
 
     if(transfers.empty())
