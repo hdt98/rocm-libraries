@@ -739,16 +739,13 @@ namespace TensileLite
             auto     itersPerTile = max(1, problem.getItersPerTile(sizeMapping));
             auto     totalIters   = tiles * itersPerTile;
 
+            uint32_t magicNumberItersPerTile;
+            uint32_t magicShiftItersPerTile;
+            magicNumberItersPerTile = magicNumber(2, itersPerTile, &magicShiftItersPerTile);
+
             args.template append<uint32_t>("itersPerTile", itersPerTile);
-            // Custom kernels still use magic division for ItersPerTile
-            if(!sizeMapping.customKernelName.empty())
-            {
-                uint32_t magicNumberItersPerTile;
-                uint32_t magicShiftItersPerTile;
-                magicNumberItersPerTile = magicNumber(2, itersPerTile, &magicShiftItersPerTile);
-                args.template append<uint32_t>("magicNumberItersPerTile", magicNumberItersPerTile);
-                args.template append<uint32_t>("magicShiftItersPerTile", magicShiftItersPerTile);
-            }
+            args.template append<uint32_t>("magicNumberItersPerTile", magicNumberItersPerTile);
+            args.template append<uint32_t>("magicShiftItersPerTile", magicShiftItersPerTile);
             if(sizeMapping.streamK == 1) // Basic SK
             {
                 uint32_t itersPerWave = CeilDivide(totalIters, numWorkGroups.x);

@@ -30,7 +30,7 @@ from rocisa.instruction import SAddCU32, SAddI32, SAddU32, SAndB32, SBarrier, \
     SMaxI32, SMinU32, SMovB32, SMovB64, SMulI32, SNop, SSleep, SStoreB32, SSubU32, \
     SWaitCnt, VAddF32, VAddF64, VAddPKF16, VAddU32, VLShiftRightB32, VMovB32, \
     VReadfirstlaneB32, VCvtBF16toFP32, BufferStoreB32
-from rocisa.functions import scalarStaticDivideAndRemainder, \
+from rocisa.functions import scalarStaticDivideAndRemainder, sMagicDiv2, \
     vectorStaticMultiply, BranchIfNotZero, scalarUInt24DivideAndRemainder, scalarUInt32DivideAndRemainder
 
 
@@ -144,11 +144,8 @@ class StreamK(Component):
 
         module.addComment0("StreamK calculate tile idx and map to WG")
 
-        # sTmp = tile index = StreamKIter / ItersPerTile
-        tmpVgpr = writer.vgprPool.checkOutAligned(4, 2, "skTileDiv")
-        tmpVgprRes = ContinuousRegister(idx=tmpVgpr, size=4)
-        module.add(scalarUInt24DivideAndRemainder(qReg=sTmp, dReg="StreamKIter", divReg="ItersPerTile", rReg=-1, tmpVgprRes=tmpVgprRes, wavewidth=kernel["WavefrontSize"], doRemainder=False, comment="tile index = StreamKIter / ItersPerTile"))
-        writer.vgprPool.checkIn(tmpVgpr)
+        # sTmp = tile index
+        module.add(sMagicDiv2(sgpr(sTmp), sgpr(sTmp+1), sgpr("StreamKIter"), sgpr("MagicNumberItersPerTile"), sgpr("MagicShiftItersPerTile"), sgpr(sTmp+2)))
         # sTmp+1 = tile start
         module.add(SMulI32(dst=sgpr(sTmp+1), src0=sgpr(sTmp), src1=sgpr("ItersPerTile"), comment="Tile start iteration"))
         # sTmp+2 = tile end
@@ -535,10 +532,7 @@ class StreamK(Component):
                 module.add(SAddU32(dst=sgpr(sCtaIdx), src0=sgpr("StreamKIdx"), src1=1, comment="input partial tile index"))
 
                 sFixupEnd = writer.sgprPool.checkOut(1, "FixupEnd") # self.defineSgpr("CtaEnd", 1)
-                tmpVgpr = writer.vgprPool.checkOutAligned(4, 2, "skFixupDiv")
-                tmpVgprRes = ContinuousRegister(idx=tmpVgpr, size=4)
-                module.add(scalarUInt24DivideAndRemainder(qReg=tmpSgpr, dReg="StreamKIterEnd", divReg="ItersPerTile", rReg=-1, tmpVgprRes=tmpVgprRes, wavewidth=kernel["WavefrontSize"], doRemainder=False, comment="tile index = StreamKIterEnd / ItersPerTile"))
-                writer.vgprPool.checkIn(tmpVgpr)
+                module.add(sMagicDiv2(sgpr(tmpSgpr), sgpr(tmpSgpr+1), sgpr("StreamKIterEnd"), sgpr("MagicNumberItersPerTile"), sgpr("MagicShiftItersPerTile"), sgpr(tmpSgpr+2)))
                 module.add(SMulI32(dst=sgpr(tmpSgpr), src0=sgpr(tmpSgpr), src1=sgpr("ItersPerTile"), comment="start iteration of partial tile"))
                 module.add(SSubU32(dst=sgpr(sFixupEnd), src0=sgpr("StreamKIterEnd"), src1=sgpr(tmpSgpr), comment="calc iterations completed by this WG"))
 
