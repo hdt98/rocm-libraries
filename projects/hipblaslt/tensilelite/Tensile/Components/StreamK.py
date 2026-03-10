@@ -110,6 +110,18 @@ class StreamK(Component):
     def __call__(self):
         assert(0)
 
+    @staticmethod
+    def _depthUForTc(kernel, tc):
+        """Return the per-tensor-character DepthU (element count along unroll).
+
+        For MX scale tensors, DepthU is divided by the MX block size because
+        there is one scale element per MXBlock data elements.
+        """
+        key = "_DepthU%s" % tc
+        if key in kernel:
+            return kernel[key]
+        return kernel["DepthU"]
+
     @abc.abstractmethod
     def preLoop(self, writer, kernel):
         pass
@@ -140,6 +152,10 @@ class StreamK(Component):
         # Always reset pointers to handle odd-exit case which moves LRO to the upper bank
         if kernel["PrefetchGlobalRead"]: # not self.prefetchAcrossPersistent
             module.add(writer.localReadResetOffsets(kernel, tPA))
+            if kernel["ProblemType"]["MXBlockA"] and "MX" in tPA:
+                module.add(writer.localReadResetOffsets(kernel, tPA["MX"]))
+            if kernel["ProblemType"]["MXBlockB"] and "MX" in tPB:
+                module.add(writer.localReadResetOffsets(kernel, tPB["MX"]))
             module.add(writer.localReadResetOffsets(kernel, tPB))
 
         module.addComment0("StreamK calculate tile idx and map to WG")
@@ -192,15 +208,17 @@ class StreamK(Component):
         return module
 
     @abc.abstractmethod
-    def computeLoadSrd(self, writer, kernel, tc, sTmp):
+    def computeLoadSrd(self, writer, kernel, tP, sTmp):
         pass
 
-    def computeLoadSrdCommon(self, writer, kernel, tc, sTmp):
+    def computeLoadSrdCommon(self, writer, kernel, tP, sTmp):
         module = Module("StreamK Common computeLoadSrd")
 
         tileStart = sTmp + 2
+        tc = tP["tensorChar"]
+        depthU = self._depthUForTc(kernel, tc)
         # StreamK partial tile - offset to tile start index
-        module.add(SMulI32(dst=sgpr(sTmp), src0=sgpr("StreamKLocalStart"), src1=kernel["DepthU"], comment="StreamK tile start offset"))
+        module.add(SMulI32(dst=sgpr(sTmp), src0=sgpr("StreamKLocalStart"), src1=depthU, comment="StreamK tile start offset"))
         strideL = writer.strideRef(tc, kernel["ProblemType"]["IndicesSummation"][0])
         module.add(writer.s_mul_u64_u32(sgpr(sTmp), sgpr(sTmp+1), sgpr(sTmp), strideL, comment="StreamK tile start offset"))
         # Overflow check removed
@@ -271,9 +289,10 @@ class StreamK(Component):
         module = Module("StreamK Common graAddresses")
 
         tc = tP["tensorChar"]
+        depthU = self._depthUForTc(kernel, tc)
         # StreamK partial tile - offset to tile start index
         tmpOffset = writer.sgprPool.checkOut(2, "skStartOffset")
-        module.add(SMulI32(dst=sgpr(tmpOffset), src0=sgpr("StreamKLocalStart"), src1=int(kernel["DepthU"] * tP["bpe"]), comment="StreamK tile start offset"))
+        module.add(SMulI32(dst=sgpr(tmpOffset), src0=sgpr("StreamKLocalStart"), src1=int(depthU * tP["bpe"]), comment="StreamK tile start offset"))
         strideL = writer.strideRef(tc, kernel["ProblemType"]["IndicesSummation"][0])
         module.add(writer.s_mul_u64_u32(sgpr(tmpOffset), sgpr(tmpOffset+1), sgpr(tmpOffset), strideL, "StreamK tile start offset"))
         # Overflow check removed
@@ -1762,7 +1781,7 @@ class StreamKOff(StreamK):
         module = Module("StreamK Off graWorkGroup")
         return module
 
-    def computeLoadSrd(self, writer, kernel, tc, sTmp):
+    def computeLoadSrd(self, writer, kernel, tP, sTmp):
         module = Module("StreamK Off computeLoadSrd")
         return module
 
@@ -1880,9 +1899,9 @@ class StreamKBasic(StreamK):
 
         return module
 
-    def computeLoadSrd(self, writer, kernel, tc, sTmp):
+    def computeLoadSrd(self, writer, kernel, tP, sTmp):
         module = Module("StreamK Basic computeLoadSrd")
-        module.add(self.computeLoadSrdCommon(writer, kernel, tc, sTmp))
+        module.add(self.computeLoadSrdCommon(writer, kernel, tP, sTmp))
         return module
 
     def computeStoreSrdStart(self, writer, kernel):
@@ -2276,9 +2295,9 @@ class StreamKTwoTileDPFirst(StreamK):
 
         return module
 
-    def computeLoadSrd(self, writer, kernel, tc, sTmp):
+    def computeLoadSrd(self, writer, kernel, tP, sTmp):
         module = Module("StreamK TwoTileDPFirst computeLoadSrd")
-        module.add(self.computeLoadSrdCommon(writer, kernel, tc, sTmp))
+        module.add(self.computeLoadSrdCommon(writer, kernel, tP, sTmp))
         return module
 
     def computeStoreSrdStart(self, writer, kernel):
