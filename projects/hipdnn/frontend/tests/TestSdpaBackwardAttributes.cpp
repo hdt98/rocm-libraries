@@ -251,8 +251,7 @@ TEST(TestSdpaBackwardAttributes, PackAttributesAllFields)
     builder.Finish(packed);
 
     auto buf = builder.GetBufferPointer();
-    auto fb
-        = flatbuffers::GetRoot<hipdnn_data_sdk::data_objects::SdpaBackwardAttributes>(buf);
+    auto fb = flatbuffers::GetRoot<hipdnn_data_sdk::data_objects::SdpaBackwardAttributes>(buf);
 
     // Required tensors
     EXPECT_EQ(fb->q_tensor_uid(), 1);
@@ -326,8 +325,7 @@ TEST(TestSdpaBackwardAttributes, PackAttributesNoOptionals)
     builder.Finish(packed);
 
     auto buf = builder.GetBufferPointer();
-    auto fb
-        = flatbuffers::GetRoot<hipdnn_data_sdk::data_objects::SdpaBackwardAttributes>(buf);
+    auto fb = flatbuffers::GetRoot<hipdnn_data_sdk::data_objects::SdpaBackwardAttributes>(buf);
 
     // Required tensors
     EXPECT_EQ(fb->q_tensor_uid(), 1);
@@ -358,8 +356,7 @@ TEST(TestSdpaBackwardAttributes, PackAttributesNoOptionals)
     EXPECT_FALSE(fb->right_bound().has_value());
 
     // Enum at default
-    EXPECT_EQ(fb->diagonal_alignment(),
-              hipdnn_data_sdk::data_objects::DiagonalAlignment::TOP_LEFT);
+    EXPECT_EQ(fb->diagonal_alignment(), hipdnn_data_sdk::data_objects::DiagonalAlignment::TOP_LEFT);
 }
 
 TEST(TestSdpaBackwardAttributes, FromFlatBufferRoundtrip)
@@ -399,8 +396,7 @@ TEST(TestSdpaBackwardAttributes, FromFlatBufferRoundtrip)
     builder.Finish(packed);
 
     auto buf = builder.GetBufferPointer();
-    auto fb
-        = flatbuffers::GetRoot<hipdnn_data_sdk::data_objects::SdpaBackwardAttributes>(buf);
+    auto fb = flatbuffers::GetRoot<hipdnn_data_sdk::data_objects::SdpaBackwardAttributes>(buf);
 
     std::unordered_map<int64_t, std::shared_ptr<TensorAttributes>> tensorMap;
     for(int64_t uid = 1; uid <= 19; ++uid)
@@ -490,8 +486,7 @@ TEST(TestSdpaBackwardAttributes, FromFlatBufferNoOptionals)
     builder.Finish(packed);
 
     auto buf = builder.GetBufferPointer();
-    auto fb
-        = flatbuffers::GetRoot<hipdnn_data_sdk::data_objects::SdpaBackwardAttributes>(buf);
+    auto fb = flatbuffers::GetRoot<hipdnn_data_sdk::data_objects::SdpaBackwardAttributes>(buf);
 
     std::unordered_map<int64_t, std::shared_ptr<TensorAttributes>> tensorMap;
     for(int64_t uid = 1; uid <= 9; ++uid)

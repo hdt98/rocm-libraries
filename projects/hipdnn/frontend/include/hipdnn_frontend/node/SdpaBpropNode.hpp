@@ -63,9 +63,8 @@ public:
             o, ErrorCode::ATTRIBUTE_NOT_SET, std::string("SdpaBpropNode missing O input"));
         HIPDNN_RETURN_IF_FALSE(
             dOut, ErrorCode::ATTRIBUTE_NOT_SET, std::string("SdpaBpropNode missing dO input"));
-        HIPDNN_RETURN_IF_FALSE(stats,
-                               ErrorCode::ATTRIBUTE_NOT_SET,
-                               std::string("SdpaBpropNode missing Stats input"));
+        HIPDNN_RETURN_IF_FALSE(
+            stats, ErrorCode::ATTRIBUTE_NOT_SET, std::string("SdpaBpropNode missing Stats input"));
 
         // Validate required output tensors
         HIPDNN_RETURN_IF_FALSE(
