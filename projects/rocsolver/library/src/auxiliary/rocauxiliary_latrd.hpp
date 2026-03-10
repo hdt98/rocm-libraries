@@ -48,7 +48,6 @@ ROCSOLVER_BEGIN_NAMESPACE
 extern "C" __attribute__((const)) __device__ float __ockl_wfred_add_f32(float x);
 extern "C" __attribute__((const)) __device__ double __ockl_wfred_add_f64(double x);
 extern "C" __attribute__((const)) __device__ int __ockl_wfred_add_i32(int x);
-
 /**************************************************************************************/
 /***************** AMD Buffer Intrinsic Helpers ***************************************/
 /**************************************************************************************/
@@ -640,11 +639,11 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(
                                                  U AA,                      // ALGORITHM: Pointer to input/output matrix A (symmetric)
                                                  const uint16_t shiftA,  // IMPLEMENTATION: Batch offset into A array
                                                  const uint16_t lda,     // ALGORITHM: Leading dimension of A
-                                                 const rocblas_stride strideA, // IMPLEMENTATION: Stride between batched A matrices
+                                                 const uint16_t strideA, // IMPLEMENTATION: Stride between batched A matrices
                                                  T* WA,                     // ALGORITHM: Work matrix W storing intermediate Householder vectors
                                                  const uint16_t shiftW,  // IMPLEMENTATION: Batch offset into W array
                                                  const uint16_t ldw,     // ALGORITHM: Leading dimension of W
-                                                 const rocblas_stride strideW) // IMPLEMENTATION: Stride between batched W matrices
+                                                 const uint16_t strideW) // IMPLEMENTATION: Stride between batched W matrices
 {
     // IMPLEMENTATION: Thread/workgroup identification for 3D grid
     // Grid dimensions: (grr_updates, grc_updates, batch_count)
@@ -765,16 +764,6 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(
     T ac;      // Per-thread accumulator: stores partial sum of y[i] across rpgc column rounds
     T sx1, sx2; // Cached x vector elements: broadcast across row threads to avoid repeated loads
 
-#if LATRD_USE_BUFFER_INTRINSICS
-    // OPTIMIZATION: Create buffer resources for branchless loads/stores
-    // Buffer intrinsics eliminate branches by allowing unconditional loads with predication
-    // OOB reads return undefined values (garbage) which we mask away using validity predicates
-    auto A1_buf = make_buffer_resource<T>(A1, m * n);      // Input matrix 1 (m×n elements)
-    auto A2_buf = make_buffer_resource<T>(A2, m * n);      // Input matrix 2 (m×n elements)
-    auto x1_buf = make_buffer_resource<T>(x1, n * incx1);  // Input vector 1 (n elements with stride)
-    auto x2_buf = make_buffer_resource<T>(x2, n * incx2);  // Input vector 2 (n elements with stride)
-#endif
-
     // IMPLEMENTATION: Main computation loop structure (divide-and-conquer execution)
     //
     // Critical understanding: We are updating ONE column (y = A(:,c)), but the calculation
@@ -816,25 +805,17 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(
         for(rocblas_int bidc = blockIdx.y; bidc < groupsc; bidc += gridDim.y)
         {
 
+            //TODO:
+            // use wave reduction
             // IMPLEMENTATION: Global thread IDs (unique across entire grid)
             int idc = bidc * threadsc + tidc;  // Global column thread ID (0 to totalthsc-1)
             int idr = bidr * threadsr + tidr;  // Global row thread ID (0 to totalthsr-1)
-            auto outBuff  = __builtin_amdgcn_make_buffer_rsrc(y + bidr * threadsr, 0, 0xffffffff, 0);
             for(int ii = 0; ii < rpgr; ++ii) // Row rounds: process row tiles (rpgr=1 always)
             {
                 i = ii * totalthsr + idr;  // Global row index: ii * (all threads) + my row thread ID
 
-#if LATRD_USE_BUFFER_INTRINSICS
-                // OPTIMIZATION: Branchless y[i] load using buffer intrinsics with explicit predication
-                // Strategy: Load unconditionally (may read garbage if OOB), then zero via mask multiplication
-                // This eliminates the branch from: ac = (idc == 0 && i < m) ? y[i] : 0;
-                int y_valid = (idc == 0) && (i < m);                    // Compute validity mask (no branch, pure ALU)
-                T y_value = buffer_load_scalar(y_buf, i * sizeof(T), (T*)nullptr); // Unconditional load (returns garbage if OOB)
-                ac = y_value * T(y_valid);                               // Zero the value if invalid (no branch)
-#else
                 // ORIGINAL: Ternary operator (compiler may or may not generate branch)
-                ac = (idc == 0 && i < m) ? y[i] : 0;
-#endif
+                ac = (idc == 0 && i < m) ? y[i] : 0; // each lane gets a unique Y
 
                 for(int jj = 0; jj < rpgc; ++jj) // Column rounds: process column tiles (rpgc varies 1→64)
                 {
@@ -844,92 +825,46 @@ ROCSOLVER_KERNEL void latrd_upper_updateA_kernel(
                     // sx1, sx2 cached in registers for reuse across the m row computations
                     j = jj * totalthsc + idc;  // Global column index
 
-#if LATRD_USE_BUFFER_INTRINSICS
-                    // OPTIMIZATION: Branchless x vector loads with explicit predication
-                    // Original code: sx1 = (j < n) ? conj(x1[j * incx1]) : 0;
-                    int x_valid = (j < n);                                      // Validity mask
-                    T x1_value = buffer_load_scalar(x1_buf, j * incx1 * sizeof(T), (T*)nullptr); // Unconditional load
-                    T x2_value = buffer_load_scalar(x2_buf, j * incx2 * sizeof(T), (T*)nullptr); // Unconditional load
-                    sx1 = conj(x1_value) * T(x_valid);                          // Apply conjugate then mask
-                    sx2 = conj(x2_value) * T(x_valid);                          // Apply conjugate then mask
-#else
                     // ORIGINAL: Ternary operators with conjugate
                     sx1 = (j < n) ? conj(x1[j * incx1]) : 0;  // x1 with conjugate (for Hermitian/complex)
                     sx2 = (j < n) ? conj(x2[j * incx2]) : 0;  // x2 with conjugate
-#endif
 
-#if LATRD_USE_BUFFER_INTRINSICS
-                    // OPTIMIZATION: Branchless core computation with explicit predication
-                    // Original code: if(i < m && j < n) ac -= A1[i + j * lda1] * sx1 + A2[i + j * lda2] * sx2;
-                    // Strategy: Always load and compute, but zero contribution if invalid
-                    int compute_valid = (i < m) && (j < n);                     // Compute validity mask
-                    rocblas_int A1_offset = i + j * lda1;                       // Matrix element offset
-                    rocblas_int A2_offset = i + j * lda2;                       // Matrix element offset
-                    T A1_value = buffer_load_scalar(A1_buf, A1_offset * sizeof(T), (T*)nullptr); // Unconditional load
-                    T A2_value = buffer_load_scalar(A2_buf, A2_offset * sizeof(T), (T*)nullptr); // Unconditional load
-                    T contrib = (A1_value * sx1 + A2_value * sx2) * T(compute_valid);  // Zero if invalid
-                    ac -= contrib;                                              // Accumulate (always executed)
-#else
                     // ORIGINAL: Conditional computation with branch
                     // ALGORITHM: Core dual GEMV operation: ac -= A1[i,j]*sx1 + A2[i,j]*sx2
                     // This is the heart of the computation: y = y - A1*x1' - A2*x2'
                     // Bounds check ensures we don't access out-of-bounds when n shrinks
                     if(i < m && j < n)
                         ac -= A1[i + j * lda1] * sx1 + A2[i + j * lda2] * sx2;
-#endif
                 }
 
                 // IMPLEMENTATION: Store per-thread accumulator to LDS for reduction across column threads
                 // Layout: acs[row + col*stride] ensures coalesced access by adjacent threads
-                acs[tidr + tidc * threadsr] = ac;
+                acs[tidc + tidr * threadsc] = ac;
                 __syncthreads();  // Synchronize to ensure all threads have written their ac values
+                // DPP based reduction of each partial accumulator (there are threadsc accumulators)
+                int flataddr = tidr + tidc * threadsr;
 
-                // IMPLEMENTATION: Tree reduction across column threads (threadsc threads → 1 result)
-                //
-                // Goal: Sum all threadsc column threads' contributions for each row
-                // Method: Binary tree reduction in LDS (log2(threadsc) steps)
-                //
-                // Example with threadsc=16:
-                //   r=8:  threads 0-7  add values from threads 8-15
-                //   r=4:  threads 0-3  add values from threads 4-7
-                //   r=2:  threads 0-1  add values from threads 2-3
-                //   r=1:  thread  0    adds value  from thread  1
-                //   Result: thread 0 has the sum of all 16 column threads
-                //
-                // Why reduction needed:
-                //   - Each thread computed ac for one (i,j) pair across rpgc iterations
-                //   - But y[i] is the sum over ALL j values (all column threads)
-                //   - Reduction combines partial sums from threadsc column threads into final y[i]
-                //
-                // Performance: log2(16) = 4 steps, each with __syncthreads() barrier
-                //
-                for(int r = threadsc / 2; r > 0; r /= 2)  // Binary tree: r = 8, 4, 2, 1, ...
+                T localVal = acs[flataddr%4 + (flataddr/4)*threadsc]; // every 4 threads needs to be reduced
+                // use __shfl to do a cross lane reduction of localVal every 4 lanes (0-3 reduce together, 4-7 reduce together,etc) up to wave size (64)
+                if constexpr (std::is_same_v<T, float>)
                 {
-                    if(tidc < r)  // Only first half of threads participate in each step
-                    {
-                        ac += acs[tidr + (tidc + r) * threadsr];  // Add partner thread's value
-                        acs[tidr + tidc * threadsr] = ac;          // Write back for next iteration
-                    }
-                    __syncthreads();  // Synchronize before next reduction step
+                    int tmp1 = __builtin_amdgcn_mov_dpp(*(int*)(&localVal),0xB1,0xF,0xF,0);
+                    localVal += *(float*)(&tmp1);
+                    int tmp2 = __builtin_amdgcn_mov_dpp(*(int*)(&localVal),0x1B,0xF,0xF,0);
+                    localVal += *(float*)(&tmp2);
+
+                }
+                else
+                {
+                    localVal += shift_left(localVal,2,4); //translates to bpermute
+                    localVal += shift_left(localVal,1,4);
                 }
 
-                // ALGORITHM: Write final result to global memory
-                // Only thread with tidc==0 (first column thread) writes after reduction is complete
-                // This thread now holds the sum of all threadsc column contributions for row i
-                const auto offset = (tidc == 0 && i < m) ? ii * totalthsr + tidr : 0xffffffff;
-                if constexpr(sizeof(T) == 1)
-                    __builtin_amdgcn_raw_buffer_store_b8(ac, outBuff, offset, 0, 0x10);
-                else if constexpr(sizeof(T) == 2)
-                    __builtin_amdgcn_raw_buffer_store_b16(ac, outBuff, offset, 0, 0x10);
-                else if constexpr(sizeof(T) == 4)
-                    __builtin_amdgcn_raw_buffer_store_b32(ac, outBuff, offset, 0, 0x10);
-                else if constexpr(sizeof(T) == 8)
-                {
-                    using uint32x2_t = uint32_t __attribute__((ext_vector_type(2)));
-                    uint32x2_t tmp;
-                    memcpy(&tmp, &ac, sizeof(T));
-                    __builtin_amdgcn_raw_buffer_store_b64(tmp, outBuff, offset, 0, 0x10);
-                }
+                 int outaddr = ii * totalthsr + flataddr / 4;
+                 if ((flataddr % 4 == 0) && outaddr < m)
+                 {
+                    y[outaddr]= localVal;
+                 }
             }
         }
     }
@@ -1461,76 +1396,90 @@ ROCSOLVER_KERNEL void latrd_upper_computeW_gemv_kernel(const rocblas_int mm,
 
 template <int NB_X, typename T, typename U>
 ROCSOLVER_KERNEL void latrd_upper_computeW_gemvt_kernel(const uint16_t blocks,
-                                                        const uint16_t mm,
-                                                        const uint16_t k,
-                                                        const uint16_t c,
-                                                        U AA,
+                                                        const uint16_t MM,
+                                                        const uint16_t K,
+                                                        const uint16_t C,
+                                                        T* pYa,
+                                                        const uint16_t shiftY,
+                                                        const uint16_t strideY,
+                                                        T* pWorkA,
+                                                        const uint16_t strideblk,
+                                                        U pAA,
                                                         const uint16_t shiftA,
                                                         const uint16_t lda,
-                                                        const rocblas_stride strideA,
-                                                        T* WA,
+                                                        const uint16_t strideA,
+                                                        T* pWA,
                                                         const uint16_t shiftW,
                                                         const uint16_t ldw,
-                                                        const rocblas_stride strideW,
-                                                        T* yA,
-                                                        const uint16_t shiftY,
-                                                        const uint16_t ldy,
-                                                        const rocblas_stride strideY,
-                                                        T* workA,
-                                                        const rocblas_stride strideblk)
+                                                        const uint16_t strideW)
 {
 
     rocblas_int bid = blockIdx.z;
     rocblas_int tx = threadIdx.x;
-    T* A  = load_ptr_batch<T>(AA, bid, shiftA, strideA);
-    T* W  = load_ptr_batch<T>(WA, bid, shiftW, strideW);
-    T* y1 = load_ptr_batch<T>(yA, bid, shiftY, strideY);
-    T* y2 = workA + bid * strideblk;
-
-    int n = c;
-    int cc = mm - c - 1;
-    // int m = mm + cc;
-    int cw = c - mm + k;
-    T* A1 = A;
-    T* A2 = W + idx2D(0, cw + 1, ldw);
-    int lda1 = lda;
-    int lda2 = ldw;
-    T* x = A + idx2D(0, c, lda);
 
     __shared__ T sdata[NB_X];
 
     // partial sums
-    rocblas_int n_full = (n / NB_X) * NB_X;
+    int n_iters = (C / NB_X);
+    rocblas_int n_full = n_iters * NB_X;
 
     for(rocblas_int i = blockIdx.x; i < blocks; i += gridDim.x)
     {
-
         // what is this checking /clamping?
-        int it = (i < mm) ? i : i - mm;
-        T* a = (i < mm) ? A1 : A2;
-        int ld = (i < mm) ? lda1 : lda2;
-        T* y = (i < mm) ? y1 : y2;
-
-        if(tx < n) // why
+        int it = (i < MM) ? i : i - MM;
+        T* y1 = load_ptr_batch<T>(pYa, bid, shiftY, strideY);
+        T* y2 = pWorkA + bid * strideblk;
+        T* y   = (i < MM) ? y1 : y2;
+        if(it != C)
         {
-            a += tx;
-        }
 
-        a += it * size_t(ld);
-        T res = 0;
+            T* A  = load_ptr_batch<T>(pAA, bid, shiftA, strideA);
+            T* W  = load_ptr_batch<T>(pWA, bid, shiftW, strideW);
 
-        if(it != c)
-        {
-            if(tx + n_full < n)
+            int cc = MM - C - 1;
+            // int m = MM + cc;
+            int cw = C - MM + K;
+            T* A1 = A;
+            T* A2 = W + idx2D(0, cw + 1, ldw);
+
+            T* x = A + idx2D(0, C, lda);
+
+            T* a   = (i < MM) ? A1 : A2;
+            int ld = (i < MM) ? lda : ldw;
+
+
+            if(tx < C) // why
+            {
+                a += tx;
+            }
+
+            a += it * size_t(ld);
+            T res = 0;
+
+
+            if(tx + n_full < C)
             {
                 res += conj(a[n_full]) * x[tx + n_full];
             }
 
-            for(rocblas_int j = 0; j < n_full; j += NB_X) // hotloop, switch to wide loads?
+            if(n_iters%2 == 0)
             {
-                res += conj(a[j]) * x[tx + j];
+                for(rocblas_int j = 0; j < n_full; j += 2*NB_X) // hotloop, switch to wide loads?
+                {
+                    T a_local1 = A[j];
+                    T a_local2 = A[j+NB_X];
+                    T x_local1 = x[tx + j];
+                    T x_local2 = x[tx + j+NB_X];
+                    res += conj(a_local1)*x_local1 + conj(a_local2)*x_local2;
+                }
             }
-
+            else
+            {
+                for(rocblas_int j = 0; j < n_full; j += NB_X) // hotloop, switch to wide loads?
+                {
+                    res += conj(a[j]) * x[tx + j];
+                }
+            }
             // fast wave reduction path
             if constexpr (std::is_same_v<T, int>)
             {
@@ -1739,7 +1688,7 @@ ROCSOLVER_KERNEL void latrd_lower_computeW_gemvt_kernel(const rocblas_int mm,
     T* a = (i < c) ? A1 : A2;
     int ld = (i < c) ? lda1 : lda2;
     int it2 = it - c - 1;
-    T* y = (i < c) ? y1 : y2;
+    T* y    = (i < c) ? y1 : y2;
 
     if(tx < n)
         a += tx;
@@ -1761,15 +1710,33 @@ ROCSOLVER_KERNEL void latrd_lower_computeW_gemvt_kernel(const rocblas_int mm,
         if(tx + n_full < n)
             res += conj(a[n_full]) * x[tx + n_full];
 
-        // reduction of partial sums
-        res += shift_left(res, 1);
-        res += shift_left(res, 2);
-        res += shift_left(res, 4);
-        res += shift_left(res, 8);
-        res += shift_left(res, 16);
-        if(warpSize > 32)
-            res += shift_left(res, 32);
-        if(tx % warpSize == 0)
+        if constexpr (std::is_same_v<T, int>)
+        {
+            res = __ockl_wfred_add_i32(res);
+        }
+        else if constexpr (std::is_same_v<T, float>)
+        {
+            res = __ockl_wfred_add_f32(res);
+        }
+        else if constexpr (std::is_same_v<T, double>)
+        {
+            res = __ockl_wfred_add_f64(res);
+        }
+        else
+        {
+            // reduction of partial sums
+            res += shift_left(res, 1);
+            res += shift_left(res, 2);
+            res += shift_left(res, 4);
+            res += shift_left(res, 8);
+            res += shift_left(res, 16);
+            if(warpSize > 32)
+                res += shift_left(res, 32);
+        }
+
+
+
+        if(__lane_id() == 0)
             sdata[tx / warpSize] = res;
         __syncthreads();
         if(tx == 0)
@@ -2039,15 +2006,15 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(
                                                  U AA,
                                                  const uint16_t shiftA,
                                                  const uint16_t lda,
-                                                 const rocblas_stride strideA,
+                                                 const uint16_t strideA,
                                                  T* WA,
                                                  const uint16_t shiftW,
                                                  const uint16_t ldw,
-                                                 const rocblas_stride strideW,
+                                                 const uint16_t strideW,
                                                  T* workA,
-                                                 const rocblas_stride strideblk,
+                                                 const uint16_t strideblk,
                                                  T* tauA,
-                                                 const rocblas_stride strideP)
+                                                 const uint16_t strideP)
 {
     int bid       = hipBlockIdx_z;
 
@@ -2099,7 +2066,7 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(
     // to cover all the rows and columns, respectively
     int ngrp = (m - 1) / threadsr + 1;
     int rpgr = (ngrp - 1) / groupsr + 1;
-    ngrp = (n - 1) / threadsc + 1;
+    ngrp     = (n - 1) / threadsc + 1;
     int rpgc = (ngrp - 1) / groupsc + 1;
     int i, j;
 
@@ -2293,8 +2260,8 @@ void latrd_get_config_for_updates(const rocblas_int n,
     }
     else if(n <= 3584)
     {
-        *thr = 16;
-        *thc = 16;
+        *thr = 64;
+        *thc = 4;
     }
     else if(n <= 7168)
     {
@@ -2715,7 +2682,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                 jw = j - n + k;
 
                 int totalGroups = grr_updates * grc_updates;
-                int maxGroups = cuCount * 8;
+                int maxGroups = cuCount * 4;
                 int updateW_grr = grr_updates;
                 int updateW_grc = grc_updates;
                 if(totalGroups > maxGroups)
@@ -2759,17 +2726,17 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
 
                 // compute column j of W
                 //--------------------------------------------------------------
-                static constexpr int NB = 64;
+                static constexpr int NB = 256;
                 const int blocksX = n + n - j - 1;
-                int maxBlocks = cuCount * 32; // max occupancy without oversubscribing
+                int maxBlocks = cuCount * 8; // max occupancy without oversubscribing
                 int gridX = std::min(blocksX, maxBlocks);
 
                 dim3 gemvt_grid(gridX, 1, batch_count);
                 dim3 gemvt_threads(NB);
                 ROCSOLVER_LAUNCH_KERNEL((latrd_upper_computeW_gemvt_kernel<NB, T>), gemvt_grid,
-                                        gemvt_threads, 0, capture_stream, blocksX, n, k, j, A, shiftA, lda, strideA, W,
-                                        shiftW, ldw, strideW, W, shiftW + idx2D(0, jw, ldw), ldw,
-                                        strideW, work, strideblk);
+                                        gemvt_threads, 0, capture_stream, blocksX, n, k, j, W, shiftW + idx2D(0, jw, ldw),
+                                        strideW, work, strideblk, A, shiftA, lda, strideA, W,
+                                        shiftW, ldw, strideW);
 
                 // update column j of W
                 //--------------------------------------------------------------
@@ -2953,7 +2920,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
             // compute update_grid based on Cucount and problem size to ensure good occupancy without oversubscribing
             // the product of x and y grid dims should not exceed 8x the cu count.
             int totalGroups = grr_updates * grc_updates;
-            int maxGroups = cuCount * 8;
+            int maxGroups = cuCount * 4;
             int updateW_grr = grr_updates;
             int updateW_grc = grc_updates;
             if(totalGroups > maxGroups)
@@ -3005,9 +2972,9 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
             dim3 gemvt_grid(gridX, 1, batch_count);
             dim3 gemvt_threads(NB);
             ROCSOLVER_LAUNCH_KERNEL((latrd_upper_computeW_gemvt_kernel<NB, T>), gemvt_grid,
-                                    gemvt_threads, 0, stream, blocksX, n, k, j, A, shiftA, lda, strideA, W,
-                                    shiftW, ldw, strideW, W, shiftW + idx2D(0, jw, ldw), ldw,
-                                    strideW, work, strideblk);
+                                    gemvt_threads, 0, stream, blocksX, n, k, j, W, shiftW + idx2D(0, jw, ldw),
+                                        strideW, work, strideblk, A, shiftA, lda, strideA, W,
+                                    shiftW, ldw, strideW);
 
             // update column j of W
             //--------------------------------------------------------------
