@@ -4935,7 +4935,7 @@ class KernelWriterAssembly(KernelWriter):
           "padding %u per block %u" % (int(kernel["LdsPad%s"%tc] * tP["bpeDS"]), kernel["LdsBlockSizePerPad%s"%tc])))
       self.vgprPool.checkIn(tmpVgpr)
 
-    if tc in ("B", "MXSA", "MXSB", "Metadata"):
+    if tc in ("A", "B", "MXSA", "MXSB", "Metadata"):
       if kernel["LdsOffset%s" % tc] != 0:
         module.add(VAddCOU32(
             dst=vgpr(destVgpr), \
@@ -5021,9 +5021,9 @@ class KernelWriterAssembly(KernelWriter):
           comment="Copy lds write address VGPR to SGPR"))
         module.add(SMulI32(dst=sgpr("LocalWriteAddr%s"%tc), src0=sgpr("LocalWriteAddr%s"%tc), \
                          src1=int((kernel["WavefrontSize"] * kernel["GlobalReadVectorWidth%s"%tc]+kernel["LdsPad%s"%tc]) * tP["bpeGR"]) ))
-        if tc == 'B':
+        if tc in ('A', 'B') and kernel["LdsOffset%s" % tc] != 0:
           module.add(SAddU32(dst=sgpr("LocalWriteAddr%s"%tc), src0=sgpr("LocalWriteAddr%s"%tc), \
-                         src1=kernel["LdsOffsetB"] ))
+                         src1=kernel["LdsOffset%s" % tc] ))
         self.vgprPool.checkIn(tmpv)
       self.vgprPool.checkIn(destVgpr)
 

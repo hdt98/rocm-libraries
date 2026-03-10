@@ -38,6 +38,8 @@ from Tensile.Common import assignParameterWithDefault, IsaInfo, \
                     roundUp, INDEX_CHARS, IsaVersion, SemanticVersion, \
                     roundUpToNearestMultiple
 from Tensile.Common.DataType import DataType
+from Tensile.SolutionStructs.LdsPadding import get_fp4_mt_config, get_fp8_mt_config, \
+                                               get_fp16_mt_config, get_fp32_mt_config
 from Tensile.Common.GlobalParameters import defaultSolution, \
                                             defaultInternalSupportParams
 from Tensile.Common.ValidParameters import validParameters
@@ -2327,12 +2329,8 @@ class Solution(collections.abc.Mapping):
         state["_DepthUMXSB"] = depthUB // state["ProblemType"]["MXBlockB"]
       state["_DepthUMetadata"] = depthUM# internal
 
-      # When VectorWidth was auto-derived (-1) and TDM is enabled,
-      # proactively reduce VW if it would cause the auto-derived
-      # LdsBlockSizePerPad to exceed the TDM pad_interval limit
-      # (max 7, i.e. LdsBlockSizePerPad <= 1024 bytes).
-      # Only the UnrollMajorLDS path uses VW in the LdsBlockSizePerPad
-      # formula: roundUp(DepthU * bpe * VW, multiple).
+      # Auto-derived VW must keep LdsBlockSizePerPad <= 1024 bytes
+      # (TDM pad_interval cap of 7). Halve VW until it fits.
       if state["TDMInst"] and state["EnableMatrixInstruction"] and not state["ProblemType"]["Sparse"]:
         multiple = 256
         for tc in ["A", "B"]:
@@ -2412,14 +2410,18 @@ class Solution(collections.abc.Mapping):
         if state["UseSubtileImpl"]:
           return 0, 0, 0, 0, 0
         if state["EnableMatrixInstruction"]:
-          # for readRegs = 1 or 4, we need to double pad for MI16x16xNx1 to avoid bank conflict.
+          # MI16x16xNx1 needs double padding to avoid bank conflict:
+          # gfx1250 doubles when readRegs == 2; other ISAs double when readRegs in {1, 4}.
           if state["MatrixInstB"] == 1 and state["MatrixInstM"] == 16:
-            if readRegsA == 4 or readRegsA == 1:
-              optPadA *= 2
-            if readRegsB == 4 or readRegsB == 1:
-              optPadB *= 2
+            if isa[:2] == (12, 5):
+              if readRegsA == 2: optPadA *= 2
+              if readRegsB == 2: optPadB *= 2
+            else:
+              if readRegsA in (1, 4): optPadA *= 2
+              if readRegsB in (1, 4): optPadB *= 2
+
         if ldsPadA == -1:
-          if isMX and (state["ProblemType"]["DataTypeA"].is6bitFloat() or state["ProblemType"]["DataTypeA"].isFloat4()):
+          if isMX and (state["ProblemType"]["DataTypeA"].is6bitFloat() or state["ProblemType"]["DataTypeA"].isFloat4()) and isa[:2] != (12, 5):
             ldsPadA = 0
           else:
             if not state["UnrollMajorLDSA"]:
@@ -2429,6 +2431,26 @@ class Solution(collections.abc.Mapping):
                   ldsPadA = int(((16 * state["VectorWidthA"] * numBytesA + state["MacroTile0"] * numBytesA * lrvwA) % 128) // numBytesA)
                 if state["GlobalReadVectorWidthA"] * numBytesA == 32 and ldsPadA == 0:
                   ldsPadA = int(16 // numBytesA)
+                if isa[:2] == (12, 5):
+                  if state["ProblemType"]["MacDataTypeA"].numBytes() == 0.5 and state.get("enableLDSTrA", False):
+                    ldsPadA = get_fp4_mt_config(state["MacroTile0"], "pad",
+                                state["MIWaveTile"][0], state["MIWaveGroup"][0])
+                  elif state["ProblemType"]["MacDataTypeA"].is8bitFloat() and state.get("enableLDSTrA", False):
+                    ldsPadA = get_fp8_mt_config(state["MacroTile0"], "pad",
+                                state["MIWaveTile"][0], state["MIWaveGroup"][0])
+                  elif state["ProblemType"]["MacDataTypeA"].numBytes() == 2 and state.get("enableLDSTrA", False):
+                    ldsPadA = get_fp16_mt_config(state["MacroTile0"], "pad", state["MIWaveGroup"][0],
+                                miInputPerThUnroll=state["MIInputPerThread"],
+                                lrvw=state["LocalReadVectorWidthA"],
+                                miWaveTile=state["MIWaveTile"][0],
+                                vw=state["VectorWidthA"])
+                  elif state["ProblemType"]["MacDataTypeA"].numBytes() == 4:
+                    ldsPadA = get_fp32_mt_config(state["MacroTile0"], "pad",
+                                state["VectorWidthA"], state["LocalReadVectorWidthA"],
+                                state["MIWaveGroup"][0],
+                                miInputPerThread=state["MIInputPerThread"],
+                                miWaveTile=state["MIWaveTile"][0],
+                                xf32EmuPack=state.get("UseF32XEmulation", False))
                 if state["DirectToLdsA"]:
                   # TODO: Check if there are cases which benefit from padding, currently set to zero by default
                   ldsPadA = state["MatrixInstM"] if state["enableLDSTrA"] else 0
@@ -2452,7 +2474,7 @@ class Solution(collections.abc.Mapping):
           assert(ldsPadA >= 0)
 
         if ldsPadB == -1:
-          if isMX and (state["ProblemType"]["DataTypeB"].is6bitFloat() or state["ProblemType"]["DataTypeB"].isFloat4()):
+          if isMX and (state["ProblemType"]["DataTypeB"].is6bitFloat() or state["ProblemType"]["DataTypeB"].isFloat4()) and isa[:2] != (12, 5):
             ldsPadB = 0
           else:
             if not state["UnrollMajorLDSB"]:
@@ -2462,6 +2484,26 @@ class Solution(collections.abc.Mapping):
                   ldsPadB = int(((16 * state["VectorWidthB"] * numBytesB + state["MacroTile1"] * numBytesB * lrvwB) % 128) // numBytesB)
                 if state["GlobalReadVectorWidthB"] * numBytesB == 32 and ldsPadB == 0:
                   ldsPadB = int(16 // numBytesB)
+                if isa[:2] == (12, 5):
+                  if state["ProblemType"]["MacDataTypeB"].numBytes() == 0.5 and state.get("enableLDSTrB", False):
+                    ldsPadB = get_fp4_mt_config(state["MacroTile1"], "pad",
+                                state["MIWaveTile"][1], state["MIWaveGroup"][1])
+                  elif state["ProblemType"]["MacDataTypeB"].is8bitFloat() and state.get("enableLDSTrB", False):
+                    ldsPadB = get_fp8_mt_config(state["MacroTile1"], "pad",
+                                state["MIWaveTile"][1], state["MIWaveGroup"][1])
+                  elif state["ProblemType"]["MacDataTypeB"].numBytes() == 2 and state.get("enableLDSTrB", False):
+                    ldsPadB = get_fp16_mt_config(state["MacroTile1"], "pad", state["MIWaveGroup"][1],
+                                miInputPerThUnroll=state["MIInputPerThread"],
+                                lrvw=state["LocalReadVectorWidthB"],
+                                miWaveTile=state["MIWaveTile"][1],
+                                vw=state["VectorWidthB"])
+                  elif state["ProblemType"]["MacDataTypeB"].numBytes() == 4:
+                    ldsPadB = get_fp32_mt_config(state["MacroTile1"], "pad",
+                                state["VectorWidthB"], state["LocalReadVectorWidthB"],
+                                state["MIWaveGroup"][1],
+                                miInputPerThread=state["MIInputPerThread"],
+                                miWaveTile=state["MIWaveTile"][1],
+                                xf32EmuPack=state.get("UseF32XEmulation", False))
                 if state["DirectToLdsB"]:
                   # TODO: Check if there are cases which benefit from padding, currently set to zero by default
                   ldsPadB = state["MatrixInstM"] if state["enableLDSTrB"] else 0
@@ -2580,6 +2622,27 @@ class Solution(collections.abc.Mapping):
             else:
               if state["MatrixInstB"] == 1 and state["MatrixInstM"] == 16:
                 LdsBlockSizePerPad = int(mt * tmpBpe * lrvw)
+                if isa[:2] == (12, 5):
+                  miWaveTileIdx = 0 if "A" in tc else 1
+                  ldsType = state["ProblemType"]["DataType%s"%tc] if state["ConvertAfterDS"] else state["ProblemType"]["MacDataType%s"%tc]
+                  miwt = state["MIWaveTile"][miWaveTileIdx]
+                  miwg = state["MIWaveGroup"][miWaveTileIdx]
+                  if tmpBpe == 0.5 and state.get("enableLDSTr%s"%tc, False):
+                    LdsBlockSizePerPad = get_fp4_mt_config(mt, "perBlock", miwt, miwg)
+                  elif tmpBpe == 1 and ldsType.is8bitFloat() and state.get("enableLDSTr%s"%tc, False):
+                    LdsBlockSizePerPad = get_fp8_mt_config(mt, "perBlock", miwt, miwg)
+                  elif tmpBpe == 2 and state.get("enableLDSTr%s"%tc, False):
+                    LdsBlockSizePerPad = get_fp16_mt_config(mt, "perBlock", miwg,
+                                            miInputPerThUnroll=state["MIInputPerThread"],
+                                            lrvw=lrvw,
+                                            miWaveTile=miwt,
+                                            vw=state[f"VectorWidth{tc}"])
+                  elif tmpBpe == 4:
+                    LdsBlockSizePerPad = get_fp32_mt_config(mt, "perBlock",
+                                            state[f"VectorWidth{tc}"], lrvw, miwg,
+                                            miInputPerThread=state["MIInputPerThread"],
+                                            miWaveTile=miwt,
+                                            xf32EmuPack=state.get("UseF32XEmulation", False))
               else:
                 LdsBlockSizePerPad = 0
           else:
@@ -4117,13 +4180,40 @@ class Solution(collections.abc.Mapping):
     state["ldsNumBytesMXSB"] = ldsNumBytesMXSB
     state["ldsNumBytesMetadata"] = ldsNumBytesMetadata
 
-    state["LdsOffsetA"] = 0
+    # Half-wave configs need a +4-byte LDS base shift (see LdsPadding).
+    halfBankShiftA = 0
+    if isa[:2] == (12, 5) and state.get("enableLDSTrA", False):
+      if state["ProblemType"]["MacDataTypeA"].numBytes() == 0.5:
+        halfBankShiftA = get_fp4_mt_config(state["MacroTile0"], "shift",
+                          state["MIWaveTile"][0], state["MIWaveGroup"][0])
+      elif state["ProblemType"]["MacDataTypeA"].is8bitFloat():
+        halfBankShiftA = get_fp8_mt_config(state["MacroTile0"], "shift",
+                          state["MIWaveTile"][0], state["MIWaveGroup"][0])
+
+    halfBankShiftB = 0
+    if isa[:2] == (12, 5) and state.get("enableLDSTrB", False):
+      if state["ProblemType"]["MacDataTypeB"].numBytes() == 0.5:
+        halfBankShiftB = get_fp4_mt_config(state["MacroTile1"], "shift",
+                          state["MIWaveTile"][1], state["MIWaveGroup"][1])
+      elif state["ProblemType"]["MacDataTypeB"].is8bitFloat():
+        halfBankShiftB = get_fp8_mt_config(state["MacroTile1"], "shift",
+                          state["MIWaveTile"][1], state["MIWaveGroup"][1])
+
+    state["LdsOffsetA"] = halfBankShiftA
     state["LdsOffsetMXSA"] = state["LdsOffsetA"] + state["LdsNumElementsAlignedA"]
     state["LdsOffsetMXSB"] = state["LdsOffsetMXSA"] + state["LdsNumElementsAlignedMXSA"]
     state["LdsOffsetMetadata"] = state["LdsOffsetMXSB"] + state["LdsNumElementsAlignedMXSB"]
-    state["LdsOffsetB"] = state["LdsOffsetMetadata"] + state["LdsNumElementsAlignedMetadata"]
+    rawLdsOffsetB = state["LdsOffsetMetadata"] + state["LdsNumElementsAlignedMetadata"]
+    if halfBankShiftB > 0:
+      # B's lroB must land at 4 mod 8 to keep the half-wave alignment.
+      if rawLdsOffsetB % 8 != 4:
+        rawLdsOffsetB += (4 - rawLdsOffsetB % 8) % 8
+    state["LdsOffsetB"] = rawLdsOffsetB
     if state["PrefetchGlobalRead"]:
       offsetBlk = state["LdsOffsetB"] + ldsNumBytesAlignedB
+      # Buffer-swap delta must be 8-aligned to keep buffer 1 in half-wave mode.
+      if (halfBankShiftA > 0 or halfBankShiftB > 0) and offsetBlk % 8 != 0:
+        offsetBlk += 8 - (offsetBlk % 8)
       roundupOffsetBlk = int(2**(math.ceil(math.log(offsetBlk, 2)))) if offsetBlk > 0 else 0
 
       if not isaInfoMap[isa].asmCaps["HasWMMA"]:
@@ -4171,12 +4261,6 @@ class Solution(collections.abc.Mapping):
     ldsSizeOccupancy = isaInfoMap[isa].archCaps["DeviceLDS"] // state["MaxOccupancy"]
     ldsNumBytesOccupancy = ldsSizeOccupancy
 
-    #print("LdsOffsetB", state["LdsOffsetB"])
-    #print("LdsOffsetMetadata", state["LdsOffsetMetadata"])
-    #if state["PrefetchGlobalRead"]:
-    #  print("LdsOffsetA_BLK", state["LdsOffsetA_Blk"])
-    #  print("LdsOffsetB_BLK", state["LdsOffsetB_Blk"])
-    #  print("LdsOffsetMetadata_BLK", state["LdsOffsetMetadata_Blk"])
 
     if state["EnableMatrixInstruction"]:
       if state["DirectToLds"] and state["1LDSBuffer"]:
@@ -4196,9 +4280,14 @@ class Solution(collections.abc.Mapping):
       # Should be able to support as long as NO scheduleLocalWrite
       if (not state["ScheduleIterAlg"] == 2) and (not state["ScheduleIterAlg"] == 3) and (state["ScheduleLocalWrite"]):
         reject(state, printRejectionReason, "1LDSBuffer only support SIA2 or SIA3, or SIA1 without SLW")
-      state["LdsOffsetA"] = 0
+      state["LdsOffsetA"] = halfBankShiftA
       state["LdsOffsetMXSA"] = state["LdsOffsetA"] + state["LdsNumElementsAlignedA"]
-      state["LdsOffsetB"] = state["LdsOffsetMXSA"] + state["LdsNumElementsAlignedMXSA"]
+      rawLdsOffsetB_1LDS = state["LdsOffsetMXSA"] + state["LdsNumElementsAlignedMXSA"]
+      # Align B for bank conflict avoidance: half-wave (4-byte aligned) or full-wave (8-byte aligned)
+      if halfBankShiftB > 0:
+        if rawLdsOffsetB_1LDS % 8 != 4:
+          rawLdsOffsetB_1LDS += (4 - rawLdsOffsetB_1LDS % 8) % 8
+      state["LdsOffsetB"] = rawLdsOffsetB_1LDS
       state["LdsOffsetMXSB"] = state["LdsOffsetB"] + state["LdsNumElementsAlignedB"]
       state["LdsOffsetMetadata"] = state["LdsOffsetMXSB"] + state["LdsNumElementsAlignedMXSB"]
       ldsNumBytesAB = state["LdsOffsetMetadata"] + ldsNumBytesMetadata
