@@ -92,6 +92,27 @@ if("gfx950" IN_LIST GPU_TARGETS)
     get_test_property(${sa3_preprocess_test} LABELS COMMON_LABELS)
     set_tests_properties(${sa3_preprocess_test}
         PROPERTIES LABELS "${COMMON_LABELS};SMOKE_TEST;${TEST_NAME}")
+
+    # SageAttention V3 preprocessing benchmark (not a CTest test; build with
+    #   cmake --build . --target bench_ck_tile_fmha_sageattn_preprocess)
+    set(sa3_preprocess_bench "bench_ck_tile_fmha_sageattn_preprocess")
+    set_source_files_properties(
+        ${CMAKE_CURRENT_LIST_DIR}/bench_fmha_sageattn_preprocess.cpp
+        PROPERTIES LANGUAGE HIP)
+    add_executable(${sa3_preprocess_bench} EXCLUDE_FROM_ALL
+        ${CMAKE_CURRENT_LIST_DIR}/bench_fmha_sageattn_preprocess.cpp)
+    set_property(TARGET ${sa3_preprocess_bench} PROPERTY HIP_ARCHITECTURES "gfx950")
+    target_include_directories(${sa3_preprocess_bench}
+        PRIVATE ${CMAKE_CURRENT_LIST_DIR} ${PROJECT_SOURCE_DIR}/include)
+    target_compile_definitions(${sa3_preprocess_bench} PRIVATE
+        CK_USE_NATIVE_MX_SUPPORT=1
+        CK_USE_GFX950=1
+        CK_USE_XDL=1)
+    target_compile_options(${sa3_preprocess_bench} PRIVATE
+        -Wno-global-constructors -Wno-undef -Wno-covered-switch-default
+        -Wno-missing-field-initializers)
+    set_target_properties(${sa3_preprocess_bench} PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 endif()
 
 add_custom_target(${TEST_NAME} DEPENDS ${TEST_NAME}_fwd ${TEST_NAME}_bwd)
