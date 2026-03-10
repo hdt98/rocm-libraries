@@ -60,8 +60,16 @@ namespace rocfft_rccl
     struct Communicator::Impl
     {
         // each comm is for one rank, and each rank has exactly one
-        // device
+        // device.  comms is indexed by device_id.
         std::vector<ncclComm_t> comms;
+
+        // unique id used to bootstrap this communicator group.
+        // stored so it can be broadcast via MPI for multi-node in the future.
+        ncclUniqueId uniqueId{};
+
+        // device_id -> NCCL rank mapping
+        std::map<int, int> device_to_rank;
+        int                nranks = 0;
 
         ~Impl()
         {
@@ -125,9 +133,43 @@ namespace rocfft_rccl
             auto new_comm   = std::make_shared<Communicator>();
             new_comm->pimpl = std::make_unique<Impl>();
 
-            // init with devices 0..N
-            new_comm->pimpl->comms.resize(ndevices);
-            ncclResult_t result = ncclCommInitAll(new_comm->pimpl->comms.data(), ndevices, nullptr);
+            // generate unique id for this communicator group.
+            // for single-node this stays local; for multi-node the root
+            // rank would broadcast this via MPI_Bcast.
+            ncclUniqueId id;
+            ncclResult_t result = ncclGetUniqueId(&id);
+            if(result != ncclSuccess)
+            {
+                return {};
+            }
+            new_comm->pimpl->uniqueId = id;
+            new_comm->pimpl->nranks   = ndevices;
+
+            // save and restore the caller's active device
+            int original_device = 0;
+            hipGetDevice(&original_device);
+
+            new_comm->pimpl->comms.resize(ndevices, nullptr);
+
+            // init one communicator per device using ncclCommInitRank,
+            // batched inside a group call for single-process efficiency
+            ncclGroupStart();
+            for(int i = 0; i < ndevices; ++i)
+            {
+                hipSetDevice(i);
+                new_comm->pimpl->device_to_rank[i] = i;
+                result = ncclCommInitRank(&new_comm->pimpl->comms[i], ndevices, id, i);
+                if(result != ncclSuccess)
+                {
+                    ncclGroupEnd();
+                    hipSetDevice(original_device);
+                    return {};
+                }
+            }
+            result = ncclGroupEnd();
+
+            hipSetDevice(original_device);
+
             if(result != ncclSuccess)
             {
                 return {};
@@ -144,9 +186,33 @@ namespace rocfft_rccl
     void* Communicator::get_comm(int device_id) const
     {
 #ifdef ROCFFT_RCCL_ENABLE
+        auto it = pimpl->device_to_rank.find(device_id);
+        if(it == pimpl->device_to_rank.end())
+            return nullptr;
         return &pimpl->comms[device_id];
 #else
         return nullptr;
+#endif
+    }
+
+    int Communicator::num_ranks() const
+    {
+#ifdef ROCFFT_RCCL_ENABLE
+        return pimpl->nranks;
+#else
+        return 0;
+#endif
+    }
+
+    int Communicator::get_rank(int device_id) const
+    {
+#ifdef ROCFFT_RCCL_ENABLE
+        auto it = pimpl->device_to_rank.find(device_id);
+        if(it == pimpl->device_to_rank.end())
+            return -1;
+        return it->second;
+#else
+        return -1;
 #endif
     }
 
