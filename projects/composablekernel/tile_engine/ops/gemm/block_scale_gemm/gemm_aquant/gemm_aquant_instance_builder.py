@@ -543,7 +543,7 @@ struct SelectedKernel {{
         auto kargs = Kernel::MakeKernelArgs(args);
 
         if (!Kernel::IsSupportedArgument(kargs)) {{
-            throw std::runtime_error("Wrong! Arguments not supported! Skipping gemm!");
+            throw std::runtime_error("Unsupported kernel arguments; skipping GEMM launch.");
         }}
 
         // Get grid and block sizes
