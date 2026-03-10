@@ -1,0 +1,7 @@
+"Correlation_Id","Dispatch_Id","Agent_Id","Queue_Id","Process_Id","Thread_Id","Grid_Size","Kernel_Id","Kernel_Name","Workgroup_Size","LDS_Block_Size","Scratch_Size","VGPR_Count","Accum_VGPR_Count","SGPR_Count","Counter_Name","Counter_Value","Start_Timestamp","End_Timestamp"
+1,1,"Agent 2",1,14632,14632,512,7,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"SQ_INSTS_LDS",0.00000000e+00,429367229237713,429367229240439
+1,1,"Agent 2",1,14632,14632,512,7,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"SQ_LDS_BANK_CONFLICT",0.00000000e+00,429367229237713,429367229240439
+2,2,"Agent 2",1,14632,14632,512,7,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"SQ_INSTS_LDS",0.00000000e+00,429367229322466,429367229325153
+2,2,"Agent 2",1,14632,14632,512,7,"__amd_rocclr_copyBuffer",512,0,0,16,0,32,"SQ_LDS_BANK_CONFLICT",0.00000000e+00,429367229322466,429367229325153
+3,3,"Agent 2",1,14632,14632,64,11,"void ck_tile::kentry<1, ck_tile::LdsProbeKernel, ck_tile::LdsProbeKargs>(ck_tile::LdsProbeKargs)",64,32768,0,8,256,112,"SQ_INSTS_LDS",1.000000,429367229825099,429367229826623
+3,3,"Agent 2",1,14632,14632,64,11,"void ck_tile::kentry<1, ck_tile::LdsProbeKernel, ck_tile::LdsProbeKargs>(ck_tile::LdsProbeKargs)",64,32768,0,8,256,112,"SQ_LDS_BANK_CONFLICT",1.000000,429367229825099,429367229826623
