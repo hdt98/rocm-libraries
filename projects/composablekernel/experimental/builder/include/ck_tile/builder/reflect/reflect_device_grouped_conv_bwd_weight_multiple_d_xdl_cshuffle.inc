@@ -1,6 +1,10 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
+/// @file
+/// @brief Reflection `InstanceTraits` specialization for `device_grouped_conv_bwd_weight_multiple_d_xdl_cshuffle`.
+
+
 // CRITICAL MAINTENANCE NOTE:
 // Keep this template parameter list strictly in sync with:
 // ck/tensor_operation/gpu/device/impl/device_grouped_conv_bwd_weight_multiple_d_xdl_cshuffle.hpp.

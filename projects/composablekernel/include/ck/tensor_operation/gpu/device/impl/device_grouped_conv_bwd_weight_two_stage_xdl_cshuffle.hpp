@@ -2197,7 +2197,7 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                       "Specialization of instance_traits not found. Please check that a "
                       "specialization exists in file "
                       "ck_tile/builder/reflect/"
-                      "instance_traits_device_grouped_conv_bwd_weight_two_stage_xdl_cshuffle.hpp "
+                      "reflect_device_grouped_conv_bwd_weight_two_stage_xdl_cshuffle.inc "
                       "for the given template parameters.");
         return ck_tile::reflect::instance_string<DeviceOp>();
     }
