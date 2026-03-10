@@ -334,6 +334,21 @@ def customMainLoopSchedule(writer, kernel, tensorParametersA, tensorParametersB,
         PackCodeA = splitForPLR(PackCodeA[0])
         PackCodeB = splitForPLR(PackCodeB[0])
 
+        # NT with swaps: re-split PackCodeB at column boundary.
+        # Default 50/50 split puts col 2-3 pack ops in PackB0, creating WAR
+        # (PackB0 overwrites packed B regs that sub-iter 0 MFMAs still read).
+        # Re-split so PackB0 only has cols 4-7 (no WAR with MFMAs 0..halfMFMA).
+        if isNT(kernel) and kernel.get("UseCustomMainLoopSchedule", 0):
+            numSwapsB = sum(1 for item in PackCodeB[1] if 'swap' in str(item).lower())
+            if numSwapsB > 0:
+                totalPackOps = len(PackCodeB[0]) + len(PackCodeB[1]) - numSwapsB
+                numCols = 8
+                numPackOpsPerCol = totalPackOps // numCols
+                targetB0 = (numCols // 2) * numPackOpsPerCol
+                itemsToMove = len(PackCodeB[0]) - targetB0
+                if itemsToMove > 0:
+                    PackCodeB[1] = PackCodeB[1] + PackCodeB[0][:itemsToMove]
+                    PackCodeB[0] = PackCodeB[0][itemsToMove:]
 
     LRSwapA = removeComments(LRSwapA)
     LRSwapB = removeComments(LRSwapB)
@@ -4359,56 +4374,66 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
         grIncB = create_range(min_val=max(grIncA)+1, num=3, max_val=max(lrb0)+4, step=1, repeat=3)
         waitLRB0 = max(lrb0)+1
         startPACKB0 = waitLRB0+4
-        packBOffset = [
+        # Position offsets for 4 columns (10 pack ops each = 40 total)
+        # Pattern per col: [4 phase0_cvt, 2 phase1_mfma4x4, 4 phase2_cvt]
+        packBOffset_4col = [
             1, 1, 1, 1,
             7, 7,
             8, 8, 8, 8,
 
-            2, 2, 2, 2, 
+            2, 2, 2, 2,
             7, 7,
             9, 9, 9, 9,
-            
+
             3, 3, 3, 3,
             7, 7,
             10, 10, 10, 10,
-            
-            4, 4, 4, 4, 
+
+            4, 4, 4, 4,
             7, 7,
             11, 11, 11, 11,
-            
-            5, 5, 5, 5,
-            7, 7,   
-            12, 12, 12, 12,
-            
-            6, 6,
         ]
-        packB0 = [x + startPACKB0 for x in packBOffset]
+        # PackB0: cols 4-7 only (40 items after NT re-split)
+        packB0 = [x + startPACKB0 for x in packBOffset_4col]
 
         # GRB
         grB = create_range(min_val=max(lrb0)+4, num=2, step=2, repeat=2)
         grB += create_range(min_val=max(grB)+4, num=2, step=2, repeat=2)
 
-        # GRA        
+        # GRA
         grA = create_range(min_val=max(grB)+2, num=3, step=2, repeat=2)
         grA += create_range(min_val=max(grA)+4,num=3,step=2, repeat=2)
 
         halfMFMA = numMfma//2
         assert max(packB0) < halfMFMA
 
-        # LR3
-        lrb3 = create_range(min_val=max(grB)+3, num=2, step=2, repeat=2)
-        lrb3 += create_range(min_val=max(lrb3)+4, num=2, step=2, repeat=2)
-        waitLRB3 = max(lrb3)+1
+        # LR1
+        # First pair loads T0+0:15 (no overlap with packed cols).
+        lrb1 = create_range(min_val=max(grB)+3, num=2, step=2, repeat=2)
+        # Second pair loads X0+4:7,12:15 (cols 0-1 consumed by mfma 8,17).
+        # Last pair loads X0+20:23,28:31 — X0+28:31 overlaps packed col 3
+        # (last read at mfma 35). Issue at halfMFMA-1 so the MFMA at that
+        # position reads old packed data before the ds_read overwrites it.
+        lrb1 += [max(lrb1)+4, max(lrb1)+4, halfMFMA-1, halfMFMA-1]
+        waitLRB1 = max(lrb1)+1
 
-        # PackB3
-        packB3 = [x + waitLRB3 + 4 for x in packBOffset]
+        # PackB1: 24 swaps + cols 0-3 pack ops (64 items after NT re-split)
+        # Set A swaps (entries 0-11): at halfMFMA+1 so dscnt=0 at
+        # waitLRB1+1 completes first (ensures LRB1 data is ready).
+        # Set B swaps (entries 12-23): early, after LRB0 dscnt=0 + barrier,
+        # before PackB0 reads cols 4-7
+        earlySwapPosB = waitLRB0 + 4
+        packB1_swaps = [halfMFMA+1] * 12 + [earlySwapPosB] * 12
+        # Cols 0-3 pack ops (40 items): after swaps, using swapped LRB1 data
+        packB1_packs = [x + waitLRB1 + 4 for x in packBOffset_4col]
+        packB1 = packB1_swaps + packB1_packs
 
-        # LRA3 + PACKA3
+        # LRA1 + PACKA1
         startLRA3 = (3*numMfma)//4 # Can't start before 3/4 MFMAs
-        lra3 = create_range(min_val=startLRA3, num=6, step=1, repeat=2)
+        lra1 = create_range(min_val=startLRA3, num=6, step=1, repeat=2)
 
-        waitLRA3 = max(lra3)+1
-        packA3 = [x + waitLRA3 for x in packAOffset]
+        waitLRA1 = max(lra1)+1
+        packA1 = [x + waitLRA1 for x in packAOffset]
 
         syncTable = [
             -1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for rest of LRA3s for next iteration"),
@@ -4423,13 +4448,13 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
             max(grB)+3, SWaitCnt(dscnt=-1, vlcnt=6, vscnt=-1, comment="Wait for previous GRA&GRB"),
             max(grB)+3, SBarrier(comment=""),
             
-            waitLRB3, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait for first 1/2 LRB3s to complete"),
-            waitLRB3+1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LRB3s to complete"),
+            waitLRB1, SWaitCnt(dscnt=4, vlcnt=-1, vscnt=-1, comment="Wait for first 1/2 LRB1s to complete"),
+            waitLRB1+1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for all LRB1s to complete"),
 
             max(grA)+3, SWaitCnt(dscnt=-1, vlcnt=10, vscnt=-1, comment="Wait for previous GRA&GRB"),
             max(grA)+3, SBarrier(comment=""),
 
-            waitLRA3+1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for rest of LRA3s to complete"),
+            waitLRA1+1, SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="Wait for rest of LRA1s to complete"),
         ]
 
         optSchedule = {
@@ -4448,18 +4473,18 @@ def _get_schedule_192x128x32_TF32(kernel, useLDSTr, TLDS):
             'GRB'    : [grB],  
 
             'LRSA'   : [[max(grIncB)+1]],
-            'LRSB'   : [[max(grIncB)+2]],
+            'LRSB'   : [[waitLRB0]],  # after all LRB0 reads (not mid-LRB0)
 
             'LWSA'   : [[52]],
             'LWSB'   : [[52]],
 
             'LCC'    : [[numMfma-1, numMfma-1]],
 
-            'LRA3'   : [lra3],
-            'LRB3'   : [lrb3],
+            'LRA1'   : [lra1],
+            'LRB1'   : [lrb1],
 
-            'PackB3' : [packB3],
-            'PackA3' : [packA3],
+            'PackB1' : [packB1],
+            'PackA1' : [packA1],
         }
 
         syncCode = syncTable[1::2]
