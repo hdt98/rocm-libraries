@@ -701,7 +701,7 @@ struct FmhaBatchPrefillWithPagedKVCacheKernel
         long_index_t batch_offset_randval = 0;
         long_index_t batch_offset_lse     = 0;
         long_index_t batch_offset_o       = 0;
-        const index_t seqlen_k = [&]() {
+        const index_t seqlen_k            = [&]() {
             if constexpr(kKVLookupTable ==
                          BlockAttentionKVCacheLookupTableEnum::SGLANG_PAGE_TABLE_1D)
             {
@@ -715,9 +715,9 @@ struct FmhaBatchPrefillWithPagedKVCacheKernel
                         return kargs.page_table.kv_last_page_lens[i_batch];
                 }();
                 return num_page_blocks > 0
-                           ? static_cast<index_t>((num_page_blocks - 1) * kargs.page_block_size +
+                                      ? static_cast<index_t>((num_page_blocks - 1) * kargs.page_block_size +
                                                   last_page_len)
-                           : 0;
+                                      : 0;
             }
             else // BlockAttentionKVCacheLookupTableEnum::VLLM_BLOCK_TABLE_2D
             {

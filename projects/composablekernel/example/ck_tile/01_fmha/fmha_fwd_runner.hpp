@@ -1029,9 +1029,9 @@ fwd_result fmha_fwd_run(mode_enum mode,
         const ck_tile::index_t split_stride_lse_acc = (shape_seqlen_q);
         const ck_tile::index_t split_stride_o_acc   = (shape_seqlen_q * hdim_v);
 
-        args.q_ptr = q_buf.GetDeviceBuffer();
-        args.k_ptr = k_buf.GetDeviceBuffer();
-        args.v_ptr = v_buf.GetDeviceBuffer();
+        args.q_ptr    = q_buf.GetDeviceBuffer();
+        args.k_ptr    = k_buf.GetDeviceBuffer();
+        args.v_ptr    = v_buf.GetDeviceBuffer();
         args.batch    = batch;
         args.seqlen_q = shape_seqlen_q; // unused in group mode
         args.hdim_q   = hdim_q;
