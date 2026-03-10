@@ -1156,9 +1156,17 @@ class KernelWriterAssembly(KernelWriter):
       if self.states.a.numVgprLocalReadAddr > 0:
         module.add(RegSet("v", "vgprLocalReadAddrOrigA", \
             self.states.a.startVgprLocalReadAddrOrig))
+      if kernel["ProblemType"]["MXBlockA"]:
+        if self.states.mxsa.numVgprLocalReadAddr > 0:
+          module.add(RegSet("v", "vgprLocalReadAddrOrigMXSA", \
+              self.states.mxsa.startVgprLocalReadAddrOrig))
       if self.states.b.numVgprLocalReadAddr > 0:
         module.add(RegSet("v", "vgprLocalReadAddrOrigB", \
             self.states.b.startVgprLocalReadAddrOrig))
+      if kernel["ProblemType"]["MXBlockB"]:
+        if self.states.mxsb.numVgprLocalReadAddr > 0:
+          module.add(RegSet("v", "vgprLocalReadAddrOrigMXSB", \
+              self.states.mxsb.startVgprLocalReadAddrOrig))
     if self.states.m.numVgprLocalReadAddr > 0:
       module.add(RegSet("v", "vgprLocalReadAddrMetadata", \
           self.states.m.startVgprLocalReadAddr))
@@ -1335,7 +1343,7 @@ class KernelWriterAssembly(KernelWriter):
       module.add(ValueSet("MTOffset", reductionOffsetLow32, format=1))
       module.add(ValueSet("MTOffsetH32", reductionOffsetHigh32, format=1))
 
-    if self.states.IncLdsBufSwitch:
+    if self.states.IncLdsBufSwitch or self.states.useCommonSgprSwap:
       module.addComment0("%d LDS Blocks for PGR %d"%(self.states.numLDSBlk, kernel["PrefetchGlobalRead"]))
       module.add(ValueSet("LdsOneBlockSize", kernel["LdsOffsetA_Blk"]))
       module.add(ValueSet("LdsBlockEndSize", kernel["LdsOffsetA_Blk"] * self.states.numLDSBlk))
@@ -4342,9 +4350,9 @@ class KernelWriterAssembly(KernelWriter):
 
         tmp = self.vgprPool.checkOut(2)
         with self.allocTmpSgpr(1) as tmpSgprInfo:
-          module.add(vectorStaticDivide(tmp, rReg, tP["bpeGR"]*8, tmpVgprRes, comment="%s: %s = %s / %s"%(swizzledOrTrName, vgpr(tmp), vgpr(rReg), tP["bpeGR"]*8)))
-          module.add(vectorStaticMultiply(vgpr(tmp), vgpr(tmp), tP["bpeGR"]*4, tmpSgprInfo, comment="%s: %s = %s * %s"%(swizzledOrTrName, vgpr(tmp), vgpr(tmp), tP["bpeGR"]*4)))
-        module.add(vectorStaticRemainder(tmp+1, rReg, rReg, tP["bpeGR"]*4, tmpVgprRes, tmpSgprInfo, comment="%s: %s = %s %% %s"%(swizzledOrTrName, vgpr(tmp), vgpr(rReg), tP["bpeGR"]*4)))
+          module.add(vectorStaticDivide(tmp, rReg, int(tP["bpeGR"])*8, tmpVgprRes, comment="%s: %s = %s / %s"%(swizzledOrTrName, vgpr(tmp), vgpr(rReg), int(tP["bpeGR"])*8)))
+          module.add(vectorStaticMultiply(vgpr(tmp), vgpr(tmp), int(tP["bpeGR"])*4, tmpSgprInfo, comment="%s: %s = %s * %s"%(swizzledOrTrName, vgpr(tmp), vgpr(tmp), int(tP["bpeGR"])*4)))
+        module.add(vectorStaticRemainder(tmp+1, rReg, rReg, int(tP["bpeGR"])*4, tmpVgprRes, tmpSgprInfo, comment="%s: %s = %s %% %s"%(swizzledOrTrName, vgpr(tmp), vgpr(rReg), int(tP["bpeGR"])*4)))
         module.add(VAddU32(dst=vgpr(rReg), src0=vgpr(tmp), src1=vgpr(rReg), comment="%s: %s = %s + %s"%(swizzledOrTrName, vgpr(rReg), vgpr(rReg), vgpr(tmp))))
 
       WvG_M = kernel["MIWaveGroup"][0]
@@ -4620,13 +4628,18 @@ class KernelWriterAssembly(KernelWriter):
         self.vgprPool.checkIn(tmpv)
       self.vgprPool.checkIn(destVgpr)
 
-    if kernel["StoreSwapAddr"]:
+    if kernel["StoreSwapAddr"] or self.states.useCommonSgprSwap:
       if kernel["LocalWriteUseSgpr%s"%tc]:
-        # needed for the VReadfirstlaneB32 in the prior code block
-        if self.states.archCaps["CrosslaneWait"]:
-          module.add(SNop(waitState=0, comment="1 wait states"))
-        module.add(SAddU32(dst=sgpr("Swap%s"%tc), src0=sgpr("LocalWriteAddr%s"%tc), src1=kernel["LdsOffsetA_Blk"], comment="Calculate starting lds addr of second buffer"))
-        module.add(SXorB32(dst=sgpr("Swap%s"%tc), src0=sgpr("Swap%s"%tc), src1=sgpr("LocalWriteAddr%s"%tc), comment="xor both lds buffer offsets to enable swapping"))
+        if self.states.useCommonSgprSwap:
+          # Need only once. Generate the code for "A" only
+          if tc == "A":
+            module.add(SMovB32(dst=sgpr("SwapCommon"), src=0, comment="Initialize SwapCommon"))
+        else:
+          # needed for the VReadfirstlaneB32 in the prior code block
+          if self.states.archCaps["CrosslaneWait"]:
+            module.add(SNop(waitState=0, comment="1 wait states"))
+          module.add(SAddU32(dst=sgpr("Swap%s"%tc), src0=sgpr("LocalWriteAddr%s"%tc), src1=kernel["LdsOffsetA_Blk"], comment="Calculate starting lds addr of second buffer"))
+          module.add(SXorB32(dst=sgpr("Swap%s"%tc), src0=sgpr("Swap%s"%tc), src1=sgpr("LocalWriteAddr%s"%tc), comment="xor both lds buffer offsets to enable swapping"))
       else:
         module.add(VAddU32(dst=vgpr("LocalWriteSwapAddr%s"%tc), src0=kernel["LdsOffsetA_Blk"], src1=vgpr("LocalWriteAddr%s"%tc), \
                            comment="starting lds addr of second buffer" ))
@@ -9392,6 +9405,9 @@ class KernelWriterAssembly(KernelWriter):
       if self.states.IncLdsBufSwitch:
         DtldsModule.add(SAddU32(dst=mgpr(0), src0=sgpr("LocalWriteAddr%s"%tc), \
                       src1=sgpr("LDSBufferWriteInc"), comment="m0 <- LDS write address (base + inc)"))
+      elif self.states.useCommonSgprSwap:
+        DtldsModule.add(SAddU32(dst=mgpr(0), src0=sgpr("LocalWriteAddr%s"%tc), \
+                      src1=sgpr("SwapCommon"), comment="m0 <- LDS write address (base + inc)"))
       elif kernel["ExpandPointerSwap"]:
         DtldsModule.add(SAddU32(dst=mgpr(0), src0=sgpr("LocalWriteAddr%s"%tc), \
                       src1=tP["localWriteSwapByteOffset"], comment="m0 <- LDS write address"))
@@ -9828,6 +9844,15 @@ class KernelWriterAssembly(KernelWriter):
         module.add(SCmpEQU32(src0=sgpr("LDSBufferWriteInc"), src1="LdsBlockEndSize", comment="LDSBufferWriteInc == End ?"))
         module.add(SCMovB32(dst=sgpr("LDSBufferWriteInc"), src=0, comment="LDSBufferWriteInc loop back to 0"))
 
+    def localWriteSwapCommon(tc):
+      is1st = tc == "A" # so far, A is always first
+      if is1st:
+        module.add(SXorB32(
+          dst=sgpr("SwapCommon"), \
+          src0="LdsOneBlockSize", \
+          src1=sgpr("SwapCommon"), \
+          comment="xor LDS block size"))
+
     def getSrc0Val(tc):
       src0Val = None
       if kernel["StoreSwapAddr"]:
@@ -9853,6 +9878,10 @@ class KernelWriterAssembly(KernelWriter):
         # 3 or more LDS block case, we do not use xor. Instead, use add and max check for round back
         # (numLDSBlk>=3 is for DTL (and LocalWriteUseSgpr) only)
         localWriteAddRound(tc)
+      elif self.states.useCommonSgprSwap:
+        # commonSwap case, need only 1 swap
+        # (generate at "A" only)
+        localWriteSwapCommon(tc)
       else:
         src0Val = getSrc0Val(tc)
         numLwa = self.states.a.numVgprLocalWriteAddr if tP["isA"] else self.states.b.numVgprLocalWriteAddr
@@ -9902,8 +9931,7 @@ class KernelWriterAssembly(KernelWriter):
     module = Module("localWriteResetOffsets")
     if needReset:
       resetMask = hex(kernel["LdsOffsetA_Blk"]-1 | self.consts.ldsOOB)
-      # MXSA/MXSB do not use swap addresses, use else branch instead
-      useSwapAddr = (internalPointerSwap or kernel["StoreSwapAddr"]) and tc not in ("MXSA", "MXSB")
+      useSwapAddr = (internalPointerSwap or (kernel["StoreSwapAddr"] and not self.states.useCommonSgprSwap))
       if useSwapAddr:
         if internalPointerSwap:
           tP["localWriteSwapByteOffset"] = 0
@@ -9938,6 +9966,14 @@ class KernelWriterAssembly(KernelWriter):
           dst=sgpr("LDSBufferWriteInc"), \
           src=0, \
           comment="reset incSgpr"))
+      elif self.states.useCommonSgprSwap:
+        # commonSwap case, back to 0
+        # (generate at "A" only)
+        if tc == "A":
+          module.add(SMovB32(
+            dst=sgpr("SwapCommon"), \
+            src=0, \
+            comment="reset swapCommon"))
       else:
         if kernel["LocalWriteUseSgpr%s"%tc]:
           module.add(SAndB32(
@@ -10919,8 +10955,7 @@ class KernelWriterAssembly(KernelWriter):
         dst=vgpr("LocalReadAddr%s"%(tc)), \
         src=vgpr("LocalReadAddrOrig%s"%(tc)), \
         comment="set LocalReadAddrOrig to LocalReadAddr"))
-    # MXSA/MXSB do not use swap addresses
-    elif kernel["StoreSwapAddr"] and tc not in ("MXSA", "MXSB"):
+    elif kernel["StoreSwapAddr"]:
       # Reset offset, by picking smaller of the two
       tmpvgpr = self.vgprPool.checkOut(1) # contains other offsets
       module.add(VXorB32(
