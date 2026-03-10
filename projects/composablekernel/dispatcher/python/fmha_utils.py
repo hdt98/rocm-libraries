@@ -334,6 +334,8 @@ class FmhaDispatcherLib:
             ctypes.c_int,  # bias_type
             ctypes.c_int,  # has_lse
             ctypes.c_int,  # has_dropout
+            ctypes.c_int,  # traits_hdim_q (0=same as hdim_q)
+            ctypes.c_int,  # traits_hdim_v (0=same as hdim_v)
             ctypes.POINTER(ctypes.c_float),  # time_ms_out
         ]
         lib.fmha_dispatcher_run_fwd.restype = ctypes.c_int
@@ -395,6 +397,8 @@ class FmhaDispatcherLib:
         bias_type: int = 0,
         has_lse: int = 0,
         has_dropout: int = 0,
+        traits_hdim_q: int = 0,
+        traits_hdim_v: int = 0,
     ) -> Tuple[int, float]:
         time_ms = ctypes.c_float(0.0)
         rc = self._lib.fmha_dispatcher_run_fwd(
@@ -414,6 +418,8 @@ class FmhaDispatcherLib:
             bias_type,
             has_lse,
             has_dropout,
+            traits_hdim_q,
+            traits_hdim_v,
             ctypes.byref(time_ms),
         )
         return rc, time_ms.value
@@ -582,6 +588,8 @@ class FmhaRunner:
                 bias_type,
                 has_lse,
                 has_dropout,
+                0,
+                0,  # traits_hdim_q, traits_hdim_v (0 = same as hdim)
                 ctypes.byref(time_ms),
             )
 
