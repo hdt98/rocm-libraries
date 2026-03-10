@@ -829,3 +829,4 @@ add_subdirectory(utils)
 if(MIOPEN_ENABLE_FIN)
     add_subdirectory(fin)
 endif()
+

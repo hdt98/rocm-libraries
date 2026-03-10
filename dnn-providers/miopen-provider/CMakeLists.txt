@@ -307,3 +307,4 @@ if(MIOPENPROVIDER_ENABLE_COVERAGE)
     add_custom_coverage_target(current-coverage "")
 
 endif()
+
