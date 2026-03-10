@@ -181,7 +181,12 @@ bool compare_bquant(std::string instanceName,
                     ck_tile::HostTensor<CDataType>& c_m_n_host_result)
 {
     const float max_accumulated_value =
-        *std::max_element(c_m_n_host_result.mData.begin(), c_m_n_host_result.mData.end());
+        std::abs(*std::max_element(c_m_n_host_result.mData.begin(),
+                                   c_m_n_host_result.mData.end(),
+                                   [](const auto& a, const auto& b) {
+                                       return std::abs(static_cast<float>(a)) <
+                                              std::abs(static_cast<float>(b));
+                                   }));
     const auto rtol_atol =
         calculate_rtol_atol_bquant<ADataType, BQDataType, BDataType, AccDataType, CDataType>(
             K, kbatch, max_accumulated_value);
@@ -191,10 +196,10 @@ bool compare_bquant(std::string instanceName,
                                    rtol_atol.at(ck_tile::number<0>{}),
                                    rtol_atol.at(ck_tile::number<1>{}));
 
-    std::cout << "For " << instanceName << " Relative error threshold is "
+    std::cerr << "For " << instanceName << " Relative error threshold is "
               << rtol_atol.at(ck_tile::number<0>{}) << " Absolute error threshold is "
               << rtol_atol.at(ck_tile::number<1>{}) << std::endl;
-    std::cout << "The verification result is:" << (pass ? "correct" : "fail") << std::endl;
+    std::cerr << "The verification result is:" << (pass ? "correct" : "fail") << std::endl;
 
     return pass;
 }

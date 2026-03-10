@@ -134,7 +134,7 @@ function(build_individual_gemm_bquant_targets datatype layout)
                 --datatype ${datatype}
                 --layout ${layout}
                 --config_json ${json_blob}
-                --gpu_target ${GEMM_BQUANT_GPU_TARGETS_INDIVIDUAL}
+                --gpu_target "${GEMM_BQUANT_GPU_TARGETS_INDIVIDUAL}"
                 --list_kernels
         WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
         RESULT_VARIABLE ret

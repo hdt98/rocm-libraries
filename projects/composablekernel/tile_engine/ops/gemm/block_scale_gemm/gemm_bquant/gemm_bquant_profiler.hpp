@@ -6,6 +6,11 @@
 #include <iostream>
 #include <fstream>
 #include <iomanip>
+#include <functional>
+#include <tuple>
+#include <vector>
+#include <algorithm>
+#include <stdexcept>
 
 #include "ck_tile/host/device_prop.hpp"
 #include "ck_tile/ops/gemm_quant.hpp"
