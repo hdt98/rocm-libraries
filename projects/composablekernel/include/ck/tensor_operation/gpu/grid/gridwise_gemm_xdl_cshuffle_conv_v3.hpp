@@ -561,9 +561,18 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
         constexpr auto c_block_size =
             c_shuffle_block_desc_mblock_mperblock_nblock_nperblock.GetElementSpaceSize();
 
-        return math::max((a_block_space_size_aligned * sizeof(ADataType) +
-                          b_block_space_size_aligned * sizeof(BDataType)),
-                         c_block_size * sizeof(CShuffleDataType));
+        constexpr index_t base_ab_byte = a_block_space_size_aligned * sizeof(ADataType) +
+                                        b_block_space_size_aligned * sizeof(BDataType);
+        constexpr index_t c_shuffle_byte = c_block_size * sizeof(CShuffleDataType);
+        // Pipeline v4 with DirectLoad uses double LDS buffer (ping-pong); allocate 2x A+B space
+        if constexpr(DirectLoad && BlkGemmPipelineVer == BlockGemmPipelineVersion::v4)
+        {
+            return (2 * base_ab_byte >= c_shuffle_byte) ? (2 * base_ab_byte) : c_shuffle_byte;
+        }
+        else
+        {
+            return (base_ab_byte >= c_shuffle_byte) ? base_ab_byte : c_shuffle_byte;
+        }
     }
 
     __host__ static constexpr bool CalculateHasMainKBlockLoop(index_t K)
@@ -630,6 +639,41 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
         const BElementwiseOperation b_element_op{};
         const CElementwiseOperation c_element_op{};
 
+        // Pipeline v4 with DirectLoad requires double LDS (ping-pong); use Run_2Lds with split buffer
+        if constexpr(DirectLoad && BlkGemmPipelineVer == BlockGemmPipelineVersion::v4)
+        {
+            const auto a_block_desc = GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(get_device_arch());
+            const auto b_block_desc = GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch());
+            constexpr index_t max_lds_align = math::lcm(AK1Number, BK1Number);
+            const index_t a_block_space_size_aligned =
+                math::integer_least_multiple(a_block_desc.GetElementSpaceSize(), max_lds_align);
+            const index_t b_block_space_size_aligned =
+                math::integer_least_multiple(b_block_desc.GetElementSpaceSize(), max_lds_align);
+            const index_t base_ab_byte = a_block_space_size_aligned * sizeof(ADataType) +
+                                        b_block_space_size_aligned * sizeof(BDataType);
+            Run_2Lds<AGridDesc_AK0_M_K1,
+                     BGridDesc_BK0_N_K1,
+                     CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
+                     HasMainKBlockLoop,
+                     CGlobalMemoryDataOperation,
+                     TailNum>(p_a_grid,
+                              p_b_grid,
+                              p_c_grid,
+                              p_shared,
+                              static_cast<char*>(p_shared) + base_ab_byte,
+                              problem,
+                              a_grid_desc_ak0_m_ak1,
+                              b_grid_desc_bk0_n_bk1,
+                              c_grid_desc_mblock_mperblock_nblock_nperblock,
+                              k_id,
+                              k_batch,
+                              block_idx_x);
+            return;
+        }
+
+        // Single LDS path (v1 or non-DirectLoad): v4 with DirectLoad uses Run_2Lds above
+        if constexpr(!(DirectLoad && BlkGemmPipelineVer == BlockGemmPipelineVersion::v4))
+        {
         // divide block work by [M, N]
         const auto block_2_ctile_map = Block2CTileMap{problem.M, problem.N, 4};
 
@@ -821,6 +865,7 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
             p_shared,
             p_c_grid,
             c_element_op);
+        } // if constexpr(!(DirectLoad && v4))
     }
 
     template <typename AGridDesc_AK0_M_K1,

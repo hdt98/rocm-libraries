@@ -96,7 +96,7 @@ using DeviceOp = ck::tensor_operation::device::DeviceGroupedConvBwdDataMultipleD
     S<1, 32, 1, 8>,
     8,
     ck::BlockGemmPipelineScheduler::Intrawave,
-    ck::BlockGemmPipelineVersion::v1,
+    ck::BlockGemmPipelineVersion::v4,
     InDataType,
     InDataType,
     true>; // DirectLoad=true

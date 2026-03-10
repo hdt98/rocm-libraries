@@ -347,7 +347,8 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffleV3
             : BBlockTransferSrcScalarPerVector;
 
     static constexpr bool ALdsScalarLoadToVgpr = false;
-    static constexpr bool BLdsScalarLoadToVgpr = true;
+    // v4 pipeline uses double LDS and does not use LdsScalarLoadToVgpr; only v1 supports it with DirectLoad
+    static constexpr bool BLdsScalarLoadToVgpr = (BlkGemmPipelineVer == BlockGemmPipelineVersion::v1);
 
     // GridwiseGemm
     using GridwiseGemm = GridwiseGemm_xdl_cshuffle_conv_v3<
