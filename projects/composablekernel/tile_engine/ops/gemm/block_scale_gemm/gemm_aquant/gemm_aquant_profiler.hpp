@@ -41,9 +41,10 @@ class AQuantGemmProfiler
                    std::vector<std::function<std::tuple<std::string, float>(
                        ck_tile::QuantGemmHostArgs&, const ck_tile::stream_config&)>>& callables)
     {
-        const ALayout layout_a = ALayout{};
-        const BLayout layout_b = BLayout{};
-        const CLayout layout_c = CLayout{};
+        const ALayout layout_a   = ALayout{};
+        const BLayout layout_b   = BLayout{};
+        const CLayout layout_c   = CLayout{};
+        const AQLayout layout_aq = AQLayout{};
 
         problem.stride_a_ = ck_tile::get_default_stride(
             problem.m_, problem.k_, problem.stride_a_, is_row_major(layout_a));
@@ -52,10 +53,10 @@ class AQuantGemmProfiler
         problem.stride_c_ = ck_tile::get_default_stride(
             problem.m_, problem.n_, problem.stride_c_, is_row_major(layout_c));
 
-        // Compute AQ scale tensor dimensions
-        // AQ layout: [M, K / group_size_k] in RowMajor
+        // Compute AQ scale tensor dimensions: [M, K / group_size_k]
         const ck_tile::index_t QK_A = problem.k_ / problem.group_size_k_;
-        problem.stride_aq_          = QK_A; // RowMajor: stride = number of columns
+        problem.stride_aq_          = ck_tile::get_default_stride(
+            problem.m_, QK_A, problem.stride_aq_, is_row_major(layout_aq));
 
         // Allocate host tensors
         ck_tile::HostTensor<ADataType> a_m_k(ck_tile::host_tensor_descriptor(
@@ -65,8 +66,9 @@ class AQuantGemmProfiler
         ck_tile::HostTensor<CDataType> c_m_n_dev_result(ck_tile::host_tensor_descriptor(
             problem.m_, problem.n_, problem.stride_c_, is_row_major(layout_c)));
 
-        // AQ scale tensor: [M, QK_A] in RowMajor
-        ck_tile::HostTensor<AQDataType> aq_m_qk({problem.m_, QK_A});
+        // AQ scale tensor: [M, QK_A]
+        ck_tile::HostTensor<AQDataType> aq_m_qk(ck_tile::host_tensor_descriptor(
+            problem.m_, QK_A, problem.stride_aq_, is_row_major(layout_aq)));
 
         // Initialize tensors
         if(setting_.init_method_ == 0)

@@ -264,19 +264,29 @@ class GemmAQuantKernelBuilder(GemmKernelBuilder):
             )
         )
 
+        layout_code = str(self.layout).strip().lower()
         combinations = []
         for combo in all_combinations:
             pipeline, epilogue, scheduler = combo[:3]
             a_preshuffle_quant = combo[6]
-            if is_aquant_trait_combination_valid(
+            if not is_aquant_trait_combination_valid(
                 pipeline, epilogue, scheduler, a_preshuffle_quant
             ):
-                combinations.append(combo)
-            else:
                 logging.debug(
                     f"Skipping unsupported AQuant trait: "
                     f"{pipeline}-{epilogue}-{scheduler}-apreshuffle={a_preshuffle_quant}"
                 )
+                continue
+
+            # CCR layout only supports non-preshuffle quantization
+            if layout_code == "ccr" and a_preshuffle_quant:
+                logging.debug(
+                    f"Skipping preshuffle quant for CCR layout: "
+                    f"{pipeline}-{epilogue}-{scheduler}"
+                )
+                continue
+
+            combinations.append(combo)
         return combinations
 
     def _list_kernels(self):
@@ -377,6 +387,14 @@ class GemmAQuantKernelBuilder(GemmKernelBuilder):
         # Layouts
         a_layout, b_layout, c_layout = get_abc_layouts(self.layout)
 
+        # AQ layout: follows ALayout except for CRR where AQ is RowMajor
+        # (matching the example's run_gemm_example_with_layouts calls)
+        layout_code = str(self.layout).strip().lower()
+        if layout_code == "crr":
+            aq_layout = "ck_tile::tensor_layout::gemm::RowMajor"
+        else:
+            aq_layout = a_layout
+
         # Pipeline mapping
         pipeline_impl_map = {
             "mem": "ck_tile::AQuantGemmPipelineAgBgCrMem",
@@ -419,6 +437,7 @@ using CDataType = {get_dtype_string(c_type)};
 using ALayout = {a_layout};
 using BLayout = {b_layout};
 using CLayout = {c_layout};
+using AQLayout = {aq_layout};
 
 // Kernel name for display
 constexpr const char* KERNEL_NAME = "{kernel_name}";
@@ -467,7 +486,8 @@ struct SelectedKernel {{
         BPreshuffleQuant,
         PreshuffleB,
         ALayout, BLayout, CLayout,
-        ck_tile::QuantType::AQuantGrouped>;
+        ck_tile::QuantType::AQuantGrouped,
+        AQLayout>;
 
     // Pipeline problem (CDataType_ param is the accumulator type for the pipeline,
     // not the output type — the output conversion is handled by the epilogue)

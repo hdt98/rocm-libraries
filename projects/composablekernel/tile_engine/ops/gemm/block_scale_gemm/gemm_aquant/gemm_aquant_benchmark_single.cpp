@@ -17,7 +17,7 @@
 // The kernel header is included via the compile command line with -include flag
 // It defines SelectedKernel struct, KERNEL_NAME, and type aliases:
 //   ADataType, BDataType, AQDataType, AccDataType, CDataType
-//   ALayout, BLayout, CLayout
+//   ALayout, BLayout, CLayout, AQLayout
 
 inline auto create_args(int argc, char* argv[])
 {

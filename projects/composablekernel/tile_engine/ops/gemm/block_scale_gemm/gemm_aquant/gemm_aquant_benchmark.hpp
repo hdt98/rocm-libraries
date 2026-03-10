@@ -18,7 +18,7 @@
 
 // Data types and Layouts are defined by the generated kernel headers:
 //   ADataType, BDataType, AQDataType, AccDataType, CDataType
-//   ALayout, BLayout, CLayout
+//   ALayout, BLayout, CLayout, AQLayout
 
 enum class Metric
 {
