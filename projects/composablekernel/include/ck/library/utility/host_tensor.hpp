@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "ck/utility/env.hpp"
 #include "ck/utility/data_type.hpp"
 #include "ck/utility/span.hpp"
 #include "ck/utility/type_convert.hpp"
@@ -833,6 +834,8 @@ struct Tensor
             return mDesc.GetElementSpaceSize();
         }
     }
+
+    bool empty() const { return mData.empty(); }
 
     std::size_t GetElementSpaceSizeInBytes() const { return sizeof(T) * GetElementSpaceSize(); }
 

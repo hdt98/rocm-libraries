@@ -83,8 +83,7 @@ TEST(InstanceTraits, V3ExtractsAllFieldsCorrectly)
             ck::BlockGemmPipelineVersion::v1,          // BlkGemmPipelineVer
             ck::half_t,                                // AComputeDataType
             ck::half_t,                                // BComputeDataType
-            false,                                     // DirectLoad
-            1>;                                        // NumGroupsToMerge
+            false>;
 
     // Use InstanceTraits to extract compile-time information
     using Traits = ck_tile::reflect::InstanceTraits<DeviceInstance>;
@@ -226,8 +225,7 @@ TEST(InstanceTraits, V3InstanceStringReturnsCorrectFormat)
             ck::BlockGemmPipelineVersion::v1,          // BlkGemmPipelineVer
             ck::half_t,                                // AComputeDataType
             ck::half_t,                                // BComputeDataType
-            false,                                     // DirectLoad
-            1>;                                        // NumGroupsToMerge
+            false>;                                    // DirectLoad
 
     std::string instance_str = ck_tile::reflect::instance_string<DeviceInstance>();
 
@@ -280,8 +278,7 @@ TEST(InstanceTraits, V3InstanceStringReturnsCorrectFormat)
                                ",v1"            // BlkGemmPipelineVer
                                ",fp16"          // AComputeDataType
                                ",fp16"          // BComputeDataType
-                               ",false"         // DirectLoad
-                               ",1>";           // NumGroupsToMerge
+                               ",false>";       // DirectLoad
 
     EXPECT_EQ(instance_str, expected_str);
 }
@@ -775,6 +772,7 @@ TEST(InstanceTraits, TileInstanceStringReturnsCorrectFormat)
         ck_tile::element_wise::PassThrough /*AElementwiseOperation*/,
         ck_tile::element_wise::PassThrough /*BElementwiseOperation*/,
         ck_tile::bf16_t /*OutDataType*/,
+        ck_tile::bf16_t,
         GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
         GroupedConvTraitsType::VectorSizeA,
         GroupedConvTraitsType::VectorSizeB>;

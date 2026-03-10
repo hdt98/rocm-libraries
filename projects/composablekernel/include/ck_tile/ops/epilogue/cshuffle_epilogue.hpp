@@ -35,7 +35,9 @@ template <typename AsDataType_,
           index_t VectorSizeC_         = 1,
           bool TiledMMAPermuteN_       = false,
           index_t BlockedXDLN_PerWarp_ = 1, // The number of continuous xdl_output per warp
-          bool DoubleSmemBuffer_       = false>
+          bool DoubleSmemBuffer_       = false,
+          typename AComputeDataType_   = void,
+          typename BComputeDataType_   = void>
 struct CShuffleEpilogueProblem
 {
     using AsDataType                             = remove_cvref_t<AsDataType_>;
@@ -46,6 +48,8 @@ struct CShuffleEpilogueProblem
     using DsLayout                               = remove_cvref_t<DsLayout_>;
     using ELayout                                = remove_cvref_t<ELayout_>;
     using CDElementwise                          = remove_cvref_t<CDElementwise_>;
+    using AComputeDataType                       = remove_cvref_t<AComputeDataType_>;
+    using BComputeDataType                       = remove_cvref_t<BComputeDataType_>;
     static constexpr index_t kBlockSize          = MWave_ * NWave_ * get_warp_size();
     static constexpr index_t kMPerBlock          = kM_;
     static constexpr index_t kNPerBlock          = kN_;
@@ -70,13 +74,15 @@ struct CShuffleEpilogueProblem
 template <typename Problem_, typename Policy_ = void>
 struct CShuffleEpilogue
 {
-    using Problem     = remove_cvref_t<Problem_>;
-    using AsDataType  = remove_cvref_t<typename Problem::AsDataType>;
-    using BsDataType  = remove_cvref_t<typename Problem::BsDataType>;
-    using AccDataType = remove_cvref_t<typename Problem::AccDataType>;
-    using ODataType   = remove_cvref_t<typename Problem::ODataType>;
-    using DsDataType  = remove_cvref_t<typename Problem::DsDataType>;
-    using DsLayout    = remove_cvref_t<typename Problem::DsLayout>;
+    using Problem          = remove_cvref_t<Problem_>;
+    using AsDataType       = remove_cvref_t<typename Problem::AsDataType>;
+    using BsDataType       = remove_cvref_t<typename Problem::BsDataType>;
+    using AccDataType      = remove_cvref_t<typename Problem::AccDataType>;
+    using ODataType        = remove_cvref_t<typename Problem::ODataType>;
+    using DsDataType       = remove_cvref_t<typename Problem::DsDataType>;
+    using DsLayout         = remove_cvref_t<typename Problem::DsLayout>;
+    using AComputeDataType = remove_cvref_t<typename Problem::AComputeDataType>;
+    using BComputeDataType = remove_cvref_t<typename Problem::BComputeDataType>;
 
     static constexpr bool ADataTypeIsTuple = is_detected<is_tuple, AsDataType>::value;
     static constexpr bool BDataTypeIsTuple = is_detected<is_tuple, BsDataType>::value;
@@ -92,44 +98,45 @@ struct CShuffleEpilogue
     using ADataType = remove_cvref_t<std::tuple_element_t<number<0>{}, AsDataTypeTuple>>;
     using BDataType = remove_cvref_t<std::tuple_element_t<number<0>{}, BsDataTypeTuple>>;
 
-    using ATypeToUse = std::conditional_t<std::is_same_v<ADataType, pk_int4_t> ||
-                                              std::is_same_v<ADataType, pk_fp4_t>,
-                                          BDataType,
-                                          ADataType>;
+    // to be compatiable with original implementation
+    using ATypeToUse =
+        std::conditional_t<std::is_same_v<AComputeDataType, void>,
+                           std::conditional_t<std::is_same_v<ADataType, pk_int4_t> ||
+                                                  std::is_same_v<ADataType, pk_fp4_t>,
+                                              BDataType,
+                                              ADataType>,
+                           AComputeDataType>;
     // Used for weight-only quantization kernel, B would be dequantized to the same data type as A
-    using BTypeToUse = std::conditional_t<std::is_same_v<BDataType, pk_int4_t> ||
-                                              std::is_same_v<BDataType, pk_fp4_t> ||
-                                              std::is_same_v<BDataType, pk_fp4_raw_t>,
-                                          ADataType,
-                                          BDataType>;
+    using BTypeToUse =
+        std::conditional_t<std::is_same_v<BComputeDataType, void>,
+                           std::conditional_t<std::is_same_v<BDataType, pk_int4_t> ||
+                                                  std::is_same_v<BDataType, pk_fp4_t> ||
+                                                  std::is_same_v<BDataType, pk_fp4_raw_t>,
+                                              ADataType,
+                                              BDataType>,
+                           BComputeDataType>;
 
-    using ELayout                          = remove_cvref_t<typename Problem::ELayout>;
-    using CDElementwise                    = remove_cvref_t<typename Problem::CDElementwise>;
-    static constexpr index_t kBlockSize    = Problem::kBlockSize;
-    static constexpr index_t kMPerBlock    = Problem::kMPerBlock;
-    static constexpr index_t kNPerBlock    = Problem::kNPerBlock;
-    static constexpr index_t MWave         = Problem::MWave;
-    static constexpr index_t NWave         = Problem::NWave;
-    static constexpr index_t MPerXdl       = Problem::MPerXdl;
-    static constexpr index_t NPerXdl       = Problem::NPerXdl;
-    static constexpr index_t KPerXdl       = Problem::KPerXdl;
-    static constexpr index_t isCTransposed = Problem::isCTransposed;
-    static constexpr bool FixedVectorSize  = Problem::FixedVectorSize;
-    static constexpr bool TiledMMAPermuteN = Problem::TiledMMAPermuteN;
-#ifdef __gfx9__
-    static constexpr bool AsyncPipeline = (MWave * NWave == 8);
-#else
-    static constexpr bool AsyncPipeline = false;
-#endif
-    static constexpr index_t BlockedXDLN_PerWarp =
-        AsyncPipeline ? kNPerBlock / NWave / NPerXdl : Problem::BlockedXDLN_PerWarp;
-    static constexpr bool DoubleSmemBuffer = Problem::DoubleSmemBuffer;
-    static constexpr index_t VectorSizeC   = Problem::VectorSizeC;
-    static constexpr index_t MPerIteration = MPerXdl * MWave;
-    static constexpr index_t NPerIteration = NPerXdl * NWave;
-    static constexpr index_t NumDTensor    = Problem::NumDTensor;
-    static constexpr index_t MRepeat       = kMPerBlock / (MPerXdl * MWave);
-    static constexpr index_t NRepeat       = kNPerBlock / (NPerXdl * NWave);
+    using ELayout                                = remove_cvref_t<typename Problem::ELayout>;
+    using CDElementwise                          = remove_cvref_t<typename Problem::CDElementwise>;
+    static constexpr index_t kBlockSize          = Problem::kBlockSize;
+    static constexpr index_t kMPerBlock          = Problem::kMPerBlock;
+    static constexpr index_t kNPerBlock          = Problem::kNPerBlock;
+    static constexpr index_t MWave               = Problem::MWave;
+    static constexpr index_t NWave               = Problem::NWave;
+    static constexpr index_t MPerXdl             = Problem::MPerXdl;
+    static constexpr index_t NPerXdl             = Problem::NPerXdl;
+    static constexpr index_t KPerXdl             = Problem::KPerXdl;
+    static constexpr index_t isCTransposed       = Problem::isCTransposed;
+    static constexpr bool FixedVectorSize        = Problem::FixedVectorSize;
+    static constexpr bool TiledMMAPermuteN       = Problem::TiledMMAPermuteN;
+    static constexpr index_t BlockedXDLN_PerWarp = Problem::BlockedXDLN_PerWarp;
+    static constexpr bool DoubleSmemBuffer       = Problem::DoubleSmemBuffer;
+    static constexpr index_t VectorSizeC         = Problem::VectorSizeC;
+    static constexpr index_t MPerIteration       = MPerXdl * MWave;
+    static constexpr index_t NPerIteration       = NPerXdl * NWave;
+    static constexpr index_t NumDTensor          = Problem::NumDTensor;
+    static constexpr index_t MRepeat             = kMPerBlock / (MPerXdl * MWave);
+    static constexpr index_t NRepeat             = kNPerBlock / (NPerXdl * NWave);
 
     CDElementwise elfunc_;
 
@@ -304,32 +311,20 @@ struct CShuffleEpilogue
     {
         constexpr auto DataTypeSize = sizeof(ODataType);
         constexpr index_t VectorLen = GetVectorSizeC();
-        constexpr index_t banks     = get_n_lds_banks();
 
+        // calculate how many elements to pad to avoid bank conflict
+#if defined(__gfx950__) || defined(__gfx125__)
+        constexpr auto PaddingAmount = VectorLen;
+#else
+        constexpr auto PaddingAmount = 0;
+#endif
         constexpr index_t BytesPerBank = 4;
-
         // N is contiguous dimension
         if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::RowMajor>)
         {
             constexpr index_t MLdsLayerRequired =
-                banks * BytesPerBank / NPerIterationShuffle / DataTypeSize;
+                get_n_lds_banks() * BytesPerBank / NPerIterationShuffle / DataTypeSize;
             constexpr auto MLdsLayer = max(1, MLdsLayerRequired);
-
-            constexpr index_t BaseStrideElems = NPerIterationShuffle * MLdsLayer;
-            static_assert((BaseStrideElems * DataTypeSize) % BytesPerBank == 0,
-                          "LDS row stride must be 4B-aligned for bank-word padding logic");
-            // calculate how many elements to pad to avoid bank conflict
-#if defined(__gfx950__)
-            constexpr index_t ElemsPer4B = BytesPerBank / ck_tile::gcd(BytesPerBank, DataTypeSize);
-            constexpr auto ToWords       = [](index_t elems) constexpr {
-                return (elems * DataTypeSize) / BytesPerBank;
-            };
-            constexpr index_t BaseWords  = ToWords(BaseStrideElems);
-            constexpr index_t PadWords   = ((BaseWords % 2) == 0) ? 1 : 0;
-            constexpr auto PaddingAmount = PadWords * ElemsPer4B;
-#else
-            constexpr auto PaddingAmount = 0;
-#endif
 
             constexpr auto lds_block_desc_0 = make_naive_tensor_descriptor(
                 make_tuple(number<MPerIterationShuffle / MLdsLayer>{},
@@ -367,23 +362,6 @@ struct CShuffleEpilogue
             constexpr index_t NLdsLayerRequired =
                 get_n_lds_banks() * BytesPerBank / MPerIterationShuffle / DataTypeSize;
             constexpr auto NLdsLayer = max(1, NLdsLayerRequired);
-
-            constexpr index_t BaseStrideElems = MPerIterationShuffle * NLdsLayer;
-
-            static_assert((BaseStrideElems * DataTypeSize) % BytesPerBank == 0,
-                          "LDS row stride must be 4B-aligned for bank-word padding logic");
-
-#if defined(__gfx950__)
-            constexpr index_t ElemsPer4B = BytesPerBank / ck_tile::gcd(BytesPerBank, DataTypeSize);
-            constexpr auto ToWords       = [](index_t elems) constexpr {
-                return (elems * DataTypeSize) / BytesPerBank;
-            };
-            constexpr index_t BaseWords  = ToWords(BaseStrideElems);
-            constexpr index_t PadWords   = ((BaseWords % 2) == 0) ? 1 : 0;
-            constexpr auto PaddingAmount = PadWords * ElemsPer4B;
-#else
-            constexpr auto PaddingAmount = 0;
-#endif
 
             constexpr auto lds_block_desc_0 = make_naive_tensor_descriptor(
                 make_tuple(number<NPerIterationShuffle / NLdsLayer>{},
@@ -447,28 +425,14 @@ struct CShuffleEpilogue
                 if constexpr(is_950 || is_any_of<ADataType, pk_int4_t, pk_fp4_t>::value ||
                              is_any_of<BDataType, pk_int4_t, pk_fp4_t>::value)
                 {
-                    if constexpr(AsyncPipeline)
-                    {
-                        return tile_distribution_encoding<
-                            sequence<>,
-                            tuple<sequence<NumMXdlPerWavePerShuffle, MWave>,
-                                  sequence<RakedXDLN_PerWarp, NWave, BlockedXDLN_PerWarp>>,
-                            tuple<sequence<2, 1>>,
-                            tuple<sequence<1, 1>>,
-                            sequence<1, 2, 2>,
-                            sequence<0, 0, 2>>{};
-                    }
-                    else
-                    {
-                        return tile_distribution_encoding<
-                            sequence<>,
-                            tuple<sequence<NumMXdlPerWavePerShuffle, MWave>,
-                                  sequence<RakedXDLN_PerWarp, NWave, BlockedXDLN_PerWarp>>,
-                            tuple<sequence<1, 2>>,
-                            tuple<sequence<1, 1>>,
-                            sequence<1, 2, 2>,
-                            sequence<0, 0, 2>>{};
-                    }
+                    return tile_distribution_encoding<
+                        sequence<>,
+                        tuple<sequence<NumMXdlPerWavePerShuffle, MWave>,
+                              sequence<RakedXDLN_PerWarp, NWave, BlockedXDLN_PerWarp>>,
+                        tuple<sequence<1, 2>>,
+                        tuple<sequence<1, 1>>,
+                        sequence<1, 2, 2>,
+                        sequence<0, 0, 2>>{};
                 }
                 else
                 {
@@ -816,7 +780,7 @@ struct CShuffleEpilogue
                                                   MPerIterationShuffle,
                                                   NPerIterationShuffle,
                                                   GetVectorSizeC(),
-                                                  tile_distribution_pattern::thread_raked,
+                                                  tile_distribution_pattern::warp_raked,
                                                   Problem::kNumWaveGroups>;
         constexpr auto dram_tile_distribution =
             TileEncodingPattern::make_2d_static_tile_distribution();

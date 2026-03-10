@@ -70,7 +70,6 @@ set(GTEST_CXX_FLAGS
      -Wno-float-equal
      -Wno-lifetime-safety-intra-tu-suggestions
      -Wno-lifetime-safety-cross-tu-suggestions
-     -Wno-character-conversion
 )
 
 if(WIN32)

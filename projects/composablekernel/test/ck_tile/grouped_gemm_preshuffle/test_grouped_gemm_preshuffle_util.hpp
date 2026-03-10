@@ -62,16 +62,18 @@ class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
     {
         using ComputeType =
             std::conditional_t<sizeof(ADataType) < sizeof(BDataType), ADataType, BDataType>;
+        // Calculate thresholds
         const auto rtol = ck_tile::get_relative_threshold<ComputeType, CDataType, AccDataType>(
             ck_tile::integer_divide_ceil(K, kbatch));
         const auto atol = ck_tile::get_absolute_threshold<ComputeType, CDataType, AccDataType>(
             max_accumulated_value / kbatch, ck_tile::integer_divide_ceil(K, kbatch));
+        // Calculate error due to split_k accumulation
         const auto rtol_split_k =
             ck_tile::get_relative_threshold<CDataType, CDataType, CDataType>(kbatch);
         const auto atol_split_k = ck_tile::get_absolute_threshold<CDataType, CDataType, CDataType>(
             max_accumulated_value, kbatch);
-        return ck_tile::make_tuple(std::max({rtol, rtol_split_k, 2e-3}),
-                                   std::max({atol, atol_split_k, 2e-3}));
+        // Use higher threshold
+        return ck_tile::make_tuple(std::max(rtol, rtol_split_k), std::max(atol, atol_split_k));
     }
 
     using grouped_gemm_kargs = ck_tile::GroupedGemmHostArgs<>;
@@ -80,7 +82,7 @@ class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
         return gemm_descs.size() * sizeof(ck_tile::GemmTransKernelArg<>);
     }
 
-    template <typename ALayout, typename BLayout, typename CLayout>
+    template <typename ALayout, typename BLayout, typename CLayout, bool IsPersistent = false>
     void invoke_grouped_gemm(const std::vector<grouped_gemm_kargs>& gemm_descs,
                              const ck_tile::stream_config& s,
                              void* kargs_ptr)
@@ -98,19 +100,19 @@ class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
         using TilePartitioner = ck_tile::
             GemmSpatiallyLocalTilePartitioner<GemmShape, TileParitionerGroupNum, TileParitionerM01>;
 
-        // for testing purposes, we can hardcode the values here as we what is compatible with
-        // pipeline
+        // Select padding strategy based on persistent mode
+        // Persistent mode requires all dimensions to be padded
         using GemmUniversalTraits =
-            ck_tile::TileGemmUniversalTraits<kPadM,
-                                             kPadN,
-                                             kPadK,
+            ck_tile::TileGemmUniversalTraits<IsPersistent ? true : kPadM,
+                                             IsPersistent ? true : kPadN,
+                                             IsPersistent ? true : kPadK,
                                              DoubleSmemBuffer,
                                              ALayout,
                                              BLayout,
                                              CLayout,
                                              TransposeC,
                                              /*UseStructuredSparsity*/ false,
-                                             /*Persistent*/ false,
+                                             IsPersistent,
                                              /*NumWaveGroups*/ 1,
                                              /*Preshuffle*/ true,
                                              VectorSize>;
@@ -377,20 +379,10 @@ class TestCkTileGroupedGemmPreshuffle : public ::testing::Test
         ck_tile::DeviceMem gemm_workspace;
         gemm_workspace.Realloc(get_workspace_size(gemm_descs));
 
-        if constexpr(Persistent)
-        {
-            invoke_grouped_gemm_persistent<ALayout, BLayout, CLayout>(
-                gemm_descs,
-                ck_tile::stream_config{nullptr, false, 1},
-                gemm_workspace.GetDeviceBuffer());
-        }
-        else
-        {
-            invoke_grouped_gemm<ALayout, BLayout, CLayout>(
-                gemm_descs,
-                ck_tile::stream_config{nullptr, false, 1},
-                gemm_workspace.GetDeviceBuffer());
-        }
+        invoke_grouped_gemm<ALayout, BLayout, CLayout, Persistent>(
+            gemm_descs,
+            ck_tile::stream_config{nullptr, false, 1},
+            gemm_workspace.GetDeviceBuffer());
 
         // Copy results back to host for validation
         for(int i = 0; i < group_count; i++)

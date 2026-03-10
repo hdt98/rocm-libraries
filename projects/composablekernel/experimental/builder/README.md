@@ -16,6 +16,12 @@ This project is a prototype for a more general builder pattern for all of compos
 - [CK Builder factory design](include/ck_tile/builder/factory/README.md)
 - [CK Builder testing design](include/ck_tile/builder/testing/README.md)
 
+## Design descriptions
+
+- [CK Builder design description](include/ck_tile/builder/README.md)
+- [CK Builder factory design](include/ck_tile/builder/factory/README.md)
+- [CK Builder testing design](include/ck_tile/builder/testing/README.md)
+
 ## Directory Structure
 
 - `include/ck_tile/builder/`

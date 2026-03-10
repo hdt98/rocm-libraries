@@ -30,8 +30,7 @@ struct DefaultMfmaCtrlFlags
     static constexpr uint32_t Blgp = 0; // BLGP flag, default 0
 };
 
-#if CK_TILE_CONCEPTS && CK_TILE_CONCEPTS_HEADER
-#include <concepts>
+#if defined(__cpp_concepts) && __cpp_concepts >= 201907L
 
 /**
  * @concept CtrlFlagsGfx9I
@@ -45,7 +44,7 @@ concept CtrlFlagsGfx9I = requires(CtrlFlags ctrlFlags) {
     { CtrlFlags::Blgp } -> std::convertible_to<int>;
 };
 
-#endif // CK_TILE_CONCEPTS && CK_TILE_CONCEPTS_HEADER
+#endif // defined(__cpp_concepts) && __cpp_concepts >= 201907L
 
 /**
  * @struct amdgcn_mma

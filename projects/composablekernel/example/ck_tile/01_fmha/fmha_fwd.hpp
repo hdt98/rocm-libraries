@@ -232,7 +232,6 @@ struct fmha_fwd_args
                                            // array [batch + 1]. (Used with padding)
     const void* block_scale_seqstart_q_ptr;
     const void* block_scale_seqstart_k_ptr;
-    const void* sink_ptr;
 
     ck_tile::index_t seqlen_q;
     ck_tile::index_t seqlen_k;
@@ -329,7 +328,6 @@ struct fmha_fwd_pagedkv_args
     const void* seqstart_q_ptr;
     const void* seqstart_k_ptr;
     const void* seqlen_k_ptr;
-    const void* sink_ptr;
 
     ck_tile::index_t seqlen_q;
     ck_tile::index_t seqlen_k;
@@ -413,7 +411,6 @@ struct fmha_fwd_splitkv_args
     const void* seqstart_q_ptr;
     const void* seqstart_k_ptr;
     const void* seqlen_k_ptr;
-    const void* sink_ptr;
 
     ck_tile::index_t seqlen_q;
     ck_tile::index_t seqlen_k;
@@ -490,7 +487,6 @@ struct fmha_fwd_appendkv_args
     ck_tile::index_t page_block_size;          // only used if 'block_table_ptr' is not nullptr
 
     const void* cache_batch_idx; // only used if block_table_ptr is nullptr -> batch mode (kvcache)
-    const void* sink_ptr;
 
     ck_tile::index_t stride_q;
     ck_tile::index_t stride_k;
@@ -534,7 +530,6 @@ struct fmha_batch_prefill_args
     //             1) +
     //                        kargs.kv_last_page_lens[b]
     const void* seqstart_q_ptr;
-    const void* sink_ptr;
 
     ck_tile::index_t seqlen_q;
     ck_tile::index_t seqlen_k;
@@ -602,13 +597,6 @@ struct fmha_batch_prefill_args
 
     std::variant<std::pair<uint64_t, uint64_t>, std::pair<const void*, const void*>>
         drop_seed_offset;
-
-    // KV_BLOCKSCALE: per-page K/V descales (Q per-tensor, K/V per-page)
-    // k_descale_ptr/v_descale_ptr are reused for KV_BLOCKSCALE mode:
-    // k_descale_ptr: [num_block, num_kv_head] - points to k block descale
-    // v_descale_ptr: [num_block, num_kv_head] - points to v block descale
-    ck_tile::index_t nblock_stride_kv_block_descale = 0; // Stride along num_block dimension
-    ck_tile::index_t nhead_stride_kv_block_descale  = 0; // Stride along num_kv_head dimension
 };
 
 template <typename FmhaKernel>
@@ -668,8 +656,7 @@ auto fmha_fwd_create_kargs_and_grids(fmha_fwd_args args)
                                              args.block_scale_size_q,
                                              args.block_scale_size_kv,
                                              args.cu_seqlen_q_ptr,
-                                             args.cu_seqlen_k_ptr,
-                                             args.sink_ptr);
+                                             args.cu_seqlen_k_ptr);
         }
         else
         { // create batch mode kernel arguments
@@ -727,8 +714,7 @@ auto fmha_fwd_create_kargs_and_grids(fmha_fwd_args args)
                                              args.block_scale_size_q,
                                              args.block_scale_size_kv,
                                              args.cu_seqlen_q_ptr,
-                                             args.cu_seqlen_k_ptr,
-                                             args.sink_ptr);
+                                             args.cu_seqlen_k_ptr);
         }
     }();
 
@@ -888,8 +874,7 @@ auto fmha_fwd_pagedkv_create_kargs_and_grids(fmha_fwd_pagedkv_args args)
                                          args.window_size_right,
                                          args.sink_size,
                                          args.mask_type,
-                                         args.min_seqlen_q,
-                                         args.sink_ptr);
+                                         args.min_seqlen_q);
         }
         else
         { // create batch mode kernel arguments
@@ -934,8 +919,7 @@ auto fmha_fwd_pagedkv_create_kargs_and_grids(fmha_fwd_pagedkv_args args)
                                          args.window_size_left,
                                          args.window_size_right,
                                          args.sink_size,
-                                         args.mask_type,
-                                         args.sink_ptr);
+                                         args.mask_type);
         }
     }();
 
@@ -1002,8 +986,7 @@ auto fmha_fwd_splitkv_create_kargs_and_grids(fmha_fwd_splitkv_args args)
                                      args.window_size_left,
                                      args.window_size_right,
                                      args.sink_size,
-                                     args.mask_type,
-                                     args.sink_ptr);
+                                     args.mask_type);
         }
         else
         { // create batch mode kernel arguments
@@ -1051,8 +1034,7 @@ auto fmha_fwd_splitkv_create_kargs_and_grids(fmha_fwd_splitkv_args args)
                                      args.window_size_left,
                                      args.window_size_right,
                                      args.sink_size,
-                                     args.mask_type,
-                                     args.sink_ptr);
+                                     args.mask_type);
         }
     }();
 
@@ -1231,10 +1213,7 @@ auto fmha_batch_prefill_create_kargs_and_grids(fmha_batch_prefill_args args)
                                          args.mask_type,
                                          args.p_drop,
                                          args.s_randval,
-                                         args.drop_seed_offset,
-                                         args.sink_ptr,
-                                         args.nblock_stride_kv_block_descale,
-                                         args.nhead_stride_kv_block_descale);
+                                         args.drop_seed_offset);
         }
         else
         { // create batch mode kernel arguments
@@ -1286,10 +1265,7 @@ auto fmha_batch_prefill_create_kargs_and_grids(fmha_batch_prefill_args args)
                                          args.mask_type,
                                          args.p_drop,
                                          args.s_randval,
-                                         args.drop_seed_offset,
-                                         args.sink_ptr,
-                                         args.nblock_stride_kv_block_descale,
-                                         args.nhead_stride_kv_block_descale);
+                                         args.drop_seed_offset);
         }
     }();
 
