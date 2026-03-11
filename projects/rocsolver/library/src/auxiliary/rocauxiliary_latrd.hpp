@@ -399,5 +399,4 @@ rocblas_status rocsolver_latrd_template(rocblas_handle handle,
     return rocblas_status_success;
 }
 
-
 ROCSOLVER_END_NAMESPACE
