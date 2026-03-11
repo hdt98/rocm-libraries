@@ -113,7 +113,7 @@ namespace rocRoller::KernelGraph
                                 ShowValue(record.coordinate),
                                 ShowValue(record.rw));
 
-                    // adds WW(output dep) and WR(flow dep) edges
+                    // adds WW(output dep) or WR(flow dep) edge
                     addDependenceEdge(writeIter->second, record.control);
                 }
 

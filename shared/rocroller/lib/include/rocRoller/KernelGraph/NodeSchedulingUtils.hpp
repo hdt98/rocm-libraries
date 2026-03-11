@@ -49,10 +49,10 @@ namespace rocRoller::KernelGraph
 
         /**
          * Builds the data dependence graph for the given kernel graph.
-     *
-     * The dependences are represented at each basic block level i.e. between the
-     * nodes sharing the same immediate body-parent in `graph.control`.
-     * The flow, anti, and output data dependences between such nodes are included.
+         *
+         * The dependences are represented at each basic block level i.e. between the
+         * nodes sharing the same immediate body-parent in `graph.control`.
+         * The flow, anti, and output data dependences between such nodes are included.
          */
         ControlGraph::ControlGraph ConstructDataDependenceDAG(KernelGraph const& graph);
     }

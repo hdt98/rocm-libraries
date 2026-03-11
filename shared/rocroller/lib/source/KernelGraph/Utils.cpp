@@ -1098,7 +1098,7 @@ namespace rocRoller
                 tag = *parent;
 
                 AssertFatal(graph.mapper.get<CT::Unroll>(tag) > 0,
-                            "SetCoordinate needs Unroll dimension");
+                            "SetCoordinate needs Unroll/ForLoop dimension");
 
                 result.insert(tag);
             }
