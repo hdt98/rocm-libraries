@@ -191,9 +191,10 @@ def validate_config(
         result.add_error(f"pipeline {pipeline} is not supported on {arch}")
 
     if pipeline in {"v3", "qr_async_trload_v3"}:
-        result.add_warning(
-            "v3 pipeline is not registered in default dispatcher profiles"
-        )
+        if not arch_info.get("supports_v3", False):
+            result.add_warning(
+                f"v3 pipeline on {arch} requires supports_v3 in arch specs"
+            )
 
     if pipeline == "qr_async_trload" and not arch_info.get("supports_trload", False):
         result.add_error("qr_async_trload requires a trload-capable architecture")
