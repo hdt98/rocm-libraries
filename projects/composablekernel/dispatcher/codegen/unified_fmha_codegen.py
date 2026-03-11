@@ -961,7 +961,7 @@ using fmha_block_warps1 = ck_tile::sequence<{wave[3]}, {wave[4]}, {wave[5]}>;
 using fmha_block_warps2 = ck_tile::sequence<{wave[6]}, {wave[7]}, {wave[8]}>;
 using fmha_warp_tile0 = ck_tile::sequence<{warp[0]}, {warp[1]}, {warp[2]}>;
 using fmha_warp_tile1 = ck_tile::sequence<{warp[3]}, {warp[4]}, {warp[5]}>;
-using fmha_warp_tile2 = ck_tile::sequence<{warp[6]}, {warp[7]}, {warp[8]}>;
+using fmha_warp_tile2 = ck_tile::sequence<{warp[0]}, {warp[1]}, ck_tile::min({warp[2]}, {tile[6] if len(tile) >= 7 else warp[2]})>;
 using fmha_shape = ck_tile::TileFmhaBwdShape<fmha_block_tile,
                                              fmha_block_warps0,
                                              fmha_warp_tile0,
@@ -1009,17 +1009,17 @@ using dk_epi = ck_tile::Default2DEpilogue<
     ck_tile::Default2DEpilogueProblem<typename FmhaBwdTypeConfig<fmha_dtype>::AccDataType,
                                       typename FmhaBwdTypeConfig<fmha_dtype>::KGradDataType,
                                       false,
-                                      {int(pad[2])}>>;
+                                      ({int(pad[2])} > 0)>>;
 using dv_epi = ck_tile::Default2DEpilogue<
     ck_tile::Default2DEpilogueProblem<typename FmhaBwdTypeConfig<fmha_dtype>::AccDataType,
                                       typename FmhaBwdTypeConfig<fmha_dtype>::VGradDataType,
                                       false,
-                                      {int(pad[3])}>>;
+                                      ({int(pad[3])} > 0)>>;
 using dq_epi = ck_tile::Default2DEpilogue<
     ck_tile::Default2DEpilogueProblem<typename FmhaBwdTypeConfig<fmha_dtype>::AccDataType,
                                       typename FmhaBwdTypeConfig<fmha_dtype>::QGradDataType,
                                       false,
-                                      {int(pad[2])}>>;
+                                      ({int(pad[2])} > 0)>>;
 using fmha_kernel = ck_tile::FmhaBwdDQDKDVKernel<fmha_pipeline, dk_epi, dv_epi, dq_epi>;
 
 using trait = fmha_bwd_dq_dk_dv_traits_<{sig["hdim_q"]},

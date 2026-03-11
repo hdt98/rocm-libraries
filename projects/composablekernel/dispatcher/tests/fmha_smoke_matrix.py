@@ -269,6 +269,72 @@ def generate_splitkv_matrix() -> List[TestCase]:
     return cases
 
 
+def generate_padding_matrix() -> List[TestCase]:
+    """Generate padding edge-case test cases."""
+    cases = []
+    idx = 0
+    for prec in ["fp16"]:
+        for hdim in [32, 64, 128]:
+            edge_shapes = [
+                dict(batch=1, nhead_q=1, seqlen_q=1, seqlen_k=1, mask="0"),
+                dict(batch=1, nhead_q=1, seqlen_q=1, seqlen_k=256, mask="0"),
+                dict(batch=1, nhead_q=1, seqlen_q=255, seqlen_k=1, mask="0"),
+                dict(batch=1, nhead_q=2, seqlen_q=3, seqlen_k=5, mask="1"),
+                dict(batch=2, nhead_q=1, seqlen_q=17, seqlen_k=33, mask="2"),
+            ]
+            for shape in edge_shapes:
+                idx += 1
+                cases.append(
+                    TestCase(
+                        name=f"pad_{idx:04d}_{prec}_h{hdim}",
+                        direction="fwd",
+                        prec=prec,
+                        mode=0,
+                        perm=1,
+                        hdim_q=hdim,
+                        hdim_v=hdim,
+                        bias="n",
+                        lse=0,
+                        p_drop=0.0,
+                        **shape,
+                    )
+                )
+    return cases
+
+
+def generate_fp8_matrix() -> List[TestCase]:
+    """Generate fp8 smoke test cases (fp8bf16 and fp8fp32)."""
+    cases = []
+    idx = 0
+    for prec in ["fp8bf16"]:
+        for mode in [0]:
+            for perm in [1]:
+                for hdim in [64, 128]:
+                    for mask in ["0", "2"]:
+                        idx += 1
+                        cases.append(
+                            TestCase(
+                                name=f"fp8_{idx:04d}_{prec}_h{hdim}",
+                                direction="fwd",
+                                prec=prec,
+                                mode=mode,
+                                perm=perm,
+                                hdim_q=hdim,
+                                hdim_v=hdim,
+                                batch=2,
+                                nhead_q=4,
+                                nhead_k=4,
+                                seqlen_q=128,
+                                seqlen_k=128,
+                                bias="n",
+                                mask=mask,
+                                lse=0,
+                                p_drop=0.0,
+                            )
+                        )
+    return cases
+
+
 def unique_kernel_configs(cases: List[TestCase]) -> Set[Tuple]:
     """Extract unique kernel configs needed to run the test cases."""
     configs = set()
@@ -323,20 +389,28 @@ def to_ck_cli_args(case: TestCase) -> list:
     ]
     if case.s_kpad:
         args.append(f"-s_kpad={case.s_kpad}")
+    if case.num_splits > 1:
+        args.append(f"-num_splits={case.num_splits}")
+    if case.page_block_size > 0:
+        args.append(f"-page_block_size={case.page_block_size}")
+    if case.cache_batch_idx:
+        args.append(f"-cache_batch_idx={case.cache_batch_idx}")
     return args
 
 
 if __name__ == "__main__":
     fwd = generate_fwd_fp16_bf16_matrix()
     bwd = generate_bwd_matrix()
-    fwd_configs = unique_kernel_configs(fwd)
-    bwd_configs = unique_kernel_configs(bwd)
+    skv = generate_splitkv_matrix()
+    pad = generate_padding_matrix()
+    fp8 = generate_fp8_matrix()
 
-    print(f"Forward test cases:  {len(fwd)}")
-    print(f"Backward test cases: {len(bwd)}")
-    print(f"Total:               {len(fwd) + len(bwd)}")
-    print(f"Unique fwd configs:  {len(fwd_configs)}")
-    print(f"Unique bwd configs:  {len(bwd_configs)}")
-    print(
-        f"Est JIT time @8w:    {(len(fwd_configs) + len(bwd_configs)) * 28 / 8 / 60:.0f} min"
-    )
+    all_cases = fwd + bwd + skv + pad + fp8
+    all_configs = unique_kernel_configs(all_cases)
+
+    print(f"Forward:   {len(fwd):5d} cases")
+    print(f"Backward:  {len(bwd):5d} cases")
+    print(f"SplitKV:   {len(skv):5d} cases")
+    print(f"Padding:   {len(pad):5d} cases")
+    print(f"FP8:       {len(fp8):5d} cases")
+    print(f"Total:     {len(all_cases):5d} cases, {len(all_configs)} unique configs")
