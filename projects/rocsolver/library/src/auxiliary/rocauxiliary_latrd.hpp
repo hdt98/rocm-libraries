@@ -2092,10 +2092,12 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(
                 // read y
                 ac = (idc == 0 && i < m) ? y[i] : 0;
 
-                for(int jj = 0; jj < rpgc; ++jj)
+                for(int jj = 0; jj < rpgc; ++jj) //hotpath, buffers + wide loads?
                 {
                     // read x
                     j = jj * totalthsc + idc;
+
+                    // is this guard realllllly needed?
                     sx1 = (j < n) ? x1[j] : 0;
                     sx2 = (j < n) ? x2[j] : 0;
 
@@ -2103,23 +2105,34 @@ ROCSOLVER_KERNEL void latrd_upper_updateW_kernel(
                     if(i < m && j < n)
                         ac -= A1[i + j * lda1] * sx1 + A2[i + j * lda2] * sx2;
                 }
-                acs[tidr + tidc * threadsr] = ac;
+
+                acs[tidc + tidr * threadsc] = ac;
+
                 __syncthreads();
 
-                // group reduction
-                for(int r = threadsc / 2; r > 0; r /= 2) // try to leverage wave reduction here
-                {
-                    if(tidc < r)
-                    {
-                        ac += acs[tidr + (tidc + r) * threadsr];
-                        acs[tidr + tidc * threadsr] = ac;
-                    }
-                    __syncthreads();
-                }
+                int flataddr = tidr + tidc * threadsr;
+                T localVal = acs[flataddr % 4 + (flataddr / 4) * threadsc]; // every 4 threads needs to be reduced
 
+                if constexpr (std::is_same_v<T, float>)
+                {
+                    int tmp1 = __builtin_amdgcn_mov_dpp(*(int*)(&localVal), 0xB1, 0xF, 0xF, 0);
+                    localVal += *(float*)(&tmp1);
+                    int tmp2 = __builtin_amdgcn_mov_dpp(*(int*)(&localVal), 0x1B, 0xF, 0xF, 0);
+                    localVal += *(float*)(&tmp2);
+                    localVal *= tauVal;
+                }
+                else
+                {
+                    localVal += shift_left(localVal, 2, 4); //translates to bpermute
+                    localVal += shift_left(localVal, 1, 4);
+                    localVal *= tauVal;
+                }
+                int outaddr = ii * totalthsr + flataddr / 4;
                 // write groups results in temp array for further reduction
-                if(tidc == 0 && i < m)
-                    y[i] = ac * tauVal;
+                if ((flataddr % 4 == 0) && outaddr < m)
+                {
+                    y[outaddr] = localVal;
+                }
             }
         }
     }
@@ -2255,8 +2268,8 @@ void latrd_get_config_for_updates(const rocblas_int n,
 {
     if(n <= 256)
     {
-        *thr = 8;
-        *thc = 16;
+        *thr = 64;
+        *thc = 4;
     }
     else if(n <= 3584)
     {
@@ -2265,13 +2278,13 @@ void latrd_get_config_for_updates(const rocblas_int n,
     }
     else if(n <= 7168)
     {
-        *thr = 32;
-        *thc = 8;
+        *thr = 64;
+        *thc = 4;
     }
     else
     {
         *thr = 64;
-        *thc = 8;
+        *thc = 4;
     }
 
     *dr = 4;
@@ -2728,7 +2741,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                 //--------------------------------------------------------------
                 static constexpr int NB = 256;
                 const int blocksX = n + n - j - 1;
-                int maxBlocks = cuCount * 8; // max occupancy without oversubscribing
+                int maxBlocks = cuCount * 4; // max occupancy without oversubscribing
                 int gridX = std::min(blocksX, maxBlocks);
 
                 dim3 gemvt_grid(gridX, 1, batch_count);
@@ -2966,7 +2979,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
             //--------------------------------------------------------------
             static constexpr int NB = 256;
             const int blocksX = n + n - j - 1;
-            int maxBlocks = cuCount * 8; // max occupancy without oversubscribing
+            int maxBlocks = cuCount * 4; // max occupancy without oversubscribing
             int gridX = std::min(blocksX, maxBlocks);
 
             dim3 gemvt_grid(gridX, 1, batch_count);
