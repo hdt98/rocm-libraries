@@ -14,9 +14,6 @@
 #include "ck_tile/host/reference/reference_mhc.hpp"
 #include "ck_tile/host/check_err.hpp"
 
-// Include the invoker from the example
-#include "../../../example/ck_tile/42_mhc/mhc_fused_pipeline_invoker.hpp"
-
 // Test fixture for MHC fused pipeline tests
 template <typename TestConfig>
 class TestMHCFusedPipeline : public ::testing::Test
@@ -30,7 +27,7 @@ class TestMHCFusedPipeline : public ::testing::Test
     static constexpr ck_tile::index_t MTile = std::tuple_element_t<4, TestConfig>::value;
 
     // Simple test with small dimensions
-    template <int B = 16, int n = 4, int C = 64>
+    template <int B = 16, int n = 4, int C = 64, bool UseLogSinkhorn = true>
     void RunBasicTest()
     {
         const int nC         = n * C;
@@ -64,7 +61,8 @@ class TestMHCFusedPipeline : public ::testing::Test
                                                                  YDataType,
                                                                  ComputeDataType,
                                                                  ck_tile::element_wise::Sigmoid,
-                                                                 MTile>;
+                                                                 MTile,
+                                                                 UseLogSinkhorn>;
         using GemmKernel      = typename Invoker::GemmKernel;
         using ReductionKernel = typename Invoker::ReductionKernel;
 
@@ -90,7 +88,7 @@ class TestMHCFusedPipeline : public ::testing::Test
             (B * output_dim + reduction_threads - 1) / reduction_threads;
 
         constexpr ck_tile::index_t kBlockPerCu = 1;
-        constexpr ck_tile::index_t kSmemSize   = 8192; // Conservative estimate
+        constexpr ck_tile::index_t kSmemSize   = Invoker::GetSmemSize();
 
         const float r = 1.0f, alpha_pre = 1.0f, alpha_post = 1.0f, alpha_res = 1.0f, bias = 0.0f;
 
@@ -150,9 +148,16 @@ class TestMHCFusedPipeline : public ::testing::Test
                                ck_tile::element_wise::Sigmoid>(
             h_x, h_phi, h_output_ref, n, C, r, alpha_pre, alpha_post, alpha_res, bias, 0);
 
-        // Validate with appropriate tolerance
-        float rtol = std::is_same_v<XDataType, ck_tile::bf16_t> ? 1e-2f : 1e-3f;
-        float atol = std::is_same_v<XDataType, ck_tile::bf16_t> ? 1e-2f : 1e-3f;
+        // Calculate appropriate tolerances based on data types and number of accumulations
+        // For MHC, we have matrix multiplication followed by reductions
+        // Estimate number of accumulations as nC (input dimension)
+        const int num_accumulations = nC;
+
+        // Use the library's tolerance calculation functions
+        const double rtol = ck_tile::get_relative_threshold<XDataType, YDataType, ComputeDataType>(
+            num_accumulations);
+        const double atol = ck_tile::get_absolute_threshold<XDataType, YDataType, ComputeDataType>(
+            1.0, num_accumulations); // max_possible_num = 1.0 for normalized inputs
 
         bool pass = ck_tile::check_err(
             h_output, h_output_ref, "Error: MHC fused pipeline output mismatch!", rtol, atol);
@@ -179,13 +184,68 @@ using TestConfig_BF16_M64 = std::tuple<ck_tile::bf16_t,
                                        float,
                                        std::integral_constant<ck_tile::index_t, 64>>;
 
-using TestTypes = ::testing::Types<TestConfig_F32_M32, TestConfig_BF16_M32, TestConfig_BF16_M64>;
+using TestConfig_FP16_M32 = std::tuple<ck_tile::half_t,
+                                       ck_tile::half_t,
+                                       float,
+                                       float,
+                                       std::integral_constant<ck_tile::index_t, 32>>;
+
+using TestConfig_FP16_M64 = std::tuple<ck_tile::half_t,
+                                       ck_tile::half_t,
+                                       float,
+                                       float,
+                                       std::integral_constant<ck_tile::index_t, 64>>;
+
+using TestConfig_FP8_M32 = std::tuple<ck_tile::fp8_t,
+                                      ck_tile::fp8_t,
+                                      float,
+                                      float,
+                                      std::integral_constant<ck_tile::index_t, 32>>;
+
+using TestConfig_FP8_M64 = std::tuple<ck_tile::fp8_t,
+                                      ck_tile::fp8_t,
+                                      float,
+                                      float,
+                                      std::integral_constant<ck_tile::index_t, 64>>;
+
+using TestTypes = ::testing::Types<TestConfig_F32_M32,
+                                   TestConfig_BF16_M32,
+                                   TestConfig_BF16_M64,
+                                   TestConfig_FP16_M32,
+                                   TestConfig_FP16_M64,
+                                   TestConfig_FP8_M32,
+                                   TestConfig_FP8_M64>;
 
 TYPED_TEST_SUITE(TestMHCFusedPipeline, TestTypes);
 
-// Basic tests with different batch sizes
-TYPED_TEST(TestMHCFusedPipeline, TestBatchSize16) { this->template RunBasicTest<16, 4, 64>(); }
+// Basic tests with different batch sizes (using log Sinkhorn by default)
+TYPED_TEST(TestMHCFusedPipeline, TestBatchSize16_LogSinkhorn)
+{
+    this->template RunBasicTest<16, 4, 64, true>();
+}
 
-TYPED_TEST(TestMHCFusedPipeline, TestBatchSize32) { this->template RunBasicTest<32, 4, 64>(); }
+TYPED_TEST(TestMHCFusedPipeline, TestBatchSize32_LogSinkhorn)
+{
+    this->template RunBasicTest<32, 4, 64, true>();
+}
 
-TYPED_TEST(TestMHCFusedPipeline, TestBatchSize8) { this->template RunBasicTest<8, 4, 128>(); }
+TYPED_TEST(TestMHCFusedPipeline, TestBatchSize8_LogSinkhorn)
+{
+    this->template RunBasicTest<8, 4, 128, true>();
+}
+
+// Tests with non-log Sinkhorn
+TYPED_TEST(TestMHCFusedPipeline, TestBatchSize16_NonLogSinkhorn)
+{
+    this->template RunBasicTest<16, 4, 64, false>();
+}
+
+TYPED_TEST(TestMHCFusedPipeline, TestBatchSize32_NonLogSinkhorn)
+{
+    this->template RunBasicTest<32, 4, 64, false>();
+}
+
+TYPED_TEST(TestMHCFusedPipeline, TestBatchSize8_NonLogSinkhorn)
+{
+    this->template RunBasicTest<8, 4, 128, false>();
+}

@@ -22,8 +22,6 @@
 // 3. Iterate over grid_k dimension with block_reduce2d
 // 4. Apply warp-level and cross-warp synchronization
 // 5. Store results with activation/scaling
-//
-// Expected performance: 60-70% reduction in reduction time (0.50ms → 0.15-0.20ms)
 
 namespace ck_tile {
 

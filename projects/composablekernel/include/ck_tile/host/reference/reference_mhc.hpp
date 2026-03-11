@@ -29,7 +29,8 @@ CK_TILE_HOST void reference_mhc(const HostTensor<XDataType>& x_b_nc,       // [B
                                 [[maybe_unused]] float alpha_res       = 1.0f,
                                 [[maybe_unused]] float bias            = 0.0f,
                                 [[maybe_unused]] int sinkhorn_iters    = 0,
-                                [[maybe_unused]] Activation activation = Activation{})
+                                [[maybe_unused]] Activation activation = Activation{},
+                                [[maybe_unused]] bool use_log_sinkhorn = false)
 {
     const int B  = x_b_nc.get_length(0);
     const int nC = n * C;
@@ -109,8 +110,18 @@ CK_TILE_HOST void reference_mhc(const HostTensor<XDataType>& x_b_nc,       // [B
         // Apply Sinkhorn-Knopp if iterations > 0
         if(sinkhorn_iters > 0)
         {
-            sinkhorn_knopp_naive_ref<ComputeDataType, ComputeDataType, ComputeDataType>(
-                h_res_input, h_res_output, sinkhorn_iters);
+            if(use_log_sinkhorn)
+            {
+                // Use log-domain Sinkhorn for better numerical stability
+                sinkhorn_knopp_log_domain_ref<ComputeDataType, ComputeDataType, ComputeDataType>(
+                    h_res_input, h_res_output, sinkhorn_iters);
+            }
+            else
+            {
+                // Use standard Sinkhorn
+                sinkhorn_knopp_naive_ref<ComputeDataType, ComputeDataType, ComputeDataType>(
+                    h_res_input, h_res_output, sinkhorn_iters);
+            }
 
             // Write result to output
             for(int row = 0; row < n; row++)

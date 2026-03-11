@@ -13,7 +13,6 @@
 #include "ck_tile/host/kernel_launch.hpp"
 #include "ck_tile/host/reference/reference_mhc.hpp"
 #include "ck_tile/host/check_err.hpp"
-#include "mhc_fused_pipeline_invoker.hpp"
 
 // Parse command-line arguments for MHC benchmark
 auto create_args(int argc, char* argv[])
@@ -98,29 +97,31 @@ bool run_mhc_fused_pipeline(const ck_tile::ArgParser& arg_parser)
     d_output_mem.ToDevice(h_output.data());
 
     // Use invoker for kernel type definitions
-    using Invoker         = ck_tile::MHCFusedPipelineInvoker<XDataType,
-                                                             PhiDataType,
-                                                             YDataType,
-                                                             ComputeDataType,
-                                                             ActivationFunc,
-                                                             MTile>;
-    using Kernel          = typename Invoker::GemmKernel;
-    using ReductionKernel = typename Invoker::ReductionKernel;
-    using SinkhornKernel  = typename Invoker::SinkhornKernel;
+    // Use log-domain Sinkhorn for better numerical stability
+    constexpr bool use_log_sinkhorn = true;
+    using Invoker                   = ck_tile::MHCFusedPipelineInvoker<XDataType,
+                                                                       PhiDataType,
+                                                                       YDataType,
+                                                                       ComputeDataType,
+                                                                       ActivationFunc,
+                                                                       MTile,
+                                                                       use_log_sinkhorn>;
+    using Kernel                    = typename Invoker::GemmKernel;
+    using ReductionKernel           = typename Invoker::ReductionKernel;
+    using SinkhornKernel            = typename Invoker::SinkhornKernel;
 
-    const ck_tile::index_t kBlockSize = Invoker::GetGemmBlockSize();
-    auto grid_size                    = Invoker::GetGridSize(B, output_dim, nC);
-    const ck_tile::index_t grid_m     = grid_size.at(ck_tile::number<0>{});
-    const ck_tile::index_t grid_n     = grid_size.at(ck_tile::number<1>{});
-    const ck_tile::index_t grid_k     = grid_size.at(ck_tile::number<2>{});
-    const ck_tile::index_t kGridSize  = grid_m * grid_n * grid_k;
+    const ck_tile::index_t kBlockSize    = Invoker::GetGemmBlockSize();
+    auto grid_size                       = Invoker::GetGridSize(B, output_dim, nC);
+    const ck_tile::index_t grid_m        = grid_size.at(ck_tile::number<0>{});
+    const ck_tile::index_t grid_n        = grid_size.at(ck_tile::number<1>{});
+    const ck_tile::index_t grid_k        = grid_size.at(ck_tile::number<2>{});
+    const ck_tile::index_t kGridSize     = grid_m * grid_n * grid_k;
+    constexpr ck_tile::index_t smem_size = Invoker::GetSmemSize();
 
     std::cout << "\nKernel Configuration:" << std::endl;
     std::cout << "  Grid: " << grid_m << " × " << grid_n << " × " << grid_k << " = " << kGridSize
               << " blocks" << std::endl;
     std::cout << "  Block size: " << kBlockSize << " threads" << std::endl;
-    // Note: GetSmemSize() is device-only, so we calculate it manually for display
-    constexpr ck_tile::index_t smem_size = 8192; // M=32, N=32, K=64 with bf16
     std::cout << "  Shared memory: " << smem_size << " bytes" << std::endl;
     std::cout << "  Split-K factor: " << grid_k << std::endl;
     std::cout << "  Reduction: OPTIMIZED (CK-Tile block_reduce2d pattern)" << std::endl;
@@ -138,7 +139,7 @@ bool run_mhc_fused_pipeline(const ck_tile::ArgParser& arg_parser)
     std::cout << "  Workspace size: " << workspace_size / (1024.0 * 1024.0) << " MB" << std::endl;
 
     constexpr ck_tile::index_t kBlockPerCu = 1;
-    constexpr ck_tile::index_t kSmemSize   = smem_size; // Use the constexpr value we calculated
+    constexpr ck_tile::index_t kSmemSize   = smem_size;
 
     // Reduction kernel configuration
     const ck_tile::index_t reduction_threads = ReductionKernel::BlockSize();
@@ -268,6 +269,7 @@ bool run_mhc_fused_pipeline(const ck_tile::ArgParser& arg_parser)
         ck_tile::HostTensor<YDataType> h_output_ref({B, output_dim});
         h_output_ref.SetZero();
 
+        // Use log-domain Sinkhorn in reference to match GPU implementation
         ck_tile::reference_mhc<XDataType, PhiDataType, YDataType, ComputeDataType, ActivationFunc>(
             h_x,
             h_phi,
@@ -279,7 +281,9 @@ bool run_mhc_fused_pipeline(const ck_tile::ArgParser& arg_parser)
             alpha_post,
             alpha_res,
             bias,
-            sinkhorn_iters);
+            sinkhorn_iters,
+            ActivationFunc{},
+            use_log_sinkhorn);
 
         // Validate with appropriate tolerance for bf16
         float rtol = std::is_same_v<XDataType, ck_tile::bf16_t> ? 1e-2f : 1e-3f;
@@ -292,12 +296,6 @@ bool run_mhc_fused_pipeline(const ck_tile::ArgParser& arg_parser)
                                   atol);
 
         std::cout << "Validation: " << (pass ? "PASS ✓" : "FAIL ✗") << std::endl;
-
-        if(pass)
-        {
-            std::cout << "\n✓ Fused pipeline produces correct results!" << std::endl;
-            std::cout << "✓ Ready for production use" << std::endl;
-        }
     }
 
     return pass;
@@ -313,8 +311,7 @@ int main(int argc, char* argv[])
     }
 
     std::cout << "\n╔════════════════════════════════════════════════════════════╗" << std::endl;
-    std::cout << "║  MHC Fused Pipeline V3 - Test & Validation               ║" << std::endl;
-    std::cout << "║  Testing new pipeline with optional fusion support       ║" << std::endl;
+    std::cout << "║  MHC  - Test & Validation                                  ║" << std::endl;
     std::cout << "╚════════════════════════════════════════════════════════════╝" << std::endl;
 
     // Run with BF16 inputs, float output and compute, M=32 tile
@@ -324,23 +321,6 @@ int main(int argc, char* argv[])
                                        float,           // ComputeDataType
                                        ck_tile::element_wise::Sigmoid,
                                        64>(arg_parser); // MTile=64
-
-    if(pass)
-    {
-        std::cout << "\n╔════════════════════════════════════════════════════════════╗"
-                  << std::endl;
-        std::cout << "║  SUCCESS: All tests passed!                              ║" << std::endl;
-        std::cout << "║  The fused pipeline is working correctly.                ║" << std::endl;
-        std::cout << "╚════════════════════════════════════════════════════════════╝" << std::endl;
-    }
-    else
-    {
-        std::cout << "\n╔════════════════════════════════════════════════════════════╗"
-                  << std::endl;
-        std::cout << "║  FAILURE: Validation failed!                             ║" << std::endl;
-        std::cout << "║  Please check the implementation.                        ║" << std::endl;
-        std::cout << "╚════════════════════════════════════════════════════════════╝" << std::endl;
-    }
 
     return pass ? 0 : -2;
 }
