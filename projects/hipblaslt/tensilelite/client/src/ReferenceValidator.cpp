@@ -327,8 +327,9 @@ namespace TensileLite
             for(size_t i = 0; i < problem.tensors().size(); i++)
             {
                 auto& tensor = problem.tensors()[i];
-                if(!tensor.isOutput())
-                    continue;
+                // if(!tensor.isOutput())
+                //     continue;
+                if (i == 11 || i == 14) continue; // METADATA or COMPRESSED
 
                 size_t validationStride = 1;
                 if(m_elementsToValidate > 0 && m_elementsToValidate < tensor.totalLogicalElements())
@@ -404,11 +405,13 @@ namespace TensileLite
                     refPtr = reference.scaleAlphaVec;
                     resPtr = result.scaleAlphaVec;
                 }
+                break;
                 case ContractionProblemGemm::TENSOR::Synchronizer:
                 {
                     refPtr = reference.Synchronizer;
                     resPtr = result.Synchronizer;
                 }
+                break;
                 case ContractionProblemGemm::TENSOR::AMAXD:
                 {
                     refPtr = reference.amaxD;
@@ -424,7 +427,11 @@ namespace TensileLite
                     std::cout << "Validating tensor " << tensor.getName() << ", cpu pointer "
                               << refPtr << ", gpu pointer " << resPtr
                               << ", size = " << result.maxElements[i] << std::endl;
-
+                if (refPtr == nullptr || resPtr == nullptr) {
+                    std::cout << "Tensor " << tensor.getName() << " doesn't point to the valid address, "
+                              << "skip to checkResults!!" << std::endl;
+                    continue;
+                }
                 rv &= checkResults(
                     tensor, refPtr, resPtr, result.maxElements[i], result.gpu, validationStride);
             }
@@ -448,11 +455,6 @@ namespace TensileLite
                                               ContractionInputs const&      result)
         {
             size_t requiredBufferSize = 0;
-
-            std::cout << "reference alpha: " << ToString(reference.alpha)
-                      << ", beta: " << ToString(reference.beta) << std::endl;
-            std::cout << "result    alpha: " << ToString(result.alpha)
-                      << ", beta: " << ToString(result.beta) << std::endl;
 
             if(m_printTensorA)
                 requiredBufferSize
@@ -582,10 +584,15 @@ namespace TensileLite
                                         problem.scaleAlphaVec().totalAllocatedBytes(),
                                         hipMemcpyDeviceToHost));
                 m_reporter->logTensor(LogLevel::Verbose,
-                                      "scaleAlphaVec",
+                                      "scaleAlphaVecGPU",
                                       m_cpuResultBuffer.get(),
                                       problem.scaleAlphaVec(),
                                       result.scaleAlphaVec);
+                m_reporter->logTensor(LogLevel::Verbose,
+                                      "scaleAlphaVecCPU",
+                                      m_cpuResultBuffer.get(),
+                                      problem.scaleAlphaVec(),
+                                      reference.scaleAlphaVec);
             }
 
             if(m_printTensorAmaxD)

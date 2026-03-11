@@ -32,8 +32,55 @@
 
 #include <cstddef>
 #include <omp.h>
-
+#include <sstream>
 #define MAX_OMP_THREADS 64
+
+
+// #pragma once
+
+// #include <type_traits>
+// #include <limits>
+// #include <cmath>
+// #include <complex>
+
+namespace TensileLite {
+
+// Re-export the standard overload set so float/double/long double still work.
+using std::isinf;
+
+// ---- std::complex<T> overload --------------------------------------------
+// A complex is "infinite" if either the real or imaginary component is infinite.
+template <class T>
+inline bool isinf(const std::complex<T>& z) {
+    using std::isinf; // pick std::isinf for the scalar T
+    return isinf(z.real()) || isinf(z.imag());
+}
+
+// ---- _Float16 (binary16) host overload -----------------------------------
+// Some libstdc++/libc++ revisions don’t provide std::isinf(_Float16).
+// Route via float to ensure a well-defined check on host.
+#if defined(__FLT16_MANT_DIG__)
+inline bool isinf(_Float16 x) {
+    return std::isinf(static_cast<float>(x));
+}
+#endif
+
+// ---- HIP/CUDA __half (device + host) -------------------------------------
+// If your code also uses __half (HIP/CUDA), convert to float then test.
+#if defined(__HIP_PLATFORM_AMD__) || defined(__HIP_PLATFORM_NVIDIA__) || defined(__CUDACC__)
+  #if defined(__HIPCC__)
+    #include <hip/hip_fp16.h>
+  #elif defined(__CUDACC__)
+    #include <cuda_fp16.h>
+  #endif
+
+inline bool isinf(__half h) {
+    return std::isinf(__half2float(h));
+}
+#endif
+
+} // namespace TensileLite
+
 
 namespace TensileLite
 {
@@ -776,6 +823,13 @@ namespace TensileLite
             constexpr bool notCmplxAmaxD = !std::is_same<Accumulator, std::complex<double>>()
                                            && !std::is_same<Accumulator, std::complex<float>>();
 
+            std::cout << "[validationStrideGemm]: " << validationStrideGemm << std::endl;
+            std::cout << "Problem factorDim: " << problem.getParams().factorDim() << std::endl;
+            std::cout << "  d sizes: (";
+            for (auto s : problem.d().sizes()) {
+                std::cout << s << ", ";
+            }
+            std::cout << ")\n";
             // gemm
             omp_set_num_threads(MAX_OMP_THREADS);
 #pragma omp parallel for
@@ -1017,7 +1071,53 @@ namespace TensileLite
                         pos = int(dNum % problem.d().sizes()[0]);
                     Accumulator scaleAlphaVec = GetValue<Accumulator>(
                         problem.alphaType(), inputs.scaleAlphaVec, pos, aConjugate);
+
+                    Accumulator tmp = resultD;
+
                     resultD *= scaleAlphaVec;
+                    // typename Inputs::DType res = SaturateCast<typename Inputs::DType>(resultD);
+                    // if (isinf(res)) {
+                    // if (dNum == 377949 || dNum == 427157 || dNum == 1820246 || dNum == 2537567) {
+                    // if (dNum == 189021 || dNum == 213653) {
+                    // if (dNum == 1511517 || dNum == 1708181 || dNum == 7280726 || dNum == 10149983 ||
+                    //     dNum == 13013101 || dNum == 27215113 || dNum == 28877475 || dNum == 34663945 || dNum == 40425337) {
+                    //     std::ostringstream oss;
+                    //     typename Inputs::DType casted_val = SaturateCast<typename Inputs::DType>(resultD); //static_cast<typename Inputs::DType>(tmp);
+                    //     oss << "TensorIdx: " << dNum
+                    //         << " (resultD, scaleAlphaVec): "
+                    //         << "(" << tmp << " * " << scaleAlphaVec << ") = "
+                    //         << resultD << ", cast to DType: " << casted_val;
+                    //     std::cout << oss.str() << std::endl;
+                    // }
+                    // if (dNum == 121839 || dNum == 141117 || dNum == 177224 || dNum == 201804 ||
+                    //     dNum == 203884 || dNum == 327296 || dNum == 407181 || dNum == 465196 || dNum == 472947 || dNum == 529569) {
+                    //     std::ostringstream oss;
+                    //     typename Inputs::DType casted_val = SaturateCast<typename Inputs::DType>(resultD); //static_cast<typename Inputs::DType>(tmp);
+                    //     oss << "TensorIdx: " << dNum
+                    //         << " (resultD, scaleAlphaVec): "
+                    //         << "(" << tmp << " * " << scaleAlphaVec << ") = "
+                    //         << resultD << ", cast to DType: " << casted_val;
+                    //     std::cout << oss.str() << std::endl;
+                    // }
+                    // if (dNum == 189021 || dNum == 213653) {
+                    //     std::ostringstream oss;
+                    //     typename Inputs::DType casted_val = SaturateCast<typename Inputs::DType>(resultD); //static_cast<typename Inputs::DType>(tmp);
+                    //     oss << "TensorIdx: " << dNum
+                    //         << " (resultD, scaleAlphaVec): "
+                    //         << "(" << tmp << " * " << scaleAlphaVec << ") = "
+                    //         << resultD << ", cast to DType: " << casted_val;
+                    //     std::cout << oss.str() << std::endl;
+                    // }
+                    if (dNum == 848 || dNum == 12072 || dNum == 46232 || dNum == 119721 ||
+                        dNum == 129552 || dNum == 177736 || dNum == 208461 || dNum == 237068 || dNum == 265846 || dNum == 303308) {
+                        std::ostringstream oss;
+                        typename Inputs::DType casted_val = SaturateCast<typename Inputs::DType>(resultD); //static_cast<typename Inputs::DType>(tmp);
+                        oss << "TensorIdx: " << dNum
+                            << " (resultD, scaleAlphaVec): "
+                            << "(" << tmp << " * " << scaleAlphaVec << ") = "
+                            << resultD << ", cast to DType: " << casted_val;
+                        std::cout << oss.str() << std::endl;
+                    }
                 }
 
                 if(beta != zero)

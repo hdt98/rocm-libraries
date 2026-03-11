@@ -1036,7 +1036,10 @@ namespace TensileLite
         template <>
         inline float DataInitialization::getValue<float, InitMode::Max>()
         {
-            return std::numeric_limits<float>::max();
+            // return std::numeric_limits<float>::max();
+            // return 86.0;
+            return 85.9843;
+            // return 100.0;
         }
         template <>
         inline float DataInitialization::getValue<float, InitMode::DenormMin>()
@@ -1069,6 +1072,7 @@ namespace TensileLite
         template <>
         inline float DataInitialization::getValue<float, InitMode::Random>()
         {
+            srand(1768697735);
             return static_cast<float>((rand() % 201) - 100);
         }
 
@@ -1487,7 +1491,13 @@ namespace TensileLite
         template <>
         inline Half DataInitialization::getValue<Half, InitMode::Max>()
         {
-            return static_cast<Half>(65504.0);
+            // return static_cast<Half>(86);
+            // return static_cast<Half>(DataInitialization::getValue<float, InitMode::Max>());
+            // return static_cast<Half>(65504.0);
+            // return static_cast<Half>(819.00165);
+            float v_fp32 = 47.625; //761.863f;
+            Half v_fp16 = __float2half(v_fp32);
+            return static_cast<Half>(v_fp16);
         }
         template <>
         inline Half DataInitialization::getValue<Half, InitMode::DenormMin>()

@@ -32,6 +32,12 @@
 
 #include <Tensile/DistinctType.hpp>
 
+
+#include <cstdint>
+#include <cstring>     // std::memcpy
+#include <iomanip>     // std::setw, std::setfill, std::hex, std::dec, std::uppercase
+
+
 namespace TensileLite
 {
 #if defined(TENSILE_USE_HIP) || defined(TENSILE_USE_FLOAT16_BUILTIN)
@@ -50,15 +56,48 @@ namespace TensileLite
 #endif
 } // namespace TensileLite
 
+// namespace std
+// {
+//     inline ostream& operator<<(ostream& stream, const TensileLite::Half val)
+//     {
+//         return stream << static_cast<float>(val);
+//     }
+
+//     inline std::string to_string(const TensileLite::Half val)
+//     {
+//         return std::to_string(static_cast<float>(val));
+//     }
+// } // namespace std
+
 namespace std
 {
     inline ostream& operator<<(ostream& stream, const TensileLite::Half val)
     {
-        return stream << static_cast<float>(val);
+        // reinterpret underlying bits
+        uint16_t bits;
+
+#if defined(TENSILE_USE_HIP) || defined(TENSILE_USE_FLOAT16_BUILTIN)
+        // val is _Float16; memcpy is safest to avoid aliasing issues
+        std::memcpy(&bits, &val, sizeof(bits));
+#else
+        // val is DistinctType<uint16_t, Half>
+        bits = val.value;
+#endif
+
+        float f = static_cast<float>(val);
+
+        // print numeric value + hex
+        stream << f << " (0x"
+               << std::hex << std::setw(4) << std::setfill('0') << bits
+               << std::dec << ")";
+
+        return stream;
     }
 
     inline std::string to_string(const TensileLite::Half val)
     {
-        return std::to_string(static_cast<float>(val));
+        std::ostringstream oss;
+        oss << val;  // reuse operator<< above
+        return oss.str();
     }
-} // namespace std
+}
