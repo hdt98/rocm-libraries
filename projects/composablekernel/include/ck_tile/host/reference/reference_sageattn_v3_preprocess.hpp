@@ -28,7 +28,7 @@ namespace reference {
 //   q_hat_out:   [B, H, seqlen_q, hdim/2]   uint8  (MXFP4 packed, lower nibble first)
 //   q_scale_out: [B, H, seqlen_q, hdim/32]  uint8  (e8m0 scale bytes)
 // -------------------------------------------------------------------------
-inline void reference_sageattn_q_preprocess(const float* Q,
+inline void reference_sageattn_v3_q_preprocess(const float* Q,
                                              float*       q_mean_out,
                                              uint8_t*     q_hat_out,
                                              uint8_t*     q_scale_out,
@@ -107,7 +107,7 @@ inline void reference_sageattn_q_preprocess(const float* Q,
 // Output:
 //   k_mean_out:  [B, H, hdim]            float
 // -------------------------------------------------------------------------
-inline void reference_sageattn_k_smooth(const float* K,
+inline void reference_sageattn_v3_k_smooth(const float* K,
                                         float*       k_mean_out,
                                         int          B,
                                         int          H,
@@ -139,7 +139,7 @@ inline void reference_sageattn_k_smooth(const float* K,
 //   k_hat_out:   [B, H, seqlen_k, hdim/2]   uint8
 //   k_scale_out: [B, H, seqlen_k, hdim/32]  uint8
 // -------------------------------------------------------------------------
-inline void reference_sageattn_k_preprocess(const float* K,
+inline void reference_sageattn_v3_k_preprocess(const float* K,
                                              const float* k_mean,
                                              uint8_t*     k_hat_out,
                                              uint8_t*     k_scale_out,
@@ -185,7 +185,7 @@ inline void reference_sageattn_k_preprocess(const float* K,
 // Output:
 //   delta_s: [B, H, num_q_blocks, seqlen_k]  float
 // -------------------------------------------------------------------------
-inline void reference_sageattn_delta_s(const float* q_mean,
+inline void reference_sageattn_v3_delta_s(const float* q_mean,
                                        const float* K,
                                        const float* k_mean,
                                        float*       delta_s,
@@ -230,7 +230,7 @@ inline void reference_sageattn_delta_s(const float* q_mean,
 //   v_hat_out:   [B, H, hdim_v, seqlen_k/2]         uint8 (MXFP4 packed)
 //   v_scale_out: [B, H, hdim_v, seqlen_k/kMxfp4Group] uint8 (e8m0 scale bytes)
 // -------------------------------------------------------------------------
-inline void reference_sageattn_v_preprocess(const float* V,
+inline void reference_sageattn_v3_v_preprocess(const float* V,
                                              uint8_t*     v_hat_out,
                                              uint8_t*     v_scale_out,
                                              int          B,
@@ -270,7 +270,7 @@ inline void reference_sageattn_v_preprocess(const float* V,
 //   scale layout: [B, H, rows, cols/kMxfp4Group]
 //   out   layout: [B, H, rows, cols]
 // -------------------------------------------------------------------------
-inline void reference_sageattn_dequant_mxfp4(const uint8_t* hat,
+inline void reference_sageattn_v3_dequant_mxfp4(const uint8_t* hat,
                                               const uint8_t* scale_bytes,
                                               float*         out,
                                               int            B,

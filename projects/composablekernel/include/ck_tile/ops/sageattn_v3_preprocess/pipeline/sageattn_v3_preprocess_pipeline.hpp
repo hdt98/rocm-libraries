@@ -4,10 +4,11 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
+#include "ck_tile/ops/sageattn_v3_preprocess/sageattn_v3_mxfp4_pack.hpp"
 
 namespace ck_tile {
 
-// SageAttnPreprocessPipeline: per-CTA computation for one tile of Q and K.
+// SageAttnV3PreprocessPipeline: per-CTA computation for one tile of Q and K.
 //
 // Each CTA (identified by tile_x, head, batch) performs:
 //
@@ -46,7 +47,7 @@ template <typename InputT_,
           index_t kCols_,
           index_t kScaleGranularity_ = 32,
           index_t kBlockSize_        = 256>
-struct SageAttnPreprocessPipeline
+struct SageAttnV3PreprocessPipeline
 {
     using InputT = InputT_;
 
@@ -148,7 +149,7 @@ struct SageAttnPreprocessPipeline
         dst_scale_ptr[row_idx * kNumGroups + grp_idx] =
             static_cast<uint8_t>(bit_cast<uint32_t>(scale) >> 23);
 
-        PackFP4Group(group_data,
+        PackFP4Group<kScaleGranularity>(group_data,
                      dst_hat_ptr + row_idx * (kCols / 2) + grp_idx * (kScaleGranularity / 2),
                      scale);
     }
@@ -159,11 +160,18 @@ struct SageAttnPreprocessPipeline
     //   k_mean_ptr:     [kCols] InputT per-head channel mean for this (batch, head).
     //   k_prime_ptr:    pointer to K'[row_start, 0] in [seqlen_k, hdim] global layout.
     //   k_prime_stride: hdim (row stride of K').
+    //   smem:           shared memory (kCols floats) — reused from RunQMean to cache k_mean.
+    //                   Caller may pass the same smem buffer; q_mean data is no longer
+    //                   needed after RunQQuantize completes.
     //
     //   Thread layout: one thread per (row, group) pair.
     //     row_idx = tid / kNumGroups  (0 .. kRows-1)
     //     grp_idx = tid % kNumGroups  (0 .. kNumGroups-1)
     //   → 100% thread utilisation. No kprime_row[kCols] stack array needed.
+    //
+    //   k_mean caching: threads 0..kCols-1 (one per channel) preload k_mean into
+    //   smem as float, followed by block_sync_lds(), so the compute loop reads from
+    //   LDS instead of global memory (avoids kRows redundant L2/HBM accesses per thread).
     // -------------------------------------------------------------------------
     CK_TILE_DEVICE void RunKSmoothAndQuantize(const InputT* __restrict__ src_ptr,
                                               const InputT* __restrict__ k_mean_ptr,
@@ -171,9 +179,17 @@ struct SageAttnPreprocessPipeline
                                               index_t k_prime_stride,
                                               uint8_t* __restrict__ dst_hat_ptr,
                                               uint8_t* __restrict__ dst_scale_ptr,
+                                              void* smem,
                                               index_t n_rows_valid) const
     {
-        const index_t tid = get_thread_id();
+        float*        smem_f = reinterpret_cast<float*>(smem);
+        const index_t tid    = get_thread_id();
+
+        // Cache k_mean from global → LDS. Threads 0..kCols-1 each load one channel.
+        // kBlockSize >= kCols so the loop runs at most once per thread.
+        for(index_t d = tid; d < kCols; d += kBlockSize)
+            smem_f[d] = static_cast<float>(k_mean_ptr[d]);
+        block_sync_lds();
 
         constexpr index_t kNumGroups = kCols / kScaleGranularity;
         const index_t     row_idx    = tid / kNumGroups;
@@ -203,8 +219,9 @@ struct SageAttnPreprocessPipeline
         float max_abs = 0.0f;
         for(index_t j = 0; j < kScaleGranularity; j++)
         {
+            // Read k_mean from LDS instead of global memory.
             const float val = static_cast<float>(src_row[d_start + j]) -
-                              static_cast<float>(k_mean_ptr[d_start + j]);
+                              smem_f[d_start + j];
             group_data[j]        = val;
             dst_row[d_start + j] = static_cast<InputT>(val);
             max_abs              = max(max_abs, abs(val));
@@ -217,7 +234,7 @@ struct SageAttnPreprocessPipeline
         dst_scale_ptr[row_idx * kNumGroups + grp_idx] =
             static_cast<uint8_t>(bit_cast<uint32_t>(scale) >> 23);
 
-        PackFP4Group(group_data,
+        PackFP4Group<kScaleGranularity>(group_data,
                      dst_hat_ptr + row_idx * (kCols / 2) + grp_idx * (kScaleGranularity / 2),
                      scale);
     }
@@ -247,29 +264,6 @@ struct SageAttnPreprocessPipeline
         atomicAdd(&k_mean_partial[d], acc);
     }
 
-private:
-    // Pack kScaleGranularity floats into kScaleGranularity/2 bytes using AMD CVT intrinsic.
-    CK_TILE_DEVICE void PackFP4Group(const float* __restrict__ group_data,
-                                      uint8_t* __restrict__ hat_group,
-                                      float scale) const
-    {
-        for(index_t j = 0; j < kScaleGranularity / 8; j++)
-        {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wuninitialized"
-            uint32_t x;
-            x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                x, group_data[8 * j + 0], group_data[8 * j + 1], scale, 0);
-            x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                x, group_data[8 * j + 2], group_data[8 * j + 3], scale, 1);
-            x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                x, group_data[8 * j + 4], group_data[8 * j + 5], scale, 2);
-            x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                x, group_data[8 * j + 6], group_data[8 * j + 7], scale, 3);
-#pragma clang diagnostic pop
-            *reinterpret_cast<uint32_t*>(hat_group + j * 4) = x;
-        }
-    }
 };
 
 } // namespace ck_tile

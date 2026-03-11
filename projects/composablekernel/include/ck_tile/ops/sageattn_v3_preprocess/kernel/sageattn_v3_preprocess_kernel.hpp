@@ -4,12 +4,13 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
-#include "ck_tile/ops/sageattn_preprocess/pipeline/sageattn_preprocess_pipeline.hpp"
+#include "ck_tile/ops/sageattn_v3_preprocess/sageattn_v3_mxfp4_pack.hpp"
+#include "ck_tile/ops/sageattn_v3_preprocess/pipeline/sageattn_v3_preprocess_pipeline.hpp"
 
 namespace ck_tile {
 
 // ============================================================================
-// SageAttnPreprocessKernel
+// SageAttnV3PreprocessKernel
 //
 // Grid: (num_tiles, nhead, batch)
 //   num_tiles = max(num_q_tiles, num_k_tiles, hdim)
@@ -20,18 +21,22 @@ namespace ck_tile {
 //   - V channel[tile_x]:   V transpose + quantize
 //
 // delta_s is produced by a separate batched GEMM (q_mean @ K'^T).
-// k_mean must already be available (written by SageAttnKMeanKernel).
+// k_mean must already be available (written by SageAttnV3KMeanKernel).
 // ============================================================================
 
-struct SageAttnPreprocessHostArgs
+// SageAttnV3PreprocessArgs: unified host/kernel args (typed on InputT).
+// Used as both the public host-side API and the kernel arg struct —
+// eliminates the old void*-based Hargs + typed Kargs duplication.
+template <typename InputT>
+struct SageAttnV3PreprocessArgs
 {
     // --- Q: [batch, nhead, seqlen_q, hdim] InputT ---
-    const void* q_ptr;
-    index_t     seqlen_q;
-    index_t     hdim;
-    index_t     stride_q;
-    index_t     nhead_stride_q;
-    index_t     batch_stride_q;
+    const InputT* q_ptr;
+    index_t       seqlen_q;
+    index_t       hdim;
+    index_t       stride_q;
+    index_t       nhead_stride_q;
+    index_t       batch_stride_q;
 
     // Q hat: [batch, nhead, seqlen_q, hdim/2] uint8
     uint8_t* q_hat_ptr;
@@ -46,18 +51,18 @@ struct SageAttnPreprocessHostArgs
     index_t  batch_stride_q_scale;
 
     // Q mean: [batch, nhead, num_q_tiles, hdim] InputT
-    void*   q_mean_ptr;           // InputT*
+    InputT* q_mean_ptr;
     index_t q_tile_size;          // kM0
     index_t stride_q_mean;        // = hdim
     index_t nhead_stride_q_mean;  // = num_q_tiles * hdim
     index_t batch_stride_q_mean;
 
     // --- K: [batch, nhead, seqlen_k, hdim] InputT ---
-    const void* k_ptr;
-    index_t     seqlen_k;
-    index_t     stride_k;
-    index_t     nhead_stride_k;
-    index_t     batch_stride_k;
+    const InputT* k_ptr;
+    index_t       seqlen_k;
+    index_t       stride_k;
+    index_t       nhead_stride_k;
+    index_t       batch_stride_k;
 
     // K hat: [batch, nhead, seqlen_k, hdim/2] uint8
     uint8_t* k_hat_ptr;
@@ -71,21 +76,21 @@ struct SageAttnPreprocessHostArgs
     index_t  nhead_stride_k_scale;
     index_t  batch_stride_k_scale;
 
-    // K mean: [batch, nhead, hdim] InputT — produced by SageAttnKMeanKernel
-    const void* k_mean_ptr;       // InputT*
-    index_t     nhead_stride_k_mean;
-    index_t     batch_stride_k_mean;
+    // K mean: [batch, nhead, hdim] InputT — produced by SageAttnV3KMeanKernel
+    const InputT* k_mean_ptr;
+    index_t       nhead_stride_k_mean;
+    index_t       batch_stride_k_mean;
 
     // K prime: [batch, nhead, seqlen_k, hdim] InputT row-major — K' = K - k_mean
-    void*   k_prime_ptr;
+    InputT* k_prime_ptr;
     index_t stride_k_prime;
     index_t nhead_stride_k_prime;
     index_t batch_stride_k_prime;
 
     // --- V: [batch, nhead, seqlen_k, hdim] InputT ---
-    const void* v_ptr;
-    index_t     nhead_stride_v;
-    index_t     batch_stride_v;
+    const InputT* v_ptr;
+    index_t       nhead_stride_v;
+    index_t       batch_stride_v;
 
     // V hat: [batch, nhead, hdim, seqlen_k/2] uint8 (transposed)
     uint8_t* v_hat_ptr;
@@ -106,74 +111,11 @@ struct SageAttnPreprocessHostArgs
     index_t num_k_tiles;
 };
 
+// Backward-compatible aliases.
 template <typename InputT>
-struct SageAttnPreprocessKargs
-{
-    const InputT* q_ptr;
-    index_t       seqlen_q;
-    index_t       hdim;
-    index_t       stride_q;
-    index_t       nhead_stride_q;
-    index_t       batch_stride_q;
-
-    uint8_t* q_hat_ptr;
-    index_t  stride_q_hat;
-    index_t  nhead_stride_q_hat;
-    index_t  batch_stride_q_hat;
-
-    uint8_t* q_scale_ptr;
-    index_t  stride_q_scale;
-    index_t  nhead_stride_q_scale;
-    index_t  batch_stride_q_scale;
-
-    InputT* q_mean_ptr;
-    index_t q_tile_size;
-    index_t stride_q_mean;
-    index_t nhead_stride_q_mean;
-    index_t batch_stride_q_mean;
-
-    const InputT* k_ptr;
-    index_t       seqlen_k;
-    index_t       stride_k;
-    index_t       nhead_stride_k;
-    index_t       batch_stride_k;
-
-    uint8_t* k_hat_ptr;
-    index_t  stride_k_hat;
-    index_t  nhead_stride_k_hat;
-    index_t  batch_stride_k_hat;
-
-    uint8_t* k_scale_ptr;
-    index_t  stride_k_scale;
-    index_t  nhead_stride_k_scale;
-    index_t  batch_stride_k_scale;
-
-    const InputT* k_mean_ptr;
-    index_t       nhead_stride_k_mean;
-    index_t       batch_stride_k_mean;
-
-    InputT* k_prime_ptr;
-    index_t stride_k_prime;
-    index_t nhead_stride_k_prime;
-    index_t batch_stride_k_prime;
-
-    const InputT* v_ptr;
-    index_t       nhead_stride_v;
-    index_t       batch_stride_v;
-
-    uint8_t* v_hat_ptr;
-    index_t  stride_v_hat;
-    index_t  nhead_stride_v_hat;
-    index_t  batch_stride_v_hat;
-
-    uint8_t* v_scale_ptr;
-    index_t  stride_v_scale;
-    index_t  nhead_stride_v_scale;
-    index_t  batch_stride_v_scale;
-
-    index_t num_q_tiles;
-    index_t num_k_tiles;
-};
+using SageAttnV3PreprocessKargs    = SageAttnV3PreprocessArgs<InputT>;
+template <typename InputT>
+using SageAttnV3PreprocessHostArgs = SageAttnV3PreprocessArgs<InputT>;
 
 // kBlockSize = kRows * (kCols / 32): one thread per (row, MXFP4-group) pair.
 // RunQQuantize and RunKSmoothAndQuantize achieve 100% thread utilisation.
@@ -182,7 +124,7 @@ template <typename InputT_,
           index_t kRows_,
           index_t kCols_,
           index_t kBlockSize_ = kRows_ * (kCols_ / 32)>
-struct SageAttnPreprocessKernel
+struct SageAttnV3PreprocessKernel
 {
     using InputT = InputT_;
 
@@ -191,78 +133,17 @@ struct SageAttnPreprocessKernel
     static constexpr index_t kBlockSize = kBlockSize_;
 
     using Pipeline =
-        SageAttnPreprocessPipeline<InputT, kRows, kCols, /*kScaleGranularity=*/32, kBlockSize>;
+        SageAttnV3PreprocessPipeline<InputT, kRows, kCols, /*kScaleGranularity=*/32, kBlockSize>;
 
-    using Kargs = SageAttnPreprocessKargs<InputT>;
-    using Hargs = SageAttnPreprocessHostArgs;
-
-    CK_TILE_HOST static Kargs MakeKargs(const Hargs& h)
-    {
-        Kargs k{};
-        k.q_ptr                = static_cast<const InputT*>(h.q_ptr);
-        k.seqlen_q             = h.seqlen_q;
-        k.hdim                 = h.hdim;
-        k.stride_q             = h.stride_q;
-        k.nhead_stride_q       = h.nhead_stride_q;
-        k.batch_stride_q       = h.batch_stride_q;
-        k.q_hat_ptr            = h.q_hat_ptr;
-        k.stride_q_hat         = h.stride_q_hat;
-        k.nhead_stride_q_hat   = h.nhead_stride_q_hat;
-        k.batch_stride_q_hat   = h.batch_stride_q_hat;
-        k.q_scale_ptr          = h.q_scale_ptr;
-        k.stride_q_scale       = h.stride_q_scale;
-        k.nhead_stride_q_scale = h.nhead_stride_q_scale;
-        k.batch_stride_q_scale = h.batch_stride_q_scale;
-        k.q_mean_ptr           = static_cast<InputT*>(h.q_mean_ptr);
-        k.q_tile_size          = h.q_tile_size;
-        k.stride_q_mean        = h.stride_q_mean;
-        k.nhead_stride_q_mean  = h.nhead_stride_q_mean;
-        k.batch_stride_q_mean  = h.batch_stride_q_mean;
-
-        k.k_ptr                = static_cast<const InputT*>(h.k_ptr);
-        k.seqlen_k             = h.seqlen_k;
-        k.stride_k             = h.stride_k;
-        k.nhead_stride_k       = h.nhead_stride_k;
-        k.batch_stride_k       = h.batch_stride_k;
-        k.k_hat_ptr            = h.k_hat_ptr;
-        k.stride_k_hat         = h.stride_k_hat;
-        k.nhead_stride_k_hat   = h.nhead_stride_k_hat;
-        k.batch_stride_k_hat   = h.batch_stride_k_hat;
-        k.k_scale_ptr          = h.k_scale_ptr;
-        k.stride_k_scale       = h.stride_k_scale;
-        k.nhead_stride_k_scale = h.nhead_stride_k_scale;
-        k.batch_stride_k_scale = h.batch_stride_k_scale;
-        k.k_mean_ptr           = static_cast<const InputT*>(h.k_mean_ptr);
-        k.nhead_stride_k_mean  = h.nhead_stride_k_mean;
-        k.batch_stride_k_mean  = h.batch_stride_k_mean;
-        k.k_prime_ptr          = static_cast<InputT*>(h.k_prime_ptr);
-        k.stride_k_prime       = h.stride_k_prime;
-        k.nhead_stride_k_prime = h.nhead_stride_k_prime;
-        k.batch_stride_k_prime = h.batch_stride_k_prime;
-
-        k.v_ptr                = static_cast<const InputT*>(h.v_ptr);
-        k.nhead_stride_v       = h.nhead_stride_v;
-        k.batch_stride_v       = h.batch_stride_v;
-        k.v_hat_ptr            = h.v_hat_ptr;
-        k.stride_v_hat         = h.stride_v_hat;
-        k.nhead_stride_v_hat   = h.nhead_stride_v_hat;
-        k.batch_stride_v_hat   = h.batch_stride_v_hat;
-        k.v_scale_ptr          = h.v_scale_ptr;
-        k.stride_v_scale       = h.stride_v_scale;
-        k.nhead_stride_v_scale = h.nhead_stride_v_scale;
-        k.batch_stride_v_scale = h.batch_stride_v_scale;
-
-        k.num_q_tiles = h.num_q_tiles;
-        k.num_k_tiles = h.num_k_tiles;
-        return k;
-    }
+    // SageAttnV3PreprocessArgs<InputT> serves as both host and kernel args — no conversion needed.
+    using Kargs = SageAttnV3PreprocessArgs<InputT>;
 
     // Grid: (num_tiles, nhead, batch)
-    //   num_tiles = max(num_q_tiles, num_k_tiles); V is handled by SageAttnVPreprocessKernel.
-    CK_TILE_HOST static dim3 GridSize(const Hargs& h)
+    //   num_tiles = max(num_q_tiles, num_k_tiles); V is handled by SageAttnV3VPreprocessKernel.
+    CK_TILE_HOST static dim3 GridSize(const Kargs& k)
     {
-        const index_t num_tiles = max(h.num_q_tiles, h.num_k_tiles);
-        return dim3(num_tiles, h.nhead, h.batch);
+        const index_t num_tiles = max(k.num_q_tiles, k.num_k_tiles);
+        return dim3(num_tiles, k.nhead, k.batch);
     }
 
     CK_TILE_HOST static constexpr dim3 BlockSize() { return dim3(kBlockSize); }
@@ -327,6 +208,8 @@ struct SageAttnPreprocessKernel
         }
 
         // ---- Step 3: K smooth + quantize -----------------------------------
+        // smem is reused from RunQMean: q_mean data is no longer needed after
+        // RunQQuantize. RunKSmoothAndQuantize will overwrite it with k_mean.
         if(do_k)
         {
             const index_t row_start = tile_x * kRows;
@@ -355,13 +238,13 @@ struct SageAttnPreprocessKernel
 
             pipeline.RunKSmoothAndQuantize(
                 src_k, k_mean, k_prime, kargs.stride_k_prime,
-                dst_k_hat, dst_k_scale, n_rows_k);
+                dst_k_hat, dst_k_scale, smem, n_rows_k);
         }
     }
 };
 
 // ============================================================================
-// SageAttnKMeanKernel
+// SageAttnV3KMeanKernel
 //
 // Computes k_mean[batch, nhead, hdim] = mean over seqlen_k of K[batch, nhead, :, hdim].
 //
@@ -374,17 +257,19 @@ struct SageAttnPreprocessKernel
 // Caller must zero-initialise k_mean_partial_ptr and counter_ptr before launch.
 // ============================================================================
 
-struct SageAttnKMeanHostArgs
+// Unified kernel/host args for the K-mean kernel (typed on InputT).
+template <typename InputT>
+struct SageAttnV3KMeanKargs
 {
-    const void* k_ptr;
-    index_t     seqlen_k;
-    index_t     hdim;
-    index_t     stride_k;          // = hdim
-    index_t     nhead_stride_k;
-    index_t     batch_stride_k;
+    const InputT* k_ptr;
+    index_t       seqlen_k;
+    index_t       hdim;
+    index_t       stride_k;        // = hdim
+    index_t       nhead_stride_k;
+    index_t       batch_stride_k;
 
     float*   k_mean_partial_ptr;   // [batch, nhead, hdim] float, pre-zeroed
-    void*    k_mean_ptr;           // [batch, nhead, hdim] InputT, output
+    InputT*  k_mean_ptr;           // [batch, nhead, hdim] InputT, output
     int32_t* counter_ptr;          // [batch, nhead] int32, pre-zeroed
 
     index_t nhead_stride_kmean;    // = hdim
@@ -395,29 +280,8 @@ struct SageAttnKMeanHostArgs
     index_t batch;
 };
 
-template <typename InputT>
-struct SageAttnKMeanKargs
-{
-    const InputT* k_ptr;
-    index_t       seqlen_k;
-    index_t       hdim;
-    index_t       stride_k;
-    index_t       nhead_stride_k;
-    index_t       batch_stride_k;
-
-    float*        k_mean_partial_ptr;
-    InputT*       k_mean_ptr;
-    int32_t*      counter_ptr;
-
-    index_t nhead_stride_kmean;
-    index_t batch_stride_kmean;
-
-    index_t num_k_tiles;
-    index_t nhead;
-};
-
 template <typename InputT_, index_t kRows_, index_t kCols_>
-struct SageAttnKMeanKernel
+struct SageAttnV3KMeanKernel
 {
     using InputT = InputT_;
 
@@ -426,33 +290,13 @@ struct SageAttnKMeanKernel
     static constexpr index_t kBlockSize = kCols; // one thread per d-channel
 
     // Pipeline reused only for RunKMeanPartial.
-    using Pipeline = SageAttnPreprocessPipeline<InputT, kRows, kCols>;
+    using Pipeline = SageAttnV3PreprocessPipeline<InputT, kRows, kCols>;
 
-    using Kargs = SageAttnKMeanKargs<InputT>;
-    using Hargs = SageAttnKMeanHostArgs;
+    using Kargs = SageAttnV3KMeanKargs<InputT>;
 
-    CK_TILE_HOST static Kargs MakeKargs(const Hargs& h)
+    CK_TILE_HOST static dim3 GridSize(const Kargs& k)
     {
-        Kargs k{};
-        k.k_ptr                = static_cast<const InputT*>(h.k_ptr);
-        k.seqlen_k             = h.seqlen_k;
-        k.hdim                 = h.hdim;
-        k.stride_k             = h.stride_k;
-        k.nhead_stride_k       = h.nhead_stride_k;
-        k.batch_stride_k       = h.batch_stride_k;
-        k.k_mean_partial_ptr   = h.k_mean_partial_ptr;
-        k.k_mean_ptr           = static_cast<InputT*>(h.k_mean_ptr);
-        k.counter_ptr          = h.counter_ptr;
-        k.nhead_stride_kmean   = h.nhead_stride_kmean;
-        k.batch_stride_kmean   = h.batch_stride_kmean;
-        k.num_k_tiles          = h.num_k_tiles;
-        k.nhead                = h.nhead;
-        return k;
-    }
-
-    CK_TILE_HOST static dim3 GridSize(const Hargs& h)
-    {
-        return dim3(h.num_k_tiles, h.nhead, h.batch);
+        return dim3(k.num_k_tiles, k.nhead, k.batch);
     }
 
     CK_TILE_HOST static constexpr dim3 BlockSize() { return dim3(kBlockSize); }
@@ -515,7 +359,7 @@ struct SageAttnKMeanKernel
 };
 
 // ============================================================================
-// SageAttnVPreprocessKernel
+// SageAttnV3VPreprocessKernel
 //
 // Quantises V (transposed layout) using an LDS-based 2-D tile transpose that
 // avoids the non-coalesced column reads of the old per-channel approach.
@@ -556,15 +400,17 @@ struct SageAttnKMeanKernel
 //   hdim     % kVHdimTile                   == 0
 // ============================================================================
 
-struct SageAttnVPreprocessHostArgs
+// Unified kernel/host args for the V preprocess kernel (typed on InputT).
+template <typename InputT>
+struct SageAttnV3VPreprocessKargs
 {
     // V source: [batch, nhead, seqlen_k, hdim] InputT row-major
-    const void* v_ptr;
-    index_t     seqlen_k;
-    index_t     seqlen_k_real;
-    index_t     hdim;              // also the row stride of V
-    index_t     nhead_stride_v;    // = seqlen_k * hdim
-    index_t     batch_stride_v;    // = nhead * seqlen_k * hdim
+    const InputT* v_ptr;
+    index_t       seqlen_k;       // padded seqlen_k (used for GridSize)
+    index_t       seqlen_k_real;  // unpadded seqlen_k (used for input bounds check)
+    index_t       hdim;           // also the row stride of V
+    index_t       nhead_stride_v; // = seqlen_k * hdim
+    index_t       batch_stride_v; // = nhead * seqlen_k * hdim
 
     // V hat: [batch, nhead, hdim, seqlen_k/2] uint8 (transposed)
     uint8_t* v_hat_ptr;
@@ -582,34 +428,11 @@ struct SageAttnVPreprocessHostArgs
     index_t batch;
 };
 
-template <typename InputT>
-struct SageAttnVPreprocessKargs
-{
-    const InputT* v_ptr;
-    index_t       seqlen_k;
-    index_t       seqlen_k_real;
-    index_t       hdim;
-    index_t       nhead_stride_v;
-    index_t       batch_stride_v;
-
-    uint8_t* v_hat_ptr;
-    index_t  stride_v_hat;
-    index_t  nhead_stride_v_hat;
-    index_t  batch_stride_v_hat;
-
-    uint8_t* v_scale_ptr;
-    index_t  stride_v_scale;
-    index_t  nhead_stride_v_scale;
-    index_t  batch_stride_v_scale;
-
-    index_t nhead;
-};
-
 template <typename InputT_,
           index_t kVGroup_          = 32,
           index_t kVHdimTile_       = 32,
           index_t kVGroupsPerBlock_ = 2>
-struct SageAttnVPreprocessKernel
+struct SageAttnV3VPreprocessKernel
 {
     using InputT = InputT_;
 
@@ -630,36 +453,14 @@ struct SageAttnVPreprocessKernel
                   "kVHdimTile and kVGroup must be multiples of each other");
     static_assert(kVGroupsPerBlock >= 1, "kVGroupsPerBlock must be at least 1");
 
-    using Kargs = SageAttnVPreprocessKargs<InputT>;
-    using Hargs = SageAttnVPreprocessHostArgs;
-
-    CK_TILE_HOST static Kargs MakeKargs(const Hargs& h)
-    {
-        Kargs k{};
-        k.v_ptr                = static_cast<const InputT*>(h.v_ptr);
-        k.seqlen_k             = h.seqlen_k;
-        k.seqlen_k_real        = h.seqlen_k_real;
-        k.hdim                 = h.hdim;
-        k.nhead_stride_v       = h.nhead_stride_v;
-        k.batch_stride_v       = h.batch_stride_v;
-        k.v_hat_ptr            = h.v_hat_ptr;
-        k.stride_v_hat         = h.stride_v_hat;
-        k.nhead_stride_v_hat   = h.nhead_stride_v_hat;
-        k.batch_stride_v_hat   = h.batch_stride_v_hat;
-        k.v_scale_ptr          = h.v_scale_ptr;
-        k.stride_v_scale       = h.stride_v_scale;
-        k.nhead_stride_v_scale = h.nhead_stride_v_scale;
-        k.batch_stride_v_scale = h.batch_stride_v_scale;
-        k.nhead                = h.nhead;
-        return k;
-    }
+    using Kargs = SageAttnV3VPreprocessKargs<InputT>;
 
     // Grid: (seqlen_k / (kVGroup * kVGroupsPerBlock), hdim / kVHdimTile, batch * nhead)
-    CK_TILE_HOST static dim3 GridSize(const Hargs& h)
+    CK_TILE_HOST static dim3 GridSize(const Kargs& k)
     {
-        return dim3(h.seqlen_k / (kVGroup * kVGroupsPerBlock),
-                    h.hdim / kVHdimTile,
-                    h.batch * h.nhead);
+        return dim3(k.seqlen_k / (kVGroup * kVGroupsPerBlock),
+                    k.hdim / kVHdimTile,
+                    k.batch * k.nhead);
     }
 
     CK_TILE_HOST static constexpr dim3 BlockSize() { return dim3(kBlockSize); }
@@ -746,30 +547,7 @@ struct SageAttnVPreprocessKernel
             // V_hat[d_global, g_abs*(kVGroup/2) ..]
             uint8_t* hat_ptr =
                 v_hat_base + d_global * kargs.stride_v_hat + g_abs * (kVGroup / 2);
-            PackFP4Group(group_data, hat_ptr, scale);
-        }
-    }
-
-private:
-    CK_TILE_DEVICE void PackFP4Group(const float* __restrict__ group_data,
-                                      uint8_t* __restrict__ hat_group,
-                                      float scale) const
-    {
-        for(index_t j = 0; j < kVGroup / 8; j++)
-        {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wuninitialized"
-            uint32_t x;
-            x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                x, group_data[8 * j + 0], group_data[8 * j + 1], scale, 0);
-            x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                x, group_data[8 * j + 2], group_data[8 * j + 3], scale, 1);
-            x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                x, group_data[8 * j + 4], group_data[8 * j + 5], scale, 2);
-            x = __builtin_amdgcn_cvt_scalef32_pk_fp4_f32(
-                x, group_data[8 * j + 6], group_data[8 * j + 7], scale, 3);
-#pragma clang diagnostic pop
-            *reinterpret_cast<uint32_t*>(hat_group + j * 4) = x;
+            PackFP4Group<kVGroup>(group_data, hat_ptr, scale);
         }
     }
 };

@@ -3,9 +3,9 @@
 
 // End-to-end GPU correctness test for SageAttn preprocessing (SA3).
 //
-// Exercises the three-kernel pipeline launched by sageattn_preprocess_run():
+// Exercises the three-kernel pipeline launched by sageattn_v3_preprocess_run():
 //   Launch 0: SageAttnKMeanKernel     — computes k_mean[b,h,d] = mean_n(K[b,h,n,d])
-//   Launch 1: SageAttnPreprocessKernel — Q mean+quantize, K smooth+quantize, V transpose+quantize
+//   Launch 1: SageAttnV3PreprocessKernel — Q mean+quantize, K smooth+quantize, V transpose+quantize
 //   Launch 2: BatchedGemmKernel        — delta_s = q_mean @ K'^T
 //
 // Verified outputs:
@@ -30,14 +30,14 @@
 #ifdef CK_USE_NATIVE_MX_SUPPORT
 
 #include "ck_tile/host.hpp"
-#include "ck_tile/ops/sageattn_preprocess/sageattn_preprocess.hpp"
-#include "ck_tile/host/reference/reference_sageattn_preprocess.hpp"
+#include "ck_tile/ops/sageattn_v3_preprocess/sageattn_v3_preprocess.hpp"
+#include "ck_tile/host/reference/reference_sageattn_v3_preprocess.hpp"
 
 namespace {
 
-// Dispatch sageattn_preprocess_run for runtime hdim (128 or 256).
+// Dispatch sageattn_v3_preprocess_run for runtime hdim (128 or 256).
 template <typename InputT>
-void run_sageattn_preprocess(const ck_tile::SageAttnPreprocessHostArgs& h,
+void run_sageattn_v3_preprocess(const ck_tile::SageAttnV3PreprocessArgs<InputT>& h,
                              float* delta_s_ptr,
                              InputT* k_mean_buf,
                              InputT* k_prime_buf,
@@ -46,10 +46,10 @@ void run_sageattn_preprocess(const ck_tile::SageAttnPreprocessHostArgs& h,
                              hipStream_t stream)
 {
     if(h.hdim == 128)
-        ck_tile::sageattn_preprocess_run<InputT, /*kRows=*/128, /*kCols=*/128>(
+        ck_tile::sageattn_v3_preprocess_run<InputT, /*kRows=*/128, /*kCols=*/128>(
             h, delta_s_ptr, k_mean_buf, k_prime_buf, k_mean_partial_buf, counter_buf, stream);
     else if(h.hdim == 256)
-        ck_tile::sageattn_preprocess_run<InputT, /*kRows=*/128, /*kCols=*/256>(
+        ck_tile::sageattn_v3_preprocess_run<InputT, /*kRows=*/128, /*kCols=*/256>(
             h, delta_s_ptr, k_mean_buf, k_prime_buf, k_mean_partial_buf, counter_buf, stream);
     else
         throw std::runtime_error("Unsupported hdim (must be 128 or 256)");
@@ -69,7 +69,7 @@ std::vector<ck_tile::fp16_t> float_to_fp16_vec(const std::vector<float>& src)
 // ---------------------------------------------------------------------------
 // Test fixture: parameterized by (B, H, seqlen_q, seqlen_k, hdim, use_fp16)
 // ---------------------------------------------------------------------------
-class SageAttnPreprocessTest
+class SageAttnV3PreprocessTest
     : public ::testing::TestWithParam<std::tuple<int, int, int, int, int, bool>>
 {
     protected:
@@ -98,7 +98,7 @@ class SageAttnPreprocessTest
 };
 
 template <typename InputT>
-void SageAttnPreprocessTest::RunGPUTest()
+void SageAttnV3PreprocessTest::RunGPUTest()
 {
     const int b = B(), h = H(), sq = seqlen_q(), sk = seqlen_k(), hd = hdim();
     ASSERT_EQ(hd % kG, 0) << "hdim must be divisible by 32";
@@ -129,7 +129,7 @@ void SageAttnPreprocessTest::RunGPUTest()
 
     // ---- CPU reference: k_mean (float precision) ----
     std::vector<float> k_mean_ref_f32(b * h * hd, 0.0f);
-    ck_tile::reference::reference_sageattn_k_smooth(
+    ck_tile::reference::reference_sageattn_v3_k_smooth(
         K_f32.data(), k_mean_ref_f32.data(), b, h, sk, hd);
 
     // If InputT = fp16, the GPU stores k_mean as fp16 → quantise the CPU reference too.
@@ -145,7 +145,7 @@ void SageAttnPreprocessTest::RunGPUTest()
     std::vector<float> q_mean_ref_f32(b * h * num_q_tiles * hd, 0.0f);
     std::vector<uint8_t> q_hat_ref(b * h * sq * (hd / 2), 0);
     std::vector<uint8_t> q_scale_ref(b * h * sq * (hd / kG), 0);
-    ck_tile::reference::reference_sageattn_q_preprocess(Q_f32.data(),
+    ck_tile::reference::reference_sageattn_v3_q_preprocess(Q_f32.data(),
                                                         q_mean_ref_f32.data(),
                                                         q_hat_ref.data(),
                                                         q_scale_ref.data(),
@@ -164,7 +164,7 @@ void SageAttnPreprocessTest::RunGPUTest()
     }
 
     std::vector<float> delta_s_ref(b * h * num_q_tiles * sk, 0.0f);
-    ck_tile::reference::reference_sageattn_delta_s(q_mean_ref_rt.data(),
+    ck_tile::reference::reference_sageattn_v3_delta_s(q_mean_ref_rt.data(),
                                                    K_f32.data(),
                                                    k_mean_ref_rt.data(),
                                                    delta_s_ref.data(),
@@ -176,12 +176,12 @@ void SageAttnPreprocessTest::RunGPUTest()
 
     std::vector<uint8_t> k_hat_ref(b * h * sk * (hd / 2), 0);
     std::vector<uint8_t> k_scale_ref(b * h * sk * (hd / kG), 0);
-    ck_tile::reference::reference_sageattn_k_preprocess(
+    ck_tile::reference::reference_sageattn_v3_k_preprocess(
         K_f32.data(), k_mean_ref_rt.data(), k_hat_ref.data(), k_scale_ref.data(), b, h, sk, hd);
 
     std::vector<uint8_t> v_hat_ref(b * h * hd * (sk / 2), 0);
     std::vector<uint8_t> v_scale_ref(b * h * hd * (sk / kG), 0);
-    ck_tile::reference::reference_sageattn_v_preprocess(
+    ck_tile::reference::reference_sageattn_v3_v_preprocess(
         V_f32.data(), v_hat_ref.data(), v_scale_ref.data(), b, h, sk, hd);
 
     // ---- Allocate and upload GPU input buffers ----
@@ -221,9 +221,9 @@ void SageAttnPreprocessTest::RunGPUTest()
     ck_tile::DeviceMem k_mean_partial_buf(bsz.k_mean_partial_bytes);
     ck_tile::DeviceMem counter_buf(bsz.counter_bytes);
 
-    // ---- Fill Hargs (k_mean_ptr / k_prime_ptr filled by sageattn_preprocess_run) ----
-    ck_tile::SageAttnPreprocessHostArgs hargs{};
-    hargs.q_ptr                = q_dev.GetDeviceBuffer();
+    // ---- Fill Hargs (k_mean_ptr / k_prime_ptr filled by sageattn_v3_preprocess_run) ----
+    ck_tile::SageAttnV3PreprocessArgs<InputT> hargs{};
+    hargs.q_ptr                = static_cast<const InputT*>(q_dev.GetDeviceBuffer());
     hargs.seqlen_q             = sq;
     hargs.hdim                 = hd;
     hargs.stride_q             = hd;
@@ -237,13 +237,13 @@ void SageAttnPreprocessTest::RunGPUTest()
     hargs.stride_q_scale       = hd / kG;
     hargs.nhead_stride_q_scale = sq_pad * (hd / kG);
     hargs.batch_stride_q_scale = h * sq_pad * (hd / kG);
-    hargs.q_mean_ptr           = q_mean_dev.GetDeviceBuffer();
+    hargs.q_mean_ptr           = static_cast<InputT*>(q_mean_dev.GetDeviceBuffer());
     hargs.q_tile_size          = kM0;
     hargs.stride_q_mean        = hd;
     hargs.nhead_stride_q_mean  = num_q_tiles * hd;
     hargs.batch_stride_q_mean  = h * num_q_tiles * hd;
 
-    hargs.k_ptr                = k_dev.GetDeviceBuffer();
+    hargs.k_ptr                = static_cast<const InputT*>(k_dev.GetDeviceBuffer());
     hargs.seqlen_k             = sk;
     hargs.stride_k             = hd;
     hargs.nhead_stride_k       = sk * hd;
@@ -256,9 +256,9 @@ void SageAttnPreprocessTest::RunGPUTest()
     hargs.stride_k_scale       = hd / kG;
     hargs.nhead_stride_k_scale = sk_pad * (hd / kG);
     hargs.batch_stride_k_scale = h * sk_pad * (hd / kG);
-    // k_mean_ptr and k_prime_ptr are set inside sageattn_preprocess_run().
+    // k_mean_ptr and k_prime_ptr are set inside sageattn_v3_preprocess_run().
 
-    hargs.v_ptr                = v_dev.GetDeviceBuffer();
+    hargs.v_ptr                = static_cast<const InputT*>(v_dev.GetDeviceBuffer());
     hargs.nhead_stride_v       = sk * hd;
     hargs.batch_stride_v       = h * sk * hd;
     hargs.v_hat_ptr            = static_cast<uint8_t*>(v_hat_dev.GetDeviceBuffer());
@@ -276,7 +276,7 @@ void SageAttnPreprocessTest::RunGPUTest()
     hargs.num_k_tiles = num_k_tiles;
 
     // ---- Launch ----
-    run_sageattn_preprocess<InputT>(hargs,
+    run_sageattn_v3_preprocess<InputT>(hargs,
                                     static_cast<float*>(delta_s_dev.GetDeviceBuffer()),
                                     static_cast<InputT*>(k_mean_buf.GetDeviceBuffer()),
                                     static_cast<InputT*>(k_prime_buf.GetDeviceBuffer()),
@@ -392,7 +392,7 @@ void SageAttnPreprocessTest::RunGPUTest()
                 }
 
         std::vector<float> q_dequant(b * h * sq * hd);
-        ck_tile::reference::reference_sageattn_dequant_mxfp4(
+        ck_tile::reference::reference_sageattn_v3_dequant_mxfp4(
             q_hat_real.data(), q_scale_real.data(), q_dequant.data(), b, h, sq, hd);
 
         std::vector<float> q_smooth_ref(b * h * sq * hd);
@@ -453,7 +453,7 @@ void SageAttnPreprocessTest::RunGPUTest()
                 }
 
         std::vector<float> k_dequant(b * h * sk * hd);
-        ck_tile::reference::reference_sageattn_dequant_mxfp4(
+        ck_tile::reference::reference_sageattn_v3_dequant_mxfp4(
             k_hat_real.data(), k_scale_real.data(), k_dequant.data(), b, h, sk, hd);
 
         std::vector<float> k_smooth_ref(b * h * sk * hd);
@@ -507,7 +507,7 @@ void SageAttnPreprocessTest::RunGPUTest()
                 }
 
         std::vector<float> v_dequant(b * h * hd * sk);
-        ck_tile::reference::reference_sageattn_dequant_mxfp4(
+        ck_tile::reference::reference_sageattn_v3_dequant_mxfp4(
             v_hat_real.data(), v_scale_real.data(), v_dequant.data(), b, h, hd, sk);
 
         for(int bi = 0; bi < b; bi++)
@@ -526,9 +526,9 @@ void SageAttnPreprocessTest::RunGPUTest()
 // ---------------------------------------------------------------------------
 // Test entry points
 // ---------------------------------------------------------------------------
-TEST_P(SageAttnPreprocessTest, Fp16Input) { RunGPUTest<ck_tile::fp16_t>(); }
+TEST_P(SageAttnV3PreprocessTest, Fp16Input) { RunGPUTest<ck_tile::fp16_t>(); }
 
-TEST_P(SageAttnPreprocessTest, Float32Input) { RunGPUTest<float>(); }
+TEST_P(SageAttnV3PreprocessTest, Float32Input) { RunGPUTest<float>(); }
 
 // ---------------------------------------------------------------------------
 // Test instantiation: (B, H, seqlen_q, seqlen_k, hdim, unused_flag)
@@ -536,7 +536,7 @@ TEST_P(SageAttnPreprocessTest, Float32Input) { RunGPUTest<float>(); }
 // ---------------------------------------------------------------------------
 INSTANTIATE_TEST_SUITE_P(
     Shapes,
-    SageAttnPreprocessTest,
+    SageAttnV3PreprocessTest,
     ::testing::Values(
         // --- aligned cases (seqlen multiples of kRows=128) ---
         std::make_tuple(1, 1, 256, 128, 128, true),
@@ -555,7 +555,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 #else // CK_USE_NATIVE_MX_SUPPORT not defined
 
-TEST(SageAttnPreprocessTest, SkippedOnNonGfx950)
+TEST(SageAttnV3PreprocessTest, SkippedOnNonGfx950)
 {
     GTEST_SKIP() << "SageAttention V3 preprocessing requires gfx950 (CK_USE_NATIVE_MX_SUPPORT)";
 }
