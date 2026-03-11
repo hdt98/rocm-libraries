@@ -110,7 +110,7 @@ def generate_dispatch_header(output_dir: Path, wrapper_dir: Path) -> Path:
         "// Stable C ABI for dlopen/dlsym-based kernel registration.",
         '// Plugins call dlsym(handle, "ck_fmha_register_kernels") to get this.',
         'extern "C" __attribute__((visibility("default")))',
-        "inline int ck_fmha_register_kernels(",
+        "int ck_fmha_register_kernels(",
         "    ck_tile::dispatcher::FmhaRegistry& registry, const char* arch) {",
         "    ::generated::register_fmha_python_kernels(registry, arch ? std::string(arch) : std::string());",
         f"    return {len(kernel_names)};",

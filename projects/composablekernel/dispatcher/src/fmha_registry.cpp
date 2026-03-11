@@ -244,6 +244,7 @@ std::size_t FmhaRegistry::filter_by_arch(const std::string& gpu_arch)
 
 std::size_t FmhaRegistry::filter_by_receipt(int receipt_id)
 {
+    std::lock_guard<std::mutex> lock(mutex());
     std::vector<std::string> to_remove;
     for(const auto& [name, entry] : entries())
     {
@@ -265,6 +266,7 @@ std::size_t FmhaRegistry::filter_by_receipt(int receipt_id)
 
 std::vector<int> FmhaRegistry::available_receipts() const
 {
+    std::lock_guard<std::mutex> lock(mutex());
     std::set<int> receipts;
     for(const auto& [name, entry] : entries())
     {

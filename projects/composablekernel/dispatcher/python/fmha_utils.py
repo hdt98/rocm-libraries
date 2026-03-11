@@ -34,21 +34,24 @@ import numpy as np
 # =============================================================================
 
 
-def get_dispatcher_root() -> Path:
-    return Path(__file__).parent.parent
+try:
+    from dispatcher_common import detect_gpu_arch, get_dispatcher_root
+except ImportError:
+    # Standalone usage without dispatcher_common on PYTHONPATH
+    def get_dispatcher_root() -> Path:
+        return Path(__file__).parent.parent
 
-
-def detect_gpu_arch() -> str:
-    try:
-        out = subprocess.check_output(
-            ["rocminfo"], text=True, stderr=subprocess.DEVNULL
-        )
-        for line in out.splitlines():
-            if "Name:" in line and "gfx" in line:
-                return line.split()[-1].strip()
-    except Exception:
-        pass
-    return "gfx950"
+    def detect_gpu_arch(fallback: str = "gfx950") -> str:
+        try:
+            out = subprocess.check_output(
+                ["rocminfo"], text=True, stderr=subprocess.DEVNULL
+            )
+            for line in out.splitlines():
+                if "Name:" in line and "gfx" in line:
+                    return line.split()[-1].strip()
+        except Exception:
+            pass
+        return fallback
 
 
 # =============================================================================
@@ -336,9 +339,12 @@ class FmhaDispatcherLib:
             ctypes.c_int,  # has_dropout
             ctypes.c_int,  # traits_hdim_q (0=same as hdim_q)
             ctypes.c_int,  # traits_hdim_v (0=same as hdim_v)
+            ctypes.c_int,  # is_v_rowmajor (1=row, 0=col)
             ctypes.c_int,  # perm (1=BHSD, 0=BSHD)
             ctypes.c_char_p,  # data_type ("fp16", "bf16")
             ctypes.c_int,  # is_group_mode
+            ctypes.c_int,  # window_left (-1=no window)
+            ctypes.c_int,  # window_right (-1=no window, 0=causal)
             ctypes.POINTER(ctypes.c_float),  # time_ms_out
         ]
         lib.fmha_dispatcher_run_fwd.restype = ctypes.c_int
@@ -593,9 +599,12 @@ class FmhaRunner:
                 has_dropout,
                 0,
                 0,  # traits_hdim_q/v (0 = same as hdim)
+                1,  # is_v_rowmajor
                 1,  # perm (1=BHSD)
                 b"fp16",
                 0,  # is_group_mode
+                -1,  # window_left (no window)
+                -1,  # window_right (no window)
                 ctypes.byref(time_ms),
             )
 

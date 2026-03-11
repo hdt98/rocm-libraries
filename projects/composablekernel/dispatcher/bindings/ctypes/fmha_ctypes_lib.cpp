@@ -86,9 +86,12 @@ int fmha_dispatcher_run_fwd(const void* q_host,
                             int has_dropout,
                             int traits_hdim_q,
                             int traits_hdim_v,
+                            int is_v_rowmajor,
                             int perm,
                             const char* data_type_str,
                             int is_group_mode,
+                            int window_left,
+                            int window_right,
                             float* time_ms_out)
 {
     if(!g_initialized)
@@ -162,7 +165,7 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     traits.hdim_v        = (traits_hdim_v > 0) ? traits_hdim_v : hdim_v;
     traits.data_type     = data_type_str ? data_type_str : "fp16";
     traits.is_group_mode = (is_group_mode != 0);
-    traits.is_v_rowmajor = true;
+    traits.is_v_rowmajor = (is_v_rowmajor != 0);
     traits.mask_type     = static_cast<mask_enum>(mask_type_int);
     traits.bias_type     = static_cast<bias_enum>(bias_type_int);
     traits.has_lse       = (has_lse != 0);
@@ -262,8 +265,8 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     args.batch_stride_k_descale = 0;
     args.batch_stride_v_descale = 0;
 
-    args.window_size_left    = -1;
-    args.window_size_right   = (mask_type_int > 0) ? 0 : -1;
+    args.window_size_left    = window_left;
+    args.window_size_right   = window_right;
     args.sink_size           = 0;
     args.mask_type           = mask_type_int;
     args.min_seqlen_q        = 0;
