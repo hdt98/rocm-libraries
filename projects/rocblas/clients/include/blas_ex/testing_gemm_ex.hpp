@@ -28,6 +28,55 @@
 
 #include <rocblas/internal/rocblas-beta.h>
 
+#include <fstream>
+#include <iomanip>
+#include <type_traits>
+
+namespace dump_detail
+{
+    template <typename T>
+    auto to_printable(const T& val) -> std::enable_if_t<!rocblas_is_complex<T>, double>
+    {
+        return static_cast<double>(val);
+    }
+
+    template <typename T>
+    auto to_printable(const T& val) -> std::enable_if_t<rocblas_is_complex<T>, std::complex<double>>
+    {
+        return std::complex<double>(static_cast<double>(std::real(val)),
+                                    static_cast<double>(std::imag(val)));
+    }
+}
+
+template <typename T>
+void dump_matrix_to_file(const std::string& filename,
+                         const T*           data,
+                         int64_t            rows,
+                         int64_t            cols,
+                         int64_t            ld)
+{
+    std::ofstream ofs(filename);
+    if(!ofs.is_open())
+    {
+        rocblas_cerr << "ERROR: Could not open file " << filename << " for writing" << std::endl;
+        return;
+    }
+    ofs << "# rows=" << rows << " cols=" << cols << " ld=" << ld << std::endl;
+    ofs << std::setprecision(8);
+    for(int64_t i = 0; i < rows; i++)
+    {
+        for(int64_t j = 0; j < cols; j++)
+        {
+            if(j > 0)
+                ofs << " ";
+            ofs << dump_detail::to_printable(data[i + j * ld]);
+        }
+        ofs << std::endl;
+    }
+    ofs.close();
+    rocblas_cout << "Dumped matrix to " << filename << std::endl;
+}
+
 /* ============================================================================================ */
 template <typename Ti, typename To, typename Tc>
 void testing_gemm_ex_bad_arg(const Arguments& arg)
@@ -357,24 +406,72 @@ void testing_gemm_ex_run(const Arguments& arg)
         rocblas_init_nan<To>(hD_2, M, N, ldd);
         rocblas_init_nan<To_hpa>(hD_gold, M, N, ldd);
 
+        // --- DEBUG: dump input matrices to files ---
+        {
+            std::string prefix = "/tmp/rocblas_debug_sol" + std::to_string(solution_index) + "_";
+            dump_matrix_to_file(prefix + "A.txt", (const Ti*)hA, A_row, A_col, lda);
+            dump_matrix_to_file(prefix + "B.txt", (const Ti*)hB, B_row, B_col, ldb);
+            dump_matrix_to_file(prefix + "C.txt", (const To*)hC, M, N, ldc);
+            rocblas_cout << "DEBUG: Dumped input matrices A, B, C for solution_index="
+                         << solution_index << " (M=" << M << " N=" << N << " K=" << K
+                         << " transA=" << arg.transA << " transB=" << arg.transB
+                         << " alpha=" << dump_detail::to_printable(h_alpha_Tc)
+                         << " beta=" << dump_detail::to_printable(h_beta_Tc) << ")" << std::endl;
+        }
+
+        bool host_call_succeeded = false;
         if(arg.pointer_mode_host)
         {
             // ROCBLAS rocblas_pointer_mode_host
             CHECK_ROCBLAS_ERROR(rocblas_set_pointer_mode(handle, rocblas_pointer_mode_host));
             handle.pre_test(arg);
-            // clang-format off
-            DAPI_CHECK(rocblas_gemm_ex_fn, (handle, transA, transB, M, N, K, &h_alpha_Tc,
+
+            rocblas_status gemm_host_status;
+            if(arg.api & c_API_64)
+            {
+                gemm_host_status = rocblas_gemm_ex_fn_64(handle, transA, transB, M, N, K, &h_alpha_Tc,
                                                dA, arg.a_type, lda,
                                                dB, arg.b_type, ldb, &h_beta_Tc,
                                                dC, arg.c_type, ldc,
-                                               dDref,  d_type, ldd,
-                                               arg.compute_type, algo, solution_index, flags));
-            // clang-format on
+                                               dDref, d_type, ldd,
+                                               arg.compute_type, algo, solution_index, flags);
+            }
+            else
+            {
+                gemm_host_status = rocblas_gemm_ex_fn(handle, transA, transB, M, N, K, &h_alpha_Tc,
+                                               dA, arg.a_type, lda,
+                                               dB, arg.b_type, ldb, &h_beta_Tc,
+                                               dC, arg.c_type, ldc,
+                                               dDref, d_type, ldd,
+                                               arg.compute_type, algo, solution_index, flags);
+            }
+            EXPECT_TRUE(status_match(rocblas_status_success, gemm_host_status))
+                << "rocblas_gemm_ex host pointer mode returned "
+                << rocblas_status_to_string(gemm_host_status)
+                << " for solution_index=" << solution_index;
+
             handle.post_test(arg);
-            // copy output from device to CPU
-            CHECK_HIP_ERROR(hD_1.transfer_from(dDref));
+
+            if(gemm_host_status == rocblas_status_success)
+            {
+                host_call_succeeded = true;
+                CHECK_HIP_ERROR(hD_1.transfer_from(dDref));
+
+                // --- DEBUG: dump GPU output D ---
+                std::string prefix = "/tmp/rocblas_debug_sol" + std::to_string(solution_index) + "_";
+                dump_matrix_to_file(prefix + "D_gpu_host_ptr.txt", (const To*)hD_1, M, N, ldd);
+                rocblas_cout << "DEBUG: Dumped GPU output D (host pointer mode) for solution_index="
+                             << solution_index << std::endl;
+            }
+            else
+            {
+                rocblas_cerr << "DEBUG: Skipping D dump for solution_index=" << solution_index
+                             << " (call returned " << rocblas_status_to_string(gemm_host_status)
+                             << ")" << std::endl;
+            }
         }
 
+        bool device_call_succeeded = false;
         if(arg.pointer_mode_device)
         {
             // ROCBLAS rocblas_pointer_mode_device
@@ -384,18 +481,43 @@ void testing_gemm_ex_run(const Arguments& arg)
 
             CHECK_HIP_ERROR(hipMemcpy(d_alpha_Tc, &h_alpha_Tc, sizeof(Tc), hipMemcpyHostToDevice));
             CHECK_HIP_ERROR(hipMemcpy(d_beta_Tc, &h_beta_Tc, sizeof(Tc), hipMemcpyHostToDevice));
-            // clang-format off
-            DAPI_CHECK(rocblas_gemm_ex_fn, (handle, transA, transB, M, N, K, d_alpha_Tc,
+
+            rocblas_status gemm_dev_status;
+            if(arg.api & c_API_64)
+            {
+                gemm_dev_status = rocblas_gemm_ex_fn_64(handle, transA, transB, M, N, K, d_alpha_Tc,
                                                dA, arg.a_type, lda,
                                                dB, arg.b_type, ldb, d_beta_Tc,
                                                dC, arg.c_type, ldc,
-                                               dDref,  d_type, ldd,
-                                               arg.compute_type, algo, solution_index, flags));
-            // clang-format on
+                                               dDref, d_type, ldd,
+                                               arg.compute_type, algo, solution_index, flags);
+            }
+            else
+            {
+                gemm_dev_status = rocblas_gemm_ex_fn(handle, transA, transB, M, N, K, d_alpha_Tc,
+                                               dA, arg.a_type, lda,
+                                               dB, arg.b_type, ldb, d_beta_Tc,
+                                               dC, arg.c_type, ldc,
+                                               dDref, d_type, ldd,
+                                               arg.compute_type, algo, solution_index, flags);
+            }
+            EXPECT_TRUE(status_match(rocblas_status_success, gemm_dev_status))
+                << "rocblas_gemm_ex device pointer mode returned "
+                << rocblas_status_to_string(gemm_dev_status)
+                << " for solution_index=" << solution_index;
 
-            CHECK_HIP_ERROR(hD_2.transfer_from(dDref));
+            if(gemm_dev_status == rocblas_status_success)
+            {
+                device_call_succeeded = true;
+                CHECK_HIP_ERROR(hD_2.transfer_from(dDref));
 
-            if(arg.repeatability_check)
+                std::string prefix = "/tmp/rocblas_debug_sol" + std::to_string(solution_index) + "_";
+                dump_matrix_to_file(prefix + "D_gpu_dev_ptr.txt", (const To*)hD_2, M, N, ldd);
+                rocblas_cout << "DEBUG: Dumped GPU output D (device pointer mode) for solution_index="
+                             << solution_index << std::endl;
+            }
+
+            if(device_call_succeeded && arg.repeatability_check)
             {
                 HOST_MEMCHECK(host_matrix<To>, hD_copy, (M, N, ldd));
 
@@ -495,9 +617,17 @@ void testing_gemm_ex_run(const Arguments& arg)
 
         cpu_time_used = get_time_us_no_sync() - cpu_time_used;
 
+        // --- DEBUG: dump CPU reference D_gold ---
+        {
+            std::string prefix = "/tmp/rocblas_debug_sol" + std::to_string(solution_index) + "_";
+            dump_matrix_to_file(prefix + "D_ref.txt", (const To_hpa*)hD_gold, M, N, ldd);
+            rocblas_cout << "DEBUG: Dumped CPU reference D_gold for solution_index="
+                         << solution_index << std::endl;
+        }
+
         if(arg.pointer_mode_host)
         {
-            if(arg.unit_check)
+            if(host_call_succeeded && arg.unit_check)
             {
                 if((rocblas_handle(handle)->getArchMajor() == 11) && (sizeof(Ti) == 2))
                 {
@@ -517,7 +647,7 @@ void testing_gemm_ex_run(const Arguments& arg)
                 }
             }
 
-            if(arg.norm_check)
+            if(host_call_succeeded && arg.norm_check)
             {
                 auto err1
                     = std::abs(norm_check_general<To>('F', M, N, ldd, (To_hpa*)hD_gold, (To*)hD_1));
@@ -528,7 +658,7 @@ void testing_gemm_ex_run(const Arguments& arg)
 
         if(arg.pointer_mode_device)
         {
-            if(arg.unit_check)
+            if(device_call_succeeded && arg.unit_check)
             {
                 if((rocblas_handle(handle)->getArchMajor() == 11) && (sizeof(Ti) == 2))
                 {
@@ -548,7 +678,7 @@ void testing_gemm_ex_run(const Arguments& arg)
                 }
             }
 
-            if(arg.norm_check)
+            if(device_call_succeeded && arg.norm_check)
             {
                 auto err1
                     = std::abs(norm_check_general<To>('F', M, N, ldd, (To_hpa*)hD_gold, (To*)hD_2));
