@@ -174,7 +174,39 @@ public:
             }
         }
 
-        // Rule 7: Optional attention scale must be a scalar tensor
+        // Rule 7: Optional attention mask validation
+        const auto attnMask = attributes.get_attn_mask();
+        if(attnMask)
+        {
+            const auto& maskDims = attnMask->get_dim();
+            const auto maskRank = maskDims.size();
+            HIPDNN_RETURN_IF_TRUE(maskRank > static_cast<size_t>(4),
+                                  ErrorCode::INVALID_VALUE,
+                                  "SdpaBpropNode: ATTN_MASK rank must be <= 4, got rank="
+                                      + std::to_string(maskRank));
+
+            const auto seqQ = qDims[2];
+            const auto seqKv = kDims[2];
+            const auto maskLast = maskDims[maskRank - 1];
+            HIPDNN_RETURN_IF_TRUE(maskLast != seqKv && maskLast != 1,
+                                  ErrorCode::INVALID_VALUE,
+                                  "SdpaBpropNode: ATTN_MASK last dim must equal seq_kv ("
+                                      + std::to_string(seqKv) + ") or 1, got "
+                                      + std::to_string(maskLast));
+
+            if(maskRank >= 2)
+            {
+                const auto maskSecondLast = maskDims[maskRank - 2];
+                HIPDNN_RETURN_IF_TRUE(maskSecondLast != seqQ && maskSecondLast != 1,
+                                      ErrorCode::INVALID_VALUE,
+                                      "SdpaBpropNode: ATTN_MASK second-to-last dim must equal "
+                                      "seq_q ("
+                                          + std::to_string(seqQ) + ") or 1, got "
+                                          + std::to_string(maskSecondLast));
+            }
+        }
+
+        // Rule 8: Optional attention scale must be a scalar tensor
         const auto scale = attributes.get_scale();
         if(scale)
         {
@@ -192,19 +224,6 @@ public:
         const auto dq = attributes.get_dq();
         const auto dk = attributes.get_dk();
         const auto dv = attributes.get_dv();
-
-        HIPDNN_RETURN_IF_FALSE(
-            q, ErrorCode::ATTRIBUTE_NOT_SET, std::string("SdpaBpropNode missing Q input"));
-        HIPDNN_RETURN_IF_FALSE(
-            k, ErrorCode::ATTRIBUTE_NOT_SET, std::string("SdpaBpropNode missing K input"));
-        HIPDNN_RETURN_IF_FALSE(
-            v, ErrorCode::ATTRIBUTE_NOT_SET, std::string("SdpaBpropNode missing V input"));
-        HIPDNN_RETURN_IF_FALSE(
-            dq, ErrorCode::ATTRIBUTE_NOT_SET, std::string("SdpaBpropNode missing dQ output"));
-        HIPDNN_RETURN_IF_FALSE(
-            dk, ErrorCode::ATTRIBUTE_NOT_SET, std::string("SdpaBpropNode missing dK output"));
-        HIPDNN_RETURN_IF_FALSE(
-            dv, ErrorCode::ATTRIBUTE_NOT_SET, std::string("SdpaBpropNode missing dV output"));
 
         HIPDNN_CHECK_ERROR(attributes.fill_from_context(graph_attributes));
 

@@ -13,7 +13,7 @@ inline void to_json(nlohmann::json& sdpaJson, const SdpaBackwardAttributes& sdpa
 {
     auto& inputs = sdpaJson["inputs"] = {};
     auto& outputs = sdpaJson["outputs"] = {};
-    auto& attributes = sdpaJson["attributes"] = {};
+    auto& params = sdpaJson["parameters"] = {};
 
     // Required input tensor UIDs
     inputs["q_tensor_uid"] = sdpa.q_tensor_uid();
@@ -43,19 +43,19 @@ inline void to_json(nlohmann::json& sdpaJson, const SdpaBackwardAttributes& sdpa
     outputs["dbias_tensor_uid"] = sdpa.dbias_tensor_uid();
 
     // Boolean flags
-    attributes["alibi_mask"] = sdpa.alibi_mask();
-    attributes["padding_mask"] = sdpa.padding_mask();
-    attributes["causal_mask"] = sdpa.causal_mask();
-    attributes["causal_mask_bottom_right"] = sdpa.causal_mask_bottom_right();
+    params["alibi_mask"] = sdpa.alibi_mask();
+    params["padding_mask"] = sdpa.padding_mask();
+    params["causal_mask"] = sdpa.causal_mask();
+    params["causal_mask_bottom_right"] = sdpa.causal_mask_bottom_right();
 
     // Scalar attributes
-    attributes["dropout_probability"] = sdpa.dropout_probability();
-    attributes["attn_scale_value"] = sdpa.attn_scale_value();
-    attributes["left_bound"] = sdpa.left_bound();
-    attributes["right_bound"] = sdpa.right_bound();
+    params["dropout_probability"] = sdpa.dropout_probability();
+    params["attn_scale_value"] = sdpa.attn_scale_value();
+    params["left_bound"] = sdpa.left_bound();
+    params["right_bound"] = sdpa.right_bound();
 
     // Enum attributes
-    attributes["diagonal_alignment"] = sdpa.diagonal_alignment();
+    params["diagonal_alignment"] = sdpa.diagonal_alignment();
 }
 
 }
@@ -67,7 +67,7 @@ inline auto to<data_objects::SdpaBackwardAttributes>(flatbuffers::FlatBufferBuil
 {
     auto& inputs = entry.at("inputs");
     auto& outputs = entry.at("outputs");
-    auto& attributes = entry.at("attributes");
+    auto& params = entry.at("parameters");
 
     return data_objects::CreateSdpaBackwardAttributes(
         builder,
@@ -95,17 +95,17 @@ inline auto to<data_objects::SdpaBackwardAttributes>(flatbuffers::FlatBufferBuil
         // Optional output tensor UIDs
         outputs.at("dbias_tensor_uid").get<std::optional<int64_t>>(),
         // Boolean flags
-        attributes.at("alibi_mask").get<bool>(),
-        attributes.at("padding_mask").get<bool>(),
-        attributes.at("causal_mask").get<bool>(),
-        attributes.at("causal_mask_bottom_right").get<bool>(),
-        // Scalar attributes
-        attributes.at("dropout_probability").get<std::optional<float>>(),
-        attributes.at("attn_scale_value").get<std::optional<float>>(),
-        attributes.at("left_bound").get<std::optional<int64_t>>(),
-        attributes.at("right_bound").get<std::optional<int64_t>>(),
-        // Enum attributes
-        attributes.at("diagonal_alignment").get<data_objects::DiagonalAlignment>());
+        params.at("alibi_mask").get<bool>(),
+        params.at("padding_mask").get<bool>(),
+        params.at("causal_mask").get<bool>(),
+        params.at("causal_mask_bottom_right").get<bool>(),
+        // Scalar parameters
+        params.at("dropout_probability").get<std::optional<float>>(),
+        params.at("attn_scale_value").get<std::optional<float>>(),
+        params.at("left_bound").get<std::optional<int64_t>>(),
+        params.at("right_bound").get<std::optional<int64_t>>(),
+        // Enum parameters
+        params.at("diagonal_alignment").get<data_objects::DiagonalAlignment>());
 }
 
 }
