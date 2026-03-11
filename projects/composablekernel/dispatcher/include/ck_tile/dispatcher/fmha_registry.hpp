@@ -37,6 +37,13 @@ class FmhaRegistry : public BaseRegistry<FmhaRegistry, std::string, FmhaKernelIn
 
     std::size_t filter_by_arch(const std::string& gpu_arch);
 
+    /// Remove kernels whose signature receipt does not match the given receipt_id.
+    /// Returns the number of kernels removed.
+    std::size_t filter_by_receipt(int receipt_id);
+
+    /// Return the set of distinct receipt IDs present in the registry.
+    [[nodiscard]] std::vector<int> available_receipts() const;
+
     static FmhaRegistry& instance();
 };
 

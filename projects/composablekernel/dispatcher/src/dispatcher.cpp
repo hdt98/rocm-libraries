@@ -9,10 +9,11 @@
 namespace ck_tile {
 namespace dispatcher {
 
-Dispatcher::Dispatcher(Registry* registry)
+Dispatcher::Dispatcher(Registry* registry, const std::string& gfx_arch)
     : registry_(registry ? registry : &Registry::instance()),
       heuristic_(nullptr),
-      strategy_(SelectionStrategy::FirstFit)
+      strategy_(SelectionStrategy::FirstFit),
+      gfx_arch_(gfx_arch)
 {
 }
 
@@ -64,6 +65,7 @@ float Dispatcher::run_fused(const void* a_ptr,
         throw NoKernelFound(oss.str());
     }
 
+    kernel->set_benchmarking(benchmarking_);
     return kernel->run(a_ptr, b_ptr, c_ptr, d_ptrs, problem, stream);
 }
 
@@ -89,6 +91,7 @@ float Dispatcher::run_explicit(const std::string& kernel_id,
         throw UnsupportedProblem(oss.str());
     }
 
+    kernel->set_benchmarking(benchmarking_);
     return kernel->run(a_ptr, b_ptr, c_ptr, d_ptrs, problem, stream);
 }
 

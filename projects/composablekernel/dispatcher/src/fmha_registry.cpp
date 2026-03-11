@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <fstream>
 #include <map>
+#include <set>
 #include <sstream>
 
 namespace ck_tile {
@@ -41,8 +42,13 @@ bool FmhaRegistry::register_kernel(FmhaKernelInstancePtr instance, Priority prio
     {
         return false;
     }
-    return Base::register_kernel(
+    bool ok = Base::register_kernel(
         instance->get_key().encode_identifier(), std::move(instance), priority);
+    if(ok)
+    {
+        perform_auto_export();
+    }
+    return ok;
 }
 
 FmhaKernelInstancePtr FmhaRegistry::lookup(const std::string& identifier) const
@@ -234,6 +240,42 @@ std::size_t FmhaRegistry::filter_by_arch(const std::string& gpu_arch)
     }
 
     return to_remove.size();
+}
+
+std::size_t FmhaRegistry::filter_by_receipt(int receipt_id)
+{
+    std::vector<std::string> to_remove;
+    for(const auto& [name, entry] : entries())
+    {
+        if(entry.instance)
+        {
+            int kernel_receipt = entry.instance->get_key().signature.receipt_;
+            if(kernel_receipt >= 0 && kernel_receipt != receipt_id)
+            {
+                to_remove.push_back(name);
+            }
+        }
+    }
+    for(const auto& name : to_remove)
+    {
+        entries_mut().erase(name);
+    }
+    return to_remove.size();
+}
+
+std::vector<int> FmhaRegistry::available_receipts() const
+{
+    std::set<int> receipts;
+    for(const auto& [name, entry] : entries())
+    {
+        if(entry.instance)
+        {
+            int r = entry.instance->get_key().signature.receipt_;
+            if(r >= 0)
+                receipts.insert(r);
+        }
+    }
+    return {receipts.begin(), receipts.end()};
 }
 
 FmhaRegistry& FmhaRegistry::instance()

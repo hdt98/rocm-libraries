@@ -232,6 +232,53 @@ struct FmhaProblem
         return s;
     }
 
+    /// Canonical key for caching -- includes ALL fields used by fmha_signature_matches().
+    /// Safe to use as a cache key (unlike to_string() which omits many fields).
+    [[nodiscard]] std::string canonical_key() const
+    {
+        std::string k;
+        k.reserve(256);
+        k += ck_tile::dispatcher::to_string(api_family);
+        k += '|';
+        k += ck_tile::dispatcher::to_string(requested_family);
+        k += '|';
+        k += data_type;
+        k += '|';
+        k += gfx_arch;
+        k += '|';
+        k += std::to_string(hdim_q);
+        k += ',';
+        k += std::to_string(hdim_v);
+        k += '|';
+        k += is_group_mode ? '1' : '0';
+        k += is_v_rowmajor ? '1' : '0';
+        k += has_logits_soft_cap ? '1' : '0';
+        k += has_lse ? '1' : '0';
+        k += has_dropout ? '1' : '0';
+        k += use_paged_kv ? '1' : '0';
+        k += do_fp8_static_quant ? '1' : '0';
+        k += skip_min_seqlen_q ? '1' : '0';
+        k += has_sink ? '1' : '0';
+        k += has_dbias ? '1' : '0';
+        k += is_store_randval ? '1' : '0';
+        k += is_deterministic ? '1' : '0';
+        k += '|';
+        k += std::to_string(mask_type);
+        k += ',';
+        k += std::to_string(bias_type);
+        k += ',';
+        k += std::to_string(qscale_type);
+        k += ',';
+        k += std::to_string(rope_type);
+        k += '|';
+        k += std::to_string(kv_memory_layout);
+        k += ',';
+        k += std::to_string(kv_lookup_table);
+        k += ',';
+        k += std::to_string(page_size);
+        return k;
+    }
+
     [[nodiscard]] static FmhaProblem from_invocation(const FmhaInvocation& invocation,
                                                      const std::string& gfx_arch = "")
     {
@@ -646,6 +693,49 @@ class FmhaProblemBuilder
     private:
     FmhaProblem problem_;
 };
+
+// =============================================================================
+// Backward workspace sizing
+// =============================================================================
+
+struct FmhaBwdWorkspaceInfo
+{
+    size_t d_bytes         = 0; // B * Hq * Sq * sizeof(float)
+    size_t dq_acc_bytes    = 0; // B * Hq * Sq * Dq * sizeof(float)
+    size_t rand_val_bytes  = 0; // 0 unless is_store_randval
+    size_t total_bytes     = 0; // aligned sum
+    size_t d_offset        = 0; // always 0
+    size_t dq_acc_offset   = 0; // align(d_bytes, 256)
+    size_t rand_val_offset = 0; // align(d_bytes + dq_acc_bytes, 256)
+};
+
+inline FmhaBwdWorkspaceInfo bwd_workspace_info(const FmhaProblem& problem)
+{
+    constexpr size_t kAlign = 256;
+    auto align_up           = [](size_t n, size_t a) -> size_t { return (n + a - 1) / a * a; };
+
+    FmhaBwdWorkspaceInfo info;
+    const auto B  = static_cast<size_t>(problem.batch);
+    const auto Hq = static_cast<size_t>(problem.nhead_q);
+    const auto Sq = static_cast<size_t>(problem.seqlen_q);
+    const auto Dq = static_cast<size_t>(problem.hdim_q);
+    const auto Sk = static_cast<size_t>(problem.seqlen_k);
+
+    info.d_bytes      = B * Hq * Sq * sizeof(float);
+    info.dq_acc_bytes = B * Hq * Sq * Dq * sizeof(float);
+
+    if(problem.is_store_randval)
+        info.rand_val_bytes = B * Hq * Sq * Sk * sizeof(uint8_t);
+
+    info.d_offset        = 0;
+    info.dq_acc_offset   = align_up(info.d_bytes, kAlign);
+    info.rand_val_offset = align_up(info.dq_acc_offset + info.dq_acc_bytes, kAlign);
+    info.total_bytes     = info.rand_val_bytes > 0
+                               ? align_up(info.rand_val_offset + info.rand_val_bytes, kAlign)
+                               : align_up(info.dq_acc_offset + info.dq_acc_bytes, kAlign);
+
+    return info;
+}
 
 } // namespace dispatcher
 } // namespace ck_tile

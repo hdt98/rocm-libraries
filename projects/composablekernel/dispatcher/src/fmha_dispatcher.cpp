@@ -12,10 +12,11 @@
 namespace ck_tile {
 namespace dispatcher {
 
-FmhaDispatcher::FmhaDispatcher(FmhaRegistry* registry)
+FmhaDispatcher::FmhaDispatcher(FmhaRegistry* registry, const std::string& gfx_arch)
     : registry_(registry ? registry : &FmhaRegistry::instance()),
       heuristic_(nullptr),
-      strategy_(SelectionStrategy::FirstFit)
+      strategy_(SelectionStrategy::FirstFit),
+      gfx_arch_(gfx_arch)
 {
 }
 
@@ -138,7 +139,7 @@ FmhaExecutionPlan FmhaDispatcher::plan(const FmhaProblem& problem) const
 
 float FmhaDispatcher::run(const FmhaInvocation& invocation, void* stream) const
 {
-    auto problem = FmhaProblem::from_invocation(invocation);
+    auto problem = FmhaProblem::from_invocation(invocation, gfx_arch_);
     auto exec    = plan(problem);
     if(!exec.is_valid())
     {
@@ -349,11 +350,11 @@ ck_tile::stream_config FmhaDispatcher::make_stream_config(void* stream) const
 {
     ck_tile::stream_config sc;
     sc.stream_id_      = reinterpret_cast<hipStream_t>(stream);
-    sc.time_kernel_    = true;
+    sc.time_kernel_    = benchmarking_enabled_;
     sc.log_level_      = 0;
-    sc.cold_niters_    = cold_niters_;
-    sc.nrepeat_        = nrepeat_;
-    sc.is_gpu_timer_   = true;
+    sc.cold_niters_    = benchmarking_enabled_ ? cold_niters_ : 0;
+    sc.nrepeat_        = benchmarking_enabled_ ? nrepeat_ : 1;
+    sc.is_gpu_timer_   = benchmarking_enabled_;
     sc.flush_cache_    = false;
     sc.rotating_count_ = 1;
     return sc;

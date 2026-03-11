@@ -37,11 +37,13 @@ class FmhaDispatcher
         Heuristic
     };
 
-    explicit FmhaDispatcher(FmhaRegistry* registry = nullptr);
+    explicit FmhaDispatcher(FmhaRegistry* registry = nullptr, const std::string& gfx_arch = "");
 
     void set_heuristic(FmhaHeuristicFunction heuristic);
     void set_strategy(SelectionStrategy strategy);
     void set_timing(int cold_niters, int nrepeat);
+    void set_arch(const std::string& arch) { gfx_arch_ = arch; }
+    [[nodiscard]] const std::string& arch() const { return gfx_arch_; }
 
     [[nodiscard]] FmhaKernelInstancePtr select_kernel(const FmhaProblem& problem) const;
     [[nodiscard]] FmhaExecutionPlan plan(const FmhaProblem& problem) const;
@@ -86,8 +88,17 @@ class FmhaDispatcher
     FmhaRegistry* registry_;
     FmhaHeuristicFunction heuristic_;
     SelectionStrategy strategy_;
-    int cold_niters_ = 5;
-    int nrepeat_     = 10;
+    std::string gfx_arch_;
+    int cold_niters_           = 5;
+    int nrepeat_               = 10;
+    bool benchmarking_enabled_ = true;
+
+    public:
+    /// Enable or disable benchmarking (GPU timing).
+    /// When disabled, kernels execute exactly once with no timing overhead
+    /// (one-shot mode for production plugins).
+    void set_benchmarking(bool enable) { benchmarking_enabled_ = enable; }
+    [[nodiscard]] bool benchmarking_enabled() const { return benchmarking_enabled_; }
 };
 
 } // namespace dispatcher

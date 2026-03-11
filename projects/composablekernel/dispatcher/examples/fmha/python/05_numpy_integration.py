@@ -99,8 +99,8 @@ Examples:
     print("\nStep 1: JIT-Compile FMHA Dispatcher")
     config = FmhaKernelConfig(
         data_type="fp16",
-        hdim_q=128,
-        hdim_v=128,
+        hdim_q=args.hdim,
+        hdim_v=args.hdim,
         gfx_arch=args.arch,
     )
     setup = setup_fmha_dispatcher(config)

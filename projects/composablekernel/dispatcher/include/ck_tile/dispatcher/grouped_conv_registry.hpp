@@ -40,6 +40,7 @@ struct ConvDispatchBuffers
     void* output_ptr       = nullptr;
     int warmup             = 3;
     int repeat             = 10;
+    bool benchmarking      = true;
 };
 
 inline thread_local ConvDispatchBuffers g_conv_dispatch_buffers;
@@ -560,11 +561,12 @@ class GroupedConvDispatcher
             throw NoKernelFound("No suitable grouped convolution kernel found for problem: " +
                                 problem.to_string());
         }
-        g_conv_dispatch_buffers.input_ptr  = input_ptr;
-        g_conv_dispatch_buffers.weight_ptr = weight_ptr;
-        g_conv_dispatch_buffers.output_ptr = output_ptr;
-        g_conv_dispatch_buffers.warmup     = warmup;
-        g_conv_dispatch_buffers.repeat     = repeat;
+        g_conv_dispatch_buffers.input_ptr    = input_ptr;
+        g_conv_dispatch_buffers.weight_ptr   = weight_ptr;
+        g_conv_dispatch_buffers.output_ptr   = output_ptr;
+        g_conv_dispatch_buffers.warmup       = warmup;
+        g_conv_dispatch_buffers.repeat       = repeat;
+        g_conv_dispatch_buffers.benchmarking = benchmarking_;
         return kernel->run(problem, stream);
     }
 
@@ -574,7 +576,13 @@ class GroupedConvDispatcher
         return select_kernel(problem);
     }
 
+    /// Enable or disable GPU benchmarking (timing).
+    /// When disabled, kernels execute once with no timing overhead.
+    void set_benchmarking(bool enable) { benchmarking_ = enable; }
+    [[nodiscard]] bool benchmarking_enabled() const { return benchmarking_; }
+
     private:
+    bool benchmarking_ = true;
     const GroupedConvKernelInstance* select_heuristic(const GroupedConvProblem& problem) const
     {
         if(!heuristic_)
