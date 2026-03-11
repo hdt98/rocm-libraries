@@ -70,6 +70,9 @@ int fmha_dispatcher_run_fwd(const void* q_host,
                             int has_dropout,
                             int traits_hdim_q,
                             int traits_hdim_v,
+                            int perm,
+                            const char* data_type_str,
+                            int is_group_mode,
                             float* time_ms_out)
 {
     if(!g_initialized)
@@ -82,10 +85,33 @@ int fmha_dispatcher_run_fwd(const void* q_host,
 
     void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
     void *bias_dev = nullptr, *lse_dev_buf = nullptr;
+    void *seqstart_q_dev = nullptr, *seqstart_k_dev = nullptr, *seqlen_k_dev = nullptr;
     HIP_CHECK(hipMalloc(&q_dev, q_bytes));
     HIP_CHECK(hipMalloc(&k_dev, k_bytes));
     HIP_CHECK(hipMalloc(&v_dev, v_bytes));
     HIP_CHECK(hipMalloc(&o_dev, o_bytes));
+
+    if(is_group_mode)
+    {
+        std::vector<int> sq_starts(batch + 1), sk_starts(batch + 1), sk_lens(batch);
+        for(int b = 0; b <= batch; ++b)
+        {
+            sq_starts[b] = b * seqlen_q;
+            sk_starts[b] = b * seqlen_k;
+        }
+        for(int b = 0; b < batch; ++b)
+            sk_lens[b] = seqlen_k;
+
+        HIP_CHECK(hipMalloc(&seqstart_q_dev, (batch + 1) * sizeof(int)));
+        HIP_CHECK(hipMalloc(&seqstart_k_dev, (batch + 1) * sizeof(int)));
+        HIP_CHECK(hipMalloc(&seqlen_k_dev, batch * sizeof(int)));
+        HIP_CHECK(hipMemcpy(
+            seqstart_q_dev, sq_starts.data(), (batch + 1) * sizeof(int), hipMemcpyHostToDevice));
+        HIP_CHECK(hipMemcpy(
+            seqstart_k_dev, sk_starts.data(), (batch + 1) * sizeof(int), hipMemcpyHostToDevice));
+        HIP_CHECK(
+            hipMemcpy(seqlen_k_dev, sk_lens.data(), batch * sizeof(int), hipMemcpyHostToDevice));
+    }
 
     HIP_CHECK(hipMemcpy(q_dev, q_host, q_bytes, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(k_dev, k_host, k_bytes, hipMemcpyHostToDevice));
@@ -117,8 +143,8 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     fmha_fwd_traits traits{};
     traits.hdim_q        = (traits_hdim_q > 0) ? traits_hdim_q : hdim_q;
     traits.hdim_v        = (traits_hdim_v > 0) ? traits_hdim_v : hdim_v;
-    traits.data_type     = "fp16";
-    traits.is_group_mode = false;
+    traits.data_type     = data_type_str ? data_type_str : "fp16";
+    traits.is_group_mode = (is_group_mode != 0);
     traits.is_v_rowmajor = true;
     traits.mask_type     = static_cast<mask_enum>(mask_type_int);
     traits.bias_type     = static_cast<bias_enum>(bias_type_int);
@@ -137,6 +163,10 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     args.v_descale_ptr              = nullptr;
     args.rand_val_ptr               = nullptr;
     args.lse_ptr                    = lse_dev_buf;
+    args.seqstart_q_ptr             = seqstart_q_dev;
+    args.seqstart_k_ptr             = seqstart_k_dev;
+    args.seqlen_q_ptr               = nullptr;
+    args.seqlen_k_ptr               = seqlen_k_dev;
     args.sink_ptr                   = nullptr;
     args.block_scale_seqstart_q_ptr = nullptr;
     args.block_scale_seqstart_k_ptr = nullptr;
@@ -152,29 +182,65 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     args.scale_s         = scale;
     args.logits_soft_cap = 0.0f;
 
-    args.stride_q               = hdim_q;
-    args.stride_k               = hdim_q;
-    args.stride_v               = hdim_v;
+    if(is_group_mode)
+    {
+        // Group mode: [total_tokens, nhead, hdim] -- batch via seqstart arrays
+        args.stride_q       = nhead_q * hdim_q;
+        args.stride_k       = nhead_k * hdim_q;
+        args.stride_v       = nhead_k * hdim_v;
+        args.stride_o       = nhead_q * hdim_v;
+        args.nhead_stride_q = hdim_q;
+        args.nhead_stride_k = hdim_q;
+        args.nhead_stride_v = hdim_v;
+        args.nhead_stride_o = hdim_v;
+        args.batch_stride_q = 0;
+        args.batch_stride_k = 0;
+        args.batch_stride_v = 0;
+        args.batch_stride_o = 0;
+    }
+    else if(perm == 1)
+    {
+        // BHSD layout: [batch, head, seq, dim]
+        args.stride_q       = hdim_q;
+        args.stride_k       = hdim_q;
+        args.stride_v       = hdim_v;
+        args.stride_o       = hdim_v;
+        args.nhead_stride_q = seqlen_q * hdim_q;
+        args.nhead_stride_k = seqlen_k * hdim_q;
+        args.nhead_stride_v = seqlen_k * hdim_v;
+        args.nhead_stride_o = seqlen_q * hdim_v;
+        args.batch_stride_q = nhead_q * seqlen_q * hdim_q;
+        args.batch_stride_k = nhead_k * seqlen_k * hdim_q;
+        args.batch_stride_v = nhead_k * seqlen_k * hdim_v;
+        args.batch_stride_o = nhead_q * seqlen_q * hdim_v;
+    }
+    else
+    {
+        // BSHD layout: [batch, seq, head, dim]
+        args.stride_q       = nhead_q * hdim_q;
+        args.stride_k       = nhead_k * hdim_q;
+        args.stride_v       = nhead_k * hdim_v;
+        args.stride_o       = nhead_q * hdim_v;
+        args.nhead_stride_q = hdim_q;
+        args.nhead_stride_k = hdim_q;
+        args.nhead_stride_v = hdim_v;
+        args.nhead_stride_o = hdim_v;
+        args.batch_stride_q = seqlen_q * nhead_q * hdim_q;
+        args.batch_stride_k = seqlen_k * nhead_k * hdim_q;
+        args.batch_stride_v = seqlen_k * nhead_k * hdim_v;
+        args.batch_stride_o = seqlen_q * nhead_q * hdim_v;
+    }
     args.stride_bias            = (bias_type_int > 0) ? seqlen_k : 0;
     args.stride_randval         = 0;
-    args.stride_o               = hdim_v;
-    args.nhead_stride_q         = seqlen_q * hdim_q;
-    args.nhead_stride_k         = seqlen_k * hdim_q;
-    args.nhead_stride_v         = seqlen_k * hdim_v;
     args.nhead_stride_bias      = (bias_type_int > 0) ? seqlen_q * seqlen_k : 0;
     args.nhead_stride_randval   = 0;
     args.nhead_stride_lse       = has_lse ? seqlen_q : 0;
-    args.nhead_stride_o         = seqlen_q * hdim_v;
     args.nhead_stride_q_descale = 0;
     args.nhead_stride_k_descale = 0;
     args.nhead_stride_v_descale = 0;
-    args.batch_stride_q         = nhead_q * seqlen_q * hdim_q;
-    args.batch_stride_k         = nhead_k * seqlen_k * hdim_q;
-    args.batch_stride_v         = nhead_k * seqlen_k * hdim_v;
     args.batch_stride_bias      = (bias_type_int > 0) ? nhead_q * seqlen_q * seqlen_k : 0;
     args.batch_stride_randval   = 0;
     args.batch_stride_lse       = has_lse ? nhead_q * seqlen_q : 0;
-    args.batch_stride_o         = nhead_q * seqlen_q * hdim_v;
     args.batch_stride_q_descale = 0;
     args.batch_stride_k_descale = 0;
     args.batch_stride_v_descale = 0;
@@ -196,8 +262,9 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     {
         elapsed = g_dispatcher->run_fwd(traits, args, nullptr);
     }
-    catch(...)
+    catch(const std::exception& e)
     {
+        fprintf(stderr, "FMHA_ERR: %s\n", e.what());
         hipFree(q_dev);
         hipFree(k_dev);
         hipFree(v_dev);
@@ -206,6 +273,31 @@ int fmha_dispatcher_run_fwd(const void* q_host,
             hipFree(bias_dev);
         if(lse_dev_buf)
             hipFree(lse_dev_buf);
+        if(seqstart_q_dev)
+            hipFree(seqstart_q_dev);
+        if(seqstart_k_dev)
+            hipFree(seqstart_k_dev);
+        if(seqlen_k_dev)
+            hipFree(seqlen_k_dev);
+        return -2;
+    }
+    catch(...)
+    {
+        fprintf(stderr, "FMHA_ERR: unknown\n");
+        hipFree(q_dev);
+        hipFree(k_dev);
+        hipFree(v_dev);
+        hipFree(o_dev);
+        if(bias_dev)
+            hipFree(bias_dev);
+        if(lse_dev_buf)
+            hipFree(lse_dev_buf);
+        if(seqstart_q_dev)
+            hipFree(seqstart_q_dev);
+        if(seqstart_k_dev)
+            hipFree(seqstart_k_dev);
+        if(seqlen_k_dev)
+            hipFree(seqlen_k_dev);
         return -2;
     }
 
@@ -219,6 +311,12 @@ int fmha_dispatcher_run_fwd(const void* q_host,
         hipFree(bias_dev);
     if(lse_dev_buf)
         hipFree(lse_dev_buf);
+    if(seqstart_q_dev)
+        hipFree(seqstart_q_dev);
+    if(seqstart_k_dev)
+        hipFree(seqstart_k_dev);
+    if(seqlen_k_dev)
+        hipFree(seqlen_k_dev);
 
     if(time_ms_out)
         *time_ms_out = elapsed;

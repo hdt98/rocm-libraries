@@ -14,6 +14,14 @@ ARCH_TAG_MAP = {
     arch: spec["arch_tag"] for arch, spec in _ARCH_SPECS["architectures"].items()
 }
 
+ARCH_PREPROC_MAP = {
+    "gfx90a": "defined(__gfx90a__)",
+    "gfx942": "defined(__gfx942__)",
+    "gfx950": "defined(__gfx950__)",
+    "gfx1100": "defined(__gfx1100__)",
+    "gfx1201": "defined(__gfx1201__)",
+}
+
 FWD_DTYPE_MAP = {
     "fp32": "FmhaFwdFp32",
     "fp16": "FmhaFwdFp16",
@@ -70,6 +78,13 @@ MASK_TO_CPP = {
     "top_left": "ck_tile::SimplifiedGenericAttentionMask<true>",
     "bottom_right": "ck_tile::SimplifiedGenericAttentionMask<true>",
     "generic": "ck_tile::GenericAttentionMask<true, true>",
+}
+
+MASK_TO_CPP_GENERIC = {
+    "no": "FmhaMasks::NoMask",
+    "top_left": "FmhaMasks::CausalMask",
+    "bottom_right": "FmhaMasks::CausalMask",
+    "generic": "FmhaMasks::GenericMask",
 }
 
 MASK_TO_INT = {
