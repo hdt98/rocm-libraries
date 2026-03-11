@@ -110,7 +110,9 @@ def _validate_global_rules(
             and hdim_v == 128
             and (bias != "no" or sig.get("dropout", False))
         ):
-            result.add_error("hdim (192,128) does not support bias or dropout")
+            result.add_warning(
+                "hdim (192,128) with bias/dropout has limited tile support"
+            )
 
     if global_rules.get("logits_requires_no_bias"):
         if bias != "no" and sig.get("logits", False):
@@ -189,8 +191,8 @@ def validate_config(
         result.add_error(f"pipeline {pipeline} is not supported on {arch}")
 
     if pipeline in {"v3", "qr_async_trload_v3"}:
-        result.add_error(
-            "v3 pipeline is intentionally disabled in dispatcher registration"
+        result.add_warning(
+            "v3 pipeline is not registered in default dispatcher profiles"
         )
 
     if pipeline == "qr_async_trload" and not arch_info.get("supports_trload", False):
@@ -206,12 +208,16 @@ def validate_config(
 
     # --- Tile validation (data-driven) ---
     tile = alg["tile"]
-    if len(tile) != 6 or len(alg["wave"]) != 9 or len(alg["warp"]) != 9:
-        result.add_error("tile/wave/warp fields must have 6/9/9 elements respectively")
-    elif family in {"fwd", "fwd_pagedkv", "fwd_splitkv", "batch_prefill"}:
-        _validate_tile_against_specs(
-            tile, sig["hdim_q"], sig["hdim_v"], dtype, pipeline, arch_info, result
+    expected_tile_len = 9 if family == "bwd_dq_dk_dv" else 6
+    if len(tile) != expected_tile_len or len(alg["wave"]) != 9 or len(alg["warp"]) != 9:
+        result.add_error(
+            f"tile/wave/warp must have {expected_tile_len}/9/9 elements for {family}"
         )
+    elif family in {"fwd", "fwd_pagedkv", "fwd_splitkv", "batch_prefill"}:
+        if not alg.get("skip_tile_validation", False):
+            _validate_tile_against_specs(
+                tile, sig["hdim_q"], sig["hdim_v"], dtype, pipeline, arch_info, result
+            )
 
     if alg["block_per_cu"] <= 0:
         result.add_error("block_per_cu must be positive")
@@ -276,9 +282,9 @@ def validate_config(
     if kv_lookup_table not in {"sglang", "vllm"}:
         result.add_error(f"Unsupported KV lookup table: {kv_lookup_table}")
 
-    if family == "bwd_dot_do_o" and tile[0] != 64:
-        result.add_error("bwd_dot_do_o currently expects bm0=64")
-    if family == "bwd_convert_dq" and tile[0] != 64:
+    if family == "bwd_dot_do_o" and tile[0] not in {16, 32, 64, 128, 256}:
+        result.add_error(f"bwd_dot_do_o bm0={tile[0]} not a valid block size")
+    if family == "bwd_convert_dq" and tile[0] not in {16, 32, 64, 128, 256}:
         result.add_error("bwd_convert_dq currently expects bm0=64")
     if family == "bwd_dq_dk_dv":
         if tile[3] <= 0 or tile[4] <= 0 or tile[5] <= 0:

@@ -203,6 +203,72 @@ def generate_bwd_matrix() -> List[TestCase]:
     return cases
 
 
+def generate_splitkv_matrix() -> List[TestCase]:
+    """Generate the splitkv smoke test matrix (same subcases as fwd, with num_splits > 1)."""
+    cases = []
+    idx = 0
+    for prec in ["fp16", "bf16"]:
+        for mode in [0]:  # splitkv only supports batch mode in smoke test
+            for perm in [0, 1]:
+                for hdim in [64, 128, 256]:
+                    for num_splits in [2, 3]:
+                        for bias in ["n"]:
+                            subcases = [
+                                dict(
+                                    batch=2,
+                                    nhead_q=2,
+                                    nhead_k=1,
+                                    seqlen_q=55,
+                                    seqlen_k=256,
+                                    mask="0",
+                                ),
+                                dict(
+                                    batch=1,
+                                    nhead_q=3,
+                                    seqlen_q=100,
+                                    seqlen_k=51,
+                                    mask="0",
+                                ),
+                                dict(
+                                    batch=1,
+                                    nhead_q=2,
+                                    nhead_k=1,
+                                    seqlen_q=1024,
+                                    seqlen_k=256,
+                                    mask="2",
+                                ),
+                                dict(
+                                    batch=3,
+                                    nhead_q=2,
+                                    nhead_k=1,
+                                    seqlen_q=200,
+                                    seqlen_k=520,
+                                    mask="t:128,30",
+                                ),
+                            ]
+                            for sc in subcases:
+                                idx += 1
+                                cases.append(
+                                    TestCase(
+                                        name=f"splitkv_{idx:04d}_{prec}_h{hdim}_s{num_splits}",
+                                        direction="fwd_splitkv",
+                                        prec=prec,
+                                        mode=mode,
+                                        perm=perm,
+                                        hdim_q=hdim,
+                                        hdim_v=hdim,
+                                        lse=1,
+                                        bias=bias,
+                                        p_drop=0.0,
+                                        num_splits=num_splits,
+                                        page_block_size=128,
+                                        cache_batch_idx=1,
+                                        **sc,
+                                    )
+                                )
+    return cases
+
+
 def unique_kernel_configs(cases: List[TestCase]) -> Set[Tuple]:
     """Extract unique kernel configs needed to run the test cases."""
     configs = set()

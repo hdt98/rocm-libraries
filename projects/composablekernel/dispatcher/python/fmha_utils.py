@@ -336,6 +336,9 @@ class FmhaDispatcherLib:
             ctypes.c_int,  # has_dropout
             ctypes.c_int,  # traits_hdim_q (0=same as hdim_q)
             ctypes.c_int,  # traits_hdim_v (0=same as hdim_v)
+            ctypes.c_int,  # perm (1=BHSD, 0=BSHD)
+            ctypes.c_char_p,  # data_type ("fp16", "bf16")
+            ctypes.c_int,  # is_group_mode
             ctypes.POINTER(ctypes.c_float),  # time_ms_out
         ]
         lib.fmha_dispatcher_run_fwd.restype = ctypes.c_int
@@ -589,7 +592,10 @@ class FmhaRunner:
                 has_lse,
                 has_dropout,
                 0,
-                0,  # traits_hdim_q, traits_hdim_v (0 = same as hdim)
+                0,  # traits_hdim_q/v (0 = same as hdim)
+                1,  # perm (1=BHSD)
+                b"fp16",
+                0,  # is_group_mode
                 ctypes.byref(time_ms),
             )
 

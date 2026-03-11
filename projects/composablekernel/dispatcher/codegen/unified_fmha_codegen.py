@@ -25,6 +25,7 @@ from codegen_common import parallel_generate
 from fmha_profiles import profile_allows
 from fmha_rules import load_arch_specs, validate_config
 from fmha_symbol_map import (
+    ARCH_PREPROC_MAP,
     ARCH_TAG_MAP,
     BIAS_TO_CPP,
     BIAS_TO_INT,
@@ -38,6 +39,7 @@ from fmha_symbol_map import (
     KV_MEMORY_LAYOUT_TO_INT,
     LAYOUT_TO_BOOL,
     MASK_TO_CPP,
+    MASK_TO_CPP_GENERIC,
     MASK_TO_INT,
     PIPELINE_ENUM_TO_CPP,
     QSCALE_TO_CPP,
@@ -83,6 +85,21 @@ def _kv_memory_cpp(value: str) -> str:
 
 def _kv_lookup_cpp(value: str) -> str:
     return KV_LOOKUP_TO_CPP[canonical_kv_lookup(value)]
+
+
+def _bwd_block_tile(tile: list, sig: dict) -> str:
+    """Format the bwd block tile sequence.
+
+    If tile has 9 elements, use them directly as (bm0,bn0,bk0,bk1,bk2,bk3,bk4,bhdq,bhdv).
+    If tile has 6 elements (forward-style), map as: M0,N0,K0,K1,K2,K3,K4,HDQ,HDV
+    using the forward-to-backward heuristic.
+    """
+    if len(tile) >= 9:
+        return ", ".join(str(t) for t in tile[:9])
+    return (
+        f"{tile[0]}, {tile[1]}, {tile[2]}, {tile[3]}, {tile[4]}, "
+        f"{tile[3]}, {tile[5]}, {sig['hdim_q']}, {sig['hdim_v']}"
+    )
 
 
 def _canonicalize_config(raw_config: dict, target_arch: str, arch_specs: dict) -> dict:
@@ -169,16 +186,20 @@ def _fwd_kernel_body(name: str, config: dict) -> str:
         "qr_async": "ck_tile::BlockFmhaPipelineQRKSVSAsync",
         "qs": "ck_tile::BlockFmhaPipelineQSKSVS",
         "qr_async_trload": "ck_tile::BlockFmhaPipelineQRKSVSAsyncTrload",
+        "qr_async_trload_v3": "ck_tile::BlockFmhaFwdV3Pipeline",
         "v3": "ck_tile::BlockFmhaFwdV3Pipeline",
     }[pipeline_name]
 
     ns = f"ns_{name}"
+    arch_check = ARCH_PREPROC_MAP.get(config["arch"], "1")
     return f"""// SPDX-License-Identifier: MIT
 // Auto-generated FMHA forward kernel specialization
 #pragma once
 
 #include "ck_tile/ops/fmha/block/variants.hpp"
 #include "example/ck_tile/01_fmha/fmha_fwd.hpp"
+
+#if !defined(__HIP_DEVICE_COMPILE__) || ({arch_check})
 
 namespace {ns} {{
 
@@ -208,7 +229,7 @@ using fmha_traits = ck_tile::TileFmhaTraits<{_bool_cpp(pad[0])},
 
 using fmha_variant = ck_tile::ComposedAttention<{_bool_cpp(sig["logits"])} * ck_tile::LOGITS_SOFT_CAP,
                                                 CK_TILE_FMHA_FWD_FAST_EXP2>;
-using fmha_mask = {_mask_cpp(sig["mask"])};
+using fmha_mask = {MASK_TO_CPP_GENERIC.get(canonical_mask(sig["mask"]), _mask_cpp(sig["mask"])) if pipeline_name in ("v3", "qr_async_trload_v3") else _mask_cpp(sig["mask"])};
 
 using fmha_pipeline_problem = ck_tile::BlockFmhaPipelineProblem<
     typename FmhaFwdTypeConfig<fmha_dtype>::QDataType,
@@ -235,7 +256,7 @@ using fmha_epilogue = ck_tile::Default2DEpilogue<
                                       typename FmhaFwdTypeConfig<fmha_dtype>::ODataType,
                                       {_bool_cpp(pad[0])},
                                       {_bool_cpp(pad[3])}>>;
-using fmha_kernel = ck_tile::FmhaFwdKernel<fmha_pipeline, fmha_epilogue>;
+using fmha_kernel = {"ck_tile::FmhaFwdV3Kernel" if pipeline_name in ("v3", "qr_async_trload_v3") else "ck_tile::FmhaFwdKernel"}<fmha_pipeline, fmha_epilogue>;
 
 using trait = fmha_fwd_traits_<{sig["hdim_q"]},
                                {dtype_cpp},
@@ -262,7 +283,7 @@ template <>
 inline float fmha_fwd_<{ns}::trait, {arch_tag}>(const ck_tile::stream_config& s, fmha_fwd_args a)
 {{
     using k_ = {ns}::fmha_kernel;
-    auto [kargs, grids] = fmha_fwd_create_kargs_and_grids<k_>(a);
+    auto [kargs, grids] = {"fmha_fwd_v3_create_kargs_and_grids" if pipeline_name in ("v3", "qr_async_trload_v3") else "fmha_fwd_create_kargs_and_grids"}<k_>(a);
     const dim3 blocks = k_::BlockSize();
     constexpr ck_tile::index_t kBlockPerCu = k_::kBlockPerCu;
     return ck_tile::launch_kernel(
@@ -283,6 +304,8 @@ inline void launch(const ck_tile::stream_config& s, fmha_fwd_args a)
 }}
 
 }} // namespace {ns}
+
+#endif // arch guard
 """
 
 
@@ -290,6 +313,7 @@ def _pagedkv_kernel_body(name: str, config: dict) -> str:
     sig = config["signature"]
     alg = config["algorithm"]
     arch_tag = ARCH_TAG_MAP[config["arch"]]
+    arch_check = ARCH_PREPROC_MAP.get(config["arch"], "1")
     dtype_cpp = FWD_DTYPE_MAP[sig["data_type"]]
     mode_cpp = "true" if sig["mode"] == "group" else "false"
     vlayout_cpp = LAYOUT_TO_BOOL[sig["vlayout"]]
@@ -302,6 +326,8 @@ def _pagedkv_kernel_body(name: str, config: dict) -> str:
 #pragma once
 
 #include "example/ck_tile/01_fmha/fmha_fwd.hpp"
+
+#if !defined(__HIP_DEVICE_COMPILE__) || ({arch_check})
 
 namespace {ns} {{
 
@@ -403,6 +429,8 @@ inline void launch(const ck_tile::stream_config& s, fmha_fwd_pagedkv_args a)
 }}
 
 }} // namespace {ns}
+
+#endif // arch guard
 """
 
 
@@ -410,6 +438,7 @@ def _splitkv_kernel_body(name: str, config: dict) -> str:
     sig = config["signature"]
     alg = config["algorithm"]
     arch_tag = ARCH_TAG_MAP[config["arch"]]
+    arch_check = ARCH_PREPROC_MAP.get(config["arch"], "1")
     dtype_cpp = FWD_DTYPE_MAP[sig["data_type"]]
     mode_cpp = "true" if sig["mode"] == "group" else "false"
     vlayout_cpp = LAYOUT_TO_BOOL[sig["vlayout"]]
@@ -426,6 +455,8 @@ def _splitkv_kernel_body(name: str, config: dict) -> str:
 #pragma once
 
 #include "example/ck_tile/01_fmha/fmha_fwd.hpp"
+
+#if !defined(__HIP_DEVICE_COMPILE__) || ({arch_check})
 
 namespace {ns} {{
 
@@ -516,6 +547,8 @@ inline void launch(const ck_tile::stream_config& s, fmha_fwd_splitkv_args a)
 }}
 
 }} // namespace {ns}
+
+#endif // arch guard
 """
 
 
@@ -523,6 +556,7 @@ def _splitkv_combine_kernel_body(name: str, config: dict) -> str:
     sig = config["signature"]
     alg = config["algorithm"]
     arch_tag = ARCH_TAG_MAP[config["arch"]]
+    arch_check = ARCH_PREPROC_MAP.get(config["arch"], "1")
     dtype_cpp = FWD_DTYPE_MAP[sig["data_type"]]
     mode_cpp = "true" if sig["mode"] == "group" else "false"
     tile = alg["tile"]
@@ -532,6 +566,8 @@ def _splitkv_combine_kernel_body(name: str, config: dict) -> str:
 #pragma once
 
 #include "example/ck_tile/01_fmha/fmha_fwd.hpp"
+
+#if !defined(__HIP_DEVICE_COMPILE__) || ({arch_check})
 
 using fmha_dtype = {dtype_cpp};
 namespace {{
@@ -608,6 +644,8 @@ inline void launch(const ck_tile::stream_config& s, fmha_fwd_splitkv_args a)
 }}
 
 }} // namespace {ns}
+
+#endif // arch guard
 """
 
 
@@ -615,6 +653,7 @@ def _appendkv_kernel_body(name: str, config: dict) -> str:
     sig = config["signature"]
     alg = config["algorithm"]
     arch_tag = ARCH_TAG_MAP[config["arch"]]
+    arch_check = ARCH_PREPROC_MAP.get(config["arch"], "1")
     dtype_cpp = FWD_DTYPE_MAP[sig["data_type"]]
     vlayout_cpp = LAYOUT_TO_BOOL[sig["vlayout"]]
     tile = alg["tile"]
@@ -624,6 +663,8 @@ def _appendkv_kernel_body(name: str, config: dict) -> str:
 #pragma once
 
 #include "example/ck_tile/01_fmha/fmha_fwd.hpp"
+
+#if !defined(__HIP_DEVICE_COMPILE__) || ({arch_check})
 
 namespace {ns} {{
 
@@ -689,12 +730,15 @@ inline void launch(const ck_tile::stream_config& s, fmha_fwd_appendkv_args a)
 }}
 
 }} // namespace {ns}
+
+#endif // arch guard
 """
 
 
 def _batch_prefill_kernel_body(name: str, config: dict) -> str:
     sig = config["signature"]
     alg = config["algorithm"]
+    arch_check = ARCH_PREPROC_MAP.get(config["arch"], "1")
     dtype_cpp = FWD_DTYPE_MAP[sig["data_type"]]
     mode_cpp = "true" if sig["mode"] == "group" else "false"
     vlayout_cpp = LAYOUT_TO_BOOL[sig["vlayout"]]
@@ -707,6 +751,8 @@ def _batch_prefill_kernel_body(name: str, config: dict) -> str:
 #pragma once
 
 #include "example/ck_tile/01_fmha/fmha_fwd.hpp"
+
+#if !defined(__HIP_DEVICE_COMPILE__) || ({arch_check})
 
 namespace {ns} {{
 
@@ -810,6 +856,8 @@ inline void launch(const ck_tile::stream_config& s, fmha_batch_prefill_args a)
 }}
 
 }} // namespace {ns}
+
+#endif // arch guard
 """
 
 
@@ -817,6 +865,7 @@ def _bwd_dot_do_o_kernel_body(name: str, config: dict) -> str:
     sig = config["signature"]
     alg = config["algorithm"]
     arch_tag = ARCH_TAG_MAP[config["arch"]]
+    arch_check = ARCH_PREPROC_MAP.get(config["arch"], "1")
     dtype_cpp = BWD_DTYPE_MAP[sig["data_type"]]
     mode_cpp = "true" if sig["mode"] == "group" else "false"
     tile = alg["tile"]
@@ -826,6 +875,8 @@ def _bwd_dot_do_o_kernel_body(name: str, config: dict) -> str:
 #pragma once
 
 #include "example/ck_tile/01_fmha/fmha_bwd.hpp"
+
+#if !defined(__HIP_DEVICE_COMPILE__) || ({arch_check})
 
 namespace {ns} {{
 
@@ -870,6 +921,8 @@ inline void launch(const ck_tile::stream_config& s, fmha_bwd_args a)
 }}
 
 }} // namespace {ns}
+
+#endif // arch guard
 """
 
 
@@ -877,6 +930,7 @@ def _bwd_dq_dk_dv_kernel_body(name: str, config: dict) -> str:
     sig = config["signature"]
     alg = config["algorithm"]
     arch_tag = ARCH_TAG_MAP[config["arch"]]
+    arch_check = ARCH_PREPROC_MAP.get(config["arch"], "1")
     dtype_cpp = BWD_DTYPE_MAP[sig["data_type"]]
     mode_cpp = "true" if sig["mode"] == "group" else "false"
     tile = alg["tile"]
@@ -896,10 +950,12 @@ def _bwd_dq_dk_dv_kernel_body(name: str, config: dict) -> str:
 
 #include "example/ck_tile/01_fmha/fmha_bwd.hpp"
 
+#if !defined(__HIP_DEVICE_COMPILE__) || ({arch_check})
+
 namespace {ns} {{
 
 using fmha_dtype = {dtype_cpp};
-using fmha_block_tile = ck_tile::sequence<{tile[0]}, {tile[1]}, {tile[2]}, {tile[3]}, {tile[4]}, {tile[3]}, {tile[5]}, {sig["hdim_q"]}, {sig["hdim_v"]}>;
+using fmha_block_tile = ck_tile::sequence<{_bwd_block_tile(tile, sig)}>;
 using fmha_block_warps0 = ck_tile::sequence<{wave[0]}, {wave[1]}, {wave[2]}>;
 using fmha_block_warps1 = ck_tile::sequence<{wave[3]}, {wave[4]}, {wave[5]}>;
 using fmha_block_warps2 = ck_tile::sequence<{wave[6]}, {wave[7]}, {wave[8]}>;
@@ -1000,6 +1056,8 @@ inline void launch(const ck_tile::stream_config& s, fmha_bwd_args a)
 }}
 
 }} // namespace {ns}
+
+#endif // arch guard
 """
 
 
@@ -1007,6 +1065,7 @@ def _bwd_convert_dq_kernel_body(name: str, config: dict) -> str:
     sig = config["signature"]
     alg = config["algorithm"]
     arch_tag = ARCH_TAG_MAP[config["arch"]]
+    arch_check = ARCH_PREPROC_MAP.get(config["arch"], "1")
     dtype_cpp = BWD_DTYPE_MAP[sig["data_type"]]
     mode_cpp = "true" if sig["mode"] == "group" else "false"
     tile = alg["tile"]
@@ -1016,6 +1075,8 @@ def _bwd_convert_dq_kernel_body(name: str, config: dict) -> str:
 #pragma once
 
 #include "example/ck_tile/01_fmha/fmha_bwd.hpp"
+
+#if !defined(__HIP_DEVICE_COMPILE__) || ({arch_check})
 
 namespace {ns} {{
 
@@ -1064,6 +1125,8 @@ inline void launch(const ck_tile::stream_config& s, fmha_bwd_args a)
 }}
 
 }} // namespace {ns}
+
+#endif // arch guard
 """
 
 
