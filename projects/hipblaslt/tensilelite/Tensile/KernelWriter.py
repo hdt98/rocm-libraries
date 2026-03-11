@@ -36,7 +36,7 @@ from rocisa.instruction import BufferLoadB128, BufferLoadB192, BufferLoadB32, Bu
   FlatLoadB64, FlatStoreB128, FlatStoreB32, FlatStoreB64, Instruction, MacroInstruction, \
   MFMAInstruction, MXMFMAInstruction, SBarrier, SBranch, SCBranchSCC0, SCBranchSCC1, SCBranchVCCNZ, SCmpEQU32, SCmpLeU32, \
   SMFMAInstruction, SNop, SSetPrior, SSetRegIMM32B32, SSubU32, SWaitCnt, SWaitAlu, \
-  SLongBranchPositive, VFmaMixF32, VMadMixF32, VMovB32, VAndB32, VCmpEQU32, VCndMaskB32, VMovB64
+  SLongBranchPositive, VFmaMixF32, VMadMixF32, VMovB32, VAndB32, VCmpEQU32, VCndMaskB32, VMovB64, Instruction
 from rocisa.register import RegisterPool
 from rocisa.enum import RegisterType, DataTypeEnum
 
@@ -336,6 +336,7 @@ class StateValues:
   doPackPreSchedulingThisLoop: bool      = False
   doPackPreSchedulingNextLoop: bool      = False
   doFullPackCodePrefetch: bool           = False
+  useCommonSgprSwap: bool                = False
 
   # Epilogue states
   preloadScaleA = False
@@ -1026,6 +1027,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
       numPackedB = 0
       numPackedM = 0
       pointerLWCodeInserted = False
+      PointerLRCodeItems = pointerLRCode.flatitems()
+      lenPointerLRCode = 0
+      # count number of PointerLRCode (excluding comment)
+      for item in PointerLRCodeItems:
+        if isinstance(item, Instruction):
+          lenPointerLRCode += 1
       #####
       # Prepare localReadCode
       ####
@@ -1641,7 +1648,19 @@ class KernelWriter(metaclass=abc.ABCMeta):
             (not pointerLWCodeInserted)):
           iterCode.add(pointerLWCode)
           pointerLWCodeInserted = True
-        if i == numMfmaPerIter - 1:
+        # schedule PointerLRCode into multiple MFMA (only v operation case (means excludes IncLdsBufSwitch))
+        if lenPointerLRCode > 2 and not self.states.IncLdsBufSwitch:
+          if len(localReadItemsThisLoop) == 0:
+            if i >= numMfmaPerIter - lenPointerLRCode:
+              while PointerLRCodeItems:
+                item = PointerLRCodeItems.pop(0)
+                iterCode.add(item)
+                if isinstance(item, Instruction):
+                  break
+            if i == numMfmaPerIter - 1:
+              while PointerLRCodeItems:
+                iterCode.add(PointerLRCodeItems.pop(0))
+        elif i == numMfmaPerIter - 1:
           iterCode.add(pointerLRCode)
 
         ####
@@ -2445,6 +2464,22 @@ class KernelWriter(metaclass=abc.ABCMeta):
           module.addComment1("global read addresses: shift mxsb")
           module.add(self.graShift(kernel, tensorParametersB["MX"]))
 
+    # addresses
+    if not forceNoTileCode:
+      module.addComment1("global read addresses: addresses a")
+      module.add(self.graAddresses(kernel, tensorParametersA))
+      if kernel["ProblemType"]["MXBlockA"]:
+        module.addComment1("global read addresses: addresses mxsa")
+        module.add(self.graAddresses(kernel, tensorParametersA["MX"]))
+      if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+        module.addComment1("global read addresses: addresses metadata")
+        module.add(self.graAddresses(kernel, tPM))
+      module.addComment1("global read addresses: addresses b")
+      module.add(self.graAddresses(kernel, tensorParametersB))
+      if kernel["ProblemType"]["MXBlockB"]:
+        module.addComment1("global read addresses: addresses mxsb")
+        module.add(self.graAddresses(kernel, tensorParametersB["MX"]))
+
     # workgoup SGPRs no longer needed
     module.add(self.removeGROffsetsVariableSgprsFromPool(kernel))
 
@@ -2467,22 +2502,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.add(self.graFinalOffsets(kernel, tensorParametersB["MX"]))
     self.dontAppendCode = False
     self.dontAppendCode = self.dontAppendCode or forceNoTileCode
-
-    # addresses
-    if not forceNoTileCode:
-      module.addComment1("global read addresses: addresses a")
-      module.add(self.graAddresses(kernel, tensorParametersA))
-      if kernel["ProblemType"]["MXBlockA"]:
-        module.addComment1("global read addresses: addresses mxsa")
-        module.add(self.graAddresses(kernel, tensorParametersA["MX"]))
-      if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
-        module.addComment1("global read addresses: addresses metadata")
-        module.add(self.graAddresses(kernel, tPM))
-      module.addComment1("global read addresses: addresses b")
-      module.add(self.graAddresses(kernel, tensorParametersB))
-      if kernel["ProblemType"]["MXBlockB"]:
-        module.addComment1("global read addresses: addresses mxsb")
-        module.add(self.graAddresses(kernel, tensorParametersB["MX"]))
 
     # Add increment code
     gsuComponent = Component.GSU.find(self)
@@ -4921,6 +4940,15 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.oneBufferScheduling = (kernel["1LDSBuffer"]) or \
                                       ((kernel["DirectToLdsA"] or kernel["DirectToLdsB"]) and \
                                        self.states.numLDSBlk == kernel["PrefetchGlobalRead"])
+    # common sgprSwap
+    # enable it for the following case.
+    #  DTLA+B + numLDSBlk==2 + (not EPS) + (not sparse) + (MX or (StoreSwapAddr and (not CMS))
+    self.states.useCommonSgprSwap = False
+    if kernel["DirectToLds"] == 1 and self.states.numLDSBlk == 2 and \
+       (not kernel["ExpandPointerSwap"]) and (not kernel["ProblemType"]["Sparse"]) and \
+       ((kernel["ProblemType"]["MXBlockA"] or kernel["ProblemType"]["MXBlockB"]) or \
+         kernel["StoreSwapAddr"] and not kernel["UseCustomMainLoopSchedule"]):
+      self.states.useCommonSgprSwap = True
 
     # NamedTuple is immutable
     class intermediateTPValues(NamedTuple):
@@ -5909,8 +5937,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # Need backup for the first LocalReadAddr only (others will be calculated from the first one)
       self.states.a.startVgprLocalReadAddrOrig = vgprIdx
       vgprIdx += 1 if self.states.a.numVgprLocalReadAddr > 0 else 0
+      if kernel["ProblemType"]["MXBlockA"]:
+        self.states.mxsa.startVgprLocalReadAddrOrig = vgprIdx
+        vgprIdx += 1 if self.states.mxsa.numVgprLocalReadAddr > 0 else 0
       self.states.b.startVgprLocalReadAddrOrig = vgprIdx
       vgprIdx += 1 if self.states.b.numVgprLocalReadAddr > 0 else 0
+      if kernel["ProblemType"]["MXBlockB"]:
+        self.states.mxsb.startVgprLocalReadAddrOrig = vgprIdx
+        vgprIdx += 1 if self.states.mxsb.numVgprLocalReadAddr > 0 else 0
 
     # ----------------------------
     # TODO: alignment hack, figure out a better solution
@@ -6655,7 +6689,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.defineSgpr("LocalWriteAddrMXSB", 1)
 
     # Allocate registers to swap between lds buffers
-    if kernel["StoreSwapAddr"]:
+    if self.states.useCommonSgprSwap:
+      self.defineSgpr("SwapCommon", 1)
+    elif kernel["StoreSwapAddr"]:
       if kernel["LocalWriteUseSgprA"]:
         self.defineSgpr("SwapA", 1)
       if kernel["LocalWriteUseSgprB"]:
