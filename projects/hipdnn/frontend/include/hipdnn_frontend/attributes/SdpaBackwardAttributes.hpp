@@ -87,10 +87,10 @@ public:
 
     enum class OutputNames
     {
-        DQ = 0, // Gradient w.r.t. query
-        DK = 1, // Gradient w.r.t. key
-        DV = 2, // Gradient w.r.t. value
-        DBIAS = 3, // Gradient w.r.t. additive attention bias (optional)
+        dQ= 0, // Gradient w.r.t. query
+        dK = 1, // Gradient w.r.t. key
+        dV = 2, // Gradient w.r.t. value
+        dBias = 3, // Gradient w.r.t. additive attention bias (optional)
     };
     typedef OutputNames output_names; // NOLINT(readability-identifier-naming)
 
