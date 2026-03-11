@@ -44,6 +44,23 @@ The **size letters** (O, S, M, E, C, G, D, W, F, R) summarize *which* matrix sha
 
 **Precision** (real, f64, 1b, 1b fnuz, int i8, xf32, mixed, **complex** f32_c/f64_c) matters because the library has different code paths and numerical behavior per type; the tables show which operation groups are tested at which precisions so gaps (e.g. no f64 in bias) are visible. Complex GEMM is supported and tested on **gfx942 and gfx950 only** (see CHANGELOG 1.2.1); complex tests run in the **full** suite (pre_checkin) but are not in smoke or quick.
 
+### 1.5 Batched GEMM coverage
+
+The suite **does** include batched GEMM tests (`batch_count` > 1). When `batch_count` > 0, the generator (`clients/tests/hipblaslt_gentest.py`) sets strides for A, B, C, D, and E from the matrix dimensions and leading dimensions so that batched runs exercise the strided-batch path correctly.
+
+**Default:** In `hipblaslt_common.yaml`, the default is **`batch_count: 1`**; most tests are single-batch.
+
+Tests that use `batch_count` > 1 in `matmul_gtest.yaml`:
+
+| Batch size(s) | Tests |
+|---------------|--------|
+| **1 and 5**   | `matmul_swizzleA`, `matmul_extapi_swizzleA`, `matmul_swizzleB`, `matmul_extapi_swizzleB` (each has `batch_count: [1, 5]`). |
+| **10**        | `matmul_batch_medium`, `matmul_batch_medium_complex`. |
+| **16**        | `matmul_fallback_equality_NN_batch16`, `matmul_fallback_equality_TN_batch16`. |
+| **17711**     | `matmul_stride_lt_ld` (single test: specific M/N/K, strides, bias; gfx950). |
+
+**Batch-size band coverage:** **Small batch (e.g. 2–128)** is only partially covered — we have 5, 10, and 16; there is no systematic spread (e.g. 2, 32, 64, 128). **Medium batch (129–1024)** and **large batch (1025–8192)** are not covered. **Very large batch (>8192)** has one test (batch_count 17711).
+
 ---
 
 ## 2. The two CIs and what they run
@@ -271,4 +288,5 @@ All of the below align with Epic **AIHPBLAS-1003** and its child work; productio
 - **Multithreaded / multi-stream:** Uncomment or add YAML entries so that at least a subset of tests run with `threads > 0` and/or `streams > 1` to exercise concurrent handle/stream usage *(AIHPBLAS-1003)*.
 - **ASAN / TSAN in CI:** Add periodic or optional CI jobs that build with ASAN (and, where feasible, TSAN) and run the test suite to catch memory and threading bugs early *(AIHPBLAS-1003; infrastructure: ROCM-658)*.
 - **Broader architecture matrix:** Where resources allow, run the suite (or a curated subset) on more GPU families to reduce the risk of architecture-specific regressions *(AIHPBLAS-1003; CI parity: AIDEVOPS-73, AIDEVOPS-84, AIDEVOPS-85)*.
+- **Batched GEMM bands:** Add or expand tests for medium batch (129–1024) and large batch (1025–8192), and optionally more points in small batch (e.g. 2, 32, 64, 128).
 - Consider reporting **code coverage** (e.g. from Math CI codecov or a TheRock run) in a separate dashboard so stakeholders can see line/branch coverage alongside this scenario-based view.
