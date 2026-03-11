@@ -30,6 +30,9 @@ from typing import Optional, Dict, Tuple
 from fmha_smoke_matrix import (
     generate_fwd_fp16_bf16_matrix,
     generate_bwd_matrix,
+    generate_splitkv_matrix,
+    generate_padding_matrix,
+    generate_fp8_matrix,
     to_ck_cli_args,
     TestCase,
 )
@@ -179,10 +182,16 @@ def config_to_codegen_json(key: tuple, arch: str) -> str:
                 "page_size": 1,
             },
             "algorithm": {
-                "pipeline": "qr_async" if dq >= 64 else "qr",
+                "pipeline": "qr"
+                if "fp8" in prec
+                else ("qr_async" if dq >= 64 else "qr"),
                 "tile": list(tile),
-                "wave": [4, 1, 1, 4, 1, 1, 1, 1, 1],
-                "warp": [32, 32, 16, 32, 32, 16, 16, 16, 16],
+                "wave": [2, 1, 1, 2, 1, 1, 1, 1, 1]
+                if "fp8" in prec
+                else [4, 1, 1, 4, 1, 1, 1, 1, 1],
+                "warp": [32, 32, 32, 32, 32, 32, 16, 16, 16]
+                if "fp8" in prec
+                else [32, 32, 16, 32, 32, 16, 16, 16, 16],
                 "padding": [True, True, True, True],
                 "block_per_cu": 1,
                 "num_wave_groups": 1,
@@ -908,6 +917,77 @@ def main():
             is_bwd=True,
         )
         all_results["bwd"] = stats
+        total_jit += jt
+        total_test += tt
+
+    # ---- Padding edge cases ----
+    if not args.bwd_only:
+        pad_cases = generate_padding_matrix()
+        pad_configs = {}
+        for c in pad_cases:
+            k = config_key(c)
+            pad_configs[k] = True
+        print(f"\n  PAD: {len(pad_cases)} cases, {len(pad_configs)} configs")
+        jt, tt, stats = _run_phase(
+            "PAD",
+            pad_cases,
+            pad_configs,
+            _jit_one,
+            run_dispatcher_test,
+            ck_exe,
+            ck_bwd_exe,
+            args,
+            jit_root,
+        )
+        all_results["padding"] = stats
+        total_jit += jt
+        total_test += tt
+
+    # ---- FP8 ----
+    if not args.bwd_only:
+        fp8_cases = generate_fp8_matrix()
+        fp8_configs = {}
+        for c in fp8_cases:
+            k = config_key(c)
+            fp8_configs[k] = True
+        print(f"\n  FP8: {len(fp8_cases)} cases, {len(fp8_configs)} configs")
+        jt, tt, stats = _run_phase(
+            "FP8",
+            fp8_cases,
+            fp8_configs,
+            _jit_one,
+            run_dispatcher_test,
+            ck_exe,
+            ck_bwd_exe,
+            args,
+            jit_root,
+        )
+        all_results["fp8"] = stats
+        total_jit += jt
+        total_test += tt
+
+    # ---- SplitKV ----
+    if not args.bwd_only:
+        skv_cases = generate_splitkv_matrix()
+        if args.max_cases > 0:
+            skv_cases = skv_cases[: args.max_cases]
+        skv_configs = {}
+        for c in skv_cases:
+            k = config_key(c)
+            skv_configs[k] = True
+        print(f"\n  SKV: {len(skv_cases)} cases, {len(skv_configs)} configs")
+        jt, tt, stats = _run_phase(
+            "SKV",
+            skv_cases,
+            skv_configs,
+            _jit_one,
+            run_dispatcher_test,
+            ck_exe,
+            ck_bwd_exe,
+            args,
+            jit_root,
+        )
+        all_results["splitkv"] = stats
         total_jit += jt
         total_test += tt
 
