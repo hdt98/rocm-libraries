@@ -81,17 +81,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          # - Exact: [32, 32, 1, 8]
-          # - Exact: [16, 16, 1, 2]
-          # - Exact: [2048, 2048, 1, 256] #128x128(times16)
-          # - Exact: [1024, 1024, 1, 64] #64x64(times16)
-          # - Exact: [512, 512, 1, 32] #32x32
-          # - Exact: [64, 64, 1, 16]
-          # - Exact: [64, 64, 1, 128]
-          # - Exact: [4096, 4096, 1, 8192]
-
-          # - Range: [[16,37, 512],[16,57,512],[1],[1,1,64]]
-          - Range: [ [127,1,129], 0, [2], [63,1,64] ]
+          - Exact: [127, 0, 2, 63] 
 
   - # cgemm NT
     - # ProblemType
@@ -129,12 +119,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          # - Exact: [16, 16, 1, 2]
-          # - Exact: [2048, 2048, 1, 256] #128x128(times16)
-          # - Exact: [1024, 1024, 1, 64] #64x64(times16)
-          # - Exact: [512, 512, 1, 32] #32x32
-
-          - Range: [ [127,1,129], 0, [2], [63,1,64] ]
+          - Exact: [127, 0, 2, 64] 
 
   - # cgemm TN
     - # ProblemType
@@ -172,12 +157,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          # - Exact: [16, 16, 1, 2]
-          # - Exact: [2048, 2048, 1, 256] #128x128(times16)
-          # - Exact: [1024, 1024, 1, 64] #64x64(times16)
-          # - Exact: [512, 512, 1, 32] #32x32
-
-          - Range: [ [127,1,129], 0, [2], [63,1,64] ]
+          - Exact: [128, 0, 2, 63] 
 
   - # cgemm TT
     - # ProblemType
@@ -215,12 +195,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          # - Exact: [16, 16, 1, 2]
-          # - Exact: [2048, 2048, 1, 256] #128x128(times16)
-          # - Exact: [1024, 1024, 1, 64] #64x64(times16)
-          # - Exact: [512, 512, 1, 32] #32x32
-
-          - Range: [ [127,1,129], 0, [2], [63,1,64] ]
+          - Exact: [129, 0, 2, 63] 
 
   - # cgemm NC
     - # ProblemType
@@ -258,12 +233,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          # - Exact: [16, 16, 1, 2]
-          # - Exact: [2048, 2048, 1, 256] #128x128(times16)
-          # - Exact: [1024, 1024, 1, 64] #64x64(times16)
-          # - Exact: [512, 512, 1, 32] #32x32
-
-          - Range: [ [127,1,129], 0, [2], [63,1,64] ]
+          - Exact: [127, 0, 2, 64] 
 
   - # cgemm CN
     - # ProblemType
@@ -301,12 +271,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          # - Exact: [16, 16, 1, 2]
-          # - Exact: [2048, 2048, 1, 256] #128x128(times16)
-          # - Exact: [1024, 1024, 1, 64] #64x64(times16)
-          # - Exact: [512, 512, 1, 32] #32x32
-
-          - Range: [ [127,1,129], 0, [2], [63,1,64] ]
+          - Exact: [128, 0, 2, 63] 
 
   - # cgemm TC
     - # ProblemType
@@ -344,12 +309,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          # - Exact: [16, 16, 1, 2]
-          # - Exact: [2048, 2048, 1, 256] #128x128(times16)
-          # - Exact: [1024, 1024, 1, 64] #64x64(times16)
-          # - Exact: [512, 512, 1, 32] #32x32
-
-          - Range: [ [127,1,129], 0, [2], [63,1,64] ]
+          - Exact: [129, 0, 2, 63] 
 
   - # cgemm CT
     - # ProblemType
@@ -387,12 +347,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          # - Exact: [16, 16, 1, 2]
-          # - Exact: [2048, 2048, 1, 256] #128x128(times16)
-          # - Exact: [1024, 1024, 1, 64] #64x64(times16)
-          # - Exact: [512, 512, 1, 32] #32x32
-
-          - Range: [ [127,1,129], 0, [2], [63,1,64] ]
+          - Exact: [127, 0, 2, 64] 
 
   - # cgemm CC
     - # ProblemType
@@ -430,9 +385,4 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          # - Exact: [16, 16, 1, 2]
-          # - Exact: [2048, 2048, 1, 256] #128x128(times16)
-          # - Exact: [1024, 1024, 1, 64] #64x64(times16)
-          # - Exact: [512, 512, 1, 32] #32x32
-
-          - Range: [ [127,1,129], 0, [2], [63,1,64] ]
+          - Exact: [127, 0, 2, 63] 

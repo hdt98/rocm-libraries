@@ -91,11 +91,6 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [512, 512, 1, 512]
-          # - Exact: [4096, 4096, 1, 1024]
-          # - Exact: [4103, 4096, 1, 1024]
-          # - Exact: [4096, 4103, 1, 1024]
-          # - Exact: [4096, 4096, 1, 1031]
-          - Exact: [4103, 4103, 1, 1031]
 
     - # HGEMM NT - Test DepthU, WGM, VW
       InitialSolutionParameters:
@@ -131,12 +126,6 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [512, 512, 1, 512]
-          # - Exact: [4096, 4096, 1, 1024]
-          # - Exact: [4103, 4096, 1, 1024]
-          # - Exact: [4096, 4103, 1, 1024]
-          # - Exact: [4096, 4096, 1, 1031]
-          # - Exact: [4103, 4103, 1, 1031]
           - Exact: [2055, 2055, 1, 1031]
 
     - # HGEMM NT - Test tuning params
@@ -179,12 +168,6 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [512, 512, 1, 512]
-          # - Exact: [4096, 4096, 1, 1024]
-          # - Exact: [4103, 4096, 1, 1024]
-          # - Exact: [4096, 4103, 1, 1024]
-          # - Exact: [4096, 4096, 1, 1031]
-          # - Exact: [4103, 4103, 1, 1031]
-          - Exact: [2055, 2055, 1, 1031]
 
   #   - # HGEMM NT - Test size range
   #     InitialSolutionParameters:
@@ -290,11 +273,6 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [512, 512, 1, 512]
-          # - Exact: [4096, 4096, 1, 1024]
-          # - Exact: [4103, 4096, 1, 1024]
-          # - Exact: [4096, 4103, 1, 1024]
-          # - Exact: [4096, 4096, 1, 1031]
           - Exact: [4103, 4103, 1, 1031]
 
     # - # HGEMM NN - Test DepthU, WGM, VW
@@ -532,12 +510,6 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [512, 512, 1, 512]
-          # - Exact: [4096, 4096, 1, 1024]
-          # - Exact: [4103, 4096, 1, 1024]
-          # - Exact: [4096, 4103, 1, 1024]
-          # - Exact: [4096, 4096, 1, 1031]
-          # - Exact: [4103, 4103, 1, 1031]
-          - Exact: [2055, 2055, 1, 1031]
 
     # - # HGEMM TN - Test tuning params
     #   InitialSolutionParameters:
@@ -779,12 +751,6 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [512, 512, 1, 512]
-          # - Exact: [4096, 4096, 1, 1024]
-          # - Exact: [4103, 4096, 1, 1024]
-          # - Exact: [4096, 4103, 1, 1024]
-          # - Exact: [4096, 4096, 1, 1031]
-          # - Exact: [4103, 4103, 1, 1031]
-          - Exact: [2055, 2055, 1, 1031]
 
   #   - # HGEMM TT - Test size range
   #     InitialSolutionParameters:

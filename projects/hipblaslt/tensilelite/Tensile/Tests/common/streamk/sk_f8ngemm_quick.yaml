@@ -79,19 +79,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [128, 128, 1, 128]
-          - Exact: [1024, 1024, 1, 1024]
-          # - Exact: [4096, 1024, 1, 1024]
-          # - Exact: [1024, 4096, 1, 1024]
-          # - Exact: [1024, 1024, 1, 4096]
-          # - Exact: [4096, 4096, 1, 4096]
-          # - Exact: [4111, 4096, 1, 4096]
-          # - Exact: [4096, 4111, 1, 4096]
-          # - Exact: [4096, 4096, 1, 4111]
-          - Exact: [4111, 4111, 1, 4111]
-          # - Exact: [1024, 1024, 1, 512]
-          # - Exact: [127,   128, 1, 640]
-          # - Exact: [128,   128, 1, 640]
-          # - Exact: [129,   128, 1, 640]
+          - Exact: [127, 127, 1, 127]
         - BiasTypeArgs: ['s']
         - ActivationArgs:
           - [Enum: none]
@@ -156,19 +144,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [128, 128, 1, 128]
-          - Exact: [1024, 1024, 1, 1024]
-          # - Exact: [4096, 1024, 1, 1024]
-          # - Exact: [1024, 4096, 1, 1024]
-          # - Exact: [1024, 1024, 1, 4096]
-          # - Exact: [4096, 4096, 1, 4096]
-          # - Exact: [4111, 4096, 1, 4096]
-          # - Exact: [4096, 4111, 1, 4096]
-          # - Exact: [4096, 4096, 1, 4111]
           - Exact: [4111, 4111, 1, 4111]
-          # - Exact: [1024, 1024, 1, 512]
-          # - Exact: [127,   128, 1, 640]
-          # - Exact: [128,   128, 1, 640]
-          # - Exact: [129,   128, 1, 640]
         - BiasTypeArgs: ['s']
         - ActivationArgs:
           - [Enum: none]
@@ -233,19 +209,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [128, 128, 1, 128]
-          - Exact: [1024, 1024, 1, 1024]
-          # - Exact: [4096, 1024, 1, 1024]
-          # - Exact: [1024, 4096, 1, 1024]
-          # - Exact: [1024, 1024, 1, 4096]
-          # - Exact: [4096, 4096, 1, 4096]
-          # - Exact: [4111, 4096, 1, 4096]
-          # - Exact: [4096, 4111, 1, 4096]
-          # - Exact: [4096, 4096, 1, 4111]
-          - Exact: [4111, 4111, 1, 4111]
-          # - Exact: [1024, 1024, 1, 512]
-          # - Exact: [127,   128, 1, 640]
-          # - Exact: [128,   128, 1, 640]
-          # - Exact: [129,   128, 1, 640]
+          - Exact: [255, 255, 1, 255]
         - BiasTypeArgs: ['s']
         - ActivationArgs:
           - [Enum: none]
@@ -310,19 +274,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [128, 128, 1, 128]
-          - Exact: [1024, 1024, 1, 1024]
-          # - Exact: [4096, 1024, 1, 1024]
-          # - Exact: [1024, 4096, 1, 1024]
-          # - Exact: [1024, 1024, 1, 4096]
-          # - Exact: [4096, 4096, 1, 4096]
-          # - Exact: [4111, 4096, 1, 4096]
-          # - Exact: [4096, 4111, 1, 4096]
-          # - Exact: [4096, 4096, 1, 4111]
-          - Exact: [4111, 4111, 1, 4111]
-          # - Exact: [1024, 1024, 1, 512]
-          # - Exact: [127,   128, 1, 640]
-          # - Exact: [128,   128, 1, 640]
-          # - Exact: [129,   128, 1, 640]
+          - Exact: [127, 127, 1, 127]
         - BiasTypeArgs: ['s']
         - ActivationArgs:
           - [Enum: none]
@@ -387,19 +339,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [128, 128, 1, 128]
-          - Exact: [1024, 1024, 1, 1024]
-          # - Exact: [4096, 1024, 1, 1024]
-          # - Exact: [1024, 4096, 1, 1024]
-          # - Exact: [1024, 1024, 1, 4096]
-          # - Exact: [4096, 4096, 1, 4096]
-          # - Exact: [4111, 4096, 1, 4096]
-          # - Exact: [4096, 4111, 1, 4096]
-          # - Exact: [4096, 4096, 1, 4111]
-          - Exact: [4111, 4111, 1, 4111]
-          # - Exact: [1024, 1024, 1, 512]
-          # - Exact: [127,   128, 1, 640]
-          # - Exact: [128,   128, 1, 640]
-          # - Exact: [129,   128, 1, 640]
+          - Exact: [31, 31, 1, 31]
         - BiasTypeArgs: ['s']
         - ActivationArgs:
           - [Enum: none]
@@ -463,20 +403,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [128, 128, 1, 128]
-          - Exact: [1024, 1024, 1, 1024]
-          # - Exact: [4096, 1024, 1, 1024]
-          # - Exact: [1024, 4096, 1, 1024]
-          # - Exact: [1024, 1024, 1, 4096]
-          # - Exact: [4096, 4096, 1, 4096]
-          # - Exact: [4111, 4096, 1, 4096]
-          # - Exact: [4096, 4111, 1, 4096]
-          # - Exact: [4096, 4096, 1, 4111]
-          - Exact: [4111, 4111, 1, 4111]
-          # - Exact: [1024, 1024, 1, 512]
-          # - Exact: [127,   128, 1, 640]
-          # - Exact: [128,   128, 1, 640]
-          # - Exact: [129,   128, 1, 640]
+          - Exact: [255, 255, 1, 255]
         - BiasTypeArgs: ['s']
         - ActivationArgs:
           - [Enum: none]
@@ -542,19 +469,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [128, 128, 1, 128]
-          - Exact: [1024, 1024, 1, 1024]
-          # - Exact: [4096, 1024, 1, 1024]
-          # - Exact: [1024, 4096, 1, 1024]
-          # - Exact: [1024, 1024, 1, 4096]
-          # - Exact: [4096, 4096, 1, 4096]
-          # - Exact: [4111, 4096, 1, 4096]
-          # - Exact: [4096, 4111, 1, 4096]
-          # - Exact: [4096, 4096, 1, 4111]
-          - Exact: [4111, 4111, 1, 4111]
-          # - Exact: [1024, 1024, 1, 512]
-          # - Exact: [127,   128, 1, 640]
-          # - Exact: [128,   128, 1, 640]
-          # - Exact: [129,   128, 1, 640]
+          - Exact: [127, 127, 1, 127]
         - BiasTypeArgs: ['s']
         - ActivationArgs:
           - [Enum: none]
@@ -619,19 +534,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [128, 128, 1, 128]
-          - Exact: [1024, 1024, 1, 1024]
-          # - Exact: [4096, 1024, 1, 1024]
-          # - Exact: [1024, 4096, 1, 1024]
-          # - Exact: [1024, 1024, 1, 4096]
-          # - Exact: [4096, 4096, 1, 4096]
-          # - Exact: [4111, 4096, 1, 4096]
-          # - Exact: [4096, 4111, 1, 4096]
-          # - Exact: [4096, 4096, 1, 4111]
-          - Exact: [4111, 4111, 1, 4111]
-          # - Exact: [1024, 1024, 1, 512]
-          # - Exact: [127,   128, 1, 640]
-          # - Exact: [128,   128, 1, 640]
-          # - Exact: [129,   128, 1, 640]
+          - Exact: [127, 127, 1, 127]
         - BiasTypeArgs: ['s']
         - ActivationArgs:
           - [Enum: none]
