@@ -36,7 +36,8 @@ inline bool isValidOrderForDatatype(hipDataType datatype, hipblasLtOrder_t order
     if((datatype == HIP_R_16F && order != HIPBLASLT_ORDER_COL16_4R8)
        || (datatype == HIP_R_16BF && order != HIPBLASLT_ORDER_COL16_4R8)
        || (datatype == HIP_R_8F_E4M3 && order != HIPBLASLT_ORDER_COL16_4R16)
-       || (datatype == HIP_R_8F_E4M3_FNUZ && order != HIPBLASLT_ORDER_COL16_4R16))
+       || (datatype == HIP_R_8F_E4M3_FNUZ && order != HIPBLASLT_ORDER_COL16_4R16)
+       || (datatype == HIP_R_4F_E2M1 && order != HIPBLASLT_ORDER_COL16_4R32))
     {
         return false;
     }
@@ -223,18 +224,14 @@ inline rocblaslt_status
                                   const void*               alpha,
                                   const RocblasltContractionProblem::ScalingFormat scaleAType,
                                   const RocblasltContractionProblem::ScalingFormat scaleBType,
-                                  const uint32_t scaleABlockRowSize,
-                                  const uint32_t scaleABlockColSize,
-                                  const uint32_t scaleBBlockRowSize,
-                                  const uint32_t scaleBBlockColSize,
-                                  void*&         E,
-                                  hipDataType&   aux_type,
-                                  int64_t&       lde,
-                                  int64_t&       batch_stride_e,
-                                  void*&         bias,
-                                  hipDataType&   bias_type,
-                                  void*&         scaleAlphaVec,
-                                  bool&          gradient)
+                                  void*&                                           E,
+                                  hipDataType&                                     aux_type,
+                                  int64_t&                                         lde,
+                                  int64_t&                                         batch_stride_e,
+                                  void*&                                           bias,
+                                  hipDataType&                                     bias_type,
+                                  void*&                                           scaleAlphaVec,
+                                  bool&                                            gradient)
 {
     // Set status
     rocblaslt_status status = rocblaslt_status_continue;
@@ -274,22 +271,6 @@ inline rocblaslt_status
     {
         log_error(__func__, "Scale A and Scale B must be both scalar, vector or block.");
         status = rocblaslt_status_invalid_value;
-    }
-    if(scaleAType == RocblasltContractionProblem::ScalingFormat::Block)
-    {
-        if(scaleABlockRowSize != 32 || scaleABlockColSize != 1)
-        {
-            log_error(__func__, "ScaleA block row and column sizes currently only support 32x1");
-            status = rocblaslt_status_invalid_value;
-        }
-    }
-    if(scaleBType == RocblasltContractionProblem::ScalingFormat::Block)
-    {
-        if(scaleBBlockRowSize != 1 || scaleBBlockColSize != 32)
-        {
-            log_error(__func__, "ScaleB block row and column sizes currently only support 1x32");
-            status = rocblaslt_status_invalid_value;
-        }
     }
     return status;
 }
@@ -417,10 +398,6 @@ inline rocblaslt_status rocblaslt_matmul_valid_args(const rocblaslt_matmul_desc 
                                                          alpha,
                                                          matmul_descr->scaleAType,
                                                          matmul_descr->scaleBType,
-                                                         matmul_descr->scaleABlockRowSize,
-                                                         matmul_descr->scaleABlockColSize,
-                                                         matmul_descr->scaleBBlockRowSize,
-                                                         matmul_descr->scaleBBlockColSize,
                                                          E,
                                                          aux_type,
                                                          lde,
@@ -457,6 +434,60 @@ inline void setTo1(const rocblaslt_compute_type& compute_type, const void* onePt
     {
         *((float*)onePtr) = 1.f;
         *dst              = onePtr;
+    }
+}
+
+inline std::complex<double> get_alpha_beta_scalar(hipDataType type, const void* ptr)
+{
+    if (!ptr) {
+        return {0.0, 0.0};
+    }
+
+    switch (type)
+    {
+        case HIP_R_32F:
+            return {static_cast<double>(*(reinterpret_cast<const float*>(ptr))), 0.0};
+        case HIP_R_64F:
+            return {*(reinterpret_cast<const double*>(ptr)), 0.0};
+        case HIP_R_32I:
+            return {static_cast<double>(*(reinterpret_cast<const int32_t*>(ptr))), 0.0};
+        
+        case HIP_R_16F:
+        case HIP_R_16BF:
+            return {static_cast<double>(*(reinterpret_cast<const float*>(ptr))), 0.0};
+
+        case HIP_C_32F:
+        {
+            auto val = *(reinterpret_cast<const std::complex<float>*>(ptr));
+            return {static_cast<double>(val.real()), static_cast<double>(val.imag())};
+        }
+        case HIP_C_64F:
+        {
+            return *(reinterpret_cast<const std::complex<double>*>(ptr));
+        }
+            
+        default:
+            return {0.0, 0.0};
+    }
+}
+
+inline hipDataType get_alpha_beta_target_type(hipblasComputeType_t typeCompute, hipDataType typeA)
+{
+    if (typeA == HIP_C_32F || typeA == HIP_C_64F)
+    {
+        if (typeCompute == HIPBLAS_COMPUTE_64F)
+            return HIP_C_64F; 
+        else
+            return HIP_C_32F; 
+    }
+    else
+    {
+        if (typeCompute == HIPBLAS_COMPUTE_64F)
+            return HIP_R_64F;
+        else if (typeCompute == HIPBLAS_COMPUTE_32I)
+            return HIP_R_32I;
+        else 
+            return HIP_R_32F; 
     }
 }
 #endif

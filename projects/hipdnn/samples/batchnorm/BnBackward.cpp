@@ -46,23 +46,11 @@ bool SampleRunner::operator()(const TensorLayout& layout)
 
     auto [dx, dscale, dbias] = graph->batchnorm_backward(dy, x, scale, bnBwdAttributes);
     dx->set_output(true);
-    dscale->set_output(true);
-    dbias->set_output(true);
+    dscale->set_output(true).set_data_type(intermediateType);
+    dbias->set_output(true).set_data_type(intermediateType);
 
-    HIPDNN_FE_CHECK(graph->validate());
-    std::cout << "Graph validation successful.\n";
-
-    HIPDNN_FE_CHECK(graph->build_operation_graph(handle));
-    std::cout << "Operation graph build successful.\n";
-
-    HIPDNN_FE_CHECK(graph->create_execution_plans());
-    std::cout << "Execution plans created successfully.\n";
-
-    HIPDNN_FE_CHECK(graph->check_support());
-    std::cout << "Graph support check successful.\n";
-
-    HIPDNN_FE_CHECK(graph->build_plans());
-    std::cout << "Plans build successful.\n";
+    HIPDNN_FE_CHECK(graph->build(handle));
+    std::cout << "Graph build successful.\n";
 
     utilities::Tensor<InputType> dyTensor(dy->get_dim(), layout);
     utilities::Tensor<InputType> xTensor(x->get_dim(), layout);
@@ -166,15 +154,10 @@ int main(int argc, char* argv[])
 {
     auto config = parseCommandLineArgs(argc, argv);
 
-    initializeFrontendLogging();
+    auto [handle, handleError] = createHipdnnHandle();
+    HIPDNN_FE_CHECK(handleError);
 
-    auto backend = hipdnnBackend();
-    hipdnnHandle_t handle;
-    HIPDNN_CHECK(backend->create(&handle));
-
-    bool allPassed = run(SampleRunner{handle, config});
-
-    HIPDNN_CHECK(backend->destroy(handle));
+    bool allPassed = run(SampleRunner{*handle, config});
 
     if(allPassed)
     {

@@ -157,7 +157,8 @@ rocblaslt_status rocblaslt_matmul_impl(const rocblaslt_handle       handle,
     //     return rocblaslt_status_invalid_size;
     // }
 
-    if(algo) {
+    if(algo)
+    {
         workspaceSizeInBytes = std::min<size_t>(workspaceSizeInBytes, algo->max_workspace_bytes);
     }
     RocblasltContractionProblem problem{opA,
@@ -206,10 +207,6 @@ rocblaslt_status rocblaslt_matmul_impl(const rocblaslt_handle       handle,
                                         scaleAlphaVec,
                                         matmul_descr->scaleAType,
                                         matmul_descr->scaleBType,
-                                        matmul_descr->scaleABlockRowSize,
-                                        matmul_descr->scaleABlockColSize,
-                                        matmul_descr->scaleBBlockRowSize,
-                                        matmul_descr->scaleBBlockColSize,
                                         bias_type,
                                         aux_type,
                                         epilogue,
@@ -369,10 +366,6 @@ rocblaslt_status rocblaslt_gemm_create_cpp_impl(const rocblaslt_handle          
                                         scaleAlphaVec,
                                         matmul_descr->scaleAType,
                                         matmul_descr->scaleBType,
-                                        matmul_descr->scaleABlockRowSize,
-                                        matmul_descr->scaleABlockColSize,
-                                        matmul_descr->scaleBBlockRowSize,
-                                        matmul_descr->scaleBBlockColSize,
                                         bias_type,
                                         aux_type,
                                         epilogue,
@@ -521,10 +514,6 @@ rocblaslt_status
                                                       alpha[i],
                                                       matmul_descr[i]->scaleAType,
                                                       matmul_descr[i]->scaleBType,
-                                                      matmul_descr[i]->scaleABlockRowSize,
-                                                      matmul_descr[i]->scaleABlockColSize,
-                                                      matmul_descr[i]->scaleBBlockRowSize,
-                                                      matmul_descr[i]->scaleBBlockColSize,
                                                       E,
                                                       aux_type,
                                                       lde,
@@ -620,68 +609,65 @@ rocblaslt_status
             = matA[i]->order != HIPBLASLT_ORDER_COL && matA[i]->order != HIPBLASLT_ORDER_ROW;
         bool swizzleB
             = matB[i]->order != HIPBLASLT_ORDER_COL && matB[i]->order != HIPBLASLT_ORDER_ROW;
-        problems.push_back(RocblasltContractionProblem{opA,
-                                                       opB,
-                                                       m_vec[i],
-                                                       n_vec[i],
-                                                       k_vec[i],
-                                                       alpha_vec[i],
-                                                       type_a,
-                                                       A_vec[i],
-                                                       nullptr,
-                                                       lda_vec[i],
-                                                       batch_stride_a_vec[i],
-                                                       type_b,
-                                                       B_vec[i],
-                                                       nullptr,
-                                                       ldb_vec[i],
-                                                       batch_stride_b_vec[i],
-                                                       beta_vec[i],
-                                                       type_c,
-                                                       C_vec[i],
-                                                       nullptr,
-                                                       ldc_vec[i],
-                                                       batch_stride_c_vec[i],
-                                                       type_d,
-                                                       D_vec[i],
-                                                       nullptr,
-                                                       ldd_vec[i],
-                                                       batch_stride_d_vec[i],
-                                                       E_vec[i],
-                                                       nullptr,
-                                                       lde_vec[i],
-                                                       batch_stride_e_vec[i],
-                                                       num_batches_a_vec[i],
-                                                       strided_batch,
-                                                       grouped_gemm,
-                                                       gradient_vec[i],
-                                                       compute_type,
-                                                       matmul_descr[i]->scale_type,
-                                                       bias_vec[i],
-                                                       scaleA_vec[i],
-                                                       scaleB_vec[i],
-                                                       scaleC_vec[i],
-                                                       scaleD_vec[i],
-                                                       scaleE_vec[i],
-                                                       scaleAlpha_vec[i],
-                                                       matmul_descr[i]->scaleAType,
-                                                       matmul_descr[i]->scaleBType,
-                                                       matmul_descr[i]->scaleABlockRowSize,
-                                                       matmul_descr[i]->scaleABlockColSize,
-                                                       matmul_descr[i]->scaleBBlockRowSize,
-                                                       matmul_descr[i]->scaleBBlockColSize,
-                                                       bias_type_vec[i],
-                                                       aux_type_vec[i],
-                                                       epilogue_vec[i],
-                                                       amaxD_vec[i],
-                                                       nullptr,
-                                                       0,
-                                                       matmul_descr[i]->act0,
-                                                       matmul_descr[i]->act1,
-                                                       0,
-                                                       (char*)handle->Synchronizer+(409600*i*sizeof(int)),
-                                                       swizzleA,
-                                                       swizzleB});
+        problems.push_back(
+            RocblasltContractionProblem{opA,
+                                        opB,
+                                        m_vec[i],
+                                        n_vec[i],
+                                        k_vec[i],
+                                        alpha_vec[i],
+                                        type_a,
+                                        A_vec[i],
+                                        nullptr,
+                                        lda_vec[i],
+                                        batch_stride_a_vec[i],
+                                        type_b,
+                                        B_vec[i],
+                                        nullptr,
+                                        ldb_vec[i],
+                                        batch_stride_b_vec[i],
+                                        beta_vec[i],
+                                        type_c,
+                                        C_vec[i],
+                                        nullptr,
+                                        ldc_vec[i],
+                                        batch_stride_c_vec[i],
+                                        type_d,
+                                        D_vec[i],
+                                        nullptr,
+                                        ldd_vec[i],
+                                        batch_stride_d_vec[i],
+                                        E_vec[i],
+                                        nullptr,
+                                        lde_vec[i],
+                                        batch_stride_e_vec[i],
+                                        num_batches_a_vec[i],
+                                        strided_batch,
+                                        grouped_gemm,
+                                        gradient_vec[i],
+                                        compute_type,
+                                        matmul_descr[i]->scale_type,
+                                        bias_vec[i],
+                                        scaleA_vec[i],
+                                        scaleB_vec[i],
+                                        scaleC_vec[i],
+                                        scaleD_vec[i],
+                                        scaleE_vec[i],
+                                        scaleAlpha_vec[i],
+                                        matmul_descr[i]->scaleAType,
+                                        matmul_descr[i]->scaleBType,
+                                        bias_type_vec[i],
+                                        aux_type_vec[i],
+                                        epilogue_vec[i],
+                                        amaxD_vec[i],
+                                        nullptr,
+                                        0,
+                                        matmul_descr[i]->act0,
+                                        matmul_descr[i]->act1,
+                                        0,
+                                        (char*)handle->Synchronizer + (409600 * i * sizeof(int)),
+                                        swizzleA,
+                                        swizzleB});
     }
     return groupedGemmCreate(problems, gemmData, gemmCount);
 }
@@ -718,6 +704,13 @@ rocblaslt_status rocblaslt_matmul(rocblaslt_handle             handle,
     // Update for the valid case: ((alpha_in_host && alpha=0) && (A=NULL || B=NULL))
     bool alpha_A_B_violation
         = (!alpha || ((matmul_descr->pointermode || (*((float*)alpha))) && (!A || !B)));
+
+    hipDataType alpha_type = matA->type;
+    hipDataType beta_type  = matD->type;
+
+    auto alpha_scalar = get_alpha_beta_scalar(alpha_type, alpha);
+    auto beta_scalar  = get_alpha_beta_scalar(beta_type, beta);
+
     // Check if pointer is valid
     if(alpha == nullptr || beta == nullptr || C == nullptr || D == nullptr || alpha_A_B_violation)
     {
@@ -769,36 +762,36 @@ rocblaslt_status rocblaslt_matmul(rocblaslt_handle             handle,
 
     if(get_logger_layer_mode() != rocblaslt_layer_mode_none)
     {
-        log_trace(__func__,
-                  "A",
-                  A,
-                  "Adesc",
-                  rocblaslt_matrix_layout_to_string(matA),
-                  "B",
-                  B,
-                  "Bdesc",
-                  rocblaslt_matrix_layout_to_string(matB),
-                  "C",
-                  C,
-                  "Cdesc",
-                  rocblaslt_matrix_layout_to_string(matC),
-                  "D",
-                  D,
-                  "Ddesc",
-                  rocblaslt_matrix_layout_to_string(matD),
-                  "computeDesc",
-                  rocblaslt_matmul_desc_to_string(matmul_descr),
-                  "workSpace",
-                  workspace,
-                  "workSpaceSizeInBytes",
-                  workspaceSizeInBytes,
-                  (matmul_descr->pointermode) ? "alphaVector" : "alpha",
-                  *(reinterpret_cast<const float*>(
-                      alpha)), // TODO: Add casts for f16 and int types of alpha.
-                  "beta",
-                  *(reinterpret_cast<const float*>(beta)),
-                  "stream",
-                  stream);
+        log_trace(
+            __func__,
+            "A",
+            A,
+            "Adesc",
+            rocblaslt_matrix_layout_to_string(matA),
+            "B",
+            B,
+            "Bdesc",
+            rocblaslt_matrix_layout_to_string(matB),
+            "C",
+            C,
+            "Cdesc",
+            rocblaslt_matrix_layout_to_string(matC),
+            "D",
+            D,
+            "Ddesc",
+            rocblaslt_matrix_layout_to_string(matD),
+            "computeDesc",
+            rocblaslt_matmul_desc_to_string(matmul_descr),
+            "workSpace",
+            workspace,
+            "workSpaceSizeInBytes",
+            workspaceSizeInBytes,
+            (matmul_descr->pointermode) ? "alphaVector" : "alpha",
+            alpha_scalar, 
+            "beta",
+            beta_scalar,
+            "stream",
+            stream);
     }
     return rocblaslt_matmul_impl(handle,
                                  matmul_descr,
@@ -920,11 +913,6 @@ rocblaslt_status rocblaslt_gemm_create_cpp_impl_2(const rocblaslt_handle handle,
                                                inputs.alpha,
                                                rocEpilogue.scaling_a_type,
                                                rocEpilogue.scaling_b_type,
-                                               // TODO: these scale block sizes might need to be set
-                                               0, /* scaleABlockRowSize */
-                                               0, /* scaleABlockColSize */
-                                               0, /* scaleBBlockRowSize */
-                                               0, /* scaleBBlockColSize */
                                                E,
                                                aux_type,
                                                lde,
@@ -1003,11 +991,6 @@ rocblaslt_status rocblaslt_gemm_create_cpp_impl_2(const rocblaslt_handle handle,
         scaleAlphaVec,
         static_cast<RocblasltContractionProblem::ScalingFormat>(rocEpilogue.scaling_a_type),
         static_cast<RocblasltContractionProblem::ScalingFormat>(rocEpilogue.scaling_b_type),
-        // TODO: these scale block sizes might need to be set
-        0, /* scaleABlockRowSize */
-        0, /* scaleABlockColSize */
-        0, /* scaleBBlockRowSize */
-        0, /* scaleBBlockColSize */
         bias_type,
         aux_type,
         epilogue,
@@ -1216,11 +1199,6 @@ rocblaslt_status rocblaslt_groupedgemm_create_cpp_impl_2(const rocblaslt_handle 
                     rocEpilogue[iIdx].scaling_a_type),
                 static_cast<RocblasltContractionProblem::ScalingFormat>(
                     rocEpilogue[iIdx].scaling_b_type),
-                // TODO: these scale block sizes might need to be set
-                0, /* scaleABlockRowSize */
-                0, /* scaleABlockColSize */
-                0, /* scaleBBlockRowSize */
-                0, /* scaleBBlockColSize */
                 E,
                 aux_type,
                 lde,
@@ -1332,11 +1310,6 @@ rocblaslt_status rocblaslt_groupedgemm_create_cpp_impl_2(const rocblaslt_handle 
                                             rocEpilogue[iIdx].scaling_a_type),
                                         static_cast<RocblasltContractionProblem::ScalingFormat>(
                                             rocEpilogue[iIdx].scaling_b_type),
-                                        // TODO: these scale block sizes might need to be set
-                                        0, /* scaleABlockRowSize */
-                                        0, /* scaleABlockColSize */
-                                        0, /* scaleBBlockRowSize */
-                                        0, /* scaleBBlockColSize */
                                         bias_type_vec[i],
                                         aux_type_vec[i],
                                         epilogue_vec[i],
@@ -1346,7 +1319,7 @@ rocblaslt_status rocblaslt_groupedgemm_create_cpp_impl_2(const rocblaslt_handle 
                                         rocEpilogue[iIdx].act0,
                                         rocEpilogue[iIdx].act1,
                                         0,
-                                        (char*)handle->Synchronizer+(409600*i*sizeof(int)),
+                                        (char*)handle->Synchronizer + (409600 * i * sizeof(int)),
                                         swizzleA,
                                         swizzleB});
     }
@@ -1501,7 +1474,15 @@ rocblaslt_status rocblaslt_makeArgument_cpp(rocblaslt_handle              handle
                                             hipStream_t                   stream,
                                             std::shared_ptr<void>         gemmData)
 {
-    return makeArgument(handle, gemmType, algo, tuning, workspace, workspaceSizeInBytes, useUserArgs, stream, gemmData);
+    return makeArgument(handle,
+                        gemmType,
+                        algo,
+                        tuning,
+                        workspace,
+                        workspaceSizeInBytes,
+                        useUserArgs,
+                        stream,
+                        gemmData);
 }
 
 std::string rocblaslt_get_kernel_name_from_data_cpp(rocblaslt_handle             handle,

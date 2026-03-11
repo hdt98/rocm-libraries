@@ -26,6 +26,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <map>
@@ -103,6 +104,7 @@ namespace TensileLite
         mutable SolutionMap<MySolution>                         solutions;
         std::string                                             version;
         mutable std::mutex                                      solutionsGuard;
+        mutable std::atomic<bool>                               lastFindTopRetAll = false;
 
         MasterSolutionLibrary() = default;
 
@@ -179,6 +181,7 @@ namespace TensileLite
                                                                Hardware const&  hardware,
                                                                const int index) const override
         {
+            std::lock_guard<std::mutex> lock(solutionsGuard);
             if(solutions.find(index) == solutions.end())
             {
                 return std::shared_ptr<MySolution>();
@@ -196,13 +199,23 @@ namespace TensileLite
                                                                const int       index) const override
         {
             loadLibrary(index);
+            std::lock_guard<std::mutex> lock(solutionsGuard);
             if(solutions.find(index) == solutions.end())
             {
                 return std::shared_ptr<MySolution>();
             }
-            auto solution = solutions.at(index);
+            auto                   solution = solutions.at(index);
+            
+            TensileLite::TensorOps nop;
+
             if(solution->requiredHostWorkspaceSizePerProblem == static_cast<size_t>(-1))
             {
+                const auto& pt = solution->problemType;
+
+                bool isComplexInput
+                    = (pt.aType == rocisa::DataType::ComplexFloat || pt.aType == rocisa::DataType::ComplexDouble);
+                rocisa::DataType alphaBetaType = isComplexInput ? pt.aType : pt.computeType;
+
                 auto problem
                     = MyProblem::createDefaultProblem(solution->problemType.transA,
                                                       solution->problemType.transB,
@@ -210,8 +223,8 @@ namespace TensileLite
                                                       solution->problemType.bType,
                                                       solution->problemType.cType,
                                                       solution->problemType.dType,
-                                                      solution->problemType.computeType,
-                                                      solution->problemType.computeType,
+                                                      alphaBetaType,
+                                                      alphaBetaType,
                                                       solution->problemType.computeInputType,
                                                       solution->problemType.computeType,
                                                       1.0,
@@ -221,7 +234,11 @@ namespace TensileLite
                                                       solution->problemType.biasDataTypeWhiteList,
                                                       solution->problemType.biasSrcWhiteList,
                                                       solution->problemType.groupedGemm,
-                                                      std::numeric_limits<size_t>::max());
+                                                      std::numeric_limits<size_t>::max(),
+                                                      nop,
+                                                      nop,
+                                                      nop,
+                                                      nop);
                 solution->requiredHostWorkspaceSizePerProblem
                     = solution->requiredHostSizeGroupedGemmSingle(problem, hardware);
             }
@@ -320,13 +337,22 @@ namespace TensileLite
                 auto   end    = std::chrono::steady_clock::now();
                 double time   = std::chrono::duration<double, std::micro>(end - start).count();
                 std::cout << "Solution selection time: " << time << " us" << std::endl;
+                lastFindTopRetAll = library->lastFindTopAlreadyRetAll();
 
                 return result;
             }
             else
             {
-                return library->findTopSolutions(problem, hardware, numSolutions);
+                const auto& result = library->findTopSolutions(problem, hardware, numSolutions);
+                lastFindTopRetAll = library->lastFindTopAlreadyRetAll();
+
+                return result;
             }
+        }
+
+        virtual bool lastFindTopAlreadyRetAll() const override
+        {
+            return lastFindTopRetAll;
         }
 
         virtual SolutionVector<MySolution>
