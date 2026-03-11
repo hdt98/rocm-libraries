@@ -289,10 +289,14 @@ StreamKTilePartitionerBase<BlockGemmShapeType, ReductionStrategyType>::estimate_
  * @return index_t  The id after XCD remap
  */
 template <typename BlockGemmShapeType, StreamKReductionStrategy ReductionStrategyType>
-CK_TILE_HOST_DEVICE index_t
+CK_TILE_HOST_DEVICE /* static */ index_t
 StreamKTilePartitionerBase<BlockGemmShapeType, ReductionStrategyType>::remap_xcd(
-    index_t block_1d_id, index_t total_num_tiles, index_t num_xcds) const noexcept
+    index_t block_1d_id, index_t total_num_tiles, index_t num_xcds) noexcept
 {
+    if(num_xcds == 1)
+    {
+        return block_1d_id;
+    }
     // Number of ids per XCD in the new arrangement
     index_t ids_per_xcd = (total_num_tiles + num_xcds - 1) / num_xcds;
 

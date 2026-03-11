@@ -222,9 +222,8 @@ struct StreamKTilePartitionerBase
      * @param num_xcds          number of XCDs
      * @return index_t  The id after XCD remap
      */
-    CK_TILE_HOST_DEVICE index_t remap_xcd(index_t block_1d_id,
-                                          index_t total_num_tiles,
-                                          index_t num_xcds = 8) const noexcept;
+    CK_TILE_HOST_DEVICE static index_t
+    remap_xcd(index_t block_1d_id, index_t total_num_tiles, index_t num_xcds = 8) noexcept;
 
     protected:
     index_t num_tiles_;
