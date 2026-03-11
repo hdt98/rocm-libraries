@@ -146,7 +146,7 @@ set( GPU_TARGETS "${target_list}" CACHE STRING "List of GPUs (gfx targets) to su
 set( AMDGPU_TARGETS "${GPU_TARGETS}" CACHE STRING "List of GPUs (gfx targets) to support" FORCE ) # for old hip cmake files backward compatibility
 
 option( BUILD_WITH_HIPBLASLT "Build with HipBLASLt" ON )
-set( hipblaslt_path "/opt/rocm" CACHE PATH "Use local HipBLASLt directory" )
+set( hipblaslt_path "/home/smalekta/RocblasIssues/rocm-libraries/projects/hipblaslt" CACHE PATH "Use local HipBLASLt directory" )
 set( HIPBLASLT_VERSION 1.2.0 CACHE STRING "The version of HipBLASLt to be used" )
 
 if( NOT BUILD_WITH_TENSILE )

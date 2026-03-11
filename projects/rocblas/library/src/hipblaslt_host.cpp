@@ -660,13 +660,47 @@ rocblas_status getAllSolutionsHipBlasLT(const RocblasContractionProblem<Ti, To, 
             {
                 if(gemm->isAlgoSupported(it->algo, tmpWorkspaceSize) == HIPBLAS_STATUS_SUCCESS)
                 {
-                    if(list_array != nullptr)
+                    int sol_index = map_hipblaslt_to_rocblas_index(*it);
+                    if(sol_index == c_rocblas_bad_solution_index)
                     {
-                        int solution_index = map_hipblaslt_to_rocblas_index(*it);
-                        if(solution_index != c_rocblas_bad_solution_index)
-                            list_array[added_sols++] = solution_index;
-                        else
-                            --retSize;
+                        --retSize;
+                        ++it;
+                        continue;
+                    }
+
+                    // Verify via getAlgosFromIndex round-trip to match execution path.
+                    // getAllAlgos and getAlgosFromIndex can produce algo objects with
+                    // different internal state, causing isAlgoSupported to disagree.
+                    bool roundtrip_ok = false;
+                    if(sol_index > 0)
+                    {
+                        std::vector<int> idx_vec(1, sol_index - 1);
+                        std::vector<hipblasLtMatmulHeuristicResult_t> rtResults;
+                        if(hipblaslt_ext::getAlgosFromIndex(handle, idx_vec, rtResults)
+                               == HIPBLAS_STATUS_SUCCESS
+                           && !rtResults.empty())
+                        {
+                            size_t rtWorkspace = 0;
+                            if(gemm->isAlgoSupported(rtResults[0].algo, rtWorkspace)
+                               == HIPBLAS_STATUS_SUCCESS)
+                            {
+                                roundtrip_ok = true;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        roundtrip_ok = true;
+                    }
+
+                    if(roundtrip_ok)
+                    {
+                        if(list_array != nullptr)
+                            list_array[added_sols++] = sol_index;
+                    }
+                    else
+                    {
+                        --retSize;
                     }
                 }
                 else
