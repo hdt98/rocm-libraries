@@ -1429,6 +1429,12 @@ class KernelWriterAssembly(KernelWriter):
       # if thread is OOB, we can invalid it by setting vOffset to BufferOOB
       module.add(ValueSet("BufferOOB", 0x80000000, format=1))
 
+      if self.states.version[:2] == (12, 5):
+          # On GFX1250, Let s0, s1, s2, and s3 be the register of the descriptor.
+          # base_address has 57 bits: s1[24:0] s0[31:0]
+          # num_records has 45 bits: s3[5:0] s2[31:0] s1[31:25]
+          module.add(ValueSet("MaskToClearNumRecordsLower7Bits", (0x1 << 25)-1, format=1))
+
       srdUpperValue = SrdUpperValue(self.states.version)
       module.addComment2("Bits 127:96 of SRD.\n" + srdUpperValue.desc())
       module.add(ValueSet("Srd127_96", srdUpperValue.getValue(), format=1))

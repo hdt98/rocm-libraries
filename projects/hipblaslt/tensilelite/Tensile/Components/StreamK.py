@@ -24,10 +24,10 @@ from rocisa.enum import CacheScope
 from rocisa.code import Module, Label
 from rocisa.container import vgpr, sgpr, SMEMModifiers, MUBUFModifiers, replaceHolder, EXEC,\
     VOP3PModifiers, ContinuousRegister
-from rocisa.instruction import SAddCU32, SAddI32, SAddU32, SAndB32, SBarrier, \
+from rocisa.instruction import SAddCU32, SAddU32, SAndB32, SBarrier, \
     SBranch, SCBranchSCC0, SCBranchSCC1, SCMovB32, SCSelectB32, SCmpEQU32, SCmpEQU64, \
-    SCmpGtU32, SCmpLeU32, SCmpLtU32, SCmpGeU32, SLShiftLeftB32, SLShiftLeftB64, SLShiftRightB32, SLoadB32, \
-    SMaxI32, SMinU32, SMovB32, SMovB64, SMulI32, SNop, SSleep, SStoreB32, SSubU32, \
+    SCmpGtU32, SCmpLeU32, SCmpLtU32, SLShiftLeftB32, SLShiftLeftB64, SLShiftRightB32, SLoadB32, \
+    SMaxI32, SMinU32, SMovB32, SMovB64, SMulI32, SNop, SOrB32, SSleep, SStoreB32, SSubU32, \
     SWaitCnt, VAddF32, VAddF64, VAddPKF16, VAddU32, VLShiftRightB32, VMovB32, \
     VReadfirstlaneB32, VCvtBF16toFP32, BufferStoreB32
 from rocisa.functions import scalarStaticDivideAndRemainder, sMagicDiv2, \
@@ -121,6 +121,19 @@ class StreamK(Component):
         if key in kernel:
             return kernel[key]
         return kernel["DepthU"]
+
+    def shiftSrd(self, writer, srdIdx) -> Module:
+      module = Module("shiftSrd")
+      if writer.states.version[:2] == (12, 5):
+        with writer.allocTmpSgpr(1) as stmpRes:
+          module.addComment("Shift num records for gfx125x")
+          module.add(SAndB32(sgpr(stmpRes.idx), sgpr(srdIdx+2), 0x7F))
+          module.add(SLShiftLeftB32(sgpr(stmpRes.idx), 25, sgpr(stmpRes.idx)))
+          module.add(SAndB32(sgpr(srdIdx+1), sgpr(srdIdx+1), 0x1FFFFFF))
+          module.add(SOrB32(sgpr(srdIdx+1), sgpr(srdIdx+1), sgpr(stmpRes.idx)))
+          module.add(SLShiftRightB32(sgpr(srdIdx+2), 7, sgpr(srdIdx+2)))
+
+      return module
 
     @abc.abstractmethod
     def preLoop(self, writer, kernel):
@@ -486,7 +499,6 @@ class StreamK(Component):
 
             module.add(skFixupWaitForFlag) # loop to wait for flag
             module.add(SLoadB32(dst=sgpr(tmpSgpr+1), base=sgpr("AddressFlags", 2), soffset=sgpr(tmpSgpr), smem=SMEMModifiers(glc=True, dlc=True, scope=CacheScope.SCOPE_DEV), comment="get flag"))
-
             module.add(SWaitCnt(kmcnt=0, comment="wait for flag load"))
             if kernel["DebugStreamK"] & 2 == 0: # Don't wait for partials if not being written
                 module.add(SCmpEQU32(src0=sgpr(tmpSgpr+1), src1=1, comment="check if ready"))
@@ -560,7 +572,6 @@ class StreamK(Component):
                 # Check flag
                 module.add(SLShiftLeftB32(dst=sgpr(tmpSgpr), src=sgpr(sCtaIdx), shiftHex=log2(4), comment="flag offset based on CTA index"))
                 module.add(SLoadB32(dst=sgpr(tmpSgpr+2), base=sgpr("AddressFlags", 2), soffset=sgpr(tmpSgpr), smem=SMEMModifiers(glc=True, dlc=True, scope=CacheScope.SCOPE_DEV), comment="get flag"))
-
                 module.add(SWaitCnt(kmcnt=0, comment="wait for flag load"))
                 if kernel["DebugStreamK"] & 2 == 0:
                     module.add(SCmpEQU32(src0=sgpr(tmpSgpr+2), src1=1, comment="check if ready"))
@@ -644,9 +655,10 @@ class StreamK(Component):
         module = Module("StreamK Common computeWorkspaceSrd")
 
         # Base Address
-        module.add(SMovB64(dst=sgpr("SrdWS+0", 2), src=sgpr("AddressWS+0", 2), comment="init SRD base address"))
-        module.add(SMovB32(dst=sgpr("SrdWS+2"), src="BufferOOB", comment=""))
-        module.add(SMovB32(dst=sgpr("SrdWS+3"), src="Srd127_96", comment="Set bits 127_96 in post-loop SRD"))
+        module.add(SMovB64(dst=sgpr("SrdWS", 2), src=sgpr("AddressWS", 2)))
+        module.add(SMovB32(dst=sgpr("SrdWS+2"), src="BufferOOB"))
+        module.add(SMovB32(dst=sgpr("SrdWS+3"), src="Srd127_96"))
+        module.add(writer.shiftSrd("WS"))
 
         tmpLocal = None
         if tmpSgpr == None:
@@ -902,6 +914,7 @@ class StreamK(Component):
         module.add(SMovB64(dst=sgpr(tmpSgprBuffer, 2), src=sgpr("AddressFlags", 2)))
         module.add(SMovB32(dst=sgpr(tmpSgprBuffer+2), src="BufferOOB"))
         module.add(SMovB32(dst=sgpr(tmpSgprBuffer+3), src="Srd127_96"))
+        module.add(self.shiftSrd(writer, tmpSgprBuffer))
         module.add(BufferStoreB32(src=src, vaddr=vgpr("off", isOff=True), saddr=sgpr(tmpSgprBuffer, 4), soffset=soffset, \
                                   mubuf=MUBUFModifiers(glc=True, dlc=True, scope=CacheScope.SCOPE_DEV), \
                                   comment=comment))
@@ -2195,7 +2208,7 @@ class StreamKTwoTileDPFirst(StreamK):
         module.add(SCSelectB32(dst=sgpr("StreamKIterEnd"), src0=sgpr(sIter+1), src1=sgpr("StreamKIterEnd"), comment="Set end iter"))
         writer.sgprPool.checkIn(sSkExtraIters)
         writer.sgprPool.checkIn(sIter)
-        # clamp to end of sk iterations
+        # TODO maybe remove clamp, since extra iters code should guarantee total iterations match
         sTmp = writer.sgprPool.checkOut(1, "TotalSKIters")
         module.add(SMulI32(dst=sgpr(sTmp), src0=sgpr("skTiles"), src1=sgpr("ItersPerTile"), comment="Total SK iters"))
         module.add(SMinU32(dst=sgpr("StreamKIterEnd"), src0=sgpr("StreamKIterEnd"), src1=sgpr(sTmp), comment="Cap ending iter at total SK iters"))
@@ -2266,8 +2279,13 @@ class StreamKTwoTileDPFirst(StreamK):
         writer.sgprPool.checkIn(sIter)
         module.add(SAddU32(dst=sgpr(sTmp+1), src0=sgpr("StreamKIter"), src1=sgpr(sTmp+3), comment="Offset to start of SK section"))
         module.add(SAddU32(dst=sgpr("StreamKIterEnd"), src0=sgpr("StreamKIterEnd"), src1=sgpr(sTmp+3), comment="Offset to start of SK section"))
-        # check if this WG has no work to do
-        module.add(SCmpLtU32(src0=sgpr("StreamKIter"), src1=sgpr("StreamKIterEnd"), comment="Make sure there's work to do"))
+        with writer.allocTmpSgpr(1, tag="TotalIters") as tmpTotalIters:
+            sTotalIters = tmpTotalIters.idx
+            module.add(self.computeTotalIters(writer, kernel, sTotalIters))
+            # TODO maybe remove clamp, since extra iters code should guarantee total iterations match
+            module.add(SMinU32(dst=sgpr("StreamKIterEnd"), src0=sgpr("StreamKIterEnd"), src1=sgpr(sTotalIters), comment="Cap ending iter at total SK iters"))
+            # check if this WG has no work to do
+            module.add(SCmpLtU32(src0=sgpr("StreamKIter"), src1=sgpr(sTotalIters), comment="Make sure there's work to do"))
         module.add(writer.longBranchScc0(Label("KernelEnd", ""), posNeg=1)) # reuse tmp
 
         # If in SK, next iteration is sTmp+2
