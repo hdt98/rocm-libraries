@@ -981,9 +981,9 @@ protected:
             auto tol = calculateConvFpropTolerance<Out, In, Comp>(
                 params.inputMin, params.inputMax, params.wMin, params.wMax, params.wDims);
 
-            auto expected = static_cast<Out>(params.expectedTolerance);
+            auto expected = static_cast<float>(params.expectedTolerance);
 
-            EXPECT_NEAR(static_cast<float>(tol), static_cast<float>(expected), 1e-5f)
+            EXPECT_NEAR(static_cast<float>(tol), expected, 1e-5f)
                 << "Failed for dims size: " << params.wDims.size();
         }
     }
