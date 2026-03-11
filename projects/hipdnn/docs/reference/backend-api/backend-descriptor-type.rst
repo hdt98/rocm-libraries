@@ -4,7 +4,7 @@
 
 
 **************************************
-hipDNN backend descriptor type C++ API
+hipDNN backend descriptor type C API
 **************************************
 
 

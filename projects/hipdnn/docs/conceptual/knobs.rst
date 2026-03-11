@@ -10,6 +10,13 @@ hipDNN engine configuration knobs
 
 Engine configuration knobs provide a flexible mechanism for controlling runtime behavior of hipDNN engines. They allow you to tune performance, configure algorithmic choices, and adjust memory usage without recompiling code.
 
+The knobs system is designed to be:
+
+- **Optional**: Plugins can opt-in to exposing knobs.
+- **Flexible**: Support for multiple data types beyond ``int64_t``.
+- **Namespace-safe**: Plugin-specific human-readable knob identifiers.
+- **Extensible**: New knob types can be added without breaking existing code.
+
 Knobs are runtime-configurable parameters that affect engine behavior. Each knob has a:
 
 - **Unique identifier**: A string-based ID (for example, ``"global.benchmarking"``).
@@ -77,149 +84,10 @@ Plugin-specific namespace:
 
   The ``global.*`` namespace is reserved for standard knobs. Custom plugins can't register knobs in this namespace.
 
-Query available knobs
-=====================
-
-You can discover what knobs an engine supports and their constraints using the hipDNN frontend:
-
-.. code:: cpp
-
-  #include <hipdnn_frontend.hpp>
-
-  using namespace hipdnn_frontend;
-
-  // After building the graph
-  Graph graph;
-  // ... setup and build graph ...
-
-  // Get available knobs for an engine
-  std::vector<Knob> knobs;
-  auto error = graph.get_knobs_for_engine(engineId, knobs);
-
-  if (error.is_good()) {
-      for (const auto& knob : knobs) {
-          std::cout << "Knob ID: " << knob.knobId() << "\n";
-          std::cout << "Description: " << knob.description() << "\n";
-          std::cout << "Type: " << static_cast<int>(knob.valueType()) << "\n";
-
-          // Access default value (it's a variant)
-          const auto& defaultVal = knob.defaultValue();
-          if (std::holds_alternative<int64_t>(defaultVal)) {
-              std::cout << "Default: " << std::get<int64_t>(defaultVal) << "\n";
-          } else if (std::holds_alternative<double>(defaultVal)) {
-              std::cout << "Default: " << std::get<double>(defaultVal) << "\n";
-          } else if (std::holds_alternative<std::string>(defaultVal)) {
-              std::cout << "Default: " << std::get<std::string>(defaultVal) << "\n";
-          }
-
-          // Check constraints
-          const IConstraint* constraint = knob.constraint();
-          if (constraint) {
-              std::cout << "Constraint: " << constraint->toString() << "\n";
-          }
-
-          std::cout << "---\n";
-      }
-  } else {
-      std::cerr << "Error getting knobs: " << error.get_message() << "\n";
-  }
-
-Use the knob lookup map
-=======================
-
-Use the lookup method to access the know ID:
-
-.. code:: cpp
-
-  std::unordered_map<std::string, Knob> knobMap;
-  auto error = graph.get_knob_lookup_for_engine(engineId, knobMap);
-
-  if (error.is_good()) {
-      auto it = knobMap.find("global.benchmarking");
-      if (it != knobMap.end()) {
-          const Knob& benchmarkingKnob = it->second;
-          // Use the knob...
-      }
-  }
-
-Set knob values
-===============
-
-You can set knob values when creating an execution plan. Here's an example:
-
-.. code:: cpp
-
-  #include <hipdnn_frontend.hpp>
-
-  using namespace hipdnn_frontend;
-
-  Graph graph;
-  // ... setup and build graph ...
-
-  // Create knob settings
-  std::vector<KnobSetting> settings;
-
-  // Set integer knob
-  settings.emplace_back("global.benchmarking", 1);
-
-  // Set int64 knob
-  settings.emplace_back("global.workspace_size_limit", 1024000LL);
-
-  // Set float knob
-  settings.emplace_back("some.float_knob", 0.5);
-
-  // Set string knob
-  settings.emplace_back("some.string_knob", std::string("value"));
-
-  // Create execution plan with these settings
-  auto error = graph.create_execution_plan_ext(engineId, settings);
-
-  if (error.is_good()) {
-      std::cout << "Execution plan created successfully with custom knob settings\n";
-  } else {
-      std::cerr << "Error: " << error.get_message() << "\n";
-  }
-
-Use type-safe knob setting
---------------------------
-
-Refer to this sample code for type-safe knob setting:
-
-.. code:: cpp
-
-  // KnobSetting constructor is type-safe
-  KnobSetting intSetting("test.knob", 42);                    // int64_t
-  KnobSetting floatSetting("test.knob", 3.14);                // double
-  KnobSetting stringSetting("test.knob", std::string("val")); // string
-
-  // You can also update values later
-  intSetting.setValue(100);
-
-Use the default knob values
-===========================
-
-If you don't specify a knob setting, the engine will use the default value defined by the knob. To explicitly use defaults for all knobs:
-
-.. code:: cpp
-
-  // Option 1: Don't specify any settings (simplest)
-  auto error = graph.create_execution_plan_ext(engineId, {});
-
-  // Option 2: Specify only the knobs you want to customize
-  std::vector<KnobSetting> settings;
-  settings.emplace_back("global.benchmarking", 1);  // Only customize this one
-  auto error = graph.create_execution_plan_ext(engineId, settings);
-
-.. note::
-
-  - All knob settings are validated against their constraints when creating an execution plan. Invalid values will result in an error with a descriptive message.
-  - If you specify a knob that doesn't exist for the engine, hipDNN will log a warning but continue. This allows forward compatibility when new knobs are added.
-  - If a knob is marked as deprecated, hipDNN will log a warning when you use it, but the knob will still function normally.
-
 Standard global knobs
 =====================
 
-These are the global knobs are available in hipDNN:
+These are the global knobs available in hipDNN:
 
 .. list-table::
    :widths: 3 3 3 5
@@ -233,6 +101,10 @@ These are the global knobs are available in hipDNN:
      - Integer (int64)
      - 0 (disabled)
      - Enable benchmarking mode for kernel selection. When enabled, engines may run multiple kernel variants and select the fastest. First run may be slower due to benchmarking overhead.
+   * - ``global.workspace_size_limit``
+     - Integer (int64)
+     - The maximum size needed for optimal performance.
+     - Limits the maximum workspace memory that solvers can use for convolution operations (Forward, Backward Data, Backward Weights). Refer to the plugin-specific ``Operation support`` document for specific details.
 
 .. note::
 
@@ -250,91 +122,22 @@ Different engine providers may expose their own custom knobs. Refer to the provi
 
   When developing with multiple providers, use ``get_knobs_for_engine()`` to programmatically discover available knobs rather than hard-coding knob names.
 
+Validation
+==========
+
+The backend:
+
+- Deserializes the knob settings from the ``EngineConfig``.
+- Queries the engine for its supported knobs.
+- Validates each setting against the knob's constraints.
+- Use the default values for any unspecified knob settings.
+
+If the validation fails, hipDNN returns ``HIPDNN_STATUS_BAD_PARAM``.
+
 API reference
 =============
 
-``Knob`` class
---------------
-
-Describes metadata for an available knob.
-
-**Key methods**:
-
-- ``const std::string& knobId()``: Get the knob identifier.
-- ``const std::string& description()``: Get a human-readable description.
-- ``bool isDeprecated()``: Check if a knob is deprecated.
-- ``KnobValueType valueType()``: Get value type (``INT64``, ``FLOAT64``, or ``STRING``).
-- ``const KnobValueVariant& defaultValue()``: Get default value as a variant.
-- ``const IConstraint* constraint()``: Get the constraint validator.
-- ``Error validate(const KnobSetting& setting)``: Validate a setting.
-
-``KnobSetting`` class
----------------------
-
-Represents a knob value setting to apply.
-
-**Constructors**:
-
-.. code:: cpp
-
-  KnobSetting(std::string knobId, KnobValueVariant value);
-  template <typename T> KnobSetting(std::string knobId, const T& value);
-
-**Key methods**:
-
-- ``const std::string& knobId()``: Get the knob identifier.
-- ``const KnobValueVariant& value()``: Get the knob value.
-- ``template <typename T> void setValue(const T& value)``: Update the knob value.
-
-Graph methods
--------------
-
-**Querying knobs**:
-
-.. code:: cpp
-
-  Error get_knobs_for_engine(int64_t engineId, std::vector<Knob>& knobs) const;
-  Error get_knob_lookup_for_engine(int64_t engineId, std::unordered_map<std::string, Knob>& knobs) const;
-
-**Setting knobs**:
-
-.. code:: cpp
-
-  Error create_execution_plan_ext(int64_t engineId, const std::vector<KnobSetting>& settings);
-
-Constraint classes
-------------------
-
-**Base interface**:
-
-.. code:: cpp
-
-  class IConstraint {
-      virtual Error validateKnobSetting(const KnobSetting& setting) const = 0;
-      virtual std::string toString() const = 0;
-  };
-
-**Implementations**:
-
-- ``IntConstraint(int64_t minValue, int64_t maxValue, int64_t step, std::unordered_set<int64_t> validValues)``
-- ``FloatConstraint(double minValue, double maxValue)``
-- ``StringConstraint(int32_t maxLength, std::unordered_set<std::string> validValues)``
-- ``EmptyConstraint()``: No constraints
-
-Type definitions
-----------------
-
-.. code:: cpp
-
-  using KnobValueVariant = std::variant<int64_t, double, std::string>;
-  typedef std::string KnobType_t;
-
-  enum class KnobValueType {
-      NOT_SET = 0,
-      INT64 = 1,
-      FLOAT64 = 2,
-      STRING = 3,
-  };
+See :ref:`knob-api` for the API reference information.
 
 Best practices
 ==============

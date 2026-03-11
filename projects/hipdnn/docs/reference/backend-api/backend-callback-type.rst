@@ -4,7 +4,7 @@
 
 
 *************************************
-hipDNN backend callback types C++ API
+hipDNN backend callback types C API
 *************************************
 
 

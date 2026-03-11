@@ -15,18 +15,10 @@ The backend discovers and manages these plugins, leveraging them for different a
 
   This page is for advanced users such as senior developers, engineers, and system administrators who are looking to extend hipDNN with customized plugins. Most users should use the default plugins described in :ref:`build-execute`.
 
-Plugin Types
+Plugin types
 ============
 
-hipDNN will support three types of plugins, each serving a specific purpose:
-
-- Engine heuristic and selection plugins (``hipdnn_plugins/heuristics/``): These plugins help determine the best execution strategy for a given operation or graph. They analyze the computation requirements and available resources to select optimal implementations.
-- Benchmarking and tuning plugins (``hipdnn_plugins/benchmarking/``): These plugins focus on performance optimization by benchmarking different implementations and tuning parameters for specific hardware configurations.
-- Kernel engine plugins (``hipdnn_plugins/engines/``): These plugins provide the actual kernel implementations for operations. They contain the compute kernels that execute on the target hardware (GPUs, accelerators, etc.).
-
-.. note::
-
-  Only kernel engine plugins are supported in hipDNN. 
+Kernel engine plugins provide the actual kernel implementations for operations. They contain the compute kernels that execute on the target hardware (GPUs, accelerators, etc.).
 
 SDK libraries
 =============
@@ -42,8 +34,6 @@ The Data SDK contains the FlatBuffers schemas and data structures for graph repr
 - Data structures for deserializing serialized graphs.
 - Utilities for working with graph data.
 
-See :ref:`add-operation` for more information on adding new operations to the Data SDK (schemas, nodes, attributes).
-
 Plugin SDK (``plugin_sdk``)
 ---------------------------
 
@@ -58,7 +48,12 @@ Test SDK (``test_sdk``)
 
 The Test SDK provides utilities for testing plugins. It includes:
 
-- CPU reference implementations for validation (convolution, batchnorm, etc.).
+- `CPU reference implementation <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/docs/OperationSupport-ReferenceImpl.md>`_ for validation (convolution, batchnorm, etc.). This implementation:
+
+  - Provides ground-truth results for validating GPU implementations.
+  - Supports core operations (Convolution, Batchnorm, Pointwise).
+  - Isn't intended for performance or production use.
+
 - Test utilities (tolerances, seeds, logging).
 - Mock objects for unit testing.
 - FlatBuffer test utilities.
@@ -76,55 +71,20 @@ The plugin API defines how kernel engine plugins interact with hipDNN:
 Engine IDs
 ==========
 
+Every engine used by hipDNN requires a unique engine ID. Plugins that provide more than one engine must have a unique ID for each engine provided by the plugin.
+
 hipDNN uses a deterministic hash-based system for managing engine IDs. This system converts human-readable engine names to unique ``int64_t`` identifiers.
+The engine ID system ensures globally unique identifiers across all plugins. 
+
+When creating a new engine, select a unique descriptive name for the new engine. 
+During development, add the ``HIPDNN_REGISTER_ENGINE(MY_NEW_ENGINE, "MY_NEW_ENGINE")`` macro to a source file in your project. 
+This registers the name globally (verifying that it doesn't conflict with plugin names from the official distribution) and creates variables that can be used to retrieve the unique ID for this engine.
 
 Here's the workflow:
 
-1. **Engine Names**: Define human-readable string names for your engines (for example, ``MIOPEN_PLUGIN``, ``MY_CUSTOM_ENGINE``).
+1. **Engine Names**: Define human-readable string names for your engines (for example, ``MY_CUSTOM_ENGINE``).
 2. **Hash Function**: The ``hipdnn_plugin_sdk::engine_names::engineNameToId()`` function converts names to IDs using a FNV-1a hash algorithm.
-3. **Registration**: Engine names are registered in the Plugin SDK header for discoverability.
-
-Use Engine IDs
---------------
-
-.. code:: cpp
-
-  #include <hipdnn_plugin_sdk/EngineNames.hpp>
-
-  // Option 1: Use a registered engine ID
-  const int64_t engineId = hipdnn_plugin_sdk::engine_names::MIOPEN_PLUGIN_ID;
-
-  // Option 2: Generate ID from custom name
-  const int64_t customEngineId = hipdnn_data_sdk::engineNameToId("MY_CUSTOM_ENGINE");
-
-  // In your engine implementation
-  class MyEngine {
-      int64_t _id;
-  public:
-      MyEngine(const char* engineName)
-          : _id(hipdnn_data_sdk::engineNameToId(engineName)) {
-          // Engine is now initialized with a unique ID
-      }
-  };
-
-
-Register new engine names
-----------------------------
-
-To add your engine name to the official registry:
-
-1. Choose a unique name.
-   
-   - Use ``UPPER_CASE`` with underscores.
-   - Make the name match the value.
-
-2. Add it to the registry. Submit a PR to add your engine name to `plugin_sdk/include/hipdnn_plugin_sdk/EngineNames.hpp <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/data_sdk/include/hipdnn_data_sdk/utilities/EngineNames.hpp>`_:
-   
-   .. code:: cpp
-
-     HIPDNN_REGISTER_ENGINE(MY_NEW_ENGINE, "MY_NEW_ENGINE")
-
-3. Test it locally. You can use unregistered names during development; they'll generate a warning, but they'll work correctly.
+3. **Registration**: Engine names are registered with the Plugin SDK for discoverability.
 
 Benefits
 --------
@@ -134,9 +94,38 @@ Benefits
 - **Human-Readable**: Debug logs can show meaningful engine names.
 - **Forward Compatible**: New engines can be used without registry updates.
 
-.. tip::
+Use Engine IDs
+--------------
 
-  The engine ID system ensures globally unique identifiers across all plugins. You can query registered engines using ``hipdnn_plugin_sdk::engine_names::getAllEngineNames()`` and check for name collisions using the provided test utilities.
+.. code:: cpp
+
+  #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+
+  // This macro register the engine name and creates helper variables
+  // such as EXAMPLE_PLUGIN_RELU_ENGINE_ID for this engine.
+  HIPDNN_REGISTER_ENGINE(MY_CUSTOM_ENGINE, "MY_CUSTOM_ENGINE")
+
+  class MyCustomEngine : public hipdnn_plugin_sdk::IEngine< ... >
+  {
+  public:
+      explicit MyCustomEngine(int64_t id);
+
+  private:
+      int64_t _id;
+  };
+  ...
+  auto engine = std::make_unique<MyCustomEngine>(EXAMPLE_PLUGIN_RELU_ENGINE_ID);
+
+Register new engine names
+----------------------------
+
+To add your engine name to the official registry, submit a GitHub pull request to add your engine name to `plugin_sdk/include/hipdnn_plugin_sdk/EngineNames.hpp <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/data_sdk/include/hipdnn_data_sdk/utilities/EngineNames.hpp>`_ in this format:
+
+.. code:: cpp
+
+  HIPDNN_REGISTER_ENGINE(MY_CUSTOM_ENGINE, "MY_CUSTOM_ENGINE")
+
+Test it locally. You can use unregistered names during development, but you'll need to remove the ``HIPDNN_REGISTER_ENGINE()`` macro from your plugin before it's added to the official registry as the duplicated registries will be interpreted as an engine ID collision error.
 
 Create a kernel engine plugin
 =============================
@@ -146,7 +135,7 @@ This section focuses on developing kernel engine plugins.
 Prerequisites
 -------------
 
-Before creating a plugin, ensure you've built and installed hipDNN. Plugins depend on the hipDNN Data SDK and Plugin SDK headers. 
+Before creating a plugin, ensure you've installed hipDNN. Plugins depend on the hipDNN Data SDK and Plugin SDK headers. 
 
 Steps
 -----
@@ -154,7 +143,7 @@ Steps
 1. Create plugin structure.
    
    1. Create a new project/repository for your plugin.
-   2. Implement the plugin interface defined in `plugin_sdk/include/hipdnn_plugin_sdk/EnginePluginApi.h <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/plugin_sdk/include/hipdnn_plugin_sdk/EnginePluginApi.h>`_. See :ref:`miopen` for an implementation reference.
+   2. Add definitions for the plugin interface defined in `plugin_sdk/include/hipdnn_plugin_sdk/EnginePluginApi.h <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/plugin_sdk/include/hipdnn_plugin_sdk/EnginePluginApi.h>`_. See :ref:`miopen` for an implementation reference.
 
 2. Implement the plugin API functions.
 
@@ -168,10 +157,10 @@ Steps
 3. Build and deploy the plugin.
   
    - Configure CMake to build the plugin as a shared library.
-   - Install to the appropriate plugin directory where hipDNN can discover it at runtime.
+   - Install to the ROCm hipDNN plugin directory where hipDNN can discover it at runtime, or use the ``HIPDNN_PLUGIN_DIR`` environment variable to force hipDNN to load plugins from only the folder specified in that environment variable.
 
-Implementation details
-----------------------
+Typical implementation details
+------------------------------
 
 The **Engine Manager** is responsible for:
 
@@ -182,11 +171,12 @@ The **Engine Manager** is responsible for:
 
 For **Engine Implementations**:
 
-- Each engine must have a unique inter-plugin ``int64_t`` identifier.
-- Implement the ``execute()`` method for graph execution.
-- Provide ``get_supported_operations()`` to report capabilities.
-- Handle operation-specific kernel launches.
-- Manage memory transfers and synchronization.
+- Each engine must have a globally unique ``int64_t`` identifier.
+- Implement ``isApplicable()`` to check if the engine solves the given graph.
+- Create execution contexts for executing plans.
+
+  - Handle operation-specific kernel launches.
+  - Manage memory transfers and synchronization.
 
 **Execution plans** for kernel engines:
 
@@ -208,31 +198,10 @@ In general, the best practices consist of:
 Key files reference
 ~~~~~~~~~~~~~~~~~~~
 
-- `Plugin API Interface <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/plugin_sdk/include/hipdnn_plugin_sdk/EnginePluginApi.h>`_
-- `Example Plugin Implementation <https://github.com/ROCm/rocm-libraries/blob/develop/dnn-providers/miopen-provider/MiopenLegacyPlugin.cpp>`_
-- `Example Engine Manager <https://github.com/ROCm/rocm-libraries/blob/develop/dnn-providers/miopen-provider/EngineManager.cpp>`_
-- `Example Engine Implementation <https://github.com/ROCm/rocm-libraries/blob/develop/dnn-providers/miopen-provider/engines/MiopenEngine.cpp>`_
-
-Plugin architecture
--------------------
-
-Directory structure for kernel engine plugins
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Your plugin should be structured as an independent project:
-
-.. code::
-
-  your_kernel_plugin_project/
-  ├── CMakeLists.txt
-  ├── YourPlugin.cpp           # Main plugin entry point
-  ├── EngineManager.cpp        # Engine management
-  ├── engines/
-  │   ├── EngineInterface.hpp  # Engine interface
-  │   ├── YourEngine.cpp       # Engine implementation
-  │   └── plans/                # Internal plans
-  ├── tests/                    # Plugin-specific tests
-  └── integration_tests/        # End-to-end integration tests
+- `Plugin API interface <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/plugin_sdk/include/hipdnn_plugin_sdk/EnginePluginApi.h>`_
+- `Example plugin implementation <https://github.com/ROCm/rocm-libraries/blob/develop/dnn-providers/hip-kernel-provider/src/HipKernelContainer.cpp>`_
+- `Example engine manager <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/plugin_sdk/include/hipdnn_plugin_sdk/EngineManager.hpp>`_
+- `Example engine implementation <https://github.com/ROCm/rocm-libraries/blob/develop/dnn-providers/miopen-provider/engines/MiopenEngine.cpp>`_
 
 
 Build configuration
@@ -278,17 +247,7 @@ Build and install directory structure
 
 The hipDNN build system maintains consistent directory structures for plugins:
 
-Build directory structure:
-
-.. code::
-
-  build/lib/
-  └── hipdnn_plugins/
-      └── engines/
-          └── your_plugin.so
-
-
-Install directory structure:
+The hipDNN plugins are installed in the ROCm install folder:
 
 .. code::
 
@@ -298,7 +257,7 @@ Install directory structure:
           └── your_plugin.so
 
 
-External plugins should follow this same structure to ensure compatibility.
+Install your plugin to this folder to have it included automatically by hipDNN. Note that if the ``HIPDNN_PLUGIN_DIR`` environment variable is set, the plugins will only be loaded from that folder and not the ROCm folder.
 
 Plugin loading
 ==============
@@ -318,7 +277,7 @@ Default structure example:
   /opt/rocm/lib/
   └── hipdnn_plugins/
       └── engines/
-          ├── miopen_legacy_plugin.so
+          ├── miopen_plugin.so
           └── other_plugin.so
 
 Environment variable override
@@ -343,7 +302,7 @@ When ``HIPDNN_PLUGIN_DIR`` is set, hipDNN will *only* load plugins from the spec
 Custom plugin paths
 -------------------
 
-Prior to creating a hipDNN handle, you can specify custom plugin paths using the ``hipdnnSetEnginePluginPaths_ext`` function:
+Prior to creating a hipDNN handle, you can specify custom plugin paths using the ``hipdnnSetEnginePluginPaths_ext`` backend API function before the hipDNN handle is created:
 
 .. code:: c
 
@@ -356,7 +315,7 @@ Prior to creating a hipDNN handle, you can specify custom plugin paths using the
 Plugin symbol resolution
 ------------------------
 
-All plugins are loaded with ``RTLD_NOW`` to ensure that all symbols are resolved at load time. 
+On Linux, all plugins are loaded with ``RTLD_NOW | RTLD_LOCAL`` to ensure that all symbols are resolved at load time. 
 This means that all dependencies must be satisfied when the plugin is loaded. To avoid symbol conflicts, all plugins must be built with with ``-fvisibility=hidden`` to limit symbol exposure.
 
 Path resolution
@@ -396,7 +355,7 @@ Plugins are loaded according to the selected path schema during hipDNN handle cr
 Query loaded plugins
 --------------------
 
-After creating a hipDNN handle, you can query which engine plugins were successfully loaded using the ``hipdnnGetLoadedEnginePluginPaths_ext`` function:
+After creating a hipDNN handle, you can query which engine plugins were successfully loaded using the ``hipdnnGetLoadedEnginePluginPaths_ext`` backend API function:
 
 .. code:: c
 
@@ -462,12 +421,12 @@ Unit tests
 
 Unit tests focus on the internal implementation of your plugin components:
 
-- **Location**: ``plugins/<plugin_name>/tests/``
+- **Location**: ``<plugin_name>/src/tests/``
 - **Purpose**: Test individual components in isolation (engines, utilities, kernel logic).
 - **Requirements**:
 
   - Must be fast-running.
-  - GPU operations must be marked with the ``SKIP_IF_NO_DEVICE()`` macro.
+  - Typically, unit tests should never access GPU hardware. If unit tests require accessing GPU hardware, use the ``SKIP_IF_NO_DEVICE()`` macro to automatically skip the test if no HIP devices are found.
   - Use mocking/stubbing for dependencies where appropriate.
   - Should work on both Windows and Linux.
 
@@ -476,7 +435,7 @@ Integration tests
 
 Integration tests validate end-to-end functionality of your plugin:
 
-- **Location**: ``plugins/<plugin_name>/integration_tests/``
+- **Location**: ``<plugin_name>/src/integration_tests/``
 - **Purpose**: Validate correctness of graph execution and accuracy of results.
 - **Requirements**:
 
@@ -484,7 +443,7 @@ Integration tests validate end-to-end functionality of your plugin:
   - Validate against reference implementations.
   - Test different data types, layouts, dimensions, and edge-cases for each.
   - Enable tests for all supported ASICs.
-  - GPU typically required for meaningful validation.
+  - A GPU is typically required for meaningful validation; use the ``SKIP_IF_NO_DEVICE()`` macro to automatically skip the test if no HIP devices are found.
   - Tests are divided into two categories described by the prefix argument passed to ``INSTANTIATE_TEST_SUITE_P``.
 
     - **Smoke** - These tests are designed to test features using the smallest possible shape and run quickly (combined smoke test run time must be under 5 mins).
@@ -496,28 +455,10 @@ For a comprehensive example of an integration test, see `IntegrationGpuBatchnorm
 
   See our `general testing requirements <https://github.com/ROCm/rocm-libraries/blob/develop/dnn-providers/miopen-provider/integration_tests/IntegrationGpuBatchnormForwardInference.cpp>`_.
 
-.. _example-miopen:
-
 Example: MIOpen Provider Plugin
 ================================
 
-`MIOpen Provider Plugin <https://github.com/ROCm/rocm-libraries/tree/develop/dnn-providers/miopen-provider>`_
-
-The MIOpen Provider Plugin is a complete example of a kernel engine plugin. It demonstrates how a plugin integrates with hipDNN and delegates execution to a backend. Furthermore, it incorporates the recommended structure and best practices for kernel engine plugins.
-
-At a high level, it:
-
-- Initializes and manages the GPU context using MIOpen handles.
-- Translates hipDNN tensors into MIOpen tensor descriptors.
-- Dispatches MIOpen kernels to execute operations.
-- Coordinates streams and handles synchronization.
-
-Structure
----------
-
-- `Main Plugin <https://github.com/ROCm/rocm-libraries/blob/develop/dnn-providers/miopen-provider/MiopenLegacyPlugin.cpp>`_: Entry point and plugin registration.
-- `Engine Manager <https://github.com/ROCm/rocm-libraries/blob/develop/dnn-providers/miopen-provider/EngineManager.hpp>`_: Manages MIOpen engines.
-- `MIOpen Engine <https://github.com/ROCm/rocm-libraries/blob/develop/dnn-providers/miopen-provider/engines/MiopenEngine.cpp>`_: Implements graph execution using MIOpen kernels.
+See :ref:`miopen` for more information.
 
 Troubleshooting
 ===============
@@ -536,7 +477,7 @@ If you see errors like ``"Failed to create handle for plugin 'PluginName'"``, th
 - GPU initialization failures (e.g., no compatible device found).
 - Plugin internal initialization errors.
 
-**Solution**: Check that all plugin dependencies are satisfied and a compatible GPU device is available.
+**Solution**: Check that all plugin dependencies are satisfied, library load paths are set correctly, and a compatible GPU device is available.
 
 Null handle returned
 ~~~~~~~~~~~~~~~~~~~~~
@@ -555,6 +496,7 @@ When multiple plugins are loaded and one or more plugins don't properly hide the
 - Crashes or undefined behavior during plugin operations.
 
 This occurs because dynamically loaded shared libraries can inadvertently share symbols, causing one plugin's function to override another plugin's function.
+If the plugin loads successfully in isolation, then this may be the issue.
 
 Example error log
 ~~~~~~~~~~~~~~~~~

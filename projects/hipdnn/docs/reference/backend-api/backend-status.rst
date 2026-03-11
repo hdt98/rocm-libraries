@@ -4,7 +4,7 @@
 
 
 *****************************
-hipDNN backend status C++ API
+hipDNN backend status C API
 *****************************
 
 .. doxygenfile:: HipdnnStatus.h

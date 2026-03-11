@@ -22,8 +22,7 @@ The component public repository is located at `https://github.com/ROCm/rocm-libr
   .. grid-item-card:: Install
 
     * :doc:`hipDNN prerequisites <./install/hipdnn-prerequisites>`
-    * :doc:`hipDNN installation (Linux) <./install/hipdnn-install>`
-    * :doc:`hipDNN installation (Windows) <./install/hipdnn-install-windows>`
+    * :doc:`Quick start <./install/quickstart>`
 
   .. grid-item-card:: Conceptual
 
@@ -42,7 +41,6 @@ The component public repository is located at `https://github.com/ROCm/rocm-libr
 
     * :doc:`Plugin-specific operation support <reference/plugins>`
     * :doc:`Environment variables <reference/environment-variables>`
-    * :doc:`Coding style and naming guidelines <reference/naming-guidelines>`
     * :doc:`Glossary <reference/glossary>`
 
 

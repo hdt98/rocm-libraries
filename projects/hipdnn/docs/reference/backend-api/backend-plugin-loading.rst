@@ -4,7 +4,7 @@
 
 
 ******************************************
-hipDNN backend plugin loading mode C++ API
+hipDNN backend plugin loading mode C API
 ******************************************
 
 .. doxygenfile:: HipdnnBackendPluginLoadingMode.h

@@ -4,7 +4,7 @@
 
 
 *************************************
-hipDNN backend attribute name C++ API
+hipDNN backend attribute name C API
 *************************************
 
 .. doxygenfile:: HipdnnBackendAttributeName.h 

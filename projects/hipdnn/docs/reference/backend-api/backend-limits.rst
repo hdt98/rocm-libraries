@@ -4,7 +4,7 @@
 
 
 *****************************
-hipDNN backend limits C++ API
+hipDNN backend limits C API
 *****************************
 
 .. doxygenfile:: HipdnnBackendLimits.h 

@@ -4,9 +4,9 @@
 
 .. _plugin-support:
 
-****************************************
-hipDNN plugin-specific operation support
-****************************************
+************************
+hipDNN operation support
+************************
 
 hipDNN operations are implemented through plugins. Each plugin provides its own set of supported operations. For detailed information about what operations are available, refer to the plugin-specific documentation.
 
@@ -20,12 +20,3 @@ Plugins
   - Fused operation graphs
 
 - :ref:`hipblaslt`: Provides integration with AMD's `hipBLASLt library <https://rocm.docs.amd.com/projects/hipBLASLt/en/latest/index.html>`_ that provides optimized GEMM operations.
-
-Reference implementation
-========================
-
-See `CPU Reference Implementation <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/docs/OperationSupport-ReferenceImpl.md>`_ for information on CPU-based reference implementation for validation and testing. The implementation:
-
-- Provides ground-truth results for validating GPU implementations.
-- Supports core operations (Convolution, Batchnorm, Pointwise).
-- Is not intended for performance or production use.

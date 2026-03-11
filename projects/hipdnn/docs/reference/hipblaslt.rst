@@ -4,11 +4,11 @@
 
 .. _hipblaslt:
 
-*************************
-hipBLASLt Provider plugin
-*************************
+************************************
+hipBLASLt provider operation support
+************************************
 
-The hipBLASLt Provider plugin provides integration with AMD's `hipBLASLt library <https://rocm.docs.amd.com/projects/hipBLASLt/en/latest/index.html>`_ that provides optimized GEMM operations.
+The hipBLASLt provider plugin provides integration with AMD's `hipBLASLt library <https://rocm.docs.amd.com/projects/hipBLASLt/en/latest/index.html>`_ that provides optimized GEMM operations.
 
 Operation support
 =================

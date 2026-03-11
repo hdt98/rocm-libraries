@@ -1,27 +1,17 @@
 .. meta::
-  :description: The MIOpen Provider plugin serves as the kernel provider. It employs a modular C++ architecture, largely decoupled from the API layer.
+  :description: The MIOpen provider plugin serves as the kernel provider. It employs a modular C++ architecture, largely decoupled from the API layer.
   :keywords: hipDNN, ROCm, API, 
 
 .. _miopen:
 
-**********************
-MIOpen Provider plugin
-**********************
+*********************************
+MIOpen provider operation support
+*********************************
 
-The MIOpen Provider plugin serves as the kernel provider. It employs a modular C++ architecture, largely decoupled from the API layer.
-
-The plugin consists of these components:
-
-- Dependency injection container (``MiopenContainer``): This is the root object that manages the lifecycle and dependencies of all other components. It initializes the ``EngineManager`` and ensures that all necessary services are correctly injected.
-- Engine manager (``EngineManager``): The central registry for execution engines. It orchestrates the selection of the appropriate engine for a given operation graph by querying its registered engines.
-- Plan builders (``IPlanBuilder``): Each engine is associated with a set of plan builders. These components are responsible for:
-
-  - Applicability: Inspecting an operation graph to determine if the engine can execute it.
-  - Resource estimation: Calculating the required workspace size.
-  - Plan construction: Creating an executable IPlan object if the graph is supported.
-
-- Plans (IPlan): An IPlan represents a strategy for executing a specific operation graph. It encapsulates all the necessary logic and state to run the routine, abstracting the details from the higher-level engine management.
-- C-API Interface: A thin translation layer that exposes these internal C++ components to the backend via the required engine plugin C-API.
+The MIOpen provider adds a number of operations available from MIOpen to hipDNN.
+MIOpen is the AMD deep-learning primitives library for GPUs. 
+It implements fusion to optimize for memory bandwidth and GPU launch overheads. 
+It also implements different algorithms to optimize convolutions for different filter and input sizes.
 
 .. _operation-support:
 
@@ -277,131 +267,3 @@ Code sample
   settings.emplace_back("global.workspace_size_limit", 32LL * 1024 * 1024);
   graph.create_execution_plan_ext(engineId, settings);
 
-Usage examples
---------------
-
-Query available knobs
-~~~~~~~~~~~~~~~~~~~~~
-
-.. code:: cpp
-
-  #include <hipdnn_frontend.hpp>
-
-  using namespace hipdnn_frontend;
-
-  // After building the graph
-  Graph graph;
-  // ... setup and build graph ...
-
-  // Query knobs for MIOpen engine
-  std::vector<Knob> knobs;
-  auto error = graph.get_knobs_for_engine(MIOPEN_ENGINE_ID, knobs);
-
-  if (error.is_good()) {
-      std::cout << "Available knobs for MIOpen engine:\n";
-      for (const auto& knob : knobs) {
-          std::cout << "  " << knob.knobId() << ": " << knob.description() << "\n";
-          std::cout << "  Default: ";
-
-          const auto& defaultVal = knob.defaultValue();
-          if (std::holds_alternative<int64_t>(defaultVal)) {
-              std::cout << std::get<int64_t>(defaultVal);
-          }
-          std::cout << "\n";
-
-          if (const auto* constraint = knob.constraint()) {
-              std::cout << "  Constraint: " << constraint->toString() << "\n";
-          }
-          std::cout << "\n";
-      }
-  }
-
-Combined knob settings
-~~~~~~~~~~~~~~~~~~~~~~
-
-.. code:: cpp
-
-  #include <hipdnn_frontend.hpp>
-
-  using namespace hipdnn_frontend;
-
-  Graph graph;
-  // ... setup convolution graph ...
-  graph.build_operation_graph(handle);
-
-  // Enable benchmarking and set workspace limit
-  std::vector<KnobSetting> settings;
-  settings.emplace_back("global.benchmarking", 1);
-  settings.emplace_back("global.workspace_size_limit", 128LL * 1024 * 1024);
-
-  auto error = graph.create_execution_plan_ext(MIOPEN_ENGINE_ID, settings);
-
-  if (error.is_good()) {
-      std::cout << "Execution plan created with custom knob settings\n";
-  }
-
-Best practices
-==============
-
-For development
----------------
-
-- **Start with defaults**: Use default knob values during initial development.
-- **Profile first**: Measure baseline performance before tuning knobs.
-- **Query knobs**: Always check available knobs and their constraints using ``get_knobs_for_engine()``.
-- **Test incremental changes**: Modify one knob at a time to understand impact.
-
-For production
---------------
-
-- **Enable benchmarking during warm-up**:
-
-  .. code:: cpp
-
-    // Warm-up phase
-    std::vector<KnobSetting> warmupSettings;
-    warmupSettings.emplace_back("global.benchmarking", 1);
-    graph.create_execution_plan_ext(engineId, warmupSettings);
-
-    // Execute a few times to populate cache
-    for (int i = 0; i < 5; i++) {
-        graph.execute(handle, variantPack, workspace);
-    }
-
-- **Use cached results in production**: After warm-up, benchmarking can be disabled as results are cached.
-- **Document knob settings**: Keep a record of knob configurations used in production for reproducibility.
-
-For memory-constrained environments
------------------------------------
-
-- **Query workspace ranges**:
-
-  .. code:: cpp
-
-    // Find minimum and maximum workspace for the operation
-    std::vector<Knob> knobs;
-    graph.get_knobs_for_engine(engineId, knobs);
-
-    for (const auto& knob : knobs) {
-        if (knob.knobId() == "global.workspace_size_limit") {
-            // Log constraint to understand valid range
-        }
-    }
-
-- **Set conservative limits**: Start with a lower workspace limit and increase if performance is insufficient.
-- **Balance batch size and workspace**: Reducing workspace allows larger batch sizes, which may offset performance loss.
-
-Error handling
---------------
-
-.. code:: cpp
-
-  auto error = graph.create_execution_plan_ext(engineId, settings);
-  if (!error.is_good()) {
-      std::cerr << "Failed to create execution plan: " << error.get_message() << "\n";
-
-      // Common errors:
-      // - Workspace limit below minimum
-      // - Invalid knob ID
-      // - Value outside valid range
-  }

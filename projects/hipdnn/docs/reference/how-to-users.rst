@@ -12,5 +12,5 @@ These guides demonstrate how to use hipDNN's standard frontend functionality.
 
 .. important::
 
-  These instructions are appropriate for general-purpose users who may be new to hipDNN. 
-  If you're experienced with hipDNN, and want to develop plugins for the platform, see :ref:`how-to-plugin`.
+  These instructions are appropriate for incorporating hipDNN into applications using the hipDNN frontend API and SDKs. 
+  If you're developing plugins to provide new engines or optimize performance, see :ref:`how-to-plugin`.

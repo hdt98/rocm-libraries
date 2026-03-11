@@ -12,18 +12,15 @@ This section covers how to use the frontend API to build and execute graph opera
 
 The hipDNN frontend provides a C++ header-only API for building and executing operation graphs. 
 
-.. note::
-
-  The MIOpen Provider plugin serves as the kernel provider. It employs a modular C++ architecture, largely decoupled from the API layer. See :ref:`miopen` for more info.
-
 Frontend file structure
 =======================
 
 Here's the basic frontend file structure with links to the GitHub repository:
 
 - `Library includes <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn/frontend/include>`_
-- `Unit tests <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn/frontend/tests>`_
 - `Samples <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn/samples>`_
+- `Unit tests <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn/frontend/tests>`_
+
 
 Frontend architecture
 =====================
@@ -43,10 +40,16 @@ The central abstraction in the frontend is the ``Graph`` class, which:
 
 .. _nodes:
 
-Tensors
--------
+TensorAttributes
+----------------
 
-Tensors are defined by Data Type, Dimensions, and Layout.
+Tensors are attributes that define the shape of the data processed by operations in the graph. 
+Tensors are attached to graph operation nodes and determine:
+
+- The dimensions of the data.
+- How the data is packed in memory.
+- The data's type.
+
 
 See :ref:`operation-support` for a detailed list of the supported operations.
 
@@ -99,7 +102,10 @@ This is the basic frontend workflow:
 
 1. Instantiate a :ref:`graph` that houses tensors and operations.
 2. Create input tensors for the operations within the graph.
-3. Add operations which become :ref:`nodes`. Any :ref:`attributes` you add configure the behaviour of these nodes.
+3. Add operations which become :ref:`nodes`, attaching the input Tensors to the nodes and creating output tensors from the node's operation. Any :ref:`attributes` you add configure the behavior of these nodes.
+4. Continue adding operations and attributes using the output Tensors from prior nodes as input Tensors for new nodes.
+
+The graph is then processed to find a matching engine, the configuration knobs are applied and execution plans are built, memory is allocated, tensor data is supplied, and the resulting plan is executed on the GPU hardware.
 
 For complete working examples, see the official `samples on GitHub <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn/samples>`_.
 

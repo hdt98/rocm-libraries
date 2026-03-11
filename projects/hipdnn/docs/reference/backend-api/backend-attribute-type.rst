@@ -4,7 +4,7 @@
 
 
 *************************************
-hipDNN backend attribute type C++ API
+hipDNN backend attribute type C API
 *************************************
 
 

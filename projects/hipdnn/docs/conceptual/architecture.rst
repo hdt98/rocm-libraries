@@ -15,19 +15,26 @@ hipDNN has support for engine plugins, which provide the kernels to solve graphs
 
   See :ref:`backend-architecture` for a more granular breakdown of the system architecture and the backend API.
 
+The Hipdnn library is structured as three primary components:
+
+- **Frontend**: The hipDNN frontend is a header-only C++ library that provides an industry standard API for interacting with hipDNN. The frontend wraps the backend C API to provide a more user-friendly C++ interface, encapsulating much of the detail required when creating graphs using the backend API.
+- **Backend**: The hipDNN backend is a shared library which provides a C API for hipDNN. The backend is the core component of hipDNN which acts as a plugin loader and manager, connecting problems to engines optimized to solve them.
+- **Engine plugins**: The hipDNN engine provider plugins are shared libraries responsible for matching the operations they provide to graphs, and executing the operations on the supported hardware. Plugins will continue to be added over time to provide additional operational support or performance improvements. See :ref:`plugin-support` for more information.
+
+The frontend API defines tensors and attaches them to operational nodes on a graph. The graph is then lowered through the backend APIs where it's examined by each plugin's engine to determine a match, at which a point and execution plan is established with the preferred matching engine. 
+The frontend then allocates memory and populates the data used by the graph, which is then dispatched to the selected plugin's engine to run.
+
+Header-only SDKs provide shared utilities and interfaces. 
+hipDNN provides three SDKs: 
+
+- :ref:`data` (graph schemas and data structures) 
+- :ref:`plugin-sdk` (plugin API and utilities)
+- :ref:`test-sdk` (testing utilities and CPU reference implementations)
+
 Architecture overview
 =====================
 
 .. image:: ../images/hipDNN_Architecture.png
-
-Components
-==========
-
-- **Frontend**: A header-only C++ library that provides the industry standard API for interacting with hipDNN. The frontend wraps the backend C API to provide a more user-friendly C++ interface.
-- **Backend**: A shared library which provides a C API for hipDNN. The backend is the core component of hipDNN which acts as a plugin loader and manager, connecting problems to plugins that can solve them.
-- **SDKs**: Header-only libraries that provide shared utilities and interfaces. hipDNN provides three SDKs: Data SDK (graph schemas and data structures), Plugin SDK (plugin API and utilities), and Test SDK (testing utilities and CPU reference implementations).
-- **MIOpen Provider Plugin**: A plugin that wraps MIOpen and provides access to the existing API through hipDNN. The :ref:`miopen` is its own separate project from hipDNN.
-- **Other Plugins**: Plugins will be added over time to provide additional operational support, or performance improvements. Plugins should be external projects to hipDNN. See :ref:`plugin-support` for more information.
 
 Frontend
 --------
@@ -56,16 +63,16 @@ The central abstraction in the frontend is the ``Graph`` class, which:
 Nodes
 ^^^^^
 
-Nodes represent individual operations within a graph:
+Nodes represent individual operations within a graph.
 
 - Each node type (for example, ``BatchnormNode``, ``PointwiseNode``) inherits from ``INode``.
 - Nodes encapsulate their specific attributes and tensor connections.
-- Support serialization to Flatbuffer format for backend consumption.
+- Uses the Backend API to convert the graph to backend descriptors for backend consumption.
 
 Attributes
 ^^^^^^^^^^
 
-Attributes configure the behavior of nodes:
+Attributes configure the behavior of nodes.
 
 - Each node type has corresponding attribute classes (for example, ``Batchnorm_attributes``).
 - Attributes include operation-specific parameters like epsilon, momentum, etc.
@@ -96,6 +103,11 @@ Simplified workflow example
 
 For complete working examples, see the official `samples on GitHub <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn/samples>`_.
 
+SDKs and plugin architecture
+============================
+
+This section is relevant for plugin developers who want a granular breakdown of the system architecture for the SDK and plugin components.
+
 SDKs
 ----
 
@@ -107,11 +119,11 @@ Data SDK (``data_sdk``)
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 The Data SDK contains ``FlatBuffers`` schemas and data structures for graph representation. 
-The serialized structures allow data to be marshalled and passed between the frontend, backend, and plugins in a type-safe and highly version-compatible fashion.
+The serialized structures allow data to be marshalled and passed between the backend and plugins in a type-safe and highly version-compatible fashion.
 
 - **Dependencies**: ``FlatBuffers`` and ``spdlog``.
 - **Purpose**: Provides data structures and serialization for graphs, tensors, and configurations.
-- **Expected usage**: Consumed by the frontend, backend, and plugins for graph data handling.
+- **Expected usage**: Consumed by the backend and plugins for graph data handling.
 - **Core functionality**:
 
   - ``FlatBuffer`` schema definitions for graphs, nodes, and attributes.
@@ -134,6 +146,8 @@ The Plugin SDK contains the plugin API and utilities for creating engine plugins
   - Base classes for engine implementation.
   - Utilities for plugin development.
 
+.. _test-sdk:
+
 Test SDK (``test_sdk``)
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -147,6 +161,48 @@ The Test SDK provides utilities for testing plugins.
   - CPU reference implementations for validation (convolution, batchnorm, etc.).
   - Test utilities (tolerances, seeds, logging).
   - Mock objects for unit testing.
+
+
+Plugin engines 
+--------------
+
+Engines, provided by each plugin, provide the actual computational implementations for hipDNN graphs.
+
+Key characteristics:
+
+- **Separate installable projects**: Independent development and deployment.
+- **Dependencies**: :ref:`data` and :ref:`plugin-sdk` (and plugin-specific dependencies as needed).
+- **Purpose**: Provides engines which are capable of solving graphs.
+- **Expected usage**: Loaded at runtime by the backend.
+
+Engine types
+------------
+
+Static kernel engines
+~~~~~~~~~~~~~~~~~~~~~
+
+- Provides pre-compiled kernels for specific operations.
+- Only handles specific configurations.
+- For example, the MIOpen Provider plugin.
+- **Advantages**:
+
+  - Highly optimized for supported cases.
+  - Predictable performance.
+  - Lower compilation overhead.
+
+Dynamic kernel engines
+~~~~~~~~~~~~~~~~~~~~~~
+
+- Generate kernels at runtime based on graph structure.
+- Broad support: Handles general graph patterns.
+- For example, future JIT-compilation plugins
+- **Advantages**:
+
+  - Flexible operation fusion.
+  - Support for novel graph patterns.
+  - Adaptable to hardware capabilities.
+
+See :ref:`develop-plugins` for information on developing and using plugins.
 
 Plugin architecture
 -------------------
@@ -180,47 +236,6 @@ Key plugin functions
 
   // Execute the graph
   hipdnnEnginePluginExecuteOpGraph(handle, context, workspace, buffers, num_buffers);
-
-Engine plugins
---------------
-
-Engine plugins provide the actual computational implementations for hipDNN graphs.
-
-Key characteristics:
-
-- **Separate installable projects**: Independent development and deployment.
-- **Dependencies**: :ref:`data` and :ref:`plugin-sdk` (and plugin-specific dependencies as needed).
-- **Purpose**: Provides engines which are capable of solving graphs.
-- **Expected usage**: Loaded at runtime by the backend.
-
-Engine plugin types
---------------------
-
-Static kernel engines
-~~~~~~~~~~~~~~~~~~~~~
-
-- Provides pre-compiled kernels for specific operations.
-- Only handles specific configurations.
-- For example, the MIOpen Provider plugin.
-- **Advantages**:
-
-  - Highly optimized for supported cases.
-  - Predictable performance.
-  - Lower compilation overhead.
-
-Dynamic kernel engines
-~~~~~~~~~~~~~~~~~~~~~~
-
-- Generate kernels at runtime based on graph structure.
-- Broad support: Handles general graph patterns.
-- For example, future JIT-compilation plugins
-- **Advantages**:
-
-  - Flexible operation fusion.
-  - Support for novel graph patterns.
-  - Adaptable to hardware capabilities.
-
-See :ref:`develop-plugins` for information on developing and using plugins.
 
 .. _backend:
 
@@ -276,6 +291,20 @@ Error handling strategy
 hipDNN uses a layered error handling approach designed to be robust across C/C++ boundaries:
 
 -  **Plugins**: Plugin entry points return ``hipdnnPluginStatus_t`` codes. Internal exceptions are caught at the plugin boundary and converted to status codes. Error strings are stored in thread-local storage via ``PluginLastErrorManager``.
--  **Backend (C API)**: All public API functions return ``hipdnnStatus_t`` codes. The backend catches any internal C++ exceptions, converts them to the appropriate status code, and stores the exception message. Users can retrieve descriptive error messages using ``hipdnnGetLastErrorString``.
 -  **Frontend (C++ API)**: The C++ frontend checks ``hipdnnStatus_t`` codes from the backend. On failure, it retrieves the detailed error message via ``hipdnnGetLastErrorString`` and returns an ``Error`` object containing the error code and description. The frontend utilizes *value-based error handling* rather than throwing exceptions.
+-  **Backend (C API)**: All public API functions return ``hipdnnStatus_t`` codes. The backend catches any internal C++ exceptions, converts them to the appropriate status code, and stores the exception message. Users can retrieve descriptive error messages using ``hipdnnGetLastErrorString``.
 
+Memory management
+=================
+
+hipDNN adopts a caller-owned memory model:
+
+-  **Tensor data**: The user is responsible for allocating and managing device memory for input and output tensors. These pointers are passed to the backend via the *Variant Pack*.
+-  **Workspace memory**: Some graph executions require temporary scratch memory. The backend calculates the required size during the Execution Plan phase (``HIPDNN_ATTR_EXECUTION_PLAN_WORKSPACE_SIZE``). The user must allocate this memory and pass the pointer during execution.
+-  **Host memory**: API descriptors and graph structures manage their own host resources. Backend API users must explicitly destroy descriptors using ``hipdnnBackendDestroyDescriptor``.
+
+Thread safety
+=============
+
+- **Library Handle** (``hipdnnHandle_t``): This handle is *not* thread-safe. Users should create a unique handle for each thread or use external synchronization locks when sharing a handle across threads.
+- **Descriptors**: Read-only access to finalized descriptors is thread-safe. Modifying a descriptor while it is being used in another thread is undefined behavior.

@@ -49,7 +49,7 @@ Migrate your cuDNN project
 ==========================
 
 Before you begin, you should have hipDNN built and installed.
-See :ref:`install` for more information. Here's an MVP (minimum viable product) example of a hipDNN project in ``CMakeLists.txt``:
+See :ref:`install` for more information. Here's a minimal example of a hipDNN project in ``CMakeLists.txt``:
 
 .. code:: cmake
 
@@ -72,15 +72,6 @@ See :ref:`install` for more information. Here's an MVP (minimum viable product) 
   target_link_libraries(my_app PRIVATE
       hipdnn_frontend
   )
-
-Build commands:
-
-.. code:: bash
-
-  mkdir build && cd build
-  cmake .. -DCMAKE_PREFIX_PATH=/opt/rocm -GNinja
-  ninja
-
 
 .. tip::
 

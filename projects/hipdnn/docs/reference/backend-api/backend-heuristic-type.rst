@@ -4,7 +4,7 @@
 
 
 *************************************
-hipDNN backend heuristic type C++ API
+hipDNN backend heuristic type C API
 *************************************
 
 .. doxygenfile:: HipdnnBackendHeuristicType.h 

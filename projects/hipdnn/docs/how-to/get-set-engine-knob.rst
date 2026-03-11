@@ -9,102 +9,215 @@ Get/set engine knob configurations in hipDNN
 ********************************************
 
 hipDNN has a flexible engine configuration knobs system that allows plugin developers to expose custom runtime settings and enables end-users to adjust these settings. 
-Unlike a more limited ``int64_t``-based knob system with min/max/stride constraints, this design leverages Flatbuffers' union types to support multiple value types (integers, floats, strings) while maintaining type safety.
 
-The knobs system is designed to be:
+.. note::
 
-- **Optional**: Plugins can opt-in to exposing knobs.
-- **Flexible**: Support for multiple data types beyond ``int64_t``.
-- **Namespace-safe**: Plugin-specific human-readable knob identifiers.
-- **Extensible**: New knob types can be added without breaking existing code.
+    For a conceptual overview of configuring engine settings using hipDNN knobs, see :ref:`knobs`.
 
-Use the frontend
-================
+Query available knobs
+=====================
 
-You can get/set engine knobs with the hipDNN frontend:
+Use the hipDNN frontend to discover what knobs an engine supports and their constraints:
 
 .. code:: cpp
 
-    std::vector<Knob> knobs;
-    graph.get_knobs_for_engine(MIOPEN_ENGINE, knobs);
+  #include <hipdnn_frontend.hpp>
 
-You can configure the knobs to use their default values, or customize specific knob settings:
+  using namespace hipdnn_frontend;
 
-.. code:: cpp 
+  // After building the graph
+  Graph graph;
+  // ... setup and build graph ...
 
-    // Option 1: Use default knob values
-    auto defaultKnobSettings = Graph::knobToDefaultKnobSettings(knobs);
-    graph.create_execution_plan_ext(MIOPEN_ENGINE, defaultKnobSettings);
+  // Get available knobs for an engine
+  std::vector<Knob> knobs;
+  auto error = graph.get_knobs_for_engine(engineId, knobs);
 
-.. code:: cpp 
-  
-    // Option 2: Customize specific knobs
-    std::unordered_map<int64_t, KnobSetting> customKnobSettings;
-    customKnobSettings.insert(Knob::make_knob_id("miopen.conv.tile_size"), 32);
-    graph.create_execution_plan_ext(MIOPEN_ENGINE, customKnobSettings);
+  if (error.is_good()) {
+      for (const auto& knob : knobs) {
+          std::cout << "Knob ID: " << knob.knobId() << "\n";
+          std::cout << "Description: " << knob.description() << "\n";
+          std::cout << "Type: " << static_cast<int>(knob.valueType()) << "\n";
 
-- ``Knob`` includes the knob's display names, descriptions, constraints, and its default values.
-- The ``KnobSetting`` class enforces type-safe value setting.
+          // Access default value (it's a variant)
+          const auto& defaultVal = knob.defaultValue();
+          if (std::holds_alternative<int64_t>(defaultVal)) {
+              std::cout << "Default: " << std::get<int64_t>(defaultVal) << "\n";
+          } else if (std::holds_alternative<double>(defaultVal)) {
+              std::cout << "Default: " << std::get<double>(defaultVal) << "\n";
+          } else if (std::holds_alternative<std::string>(defaultVal)) {
+              std::cout << "Default: " << std::get<std::string>(defaultVal) << "\n";
+          }
 
-Here's a complete working example you can use for reference:
+          // Check constraints
+          const IConstraint* constraint = knob.constraint();
+          if (constraint) {
+              std::cout << "Constraint: " << constraint->toString() << "\n";
+          }
+
+          std::cout << "---\n";
+      }
+  } else {
+      std::cerr << "Error getting knobs: " << error.get_message() << "\n";
+  }
+
+Use the knob lookup map
+=======================
+
+Use the lookup method to access the knob ID:
 
 .. code:: cpp
 
-    using namespace hipdnn::frontend;
+  std::unordered_map<std::string, Knob> knobMap;
+  auto error = graph.get_knob_lookup_for_engine(engineId, knobMap);
 
-    // Create and build graph
-    Graph graph;
+  if (error.is_good()) {
+      auto it = knobMap.find("global.benchmarking");
+      if (it != knobMap.end()) {
+          const Knob& benchmarkingKnob = it->second;
+          // Use the knob...
+      }
+  }
 
-    // ... setup graph ...
+Set knob values
+===============
 
+You can set knob values when creating an execution plan. Here's an example:
+
+.. code:: cpp
+
+  #include <hipdnn_frontend.hpp>
+
+  using namespace hipdnn_frontend;
+
+  Graph graph;
+  // ... setup and build graph ...
+
+  // Create knob settings
+  std::vector<KnobSetting> settings;
+
+  // Set integer knob
+  settings.emplace_back("global.benchmarking", 1);
+
+  // Set int64 knob
+  settings.emplace_back("global.workspace_size_limit", 1024000LL);
+
+  // Set float knob
+  settings.emplace_back("some.float_knob", 0.5);
+
+  // Set string knob
+  settings.emplace_back("some.string_knob", std::string("value"));
+
+  // Create execution plan with these settings
+  auto error = graph.create_execution_plan_ext(engineId, settings);
+
+  if (error.is_good()) {
+      std::cout << "Execution plan created successfully with custom knob settings\n";
+  } else {
+      std::cerr << "Error: " << error.get_message() << "\n";
+  }
+
+Use type-safe knob setting
+--------------------------
+
+Refer to this sample code for type-safe knob setting:
+
+.. code:: cpp
+
+  // KnobSetting constructor is type-safe
+  KnobSetting intSetting("test.knob", 42);                    // int64_t
+  KnobSetting floatSetting("test.knob", 3.14);                // double
+  KnobSetting stringSetting("test.knob", std::string("val")); // string
+
+  // You can also update values later
+  intSetting.setValue(100);
+
+Use the default knob values
+===========================
+
+If you don't specify a knob setting, the engine will use the default value defined by the knob. To explicitly use defaults for all knobs:
+
+.. code:: cpp
+
+  // Option 1: Don't specify any settings (simplest)
+  auto error = graph.create_execution_plan_ext(engineId, {});
+
+  // Option 2: Specify only the knobs you want to customize
+  std::vector<KnobSetting> settings;
+  settings.emplace_back("global.benchmarking", 1);  // Only customize this one
+  auto error = graph.create_execution_plan_ext(engineId, settings);
+
+.. note::
+
+  - All knob settings are validated against their constraints when creating an execution plan. Invalid values will result in an error with a descriptive message.
+  - If you specify a knob that doesn't exist for the engine, hipDNN will log a warning but continue. This allows forward compatibility when new knobs are added.
+  - If a knob is marked as deprecated, hipDNN will log a warning when you use it, but the knob will still function normally.
+
+Best practices
+==============
+
+For development
+---------------
+
+- **Start with defaults**: Use default knob values during initial development.
+- **Profile first**: Measure baseline performance before tuning knobs.
+- **Query knobs**: Always check available knobs and their constraints using ``get_knobs_for_engine()``.
+- **Test incremental changes**: Modify one knob at a time to understand impact.
+
+For production
+--------------
+
+- **Enable benchmarking during warm-up**:
+
+  .. code:: cpp
+
+    // Warm-up phase
+    std::vector<KnobSetting> warmupSettings;
+    warmupSettings.emplace_back("global.benchmarking", 1);
+    graph.create_execution_plan_ext(engineId, warmupSettings);
+
+    // Execute a few times to populate cache
+    for (int i = 0; i < 5; i++) {
+        graph.execute(handle, variantPack, workspace);
+    }
+
+- **Use cached results in production**: After warm-up, benchmarking can be disabled as results are cached.
+- **Document knob settings**: Keep a record of knob configurations used in production for reproducibility.
+
+For memory-constrained environments
+-----------------------------------
+
+- **Query workspace ranges**:
+
+  .. code:: cpp
+
+    // Find minimum and maximum workspace for the operation
     std::vector<Knob> knobs;
-    graph.get_knobs_for_engine(MIOPEN_ENGINE, knobs);
+    graph.get_knobs_for_engine(engineId, knobs);
 
-    // Option 1: Use default knob values
-    auto defaultKnobSettings = Graph::knobToDefaultKnobSettings(knobs);
-    graph.create_execution_plan_ext(MIOPEN_ENGINE, defaultKnobSettings);
+    for (const auto& knob : knobs) {
+        if (knob.knobId() == "global.workspace_size_limit") {
+            // Log constraint to understand valid range
+        }
+    }
 
-    // Option 2: Customize specific knobs
-    std::unordered_map<int64_t, KnobSetting> customKnobSettings;
-    customKnobSettings.insert(Knob::make_knob_id("miopen.conv.tile_size"), 32);
-    graph.create_execution_plan_ext(MIOPEN_ENGINE, customKnobSettings);
+- **Set conservative limits**: Start with a lower workspace limit and increase if performance is insufficient.
+- **Balance batch size and workspace**: Reducing workspace allows larger batch sizes, which may offset performance loss.
 
-Validation
-----------
+Error handling
+--------------
 
-The backend:
+.. code:: cpp
 
-- Deserializes the knob settings from the ``EngineConfig``.
-- Queries the engine for its supported knobs.
-- Validates each setting against the knob's constraints.
-- Use the default values for any unspecified knob settings.
+  auto error = graph.create_execution_plan_ext(engineId, settings);
+  if (!error.is_good()) {
+      std::cerr << "Failed to create execution plan: " << error.get_message() << "\n";
 
-If the validation fails, hipDNN returns ``HIPDNN_STATUS_BAD_PARAM``.
-
-Knob naming convention guide
-============================
-
-You should use a hierarchical naming scheme when naming your knobs: ``<plugin_name>.<engine_name>.<knob_name>``.
-
-For example:
-
-- ``miopen.conv.tile_size``
-- ``miopen.conv.algorithm``
-- ``rocblas.gemm.transpose_algorithm``
-- ``custom_plugin.matmul.block_size``
-
-The plugin name prefix (for example, ``miopen.``) ensures that different plugins can have semantically similar knobs.
-
-There's a ``global.`` namespace that contains commonly used knobs. 
-Here are some examples:
-
-- ``global.deterministic``
-- ``global.workspace``
-- ``global.benchmarking``
-
-.. warning::
-
-  There's no support for custom knobs in the ``global.`` namespace. Custom knobs registered in the ``global.`` namespace will be rejected.
+      // Common errors:
+      // - Workspace limit below minimum
+      // - Invalid knob ID
+      // - Value outside valid range
+  }
 
 
 

@@ -1,5 +1,5 @@
 .. meta::
-   :description: hipDNN is a plugin-based deep learning library that provides graph-based operation support through backend plugins 
+   :description: hipDNN (Deep Neural Network) is a graph-based deep learning library that enables multi-operation fusion for improved performance on AMD GPUs. 
    :keywords: hipDNN, ROCm, library, API
 
 .. _what-is:
@@ -11,7 +11,7 @@ What is hipDNN?
 hipDNN (Deep Neural Network) is a graph-based deep learning library that enables multi-operation fusion for improved performance on AMD GPUs. 
 It uses operation graphs as an intermediate representation to describe computations, allowing different backend engines to optimize and execute these graphs efficiently.
 
-hipDNN allows developers to run deep learning workloads on AMD GPUs by providing an interface modeled after the cuDNN frontend API.
+hipDNN allows developers to run deep learning workloads on AMD GPUs by providing an interface that matches established deep learning library conventions.
 
 hipDNN has a plugin-based architecture which allows advanced users to extend hipDNN without modifying the core library.
 
@@ -31,9 +31,9 @@ hipDNN and the ROCm ecosystem
    * - Interface
      - **hipDNN**
      - The portable API for deep learning operations.
-   * - Primitives
-     - MIOpen
-     - The AMD open-source, deep-learning primitives library for GPUs.
+   * - Engine selection and execution
+     - Engine provider plugins
+     - Matches fused graph operations to engines for optimized performance.
    * - Runtime
      - HIP
      - The translation layer between C++ and GPU hardware.
@@ -58,9 +58,9 @@ Components
 - **SDKs**: Header-only libraries that provide shared utilities and interfaces. hipDNN provides three SDKs: Data SDK (graph schemas and data structures), Plugin SDK (plugin API and utilities), and Test SDK (testing utilities and CPU reference implementations).
 - **Plugins**: Plugins provide additional operational support or performance improvements.
 
-Plugins
-=======
+Engine provider plugins
+=======================
 
-hipDNN operations are implemented through plugins. Each plugin provides its own set of supported operations. See :ref:`plugin-support` for more information.
+hipDNN operations are implemented through provider plugins. Each provider plugin provides its own set of supported operations. See :ref:`plugin-support` for more information.
 
 
