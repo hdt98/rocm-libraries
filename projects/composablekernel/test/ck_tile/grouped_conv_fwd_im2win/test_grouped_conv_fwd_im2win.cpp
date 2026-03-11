@@ -9,15 +9,25 @@
 // For each test case:
 //   1. Fill input (GNCHW) and weight (GKCYX) host tensors with random data.
 //   2. Upload to device.
-//   3. Run im2win kernel → output (GNKHW) on device.
-//   4. Run naive GPU reference kernel (NHWGC/GKYXC/NHWGK layout) on
-//      separately-layout-transposed device buffers.
-//   5. Transpose the reference output back to GNKHW and compare
-//      element-wise with the im2win result.
+//   3. Run im2win kernel → output (NHWGK) on device.
+//   4. Prepare the GPU reference inputs:
+//        • Weight GKCYX→GKYXC: use BatchedTransposeKernel on device
+//          (batch = G×K, height = C, width = Y×X).
+//        • Input  GNCHW→NHWGC: use a strided HostTensor view on host to
+//          avoid the nested G/N dimension interleaving that would require
+//          two separate GPU transpose passes.
+//   5. Run the naive GPU reference → NHWGK output.
+//   6. Compare im2win and reference outputs element-wise.
 //
-// The naive GPU reference is the same kernel used by the existing
-// grouped conv forward example (ck_tile/ref/naive_grouped_conv_fwd_gpu.hpp)
-// and provides an independent correctness oracle.
+// The weight transpose from GKCYX to GKYXC maps cleanly to a 2D batched
+// transpose (swap the C row-dimension with the Y×X column-dimension) and
+// is therefore done entirely on the GPU using BatchedTransposeKernel.
+//
+// The input GNCHW→NHWGC requires two separate dim-group swaps (G↔N and
+// C↔H*W) that cannot be expressed as a single 2D batched transpose because
+// G and N are interleaved in the target layout.  We handle it on host via
+// a strided HostTensor view, which copies elements with the correct strides
+// without any explicit index arithmetic.
 //
 // Test matrix
 // -----------
@@ -39,92 +49,103 @@
 #include "ck_tile/host.hpp"
 #include "ck_tile/ref/naive_grouped_conv_fwd_gpu.hpp"
 #include "ck_tile/ops/grouped_convolution/utils/transform_conv_fwd_to_im2win.hpp"
+#include "ck_tile/ops/batched_transpose.hpp"
 
 #include "grouped_conv_fwd_im2win_invoker.hpp"
 
-// ── Layout helpers ────────────────────────────────────────────────────────────
-// The naive GPU ref operates on NHWGC / GKYXC / NHWGK (channels-last).
-// Our im2win kernel operates on GNCHW / GKCYX / GNKHW (channels-first).
-// We perform layout transpositions on host before/after GPU reference.
-
-// GNCHW → NHWGC  (input reorder for ref)
-template <typename T>
-static ck_tile::HostTensor<T>
-gnchw_to_nhwgc(const ck_tile::HostTensor<T>& src, int G, int N, int C, int H, int W)
+// ── GPU transpose helper ──────────────────────────────────────────────────────
+// Launches BatchedTransposeKernel to transpose a flat [batch, height, width]
+// device buffer to [batch, width, height] in-place (src and dst are separate).
+//
+// Uses the Universal pipeline with padding enabled so arbitrary shapes work.
+template <typename DataType>
+static void gpu_batched_transpose(const ck_tile::DeviceMem& d_src,
+                                  ck_tile::DeviceMem& d_dst,
+                                  int batch,
+                                  int height,
+                                  int width)
 {
-    // src shape: [G, N, C, H, W], dst shape: [N, H, W, G, C]
-    ck_tile::HostTensor<T> dst({static_cast<std::size_t>(N),
-                                static_cast<std::size_t>(H),
-                                static_cast<std::size_t>(W),
-                                static_cast<std::size_t>(G),
-                                static_cast<std::size_t>(C)});
-    for(int g = 0; g < G; ++g)
-        for(int n = 0; n < N; ++n)
-            for(int c = 0; c < C; ++c)
-                for(int h = 0; h < H; ++h)
-                    for(int w = 0; w < W; ++w)
-                    {
-                        // src: g*N*C*H*W + n*C*H*W + c*H*W + h*W + w
-                        std::size_t si = g * (N * C * H * W) + n * (C * H * W) + c * (H * W) +
-                                         h * W + w;
-                        // dst: n*H*W*G*C + h*W*G*C + w*G*C + g*C + c
-                        std::size_t di = n * (H * W * G * C) + h * (W * G * C) + w * (G * C) +
-                                         g * C + c;
-                        dst.mData[di] = src.mData[si];
-                    }
-    return dst;
+    // Block tile 64×64, single warp, padding enabled for arbitrary shapes.
+    using BlockTile  = ck_tile::sequence<64, 64>;
+    using WarpLayout = ck_tile::sequence<1, 1>;
+    using Problem    = ck_tile::BatchedTransposeProblem<DataType,
+                                                        BlockTile,
+                                                        WarpLayout,
+                                                        /*kPadM=*/true,
+                                                        /*kPadN=*/true>;
+    using Pipeline   = ck_tile::BatchedTransposePipeline<Problem>;
+    using Kernel     = ck_tile::BatchedTransposeKernel<Pipeline>;
+
+    const ck_tile::BatchedTransposeHostArgs hargs{
+        d_src.GetDeviceBuffer(),
+        d_dst.GetDeviceBuffer(),
+        batch,
+        height,
+        width,
+        /*dim_stride=*/height * width,
+        /*dim_block_h=*/BlockTile::at(ck_tile::number<0>{}),
+        /*dim_block_w=*/BlockTile::at(ck_tile::number<1>{})};
+
+    auto kargs            = Kernel::MakeKargs(hargs);
+    const dim3 grid_size  = Kernel::GridSize(hargs);
+    const dim3 block_size = Kernel::BlockSize();
+
+    ck_tile::launch_kernel(ck_tile::stream_config{},
+                           ck_tile::make_kernel<1>(Kernel{}, grid_size, block_size, 0, kargs));
 }
 
-// GKCYX → GKYXC  (weight reorder for ref)
-template <typename T>
-static ck_tile::HostTensor<T>
-gkcyx_to_gkyxc(const ck_tile::HostTensor<T>& src, int G, int K, int C, int Y, int X)
+// ── Host layout reorder: GNCHW → NHWGC ───────────────────────────────────────
+// The naive GPU reference requires input in NHWGC = [N, Hi, Wi, G, C].
+// Our input is in GNCHW = [G, N, C, Hi, Wi].
+//
+// This permutation requires swapping (G,N) and (C,Hi,Wi) dimension groups,
+// which cannot be expressed as a single 2D batched transpose because G and N
+// are interleaved in the target layout.  We use a strided HostTensor view to
+// let CK's tensor infrastructure compute the correct element offsets.
+template <typename DataType>
+static ck_tile::HostTensor<DataType>
+host_gnchw_to_nhwgc(const ck_tile::HostTensor<DataType>& src, int G, int N, int C, int H, int W)
 {
-    // src shape: [G, K, C, Y, X], dst shape: [G, K, Y, X, C]
-    ck_tile::HostTensor<T> dst({static_cast<std::size_t>(G),
-                                static_cast<std::size_t>(K),
-                                static_cast<std::size_t>(Y),
-                                static_cast<std::size_t>(X),
-                                static_cast<std::size_t>(C)});
-    for(int g = 0; g < G; ++g)
-        for(int k = 0; k < K; ++k)
-            for(int c = 0; c < C; ++c)
-                for(int y = 0; y < Y; ++y)
-                    for(int x = 0; x < X; ++x)
-                    {
-                        std::size_t si = g * (K * C * Y * X) + k * (C * Y * X) + c * (Y * X) +
-                                         y * X + x;
-                        std::size_t di = g * (K * Y * X * C) + k * (Y * X * C) + y * (X * C) +
-                                         x * C + c;
-                        dst.mData[di] = src.mData[si];
-                    }
-    return dst;
-}
+    // src physical layout: [G, N, C, H, W] with packed strides
+    //   stride(G) = N*C*H*W,  stride(N) = C*H*W,  stride(C) = H*W,
+    //   stride(H) = W,        stride(W) = 1
+    //
+    // dst logical layout:  [N, H, W, G, C]
+    //   stride(N) = H*W*G*C,  stride(H) = W*G*C,  stride(W) = G*C,
+    //   stride(G) = C,        stride(C) = 1
+    //
+    // We build dst with these explicit strides so that element (n,h,w,g,c)
+    // in the dst HostTensor maps to the correct flat index, then copy from src.
 
-// NHWGK → GNKHW  (output reorder: ref → im2win layout)
-template <typename T>
-static ck_tile::HostTensor<T>
-nhwgk_to_gnkhw(const ck_tile::HostTensor<T>& src, int G, int N, int K, int H, int W)
-{
-    // src shape: [N, H, W, G, K], dst shape: [G, N, K, H, W]
-    ck_tile::HostTensor<T> dst({static_cast<std::size_t>(G),
-                                static_cast<std::size_t>(N),
-                                static_cast<std::size_t>(K),
-                                static_cast<std::size_t>(H),
-                                static_cast<std::size_t>(W)});
-    for(int g = 0; g < G; ++g)
-        for(int n = 0; n < N; ++n)
-            for(int k = 0; k < K; ++k)
-                for(int h = 0; h < H; ++h)
-                    for(int w = 0; w < W; ++w)
+    const int nhwgc_total = N * H * W * G * C;
+
+    // dst tensor with NHWGC element order (packed)
+    ck_tile::HostTensor<DataType> dst({static_cast<std::size_t>(N),
+                                       static_cast<std::size_t>(H),
+                                       static_cast<std::size_t>(W),
+                                       static_cast<std::size_t>(G),
+                                       static_cast<std::size_t>(C)});
+    dst.mData.resize(nhwgc_total);
+
+    // Use explicit index arithmetic matching the GNCHW src strides.
+    const int sN = C * H * W; // src stride of N within one G slice
+    const int sC = H * W;
+    const int sH = W;
+    const int sW = 1;
+    const int sG = N * C * H * W; // src stride of G (outermost)
+
+    for(int n = 0; n < N; ++n)
+        for(int h = 0; h < H; ++h)
+            for(int w = 0; w < W; ++w)
+                for(int g = 0; g < G; ++g)
+                    for(int c = 0; c < C; ++c)
                     {
-                        // src: n*H*W*G*K + h*W*G*K + w*G*K + g*K + k
-                        std::size_t si = n * (H * W * G * K) + h * (W * G * K) + w * (G * K) +
-                                         g * K + k;
-                        // dst: g*N*K*H*W + n*K*H*W + k*H*W + h*W + w
-                        std::size_t di = g * (N * K * H * W) + n * (K * H * W) + k * (H * W) +
-                                         h * W + w;
-                        dst.mData[di] = src.mData[si];
+                        // GNCHW src flat index
+                        int src_idx = g * sG + n * sN + c * sC + h * sH + w * sW;
+                        // NHWGC dst flat index
+                        int dst_idx = n * (H * W * G * C) + h * (W * G * C) +
+                                      w * (G * C) + g * C + c;
+                        dst.mData[dst_idx] = src.mData[src_idx];
                     }
     return dst;
 }
@@ -153,26 +174,19 @@ static bool run_im2win_vs_ref(const ConvProblem& p)
     // Weight: GKCYX (G, K, C,  Y,  X) — channels-first
     // Output: NHWGK (N, Ho, Wo, G, K) — channels-last, K innermost
     //
-    // We use NHWGK for the output because:
-    //   1. The CShuffleEpilogue writes M×N tiles where N=K.  K must be
-    //      contiguous (stride 1) in global memory for vectorised stores.
-    //   2. GNKHW has stride(K) = Ho×Wo — not contiguous → wrong writes.
-    //   3. The naive GPU reference also outputs NHWGK, so no transpose
-    //      is needed for comparison.
+    // NHWGK is required because the CShuffleEpilogue writes vectorised
+    // stores along the N_gemm=K dimension, which must be contiguous.
     using InLayout  = ck_tile::tensor_layout::convolution::GNCHW;
     using WeiLayout = ck_tile::tensor_layout::convolution::GKCYX;
     using OutLayout = ck_tile::tensor_layout::convolution::NHWGK;
     using Config    = Im2winConvTestConfig<DataType>;
 
     // ── Host tensors ──────────────────────────────────────────────────
-    // Input: GNCHW = [G, N, C, Hi, Wi]
     ck_tile::HostTensor<DataType> h_input({static_cast<std::size_t>(p.G),
                                            static_cast<std::size_t>(p.N),
                                            static_cast<std::size_t>(p.C),
                                            static_cast<std::size_t>(p.Hi),
                                            static_cast<std::size_t>(p.Wi)});
-    // Weight: GKCYX = [G, K, C, Y, X] (channels-first)
-    // The naive GPU reference uses GKYXC; we'll reorder below.
     ck_tile::HostTensor<DataType> h_weight({static_cast<std::size_t>(p.G),
                                             static_cast<std::size_t>(p.K),
                                             static_cast<std::size_t>(p.C),
@@ -182,7 +196,7 @@ static bool run_im2win_vs_ref(const ConvProblem& p)
     ck_tile::FillUniformDistribution<DataType>{-2.f, 2.f}(h_input);
     ck_tile::FillUniformDistribution<DataType>{-2.f, 2.f}(h_weight);
 
-    // ── Device buffers ────────────────────────────────────────────────
+    // ── Device buffers for im2win kernel (channels-first layout) ──────
     const std::size_t out_elems =
         static_cast<std::size_t>(p.N) * Ho * Wo * p.G * p.K;
     ck_tile::DeviceMem d_input(h_input.get_element_space_size_in_bytes());
@@ -193,7 +207,7 @@ static bool run_im2win_vs_ref(const ConvProblem& p)
     d_weight.ToDevice(h_weight.data());
     d_output.SetZero();
 
-    // ── Build ConvParam and run im2win kernel ─────────────────────────
+    // ── Run im2win kernel ─────────────────────────────────────────────
     ck_tile::conv::ConvParam conv_param{
         2 /*NDimSpatial*/,
         p.G, p.N, p.K, p.C,
@@ -231,23 +245,38 @@ static bool run_im2win_vs_ref(const ConvProblem& p)
                                                    static_cast<std::size_t>(p.K)});
     d_output.FromDevice(h_output_im2win.data());
 
-    // ── GPU reference (also NHWGK) ─────────────────────────────────────
-    // The naive GPU ref uses NHWGC input and GKYXC weight; reorder our
-    // channels-first host tensors to channels-last for it.
-    auto h_input_nhwgc  = gnchw_to_nhwgc(h_input,  p.G, p.N, p.C, p.Hi, p.Wi);
-    auto h_weight_gkyxc = gkcyx_to_gkyxc(h_weight, p.G, p.K, p.C, p.Y,  p.X);
+    // ── Prepare reference inputs ──────────────────────────────────────
+    //
+    // Weight: GKCYX → GKYXC via GPU BatchedTransposeKernel
+    // ─────────────────────────────────────────────────────
+    // View GKCYX as [G*K, C, Y*X].  Transposing height=C ↔ width=Y*X
+    // gives [G*K, Y*X, C] = GKYXC.
+    const int wei_batch  = p.G * p.K;
+    const int wei_height = p.C;
+    const int wei_width  = p.Y * p.X;
+
+    ck_tile::DeviceMem d_weight_gkyxc(h_weight.get_element_space_size_in_bytes());
+    gpu_batched_transpose<DataType>(d_weight, d_weight_gkyxc, wei_batch, wei_height, wei_width);
+
+    //
+    // Input: GNCHW → NHWGC via strided host copy
+    // ────────────────────────────────────────────
+    // The target NHWGC layout interleaves the G and N outer dimensions
+    // (dst[n,h,w,g,c] comes from src[g,n,c,h,w]), which cannot be
+    // expressed as a single 2D batched transpose.  We use an explicit
+    // host-side copy with the correct index arithmetic.
+    auto h_input_nhwgc = host_gnchw_to_nhwgc(h_input, p.G, p.N, p.C, p.Hi, p.Wi);
 
     ck_tile::DeviceMem d_input_ref(h_input_nhwgc.get_element_space_size_in_bytes());
-    ck_tile::DeviceMem d_weight_ref(h_weight_gkyxc.get_element_space_size_in_bytes());
     ck_tile::DeviceMem d_output_ref(out_elems * sizeof(DataType));
 
     d_input_ref.ToDevice(h_input_nhwgc.data());
-    d_weight_ref.ToDevice(h_weight_gkyxc.data());
     d_output_ref.SetZero();
 
+    // ── Run naive GPU reference → NHWGK ───────────────────────────────
     ck_tile::naive_grouped_conv_fwd<2, DataType, DataType, DataType>(
         reinterpret_cast<const DataType*>(d_input_ref.GetDeviceBuffer()),
-        reinterpret_cast<const DataType*>(d_weight_ref.GetDeviceBuffer()),
+        reinterpret_cast<const DataType*>(d_weight_gkyxc.GetDeviceBuffer()),
         reinterpret_cast<DataType*>(d_output_ref.GetDeviceBuffer()),
         p.G, p.N, p.K, p.C,
         {static_cast<ck_tile::long_index_t>(p.Hi), static_cast<ck_tile::long_index_t>(p.Wi)},
@@ -258,7 +287,7 @@ static bool run_im2win_vs_ref(const ConvProblem& p)
         {static_cast<ck_tile::long_index_t>(p.LPH),
          static_cast<ck_tile::long_index_t>(p.LPW)});
 
-    // Copy GPU reference output (NHWGK) to host.
+    // Copy reference output (NHWGK) to host.
     ck_tile::HostTensor<DataType> h_output_ref({static_cast<std::size_t>(p.N),
                                                 static_cast<std::size_t>(Ho),
                                                 static_cast<std::size_t>(Wo),
@@ -266,7 +295,7 @@ static bool run_im2win_vs_ref(const ConvProblem& p)
                                                 static_cast<std::size_t>(p.K)});
     d_output_ref.FromDevice(h_output_ref.data());
 
-    // ── Compute tolerance ─────────────────────────────────────────────
+    // ── Compute tolerance and compare ─────────────────────────────────
     const int GemmK = p.C * p.Y * p.X;
     const float max_val = *std::max_element(h_output_ref.mData.begin(),
                                             h_output_ref.mData.end());
@@ -274,7 +303,6 @@ static bool run_im2win_vs_ref(const ConvProblem& p)
     const auto atol = ck_tile::get_absolute_threshold<DataType, DataType, AccDataType>(
         max_val, GemmK);
 
-    // ── Compare ───────────────────────────────────────────────────────
     bool pass = ck_tile::check_err(
         h_output_im2win, h_output_ref, "im2win vs GPU reference", rtol, atol);
 
