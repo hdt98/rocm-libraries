@@ -33,6 +33,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <fstream>
 #include <functional>
 #include <map>
@@ -152,6 +153,8 @@ public:
         MIOPEN_LOG_I2("Lock Refresh Active < " << unique_handle.string());
         auto last_refresh = fs::file_time_type::clock::now();
         auto age          = update_freq;
+
+        std::unique_lock<std::mutex> lock(refresh_mutex);
         while(lock_held.load(std::memory_order_acquire))
         {
             if(age >= update_freq)
@@ -169,7 +172,10 @@ public:
                 }
                 last_refresh = fs::file_time_type::clock::now();
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+            refresh_cv.wait_for(lock, update_freq,
+                [this]() { return !lock_held.load(std::memory_order_acquire); });
+
             auto now = fs::file_time_type::clock::now();
             age      = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_refresh);
         }
@@ -208,15 +214,8 @@ public:
     void unlock()
     {
         MIOPEN_LOG_I2("Unlock < " << lockfile_path.string());
-        lock_held.store(false, std::memory_order_release);
 
-        // Only join if thread was started
-        if(refresh_thread.joinable())
-        {
-            refresh_thread.join();
-        }
-
-        // Handle errors in file removal
+        // Remove lock files immediately to allow other threads to acquire the lock
         std::error_code ec1, ec2;
         fs::remove(lockfile_path, ec1);
         fs::remove(unique_handle, ec2);
@@ -225,6 +224,16 @@ public:
             MIOPEN_LOG_W("Failed to remove lockfile: " << ec1.message());
         if(ec2)
             MIOPEN_LOG_W("Failed to remove unique handle: " << ec2.message());
+
+        // Signal refresh thread to exit and wake it up immediately
+        lock_held.store(false, std::memory_order_release);
+        refresh_cv.notify_one();
+
+        // Join the refresh thread (should exit quickly now)
+        if(refresh_thread.joinable())
+        {
+            refresh_thread.join();
+        }
     }
 
     fs::path get_unique_handle() { return unique_handle; }
@@ -238,6 +247,9 @@ private:
     // Instance-specific state for clock desync handling
     fs::file_time_type last_write_seen{};
     fs::file_time_type now_at_write{};
+    // Synchronization for graceful refresh thread termination
+    std::mutex refresh_mutex;
+    std::condition_variable refresh_cv;
 };
 
 MIOPEN_INTERNALS_EXPORT fs::path LockFilePath(const fs::path& filename_);
