@@ -304,7 +304,8 @@ public:
         }
         catch(...)
         {
-            access_mutex.unlock();
+            access_mutex.unlock_shared();
+            throw;
         }
     }
 
@@ -373,20 +374,20 @@ public:
                return flock.timed_lock_sharable(ToPTime(duration));
            }))
             return true;
-        access_mutex.unlock();
+        access_mutex.unlock_shared();
         return false;
     }
 
     template <class TPoint>
     bool try_lock_until(TPoint point)
     {
-        return try_lock_for(point - std::chrono::system_clock::now());
+        return try_lock_for(point - std::chrono::steady_clock::now());
     }
 
     template <class TPoint>
     bool try_lock_shared_until(TPoint point)
     {
-        return try_lock_shared_for(point - std::chrono::system_clock::now());
+        return try_lock_shared_for(point - std::chrono::steady_clock::now());
     }
 
 private:
