@@ -45,7 +45,7 @@ hipDNN's SDPA forward path is fully implemented in the frontend (`SdpaFpropNode`
 ### Directory Structure
 
 ```
-dnn-providers/aiter-provider/
+dnn-providers/aiter-ck-spda/
   CMakeLists.txt
   src/
     AiterPluginPublic.cpp             # 6-line entry point
