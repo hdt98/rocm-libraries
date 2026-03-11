@@ -74,7 +74,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 192]]
+          - Range: [[255], [255], [1], [1, 148, 192]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -108,7 +108,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 192]]
+          - Range: [[255], [255], [1], [1, 148, 192]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -179,8 +179,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[160], [256], [1], [1,17,64]]
-          - Range: [[160], [256], [1], [32, 64, 256]]
+          - Range: [[160], [256], [1], [1,34,64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -218,8 +217,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [160], [1], [1,17,64]]
-          - Range: [[256], [160], [1], [32, 64, 256]]
+          - Range: [[256], [160], [1], [1,34,64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -253,8 +251,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [240], [1], [1, 17, 64]]
-          - Range: [[256], [240], [1], [32, 64, 256]]
+          - Range: [[256], [240], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -292,8 +289,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [208], [1], [1, 17, 64]]
-          - Range: [[256], [208], [1], [32, 64, 256]]
+          - Range: [[256], [208], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -331,8 +327,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[320], [192], [1], [1, 17, 64]]
-          - Range: [[320], [192], [1], [32, 64, 256]]
+          - Range: [[320], [192], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -366,8 +361,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[192], [320], [1], [1, 17, 64]]
-          - Range: [[192], [320], [1], [32, 64, 256]]
+          - Range: [[192], [320], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -405,8 +399,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [192], [1], [32, 64, 256]]
-          - Range: [[256], [192], [1], [1,17,64]]
+          - Range: [[256], [192], [1], [1,34,64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -440,8 +433,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[208], [256], [1], [1, 17, 64]]
-          - Range: [[208], [256], [1], [32, 64, 256]]
+          - Range: [[208], [256], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -514,8 +506,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[240], [256], [1], [64, 64, 256]]
-          - Range: [[240], [256], [1], [1, 17, 256]]  
+          - Range: [[240], [256], [1], [64, 128, 256]]
           - Exact: [3840, 4096, 1, 8192]
         - BiasTypeArgs: ['b']          
     - # BenchmarkProblemSizeGroup - Standard - All problem
@@ -548,8 +539,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[128], [224], [1], [1,17,64]]
-          - Range: [[128], [224], [1], [32, 64, 256]]
+          - Range: [[128], [224], [1], [1,34,64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -579,9 +569,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[128], [256], [1], [64, 64, 256]]
-          - Range: [[128], [256], [1], [1,1,64]]
-          - Range: [[128], [256], [1], [32, 64, 256]]          
+          - Range: [[128], [256], [1], [1,26,64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -616,9 +604,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [96], [1], [64, 64, 256]]
-          - Range: [[256], [96], [1], [1, 1, 64]]
-          - Range: [[256], [96], [1], [32, 64, 256]]
+          - Range: [[256], [96], [1], [1, 29, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -650,9 +636,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[224], [128], [1], [64, 64, 256]]
-          - Range: [[224], [128], [1], [1,1,64]]
-          - Range: [[224], [128], [1], [32, 64, 256]]
+          - Range: [[224], [128], [1], [1,33,64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - 256x224x64 NN
       InitialSolutionParameters:
@@ -682,8 +666,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [224], [1], [ 1, 17,  64]]
-          - Range: [[256], [224], [1], [32, 64, 256]]
+          - Range: [[256], [224], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - 256x224x64 NN
       InitialSolutionParameters:
@@ -713,8 +696,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[224], [256], [1], [ 1, 17,  64]]
-          - Range: [[224], [256], [1], [32, 64, 256]]
+          - Range: [[224], [256], [1], [ 1, 33,  64]]
         - BiasTypeArgs: ['b']        
   ########################################
   # HHS NN - standard
@@ -761,7 +743,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 192]]
+          - Range: [[257], [257], [1], [1, 148, 192]]
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
       BenchmarkCommonParameters:
@@ -794,7 +776,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 192]]
+          - Range: [[257], [257], [1], [1, 148, 192]]
     - # BenchmarkProblemSizeGroup - 96x256x64 NN (CMS)
       InitialSolutionParameters:
       BenchmarkCommonParameters:
@@ -826,8 +808,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[96], [256], [1], [1, 17, 64]]
-          - Range: [[96], [256], [1], [32, 64, 256]]
+          - Range: [[96], [256], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
 
   ########################################
@@ -882,8 +863,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 192]]
-          - Range: [[613], [612], [1], [1, 1, 64]]
+          - Range: [[613], [612], [1], [1, 33, 64]]
         - BiasTypeArgs: ['b']
 
   ########################################
@@ -931,7 +911,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 192]]
+          - Range: [[255], [257], [1], [1, 148, 192]]
 
   ########################################
   # BBS TN - standard
@@ -986,8 +966,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 192]]
-          - Range: [[613], [612], [1], [1, 1, 64]]
+          - Range: [[613], [612], [1], [1, 27, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - 192x128x64 TN (CMS)
       InitialSolutionParameters:
@@ -1022,8 +1001,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[192], [128], [1], [1, 17, 64]]
-          - Range: [[192], [128], [1], [32, 64, 256]]
+          - Range: [[192], [128], [1], [1, 33, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - 256x160x64 TN (match cms-tn.yaml)
       InitialSolutionParameters:
@@ -1057,8 +1035,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [160], [1], [1, 17, 64]]
-          - Range: [[256], [160], [1], [32, 64, 256]]
+          - Range: [[256], [160], [1], [1, 33, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -1091,8 +1068,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[192], [256], [1], [1, 17, 64]]
-          - Range: [[192], [256], [1], [32, 64, 256]]
+          - Range: [[192], [256], [1], [1, 33, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - 96x256x64 TN
       InitialSolutionParameters:
@@ -1126,9 +1102,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [1536, 4096, 1, 8192]
-          - Range: [[96], [256], [1], [64, 64, 256]]
-          - Range: [[96], [256], [1], [32, 64, 256]]
-          - Range: [[96], [256], [1], [1, 1, 64]]
+          - Range: [[96], [256], [1], [1, 33, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -1161,8 +1135,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [240], [1], [1, 17, 64]]
-          - Range: [[256], [240], [1], [32, 64, 256]]
+          - Range: [[256], [240], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -1195,8 +1168,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [208], [1], [1, 17, 64]]
-          - Range: [[256], [208], [1], [32, 64, 256]]
+          - Range: [[256], [208], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -1230,8 +1202,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[224], [128], [1], [1, 17, 64]]
-          - Range: [[224], [128], [1], [32, 64, 256]]
+          - Range: [[224], [128], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -1264,8 +1235,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[224], [256], [1], [1, 17, 64]]
-          - Range: [[224], [256], [1], [32, 64, 256]]
+          - Range: [[224], [256], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -1298,8 +1268,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [224], [1], [1, 17, 64]]
-          - Range: [[256], [224], [1], [32, 64, 256]]
+          - Range: [[256], [224], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -1332,8 +1301,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [192], [1], [1, 17, 64]]
-          - Range: [[256], [192], [1], [32, 64, 256]]
+          - Range: [[256], [192], [1], [1, 34, 64]]
           - Exact: [4096, 3072, 1, 8192]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
@@ -1369,8 +1337,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [96], [1], [1, 17, 64]]
-          - Range: [[256], [96], [1], [32, 64, 256]]
+          - Range: [[256], [96], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -1403,8 +1370,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[160], [256], [1], [1, 17, 64]]
-          - Range: [[160], [256], [1], [32, 64, 256]]
+          - Range: [[160], [256], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -1437,8 +1403,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [192], [1], [1, 17, 64]]
-          - Range: [[256], [192], [1], [32, 64, 256]]
+          - Range: [[256], [192], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -1519,8 +1484,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[240], [256], [1], [1, 17, 64]]
-          - Range: [[240], [256], [1], [32, 64, 256]]
+          - Range: [[240], [256], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -1567,8 +1531,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[208], [256], [1], [1, 17, 64]]
-          - Range: [[208], [256], [1], [32, 64, 256]]
+          - Range: [[208], [256], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -1602,8 +1565,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[192], [256], [1], [1, 17, 64]]
-          - Range: [[192], [256], [1], [32, 64, 256]]
+          - Range: [[192], [256], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -1629,8 +1591,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
       - ProblemSizes:
-        - Range: [[192], [320], [1], [1, 17, 64]]
-        - Range: [[192], [320], [1], [32, 64, 256]]
+        - Range: [[192], [320], [1], [1, 34, 64]]
       - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -1663,8 +1624,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[128], [224], [1], [1, 17, 64]]
-          - Range: [[128], [224], [1], [32, 64, 256]]
+          - Range: [[128], [224], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -1698,8 +1658,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[320], [192], [1], [1, 17, 64]]
-          - Range: [[320], [192], [1], [32, 64, 256]]
+          - Range: [[320], [192], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - 128x192x64 TN (CMS)
       InitialSolutionParameters:
@@ -1734,8 +1693,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[128], [192], [1], [ 1, 17,  64]]
-          - Range: [[128], [192], [1], [32, 64, 256]]
+          - Range: [[128], [192], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - 352x192x64 TN (CMS)
       InitialSolutionParameters:
@@ -1770,8 +1728,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[352], [192], [1], [1, 17,  64]]
-          - Range: [[352], [192], [1], [32, 64, 256]]
+          - Range: [[352], [192], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -1805,8 +1762,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[224], [320], [1], [1, 17, 64]]
-          - Range: [[224], [320], [1], [32, 64, 256]]
+          - Range: [[224], [320], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
 
   ########################################
@@ -1854,7 +1810,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 192]]
+          - Range: [[255], [257], [1], [1, 148, 192]]
 
   ########################################
   # F8BS TN - standard
@@ -1909,8 +1865,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[17, 235, 750], [2, 127, 400], [1], [4, 4, 400]]
-          - Range: [[613], [612], [1], [1, 1, 128]]
+          - Range: [[17, 470, 750], [2, 254, 400], [1], [4, 128, 400]]
         #- BiasTypeArgs: ['b']
 
   ########################################
@@ -1965,8 +1920,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 192]]
-          - Range: [[613], [612], [1], [1, 1, 128]]
+          - Range: [[613], [612], [1], [1, 32, 128]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - 224x128x64 NT
       InitialSolutionParameters:
@@ -2002,8 +1956,7 @@ BenchmarkProblems:
       BenchmarkFinalParameters:
         - ProblemSizes:
           - Exact: [3584, 2048, 1, 8192]
-          - Range: [[224], [128], [1], [1, 16, 64]]
-          - Range: [[224], [128], [1], [32, 64, 256]]
+          - Range: [[224], [128], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - 128x224x64 NT
       InitialSolutionParameters:
@@ -2038,8 +1991,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[128], [224], [1], [1, 17, 64]]
-          - Range: [[128], [224], [1], [32, 64, 256]]
+          - Range: [[128], [224], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -2106,8 +2058,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[96], [256], [1], [1, 17, 64]]
-          - Range: [[96], [256], [1], [32, 64, 256]]
+          - Range: [[96], [256], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -2145,8 +2096,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[160], [256], [1], [1,17,64]]
-          - Range: [[160], [256], [1], [32, 64, 256]]
+          - Range: [[160], [256], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -2179,8 +2129,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[192], [256], [1], [1, 17, 64]]
-          - Range: [[192], [256], [1], [32, 64, 256]]
+          - Range: [[192], [256], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -2218,8 +2167,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [160], [1], [1,17,64]]
-          - Range: [[256], [160], [1], [32, 64, 256]]
+          - Range: [[256], [160], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -2253,8 +2201,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [240], [1], [1, 17, 64]]
-          - Range: [[256], [240], [1], [32, 64, 256]]
+          - Range: [[256], [240], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -2327,8 +2274,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[240], [256], [1], [1, 17, 256]]
-          - Range: [[240], [256], [1], [32, 64, 256]]
+          - Range: [[240], [256], [1], [1, 34, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -2362,8 +2308,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[320], [192], [1], [1, 17, 64]]
-          - Range: [[320], [192], [1], [32, 64, 256]]
+          - Range: [[320], [192], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -2396,8 +2341,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[208], [256], [1], [1, 17, 64]]
-          - Range: [[208], [256], [1], [32, 64, 256]]
+          - Range: [[208], [256], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -2431,8 +2375,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [192], [1], [1, 17, 64]]
-          - Range: [[256], [192], [1], [32, 64, 256]]
+          - Range: [[256], [192], [1], [1, 34, 64]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -2465,8 +2408,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[192], [320], [1], [1, 17, 64]]
-          - Range: [[192], [320], [1], [32, 64, 256]]
+          - Range: [[192], [320], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -2500,8 +2442,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[224], [256], [1], [1, 17, 256]]
-          - Range: [[224], [256], [1], [32, 64, 256]]
+          - Range: [[224], [256], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -2531,8 +2472,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [224], [1], [1, 17, 64]]
-          - Range: [[256], [224], [1], [32, 64, 256]]
+          - Range: [[256], [224], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
     - # BenchmarkProblemSizeGroup - Standard - All problem
       InitialSolutionParameters:
@@ -2567,8 +2507,7 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[256], [96], [1], [1, 17, 256]]
-          - Range: [[256], [96], [1], [32, 64, 256]]
+          - Range: [[256], [96], [1], [32, 128, 256]]
         - BiasTypeArgs: ['b']
 
   ########################################
@@ -2615,4 +2554,4 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Range: [[255, 1, 257], [255, 1, 257], [1], [1, 37, 192]]
+          - Range: [[257], [255], [1], [1, 148, 192]]
