@@ -78,21 +78,19 @@ namespace rocRoller::KernelGraph
                 return bodyParent.value();
             }
 
-            void DataDependenceDAGDetail::addDependenceEdge(int sourceControl, int destControl)
+            void DataDependenceDAGDetail::addDependenceEdge(int source, int dest)
             {
-                AssertFatal(
-                    sourceControl != destControl, ShowValue(sourceControl), ShowValue(destControl));
+                AssertFatal(source != dest, ShowValue(source), ShowValue(dest));
 
-                auto sourceBodyParent = getBodyParent(sourceControl);
-                auto destBodyParent   = getBodyParent(destControl);
+                auto sourceBodyParent = getBodyParent(source);
+                auto destBodyParent   = getBodyParent(dest);
 
                 if(sourceBodyParent != destBodyParent)
                     return;
 
-                if(!m_dependenceDAG.findEdge(sourceControl, destControl).has_value())
+                if(!m_dependenceDAG.findEdge(source, dest).has_value())
                 {
-                    m_dependenceDAG.addElement(
-                        ControlGraph::Sequence(), {sourceControl}, {destControl});
+                    m_dependenceDAG.addElement(ControlGraph::Sequence(), {source}, {dest});
                 }
             }
 

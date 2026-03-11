@@ -1098,7 +1098,7 @@ namespace rocRoller
                 tag = *parent;
 
                 AssertFatal(graph.mapper.get<CT::Unroll>(tag) > 0,
-                            "SetCoordinate needs Unroll/ForLoop dimension");
+                            "SetCoordinate needs Unroll dimension");
 
                 result.insert(tag);
             }
@@ -1125,7 +1125,7 @@ namespace rocRoller
 
                 AssertFatal(graph.mapper.get<CT::Unroll>(tag) > 0
                                 || graph.mapper.get<CT::ForLoop>(tag) > 0,
-                            "SetCoordinate needs Unroll dimension");
+                            "SetCoordinate needs Unroll/ForLoop dimension");
             }
             return tag;
         }

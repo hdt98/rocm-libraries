@@ -6,10 +6,6 @@
 #include <rocRoller/KernelGraph/Transforms/Simplify.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
 
-#include <map>
-#include <unordered_map>
-#include <unordered_set>
-
 namespace rocRoller::KernelGraph::NodeScheduling
 {
     ControlGraph::ControlGraph createSubGraph(KernelGraph const&      graph,
@@ -55,4 +51,5 @@ namespace rocRoller::KernelGraph::NodeScheduling
 
         return subGraph;
     }
+
 }

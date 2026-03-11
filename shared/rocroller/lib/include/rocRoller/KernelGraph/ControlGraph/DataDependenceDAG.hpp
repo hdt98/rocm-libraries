@@ -7,5 +7,22 @@
 
 namespace rocRoller::KernelGraph::DataDependenceDAG
 {
+    /**
+     * Builds the data dependence graph for the given kernel graph,
+     * specifically based on its control graph portion. It explicitly
+     * represents only the data dependences(flow, anti, and output) between
+     * the control graph nodes at the basic-block level.
+     *
+     * The data dependence graph has no cycles in it, therefore it
+     * is termed as data dependence DAG (directed acyclic graph).
+     *
+     * It describes the dependency relationship between the control graph nodes,
+     * so it makes sense to use the existing `rocRoller::KernelGraph::ControlGraph`
+     * structure for its represenatation.
+     *
+     * The dependences are indicated using `Sequence` edges at each basic-block
+     * level i.e. between the nodes sharing the same immediate body-parent
+     * in `graph.control`.
+     */
     ControlGraph::ControlGraph ConstructDataDependenceDAG(KernelGraph const& graph);
 }
