@@ -219,9 +219,9 @@ public:
                                 "SdpaBpropNode: DROPOUT_MASK must be rank-4, got rank="
                                     + std::to_string(dmDims.size()));
 
-            const auto seqQ  = qDims[2];
+            const auto seqQ = qDims[2];
             const auto seqKv = kDims[2];
-            const auto batch  = qDims[0];
+            const auto batch = qDims[0];
 
             HIPDNN_RETURN_IF_TRUE(dmDims[0] != batch && dmDims[0] != 1,
                                   ErrorCode::INVALID_VALUE,
@@ -237,8 +237,7 @@ public:
                                 seqQ,
                                 ErrorCode::INVALID_VALUE,
                                 "SdpaBpropNode: DROPOUT_MASK dim[2] must equal seq_q ("
-                                    + std::to_string(seqQ) + "), got "
-                                    + std::to_string(dmDims[2]));
+                                    + std::to_string(seqQ) + "), got " + std::to_string(dmDims[2]));
             HIPDNN_RETURN_IF_NE(dmDims[3],
                                 seqKv,
                                 ErrorCode::INVALID_VALUE,
@@ -251,7 +250,7 @@ public:
         // be provided as rank-4 tensors with shape (B, 1, 1, 1) and INT32 data type.
         if(attributes.padding_mask)
         {
-            const auto seqLenQ  = attributes.get_seq_len_q();
+            const auto seqLenQ = attributes.get_seq_len_q();
             const auto seqLenKv = attributes.get_seq_len_kv();
 
             HIPDNN_RETURN_IF_FALSE(
@@ -265,9 +264,9 @@ public:
                 std::string(
                     "SdpaBpropNode: padding_mask=true requires seq_len_kv tensor to be set"));
 
-            const auto& sqDims  = seqLenQ->get_dim();
+            const auto& sqDims = seqLenQ->get_dim();
             const auto& skvDims = seqLenKv->get_dim();
-            const auto  batch   = qDims[0];
+            const auto batch = qDims[0];
 
             HIPDNN_RETURN_IF_NE(sqDims.size(),
                                 static_cast<size_t>(4),
