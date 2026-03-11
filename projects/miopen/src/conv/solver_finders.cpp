@@ -261,9 +261,6 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
 
         try
         {
-            // Set tuning mode flag for kernel logging - extends to all runs in this scope
-            ScopedKernelTuningMode tuning_mode_scope;
-            
             // Log solution name for grouped kernel logging
             const auto solver_id_obj = solver::Id{sol.solver_id};
             LogSolutionName(sol.solver_id, solver_id_obj.Value());

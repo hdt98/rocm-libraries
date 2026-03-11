@@ -407,8 +407,8 @@ ConvSolution InitAnyInvokerFactory(const ProblemDescriptionType& problem,
                     float elapsed_time = handle.GetKernelTime();
                     
                     // Kernel logging for CK kernels
-                    const bool is_tuning_mode = GetKernelTuningMode();
-                    if(IsLoggingKernel(is_tuning_mode))
+                    const KernelPhase current_phase = GetKernelPhase();
+                    if(IsLoggingKernel(current_phase))
                     {                   
                         const auto exec_id = GetKernelExecutionCounter();
                         AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed_time, false);
@@ -1274,10 +1274,10 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
             if(handle.IsProfilingEnabled())
             {
                 elapsed += handle.GetKernelTime();
-                    
+
                 // Kernel logging for CK kernels
-                const bool is_tuning_mode = GetKernelTuningMode();
-                if(IsLoggingKernel(is_tuning_mode))
+                const KernelPhase current_phase = GetKernelPhase();
+                if(IsLoggingKernel(current_phase))
                 {
                     const auto exec_id = GetKernelExecutionCounter();
                     AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false);
@@ -1396,8 +1396,8 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     elapsed += handle.GetKernelTime();
                     
                     // Kernel logging for CK kernels
-                    const bool is_tuning_mode = GetKernelTuningMode();
-                    if(IsLoggingKernel(is_tuning_mode))
+                    const KernelPhase current_phase = GetKernelPhase();
+                    if(IsLoggingKernel(current_phase))
                     {
                         const auto exec_id = GetKernelExecutionCounter();
                         AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false);
@@ -1459,8 +1459,8 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     elapsed += handle.GetKernelTime();
                     
                     // Kernel logging for CK kernels
-                    const bool is_tuning_mode = GetKernelTuningMode();
-                    if(IsLoggingKernel(is_tuning_mode))
+                    const KernelPhase current_phase = GetKernelPhase();
+                    if(IsLoggingKernel(current_phase))
                     {
                         const auto exec_id = GetKernelExecutionCounter();
                         AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false);

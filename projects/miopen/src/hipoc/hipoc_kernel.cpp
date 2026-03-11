@@ -121,8 +121,8 @@ void HIPOCKernelInvoke::run(void* args, std::size_t size) const
 #else
         (void)hipEventSynchronize(stop.get());
 #endif
-        const bool is_tuning_mode = GetKernelTuningMode();
-        if(IsLoggingKernel(is_tuning_mode))
+        const KernelPhase current_phase = GetKernelPhase();
+        if(IsLoggingKernel(current_phase))
         {
             float elapsed_time = 0.0f;
             (void)hipEventElapsedTime(&elapsed_time, start.get(), stop.get());
@@ -206,8 +206,8 @@ void HIPOCKernelInvoke::run_cooperative(void** kern_args) const
         status = hipEventSynchronize(stop.get());
         if(status != hipSuccess)
             MIOPEN_THROW_HIP_STATUS(status, "hipEventSynchronize() failed");
-        const bool is_tuning_mode = GetKernelTuningMode();
-        if(IsLoggingKernel(is_tuning_mode))
+        const KernelPhase current_phase = GetKernelPhase();
+        if(IsLoggingKernel(current_phase))
         {
             float elapsed_time = 0.0f;
             (void)hipEventElapsedTime(&elapsed_time, start.get(), stop.get());

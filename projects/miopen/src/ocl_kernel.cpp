@@ -66,8 +66,8 @@ void OCLKernelInvoke::run() const
         clWaitForEvents(1, &ev);
         // Profiling is enable when Performance Logs are see `Run` in handleocl.cpp so this is nested in callback
         // Log to JSON accumulator
-        const bool is_tuning_mode = GetKernelTuningMode();
-        if(IsLoggingKernel(is_tuning_mode))
+        const KernelPhase current_phase = GetKernelPhase();
+        if(IsLoggingKernel(current_phase))
         {
             // Match handleocl.cpp `SetProfilingResult`
             size_t st, end;

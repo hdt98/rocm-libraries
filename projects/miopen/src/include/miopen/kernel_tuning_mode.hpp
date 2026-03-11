@@ -21,14 +21,43 @@ MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_PERFORMANCE_LOGS)
 
 namespace miopen {
 
-/// Thread-local flag to indicate if we're in kernel tuning/search mode
-/// This is used by kernel logging to distinguish between:
-/// - Kernels executed during find/search/benchmark (tuning mode)
-/// - Kernels executed for actual computation (execution mode)
-inline bool& GetKernelTuningMode()
+/// Kernel execution phase enumeration
+/// Determines the context in which kernels are executed for logging purposes
+enum class KernelPhase
 {
-    thread_local bool is_tuning = false;
-    return is_tuning;
+    Unknown,       // Default/unset phase
+    Execution,     // Normal kernel execution
+    Validation,    // Validation phase
+    SolverTuning,   // Solver tuning/search phase
+    Tuning
+};
+
+/// Convert KernelPhase enum to string for JSON output
+inline const char* KernelPhaseToString(KernelPhase phase)
+{
+    switch(phase)
+    {
+    case KernelPhase::Unknown:      return "unknown";
+    case KernelPhase::Execution:    return "execution";
+    case KernelPhase::Validation:   return "validation";
+    case KernelPhase::SolverTuning: return "solver_tuning";
+    case KernelPhase::Tuning:       return "tuning";
+    default:                        return "unknown";
+    }
+}
+
+/// Thread-local storage for current kernel execution phase
+/// Default phase is Unknown
+inline KernelPhase& GetKernelPhase()
+{
+    thread_local KernelPhase current_phase = KernelPhase::Unknown;
+    return current_phase;
+}
+
+/// Set the current kernel phase
+inline void SetKernelPhase(KernelPhase phase)
+{
+    GetKernelPhase() = phase;
 }
 
 /// Thread-local counter for execution/iteration tracking
@@ -212,19 +241,19 @@ inline SolutionExecutionData& GetJsonAccumulator()
 
 /// Check if this kernel should be logged
 /// - When log_level <= 2: Only log execution phase kernels (not tuning)
-/// - When log_level > 2: Log both tuning and execution phase kernels
-inline bool IsLoggingKernel(bool is_tuning)
+/// - When log_level > 2: Log all kernels (all phases)
+inline bool IsLoggingKernel(KernelPhase phase)
 {
     const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
     if(log_level > 2)
     {
-        // Log all kernels (both tuning and execution) when log_level > 2
+        // Log all kernels (all phases) when log_level > 2
         return true;
     }
     else if(log_level > 0)
     {
         // Only log execution phase kernels when 0 < log_level <= 2
-        return !is_tuning;
+        return (phase == KernelPhase::Execution);
     }
     return false;
 }
@@ -235,8 +264,8 @@ inline bool IsLoggingKernel(bool is_tuning)
 inline void AddPerformanceConfig(const std::string& config_name,
                                   const std::string& config_descriptor = "")
 {
-    const bool is_tuning_mode  = GetKernelTuningMode();
-    const bool logging_enabled = IsLoggingKernel(is_tuning_mode);
+    const KernelPhase current_phase = GetKernelPhase();
+    const bool logging_enabled = IsLoggingKernel(current_phase);
     if(logging_enabled)
     {
         auto& data = GetJsonAccumulator();
@@ -254,8 +283,8 @@ inline void AddPerformanceConfig(const std::string& config_name,
 /// This should be called after AddPerformanceConfig() and after kernel execution completes
 inline void AddInvokerTimes(const std::vector<float>& invoker_times_ms)
 {
-    const bool is_tuning_mode  = GetKernelTuningMode();
-    const bool logging_enabled = IsLoggingKernel(is_tuning_mode);
+    const KernelPhase current_phase = GetKernelPhase();
+    const bool logging_enabled = IsLoggingKernel(current_phase);
     if(!logging_enabled)
         return;
     
@@ -490,8 +519,8 @@ inline void AddKernelToJsonAccumulator(size_t exec_id,
                                        float time_ms,
                                        bool is_transform)
 {
-    const bool is_tuning_mode  = GetKernelTuningMode();
-    const bool logging_enabled = IsLoggingKernel(is_tuning_mode);
+    const KernelPhase current_phase = GetKernelPhase();
+    const bool logging_enabled = IsLoggingKernel(current_phase);
     if(!logging_enabled)
         return;
 
@@ -516,13 +545,13 @@ inline bool IsPerformanceLoggingEnabled()
 /// Only prints if the solution name has changed since the last call
 inline void LogSolutionName(const std::string& solution_name, uint64_t solver_id)
 {
-    const bool is_tuning_mode  = GetKernelTuningMode();
-    const bool logging_enabled = IsLoggingKernel(is_tuning_mode);
+    const KernelPhase current_phase = GetKernelPhase();
+    const bool logging_enabled = IsLoggingKernel(current_phase);
     if(logging_enabled && !solution_name.empty())
     {
         auto& last_solution = GetLastPrintedSolutionName();
         auto& last_solver_id = GetLastPrintedSolverId();
-        
+
         // Check if solution name or solver_id has changed
         if(solution_name != last_solution || solver_id != last_solver_id)
         {
@@ -533,26 +562,34 @@ inline void LogSolutionName(const std::string& solution_name, uint64_t solver_id
             auto& data         = GetJsonAccumulator();
             data.solution_name = solution_name;
             data.solver_id     = solver_id;
-            data.phase         = is_tuning_mode ? "tuning" : "execution";
+            data.phase         = KernelPhaseToString(current_phase);
             last_solution      = solution_name;
             last_solver_id     = solver_id;
         }
     }
 }
 
-/// RAII helper to set tuning mode for a scope
-class ScopedKernelTuningMode
+/// RAII helper to set kernel phase for a scope
+/// Automatically restores previous phase when scope exits
+class ScopedKernelPhase
 {
 public:
-    ScopedKernelTuningMode() : prev_value(GetKernelTuningMode()) { GetKernelTuningMode() = true; }
+    explicit ScopedKernelPhase(KernelPhase phase)
+        : prev_phase(GetKernelPhase())
+    {
+        SetKernelPhase(phase);
+    }
 
-    ~ScopedKernelTuningMode() { GetKernelTuningMode() = prev_value; }
+    ~ScopedKernelPhase()
+    {
+        SetKernelPhase(prev_phase);
+    }
 
-    ScopedKernelTuningMode(const ScopedKernelTuningMode&)            = delete;
-    ScopedKernelTuningMode& operator=(const ScopedKernelTuningMode&) = delete;
+    ScopedKernelPhase(const ScopedKernelPhase&)            = delete;
+    ScopedKernelPhase& operator=(const ScopedKernelPhase&) = delete;
 
 private:
-    bool prev_value;
+    KernelPhase prev_phase;
 };
 
 } // namespace miopen

@@ -2267,6 +2267,8 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
     // Get performance_log_level once at the start to avoid shadow variable warnings
     const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
     // Log the selected solver for execution phase kernel tracking
+    
+    miopen::ScopedKernelPhase phase_scope(miopen::KernelPhase::Execution);
     std::string solution_name = (found_solution.solution_id != 0) ? miopen::solver::Id(found_solution.solution_id).ToString()
                                                              : std::string("UNKNOWN");
     miopen::LogSolutionName(solution_name, found_solution.solution_id);
@@ -2455,6 +2457,7 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuImmed(const bool is_transform)
 
     // Log the selected solver for execution phase kernel tracking
     const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
+    miopen::ScopedKernelPhase phase_scope(miopen::KernelPhase::Execution);
     std::string solution_name = (selected->solution_id != 0) ? miopen::solver::Id(selected->solution_id).ToString()
                                                              : std::string("UNKNOWN");
     miopen::LogSolutionName(solution_name, selected->solution_id);
@@ -2837,6 +2840,8 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuFind()
                          found_solution);
     
     // Log the selected solver for execution phase kernel tracking
+    
+    miopen::ScopedKernelPhase phase_scope(miopen::KernelPhase::Execution);
     std::string solution_name = (found_solution.solution_id != 0) ? miopen::solver::Id(found_solution.solution_id).ToString()
                                                              : std::string("UNKNOWN");
     miopen::LogSolutionName(solution_name, found_solution.solution_id);
@@ -3127,6 +3132,7 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuFind()
                          found_solution);
     
     // Log the selected solver for execution phase kernel tracking
+    miopen::ScopedKernelPhase phase_scope(miopen::KernelPhase::Execution);
     std::string solution_name = (found_solution.solution_id != 0) ? miopen::solver::Id(found_solution.solution_id).ToString()
                                                              : std::string("UNKNOWN");
     miopen::LogSolutionName(solution_name, found_solution.solution_id);
@@ -3445,6 +3451,7 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuImmed()
     float wall_first_time   = 0.f;
 
     // Log the selected solver for execution phase kernel tracking
+    miopen::ScopedKernelPhase phase_scope(miopen::KernelPhase::Execution);
     const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
     std::string solution_name = (selected->solution_id != 0) ? miopen::solver::Id(selected->solution_id).ToString()
                                                              : std::string("UNKNOWN");
@@ -3610,6 +3617,7 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuImmed()
     float wall_first_time   = 0.f;
 
     // Log the selected solver for execution phase kernel tracking
+    miopen::ScopedKernelPhase phase_scope(miopen::KernelPhase::Execution);
     const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
     std::string solution_name = (selected->solution_id != 0) ? miopen::solver::Id(selected->solution_id).ToString()
                                                              : std::string("UNKNOWN");

@@ -552,8 +552,8 @@ auto GenericSearch(const Solver s,
                                                        current_solution.construction_params);
 
                     // Set tuning mode flag for kernel logging - extends to all runs in this scope
-                    ScopedKernelTuningMode tuning_mode_scope;
-                    
+                    miopen::ScopedKernelPhase phase_scope(miopen::KernelPhase::SolverTuning);
+
                     // Log solution name for grouped kernel logging (only once per solution)
                     const auto solver_name = s.SolverDbId();
                     const auto solver_id = miopen::solver::Id(solver_name).Value();
