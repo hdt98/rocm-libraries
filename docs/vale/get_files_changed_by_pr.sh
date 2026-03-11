@@ -13,10 +13,9 @@
 #     -d Optional string. Regex for the relative paths, such that only files whose relative paths match this regex
 #                         will be downloaded. Only relevant if -l is set. Default: '^.*$'.
 #     -t Optional string. The full path to a file that contains (only) the GitHub token that should
-#                         be used to access GitHub. Either this or -T should be provided; if both are, -t will be
-#                         prioritized.
-#     -T Optional string. The GitHub token that should be used to access GitHub. Either this or -t should be provided;
-#                         if both are, -t will be prioritized.
+#                         be used to access GitHub. If not provided, the token will be requested via STDIN.
+#
+# Accepts over STDIN: The GitHub token, unless provided via the -t parameter.
 #
 # Outputs to STDOUT a list of file paths altered by the PR, in alphabetical order (according to current locale),
 #     paths relative to repository root. For example:
@@ -85,10 +84,7 @@ help_message () {
     echo "    -d Optional string. Regex for the relative paths, such that only files whose relative paths match this"
     echo "                        regex will be downloaded. Only relevant if -l is set. Default: '^.*$'."
     echo "    -t Optional string. The full path to a file that contains (only) the GitHub token that should"
-    echo "                        be used to access GitHub. Either this or -T should be provided; if both are,"
-    echo "                        -t will be prioritized."
-    echo "    -T Optional string. The GitHub token that should be used to access GitHub. Either this or -t"
-    echo "                        should be provided; if both are, -t will be prioritized."
+    echo "                        be used to access GitHub. If not provided, the token will be requested over STDIN."
     echo ""
     echo "Outputs to STDOUT a list of file paths altered by the PR, in alphabetical order (according to"
     echo "    current locale), paths relative to repository root. For example:"
@@ -590,11 +586,9 @@ declare pr_number_text  # -p
 declare local_download_path  # -l
 declare download_paths_regex_argument  # -d
 declare github_token_file_path  # -t
-declare github_token_argument  # -T
-
 
 # Store arguments into variables. We'll deal with them later.
-while getopts 'o:r:p:l:d:t:T:' letter_option; do
+while getopts 'o:r:p:l:d:t:' letter_option; do
     case "${letter_option}" in
         "o" )
             repository_owner="${OPTARG}"
@@ -618,10 +612,6 @@ while getopts 'o:r:p:l:d:t:T:' letter_option; do
 
         "t" )
             github_token_file_path="${OPTARG}"
-        ;;
-
-        "T" )
-            github_token_argument="${OPTARG}"
         ;;
     esac
 done
@@ -667,7 +657,7 @@ if [[ ! -z "${download_paths_regex_argument}" ]]; then
     download_paths_regex="${download_paths_regex_argument}"
 fi
 
-# github_token_file_path -t and github_token_argument
+# GitHub token
 declare github_token
 if [[ ! -z "${github_token_file_path}" ]]; then
     # Reading token from file.
@@ -681,13 +671,17 @@ if [[ ! -z "${github_token_file_path}" ]]; then
         echo_log "Provided GitHub token file path (-t) |${github_token_file_path}| appears to be an empty file!"
         exit 1
     fi
-elif [[ ! -z "${github_token_argument}" ]]; then
-    github_token="${github_token_argument}"
 else
-    echo_log "Not provided a GitHub token path (-t) or GitHub token (-T)."
-    exit 1
-fi
+    # Collecting token via STDIN
+    echo "Please enter the GitHub token."
+    echo -n "Token: "
+    read github_token
 
+    if [[ -z "${github_token}" ]]; then
+        echo_log "The GitHub token that was provided over STDIN is empty!"
+        exit 1
+    fi
+fi
 
 # Execute the operation.
 
