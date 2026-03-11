@@ -9,6 +9,7 @@
 #include <common/mxDataGen.hpp>
 
 #include "GPUContextFixture.hpp"
+#include "Utilities.hpp"
 
 using namespace rocRoller;
 

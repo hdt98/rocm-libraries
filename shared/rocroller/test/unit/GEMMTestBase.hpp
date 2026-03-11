@@ -8,6 +8,7 @@
 #include <rocRoller/Utilities/Error.hpp>
 
 #include "GPUContextFixture.hpp"
+#include "Utilities.hpp"
 
 #include <common/GEMMProblem.hpp>
 #include <common/mxDataGen.hpp>
