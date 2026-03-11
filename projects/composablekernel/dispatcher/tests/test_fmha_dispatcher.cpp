@@ -283,3 +283,121 @@ TEST(FmhaDispatcherTest, PlansBackwardAsThreeStagesWhenConvertExists)
     EXPECT_EQ(plan.stages[1].family, FmhaKernelFamily::BwdDqDkDv);
     EXPECT_EQ(plan.stages[2].family, FmhaKernelFamily::BwdConvertDq);
 }
+
+// #15: BWD with asymmetric head dimensions (hdim_q != hdim_v)
+TEST(FmhaDispatcherTest, PlansBackwardWithAsymmetricHdim)
+{
+    FmhaRegistry registry;
+    registry.set_name("test_bwd_asym");
+
+    auto asym_key = [](FmhaKernelFamily family, const std::string& n) {
+        auto key             = make_key(family, n);
+        key.signature.hdim_q = 96;
+        key.signature.hdim_v = 128;
+        return key;
+    };
+
+    registry.register_kernel(
+        std::make_shared<MockFmhaKernel>(asym_key(FmhaKernelFamily::BwdDotDoO, "dot96"), "dot96"));
+    registry.register_kernel(
+        std::make_shared<MockFmhaKernel>(asym_key(FmhaKernelFamily::BwdDqDkDv, "dq96"), "dq96"));
+
+    FmhaDispatcher dispatcher(&registry);
+    auto problem   = make_bwd_problem();
+    problem.hdim_q = 96;
+    problem.hdim_v = 128;
+    auto plan      = dispatcher.plan(problem);
+    ASSERT_TRUE(plan.is_valid());
+    EXPECT_GE(plan.stages.size(), 2u);
+    EXPECT_EQ(plan.stages[0].family, FmhaKernelFamily::BwdDotDoO);
+    EXPECT_EQ(plan.stages[1].family, FmhaKernelFamily::BwdDqDkDv);
+}
+
+// #16: BWD negative test -- no matching kernel returns invalid plan
+TEST(FmhaDispatcherTest, PlansBackwardReturnsInvalidWhenNoKernel)
+{
+    FmhaRegistry registry;
+    registry.set_name("test_bwd_neg");
+
+    // Register only a fwd kernel, no bwd kernels
+    registry.register_kernel(
+        std::make_shared<MockFmhaKernel>(make_key(FmhaKernelFamily::Fwd, "fwd"), "fwd"));
+
+    FmhaDispatcher dispatcher(&registry);
+    auto plan = dispatcher.plan(make_bwd_problem());
+    EXPECT_FALSE(plan.is_valid());
+}
+
+// #17: Canonical key distinguishes dropout seed differences
+TEST(FmhaDispatcherTest, CanonicalKeyDistinguishesDropout)
+{
+    FmhaProblem p1;
+    p1.data_type   = "fp16";
+    p1.hdim_q      = 128;
+    p1.hdim_v      = 128;
+    p1.has_dropout = false;
+
+    FmhaProblem p2 = p1;
+    p2.has_dropout = true;
+
+    EXPECT_NE(p1.canonical_key(), p2.canonical_key());
+}
+
+// Canonical key covers all signature fields
+TEST(FmhaDispatcherTest, CanonicalKeyCoversAllFields)
+{
+    FmhaProblem base;
+    base.data_type = "fp16";
+    base.hdim_q    = 128;
+    base.hdim_v    = 128;
+
+    auto check_differs = [&](auto mutator) {
+        FmhaProblem p = base;
+        mutator(p);
+        EXPECT_NE(base.canonical_key(), p.canonical_key());
+    };
+
+    check_differs([](FmhaProblem& p) { p.has_lse = true; });
+    check_differs([](FmhaProblem& p) { p.has_dropout = true; });
+    check_differs([](FmhaProblem& p) { p.has_logits_soft_cap = true; });
+    check_differs([](FmhaProblem& p) { p.has_sink = true; });
+    check_differs([](FmhaProblem& p) { p.is_deterministic = true; });
+    check_differs([](FmhaProblem& p) { p.has_dbias = true; });
+    check_differs([](FmhaProblem& p) { p.is_store_randval = true; });
+    check_differs([](FmhaProblem& p) { p.mask_type = 1; });
+    check_differs([](FmhaProblem& p) { p.bias_type = 2; });
+    check_differs([](FmhaProblem& p) { p.is_group_mode = true; });
+}
+
+// BWD workspace sizing
+TEST(FmhaDispatcherTest, BwdWorkspaceInfoComputation)
+{
+    FmhaProblem p;
+    p.batch    = 2;
+    p.nhead_q  = 8;
+    p.seqlen_q = 256;
+    p.seqlen_k = 256;
+    p.hdim_q   = 128;
+
+    auto info = bwd_workspace_info(p);
+    EXPECT_EQ(info.d_bytes, 2u * 8 * 256 * sizeof(float));
+    EXPECT_EQ(info.dq_acc_bytes, 2u * 8 * 256 * 128 * sizeof(float));
+    EXPECT_EQ(info.d_offset, 0u);
+    EXPECT_GT(info.dq_acc_offset, 0u);
+    EXPECT_GE(info.dq_acc_offset, info.d_bytes);
+    EXPECT_EQ(info.dq_acc_offset % 256, 0u);
+    EXPECT_GT(info.total_bytes, info.dq_acc_offset + info.dq_acc_bytes - 1);
+}
+
+// Benchmarking control
+TEST(FmhaDispatcherTest, SetBenchmarkingControlsTimingFlag)
+{
+    FmhaRegistry registry;
+    FmhaDispatcher dispatcher(&registry);
+
+    EXPECT_TRUE(dispatcher.benchmarking_enabled());
+    dispatcher.set_benchmarking(false);
+    EXPECT_FALSE(dispatcher.benchmarking_enabled());
+    dispatcher.set_benchmarking(true);
+    EXPECT_TRUE(dispatcher.benchmarking_enabled());
+}

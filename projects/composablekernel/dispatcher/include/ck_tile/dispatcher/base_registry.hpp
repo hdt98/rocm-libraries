@@ -160,6 +160,19 @@ class BaseRegistry
     [[nodiscard]] bool is_auto_export_enabled() const
     {
         return auto_export_enabled_.load(std::memory_order_acquire);
+        auto_export_enabled_     = true;
+    }
+
+    void disable_auto_export()
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto_export_enabled_ = false;
+    }
+
+    [[nodiscard]] bool is_auto_export_enabled() const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return auto_export_enabled_;
     }
 
     /// Call after registration to trigger auto-export if enabled.
@@ -169,6 +182,7 @@ class BaseRegistry
             return;
         std::lock_guard<std::mutex> lock(mutex_);
         if(auto_export_on_register_)
+        if(auto_export_enabled_ && auto_export_on_register_)
         {
             static_cast<Derived*>(this)->export_json_to_file(auto_export_path_, auto_export_stats_);
         }
@@ -190,6 +204,7 @@ class BaseRegistry
     std::string name_ = "default";
 
     std::atomic<bool> auto_export_enabled_{false};
+    bool auto_export_enabled_     = false;
     bool auto_export_on_register_ = true;
     bool auto_export_stats_       = true;
     std::string auto_export_path_;

@@ -583,3 +583,16 @@ struct fmha_bwd_traits
 };
 
 #endif // CK_TILE_FMHA_BWD_TYPES_FROM_EXAMPLE
+
+// ABI safety: when example headers ARE included (in generated kernel TUs),
+// verify that the upstream types have the same size as our fallback definitions
+// would produce. This catches silent struct drift between the dispatcher's
+// fallback types and the upstream example headers.
+#if defined(CK_TILE_FMHA_FWD_TYPES_FROM_EXAMPLE)
+static_assert(sizeof(fmha_fwd_traits) >= 8, "fmha_fwd_traits layout may have changed upstream");
+static_assert(sizeof(fmha_fwd_args) >= 64, "fmha_fwd_args layout may have changed upstream");
+#endif
+#if defined(CK_TILE_FMHA_BWD_TYPES_FROM_EXAMPLE)
+static_assert(sizeof(fmha_bwd_traits) >= 8, "fmha_bwd_traits layout may have changed upstream");
+static_assert(sizeof(fmha_bwd_args) >= 64, "fmha_bwd_args layout may have changed upstream");
+#endif

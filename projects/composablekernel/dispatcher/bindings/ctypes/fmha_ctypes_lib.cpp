@@ -23,12 +23,28 @@ static std::unique_ptr<FmhaRegistry> g_registry;
 static std::unique_ptr<FmhaDispatcher> g_dispatcher;
 static bool g_initialized = false;
 
-#define HIP_CHECK(call)        \
-    {                          \
-        hipError_t err = call; \
-        if(err != hipSuccess)  \
-            return -1;         \
+// Safe HIP check that sets rc and jumps to cleanup on failure.
+// All functions using this must have:  int rc = 0;  and a  cleanup:  label.
+#define HIP_CHECK(call)           \
+    do                            \
+    {                             \
+        hipError_t err_ = (call); \
+        if(err_ != hipSuccess)    \
+        {                         \
+            rc = -1;              \
+            goto cleanup;         \
+        }                         \
+    } while(0)
+
+// Helper to free a device pointer if non-null
+static inline void safe_hip_free(void*& ptr)
+{
+    if(ptr)
+    {
+        hipFree(ptr);
+        ptr = nullptr;
     }
+}
 
 extern "C" {
 
@@ -78,6 +94,7 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     if(!g_initialized)
         return -1;
 
+    int rc                = 0;
     const int64_t q_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * 2;
     const int64_t k_bytes = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * 2;
     const int64_t v_bytes = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * 2;
@@ -265,63 +282,37 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     catch(const std::exception& e)
     {
         fprintf(stderr, "FMHA_ERR: %s\n", e.what());
-        hipFree(q_dev);
-        hipFree(k_dev);
-        hipFree(v_dev);
-        hipFree(o_dev);
-        if(bias_dev)
-            hipFree(bias_dev);
-        if(lse_dev_buf)
-            hipFree(lse_dev_buf);
-        if(seqstart_q_dev)
-            hipFree(seqstart_q_dev);
-        if(seqstart_k_dev)
-            hipFree(seqstart_k_dev);
-        if(seqlen_k_dev)
-            hipFree(seqlen_k_dev);
-        return -2;
+        rc = -2;
+        goto cleanup;
     }
     catch(...)
     {
         fprintf(stderr, "FMHA_ERR: unknown\n");
-        hipFree(q_dev);
-        hipFree(k_dev);
-        hipFree(v_dev);
-        hipFree(o_dev);
-        if(bias_dev)
-            hipFree(bias_dev);
-        if(lse_dev_buf)
-            hipFree(lse_dev_buf);
-        if(seqstart_q_dev)
-            hipFree(seqstart_q_dev);
-        if(seqstart_k_dev)
-            hipFree(seqstart_k_dev);
-        if(seqlen_k_dev)
-            hipFree(seqlen_k_dev);
-        return -2;
+        rc = -2;
+        goto cleanup;
     }
 
-    HIP_CHECK(hipMemcpy(o_host, o_dev, o_bytes, hipMemcpyDeviceToHost));
-
-    hipFree(q_dev);
-    hipFree(k_dev);
-    hipFree(v_dev);
-    hipFree(o_dev);
-    if(bias_dev)
-        hipFree(bias_dev);
-    if(lse_dev_buf)
-        hipFree(lse_dev_buf);
-    if(seqstart_q_dev)
-        hipFree(seqstart_q_dev);
-    if(seqstart_k_dev)
-        hipFree(seqstart_k_dev);
-    if(seqlen_k_dev)
-        hipFree(seqlen_k_dev);
+    {
+        hipError_t cpy_err = hipMemcpy(o_host, o_dev, o_bytes, hipMemcpyDeviceToHost);
+        if(cpy_err != hipSuccess)
+            rc = -1;
+    }
 
     if(time_ms_out)
         *time_ms_out = elapsed;
 
-    return 0;
+cleanup:
+    safe_hip_free(q_dev);
+    safe_hip_free(k_dev);
+    safe_hip_free(v_dev);
+    safe_hip_free(o_dev);
+    safe_hip_free(bias_dev);
+    safe_hip_free(lse_dev_buf);
+    safe_hip_free(seqstart_q_dev);
+    safe_hip_free(seqstart_k_dev);
+    safe_hip_free(seqlen_k_dev);
+
+    return rc;
 }
 
 int fmha_dispatcher_run_bwd(const void* q_host,
@@ -346,6 +337,7 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     if(!g_initialized)
         return -1;
 
+    int rc                     = 0;
     const int64_t q_bytes      = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * 2;
     const int64_t k_bytes      = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * 2;
     const int64_t v_bytes      = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * 2;
@@ -482,40 +474,35 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     }
     catch(...)
     {
-        hipFree(q_dev);
-        hipFree(k_dev);
-        hipFree(v_dev);
-        hipFree(o_dev);
-        hipFree(lse_dev);
-        hipFree(do_dev);
-        hipFree(d_dev);
-        hipFree(dq_dev);
-        hipFree(dk_dev);
-        hipFree(dv_dev);
-        hipFree(dq_acc_dev);
-        return -2;
+        rc = -2;
+        goto bwd_cleanup;
     }
 
-    HIP_CHECK(hipMemcpy(dq_host, dq_dev, dq_bytes, hipMemcpyDeviceToHost));
-    HIP_CHECK(hipMemcpy(dk_host, dk_dev, dk_bytes, hipMemcpyDeviceToHost));
-    HIP_CHECK(hipMemcpy(dv_host, dv_dev, dv_bytes, hipMemcpyDeviceToHost));
-
-    hipFree(q_dev);
-    hipFree(k_dev);
-    hipFree(v_dev);
-    hipFree(o_dev);
-    hipFree(lse_dev);
-    hipFree(do_dev);
-    hipFree(d_dev);
-    hipFree(dq_dev);
-    hipFree(dk_dev);
-    hipFree(dv_dev);
-    hipFree(dq_acc_dev);
+    {
+        hipError_t e1 = hipMemcpy(dq_host, dq_dev, dq_bytes, hipMemcpyDeviceToHost);
+        hipError_t e2 = hipMemcpy(dk_host, dk_dev, dk_bytes, hipMemcpyDeviceToHost);
+        hipError_t e3 = hipMemcpy(dv_host, dv_dev, dv_bytes, hipMemcpyDeviceToHost);
+        if(e1 != hipSuccess || e2 != hipSuccess || e3 != hipSuccess)
+            rc = -1;
+    }
 
     if(time_ms_out)
         *time_ms_out = elapsed;
 
-    return 0;
+bwd_cleanup:
+    safe_hip_free(q_dev);
+    safe_hip_free(k_dev);
+    safe_hip_free(v_dev);
+    safe_hip_free(o_dev);
+    safe_hip_free(lse_dev);
+    safe_hip_free(do_dev);
+    safe_hip_free(d_dev);
+    safe_hip_free(dq_dev);
+    safe_hip_free(dk_dev);
+    safe_hip_free(dv_dev);
+    safe_hip_free(dq_acc_dev);
+
+    return rc;
 }
 
 int fmha_dispatcher_kernel_count()
