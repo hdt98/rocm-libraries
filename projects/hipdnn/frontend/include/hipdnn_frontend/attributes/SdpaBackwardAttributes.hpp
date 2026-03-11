@@ -601,5 +601,5 @@ public:
     }
 };
 
-typedef SdpaBackwardAttributes Sdpa_backward_attributes; // NOLINT(readability-identifier-naming)
+typedef SdpaBackwardAttributes SDPA_backward_attributes; // NOLINT(readability-identifier-naming)
 } // namespace hipdnn_frontend::graph
