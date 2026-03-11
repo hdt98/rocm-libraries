@@ -31,6 +31,7 @@
 #include <miopen/file_lock.hpp>
 #include <miopen/logger.hpp>
 
+#include <atomic>
 #include <chrono>
 #include <fstream>
 #include <functional>
@@ -46,23 +47,28 @@ namespace miopen {
 class FSLockFile
 {
 public:
-    FSLockFile() {}
-    FSLockFile(const fs::path& path_) : path(path_)
+    FSLockFile() : lock_held(false) {}
+    FSLockFile(const fs::path& path_) : lock_held(false), path(path_)
     {
-        lock_held     = false;
         lockfile_path = path.string() + ".fslock";
         unique_handle = lockfile_path.string() + "." + sysinfo::GetSystemHostname() + "." +
                         std::to_string(getpid());
     }
 
+    // Prevent copying and moving (atomic<bool> is not movable)
+    FSLockFile(const FSLockFile&) = delete;
+    FSLockFile& operator=(const FSLockFile&) = delete;
+    FSLockFile(FSLockFile&&) = delete;
+    FSLockFile& operator=(FSLockFile&&) = delete;
+
     bool timed_lock(const std::chrono::time_point<std::chrono::steady_clock>& abs_time)
     {
-        auto now      = std::chrono::system_clock::now();
+        auto now      = std::chrono::steady_clock::now();
         bool acquired = false;
         MIOPEN_LOG_I2("Attempting Lock < " << lockfile_path.string());
         while(!acquired && now < abs_time)
         {
-            now      = std::chrono::system_clock::now();
+            now      = std::chrono::steady_clock::now();
             acquired = try_lock_hardlink();
             if(!acquired)
             {
@@ -103,10 +109,18 @@ public:
     bool clear_stale_lock()
     {
         constexpr const auto timeout = std::chrono::milliseconds(20);
-        auto last_write_time         = fs::last_write_time(lockfile_path);
-        auto now                     = fs::file_time_type::clock::now();
+
+        // Check if lockfile exists before accessing it
+        std::error_code ec;
+        if(!fs::exists(lockfile_path, ec) || ec)
+            return false;
+
+        auto last_write_time = fs::last_write_time(lockfile_path, ec);
+        if(ec)
+            return false; // File was deleted between exists check and last_write_time
+
+        auto now = fs::file_time_type::clock::now();
         auto age = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_write_time);
-        static fs::file_time_type last_write_seen, now_at_write;
 
         if(now < last_write_time)
         {
@@ -115,7 +129,7 @@ public:
             if(last_write_seen != last_write_time)
             {
                 last_write_seen = last_write_time;
-                now_at_write = now;
+                now_at_write    = now;
             }
             age = std::chrono::duration_cast<std::chrono::milliseconds>(now - now_at_write);
         }
@@ -124,7 +138,9 @@ public:
         {
             MIOPEN_LOG_I2("Removing Stale Lock < " << lockfile_path.string()
                                                    << ", Age(ms): " << age.count());
-            fs::remove(lockfile_path);
+            std::error_code remove_ec;
+            fs::remove(lockfile_path, remove_ec);
+            // Return true even if remove failed - another process may have removed it
             return true;
         }
         return false;
@@ -136,7 +152,7 @@ public:
         MIOPEN_LOG_I2("Lock Refresh Active < " << unique_handle.string());
         auto last_refresh = fs::file_time_type::clock::now();
         auto age          = update_freq;
-        while(lock_held)
+        while(lock_held.load(std::memory_order_acquire))
         {
             if(age >= update_freq)
             {
@@ -148,6 +164,7 @@ public:
                                            << " time update failed. Terminating refresh."
                                            << "Error code: " << ec.value() << ". "
                                            << "Description: '" << ec.message() << "'");
+                    lock_held.store(false, std::memory_order_release);
                     return;
                 }
                 last_refresh = fs::file_time_type::clock::now();
@@ -168,14 +185,14 @@ public:
             if(!std::ofstream{unique_handle})
                 MIOPEN_THROW("Error creating file <" + unique_handle + "> for locking.");
         }
-        fs::permissions(unique_handle, FS_ENUM_PERMS_ALL);
+        fs::permissions(unique_handle, fs::perms::all);
 
         create_hard_link(unique_handle, lockfile_path, ec);
         if(ec.value() == 0)
         {
             if(fs::hard_link_count(unique_handle) == 2)
             {
-                lock_held      = true;
+                lock_held.store(true, std::memory_order_release);
                 refresh_thread = std::thread([this]() { this->refresh_lock(); });
                 return true;
             }
@@ -191,20 +208,36 @@ public:
     void unlock()
     {
         MIOPEN_LOG_I2("Unlock < " << lockfile_path.string());
-        lock_held = false;
-        fs::remove(lockfile_path);
-        fs::remove(unique_handle);
-        refresh_thread.join();
+        lock_held.store(false, std::memory_order_release);
+
+        // Only join if thread was started
+        if(refresh_thread.joinable())
+        {
+            refresh_thread.join();
+        }
+
+        // Handle errors in file removal
+        std::error_code ec1, ec2;
+        fs::remove(lockfile_path, ec1);
+        fs::remove(unique_handle, ec2);
+
+        if(ec1)
+            MIOPEN_LOG_W("Failed to remove lockfile: " << ec1.message());
+        if(ec2)
+            MIOPEN_LOG_W("Failed to remove unique handle: " << ec2.message());
     }
 
     fs::path get_unique_handle() { return unique_handle; }
 
 private:
-    bool lock_held;
+    std::atomic<bool> lock_held;
     fs::path path;
     fs::path lockfile_path;
     fs::path unique_handle;
     std::thread refresh_thread;
+    // Instance-specific state for clock desync handling
+    fs::file_time_type last_write_seen{};
+    fs::file_time_type now_at_write{};
 };
 
 MIOPEN_INTERNALS_EXPORT fs::path LockFilePath(const fs::path& filename_);
