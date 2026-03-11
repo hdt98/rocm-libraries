@@ -38,6 +38,7 @@ target_sources(rocroller
         "${CMAKE_CURRENT_SOURCE_DIR}/OrderMemory.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/OrderMultiplyNodes.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/PrefetchScale.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/RegisterUsage.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/RemapOutputTiles.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/RemoveDuplicates.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/RemoveImplicitScheduling.cpp"
