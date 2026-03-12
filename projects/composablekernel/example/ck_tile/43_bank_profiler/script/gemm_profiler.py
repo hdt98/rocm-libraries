@@ -33,7 +33,7 @@ def find_binary(build_dir, config):
     candidates = [
         os.path.join(build_dir, name),
         os.path.join(build_dir, "bin", name),
-        os.path.join(build_dir, "example", "ck_tile", "16_bank_profiler",
+        os.path.join(build_dir, "example", "ck_tile", "43_bank_profiler",
                      name),
     ]
     for c in candidates:
