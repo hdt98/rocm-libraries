@@ -19,8 +19,8 @@ For example, on Linux with a gfx950 GPU, install the ``amdrocm-core-dev7.12-gfx9
 System requirements
 ===================
 
-- An AMD GPU with ROCm support (see `ROCm compatibility matrix <https://rocm.docs.amd.com/en/7.12.0/compatibility/compatibility-matrix.html>`_)
-- Linux or Windows operating system (see `Install AMD ROCm <https://rocm.docs.amd.com/en/7.12.0/install/rocm.html>`_)
+- An AMD GPU with ROCm support (see `ROCm compatibility matrix <https://advanced-micro-devices-rocm-internal--692.com.readthedocs.build/en/692/compatibility/compatibility-matrix.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_)
+- Linux or Windows operating system (see `Install AMD ROCm <https://advanced-micro-devices-rocm-internal--692.com.readthedocs.build/en/692/install/rocm.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_)
 
 Dependencies
 ============
@@ -51,4 +51,4 @@ Required dependencies
 Install ROCm and hipDNN
 =======================
 
-Follow the instructions at `Install AMD ROCm <https://rocm.docs.amd.com/en/7.12.0/install/rocm.html>`_ to install ROCm, including hipDNN.
+Follow the instructions at `Install AMD ROCm <https://advanced-micro-devices-rocm-internal--692.com.readthedocs.build/en/692/install/rocm.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_ to install ROCm, including hipDNN.
