@@ -48,7 +48,8 @@ struct get_wgattr_num_access
 
 template <typename WarpGemmAttributeMfmaImpl_,
           WGAttrNumAccessEnum AttrNumAccessA_ = WGAttrNumAccessEnum::Single,
-          WGAttrNumAccessEnum AttrNumAccessB_ = AttrNumAccessA_>
+          WGAttrNumAccessEnum AttrNumAccessB_ = AttrNumAccessA_,
+          bool ForcePackNumAccess_            = false>
 struct WarpGemmAttributeMfma
 {
     using Impl                            = remove_cvref_t<WarpGemmAttributeMfmaImpl_>;
@@ -57,7 +58,8 @@ struct WarpGemmAttributeMfma
     static constexpr auto AttrNumAccessB  = AttrNumAccessB_;
     static constexpr auto AttrNumAccessBV = get_wgattr_num_access<AttrNumAccessB>::value;
 
-    static constexpr bool UsePackNumAccess = AttrNumAccessA != AttrNumAccessB;
+    static constexpr bool UsePackNumAccess =
+        ForcePackNumAccess_ || (AttrNumAccessA != AttrNumAccessB);
 
     using ADataType = typename Impl::ADataType;
     using BDataType = typename Impl::BDataType;
@@ -187,7 +189,8 @@ struct WarpGemmAttributeMfma
 template <typename WarpGemmAttributeMfmaImpl_,
           index_t kKIter,
           WGAttrNumAccessEnum AttrNumAccessA_ = WGAttrNumAccessEnum::Single,
-          WGAttrNumAccessEnum AttrNumAccessB_ = AttrNumAccessA_>
+          WGAttrNumAccessEnum AttrNumAccessB_ = AttrNumAccessA_,
+          bool ForcePackNumAccess_            = false>
 struct WarpGemmAttributeMfmaIterateK
 {
     static_assert(kKIter > 0, "wrong!");
@@ -198,7 +201,8 @@ struct WarpGemmAttributeMfmaIterateK
     static constexpr auto AttrNumAccessB  = AttrNumAccessB_;
     static constexpr auto AttrNumAccessBV = get_wgattr_num_access<AttrNumAccessB>::value;
 
-    static constexpr bool UsePackNumAccess = AttrNumAccessA != AttrNumAccessB;
+    static constexpr bool UsePackNumAccess =
+        ForcePackNumAccess_ || (AttrNumAccessA != AttrNumAccessB);
 
     using ADataType = typename Impl::ADataType;
     using BDataType = typename Impl::BDataType;

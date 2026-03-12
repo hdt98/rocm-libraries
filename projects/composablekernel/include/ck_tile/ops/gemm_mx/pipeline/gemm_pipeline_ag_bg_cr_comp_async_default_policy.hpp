@@ -5,6 +5,7 @@
 
 #include "ck_tile/core.hpp"
 #include "ck_tile/core/arch/arch.hpp"
+#include "ck_tile/core/numeric/float8.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm_dispatcher.hpp"
 #include "ck_tile/ops/common/tensor_layout.hpp"
 #include "ck_tile/ops/gemm/pipeline/gemm_universal_pipeline_ag_bg_cr_policy.hpp"
@@ -105,8 +106,9 @@ struct MXGemmPipelineAgBgCrCompAsyncDefaultPolicy
         using BDataType = typename Problem::BDataType;
         using CDataType = typename Problem::CDataType;
 
+        constexpr auto APackedSize = numeric_traits<ADataType>::PackedSize;
         constexpr index_t vector_size =
-            DS_READ_TR_SIZE() / sizeof(ADataType);
+            DS_READ_TR_SIZE() * APackedSize / sizeof(ADataType);
         constexpr index_t thread_elements =
             WarpTile::at(I1) * WarpTile::at(I2) / get_warp_size();
         constexpr auto wg_attr_num_access =
@@ -120,6 +122,7 @@ struct MXGemmPipelineAgBgCrCompAsyncDefaultPolicy
                 ? WGAttrNumAccessEnum::Quad
                 : WGAttrNumAccessEnum::Invalid;
 
+        constexpr bool force_pack = !std::is_same_v<ADataType, fp8_t> && !std::is_same_v<BDataType, fp8_t>;
         using WarpGemm = WarpGemmDispatcher<ADataType,
                                             BDataType,
                                             CDataType, // AccDataType
@@ -129,7 +132,9 @@ struct MXGemmPipelineAgBgCrCompAsyncDefaultPolicy
                                             Problem::TransposeC,
                                             false,
                                             false,
-                                            wg_attr_num_access>;
+                                            wg_attr_num_access,
+                                            wg_attr_num_access,
+                                            force_pack>;
 
         using BlockGemmPolicy = BlockGemmARegBRegCRegV1CustomPolicy<ADataType,
                                                                     BDataType,
