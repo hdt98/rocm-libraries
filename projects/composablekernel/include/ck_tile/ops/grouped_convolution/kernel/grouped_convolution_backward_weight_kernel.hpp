@@ -574,7 +574,10 @@ struct GroupedConvolutionBackwardWeightKernel
                                    kargs.tile_partitioner.get_flags_buffer_size() +
                                    cta_idx * c_block_tile_buffer_size;
 
-        const auto& partial_tensor_view = make_naive_tensor_view<address_space_enum::global>(
+        const auto& partial_tensor_view = make_naive_tensor_view<
+            address_space_enum::global,
+            memory_operation_enum::set,
+            StreamKCoherency<decltype(core::arch::get_compiler_target())>::BUFFER_COHERENCE>(
             static_cast<DataType*>(partial_buffer_ptr),
             make_tuple(number<TilePartitioner::MPerBlock>{}, number<TilePartitioner::NPerBlock>{}),
             make_tuple(TilePartitioner::NPerBlock, 1),
@@ -616,8 +619,7 @@ struct GroupedConvolutionBackwardWeightKernel
         auto* sk_flags_ptr = static_cast<index_t*>(kargs.workspace_ptr);
         index_t offset     = cta_idx * sizeof(index_t);
 
-        asm volatile("s_mov_b32 m0, %2\n\t"
-                     "s_store_dword %0, %1, %2 glc\n\t"
+        asm volatile("s_store_dword %0, %1, %2 glc\n\t"
                      "s_waitcnt lgkmcnt(0)"
                      :
                      : "s"(1), "s"(sk_flags_ptr), "s"(offset)
@@ -633,8 +635,7 @@ struct GroupedConvolutionBackwardWeightKernel
 
         do
         {
-            asm volatile("s_mov_b32 m0, %2\n\t"
-                         "s_load_dword %0, %1, %2 glc\n\t"
+            asm volatile("s_load_dword %0, %1, %2 glc\n\t"
                          "s_waitcnt lgkmcnt(0)"
                          : "=s"(result)
                          : "s"(sk_flags_ptr), "s"(offset)
@@ -1182,6 +1183,9 @@ struct GroupedConvolutionBackwardWeightKernel
     {
         if constexpr(IsStreamK)
         {
+            static_assert(NumDTensor == 0,
+                          "D tensor per-group offsets not implemented for StreamK path");
+
             // --- StreamK execution path ---
             __shared__ char smem_ptr[GetSmemSize()];
 
@@ -1198,7 +1202,9 @@ struct GroupedConvolutionBackwardWeightKernel
             const InDataType* b_ptr = static_cast<const InDataType*>(kargs.in_ptr) + group_offset_b;
             WeiDataType* c_ptr      = static_cast<WeiDataType*>(kargs.wei_ptr) + group_offset_c;
 
-            // Offset workspace per group so groups don't interfere
+            // Offset workspace per group so groups don't interfere.
+            // Safe to mutate kargs: on GPU each workgroup operates on its own
+            // register-local copy of the kernel arguments.
             const auto per_group_ws_size =
                 kargs.tile_partitioner.get_workspace_size(sizeof(AccDataType));
             kargs.workspace_ptr =
@@ -1340,6 +1346,9 @@ struct GroupedConvolutionBackwardWeightKernel
 
                     for(;; stride <<= 1)
                     {
+                        // Partner index is a *global* SK CTA index. This works because
+                        // CTAs contributing to the same tile always have contiguous global
+                        // SK CTA indices (guaranteed by the partitioner's iteration assignment).
                         const index_t partner_cta_idx =
                             amd_wave_read_first_lane(sk_cta_idx + stride);
                         const index_t partner_start_iter = amd_wave_read_first_lane(

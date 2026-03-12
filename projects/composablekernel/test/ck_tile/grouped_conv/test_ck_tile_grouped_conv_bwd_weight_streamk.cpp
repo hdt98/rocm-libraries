@@ -364,7 +364,35 @@ static bool run_streamk_vs_splitk_test(index_t G,
     weight_ref_dev.FromDevice(weight_ref.data());
     weight_streamk_dev.FromDevice(weight_streamk.data());
 
-    return check_err(weight_streamk, weight_ref, "StreamK vs SplitK mismatch", 1e-3, 1e-3);
+    // Compute GemmK = N * product(output_spatial_lengths) for bwd weight
+    const index_t GemmK = N * std::accumulate(conv_param.output_spatial_lengths_.begin(),
+                                              conv_param.output_spatial_lengths_.end(),
+                                              static_cast<index_t>(1),
+                                              std::multiplies<index_t>());
+
+    // Max accumulated value calibrates atol to the output's ULP scale.
+    const float max_accumulated_value =
+        *std::max_element(weight_ref.mData.begin(), weight_ref.mData.end());
+
+    // Tolerance follows the calculate_rtol_atol pattern from conv examples:
+    // (1) GEMM accumulation error: fp16 compute, fp16 output, f32 accumulator
+    // (2) Reduction error: accounts for fp16 output quantization differences
+    //     when two f32 results (from different accumulation orders) round to fp16
+    using ComputeType        = PrecType;
+    using AccType            = float;
+    constexpr index_t kbatch = 1;
+    const auto rtol_gemm =
+        get_relative_threshold<ComputeType, PrecType, AccType>(integer_divide_ceil(GemmK, kbatch));
+    const auto atol_gemm = get_absolute_threshold<ComputeType, PrecType, AccType>(
+        max_accumulated_value / kbatch, integer_divide_ceil(GemmK, kbatch));
+    const auto rtol_reduction = get_relative_threshold<PrecType, PrecType, PrecType>(kbatch);
+    const auto atol_reduction =
+        get_absolute_threshold<PrecType, PrecType, PrecType>(max_accumulated_value, kbatch);
+
+    const double rtol = std::max(rtol_gemm, rtol_reduction);
+    const double atol = std::max(atol_gemm, atol_reduction);
+
+    return check_err(weight_streamk, weight_ref, "StreamK vs SplitK mismatch", rtol, atol);
 }
 
 // Linear Reduction
