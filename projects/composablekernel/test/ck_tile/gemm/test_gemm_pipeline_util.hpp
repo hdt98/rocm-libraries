@@ -106,6 +106,8 @@ struct GemmPipelineTypeSelector<GemmPipelineType::CompAsyncEightWaves, Problem>
 
     static constexpr auto GetName() { return "GemmPipelineAgBgCrCompAsyncEightWaves"; }
 };
+template <typename T>
+using has_async = decltype(T::Async);
 
 template <typename Tuple, typename Derived>
 class TestCkTileGemmPipeline : public ::testing::Test
@@ -174,6 +176,17 @@ class TestCkTileGemmPipeline : public ::testing::Test
         using TilePartitioner = ck_tile::
             GemmSpatiallyLocalTilePartitioner<GemmShape, TileParitionerGroupNum, TileParitionerM01>;
 
+        constexpr bool IsAsync_v = [] {
+            if constexpr(ck_tile::is_detected<has_async, Derived>{})
+            {
+                return Derived::Async;
+            }
+            else
+            {
+                return false;
+            }
+        }();
+
         using GemmUniversalTraits = ck_tile::TileGemmUniversalTraits<kPadM,
                                                                      kPadN,
                                                                      kPadK,
@@ -185,7 +198,8 @@ class TestCkTileGemmPipeline : public ::testing::Test
                                                                      StructuredSparsity,
                                                                      Persistent,
                                                                      NumWaveGroup,
-                                                                     preshuffle>;
+                                                                     preshuffle,
+                                                                     IsAsync_v>;
 
         using UniversalGemmProblem =
             ck_tile::UniversalGemmPipelineProblem<ADataTypeBuf,
