@@ -104,13 +104,15 @@ static void reference_conv2d(const std::vector<float>& I,
                             }
 }
 
-// Run the im2win GEMM using the B descriptor for weights, but computing
-// the A (input) values directly via the logical (n, c, ho, wo, y, x) indices.
-// This avoids relying on calculate_offset for padded positions (which return
-// aliased addresses rather than an out-of-bounds flag in the CK descriptor
-// system — bounds checking is normally done by the tile window at load time).
+// Run the true im2win GEMM and compare with reference.
 //
-// The B descriptor is verified via calculate_offset since weight has no padding.
+// True im2win GEMM shape:
+//   A[M=K, K_gemm=C×Y×X]    ← weight   (no padding, use calculate_offset)
+//   B[N=N×Ho×Wo, K_gemm]    ← input    (padded, use logical index arithmetic)
+//   C[M=K, N=N×Ho×Wo]       ← output
+//
+// C[k, n] = Σ_kg  A[k, kg] × B[n, kg]
+//         = Σ_{c,y,x}  W[k,c,y,x] × I[n→(batch,ho,wo), c, ho*Sy+y*Dy-LPH, wo*Sx+x*Dx-LPW]
 template <typename Transformer>
 static bool run_im2win_gemm_and_compare(const Transformer& tr,
                                         const std::vector<float>& I,
@@ -122,53 +124,52 @@ static bool run_im2win_gemm_and_compare(const Transformer& tr,
                                         int Wo,
                                         float tol = 1e-4f)
 {
-    const int M      = tr.GetGemmM(); // N × Ho × Wo
-    const int N_gemm = tr.GetGemmN(); // K
+    const int M      = tr.GetGemmM(); // K (output channels)
+    const int N_gemm = tr.GetGemmN(); // N × Ho × Wo (spatial)
     const int K_gemm = tr.GetGemmK(); // C × Y × X
 
-    const int C  = tr.C_;
-    const int Hi = tr.Hi_;
-    const int Wi = tr.Wi_;
-    const int Y  = tr.Y_;
-    const int X  = tr.X_;
-    const int Sy = tr.ConvStrideH_;
-    const int Sx = tr.ConvStrideW_;
-    const int Dy = tr.ConvDilationH_;
-    const int Dx = tr.ConvDilationW_;
+    const int C   = tr.C_;
+    const int Hi  = tr.Hi_;
+    const int Wi  = tr.Wi_;
+    const int Y   = tr.Y_;
+    const int X   = tr.X_;
+    const int Sy  = tr.ConvStrideH_;
+    const int Sx  = tr.ConvStrideW_;
+    const int Dy  = tr.ConvDilationH_;
+    const int Dx  = tr.ConvDilationW_;
     const int LPH = tr.InLeftPadH_;
     const int LPW = tr.InLeftPadW_;
 
-    // Verify descriptor GEMM dimensions.
-    auto a_desc = tr.template MakeADescriptor_M_K<tensor_layout::convolution::GNCHW>();
-    auto b_desc = tr.template MakeBDescriptor_N_K<tensor_layout::convolution::GKCYX>();
+    // Check descriptors match the true im2win shape.
+    auto a_desc = tr.template MakeADescriptor_M_K<tensor_layout::convolution::GKCYX>();
+    auto b_desc = tr.template MakeBDescriptor_N_K<tensor_layout::convolution::GNCHW>();
     if(a_desc.get_length(number<0>{}) != M || a_desc.get_length(number<1>{}) != K_gemm)
         return false;
     if(b_desc.get_length(number<0>{}) != N_gemm || b_desc.get_length(number<1>{}) != K_gemm)
         return false;
 
-    // Also verify that the B descriptor offsets match the expected W[K,C,Y,X] physical layout.
-    for(int ng = 0; ng < N_gemm; ++ng)
+    // Verify A descriptor (weight, no padding): A[k, kg] = W[k, c(kg), y(kg), x(kg)].
+    for(int k = 0; k < K; ++k)
         for(int kg = 0; kg < K_gemm; ++kg)
         {
             const int xx = kg % X, yy = (kg / X) % Y, cc = kg / (Y * X);
-            const int expected = ((ng * C + cc) * Y + yy) * X + xx;
-            const auto got = b_desc.calculate_offset(make_tuple(index_t(ng), index_t(kg)));
+            const int expected = ((k * C + cc) * Y + yy) * X + xx;
+            const auto got = a_desc.calculate_offset(make_tuple(index_t(k), index_t(kg)));
             if(static_cast<int>(got) != expected)
                 return false;
         }
 
-    // C[M, N_gemm] = A × B  computed using logical indices.
-    // K_gemm ordering: kg = c*(Y*X) + y*X + x  (C outermost, matches merge order).
-    // M ordering:      m  = n*(Ho*Wo) + ho*Wo + wo.
+    // C[M=K, N=N×Ho×Wo] computed via true im2win GEMM.
+    // A[k, kg] is loaded via calculate_offset (no padding).
+    // B[n, kg] is computed via direct logical indexing (input has padding).
     std::vector<float> C_out(M * N_gemm, 0.f);
 
-    for(int n = 0; n < N; ++n)
-        for(int ho = 0; ho < Ho; ++ho)
-            for(int wo = 0; wo < Wo; ++wo)
-            {
-                const int m = n * Ho * Wo + ho * Wo + wo;
-                for(int k = 0; k < K; ++k)
+    for(int k = 0; k < K; ++k)
+        for(int n = 0; n < N; ++n)
+            for(int ho = 0; ho < Ho; ++ho)
+                for(int wo = 0; wo < Wo; ++wo)
                 {
+                    const int col = n * Ho * Wo + ho * Wo + wo; // N index
                     float acc = 0.f;
                     for(int c = 0; c < C; ++c)
                         for(int y = 0; y < Y; ++y)
@@ -176,35 +177,35 @@ static bool run_im2win_gemm_and_compare(const Transformer& tr,
                             {
                                 const int hi = ho * Sy + y * Dy - LPH;
                                 const int wi = wo * Sx + x * Dx - LPW;
-                                const float a_val =
+                                const int kg = c * (Y * X) + y * X + x;
+
+                                // A[k, kg] from weight descriptor.
+                                const float a_val = W_data[
+                                    a_desc.calculate_offset(make_tuple(index_t(k), index_t(kg)))];
+
+                                // B[col, kg] from input via logical indices (handles padding).
+                                const float b_val =
                                     (hi >= 0 && hi < Hi && wi >= 0 && wi < Wi)
                                         ? I[idx_nchw(n, c, hi, wi, C, Hi, Wi)]
                                         : 0.f;
-                                const int kg = c * (Y * X) + y * X + x;
-                                const auto b_off =
-                                    b_desc.calculate_offset(make_tuple(index_t(k), index_t(kg)));
-                                acc += a_val * W_data[b_off];
-                            }
-                    C_out[m * N_gemm + k] = acc;
-                }
-            }
 
-    // Compare C_out[m, n_g] with O_ref[n, k, ho, wo] reshaped.
-    // The M dimension encodes (n, ho, wo) in row-major order:
-    //   m = n * Ho * Wo + ho * Wo + wo,  n_g = k
+                                acc += a_val * b_val;
+                            }
+                    C_out[k * N_gemm + col] = acc;
+                }
+
+    // Compare C_out[k, n*Ho*Wo+ho*Wo+wo] with O_ref[n, k, ho, wo].
     bool ok = true;
-    for(int n = 0; n < N; ++n)
-        for(int k = 0; k < K; ++k)
+    for(int k = 0; k < K; ++k)
+        for(int n = 0; n < N; ++n)
             for(int ho = 0; ho < Ho; ++ho)
                 for(int wo = 0; wo < Wo; ++wo)
                 {
-                    int m   = n * Ho * Wo + ho * Wo + wo;
-                    float got  = C_out[m * N_gemm + k];
+                    const int col  = n * Ho * Wo + ho * Wo + wo;
+                    float got  = C_out[k * N_gemm + col];
                     float want = O_ref[idx_nkhw(n, k, ho, wo, K, Ho, Wo)];
                     if(std::abs(got - want) > tol)
-                    {
                         ok = false;
-                    }
                 }
     return ok;
 }
@@ -248,13 +249,14 @@ TEST(TransformConvFwdToIm2win, GemmDimensions)
 
     Tr tr{a,b,c,s,d,lp,rp};
 
-    EXPECT_EQ(tr.GetGemmM(), N * Ho * Wo);
-    EXPECT_EQ(tr.GetGemmN(), K);
+    // True im2win: M=K, N=N×Ho×Wo (transposed vs im2col)
+    EXPECT_EQ(tr.GetGemmM(), K);           // output channels → M
+    EXPECT_EQ(tr.GetGemmN(), N * Ho * Wo); // spatial positions → N
     EXPECT_EQ(tr.GetGemmK(), C * Y * X);
     EXPECT_EQ(tr.GetGemmBatch(), G);
-    EXPECT_EQ(tr.GetGroupStrideA(), N * C * Hi * Wi);   // elements per group in I[G,N,C,Hi,Wi]
-    EXPECT_EQ(tr.GetGroupStrideB(), K * C * Y * X);     // elements per group in W[G,K,C,Y,X]
-    EXPECT_EQ(tr.GetGroupStrideC(), N * K * Ho * Wo);   // elements per group in O[G,N,K,Ho,Wo]
+    EXPECT_EQ(tr.GetGroupStrideA(), K * C * Y * X);          // weight per group (A=weight)
+    EXPECT_EQ(tr.GetGroupStrideB(), N * C * Hi * Wi);        // input per group  (B=input)
+    EXPECT_EQ(tr.GetGroupStrideC(), static_cast<long_index_t>(K)); // NHWGK: stride(G)=K
 }
 
 // ── 2. Group stride queries with G=32 (primary use case) ──────────────
@@ -270,16 +272,17 @@ TEST(TransformConvFwdToIm2win, GroupStridesPrimaryUseCase)
 
     EXPECT_EQ(tr.GetGemmBatch(), G);
 
-    // Each group's slice in the full [G, N, C, Hi, Wi] tensor.
-    EXPECT_EQ(tr.GetGroupStrideA(), static_cast<long_index_t>(N) * C * Hi * Wi);
-    // Each group's slice in [G, K, C, Y, X].
-    EXPECT_EQ(tr.GetGroupStrideB(), static_cast<long_index_t>(K) * C * Y * X);
-    // Each group's slice in [G, N, K, Ho, Wo].
-    EXPECT_EQ(tr.GetGroupStrideC(), static_cast<long_index_t>(N) * K * Ho * Wo);
+    // True im2win: A=weight, B=input, so strides are swapped vs old code.
+    // Weight per group in [G, K, C, Y, X].
+    EXPECT_EQ(tr.GetGroupStrideA(), static_cast<long_index_t>(K) * C * Y * X);
+    // Input per group in [G, N, C, Hi, Wi].
+    EXPECT_EQ(tr.GetGroupStrideB(), static_cast<long_index_t>(N) * C * Hi * Wi);
+    // Output per group in NHWGK: stride(G) = K.
+    EXPECT_EQ(tr.GetGroupStrideC(), static_cast<long_index_t>(K));
 
-    // GemmBatch × group_stride_a should equal the total input element count.
+    // GemmBatch × weight-group-stride = total weight elements.
     EXPECT_EQ(tr.GetGemmBatch() * tr.GetGroupStrideA(),
-              static_cast<long_index_t>(G) * N * C * Hi * Wi);
+              static_cast<long_index_t>(G) * K * C * Y * X);
 }
 
 // ── 2. Default specialisation, 3×3, unit stride/dilation, pad=1 ──────
@@ -433,7 +436,8 @@ TEST(TransformConvFwdToIm2win, MultiBatch)
 
     Tr tr{a,b,c,s,d,lp,rp};
 
-    EXPECT_EQ(tr.GetGemmM(), N * Ho * Wo);
+    EXPECT_EQ(tr.GetGemmM(), K);           // true im2win: M=K
+    EXPECT_EQ(tr.GetGemmN(), N * Ho * Wo); // true im2win: N=N×Ho×Wo
 
     std::vector<float> I(N*C*Hi*Wi), Wt(K*C*Y*X), O_ref(N*K*Ho*Wo);
     for(int i = 0; i < static_cast<int>(I.size()); ++i) I[i] = float(i % 11 + 1);
@@ -510,8 +514,8 @@ TEST(TransformConvFwdToIm2win, SmallChannelsTargetCase)
 
     Tr tr{a,b,c,s,d,lp,rp};
 
-    EXPECT_EQ(tr.GetGemmM(), N * Ho * Wo);   // 64
-    EXPECT_EQ(tr.GetGemmN(), K);              // 8
+    EXPECT_EQ(tr.GetGemmM(), K);              // 8  (true im2win: M=K)
+    EXPECT_EQ(tr.GetGemmN(), N * Ho * Wo);   // 64 (true im2win: N=N×Ho×Wo)
     EXPECT_EQ(tr.GetGemmK(), C * Y * X);     // 72
 
     std::vector<float> I(N*C*Hi*Wi), Wt(K*C*Y*X), O_ref(N*K*Ho*Wo);
@@ -540,7 +544,8 @@ TEST(TransformConvFwdToIm2win, CDescriptorShape)
 
     Tr tr{a,b,c,s,d,lp,rp};
 
-    auto c_desc = tr.template MakeCDescriptor_M_N<tensor_layout::convolution::GNKHW>();
-    EXPECT_EQ(c_desc.get_length(number<0>{}), N * Ho * Wo);
-    EXPECT_EQ(c_desc.get_length(number<1>{}), K);
+    // True im2win C descriptor: [M=K, N=N×Ho×Wo] in NHWGK layout.
+    auto c_desc = tr.template MakeCDescriptor_M_N<tensor_layout::convolution::NHWGK>();
+    EXPECT_EQ(c_desc.get_length(number<0>{}), K);          // M = K
+    EXPECT_EQ(c_desc.get_length(number<1>{}), N * Ho * Wo); // N = spatial
 }

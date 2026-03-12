@@ -61,6 +61,12 @@ from typing import Optional
 # ── Config registry ──────────────────────────────────────────────────────────
 # Must stay in sync with im2win_conv_configs.hpp and CMakeLists.txt.
 ALL_CONFIGS: list[str] = [
+    # True im2win (M=K, N=N×Ho×Wo) — correct algorithm
+    "Ti_M4N256K64",
+    "Ti_M4N128K64",
+    "Ti_M8N128K64",
+    "Ti_M16N64K64",
+    # Old-shape configs (M=N×Ho×Wo, N=K) — kept for comparison
     "CV3_M16N64K64",
     "CV3_M64N64K64",
     "CV3_M64N32K64",

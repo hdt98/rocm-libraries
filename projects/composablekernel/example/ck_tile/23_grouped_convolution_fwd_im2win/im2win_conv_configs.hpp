@@ -107,6 +107,108 @@ struct Im2winConvConfigBase
 //   GemmM = N×Ho×Wo,  GemmN = K (small!),  GemmK = C×Y×X
 // ══════════════════════════════════════════════════════════════════════
 
+// ══════════════════════════════════════════════════════════════════════
+// True im2win configs  (M = K, N = N×Ho×Wo)
+//
+// In true im2win the GEMM shape is:
+//   A[M=K, K_gemm=C×Y×X]   ← weight   (small, ~9 KB for G=32,K=4,C=4,3×3)
+//   B[N=N×Ho×Wo, K_gemm]   ← input    (large, sliding window)
+//   C[M=K, N=N×Ho×Wo]      ← output   (K unit-stride in NHWGK)
+//
+// With K=4 the WarpGemmMfmaF16F16F32M4N64K16 instruction matches M=K
+// exactly — zero M-dimension waste.
+// ══════════════════════════════════════════════════════════════════════
+
+// ── Config T0: True im2win, M=4 (K=4), N=256, Memory pipeline
+// WarpGemmMfmaF16F16F32M4N64K16: M_WT=4, N_WT=64.
+// M_Warp=1, N_Warp=4 → 256 threads, N_Tile=256.
+// Optimal for K=4 (zero M waste, large N tiles).
+// ComputeV3 pipeline cannot handle M_Tile=4 (internal div-by-zero constraint),
+// so we use the Memory pipeline which supports arbitrary small M tiles.
+template <typename PrecType>
+struct Im2winConfig_Ti_M4N256K64 : public Im2winConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 4;
+    static constexpr ck_tile::index_t N_Tile = 256;
+    static constexpr ck_tile::index_t K_Tile = 128 / sizeof(PrecType);
+
+    static constexpr ck_tile::index_t M_Warp = 1;
+    static constexpr ck_tile::index_t N_Warp = 4;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 4;   // 4×64×16 MFMA
+    static constexpr ck_tile::index_t N_Warp_Tile = 64;
+    static constexpr ck_tile::index_t K_Warp_Tile = 16;
+
+    static constexpr ck_tile::GemmPipeline         Pipeline  = ck_tile::GemmPipeline::MEMORY;
+    static constexpr ck_tile::GemmPipelineScheduler Scheduler =
+        ck_tile::GemmPipelineScheduler::Intrawave;
+};
+
+// ── Config T1: True im2win, M=4 (K=4), N=128 — smaller N tile
+template <typename PrecType>
+struct Im2winConfig_Ti_M4N128K64 : public Im2winConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 4;
+    static constexpr ck_tile::index_t N_Tile = 128;
+    static constexpr ck_tile::index_t K_Tile = 128 / sizeof(PrecType);
+
+    static constexpr ck_tile::index_t M_Warp = 1;
+    static constexpr ck_tile::index_t N_Warp = 2;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 4;
+    static constexpr ck_tile::index_t N_Warp_Tile = 64;
+    static constexpr ck_tile::index_t K_Warp_Tile = 16;
+
+    static constexpr ck_tile::GemmPipeline         Pipeline  = ck_tile::GemmPipeline::MEMORY;
+    static constexpr ck_tile::GemmPipelineScheduler Scheduler =
+        ck_tile::GemmPipelineScheduler::Intrawave;
+};
+
+// ── Config T2: True im2win, M=8 (K=8), N=128 — for K=8 problems
+template <typename PrecType>
+struct Im2winConfig_Ti_M8N128K64 : public Im2winConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 8;
+    static constexpr ck_tile::index_t N_Tile = 128;
+    static constexpr ck_tile::index_t K_Tile = 128 / sizeof(PrecType);
+
+    static constexpr ck_tile::index_t M_Warp = 2;
+    static constexpr ck_tile::index_t N_Warp = 2;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 4;
+    static constexpr ck_tile::index_t N_Warp_Tile = 64;
+    static constexpr ck_tile::index_t K_Warp_Tile = 16;
+
+    static constexpr ck_tile::GemmPipeline         Pipeline  = ck_tile::GemmPipeline::MEMORY;
+    static constexpr ck_tile::GemmPipelineScheduler Scheduler =
+        ck_tile::GemmPipelineScheduler::Intrawave;
+};
+
+// ── Config T3: True im2win, M=16 (K=16), N=64 — for K=16 problems
+// M_Tile=16 is large enough for CV3 pipeline.
+template <typename PrecType>
+struct Im2winConfig_Ti_M16N64K64 : public Im2winConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 16;
+    static constexpr ck_tile::index_t N_Tile = 64;
+    static constexpr ck_tile::index_t K_Tile = 64;
+
+    static constexpr ck_tile::index_t M_Warp = 4;
+    static constexpr ck_tile::index_t N_Warp = 1;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 4;
+    static constexpr ck_tile::index_t N_Warp_Tile = 64;
+    static constexpr ck_tile::index_t K_Warp_Tile = 16;
+
+    static constexpr ck_tile::GemmPipeline         Pipeline  = ck_tile::GemmPipeline::MEMORY;
+    static constexpr ck_tile::GemmPipelineScheduler Scheduler =
+        ck_tile::GemmPipelineScheduler::Intrawave;
+};
+
 // ── Config 1: ComputeV3, matches ConvConfigComputeV3 from the existing example
 // Tile 16×64×64, 1×4 warps, warp tile 16×16×32.
 // Good balance for small K (K_tile=64 >> K in practice, kPadN handles remainder).
@@ -512,7 +614,17 @@ struct Im2winConfig_CV3_M64N16K64_Gm32 : public Im2winConvConfigBase
 #define IM2WIN_CONFIG_ID 0   // default: Config 0 (CV3_M16N64K64)
 #endif
 
-#if   IM2WIN_CONFIG_ID == 0
+// True im2win configs (prefix Ti_)
+#if   IM2WIN_CONFIG_ID == -4
+template <typename P> using ActiveIm2winConfig = Im2winConfig_Ti_M16N64K64<P>;
+#elif IM2WIN_CONFIG_ID == -3
+template <typename P> using ActiveIm2winConfig = Im2winConfig_Ti_M8N128K64<P>;
+#elif IM2WIN_CONFIG_ID == -2
+template <typename P> using ActiveIm2winConfig = Im2winConfig_Ti_M4N128K64<P>;
+#elif IM2WIN_CONFIG_ID == -1
+template <typename P> using ActiveIm2winConfig = Im2winConfig_Ti_M4N256K64<P>;
+// Old (wrong-shape) im2win configs kept for comparison
+#elif IM2WIN_CONFIG_ID == 0
 template <typename P> using ActiveIm2winConfig = Im2winConfig_CV3_M16N64K64<P>;
 #elif IM2WIN_CONFIG_ID == 1
 template <typename P> using ActiveIm2winConfig = Im2winConfig_CV3_M64N64K64<P>;

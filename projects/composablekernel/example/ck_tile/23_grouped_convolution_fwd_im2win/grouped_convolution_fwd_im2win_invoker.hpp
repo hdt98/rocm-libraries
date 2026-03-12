@@ -85,9 +85,10 @@ struct GroupedConvolutionFwdIm2winInvoker
             GroupedConvTraitsType::FixedGemmParams::Persistent,
             ConvConfig::NumWaveGroups>;
 
+        // True im2win: A = weight (WeiDataType), B = input (InDataType).
         using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<
-            InDataType,
             WeiDataType,
+            InDataType,
             AccDataType,
             GemmShape,
             GemmUniversalTraits,

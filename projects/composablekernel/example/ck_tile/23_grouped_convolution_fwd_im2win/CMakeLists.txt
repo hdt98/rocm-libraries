@@ -12,8 +12,16 @@ if(GPU_TARGETS MATCHES "gfx94|gfx95")
     # ── Config registry ──────────────────────────────────────────────────────
     # Parallel lists: IM2WIN_CONFIG_IDS[i] ↔ IM2WIN_CONFIG_NAMES[i]
     # IM2WIN_CONFIG_ID matches the #if branch in im2win_conv_configs.hpp.
-    set(IM2WIN_CONFIG_IDS   0  1  2  3  4  5  6  7  8  9  10  11  12  13  14  15  16  17)
+    # True im2win configs use negative IDs (IM2WIN_CONFIG_ID < 0)
+    # CMake does not allow negative values in lists, so pass them as strings.
+    set(IM2WIN_CONFIG_IDS
+        -4 -3 -2 -1
+        0  1  2  3  4  5  6  7  8  9  10  11  12  13  14  15  16  17)
     set(IM2WIN_CONFIG_NAMES
+        Ti_M16N64K64
+        Ti_M8N128K64
+        Ti_M4N128K64
+        Ti_M4N256K64
         CV3_M16N64K64
         CV3_M64N64K64
         CV3_M64N32K64

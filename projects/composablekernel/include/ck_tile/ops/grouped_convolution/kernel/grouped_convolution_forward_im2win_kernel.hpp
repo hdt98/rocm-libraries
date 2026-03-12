@@ -105,10 +105,12 @@ struct GroupedConvFwdIm2winKernelArgs
                                                input_left_pads,
                                                input_right_pads};
 
+        // True im2win: A = weight [M=K, K_gemm], B = input [N=N×Ho×Wo, K_gemm].
+        // The layout template parameters reflect the physical memory layout of each tensor.
         a_grid_desc_m_k =
-            transformer_.template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout>();
+            transformer_.template MakeADescriptor_M_K<typename GroupedConvTraitsType_::WeiLayout>();
         b_grid_desc_n_k =
-            transformer_.template MakeBDescriptor_N_K<typename GroupedConvTraitsType_::WeiLayout>();
+            transformer_.template MakeBDescriptor_N_K<typename GroupedConvTraitsType_::InLayout>();
         c_grid_desc_m_n =
             transformer_.template MakeCDescriptor_M_N<typename GroupedConvTraitsType_::OutLayout>();
 
@@ -166,12 +168,13 @@ struct GroupedConvFwdIm2winKernelArgs
     }
 
     // ── Descriptor type aliases (needed for kernel template deduction) ─
+    // True im2win: A = weight (WeiLayout), B = input (InLayout).
     using AGridDescMK = remove_cvref_t<
         decltype(ConvToIm2winTransformer{}.template MakeADescriptor_M_K<
-                 typename GroupedConvTraitsType_::InLayout>())>;
+                 typename GroupedConvTraitsType_::WeiLayout>())>;
     using BGridDescNK = remove_cvref_t<
         decltype(ConvToIm2winTransformer{}.template MakeBDescriptor_N_K<
-                 typename GroupedConvTraitsType_::WeiLayout>())>;
+                 typename GroupedConvTraitsType_::InLayout>())>;
     using CGridDescMN = remove_cvref_t<
         decltype(ConvToIm2winTransformer{}.template MakeCDescriptor_M_N<
                  typename GroupedConvTraitsType_::OutLayout>())>;
@@ -202,8 +205,8 @@ struct GroupedConvFwdIm2winKernelArgs
     BGridDescNK b_grid_desc_n_k;
     CGridDescMN c_grid_desc_m_n;
 
-    long_index_t group_stride_a; ///< Elements per group in input tensor
-    long_index_t group_stride_b; ///< Elements per group in weight tensor
+    long_index_t group_stride_a; ///< Elements per group in weight tensor (A = weight in true im2win)
+    long_index_t group_stride_b; ///< Elements per group in input tensor  (B = input  in true im2win)
     long_index_t group_stride_c; ///< Elements per group in output tensor
 
     // Split-N support
@@ -464,7 +467,9 @@ struct GroupedConvolutionForwardIm2winKernel
         const index_t g_base = merged_batch_idx * KernelArgs::NumGroupsToMerge;
 
         // Precompute the split-N batch offset once — it is the same for all sub-groups.
-        const long_index_t split_n_offset_a =
+        // In true im2win: A = weight (no N dimension), B = input (has N dimension).
+        // Split-N therefore applies to B (input) and C (output), not A (weight).
+        const long_index_t split_n_offset_b =
             static_cast<long_index_t>(n_split_idx) * kargs.n_per_split * kargs.input_batch_stride;
         const long_index_t split_n_offset_c =
             static_cast<long_index_t>(n_split_idx) * kargs.n_per_split * kargs.output_batch_stride;
@@ -485,14 +490,16 @@ struct GroupedConvolutionForwardIm2winKernel
             constexpr index_t g_local = g_local_num.value;
 
             // Per-group pointer offsets.
+            // True im2win: A = weight (no N split), B = input (N split applied).
             const auto* a_ptr =
-                reinterpret_cast<const InDataType*>(kargs.in_ptr) +
-                static_cast<long_index_t>(g_base + g_local) * kargs.group_stride_a +
-                split_n_offset_a;
+                reinterpret_cast<const WeiDataType*>(kargs.wei_ptr) +
+                static_cast<long_index_t>(g_base + g_local) * kargs.group_stride_a;
+            // Weight has no batch (N) dimension → no split_n offset.
 
             const auto* b_ptr =
-                reinterpret_cast<const WeiDataType*>(kargs.wei_ptr) +
-                static_cast<long_index_t>(g_base + g_local) * kargs.group_stride_b;
+                reinterpret_cast<const InDataType*>(kargs.in_ptr) +
+                static_cast<long_index_t>(g_base + g_local) * kargs.group_stride_b +
+                split_n_offset_b;
 
             auto* c_ptr =
                 reinterpret_cast<OutDataType*>(kargs.out_ptr) +
