@@ -14,6 +14,7 @@ These development packages contain the ``dev`` prefix.
 .. important::
 
   The base ROCm install package does *not* include the hipDNN frontend API header files. You must use the development ROCm packages. 
+  
   For example, on Linux with a gfx950 GPU, install the ``amdrocm-core-dev7.12-gfx950`` package instead of the ``amdrocm7.12-gfx950`` package (``amdrocm-core-dev7.12-gfx950`` includes the ``amdrocm7.121-gfx950`` package, so only the ``amdrocm-core-dev7.12-gfx950`` package needs to be installed).
 
 System requirements
@@ -22,11 +23,8 @@ System requirements
 - An AMD GPU with ROCm support (see `ROCm compatibility matrix <https://advanced-micro-devices-rocm-internal--692.com.readthedocs.build/en/692/compatibility/compatibility-matrix.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_)
 - Linux or Windows operating system (see `Install AMD ROCm <https://advanced-micro-devices-rocm-internal--692.com.readthedocs.build/en/692/install/rocm.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_)
 
-Dependencies
-============
-
 Required dependencies
----------------------
+=====================
 
 .. list-table::
    :widths: 3 3 5

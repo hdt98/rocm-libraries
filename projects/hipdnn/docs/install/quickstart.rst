@@ -29,11 +29,8 @@ Steps
      add_executable(my_app main.cpp)
      target_link_libraries(my_app PRIVATE hipdnn_frontend)
 
-   .. note::
-
-     - ``find_package(hipdnn_frontend)`` transitively brings in ``hipdnn_backend``, ``hipdnn_data_sdk``, and ``hip`` — only one ``find_package`` call is needed. HIP runtime APIs (``hipMalloc``, ``hipFree``, etc.) are available through the transitive ``hip::host`` link dependency.
-     - If CMake can't find the packages, set ``CMAKE_PREFIX_PATH`` to the ROCm install location. hipDNN CMake files are installed to ``<ROCM Install Path>/lib/cmake`` by default, which CMake may already search automatically depending on your system configuration. For example: ``-DCMAKE_PREFIX_PATH=/opt/rocm/lib/cmake``.
-
+   - ``find_package(hipdnn_frontend)`` transitively brings in ``hipdnn_backend``, ``hipdnn_data_sdk``, and ``hip`` — only one ``find_package`` call is needed. HIP runtime APIs (``hipMalloc``, ``hipFree``, etc.) are available through the transitive ``hip::host`` link dependency.
+   - If CMake can't find the packages, set ``CMAKE_PREFIX_PATH`` to the ROCm install location. hipDNN CMake files are installed to ``<ROCM Install Path>/lib/cmake`` by default, which CMake may already search automatically depending on your system configuration. For example: ``-DCMAKE_PREFIX_PATH=/opt/rocm/lib/cmake``.
 
 2. Include the frontend header to access the hipDNN graph API:
 
@@ -41,4 +38,9 @@ Steps
 
      #include <hipdnn_frontend.hpp>
 
-   See `Samples <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/samples/README.md>`_ for complete working examples of building and executing operation graphs.
+Next Steps
+==========
+
+- :ref:`build-execute`
+- :ref:`architecture`
+- See `Samples <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/samples/README.md>`_ for complete working examples of building and executing operation graphs.
