@@ -65,34 +65,36 @@ namespace hipdnn_frontend::graph
 class SdpaBackwardAttributes : public Attributes<SdpaBackwardAttributes>
 {
 public:
+    // NOLINTBEGIN(readability-identifier-naming)
     enum class InputNames
     {
         Q = 0,
         K = 1,
         V = 2,
         O = 3,
-        DO = 4, // Gradient of output (dO)
-        STATS = 5, // Softmax statistics from forward pass
-        SCALE = 6, // Attention scale tensor (Attn_scale)
-        ATTN_MASK = 7, // Additive attention bias (Bias)
+        dO = 4, // Gradient of output (dO)
+        Stats = 5, // Softmax statistics from forward pass
+        Attn_scale = 6, // Attention scale tensor
+        Bias = 7, // Additive attention bias (Bias)
         SEQ_LEN_Q = 8,
         SEQ_LEN_KV = 9,
-        SEED = 10, // Dropout seed
-        OFFSET = 11, // Dropout offset
-        DROPOUT_MASK = 12,
-        DROPOUT_SCALE = 13,
-        DROPOUT_SCALE_INV = 14,
+        Seed = 10, // Dropout seed
+        Offset = 11, // Dropout offset
+        Dropout_mask = 12,
+        Dropout_scale = 13,
+        Dropout_scale_inv = 14,
     };
-    typedef InputNames input_names; // NOLINT(readability-identifier-naming)
+    typedef InputNames input_names;
 
     enum class OutputNames
     {
-        dQ= 0, // Gradient w.r.t. query
+        dQ = 0, // Gradient w.r.t. query
         dK = 1, // Gradient w.r.t. key
         dV = 2, // Gradient w.r.t. value
         dBias = 3, // Gradient w.r.t. additive attention bias (optional)
     };
-    typedef OutputNames output_names; // NOLINT(readability-identifier-naming)
+    typedef OutputNames output_names;
+    // NOLINTEND(readability-identifier-naming)
 
     std::unordered_map<InputNames, std::shared_ptr<TensorAttributes>> inputs;
     std::unordered_map<OutputNames, std::shared_ptr<TensorAttributes>> outputs;
@@ -139,22 +141,22 @@ public:
     // NOLINTNEXTLINE(readability-identifier-naming)
     std::shared_ptr<TensorAttributes> get_do() const
     {
-        return getInput(InputNames::DO);
+        return getInput(InputNames::dO);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     std::shared_ptr<TensorAttributes> get_stats() const
     {
-        return getInput(InputNames::STATS);
+        return getInput(InputNames::Stats);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
-    std::shared_ptr<TensorAttributes> get_scale() const
+    std::shared_ptr<TensorAttributes> get_attn_scale() const
     {
-        return getInput(InputNames::SCALE);
+        return getInput(InputNames::Attn_scale);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
-    std::shared_ptr<TensorAttributes> get_attn_mask() const
+    std::shared_ptr<TensorAttributes> get_bias() const
     {
-        return getInput(InputNames::ATTN_MASK);
+        return getInput(InputNames::Bias);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     std::shared_ptr<TensorAttributes> get_seq_len_q() const
@@ -169,27 +171,27 @@ public:
     // NOLINTNEXTLINE(readability-identifier-naming)
     std::shared_ptr<TensorAttributes> get_seed() const
     {
-        return getInput(InputNames::SEED);
+        return getInput(InputNames::Seed);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     std::shared_ptr<TensorAttributes> get_offset() const
     {
-        return getInput(InputNames::OFFSET);
+        return getInput(InputNames::Offset);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     std::shared_ptr<TensorAttributes> get_dropout_mask() const
     {
-        return getInput(InputNames::DROPOUT_MASK);
+        return getInput(InputNames::Dropout_mask);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     std::shared_ptr<TensorAttributes> get_dropout_scale() const
     {
-        return getInput(InputNames::DROPOUT_SCALE);
+        return getInput(InputNames::Dropout_scale);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     std::shared_ptr<TensorAttributes> get_dropout_scale_inv() const
     {
-        return getInput(InputNames::DROPOUT_SCALE_INV);
+        return getInput(InputNames::Dropout_scale_inv);
     }
 
     // -- Output tensor getters --
@@ -197,22 +199,22 @@ public:
     // NOLINTNEXTLINE(readability-identifier-naming)
     std::shared_ptr<TensorAttributes> get_dq() const
     {
-        return getOutput(OutputNames::DQ);
+        return getOutput(OutputNames::dQ);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     std::shared_ptr<TensorAttributes> get_dk() const
     {
-        return getOutput(OutputNames::DK);
+        return getOutput(OutputNames::dK);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     std::shared_ptr<TensorAttributes> get_dv() const
     {
-        return getOutput(OutputNames::DV);
+        return getOutput(OutputNames::dV);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     std::shared_ptr<TensorAttributes> get_dbias() const
     {
-        return getOutput(OutputNames::DBIAS);
+        return getOutput(OutputNames::dBias);
     }
 
     // -- Input tensor setters --
@@ -260,42 +262,42 @@ public:
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_do(const std::shared_ptr<TensorAttributes>& value)
     {
-        return setInput(InputNames::DO, value);
+        return setInput(InputNames::dO, value);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_do(std::shared_ptr<TensorAttributes>&& value)
     {
-        return setInput(InputNames::DO, std::move(value));
+        return setInput(InputNames::dO, std::move(value));
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_stats(const std::shared_ptr<TensorAttributes>& value)
     {
-        return setInput(InputNames::STATS, value);
+        return setInput(InputNames::Stats, value);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_stats(std::shared_ptr<TensorAttributes>&& value)
     {
-        return setInput(InputNames::STATS, std::move(value));
+        return setInput(InputNames::Stats, std::move(value));
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
-    SdpaBackwardAttributes& set_scale(const std::shared_ptr<TensorAttributes>& value)
+    SdpaBackwardAttributes& set_attn_scale(const std::shared_ptr<TensorAttributes>& value)
     {
-        return setInput(InputNames::SCALE, value);
+        return setInput(InputNames::Attn_scale, value);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
-    SdpaBackwardAttributes& set_scale(std::shared_ptr<TensorAttributes>&& value)
+    SdpaBackwardAttributes& set_attn_scale(std::shared_ptr<TensorAttributes>&& value)
     {
-        return setInput(InputNames::SCALE, std::move(value));
+        return setInput(InputNames::Attn_scale, std::move(value));
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
-    SdpaBackwardAttributes& set_attn_mask(const std::shared_ptr<TensorAttributes>& value)
+    SdpaBackwardAttributes& set_bias(const std::shared_ptr<TensorAttributes>& value)
     {
-        return setInput(InputNames::ATTN_MASK, value);
+        return setInput(InputNames::Bias, value);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
-    SdpaBackwardAttributes& set_attn_mask(std::shared_ptr<TensorAttributes>&& value)
+    SdpaBackwardAttributes& set_bias(std::shared_ptr<TensorAttributes>&& value)
     {
-        return setInput(InputNames::ATTN_MASK, std::move(value));
+        return setInput(InputNames::Bias, std::move(value));
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_seq_len_q(const std::shared_ptr<TensorAttributes>& value)
@@ -320,52 +322,52 @@ public:
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_seed(const std::shared_ptr<TensorAttributes>& value)
     {
-        return setInput(InputNames::SEED, value);
+        return setInput(InputNames::Seed, value);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_seed(std::shared_ptr<TensorAttributes>&& value)
     {
-        return setInput(InputNames::SEED, std::move(value));
+        return setInput(InputNames::Seed, std::move(value));
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_offset(const std::shared_ptr<TensorAttributes>& value)
     {
-        return setInput(InputNames::OFFSET, value);
+        return setInput(InputNames::Offset, value);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_offset(std::shared_ptr<TensorAttributes>&& value)
     {
-        return setInput(InputNames::OFFSET, std::move(value));
+        return setInput(InputNames::Offset, std::move(value));
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_dropout_mask(const std::shared_ptr<TensorAttributes>& value)
     {
-        return setInput(InputNames::DROPOUT_MASK, value);
+        return setInput(InputNames::Dropout_mask, value);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_dropout_mask(std::shared_ptr<TensorAttributes>&& value)
     {
-        return setInput(InputNames::DROPOUT_MASK, std::move(value));
+        return setInput(InputNames::Dropout_mask, std::move(value));
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_dropout_scale(const std::shared_ptr<TensorAttributes>& value)
     {
-        return setInput(InputNames::DROPOUT_SCALE, value);
+        return setInput(InputNames::Dropout_scale, value);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_dropout_scale(std::shared_ptr<TensorAttributes>&& value)
     {
-        return setInput(InputNames::DROPOUT_SCALE, std::move(value));
+        return setInput(InputNames::Dropout_scale, std::move(value));
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_dropout_scale_inv(const std::shared_ptr<TensorAttributes>& value)
     {
-        return setInput(InputNames::DROPOUT_SCALE_INV, value);
+        return setInput(InputNames::Dropout_scale_inv, value);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_dropout_scale_inv(std::shared_ptr<TensorAttributes>&& value)
     {
-        return setInput(InputNames::DROPOUT_SCALE_INV, std::move(value));
+        return setInput(InputNames::Dropout_scale_inv, std::move(value));
     }
 
     // -- Output tensor setters --
@@ -373,42 +375,42 @@ public:
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_dq(const std::shared_ptr<TensorAttributes>& value)
     {
-        return setOutput(OutputNames::DQ, value);
+        return setOutput(OutputNames::dQ, value);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_dq(std::shared_ptr<TensorAttributes>&& value)
     {
-        return setOutput(OutputNames::DQ, std::move(value));
+        return setOutput(OutputNames::dQ, std::move(value));
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_dk(const std::shared_ptr<TensorAttributes>& value)
     {
-        return setOutput(OutputNames::DK, value);
+        return setOutput(OutputNames::dK, value);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_dk(std::shared_ptr<TensorAttributes>&& value)
     {
-        return setOutput(OutputNames::DK, std::move(value));
+        return setOutput(OutputNames::dK, std::move(value));
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_dv(const std::shared_ptr<TensorAttributes>& value)
     {
-        return setOutput(OutputNames::DV, value);
+        return setOutput(OutputNames::dV, value);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_dv(std::shared_ptr<TensorAttributes>&& value)
     {
-        return setOutput(OutputNames::DV, std::move(value));
+        return setOutput(OutputNames::dV, std::move(value));
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_dbias(const std::shared_ptr<TensorAttributes>& value)
     {
-        return setOutput(OutputNames::DBIAS, value);
+        return setOutput(OutputNames::dBias, value);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
     SdpaBackwardAttributes& set_dbias(std::shared_ptr<TensorAttributes>&& value)
     {
-        return setOutput(OutputNames::DBIAS, std::move(value));
+        return setOutput(OutputNames::dBias, std::move(value));
     }
 
     // -- Scalar/flag setters --
@@ -443,8 +445,8 @@ public:
                                         const std::shared_ptr<TensorAttributes>& offset)
     {
         dropout_probability = probability;
-        setInput(InputNames::SEED, seed);
-        setInput(InputNames::OFFSET, offset);
+        setInput(InputNames::Seed, seed);
+        setInput(InputNames::Offset, offset);
         return *this;
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
@@ -491,8 +493,8 @@ public:
             get_dq()->get_uid(),
             get_dk()->get_uid(),
             get_dv()->get_uid(),
-            optUid(get_scale()),
-            optUid(get_attn_mask()),
+            optUid(get_attn_scale()),
+            optUid(get_bias()),
             optUid(get_seq_len_q()),
             optUid(get_seq_len_kv()),
             optUid(get_seed()),
@@ -534,11 +536,11 @@ public:
 
         if(fb->scale_tensor_uid().has_value())
         {
-            attr.set_scale(tensorMap.at(fb->scale_tensor_uid().value()));
+            attr.set_attn_scale(tensorMap.at(fb->scale_tensor_uid().value()));
         }
         if(fb->attn_mask_tensor_uid().has_value())
         {
-            attr.set_attn_mask(tensorMap.at(fb->attn_mask_tensor_uid().value()));
+            attr.set_bias(tensorMap.at(fb->attn_mask_tensor_uid().value()));
         }
         if(fb->seq_len_q_tensor_uid().has_value())
         {
@@ -601,5 +603,5 @@ public:
     }
 };
 
-typedef SdpaBackwardAttributes Sdpa_backward_attributes; // NOLINT(readability-identifier-naming)
+typedef SdpaBackwardAttributes SDPA_backward_attributes; // NOLINT(readability-identifier-naming)
 } // namespace hipdnn_frontend::graph

@@ -174,8 +174,165 @@ public:
             }
         }
 
-        // Rule 7: Optional attention scale must be a scalar tensor
-        const auto scale = attributes.get_scale();
+        // Rule 7: Optional attention mask validation
+        const auto attnMask = attributes.get_bias();
+        if(attnMask)
+        {
+            const auto& maskDims = attnMask->get_dim();
+            const auto maskRank = maskDims.size();
+            HIPDNN_RETURN_IF_TRUE(maskRank > static_cast<size_t>(4),
+                                  ErrorCode::INVALID_VALUE,
+                                  "SdpaBpropNode: ATTN_MASK rank must be <= 4, got rank="
+                                      + std::to_string(maskRank));
+
+            const auto seqQ = qDims[2];
+            const auto seqKv = kDims[2];
+            const auto maskLast = maskDims[maskRank - 1];
+            HIPDNN_RETURN_IF_TRUE(maskLast != seqKv && maskLast != 1,
+                                  ErrorCode::INVALID_VALUE,
+                                  "SdpaBpropNode: ATTN_MASK last dim must equal seq_kv ("
+                                      + std::to_string(seqKv) + ") or 1, got "
+                                      + std::to_string(maskLast));
+
+            if(maskRank >= 2)
+            {
+                const auto maskSecondLast = maskDims[maskRank - 2];
+                HIPDNN_RETURN_IF_TRUE(maskSecondLast != seqQ && maskSecondLast != 1,
+                                      ErrorCode::INVALID_VALUE,
+                                      "SdpaBpropNode: ATTN_MASK second-to-last dim must equal "
+                                      "seq_q ("
+                                          + std::to_string(seqQ) + ") or 1, got "
+                                          + std::to_string(maskSecondLast));
+            }
+        }
+
+        // Rule 8: Optional dropout mask validation
+        // Shape must be rank-4 (B or 1, H_q or 1, S_q, S_kv) — last two dims are exact,
+        // first two dims may broadcast (1 allowed).
+        const auto dropoutMask = attributes.get_dropout_mask();
+        if(dropoutMask)
+        {
+            const auto& dmDims = dropoutMask->get_dim();
+            HIPDNN_RETURN_IF_NE(dmDims.size(),
+                                static_cast<size_t>(4),
+                                ErrorCode::INVALID_VALUE,
+                                "SdpaBpropNode: DROPOUT_MASK must be rank-4, got rank="
+                                    + std::to_string(dmDims.size()));
+
+            const auto seqQ = qDims[2];
+            const auto seqKv = kDims[2];
+            const auto batch = qDims[0];
+
+            HIPDNN_RETURN_IF_TRUE(dmDims[0] != batch && dmDims[0] != 1,
+                                  ErrorCode::INVALID_VALUE,
+                                  "SdpaBpropNode: DROPOUT_MASK dim[0] must equal batch ("
+                                      + std::to_string(batch) + ") or 1, got "
+                                      + std::to_string(dmDims[0]));
+            HIPDNN_RETURN_IF_TRUE(dmDims[1] != numHeads && dmDims[1] != 1,
+                                  ErrorCode::INVALID_VALUE,
+                                  "SdpaBpropNode: DROPOUT_MASK dim[1] must equal num_heads ("
+                                      + std::to_string(numHeads) + ") or 1, got "
+                                      + std::to_string(dmDims[1]));
+            HIPDNN_RETURN_IF_NE(dmDims[2],
+                                seqQ,
+                                ErrorCode::INVALID_VALUE,
+                                "SdpaBpropNode: DROPOUT_MASK dim[2] must equal seq_q ("
+                                    + std::to_string(seqQ) + "), got " + std::to_string(dmDims[2]));
+            HIPDNN_RETURN_IF_NE(dmDims[3],
+                                seqKv,
+                                ErrorCode::INVALID_VALUE,
+                                "SdpaBpropNode: DROPOUT_MASK dim[3] must equal seq_kv ("
+                                    + std::to_string(seqKv) + "), got "
+                                    + std::to_string(dmDims[3]));
+        }
+
+        // Rule 9: Padding mask — when padding_mask=true, seq_len_q and seq_len_kv must
+        // be provided as rank-4 tensors with shape (B, 1, 1, 1) and INT32 data type.
+        if(attributes.padding_mask)
+        {
+            const auto seqLenQ = attributes.get_seq_len_q();
+            const auto seqLenKv = attributes.get_seq_len_kv();
+
+            HIPDNN_RETURN_IF_FALSE(
+                seqLenQ,
+                ErrorCode::ATTRIBUTE_NOT_SET,
+                std::string(
+                    "SdpaBpropNode: padding_mask=true requires seq_len_q tensor to be set"));
+            HIPDNN_RETURN_IF_FALSE(
+                seqLenKv,
+                ErrorCode::ATTRIBUTE_NOT_SET,
+                std::string(
+                    "SdpaBpropNode: padding_mask=true requires seq_len_kv tensor to be set"));
+
+            const auto& sqDims = seqLenQ->get_dim();
+            const auto& skvDims = seqLenKv->get_dim();
+            const auto batch = qDims[0];
+
+            HIPDNN_RETURN_IF_NE(sqDims.size(),
+                                static_cast<size_t>(4),
+                                ErrorCode::INVALID_VALUE,
+                                "SdpaBpropNode: seq_len_q must be rank-4, got rank="
+                                    + std::to_string(sqDims.size()));
+            HIPDNN_RETURN_IF_NE(sqDims[0],
+                                batch,
+                                ErrorCode::INVALID_VALUE,
+                                "SdpaBpropNode: seq_len_q dim[0] must equal batch ("
+                                    + std::to_string(batch) + "), got "
+                                    + std::to_string(sqDims[0]));
+            HIPDNN_RETURN_IF_NE(sqDims[1],
+                                static_cast<int64_t>(1),
+                                ErrorCode::INVALID_VALUE,
+                                "SdpaBpropNode: seq_len_q dim[1] must be 1, got "
+                                    + std::to_string(sqDims[1]));
+            HIPDNN_RETURN_IF_NE(sqDims[2],
+                                static_cast<int64_t>(1),
+                                ErrorCode::INVALID_VALUE,
+                                "SdpaBpropNode: seq_len_q dim[2] must be 1, got "
+                                    + std::to_string(sqDims[2]));
+            HIPDNN_RETURN_IF_NE(sqDims[3],
+                                static_cast<int64_t>(1),
+                                ErrorCode::INVALID_VALUE,
+                                "SdpaBpropNode: seq_len_q dim[3] must be 1, got "
+                                    + std::to_string(sqDims[3]));
+            HIPDNN_RETURN_IF_TRUE(seqLenQ->get_data_type() != DataType::INT32,
+                                  ErrorCode::INVALID_VALUE,
+                                  std::string("SdpaBpropNode: seq_len_q must have INT32 data "
+                                              "type"));
+
+            HIPDNN_RETURN_IF_NE(skvDims.size(),
+                                static_cast<size_t>(4),
+                                ErrorCode::INVALID_VALUE,
+                                "SdpaBpropNode: seq_len_kv must be rank-4, got rank="
+                                    + std::to_string(skvDims.size()));
+            HIPDNN_RETURN_IF_NE(skvDims[0],
+                                batch,
+                                ErrorCode::INVALID_VALUE,
+                                "SdpaBpropNode: seq_len_kv dim[0] must equal batch ("
+                                    + std::to_string(batch) + "), got "
+                                    + std::to_string(skvDims[0]));
+            HIPDNN_RETURN_IF_NE(skvDims[1],
+                                static_cast<int64_t>(1),
+                                ErrorCode::INVALID_VALUE,
+                                "SdpaBpropNode: seq_len_kv dim[1] must be 1, got "
+                                    + std::to_string(skvDims[1]));
+            HIPDNN_RETURN_IF_NE(skvDims[2],
+                                static_cast<int64_t>(1),
+                                ErrorCode::INVALID_VALUE,
+                                "SdpaBpropNode: seq_len_kv dim[2] must be 1, got "
+                                    + std::to_string(skvDims[2]));
+            HIPDNN_RETURN_IF_NE(skvDims[3],
+                                static_cast<int64_t>(1),
+                                ErrorCode::INVALID_VALUE,
+                                "SdpaBpropNode: seq_len_kv dim[3] must be 1, got "
+                                    + std::to_string(skvDims[3]));
+            HIPDNN_RETURN_IF_TRUE(seqLenKv->get_data_type() != DataType::INT32,
+                                  ErrorCode::INVALID_VALUE,
+                                  std::string("SdpaBpropNode: seq_len_kv must have INT32 data "
+                                              "type"));
+        }
+
+        // Rule 10: Optional attention scale must be a scalar tensor
+        const auto scale = attributes.get_attn_scale();
         if(scale)
         {
             HIPDNN_CHECK_ERROR(detail::validateScalarParameter(scale, "SCALE tensor"));
@@ -192,19 +349,6 @@ public:
         const auto dq = attributes.get_dq();
         const auto dk = attributes.get_dk();
         const auto dv = attributes.get_dv();
-
-        HIPDNN_RETURN_IF_FALSE(
-            q, ErrorCode::ATTRIBUTE_NOT_SET, std::string("SdpaBpropNode missing Q input"));
-        HIPDNN_RETURN_IF_FALSE(
-            k, ErrorCode::ATTRIBUTE_NOT_SET, std::string("SdpaBpropNode missing K input"));
-        HIPDNN_RETURN_IF_FALSE(
-            v, ErrorCode::ATTRIBUTE_NOT_SET, std::string("SdpaBpropNode missing V input"));
-        HIPDNN_RETURN_IF_FALSE(
-            dq, ErrorCode::ATTRIBUTE_NOT_SET, std::string("SdpaBpropNode missing dQ output"));
-        HIPDNN_RETURN_IF_FALSE(
-            dk, ErrorCode::ATTRIBUTE_NOT_SET, std::string("SdpaBpropNode missing dK output"));
-        HIPDNN_RETURN_IF_FALSE(
-            dv, ErrorCode::ATTRIBUTE_NOT_SET, std::string("SdpaBpropNode missing dV output"));
 
         HIPDNN_CHECK_ERROR(attributes.fill_from_context(graph_attributes));
 

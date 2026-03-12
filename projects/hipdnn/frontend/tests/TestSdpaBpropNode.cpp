@@ -362,6 +362,331 @@ TEST(TestSdpaBpropNode, PreValidateFailsDoShapeMismatchWithO)
 }
 
 //==============================================================================
+// dropout_mask validation tests
+//==============================================================================
+
+TEST(TestSdpaBpropNode, PreValidateSucceedsDropoutMaskExactShape)
+{
+    // dropout_mask shape (B, H_q, S_q, S_kv) — exact match
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    attrs.set_dropout_mask(makeTensor4D(2, 8, 16, 32));
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
+}
+
+TEST(TestSdpaBpropNode, PreValidateSucceedsDropoutMaskBroadcastBatch)
+{
+    // dropout_mask dim[0]=1 broadcasts over batch
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    attrs.set_dropout_mask(makeTensor4D(1, 8, 16, 32));
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
+}
+
+TEST(TestSdpaBpropNode, PreValidateSucceedsDropoutMaskBroadcastHeads)
+{
+    // dropout_mask dim[1]=1 broadcasts over num_heads
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    attrs.set_dropout_mask(makeTensor4D(2, 1, 16, 32));
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
+}
+
+TEST(TestSdpaBpropNode, PreValidateSucceedsDropoutMaskBroadcastBothOuter)
+{
+    // dropout_mask (1, 1, S_q, S_kv) — both batch and heads broadcast
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    attrs.set_dropout_mask(makeTensor4D(1, 1, 16, 32));
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
+}
+
+TEST(TestSdpaBpropNode, PreValidateFailsDropoutMaskWrongRank)
+{
+    // dropout_mask must be rank-4; rank-3 is invalid
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+
+    auto mask = std::make_shared<TensorAttributes>();
+    mask->set_dim({8, 16, 32}); // rank-3
+    attrs.set_dropout_mask(mask);
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
+}
+
+TEST(TestSdpaBpropNode, PreValidateFailsDropoutMaskBatchMismatch)
+{
+    // dim[0]=3 is neither batch(2) nor 1
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    attrs.set_dropout_mask(makeTensor4D(3, 8, 16, 32));
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
+}
+
+TEST(TestSdpaBpropNode, PreValidateFailsDropoutMaskHeadsMismatch)
+{
+    // dim[1]=4 is neither num_heads(8) nor 1
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    attrs.set_dropout_mask(makeTensor4D(2, 4, 16, 32));
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
+}
+
+TEST(TestSdpaBpropNode, PreValidateFailsDropoutMaskSeqQMismatch)
+{
+    // dim[2] must exactly equal seq_q(16), not 1
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    attrs.set_dropout_mask(makeTensor4D(2, 8, 8, 32)); // wrong seq_q
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
+}
+
+TEST(TestSdpaBpropNode, PreValidateFailsDropoutMaskSeqKvMismatch)
+{
+    // dim[3] must exactly equal seq_kv(32), not 1
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    attrs.set_dropout_mask(makeTensor4D(2, 8, 16, 16)); // wrong seq_kv
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
+}
+
+//==============================================================================
+// padding_mask validation tests
+//==============================================================================
+
+namespace
+{
+// Helper: create a (B, 1, 1, 1) INT32 tensor for seq_len
+std::shared_ptr<TensorAttributes> makeSeqLenTensor(int64_t batch)
+{
+    auto t = std::make_shared<TensorAttributes>();
+    t->set_dim({batch, 1, 1, 1});
+    t->set_data_type(DataType::INT32);
+    return t;
+}
+} // namespace
+
+TEST(TestSdpaBpropNode, PreValidateSucceedsPaddingMaskWithValidSeqLens)
+{
+    // padding_mask=true with valid (B,1,1,1) INT32 seq_len tensors
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    attrs.set_padding_mask(true);
+    attrs.set_seq_len_q(makeSeqLenTensor(2));
+    attrs.set_seq_len_kv(makeSeqLenTensor(2));
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
+}
+
+TEST(TestSdpaBpropNode, PreValidateSucceedsNoPaddingMaskNoSeqLens)
+{
+    // padding_mask=false (default) — seq_len tensors not required
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    // no seq_len_q / seq_len_kv
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
+}
+
+TEST(TestSdpaBpropNode, PreValidateFailsPaddingMaskMissingSeqLenQ)
+{
+    // padding_mask=true but seq_len_q not set
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    attrs.set_padding_mask(true);
+    attrs.set_seq_len_kv(makeSeqLenTensor(2));
+    // seq_len_q intentionally not set
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::ATTRIBUTE_NOT_SET);
+}
+
+TEST(TestSdpaBpropNode, PreValidateFailsPaddingMaskMissingSeqLenKv)
+{
+    // padding_mask=true but seq_len_kv not set
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    attrs.set_padding_mask(true);
+    attrs.set_seq_len_q(makeSeqLenTensor(2));
+    // seq_len_kv intentionally not set
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::ATTRIBUTE_NOT_SET);
+}
+
+TEST(TestSdpaBpropNode, PreValidateFailsPaddingMaskSeqLenQWrongRank)
+{
+    // seq_len_q must be rank-4; rank-1 is invalid
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    attrs.set_padding_mask(true);
+
+    auto seqLenQ = std::make_shared<TensorAttributes>();
+    seqLenQ->set_dim({2}); // rank-1
+    seqLenQ->set_data_type(DataType::INT32);
+    attrs.set_seq_len_q(seqLenQ);
+    attrs.set_seq_len_kv(makeSeqLenTensor(2));
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
+}
+
+TEST(TestSdpaBpropNode, PreValidateFailsPaddingMaskSeqLenQBatchMismatch)
+{
+    // seq_len_q dim[0] must equal batch (2), not 1
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    attrs.set_padding_mask(true);
+    attrs.set_seq_len_q(makeSeqLenTensor(4)); // batch mismatch
+    attrs.set_seq_len_kv(makeSeqLenTensor(2));
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
+}
+
+TEST(TestSdpaBpropNode, PreValidateFailsPaddingMaskSeqLenQNonOneDim)
+{
+    // seq_len_q dim[1]/[2]/[3] must be 1
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    attrs.set_padding_mask(true);
+
+    auto seqLenQ = std::make_shared<TensorAttributes>();
+    seqLenQ->set_dim({2, 8, 1, 1}); // dim[1] should be 1
+    seqLenQ->set_data_type(DataType::INT32);
+    attrs.set_seq_len_q(seqLenQ);
+    attrs.set_seq_len_kv(makeSeqLenTensor(2));
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
+}
+
+TEST(TestSdpaBpropNode, PreValidateFailsPaddingMaskSeqLenQWrongDataType)
+{
+    // seq_len_q must be INT32; FLOAT is invalid
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    attrs.set_padding_mask(true);
+
+    auto seqLenQ = std::make_shared<TensorAttributes>();
+    seqLenQ->set_dim({2, 1, 1, 1});
+    seqLenQ->set_data_type(DataType::FLOAT); // wrong dtype
+    attrs.set_seq_len_q(seqLenQ);
+    attrs.set_seq_len_kv(makeSeqLenTensor(2));
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
+}
+
+TEST(TestSdpaBpropNode, PreValidateFailsPaddingMaskSeqLenKvWrongDataType)
+{
+    // seq_len_kv must be INT32; HALF is invalid
+    auto q = makeTensor4D(2, 8, 16, 64);
+    auto k = makeTensor4D(2, 8, 32, 64);
+    auto v = makeTensor4D(2, 8, 32, 64);
+    auto attrs = makeMinimalAttrs(q, k, v);
+    attrs.set_padding_mask(true);
+    attrs.set_seq_len_q(makeSeqLenTensor(2));
+
+    auto seqLenKv = std::make_shared<TensorAttributes>();
+    seqLenKv->set_dim({2, 1, 1, 1});
+    seqLenKv->set_data_type(DataType::HALF); // wrong dtype
+    attrs.set_seq_len_kv(seqLenKv);
+
+    GraphAttributes graphAttrs;
+    SdpaBpropNode node(std::move(attrs), graphAttrs);
+    auto err = node.pre_validate_node();
+    EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
+}
+
+//==============================================================================
 // infer_properties_node tests
 //==============================================================================
 
