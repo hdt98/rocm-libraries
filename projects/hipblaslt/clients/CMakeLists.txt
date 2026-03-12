@@ -28,7 +28,7 @@ target_link_libraries(hipblaslt-clients-common
         hip::device
 )
 
-if(HIPBLASLT_ENABLE_MXDATAGENERATOR AND NOT ROCM_LIBS_SUPERBUILD)
+if(NOT ROCM_LIBS_SUPERBUILD)
     if(HIPBLASLT_ENABLE_THEROCK)
         find_package(mxDataGenerator REQUIRED)
     else()
@@ -36,10 +36,7 @@ if(HIPBLASLT_ENABLE_MXDATAGENERATOR AND NOT ROCM_LIBS_SUPERBUILD)
     endif()
 endif()
 target_compile_features(hipblaslt-clients-common PRIVATE cxx_std_20)
-if(HIPBLASLT_ENABLE_MXDATAGENERATOR)
-    target_compile_definitions(hipblaslt-clients-common PRIVATE HIPBLASLT_ENABLE_MXDATAGENERATOR)
-    target_link_libraries(hipblaslt-clients-common PRIVATE roc::mxDataGenerator)
-endif()
+target_link_libraries(hipblaslt-clients-common PRIVATE roc::mxDataGenerator)
 
 if(HIPBLASLT_ENABLE_ROCROLLER)
     target_compile_definitions(hipblaslt-clients-common PRIVATE HIPBLASLT_USE_ROCROLLER)

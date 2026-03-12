@@ -225,9 +225,9 @@ class DataType:
             'nameAbbrev': 'fp6',
             'miOutTypeNameAbbrev': 'f32',
             'reg': 0.1875,
-            'hip': 'ERROR',
+            'hip': 'tensile_float6x32',
             'isComplex': False,
-            'packing': 1,
+            'packing': 32,
         },
         {
             'enum': DataTypeEnum.BFloat6,
@@ -235,9 +235,9 @@ class DataType:
             'nameAbbrev': 'bf6',
             'miOutTypeNameAbbrev': 'f32',
             'reg': 0.1875,
-            'hip': 'ERROR',
+            'hip': 'tensile_bfloat6x32',
             'isComplex': False,
-            'packing': 1,
+            'packing': 32,
         },
         {
             'enum': DataTypeEnum.Float4,
@@ -245,9 +245,9 @@ class DataType:
             'nameAbbrev': 'fp4',
             'miOutTypeNameAbbrev': 'f32',
             'reg': 0.125,
-            'hip': 'ERROR',
+            'hip': 'tensile_float4x2',
             'isComplex': False,
-            'packing': 1,
+            'packing': 2,
         },
     ]
     lookup = {}
