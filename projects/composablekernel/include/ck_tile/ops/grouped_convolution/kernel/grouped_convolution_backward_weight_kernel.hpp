@@ -1281,42 +1281,112 @@ struct GroupedConvolutionBackwardWeightKernel
                 auto tile_started = iter_start == tile_iter_start;
                 auto tile_ended   = iter_end >= tile_iter_end;
 
-                // Linear Reduction
-                if(!tile_started)
+                if constexpr(TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Linear)
                 {
-                    StorePartial(kargs, sk_cta_idx, c_block_tile);
-                    SignalStorePartialDone(kargs, sk_cta_idx);
+                    // Linear Reduction: tile-starter sequentially accumulates all
+                    // partials from subsequent CTAs in order.
+                    if(!tile_started)
+                    {
+                        StorePartial(kargs, sk_cta_idx, c_block_tile);
+                        SignalStorePartialDone(kargs, sk_cta_idx);
+                    }
+                    else
+                    {
+                        auto accum_block_tile = c_block_tile;
+                        if(!tile_ended)
+                        {
+                            const index_t iter_per_tile =
+                                kargs.tile_partitioner.get_iters_per_tile();
+                            const index_t iter_per_cta =
+                                kargs.tile_partitioner.get_iters_per_sk_cta();
+                            const index_t extra_iters = kargs.tile_partitioner.get_extra_iters();
+                            int accum_iters           = local_iter_end - local_iter_start;
+                            int next_cta              = sk_cta_idx + 1;
+
+                            while(accum_iters < iter_per_tile)
+                            {
+                                WaitStorePartialDone(kargs, next_cta);
+
+                                using BlockType = remove_cvref_t<decltype(c_block_tile)>;
+                                AddBlockTile(
+                                    accum_block_tile,
+                                    LoadPartial<typename BlockType::DataType>(
+                                        kargs, next_cta, c_block_tile.get_tile_distribution()));
+
+                                accum_iters += iter_per_cta + (next_cta < extra_iters);
+                                ++next_cta;
+                            }
+                        }
+
+                        auto c_block_window_out =
+                            MakeCBlockWindow<memory_operation_enum::set>(c_ptr, kargs, i_m, i_n);
+                        EpiloguePipeline{}(
+                            c_block_window_out, accum_block_tile, d_block_window, smem_ptr);
+                    }
+                }
+                else if constexpr(TilePartitioner::ReductionStrategy ==
+                                  StreamKReductionStrategy::Tree)
+                {
+                    // Tree Reduction: pairwise reduction with stride doubling.
+                    // At each round, half the CTAs store their accumulated partial
+                    // and exit; the other half load and accumulate from their partner.
+                    // The tile-starter writes the final result.
+                    auto accum_block_tile = c_block_tile;
+                    index_t tile_local_cta_idx =
+                        amd_wave_read_first_lane(kargs.tile_partitioner.get_tile_local_cta_index(
+                            tile_iter_start, sk_cta_idx));
+
+                    index_t stride = amd_wave_read_first_lane(1);
+
+                    for(;; stride <<= 1)
+                    {
+                        const index_t partner_cta_idx =
+                            amd_wave_read_first_lane(sk_cta_idx + stride);
+                        const index_t partner_start_iter = amd_wave_read_first_lane(
+                            kargs.tile_partitioner.get_start_iter(partner_cta_idx));
+                        bool partner_in_tile =
+                            amd_wave_read_first_lane(partner_start_iter < tile_iter_end);
+
+                        // If the partner of the tile-starter is not in this tile,
+                        // then all partials are accumulated — write final result.
+                        if(tile_started && !partner_in_tile)
+                        {
+                            auto c_block_window_out = MakeCBlockWindow<memory_operation_enum::set>(
+                                c_ptr, kargs, i_m, i_n);
+                            EpiloguePipeline{}(
+                                c_block_window_out, accum_block_tile, d_block_window, smem_ptr);
+                            break;
+                        }
+
+                        // This CTA's turn to read from its partner and accumulate.
+                        if(tile_local_cta_idx % (stride << 1) == 0)
+                        {
+                            if(partner_in_tile)
+                            {
+                                WaitStorePartialDone(kargs, partner_cta_idx);
+                                using BlockType = remove_cvref_t<decltype(c_block_tile)>;
+                                AddBlockTile(accum_block_tile,
+                                             LoadPartial<typename BlockType::DataType>(
+                                                 kargs,
+                                                 partner_cta_idx,
+                                                 c_block_tile.get_tile_distribution()));
+                            }
+                        }
+                        // This CTA's turn to write its partial and exit.
+                        else
+                        {
+                            StorePartial(kargs, sk_cta_idx, accum_block_tile);
+                            SignalStorePartialDone(kargs, sk_cta_idx);
+                            break;
+                        }
+                    }
                 }
                 else
                 {
-                    auto accum_block_tile = c_block_tile;
-                    if(!tile_ended)
-                    {
-                        const index_t iter_per_tile = kargs.tile_partitioner.get_iters_per_tile();
-                        const index_t iter_per_cta  = kargs.tile_partitioner.get_iters_per_sk_cta();
-                        const index_t extra_iters   = kargs.tile_partitioner.get_extra_iters();
-                        int accum_iters             = local_iter_end - local_iter_start;
-                        int next_cta                = sk_cta_idx + 1;
-
-                        while(accum_iters < iter_per_tile)
-                        {
-                            WaitStorePartialDone(kargs, next_cta);
-
-                            using BlockType = remove_cvref_t<decltype(c_block_tile)>;
-                            AddBlockTile(
-                                accum_block_tile,
-                                LoadPartial<typename BlockType::DataType>(
-                                    kargs, next_cta, c_block_tile.get_tile_distribution()));
-
-                            accum_iters += iter_per_cta + (next_cta < extra_iters);
-                            ++next_cta;
-                        }
-                    }
-
-                    auto c_block_window_out =
-                        MakeCBlockWindow<memory_operation_enum::set>(c_ptr, kargs, i_m, i_n);
-                    EpiloguePipeline{}(
-                        c_block_window_out, accum_block_tile, d_block_window, smem_ptr);
+                    static_assert(
+                        TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Linear ||
+                            TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Tree,
+                        "Unsupported StreamK reduction strategy for conv bwd weight.");
                 }
 
                 // Advance to next tile

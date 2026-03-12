@@ -14,11 +14,9 @@
 #include "grouped_convolution_backward_weight_streamk_invoker.hpp"
 #include "run_grouped_convolution_bwd_weight_example.inc"
 
-template <template <typename PrecType> typename ConvConfig>
+template <template <typename PrecType> typename ConvConfig, typename Invoker>
 int run_grouped_conv_bwd_weight_example(ck_tile::ArgParser& arg_parser)
 {
-    using Invoker = GroupedConvolutionBackwardWeightStreamKInvoker;
-
     std::string data_type  = arg_parser.get_str("prec");
     std::string in_layout  = arg_parser.get_str("in_layout");
     std::string wei_layout = arg_parser.get_str("wei_layout");
@@ -46,13 +44,37 @@ int run_grouped_conv_bwd_weight_example(ck_tile::ArgParser& arg_parser)
 
 int main(int argc, char* argv[])
 {
-    auto [result, arg_parser] = create_args(argc, argv);
+    auto [result, arg_parser] =
+        create_args(argc,
+                    argv,
+                    {
+                        {"streamk_reduction", "tree", "StreamK reduction strategy: linear or tree"},
+                    });
     if(!result)
         return -1;
 
     try
     {
-        return !run_grouped_conv_bwd_weight_example<ConvConfigComputeV3>(arg_parser);
+        const std::string reduction = arg_parser.get_str("streamk_reduction");
+
+        if(reduction == "linear")
+        {
+            using Invoker = GroupedConvolutionBackwardWeightStreamKInvoker<
+                ck_tile::StreamKReductionStrategy::Linear>;
+            return !run_grouped_conv_bwd_weight_example<ConvConfigComputeV3, Invoker>(arg_parser);
+        }
+        else if(reduction == "tree")
+        {
+            using Invoker = GroupedConvolutionBackwardWeightStreamKInvoker<
+                ck_tile::StreamKReductionStrategy::Tree>;
+            return !run_grouped_conv_bwd_weight_example<ConvConfigComputeV3, Invoker>(arg_parser);
+        }
+        else
+        {
+            std::cerr << "Unknown streamk_reduction: " << reduction
+                      << ". Use 'linear' or 'tree'.\n";
+            return EXIT_FAILURE;
+        }
     }
     catch(const std::runtime_error& e)
     {

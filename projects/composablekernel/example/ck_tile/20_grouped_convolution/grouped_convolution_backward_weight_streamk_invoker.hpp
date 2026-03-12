@@ -4,6 +4,8 @@
 #include "grouped_convolution_utils.hpp"
 #include "ck_tile/ops/gemm/kernel/streamk_gemm/streamk_gemm_tile_partitioner.hpp"
 
+template <ck_tile::StreamKReductionStrategy ReductionStrategy_ =
+              ck_tile::StreamKReductionStrategy::Linear>
 struct GroupedConvolutionBackwardWeightStreamKInvoker
 {
     template <ck_tile::index_t NDimSpatial,
@@ -40,9 +42,9 @@ struct GroupedConvolutionBackwardWeightStreamKInvoker
                                                                  ConvConfig::VectorSizeC,
                                                                  ConvConfig::NumGroupsToMerge>;
 
-        // StreamK tile partitioner (Linear reduction, non-persistent)
-        using TilePartitioner = ck_tile::
-            StreamKTilePartitioner<GemmShape, ck_tile::StreamKReductionStrategy::Linear, false>;
+        // StreamK tile partitioner (configurable reduction strategy, non-persistent)
+        using TilePartitioner =
+            ck_tile::StreamKTilePartitioner<GemmShape, ReductionStrategy_, false>;
 
         using GemmUniversalTraits = ck_tile::TileGemmUniversalTraits<
             GroupedConvTraitsType::FixedGemmParams::kPadM,
