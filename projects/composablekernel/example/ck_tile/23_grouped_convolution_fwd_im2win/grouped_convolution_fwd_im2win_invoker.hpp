@@ -63,7 +63,7 @@ struct GroupedConvolutionFwdIm2winInvoker
             ConvConfig::VectorSizeA,
             ConvConfig::VectorSizeB,
             ConvConfig::VectorSizeC,
-            /*NumGroupsToMerge=*/1>;
+            ConvConfig::NumGroupsToMerge>;
 
         // ── Tile partitioner ──────────────────────────────────────────────
         using TilePartitioner = ck_tile::GemmSpatiallyLocalTilePartitioner<

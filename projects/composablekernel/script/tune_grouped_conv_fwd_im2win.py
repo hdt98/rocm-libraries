@@ -74,6 +74,12 @@ ALL_CONFIGS: list[str] = [
     "CV3_M64N16K64_Occ2",
     "Mem_M128N4K64",
     "Mem_M256N4K64",
+    # Group-merging configs (sequential Gm sub-GEMMs per block)
+    "CV3_M128N16K64_Gm2",
+    "CV3_M128N16K64_Gm4",
+    "CV3_M128N16K64_Gm8",
+    "CV3_M128N16K64_Gm32",
+    "CV3_M64N16K64_Gm32",
 ]
 
 BINARY_PREFIX = "tile_example_grouped_conv_fwd_im2win_"

@@ -89,7 +89,12 @@ struct Im2winConvConfigBase
     static constexpr ck_tile::GemmPipeline         Pipeline  = ck_tile::GemmPipeline::COMPUTE_V3;
     static constexpr ck_tile::GemmPipelineScheduler Scheduler =
         ck_tile::GemmPipelineScheduler::Intrawave;
-    static constexpr ck_tile::index_t NumWaveGroups = 1;
+    static constexpr ck_tile::index_t NumWaveGroups    = 1;
+    // NumGroupsToMerge: how many conv groups one block processes sequentially.
+    // 1 = no merging (default). Gm > 1 reduces GemmBatch from G to G/Gm,
+    // cutting block-dispatch overhead at the cost of Gm sequential GEMM calls
+    // per block. Useful when K is tiny (N_Tile >> K) and G is large.
+    static constexpr ck_tile::index_t NumGroupsToMerge = 1;
 };
 
 // ══════════════════════════════════════════════════════════════════════
@@ -385,6 +390,112 @@ struct Im2winConfig_Mem_M256N4K64 : public Im2winConvConfigBase
 };
 
 // ══════════════════════════════════════════════════════════════════════
+// Configs with group merging (NumGroupsToMerge > 1)
+//
+// These are most useful when K (= N_gemm) is small relative to N_Tile,
+// because merging reduces block dispatch overhead.  Each block runs Gm
+// sequential GEMM sub-problems (one per group) sharing the same M-tile
+// spatial computation and the same LDS allocation.
+//
+// Constraint: G must be divisible by NumGroupsToMerge.
+// ══════════════════════════════════════════════════════════════════════
+
+// ── Config 14: CV3, M128×N16, Gm=2 — baseline group-merging
+template <typename PrecType>
+struct Im2winConfig_CV3_M128N16K64_Gm2 : public Im2winConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 128;
+    static constexpr ck_tile::index_t N_Tile = 16;
+    static constexpr ck_tile::index_t K_Tile = 64;
+
+    static constexpr ck_tile::index_t M_Warp = 4;
+    static constexpr ck_tile::index_t N_Warp = 1;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 16;
+    static constexpr ck_tile::index_t N_Warp_Tile = 16;
+    static constexpr ck_tile::index_t K_Warp_Tile = 32;
+
+    static constexpr ck_tile::index_t NumGroupsToMerge = 2;
+};
+
+// ── Config 15: CV3, M128×N16, Gm=4
+template <typename PrecType>
+struct Im2winConfig_CV3_M128N16K64_Gm4 : public Im2winConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 128;
+    static constexpr ck_tile::index_t N_Tile = 16;
+    static constexpr ck_tile::index_t K_Tile = 64;
+
+    static constexpr ck_tile::index_t M_Warp = 4;
+    static constexpr ck_tile::index_t N_Warp = 1;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 16;
+    static constexpr ck_tile::index_t N_Warp_Tile = 16;
+    static constexpr ck_tile::index_t K_Warp_Tile = 32;
+
+    static constexpr ck_tile::index_t NumGroupsToMerge = 4;
+};
+
+// ── Config 16: CV3, M128×N16, Gm=8
+template <typename PrecType>
+struct Im2winConfig_CV3_M128N16K64_Gm8 : public Im2winConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 128;
+    static constexpr ck_tile::index_t N_Tile = 16;
+    static constexpr ck_tile::index_t K_Tile = 64;
+
+    static constexpr ck_tile::index_t M_Warp = 4;
+    static constexpr ck_tile::index_t N_Warp = 1;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 16;
+    static constexpr ck_tile::index_t N_Warp_Tile = 16;
+    static constexpr ck_tile::index_t K_Warp_Tile = 32;
+
+    static constexpr ck_tile::index_t NumGroupsToMerge = 8;
+};
+
+// ── Config 17: CV3, M128×N16, Gm=32 — merge all groups (G=32 target problem)
+template <typename PrecType>
+struct Im2winConfig_CV3_M128N16K64_Gm32 : public Im2winConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 128;
+    static constexpr ck_tile::index_t N_Tile = 16;
+    static constexpr ck_tile::index_t K_Tile = 64;
+
+    static constexpr ck_tile::index_t M_Warp = 4;
+    static constexpr ck_tile::index_t N_Warp = 1;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 16;
+    static constexpr ck_tile::index_t N_Warp_Tile = 16;
+    static constexpr ck_tile::index_t K_Warp_Tile = 32;
+
+    static constexpr ck_tile::index_t NumGroupsToMerge = 32;
+};
+
+// ── Config 18: CV3, M64×N16, Gm=32 — smaller M tile with full group merge
+template <typename PrecType>
+struct Im2winConfig_CV3_M64N16K64_Gm32 : public Im2winConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 64;
+    static constexpr ck_tile::index_t N_Tile = 16;
+    static constexpr ck_tile::index_t K_Tile = 64;
+
+    static constexpr ck_tile::index_t M_Warp = 2;
+    static constexpr ck_tile::index_t N_Warp = 1;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 16;
+    static constexpr ck_tile::index_t N_Warp_Tile = 16;
+    static constexpr ck_tile::index_t K_Warp_Tile = 32;
+
+    static constexpr ck_tile::index_t NumGroupsToMerge = 32;
+};
+
+// ══════════════════════════════════════════════════════════════════════
 // Config registry and compile-time selection
 //
 // The CMakeLists builds one binary per config by passing
@@ -427,6 +538,16 @@ template <typename P> using ActiveIm2winConfig = Im2winConfig_CV3_M64N16K64_Occ2
 template <typename P> using ActiveIm2winConfig = Im2winConfig_Mem_M128N4K64<P>;
 #elif IM2WIN_CONFIG_ID == 12
 template <typename P> using ActiveIm2winConfig = Im2winConfig_Mem_M256N4K64<P>;
+#elif IM2WIN_CONFIG_ID == 13
+template <typename P> using ActiveIm2winConfig = Im2winConfig_CV3_M128N16K64_Gm2<P>;
+#elif IM2WIN_CONFIG_ID == 14
+template <typename P> using ActiveIm2winConfig = Im2winConfig_CV3_M128N16K64_Gm4<P>;
+#elif IM2WIN_CONFIG_ID == 15
+template <typename P> using ActiveIm2winConfig = Im2winConfig_CV3_M128N16K64_Gm8<P>;
+#elif IM2WIN_CONFIG_ID == 16
+template <typename P> using ActiveIm2winConfig = Im2winConfig_CV3_M128N16K64_Gm32<P>;
+#elif IM2WIN_CONFIG_ID == 17
+template <typename P> using ActiveIm2winConfig = Im2winConfig_CV3_M64N16K64_Gm32<P>;
 #else
 #error "Unknown IM2WIN_CONFIG_ID"
 #endif

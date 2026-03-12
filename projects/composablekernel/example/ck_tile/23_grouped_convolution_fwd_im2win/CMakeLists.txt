@@ -12,7 +12,7 @@ if(GPU_TARGETS MATCHES "gfx94|gfx95")
     # ── Config registry ──────────────────────────────────────────────────────
     # Parallel lists: IM2WIN_CONFIG_IDS[i] ↔ IM2WIN_CONFIG_NAMES[i]
     # IM2WIN_CONFIG_ID matches the #if branch in im2win_conv_configs.hpp.
-    set(IM2WIN_CONFIG_IDS   0  1  2  3  4  5  6  7  8  9  10  11  12)
+    set(IM2WIN_CONFIG_IDS   0  1  2  3  4  5  6  7  8  9  10  11  12  13  14  15  16  17)
     set(IM2WIN_CONFIG_NAMES
         CV3_M16N64K64
         CV3_M64N64K64
@@ -27,6 +27,11 @@ if(GPU_TARGETS MATCHES "gfx94|gfx95")
         CV3_M64N16K64_Occ2
         Mem_M128N4K64
         Mem_M256N4K64
+        CV3_M128N16K64_Gm2
+        CV3_M128N16K64_Gm4
+        CV3_M128N16K64_Gm8
+        CV3_M128N16K64_Gm32
+        CV3_M64N16K64_Gm32
     )
 
     list(LENGTH IM2WIN_CONFIG_IDS _num_configs)
