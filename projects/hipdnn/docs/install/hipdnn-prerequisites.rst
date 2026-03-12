@@ -1,12 +1,12 @@
 .. meta::
-  :description: hipDNN installation prerequisites
+  :description: Learn how to install hipDNN through ROCm.
   :keywords: hipDNN, ROCm, install, prerequisites
 
 .. _prerequisites:
 
-********************
-hipDNN prerequisites
-********************
+*******************
+hipDNN installation
+*******************
 
 Ensure your system has these requirements before installing hipDNN.
 

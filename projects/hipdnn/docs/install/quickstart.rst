@@ -2,9 +2,9 @@
   :description: This quick start guide demonstrates how to include hipDNN in a CMake project.
   :keywords: hipDNN, ROCm, install, Windows
 
-******************
-hipDNN quick start
-******************
+**************************
+Add hipDNN to your project
+**************************
 
 This guide demonstrates how to include hipDNN in a CMake project on a system with ROCm installed.
 
