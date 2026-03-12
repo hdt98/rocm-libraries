@@ -302,53 +302,33 @@ namespace rocRoller
             }
 
         private:
-            /**
-             * Populates m_orderCache for startingNodes relative to their descendents, and the
-             * descendents of each relative to each other. Returns the descendents of
-             * startingNodes.
-             */
-            template <CForwardRangeOf<int> Range>
-            Bitset populateOrderCache(Range const& startingNodes) const;
-
-            /**
-             * Populates m_orderCache for startingNode relative to its descendents, and the
-             * descendents relative to each other. Returns the descendents of startingNode.
-             */
-            Bitset populateOrderCache(int startingNode) const;
-
             virtual void clearCache(Graph::GraphModification modification) override;
             void         populateOrderCache() const;
-            //void         sortOrderCache() const;
-            void validateOrderCache() const;
-
+            void         validateOrderCache() const;
             NodeOrdering lookupOrder(CacheOnlyPolicy const, int nodeA, int nodeB) const;
             NodeOrdering lookupOrder(IgnoreCachePolicy const, int nodeA, int nodeB) const;
-
+            /**
+         * Dense cache write helpers.
+         * IMPORTANT:
+         *   - Bit positions in these Bitsets are dense node indices [0, nodeCount).
+         *   - nodeA/nodeB arguments are also dense node indices.
+         */
             void writeOrderCache(Bitset const& nodesA,
                                  Bitset const& nodesB,
                                  NodeOrdering  order) const;
-            // Single-node-to-bitset convenience overload
             void writeOrderCache(int nodeA, Bitset const& nodesB, NodeOrdering order) const;
-
             void writeOrderCache(int nodeA, int nodeB, NodeOrdering order) const;
-
-            //template <CForwardRangeOf<int> ARange = std::initializer_list<int>,
-            //          CForwardRangeOf<int> BRange = std::initializer_list<int>>
-            //void writeOrderCache(ARange const& nodesA,
-            //                     BRange const& nodesB,
-            //                     NodeOrdering  order) const;
-
-            mutable std::unordered_map<int, NodeOrders> m_orderCache;
-            /**
-             * If an entry is present, the value will be the IDs of every descendent from the key,
-             * following every kind of edge.
-             */
-            //mutable std::unordered_map<int, std::vector<int>> m_descendentCache;
-            mutable std::unordered_map<int, Bitset> m_descendentCache;
-
-            mutable CacheStatus m_cacheStatus = CacheStatus::Invalid;
-
-            mutable bool m_changesRestricted = false;
+            // Dense-index <-> graph-tag mapping.
+            mutable std::vector<int> m_cacheDenseToTag; // dense -> graph tag
+            mutable std::vector<int> m_cacheTagToDense; // graph tag -> dense, -1 if not node
+            mutable size_t           m_cacheWords = 0; // words per row in dense bit matrices
+                // Row-major bit matrices: row=nodeA_dense, bit=nodeB_dense.
+            mutable std::vector<uint64_t> m_cacheAfter;
+            mutable std::vector<uint64_t> m_cacheBefore;
+            mutable std::vector<uint64_t> m_cacheInBody;
+            mutable std::vector<uint64_t> m_cacheContaining;
+            mutable CacheStatus           m_cacheStatus       = CacheStatus::Invalid;
+            mutable bool                  m_changesRestricted = false;
         };
 
         std::string name(ControlGraph::Element const& el);

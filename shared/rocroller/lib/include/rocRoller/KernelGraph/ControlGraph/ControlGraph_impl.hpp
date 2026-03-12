@@ -103,126 +103,124 @@ namespace rocRoller::KernelGraph::ControlGraph
 
     inline NodeOrdering ControlGraph::lookupOrder(CacheOnlyPolicy const, int nodeA, int nodeB) const
     {
-        auto it = m_orderCache.find(nodeA);
-        if(it == m_orderCache.end())
+        auto toDense = [this](int tag) -> int {
+            if(tag < 0 || static_cast<size_t>(tag) >= m_cacheTagToDense.size())
+                return -1;
+            return m_cacheTagToDense[static_cast<size_t>(tag)];
+        };
+        int const a = toDense(nodeA);
+        int const b = toDense(nodeB);
+        if(a < 0 || b < 0 || m_cacheWords == 0)
             return NodeOrdering::Undefined;
-        auto const& orders = it->second;
-        if(bitsetTest(orders.after, nodeB))
+        auto test = [this, a, b](std::vector<uint64_t> const& mat) -> bool {
+            auto const* row = mat.data() + static_cast<size_t>(a) * m_cacheWords;
+            return ((row[static_cast<size_t>(b) >> 6] >> (b & 63)) & 1ull) != 0;
+        };
+        if(test(m_cacheAfter))
             return NodeOrdering::LeftFirst;
-        if(bitsetTest(orders.before, nodeB))
+        if(test(m_cacheBefore))
             return NodeOrdering::RightFirst;
-        if(bitsetTest(orders.inBody, nodeB))
+        if(test(m_cacheInBody))
             return NodeOrdering::RightInBodyOfLeft;
-        if(bitsetTest(orders.containing, nodeB))
+        if(test(m_cacheContaining))
             return NodeOrdering::LeftInBodyOfRight;
         return NodeOrdering::Undefined;
-
-        //auto it = m_orderCache.find(nodeA);
-        //if(it == m_orderCache.end())
-        //    return NodeOrdering::Undefined;
-        //auto const& orders = it->second;
-        //if(std::ranges::binary_search(orders.after, nodeB))
-        //    return NodeOrdering::LeftFirst;
-        //if(std::ranges::binary_search(orders.before, nodeB))
-        //    return NodeOrdering::RightFirst;
-        //if(std::ranges::binary_search(orders.inBody, nodeB))
-        //    return NodeOrdering::RightInBodyOfLeft;
-        //if(std::ranges::binary_search(orders.containing, nodeB))
-        //    return NodeOrdering::LeftInBodyOfRight;
-        //return NodeOrdering::Undefined;
     }
 
     inline Generator<int> ControlGraph::nodesAfter(int node) const
     {
         populateOrderCache();
-        auto it = m_orderCache.find(node);
-        if(it != m_orderCache.end())
+        if(node < 0 || static_cast<size_t>(node) >= m_cacheTagToDense.size())
+            co_return;
+        int const dense = m_cacheTagToDense[static_cast<size_t>(node)];
+        if(dense < 0)
+            co_return;
+        auto const* row = m_cacheAfter.data() + static_cast<size_t>(dense) * m_cacheWords;
+        int const   n   = static_cast<int>(m_cacheDenseToTag.size());
+        for(size_t w = 0; w < m_cacheWords; ++w)
         {
-            auto const& bs = it->second.after;
-            for(size_t w = 0; w < bs.size(); ++w)
+            uint64_t bits = row[w];
+            while(bits)
             {
-                uint64_t bits = bs[w];
-                while(bits)
-                {
-                    int bit = std::countr_zero(bits);
-                    co_yield static_cast<int>(w * 64 + bit);
-                    bits &= bits - 1;
-                }
+                int bit = std::countr_zero(bits);
+                int d   = static_cast<int>(w * 64 + bit);
+                if(d < n)
+                    co_yield m_cacheDenseToTag[d];
+                bits &= bits - 1;
             }
         }
-
-        //if(it != m_orderCache.end())
-        //    for(int n : it->second.after)
-        //        co_yield n;
     }
+
     inline Generator<int> ControlGraph::nodesBefore(int node) const
     {
         populateOrderCache();
-        auto it = m_orderCache.find(node);
-        if(it != m_orderCache.end())
+        if(node < 0 || static_cast<size_t>(node) >= m_cacheTagToDense.size())
+            co_return;
+        int const dense = m_cacheTagToDense[static_cast<size_t>(node)];
+        if(dense < 0)
+            co_return;
+        auto const* row = m_cacheBefore.data() + static_cast<size_t>(dense) * m_cacheWords;
+        int const   n   = static_cast<int>(m_cacheDenseToTag.size());
+        for(size_t w = 0; w < m_cacheWords; ++w)
         {
-            auto const& bs = it->second.before;
-            for(size_t w = 0; w < bs.size(); ++w)
+            uint64_t bits = row[w];
+            while(bits)
             {
-                uint64_t bits = bs[w];
-                while(bits)
-                {
-                    int bit = std::countr_zero(bits);
-                    co_yield static_cast<int>(w * 64 + bit);
-                    bits &= bits - 1;
-                }
+                int bit = std::countr_zero(bits);
+                int d   = static_cast<int>(w * 64 + bit);
+                if(d < n)
+                    co_yield m_cacheDenseToTag[d];
+                bits &= bits - 1;
             }
         }
-
-        //if(it != m_orderCache.end())
-        //    for(int n : it->second.before)
-        //        co_yield n;
     }
+
     inline Generator<int> ControlGraph::nodesInBody(int node) const
     {
         populateOrderCache();
-        auto it = m_orderCache.find(node);
-        if(it != m_orderCache.end())
+        if(node < 0 || static_cast<size_t>(node) >= m_cacheTagToDense.size())
+            co_return;
+        int const dense = m_cacheTagToDense[static_cast<size_t>(node)];
+        if(dense < 0)
+            co_return;
+        auto const* row = m_cacheInBody.data() + static_cast<size_t>(dense) * m_cacheWords;
+        int const   n   = static_cast<int>(m_cacheDenseToTag.size());
+        for(size_t w = 0; w < m_cacheWords; ++w)
         {
-            auto const& bs = it->second.inBody;
-            for(size_t w = 0; w < bs.size(); ++w)
+            uint64_t bits = row[w];
+            while(bits)
             {
-                uint64_t bits = bs[w];
-                while(bits)
-                {
-                    int bit = std::countr_zero(bits);
-                    co_yield static_cast<int>(w * 64 + bit);
-                    bits &= bits - 1;
-                }
+                int bit = std::countr_zero(bits);
+                int d   = static_cast<int>(w * 64 + bit);
+                if(d < n)
+                    co_yield m_cacheDenseToTag[d];
+                bits &= bits - 1;
             }
         }
-
-        //if(it != m_orderCache.end())
-        //    for(int n : it->second.inBody)
-        //        co_yield n;
     }
+
     inline Generator<int> ControlGraph::nodesContaining(int node) const
     {
         populateOrderCache();
-        auto it = m_orderCache.find(node);
-        if(it != m_orderCache.end())
+        if(node < 0 || static_cast<size_t>(node) >= m_cacheTagToDense.size())
+            co_return;
+        int const dense = m_cacheTagToDense[static_cast<size_t>(node)];
+        if(dense < 0)
+            co_return;
+        auto const* row = m_cacheContaining.data() + static_cast<size_t>(dense) * m_cacheWords;
+        int const   n   = static_cast<int>(m_cacheDenseToTag.size());
+        for(size_t w = 0; w < m_cacheWords; ++w)
         {
-            auto const& bs = it->second.containing;
-            for(size_t w = 0; w < bs.size(); ++w)
+            uint64_t bits = row[w];
+            while(bits)
             {
-                uint64_t bits = bs[w];
-                while(bits)
-                {
-                    int bit = std::countr_zero(bits);
-                    co_yield static_cast<int>(w * 64 + bit);
-                    bits &= bits - 1;
-                }
+                int bit = std::countr_zero(bits);
+                int d   = static_cast<int>(w * 64 + bit);
+                if(d < n)
+                    co_yield m_cacheDenseToTag[d];
+                bits &= bits - 1;
             }
         }
-
-        //if(it != m_orderCache.end())
-        //    for(int n : it->second.containing)
-        //        co_yield n;
     }
 
     template <typename T>

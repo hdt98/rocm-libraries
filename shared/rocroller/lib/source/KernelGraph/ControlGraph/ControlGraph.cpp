@@ -5,53 +5,124 @@
 #include <rocRoller/Utilities/Settings.hpp>
 #include <rocRoller/Utilities/Timer.hpp>
 
+#include <algorithm>
+
 #include <bitset>
 #include <cmath>
 #include <iomanip>
 
 namespace rocRoller::KernelGraph::ControlGraph
 {
+    namespace
+    {
+        inline size_t wordsForBits(size_t bits)
+        {
+            return (bits + 63) >> 6;
+        }
+        inline uint64_t* matrixRow(std::vector<uint64_t>& mat, size_t words, int row)
+        {
+            return mat.data() + static_cast<size_t>(row) * words;
+        }
+        inline uint64_t const* matrixRow(std::vector<uint64_t> const& mat, size_t words, int row)
+        {
+            return mat.data() + static_cast<size_t>(row) * words;
+        }
+        inline void rowOr(uint64_t* dst, uint64_t const* src, size_t words)
+        {
+            for(size_t i = 0; i < words; ++i)
+                dst[i] |= src[i];
+        }
+        inline bool rowAny(uint64_t const* row, size_t words)
+        {
+            for(size_t i = 0; i < words; ++i)
+                if(row[i])
+                    return true;
+            return false;
+        }
+        inline bool rowOverlap(uint64_t const* a, uint64_t const* b, size_t words)
+        {
+            for(size_t i = 0; i < words; ++i)
+                if(a[i] & b[i])
+                    return true;
+            return false;
+        }
+        template <typename F>
+        inline void forEachSetBit(uint64_t const* row, size_t words, F&& fn)
+        {
+            for(size_t w = 0; w < words; ++w)
+            {
+                uint64_t bits = row[w];
+                while(bits)
+                {
+                    int bit = std::countr_zero(bits);
+                    fn(static_cast<int>(w * 64 + bit));
+                    bits &= bits - 1;
+                }
+            }
+        }
+        template <typename F>
+        inline void forEachSetBit(Bitset const& bs, F&& fn)
+        {
+            for(size_t w = 0; w < bs.size(); ++w)
+            {
+                uint64_t bits = bs[w];
+                while(bits)
+                {
+                    int bit = std::countr_zero(bits);
+                    fn(static_cast<int>(w * 64 + bit));
+                    bits &= bits - 1;
+                }
+            }
+        }
+        inline void denseSet(Bitset& bs, int dense)
+        {
+            bs[static_cast<size_t>(dense) >> 6] |= uint64_t(1) << (dense & 63);
+        }
+        inline void denseClear(Bitset& bs, int dense)
+        {
+            bs[static_cast<size_t>(dense) >> 6] &= ~(uint64_t(1) << (dense & 63));
+        }
+        inline void denseOr(Bitset& dst, Bitset const& src)
+        {
+            for(size_t i = 0; i < dst.size(); ++i)
+                dst[i] |= src[i];
+        }
+        inline void denseAndNot(Bitset& dst, Bitset const& mask)
+        {
+            for(size_t i = 0; i < dst.size(); ++i)
+                dst[i] &= ~mask[i];
+        }
+    }
+
     std::unordered_map<int, std::unordered_map<int, NodeOrdering>>
         ControlGraph::nodeOrderTable() const
     {
         populateOrderCache();
         std::unordered_map<int, std::unordered_map<int, NodeOrdering>> table;
-        for(auto const& [node, orders] : m_orderCache)
+        int const n = static_cast<int>(m_cacheDenseToTag.size());
+        for(int aDense = 0; aDense < n; ++aDense)
         {
-            for(int other : bitsetToSortedVec(orders.after))
-            {
-                if(node < other)
-                    table[node][other] = NodeOrdering::LeftFirst;
-            }
-            for(int other : bitsetToSortedVec(orders.inBody))
-            {
-                if(node < other)
-                    table[node][other] = NodeOrdering::RightInBodyOfLeft;
-                else
-                    table[other][node] = NodeOrdering::LeftInBodyOfRight;
-            }
+            int const   aTag      = m_cacheDenseToTag[aDense];
+            auto const* afterRow  = matrixRow(m_cacheAfter, m_cacheWords, aDense);
+            auto const* inBodyRow = matrixRow(m_cacheInBody, m_cacheWords, aDense);
+            forEachSetBit(afterRow, m_cacheWords, [&](int bDense) {
+                if(bDense >= n)
+                    return;
+                int const bTag = m_cacheDenseToTag[bDense];
+                if(aTag < bTag)
+                    table[aTag][bTag] = NodeOrdering::LeftFirst;
+            });
+            forEachSetBit(inBodyRow, m_cacheWords, [&](int bDense) {
+                if(bDense >= n)
+                    return;
+                int const bTag = m_cacheDenseToTag[bDense];
+                if(aTag < bTag)
+                    table[aTag][bTag] = NodeOrdering::RightInBodyOfLeft;
+                else if(bTag < aTag)
+                    table[bTag][aTag] = NodeOrdering::LeftInBodyOfRight;
+            });
         }
         return table;
-
-        //populateOrderCache();
-
-        //std::unordered_map<int, std::unordered_map<int, NodeOrdering>> table;
-        //for(auto const& [node, orders] : m_orderCache)
-        //{
-        //    for(int other : orders.after)
-        //    {
-        //        if(node < other)
-        //            table[node][other] = NodeOrdering::LeftFirst;
-        //    }
-        //    for(int other : orders.inBody)
-        //    {
-        //        if(node < other)
-        //            table[node][other] = NodeOrdering::RightInBodyOfLeft;
-        //        else
-        //            table[other][node] = NodeOrdering::LeftInBodyOfRight;
-        //    }
-        //}
-        //return table;
     }
 
     std::string ControlGraph::nodeOrderTableString(std::set<int> const& nodes) const
@@ -106,65 +177,52 @@ namespace rocRoller::KernelGraph::ControlGraph
         populateOrderCache();
         TIMER(t, "nodeOrderTable");
         std::set<int> nodes;
-        for(auto const& [node, orders] : m_orderCache)
+        int const     n = static_cast<int>(m_cacheDenseToTag.size());
+        for(int d = 0; d < n; ++d)
         {
-            if(bitsetAny(orders.after) || bitsetAny(orders.before) || bitsetAny(orders.inBody)
-               || bitsetAny(orders.containing))
+            int const   tag           = m_cacheDenseToTag[d];
+            auto const* afterRow      = matrixRow(m_cacheAfter, m_cacheWords, d);
+            auto const* beforeRow     = matrixRow(m_cacheBefore, m_cacheWords, d);
+            auto const* inBodyRow     = matrixRow(m_cacheInBody, m_cacheWords, d);
+            auto const* containingRow = matrixRow(m_cacheContaining, m_cacheWords, d);
+            if(rowAny(afterRow, m_cacheWords) || rowAny(beforeRow, m_cacheWords)
+               || rowAny(inBodyRow, m_cacheWords) || rowAny(containingRow, m_cacheWords))
             {
-                nodes.insert(node);
+                nodes.insert(tag);
             }
-            for(int n : bitsetToSortedVec(orders.after))
-                nodes.insert(n);
-            for(int n : bitsetToSortedVec(orders.before))
-                nodes.insert(n);
-            for(int n : bitsetToSortedVec(orders.inBody))
-                nodes.insert(n);
-            for(int n : bitsetToSortedVec(orders.containing))
-                nodes.insert(n);
+            auto addRowNodes = [&](uint64_t const* row) {
+                forEachSetBit(row, m_cacheWords, [&](int otherDense) {
+                    if(otherDense < n)
+                        nodes.insert(m_cacheDenseToTag[otherDense]);
+                });
+            };
+            addRowNodes(afterRow);
+            addRowNodes(beforeRow);
+            addRowNodes(inBodyRow);
+            addRowNodes(containingRow);
         }
         return nodeOrderTableString(nodes);
-
-        //populateOrderCache();
-
-        //TIMER(t, "nodeOrderTable");
-
-        //std::set<int> nodes;
-        //for(auto const& [node, orders] : m_orderCache)
-        //{
-        //    if(!orders.after.empty() or !orders.before.empty() or !orders.inBody.empty()
-        //       or !orders.containing.empty())
-        //    {
-        //        nodes.insert(node);
-        //    }
-        //    for(int n : orders.after)
-        //        nodes.insert(n);
-        //    for(int n : orders.before)
-        //        nodes.insert(n);
-        //    for(int n : orders.inBody)
-        //        nodes.insert(n);
-        //    for(int n : orders.containing)
-        //        nodes.insert(n);
-        //}
-        //return nodeOrderTableString(nodes);
     }
 
     void ControlGraph::clearCache(Graph::GraphModification modification)
     {
         Hypergraph<Operation, ControlEdge, false>::clearCache(modification);
-
         if(modification == Graph::GraphModification::AddElement
            && m_cacheStatus != CacheStatus::Invalid)
         {
-            // If adding a new element and order is non-empty (partial or valid)
             m_cacheStatus = CacheStatus::Partial;
         }
         else
         {
-            m_orderCache.clear();
             m_cacheStatus = CacheStatus::Invalid;
         }
-
-        m_descendentCache.clear();
+        m_cacheDenseToTag.clear();
+        m_cacheTagToDense.clear();
+        m_cacheWords = 0;
+        m_cacheAfter.clear();
+        m_cacheBefore.clear();
+        m_cacheInBody.clear();
+        m_cacheContaining.clear();
     }
 
     bool ControlGraph::isModificationAllowed(int index) const
@@ -200,52 +258,26 @@ namespace rocRoller::KernelGraph::ControlGraph
 
     void ControlGraph::validateOrderCache() const
     {
-        for(auto const& [node, orders] : m_orderCache)
+        int const n = static_cast<int>(m_cacheDenseToTag.size());
+        for(int r = 0; r < n; ++r)
         {
-            AssertFatal(!bitsetOverlaps(orders.after, orders.before),
+            auto const* afterRow      = matrixRow(m_cacheAfter, m_cacheWords, r);
+            auto const* beforeRow     = matrixRow(m_cacheBefore, m_cacheWords, r);
+            auto const* inBodyRow     = matrixRow(m_cacheInBody, m_cacheWords, r);
+            auto const* containingRow = matrixRow(m_cacheContaining, m_cacheWords, r);
+            AssertFatal(!rowOverlap(afterRow, beforeRow, m_cacheWords),
                         "Node has conflicting orders (after & before)");
-            AssertFatal(!bitsetOverlaps(orders.after, orders.inBody),
+            AssertFatal(!rowOverlap(afterRow, inBodyRow, m_cacheWords),
                         "Node has conflicting orders (after & inBody)");
-            AssertFatal(!bitsetOverlaps(orders.after, orders.containing),
+            AssertFatal(!rowOverlap(afterRow, containingRow, m_cacheWords),
                         "Node has conflicting orders (after & containing)");
-            AssertFatal(!bitsetOverlaps(orders.before, orders.inBody),
+            AssertFatal(!rowOverlap(beforeRow, inBodyRow, m_cacheWords),
                         "Node has conflicting orders (before & inBody)");
-            AssertFatal(!bitsetOverlaps(orders.before, orders.containing),
+            AssertFatal(!rowOverlap(beforeRow, containingRow, m_cacheWords),
                         "Node has conflicting orders (before & containing)");
-            AssertFatal(!bitsetOverlaps(orders.inBody, orders.containing),
+            AssertFatal(!rowOverlap(inBodyRow, containingRow, m_cacheWords),
                         "Node has conflicting orders (inBody & containing)");
         }
-
-        //int const                    maxId = std::ranges::max(m_orderCache | std::views::keys);
-        //std::vector<std::bitset<64>> bits((maxId + 64) / 64);
-
-        //auto check = [&](const auto&... vec) {
-        //    (
-        //        [&]() {
-        //            for(auto v : vec)
-        //            {
-        //                int const id     = v / 64;
-        //                int const remain = v & 63;
-        //                AssertFatal(!bits[id][remain],
-        //                            "A node has two orders",
-        //                            ShowValue(id),
-        //                            ShowValue(remain),
-        //                            ShowValue(v));
-        //                bits[id].set(remain);
-        //            }
-        //        }(),
-        //        ...);
-        //    std::ranges::fill(bits, std::bitset<64>{});
-        //};
-
-        //for(auto& [node, orders] : m_orderCache)
-        //{
-        //    std::ranges::sort(orders.after);
-        //    std::ranges::sort(orders.before);
-        //    std::ranges::sort(orders.inBody);
-        //    std::ranges::sort(orders.containing);
-        //    check(orders.after, orders.before, orders.inBody, orders.containing);
-        //}
     }
 
     using NodeOrderField = Bitset NodeOrders::*;
@@ -282,11 +314,15 @@ namespace rocRoller::KernelGraph::ControlGraph
         TIMER(t, "populateOrderCache");
         if(m_cacheStatus == CacheStatus::Valid)
             return;
-        m_orderCache.clear();
-        m_descendentCache.clear();
+        m_cacheDenseToTag.clear();
+        m_cacheTagToDense.clear();
+        m_cacheWords = 0;
+        m_cacheAfter.clear();
+        m_cacheBefore.clear();
+        m_cacheInBody.clear();
+        m_cacheContaining.clear();
         static_assert(std::variant_size_v<ControlEdge> == 5,
-                      "Assumes edge indices: Sequence(0), Initialize(1), "
-                      "ForLoopIncrement(2), Body(3), Else(4).");
+                      "Assumes Sequence(0), Initialize(1), ForLoopIncrement(2), Body(3), Else(4).");
         constexpr uint8_t kSequence      = 0;
         constexpr uint8_t kInit          = 1;
         constexpr uint8_t kInc           = 2;
@@ -300,210 +336,155 @@ namespace rocRoller::KernelGraph::ControlGraph
             m_cacheStatus = CacheStatus::Valid;
             return;
         }
-        int const nodeCount  = static_cast<int>(nodeTags.size());
-        int const maxNodeTag = *std::max_element(nodeTags.begin(), nodeTags.end());
-        // Dense lookup: graph tag -> dense node index [0, nodeCount).
-        std::vector<int> tagToDense(static_cast<size_t>(maxNodeTag) + 1, -1);
-        for(int i = 0; i < nodeCount; ++i)
-            tagToDense[static_cast<size_t>(nodeTags[i])] = i;
-        struct NodeAdj
+        int const nodeCount = static_cast<int>(nodeTags.size());
+        int const maxTag    = *std::max_element(nodeTags.begin(), nodeTags.end());
+        // Dense mapping.
+        m_cacheDenseToTag = nodeTags;
+        m_cacheTagToDense.assign(static_cast<size_t>(maxTag) + 1, -1);
+        for(int d = 0; d < nodeCount; ++d)
+            m_cacheTagToDense[static_cast<size_t>(m_cacheDenseToTag[d])] = d;
+        m_cacheWords            = wordsForBits(static_cast<size_t>(nodeCount));
+        size_t const matrixSize = static_cast<size_t>(nodeCount) * m_cacheWords;
+        m_cacheAfter.assign(matrixSize, 0);
+        m_cacheBefore.assign(matrixSize, 0);
+        m_cacheInBody.assign(matrixSize, 0);
+        m_cacheContaining.assign(matrixSize, 0);
+        // allDesc[row=u_dense] contains all descendants of u (dense bits).
+        std::vector<uint64_t>                                     allDesc(matrixSize, 0);
+        std::vector<std::array<std::vector<int>, kEdgeTypeCount>> childrenByType(nodeCount);
+        std::vector<int>                                          indegree(nodeCount, 0);
+        // Build adjacency (node -> child nodes by outgoing edge type).
+        for(int u = 0; u < nodeCount; ++u)
         {
-            // child dense node indices grouped by outgoing edge type.
-            std::array<std::vector<int>, kEdgeTypeCount> childrenByType;
-        };
-        std::vector<NodeAdj> adj(nodeCount);
-        std::vector<int>     indegree(nodeCount, 0);
-        // Build node-level adjacency once.
-        for(int parentDense = 0; parentDense < nodeCount; ++parentDense)
-        {
-            int const parentTag = nodeTags[parentDense];
+            int const parentTag = m_cacheDenseToTag[u];
             for(int edgeTag : getNeighbours<GD::Downstream>(parentTag))
             {
-                uint8_t const edgeType  = static_cast<uint8_t>(getEdge(edgeTag).index());
-                auto&         bucket    = adj[parentDense].childrenByType[edgeType];
-                auto          childTags = getNeighbours<GD::Downstream>(edgeTag);
-                bucket.reserve(bucket.size() + childTags.size());
-                for(int childTag : childTags)
+                uint8_t const edgeType = static_cast<uint8_t>(getEdge(edgeTag).index());
+                auto&         bucket   = childrenByType[u][edgeType];
+                for(int childTag : getNeighbours<GD::Downstream>(edgeTag))
                 {
-                    if(childTag < 0 || childTag > maxNodeTag)
+                    if(childTag < 0 || childTag > maxTag)
                         continue;
-                    int const childDense = tagToDense[static_cast<size_t>(childTag)];
-                    if(childDense < 0)
-                        continue;
-                    bucket.push_back(childDense);
-                    ++indegree[childDense];
+                    int const v = m_cacheTagToDense[static_cast<size_t>(childTag)];
+                    if(v >= 0)
+                        bucket.push_back(v);
                 }
             }
         }
-        // Topological order on node DAG.
-        std::vector<int> zeroIn;
-        zeroIn.reserve(nodeCount);
+        // Deduplicate buckets and compute indegree after dedup.
+        for(int u = 0; u < nodeCount; ++u)
+        {
+            for(auto& bucket : childrenByType[u])
+            {
+                std::sort(bucket.begin(), bucket.end());
+                bucket.erase(std::unique(bucket.begin(), bucket.end()), bucket.end());
+                for(int v : bucket)
+                    ++indegree[v];
+            }
+        }
+        // Kahn topological order.
+        std::vector<int> q;
+        q.reserve(nodeCount);
         for(int i = 0; i < nodeCount; ++i)
             if(indegree[i] == 0)
-                zeroIn.push_back(i);
-        std::vector<int> topoOrder;
-        topoOrder.reserve(nodeCount);
-        for(size_t head = 0; head < zeroIn.size(); ++head)
+                q.push_back(i);
+        std::vector<int> topo;
+        topo.reserve(nodeCount);
+        for(size_t head = 0; head < q.size(); ++head)
         {
-            int const u = zeroIn[head];
-            topoOrder.push_back(u);
-            for(auto const& byType : adj[u].childrenByType)
+            int const u = q[head];
+            topo.push_back(u);
+            for(auto const& bucket : childrenByType[u])
             {
-                for(int v : byType)
+                for(int v : bucket)
                 {
                     if(--indegree[v] == 0)
-                        zeroIn.push_back(v);
+                        q.push_back(v);
                 }
             }
         }
-        AssertFatal(static_cast<int>(topoOrder.size()) == nodeCount,
-                    "ControlGraph must be acyclic for order-cache construction.");
-        // Dense build storage; avoids unordered_map lookups in hot loops.
-        std::vector<NodeOrders> denseOrders(nodeCount);
-        // allDesc[u] = all descendants of u across all edge types.
-        std::vector<Bitset> allDesc(nodeCount);
-        auto writeNodeDense = [&](int nodeDense, Bitset const& nodesB, NodeOrdering order) {
-            if(!bitsetAny(nodesB))
-                return;
-            auto const fieldAB = orderField(order);
-            auto const fieldBA = orderField(opposite(order));
-            int const  nodeTag = nodeTags[nodeDense];
-            bitsetOr(denseOrders[nodeDense].*fieldAB, nodesB);
-            for(size_t w = 0; w < nodesB.size(); ++w)
-            {
-                uint64_t bits = nodesB[w];
-                while(bits)
-                {
-                    int const bit  = std::countr_zero(bits);
-                    int const bTag = static_cast<int>(w * 64 + bit);
-                    AssertFatal(
-                        bTag >= 0 && bTag <= maxNodeTag, ShowValue(bTag), ShowValue(maxNodeTag));
-                    int const bDense = tagToDense[static_cast<size_t>(bTag)];
-                    AssertFatal(bDense >= 0, ShowValue(bTag));
-                    bitsetSet(denseOrders[bDense].*fieldBA, nodeTag);
-                    bits &= bits - 1;
-                }
-            }
-        };
-        auto writeDense = [&](Bitset const& nodesA, Bitset const& nodesB, NodeOrdering order) {
-            if(!bitsetAny(nodesA) || !bitsetAny(nodesB))
-                return;
-            auto const fieldAB = orderField(order);
-            auto const fieldBA = orderField(opposite(order));
-            for(size_t w = 0; w < nodesA.size(); ++w)
-            {
-                uint64_t bits = nodesA[w];
-                while(bits)
-                {
-                    int const bit  = std::countr_zero(bits);
-                    int const aTag = static_cast<int>(w * 64 + bit);
-                    AssertFatal(
-                        aTag >= 0 && aTag <= maxNodeTag, ShowValue(aTag), ShowValue(maxNodeTag));
-                    int const aDense = tagToDense[static_cast<size_t>(aTag)];
-                    AssertFatal(aDense >= 0, ShowValue(aTag));
-                    bitsetOr(denseOrders[aDense].*fieldAB, nodesB);
-                    bits &= bits - 1;
-                }
-            }
-            for(size_t w = 0; w < nodesB.size(); ++w)
-            {
-                uint64_t bits = nodesB[w];
-                while(bits)
-                {
-                    int const bit  = std::countr_zero(bits);
-                    int const bTag = static_cast<int>(w * 64 + bit);
-                    AssertFatal(
-                        bTag >= 0 && bTag <= maxNodeTag, ShowValue(bTag), ShowValue(maxNodeTag));
-                    int const bDense = tagToDense[static_cast<size_t>(bTag)];
-                    AssertFatal(bDense >= 0, ShowValue(bTag));
-                    bitsetOr(denseOrders[bDense].*fieldBA, nodesA);
-                    bits &= bits - 1;
-                }
-            }
-        };
-        auto mergeChildrenDesc = [&](Bitset& dst, std::vector<int> const& childDenseList) {
-            for(int childDense : childDenseList)
-            {
-                int const childTag = nodeTags[childDense];
-                bitsetSet(dst, childTag);
-                bitsetOr(dst, allDesc[childDense]);
-            }
-        };
+        AssertFatal(static_cast<int>(topo.size()) == nodeCount,
+                    "ControlGraph must be acyclic for order-cache population.");
+        // Reused temporaries: fixed-size dense bitsets.
         std::array<Bitset, kEdgeTypeCount> typedDesc;
-        Bitset                             bodyLike;
-        Bitset                             afterInit;
-        Bitset                             afterBody;
-        Bitset                             afterElse;
-        // Reverse topo: children already have allDesc computed.
-        for(auto it = topoOrder.rbegin(); it != topoOrder.rend(); ++it)
+        for(auto& bs : typedDesc)
+            bs.assign(m_cacheWords, 0);
+        Bitset seen(m_cacheWords, 0);
+        Bitset bodyLike(m_cacheWords, 0);
+        Bitset afterInit(m_cacheWords, 0);
+        Bitset afterBody(m_cacheWords, 0);
+        Bitset afterElse(m_cacheWords, 0);
+        auto   mergeChildrenDesc = [&](Bitset& dst, std::vector<int> const& childDenseList) {
+            for(int child : childDenseList)
+            {
+                denseSet(dst, child);
+                rowOr(dst.data(), matrixRow(allDesc, m_cacheWords, child), m_cacheWords);
+            }
+        };
+        // Reverse topo => children processed before parents.
+        for(auto it = topo.rbegin(); it != topo.rend(); ++it)
         {
-            int const uDense = *it;
-            int const uTag   = nodeTags[uDense];
+            int const u = *it;
             for(auto& bs : typedDesc)
-                bs.clear();
-            bodyLike.clear();
-            afterInit.clear();
-            afterBody.clear();
-            afterElse.clear();
-            mergeChildrenDesc(typedDesc[kInit], adj[uDense].childrenByType[kInit]);
-            mergeChildrenDesc(typedDesc[kBody], adj[uDense].childrenByType[kBody]);
-            mergeChildrenDesc(typedDesc[kElse], adj[uDense].childrenByType[kElse]);
-            mergeChildrenDesc(typedDesc[kInc], adj[uDense].childrenByType[kInc]);
-            mergeChildrenDesc(typedDesc[kSequence], adj[uDense].childrenByType[kSequence]);
+                std::fill(bs.begin(), bs.end(), 0);
+            std::fill(seen.begin(), seen.end(), 0);
+            std::fill(bodyLike.begin(), bodyLike.end(), 0);
+            std::fill(afterInit.begin(), afterInit.end(), 0);
+            std::fill(afterBody.begin(), afterBody.end(), 0);
+            std::fill(afterElse.begin(), afterElse.end(), 0);
+            mergeChildrenDesc(typedDesc[kInit], childrenByType[u][kInit]);
+            mergeChildrenDesc(typedDesc[kBody], childrenByType[u][kBody]);
+            mergeChildrenDesc(typedDesc[kElse], childrenByType[u][kElse]);
+            mergeChildrenDesc(typedDesc[kInc], childrenByType[u][kInc]);
+            mergeChildrenDesc(typedDesc[kSequence], childrenByType[u][kSequence]);
+            // Make partitions disjoint by precedence:
+            // Initialize -> Body -> Else -> ForLoopIncrement -> Sequence.
+            // This removes contradictory cross-writes in merged-path corner cases.
+            seen = typedDesc[kInit];
+            denseAndNot(typedDesc[kBody], seen);
+            denseOr(seen, typedDesc[kBody]);
+            denseAndNot(typedDesc[kElse], seen);
+            denseOr(seen, typedDesc[kElse]);
+            denseAndNot(typedDesc[kInc], seen);
+            denseOr(seen, typedDesc[kInc]);
+            denseAndNot(typedDesc[kSequence], seen);
             auto& initNodes = typedDesc[kInit];
             auto& bodyNodes = typedDesc[kBody];
             auto& elseNodes = typedDesc[kElse];
             auto& incNodes  = typedDesc[kInc];
             auto& seqNodes  = typedDesc[kSequence];
-            // Defensive only: keep self out of all descendant partitions.
-            clearBit(initNodes, uTag);
-            clearBit(bodyNodes, uTag);
-            clearBit(elseNodes, uTag);
-            clearBit(incNodes, uTag);
-            clearBit(seqNodes, uTag);
             // bodyLike = init | body | else | inc
             bodyLike = initNodes;
-            bitsetOr(bodyLike, bodyNodes);
-            bitsetOr(bodyLike, elseNodes);
-            bitsetOr(bodyLike, incNodes);
-            // Parent-to-descendant relations.
-            writeNodeDense(uDense, bodyLike, NodeOrdering::RightInBodyOfLeft);
-            writeNodeDense(uDense, seqNodes, NodeOrdering::LeftFirst);
-            // Cross-partition ordering with strict precedence:
-            // Initialize -> Body -> Else -> ForLoopIncrement -> Sequence
-            //
-            // Critical correctness fix:
-            // afterInit excludes initNodes itself.
+            denseOr(bodyLike, bodyNodes);
+            denseOr(bodyLike, elseNodes);
+            denseOr(bodyLike, incNodes);
+            // Parent relationships.
+            writeOrderCache(u, bodyLike, NodeOrdering::RightInBodyOfLeft);
+            writeOrderCache(u, seqNodes, NodeOrdering::LeftFirst);
+            // Cross-partition relationships.
+            // IMPORTANT correctness fix: afterInit excludes initNodes itself.
             afterInit = bodyNodes;
-            bitsetOr(afterInit, elseNodes);
-            bitsetOr(afterInit, incNodes);
-            bitsetOr(afterInit, seqNodes);
-            writeDense(initNodes, afterInit, NodeOrdering::LeftFirst);
+            denseOr(afterInit, elseNodes);
+            denseOr(afterInit, incNodes);
+            denseOr(afterInit, seqNodes);
+            writeOrderCache(initNodes, afterInit, NodeOrdering::LeftFirst);
             afterBody = elseNodes;
-            bitsetOr(afterBody, incNodes);
-            bitsetOr(afterBody, seqNodes);
-            writeDense(bodyNodes, afterBody, NodeOrdering::LeftFirst);
+            denseOr(afterBody, incNodes);
+            denseOr(afterBody, seqNodes);
+            writeOrderCache(bodyNodes, afterBody, NodeOrdering::LeftFirst);
             afterElse = incNodes;
-            bitsetOr(afterElse, seqNodes);
-            writeDense(elseNodes, afterElse, NodeOrdering::LeftFirst);
-            writeDense(incNodes, seqNodes, NodeOrdering::LeftFirst);
-            allDesc[uDense] = bodyLike;
-            bitsetOr(allDesc[uDense], seqNodes);
-        }
-        // Move dense result into public cache structure.
-        m_orderCache.reserve(nodeCount);
-        for(int i = 0; i < nodeCount; ++i)
-        {
-            auto& orders = denseOrders[i];
-            if(bitsetAny(orders.after) || bitsetAny(orders.before) || bitsetAny(orders.inBody)
-               || bitsetAny(orders.containing))
-            {
-                m_orderCache.emplace(nodeTags[i], std::move(orders));
-            }
+            denseOr(afterElse, seqNodes);
+            writeOrderCache(elseNodes, afterElse, NodeOrdering::LeftFirst);
+            writeOrderCache(incNodes, seqNodes, NodeOrdering::LeftFirst);
+            // Cache all descendants for parent computations.
+            auto* allRow = matrixRow(allDesc, m_cacheWords, u);
+            for(size_t w = 0; w < m_cacheWords; ++w)
+                allRow[w] = bodyLike[w] | seqNodes[w];
+            // Defensive: no self descendant.
+            allRow[static_cast<size_t>(u) >> 6] &= ~(uint64_t(1) << (u & 63));
         }
         validateOrderCache();
         m_cacheStatus = CacheStatus::Valid;
-        m_descendentCache.clear();
     }
 
     /*
@@ -771,336 +752,104 @@ void ControlGraph::populateOrderCache() const
     //    m_descendentCache.clear();
     //}
 
-    template <CForwardRangeOf<int> Range>
-    //std::vector<int> ControlGraph::populateOrderCache(Range const& startingNodes) const
-    Bitset ControlGraph::populateOrderCache(Range const& startingNodes) const
-    {
-        Bitset rv;
-        for(auto it = startingNodes.begin(); it != startingNodes.end(); ++it)
-        {
-            auto nodes = populateOrderCache(*it);
-            bitsetOr(rv, nodes);
-        }
-        return rv;
-
-        //std::vector<int> rv;
-        //for(auto it = startingNodes.begin(); it != startingNodes.end(); ++it)
-        //{
-        //    auto nodes = populateOrderCache(*it);
-        //    rv.insert(rv.end(), nodes.begin(), nodes.end());
-        //}
-        //return rv;
-    }
-
-    //std::vector<int> ControlGraph::populateOrderCache(int startingNode) const
-    Bitset ControlGraph::populateOrderCache(int startingNode) const
-    {
-
-        auto ccEntry = m_descendentCache.find(startingNode);
-        if(ccEntry != m_descendentCache.end())
-            return ccEntry->second;
-        static_assert(std::variant_size_v<ControlEdge> == 5,
-                      "Currently the available edge types are Sequence(0), Initialize(1), "
-                      "ForLoopIncrement(2), Body(3) and Else(4)."
-                      "If more edge types are added, this function has to be updated.");
-        using GD = Graph::Direction;
-        std::array<std::vector<int>, std::variant_size_v<ControlEdge>> directChildren;
-        for(auto edge : getNeighbours<GD::Downstream>(startingNode))
-        {
-            auto edgeTypeIndex = getEdge(edge).index();
-            for(auto child : getNeighbours<GD::Downstream>(edge))
-                directChildren[edgeTypeIndex].push_back(child);
-        }
-        auto addDescendents = [this](std::vector<int> const& children) -> Bitset {
-            Bitset descendents = populateOrderCache(children);
-            Bitset result      = descendents;
-            for(int c : children)
-                bitsetSet(result, c);
-            return result;
-        };
-        auto initNodes = addDescendents(directChildren[1]);
-        auto bodyNodes = addDescendents(directChildren[3]);
-        auto elseNodes = addDescendents(directChildren[4]);
-        auto incNodes  = addDescendents(directChildren[2]);
-        auto seqNodes  = addDescendents(directChildren[0]);
-        writeOrderCache(startingNode, initNodes, NodeOrdering::RightInBodyOfLeft);
-        writeOrderCache(startingNode, bodyNodes, NodeOrdering::RightInBodyOfLeft);
-        writeOrderCache(startingNode, elseNodes, NodeOrdering::RightInBodyOfLeft);
-        writeOrderCache(startingNode, incNodes, NodeOrdering::RightInBodyOfLeft);
-
-        writeOrderCache(startingNode, seqNodes, NodeOrdering::LeftFirst);
-        writeOrderCache(initNodes, bodyNodes, NodeOrdering::LeftFirst);
-        writeOrderCache(initNodes, elseNodes, NodeOrdering::LeftFirst);
-        writeOrderCache(initNodes, incNodes, NodeOrdering::LeftFirst);
-        writeOrderCache(initNodes, seqNodes, NodeOrdering::LeftFirst);
-        writeOrderCache(bodyNodes, elseNodes, NodeOrdering::LeftFirst);
-        writeOrderCache(bodyNodes, incNodes, NodeOrdering::LeftFirst);
-        writeOrderCache(bodyNodes, seqNodes, NodeOrdering::LeftFirst);
-        writeOrderCache(elseNodes, incNodes, NodeOrdering::LeftFirst);
-        writeOrderCache(elseNodes, seqNodes, NodeOrdering::LeftFirst);
-        writeOrderCache(incNodes, seqNodes, NodeOrdering::LeftFirst);
-        Bitset allNodes;
-        bitsetOr(allNodes, initNodes);
-        bitsetOr(allNodes, bodyNodes);
-        bitsetOr(allNodes, elseNodes);
-        bitsetOr(allNodes, incNodes);
-        bitsetOr(allNodes, seqNodes);
-        m_descendentCache[startingNode] = allNodes;
-        return allNodes;
-
-        //auto ccEntry = m_descendentCache.find(startingNode);
-        //if(ccEntry != m_descendentCache.end())
-        //    return ccEntry->second;
-
-        //static_assert(std::variant_size_v<ControlEdge> == 5,
-        //              "Currently the available edge types are Sequence(0), Initialize(1), "
-        //              "ForLoopIncrement(2), Body(3) and Else(4)."
-        //              "If more edge types are added, this function has to be updated.");
-
-        //using GD = Graph::Direction;
-        //// Edge variant indices: Sequence(0), Initialize(1), ForLoopIncrement(2), Body(3), Else(4)
-        //std::array<std::vector<int>, std::variant_size_v<ControlEdge>> directChildren;
-        //for(auto edge : getNeighbours<GD::Downstream>(startingNode))
-        //{
-        //    auto edgeTypeIndex = getEdge(edge).index();
-        //    for(auto child : getNeighbours<GD::Downstream>(edge))
-        //        directChildren[edgeTypeIndex].push_back(child);
-        //}
-
-        //auto addDescendents = [this](std::vector<int> const& children) -> std::vector<int> {
-        //    auto             descendents = populateOrderCache(children);
-        //    std::vector<int> result;
-        //    result.reserve(children.size() + descendents.size());
-        //    result.insert(result.end(), children.begin(), children.end());
-        //    result.insert(result.end(), descendents.begin(), descendents.end());
-
-        //    std::ranges::sort(result);
-        //    result.erase(std::unique(result.begin(), result.end()), result.end());
-        //    return result;
-        //};
-
-        //// Index: Initialize(1), Body(3), Else(4), ForLoopIncrement(2), Sequence(0)
-        //auto initNodes = addDescendents(directChildren[1]);
-        //auto bodyNodes = addDescendents(directChildren[3]);
-        //auto elseNodes = addDescendents(directChildren[4]);
-        //auto incNodes  = addDescendents(directChildren[2]);
-        //auto seqNodes  = addDescendents(directChildren[0]);
-
-        //// {init, body, else, inc} nodes are in the body of the current node
-        //writeOrderCache({startingNode}, initNodes, NodeOrdering::RightInBodyOfLeft);
-        //writeOrderCache({startingNode}, bodyNodes, NodeOrdering::RightInBodyOfLeft);
-        //writeOrderCache({startingNode}, elseNodes, NodeOrdering::RightInBodyOfLeft);
-        //writeOrderCache({startingNode}, incNodes, NodeOrdering::RightInBodyOfLeft);
-
-        //// Sequence connected nodes are after the current node
-        //writeOrderCache({startingNode}, seqNodes, NodeOrdering::LeftFirst);
-
-        //// {body, else, inc, sequence} are after init nodes
-        //writeOrderCache(initNodes, bodyNodes, NodeOrdering::LeftFirst);
-        //writeOrderCache(initNodes, elseNodes, NodeOrdering::LeftFirst);
-        //writeOrderCache(initNodes, incNodes, NodeOrdering::LeftFirst);
-        //writeOrderCache(initNodes, seqNodes, NodeOrdering::LeftFirst);
-
-        //// {else, inc, sequence} are after body nodes
-        //writeOrderCache(bodyNodes, elseNodes, NodeOrdering::LeftFirst);
-        //writeOrderCache(bodyNodes, incNodes, NodeOrdering::LeftFirst);
-        //writeOrderCache(bodyNodes, seqNodes, NodeOrdering::LeftFirst);
-
-        //// {inc, sequence} are after else nodes
-        //writeOrderCache(elseNodes, incNodes, NodeOrdering::LeftFirst);
-        //writeOrderCache(elseNodes, seqNodes, NodeOrdering::LeftFirst);
-
-        //// sequence are after inc nodes
-        //writeOrderCache(incNodes, seqNodes, NodeOrdering::LeftFirst);
-
-        //std::vector<int> allNodes;
-        //allNodes.reserve(initNodes.size() + bodyNodes.size() + elseNodes.size() + incNodes.size()
-        //                 + seqNodes.size());
-
-        //allNodes.insert(allNodes.end(), initNodes.begin(), initNodes.end());
-        //allNodes.insert(allNodes.end(), bodyNodes.begin(), bodyNodes.end());
-        //allNodes.insert(allNodes.end(), elseNodes.begin(), elseNodes.end());
-        //allNodes.insert(allNodes.end(), incNodes.begin(), incNodes.end());
-        //allNodes.insert(allNodes.end(), seqNodes.begin(), seqNodes.end());
-
-        //std::ranges::sort(allNodes);
-        //allNodes.erase(std::unique(allNodes.begin(), allNodes.end()), allNodes.end());
-        //m_descendentCache[startingNode] = allNodes;
-
-        //return allNodes;
-    }
-
     void ControlGraph::writeOrderCache(Bitset const& nodesA,
                                        Bitset const& nodesB,
                                        NodeOrdering  order) const
     {
         if(!bitsetAny(nodesA) || !bitsetAny(nodesB))
             return;
-        auto selectBitset = [](NodeOrders& orders, NodeOrdering order) -> Bitset& {
-            switch(order)
+        auto selectMatrix = [this](NodeOrdering o) -> std::vector<uint64_t>& {
+            switch(o)
             {
             case NodeOrdering::LeftFirst:
-                return orders.after;
+                return m_cacheAfter;
             case NodeOrdering::RightFirst:
-                return orders.before;
+                return m_cacheBefore;
             case NodeOrdering::RightInBodyOfLeft:
-                return orders.inBody;
+                return m_cacheInBody;
             case NodeOrdering::LeftInBodyOfRight:
-                return orders.containing;
+                return m_cacheContaining;
             default:
                 break;
             }
-            AssertFatal(false, "Invalid order: ", ShowValue(order));
-            return orders.after;
+            AssertFatal(false, "Invalid order", ShowValue(o));
+            return m_cacheAfter;
         };
-        for(size_t w = 0; w < nodesA.size(); ++w)
-        {
-            uint64_t bits = nodesA[w];
-            while(bits)
-            {
-                int bit = std::countr_zero(bits);
-                int a   = static_cast<int>(w * 64 + bit);
-                bitsetOr(selectBitset(m_orderCache[a], order), nodesB);
-                bits &= bits - 1;
-            }
-        }
-        auto oppositeOrder = opposite(order);
-        for(size_t w = 0; w < nodesB.size(); ++w)
-        {
-            uint64_t bits = nodesB[w];
-            while(bits)
-            {
-                int bit = std::countr_zero(bits);
-                int b   = static_cast<int>(w * 64 + bit);
-                bitsetOr(selectBitset(m_orderCache[b], oppositeOrder), nodesA);
-                bits &= bits - 1;
-            }
-        }
+        auto&     matAB = selectMatrix(order);
+        auto&     matBA = selectMatrix(opposite(order));
+        int const n     = static_cast<int>(m_cacheDenseToTag.size());
+        forEachSetBit(nodesA, [&](int aDense) {
+            if(aDense >= n)
+                return;
+            rowOr(matrixRow(matAB, m_cacheWords, aDense), nodesB.data(), m_cacheWords);
+        });
+        forEachSetBit(nodesB, [&](int bDense) {
+            if(bDense >= n)
+                return;
+            rowOr(matrixRow(matBA, m_cacheWords, bDense), nodesA.data(), m_cacheWords);
+        });
     }
-
-    //template <CForwardRangeOf<int> ARange, CForwardRangeOf<int> BRange>
-    //void ControlGraph::writeOrderCache(ARange const& nodesA,
-    //                                   BRange const& nodesB,
-    //                                   NodeOrdering  order) const
-    //{
-    //    if(nodesA.size() == 0 or nodesB.size() == 0)
-    //        return;
-
-    //    auto selectVec = [](NodeOrders& orders, NodeOrdering order) -> std::vector<int>& {
-    //        switch(order)
-    //        {
-    //        case NodeOrdering::LeftFirst:
-    //            return orders.after;
-    //        case NodeOrdering::RightFirst:
-    //            return orders.before;
-    //        case NodeOrdering::RightInBodyOfLeft:
-    //            return orders.inBody;
-    //        case NodeOrdering::LeftInBodyOfRight:
-    //            return orders.containing;
-    //        default:
-    //            break;
-    //        }
-    //        AssertFatal(false, "Invalid order: ", ShowValue(order));
-    //        return orders.after; // this statement should never be reached
-    //    };
-    //    for(int a : nodesA)
-    //    {
-    //        auto& vec = selectVec(m_orderCache[a], order);
-    //        vec.insert(vec.end(), nodesB.begin(), nodesB.end());
-    //    }
-
-    //    auto oppositeOrder = opposite(order);
-    //    for(int b : nodesB)
-    //    {
-    //        auto& vec = selectVec(m_orderCache[b], oppositeOrder);
-    //        vec.insert(vec.end(), nodesA.begin(), nodesA.end());
-    //    }
-    //}
-
     void ControlGraph::writeOrderCache(int nodeA, Bitset const& nodesB, NodeOrdering order) const
     {
         if(!bitsetAny(nodesB))
             return;
-        auto selectBitset = [](NodeOrders& orders, NodeOrdering order) -> Bitset& {
-            switch(order)
+        int const n = static_cast<int>(m_cacheDenseToTag.size());
+        AssertFatal(nodeA >= 0 && nodeA < n, ShowValue(nodeA), ShowValue(n));
+        auto selectMatrix = [this](NodeOrdering o) -> std::vector<uint64_t>& {
+            switch(o)
             {
             case NodeOrdering::LeftFirst:
-                return orders.after;
+                return m_cacheAfter;
             case NodeOrdering::RightFirst:
-                return orders.before;
+                return m_cacheBefore;
             case NodeOrdering::RightInBodyOfLeft:
-                return orders.inBody;
+                return m_cacheInBody;
             case NodeOrdering::LeftInBodyOfRight:
-                return orders.containing;
+                return m_cacheContaining;
             default:
                 break;
             }
-            AssertFatal(false, "Invalid order: ", ShowValue(order));
-            return orders.after;
+            AssertFatal(false, "Invalid order", ShowValue(o));
+            return m_cacheAfter;
         };
-        bitsetOr(selectBitset(m_orderCache[nodeA], order), nodesB);
-        auto oppositeOrder = opposite(order);
-        for(size_t w = 0; w < nodesB.size(); ++w)
-        {
-            uint64_t bits = nodesB[w];
-            while(bits)
-            {
-                int bit = std::countr_zero(bits);
-                int b   = static_cast<int>(w * 64 + bit);
-                bitsetSet(selectBitset(m_orderCache[b], oppositeOrder), nodeA);
-                bits &= bits - 1;
-            }
-        }
+        auto& matAB = selectMatrix(order);
+        auto& matBA = selectMatrix(opposite(order));
+        rowOr(matrixRow(matAB, m_cacheWords, nodeA), nodesB.data(), m_cacheWords);
+        forEachSetBit(nodesB, [&](int bDense) {
+            if(bDense >= n)
+                return;
+            auto* row = matrixRow(matBA, m_cacheWords, bDense);
+            row[static_cast<size_t>(nodeA) >> 6] |= uint64_t(1) << (nodeA & 63);
+        });
     }
-
-    //void ControlGraph::writeOrderCache(int nodeA, int nodeB, NodeOrdering order) const
-    //{
-    //    switch(order)
-    //    {
-    //    case NodeOrdering::LeftFirst:
-    //        m_orderCache[nodeA].after.push_back(nodeB);
-    //        m_orderCache[nodeB].before.push_back(nodeA);
-    //        break;
-    //    case NodeOrdering::RightFirst:
-    //        m_orderCache[nodeA].before.push_back(nodeB);
-    //        m_orderCache[nodeB].after.push_back(nodeA);
-    //        break;
-    //    case NodeOrdering::RightInBodyOfLeft:
-    //        m_orderCache[nodeA].inBody.push_back(nodeB);
-    //        m_orderCache[nodeB].containing.push_back(nodeA);
-    //        break;
-    //    case NodeOrdering::LeftInBodyOfRight:
-    //        m_orderCache[nodeA].containing.push_back(nodeB);
-    //        m_orderCache[nodeB].inBody.push_back(nodeA);
-    //        break;
-    //    default:
-    //        break;
-    //    }
-    //}
-
     void ControlGraph::writeOrderCache(int nodeA, int nodeB, NodeOrdering order) const
     {
-        switch(order)
-        {
-        case NodeOrdering::LeftFirst:
-            bitsetSet(m_orderCache[nodeA].after, nodeB);
-            bitsetSet(m_orderCache[nodeB].before, nodeA);
-            break;
-        case NodeOrdering::RightFirst:
-            bitsetSet(m_orderCache[nodeA].before, nodeB);
-            bitsetSet(m_orderCache[nodeB].after, nodeA);
-            break;
-        case NodeOrdering::RightInBodyOfLeft:
-            bitsetSet(m_orderCache[nodeA].inBody, nodeB);
-            bitsetSet(m_orderCache[nodeB].containing, nodeA);
-            break;
-        case NodeOrdering::LeftInBodyOfRight:
-            bitsetSet(m_orderCache[nodeA].containing, nodeB);
-            bitsetSet(m_orderCache[nodeB].inBody, nodeA);
-            break;
-        default:
-            break;
-        }
+        int const n = static_cast<int>(m_cacheDenseToTag.size());
+        AssertFatal(nodeA >= 0 && nodeA < n, ShowValue(nodeA), ShowValue(n));
+        AssertFatal(nodeB >= 0 && nodeB < n, ShowValue(nodeB), ShowValue(n));
+        auto selectMatrix = [this](NodeOrdering o) -> std::vector<uint64_t>& {
+            switch(o)
+            {
+            case NodeOrdering::LeftFirst:
+                return m_cacheAfter;
+            case NodeOrdering::RightFirst:
+                return m_cacheBefore;
+            case NodeOrdering::RightInBodyOfLeft:
+                return m_cacheInBody;
+            case NodeOrdering::LeftInBodyOfRight:
+                return m_cacheContaining;
+            default:
+                break;
+            }
+            AssertFatal(false, "Invalid order", ShowValue(o));
+            return m_cacheAfter;
+        };
+        auto& matAB = selectMatrix(order);
+        auto& matBA = selectMatrix(opposite(order));
+        auto* rowAB = matrixRow(matAB, m_cacheWords, nodeA);
+        auto* rowBA = matrixRow(matBA, m_cacheWords, nodeB);
+        rowAB[static_cast<size_t>(nodeB) >> 6] |= uint64_t(1) << (nodeB & 63);
+        rowBA[static_cast<size_t>(nodeA) >> 6] |= uint64_t(1) << (nodeA & 63);
     }
 
     NodeOrdering ControlGraph::lookupOrder(IgnoreCachePolicy const, int nodeA, int nodeB) const
