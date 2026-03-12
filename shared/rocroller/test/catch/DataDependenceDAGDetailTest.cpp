@@ -56,11 +56,22 @@ namespace DataDependenceDAGDetailTest
         }
     }
 
-    TEST_CASE("construct data dependence directed acyclic graph", "[data-dependence-dag]")
+    TEST_CASE("data dependence DAG detail member functions and states", "[data-dependence-dag]")
     {
         KernelGraph::KernelGraph graph;
 
         // computes Nth Fibonacci number
+        // if(N <= 1)
+        // then
+        //   Result = N
+        // else
+        //   F0 = 0, F1 = 1
+        //   for(I = 2; I <=N, I++)
+        //     F2 = F0 + F1
+        //     F0 = F1
+        //     F1 = F2
+        //   Result = F2
+
         auto kernel = graph.control.addElement(Kernel());
 
         auto loadN = graph.control.addElement(LoadVGPR(DataType::UInt32));
@@ -135,64 +146,146 @@ namespace DataDependenceDAGDetailTest
 
         graph.control.addElement(Sequence(), {conditional}, {storeResult});
 
-        DataDependenceDAGDetail obj(graph);
-        obj.constructDataDependenceDAG();
+        SECTION("constructDataDependenceDAG and test if the required dependence edges are present")
+        {
+            DataDependenceDAGDetail obj(graph);
+            obj.constructDataDependenceDAG();
 
-        auto depDAG = obj.getDataDependenceDAG();
+            auto depDAG = obj.getDataDependenceDAG();
 
-        CHECK(graph.control.findEdge(kernel, loadN).has_value());
-        CHECK(!depDAG.findEdge(kernel, loadN).has_value());
+            CHECK(graph.control.findEdge(kernel, loadN).has_value());
+            CHECK(!depDAG.findEdge(kernel, loadN).has_value());
 
-        // conditional if(N <= 1) reads loadN
-        // WR (flow) dependency
-        CHECK(graph.control.findEdge(loadN, conditional).has_value());
-        CHECK(depDAG.findEdge(loadN, conditional).has_value());
-        CHECK(obj.getBodyParent(loadN) == kernel);
-        CHECK(obj.getBodyParent(conditional) == kernel);
+            // conditional if(N <= 1) reads loadN
+            // WR (flow) dependency
+            CHECK(graph.control.findEdge(loadN, conditional).has_value());
+            CHECK(depDAG.findEdge(loadN, conditional).has_value());
+            CHECK(obj.getBodyParent(loadN) == kernel);
+            CHECK(obj.getBodyParent(conditional) == kernel);
 
-        CHECK(graph.control.findEdge(conditional, assignResult).has_value());
-        CHECK(!depDAG.findEdge(conditional, assignResult).has_value());
+            CHECK(graph.control.findEdge(conditional, assignResult).has_value());
+            CHECK(!depDAG.findEdge(conditional, assignResult).has_value());
 
-        CHECK(graph.control.findEdge(conditional, assignF0).has_value());
-        CHECK(!depDAG.findEdge(conditional, assignF0).has_value());
+            CHECK(graph.control.findEdge(conditional, assignF0).has_value());
+            CHECK(!depDAG.findEdge(conditional, assignF0).has_value());
 
-        CHECK(graph.control.findEdge(assignF0, assignF1).has_value());
-        CHECK(!depDAG.findEdge(assignF0, assignF1).has_value());
+            CHECK(graph.control.findEdge(assignF0, assignF1).has_value());
+            CHECK(!depDAG.findEdge(assignF0, assignF1).has_value());
 
-        CHECK(graph.control.findEdge(assignF1, forLoop).has_value());
-        CHECK(!depDAG.findEdge(assignF1, forLoop).has_value());
+            CHECK(graph.control.findEdge(assignF1, forLoop).has_value());
+            CHECK(!depDAG.findEdge(assignF1, forLoop).has_value());
 
-        // WW (output) dependency
-        CHECK(!graph.control.findEdge(forInit, forInc).has_value());
-        CHECK(depDAG.findEdge(forInit, forInc).has_value());
-        CHECK(obj.getBodyParent(forInit) == forLoop);
-        CHECK(obj.getBodyParent(forInc) == forLoop);
+            // WW (output) dependency
+            CHECK(!graph.control.findEdge(forInit, forInc).has_value());
+            CHECK(depDAG.findEdge(forInit, forInc).has_value());
+            CHECK(obj.getBodyParent(forInit) == forLoop);
+            CHECK(obj.getBodyParent(forInc) == forLoop);
 
-        // F2 = F0 + F1 reads both F0 and F1,
-        // but assignF0 and assignF2 have different body parents
-        // and assignF1 and assignF2 also have different body parents,
-        // meaning they belong to different basic blocks,
-        // therefore, no dependence edges between them.
-        CHECK(!graph.control.findEdge(assignF0, assignF2).has_value());
-        CHECK(!depDAG.findEdge(assignF0, assignF2).has_value());
-        CHECK(!graph.control.findEdge(assignF1, assignF2).has_value());
-        CHECK(!depDAG.findEdge(assignF0, assignF2).has_value());
-        CHECK(obj.getBodyParent(assignF0) == conditional);
-        CHECK(obj.getBodyParent(assignF1) == conditional);
-        CHECK(obj.getBodyParent(assignF2) == forLoop);
+            // F2 = F0 + F1 reads both F0 and F1,
+            // but assignF0 and assignF2 have different body parents
+            // and assignF1 and assignF2 also have different body parents,
+            // meaning they belong to different basic blocks,
+            // therefore, no dependence edges between them.
+            CHECK(!graph.control.findEdge(assignF0, assignF2).has_value());
+            CHECK(!depDAG.findEdge(assignF0, assignF2).has_value());
+            CHECK(!graph.control.findEdge(assignF1, assignF2).has_value());
+            CHECK(!depDAG.findEdge(assignF0, assignF2).has_value());
+            CHECK(obj.getBodyParent(assignF0) == conditional);
+            CHECK(obj.getBodyParent(assignF1) == conditional);
+            CHECK(obj.getBodyParent(assignF2) == forLoop);
 
-        // F0 = F1
-        // RW (anti) dep
-        CHECK(graph.control.findEdge(assignF2, assignF1ToF0).has_value());
-        CHECK(depDAG.findEdge(assignF2, assignF1ToF0).has_value());
-        CHECK(obj.getBodyParent(assignF2) == forLoop);
-        CHECK(obj.getBodyParent(assignF1ToF0) == forLoop);
+            // F0 = F1
+            // RW (anti) dep
+            CHECK(graph.control.findEdge(assignF2, assignF1ToF0).has_value());
+            CHECK(depDAG.findEdge(assignF2, assignF1ToF0).has_value());
+            CHECK(obj.getBodyParent(assignF2) == forLoop);
+            CHECK(obj.getBodyParent(assignF1ToF0) == forLoop);
 
-        // F1 = F2
-        // WR (flow) dependency
-        CHECK(!graph.control.findEdge(assignF2, assignF2ToF1).has_value());
-        CHECK(depDAG.findEdge(assignF2, assignF2ToF1).has_value());
-        CHECK(obj.getBodyParent(assignF2) == forLoop);
-        CHECK(obj.getBodyParent(assignF2ToF1) == forLoop);
+            // F1 = F2
+            // WR (flow) dependency
+            CHECK(!graph.control.findEdge(assignF2, assignF2ToF1).has_value());
+            CHECK(depDAG.findEdge(assignF2, assignF2ToF1).has_value());
+            CHECK(obj.getBodyParent(assignF2) == forLoop);
+            CHECK(obj.getBodyParent(assignF2ToF1) == forLoop);
+        }
+
+        SECTION("process tracer records to add dependence edges if possible")
+        {
+            DataDependenceDAGDetail obj(graph);
+            auto                    depDAG = obj.getDataDependenceDAG();
+
+            auto tracer  = rocRoller::KernelGraph::ControlFlowRWTracer(graph);
+            auto records = tracer.coordinatesReadWrite();
+            std::cout << records.size() << std::endl;
+
+            for(auto iter = records.begin(); iter != records.end();)
+            {
+                std::cout << iter->control << std::endl;
+                switch(iter->control)
+                {
+                case 2:
+                {
+                    CHECK(iter->control == loadN);
+                    CHECK(iter->coordinate == vgprN);
+                    CHECK(iter->rw
+                          == rocRoller::KernelGraph::ControlFlowRWTracer::ReadWrite::WRITE);
+                    obj.processReadWriteRecord(*iter);
+                    iter++;
+                    break;
+                }
+                case 3:
+                {
+                    CHECK(iter->control == conditional);
+                    CHECK(iter->coordinate == vgprN);
+                    CHECK(iter->rw == rocRoller::KernelGraph::ControlFlowRWTracer::ReadWrite::READ);
+                    CHECK(!depDAG.findEdge(loadN, conditional).has_value());
+
+                    obj.processReadWriteRecord(*iter);
+                    depDAG = obj.getDataDependenceDAG();
+                    // WR (flow) dependency
+                    CHECK(depDAG.findEdge(loadN, conditional).has_value());
+                    iter++;
+                    break;
+                }
+                case 6:
+                {
+                    CHECK(iter->control == assignResult);
+                    CHECK(iter->coordinate == vgprN);
+                    CHECK(iter->rw == rocRoller::KernelGraph::ControlFlowRWTracer::ReadWrite::READ);
+                    CHECK(!depDAG.findEdge(loadN, assignResult).has_value());
+                    obj.processReadWriteRecord(*iter);
+                    iter++;
+
+                    depDAG = obj.getDataDependenceDAG();
+                    CHECK(obj.getBodyParent(loadN) != obj.getBodyParent(assignResult));
+                    CHECK(obj.getBodyParent(loadN) == kernel);
+                    CHECK(obj.getBodyParent(assignResult) == conditional);
+                    // Since loadN and assignResult belong to different basic-blocks,
+                    // so, no WR dependence edge between them.
+                    CHECK(!depDAG.findEdge(loadN, assignResult).has_value());
+
+                    // a dependence edge can only be added between the nodes
+                    // that belong to the same basic-block.
+                    obj.addDependenceEdge(loadN, assignResult);
+                    depDAG = obj.getDataDependenceDAG();
+                    CHECK(!depDAG.findEdge(loadN, assignResult).has_value());
+
+                    CHECK(iter->control == assignResult);
+                    CHECK(iter->coordinate == vgprResult);
+                    CHECK(iter->rw
+                          == rocRoller::KernelGraph::ControlFlowRWTracer::ReadWrite::WRITE);
+                    obj.processReadWriteRecord(*iter);
+                    iter++;
+                    break;
+                }
+                default:
+                {
+                    obj.processReadWriteRecord(*iter);
+                    iter++;
+                    break;
+                }
+                }
+            }
+        }
     }
 }
