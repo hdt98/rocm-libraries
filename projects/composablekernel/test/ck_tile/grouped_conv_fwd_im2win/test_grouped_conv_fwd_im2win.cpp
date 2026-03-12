@@ -312,6 +312,114 @@ static bool run_im2win_vs_ref(const ConvProblem& p)
     return pass;
 }
 
+// ── Test runner for NHWGC/GKYXC layout (channels-last) ───────────────────────
+//
+// Channels-last is the layout that enables group merging (G adjacent to C).
+// The GPU reference already uses NHWGC/GKYXC, so no transpose is needed.
+template <typename DataType>
+static bool run_im2win_vs_ref_nhwgc(const ConvProblem& p)
+{
+    using AccDataType = float;
+
+    const int Ho = (p.Hi + 2 * p.LPH - p.Y) / p.Sy + 1;
+    const int Wo = (p.Wi + 2 * p.LPW - p.X) / p.Sx + 1;
+
+    using InLayout  = ck_tile::tensor_layout::convolution::NHWGC;
+    using WeiLayout = ck_tile::tensor_layout::convolution::GKYXC;
+    using OutLayout = ck_tile::tensor_layout::convolution::NHWGK;
+    using Config    = Im2winConvTestConfig<DataType>;
+
+    // ── Host tensors in NHWGC / GKYXC / NHWGK ────────────────────────
+    // NHWGC = [N, Hi, Wi, G, C]
+    ck_tile::HostTensor<DataType> h_input({static_cast<std::size_t>(p.N),
+                                           static_cast<std::size_t>(p.Hi),
+                                           static_cast<std::size_t>(p.Wi),
+                                           static_cast<std::size_t>(p.G),
+                                           static_cast<std::size_t>(p.C)});
+    // GKYXC = [G, K, Y, X, C]
+    ck_tile::HostTensor<DataType> h_weight({static_cast<std::size_t>(p.G),
+                                            static_cast<std::size_t>(p.K),
+                                            static_cast<std::size_t>(p.Y),
+                                            static_cast<std::size_t>(p.X),
+                                            static_cast<std::size_t>(p.C)});
+
+    ck_tile::FillUniformDistribution<DataType>{-2.f, 2.f}(h_input);
+    ck_tile::FillUniformDistribution<DataType>{-2.f, 2.f}(h_weight);
+
+    const std::size_t out_elems =
+        static_cast<std::size_t>(p.N) * Ho * Wo * p.G * p.K;
+    ck_tile::DeviceMem d_input(h_input.get_element_space_size_in_bytes());
+    ck_tile::DeviceMem d_weight(h_weight.get_element_space_size_in_bytes());
+    ck_tile::DeviceMem d_output(out_elems * sizeof(DataType));
+
+    d_input.ToDevice(h_input.data());
+    d_weight.ToDevice(h_weight.data());
+    d_output.SetZero();
+
+    // ── Run im2win kernel (NHWGC/GKYXC → NHWGK) ──────────────────────
+    ck_tile::conv::ConvParam conv_param{
+        2, p.G, p.N, p.K, p.C,
+        {p.Y, p.X}, {p.Hi, p.Wi}, {p.Sy, p.Sx},
+        {1, 1}, {p.LPH, p.LPW}, {p.LPH, p.LPW}};
+
+    ck_tile::GroupedConvFwdHostArgs<> args(conv_param,
+                                           d_input.GetDeviceBuffer(),
+                                           d_weight.GetDeviceBuffer(),
+                                           {}, d_output.GetDeviceBuffer(), 1);
+
+    GroupedConvFwdIm2winInvoker::grouped_conv_fwd<2, Config,
+                                                   DataType, DataType, AccDataType, DataType,
+                                                   InLayout, WeiLayout, OutLayout>(
+        args, ck_tile::stream_config{nullptr, false});
+
+    ck_tile::HostTensor<DataType> h_output_im2win({static_cast<std::size_t>(p.N),
+                                                   static_cast<std::size_t>(Ho),
+                                                   static_cast<std::size_t>(Wo),
+                                                   static_cast<std::size_t>(p.G),
+                                                   static_cast<std::size_t>(p.K)});
+    d_output.FromDevice(h_output_im2win.data());
+
+    // ── GPU reference (same NHWGC/GKYXC, no transpose needed) ─────────
+    ck_tile::DeviceMem d_output_ref(out_elems * sizeof(DataType));
+    d_output_ref.SetZero();
+
+    ck_tile::naive_grouped_conv_fwd<2, DataType, DataType, DataType>(
+        reinterpret_cast<const DataType*>(d_input.GetDeviceBuffer()),
+        reinterpret_cast<const DataType*>(d_weight.GetDeviceBuffer()),
+        reinterpret_cast<DataType*>(d_output_ref.GetDeviceBuffer()),
+        p.G, p.N, p.K, p.C,
+        {static_cast<ck_tile::long_index_t>(p.Hi), static_cast<ck_tile::long_index_t>(p.Wi)},
+        {static_cast<ck_tile::long_index_t>(p.Y),  static_cast<ck_tile::long_index_t>(p.X)},
+        {static_cast<ck_tile::long_index_t>(Ho),   static_cast<ck_tile::long_index_t>(Wo)},
+        {static_cast<ck_tile::long_index_t>(p.Sy), static_cast<ck_tile::long_index_t>(p.Sx)},
+        {1LL, 1LL},
+        {static_cast<ck_tile::long_index_t>(p.LPH),
+         static_cast<ck_tile::long_index_t>(p.LPW)});
+
+    ck_tile::HostTensor<DataType> h_output_ref({static_cast<std::size_t>(p.N),
+                                                static_cast<std::size_t>(Ho),
+                                                static_cast<std::size_t>(Wo),
+                                                static_cast<std::size_t>(p.G),
+                                                static_cast<std::size_t>(p.K)});
+    d_output_ref.FromDevice(h_output_ref.data());
+
+    // ── Compare ───────────────────────────────────────────────────────
+    const int GemmK = p.C * p.Y * p.X;
+    const float max_val = *std::max_element(h_output_ref.mData.begin(),
+                                            h_output_ref.mData.end());
+    const auto rtol = ck_tile::get_relative_threshold<DataType, DataType, AccDataType>(GemmK);
+    const auto atol = ck_tile::get_absolute_threshold<DataType, DataType, AccDataType>(
+        max_val, GemmK);
+
+    bool pass = ck_tile::check_err(
+        h_output_im2win, h_output_ref, "im2win(NHWGC) vs GPU reference", rtol, atol);
+
+    if(!pass)
+        std::cout << "[FAIL] " << p.label << " (NHWGC)  rtol=" << rtol << " atol=" << atol << "\n";
+
+    return pass;
+}
+
 // ── GTest parametrised fixture ────────────────────────────────────────────────
 
 template <typename DataType>
@@ -377,3 +485,56 @@ TYPED_TEST(GroupedConvFwdIm2winTest, G32_C8_K8_3x3_Hi32Wi32)
 }
 
 #undef RUN
+
+// ── Channels-last (NHWGC/GKYXC) test suite ───────────────────────────────────
+// Tests the same problems but with the channels-last layout pair that enables
+// group merging.  The GPU reference uses NHWGC/GKYXC directly so no transpose
+// is needed, making these tests simpler and faster.
+template <typename DataType>
+class GroupedConvFwdIm2winTestNhwgc : public ::testing::Test {};
+
+TYPED_TEST_SUITE(GroupedConvFwdIm2winTestNhwgc, TestTypes);
+
+#define RUN_CL(problem) EXPECT_TRUE((run_im2win_vs_ref_nhwgc<TypeParam>(problem)))
+
+TYPED_TEST(GroupedConvFwdIm2winTestNhwgc, G1_C8_K8_3x3_pad1)
+{
+    RUN_CL((ConvProblem{1, 1, 8, 8, 8, 8, 3, 3, 1, 1, 1, 1, "G1_C8_K8_3x3_pad1"}));
+}
+
+TYPED_TEST(GroupedConvFwdIm2winTestNhwgc, G4_C8_K8_3x3_pad1)
+{
+    RUN_CL((ConvProblem{4, 1, 8, 8, 8, 8, 3, 3, 1, 1, 1, 1, "G4_C8_K8_3x3_pad1"}));
+}
+
+// Primary target: G=32, C=K=8
+TYPED_TEST(GroupedConvFwdIm2winTestNhwgc, G32_C8_K8_3x3_pad1)
+{
+    RUN_CL((ConvProblem{32, 1, 8, 8, 16, 16, 3, 3, 1, 1, 1, 1, "G32_C8_K8_3x3_pad1"}));
+}
+
+// C=K=4 (smallest target channel count)
+TYPED_TEST(GroupedConvFwdIm2winTestNhwgc, G32_C4_K4_3x3_pad1)
+{
+    RUN_CL((ConvProblem{32, 1, 4, 4, 16, 16, 3, 3, 1, 1, 1, 1, "G32_C4_K4_3x3_pad1"}));
+}
+
+// Stride=2, no pad
+TYPED_TEST(GroupedConvFwdIm2winTestNhwgc, G4_C8_K8_3x3_stride2)
+{
+    RUN_CL((ConvProblem{4, 1, 8, 8, 9, 9, 3, 3, 2, 2, 0, 0, "G4_C8_K8_3x3_stride2"}));
+}
+
+// Multi-batch N=2
+TYPED_TEST(GroupedConvFwdIm2winTestNhwgc, G4_N2_C8_K8_3x3_pad1)
+{
+    RUN_CL((ConvProblem{4, 2, 8, 8, 8, 8, 3, 3, 1, 1, 1, 1, "G4_N2_C8_K8_3x3_pad1"}));
+}
+
+// Larger spatial
+TYPED_TEST(GroupedConvFwdIm2winTestNhwgc, G32_C8_K8_3x3_Hi32Wi32)
+{
+    RUN_CL((ConvProblem{32, 1, 8, 8, 32, 32, 3, 3, 1, 1, 1, 1, "G32_C8_K8_3x3_Hi32Wi32"}));
+}
+
+#undef RUN_CL

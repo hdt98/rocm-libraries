@@ -166,16 +166,22 @@ struct TransformConvFwdToIm2win
         }
     }
 
-    // ── A descriptor: Weight W → A[M=K, K_gemm=C×Y×X] ───────────────
+    // ── A descriptor: Weight W → A[M=K, K_gemm] ─────────────────────
     //
-    // In true im2win, the weight is the A matrix of the GEMM.
-    // Physical layout: W[K, C, Y, X] (GKCYX, group stripped by pointer offset).
+    // Two weight layouts are supported, differing in K_gemm element ordering:
     //
-    // The weight descriptor is a simple 2D naive descriptor — no sliding
-    // window, no padding.  This is very compact: for K=4, C=4, Y=3, X=3
-    // the entire A tile (144 elements = 288 bytes) fits in registers.
+    //   GKCYX (channels-first):  W[K, C, Y, X], K_gemm = merge([C, Y, X])
+    //                            kg = c*(Y*X) + y*X + x  (C outermost)
+    //                            Pair with GNCHW input.
     //
-    // Supported layout: GKCYX
+    //   GKYXC (channels-last):   W[K, Y, X, C], K_gemm = merge([Y, X, C])
+    //                            kg = y*(X*C) + x*C + c  (C innermost, vectorisable)
+    //                            Pair with NHWGC input.
+    //
+    // Both descriptors are simple 2D naive descriptors (no sliding window).
+    // ─────────────────────────────────────────────────────────────────
+
+    // ── A descriptor for GKCYX (channels-first weight) ───────────────
     template <typename ALayout,
               typename std::enable_if<std::is_same_v<ALayout, tensor_layout::convolution::GKCYX>,
                                       bool>::type = false>
@@ -189,7 +195,6 @@ struct TransformConvFwdToIm2win
 
         if constexpr(ConvSpecialization == ConvolutionSpecialization::Filter3x3)
         {
-            // Y×X = 9 is a compile-time constant.
             return make_naive_tensor_descriptor(
                 make_tuple(K_, C_ * number<9>{}),
                 make_tuple(KStride, XStride),
@@ -198,7 +203,6 @@ struct TransformConvFwdToIm2win
         }
         else
         {
-            // General: flatten C×Y×X at runtime.
             const auto wei_k_c_y_x_desc = make_naive_tensor_descriptor(
                 make_tuple(K_, C_, Y_, X_),
                 make_tuple(KStride, CStride, YStride, XStride),
@@ -209,6 +213,46 @@ struct TransformConvFwdToIm2win
                 wei_k_c_y_x_desc,
                 make_tuple(make_pass_through_transform(K_),
                            make_merge_transform(make_tuple(C_, Y_, X_))),
+                make_tuple(sequence<0>{}, sequence<1, 2, 3>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}));
+        }
+    }
+
+    // ── A descriptor for GKYXC (channels-last weight) ─────────────────
+    // K_gemm = merge([Y, X, C]): C innermost → vectorised A loads along C.
+    // Use with NHWGC input (MakeBDescriptor_N_K<NHWGC>).
+    template <typename ALayout,
+              typename std::enable_if<std::is_same_v<ALayout, tensor_layout::convolution::GKYXC>,
+                                      bool>::type = false>
+    CK_TILE_HOST auto MakeADescriptor_M_K() const
+    {
+        // Physical strides for W[K, Y, X, C] (KYXC order, group stripped).
+        const IndexType KStride = Y_ * X_ * C_;
+        const IndexType YStride = X_ * C_;
+        const IndexType XStride = C_;
+        const IndexType CStride = 1; // C innermost
+
+        if constexpr(ConvSpecialization == ConvolutionSpecialization::Filter3x3)
+        {
+            // K_gemm = C * 9  (Y=X=3 at compile time, C innermost)
+            return make_naive_tensor_descriptor(
+                make_tuple(K_, C_ * number<9>{}),
+                make_tuple(KStride, CStride),
+                number<VectorSizeA>{},
+                I1);
+        }
+        else
+        {
+            const auto wei_k_y_x_c_desc = make_naive_tensor_descriptor(
+                make_tuple(K_, Y_, X_, C_),
+                make_tuple(KStride, YStride, XStride, CStride),
+                number<VectorSizeA>{},
+                I1);
+
+            return transform_tensor_descriptor(
+                wei_k_y_x_c_desc,
+                make_tuple(make_pass_through_transform(K_),
+                           make_merge_transform(make_tuple(Y_, X_, C_))),
                 make_tuple(sequence<0>{}, sequence<1, 2, 3>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
         }
@@ -352,6 +396,151 @@ struct TransformConvFwdToIm2win
                 make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
                            make_merge_transform(make_tuple(C_, Y_, X_))),
                 make_tuple(sequence<0, 3, 5>{}, sequence<1, 2, 4>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}));
+        }
+    }
+
+    // ── B descriptor: Input I → B[N=N×Ho×Wo, K_gemm] (NHWGC) ─────────
+    //
+    // Channels-last input layout.  In NHWGC, the G dimension is adjacent
+    // to C (innermost), so the group pointer offset is just g_base * C.
+    // This enables group merging analogous to im2col's NHWGC support.
+    //
+    // K_gemm = merge([Y, X, C]):  C innermost → vectorised B loads.
+    // Use with MakeADescriptor_M_K<GKYXC>().
+    //
+    // Physical layout after group strip: I[N, Hi, Wi, C] with strides
+    //   [Hi*Wi*G*C,  Wi*G*C,  G*C,  1]
+    // (G is NOT stripped from the strides — b_ptr = in_ptr + g_base*C
+    //  handles the group offset, but N still strides over the full G*C.)
+    //
+    // Supported layout: NHWGC
+    template <typename BLayout,
+              typename std::enable_if<
+                  NDimSpatial == 2 &&
+                      std::is_same_v<BLayout, tensor_layout::convolution::NHWGC>,
+                  bool>::type = false>
+    CK_TILE_HOST auto MakeBDescriptor_N_K() const
+    {
+        // Full NHWGC strides for I[N, Hi, Wi, G, C].
+        // b_ptr = in_ptr + g_base * C_ handles the group offset.
+        const IndexType NStride  = Hi_ * Wi_ * G_ * C_;
+        const IndexType HiStride = Wi_ * G_ * C_;
+        const IndexType WiStride = G_ * C_;
+        const IndexType CStride  = 1; // C innermost
+
+        if constexpr(ConvSpecialization == ConvolutionSpecialization::Filter1x1Stride1Pad0)
+        {
+            const auto in_n_ho_wo_c_desc = make_naive_tensor_descriptor(
+                make_tuple(N_, Ho_, Wo_, C_),
+                make_tuple(NStride, HiStride, WiStride, CStride),
+                number<VectorSizeB>{},
+                I1);
+
+            return transform_tensor_descriptor(
+                in_n_ho_wo_c_desc,
+                make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
+                           make_pass_through_transform(C_)),
+                make_tuple(sequence<0, 1, 2>{}, sequence<3>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}));
+        }
+        else if constexpr(ConvSpecialization == ConvolutionSpecialization::Filter3x3)
+        {
+            // Step 1: I[N, Hi, Wi, C] with full NHWGC strides.
+            const auto in_n_hi_wi_c_desc = make_naive_tensor_descriptor(
+                make_tuple(N_, Hi_, Wi_, C_),
+                make_tuple(NStride, HiStride, WiStride, CStride),
+                number<VectorSizeB>{},
+                I1);
+
+            // Step 2: pad Hi, Wi.
+            const auto in_n_hip_wip_c_desc = transform_tensor_descriptor(
+                in_n_hi_wi_c_desc,
+                make_tuple(make_pass_through_transform(N_),
+                           make_pad_transform(Hi_, InLeftPadH_, InRightPadH_),
+                           make_pad_transform(Wi_, InLeftPadW_, InRightPadW_),
+                           make_pass_through_transform(C_)),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}));
+
+            // Step 3: embed filter dims.
+            const auto in_n_y_ho_x_wo_c_desc = transform_tensor_descriptor(
+                in_n_hip_wip_c_desc,
+                make_tuple(make_pass_through_transform(N_),
+                           make_embed_transform(make_tuple(number<3>{}, Ho_),
+                                               make_tuple(ConvDilationH_, ConvStrideH_)),
+                           make_embed_transform(make_tuple(number<3>{}, Wo_),
+                                               make_tuple(ConvDilationW_, ConvStrideW_)),
+                           make_pass_through_transform(C_)),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+                make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3, 4>{}, sequence<5>{}));
+
+            // Step 4: merge → B[N=N*Ho*Wo, K_gemm=Y*X*C] (C innermost).
+            return transform_tensor_descriptor(
+                in_n_y_ho_x_wo_c_desc,
+                make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
+                           make_merge_transform(make_tuple(number<3>{}, number<3>{}, C_))),
+                make_tuple(sequence<0, 2, 4>{}, sequence<1, 3, 5>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}));
+        }
+        else if constexpr(ConvSpecialization == ConvolutionSpecialization::Filter1x1Pad0)
+        {
+            const auto in_n_hi_wi_c_desc = make_naive_tensor_descriptor(
+                make_tuple(N_, Hi_, Wi_, C_),
+                make_tuple(NStride, HiStride, WiStride, CStride),
+                number<VectorSizeB>{},
+                I1);
+
+            const auto in_n_ho_wo_c_desc = transform_tensor_descriptor(
+                in_n_hi_wi_c_desc,
+                make_tuple(make_pass_through_transform(N_),
+                           make_embed_transform(make_tuple(Ho_), make_tuple(ConvStrideH_)),
+                           make_embed_transform(make_tuple(Wo_), make_tuple(ConvStrideW_)),
+                           make_pass_through_transform(C_)),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}));
+
+            return transform_tensor_descriptor(
+                in_n_ho_wo_c_desc,
+                make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
+                           make_pass_through_transform(C_)),
+                make_tuple(sequence<0, 1, 2>{}, sequence<3>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}));
+        }
+        else
+        {
+            // General case.
+            const auto in_n_hi_wi_c_desc = make_naive_tensor_descriptor(
+                make_tuple(N_, Hi_, Wi_, C_),
+                make_tuple(NStride, HiStride, WiStride, CStride),
+                number<VectorSizeB>{},
+                I1);
+
+            const auto in_n_hip_wip_c_desc = transform_tensor_descriptor(
+                in_n_hi_wi_c_desc,
+                make_tuple(make_pass_through_transform(N_),
+                           make_pad_transform(Hi_, InLeftPadH_, InRightPadH_),
+                           make_pad_transform(Wi_, InLeftPadW_, InRightPadW_),
+                           make_pass_through_transform(C_)),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}));
+
+            const auto in_n_y_ho_x_wo_c_desc = transform_tensor_descriptor(
+                in_n_hip_wip_c_desc,
+                make_tuple(make_pass_through_transform(N_),
+                           make_embed_transform(make_tuple(Y_, Ho_),
+                                               make_tuple(ConvDilationH_, ConvStrideH_)),
+                           make_embed_transform(make_tuple(X_, Wo_),
+                                               make_tuple(ConvDilationW_, ConvStrideW_)),
+                           make_pass_through_transform(C_)),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+                make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3, 4>{}, sequence<5>{}));
+
+            return transform_tensor_descriptor(
+                in_n_y_ho_x_wo_c_desc,
+                make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
+                           make_merge_transform(make_tuple(Y_, X_, C_))),
+                make_tuple(sequence<0, 2, 4>{}, sequence<1, 3, 5>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
         }
     }

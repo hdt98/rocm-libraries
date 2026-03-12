@@ -45,18 +45,26 @@ struct GroupedConvFwdIm2winKernelArgs
 
     static constexpr index_t NonSpatialDims = 3;
 
-    // ── Constructor for GNCHW / GKCYX / {GNKHW or NHWGK} layout ─────
-    // NHWGK is preferred for output (K innermost → vectorised stores work).
-    // GNKHW is kept for future use but currently produces strided K stores.
+    // ── Constructor for {GNCHW/GKCYX} or {NHWGC/GKYXC} + {NHWGK} ─────
+    //
+    // Two input/weight layout pairs are supported:
+    //   Channels-first:  GNCHW input + GKCYX weight  (original)
+    //   Channels-last:   NHWGC input + GKYXC weight  (enables group merging)
+    //
+    // The output is always NHWGK (K innermost for vectorised stores).
     template <
         typename InLay  = typename GroupedConvTraitsType_::InLayout,
         typename WeiLay = typename GroupedConvTraitsType_::WeiLayout,
         typename OutLay = typename GroupedConvTraitsType_::OutLayout,
         typename std::enable_if<
-            std::is_same_v<InLay, tensor_layout::convolution::GNCHW> &&
-                std::is_same_v<WeiLay, tensor_layout::convolution::GKCYX> &&
-                (std::is_same_v<OutLay, tensor_layout::convolution::GNKHW> ||
-                 std::is_same_v<OutLay, tensor_layout::convolution::NHWGK>),
+            // Channels-first pair
+            ((std::is_same_v<InLay, tensor_layout::convolution::GNCHW> &&
+              std::is_same_v<WeiLay, tensor_layout::convolution::GKCYX>) ||
+             // Channels-last pair
+             (std::is_same_v<InLay, tensor_layout::convolution::NHWGC> &&
+              std::is_same_v<WeiLay, tensor_layout::convolution::GKYXC>)) &&
+            (std::is_same_v<OutLay, tensor_layout::convolution::GNKHW> ||
+             std::is_same_v<OutLay, tensor_layout::convolution::NHWGK>),
             bool>::type = false>
     CK_TILE_HOST GroupedConvFwdIm2winKernelArgs(const GroupedConvFwdHostArgs<CDElementwise>& args)
         : elfunc(args.elfunc)
@@ -126,18 +134,41 @@ struct GroupedConvFwdIm2winKernelArgs
         original_n  = transformer_.GetOriginalN();
         n_splits    = integer_divide_ceil(original_n, n_per_split);
 
-        // Per-group element strides (input / weight always GNCHW / GKCYX).
-        group_stride_a = transformer_.GetGroupStrideA();
-        group_stride_b = transformer_.GetGroupStrideB();
+        // ── Per-group strides (layout-dependent) ─────────────────────────
+        //
+        // The group stride is the offset to advance the tensor pointer by one
+        // group, i.e. from group g_base to group g_base+1.
+        //
+        // For GKCYX/GNCHW (channels-first):
+        //   group_stride_a = K*C*Y*X   (one group's weight in GKCYX)
+        //   group_stride_b = N*C*Hi*Wi (one group's input in GNCHW)
+        //
+        // For GKYXC/NHWGC (channels-last):
+        //   group_stride_a = K*Y*X*C   (one group's weight in GKYXC — same value!)
+        //   group_stride_b = C          (stride(G) in NHWGC: G is adjacent to C)
+        //
+        // Note: K*C*Y*X == K*Y*X*C, so group_stride_a is the same for both.
+        group_stride_a = transformer_.GetGroupStrideA(); // K*C*Y*X, same for both layouts
 
-        // Output layout determines how group and N-batch strides are computed.
+        if constexpr(std::is_same_v<InLay, tensor_layout::convolution::NHWGC>)
+        {
+            // NHWGC = [N, Hi, Wi, G, C]: stride(G) = C (G is adjacent to C).
+            group_stride_b = static_cast<long_index_t>(transformer_.C_);
+        }
+        else
+        {
+            // GNCHW = [G, N, C, Hi, Wi]: one group occupies N*C*Hi*Wi elements.
+            group_stride_b = transformer_.GetGroupStrideB();
+        }
+
+        // ── Output group and N-batch strides (OutLayout-dependent) ───────
         if constexpr(std::is_same_v<OutLay, tensor_layout::convolution::NHWGK>)
         {
             // NHWGK = [N, Ho, Wo, G, K]:  stride(G) = K,  stride(N) = Ho*Wo*G*K.
             group_stride_c      = static_cast<long_index_t>(transformer_.K_);
             output_batch_stride = static_cast<index_t>(transformer_.Ho_) *
                                   static_cast<index_t>(transformer_.Wo_) *
-                                  static_cast<index_t>(transformer_.G_) * // full G, not GemmBatch
+                                  static_cast<index_t>(transformer_.G_) *
                                   static_cast<index_t>(transformer_.K_);
         }
         else
@@ -149,10 +180,23 @@ struct GroupedConvFwdIm2winKernelArgs
                                   static_cast<index_t>(transformer_.Wo_);
         }
 
-        // Input N-batch stride: GNCHW stride(N within group) = C * Hi * Wi.
-        input_batch_stride = static_cast<index_t>(transformer_.C_) *
-                             static_cast<index_t>(transformer_.Hi_) *
-                             static_cast<index_t>(transformer_.Wi_);
+        // ── Input N-batch stride (InLayout-dependent) ────────────────────
+        // Stride to advance b_ptr by one N-slice (for split-N).
+        if constexpr(std::is_same_v<InLay, tensor_layout::convolution::NHWGC>)
+        {
+            // NHWGC stride(N) = Hi*Wi*G*C (full row including all groups).
+            input_batch_stride = static_cast<index_t>(transformer_.Hi_) *
+                                 static_cast<index_t>(transformer_.Wi_) *
+                                 static_cast<index_t>(transformer_.G_) *
+                                 static_cast<index_t>(transformer_.C_);
+        }
+        else
+        {
+            // GNCHW stride(N within group) = C * Hi * Wi.
+            input_batch_stride = static_cast<index_t>(transformer_.C_) *
+                                 static_cast<index_t>(transformer_.Hi_) *
+                                 static_cast<index_t>(transformer_.Wi_);
+        }
 
         if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
         {
@@ -343,10 +387,18 @@ struct GroupedConvolutionForwardIm2winKernel
         if constexpr(NDimSpatial != 2)
             return false;
 
-        if constexpr(!std::is_same_v<InLayout, tensor_layout::convolution::GNCHW> ||
-                     !std::is_same_v<WeiLayout, tensor_layout::convolution::GKCYX> ||
-                     (!std::is_same_v<OutLayout, tensor_layout::convolution::GNKHW> &&
-                      !std::is_same_v<OutLayout, tensor_layout::convolution::NHWGK>))
+        // Accept both channels-first (GNCHW/GKCYX) and channels-last (NHWGC/GKYXC) pairs.
+        constexpr bool channels_first =
+            std::is_same_v<InLayout, tensor_layout::convolution::GNCHW> &&
+            std::is_same_v<WeiLayout, tensor_layout::convolution::GKCYX>;
+        constexpr bool channels_last =
+            std::is_same_v<InLayout, tensor_layout::convolution::NHWGC> &&
+            std::is_same_v<WeiLayout, tensor_layout::convolution::GKYXC>;
+        constexpr bool out_ok =
+            std::is_same_v<OutLayout, tensor_layout::convolution::GNKHW> ||
+            std::is_same_v<OutLayout, tensor_layout::convolution::NHWGK>;
+
+        if constexpr(!(channels_first || channels_last) || !out_ok)
         {
             return false;
         }

@@ -288,27 +288,55 @@ int run_grouped_conv_fwd_im2win_example_with_layouts(
         //   • Weight GKCYX→GKYXC: on-device BatchedTransposeKernel
         //   • Input  GNCHW→NHWGC: host-side strided copy (G/N interleaving)
 
-        // Weight transpose on device: [G*K, C, Y*X] → [G*K, Y*X, C]
+        // The naive GPU reference uses NHWGC input and GKYXC weight.
+        // Prepare reference input buffer (NHWGC) and weight buffer (GKYXC):
+        //   - If kernel uses NHWGC: use input_buf directly (no transpose needed).
+        //   - If kernel uses GNCHW: reorder GNCHW → NHWGC on host.
+        //   - If kernel uses GKYXC: use weight_buf directly.
+        //   - If kernel uses GKCYX: transpose GKCYX → GKYXC on device.
+
+        const bool input_is_nhwgc =
+            (std::string(InLayout::name) == "NHWGC");
+        const bool weight_is_gkyxc =
+            (std::string(WeiLayout::name) == "GKYXC");
+
+        // Weight: ensure GKYXC for reference kernel.
         ck_tile::DeviceMem weight_gkyxc_buf(weight.get_element_space_size_in_bytes());
-        transpose_gkcyx_to_gkyxc<WeiDataType>(weight_buf,
-                                              weight_gkyxc_buf,
-                                              static_cast<int>(conv_param.G_),
-                                              static_cast<int>(conv_param.K_),
-                                              static_cast<int>(conv_param.C_),
-                                              static_cast<int>(conv_param.filter_spatial_lengths_[0]),
-                                              static_cast<int>(conv_param.filter_spatial_lengths_[1]));
+        if(weight_is_gkyxc)
+        {
+            weight_gkyxc_buf.ToDevice(weight.data()); // already GKYXC
+        }
+        else
+        {
+            // GKCYX → GKYXC on device.
+            transpose_gkcyx_to_gkyxc<WeiDataType>(weight_buf,
+                                                  weight_gkyxc_buf,
+                                                  static_cast<int>(conv_param.G_),
+                                                  static_cast<int>(conv_param.K_),
+                                                  static_cast<int>(conv_param.C_),
+                                                  static_cast<int>(conv_param.filter_spatial_lengths_[0]),
+                                                  static_cast<int>(conv_param.filter_spatial_lengths_[1]));
+        }
 
-        // Input reorder on host: GNCHW → NHWGC
-        auto input_nhwgc = reorder_gnchw_to_nhwgc(input,
-                                                   static_cast<int>(conv_param.G_),
-                                                   static_cast<int>(conv_param.N_),
-                                                   static_cast<int>(conv_param.C_),
-                                                   static_cast<int>(conv_param.input_spatial_lengths_[0]),
-                                                   static_cast<int>(conv_param.input_spatial_lengths_[1]));
-
-        ck_tile::DeviceMem input_ref_buf(input_nhwgc.get_element_space_size_in_bytes());
+        // Input: ensure NHWGC for reference kernel.
+        ck_tile::DeviceMem input_ref_buf(input.get_element_space_size_in_bytes());
         ck_tile::DeviceMem output_ref_buf(output.get_element_space_size_in_bytes());
-        input_ref_buf.ToDevice(input_nhwgc.data());
+        if(input_is_nhwgc)
+        {
+            input_ref_buf.ToDevice(input.data()); // already NHWGC
+        }
+        else
+        {
+            // GNCHW → NHWGC on host.
+            auto input_nhwgc = reorder_gnchw_to_nhwgc(
+                input,
+                static_cast<int>(conv_param.G_),
+                static_cast<int>(conv_param.N_),
+                static_cast<int>(conv_param.C_),
+                static_cast<int>(conv_param.input_spatial_lengths_[0]),
+                static_cast<int>(conv_param.input_spatial_lengths_[1]));
+            input_ref_buf.ToDevice(input_nhwgc.data());
+        }
         output_ref_buf.SetZero();
 
         std::cout << "  Running GPU reference kernel..." << std::endl;
@@ -353,8 +381,11 @@ int run_grouped_conv_fwd_im2win_example_with_layouts(
 }
 
 // ── run_grouped_conv_fwd_im2win_example_prec_type ─────────────────────────────
-// Dispatches to the correct NDimSpatial based on layout strings.
-// Only 2D is supported by the im2win kernel (GNCHW/GKCYX/NHWGK).
+// Dispatches to the correct 2D layout combination.
+//
+// Supported layout pairs:
+//   GNCHW/GKCYX/NHWGK — channels-first (original im2win)
+//   NHWGC/GKYXC/NHWGK — channels-last  (enables group merging)
 template <typename Invoker,
           typename ConvConfig,
           typename InPrecType,
@@ -365,6 +396,8 @@ int run_grouped_conv_fwd_im2win_example_prec_type(
 {
     using GNCHW = ck_tile::tensor_layout::convolution::GNCHW;
     using GKCYX = ck_tile::tensor_layout::convolution::GKCYX;
+    using NHWGC = ck_tile::tensor_layout::convolution::NHWGC;
+    using GKYXC = ck_tile::tensor_layout::convolution::GKYXC;
     using NHWGK = ck_tile::tensor_layout::convolution::NHWGK;
 
     if(in_layout == "GNCHW" && wei_layout == "GKCYX" && out_layout == "NHWGK")
@@ -377,10 +410,20 @@ int run_grouped_conv_fwd_im2win_example_prec_type(
                                                                  OutPrecType>(
             argc, argv, GNCHW{}, GKCYX{}, NHWGK{});
     }
+    else if(in_layout == "NHWGC" && wei_layout == "GKYXC" && out_layout == "NHWGK")
+    {
+        return run_grouped_conv_fwd_im2win_example_with_layouts<ck_tile::number<2>{},
+                                                                 ConvConfig,
+                                                                 Invoker,
+                                                                 InPrecType,
+                                                                 WeiPrecType,
+                                                                 OutPrecType>(
+            argc, argv, NHWGC{}, GKYXC{}, NHWGK{});
+    }
     else
     {
         throw std::runtime_error(
-            "im2win example only supports GNCHW/GKCYX/NHWGK layout combination.\n"
-            "Pass --in_layout GNCHW --wei_layout GKCYX --out_layout NHWGK\n");
+            "im2win supports GNCHW/GKCYX/NHWGK (channels-first) and "
+            "NHWGC/GKYXC/NHWGK (channels-last).\n");
     }
 }
