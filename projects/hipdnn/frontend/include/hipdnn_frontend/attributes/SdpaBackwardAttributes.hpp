@@ -65,6 +65,7 @@ namespace hipdnn_frontend::graph
 class SdpaBackwardAttributes : public Attributes<SdpaBackwardAttributes>
 {
 public:
+    // NOLINTBEGIN(readability-identifier-naming)
     enum class InputNames
     {
         Q = 0,
@@ -83,7 +84,7 @@ public:
         Dropout_scale = 13,
         Dropout_scale_inv = 14,
     };
-    typedef InputNames input_names; // NOLINT(readability-identifier-naming)
+    typedef InputNames input_names;
 
     enum class OutputNames
     {
@@ -92,7 +93,8 @@ public:
         dV = 2, // Gradient w.r.t. value
         dBias = 3, // Gradient w.r.t. additive attention bias (optional)
     };
-    typedef OutputNames output_names; // NOLINT(readability-identifier-naming)
+    typedef OutputNames output_names;
+    // NOLINTEND(readability-identifier-naming)
 
     std::unordered_map<InputNames, std::shared_ptr<TensorAttributes>> inputs;
     std::unordered_map<OutputNames, std::shared_ptr<TensorAttributes>> outputs;
