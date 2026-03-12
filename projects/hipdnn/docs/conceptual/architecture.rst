@@ -21,15 +21,15 @@ The Hipdnn library is structured as three primary components:
 - **Backend**: The hipDNN backend is a shared library which provides a C API for hipDNN. The backend is the core component of hipDNN which acts as a plugin loader and manager, connecting problems to engines optimized to solve them.
 - **Engine plugins**: The hipDNN engine provider plugins are shared libraries responsible for matching the operations they provide to graphs, and executing the operations on the supported hardware. Plugins will continue to be added over time to provide additional operational support or performance improvements. See :ref:`plugin-support` for more information.
 
-The frontend API defines tensors and attaches them to operational nodes on a graph. The graph is then lowered through the backend APIs where it's examined by each plugin's engine to determine a match, at which a point an execution plan is established with the preferred matched engine.
+The frontend API defines tensors and attaches them to operational nodes on a graph. The graph is then lowered through the backend APIs where it's examined by each plugin's engine to determine a match, at which point an execution plan is established with the preferred matched engine.
 The frontend then allocates memory and populates the data used by the graph, which is then dispatched to the selected plugin's engine to run.
 
 Header-only SDKs provide shared utilities and interfaces.
 hipDNN provides three SDKs:
 
-- :ref:`data` (graph schemas and data structures)
-- :ref:`plugin-sdk` (plugin API and utilities)
-- :ref:`test-sdk` (testing utilities and CPU reference implementations)
+- :ref:`data`: Graph schemas and data structures
+- :ref:`plugin-sdk`: Plugin API and utilities
+- :ref:`test-sdk`: Testing utilities and CPU reference implementations
 
 Architecture overview
 =====================
@@ -70,7 +70,7 @@ Nodes
 Nodes represent individual operations within a graph (for example, ``BatchnormNode``, ``PointwiseNode``).
 
 - Nodes encapsulate their specific attributes and tensor connections.
-- The Frontend uses the Backend API to convert the graph to backend descriptors for engine consumption.
+- The frontend uses the backend API to convert the graph to backend descriptors for engine consumption.
 
 See :ref:`plugin-support` for a detailed list of the supported operations.
 
@@ -100,12 +100,12 @@ Tensors are attached to graph operation nodes and determine:
 Simplified workflow example
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-See :ref: `build-execute` for a simplified workflow example.
+See :ref:`build-execute` for a simplified workflow example.
 
 SDKs and plugin architecture
 ============================
 
-This section is relevant primarily for plugin developers who want a breakdown of the system architecture for the SDK and plugin components.
+This section is relevant for plugin developers who want a breakdown of the system architecture for the SDK and plugin components.
 
 SDKs
 ----
@@ -182,7 +182,7 @@ Static kernel engines
 
 - Provides pre-compiled kernels for specific operations.
 - Only handles specific configurations.
-- For example, the MIOpen Provider plugin.
+- For example, :ref:`miopen`.
 - **Advantages**:
 
   - Highly optimized for supported cases.
@@ -246,7 +246,7 @@ The backend is the core engine of hipDNN responsible for managing plugins and or
 Key characteristics
 ~~~~~~~~~~~~~~~~~~~
 
-- **Installable library**: C API with ABI for language interoperability, which is dynamically loadable.
+- **Installable library**: C API with API for language interoperability, which is dynamically loadable.
 - **Dependencies**: :ref:`data`.
 - **Purpose**: Provides a stable C API for interacting with the hipDNN kernel providers.
 - **Expected usage**: Library linked to the frontend API and expert user projects that provides access to the backend API.

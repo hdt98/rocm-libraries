@@ -13,6 +13,8 @@ subtrees:
     title: Prerequisites
   - file: install/quickstart.rst
     title: Quick start
+  - file: install/hipdnn-install.rst
+    title: Build and install hipDNN from source
 
 - caption: Conceptual
   entries:

@@ -14,11 +14,9 @@ hipDNN uses operation graphs as an intermediate representation to describe compu
 
 hipDNN provides an interace that follows established deep learning conventions and has a plugin-based architecture which allows advanced users to extend hipDNN without modifying the core library.
 
-The public repository for hipDNN is located at `https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn>`_.
-
 .. note::
 
-  hipDNN is in beta-stage development and consequently not recommended for running production workloads at this time.
+  hipDNN is in beta. Running production workloads is not recommended.
 
 hipDNN and the ROCm ecosystem
 =============================
@@ -41,7 +39,7 @@ hipDNN and the ROCm ecosystem
      - Matches fused graph operations with engines for optimized performance.
    * - Runtime
      - HIP
-     - The translation layer between C++ and GPU hardware.
+     - The translation layer between C++ and the GPU hardware.
    * - Hardware
      - AMD Instinct / Radeon
      - The physical GPU.

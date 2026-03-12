@@ -10,16 +10,14 @@ hipDNN prerequisites
 
 Ensure your system has these requirements before installing hipDNN.
 
-.. important::
-
-  The hipDNN frontend API is distributed as a header-only library, requiring the development ROCm packages to be installed. The base ROCm install package does not include the hipDNN frontend API header files.
-  For example, on Linux with a gfx950 GPU, install the `amdrocm-core-dev7.12-gfx950` package instead of the `amdrocm7.12-gfx950` package (`amdrocm-core-dev7.12-gfx950` includes the `amdrocm7.121-gfx950` package, so only the `amdrocm-core-dev7.12-gfx950` package needs to be installed).
+The hipDNN frontend API is distributed as a header-only library, requiring the development ROCm packages to be installed. The base ROCm install package does *not* include the hipDNN frontend API header files.
+For example, on Linux with a gfx950 GPU, install the ``amdrocm-core-dev7.12-gfx950`` package instead of the ``amdrocm7.12-gfx950`` package (``amdrocm-core-dev7.12-gfx950`` includes the ``amdrocm7.121-gfx950`` package, so only the ``amdrocm-core-dev7.12-gfx950`` package needs to be installed).
 
 System requirements
 ===================
 
-- An AMD GPU with ROCm support. See `ROCm compatibility matrix <https://rocm.docs.amd.com/en/7.12.0/compatibility/compatibility-matrix.html>`
-- Linux or Windows operating system. See `Install AMD ROCm <https://rocm.docs.amd.com/en/7.12.0/install/rocm.html>`
+- An AMD GPU with ROCm support. See `ROCm compatibility matrix <https://rocm.docs.amd.com/en/7.12.0/compatibility/compatibility-matrix.html>`_
+- Linux or Windows operating system. See `Install AMD ROCm <https://rocm.docs.amd.com/en/7.12.0/install/rocm.html>`_
 
 Dependencies
 ============
@@ -47,7 +45,7 @@ Required dependencies
      - C++17 compatible
      - hipDNN API supports C++17
 
-Install
-=======
+Install ROCm and hipDNN
+=======================
 
-Follow the instructions at `Install AMD ROCm <https://rocm.docs.amd.com/en/7.12.0/install/rocm.html>` to install ROCm, including hipDNN.
+Follow the instructions at `Install AMD ROCm <https://rocm.docs.amd.com/en/7.12.0/install/rocm.html>`_ to install ROCm, including hipDNN.

@@ -25,7 +25,7 @@ Here's the basic frontend file structure with links to the GitHub repository:
 Frontend architecture
 =====================
 
-Refer to :ref: `architecture` for a conceptual description of the hipDNN graph, tensors, nodes, and attributes.
+Refer to :ref:`architecture` for a conceptual description of the hipDNN graph, tensors, nodes, and attributes.
 
 See :ref:`plugin-support` for a detailed list of the supported operations.
 

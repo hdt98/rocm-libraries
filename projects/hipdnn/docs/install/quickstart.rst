@@ -6,16 +6,16 @@
 hipDNN quick start
 ******************
 
-This guide demonstrates how to include hipDNN in a CMake project. This guide requires hipDNN and ROCM already installed on your system.
+This guide demonstrates how to include hipDNN in a CMake project on a system with ROCm installed.
 
 .. important::
 
-  This guide is appropriate for integrating hipDNN into applications for running deep learning worlkloads. Plugin developers who want to build from source should refer to :ref:`plugin-install`.
+  This guide is appropriate for integrating hipDNN into applications for running deep learning worlkloads. Plugin developers who want to build from source should refer to :ref:`install`.
 
 Prerequisites
 ==============
 
-- ROCm and hipDNN installed with dependencies. See :ref:`prerequisites`.
+ROCm and hipDNN installed with dependencies. See :ref:`prerequisites`.
 
 Add the hipdnn_frontend package to your project files
 =====================================================

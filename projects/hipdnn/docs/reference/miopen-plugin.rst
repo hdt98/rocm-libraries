@@ -148,6 +148,10 @@ The MIOpen Provider plugin supports two types of knobs:
 
 This table lists all configuration knobs supported by the MIOpen Provider plugin:
 
+.. |br| raw:: html
+
+    <br />
+
 .. list-table::
    :widths: 3 3 3 3 3 5
    :header-rows: 1
@@ -164,7 +168,7 @@ This table lists all configuration knobs supported by the MIOpen Provider plugin
      - 0 (disabled)
      - 0-1
      - Enable benchmarking mode for kernel selection
-   * - ``global.workspace_size_limit``
+   * - ``global.workspace`` |br| ``_size_limit``
      - Integer (int64)
      - Convolution operations only
      - Maximum

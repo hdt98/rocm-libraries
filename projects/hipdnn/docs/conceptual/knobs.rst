@@ -28,14 +28,14 @@ Knobs are runtime-configurable parameters that affect engine behavior. Each knob
 Knobs enable you to:
 
 - Enable or disable features (for example, benchmarking mode).
-- Tune performance parameters (for example, tile sizes, workspace limits).
+- Tune performance parameters (for example, tile sizes and workspace limits).
 - Select algorithmic variants (for example, solver selection).
 - Control memory usage (for example, workspace size limits).
 
 Knob types
 ==========
 
-hipDNN supports two categories of knobs: Global and Custom knobs.
+hipDNN supports two categories of knobs: global and custom knobs.
 
 Global knobs
 ------------
@@ -87,6 +87,10 @@ Plugin-specific namespace:
 Standard global knobs
 =====================
 
+.. |br| raw:: html
+
+    <br />
+
 These are the global knobs available in hipDNN:
 
 .. list-table::
@@ -101,7 +105,7 @@ These are the global knobs available in hipDNN:
      - Integer (int64)
      - 0 (disabled)
      - Enable benchmarking mode for kernel selection. When enabled, engines may run multiple kernel variants and select the fastest. First run may be slower due to benchmarking overhead.
-   * - ``global.workspace_size_limit``
+   * - ``global.workspace``|br| ``_size_limit``
      - Integer (int64)
      - The maximum size needed for optimal performance.
      - Limits the maximum workspace memory that solvers can use for convolution operations (Forward, Backward Data, Backward Weights). Refer to :ref: `plugin-support` for specific details.
@@ -113,7 +117,7 @@ These are the global knobs available in hipDNN:
 Provider-specific knobs
 =======================
 
-Different engine providers may expose their own custom knobs. Refer to the o :ref: `plugin-support` for specific details.
+Different engine providers may expose their own custom knobs. Refer to the o :ref:`plugin-support` for specific details.
 
 .. tip::
 
@@ -158,12 +162,12 @@ Plugin developers can expose custom knobs using the Plugin SDK utilities:
 - `IPlanBuilder::getCustomKnobs() <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/plugin_sdk/include/hipdnn_plugin_sdk/interfaces/IPlanBuilder.hpp>`_: Interface method for exposing knobs.
 - `GlobalKnobDefines <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/plugin_sdk/include/hipdnn_plugin_sdk/GlobalKnobDefines.hpp>`_: Constants for standard global knob names.
 
-For comprehensive guidance on exposing knobs in your plugin, see the `Providing Knobs <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/docs/PluginDevelopment.md#providing-knobs>`_.
+For comprehensive guidance on exposing knobs in your plugin, see `Providing Knobs <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/docs/PluginDevelopment.md#providing-knobs>`_.
 
 Examples
 ========
 
 For complete working examples, see:
 
-- `Knobs Usage Sample <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn/samples/knobs>`_: Comprehensive example demonstrating knob discovery and configuration.
+- `Knobs Usage Sample <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn/samples/knobs>`_: A comprehensive example demonstrating knob discovery and configuration.
 - `Frontend Tests <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/frontend/tests/TestKnob.cpp>`_: Unit tests showing knob API usage.
