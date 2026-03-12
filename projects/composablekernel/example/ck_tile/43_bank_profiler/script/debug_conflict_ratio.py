@@ -10,13 +10,10 @@ Key corrections from original analysis:
 """
 
 import os
-import argparse
 
 
 NUM_BANKS = 32
 BANK_WIDTH = 4  # bytes per bank
-
-
 def xor_swizzle_byte_offset(m, k, MPerBlock, KPerBlock, KPack=8, MLdsLayer=None):
     """
     Compute the LDS byte offset for logical index (m, k) in the
