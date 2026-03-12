@@ -17,7 +17,7 @@ if(GPU_TARGETS MATCHES "gfx94|gfx95")
     set(IM2WIN_CONFIG_IDS
         -4 -3 -2 -1
         0  1  2  3  4  5  6  7  8  9  10  11  12  13  14  15  16  17
-        18 19 20 21 22)
+        18 19 20 21 22 23)
     set(IM2WIN_CONFIG_NAMES
         Ti_M16N64K64
         Ti_M8N128K64
@@ -46,6 +46,7 @@ if(GPU_TARGETS MATCHES "gfx94|gfx95")
         Merge_Gm8_M32N128K64
         Merge_Gm32_M128N32K64
         Merge_Gm32_M128N64K64
+        Merge_Gm8_M128N32K32
     )
 
     list(LENGTH IM2WIN_CONFIG_IDS _num_configs)

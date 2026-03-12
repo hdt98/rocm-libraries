@@ -722,6 +722,32 @@ struct Im2winConfig_Merge_Gm32_M128N64K64 : public Im2winConvConfigBase
     static constexpr ck_tile::index_t NumGroupsToMerge = 32;
 };
 
+// ── Config Mg8_M128N32K32: tile (128,32,32), 32×32 MFMA, Gm=8 ─────────────
+// Requested: M_per_XDL=32, N_per_XDL=32, tile=(128,32,32), Gm=8.
+// With K=4, Gm=8 → M_actual=32. M_Tile=128 covers 4 logical groups × 32
+// (kPadM fills unused M). K_Tile=32 < K_gemm=36 → 2 K-loop iterations.
+// 32×32×16 MFMA; Block = M_Warp×N_Warp×64 = 4×1×64 = 256 threads.
+template <typename PrecType>
+struct Im2winConfig_Merge_Gm8_M128N32K32 : public Im2winConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 128;
+    static constexpr ck_tile::index_t N_Tile = 32;
+    static constexpr ck_tile::index_t K_Tile = 32;
+
+    static constexpr ck_tile::index_t M_Warp = 4;
+    static constexpr ck_tile::index_t N_Warp = 1;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 32; // 32×32×16 MFMA (fp16 valid)
+    static constexpr ck_tile::index_t N_Warp_Tile = 32;
+    static constexpr ck_tile::index_t K_Warp_Tile = 16;
+
+    static constexpr ck_tile::GemmPipeline         Pipeline  = ck_tile::GemmPipeline::MEMORY;
+    static constexpr ck_tile::GemmPipelineScheduler Scheduler =
+        ck_tile::GemmPipelineScheduler::Intrawave;
+    static constexpr ck_tile::index_t NumGroupsToMerge = 8;
+};
+
 // ══════════════════════════════════════════════════════════════════════
 // Config registry and compile-time selection
 //
@@ -796,6 +822,8 @@ template <typename P> using ActiveIm2winConfig = Im2winConfig_Merge_Gm8_M32N128K
 template <typename P> using ActiveIm2winConfig = Im2winConfig_Merge_Gm32_M128N32K64<P>;
 #elif IM2WIN_CONFIG_ID == 22
 template <typename P> using ActiveIm2winConfig = Im2winConfig_Merge_Gm32_M128N64K64<P>;
+#elif IM2WIN_CONFIG_ID == 23
+template <typename P> using ActiveIm2winConfig = Im2winConfig_Merge_Gm8_M128N32K32<P>;
 #else
 #error "Unknown IM2WIN_CONFIG_ID"
 #endif

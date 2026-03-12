@@ -92,6 +92,7 @@ ALL_CONFIGS: list[str] = [
     "Merge_Gm8_M32N128K64",
     "Merge_Gm32_M128N32K64",
     "Merge_Gm32_M128N64K64",
+    "Merge_Gm8_M128N32K32",
 ]
 
 BINARY_PREFIX = "tile_example_grouped_conv_fwd_im2win_"
