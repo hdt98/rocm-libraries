@@ -1,20 +1,59 @@
 # Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 
-# im2win forward convolution example targets gfx94/gfx95 (CDNA3/CDNA4)
-# where the small-channel grouped conv use case originates.
 if(GPU_TARGETS MATCHES "gfx94|gfx95")
     set(EXAMPLE_IM2WIN_COMPILE_OPTIONS)
     list(APPEND EXAMPLE_IM2WIN_COMPILE_OPTIONS -mllvm -enable-noalias-to-md-conversion=0)
 
-    add_executable(tile_example_grouped_conv_fwd_im2win
-        grouped_convolution_fwd_im2win.cpp)
-
-    target_compile_options(tile_example_grouped_conv_fwd_im2win
-        PRIVATE ${EXAMPLE_IM2WIN_COMPILE_OPTIONS})
-
-    # The run harness includes headers from the sibling example directory.
-    target_include_directories(tile_example_grouped_conv_fwd_im2win PRIVATE
+    set(IM2WIN_INCLUDE_DIRS
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/../20_grouped_convolution)
+
+    # ── Config registry ──────────────────────────────────────────────────────
+    # Parallel lists: IM2WIN_CONFIG_IDS[i] ↔ IM2WIN_CONFIG_NAMES[i]
+    # IM2WIN_CONFIG_ID matches the #if branch in im2win_conv_configs.hpp.
+    set(IM2WIN_CONFIG_IDS   0  1  2  3  4  5  6  7  8  9  10  11  12)
+    set(IM2WIN_CONFIG_NAMES
+        CV3_M16N64K64
+        CV3_M64N64K64
+        CV3_M64N32K64
+        Mem_M128N32K64
+        Mem_M128N32K64_IW
+        CV3_M128N128K64_Occ2
+        CV3_M64N16K64
+        CV3_M128N16K64
+        Mem_M128N16K64
+        Mem_M128N16K64_IW
+        CV3_M64N16K64_Occ2
+        Mem_M128N4K64
+        Mem_M256N4K64
+    )
+
+    list(LENGTH IM2WIN_CONFIG_IDS _num_configs)
+    math(EXPR _last "${_num_configs} - 1")
+
+    add_custom_target(tile_example_grouped_conv_fwd_im2win_all)
+
+    foreach(_i RANGE 0 ${_last})
+        list(GET IM2WIN_CONFIG_IDS   ${_i} _id)
+        list(GET IM2WIN_CONFIG_NAMES ${_i} _name)
+        set(_tgt "tile_example_grouped_conv_fwd_im2win_${_name}")
+
+        add_executable(${_tgt} grouped_convolution_fwd_im2win.cpp)
+        target_compile_definitions(${_tgt} PRIVATE IM2WIN_CONFIG_ID=${_id})
+        target_compile_options(${_tgt} PRIVATE ${EXAMPLE_IM2WIN_COMPILE_OPTIONS})
+        target_include_directories(${_tgt} PRIVATE ${IM2WIN_INCLUDE_DIRS})
+
+        add_dependencies(tile_example_grouped_conv_fwd_im2win_all ${_tgt})
+    endforeach()
+
+    # Convenience alias without a suffix (config 0 = CV3_M16N64K64).
+    add_executable(tile_example_grouped_conv_fwd_im2win
+        grouped_convolution_fwd_im2win.cpp)
+    target_compile_definitions(tile_example_grouped_conv_fwd_im2win PRIVATE
+        IM2WIN_CONFIG_ID=0)
+    target_compile_options(tile_example_grouped_conv_fwd_im2win PRIVATE
+        ${EXAMPLE_IM2WIN_COMPILE_OPTIONS})
+    target_include_directories(tile_example_grouped_conv_fwd_im2win PRIVATE
+        ${IM2WIN_INCLUDE_DIRS})
 endif()
