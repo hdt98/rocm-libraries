@@ -1,8 +1,8 @@
 # Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 
-# CShuffleLds microbenchmark suite
-# Benchmark source files are generated at CMake configure time
+# CShuffleLds LDS store/load microbenchmark suite
+# Measures LDS bandwidth and bank conflicts for different MFMA configurations
 
 set(GENERATED_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated")
 file(MAKE_DIRECTORY ${GENERATED_SOURCE_DIR})
