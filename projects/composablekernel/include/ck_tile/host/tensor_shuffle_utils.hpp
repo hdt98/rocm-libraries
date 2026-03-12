@@ -121,6 +121,35 @@ auto shuffle_b(const ck_tile::HostTensor<T>& t)
     return shuffle_b(t, GemmConfig{});
 }
 
+/*
+For the permuteN feature, the BQ (scale) tensor must be shuffled so its layout matches the MFMA
+result. The required shuffle depends on group_N (the N dimension of the quant group). The BQ tensor
+is treated as an N×K matrix with N = 128 / group_N: 1×8×128 → N = 16 (BQ 16×1) 1×16×128 → N = 8
+1×32×128 → N = 4
+1×64×128 → N = 2
+1×128×128 → N = 1 (one value per full block tile)
+The shuffle is given as a 4-tuple whose meaning is tied to n, N_warp, N_warp_tile, and NRepeat:
+group_N = 8: Shuffle (1, 4, 2, 2) — i.e. (1, N_warp, N_warp_tile/group_N, NRepeat) with
+N_warp_tile/8 = 2 (e.g. 16/8). group_N = 16: Shuffle (1, 4, 1, 2) — 1 value per N_warp_tile
+(N_warp_tile/16 = 1). group_N = 32: Shuffle (1, 2, 1, 2) — (1, N_warp/2, 1, NRepeat); 2 N_warp_tiles
+share the same scale. group_N = 64: Shuffle (1, 1, 1, 2) — (1, N_warp/4, 1, NRepeat); 4 N_warp_tiles
+share the same value. group_N = 128: Shuffle (1, 1, 1, 1) — 1 value for the full block tile.
+
+The alignment problem:
+When the BQ tensor is shuffled according to these rules (the 4-tuples above), its layout no longer
+matches what the block pipeline expects after block-level MFMA. So even with the “correct” shuffle
+for each group_N, BQ is misaligned with the MFMA result at the block level. That’s why the code
+today only enables TiledPermuteN for BQuantGroupSize::kN equal to 1 or 128.
+
+Options to fix alignment
+1) Update tile_distribution_encoding for permuteN
+Adjust the BQ tile distribution encoding so the encoded distribution matches the shuffle layout and
+aligns with how the block consumes C and BQ after MFMA. 2) Update the tile window when reading from
+DRAM Keep the shuffle as defined above and change how the BQ tile window is built when reading from
+device memory so that the window layout matches the post-MFMA layout. 3) Update indexes for BQ reads
+Keep the shuffle and tile window; change the indexing used when reading BQ in the block so that each
+thread/warp loads the scale that corresponds to its part of the MFMA result.
+*/
 template <typename GemmConfig, typename T>
 auto bq_permuteN(const ck_tile::HostTensor<T>& t, index_t group_n)
 {
