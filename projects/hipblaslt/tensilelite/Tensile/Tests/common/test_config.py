@@ -22,6 +22,7 @@
 #
 ################################################################################
 
+import glob
 import os
 import pytest
 import subprocess
@@ -228,6 +229,75 @@ def findConfigs(rootDir=None):
                     params.append(pytest.param(filepath, marks=marks, id=relpath))
     return params
 
+def _disable_timer_and_hwmonitor(args):
+    """Append --global-parameters to disable BenchmarkTimer and HardwareMonitor.
+
+    Inserts the overrides after the existing --global-parameters flag if present,
+    otherwise appends it. Modifies args in place.
+    """
+    try:
+        idx = args.index("--global-parameters")
+    except ValueError:
+        args.append("--global-parameters")
+        idx = len(args) - 1
+    args.insert(idx + 1, "BenchmarkTimer=0")
+    args.insert(idx + 2, "HardwareMonitor=0")
+
+
+def _parse_ini_value(ini_path, key):
+    """Parse a key=value from a Tensile client .ini file. Returns None if not found."""
+    with open(ini_path) as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith(key + "="):
+                return line.split("=", 1)[1]
+    return None
+
+
+def _verify_timer_and_hwmonitor(output_dir, expect_disabled):
+    """Verify benchmark-timer and hardware-monitor values in generated .ini files.
+
+    Args:
+        output_dir: The Tensile output directory to search for .ini files.
+        expect_disabled: If True, assert both parameters are disabled.
+            If False, assert benchmark-timer is enabled (hardware-monitor
+            is only checked for presence since some architectures like
+            gfx950 force-disable it).
+    """
+    ini_files = glob.glob(os.path.join(output_dir, "**", "*.ini"), recursive=True)
+    assert ini_files, "Expected at least one .ini file in the output directory"
+
+    # Values that indicate the feature is disabled (int 0 from CLI override,
+    # or bool False from code).
+    disabled_values = {"0", "False"}
+
+    for ini_file in ini_files:
+        bt_value = _parse_ini_value(ini_file, "benchmark-timer")
+        hm_value = _parse_ini_value(ini_file, "hardware-monitor")
+
+        assert bt_value is not None, \
+            f"benchmark-timer not found in {ini_file}"
+        assert hm_value is not None, \
+            f"hardware-monitor not found in {ini_file}"
+
+        if expect_disabled:
+            assert bt_value in disabled_values, \
+                f"Expected benchmark-timer disabled in {ini_file}, got {bt_value}"
+            assert hm_value in disabled_values, \
+                f"Expected hardware-monitor disabled in {ini_file}, got {hm_value}"
+        else:
+            assert bt_value not in disabled_values, \
+                f"Expected benchmark-timer enabled in {ini_file}, got {bt_value}"
+
+
 @pytest.mark.parametrize("config", findConfigs())
 def test_config(tensile_args, config, tmpdir):
-    Tensile.Tensile([config, tmpdir.strpath, *tensile_args])
+    args = [config, tmpdir.strpath, *tensile_args]
+    is_benchmark_timer_config = "benchmark_timer" in os.path.basename(config)
+    # Disable timer and hwmonitor for CI correctness-only runs.
+    # benchmark_timer tests retain timing to verify it works.
+    if not is_benchmark_timer_config:
+        _disable_timer_and_hwmonitor(args)
+    Tensile.Tensile(args)
+
+    _verify_timer_and_hwmonitor(tmpdir.strpath, expect_disabled=not is_benchmark_timer_config)

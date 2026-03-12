@@ -56,6 +56,7 @@ namespace TensileLite
             , m_hardware(hardware)
             , m_numEnqueuesPerSolution(m_numEnqueuesPerSync * m_numSyncsPerBenchmark)
             , m_useGPUTimer(args["use-gpu-timer"].as<bool>())
+            , m_timerActive(args["benchmark-timer"].as<bool>())
             , m_sleepPercent(args["sleep-percent"].as<int>())
             , m_timeInSolution(0)
             , m_totalGPUTime(0)
@@ -173,7 +174,7 @@ namespace TensileLite
 
             {
                 ScopedTimer timer("post_solution_perf_calc");
-                bool   sol_is_skipped    = (m_skiprun_from_map || m_skip_slow_solution);
+                bool   sol_is_skipped    = (m_skiprun_from_map || m_skip_slow_solution || !m_timerActive);
                 timePerEnqueue_us = !sol_is_skipped ? double_micros(m_timeInSolution).count()
                                                                      / m_numEnqueuesInSolution
                                                                  - m_flushTimeUs
@@ -336,6 +337,9 @@ namespace TensileLite
 
         void BenchmarkTimer::preEnqueues(hipStream_t const& stream)
         {
+            if(!m_timerActive)
+                return;
+
             if(!m_useGPUTimer)
             {
                 HIP_CHECK_EXC(hipDeviceSynchronize());
@@ -356,6 +360,9 @@ namespace TensileLite
                                           TimingEvents const& stopEvents,
                                           hipStream_t const&  stream)
         {
+            if(!m_timerActive)
+                return;
+
             if(!m_useGPUTimer)
             {
                 HIP_CHECK_EXC(hipDeviceSynchronize());
@@ -372,6 +379,12 @@ namespace TensileLite
                                               TimingEvents const&            startEvents,
                                               TimingEvents const&            stopEvents)
         {
+            if(!m_timerActive)
+            {
+                m_numEnqueuesInSolution += startEvents->size();
+                return;
+            }
+
             ScopedTimer t("benchmark_runs.validate_enqueues.timer");
             double_millis totalTime(0.0);
 
