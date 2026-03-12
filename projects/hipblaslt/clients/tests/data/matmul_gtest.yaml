@@ -2437,4 +2437,16 @@ Tests:
   beta: [ 0.0, 1.0 ]
   gpu_arch: '90a'
 
+- name: matmul_multithread_stream
+  category: nightly
+  function:
+    - matmul: *real_precisions
+    - matmul: *real_precisions_gemm_only
+  matrix_size: *medium_matrix_size_range
+  transA_transB: *transA_transB_range
+  alpha_beta: *alpha_beta_range
+  threads_streams: *common_threads_streams
+  gpu_arch: '9(50|42)'
+
+
 ...
