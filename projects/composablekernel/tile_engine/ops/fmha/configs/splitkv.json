@@ -1,11 +1,5 @@
 {
   "variant": "splitkv",
-  "tile_config": {
-    "hdim": {"values": [64, 128, 256]},
-    "tile_m0": {"values": [128]},
-    "tile_n0": {"values": [64, 128]},
-    "tile_k0": {"values": [32]}
-  },
   "trait_config": {
     "data_type": {"values": ["fp16", "bf16"]},
     "pipeline": {"values": ["qr", "qr_async"]},

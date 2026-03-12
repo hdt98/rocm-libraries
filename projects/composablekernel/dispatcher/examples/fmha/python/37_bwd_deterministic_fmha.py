@@ -40,7 +40,6 @@ from fmha_utils import (
     FmhaKernelConfig,
     FmhaProblem,
     setup_fmha_dispatcher,
-    cleanup_fmha,
     detect_gpu_arch,
 )
 
@@ -299,9 +298,6 @@ def main():
     print("    FmhaKernelConfig(family='bwd', deterministic=True)")
     print("    dQ via multi-buffer + final reduction (reproducible)")
     print("    Requires extra workspace: num_tiles_k * sizeof(dQ)")
-
-    if setup.success:
-        cleanup_fmha()
 
     # --- Summary ---
     print("\n" + "=" * 70)

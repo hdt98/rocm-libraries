@@ -25,7 +25,6 @@ import numpy as np
 from fmha_utils import (
     FmhaKernelConfig,
     FmhaProblem,
-    cleanup_fmha,
     cpu_attention_fwd,
     detect_gpu_arch,
     setup_fmha_dispatcher,
@@ -205,15 +204,12 @@ Examples:
     print(f"  O: {O_gqa.shape}")
     print(f"  Match: {gqa_match}")
 
-    cleanup_fmha()
-
     # Summary
     print("\n" + "=" * 70)
     print("NumPy Integration Pattern:")
     print("=" * 70)
     print("  1. setup = setup_fmha_dispatcher(config)")
     print("  2. O = fmha_matmul(Q, K, V, runner=setup.runner)")
-    print("  3. cleanup_fmha()")
     print("=" * 70)
 
     return 0 if match and gqa_match else 1

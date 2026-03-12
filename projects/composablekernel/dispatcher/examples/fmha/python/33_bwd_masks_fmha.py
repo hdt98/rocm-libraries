@@ -40,7 +40,6 @@ from fmha_utils import (
     FmhaKernelConfig,
     FmhaProblem,
     setup_fmha_dispatcher,
-    cleanup_fmha,
     detect_gpu_arch,
 )
 
@@ -254,9 +253,6 @@ def main():
     print("    Stage 1: bwd_dot_do_o  -- D = rowsum(dO * out)")
     print("    Stage 2: bwd_dq_dk_dv  -- compute dQ, dK, dV with mask")
     print("    Stage 3: bwd_convert_dq -- optional dtype conversion")
-
-    if setup.success:
-        cleanup_fmha()
 
     # --- Summary ---
     print("\n" + "=" * 70)

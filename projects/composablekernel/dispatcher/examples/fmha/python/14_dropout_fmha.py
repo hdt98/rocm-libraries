@@ -36,7 +36,6 @@ from fmha_utils import (
     cpu_attention_fwd,
     detect_gpu_arch,
     setup_fmha_dispatcher,
-    cleanup_fmha,
 )
 
 
@@ -136,7 +135,6 @@ def main():
             print("  Note: JIT kernel runs without dropout; shown for baseline")
         else:
             print("  GPU: Kernel returned failure")
-        cleanup_fmha()
 
     # --- CPU reference: no dropout (baseline) ---
     print("\n--- CPU Reference ---")

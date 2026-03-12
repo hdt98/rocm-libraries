@@ -1654,7 +1654,7 @@
             "128_128"
           ],
           "128_128": {
-            "required_bn0": 128
+            "forbidden_bn0": [128]
           }
         },
         "qr_async_trload_v3": {

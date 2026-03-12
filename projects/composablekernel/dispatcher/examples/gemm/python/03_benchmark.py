@@ -27,7 +27,6 @@ from ctypes_utils import (
     KernelConfig,
     setup_gemm_dispatcher,
     cleanup_gemm,
-    reset_for_example,
     detect_gpu_arch,
 )
 
@@ -68,8 +67,6 @@ Examples:
         help="Target architecture (auto-detected from rocminfo)",
     )
     args = parser.parse_args()
-
-    reset_for_example()
 
     print("=" * 60)
     print("Example 03: Benchmark")

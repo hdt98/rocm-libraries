@@ -1,8 +1,5 @@
 {
   "variant": "appendkv",
-  "tile_config": {
-    "hdim": {"values": [64, 128, 256]}
-  },
   "trait_config": {
     "data_type": {"values": ["fp16", "bf16"]},
     "pipeline": {"values": ["appendkv"]},

@@ -34,7 +34,6 @@ from fmha_utils import (
     FmhaKernelConfig,
     FmhaProblem,
     FmhaValidator,
-    cleanup_fmha,
     cpu_attention_fwd,
     detect_gpu_arch,
     setup_fmha_dispatcher,
@@ -301,7 +300,6 @@ def main():
             )
         else:
             print(f"  GPU error: {result.error}")
-        cleanup_fmha()
 
     # Summary
     print("\n" + "=" * 70)

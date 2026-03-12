@@ -41,7 +41,6 @@ from ctypes_utils import (
     KernelConfig,
     setup_gemm_dispatcher,
     cleanup_gemm,
-    reset_for_example,
     detect_gpu_arch,
 )
 
@@ -565,8 +564,6 @@ Examples:
         help="Target architecture (auto-detected from rocminfo, override with --arch gfxNNN)",
     )
     args = parser.parse_args()
-
-    reset_for_example()
 
     print("=" * 75)
     print("Example 08: Custom Heuristics")

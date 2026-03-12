@@ -36,7 +36,6 @@ from fmha_utils import (
     cpu_attention_fwd,
     detect_gpu_arch,
     setup_fmha_dispatcher,
-    cleanup_fmha,
 )
 
 
@@ -181,7 +180,6 @@ def main():
             print(f"  GPU (full): {res.time_ms:.4f} ms, {res.tflops:.2f} TFLOPS")
         else:
             print("  GPU: Kernel returned failure")
-        cleanup_fmha()
 
     # --- Split-KV with various num_splits ---
     print("\n--- Split-KV Execution Plan ---")

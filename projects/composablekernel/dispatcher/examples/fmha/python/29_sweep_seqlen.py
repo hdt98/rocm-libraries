@@ -29,7 +29,6 @@ from fmha_utils import (
     FmhaKernelConfig,
     FmhaProblem,
     FmhaValidator,
-    cleanup_fmha,
     cpu_attention_fwd,
     detect_gpu_arch,
     setup_fmha_dispatcher,
@@ -119,8 +118,6 @@ def main():
             f"  {seqlen:>8} | {res.time_ms:>10.4f} | {res.tflops:>10.2f} | {max_err:>10.2e} | {tag:<6}"
         )
         results.append((seqlen, ok, res.time_ms, res.tflops, max_err))
-
-    cleanup_fmha()
 
     # Step 3: Scaling analysis
     print("\nStep 3: Scaling Analysis")

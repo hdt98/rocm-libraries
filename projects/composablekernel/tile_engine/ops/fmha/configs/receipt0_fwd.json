@@ -1,14 +1,6 @@
 {
   "variant": "fwd",
   "trait_config": {
-    "data_type": {"values": ["fp16", "bf16", "fp8bf16", "fp8fp32"]},
-    "pipeline": {"values": ["qr", "qr_async", "qr_async_trload", "qr_async_trload_v3"]},
-    "mask": {"values": ["no", "top_left"]},
-    "bias": {"values": ["no", "bias", "alibi"]},
-    "mode": {"values": ["batch", "group"]},
-    "lse": {"values": [false, true]},
-    "dropout": {"values": [false, true]},
-    "logits": {"values": [false, true]},
-    "sink": {"values": [false, true]}
+    "data_type": {"values": ["fp16", "bf16", "fp8bf16", "fp8fp32"]}
   }
 }

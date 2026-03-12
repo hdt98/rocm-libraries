@@ -30,7 +30,6 @@ from fmha_utils import (
     cpu_attention_fwd,
     detect_gpu_arch,
     setup_fmha_dispatcher,
-    cleanup_fmha,
 )
 
 
@@ -108,7 +107,6 @@ def main():
         if result.success:
             max_err = float(np.abs(result.output.astype(np.float32) - O_ref).max())
             print(f"  FP16 baseline: {result.time_ms:.4f} ms, max_err={max_err:.2e}")
-        cleanup_fmha()
 
     print(f"\n{'=' * 70}")
     print(f"  FP8 kernel configs demonstrated: {len(FP8_CONFIGS)}")

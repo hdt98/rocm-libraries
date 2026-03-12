@@ -30,7 +30,6 @@ from fmha_utils import (
     FmhaKernelConfig,
     FmhaProblem,
     FmhaValidator,
-    cleanup_fmha,
     cpu_attention_fwd,
     detect_gpu_arch,
     setup_fmha_dispatcher,
@@ -138,8 +137,6 @@ def main():
     print("  GQA: multiple Q heads share fewer K/V heads")
     gqa_configs = [(nq, nk) for nq, nk, _ in GQA_CONFIGS]
     gqa_results = run_sweep(runner, validator, gqa_configs, "GQA")
-
-    cleanup_fmha()
 
     # Step 4: Comparison
     print("\nStep 4: MHA vs GQA Comparison")

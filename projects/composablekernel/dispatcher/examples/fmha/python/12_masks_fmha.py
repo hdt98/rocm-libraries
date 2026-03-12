@@ -38,7 +38,6 @@ from fmha_utils import (
     FmhaValidator,
     detect_gpu_arch,
     setup_fmha_dispatcher,
-    cleanup_fmha,
 )
 
 
@@ -207,9 +206,6 @@ def main():
             f"  {i:<3} {name:<18} {mask_id:<4} {density:>7.1f}% {gpu_status:<12} {cpu_status:<8} {err_str:>10} {tag:>8}"
         )
         results.append((name, ok))
-
-    if runner is not None:
-        cleanup_fmha()
 
     # --- Mask visualization ---
     print("\n--- Mask Patterns (first 8x8 corner) ---")

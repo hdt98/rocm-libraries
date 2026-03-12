@@ -38,7 +38,6 @@ from fmha_utils import (
     FmhaKernelConfig,
     FmhaProblem,
     setup_fmha_dispatcher,
-    cleanup_fmha,
     detect_gpu_arch,
 )
 
@@ -271,9 +270,6 @@ def main():
     print("  Stage 3 (convert_dq) converts fp32 accumulator -> bf16 output.")
     print("  BF16 advantage: wider dynamic range prevents overflow in")
     print("  intermediate products (S = Q @ K^T) for large sequences.")
-
-    if setup.success:
-        cleanup_fmha()
 
     # --- Summary ---
     print("\n" + "=" * 70)

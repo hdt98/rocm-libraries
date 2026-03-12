@@ -4,6 +4,9 @@
 // FMHA Dispatcher ctypes library.
 // Provides a C API for Python ctypes integration.
 // Kernel header included via -include at compile time.
+//
+// Thread safety: NOT thread-safe. All calls must be serialized by the caller
+// (Python GIL provides this when called from ctypes).
 
 #include <hip/hip_runtime.h>
 #include <cstdint>
@@ -14,7 +17,7 @@
 #include "ck_tile/dispatcher.hpp"
 
 #ifndef GFX_ARCH
-#define GFX_ARCH "gfx950"
+#error "GFX_ARCH must be defined at compile time (e.g. -DGFX_ARCH=\"gfx950\")"
 #endif
 
 using namespace ck_tile::dispatcher;
@@ -23,8 +26,6 @@ static std::unique_ptr<FmhaRegistry> g_registry;
 static std::unique_ptr<FmhaDispatcher> g_dispatcher;
 static bool g_initialized = false;
 
-// Safe HIP check that sets rc and jumps to cleanup on failure.
-// All functions using this must have:  int rc = 0;  and a  cleanup:  label.
 #define HIP_CHECK(call)           \
     do                            \
     {                             \
@@ -36,7 +37,6 @@ static bool g_initialized = false;
         }                         \
     } while(0)
 
-// Helper to free a device pointer if non-null
 static inline void safe_hip_free(void*& ptr)
 {
     if(ptr)
@@ -44,6 +44,18 @@ static inline void safe_hip_free(void*& ptr)
         hipFree(ptr);
         ptr = nullptr;
     }
+}
+
+static int dtype_element_bytes(const char* dtype)
+{
+    if(!dtype)
+        return 2;
+    if(std::strcmp(dtype, "fp32") == 0)
+        return 4;
+    if(std::strcmp(dtype, "fp8bf16") == 0 || std::strcmp(dtype, "fp8fp32") == 0 ||
+       std::strcmp(dtype, "bf8") == 0)
+        return 1;
+    return 2; // fp16, bf16
 }
 
 extern "C" {
@@ -98,14 +110,17 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     if(!g_initialized)
         return -1;
 
-    int rc                   = 0;
-    const int64_t q_bytes    = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * 2;
-    const int64_t k_bytes    = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * 2;
-    const int64_t v_bytes    = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * 2;
-    const int64_t o_bytes    = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v * 2;
-    const int64_t bias_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * seqlen_k * 2;
-    const int64_t lse_bytes  = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
-    float elapsed            = 0.0f;
+    const int elem_bytes = dtype_element_bytes(data_type_str);
+
+    int rc                = 0;
+    const int64_t q_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * elem_bytes;
+    const int64_t k_bytes = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * elem_bytes;
+    const int64_t v_bytes = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * elem_bytes;
+    const int64_t o_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v * elem_bytes;
+    const int64_t bias_bytes =
+        static_cast<int64_t>(batch) * nhead_q * seqlen_q * seqlen_k * elem_bytes;
+    const int64_t lse_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
+    float elapsed           = 0.0f;
 
     void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
     void *bias_dev = nullptr, *lse_dev_buf = nullptr;
@@ -199,7 +214,6 @@ int fmha_dispatcher_run_fwd(const void* q_host,
 
     if(is_group_mode)
     {
-        // Group mode: [total_tokens, nhead, hdim] -- batch via seqstart arrays
         args.stride_q       = nhead_q * hdim_q;
         args.stride_k       = nhead_k * hdim_q;
         args.stride_v       = nhead_k * hdim_v;
@@ -215,7 +229,7 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     }
     else if(perm == 1)
     {
-        // BHSD layout: [batch, head, seq, dim]
+        // BHSD: [batch, head, seq, dim]
         args.stride_q       = hdim_q;
         args.stride_k       = hdim_q;
         args.stride_v       = hdim_v;
@@ -224,14 +238,14 @@ int fmha_dispatcher_run_fwd(const void* q_host,
         args.nhead_stride_k = seqlen_k * hdim_q;
         args.nhead_stride_v = seqlen_k * hdim_v;
         args.nhead_stride_o = seqlen_q * hdim_v;
-        args.batch_stride_q = nhead_q * seqlen_q * hdim_q;
-        args.batch_stride_k = nhead_k * seqlen_k * hdim_q;
-        args.batch_stride_v = nhead_k * seqlen_k * hdim_v;
-        args.batch_stride_o = nhead_q * seqlen_q * hdim_v;
+        args.batch_stride_q = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
+        args.batch_stride_k = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_q;
+        args.batch_stride_v = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_v;
+        args.batch_stride_o = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
     }
     else
     {
-        // BSHD layout: [batch, seq, head, dim]
+        // BSHD: [batch, seq, head, dim]
         args.stride_q       = nhead_q * hdim_q;
         args.stride_k       = nhead_k * hdim_q;
         args.stride_v       = nhead_k * hdim_v;
@@ -240,22 +254,23 @@ int fmha_dispatcher_run_fwd(const void* q_host,
         args.nhead_stride_k = hdim_q;
         args.nhead_stride_v = hdim_v;
         args.nhead_stride_o = hdim_v;
-        args.batch_stride_q = seqlen_q * nhead_q * hdim_q;
-        args.batch_stride_k = seqlen_k * nhead_k * hdim_q;
-        args.batch_stride_v = seqlen_k * nhead_k * hdim_v;
-        args.batch_stride_o = seqlen_q * nhead_q * hdim_v;
+        args.batch_stride_q = static_cast<int64_t>(seqlen_q) * nhead_q * hdim_q;
+        args.batch_stride_k = static_cast<int64_t>(seqlen_k) * nhead_k * hdim_q;
+        args.batch_stride_v = static_cast<int64_t>(seqlen_k) * nhead_k * hdim_v;
+        args.batch_stride_o = static_cast<int64_t>(seqlen_q) * nhead_q * hdim_v;
     }
-    args.stride_bias            = (bias_type_int > 0) ? seqlen_k : 0;
-    args.stride_randval         = 0;
-    args.nhead_stride_bias      = (bias_type_int > 0) ? seqlen_q * seqlen_k : 0;
-    args.nhead_stride_randval   = 0;
-    args.nhead_stride_lse       = has_lse ? seqlen_q : 0;
+    args.stride_bias          = (bias_type_int > 0) ? seqlen_k : 0;
+    args.stride_randval       = 0;
+    args.nhead_stride_bias    = (bias_type_int > 0) ? static_cast<int64_t>(seqlen_q) * seqlen_k : 0;
+    args.nhead_stride_randval = 0;
+    args.nhead_stride_lse     = has_lse ? seqlen_q : 0;
     args.nhead_stride_q_descale = 0;
     args.nhead_stride_k_descale = 0;
     args.nhead_stride_v_descale = 0;
-    args.batch_stride_bias      = (bias_type_int > 0) ? nhead_q * seqlen_q * seqlen_k : 0;
+    args.batch_stride_bias =
+        (bias_type_int > 0) ? static_cast<int64_t>(nhead_q) * seqlen_q * seqlen_k : 0;
     args.batch_stride_randval   = 0;
-    args.batch_stride_lse       = has_lse ? nhead_q * seqlen_q : 0;
+    args.batch_stride_lse       = has_lse ? static_cast<int64_t>(nhead_q) * seqlen_q : 0;
     args.batch_stride_q_descale = 0;
     args.batch_stride_k_descale = 0;
     args.batch_stride_v_descale = 0;
@@ -329,24 +344,28 @@ int fmha_dispatcher_run_bwd(const void* q_host,
                             int hdim_q,
                             int hdim_v,
                             float scale,
+                            const char* data_type_str,
                             float* time_ms_out)
 {
     if(!g_initialized)
         return -1;
 
-    int rc                     = 0;
-    const int64_t q_bytes      = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * 2;
-    const int64_t k_bytes      = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * 2;
-    const int64_t v_bytes      = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * 2;
-    const int64_t o_bytes      = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v * 2;
-    const int64_t do_bytes     = o_bytes;
-    const int64_t dq_bytes     = q_bytes;
-    const int64_t dk_bytes     = k_bytes;
-    const int64_t dv_bytes     = v_bytes;
-    const int64_t lse_bytes    = static_cast<int64_t>(batch) * nhead_q * seqlen_q * 4;
-    const int64_t d_bytes      = static_cast<int64_t>(batch) * nhead_q * seqlen_q * 4;
-    const int64_t dq_acc_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * 4;
-    float elapsed              = 0.0f;
+    const int elem_bytes = dtype_element_bytes(data_type_str);
+
+    int rc                 = 0;
+    const int64_t q_bytes  = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * elem_bytes;
+    const int64_t k_bytes  = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * elem_bytes;
+    const int64_t v_bytes  = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * elem_bytes;
+    const int64_t o_bytes  = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v * elem_bytes;
+    const int64_t do_bytes = o_bytes;
+    const int64_t dq_bytes = q_bytes;
+    const int64_t dk_bytes = k_bytes;
+    const int64_t dv_bytes = v_bytes;
+    const int64_t lse_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
+    const int64_t d_bytes   = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
+    const int64_t dq_acc_bytes =
+        static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * sizeof(float);
+    float elapsed = 0.0f;
 
     void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
     void *lse_dev = nullptr, *do_dev = nullptr, *d_dev = nullptr;
@@ -355,7 +374,7 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     fmha_bwd_traits traits{};
     traits.hdim_q           = hdim_q;
     traits.hdim_v           = hdim_v;
-    traits.data_type        = "fp16";
+    traits.data_type        = data_type_str ? data_type_str : "fp16";
     traits.is_group_mode    = false;
     traits.mask_type        = mask_enum::no_mask;
     traits.bias_type        = bias_enum::no_bias;
@@ -416,7 +435,7 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     args.nhead_k      = nhead_k;
     args.scale        = scale;
 
-    // bhsd strides
+    // bhsd strides (cast first operand to int64_t to prevent int32 overflow)
     args.stride_q       = hdim_q;
     args.stride_k       = hdim_q;
     args.stride_v       = hdim_v;
@@ -430,32 +449,32 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     args.stride_dv      = hdim_v;
     args.stride_dbias   = 0;
 
-    args.nhead_stride_q       = seqlen_q * hdim_q;
-    args.nhead_stride_k       = seqlen_k * hdim_q;
-    args.nhead_stride_v       = seqlen_k * hdim_v;
+    args.nhead_stride_q       = static_cast<int64_t>(seqlen_q) * hdim_q;
+    args.nhead_stride_k       = static_cast<int64_t>(seqlen_k) * hdim_q;
+    args.nhead_stride_v       = static_cast<int64_t>(seqlen_k) * hdim_v;
     args.nhead_stride_bias    = 0;
-    args.nhead_stride_o       = seqlen_q * hdim_v;
+    args.nhead_stride_o       = static_cast<int64_t>(seqlen_q) * hdim_v;
     args.nhead_stride_randval = 0;
-    args.nhead_stride_do      = seqlen_q * hdim_v;
+    args.nhead_stride_do      = static_cast<int64_t>(seqlen_q) * hdim_v;
     args.nhead_stride_lsed    = seqlen_q;
     args.nhead_stride_dq_acc  = static_cast<ck_tile::long_index_t>(seqlen_q) * hdim_q;
-    args.nhead_stride_dq      = seqlen_q * hdim_q;
-    args.nhead_stride_dk      = seqlen_k * hdim_q;
-    args.nhead_stride_dv      = seqlen_k * hdim_v;
+    args.nhead_stride_dq      = static_cast<int64_t>(seqlen_q) * hdim_q;
+    args.nhead_stride_dk      = static_cast<int64_t>(seqlen_k) * hdim_q;
+    args.nhead_stride_dv      = static_cast<int64_t>(seqlen_k) * hdim_v;
     args.nhead_stride_dbias   = 0;
 
-    args.batch_stride_q       = nhead_q * seqlen_q * hdim_q;
-    args.batch_stride_k       = nhead_k * seqlen_k * hdim_q;
-    args.batch_stride_v       = nhead_k * seqlen_k * hdim_v;
+    args.batch_stride_q       = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
+    args.batch_stride_k       = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_q;
+    args.batch_stride_v       = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_v;
     args.batch_stride_bias    = 0;
-    args.batch_stride_o       = nhead_q * seqlen_q * hdim_v;
+    args.batch_stride_o       = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
     args.batch_stride_randval = 0;
-    args.batch_stride_do      = nhead_q * seqlen_q * hdim_v;
-    args.batch_stride_lsed    = nhead_q * seqlen_q;
+    args.batch_stride_do      = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
+    args.batch_stride_lsed    = static_cast<int64_t>(nhead_q) * seqlen_q;
     args.batch_stride_dq_acc  = static_cast<ck_tile::long_index_t>(nhead_q) * seqlen_q * hdim_q;
-    args.batch_stride_dq      = nhead_q * seqlen_q * hdim_q;
-    args.batch_stride_dk      = nhead_k * seqlen_k * hdim_q;
-    args.batch_stride_dv      = nhead_k * seqlen_k * hdim_v;
+    args.batch_stride_dq      = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
+    args.batch_stride_dk      = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_q;
+    args.batch_stride_dv      = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_v;
     args.batch_stride_dbias   = 0;
     args.split_stride_dq_acc  = 0;
 

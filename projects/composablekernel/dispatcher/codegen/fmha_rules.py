@@ -87,6 +87,13 @@ def _validate_tile_against_specs(
         result.add_error(
             f"{pipeline} with hdim ({hdim_q},{hdim_v}) forbids bk0={tile[2]}"
         )
+    if (
+        "forbidden_bn0" in hdim_constraint
+        and tile[1] in hdim_constraint["forbidden_bn0"]
+    ):
+        result.add_error(
+            f"{pipeline} with hdim ({hdim_q},{hdim_v}) forbids bn0={tile[1]}"
+        )
 
     if "allowed_hdim" in constraints and hdim_key not in constraints["allowed_hdim"]:
         result.add_error(

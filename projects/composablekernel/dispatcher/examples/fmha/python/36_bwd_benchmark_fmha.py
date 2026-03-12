@@ -38,7 +38,6 @@ from fmha_utils import (
     FmhaKernelConfig,
     FmhaProblem,
     setup_fmha_dispatcher,
-    cleanup_fmha,
     detect_gpu_arch,
 )
 
@@ -246,9 +245,6 @@ def main():
         for sl in sorted(ref_times):
             ratio = ref_times[sl] / base
             print(f"  {sl:>7} {ref_times[sl]:>10.4f} {ratio:>9.1f}x")
-
-    if setup.success:
-        cleanup_fmha()
 
     # --- Summary ---
     print("\n" + "=" * 70)

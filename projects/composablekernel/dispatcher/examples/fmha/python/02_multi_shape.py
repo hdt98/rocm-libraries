@@ -25,7 +25,6 @@ import numpy as np
 from fmha_utils import (
     FmhaKernelSpec,
     FmhaProblem,
-    cleanup_fmha,
     detect_gpu_arch,
     setup_fmha_dispatcher,
     spec_to_config,
@@ -136,7 +135,6 @@ Examples:
         avg_tflops = (total_ops / 1e12) / (total_time / 1000)
         print(f"\n  Total: {total_time:.2f} ms, Average: {avg_tflops:.2f} TFLOPS")
 
-    cleanup_fmha()
     runner.cleanup()
 
     print("\n" + "=" * 70)

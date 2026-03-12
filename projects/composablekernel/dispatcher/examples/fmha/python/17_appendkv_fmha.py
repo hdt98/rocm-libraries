@@ -35,7 +35,6 @@ from fmha_utils import (
     FmhaKernelConfig,
     detect_gpu_arch,
     setup_fmha_dispatcher,
-    cleanup_fmha,
 )
 
 
@@ -324,7 +323,6 @@ def main():
             )
         else:
             print("  GPU: Kernel returned failure (appendkv not supported)")
-        cleanup_fmha()
     print("  Note: Prebuilt kernel does not support appendkv family")
 
     # --- RoPE position-dependency visualization ---

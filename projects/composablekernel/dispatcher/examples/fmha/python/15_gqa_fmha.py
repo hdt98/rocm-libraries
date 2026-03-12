@@ -36,7 +36,6 @@ from fmha_utils import (
     cpu_attention_fwd,
     detect_gpu_arch,
     setup_fmha_dispatcher,
-    cleanup_fmha,
 )
 
 
@@ -146,9 +145,6 @@ def main():
             f"{time_str:>10} {tflops_str:>10} {err_str:>10} {tag:>8}"
         )
         results.append((ratio, hk, ok, max_abs))
-
-    if runner is not None:
-        cleanup_fmha()
 
     # --- Memory analysis ---
     print("\n--- KV Cache Memory Analysis ---")

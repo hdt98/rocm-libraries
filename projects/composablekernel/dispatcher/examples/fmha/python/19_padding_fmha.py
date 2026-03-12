@@ -37,7 +37,6 @@ from fmha_utils import (
     cpu_attention_fwd,
     detect_gpu_arch,
     setup_fmha_dispatcher,
-    cleanup_fmha,
 )
 
 
@@ -302,7 +301,6 @@ def main():
             )
         else:
             print("  GPU: Kernel returned failure")
-        cleanup_fmha()
 
     # --- Memory analysis ---
     print("\n--- Memory Efficiency Analysis ---")

@@ -40,7 +40,6 @@ from fmha_utils import (
     FmhaKernelConfig,
     FmhaProblem,
     setup_fmha_dispatcher,
-    cleanup_fmha,
     detect_gpu_arch,
 )
 
@@ -261,9 +260,6 @@ def main():
     print("    - dQ: computed per query head (no grouping needed)")
     print("    - dK, dV: accumulated across head groups via atomicAdd")
     print("              or multi-buffer reduction (deterministic mode)")
-
-    if setup.success:
-        cleanup_fmha()
 
     # --- Summary ---
     print("\n" + "=" * 70)
