@@ -4,26 +4,29 @@
 # SPDX-License-Identifier: MIT
 
 from dataclasses import dataclass
+from enum import IntEnum
 from typing import Callable, Dict, Iterable, Optional
 
 from fmha_symbol_map import canonical_bias, canonical_qscale
 
 
-PROFILE_ALIASES: Dict[str, str] = {
-    "0": "ck_default",
-    "1": "ck_extended",
-    "2": "flash_fwd",
-    "3": "flash_bwd",
-    "4": "pytorch",
-    "100": "aiter_batch",
-    "200": "aiter_group",
-    "300": "aiter_bwd_batch",
-    "400": "aiter_bwd_group",
-    "600": "aiter_cpp",
-    "800": "fp32_all",
-    "801": "fp32_min",
-    "888": "fp8_test",
-}
+class Receipt(IntEnum):
+    CK_DEFAULT = 0
+    CK_EXTENDED = 1
+    FLASH_FWD = 2
+    FLASH_BWD = 3
+    PYTORCH = 4
+    AITER_BATCH = 100
+    AITER_GROUP = 200
+    AITER_BWD_BATCH = 300
+    AITER_BWD_GROUP = 400
+    AITER_CPP = 600
+    FP32_ALL = 800
+    FP32_MIN = 801
+    FP8_TEST = 888
+
+
+PROFILE_ALIASES: Dict[str, str] = {str(r.value): r.name.lower() for r in Receipt}
 
 
 def normalize_profile(

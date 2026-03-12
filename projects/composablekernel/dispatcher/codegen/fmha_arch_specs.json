@@ -1,5 +1,5 @@
 {
-  "_comment": "FMHA per-arch capabilities. Tile tables migrated from 01_fmha/codegen/ops/fmha_fwd.py",
+  "_comment": "FMHA per-arch capabilities. Hand-maintained, NOT auto-generated. Tile tables and constraints migrated from 01_fmha/codegen/ops/fmha_fwd.py. Run tests/validate_arch_specs_parity.py to verify parity with CK upstream.",
   "architectures": {
     "gfx90a": {
       "family": "cdna2",
