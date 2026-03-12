@@ -175,7 +175,7 @@ public:
         }
 
         // Rule 7: Optional attention mask validation
-        const auto attnMask = attributes.get_attn_mask();
+        const auto attnMask = attributes.get_bias();
         if(attnMask)
         {
             const auto& maskDims = attnMask->get_dim();
@@ -332,7 +332,7 @@ public:
         }
 
         // Rule 10: Optional attention scale must be a scalar tensor
-        const auto scale = attributes.get_scale();
+        const auto scale = attributes.get_attn_scale();
         if(scale)
         {
             HIPDNN_CHECK_ERROR(detail::validateScalarParameter(scale, "SCALE tensor"));

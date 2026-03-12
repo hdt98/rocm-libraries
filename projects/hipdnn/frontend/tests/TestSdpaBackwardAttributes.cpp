@@ -34,8 +34,8 @@ TEST(TestSdpaBackwardAttributes, DefaultValues)
     EXPECT_EQ(attrs.get_dv(), nullptr);
 
     // Optional input tensors
-    EXPECT_EQ(attrs.get_scale(), nullptr);
-    EXPECT_EQ(attrs.get_attn_mask(), nullptr);
+    EXPECT_EQ(attrs.get_attn_scale(), nullptr);
+    EXPECT_EQ(attrs.get_bias(), nullptr);
     EXPECT_EQ(attrs.get_seq_len_q(), nullptr);
     EXPECT_EQ(attrs.get_seq_len_kv(), nullptr);
     EXPECT_EQ(attrs.get_seed(), nullptr);
@@ -98,8 +98,8 @@ TEST(TestSdpaBackwardAttributes, SetRequiredTensors)
     EXPECT_EQ(attrs.get_dv(), dv);
 
     // Unset optional tensors remain null
-    EXPECT_EQ(attrs.get_scale(), nullptr);
-    EXPECT_EQ(attrs.get_attn_mask(), nullptr);
+    EXPECT_EQ(attrs.get_attn_scale(), nullptr);
+    EXPECT_EQ(attrs.get_bias(), nullptr);
     EXPECT_EQ(attrs.get_dbias(), nullptr);
 }
 
@@ -118,8 +118,8 @@ TEST(TestSdpaBackwardAttributes, SetOptionalInputTensors)
     auto dropoutScaleInv = makeTensor(18);
     auto dbias = makeTensor(19);
 
-    attrs.set_scale(scale)
-        .set_attn_mask(attnMask)
+    attrs.set_attn_scale(scale)
+        .set_bias(attnMask)
         .set_seq_len_q(seqLenQ)
         .set_seq_len_kv(seqLenKv)
         .set_seed(seed)
@@ -129,8 +129,8 @@ TEST(TestSdpaBackwardAttributes, SetOptionalInputTensors)
         .set_dropout_scale_inv(dropoutScaleInv)
         .set_dbias(dbias);
 
-    EXPECT_EQ(attrs.get_scale(), scale);
-    EXPECT_EQ(attrs.get_attn_mask(), attnMask);
+    EXPECT_EQ(attrs.get_attn_scale(), scale);
+    EXPECT_EQ(attrs.get_bias(), attnMask);
     EXPECT_EQ(attrs.get_seq_len_q(), seqLenQ);
     EXPECT_EQ(attrs.get_seq_len_kv(), seqLenKv);
     EXPECT_EQ(attrs.get_seed(), seed);
@@ -220,8 +220,8 @@ TEST(TestSdpaBackwardAttributes, PackAttributesAllFields)
         .set_dv(makeTensor(9));
 
     // Optional input tensors
-    attrs.set_scale(makeTensor(10))
-        .set_attn_mask(makeTensor(11))
+    attrs.set_attn_scale(makeTensor(10))
+        .set_bias(makeTensor(11))
         .set_seq_len_q(makeTensor(12))
         .set_seq_len_kv(makeTensor(13))
         .set_seed(makeTensor(14))
@@ -371,8 +371,8 @@ TEST(TestSdpaBackwardAttributes, FromFlatBufferRoundtrip)
         .set_dq(makeTensor(7))
         .set_dk(makeTensor(8))
         .set_dv(makeTensor(9));
-    original.set_scale(makeTensor(10))
-        .set_attn_mask(makeTensor(11))
+    original.set_attn_scale(makeTensor(10))
+        .set_bias(makeTensor(11))
         .set_seq_len_q(makeTensor(12))
         .set_seq_len_kv(makeTensor(13))
         .set_seed(makeTensor(14))
@@ -427,10 +427,10 @@ TEST(TestSdpaBackwardAttributes, FromFlatBufferRoundtrip)
     EXPECT_EQ(attrs.get_dv()->get_uid(), 9);
 
     // Optional input tensors
-    ASSERT_NE(attrs.get_scale(), nullptr);
-    EXPECT_EQ(attrs.get_scale()->get_uid(), 10);
-    ASSERT_NE(attrs.get_attn_mask(), nullptr);
-    EXPECT_EQ(attrs.get_attn_mask()->get_uid(), 11);
+    ASSERT_NE(attrs.get_attn_scale(), nullptr);
+    EXPECT_EQ(attrs.get_attn_scale()->get_uid(), 10);
+    ASSERT_NE(attrs.get_bias(), nullptr);
+    EXPECT_EQ(attrs.get_bias()->get_uid(), 11);
     ASSERT_NE(attrs.get_seq_len_q(), nullptr);
     EXPECT_EQ(attrs.get_seq_len_q()->get_uid(), 12);
     ASSERT_NE(attrs.get_seq_len_kv(), nullptr);
@@ -503,8 +503,8 @@ TEST(TestSdpaBackwardAttributes, FromFlatBufferNoOptionals)
     EXPECT_EQ(attrs.get_dv()->get_uid(), 9);
 
     // All optional tensors absent
-    EXPECT_EQ(attrs.get_scale(), nullptr);
-    EXPECT_EQ(attrs.get_attn_mask(), nullptr);
+    EXPECT_EQ(attrs.get_attn_scale(), nullptr);
+    EXPECT_EQ(attrs.get_bias(), nullptr);
     EXPECT_EQ(attrs.get_seq_len_q(), nullptr);
     EXPECT_EQ(attrs.get_seq_len_kv(), nullptr);
     EXPECT_EQ(attrs.get_seed(), nullptr);

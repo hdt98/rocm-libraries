@@ -74,7 +74,7 @@ public:
         O = 3,
         dO = 4, // Gradient of output (dO)
         Stats = 5, // Softmax statistics from forward pass
-        Attn_Scale = 6, // Attention scale tensor (Attn_scale)
+        Attn_scale = 6, // Attention scale tensor
         Bias = 7, // Additive attention bias (Bias)
         SEQ_LEN_Q = 8,
         SEQ_LEN_KV = 9,
@@ -149,12 +149,12 @@ public:
         return getInput(InputNames::Stats);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
-    std::shared_ptr<TensorAttributes> get_scale() const
+    std::shared_ptr<TensorAttributes> get_attn_scale() const
     {
-        return getInput(InputNames::Attn_Scale);
+        return getInput(InputNames::Attn_scale);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
-    std::shared_ptr<TensorAttributes> get_attn_mask() const
+    std::shared_ptr<TensorAttributes> get_bias() const
     {
         return getInput(InputNames::Bias);
     }
@@ -280,22 +280,22 @@ public:
         return setInput(InputNames::Stats, std::move(value));
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
-    SdpaBackwardAttributes& set_scale(const std::shared_ptr<TensorAttributes>& value)
+    SdpaBackwardAttributes& set_attn_scale(const std::shared_ptr<TensorAttributes>& value)
     {
-        return setInput(InputNames::Attn_Scale, value);
+        return setInput(InputNames::Attn_scale, value);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
-    SdpaBackwardAttributes& set_scale(std::shared_ptr<TensorAttributes>&& value)
+    SdpaBackwardAttributes& set_attn_scale(std::shared_ptr<TensorAttributes>&& value)
     {
-        return setInput(InputNames::Attn_Scale, std::move(value));
+        return setInput(InputNames::Attn_scale, std::move(value));
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
-    SdpaBackwardAttributes& set_attn_mask(const std::shared_ptr<TensorAttributes>& value)
+    SdpaBackwardAttributes& set_bias(const std::shared_ptr<TensorAttributes>& value)
     {
         return setInput(InputNames::Bias, value);
     }
     // NOLINTNEXTLINE(readability-identifier-naming)
-    SdpaBackwardAttributes& set_attn_mask(std::shared_ptr<TensorAttributes>&& value)
+    SdpaBackwardAttributes& set_bias(std::shared_ptr<TensorAttributes>&& value)
     {
         return setInput(InputNames::Bias, std::move(value));
     }
@@ -493,8 +493,8 @@ public:
             get_dq()->get_uid(),
             get_dk()->get_uid(),
             get_dv()->get_uid(),
-            optUid(get_scale()),
-            optUid(get_attn_mask()),
+            optUid(get_attn_scale()),
+            optUid(get_bias()),
             optUid(get_seq_len_q()),
             optUid(get_seq_len_kv()),
             optUid(get_seed()),
@@ -536,11 +536,11 @@ public:
 
         if(fb->scale_tensor_uid().has_value())
         {
-            attr.set_scale(tensorMap.at(fb->scale_tensor_uid().value()));
+            attr.set_attn_scale(tensorMap.at(fb->scale_tensor_uid().value()));
         }
         if(fb->attn_mask_tensor_uid().has_value())
         {
-            attr.set_attn_mask(tensorMap.at(fb->attn_mask_tensor_uid().value()));
+            attr.set_bias(tensorMap.at(fb->attn_mask_tensor_uid().value()));
         }
         if(fb->seq_len_q_tensor_uid().has_value())
         {
