@@ -612,6 +612,20 @@ namespace
         auto                          typeBTensile = hip2TensileType(typeB);
         std::vector<rocisa::DataType> biasDataTypeWhiteList; // dummy
         std::vector<int>              biasSrcWhiteList; // dummy
+
+        TensileLite::TensorOps aOps, bOps, cOps, dOps;
+
+        if(opA == HIPBLAS_OP_C)
+            aOps = {TensileLite::TensorOp::ComplexConjugate()};
+
+        if(opB == HIPBLAS_OP_C)
+            bOps = {TensileLite::TensorOp::ComplexConjugate()};
+
+        bool isComplexInput = (typeATensile == rocisa::DataType::ComplexFloat
+                               || typeATensile == rocisa::DataType::ComplexDouble);
+
+        auto alphaBetaType = isComplexInput ? typeATensile : roc2TensileType(typeCompute);
+
         return TensileLite::ContractionProblemGemm::createDefaultProblem(
             (opA != HIPBLAS_OP_N),
             (opB != HIPBLAS_OP_N),
@@ -2074,31 +2088,9 @@ namespace
         // convert alpha and beta to float if compute type is half
         if(prob.compute_type == rocblaslt_compute_f16)
         {
-            rocisa::DataType key_type = computeTypeToRocisaDataType(prob.compute_type);
-
-            auto it = argument_vals.find(key_type);
-
-            if(it == argument_vals.end())
-            {
-                log_error(__func__, "Unsupported compute type for activation args");
-                throw std::runtime_error("[GetTensileInputs] unsupported compute type.");
-            }
-
-            std::visit(
-                [&inputs, &prob](auto val) {
-                    using T_compute = decltype(val);
-                    if constexpr(std::is_constructible_v<T_compute, float>)
-                    {
-                        inputs.activationArgs.push_back(T_compute(prob.act0));
-                        inputs.activationArgs.push_back(T_compute(prob.act1));
-                    }
-                    else
-                    {
-                        throw std::runtime_error(
-                            "[GetTensileInputs] unsupported compute type for activation");
-                    }
-                },
-                it->second);
+            inputs.activationArgs = {prob.act0, prob.act1};
+            inputs.alpha          = static_cast<float>(std::get<hipblasLtHalf>(inputs.alpha));
+            inputs.beta           = static_cast<float>(std::get<hipblasLtHalf>(inputs.beta));
         }
 
         return inputs;
