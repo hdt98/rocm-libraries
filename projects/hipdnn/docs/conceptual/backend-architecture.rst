@@ -27,14 +27,14 @@ hipDNN uses a three-layer architecture:
 .. code::
 
    User Application
-      |
-   1. Frontend (C++ API) -- hipdnn_frontend namespace
-      |
-   2. Backend (C API) -- hipdnn_backend.h
-      |
-   3. Plugin SDK (C API) -- PluginApi.h + EnginePluginApi.h
-      |
-      Engine Plugin (.so) -- e.g., MIOpen plugin
+         |
+      1. Frontend (C++ API) -- hipdnn_frontend namespace
+         |
+      2. Backend (C API) -- hipdnn_backend.h
+         |
+      3. Plugin SDK (C API) -- PluginApi.h + EnginePluginApi.h
+         |
+         Engine Plugin (.so) -- e.g., MIOpen plugin
 
 The frontend provides a high-level graph-based C++ API. It translates user operations into backend descriptor calls. The backend manages descriptors, handles, and the plugin system. Plugins implement the actual GPU computation.
 
@@ -45,7 +45,7 @@ Plugin configuration
 --------------------
 
 .. list-table::
-   :widths: 3 3
+   :widths: 3 5
    :header-rows: 1
 
    * - Function
@@ -59,7 +59,7 @@ Handle management
 -----------------
 
 .. list-table::
-   :widths: 3 3
+   :widths: 3 5
    :header-rows: 1
 
    * - Function
@@ -79,7 +79,7 @@ Graph configuration
 -------------------
 
 .. list-table::
-   :widths: 3 3
+   :widths: 5 3
    :header-rows: 1
 
    * - Function
@@ -287,7 +287,7 @@ Descriptor management
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. list-table::
-   :widths: 3 3
+   :widths: 3 5
    :header-rows: 1
 
    * - Descriptor Type 
@@ -321,7 +321,7 @@ Graph serialization (backend)
 -----------------------------
 
 .. list-table::
-   :widths: 3 3
+   :widths: 5 3
    :header-rows: 1
 
    * - Function
@@ -335,7 +335,7 @@ Plugin configuration
 --------------------
 
 .. list-table::
-   :widths: 3 3
+   :widths: 5 3
    :header-rows: 1
 
    * - Function
@@ -355,7 +355,7 @@ Logging and error
 -----------------
 
 .. list-table::
-   :widths: 3 3
+   :widths: 5 3
    :header-rows: 1
 
    * - Function
@@ -379,7 +379,7 @@ Version
 -------
 
 .. list-table::
-   :widths: 3 3
+   :widths: 5 3
    :header-rows: 1
 
    * - Function

@@ -10,9 +10,6 @@ Migrate a cudNN project to hipDNN
 
 This guide demonstrates how to migrate a cuDNN code project to hipDNN.
 
-Migrate your cuDNN project
-==========================
-
 Before you begin, ensure hipDNN (ROCm) is installed. See :ref:`install` for more information.
 
 Here's a minimal example of a hipDNN project in ``CMakeLists.txt``:
@@ -72,6 +69,7 @@ Tensor dimensions and layouts
 Tensor dimension ordering in hipDNN is *operation-specific*, following the same conventions as
 PyTorch and cuDNN. The *memory layout* (channel-first vs channel-last) is always controlled by
 strides and stride order, not by the order of the tensor dimension vector that always holds values as [N,C,H,W] or [N,C,D,H,W]. 
+
 For example, memory arranged as NCHW corresponds to stride order {3,2,1,0} (W is the most tightly packed), and NDHWC corresponds to stride order {4,0,3,2,1} (C is the most tightly packed). 
 Use the ``TensorLayout`` constants and ``generateStrides()`` utility to compute strides for common layouts.
 
@@ -165,13 +163,13 @@ Matrix multiplication
      - Shape
      - Description
    * - A
-     - `(...batch, M, K)`
+     - ``(...batch, M, K)``
      - Leading batch dims, last two are matrix dims
    * - B
-     - `(...batch, K, N)`
+     - ``(...batch, K, N)``
      - K must match A's last dim
    * - C (output)
-     - `(...batch, M, N)`
+     - ``(...batch, M, N)``
      - Batch dims are broadcast
 
 Batch dimensions support broadcasting (dims must be equal or divisible).
