@@ -1,0 +1,13 @@
+{
+  "variant": "bwd",
+  "tile_config": {
+    "hdim": {"values": [64, 128]}
+  },
+  "trait_config": {
+    "data_type": {"values": ["fp16", "bf16"]},
+    "mask": {"values": ["no", "top_left"]},
+    "bias": {"values": ["no", "alibi"]},
+    "dropout": {"values": [false]},
+    "lse": {"values": [true]}
+  }
+}
