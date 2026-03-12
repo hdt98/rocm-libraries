@@ -104,6 +104,7 @@ namespace TensileLite
             const size_t m_minFlopsPerSync = 0;
 
             const bool m_useGPUTimer;
+            const bool m_timerActive;
             const bool m_syncAfterWarmups = true;
             const int  m_sleepPercent;
 
