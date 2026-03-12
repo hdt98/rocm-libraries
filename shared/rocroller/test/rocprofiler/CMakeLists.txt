@@ -3,34 +3,9 @@
 
 find_package(rocprofiler-sdk REQUIRED)
 find_package(rocprofiler-sdk-roctx REQUIRED)
-find_package(
-    amd_comgr
-    REQUIRED
-    CONFIG
-    HINTS
-    ${rocm_version_DIR}
-    ${ROCM_PATH}
-    PATHS
-    ${rocm_version_DIR}
-    ${ROCM_PATH})
 
 list(APPEND CMAKE_MODULE_PATH "${rocprofiler-sdk_DIR}/Modules")
 find_package(libdw REQUIRED)
-
-find_package(Catch2 QUIET)
-if(NOT Catch2_FOUND)
-    if(ROCROLLER_ENABLE_FETCH)
-        include(FetchContent)
-        FetchContent_Declare(
-            Catch2
-            GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-            GIT_TAG devel
-        )
-        FetchContent_MakeAvailable(Catch2)
-    else()
-        message(FATAL_ERROR "Failed to find Catch2")
-    endif()
-endif()
 
 target_link_libraries(rocroller-tests-rocprofiler
     PRIVATE

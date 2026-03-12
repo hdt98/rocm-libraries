@@ -14,6 +14,10 @@ if(NOT GTest_FOUND)
     endif()
 endif()
 
+find_package(BLAS REQUIRED)
+find_package(cblas)
+find_package(OpenMP REQUIRED)
+
 if(NOT ROCM_LIBS_SUPERBUILD)
     if(ROCROLLER_ENABLE_THEROCK)
         find_package(mxDataGenerator REQUIRED)
@@ -24,36 +28,67 @@ endif()
 
 add_executable(rocroller-tests)
 
-if(ROCROLLER_ENABLE_CATCH AND (ROCROLLER_BUILD_TESTING OR BUILD_TESTING))
-    add_executable(rocroller-tests-catch)
-    if(ROCROLLER_ENABLE_ROCPROF_ANALYZER)
-        add_executable(rocroller-tests-rocprofiler)
+if(ROCROLLER_ENABLE_CATCH)
+    if(ROCROLLER_ENABLE_CATCH)
+        find_package(Catch2 QUIET)
+        if(NOT Catch2_FOUND)
+            if(ROCROLLER_ENABLE_FETCH)
+                FetchContent_Declare(
+                    Catch2
+                    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+                    GIT_TAG devel
+                )
+                FetchContent_MakeAvailable(Catch2)
+            else()
+                message(FATAL_ERROR "Failed to find Catch2")
+            endif()
+        endif()
     endif()
-    # When detecting tests gtest and catch test discovery modules run
-    # something like:
-    # execute_process(COMMAND ${_TEST_EXECUTOR} "${_TEST_EXECUTABLE}" --gtest_list_tests ${filter})
-    # where TEST_EXECUTABLE is rocroller-tests-catch and TEST_EXECUTOR
-    # is a command to prepend primarily for the purposes of running in
-    # a cross compiled environment. As such, we can set the CROSSCOMPILING_EMULATOR
-    # property on the test targets to use the cmake -E -env command providing
-    # the LD_PRELOAD and ASAN_OPTIONS variables necessary to run sanitizer builds.
-    # Note that the entries in the string are semicolon separated which is necessary
-    # to ensure that the command supplied to execute_process is interpreted as a list
-    # of strings rather than one white space delimited string.
+
+    add_executable(rocroller-tests-catch)
+    add_executable(rocroller-tests-api)
+
     if(ROCROLLER_ENABLE_ASAN)
+        # When detecting tests gtest and catch test discovery modules run
+        # something like:
+        # execute_process(COMMAND ${_TEST_EXECUTOR} "${_TEST_EXECUTABLE}" --gtest_list_tests ${filter})
+        # where TEST_EXECUTABLE is rocroller-tests-catch and TEST_EXECUTOR
+        # is a command to prepend primarily for the purposes of running in
+        # a cross compiled environment. As such, we can set the CROSSCOMPILING_EMULATOR
+        # property on the test targets to use the cmake -E -env command providing
+        # the LD_PRELOAD and ASAN_OPTIONS variables necessary to run sanitizer builds.
+        # Note that the entries in the string are semicolon separated which is necessary
+        # to ensure that the command supplied to execute_process is interpreted as a list
+        # of strings rather than one white space delimited string.
         rocroller_target_configure_sanitizers(rocroller-tests-catch PRIVATE)
         set_target_properties(rocroller-tests-catch
             PROPERTIES
                 CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
         )
-        if(ROCROLLER_ENABLE_ROCPROF_ANALYZER)
-            rocroller_target_configure_sanitizers(rocroller-tests-rocprofiler PRIVATE)
-            set_target_properties(rocroller-tests-rocprofiler
-                PROPERTIES
-                    CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
-            )
-        endif()
+
+        rocroller_target_configure_sanitizers(rocroller-tests-api PRIVATE)
+        set_target_properties(rocroller-tests-api
+            PROPERTIES
+                CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
+        )
     endif()
+
+    add_subdirectory(catch)
+    add_subdirectory(api)
+endif()
+
+if(ROCROLLER_ENABLE_ROCPROF_ANALYZER)
+    add_executable(rocroller-tests-rocprofiler)
+
+    if(ROCROLLER_ENABLE_ROCPROF_ANALYZER)
+        rocroller_target_configure_sanitizers(rocroller-tests-rocprofiler PRIVATE)
+        set_target_properties(rocroller-tests-rocprofiler
+            PROPERTIES
+                CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
+        )
+    endif()
+
+    add_subdirectory(rocprofiler)
 endif()
 
 # Component stand-alone test
@@ -90,23 +125,12 @@ if(ROCROLLER_ENABLE_ASAN)
     )
 endif()
 
-find_package(BLAS REQUIRED)
-find_package(cblas)
-find_package(OpenMP REQUIRED)
-
 if(ROCROLLER_ENABLE_YAML_CPP)
     target_compile_definitions(rocroller-tests PRIVATE ROCROLLER_TESTS_USE_YAML_CPP)
 else()
     target_compile_definitions(rocroller-tests PRIVATE ROCROLLER_USE_LLVM)
 endif()
 
-if(ROCROLLER_ENABLE_CATCH)
-    add_subdirectory(catch)
-    add_subdirectory(api)
-    if(ROCROLLER_ENABLE_ROCPROF_ANALYZER)
-        add_subdirectory(rocprofiler)
-    endif()
-endif()
 add_subdirectory(common)
 add_subdirectory(standalone)
 add_subdirectory(unit)
@@ -176,6 +200,17 @@ if(ROCROLLER_ENABLE_TEST_DISCOVERY)
                        "ENVIRONMENT" "${asan_opts}"
             SKIP_REGULAR_EXPRESSION "[1-9][0-9]* skipped" "[1-9][0-9]* SKIPPED"
         )
+        catch_discover_tests(
+            rocroller-tests-api
+            REPORTER JUnit
+            OUTPUT_DIR ${TEST_REPORT_DIR}
+            OUTPUT_SUFFIX ".xml"
+            DISCOVERY_MODE PRE_TEST
+            EXTRA_ARGS "--reporter console::out=-::colour-mode=ansi"
+            PROPERTIES "LABELS" "CATCH;API"
+                    "ENVIRONMENT" "${asan_opts}"
+            SKIP_REGULAR_EXPRESSION "[1-9][0-9]* skipped" "[1-9][0-9]* SKIPPED"
+        )    
         if(ROCROLLER_ENABLE_ROCPROF_ANALYZER)
             catch_discover_tests(
                 rocroller-tests-rocprofiler
@@ -237,8 +272,13 @@ if(ROCROLLER_ENABLE_COVERAGE OR BUILD_CODE_COVERAGE)
     target_compile_options(rocroller-tests PRIVATE -fprofile-instr-generate -fcoverage-mapping)
     target_link_options(rocroller-tests PRIVATE -fprofile-instr-generate)
 
-    target_compile_options(rocroller-tests-catch PRIVATE -fprofile-instr-generate -fcoverage-mapping)
-    target_link_options(rocroller-tests-catch PRIVATE -fprofile-instr-generate)
+    if(ROCROLLER_ENABLE_CATCH)
+        target_compile_options(rocroller-tests-catch PRIVATE -fprofile-instr-generate -fcoverage-mapping)
+        target_link_options(rocroller-tests-catch PRIVATE -fprofile-instr-generate)
+
+        target_compile_options(rocroller-tests-api PRIVATE -fprofile-instr-generate -fcoverage-mapping)
+        target_link_options(rocroller-tests-api PRIVATE -fprofile-instr-generate)
+    endif()
 
     if(ROCROLLER_ENABLE_ROCPROF_ANALYZER)
         target_compile_options(rocroller-tests-rocprofiler PRIVATE -fprofile-instr-generate -fcoverage-mapping)

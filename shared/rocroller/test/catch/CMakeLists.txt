@@ -1,20 +1,6 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 
-find_package(Catch2 QUIET)
-if(NOT Catch2_FOUND)
-    if(ROCROLLER_ENABLE_FETCH)
-        FetchContent_Declare(
-            Catch2
-            GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-            GIT_TAG devel
-        )
-        FetchContent_MakeAvailable(Catch2)
-    else()
-        message(FATAL_ERROR "Failed to find Catch2")
-    endif()
-endif()
-
 target_link_libraries(rocroller-tests-catch
     PRIVATE
         rocroller::common-test-utilities
@@ -76,10 +62,10 @@ target_sources(rocroller-tests-catch
         "${CMAKE_CURRENT_SOURCE_DIR}/KernelGraphRemoveDuplicatesTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/KernelGraphSimplifyTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/KernelGraphUtilsTest.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/LDSAllocationTest.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/LDSModelTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/LargerLDSTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/LazySingletonUnitTest.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/LDSAllocationTest.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/LDSModelTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/LoadPackedTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/MEMObserverTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ModelAddressesTest.cpp"
