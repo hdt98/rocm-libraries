@@ -49,6 +49,7 @@ def retrieve_build_variant(variant_name: str) -> Tuple[str, str, bool]:
 
     return BUILD_VARIANT_CONFIG[variant_name]
 
+
 logging.basicConfig(level=logging.INFO)
 SCRIPT_DIR = Path(__file__).resolve().parent
 
