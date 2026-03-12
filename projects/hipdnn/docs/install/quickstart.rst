@@ -38,7 +38,7 @@ Steps
 
      #include <hipdnn_frontend.hpp>
 
-Next Steps
+Next steps
 ==========
 
 - :ref:`build-execute`
