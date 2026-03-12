@@ -119,8 +119,6 @@ struct GemmABQuantPipelineAgBgCrAsyncPolicy
     {
         static_assert(Problem::BQuantGroupSize::kK % WarpTile::at(I2) == 0,
                       "KPerWarpGemm must be a multiple of QuantGroupSize::kK!");
-        static_assert(Problem::TransposeC, "Wrong!");
-
         using WarpGemm = WarpGemmDispatcher<ComputeDataType,
                                             ComputeDataType,
                                             CDataType,

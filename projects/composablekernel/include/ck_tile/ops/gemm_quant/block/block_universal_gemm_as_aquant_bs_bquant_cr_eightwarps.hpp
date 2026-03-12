@@ -341,18 +341,46 @@ struct ABQuantBlockUniversalGemmAsBsCrAsync : public BlockGemmQuantBase
 
                     if constexpr(Traits::NQPerBlock / NWarp == 1)
                     {
-                        constexpr auto cw_spans = CWarpTensor::get_distributed_spans();
-                        static_assert(cw_spans[I0{}].impl_.size() == 0);
-                        sweep_tile_span(cw_spans[I1{}], [&](auto in) {
-                            constexpr auto block_idx_m = tile_distributed_index<mIter>{};
-                            constexpr auto block_idx_n = detail::make_tile_distributed_index(
+                        constexpr auto cw_spans  = CWarpTensor::get_distributed_spans();
+                        constexpr auto empty_idx = tile_distributed_index<>{};
+
+                        auto accumulate_c = [&](auto im, auto in) {
+                            constexpr auto c_block_idx_m = detail::make_tile_distributed_index(
+                                merge_sequences(sequence<mIter>{}, im.impl_));
+                            constexpr auto c_block_idx_n = detail::make_tile_distributed_index(
                                 merge_sequences(sequence<nIter>{}, in.impl_));
-                            constexpr auto block_idx_kq = tile_distributed_index<kQScale>{};
-                            constexpr auto empty_idx    = tile_distributed_index<>{};
-                            c_block_tensor(make_tuple(block_idx_m, block_idx_n)) +=
-                                c_warp_tensor(make_tuple(empty_idx, in)) *
-                                q_block_tensor(make_tuple(block_idx_m, block_idx_kq));
-                        });
+                            // q_block_tensor's M distribution only has mIter
+                            // as its Y index (no warp-internal M indices),
+                            // so use a separate M index for it.
+                            constexpr auto q_block_idx_m = tile_distributed_index<mIter>{};
+                            constexpr auto block_idx_kq  = tile_distributed_index<kQScale>{};
+                            c_block_tensor(make_tuple(c_block_idx_m, c_block_idx_n)) +=
+                                c_warp_tensor(make_tuple(im, in)) *
+                                q_block_tensor(make_tuple(q_block_idx_m, block_idx_kq));
+                        };
+
+                        // Handle both transposed C (M span empty, N span
+                        // non-empty) and non-transposed C (M span non-empty,
+                        // N span empty). sweep_tile_span cannot handle empty
+                        // spans, so dispatch based on span sizes.
+                        if constexpr(cw_spans[I0{}].impl_.size() > 0 &&
+                                     cw_spans[I1{}].impl_.size() > 0)
+                        {
+                            sweep_tile_span(cw_spans[I0{}], [&](auto im) {
+                                sweep_tile_span(cw_spans[I1{}],
+                                                [&](auto in) { accumulate_c(im, in); });
+                            });
+                        }
+                        else if constexpr(cw_spans[I0{}].impl_.size() > 0)
+                        {
+                            sweep_tile_span(cw_spans[I0{}],
+                                            [&](auto im) { accumulate_c(im, empty_idx); });
+                        }
+                        else if constexpr(cw_spans[I1{}].impl_.size() > 0)
+                        {
+                            sweep_tile_span(cw_spans[I1{}],
+                                            [&](auto in) { accumulate_c(empty_idx, in); });
+                        }
                     }
                     else
                     {
