@@ -192,7 +192,7 @@ TEST(StreamKConvBwdWeight, TypeTraitDetection)
     EXPECT_TRUE(is_streamk_partitioner<TreePartitioner>::value);
 }
 
-TEST(StreamKConvBwdWeight, KernelArgsConstruction_Linear)
+TEST(StreamKConvBwdWeight, KernelArgsConstruction_LinearPartitioner)
 {
     using Kernel = TestKernel<LinearPartitioner>;
     EXPECT_TRUE(Kernel::IsStreamK);
@@ -207,7 +207,7 @@ TEST(StreamKConvBwdWeight, KernelArgsConstruction_Linear)
     EXPECT_GT(kargs.tile_partitioner.get_grid(), 0);
 }
 
-TEST(StreamKConvBwdWeight, KernelArgsConstruction_Tree)
+TEST(StreamKConvBwdWeight, KernelArgsConstruction_TreePartitioner)
 {
     using Kernel = TestKernel<TreePartitioner>;
     EXPECT_TRUE(Kernel::IsStreamK);
@@ -271,7 +271,15 @@ static bool run_streamk_vs_splitk_test(index_t G,
                                        index_t Hi,
                                        index_t Wi,
                                        index_t num_cu,
-                                       index_t occupancy)
+                                       index_t occupancy,
+                                       index_t stride_h   = 1,
+                                       index_t stride_w   = 1,
+                                       index_t dilation_h = 1,
+                                       index_t dilation_w = 1,
+                                       index_t lpad_h     = 1,
+                                       index_t lpad_w     = 1,
+                                       index_t rpad_h     = 1,
+                                       index_t rpad_w     = 1)
 {
     using RefKernel               = TestKernel<SplitKPartitioner>;
     constexpr index_t NDimSpatial = 2;
@@ -283,10 +291,10 @@ static bool run_streamk_vs_splitk_test(index_t G,
                                       C,
                                       {Y, X},
                                       {Hi, Wi},
-                                      {1, 1},  // strides
-                                      {1, 1},  // dilations
-                                      {1, 1},  // left pads
-                                      {1, 1}}; // right pads
+                                      {stride_h, stride_w},
+                                      {dilation_h, dilation_w},
+                                      {lpad_h, lpad_w},
+                                      {rpad_h, rpad_w}};
 
     const auto in_desc =
         conv::make_input_host_tensor_descriptor_g_n_c_wis_packed<InLayout>(conv_param);
@@ -443,4 +451,162 @@ TEST(StreamKConvBwdWeight, Tree_EndToEnd_MultiGroup)
 {
     EXPECT_TRUE((run_streamk_vs_splitk_test<TestKernel<TreePartitioner>>(
         2, 4, 128, 128, 3, 3, 16, 16, 4, 1)));
+}
+
+// Stride > 1 — shrinks Ho/Wo, changing the K/tile ratio and DP/SK split.
+// Hi=16, Wi=16, 3x3 filter, stride=2, pad=1 → Ho=Wo=8, GemmK=N*64
+TEST(StreamKConvBwdWeight, Linear_EndToEnd_Stride2)
+{
+    EXPECT_TRUE((run_streamk_vs_splitk_test<TestKernel<LinearPartitioner>>(1,
+                                                                           4,
+                                                                           128,
+                                                                           128,
+                                                                           3,
+                                                                           3,
+                                                                           16,
+                                                                           16,
+                                                                           4,
+                                                                           1,
+                                                                           /*stride=*/2,
+                                                                           2,
+                                                                           /*dil=*/1,
+                                                                           1,
+                                                                           /*pad=*/1,
+                                                                           1,
+                                                                           1,
+                                                                           1)));
+}
+
+TEST(StreamKConvBwdWeight, Tree_EndToEnd_Stride2)
+{
+    EXPECT_TRUE((run_streamk_vs_splitk_test<TestKernel<TreePartitioner>>(1,
+                                                                         4,
+                                                                         128,
+                                                                         128,
+                                                                         3,
+                                                                         3,
+                                                                         16,
+                                                                         16,
+                                                                         4,
+                                                                         1,
+                                                                         /*stride=*/2,
+                                                                         2,
+                                                                         /*dil=*/1,
+                                                                         1,
+                                                                         /*pad=*/1,
+                                                                         1,
+                                                                         1,
+                                                                         1)));
+}
+
+// Pure DP — num_tiles evenly divides grid, so sk_ctas=0.
+// K=256, C=128, 3x3 → GemmM=256, GemmN=1152 → tiles=2*9=18, grid=3*1=3, 18%3=0
+TEST(StreamKConvBwdWeight, Linear_EndToEnd_PureDP)
+{
+    EXPECT_TRUE((run_streamk_vs_splitk_test<TestKernel<LinearPartitioner>>(
+        1, 4, 256, 128, 3, 3, 16, 16, 3, 1)));
+}
+
+TEST(StreamKConvBwdWeight, Tree_EndToEnd_PureDP)
+{
+    EXPECT_TRUE((run_streamk_vs_splitk_test<TestKernel<TreePartitioner>>(
+        1, 4, 256, 128, 3, 3, 16, 16, 3, 1)));
+}
+
+// Single output tile — all work is SK, zero DP tiles.
+// K=128, C=128, 1x1 filter, stride=1, pad=0 → GemmM=128, GemmN=128, tiles=1
+TEST(StreamKConvBwdWeight, Linear_EndToEnd_SingleTile)
+{
+    EXPECT_TRUE((run_streamk_vs_splitk_test<TestKernel<LinearPartitioner>>(1,
+                                                                           4,
+                                                                           128,
+                                                                           128,
+                                                                           1,
+                                                                           1,
+                                                                           16,
+                                                                           16,
+                                                                           4,
+                                                                           1,
+                                                                           /*stride=*/1,
+                                                                           1,
+                                                                           /*dil=*/1,
+                                                                           1,
+                                                                           /*pad=*/0,
+                                                                           0,
+                                                                           0,
+                                                                           0)));
+}
+
+TEST(StreamKConvBwdWeight, Tree_EndToEnd_SingleTile)
+{
+    EXPECT_TRUE((run_streamk_vs_splitk_test<TestKernel<TreePartitioner>>(1,
+                                                                         4,
+                                                                         128,
+                                                                         128,
+                                                                         1,
+                                                                         1,
+                                                                         16,
+                                                                         16,
+                                                                         4,
+                                                                         1,
+                                                                         /*stride=*/1,
+                                                                         1,
+                                                                         /*dil=*/1,
+                                                                         1,
+                                                                         /*pad=*/0,
+                                                                         0,
+                                                                         0,
+                                                                         0)));
+}
+
+// Large N — GemmK = 32*16*16 = 8192, many K iterations per tile.
+TEST(StreamKConvBwdWeight, Linear_EndToEnd_LargeN)
+{
+    EXPECT_TRUE((run_streamk_vs_splitk_test<TestKernel<LinearPartitioner>>(
+        1, 32, 128, 128, 3, 3, 16, 16, 4, 1)));
+}
+
+TEST(StreamKConvBwdWeight, Tree_EndToEnd_LargeN)
+{
+    EXPECT_TRUE((run_streamk_vs_splitk_test<TestKernel<TreePartitioner>>(
+        1, 32, 128, 128, 3, 3, 16, 16, 4, 1)));
+}
+
+// Higher occupancy — doubles the grid, more SK CTAs share tiles.
+TEST(StreamKConvBwdWeight, Linear_EndToEnd_HigherOccupancy)
+{
+    EXPECT_TRUE((run_streamk_vs_splitk_test<TestKernel<LinearPartitioner>>(
+        1, 4, 128, 128, 3, 3, 16, 16, 4, 2)));
+}
+
+TEST(StreamKConvBwdWeight, Tree_EndToEnd_HigherOccupancy)
+{
+    EXPECT_TRUE((run_streamk_vs_splitk_test<TestKernel<TreePartitioner>>(
+        1, 4, 128, 128, 3, 3, 16, 16, 4, 2)));
+}
+
+// ============================================================================
+// Negative tests: IsSupportedArgument should reject invalid shapes
+// ============================================================================
+
+// C not divisible by VectorSizeB (=8) → rejected
+TEST(StreamKConvBwdWeight, IsSupportedArgument_RejectsUnalignedC)
+{
+    using Kernel = TestKernel<LinearPartitioner>;
+
+    auto host_args = create_host_args(1, 4, 128, 100, 3, 3, 16, 16, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+    auto kargs     = Kernel::MakeKernelArgs(host_args, /*num_cu=*/4, /*occupancy=*/1);
+
+    EXPECT_FALSE(Kernel::IsSupportedArgument(kargs));
+}
+
+// K not divisible by VectorSizeA (=4) → rejected
+TEST(StreamKConvBwdWeight, IsSupportedArgument_RejectsUnalignedK)
+{
+    using Kernel = TestKernel<TreePartitioner>;
+
+    auto host_args = create_host_args(1, 4, 103, 128, 3, 3, 16, 16, 1, 1, 1, 1, 1, 1, 1, 1, 1);
+    auto kargs     = Kernel::MakeKernelArgs(host_args, /*num_cu=*/4, /*occupancy=*/1);
+
+    EXPECT_FALSE(Kernel::IsSupportedArgument(kargs));
 }
