@@ -50,7 +50,7 @@ namespace miopen {
 
 static std::chrono::seconds GetLockTimeout() { return std::chrono::seconds{60}; }
 
-using exclusive_lock = std::unique_lock<LockFile>;
+using exclusive_lock = std::unique_lock<FSLockFile>;
 
 AnyRamDb& AnyRamDb::GetCached(const fs::path& path)
 {

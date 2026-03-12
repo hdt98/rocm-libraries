@@ -42,7 +42,7 @@ fs::path LockFilePath(const fs::path& filename_)
     }
 }
 
-LockFile::LockFile(const fs::path& path_, PassKey) : path(path_), flock(path.string()), fs_lock(path.string())
+LockFile::LockFile(const fs::path& path_, PassKey) : path(path_), flock(path.string())
 {
     try
     {

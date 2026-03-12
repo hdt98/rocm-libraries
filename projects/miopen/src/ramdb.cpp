@@ -83,7 +83,7 @@ static void UpdateDbModificationTime(const fs::path& path)
 
 static std::chrono::seconds GetLockTimeout() { return std::chrono::seconds{60}; }
 
-using exclusive_lock = std::unique_lock<LockFile>;
+using exclusive_lock = std::unique_lock<FSLockFile>;
 
 RamDb::RamDb(DbKinds db_kind_, const fs::path& path, bool is_system)
     : PlainTextDb(db_kind_, path, is_system)

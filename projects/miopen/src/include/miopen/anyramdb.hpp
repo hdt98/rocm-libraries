@@ -38,15 +38,13 @@
 
 namespace miopen {
 
-class LockFile;
-
 struct AnyRamDb
 {
     using TRecord = std::vector<std::any>;
 
 public:
     AnyRamDb(const fs::path& filename_)
-        : filename(filename_), lock_file(LockFile::Get(LockFilePath(filename_))){};
+        : filename(filename_), lock_file(LockFilePath(filename_)){};
 
     AnyRamDb(const AnyRamDb&)            = delete;
     AnyRamDb(AnyRamDb&&)                 = delete;
@@ -88,7 +86,7 @@ public:
 private:
     std::map<std::string, std::vector<std::any>> cache;
     fs::path filename;
-    LockFile& lock_file;
+    FSLockFile lock_file;
     std::optional<TRecord> FindRecordUnsafe(const std::string& problem);
     void UpdateCacheEntryUnsafe(const std::string& key, const TRecord& value);
 };

@@ -43,8 +43,6 @@ namespace miopen {
 
 using ramdb_clock = std::chrono::steady_clock;
 
-class LockFile;
-
 class RamDb : protected PlainTextDb
 {
 public:

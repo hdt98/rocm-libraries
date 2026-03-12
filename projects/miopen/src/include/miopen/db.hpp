@@ -30,6 +30,7 @@
 #include <miopen/db_record.hpp>
 #include <miopen/rank.hpp>
 #include <miopen/filesystem.hpp>
+#include <miopen/lock_file.hpp>
 
 #include <chrono>
 #include <optional>
@@ -42,8 +43,6 @@ struct RecordPositions
     std::streamoff begin = -1;
     std::streamoff end   = -1;
 };
-
-class LockFile;
 
 constexpr bool DisableUserDbFileIO = MIOPEN_DISABLE_USERDB;
 
@@ -140,7 +139,7 @@ public:
 protected:
     const DbKinds db_kind;
 
-    LockFile& GetLockFile() { return lock_file; }
+    FSLockFile& GetLockFile() { return lock_file; }
     const fs::path& GetFileName() const { return filename; }
     bool IsWarningIfUnreadable() const { return warning_if_unreadable; }
     std::optional<DbRecord> FindRecordUnsafe(const std::string& key, RecordPositions* pos);
@@ -150,7 +149,7 @@ protected:
 
 private:
     fs::path filename;
-    LockFile& lock_file;
+    FSLockFile lock_file;
     const bool warning_if_unreadable;
 
     bool FlushUnsafe(const DbRecord& record, const RecordPositions* pos);

@@ -25,7 +25,7 @@ namespace miopen {
 PlainTextDb::PlainTextDb(DbKinds db_kind_, const fs::path& filename_, bool is_system)
     : db_kind(db_kind_),
       filename(filename_),
-      lock_file(LockFile::Get(LockFilePath(filename_))),
+      lock_file(LockFilePath(filename_)),
       warning_if_unreadable(is_system)
 {
     if(is_system)
@@ -56,8 +56,8 @@ PlainTextDb::PlainTextDb(DbKinds db_kind_, const fs::path& filename_, bool is_sy
 
 static std::chrono::seconds GetLockTimeout() { return std::chrono::seconds{60}; }
 
-using exclusive_lock = std::unique_lock<LockFile>;
-using shared_lock    = std::shared_lock<LockFile>;
+using exclusive_lock = std::unique_lock<FSLockFile>;
+using shared_lock    = std::shared_lock<FSLockFile>;
 
 std::optional<DbRecord> PlainTextDb::FindRecord(const std::string& key)
 {
