@@ -1444,23 +1444,17 @@ namespace TensileLite
                             throw std::runtime_error("out of batch gpu memory");
                         pUnit.gpuInput.batch = batch_ptr;
 
-                        // Allocate alternate buffers for triple-buffering
+                        // Allocate alternate buffers for double-buffering
                         if(m_hasAltBuffers && !pUnit.gpuInput.currentAlt)
                         {
                             auto altPtr = allocNewGPUBuffer<void>(
                                 (it.name + "_alt").c_str(), size);
-                            auto altPtr2 = allocNewGPUBuffer<void>(
-                                (it.name + "_alt2").c_str(), size);
                             auto altBatch = allocNewGPUBuffer<void*>(
                                 (n + "_alt").c_str(), sizeof(uint8_t*) * m_maxBatch);
-                            auto altBatch2 = allocNewGPUBuffer<void*>(
-                                (n + "_alt2").c_str(), sizeof(uint8_t*) * m_maxBatch);
-                            if(altPtr && altPtr2 && altBatch && altBatch2)
+                            if(altPtr && altBatch)
                             {
                                 pUnit.gpuInput.currentAlt = altPtr;
                                 pUnit.gpuInput.batchAlt   = altBatch;
-                                pUnit.gpuInput.currentAlt2 = altPtr2;
-                                pUnit.gpuInput.batchAlt2   = altBatch2;
                             }
                             else
                             {
@@ -2855,17 +2849,6 @@ namespace TensileLite
                         }
                 },
                 m_gpuPtrsAlt, m_gpuBatchPtrsAlt, m_cachedGPUInputsAlt);
-
-            initOneAltSet(
-                [&]() {
-                    for(auto& vd : m_vdata)
-                        for(auto& [dt, pu] : vd.pristine)
-                        {
-                            std::swap(pu.gpuInput.current, pu.gpuInput.currentAlt2);
-                            std::swap(pu.gpuInput.batch, pu.gpuInput.batchAlt2);
-                        }
-                },
-                m_gpuPtrsAlt2, m_gpuBatchPtrsAlt2, m_cachedGPUInputsAlt2);
         }
 
         DataInitialization::~DataInitialization()

@@ -233,9 +233,10 @@ namespace TensileLite
             {
                 if(m_asyncResetPending)
                 {
-                    // Triple-buffer: rotate to the ready buffer (alt).
-                    // It was prepared 2 solutions ago and has had a full
-                    // solution cycle to complete — no sync needed.
+                    // Double-buffer: swap to the alt buffer prepared by
+                    // beginAsyncReset. Caller must syncCopyStream() before
+                    // the buffer is actually used (done in main.cpp before
+                    // benchmark_runs).
                     rotateBufSets();
                     m_asyncResetPending = false;
                     return m_cachedGPUInputs;
@@ -268,23 +269,21 @@ namespace TensileLite
                 m_gpuPtrsAlt.clear();
                 m_gpuBatchPtrsAlt.clear();
                 m_cachedGPUInputsAlt.reset();
-                m_gpuPtrsAlt2.clear();
-                m_gpuBatchPtrsAlt2.clear();
-                m_cachedGPUInputsAlt2.reset();
             }
 
-            // Triple-buffer: kick off async reset of the oldest buffer (alt2)
-            // on m_copyStream. The previous async prep (if any) is synced first
-            // (it had a full solution to complete, so this should be instant).
-            // The next prepareGPUInputs call rotates to the ready buffer (alt)
-            // without syncing.
+            void syncCopyStream()
+            {
+                if(m_copyStream)
+                    HIP_CHECK_EXC(hipStreamSynchronize(m_copyStream));
+            }
+
+            // Double-buffer: kick off async reset of the alt buffer
+            // on m_copyStream. The caller must syncCopyStream() before
+            // using the alt buffer (done in main.cpp before benchmark_runs).
             void beginAsyncReset(ContractionProblem const* problem)
             {
                 if(!m_hasAltBuffers || !m_copyStream)
                     return;
-
-                // Sync previous async prep (should be instant)
-                syncCopyStream();
 
                 // Save current working state
                 auto savePtrs    = std::move(m_gpuPtrs);
@@ -293,32 +292,32 @@ namespace TensileLite
                 auto saveMax     = std::move(m_maxElements);
                 auto saveOffsets = std::move(m_groupedOffsets);
 
-                // Swap pristine pointers to target alt2 (oldest buffer)
+                // Swap pristine pointers to target alt buffer
                 for(auto& vd : m_vdata)
                     for(auto& [dt, pu] : vd.pristine)
                     {
-                        std::swap(pu.gpuInput.current, pu.gpuInput.currentAlt2);
-                        std::swap(pu.gpuInput.batch, pu.gpuInput.batchAlt2);
+                        std::swap(pu.gpuInput.current, pu.gpuInput.currentAlt);
+                        std::swap(pu.gpuInput.batch, pu.gpuInput.batchAlt);
                     }
 
-                // Async-prepare alt2
+                // Async-prepare alt
                 if(auto gemmProblem = dynamic_cast<ContractionProblemGemm const*>(problem))
                     prepareGPUInputsInternal(*gemmProblem, m_copyStream);
                 else if(auto groupedProblem
                         = dynamic_cast<ContractionProblemGroupedGemm const*>(problem))
                     prepareGPUInputsInternal(groupedProblem->gemms[0], m_copyStream);
 
-                // Store results in alt2 slots
-                m_gpuPtrsAlt2      = std::move(m_gpuPtrs);
-                m_gpuBatchPtrsAlt2 = std::move(m_gpuBatchPtrs);
-                m_cachedGPUInputsAlt2 = std::move(m_cachedGPUInputs);
+                // Store results in alt slots
+                m_gpuPtrsAlt      = std::move(m_gpuPtrs);
+                m_gpuBatchPtrsAlt = std::move(m_gpuBatchPtrs);
+                m_cachedGPUInputsAlt = std::move(m_cachedGPUInputs);
 
                 // Swap pristine pointers back
                 for(auto& vd : m_vdata)
                     for(auto& [dt, pu] : vd.pristine)
                     {
-                        std::swap(pu.gpuInput.current, pu.gpuInput.currentAlt2);
-                        std::swap(pu.gpuInput.batch, pu.gpuInput.batchAlt2);
+                        std::swap(pu.gpuInput.current, pu.gpuInput.currentAlt);
+                        std::swap(pu.gpuInput.batch, pu.gpuInput.batchAlt);
                     }
 
                 // Restore working state
@@ -849,11 +848,9 @@ namespace TensileLite
                 std::shared_ptr<void>  valid;
                 std::shared_ptr<void>  bad;
                 std::shared_ptr<void*> batch;
-                // Alternate buffers for triple-buffering
+                // Alternate buffers for double-buffering
                 std::shared_ptr<void>  currentAlt;
                 std::shared_ptr<void*> batchAlt;
-                std::shared_ptr<void>  currentAlt2;
-                std::shared_ptr<void*> batchAlt2;
             };
 
             // Pristine unit for each allocated memory
@@ -947,31 +944,18 @@ namespace TensileLite
 
             void initializeAltBufferSet(ContractionProblemGemm const& problem);
 
-            // Rotate buffer sets: current→alt2, alt→current, alt2→alt.
-            // After rotation: current = old ready (alt), alt = old preparing
-            // (alt2, becomes ready next), alt2 = old active (for next prep).
+            // Swap buffer sets: current↔alt.
             void rotateBufSets()
             {
                 for(auto& vd : m_vdata)
                     for(auto& [dt, pu] : vd.pristine)
                     {
                         std::swap(pu.gpuInput.current, pu.gpuInput.currentAlt);
-                        std::swap(pu.gpuInput.currentAlt, pu.gpuInput.currentAlt2);
                         std::swap(pu.gpuInput.batch, pu.gpuInput.batchAlt);
-                        std::swap(pu.gpuInput.batchAlt, pu.gpuInput.batchAlt2);
                     }
                 std::swap(m_gpuPtrs, m_gpuPtrsAlt);
-                std::swap(m_gpuPtrsAlt, m_gpuPtrsAlt2);
                 std::swap(m_gpuBatchPtrs, m_gpuBatchPtrsAlt);
-                std::swap(m_gpuBatchPtrsAlt, m_gpuBatchPtrsAlt2);
                 std::swap(m_cachedGPUInputs, m_cachedGPUInputsAlt);
-                std::swap(m_cachedGPUInputsAlt, m_cachedGPUInputsAlt2);
-            }
-
-            void syncCopyStream()
-            {
-                if(m_copyStream)
-                    HIP_CHECK_EXC(hipStreamSynchronize(m_copyStream));
             }
 
             std::shared_ptr<ProblemInputs>
@@ -990,19 +974,16 @@ namespace TensileLite
             bool m_cpuInit = false;
             bool m_gpuInit = false;
 
-            // Triple-buffer control
+            // Double-buffer control
             bool m_hasAltBuffers      = false;
             bool m_asyncResetPending  = false;
 
             std::shared_ptr<ProblemInputs> m_cachedGPUInputs;
 
-            // Triple-buffer: two alternate sets of working vectors and cached inputs
+            // Double-buffer: alternate set of working vectors and cached inputs
             std::vector<void*>               m_gpuPtrsAlt;
             std::vector<void**>              m_gpuBatchPtrsAlt;
             std::shared_ptr<ProblemInputs>   m_cachedGPUInputsAlt;
-            std::vector<void*>               m_gpuPtrsAlt2;
-            std::vector<void**>              m_gpuBatchPtrsAlt2;
-            std::shared_ptr<ProblemInputs>   m_cachedGPUInputsAlt2;
 
             hipStream_t m_copyStream = nullptr;
 

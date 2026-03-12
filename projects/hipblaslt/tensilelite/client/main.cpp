@@ -1142,6 +1142,10 @@ int main(int argc, const char* argv[])
                                 TimingEvents warmupStartEvents(warmupInvocations, warmupEventCount);
                                 TimingEvents warmupStopEvents(warmupInvocations, warmupEventCount);
 
+                                // Ensure any pending async reset is complete
+                                // before the first kernel launch (warmup or benchmark).
+                                dataInit->syncCopyStream();
+
                                 if(warmupInvocations > 0)
                                 {
                                     {
@@ -1224,15 +1228,15 @@ int main(int argc, const char* argv[])
                                 {
                                     solution->relaseDeviceUserArgs(dUA, dUAHost);
                                 }
-                            }
 
-                            // Kick off async reset in the inter-solution gap.
-                            // Copies on m_copyStream overlap with postSolution
-                            // + preSolution and are synced at the next
-                            // prepareGPUInputs call.
-                            {
-                                ScopedTimer timer("async_reset_submit");
-                                dataInit->beginAsyncReset(problem);
+                                // Kick off async reset after benchmark completes.
+                                // DMA on m_copyStream overlaps with the next
+                                // iteration's prepareGPUInputs, kernel_solving,
+                                // and warmup — synced before the next benchmark_runs.
+                                {
+                                    ScopedTimer timer("async_reset_submit");
+                                    dataInit->beginAsyncReset(problem);
+                                }
                             }
                         }
                         catch(std::runtime_error const& err)
