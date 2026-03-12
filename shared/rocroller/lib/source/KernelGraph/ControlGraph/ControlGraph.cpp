@@ -1,37 +1,46 @@
 // Copyright Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-
-#include <rocRoller/KernelGraph/ControlGraph/ControlGraph.hpp>
-#include <rocRoller/Utilities/Settings.hpp>
-#include <rocRoller/Utilities/Timer.hpp>
-
 #include <algorithm>
-
 #include <bitset>
 #include <cmath>
 #include <iomanip>
-
+#include <rocRoller/KernelGraph/ControlGraph/ControlGraph.hpp>
+#include <rocRoller/Utilities/Settings.hpp>
+#include <rocRoller/Utilities/Timer.hpp>
 namespace rocRoller::KernelGraph::ControlGraph
 {
+    //=========================================================================
+    // Anonymous helpers (file-local, used only by cache build/read methods).
+    //=========================================================================
     namespace
     {
+        // Edge variant indices matching ControlEdge = variant<Sequence, Initialize, ForLoopIncrement, Body, Else>.
+        constexpr uint8_t kSeq  = 0;
+        constexpr uint8_t kInit = 1;
+        constexpr uint8_t kInc  = 2;
+        constexpr uint8_t kBody = 3;
+        constexpr uint8_t kElse = 4;
+        // How many uint64_t words are needed to hold `bits` bits.
         inline size_t wordsForBits(size_t bits)
         {
             return (bits + 63) >> 6;
         }
-        inline uint64_t* matrixRow(std::vector<uint64_t>& mat, size_t words, int row)
+        // Pointer to the beginning of row `r` in a row-major bit matrix.
+        inline uint64_t* matRow(std::vector<uint64_t>& mat, size_t words, int r)
         {
-            return mat.data() + static_cast<size_t>(row) * words;
+            return mat.data() + static_cast<size_t>(r) * words;
         }
-        inline uint64_t const* matrixRow(std::vector<uint64_t> const& mat, size_t words, int row)
+        inline uint64_t const* matRow(std::vector<uint64_t> const& mat, size_t words, int r)
         {
-            return mat.data() + static_cast<size_t>(row) * words;
+            return mat.data() + static_cast<size_t>(r) * words;
         }
+        // Bitwise OR src into dst (both length `words`).
         inline void rowOr(uint64_t* dst, uint64_t const* src, size_t words)
         {
             for(size_t i = 0; i < words; ++i)
                 dst[i] |= src[i];
         }
+        // True if any bit is set.
         inline bool rowAny(uint64_t const* row, size_t words)
         {
             for(size_t i = 0; i < words; ++i)
@@ -39,6 +48,7 @@ namespace rocRoller::KernelGraph::ControlGraph
                     return true;
             return false;
         }
+        // True if a[i] & b[i] is nonzero for any word.
         inline bool rowOverlap(uint64_t const* a, uint64_t const* b, size_t words)
         {
             for(size_t i = 0; i < words; ++i)
@@ -46,22 +56,9 @@ namespace rocRoller::KernelGraph::ControlGraph
                     return true;
             return false;
         }
-        template <typename F>
-        inline void forEachSetBit(uint64_t const* row, size_t words, F&& fn)
-        {
-            for(size_t w = 0; w < words; ++w)
-            {
-                uint64_t bits = row[w];
-                while(bits)
-                {
-                    int bit = std::countr_zero(bits);
-                    fn(static_cast<int>(w * 64 + bit));
-                    bits &= bits - 1;
-                }
-            }
-        }
-        template <typename F>
-        inline void forEachSetBit(Bitset const& bs, F&& fn)
+        // Call fn(denseIndex) for every set bit in a fixed-size Bitset.
+        template <typename Fn>
+        inline void forEachBit(Bitset const& bs, Fn&& fn)
         {
             for(size_t w = 0; w < bs.size(); ++w)
             {
@@ -74,26 +71,73 @@ namespace rocRoller::KernelGraph::ControlGraph
                 }
             }
         }
-        inline void denseSet(Bitset& bs, int dense)
+        // Call fn(denseIndex) for every set bit in a raw row pointer.
+        template <typename Fn>
+        inline void forEachBit(uint64_t const* row, size_t words, Fn&& fn)
         {
-            bs[static_cast<size_t>(dense) >> 6] |= uint64_t(1) << (dense & 63);
+            for(size_t w = 0; w < words; ++w)
+            {
+                uint64_t bits = row[w];
+                while(bits)
+                {
+                    int bit = std::countr_zero(bits);
+                    fn(static_cast<int>(w * 64 + bit));
+                    bits &= bits - 1;
+                }
+            }
         }
-        inline void denseClear(Bitset& bs, int dense)
+        // Set/clear a single bit in a fixed-size Bitset by dense index.
+        inline void dSet(Bitset& bs, int d)
         {
-            bs[static_cast<size_t>(dense) >> 6] &= ~(uint64_t(1) << (dense & 63));
+            bs[static_cast<size_t>(d) >> 6] |= uint64_t(1) << (d & 63);
         }
-        inline void denseOr(Bitset& dst, Bitset const& src)
+        inline void dClear(Bitset& bs, int d)
+        {
+            bs[static_cast<size_t>(d) >> 6] &= ~(uint64_t(1) << (d & 63));
+        }
+        inline void dOr(Bitset& dst, Bitset const& src)
         {
             for(size_t i = 0; i < dst.size(); ++i)
                 dst[i] |= src[i];
         }
-        inline void denseAndNot(Bitset& dst, Bitset const& mask)
+        // dst &= ~mask (clear bits present in mask).
+        inline void dAndNot(Bitset& dst, Bitset const& mask)
         {
             for(size_t i = 0; i < dst.size(); ++i)
                 dst[i] &= ~mask[i];
         }
+    } // anonymous namespace
+    //=========================================================================
+    // denseOfTag / selectCacheMatrix
+    //=========================================================================
+    int ControlGraph::denseOfTag(int tag) const
+    {
+        auto it = m_cacheTagToDense.find(tag);
+        if(it == m_cacheTagToDense.end())
+            return -1;
+        return it->second;
     }
-
+    std::vector<uint64_t>& ControlGraph::selectCacheMatrix(NodeOrdering order) const
+    {
+        switch(order)
+        {
+        case NodeOrdering::LeftFirst:
+            return m_cacheAfter;
+        case NodeOrdering::RightFirst:
+            return m_cacheBefore;
+        case NodeOrdering::RightInBodyOfLeft:
+            return m_cacheInBody;
+        case NodeOrdering::LeftInBodyOfRight:
+            return m_cacheContaining;
+        default:
+            break;
+        }
+        AssertFatal(false, "Invalid NodeOrdering", ShowValue(order));
+        return m_cacheAfter;
+    }
+    //=========================================================================
+    // nodeOrderTable / nodeOrderTableString
+    //=========================================================================
     std::unordered_map<int, std::unordered_map<int, NodeOrdering>>
         ControlGraph::nodeOrderTable() const
     {
@@ -102,17 +146,15 @@ namespace rocRoller::KernelGraph::ControlGraph
         int const n = static_cast<int>(m_cacheDenseToTag.size());
         for(int aDense = 0; aDense < n; ++aDense)
         {
-            int const   aTag      = m_cacheDenseToTag[aDense];
-            auto const* afterRow  = matrixRow(m_cacheAfter, m_cacheWords, aDense);
-            auto const* inBodyRow = matrixRow(m_cacheInBody, m_cacheWords, aDense);
-            forEachSetBit(afterRow, m_cacheWords, [&](int bDense) {
+            int const aTag = m_cacheDenseToTag[aDense];
+            forEachBit(matRow(m_cacheAfter, m_cacheWords, aDense), m_cacheWords, [&](int bDense) {
                 if(bDense >= n)
                     return;
                 int const bTag = m_cacheDenseToTag[bDense];
                 if(aTag < bTag)
                     table[aTag][bTag] = NodeOrdering::LeftFirst;
             });
-            forEachSetBit(inBodyRow, m_cacheWords, [&](int bDense) {
+            forEachBit(matRow(m_cacheInBody, m_cacheWords, aDense), m_cacheWords, [&](int bDense) {
                 if(bDense >= n)
                     return;
                 int const bTag = m_cacheDenseToTag[bDense];
@@ -124,7 +166,6 @@ namespace rocRoller::KernelGraph::ControlGraph
         }
         return table;
     }
-
     std::string ControlGraph::nodeOrderTableString(std::set<int> const& nodes) const
     {
         populateOrderCache();
@@ -132,18 +173,13 @@ namespace rocRoller::KernelGraph::ControlGraph
         {
             return "Empty order cache.\n";
         }
-
         std::ostringstream msg;
-
-        int width = std::ceil(std::log10(static_cast<float>(*nodes.rbegin())));
-        width     = std::max(width, 3);
-
+        int                width = std::ceil(std::log10(static_cast<float>(*nodes.rbegin())));
+        width                    = std::max(width, 3);
         msg << std::setw(width) << " "
             << "\\";
-
         for(int n : nodes)
             msg << " " << std::setw(width) << n;
-
         for(int i : nodes)
         {
             msg << std::endl << std::setw(width) << i << "|";
@@ -171,7 +207,6 @@ namespace rocRoller::KernelGraph::ControlGraph
         msg << std::endl;
         return msg.str();
     }
-
     std::string ControlGraph::nodeOrderTableString() const
     {
         populateOrderCache();
@@ -180,30 +215,32 @@ namespace rocRoller::KernelGraph::ControlGraph
         int const     n = static_cast<int>(m_cacheDenseToTag.size());
         for(int d = 0; d < n; ++d)
         {
-            int const   tag           = m_cacheDenseToTag[d];
-            auto const* afterRow      = matrixRow(m_cacheAfter, m_cacheWords, d);
-            auto const* beforeRow     = matrixRow(m_cacheBefore, m_cacheWords, d);
-            auto const* inBodyRow     = matrixRow(m_cacheInBody, m_cacheWords, d);
-            auto const* containingRow = matrixRow(m_cacheContaining, m_cacheWords, d);
-            if(rowAny(afterRow, m_cacheWords) || rowAny(beforeRow, m_cacheWords)
-               || rowAny(inBodyRow, m_cacheWords) || rowAny(containingRow, m_cacheWords))
+            int const   tag  = m_cacheDenseToTag[d];
+            auto const* aRow = matRow(m_cacheAfter, m_cacheWords, d);
+            auto const* bRow = matRow(m_cacheBefore, m_cacheWords, d);
+            auto const* iRow = matRow(m_cacheInBody, m_cacheWords, d);
+            auto const* cRow = matRow(m_cacheContaining, m_cacheWords, d);
+            if(rowAny(aRow, m_cacheWords) || rowAny(bRow, m_cacheWords)
+               || rowAny(iRow, m_cacheWords) || rowAny(cRow, m_cacheWords))
             {
                 nodes.insert(tag);
             }
-            auto addRowNodes = [&](uint64_t const* row) {
-                forEachSetBit(row, m_cacheWords, [&](int otherDense) {
+            auto addNodes = [&](uint64_t const* row) {
+                forEachBit(row, m_cacheWords, [&](int otherDense) {
                     if(otherDense < n)
                         nodes.insert(m_cacheDenseToTag[otherDense]);
                 });
             };
-            addRowNodes(afterRow);
-            addRowNodes(beforeRow);
-            addRowNodes(inBodyRow);
-            addRowNodes(containingRow);
+            addNodes(aRow);
+            addNodes(bRow);
+            addNodes(iRow);
+            addNodes(cRow);
         }
         return nodeOrderTableString(nodes);
     }
-
+    //=========================================================================
+    // clearCache
+    //=========================================================================
     void ControlGraph::clearCache(Graph::GraphModification modification)
     {
         Hypergraph<Operation, ControlEdge, false>::clearCache(modification);
@@ -224,17 +261,16 @@ namespace rocRoller::KernelGraph::ControlGraph
         m_cacheInBody.clear();
         m_cacheContaining.clear();
     }
-
+    //=========================================================================
+    // isModificationAllowed (unchanged)
+    //=========================================================================
     bool ControlGraph::isModificationAllowed(int index) const
     {
         if(not Settings::getInstance()->get(Settings::EnforceGraphConstraints))
             return true;
-
         if(not m_changesRestricted)
             return true;
-
         auto const& el = getElement(index);
-
         if(std::holds_alternative<Operation>(el))
         {
             return std::visit(
@@ -247,73 +283,44 @@ namespace rocRoller::KernelGraph::ControlGraph
         }
         else
         {
-            //
-            // Theoretically, add/delete Body edge should be disallowed. But sometimes
-            // delete Body edges is OK (e.g., Simplify), and currently there is no way
-            // to know if this is called in a valid or invalid use case.
-            //
             return true;
         }
     }
-
+    //=========================================================================
+    // validateOrderCache
+    //=========================================================================
     void ControlGraph::validateOrderCache() const
     {
         int const n = static_cast<int>(m_cacheDenseToTag.size());
         for(int r = 0; r < n; ++r)
         {
-            auto const* afterRow      = matrixRow(m_cacheAfter, m_cacheWords, r);
-            auto const* beforeRow     = matrixRow(m_cacheBefore, m_cacheWords, r);
-            auto const* inBodyRow     = matrixRow(m_cacheInBody, m_cacheWords, r);
-            auto const* containingRow = matrixRow(m_cacheContaining, m_cacheWords, r);
-            AssertFatal(!rowOverlap(afterRow, beforeRow, m_cacheWords),
+            auto const* aRow = matRow(m_cacheAfter, m_cacheWords, r);
+            auto const* bRow = matRow(m_cacheBefore, m_cacheWords, r);
+            auto const* iRow = matRow(m_cacheInBody, m_cacheWords, r);
+            auto const* cRow = matRow(m_cacheContaining, m_cacheWords, r);
+            AssertFatal(!rowOverlap(aRow, bRow, m_cacheWords),
                         "Node has conflicting orders (after & before)");
-            AssertFatal(!rowOverlap(afterRow, inBodyRow, m_cacheWords),
+            AssertFatal(!rowOverlap(aRow, iRow, m_cacheWords),
                         "Node has conflicting orders (after & inBody)");
-            AssertFatal(!rowOverlap(afterRow, containingRow, m_cacheWords),
+            AssertFatal(!rowOverlap(aRow, cRow, m_cacheWords),
                         "Node has conflicting orders (after & containing)");
-            AssertFatal(!rowOverlap(beforeRow, inBodyRow, m_cacheWords),
+            AssertFatal(!rowOverlap(bRow, iRow, m_cacheWords),
                         "Node has conflicting orders (before & inBody)");
-            AssertFatal(!rowOverlap(beforeRow, containingRow, m_cacheWords),
+            AssertFatal(!rowOverlap(bRow, cRow, m_cacheWords),
                         "Node has conflicting orders (before & containing)");
-            AssertFatal(!rowOverlap(inBodyRow, containingRow, m_cacheWords),
+            AssertFatal(!rowOverlap(iRow, cRow, m_cacheWords),
                         "Node has conflicting orders (inBody & containing)");
         }
     }
-
-    using NodeOrderField = Bitset NodeOrders::*;
-    // Maps ordering enum to the exact bitset field in NodeOrders.
-    // This lets writeOrderCache compute the field once per call,
-    // not once per element in hot loops.
-    inline NodeOrderField orderField(NodeOrdering order)
-    {
-        switch(order)
-        {
-        case NodeOrdering::LeftFirst:
-            return &NodeOrders::after;
-        case NodeOrdering::RightFirst:
-            return &NodeOrders::before;
-        case NodeOrdering::RightInBodyOfLeft:
-            return &NodeOrders::inBody;
-        case NodeOrdering::LeftInBodyOfRight:
-            return &NodeOrders::containing;
-        default:
-            break;
-        }
-        AssertFatal(false, "Invalid NodeOrdering", ShowValue(order));
-        return &NodeOrders::after;
-    }
-    inline void clearBit(Bitset& bs, int id)
-    {
-        size_t const word = static_cast<size_t>(id) >> 6;
-        if(word < bs.size())
-            bs[word] &= ~(uint64_t(1) << (id & 63));
-    }
-
+    //=========================================================================
+    // populateOrderCache  (ancestor-upward algorithm -- my idea)
+    //=========================================================================
     void ControlGraph::populateOrderCache() const
     {
         TIMER(t, "populateOrderCache");
         if(m_cacheStatus == CacheStatus::Valid)
             return;
+        // ---- Reset all cache storage ----
         m_cacheDenseToTag.clear();
         m_cacheTagToDense.clear();
         m_cacheWords = 0;
@@ -323,55 +330,54 @@ namespace rocRoller::KernelGraph::ControlGraph
         m_cacheContaining.clear();
         static_assert(std::variant_size_v<ControlEdge> == 5,
                       "Assumes Sequence(0), Initialize(1), ForLoopIncrement(2), Body(3), Else(4).");
-        constexpr uint8_t kSequence      = 0;
-        constexpr uint8_t kInit          = 1;
-        constexpr uint8_t kInc           = 2;
-        constexpr uint8_t kBody          = 3;
-        constexpr uint8_t kElse          = 4;
-        constexpr size_t  kEdgeTypeCount = std::variant_size_v<ControlEdge>;
-        using GD                         = Graph::Direction;
-        auto nodeTags                    = getNodes().to<std::vector>();
+        using GD = Graph::Direction;
+        // Collect all node tags.
+        auto nodeTags = getNodes().to<std::vector>();
         if(nodeTags.empty())
         {
             m_cacheStatus = CacheStatus::Valid;
             return;
         }
         int const nodeCount = static_cast<int>(nodeTags.size());
-        int const maxTag    = *std::max_element(nodeTags.begin(), nodeTags.end());
-        // Dense mapping.
+        // ---- Build dense <-> tag mapping ----
+        // Dense indices are [0, nodeCount). All hot-path operations use dense indices.
+        // The single unordered_map is only touched at boundary (build + query entry).
         m_cacheDenseToTag = nodeTags;
-        m_cacheTagToDense.assign(static_cast<size_t>(maxTag) + 1, -1);
+        m_cacheTagToDense.reserve(nodeCount * 2);
         for(int d = 0; d < nodeCount; ++d)
-            m_cacheTagToDense[static_cast<size_t>(m_cacheDenseToTag[d])] = d;
-        m_cacheWords            = wordsForBits(static_cast<size_t>(nodeCount));
-        size_t const matrixSize = static_cast<size_t>(nodeCount) * m_cacheWords;
-        m_cacheAfter.assign(matrixSize, 0);
-        m_cacheBefore.assign(matrixSize, 0);
-        m_cacheInBody.assign(matrixSize, 0);
-        m_cacheContaining.assign(matrixSize, 0);
-        // allDesc[row=u_dense] contains all descendants of u (dense bits).
-        std::vector<uint64_t>                                     allDesc(matrixSize, 0);
-        std::vector<std::array<std::vector<int>, kEdgeTypeCount>> childrenByType(nodeCount);
-        std::vector<int>                                          indegree(nodeCount, 0);
-        // Build adjacency (node -> child nodes by outgoing edge type).
+            m_cacheTagToDense.emplace(m_cacheDenseToTag[d], d);
+        // ---- Allocate row-major bit matrices ----
+        // Each matrix has nodeCount rows, each row has m_cacheWords uint64_t words.
+        // Bit position is a dense node index, NOT a graph tag.
+        m_cacheWords             = wordsForBits(static_cast<size_t>(nodeCount));
+        size_t const matrixWords = static_cast<size_t>(nodeCount) * m_cacheWords;
+        m_cacheAfter.assign(matrixWords, 0);
+        m_cacheBefore.assign(matrixWords, 0);
+        m_cacheInBody.assign(matrixWords, 0);
+        m_cacheContaining.assign(matrixWords, 0);
+        // ---- Build node-level adjacency in dense space ----
+        // childrenByType[u][edgeType] = list of direct child dense indices via that edge type.
+        // parents[v] = list of (parent_dense, edgeType) pairs.
+        std::vector<std::array<std::vector<int>, 5>>      childrenByType(nodeCount);
+        std::vector<std::vector<std::pair<int, uint8_t>>> parents(nodeCount);
         for(int u = 0; u < nodeCount; ++u)
         {
             int const parentTag = m_cacheDenseToTag[u];
             for(int edgeTag : getNeighbours<GD::Downstream>(parentTag))
             {
                 uint8_t const edgeType = static_cast<uint8_t>(getEdge(edgeTag).index());
-                auto&         bucket   = childrenByType[u][edgeType];
                 for(int childTag : getNeighbours<GD::Downstream>(edgeTag))
                 {
-                    if(childTag < 0 || childTag > maxTag)
+                    int const v = denseOfTag(childTag);
+                    if(v < 0)
                         continue;
-                    int const v = m_cacheTagToDense[static_cast<size_t>(childTag)];
-                    if(v >= 0)
-                        bucket.push_back(v);
+                    childrenByType[u][edgeType].push_back(v);
+                    parents[v].emplace_back(u, edgeType);
                 }
             }
         }
-        // Deduplicate buckets and compute indegree after dedup.
+        // Dedup adjacency (a node can be reached via multiple edges of same type).
+        std::vector<int> indegree(nodeCount, 0);
         for(int u = 0; u < nodeCount; ++u)
         {
             for(auto& bucket : childrenByType[u])
@@ -381,500 +387,285 @@ namespace rocRoller::KernelGraph::ControlGraph
                 for(int v : bucket)
                     ++indegree[v];
             }
+            auto& p = parents[u];
+            std::sort(p.begin(), p.end());
+            p.erase(std::unique(p.begin(), p.end()), p.end());
         }
-        // Kahn topological order.
-        std::vector<int> q;
-        q.reserve(nodeCount);
+        // ---- Topological order (Kahn's algorithm) ----
+        std::vector<int> topoQueue;
+        topoQueue.reserve(nodeCount);
         for(int i = 0; i < nodeCount; ++i)
             if(indegree[i] == 0)
-                q.push_back(i);
+                topoQueue.push_back(i);
         std::vector<int> topo;
         topo.reserve(nodeCount);
-        for(size_t head = 0; head < q.size(); ++head)
+        for(size_t head = 0; head < topoQueue.size(); ++head)
         {
-            int const u = q[head];
+            int const u = topoQueue[head];
             topo.push_back(u);
             for(auto const& bucket : childrenByType[u])
-            {
                 for(int v : bucket)
-                {
                     if(--indegree[v] == 0)
-                        q.push_back(v);
-                }
-            }
+                        topoQueue.push_back(v);
         }
         AssertFatal(static_cast<int>(topo.size()) == nodeCount,
-                    "ControlGraph must be acyclic for order-cache population.");
-        // Reused temporaries: fixed-size dense bitsets.
-        std::array<Bitset, kEdgeTypeCount> typedDesc;
-        for(auto& bs : typedDesc)
+                    "ControlGraph must be acyclic for order-cache construction.");
+        // ---- Phase 1: Bottom-up DP to precompute "before" sets per ancestor ----
+        //
+        // For each node u we compute:
+        //   allDesc[u]  = all descendants of u (dense bitset)
+        //   beforeByArrival[u].viaBody = descendants reachable via Init edges from u
+        //   beforeByArrival[u].viaElse = Init | Body descendants
+        //   beforeByArrival[u].viaInc  = Init | Body | Else descendants
+        //   beforeByArrival[u].viaSeq  = Init | Body | Else | Inc descendants
+        //
+        // These represent: if a target node arrives at ancestor u via a given
+        // edge type, which of u's descendants are known to be before the target?
+        //
+        // Edge precedence: Initialize -> Body -> Else -> ForLoopIncrement -> Sequence.
+        struct BeforeByArrival
+        {
+            Bitset viaBody; // descendants before if target arrives via Body
+            Bitset viaElse; // descendants before if target arrives via Else
+            Bitset viaInc; // descendants before if target arrives via Inc
+            Bitset viaSeq; // descendants before if target arrives via Sequence
+        };
+        std::vector<BeforeByArrival> beforeByArrival(nodeCount);
+        for(auto& s : beforeByArrival)
+        {
+            s.viaBody.assign(m_cacheWords, 0);
+            s.viaElse.assign(m_cacheWords, 0);
+            s.viaInc.assign(m_cacheWords, 0);
+            s.viaSeq.assign(m_cacheWords, 0);
+        }
+        std::vector<Bitset> allDesc(nodeCount, Bitset(m_cacheWords, 0));
+        // Reused temporaries (avoid per-node allocation).
+        std::array<Bitset, 5> typed;
+        for(auto& bs : typed)
             bs.assign(m_cacheWords, 0);
         Bitset seen(m_cacheWords, 0);
-        Bitset bodyLike(m_cacheWords, 0);
-        Bitset afterInit(m_cacheWords, 0);
-        Bitset afterBody(m_cacheWords, 0);
-        Bitset afterElse(m_cacheWords, 0);
-        auto   mergeChildrenDesc = [&](Bitset& dst, std::vector<int> const& childDenseList) {
-            for(int child : childDenseList)
-            {
-                denseSet(dst, child);
-                rowOr(dst.data(), matrixRow(allDesc, m_cacheWords, child), m_cacheWords);
-            }
-        };
-        // Reverse topo => children processed before parents.
+        // Process in reverse topological order so children are done before parents.
         for(auto it = topo.rbegin(); it != topo.rend(); ++it)
         {
             int const u = *it;
-            for(auto& bs : typedDesc)
+            // Zero out temporaries.
+            for(auto& bs : typed)
                 std::fill(bs.begin(), bs.end(), 0);
             std::fill(seen.begin(), seen.end(), 0);
-            std::fill(bodyLike.begin(), bodyLike.end(), 0);
-            std::fill(afterInit.begin(), afterInit.end(), 0);
-            std::fill(afterBody.begin(), afterBody.end(), 0);
-            std::fill(afterElse.begin(), afterElse.end(), 0);
-            mergeChildrenDesc(typedDesc[kInit], childrenByType[u][kInit]);
-            mergeChildrenDesc(typedDesc[kBody], childrenByType[u][kBody]);
-            mergeChildrenDesc(typedDesc[kElse], childrenByType[u][kElse]);
-            mergeChildrenDesc(typedDesc[kInc], childrenByType[u][kInc]);
-            mergeChildrenDesc(typedDesc[kSequence], childrenByType[u][kSequence]);
-            // Make partitions disjoint by precedence:
-            // Initialize -> Body -> Else -> ForLoopIncrement -> Sequence.
-            // This removes contradictory cross-writes in merged-path corner cases.
-            seen = typedDesc[kInit];
-            denseAndNot(typedDesc[kBody], seen);
-            denseOr(seen, typedDesc[kBody]);
-            denseAndNot(typedDesc[kElse], seen);
-            denseOr(seen, typedDesc[kElse]);
-            denseAndNot(typedDesc[kInc], seen);
-            denseOr(seen, typedDesc[kInc]);
-            denseAndNot(typedDesc[kSequence], seen);
-            auto& initNodes = typedDesc[kInit];
-            auto& bodyNodes = typedDesc[kBody];
-            auto& elseNodes = typedDesc[kElse];
-            auto& incNodes  = typedDesc[kInc];
-            auto& seqNodes  = typedDesc[kSequence];
-            // bodyLike = init | body | else | inc
-            bodyLike = initNodes;
-            denseOr(bodyLike, bodyNodes);
-            denseOr(bodyLike, elseNodes);
-            denseOr(bodyLike, incNodes);
-            // Parent relationships.
-            writeOrderCache(u, bodyLike, NodeOrdering::RightInBodyOfLeft);
-            writeOrderCache(u, seqNodes, NodeOrdering::LeftFirst);
-            // Cross-partition relationships.
-            // IMPORTANT correctness fix: afterInit excludes initNodes itself.
-            afterInit = bodyNodes;
-            denseOr(afterInit, elseNodes);
-            denseOr(afterInit, incNodes);
-            denseOr(afterInit, seqNodes);
-            writeOrderCache(initNodes, afterInit, NodeOrdering::LeftFirst);
-            afterBody = elseNodes;
-            denseOr(afterBody, incNodes);
-            denseOr(afterBody, seqNodes);
-            writeOrderCache(bodyNodes, afterBody, NodeOrdering::LeftFirst);
-            afterElse = incNodes;
-            denseOr(afterElse, seqNodes);
-            writeOrderCache(elseNodes, afterElse, NodeOrdering::LeftFirst);
-            writeOrderCache(incNodes, seqNodes, NodeOrdering::LeftFirst);
-            // Cache all descendants for parent computations.
-            auto* allRow = matrixRow(allDesc, m_cacheWords, u);
-            for(size_t w = 0; w < m_cacheWords; ++w)
-                allRow[w] = bodyLike[w] | seqNodes[w];
-            // Defensive: no self descendant.
-            allRow[static_cast<size_t>(u) >> 6] &= ~(uint64_t(1) << (u & 63));
+            // typed[t] = descendants whose first edge from u is type t.
+            for(uint8_t t = 0; t < 5; ++t)
+            {
+                for(int c : childrenByType[u][t])
+                {
+                    dSet(typed[t], c); // direct child
+                    dOr(typed[t], allDesc[c]); // all of child's descendants
+                }
+            }
+            // Make partitions disjoint by precedence to prevent A-before-B AND B-before-A.
+            // If a descendant is reachable via multiple edge types, keep the earliest one.
+            seen = typed[kInit];
+            dAndNot(typed[kBody], seen);
+            dOr(seen, typed[kBody]);
+            dAndNot(typed[kElse], seen);
+            dOr(seen, typed[kElse]);
+            dAndNot(typed[kInc], seen);
+            dOr(seen, typed[kInc]);
+            dAndNot(typed[kSeq], seen);
+            // Build cumulative "before" sets.
+            // viaBody: if target arrives via Body, Init descendants are before it.
+            beforeByArrival[u].viaBody = typed[kInit];
+            // viaElse: Init | Body descendants are before it.
+            beforeByArrival[u].viaElse = beforeByArrival[u].viaBody;
+            dOr(beforeByArrival[u].viaElse, typed[kBody]);
+            // viaInc: Init | Body | Else descendants are before it.
+            beforeByArrival[u].viaInc = beforeByArrival[u].viaElse;
+            dOr(beforeByArrival[u].viaInc, typed[kElse]);
+            // viaSeq: Init | Body | Else | Inc descendants are before it.
+            beforeByArrival[u].viaSeq = beforeByArrival[u].viaInc;
+            dOr(beforeByArrival[u].viaSeq, typed[kInc]);
+            // All descendants = viaSeq set | Sequence descendants.
+            allDesc[u] = beforeByArrival[u].viaSeq;
+            dOr(allDesc[u], typed[kSeq]);
+            dClear(allDesc[u], u); // node is not its own descendant
+        }
+        // ---- Phase 2: Per-target upward ancestor traversal ----
+        //
+        // My idea:
+        // For each target node, climb upward through all ancestors.
+        // At each ancestor, based on the edge type connecting the ancestor
+        // to the path towards the target:
+        //   - If edge is Sequence: ancestor is before target (LeftFirst).
+        //   - If edge is Init/Body/Else/Inc: target is in ancestor's body (RightInBodyOfLeft).
+        //   - Also, ancestor's descendants that come before the target (from Phase 1)
+        //     are all before the target (LeftFirst).
+        //
+        // We accumulate two dense bitsets per target:
+        //   rowsAfter     = nodes that should be "before target" (target goes in their .after)
+        //   rowsContaining = nodes that should "contain target" (target goes in their .inBody)
+        //
+        // Then we do two many-to-one writes per target, which is efficient:
+        // one bit set per source row + one bulk OR on target's row.
+        // Dedup state: stamp per node, plus the best (earliest precedence) edge type seen.
+        // "Best" means the numerically smallest index in the precedence order
+        // {Init=1, Body=3, Else=4, Inc=2, Seq=0}, but we remap to a precedence rank
+        // so that comparison is just <.
+        // Precedence rank: Init(0) < Body(1) < Else(2) < Inc(3) < Seq(4).
+        auto precedenceRank = [](uint8_t edgeType) -> uint8_t {
+            switch(edgeType)
+            {
+            case kInit:
+                return 0;
+            case kBody:
+                return 1;
+            case kElse:
+                return 2;
+            case kInc:
+                return 3;
+            case kSeq:
+                return 4;
+            default:
+                return 5;
+            }
+        };
+        std::vector<uint32_t> visitStamp(nodeCount, 0);
+        std::vector<uint8_t>  bestEdgeType(nodeCount, 0xFF);
+        uint32_t              stamp = 0;
+        // Track which ancestors were reached for this target (to avoid scanning all nodes).
+        std::vector<int> reachedAncestors;
+        reachedAncestors.reserve(64);
+        // DFS stack for upward traversal.
+        std::vector<int> stack;
+        stack.reserve(64);
+        Bitset rowsAfter(m_cacheWords, 0);
+        Bitset rowsContaining(m_cacheWords, 0);
+        for(int target = 0; target < nodeCount; ++target)
+        {
+            // ---- Upward BFS/DFS from target to collect all ancestors ----
+            // For each ancestor, record the "best" (earliest-precedence) edge type
+            // through which the target is reachable from it.
+            if(++stamp == 0)
+            {
+                // Handle extremely unlikely uint32 wrap.
+                std::fill(visitStamp.begin(), visitStamp.end(), 0);
+                stamp = 1;
+            }
+            reachedAncestors.clear();
+            stack.clear();
+            // Seed: target's direct parents.
+            for(auto const& [p, eType] : parents[target])
+            {
+                if(visitStamp[p] != stamp)
+                {
+                    visitStamp[p]   = stamp;
+                    bestEdgeType[p] = eType;
+                    reachedAncestors.push_back(p);
+                    stack.push_back(p);
+                }
+                else if(precedenceRank(eType) < precedenceRank(bestEdgeType[p]))
+                {
+                    bestEdgeType[p] = eType;
+                }
+            }
+            // Climb upward: each ancestor's parents inherit "best reachable edge type"
+            // propagated through the path. An ancestor's own edge type toward its child
+            // is what matters (not the child->grandchild type), because the ordering rule
+            // depends on which bucket of the ancestor the target falls into.
+            while(!stack.empty())
+            {
+                int const node = stack.back();
+                stack.pop_back();
+                for(auto const& [p, eType] : parents[node])
+                {
+                    if(visitStamp[p] != stamp)
+                    {
+                        visitStamp[p]   = stamp;
+                        bestEdgeType[p] = eType;
+                        reachedAncestors.push_back(p);
+                        stack.push_back(p);
+                    }
+                    else if(precedenceRank(eType) < precedenceRank(bestEdgeType[p]))
+                    {
+                        bestEdgeType[p] = eType;
+                    }
+                }
+            }
+            // ---- Gather relation sets from ancestors ----
+            std::fill(rowsAfter.begin(), rowsAfter.end(), 0);
+            std::fill(rowsContaining.begin(), rowsContaining.end(), 0);
+            for(int anc : reachedAncestors)
+            {
+                uint8_t const viaType = bestEdgeType[anc];
+                // Direct ancestor relation.
+                if(viaType == kSeq)
+                    dSet(rowsAfter, anc); // ancestor is before target
+                else
+                    dSet(rowsContaining, anc); // target is in ancestor's body
+                // Descendants of ancestor that are before target by edge precedence.
+                switch(viaType)
+                {
+                case kInit:
+                    // Nothing is before Init descendants.
+                    break;
+                case kBody:
+                    dOr(rowsAfter, beforeByArrival[anc].viaBody);
+                    break;
+                case kElse:
+                    dOr(rowsAfter, beforeByArrival[anc].viaElse);
+                    break;
+                case kInc:
+                    dOr(rowsAfter, beforeByArrival[anc].viaInc);
+                    break;
+                case kSeq:
+                    dOr(rowsAfter, beforeByArrival[anc].viaSeq);
+                    break;
+                default:
+                    AssertFatal(false, "Unexpected edge type", ShowValue(viaType));
+                }
+            }
+            // Target should not be before/contain itself.
+            dClear(rowsAfter, target);
+            dClear(rowsContaining, target);
+            // ---- Write into cache matrices ----
+            // Many-to-one pattern:
+            //   For each source in rowsAfter: set bit `target` in source's After row.
+            //   Then OR rowsAfter into target's Before row (the opposite relation).
+            //   Same pattern for rowsContaining -> InBody/Containing.
+            size_t const   colWord = static_cast<size_t>(target) >> 6;
+            uint64_t const colMask = uint64_t(1) << (target & 63);
+            // LeftFirst: source.after[target]=1, target.before |= sources
+            forEachBit(rowsAfter, [&](int srcDense) {
+                matRow(m_cacheAfter, m_cacheWords, srcDense)[colWord] |= colMask;
+            });
+            rowOr(matRow(m_cacheBefore, m_cacheWords, target), rowsAfter.data(), m_cacheWords);
+            // RightInBodyOfLeft: source.inBody[target]=1, target.containing |= sources
+            forEachBit(rowsContaining, [&](int srcDense) {
+                matRow(m_cacheInBody, m_cacheWords, srcDense)[colWord] |= colMask;
+            });
+            rowOr(matRow(m_cacheContaining, m_cacheWords, target),
+                  rowsContaining.data(),
+                  m_cacheWords);
         }
         validateOrderCache();
         m_cacheStatus = CacheStatus::Valid;
     }
-
-    /*
-void ControlGraph::populateOrderCache() const
-  {
-      TIMER(t, "populateOrderCache");
-      if(m_cacheStatus == CacheStatus::Valid)
-          return;
-      m_orderCache.clear();
-      m_descendentCache.clear();
-      static_assert(std::variant_size_v<ControlEdge> == 5,
-                    "Edge types assumed: Sequence(0), Initialize(1), ForLoopIncrement(2), "
-                    "Body(3), Else(4). Update populateOrderCache if this changes.");
-      constexpr int kEdgeTypeCount = std::variant_size_v<ControlEdge>;
-      // Variant indices in ControlEdge.
-      constexpr uint8_t kSequence = 0;
-      constexpr uint8_t kInit     = 1;
-      constexpr uint8_t kInc      = 2;
-      constexpr uint8_t kBody     = 3;
-      constexpr uint8_t kElse     = 4;
-      // Per-node topology in dense-node-index space (not graph tag space).
-      // We keep dense indexing to avoid hash lookups in hot loops.
-      struct NodeTopology
-      {
-          // Child node indices grouped by outgoing edge type.
-          std::array<std::vector<int>, kEdgeTypeCount> childrenByTypeIdx;
-          // Immediate parents of this node: {parentNodeIndex, edgeType(parent->this)}.
-          std::vector<std::pair<int, uint8_t>> parents;
-      };
-      // Memoized descendants grouped by "first edge type" from the source node.
-      struct DescInfo
-      {
-          std::array<Bitset, kEdgeTypeCount> byFirstEdge;
-          Bitset                             all; // union of all byFirstEdge sets
-          uint8_t                            dfsState = 0; // 0=unvisited,1=visiting,2=done
-      };
-      using GD = Graph::Direction;
-      auto nodeTags = getNodes().to<std::vector>();
-      if(nodeTags.empty())
-      {
-          m_cacheStatus = CacheStatus::Valid;
-          return;
-      }
-      // Optional micro-optimization:
-      // Process larger tags first so "set one bit in many rows" tends to grow bitsets once.
-      std::sort(nodeTags.begin(), nodeTags.end(), std::greater<int>{});
-      int const nodeCount = static_cast<int>(nodeTags.size());
-      // Tag -> dense index.
-      std::unordered_map<int, int> tagToIdx;
-      tagToIdx.reserve(nodeTags.size());
-      for(int i = 0; i < nodeCount; ++i)
-          tagToIdx.emplace(nodeTags[i], i);
-      std::vector<NodeTopology> topo(nodeCount);
-      // Build parent and childrenByType adjacency once from graph edges.
-      // This avoids repeated getNeighbours() calls inside per-node ancestor traversals.
-      for(int edge : getEdges().to<std::vector>())
-      {
-          uint8_t const edgeType = static_cast<uint8_t>(getEdge(edge).index());
-          auto const parents = getNeighbours<GD::Upstream>(edge);
-          auto const kids    = getNeighbours<GD::Downstream>(edge);
-          for(int pTag : parents)
-          {
-              auto pIt = tagToIdx.find(pTag);
-              if(pIt == tagToIdx.end())
-                  continue;
-              int const pIdx = pIt->second;
-              auto&     bucket = topo[pIdx].childrenByTypeIdx[edgeType];
-              for(int cTag : kids)
-              {
-                  auto cIt = tagToIdx.find(cTag);
-                  if(cIt == tagToIdx.end())
-                      continue;
-                  int const cIdx = cIt->second;
-                  bucket.push_back(cIdx);
-                  topo[cIdx].parents.emplace_back(pIdx, edgeType);
-              }
-          }
-      }
-      // Descendant cache by first-edge-type, computed once per node.
-      std::vector<DescInfo> desc(nodeCount);
-      auto buildDescByFirstEdge = [&](auto&& self, int nodeIdx) -> DescInfo const& {
-          auto& info = desc[nodeIdx];
-          if(info.dfsState == 2)
-              return info;
-          // If this fires, graph has a cycle in node-level reachability.
-          // Current cache logic (old and new) assumes acyclic control structure.
-          AssertFatal(info.dfsState != 1,
-                      "ControlGraph must be acyclic while building order cache.",
-                      ShowValue(nodeTags[nodeIdx]));
-          info.dfsState = 1;
-          for(uint8_t edgeType = 0; edgeType < kEdgeTypeCount; ++edgeType)
-          {
-              for(int childIdx : topo[nodeIdx].childrenByTypeIdx[edgeType])
-              {
-                  int const childTag = nodeTags[childIdx];
-                  // Direct child belongs to this first-edge-type bucket.
-                  bitsetSet(info.byFirstEdge[edgeType], childTag);
-                  // Everything reachable from that child also belongs to same first-edge bucket.
-                  auto const& childInfo = self(self, childIdx);
-                  bitsetOr(info.byFirstEdge[edgeType], childInfo.all);
-              }
-              bitsetOr(info.all, info.byFirstEdge[edgeType]);
-          }
-          info.dfsState = 2;
-          return info;
-      };
-      for(int i = 0; i < nodeCount; ++i)
-          (void)buildDescByFirstEdge(buildDescByFirstEdge, i);
-      // Select which NodeOrders bitset a NodeOrdering writes to.
-      auto selectField = [](NodeOrdering order) -> Bitset NodeOrders::* {
-          switch(order)
-          {
-          case NodeOrdering::LeftFirst:
-              return &NodeOrders::after;
-          case NodeOrdering::RightFirst:
-              return &NodeOrders::before;
-          case NodeOrdering::RightInBodyOfLeft:
-              return &NodeOrders::inBody;
-          case NodeOrdering::LeftInBodyOfRight:
-              return &NodeOrders::containing;
-          default:
-              break;
-          }
-          AssertFatal(false, "Invalid order: ", ShowValue(order));
-          return &NodeOrders::after;
-      };
-      // Writes A -> nodeB (many-to-one) efficiently:
-      // 1) set one bit in each left row
-      // 2) one bulk OR into right row's opposite set
-      auto writeManyToOne = [&](Bitset const& leftNodes, int nodeB, NodeOrdering order) {
-          auto const lhsField = selectField(order);
-          auto const rhsField = selectField(opposite(order));
-          bool any = false;
-          for(size_t w = 0; w < leftNodes.size(); ++w)
-          {
-              uint64_t bits = leftNodes[w];
-              while(bits)
-              {
-                  int const bit     = std::countr_zero(bits);
-                  int const leftTag = static_cast<int>(w * 64 + bit);
-                  bitsetSet((m_orderCache[leftTag].*lhsField), nodeB);
-                  bits &= bits - 1;
-                  any = true;
-              }
-          }
-          if(any)
-              bitsetOr((m_orderCache[nodeB].*rhsField), leftNodes);
-      };
-      auto clearBit = [](Bitset& bs, int id) {
-          size_t const word = static_cast<size_t>(id) >> 6;
-          if(word < bs.size())
-              bs[word] &= ~(uint64_t(1) << (id & 63));
-      };
-      m_orderCache.reserve(nodeTags.size());
-      // Stamp+mask visitation:
-      // - stamp tells if ancestor was visited for current target node
-      // - mask dedups by (ancestor, viaEdgeType), not just ancestor
-      // This is important because same ancestor can be reached through different first-edge types.
-      std::vector<uint32_t> seenStamp(nodeCount, 0);
-      std::vector<uint8_t>  seenMask(nodeCount, 0);
-      uint32_t              stamp = 0;
-      std::vector<std::pair<int, uint8_t>> stack;
-      stack.reserve(64);
-      // Main algorithm (your idea):
-      // For each target node:
-      //   - traverse ancestors upward
-      //   - add direct ancestor relation based on incoming edge type
-      //   - add all descendants of ancestor that are known to execute before target
-      for(int nodeIdx = 0; nodeIdx < nodeCount; ++nodeIdx)
-      {
-          int const nodeTag = nodeTags[nodeIdx];
-          ++stamp;
-          Bitset before;     // nodes definitely before nodeTag
-          Bitset containing; // nodes that contain nodeTag in body
-          stack.clear();
-          for(auto const& p : topo[nodeIdx].parents)
-              stack.push_back(p);
-          while(!stack.empty())
-          {
-              auto const [ancIdx, viaEdgeType] = stack.back();
-              stack.pop_back();
-              if(seenStamp[ancIdx] != stamp)
-              {
-                  seenStamp[ancIdx] = stamp;
-                  seenMask[ancIdx]  = 0;
-              }
-              uint8_t const edgeMask = static_cast<uint8_t>(1u << viaEdgeType);
-              if(seenMask[ancIdx] & edgeMask)
-                  continue;
-              seenMask[ancIdx] |= edgeMask;
-              int const ancTag = nodeTags[ancIdx];
-              // Ancestor relation.
-              if(viaEdgeType == kSequence)
-                  bitsetSet(before, ancTag); // ancestor is before target
-              else
-                  bitsetSet(containing, ancTag); // target is in ancestor's body
-              // Descendants of ancestor that are before this target, based on edge precedence:
-              // Initialize < Body < Else < ForLoopIncrement < Sequence
-              auto const& byType = desc[ancIdx].byFirstEdge;
-              switch(viaEdgeType)
-              {
-              case kInit:
-                  // Nothing before Initialize bucket.
-                  break;
-              case kBody:
-                  bitsetOr(before, byType[kInit]);
-                  break;
-              case kElse:
-                  bitsetOr(before, byType[kInit]);
-                  bitsetOr(before, byType[kBody]);
-                  break;
-              case kInc:
-                  bitsetOr(before, byType[kInit]);
-                  bitsetOr(before, byType[kBody]);
-                  bitsetOr(before, byType[kElse]);
-                  break;
-              case kSequence:
-                  bitsetOr(before, byType[kInit]);
-                  bitsetOr(before, byType[kBody]);
-                  bitsetOr(before, byType[kElse]);
-                  bitsetOr(before, byType[kInc]);
-                  break;
-              default:
-                  AssertFatal(false, "Unhandled edge type index", ShowValue(viaEdgeType));
-              }
-              // Continue climbing ancestors.
-              for(auto const& p : topo[ancIdx].parents)
-                  stack.push_back(p);
-          }
-          // Defensive: avoid self relation if malformed graph introduces it.
-          clearBit(before, nodeTag);
-          clearBit(containing, nodeTag);
-          // Materialize two relation families.
-          writeManyToOne(before, nodeTag, NodeOrdering::LeftFirst);
-          writeManyToOne(containing, nodeTag, NodeOrdering::RightInBodyOfLeft);
-      }
-      validateOrderCache();
-      m_cacheStatus = CacheStatus::Valid;
-      m_descendentCache.clear();
-  }
-*/
-
-    //void ControlGraph::populateOrderCache() const
-    //{
-    //    TIMER(t, "populateOrderCache");
-
-    //    if(m_cacheStatus == CacheStatus::Valid)
-    //        return;
-
-    //    m_orderCache.clear();
-
-    //    auto rootNodes = roots().to<std::vector>();
-
-    //    populateOrderCache(rootNodes);
-    //    validateOrderCache();
-    //    //sortOrderCache();
-
-    //    m_cacheStatus = CacheStatus::Valid;
-    //    //
-    //    // m_descendentCache is only used to help build m_orderCache,
-    //    // and it must be cleared after finish building m_orderCache
-    //    // to ensure no stale data being used when building m_orderCache
-    //    // next time.
-    //    //
-    //    m_descendentCache.clear();
-    //}
-
-    void ControlGraph::writeOrderCache(Bitset const& nodesA,
-                                       Bitset const& nodesB,
-                                       NodeOrdering  order) const
-    {
-        if(!bitsetAny(nodesA) || !bitsetAny(nodesB))
-            return;
-        auto selectMatrix = [this](NodeOrdering o) -> std::vector<uint64_t>& {
-            switch(o)
-            {
-            case NodeOrdering::LeftFirst:
-                return m_cacheAfter;
-            case NodeOrdering::RightFirst:
-                return m_cacheBefore;
-            case NodeOrdering::RightInBodyOfLeft:
-                return m_cacheInBody;
-            case NodeOrdering::LeftInBodyOfRight:
-                return m_cacheContaining;
-            default:
-                break;
-            }
-            AssertFatal(false, "Invalid order", ShowValue(o));
-            return m_cacheAfter;
-        };
-        auto&     matAB = selectMatrix(order);
-        auto&     matBA = selectMatrix(opposite(order));
-        int const n     = static_cast<int>(m_cacheDenseToTag.size());
-        forEachSetBit(nodesA, [&](int aDense) {
-            if(aDense >= n)
-                return;
-            rowOr(matrixRow(matAB, m_cacheWords, aDense), nodesB.data(), m_cacheWords);
-        });
-        forEachSetBit(nodesB, [&](int bDense) {
-            if(bDense >= n)
-                return;
-            rowOr(matrixRow(matBA, m_cacheWords, bDense), nodesA.data(), m_cacheWords);
-        });
-    }
-    void ControlGraph::writeOrderCache(int nodeA, Bitset const& nodesB, NodeOrdering order) const
-    {
-        if(!bitsetAny(nodesB))
-            return;
-        int const n = static_cast<int>(m_cacheDenseToTag.size());
-        AssertFatal(nodeA >= 0 && nodeA < n, ShowValue(nodeA), ShowValue(n));
-        auto selectMatrix = [this](NodeOrdering o) -> std::vector<uint64_t>& {
-            switch(o)
-            {
-            case NodeOrdering::LeftFirst:
-                return m_cacheAfter;
-            case NodeOrdering::RightFirst:
-                return m_cacheBefore;
-            case NodeOrdering::RightInBodyOfLeft:
-                return m_cacheInBody;
-            case NodeOrdering::LeftInBodyOfRight:
-                return m_cacheContaining;
-            default:
-                break;
-            }
-            AssertFatal(false, "Invalid order", ShowValue(o));
-            return m_cacheAfter;
-        };
-        auto& matAB = selectMatrix(order);
-        auto& matBA = selectMatrix(opposite(order));
-        rowOr(matrixRow(matAB, m_cacheWords, nodeA), nodesB.data(), m_cacheWords);
-        forEachSetBit(nodesB, [&](int bDense) {
-            if(bDense >= n)
-                return;
-            auto* row = matrixRow(matBA, m_cacheWords, bDense);
-            row[static_cast<size_t>(nodeA) >> 6] |= uint64_t(1) << (nodeA & 63);
-        });
-    }
-    void ControlGraph::writeOrderCache(int nodeA, int nodeB, NodeOrdering order) const
-    {
-        int const n = static_cast<int>(m_cacheDenseToTag.size());
-        AssertFatal(nodeA >= 0 && nodeA < n, ShowValue(nodeA), ShowValue(n));
-        AssertFatal(nodeB >= 0 && nodeB < n, ShowValue(nodeB), ShowValue(n));
-        auto selectMatrix = [this](NodeOrdering o) -> std::vector<uint64_t>& {
-            switch(o)
-            {
-            case NodeOrdering::LeftFirst:
-                return m_cacheAfter;
-            case NodeOrdering::RightFirst:
-                return m_cacheBefore;
-            case NodeOrdering::RightInBodyOfLeft:
-                return m_cacheInBody;
-            case NodeOrdering::LeftInBodyOfRight:
-                return m_cacheContaining;
-            default:
-                break;
-            }
-            AssertFatal(false, "Invalid order", ShowValue(o));
-            return m_cacheAfter;
-        };
-        auto& matAB = selectMatrix(order);
-        auto& matBA = selectMatrix(opposite(order));
-        auto* rowAB = matrixRow(matAB, m_cacheWords, nodeA);
-        auto* rowBA = matrixRow(matBA, m_cacheWords, nodeB);
-        rowAB[static_cast<size_t>(nodeB) >> 6] |= uint64_t(1) << (nodeB & 63);
-        rowBA[static_cast<size_t>(nodeA) >> 6] |= uint64_t(1) << (nodeA & 63);
-    }
-
+    //=========================================================================
+    // lookupOrder(IgnoreCache) -- unchanged algorithm, no cache involved
+    //=========================================================================
     NodeOrdering ControlGraph::lookupOrder(IgnoreCachePolicy const, int nodeA, int nodeB) const
     {
         TIMER(t, "ControlGraph::lookupOrder");
-
         using GD = Graph::Direction;
         std::unordered_set<int> visited_nodes;
-
-        // Decide order of A and B when A is parent of B
-        auto const getOrderIfParent = [&](int edge) {
+        auto const              getOrderIfParent = [&](int edge) {
             return std::holds_alternative<Sequence>(getEdge(edge))
-                       ? NodeOrdering::LeftFirst
-                       : NodeOrdering::RightInBodyOfLeft;
+                                    ? NodeOrdering::LeftFirst
+                                    : NodeOrdering::RightInBodyOfLeft;
         };
-
-        // Decide order of A and B when A and B are descendants of a node
-        // And order of edge type :
-        // Initialize -> Body -> Else -> ForLoopIncrement -> Sequence.
         auto const getOrderOfDescendants = [&](int edgeA, int edgeB) {
             auto edgeAElem = getEdge(edgeA);
             auto edgeBElem = getEdge(edgeB);
             AssertFatal(edgeAElem.index() != edgeBElem.index(),
                         "edgeA and edgeB types should not be the same");
-
             return std::visit(
                 rocRoller::overloaded{
                     [&](auto const&) {
@@ -901,27 +692,19 @@ void ControlGraph::populateOrderCache() const
                     }},
                 edgeAElem);
         };
-
-        // {key, value} = {node index, edge index}
         std::unordered_map<int, int> A_ancestors;
-        // stack
-        std::vector<int> stk{nodeA};
-
-        // Traverse upstream from A to collect all ancestors of A
+        std::vector<int>             stk{nodeA};
         while(!stk.empty())
         {
             auto node = stk.back();
             stk.pop_back();
-
             for(auto edge : getNeighbours<GD::Upstream>(node))
             {
                 for(auto parent : getNeighbours<GD::Upstream>(edge))
                 {
                     if(parent == nodeB)
                         return opposite(getOrderIfParent(edge));
-
                     A_ancestors.insert({parent, edge});
-
                     if(!visited_nodes.contains(parent))
                     {
                         visited_nodes.insert(parent);
@@ -930,34 +713,26 @@ void ControlGraph::populateOrderCache() const
                 }
             }
         }
-
         AssertFatal(stk.empty());
         stk.push_back(nodeB);
         visited_nodes.clear();
-
-        // Traverse upstream from B to find common ancestors to decide order
         while(!stk.empty())
         {
             auto node = stk.back();
             stk.pop_back();
-
             for(auto edge : getNeighbours<GD::Upstream>(node))
             {
                 for(auto parent : getNeighbours<GD::Upstream>(edge))
                 {
                     if(parent == nodeA)
                         return getOrderIfParent(edge);
-
                     if(A_ancestors.contains(parent))
                     {
-                        // If this is a common ancestor, compare the types of both edges to
-                        // know the order
                         if(getEdge(A_ancestors.at(parent)).index() != getEdge(edge).index())
                         {
                             return getOrderOfDescendants(A_ancestors.at(parent), edge);
                         }
                     }
-
                     if(!visited_nodes.contains(parent))
                     {
                         visited_nodes.insert(parent);
@@ -966,10 +741,11 @@ void ControlGraph::populateOrderCache() const
                 }
             }
         }
-
         return NodeOrdering::Undefined;
     }
-
+    //=========================================================================
+    // compareNodes variants
+    //=========================================================================
     static void validateNodes(ControlGraph const& control, int nodeA, int nodeB)
     {
         AssertFatal(nodeA != nodeB, ShowValue(nodeA));
@@ -978,32 +754,25 @@ void ControlGraph::populateOrderCache() const
                     ShowValue(control.getElementType(nodeA)),
                     ShowValue(control.getElementType(nodeB)));
     }
-
     NodeOrdering ControlGraph::compareNodes(CacheOnlyPolicy const, int nodeA, int nodeB) const
     {
         AssertFatal(m_cacheStatus == CacheStatus::Valid);
-
         validateNodes(*this, nodeA, nodeB);
         return lookupOrder(CacheOnly, nodeA, nodeB);
     }
-
     NodeOrdering ControlGraph::compareNodes(UpdateCachePolicy const, int nodeA, int nodeB) const
     {
         if(m_cacheStatus != CacheStatus::Valid)
             populateOrderCache();
-
         return compareNodes(CacheOnly, nodeA, nodeB);
     }
-
     NodeOrdering
         ControlGraph::compareNodes(UseCacheIfAvailablePolicy const, int nodeA, int nodeB) const
     {
         validateNodes(*this, nodeA, nodeB);
-
         return m_cacheStatus == CacheStatus::Valid ? compareNodes(CacheOnly, nodeA, nodeB)
                                                    : compareNodes(IgnoreCache, nodeA, nodeB);
     }
-
     NodeOrdering ControlGraph::compareNodes(IgnoreCachePolicy const, int nodeA, int nodeB) const
     {
         validateNodes(*this, nodeA, nodeB);

@@ -103,15 +103,12 @@ namespace rocRoller::KernelGraph::ControlGraph
 
     inline NodeOrdering ControlGraph::lookupOrder(CacheOnlyPolicy const, int nodeA, int nodeB) const
     {
-        auto toDense = [this](int tag) -> int {
-            if(tag < 0 || static_cast<size_t>(tag) >= m_cacheTagToDense.size())
-                return -1;
-            return m_cacheTagToDense[static_cast<size_t>(tag)];
-        };
-        int const a = toDense(nodeA);
-        int const b = toDense(nodeB);
+        // Translate graph tags to dense indices for matrix lookup.
+        int const a = denseOfTag(nodeA);
+        int const b = denseOfTag(nodeB);
         if(a < 0 || b < 0 || m_cacheWords == 0)
             return NodeOrdering::Undefined;
+        // Test a single bit in a row-major matrix: row a, column b.
         auto test = [this, a, b](std::vector<uint64_t> const& mat) -> bool {
             auto const* row = mat.data() + static_cast<size_t>(a) * m_cacheWords;
             return ((row[static_cast<size_t>(b) >> 6] >> (b & 63)) & 1ull) != 0;
@@ -126,98 +123,86 @@ namespace rocRoller::KernelGraph::ControlGraph
             return NodeOrdering::LeftInBodyOfRight;
         return NodeOrdering::Undefined;
     }
-
     inline Generator<int> ControlGraph::nodesAfter(int node) const
     {
         populateOrderCache();
-        if(node < 0 || static_cast<size_t>(node) >= m_cacheTagToDense.size())
+        int const dense = denseOfTag(node);
+        if(dense < 0 || m_cacheWords == 0)
             co_return;
-        int const dense = m_cacheTagToDense[static_cast<size_t>(node)];
-        if(dense < 0)
-            co_return;
-        auto const* row = m_cacheAfter.data() + static_cast<size_t>(dense) * m_cacheWords;
         int const   n   = static_cast<int>(m_cacheDenseToTag.size());
+        auto const* row = m_cacheAfter.data() + static_cast<size_t>(dense) * m_cacheWords;
         for(size_t w = 0; w < m_cacheWords; ++w)
         {
             uint64_t bits = row[w];
             while(bits)
             {
-                int bit = std::countr_zero(bits);
-                int d   = static_cast<int>(w * 64 + bit);
-                if(d < n)
-                    co_yield m_cacheDenseToTag[d];
+                int bit   = std::countr_zero(bits);
+                int other = static_cast<int>(w * 64 + bit);
+                if(other < n)
+                    co_yield m_cacheDenseToTag[other];
                 bits &= bits - 1;
             }
         }
     }
-
     inline Generator<int> ControlGraph::nodesBefore(int node) const
     {
         populateOrderCache();
-        if(node < 0 || static_cast<size_t>(node) >= m_cacheTagToDense.size())
+        int const dense = denseOfTag(node);
+        if(dense < 0 || m_cacheWords == 0)
             co_return;
-        int const dense = m_cacheTagToDense[static_cast<size_t>(node)];
-        if(dense < 0)
-            co_return;
-        auto const* row = m_cacheBefore.data() + static_cast<size_t>(dense) * m_cacheWords;
         int const   n   = static_cast<int>(m_cacheDenseToTag.size());
+        auto const* row = m_cacheBefore.data() + static_cast<size_t>(dense) * m_cacheWords;
         for(size_t w = 0; w < m_cacheWords; ++w)
         {
             uint64_t bits = row[w];
             while(bits)
             {
-                int bit = std::countr_zero(bits);
-                int d   = static_cast<int>(w * 64 + bit);
-                if(d < n)
-                    co_yield m_cacheDenseToTag[d];
+                int bit   = std::countr_zero(bits);
+                int other = static_cast<int>(w * 64 + bit);
+                if(other < n)
+                    co_yield m_cacheDenseToTag[other];
                 bits &= bits - 1;
             }
         }
     }
-
     inline Generator<int> ControlGraph::nodesInBody(int node) const
     {
         populateOrderCache();
-        if(node < 0 || static_cast<size_t>(node) >= m_cacheTagToDense.size())
+        int const dense = denseOfTag(node);
+        if(dense < 0 || m_cacheWords == 0)
             co_return;
-        int const dense = m_cacheTagToDense[static_cast<size_t>(node)];
-        if(dense < 0)
-            co_return;
-        auto const* row = m_cacheInBody.data() + static_cast<size_t>(dense) * m_cacheWords;
         int const   n   = static_cast<int>(m_cacheDenseToTag.size());
+        auto const* row = m_cacheInBody.data() + static_cast<size_t>(dense) * m_cacheWords;
         for(size_t w = 0; w < m_cacheWords; ++w)
         {
             uint64_t bits = row[w];
             while(bits)
             {
-                int bit = std::countr_zero(bits);
-                int d   = static_cast<int>(w * 64 + bit);
-                if(d < n)
-                    co_yield m_cacheDenseToTag[d];
+                int bit   = std::countr_zero(bits);
+                int other = static_cast<int>(w * 64 + bit);
+                if(other < n)
+                    co_yield m_cacheDenseToTag[other];
                 bits &= bits - 1;
             }
         }
     }
-
     inline Generator<int> ControlGraph::nodesContaining(int node) const
     {
         populateOrderCache();
-        if(node < 0 || static_cast<size_t>(node) >= m_cacheTagToDense.size())
+        int const dense = denseOfTag(node);
+        if(dense < 0 || m_cacheWords == 0)
             co_return;
-        int const dense = m_cacheTagToDense[static_cast<size_t>(node)];
-        if(dense < 0)
-            co_return;
-        auto const* row = m_cacheContaining.data() + static_cast<size_t>(dense) * m_cacheWords;
         int const   n   = static_cast<int>(m_cacheDenseToTag.size());
+        auto const* row = m_cacheContaining.data() + static_cast<size_t>(dense) * m_cacheWords;
         for(size_t w = 0; w < m_cacheWords; ++w)
         {
             uint64_t bits = row[w];
             while(bits)
             {
-                int bit = std::countr_zero(bits);
-                int d   = static_cast<int>(w * 64 + bit);
-                if(d < n)
-                    co_yield m_cacheDenseToTag[d];
+                int bit   = std::countr_zero(bits);
+                int other = static_cast<int>(w * 64 + bit);
+                if(other < n)
+                    co_yield m_cacheDenseToTag[other];
                 bits &= bits - 1;
             }
         }

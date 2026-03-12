@@ -162,141 +162,40 @@ namespace rocRoller
         class ControlGraph : public Graph::Hypergraph<Operation, ControlEdge, false>
         {
         public:
-            using Base = Graph::Hypergraph<Operation, ControlEdge, false>;
-
+            using Base     = Graph::Hypergraph<Operation, ControlEdge, false>;
             ControlGraph() = default;
-
-            /**
-             * @brief Get a node/edge from the control graph.
-             *
-             * If the element specified by tag cannot be converted to
-             * T, the return value is empty.
-             *
-             * @param tag Graph tag/index.
-             */
             template <typename T>
             requires(std::constructible_from<ControlGraph::Element, T>) std::optional<T> get(
                 int tag)
             const;
-
-            /**
-             * Returns the relative ordering of nodeA and nodeB according to the graph rules.
-             *
-             * From node X,
-             *
-             *  - Nodes connected via a Sequence edge (and their descendents) are after X.
-             *  - Nodes connected via other kinds of edges (Initialize, Body, ForLoopIncrement)
-             *    are in the body of X.
-             *  - The descendents of X are ordered by the first kind of edge, in this order:
-             *    Initialize -> Body -> ForLoopIncrement -> Sequence.
-             *
-             * Nodes whose relationship is not determined by the above rules could be
-             * scheduled concurrently.
-             */
             NodeOrdering compareNodes(UpdateCachePolicy const, int nodeA, int nodeB) const;
             NodeOrdering compareNodes(CacheOnlyPolicy const, int nodeA, int nodeB) const;
             NodeOrdering compareNodes(UseCacheIfAvailablePolicy const, int nodeA, int nodeB) const;
             NodeOrdering compareNodes(IgnoreCachePolicy const, int nodeA, int nodeB) const;
-
-            /**
-             * Yields (in no particular order) all nodes that are definitely after `node`.
-             */
             Generator<int> nodesAfter(int node) const;
-
-            /**
-             * Yields (in no particular order) all nodes that are definitely before `node`.
-             */
             Generator<int> nodesBefore(int node) const;
-
-            /**
-             * Yields (in no particular order) all nodes that are inside the body of `node`.
-             * Note
-             */
             Generator<int> nodesInBody(int node) const;
-
-            /**
-             * Yields (in no particular order) all nodes that contain `node` in their body.
-             * Note
-             */
             Generator<int> nodesContaining(int node) const;
-
-            /**
-             * Returns a string containing a text table describing the relationship between
-             * all nodes in the graph.
-             */
-            std::string nodeOrderTableString() const;
-
-            /**
-             * Returns a string containing a text table describing the relationship between
-             * the listed nodes in the graph.
-             */
-            std::string nodeOrderTableString(std::set<int> const& nodes) const;
-
-            /**
-             * Contains a map of every definite ordering between two nodes.
-             * Note that node pairs whose ordering is undefined will be missing from the cache.
-             * Also note that the entries are not duplicated for (nodeA, nodeB) and
-             * (nodeB, nodeA). Only the entry where the first node ID is the lower number
-             * will be present. The other entry can be obtained from opposite(nodeB, nodeA).
-             *
-             * Also, if a reference to the returned value is maintained through any changes
-             * to the graph, the returned map will be cleared.
-             */
+            std::string    nodeOrderTableString() const;
+            std::string    nodeOrderTableString(std::set<int> const& nodes) const;
             std::unordered_map<int, std::unordered_map<int, NodeOrdering>> nodeOrderTable() const;
-
             template <typename T>
             requires(std::constructible_from<Operation, T>)
                 std::set<std::pair<int, int>> ambiguousNodes()
             const;
-
-            /**
-             * @brief Given two control stacks, add the necessary sequence edge such that the final nodes in the stack are relatively ordered.
-             *
-             * The final nodes in the control stacks are ordered by adding a sequence edge between the first nodes in the stacks that differ.
-             *
-             * If ordered is true, the order imposed is a -> b.
-             * Otherwise, the order is inferred based on the following rules:
-             * 1. If the differing nodes are translate time evaluatable setcoords, order the smaller one first.
-             * 2. Otherwise, order the smaller numbered node first.
-             *
-             *
-             * @tparam Range
-             * @param aControlStack Path in the body-parent tree (computed from the control graph) from root to a.
-             * @param bControlStack Path in the body-parent tree from root to b.
-             * @param ordered Inputs are passed in order.
-             */
             template <CForwardRangeOf<int> Range>
             void orderMemoryNodes(Range const& aControlStack,
                                   Range const& bControlStack,
                                   bool         ordered = true);
-
             template <typename T>
             inline std::predicate<int> auto isElemType() const
             {
                 return [this](int x) -> bool { return get<T>(x).has_value(); };
             }
-
-            /**
-             * Connects each argument in order with a separate edge of type `Edge`. Accepts
-             * any number of arguments.  The edges will be default-constructed.
-             *
-             * e.g. chain<Sequence>(a, b, c) will create two sequence edges, one from a to b,
-             * and one from b to c.
-             */
             template <CControlEdge Edge, std::convertible_to<int>... Nodes>
-            void chain(int a, int b, Nodes... remaining);
-
-            /**
-             *  Check if modifying an element (index) is allowed or not. This
-             *  only comes into effect when the graph is in restricted mode.
-             */
+            void         chain(int a, int b, Nodes... remaining);
             virtual bool isModificationAllowed(int index) const override;
-
-            /**
-             *  Set the graph to be in restricted mode. Some operations would
-             *  be disallowed when in restricted mode.
-             */
-            void setRestricted()
+            void         setRestricted()
             {
                 m_changesRestricted = true;
             }
@@ -308,21 +207,21 @@ namespace rocRoller
             NodeOrdering lookupOrder(CacheOnlyPolicy const, int nodeA, int nodeB) const;
             NodeOrdering lookupOrder(IgnoreCachePolicy const, int nodeA, int nodeB) const;
             /**
-         * Dense cache write helpers.
-         * IMPORTANT:
-         *   - Bit positions in these Bitsets are dense node indices [0, nodeCount).
-         *   - nodeA/nodeB arguments are also dense node indices.
-         */
-            void writeOrderCache(Bitset const& nodesA,
-                                 Bitset const& nodesB,
-                                 NodeOrdering  order) const;
-            void writeOrderCache(int nodeA, Bitset const& nodesB, NodeOrdering order) const;
-            void writeOrderCache(int nodeA, int nodeB, NodeOrdering order) const;
-            // Dense-index <-> graph-tag mapping.
-            mutable std::vector<int> m_cacheDenseToTag; // dense -> graph tag
-            mutable std::vector<int> m_cacheTagToDense; // graph tag -> dense, -1 if not node
-            mutable size_t           m_cacheWords = 0; // words per row in dense bit matrices
-                // Row-major bit matrices: row=nodeA_dense, bit=nodeB_dense.
+                 * Convert graph tag to dense cache index, or -1 if not present.
+                 */
+            int denseOfTag(int tag) const;
+            /**
+                 * Select the row-major cache matrix corresponding to a NodeOrdering.
+                 * Resolved once per write call so inner loops have no branching.
+                 */
+            std::vector<uint64_t>& selectCacheMatrix(NodeOrdering order) const;
+            // Dense index -> graph node tag.
+            mutable std::vector<int> m_cacheDenseToTag;
+            // Graph tag -> dense index. Single generic lookup structure.
+            mutable std::unordered_map<int, int> m_cacheTagToDense;
+            // Number of uint64_t words per row in the dense bit matrices.
+            mutable size_t m_cacheWords = 0;
+            // Row-major dense bit matrices (row = node_dense, bit = other_dense).
             mutable std::vector<uint64_t> m_cacheAfter;
             mutable std::vector<uint64_t> m_cacheBefore;
             mutable std::vector<uint64_t> m_cacheInBody;
