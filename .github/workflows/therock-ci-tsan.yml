@@ -1,6 +1,7 @@
 name: TheRock CI TSAN
 
 on:
+  pull_request:
   schedule:
     - cron: "0 8 * * *" # Runs nightly at 8 AM UTC (offset from ASAN at 7 AM)
   workflow_dispatch:
