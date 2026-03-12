@@ -22,6 +22,7 @@
 #
 ################################################################################
 
+import glob
 import pytest
 
 from Tensile import Tensile
@@ -29,4 +30,12 @@ from config_helpers import findConfigs
 
 @pytest.mark.parametrize("config", findConfigs())
 def test_config(tensile_args, config, tmpdir):
-    Tensile.Tensile([config, tmpdir.strpath, *tensile_args])
+    args = [config, tmpdir.strpath, *tensile_args]
+    is_benchmark_timer_config = "benchmark_timer" in os.path.basename(config)
+    # Disable timer and hwmonitor for CI correctness-only runs.
+    # benchmark_timer tests retain timing to verify it works.
+    if not is_benchmark_timer_config:
+        _disable_timer_and_hwmonitor(args)
+    Tensile.Tensile(args)
+
+    _verify_timer_and_hwmonitor(tmpdir.strpath, expect_disabled=not is_benchmark_timer_config)
