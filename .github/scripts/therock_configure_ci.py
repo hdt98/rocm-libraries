@@ -3,6 +3,9 @@ This script determines which build flag and tests to run based on SUBTREES
 
 Required environment variables:
   - SUBTREES
+
+Optional environment variables:
+  - BUILD_VARIANT: Build variant to use (e.g., "release", "asan", "tsan"). Defaults to "release".
 """
 
 import fnmatch
@@ -13,10 +16,38 @@ from pathlib import Path
 import sys
 from therock_matrix import subtree_to_project_map, collect_projects_to_run
 import time
-from typing import Mapping, Optional, Iterable, List
+from typing import Mapping, Optional, Iterable, List, Tuple
 import os
 from pr_detect_changed_subtrees import get_valid_prefixes, find_matched_subtrees
 from config_loader import load_repo_config
+
+
+# Build variant configuration mapping
+# Maps variant name to (cmake_preset, label, expect_failure)
+BUILD_VARIANT_CONFIG = {
+    "release": ("linux-release", "release", False),
+    "asan": ("linux-release-asan", "asan", True),
+    "tsan": ("linux-release-tsan", "tsan", True),
+}
+
+
+def retrieve_build_variant(variant_name: str) -> Tuple[str, str, bool]:
+    """
+    Retrieves build variant configuration.
+
+    Args:
+        variant_name: Name of the build variant (e.g., "release", "asan", "tsan")
+
+    Returns:
+        Tuple of (cmake_preset, label, expect_failure)
+    """
+    if variant_name not in BUILD_VARIANT_CONFIG:
+        logging.warning(
+            f"Unknown build variant '{variant_name}', falling back to 'release'"
+        )
+        variant_name = "release"
+
+    return BUILD_VARIANT_CONFIG[variant_name]
 
 logging.basicConfig(level=logging.INFO)
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -199,9 +230,19 @@ def retrieve_projects(args):
 def run(args):
     platform = args.get("platform")
     project_to_run, test_type = retrieve_projects(args)
-    set_github_output(
-        {f"{platform}_projects": json.dumps(project_to_run), "test_type": test_type}
-    )
+
+    # Get build variant configuration
+    build_variant = args.get("build_variant", "release")
+    cmake_preset, variant_label, expect_failure = retrieve_build_variant(build_variant)
+
+    outputs = {
+        f"{platform}_projects": json.dumps(project_to_run),
+        "test_type": test_type,
+        "build_variant_cmake_preset": cmake_preset,
+        "build_variant_label": variant_label,
+        "expect_failure": str(expect_failure).lower(),
+    }
+    set_github_output(outputs)
 
 
 if __name__ == "__main__":
@@ -220,6 +261,9 @@ if __name__ == "__main__":
     args["input_projects"] = input_projects
 
     args["base_ref"] = os.environ.get("BASE_REF", "HEAD^")
+
+    # Build variant (e.g., "release", "asan", "tsan")
+    args["build_variant"] = os.environ.get("BUILD_VARIANT", "release")
 
     logging.info(f"Retrieved arguments {args}")
 

@@ -13,14 +13,23 @@ on:
         type: string
       test_runs_on:
         type: string
+      build_variant_cmake_preset:
+        type: string
+        default: "linux-release"
+      build_variant_label:
+        type: string
+        default: "release"
+      expect_failure:
+        type: string
+        default: "false"
 
 permissions:
   contents: read
 
 jobs:
   therock-build-linux:
-    name: Build (${{ inputs.amdgpu_families }})
-    runs-on: azure-linux-scale-rocm
+    name: Build (${{ inputs.amdgpu_families }}${{ inputs.build_variant_label != 'release' && format(' | {0}', inputs.build_variant_label) || '' }})
+    runs-on: ${{ contains(inputs.build_variant_label, 'san') && 'azure-linux-scale-rocm-heavy' || 'azure-linux-scale-rocm' }}
     permissions:
       id-token: write
     container:
@@ -92,6 +101,7 @@ jobs:
           package_version: ADHOCBUILD
           extra_cmake_options: "-DTHEROCK_ROCM_LIBRARIES_SOURCE_DIR=../ ${{ inputs.cmake_options }}"
           BUILD_DIR: build
+          cmake_preset: ${{ inputs.build_variant_cmake_preset }}
         run: |
           python3 TheRock/build_tools/github_actions/build_configure.py
 
@@ -145,10 +155,11 @@ jobs:
             --pr-title "${{ github.event.pull_request.title }}"
 
   therock-test-linux:
-    name: Test (${{ inputs.amdgpu_families }})
+    name: Test (${{ inputs.amdgpu_families }}${{ inputs.build_variant_label != 'release' && format(' | {0}', inputs.build_variant_label) || '' }})
     needs: [therock-build-linux]
     # TODO(TheRock#3288): Re-enable gfx950-dcgpu runners once we get more capacity
-    if: ${{ inputs.amdgpu_families != 'gfx950-dcgpu'}}
+    # Skip tests if expect_failure is true (sanitizer builds may have known failures)
+    if: ${{ inputs.amdgpu_families != 'gfx950-dcgpu' && inputs.expect_failure != 'true' }}
     uses: ./.github/workflows/therock-test-packages.yml
     with:
       projects_to_test: ${{ inputs.projects_to_test }}

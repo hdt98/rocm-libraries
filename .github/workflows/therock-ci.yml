@@ -5,11 +5,11 @@ on:
     branches:
       - develop
       - release/therock-*
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
+  #pull_request:
+  #  types:
+  #    - opened
+  #    - synchronize
+  #    - reopened
   workflow_dispatch:
     inputs:
       projects:
@@ -84,6 +84,7 @@ jobs:
         env:
           PROJECTS: ${{ inputs.projects }}
           PLATFORM: "linux"
+          BUILD_VARIANT: "release"
         run: |
           python .github/scripts/therock_configure_ci.py
 
@@ -92,6 +93,7 @@ jobs:
         env:
           PROJECTS: ${{ inputs.projects }}
           PLATFORM: "windows"
+          BUILD_VARIANT: "release"
         run: |
           python .github/scripts/therock_configure_ci.py
 
