@@ -43,8 +43,7 @@ struct AnyRamDb
     using TRecord = std::vector<std::any>;
 
 public:
-    AnyRamDb(const fs::path& filename_)
-        : filename(filename_), lock_file(LockFilePath(filename_)){};
+    AnyRamDb(const fs::path& filename_) : filename(filename_), lock_file(LockFilePath(filename_)){};
 
     AnyRamDb(const AnyRamDb&)            = delete;
     AnyRamDb(AnyRamDb&&)                 = delete;

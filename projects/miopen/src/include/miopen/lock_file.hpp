@@ -49,7 +49,12 @@ namespace miopen {
 class FSLockFile
 {
 public:
-    enum class LockType { None, Exclusive, Shared };
+    enum class LockType
+    {
+        None,
+        Exclusive,
+        Shared
+    };
 
     FSLockFile() : lock_held(false), lock_type(LockType::None) {}
     FSLockFile(const fs::path& path_) : lock_held(false), lock_type(LockType::None)
@@ -57,21 +62,20 @@ public:
         lockfile_path = path_.string() + ".fslock";
 
         auto process_id = generate_process_identifier();
-        unique_handle = lockfile_path.string() + "." + process_id;
+        unique_handle   = lockfile_path.string() + "." + process_id;
 
         // Make reader_file unique per object instance using object address
         std::ostringstream oss;
-        oss << lockfile_path.string() << "/" << process_id << "."
-            << std::this_thread::get_id() << "."
-            << static_cast<const void*>(this) << ".reader";
+        oss << lockfile_path.string() << "/" << process_id << "." << std::this_thread::get_id()
+            << "." << static_cast<const void*>(this) << ".reader";
         reader_file = oss.str();
     }
 
     // Prevent copying and moving (atomic<bool> is not movable)
-    FSLockFile(const FSLockFile&) = delete;
+    FSLockFile(const FSLockFile&)            = delete;
     FSLockFile& operator=(const FSLockFile&) = delete;
-    FSLockFile(FSLockFile&&) = delete;
-    FSLockFile& operator=(FSLockFile&&) = delete;
+    FSLockFile(FSLockFile&&)                 = delete;
+    FSLockFile& operator=(FSLockFile&&)      = delete;
 
     bool timed_lock(const std::chrono::time_point<std::chrono::steady_clock>& abs_time)
     {
@@ -83,7 +87,7 @@ public:
     bool try_lock_for(TDuration duration)
     {
         auto abs_time = std::chrono::steady_clock::now() +
-                       std::chrono::duration_cast<std::chrono::milliseconds>(duration);
+                        std::chrono::duration_cast<std::chrono::milliseconds>(duration);
         return timed_lock(abs_time);
     }
 
@@ -124,8 +128,8 @@ public:
 
         if(now < last_write_time)
         {
-            MIOPEN_LOG_I2("Clocks desyncronized, Lock write time is later than present < " << lockfile_path.string()
-                                                   << ", Age(ms): " << age.count());
+            MIOPEN_LOG_I2("Clocks desyncronized, Lock write time is later than present < "
+                          << lockfile_path.string() << ", Age(ms): " << age.count());
             if(last_write_seen != last_write_time)
             {
                 last_write_seen = last_write_time;
@@ -293,7 +297,7 @@ public:
     bool try_lock_shared_for(TDuration duration)
     {
         auto abs_time = std::chrono::steady_clock::now() +
-                       std::chrono::duration_cast<std::chrono::milliseconds>(duration);
+                        std::chrono::duration_cast<std::chrono::milliseconds>(duration);
         return timed_lock_shared(abs_time);
     }
 
@@ -327,9 +331,9 @@ public:
 
 private:
     // Configuration constants
-    static constexpr auto STALE_TIMEOUT = std::chrono::milliseconds(20);
+    static constexpr auto STALE_TIMEOUT     = std::chrono::milliseconds(20);
     static constexpr auto REFRESH_FREQUENCY = std::chrono::milliseconds(4);
-    static constexpr auto POLL_INTERVAL = std::chrono::microseconds(100);
+    static constexpr auto POLL_INTERVAL     = std::chrono::microseconds(100);
 
     // Helper: Generate unique process identifier
     std::string generate_process_identifier() const
@@ -338,7 +342,7 @@ private:
     }
 
     // Helper: Unified blocking lock implementation
-    template<typename TryLockFunc>
+    template <typename TryLockFunc>
     void blocking_lock_impl(TryLockFunc try_lock_fn, const std::string& lock_name)
     {
         bool acquired = false;
@@ -354,18 +358,18 @@ private:
     }
 
     // Helper: Unified timed lock implementation
-    template<typename TryLockFunc>
+    template <typename TryLockFunc>
     bool timed_lock_impl(TryLockFunc try_lock_fn,
                          const std::chrono::time_point<std::chrono::steady_clock>& abs_time,
                          const std::string& lock_name)
     {
-        auto now = std::chrono::steady_clock::now();
+        auto now      = std::chrono::steady_clock::now();
         bool acquired = false;
         MIOPEN_LOG_I2("Attempting " << lock_name << " < " << lockfile_path.string());
 
         while(!acquired && now < abs_time)
         {
-            now = std::chrono::steady_clock::now();
+            now      = std::chrono::steady_clock::now();
             acquired = try_lock_fn();
 
             if(!acquired && now < abs_time)
@@ -381,7 +385,7 @@ private:
     {
         MIOPEN_LOG_I2(log_name << " Refresh Active < " << file_to_refresh.string());
         auto last_refresh = fs::file_time_type::clock::now();
-        auto age = REFRESH_FREQUENCY;
+        auto age          = REFRESH_FREQUENCY;
 
         std::unique_lock<std::mutex> lock(refresh_mutex);
         while(lock_held.load(std::memory_order_acquire))
@@ -393,20 +397,21 @@ private:
                 if(ec.value() != 0)
                 {
                     MIOPEN_LOG_I2("File <" << file_to_refresh << "> "
-                                  << " time update failed. Terminating refresh. "
-                                  << "Error code: " << ec.value() << ". "
-                                  << "Description: '" << ec.message() << "'");
+                                           << " time update failed. Terminating refresh. "
+                                           << "Error code: " << ec.value() << ". "
+                                           << "Description: '" << ec.message() << "'");
                     lock_held.store(false, std::memory_order_release);
                     return;
                 }
                 last_refresh = fs::file_time_type::clock::now();
             }
 
-            refresh_cv.wait_for(lock, REFRESH_FREQUENCY,
-                [this]() { return !lock_held.load(std::memory_order_acquire); });
+            refresh_cv.wait_for(lock, REFRESH_FREQUENCY, [this]() {
+                return !lock_held.load(std::memory_order_acquire);
+            });
 
             auto now = fs::file_time_type::clock::now();
-            age = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_refresh);
+            age      = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_refresh);
         }
         MIOPEN_LOG_I2(log_name << " Refresh Exit < " << file_to_refresh.string());
     }
@@ -431,7 +436,7 @@ private:
     }
 
     // Helper: Iterate over reader files
-    template<typename ReaderAction>
+    template <typename ReaderAction>
     void iterate_readers(ReaderAction action)
     {
         std::error_code ec;
@@ -455,15 +460,9 @@ private:
         }
     }
 
-    void refresh_lock()
-    {
-        refresh_file(unique_handle, "Lock");
-    }
+    void refresh_lock() { refresh_file(unique_handle, "Lock"); }
 
-    void refresh_lock_shared()
-    {
-        refresh_file(reader_file, "Shared Lock");
-    }
+    void refresh_lock_shared() { refresh_file(reader_file, "Shared Lock"); }
 
     bool has_active_readers()
     {
@@ -483,7 +482,7 @@ private:
             if(age > STALE_TIMEOUT)
             {
                 MIOPEN_LOG_I2("Removing stale reader < " << reader_path.string()
-                              << ", Age(ms): " << age.count());
+                                                         << ", Age(ms): " << age.count());
                 std::error_code ec;
                 fs::remove(reader_path, ec);
             }

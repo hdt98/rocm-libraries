@@ -213,7 +213,7 @@ TEST(CPU_UnitTestLockFile_NONE, UniqueHandleDeletedDuringLock)
 {
     auto lockpath = miopen::LockFilePath(
         miopen::fs::path{"/tmp/config/miopen/test_deleted." + std::to_string(getpid())});
-    auto lockfile = miopen::FSLockFile(lockpath);
+    auto lockfile      = miopen::FSLockFile(lockpath);
     auto unique_handle = lockfile.get_unique_handle();
 
     EXPECT_TRUE(lockfile.try_lock());
@@ -269,7 +269,7 @@ TEST(CPU_UnitTestLockFile_NONE, DesynchronizedClocks)
 {
     auto lockpath = miopen::LockFilePath(
         miopen::fs::path{"/tmp/config/miopen/test_desync." + std::to_string(getpid())});
-    auto lockfile = miopen::FSLockFile(lockpath);
+    auto lockfile                 = miopen::FSLockFile(lockpath);
     miopen::fs::path fs_lock_path = lockpath.string() + ".fslock";
 
     // Create a stale lock with future timestamp (simulating clock desync)
@@ -518,8 +518,8 @@ TEST(CPU_UnitTestLockFile_NONE, SharedLockConcurrent)
 
 TEST(CPU_UnitTestLockFile_NONE, SharedExclusiveInterleaved)
 {
-    auto lockpath = miopen::LockFilePath(
-        miopen::fs::path{"/tmp/config/miopen/test_shared_excl_interleaved." + std::to_string(getpid())});
+    auto lockpath = miopen::LockFilePath(miopen::fs::path{
+        "/tmp/config/miopen/test_shared_excl_interleaved." + std::to_string(getpid())});
 
     // Acquire shared, release, acquire exclusive, release, acquire shared again
     miopen::FSLockFile lockfile1(lockpath);
@@ -599,7 +599,8 @@ TEST(CPU_UnitTestLockFile_NONE, RapidSharedToExclusiveTransition)
 
         // Immediately try to acquire exclusive lock
         miopen::FSLockFile excl_lock(lockpath);
-        EXPECT_TRUE(excl_lock.try_lock()) << "Failed to acquire exclusive lock after shared unlock on iteration " << i;
+        EXPECT_TRUE(excl_lock.try_lock())
+            << "Failed to acquire exclusive lock after shared unlock on iteration " << i;
         excl_lock.unlock();
     }
 }
@@ -629,7 +630,8 @@ TEST(CPU_UnitTestLockFile_NONE, MultipleSharedLocksReleaseOrder)
     {
         locks[i]->unlock_shared();
         // Directory should still exist (one lock remaining)
-        EXPECT_TRUE(miopen::fs::exists(fs_lock_path)) << "Directory removed too early after releasing lock " << i;
+        EXPECT_TRUE(miopen::fs::exists(fs_lock_path))
+            << "Directory removed too early after releasing lock " << i;
     }
 
     // Release last lock
@@ -803,7 +805,8 @@ TEST(CPU_UnitTestLockFile_NONE, SharedLockWithExistingReaderFile)
     miopen::FSLockFile lock1(lockpath);
     EXPECT_TRUE(lock1.try_lock_shared());
 
-    // Create second lock with same lockpath (different object, might have overlapping reader file name)
+    // Create second lock with same lockpath (different object, might have overlapping reader file
+    // name)
     miopen::FSLockFile lock2(lockpath);
     EXPECT_TRUE(lock2.try_lock_shared());
 
@@ -906,7 +909,7 @@ TEST(CPU_UnitTestLockFile_NONE, EmptyDirectoryRaceCondition)
 
     std::thread shared_thread([&]() {
         miopen::FSLockFile lock(lockpath);
-        lock.lock_shared();  // Blocking
+        lock.lock_shared(); // Blocking
         shared_started = true;
 
         // Hold lock while exclusive attempts
