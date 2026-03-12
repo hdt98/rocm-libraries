@@ -15,7 +15,7 @@ on:
         type: string
       build_variant_cmake_preset:
         type: string
-        default: "linux-release"
+        default: "linux-release-package"
       build_variant_label:
         type: string
         default: "release"
