@@ -37,7 +37,7 @@ struct GroupedConvFwdIm2winKernelArgs
                                  GroupedConvTraitsType_::VectorSizeA,
                                  GroupedConvTraitsType_::VectorSizeB,
                                  GroupedConvTraitsType_::VectorSizeC,
-                                 /*NumGroupsToMerge=*/1,
+                                 GroupedConvTraitsType_::NumGroupsToMerge,
                                  /*SplitN=*/true>;
     using CDElementwise                       = CDElementwise_;
     static constexpr index_t NumDTensor       = GroupedConvTraitsType_::NumDTensor;
@@ -125,9 +125,8 @@ struct GroupedConvFwdIm2winKernelArgs
         GemmM     = a_grid_desc_m_k.get_length(number<0>{});
         GemmN     = b_grid_desc_n_k.get_length(number<0>{});
         GemmK     = a_grid_desc_m_k.get_length(number<1>{});
-        // With group merging, each kernel block processes NumGroupsToMerge
-        // groups sequentially, so the GEMM batch count is G / NumGroupsToMerge.
-        GemmBatch = transformer_.GetGemmBatch() / NumGroupsToMerge;
+        // Transformer already accounts for NumGroupsToMerge in GetGemmBatch().
+        GemmBatch = transformer_.GetGemmBatch();
 
         // Split-N support: each group's input/output strides across N.
         n_per_split = transformer_.GetN();
@@ -148,24 +147,27 @@ struct GroupedConvFwdIm2winKernelArgs
         //   group_stride_b = C          (stride(G) in NHWGC: G is adjacent to C)
         //
         // Note: K*C*Y*X == K*Y*X*C, so group_stride_a is the same for both.
-        group_stride_a = transformer_.GetGroupStrideA(); // K*C*Y*X, same for both layouts
+        // group_stride_* is the offset to advance the pointer by ONE MERGED BATCH,
+        // i.e., by NumGroupsToMerge groups.  Each single-group stride is multiplied
+        // by NumGroupsToMerge to get the merged-batch stride.
+        group_stride_a = transformer_.GetGroupStrideA() * NumGroupsToMerge; // K*C*Y*X * Gm
 
         if constexpr(std::is_same_v<InLay, tensor_layout::convolution::NHWGC>)
         {
-            // NHWGC = [N, Hi, Wi, G, C]: stride(G) = C (G is adjacent to C).
-            group_stride_b = static_cast<long_index_t>(transformer_.C_);
+            // NHWGC: stride(G) = C. For Gm groups: advance by Gm * C.
+            group_stride_b = static_cast<long_index_t>(transformer_.C_) * NumGroupsToMerge;
         }
         else
         {
-            // GNCHW = [G, N, C, Hi, Wi]: one group occupies N*C*Hi*Wi elements.
-            group_stride_b = transformer_.GetGroupStrideB();
+            // GNCHW: one group = N*C*Hi*Wi. For Gm groups: advance by Gm * N*C*Hi*Wi.
+            group_stride_b = transformer_.GetGroupStrideB() * NumGroupsToMerge;
         }
 
         // ── Output group and N-batch strides (OutLayout-dependent) ───────
         if constexpr(std::is_same_v<OutLay, tensor_layout::convolution::NHWGK>)
         {
-            // NHWGK = [N, Ho, Wo, G, K]:  stride(G) = K,  stride(N) = Ho*Wo*G*K.
-            group_stride_c      = static_cast<long_index_t>(transformer_.K_);
+            // NHWGK: stride(G) = K. For Gm groups: advance by Gm * K.
+            group_stride_c      = static_cast<long_index_t>(transformer_.K_) * NumGroupsToMerge;
             output_batch_stride = static_cast<index_t>(transformer_.Ho_) *
                                   static_cast<index_t>(transformer_.Wo_) *
                                   static_cast<index_t>(transformer_.G_) *
@@ -173,8 +175,8 @@ struct GroupedConvFwdIm2winKernelArgs
         }
         else
         {
-            // GNKHW = [G, N, K, Ho, Wo]: stride(G) = N*K*Ho*Wo, stride(N) = K*Ho*Wo.
-            group_stride_c      = transformer_.GetGroupStrideC();
+            // GNKHW: one group = N*K*Ho*Wo. For Gm groups: advance by Gm * N*K*Ho*Wo.
+            group_stride_c      = transformer_.GetGroupStrideC() * NumGroupsToMerge;
             output_batch_stride = static_cast<index_t>(transformer_.K_) *
                                   static_cast<index_t>(transformer_.Ho_) *
                                   static_cast<index_t>(transformer_.Wo_);
@@ -530,54 +532,96 @@ struct GroupedConvolutionForwardIm2winKernel
         const index_t num_loop =
             amd_wave_read_first_lane(TilePartitioner::GetLoopNum(kargs.GemmK));
 
-        // ── Group-merging loop ────────────────────────────────────────
-        // Each iteration processes one group within the merged batch.
-        // The M-tile spatial index (block_idx_m) is shared; only the A/B/C
-        // pointers advance by one group stride per iteration.
+        // ── GEMM execution ────────────────────────────────────────────
         //
-        // A __syncthreads() between iterations ensures that LDS used by the
-        // previous GemmPipeline call is not overwritten before the epilogue
-        // has finished writing the result to global memory.
-        static_for<0, KernelArgs::NumGroupsToMerge, 1>{}([&](auto g_local_num) {
-            constexpr index_t g_local = g_local_num.value;
+        // Two paths depending on whether true group merging is active:
+        //
+        // (A) Channels-last NHWGC/GKYXC + NumGroupsToMerge > 1:
+        //     One GEMM call with merged descriptors. The XOR-diagonal trick
+        //     in the C descriptor ensures only g_M == g_N output pairs write.
+        //     A[M=Gm*K, K_gemm], B[N=Gm*N*Ho*Wo, K_gemm], C[Gm*K, Gm*N*Ho*Wo].
+        //     Pointers advance by ONE MERGED BATCH stride (= Gm * per-group stride).
+        //
+        // (B) NumGroupsToMerge == 1 or channels-first GNCHW/GKCYX:
+        //     Sequential loop over NumGroupsToMerge sub-groups, each running
+        //     its own GemmPipeline call. Used for Gm=1 and as a fallback.
 
-            // Per-group pointer offsets.
-            // True im2win: A = weight (no N split), B = input (N split applied).
+        constexpr bool channels_last_merge =
+            std::is_same_v<InLayout, tensor_layout::convolution::NHWGC> &&
+            std::is_same_v<WeiLayout, tensor_layout::convolution::GKYXC> &&
+            (KernelArgs::NumGroupsToMerge > 1);
+
+        if constexpr(channels_last_merge)
+        {
+            // Path A: single GEMM with merged A, B, C descriptors.
+            // merged_batch_idx already selects the right Gm-group block via
+            // group_stride_* which equal Gm × single-group-stride.
             const auto* a_ptr =
                 reinterpret_cast<const WeiDataType*>(kargs.wei_ptr) +
-                static_cast<long_index_t>(g_base + g_local) * kargs.group_stride_a;
-            // Weight has no batch (N) dimension → no split_n offset.
+                static_cast<long_index_t>(merged_batch_idx) * kargs.group_stride_a;
 
             const auto* b_ptr =
                 reinterpret_cast<const InDataType*>(kargs.in_ptr) +
-                static_cast<long_index_t>(g_base + g_local) * kargs.group_stride_b +
+                static_cast<long_index_t>(merged_batch_idx) * kargs.group_stride_b +
                 split_n_offset_b;
 
             auto* c_ptr =
                 reinterpret_cast<OutDataType*>(kargs.out_ptr) +
-                static_cast<long_index_t>(g_base + g_local) * kargs.group_stride_c +
+                static_cast<long_index_t>(merged_batch_idx) * kargs.group_stride_c +
                 split_n_offset_c;
 
-            // Build tile windows for this sub-group.
             auto a_block_window = MakeABlockWindow(a_ptr, kargs.a_grid_desc_m_k, block_idx_m);
             auto b_block_window = MakeBBlockWindow(b_ptr, kargs.b_grid_desc_n_k, block_idx_n);
 
-            // Run the GEMM pipeline for this sub-group.
             auto c_block_tile = GemmPipeline{}.template operator()(
                 a_block_window, b_block_window, num_loop, smem);
 
-            // Write the accumulated C tile to this sub-group's output.
             auto c_block_window =
                 MakeCBlockWindow(c_ptr, kargs.c_grid_desc_m_n, block_idx_m, block_idx_n);
             auto ds_block_windows = generate_tuple([&](auto) { return c_block_window; },
                                                    number<NumDTensor>{});
             EpiloguePipeline{kargs.elfunc}.template operator()(
                 c_block_window, c_block_tile, ds_block_windows, smem);
+        }
+        else
+        {
+            // Path B: sequential sub-group loop (Gm=1 or channels-first fallback).
+            // For Gm=1 this is a single iteration with no overhead.
+            static_for<0, KernelArgs::NumGroupsToMerge, 1>{}([&](auto g_local_num) {
+                constexpr index_t g_local = g_local_num.value;
 
-            // Synchronise threads so that the next iteration can safely reuse LDS.
-            if constexpr(g_local + 1 < KernelArgs::NumGroupsToMerge)
-                __syncthreads();
-        });
+                const auto* a_ptr =
+                    reinterpret_cast<const WeiDataType*>(kargs.wei_ptr) +
+                    static_cast<long_index_t>(g_base + g_local) * kargs.group_stride_a /
+                        KernelArgs::NumGroupsToMerge;
+                const auto* b_ptr =
+                    reinterpret_cast<const InDataType*>(kargs.in_ptr) +
+                    static_cast<long_index_t>(g_base + g_local) * kargs.group_stride_b /
+                        KernelArgs::NumGroupsToMerge +
+                    split_n_offset_b;
+                auto* c_ptr =
+                    reinterpret_cast<OutDataType*>(kargs.out_ptr) +
+                    static_cast<long_index_t>(g_base + g_local) * kargs.group_stride_c /
+                        KernelArgs::NumGroupsToMerge +
+                    split_n_offset_c;
+
+                auto a_block_window =
+                    MakeABlockWindow(a_ptr, kargs.a_grid_desc_m_k, block_idx_m);
+                auto b_block_window =
+                    MakeBBlockWindow(b_ptr, kargs.b_grid_desc_n_k, block_idx_n);
+                auto c_block_tile = GemmPipeline{}.template operator()(
+                    a_block_window, b_block_window, num_loop, smem);
+                auto c_block_window =
+                    MakeCBlockWindow(c_ptr, kargs.c_grid_desc_m_n, block_idx_m, block_idx_n);
+                auto ds_block_windows = generate_tuple([&](auto) { return c_block_window; },
+                                                       number<NumDTensor>{});
+                EpiloguePipeline{kargs.elfunc}.template operator()(
+                    c_block_window, c_block_tile, ds_block_windows, smem);
+
+                if constexpr(g_local + 1 < KernelArgs::NumGroupsToMerge)
+                    __syncthreads();
+            });
+        }
     }
 };
 

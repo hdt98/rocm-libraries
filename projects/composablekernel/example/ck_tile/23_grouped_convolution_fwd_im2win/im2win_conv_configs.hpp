@@ -598,6 +598,131 @@ struct Im2winConfig_CV3_M64N16K64_Gm32 : public Im2winConvConfigBase
 };
 
 // ══════════════════════════════════════════════════════════════════════
+// Group-merging configs  (NHWGC/GKYXC layout, NumGroupsToMerge > 1)
+//
+// With Gm groups merged:
+//   M = Gm * K   (fills the M tile for small K — zero M-tile waste!)
+//   N = Gm * N * Ho * Wo  (spatial × Gm, XOR diagonal ensures correctness)
+//   GemmBatch = G / Gm     (fewer kernel dispatches)
+//
+// Target: G=32, K=4 → Gm=32 gives M=128 (exactly one M_Tile=128 block).
+// All MEMORY pipeline (ComputeV3 cannot handle small M_Tile < 16).
+// ══════════════════════════════════════════════════════════════════════
+
+// ── Config Mg2: Gm=2, M=8 (K=4), MEMORY pipeline
+template <typename PrecType>
+struct Im2winConfig_Merge_Gm2_M8N128K64 : public Im2winConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 8;
+    static constexpr ck_tile::index_t N_Tile = 128;
+    static constexpr ck_tile::index_t K_Tile = 128 / sizeof(PrecType);
+
+    static constexpr ck_tile::index_t M_Warp = 2;
+    static constexpr ck_tile::index_t N_Warp = 2;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 4;
+    static constexpr ck_tile::index_t N_Warp_Tile = 64;
+    static constexpr ck_tile::index_t K_Warp_Tile = 16;
+
+    static constexpr ck_tile::GemmPipeline         Pipeline  = ck_tile::GemmPipeline::MEMORY;
+    static constexpr ck_tile::GemmPipelineScheduler Scheduler =
+        ck_tile::GemmPipelineScheduler::Intrawave;
+    static constexpr ck_tile::index_t NumGroupsToMerge = 2;
+};
+
+// ── Config Mg4: Gm=4, M=16 (K=4), MEMORY pipeline
+// Uses 16×16×32 MFMA (valid), 1 M-warp, 4 N-warps → N_Tile=64, 256 threads.
+template <typename PrecType>
+struct Im2winConfig_Merge_Gm4_M16N64K64 : public Im2winConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 16;
+    static constexpr ck_tile::index_t N_Tile = 64;
+    static constexpr ck_tile::index_t K_Tile = 128 / sizeof(PrecType);
+
+    static constexpr ck_tile::index_t M_Warp = 1;
+    static constexpr ck_tile::index_t N_Warp = 4;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 16; // 16×16×32 MFMA (valid)
+    static constexpr ck_tile::index_t N_Warp_Tile = 16;
+    static constexpr ck_tile::index_t K_Warp_Tile = 32;
+
+    static constexpr ck_tile::GemmPipeline         Pipeline  = ck_tile::GemmPipeline::MEMORY;
+    static constexpr ck_tile::GemmPipelineScheduler Scheduler =
+        ck_tile::GemmPipelineScheduler::Intrawave;
+    static constexpr ck_tile::index_t NumGroupsToMerge = 4;
+};
+
+// ── Config Mg8: Gm=8, M=32 (K=4), MEMORY pipeline
+template <typename PrecType>
+struct Im2winConfig_Merge_Gm8_M32N128K64 : public Im2winConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 32;
+    static constexpr ck_tile::index_t N_Tile = 128;
+    static constexpr ck_tile::index_t K_Tile = 128 / sizeof(PrecType);
+
+    static constexpr ck_tile::index_t M_Warp = 1;
+    static constexpr ck_tile::index_t N_Warp = 4;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 32;
+    static constexpr ck_tile::index_t N_Warp_Tile = 32;
+    static constexpr ck_tile::index_t K_Warp_Tile = 16;
+
+    static constexpr ck_tile::GemmPipeline         Pipeline  = ck_tile::GemmPipeline::MEMORY;
+    static constexpr ck_tile::GemmPipelineScheduler Scheduler =
+        ck_tile::GemmPipelineScheduler::Intrawave;
+    static constexpr ck_tile::index_t NumGroupsToMerge = 8;
+};
+
+// ── Config Mg32: Gm=32, M=128 (K=4), MEMORY pipeline — PRIMARY TARGET
+// With K=4 and G=32: M=128 fills M_Tile=128 perfectly (zero M waste).
+// GemmBatch = 1 — entire convolution in a single pass.
+template <typename PrecType>
+struct Im2winConfig_Merge_Gm32_M128N32K64 : public Im2winConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 128;
+    static constexpr ck_tile::index_t N_Tile = 32;
+    static constexpr ck_tile::index_t K_Tile = 128 / sizeof(PrecType);
+
+    static constexpr ck_tile::index_t M_Warp = 4;
+    static constexpr ck_tile::index_t N_Warp = 1;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 32;
+    static constexpr ck_tile::index_t N_Warp_Tile = 32;
+    static constexpr ck_tile::index_t K_Warp_Tile = 16;
+
+    static constexpr ck_tile::GemmPipeline         Pipeline  = ck_tile::GemmPipeline::MEMORY;
+    static constexpr ck_tile::GemmPipelineScheduler Scheduler =
+        ck_tile::GemmPipelineScheduler::Intrawave;
+    static constexpr ck_tile::index_t NumGroupsToMerge = 32;
+};
+
+// Variant: larger N tile for Gm=32
+template <typename PrecType>
+struct Im2winConfig_Merge_Gm32_M128N64K64 : public Im2winConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 128;
+    static constexpr ck_tile::index_t N_Tile = 64;
+    static constexpr ck_tile::index_t K_Tile = 128 / sizeof(PrecType);
+
+    static constexpr ck_tile::index_t M_Warp = 2;
+    static constexpr ck_tile::index_t N_Warp = 2;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 32;
+    static constexpr ck_tile::index_t N_Warp_Tile = 32;
+    static constexpr ck_tile::index_t K_Warp_Tile = 16;
+
+    static constexpr ck_tile::GemmPipeline         Pipeline  = ck_tile::GemmPipeline::MEMORY;
+    static constexpr ck_tile::GemmPipelineScheduler Scheduler =
+        ck_tile::GemmPipelineScheduler::Intrawave;
+    static constexpr ck_tile::index_t NumGroupsToMerge = 32;
+};
+
+// ══════════════════════════════════════════════════════════════════════
 // Config registry and compile-time selection
 //
 // The CMakeLists builds one binary per config by passing
@@ -660,6 +785,17 @@ template <typename P> using ActiveIm2winConfig = Im2winConfig_CV3_M128N16K64_Gm8
 template <typename P> using ActiveIm2winConfig = Im2winConfig_CV3_M128N16K64_Gm32<P>;
 #elif IM2WIN_CONFIG_ID == 17
 template <typename P> using ActiveIm2winConfig = Im2winConfig_CV3_M64N16K64_Gm32<P>;
+// True group merging configs (NHWGC/GKYXC + XOR diagonal C descriptor)
+#elif IM2WIN_CONFIG_ID == 18
+template <typename P> using ActiveIm2winConfig = Im2winConfig_Merge_Gm2_M8N128K64<P>;
+#elif IM2WIN_CONFIG_ID == 19
+template <typename P> using ActiveIm2winConfig = Im2winConfig_Merge_Gm4_M16N64K64<P>;
+#elif IM2WIN_CONFIG_ID == 20
+template <typename P> using ActiveIm2winConfig = Im2winConfig_Merge_Gm8_M32N128K64<P>;
+#elif IM2WIN_CONFIG_ID == 21
+template <typename P> using ActiveIm2winConfig = Im2winConfig_Merge_Gm32_M128N32K64<P>;
+#elif IM2WIN_CONFIG_ID == 22
+template <typename P> using ActiveIm2winConfig = Im2winConfig_Merge_Gm32_M128N64K64<P>;
 #else
 #error "Unknown IM2WIN_CONFIG_ID"
 #endif

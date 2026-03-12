@@ -402,13 +402,18 @@ int run_grouped_conv_fwd_im2win_example_prec_type(
 
     if(in_layout == "GNCHW" && wei_layout == "GKCYX" && out_layout == "NHWGK")
     {
-        return run_grouped_conv_fwd_im2win_example_with_layouts<ck_tile::number<2>{},
-                                                                 ConvConfig,
-                                                                 Invoker,
-                                                                 InPrecType,
-                                                                 WeiPrecType,
-                                                                 OutPrecType>(
-            argc, argv, GNCHW{}, GKCYX{}, NHWGK{});
+        if constexpr(ConvConfig::NumGroupsToMerge > 1)
+            throw std::runtime_error(
+                "NumGroupsToMerge > 1 requires channels-last NHWGC/GKYXC layout.\n"
+                "Pass -in_layout=NHWGC -wei_layout=GKYXC -out_layout=NHWGK\n");
+        else
+            return run_grouped_conv_fwd_im2win_example_with_layouts<ck_tile::number<2>{},
+                                                                     ConvConfig,
+                                                                     Invoker,
+                                                                     InPrecType,
+                                                                     WeiPrecType,
+                                                                     OutPrecType>(
+                argc, argv, GNCHW{}, GKCYX{}, NHWGK{});
     }
     else if(in_layout == "NHWGC" && wei_layout == "GKYXC" && out_layout == "NHWGK")
     {

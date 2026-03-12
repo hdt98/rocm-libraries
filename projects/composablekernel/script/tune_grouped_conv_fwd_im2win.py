@@ -80,12 +80,18 @@ ALL_CONFIGS: list[str] = [
     "CV3_M64N16K64_Occ2",
     "Mem_M128N4K64",
     "Mem_M256N4K64",
-    # Group-merging configs (sequential Gm sub-GEMMs per block)
+    # Old sequential group-merging (GNCHW, loop per group)
     "CV3_M128N16K64_Gm2",
     "CV3_M128N16K64_Gm4",
     "CV3_M128N16K64_Gm8",
     "CV3_M128N16K64_Gm32",
     "CV3_M64N16K64_Gm32",
+    # True group merging (NHWGC/GKYXC + XOR diagonal C descriptor)
+    "Merge_Gm2_M8N128K64",
+    "Merge_Gm4_M16N64K64",
+    "Merge_Gm8_M32N128K64",
+    "Merge_Gm32_M128N32K64",
+    "Merge_Gm32_M128N64K64",
 ]
 
 BINARY_PREFIX = "tile_example_grouped_conv_fwd_im2win_"
