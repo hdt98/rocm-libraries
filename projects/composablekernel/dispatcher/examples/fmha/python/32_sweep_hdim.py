@@ -29,7 +29,6 @@ from fmha_utils import (
     FmhaKernelConfig,
     FmhaProblem,
     FmhaValidator,
-    cleanup_fmha,
     cpu_attention_fwd,
     detect_gpu_arch,
     setup_fmha_dispatcher,
@@ -149,9 +148,6 @@ def main():
             f"  {hdim:>6} | {res.time_ms:>10.4f} | {res.tflops:>10.2f} | {max_err:>10.2e} | {tag:<10}"
         )
         results.append((hdim, ok, res.time_ms, res.tflops, max_err))
-
-    if runner is not None:
-        cleanup_fmha()
 
     # Step 4: hdim analysis
     print("\nStep 4: Head Dimension Analysis")

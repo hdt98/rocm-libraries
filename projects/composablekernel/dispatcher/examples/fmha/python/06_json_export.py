@@ -25,8 +25,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "python"))
 from fmha_utils import (
     FmhaKernelConfig,
     setup_fmha_dispatcher,
-    cleanup_fmha,
-    reset_for_example,
     detect_gpu_arch,
 )
 
@@ -49,8 +47,6 @@ Examples:
     )
     parser.add_argument("--arch", default=detect_gpu_arch())
     args = parser.parse_args()
-
-    reset_for_example()
 
     print("=" * 70)
     print("Example 06: JSON Export")
@@ -212,8 +208,6 @@ Examples:
     if len(json_str) > 500:
         preview += "\n  ..."
     print(preview)
-
-    cleanup_fmha()
 
     print("\n" + "=" * 70)
     print("JSON Export complete!")

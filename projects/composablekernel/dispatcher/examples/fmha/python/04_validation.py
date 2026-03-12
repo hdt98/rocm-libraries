@@ -27,7 +27,6 @@ from fmha_utils import (
     FmhaKernelSpec,
     FmhaProblem,
     FmhaValidator,
-    cleanup_fmha,
     cpu_attention_fwd,
     detect_gpu_arch,
     setup_fmha_dispatcher,
@@ -160,7 +159,6 @@ Examples:
             )
             failed += 1
 
-    cleanup_fmha()
     runner.cleanup()
 
     # Summary

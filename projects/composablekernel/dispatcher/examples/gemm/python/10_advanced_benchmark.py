@@ -32,7 +32,6 @@ from ctypes_utils import (
     KernelConfig,
     setup_gemm_dispatcher,
     cleanup_gemm,
-    reset_for_example,
     detect_gpu_arch,
 )
 
@@ -94,8 +93,6 @@ def initialize_matrix(shape, method, dtype):
 
 def main():
     args = parse_args()
-
-    reset_for_example()
 
     print("=" * 70)
     print("Example 10: Advanced GEMM Benchmarking")

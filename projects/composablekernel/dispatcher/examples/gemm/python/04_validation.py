@@ -25,6 +25,8 @@ from ctypes_utils import (
     KernelConfig,
     Validator,
     Registry,
+    setup_gemm_dispatcher,
+    cleanup_gemm,
     detect_gpu_arch,
 )
 

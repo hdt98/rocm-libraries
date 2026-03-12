@@ -37,7 +37,6 @@ from fmha_utils import (
     cpu_attention_fwd,
     detect_gpu_arch,
     setup_fmha_dispatcher,
-    cleanup_fmha,
 )
 
 
@@ -192,9 +191,6 @@ def main():
             f"  {i:<3} {name:<14} {bias_range:>20} {gpu_status:<12} {err_str:>10} {tag:>8}"
         )
         results.append((name, ok))
-
-    if runner is not None:
-        cleanup_fmha()
 
     # --- Show ALiBi details ---
     print("\n--- ALiBi Details ---")

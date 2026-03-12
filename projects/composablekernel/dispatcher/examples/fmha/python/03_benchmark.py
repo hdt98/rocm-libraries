@@ -26,7 +26,6 @@ import numpy as np
 from fmha_utils import (
     FmhaKernelSpec,
     FmhaProblem,
-    cleanup_fmha,
     detect_gpu_arch,
     setup_fmha_dispatcher,
     spec_to_config,
@@ -151,7 +150,6 @@ Examples:
                 f"  {batch:>5} {seqlen:>7} | {'---':>10} {'---':>10} {'---':>10} | {'FAIL':>10}"
             )
 
-    cleanup_fmha()
     runner.cleanup()
 
     # Summary

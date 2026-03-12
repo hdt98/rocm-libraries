@@ -30,7 +30,6 @@ from fmha_utils import (
     FmhaKernelConfig,
     FmhaProblem,
     FmhaValidator,
-    cleanup_fmha,
     cpu_attention_fwd,
     detect_gpu_arch,
     setup_fmha_dispatcher,
@@ -201,7 +200,6 @@ def main():
             gpu_time = result.time_ms
         else:
             print(f"  GPU error: {result.error}")
-        cleanup_fmha()
 
     # Step 5: Performance projection table
     print("\nStep 5: Performance Summary Table")

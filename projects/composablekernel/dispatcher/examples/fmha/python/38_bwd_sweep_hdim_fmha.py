@@ -39,7 +39,6 @@ from fmha_utils import (
     FmhaKernelConfig,
     FmhaProblem,
     setup_fmha_dispatcher,
-    cleanup_fmha,
     detect_gpu_arch,
 )
 
@@ -245,9 +244,6 @@ def main():
         print(f"      tile_k0max={hdim}, tile_n1={hdim},")
         print(f"      tile_k0={min(32, hdim)}, tile_k1={min(32, hdim)},")
         print("    )")
-
-    if setup.success:
-        cleanup_fmha()
 
     # --- Summary ---
     print("\n" + "=" * 70)

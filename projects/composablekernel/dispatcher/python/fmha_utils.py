@@ -21,7 +21,7 @@ import json
 import os
 import subprocess
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -171,6 +171,7 @@ class FmhaKernelConfig:
     logits: bool = False
     paged_kv: bool = False
     sink: bool = False
+    skip_min_seqlen_q: bool = False
 
     @property
     def tile(self) -> Tuple[int, ...]:
@@ -217,6 +218,10 @@ class FmhaKernelConfig:
 
     @property
     def name(self) -> str:
+        s = int(self.pad_s)
+        k = int(self.pad_sk)
+        d = int(self.pad_d)
+        v = int(self.pad_dv)
         parts = [
             f"fmha_{self.family}_{self.data_type}",
             self.mode,
@@ -225,19 +230,22 @@ class FmhaKernelConfig:
             else f"h{self.hdim_q}",
             self.pipeline,
             f"{self.tile_m0}x{self.tile_n0}x{self.tile_k0}",
+            f"pad{s}{k}{d}{v}",
+            f"mask={self.mask}",
+            f"bias={self.bias}",
         ]
-        if self.mask != "no":
-            parts.append(f"m{self.mask}")
-        if self.bias != "no":
-            parts.append(f"b{self.bias}")
         if self.lse:
-            parts.append("lse")
+            parts.append("lse=1")
         if self.dropout:
-            parts.append("drop")
+            parts.append("drop=1")
         if self.logits:
-            parts.append("logits")
+            parts.append("logits=1")
         if self.sink:
-            parts.append("sink")
+            parts.append("sink=1")
+        if self.skip_min_seqlen_q:
+            parts.append("skip=1")
+        if self.qscale != "no":
+            parts.append(f"qs={self.qscale}")
         return "_".join(parts)
 
     def to_codegen_json(self) -> str:
@@ -260,7 +268,7 @@ class FmhaKernelConfig:
                     "logits": self.logits,
                     "paged_kv": self.paged_kv,
                     "fp8_static_quant": False,
-                    "skip_min_seqlen_q": False,
+                    "skip_min_seqlen_q": self.skip_min_seqlen_q,
                     "sink": self.sink,
                     "dbias": False,
                     "store_randval": False,
@@ -384,6 +392,7 @@ class FmhaDispatcherLib:
             ctypes.c_int,  # hdim_q
             ctypes.c_int,  # hdim_v
             ctypes.c_float,  # scale
+            ctypes.c_char_p,  # data_type_str
             ctypes.POINTER(ctypes.c_float),  # time_ms_out
         ]
         lib.fmha_dispatcher_run_bwd.restype = ctypes.c_int
@@ -413,44 +422,6 @@ class FmhaDispatcherLib:
     def initialize(self, arch: str = "gfx950") -> bool:
         return self._lib.fmha_dispatcher_initialize(arch.encode()) == 0
 
-    def run_fwd(
-        self,
-        q: ctypes.c_void_p,
-        k: ctypes.c_void_p,
-        v: ctypes.c_void_p,
-        o: ctypes.c_void_p,
-        prob: FmhaProblem,
-        mask_type: int = 0,
-        bias_type: int = 0,
-        has_lse: int = 0,
-        has_dropout: int = 0,
-        traits_hdim_q: int = 0,
-        traits_hdim_v: int = 0,
-    ) -> Tuple[int, float]:
-        time_ms = ctypes.c_float(0.0)
-        rc = self._lib.fmha_dispatcher_run_fwd(
-            q,
-            k,
-            v,
-            o,
-            prob.batch,
-            prob.nhead_q,
-            prob.nhead_k,
-            prob.seqlen_q,
-            prob.seqlen_k,
-            prob.hdim_q,
-            prob.hdim_v,
-            prob.scale,
-            mask_type,
-            bias_type,
-            has_lse,
-            has_dropout,
-            traits_hdim_q,
-            traits_hdim_v,
-            ctypes.byref(time_ms),
-        )
-        return rc, time_ms.value
-
     def run_bwd(
         self,
         q: ctypes.c_void_p,
@@ -463,6 +434,7 @@ class FmhaDispatcherLib:
         dk: ctypes.c_void_p,
         dv: ctypes.c_void_p,
         prob: FmhaProblem,
+        data_type: str = "fp16",
     ) -> Tuple[int, float]:
         time_ms = ctypes.c_float(0.0)
         rc = self._lib.fmha_dispatcher_run_bwd(
@@ -483,6 +455,7 @@ class FmhaDispatcherLib:
             prob.hdim_q,
             prob.hdim_v,
             prob.scale,
+            data_type.encode(),
             ctypes.byref(time_ms),
         )
         return rc, time_ms.value
@@ -688,6 +661,32 @@ def _find_hipcc() -> str:
     return "hipcc"
 
 
+def fmha_compile_flags(arch: str, hipcc: str = "") -> List[str]:
+    """Base hipcc flags for compiling FMHA kernels. Shared by JIT and tile engine."""
+    if not hipcc:
+        hipcc = _find_hipcc()
+    root = get_dispatcher_root()
+    flags = [
+        hipcc,
+        "-c",
+        "-fPIC",
+        "-O3",
+        f"--offload-arch={arch}",
+        "-std=c++17",
+        f"-I{root.parent / 'include'}",
+        f"-I{root / 'include'}",
+        f"-I{root.parent}",
+        "-mllvm",
+        "-enable-noalias-to-md-conversion=0",
+        "-Wno-undefined-func-template",
+        "-Wno-float-equal",
+        "--offload-compress",
+    ]
+    if arch.startswith("gfx9"):
+        flags.append("-DCK_TILE_FMHA_FWD_FAST_EXP2=1")
+    return flags
+
+
 def setup_fmha_dispatcher(
     config: FmhaKernelConfig,
     output_dir: Optional[Path] = None,
@@ -695,12 +694,8 @@ def setup_fmha_dispatcher(
 ) -> FmhaSetupResult:
     """JIT-compile a single FMHA kernel and return a runner.
 
-    Steps:
-      1. Run unified_fmha_codegen.py to generate kernel header + wrapper
-      2. Run generate_fmha_fallback.py to create dispatch header
-      3. Compile kernel .cpp into .o
-      4. Compile fmha_ctypes_lib.cpp with -include dispatch header
-      5. Link into .so
+    Cached: if the .so already exists, loads it directly (~1ms).
+    Fresh build: codegen → parallel compile (kernel + ctypes) → link.
     """
     import time
 
@@ -719,6 +714,20 @@ def setup_fmha_dispatcher(
     lib_name = f"libdispatcher_fmha_{config.name}.so"
     lib_path = output_dir / lib_name
 
+    # Cache hit: .so already exists, just load
+    if lib_path.exists():
+        try:
+            runner = FmhaRunner.from_library(str(lib_path), config.gfx_arch)
+            return FmhaSetupResult(
+                success=True,
+                config=config,
+                runner=runner,
+                library_path=str(lib_path),
+                build_time_s=time.perf_counter() - t0,
+            )
+        except Exception:
+            pass  # stale .so, rebuild
+
     if not static_lib:
         return FmhaSetupResult(
             success=False, config=config, error="libck_tile_dispatcher.a not found"
@@ -728,7 +737,7 @@ def setup_fmha_dispatcher(
             success=False, config=config, error="fmha_ctypes_lib.cpp not found"
         )
 
-    # Step 1: Generate kernel
+    # Step 1: Codegen
     gen_cmd = [
         sys.executable,
         str(codegen_dir / "generate_fmha_fallback.py"),
@@ -751,80 +760,49 @@ def setup_fmha_dispatcher(
             success=False, config=config, error="Dispatch header not generated"
         )
 
-    # Step 2: Compile kernel .cpp
+    # Step 2: Compile kernel .cpp AND ctypes in parallel
     kernel_cpps = list(output_dir.glob("fmha_*.cpp"))
-    kernel_objs = []
-    include_dirs = [
-        str(root.parent / "include"),
-        str(root / "include"),
-        str(root.parent),
-    ]
-    inc_flags = [f"-I{d}" for d in include_dirs]
+    base_flags = fmha_compile_flags(config.gfx_arch, hipcc)
 
+    compile_jobs = []
     for cpp in kernel_cpps:
         obj = cpp.with_suffix(".o")
-        compile_cmd = [
-            hipcc,
-            "-c",
-            "-fPIC",
-            "-O3",
-            f"--offload-arch={config.gfx_arch}",
-            "-std=c++17",
-            *inc_flags,
-            "-mllvm",
-            "-enable-noalias-to-md-conversion=0",
-            "-Wno-undefined-func-template",
-            "-Wno-float-equal",
-            "--offload-compress",
-            str(cpp),
-            "-o",
-            str(obj),
-        ]
-        if config.gfx_arch.startswith("gfx9"):
-            compile_cmd.append("-DCK_TILE_FMHA_FWD_FAST_EXP2=1")
-        r = subprocess.run(compile_cmd, capture_output=True, text=True)
-        if r.returncode != 0:
-            return FmhaSetupResult(
-                success=False,
-                config=config,
-                error=f"Kernel compile failed: {r.stderr[:500]}",
-            )
-        kernel_objs.append(str(obj))
+        compile_jobs.append((base_flags + [str(cpp), "-o", str(obj)], obj, "kernel"))
 
-    # Step 3: Compile fmha_ctypes_lib.cpp
     ctypes_obj = output_dir / "fmha_ctypes_lib.o"
-    compile_cmd = [
-        hipcc,
-        "-c",
-        "-fPIC",
-        "-O3",
-        f"--offload-arch={config.gfx_arch}",
-        "-std=c++17",
-        *inc_flags,
+    ctypes_cmd = base_flags + [
         f"-I{output_dir}",
         f"-I{output_dir / 'dispatcher_wrappers'}",
         f"-include{dispatch_header}",
         f'-DGFX_ARCH="{config.gfx_arch}"',
-        "-mllvm",
-        "-enable-noalias-to-md-conversion=0",
-        "-Wno-undefined-func-template",
-        "-Wno-float-equal",
-        "--offload-compress",
         str(ctypes_src),
         "-o",
         str(ctypes_obj),
     ]
-    if config.gfx_arch.startswith("gfx9"):
-        compile_cmd.append("-DCK_TILE_FMHA_FWD_FAST_EXP2=1")
-    r = subprocess.run(compile_cmd, capture_output=True, text=True)
-    if r.returncode != 0:
-        return FmhaSetupResult(
-            success=False,
-            config=config,
-            error=f"ctypes compile failed: {r.stderr[:500]}",
-        )
+    compile_jobs.append((ctypes_cmd, ctypes_obj, "ctypes"))
 
-    # Step 4: Link shared library
+    def _run_compile(job):
+        cmd, obj, label = job
+        if obj.exists():
+            return (True, obj, label, "")
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        return (r.returncode == 0, obj, label, r.stderr[:500])
+
+    with ThreadPoolExecutor(max_workers=len(compile_jobs)) as pool:
+        results = list(pool.map(_run_compile, compile_jobs))
+
+    kernel_objs = []
+    for ok, obj, label, err in results:
+        if not ok:
+            return FmhaSetupResult(
+                success=False,
+                config=config,
+                error=f"{label} compile failed: {err}",
+            )
+        if label == "kernel":
+            kernel_objs.append(str(obj))
+
+    # Step 3: Link
     link_cmd = [
         hipcc,
         "-shared",
@@ -841,7 +819,7 @@ def setup_fmha_dispatcher(
             success=False, config=config, error=f"Link failed: {r.stderr[:500]}"
         )
 
-    # Step 5: Load and return runner
+    # Step 4: Load
     try:
         runner = FmhaRunner.from_library(str(lib_path), config.gfx_arch)
     except Exception as e:
@@ -859,31 +837,169 @@ def setup_fmha_dispatcher(
 
 def setup_multiple_fmha_dispatchers(
     configs: List[FmhaKernelConfig],
+    output_dir: Optional[Path] = None,
     verbose: bool = False,
     max_workers: Optional[int] = None,
 ) -> List[FmhaSetupResult]:
-    """Parallel JIT compile multiple FMHA kernels."""
+    """3-stage pipelined JIT: codegen(parallel) -> compile(parallel) -> link+load(parallel).
+
+    Faster than calling setup_fmha_dispatcher() per-kernel because all hipcc
+    compile jobs (kernel + ctypes from ALL kernels) share one thread pool.
+    """
     if not configs:
         return []
 
     workers = max_workers or min(len(configs), os.cpu_count() or 4)
-    results: List[Optional[FmhaSetupResult]] = [None] * len(configs)
+    root = get_dispatcher_root()
+    codegen_dir = root / "codegen"
+    ctypes_src = root / "bindings" / "ctypes" / "fmha_ctypes_lib.cpp"
+    static_lib = _find_static_lib()
+    hipcc = _find_hipcc()
+    arch = configs[0].gfx_arch
+
+    if output_dir is None:
+        output_dir = root / "build" / "examples"
+
+    results: dict[str, FmhaSetupResult] = {}
+
+    # --- Stage 1: Parallel codegen ---
+    def _codegen(cfg):
+        out = output_dir / f"fmha_jit_{cfg.name}"
+        lib_path = out / f"libdispatcher_fmha_{cfg.name}.so"
+        if lib_path.exists():
+            try:
+                FmhaRunner.from_library(str(lib_path), arch)
+                return (cfg.name, cfg, out, True)
+            except Exception:
+                pass
+        out.mkdir(parents=True, exist_ok=True)
+        r = subprocess.run(
+            [
+                sys.executable,
+                str(codegen_dir / "generate_fmha_fallback.py"),
+                "--output-dir",
+                str(out),
+                "--gpu-target",
+                cfg.gfx_arch,
+                "--config-json",
+                cfg.to_codegen_json(),
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(codegen_dir),
+        )
+        ok = r.returncode == 0 and (out / "fmha_python_dispatch.hpp").exists()
+        if not ok:
+            results[cfg.name] = FmhaSetupResult(
+                success=False, config=cfg, error=f"Codegen failed: {r.stderr[:200]}"
+            )
+        return (cfg.name, cfg, out, ok)
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {}
-        for i, cfg in enumerate(configs):
-            f = pool.submit(setup_fmha_dispatcher, cfg, verbose=verbose)
-            futures[f] = i
-        for f in as_completed(futures):
-            idx = futures[f]
-            try:
-                results[idx] = f.result()
-            except Exception as e:
-                results[idx] = FmhaSetupResult(
-                    success=False, config=configs[idx], error=str(e)
-                )
+        codegen_results = list(pool.map(_codegen, configs))
 
-    return [r for r in results if r is not None]
+    # --- Stage 2: Collect ALL compile jobs, run in one pool ---
+    base_flags = fmha_compile_flags(arch, hipcc)
+    compile_jobs = []  # (cmd, obj_path, kernel_name, label)
+
+    config_dirs: dict[str, tuple[FmhaKernelConfig, Path]] = {}
+    for name, cfg, out, ok in codegen_results:
+        if not ok or name in results:
+            continue
+        config_dirs[name] = (cfg, out)
+        for cpp in out.glob("fmha_*.cpp"):
+            obj = cpp.with_suffix(".o")
+            if not obj.exists():
+                compile_jobs.append(
+                    (base_flags + [str(cpp), "-o", str(obj)], obj, name, "kernel")
+                )
+        ctypes_obj = out / "fmha_ctypes_lib.o"
+        if not ctypes_obj.exists():
+            dispatch = out / "fmha_python_dispatch.hpp"
+            compile_jobs.append(
+                (
+                    base_flags
+                    + [
+                        f"-I{out}",
+                        f"-I{out / 'dispatcher_wrappers'}",
+                        f"-include{dispatch}",
+                        f'-DGFX_ARCH="{arch}"',
+                        str(ctypes_src),
+                        "-o",
+                        str(ctypes_obj),
+                    ],
+                    ctypes_obj,
+                    name,
+                    "ctypes",
+                )
+            )
+
+    failed_names: set = set()
+
+    def _compile(job):
+        cmd, obj, name, label = job
+        if obj.exists():
+            return (name, True, "")
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0:
+            return (name, False, r.stderr[:200])
+        return (name, True, "")
+
+    if compile_jobs:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            for name, ok, err in pool.map(_compile, compile_jobs):
+                if not ok:
+                    failed_names.add(name)
+                    if name not in results:
+                        cfg, _ = config_dirs[name]
+                        results[name] = FmhaSetupResult(
+                            success=False, config=cfg, error=f"Compile: {err}"
+                        )
+
+    # --- Stage 3: Link + load ---
+    def _link_load(item):
+        name, (cfg, out) = item
+        if name in failed_names or name in results:
+            return
+        objs = list(out.glob("*.o"))
+        lib_path = out / f"libdispatcher_fmha_{name}.so"
+        if not lib_path.exists():
+            r = subprocess.run(
+                [
+                    hipcc,
+                    "-shared",
+                    "-fPIC",
+                    *[str(o) for o in objs],
+                    str(static_lib),
+                    "-o",
+                    str(lib_path),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            if r.returncode != 0:
+                results[name] = FmhaSetupResult(
+                    success=False, config=cfg, error=f"Link: {r.stderr[:200]}"
+                )
+                return
+        try:
+            runner = FmhaRunner.from_library(str(lib_path), arch)
+            results[name] = FmhaSetupResult(
+                success=True, config=cfg, runner=runner, library_path=str(lib_path)
+            )
+        except Exception as e:
+            results[name] = FmhaSetupResult(
+                success=False, config=cfg, error=f"Load: {e}"
+            )
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        list(pool.map(_link_load, config_dirs.items()))
+
+    # Return in original order
+    return [
+        results.get(c.name, FmhaSetupResult(success=False, config=c, error="skipped"))
+        for c in configs
+    ]
 
 
 # =============================================================================
@@ -914,28 +1030,6 @@ class FmhaRegistry:
             verbose=verbose,
             max_workers=max_workers,
         )
-
-
-# =============================================================================
-# Cleanup / reset (mirrors ctypes_utils.cleanup_gemm / reset_for_example)
-# =============================================================================
-
-_active_runners: List[FmhaRunner] = []
-
-
-def cleanup_fmha():
-    """Clean up all active FMHA runners."""
-    for r in _active_runners:
-        try:
-            r.cleanup()
-        except Exception:
-            pass
-    _active_runners.clear()
-
-
-def reset_for_example():
-    """Reset state between examples."""
-    cleanup_fmha()
 
 
 # =============================================================================

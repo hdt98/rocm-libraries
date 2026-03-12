@@ -1,8 +1,5 @@
 {
   "variant": "bwd",
-  "tile_config": {
-    "hdim": {"values": [64, 128]}
-  },
   "trait_config": {
     "data_type": {"values": ["fp16", "bf16"]},
     "mask": {"values": ["no", "top_left"]},

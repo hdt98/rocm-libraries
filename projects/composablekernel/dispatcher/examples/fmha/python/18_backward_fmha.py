@@ -36,7 +36,6 @@ from fmha_utils import (
     cpu_attention_fwd,
     detect_gpu_arch,
     setup_fmha_dispatcher,
-    cleanup_fmha,
 )
 
 
@@ -271,7 +270,6 @@ def main():
         else:
             print("  Forward GPU: Kernel returned failure")
         print("  Backward GPU: Not available (requires bwd family kernel)")
-        cleanup_fmha()
 
     # --- Backward plan structure ---
     print("\n--- Backward Plan Structure ---")

@@ -36,7 +36,6 @@ from fmha_utils import (
     cpu_attention_fwd,
     detect_gpu_arch,
     setup_fmha_dispatcher,
-    cleanup_fmha,
 )
 
 
@@ -131,7 +130,6 @@ def main():
             print("  Note: Ran as fp16 (JIT kernel); native bf16 kernel not compiled")
         else:
             print("  GPU:  Kernel does not support bf16 (expected)")
-        cleanup_fmha()
 
     # --- CPU reference (always computed) ---
     print("\n--- CPU Reference (float32 with bf16-quantized inputs) ---")
