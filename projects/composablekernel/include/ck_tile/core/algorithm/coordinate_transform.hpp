@@ -1391,6 +1391,107 @@ CK_TILE_HOST_DEVICE static void print(const xor_t<LowLengths>& x)
     printf("}");
 }
 
+// 2D XOR transform for FP8 bank conflict avoidance
+// Maps: new_n = n ^ ((m & 0x3) << 2)
+// This spreads 4 consecutive N positions across 4 different banks based on M row
+template <typename LowLengths>
+struct xor_fp8_bank_t : public base_transform<2, 2>
+{
+    static constexpr auto type_enum = coord_transform_enum::xor_t; // reuse enum
+
+    using LowerIndex = multi_index<2>;
+    using UpperIndex = multi_index<2>;
+
+    using UpLengths = LowLengths;
+
+    UpLengths up_lengths_;
+
+    CK_TILE_HOST_DEVICE constexpr xor_fp8_bank_t() : up_lengths_{} {}
+
+    CK_TILE_HOST_DEVICE constexpr xor_fp8_bank_t(const LowLengths& low_lengths)
+        : up_lengths_{low_lengths}
+    {
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr auto get_type_enum()
+    {
+        return coord_transform_enum::xor_t;
+    }
+
+    CK_TILE_HOST_DEVICE constexpr const auto& get_upper_lengths() const { return up_lengths_; }
+
+    template <typename LowIdx, typename UpIdx>
+    CK_TILE_HOST_DEVICE constexpr void calculate_lower_index(LowIdx& idx_low,
+                                                             const UpIdx& idx_up) const
+    {
+        static_assert(LowIdx::size() == 2 && UpIdx::size() == 2,
+                      "wrong! inconsistent # of dimension");
+
+        idx_low(number<0>{}) = idx_up[number<0>{}];
+
+        // XOR N with ((M / 4) & 3) << 2 to spread across banks
+        // M indices come in strides of 4 (MLdsLayer), so divide by 4 first
+        const auto m_row = idx_up[number<0>{}] >> 2; // Divide by 4
+        idx_low(number<1>{}) = idx_up[number<1>{}] ^ ((m_row & 3) << 2);
+    }
+
+    template <typename LowIdxDiff, typename UpIdxDiff, typename LowIdx, typename UpIdx>
+    CK_TILE_HOST_DEVICE void update_lower_index(LowIdxDiff& idx_diff_low,
+                                                const UpIdxDiff&,
+                                                LowIdx& idx_low,
+                                                const UpIdx& idx_up) const
+    {
+        static_assert(LowIdxDiff::size() == 2 && UpIdxDiff::size() == 2 && LowIdx::size() == 2 &&
+                          UpIdx::size() == 2,
+                      "wrong! inconsistent # of dimension");
+
+        const auto idx_low_old = idx_low;
+
+        calculate_lower_index(idx_low, idx_up);
+
+        idx_diff_low = idx_low - idx_low_old;
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr bool
+    is_valid_upper_index_always_mapped_to_valid_lower_index()
+    {
+        return true;
+    }
+
+    template <typename UpIdx>
+    CK_TILE_HOST_DEVICE static constexpr bool
+    is_valid_upper_index_mapped_to_valid_lower_index(const UpIdx& /* idx_up */)
+    {
+        return true;
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr bool is_known_at_compile_time()
+    {
+        return ck_tile::is_known_at_compile_time<UpLengths>::value;
+    }
+
+    // MUST be static function
+    template <typename LowVectorLengths, typename LowVectorStrides>
+    CK_TILE_HOST_DEVICE constexpr auto calculate_upper_dimension_safe_vector_length_strides(
+        const LowVectorLengths& low_vector_lengths,
+        const LowVectorStrides& low_vector_strides) const
+    {
+        array<index_t, 2> up_vector_lengths = low_vector_lengths;
+        array<index_t, 2> up_vector_strides = low_vector_strides;
+
+        return make_tuple(up_vector_lengths, up_vector_strides);
+    }
+};
+
+template <typename LowLengths>
+CK_TILE_HOST_DEVICE static void print(const xor_fp8_bank_t<LowLengths>& x)
+{
+    printf("xor_fp8_bank_t{");
+    printf("up_lengths_: ");
+    print(x.up_lengths_);
+    printf("}");
+}
+
 template <typename LowLength, typename OffsetLength>
 struct offset : public base_transform<1, 1>
 {
@@ -1741,6 +1842,12 @@ template <typename LowLengths>
 CK_TILE_HOST_DEVICE constexpr auto make_xor_transform(const LowLengths& low_lengths)
 {
     return xor_t<LowLengths>{low_lengths};
+}
+
+template <typename LowLengths>
+CK_TILE_HOST_DEVICE constexpr auto make_xor_fp8_bank_transform(const LowLengths& low_lengths)
+{
+    return xor_fp8_bank_t<LowLengths>{low_lengths};
 }
 
 template <typename LowLength, typename OffsetLength>

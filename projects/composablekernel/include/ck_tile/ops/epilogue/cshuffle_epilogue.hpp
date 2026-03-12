@@ -346,7 +346,7 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
                 make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
 
-            constexpr auto lds_block_desc = transform_tensor_descriptor(
+            constexpr auto lds_block_desc_2 = transform_tensor_descriptor(
                 lds_block_desc_1,
                 make_tuple(make_merge_transform_v3_division_mod(make_tuple(
                                number<MPerIterationShuffle / MLdsLayer>{}, number<MLdsLayer>{})),
@@ -354,6 +354,18 @@ struct CShuffleEpilogue
                                number<NPerIterationShuffle / VectorLen>{}, number<VectorLen>{}))),
                 make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
+
+            // For sub-4-byte types (FP8), apply XOR swizzle to avoid bank conflicts
+            // This spreads consecutive N positions across banks based on M row
+            // XOR formula: new_n = n ^ ((m & 0x3) << 2)
+            // Applied AFTER merging to operate on raw element indices
+            constexpr auto lds_block_desc = transform_tensor_descriptor(
+                lds_block_desc_2,
+                make_tuple(make_xor_fp8_bank_transform(
+                    make_tuple(number<MPerIterationShuffle>{},
+                               number<NPerIterationShuffle>{}))),
+                make_tuple(sequence<0, 1>{}),
+                make_tuple(sequence<0, 1>{}));
 
             return lds_block_desc;
         }
