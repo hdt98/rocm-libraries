@@ -242,42 +242,17 @@ std::size_t FmhaRegistry::filter_by_arch(const std::string& gpu_arch)
     return to_remove.size();
 }
 
-std::size_t FmhaRegistry::filter_by_receipt(int receipt_id)
+std::size_t FmhaRegistry::filter_by_receipt(int /*receipt_id*/)
 {
-    std::lock_guard<std::mutex> lock(mutex());
-    std::vector<std::string> to_remove;
-    for(const auto& [name, entry] : entries())
-    {
-        if(entry.instance)
-        {
-            int kernel_receipt = entry.instance->get_key().signature.receipt_;
-            if(kernel_receipt >= 0 && kernel_receipt != receipt_id)
-            {
-                to_remove.push_back(name);
-            }
-        }
-    }
-    for(const auto& name : to_remove)
-    {
-        entries_mut().erase(name);
-    }
-    return to_remove.size();
+    // Receipt is a codegen/build-time concept, not stored in FmhaKernelKey at runtime.
+    // Filtering by receipt requires build-time metadata not available here.
+    return 0;
 }
 
 std::vector<int> FmhaRegistry::available_receipts() const
 {
-    std::lock_guard<std::mutex> lock(mutex());
-    std::set<int> receipts;
-    for(const auto& [name, entry] : entries())
-    {
-        if(entry.instance)
-        {
-            int r = entry.instance->get_key().signature.receipt_;
-            if(r >= 0)
-                receipts.insert(r);
-        }
-    }
-    return {receipts.begin(), receipts.end()};
+    // Receipt metadata is not stored in the runtime kernel key.
+    return {};
 }
 
 FmhaRegistry& FmhaRegistry::instance()

@@ -97,15 +97,33 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     if(!g_initialized)
         return -1;
 
-    int rc                = 0;
-    const int64_t q_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * 2;
-    const int64_t k_bytes = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * 2;
-    const int64_t v_bytes = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * 2;
-    const int64_t o_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v * 2;
+    int rc                   = 0;
+    const int64_t q_bytes    = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * 2;
+    const int64_t k_bytes    = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * 2;
+    const int64_t v_bytes    = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * 2;
+    const int64_t o_bytes    = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v * 2;
+    const int64_t bias_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * seqlen_k * 2;
+    const int64_t lse_bytes  = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
+    float elapsed            = 0.0f;
 
     void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
     void *bias_dev = nullptr, *lse_dev_buf = nullptr;
     void *seqstart_q_dev = nullptr, *seqstart_k_dev = nullptr, *seqlen_k_dev = nullptr;
+
+    fmha_fwd_traits traits{};
+    traits.hdim_q        = (traits_hdim_q > 0) ? traits_hdim_q : hdim_q;
+    traits.hdim_v        = (traits_hdim_v > 0) ? traits_hdim_v : hdim_v;
+    traits.data_type     = data_type_str ? data_type_str : "fp16";
+    traits.is_group_mode = (is_group_mode != 0);
+    traits.is_v_rowmajor = (is_v_rowmajor != 0);
+    traits.mask_type     = static_cast<mask_enum>(mask_type_int);
+    traits.bias_type     = static_cast<bias_enum>(bias_type_int);
+    traits.has_lse       = (has_lse != 0);
+    traits.has_dropout   = (has_dropout != 0);
+    traits.qscale_type   = quant_scale_enum::no_scale;
+
+    fmha_fwd_args args{};
+
     HIP_CHECK(hipMalloc(&q_dev, q_bytes));
     HIP_CHECK(hipMalloc(&k_dev, k_bytes));
     HIP_CHECK(hipMalloc(&v_dev, v_bytes));
@@ -138,21 +156,10 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     HIP_CHECK(hipMemcpy(v_dev, v_host, v_bytes, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemset(o_dev, 0, o_bytes));
 
-    const int64_t bias_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * seqlen_k * 2;
-    const int64_t lse_bytes  = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
-
     if(bias_type_int > 0)
     {
         HIP_CHECK(hipMalloc(&bias_dev, bias_bytes));
-        if(bias_type_int == 2)
-        {
-            // ALiBi: fill with slope-based values (simplified: zeros for correctness test)
-            HIP_CHECK(hipMemset(bias_dev, 0, bias_bytes));
-        }
-        else
-        {
-            HIP_CHECK(hipMemset(bias_dev, 0, bias_bytes));
-        }
+        HIP_CHECK(hipMemset(bias_dev, 0, bias_bytes));
     }
     if(has_lse)
     {
@@ -160,19 +167,6 @@ int fmha_dispatcher_run_fwd(const void* q_host,
         HIP_CHECK(hipMemset(lse_dev_buf, 0, lse_bytes));
     }
 
-    fmha_fwd_traits traits{};
-    traits.hdim_q        = (traits_hdim_q > 0) ? traits_hdim_q : hdim_q;
-    traits.hdim_v        = (traits_hdim_v > 0) ? traits_hdim_v : hdim_v;
-    traits.data_type     = data_type_str ? data_type_str : "fp16";
-    traits.is_group_mode = (is_group_mode != 0);
-    traits.is_v_rowmajor = (is_v_rowmajor != 0);
-    traits.mask_type     = static_cast<mask_enum>(mask_type_int);
-    traits.bias_type     = static_cast<bias_enum>(bias_type_int);
-    traits.has_lse       = (has_lse != 0);
-    traits.has_dropout   = (has_dropout != 0);
-    traits.qscale_type   = quant_scale_enum::no_scale;
-
-    fmha_fwd_args args{};
     args.q_ptr                      = q_dev;
     args.k_ptr                      = k_dev;
     args.v_ptr                      = v_dev;
@@ -277,7 +271,6 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     args.block_scale_size_q  = 0;
     args.block_scale_size_kv = 0;
 
-    float elapsed = 0.0f;
     try
     {
         elapsed = g_dispatcher->run_fwd(traits, args, nullptr);
@@ -352,10 +345,25 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     const int64_t lse_bytes    = static_cast<int64_t>(batch) * nhead_q * seqlen_q * 4;
     const int64_t d_bytes      = static_cast<int64_t>(batch) * nhead_q * seqlen_q * 4;
     const int64_t dq_acc_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * 4;
+    float elapsed              = 0.0f;
 
     void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
     void *lse_dev = nullptr, *do_dev = nullptr, *d_dev = nullptr;
     void *dq_dev = nullptr, *dk_dev = nullptr, *dv_dev = nullptr, *dq_acc_dev = nullptr;
+
+    fmha_bwd_traits traits{};
+    traits.hdim_q           = hdim_q;
+    traits.hdim_v           = hdim_v;
+    traits.data_type        = "fp16";
+    traits.is_group_mode    = false;
+    traits.mask_type        = mask_enum::no_mask;
+    traits.bias_type        = bias_enum::no_bias;
+    traits.has_dbias        = false;
+    traits.has_dropout      = false;
+    traits.is_store_randval = false;
+    traits.is_deterministic = false;
+
+    fmha_bwd_args args{};
 
     HIP_CHECK(hipMalloc(&q_dev, q_bytes));
     HIP_CHECK(hipMalloc(&k_dev, k_bytes));
@@ -381,19 +389,6 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     HIP_CHECK(hipMemset(dv_dev, 0, dv_bytes));
     HIP_CHECK(hipMemset(dq_acc_dev, 0, dq_acc_bytes));
 
-    fmha_bwd_traits traits{};
-    traits.hdim_q           = hdim_q;
-    traits.hdim_v           = hdim_v;
-    traits.data_type        = "fp16";
-    traits.is_group_mode    = false;
-    traits.mask_type        = mask_enum::no_mask;
-    traits.bias_type        = bias_enum::no_bias;
-    traits.has_dbias        = false;
-    traits.has_dropout      = false;
-    traits.is_store_randval = false;
-    traits.is_deterministic = false;
-
-    fmha_bwd_args args{};
     args.q_ptr        = q_dev;
     args.k_ptr        = k_dev;
     args.v_ptr        = v_dev;
@@ -470,7 +465,6 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     args.p_undrop          = 1.0f;
     args.drop_seed_offset  = std::make_pair(uint64_t(0), uint64_t(0));
 
-    float elapsed = 0.0f;
     try
     {
         elapsed = g_dispatcher->run_bwd(traits, args, nullptr);
@@ -478,7 +472,7 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     catch(...)
     {
         rc = -2;
-        goto bwd_cleanup;
+        goto cleanup;
     }
 
     {
@@ -492,7 +486,7 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     if(time_ms_out)
         *time_ms_out = elapsed;
 
-bwd_cleanup:
+cleanup:
     safe_hip_free(q_dev);
     safe_hip_free(k_dev);
     safe_hip_free(v_dev);

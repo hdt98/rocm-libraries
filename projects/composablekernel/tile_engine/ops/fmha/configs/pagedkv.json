@@ -1,0 +1,12 @@
+{
+  "variant": "pagedkv",
+  "tile_config": {
+    "hdim": {"values": [128]}
+  },
+  "trait_config": {
+    "data_type": {"values": ["fp16", "bf16"]},
+    "pipeline": {"values": ["qr_async"]},
+    "mask": {"values": ["no", "top_left"]},
+    "bias": {"values": ["no"]}
+  }
+}

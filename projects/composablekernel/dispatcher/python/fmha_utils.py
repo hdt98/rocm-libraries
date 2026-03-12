@@ -217,10 +217,28 @@ class FmhaKernelConfig:
 
     @property
     def name(self) -> str:
-        return (
-            f"fmha_{self.family}_{self.data_type}_h{self.hdim_q}"
-            f"_{self.pipeline}_{self.tile_m0}x{self.tile_n0}x{self.tile_k0}"
-        )
+        parts = [
+            f"fmha_{self.family}_{self.data_type}",
+            self.mode,
+            f"h{self.hdim_q}x{self.hdim_v}"
+            if self.hdim_q != self.hdim_v
+            else f"h{self.hdim_q}",
+            self.pipeline,
+            f"{self.tile_m0}x{self.tile_n0}x{self.tile_k0}",
+        ]
+        if self.mask != "no":
+            parts.append(f"m{self.mask}")
+        if self.bias != "no":
+            parts.append(f"b{self.bias}")
+        if self.lse:
+            parts.append("lse")
+        if self.dropout:
+            parts.append("drop")
+        if self.logits:
+            parts.append("logits")
+        if self.sink:
+            parts.append("sink")
+        return "_".join(parts)
 
     def to_codegen_json(self) -> str:
         return json.dumps(
@@ -762,6 +780,8 @@ def setup_fmha_dispatcher(
             "-o",
             str(obj),
         ]
+        if config.gfx_arch.startswith("gfx9"):
+            compile_cmd.append("-DCK_TILE_FMHA_FWD_FAST_EXP2=1")
         r = subprocess.run(compile_cmd, capture_output=True, text=True)
         if r.returncode != 0:
             return FmhaSetupResult(
@@ -794,6 +814,8 @@ def setup_fmha_dispatcher(
         "-o",
         str(ctypes_obj),
     ]
+    if config.gfx_arch.startswith("gfx9"):
+        compile_cmd.append("-DCK_TILE_FMHA_FWD_FAST_EXP2=1")
     r = subprocess.run(compile_cmd, capture_output=True, text=True)
     if r.returncode != 0:
         return FmhaSetupResult(

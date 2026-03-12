@@ -8,4 +8,5 @@ include_directories(BEFORE
 add_subdirectory(ops/gemm)
 add_subdirectory(ops/gemm_streamk)
 add_subdirectory(ops/reduce)
+add_subdirectory(ops/fmha)
 
