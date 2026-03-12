@@ -246,6 +246,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
                         int do_validation,
                         int init_sink_value,
                         const ck_tile::stream_config& stream_config,
+                        bool run_all_kernels = false,
                         std::optional<std::string> json = std::nullopt)
 {
     using TypeConfig = FmhaFwdTypeConfig<DataTypeConfig>;
@@ -1555,6 +1556,41 @@ fwd_result fmha_fwd_run(mode_enum mode,
 
         return fmha_fwd(fmha_traits, fmha_args, sc);
     };
+
+    // --- run_all_kernels path: benchmark every matching instance ---
+    if(run_all_kernels)
+    {
+        fmha_fwd_traits fmha_traits;
+        init_traits(fmha_traits);
+
+        fmha_fwd_args fmha_args;
+        init_args(fmha_args);
+
+        auto all_results = fmha_fwd_all(fmha_traits, fmha_args, stream_config);
+        if(all_results.empty())
+        {
+            std::cout << ", no matching instances" << std::flush << std::endl;
+            return fwd_result::no_instance;
+        }
+        std::cout << std::endl;
+        std::cout << "[run_all_kernels] " << all_results.size()
+                  << " instance(s) benchmarked:" << std::endl;
+        for(size_t i = 0; i < all_results.size(); i++)
+        {
+            const auto& [kname, t] = all_results[i];
+            const float total_t    = appendkv_ave_time + t;
+            const float tf =
+                static_cast<float>(flop) / 1.E9 / total_t;
+            const float bw = num_byte / 1.E6 / total_t;
+            std::cout << std::fixed << "  [" << i << "] " << kname << ", "
+                      << std::setprecision(3) << total_t << " ms, "
+                      << std::setprecision(2) << tf << " TFlops, "
+                      << std::setprecision(2) << bw << " GB/s" << std::endl;
+        }
+        return fwd_result::success;
+    }
+    // --- normal (heuristic) path ---
+
     const float fwd_ave_time = run_fwd(stream_config);
     if(fwd_ave_time < 0.0f)
     {

@@ -15,8 +15,10 @@
 #include "rotary.hpp"
 
 #include <type_traits>
+#include <string>
 #include <utility>
 #include <variant>
+#include <vector>
 
 struct FmhaFwdFp32
 {
@@ -1668,6 +1670,9 @@ struct fmha_fwd_traits
     // TODO: padding check is inside this api
 };
 float fmha_fwd(fmha_fwd_traits, fmha_fwd_args, const ck_tile::stream_config&);
+
+// Run ALL matching kernel instances for benchmarking; returns vector of (kernel_name, time_ms).
+std::vector<std::pair<std::string, float>> fmha_fwd_all(fmha_fwd_traits, fmha_fwd_args, const ck_tile::stream_config&);
 
 struct fmha_fwd_pagedkv_traits
 {
