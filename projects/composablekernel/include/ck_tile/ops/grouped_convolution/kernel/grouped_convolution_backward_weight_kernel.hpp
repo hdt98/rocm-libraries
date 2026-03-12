@@ -1185,6 +1185,11 @@ struct GroupedConvolutionBackwardWeightKernel
         {
             static_assert(NumDTensor == 0,
                           "D tensor per-group offsets not implemented for StreamK path");
+            static_assert(
+                StreamKCoherency<decltype(core::arch::get_compiler_target())>::BUFFER_COHERENCE !=
+                    amd_buffer_coherence_enum::coherence_default,
+                "StreamK requires cross-CU buffer coherence (StreamKCoherency specialization). "
+                "Currently supported: gfx90a, gfx942, gfx950.");
 
             // --- StreamK execution path ---
             __shared__ char smem_ptr[GetSmemSize()];
