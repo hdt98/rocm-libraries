@@ -25,7 +25,7 @@ from config_loader import load_repo_config
 # Build variant configuration mapping
 # Maps variant name to (cmake_preset, label, expect_failure)
 BUILD_VARIANT_CONFIG = {
-    "release": ("linux-release", "release", False),
+    "release": ("linux-release-package", "release", False),
     "asan": ("linux-release-asan", "asan", True),
     "tsan": ("linux-release-tsan", "tsan", True),
 }
