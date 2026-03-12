@@ -571,6 +571,20 @@ struct problem_t {
 };
 
 /**
+ * @brief Struct to define a grouped GEMM problem.
+ *
+ * Contains a vector of individual GEMM problems that are dispatched
+ * as a single kernel with one tile configuration across all groups.
+ * Each group can have different M, N, K dimensions and data types.
+ * This mirrors hipblaslt's ContractionProblemGroupedGemm which stores
+ * a vector of ContractionProblemGemm.
+ */
+struct grouped_problem_t {
+  /// Individual GEMM problems, one per group.
+  std::vector<problem_t> groups;
+};
+
+/**
  * @brief Struct to define various workgroup mapping parameters.
  *
  * Contains all the parameters needed to describe various workgroup mapping parameters.

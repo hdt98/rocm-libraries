@@ -122,6 +122,35 @@ std::vector<prediction_result_t> select_topk_configs(const problem_t& problem,
                                                      std::size_t topk);
 
 /**
+ * @brief Select best configuration for a grouped GEMM problem.
+ *
+ * Evaluates all candidate configurations against the grouped GEMM latency model
+ * and returns the one with the lowest predicted total latency. The selected
+ * configuration uses one tile size across all groups, matching hipblaslt's
+ * grouped GEMM dispatch.
+ *
+ * @param grouped_problem Grouped GEMM problem (vector of per-group problems)
+ * @param hardware Hardware characteristics (@see origami::hardware_t)
+ * @param configs Vector of all possible valid configurations
+ * @return prediction_result_t Configuration with best latency
+ */
+prediction_result_t select_config_grouped(const grouped_problem_t& grouped_problem,
+                                          const hardware_t& hardware,
+                                          const std::vector<config_t>& configs);
+
+/**
+ * @brief Rank configurations for a grouped GEMM problem by predicted performance.
+ *
+ * @param grouped_problem Grouped GEMM problem (vector of per-group problems)
+ * @param hardware Hardware characteristics (@see origami::hardware_t)
+ * @param configs List of candidate configurations to rank
+ * @return std::vector<prediction_result_t> Configurations ranked by performance (best first)
+ */
+std::vector<prediction_result_t> rank_configs_grouped(const grouped_problem_t& grouped_problem,
+                                                      const hardware_t& hardware,
+                                                      const std::vector<config_t>& configs);
+
+/**
  * @brief Given a latency, compute the achieved throughput in gflops.
  *
  * @param hardware Hardware characteristics (@see origami::hardware_t)

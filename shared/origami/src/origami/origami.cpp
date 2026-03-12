@@ -735,4 +735,62 @@ double compute_perf_gflops(const hardware_t& hardware,
   double GFLOPS = FLOPS / 1e9;  // 1 TFLOP = 1e9 FLOPs
   return GFLOPS;
 }
+
+std::vector<prediction_result_t> rank_configs_grouped(const grouped_problem_t& grouped_problem,
+                                                      const hardware_t& hardware,
+                                                      const std::vector<config_t>& configs) {
+  if (configs.empty()) { throw std::runtime_error("No configurations provided."); }
+  if (grouped_problem.groups.empty()) { throw std::runtime_error("No groups in grouped problem."); }
+
+  struct prediction_result_wrapper_t {
+    double latency;
+    std::reference_wrapper<const config_t> config;
+  };
+
+  std::vector<prediction_result_wrapper_t> latencies_configs;
+  latencies_configs.reserve(configs.size());
+
+  // Check LDS capacity against all groups — a config must fit all groups
+  for (auto& config : configs) {
+    bool lds_ok = true;
+    for (const auto& group : grouped_problem.groups) {
+      if (!check_lds_capacity(hardware, config.mt, group.a_dtype, group.b_dtype)) {
+        lds_ok = false;
+        break;
+      }
+    }
+    if (!lds_ok) continue;
+
+    double latency = compute_total_latency_grouped(grouped_problem, hardware, config, hardware.N_CU);
+    if (latency != std::numeric_limits<double>::max())
+      latencies_configs.push_back({latency, std::cref(config)});
+  }
+
+  if (latencies_configs.empty()) { throw std::runtime_error("No valid configs found for grouped GEMM."); }
+
+  std::stable_sort(latencies_configs.begin(),
+                   latencies_configs.end(),
+                   [](const auto& a, const auto& b) {
+                     return a.latency < b.latency;
+                   });
+
+  std::vector<prediction_result_t> results;
+  results.reserve(latencies_configs.size());
+  std::transform(latencies_configs.begin(),
+                 latencies_configs.end(),
+                 std::back_inserter(results),
+                 [&](const auto& r) -> prediction_result_t {
+                   return {r.latency, r.config.get()};
+                 });
+
+  return results;
+}
+
+prediction_result_t select_config_grouped(const grouped_problem_t& grouped_problem,
+                                          const hardware_t& hardware,
+                                          const std::vector<config_t>& configs) {
+  auto ranked = rank_configs_grouped(grouped_problem, hardware, configs);
+  return ranked[0];
+}
+
 }  // namespace origami

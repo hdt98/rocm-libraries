@@ -182,6 +182,10 @@ NB_MODULE(origami, m) {
       .def_rw("a_mx_block_size", &origami::problem_t::a_mx_block_size)
       .def_rw("b_mx_block_size", &origami::problem_t::b_mx_block_size);
 
+  nanobind::class_<origami::grouped_problem_t>(m, "grouped_problem_t")
+      .def(nanobind::init<>())
+      .def_rw("groups", &origami::grouped_problem_t::groups);
+
   nanobind::class_<origami::staggerU_t>(m, "staggerU_t")
       .def(nanobind::init<>())
       .def_rw("staggerUMapping", &origami::staggerU_t::staggerUMapping)
@@ -316,5 +320,22 @@ NB_MODULE(origami, m) {
   m.def("compute_number_of_output_tiles",
         &origami::streamk::compute_number_of_output_tiles,
         "Compute number of output tiles");
+
+  // Grouped GEMM functions
+  m.def("select_config_grouped",
+        &origami::select_config_grouped,
+        "Select best configuration for a grouped GEMM problem");
+
+  m.def("rank_configs_grouped",
+        &origami::rank_configs_grouped,
+        "Rank configurations for a grouped GEMM problem by performance");
+
+  m.def("compute_total_latency_grouped",
+        &origami::compute_total_latency_grouped,
+        "Compute total latency for a grouped GEMM problem");
+
+  m.def("estimate_concurrent_groups",
+        &origami::estimate_concurrent_groups,
+        "Estimate number of concurrently active groups during grouped GEMM execution");
 
 }

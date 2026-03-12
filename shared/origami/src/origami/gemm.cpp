@@ -1089,4 +1089,182 @@ static double compute_formocast_latency(const problem_t& problem,
   return perf.microSeconds;
 }
 
+/* ---------------------------------------------------------------------------------------- */
+/* Grouped GEMM functions                                                                   */
+/* ---------------------------------------------------------------------------------------- */
+
+double estimate_concurrent_groups(const grouped_problem_t& grouped_problem,
+                                  const hardware_t& hardware,
+                                  const config_t& config) {
+  const size_t G = grouped_problem.groups.size();
+  if (G <= 1) return static_cast<double>(G);
+
+  const size_t N_CU = hardware.N_CU;
+
+  // Compute per-group tile counts
+  std::vector<size_t> tiles_per_group(G);
+  size_t total_tiles = 0;
+  for (size_t g = 0; g < G; ++g) {
+    const auto& prob = grouped_problem.groups[g];
+    size_t mt_m = math::safe_ceil_div(prob.size.m, config.mt.m);
+    size_t mt_n = math::safe_ceil_div(prob.size.n, config.mt.n);
+    tiles_per_group[g] = mt_m * mt_n * prob.batch;
+    total_tiles += tiles_per_group[g];
+  }
+
+  if (total_tiles == 0) return 1.0;
+
+  size_t num_timesteps = math::safe_ceil_div(total_tiles, N_CU);
+  if (num_timesteps == 0) return 1.0;
+
+  // Walk through timesteps to count how many groups are active at each.
+  // Groups are laid out sequentially (matching hipblaslt's wgTable prefix-sum).
+  // At timestep t, CUs process tiles [t*N_CU, min((t+1)*N_CU, total_tiles)).
+  // Count how many group boundaries this span crosses.
+  //
+  // Build prefix sums of per-group tile counts.
+  std::vector<size_t> prefix(G + 1, 0);
+  for (size_t g = 0; g < G; ++g) {
+    prefix[g + 1] = prefix[g] + tiles_per_group[g];
+  }
+
+  double total_active = 0.0;
+  size_t group_cursor = 0;  // tracks which group the start of the timestep is in
+  for (size_t t = 0; t < num_timesteps; ++t) {
+    size_t ts_start = t * N_CU;
+    size_t ts_end = std::min(ts_start + N_CU, total_tiles);
+
+    // Advance cursor to the group containing ts_start
+    while (group_cursor + 1 < G && prefix[group_cursor + 1] <= ts_start) {
+      ++group_cursor;
+    }
+
+    // Count groups that overlap [ts_start, ts_end)
+    size_t active_groups = 0;
+    for (size_t g = group_cursor; g < G && prefix[g] < ts_end; ++g) {
+      ++active_groups;
+    }
+    total_active += static_cast<double>(active_groups);
+  }
+
+  return total_active / static_cast<double>(num_timesteps);
+}
+
+double compute_total_latency_grouped(const grouped_problem_t& grouped_problem,
+                                     const hardware_t& hardware,
+                                     const config_t& config,
+                                     size_t max_cus) {
+  assert(config.is_valid());
+  bool debug = runtime_options::get().debug_enabled;
+
+  const size_t G = grouped_problem.groups.size();
+  if (G == 0) return 0.0;
+
+  // Single group degenerates to regular GEMM
+  if (G == 1) {
+    return compute_total_latency(grouped_problem.groups[0], hardware, config, max_cus);
+  }
+
+  const size_t MT_M = config.mt.m;
+  const size_t MT_N = config.mt.n;
+
+  // Grouped GEMM kernel overhead constants (in cycles).
+  // Empirically calibrated on MI350X (gfx950) at 2.2 GHz.
+  //
+  // Grouped kernels have higher launch cost than individual GEMMs due to:
+  // - wgTable construction and argument packing per group
+  // - Larger code object with group dispatch logic
+  // - Per-group argument fetch and pointer resolution inside the kernel
+  //
+  // Calibration: MI350X grouped_mm with tiny groups (64x64x64):
+  //   - Individual kernel launch floor: ~11 us = ~24,400 cycles
+  //   - Grouped kernel base overhead: ~36 us = ~79,200 cycles
+  //   - Per-group marginal cost: ~4.5 us = ~9,900 cycles
+  //   - Grouped extra vs individual: ~25 us = ~54,800 cycles
+  const double grouped_kernel_base_overhead = 54800.0;  // extra over individual launch
+  const double per_group_overhead           =  9900.0;  // per group inside the kernel
+
+  // 1) Compute per-group tile counts and total tiles
+  std::vector<size_t> tiles_per_group(G);
+  size_t total_tiles = 0;
+  for (size_t g = 0; g < G; ++g) {
+    const auto& prob = grouped_problem.groups[g];
+    size_t mt_m = math::safe_ceil_div(prob.size.m, MT_M);
+    size_t mt_n = math::safe_ceil_div(prob.size.n, MT_N);
+    tiles_per_group[g] = mt_m * mt_n * prob.batch;
+    total_tiles += tiles_per_group[g];
+  }
+
+  if (total_tiles == 0) return 0.0;
+
+  // 2) Compute timesteps (data-parallel, no StreamK for grouped GEMM)
+  size_t num_active_cus = std::min(total_tiles, hardware.N_CU);
+  size_t num_timesteps = math::safe_ceil_div(total_tiles, hardware.N_CU);
+
+  // 3) Estimate concurrent groups for cache pressure modeling
+  double concurrent_groups = estimate_concurrent_groups(grouped_problem, hardware, config);
+
+  // 4) Compute per-group tile latency with degraded cache reuse.
+  //    Each group sees reduced effective CUs because concurrent groups pollute each other's caches.
+  //    This mirrors how batch GEMM reduces effective_cus by dividing by batch count.
+  size_t effective_cus_per_group = std::max(
+      static_cast<size_t>(static_cast<double>(num_active_cus) / concurrent_groups),
+      static_cast<size_t>(1));
+
+  // Use default WGM from first group (matches hipblaslt's behavior of using problems[0])
+  const auto& first_group = grouped_problem.groups[0];
+  int defaultWGM = first_group.batch > 1
+                       ? 1
+                       : static_cast<int>(ceil(std::sqrt(hardware.N_CU / hardware.NUM_XCD)));
+  auto config_with_wgm = config;
+  config_with_wgm.workgroup_mapping = std::max(defaultWGM, 1);
+
+  // 5) Compute weighted-average tile latency across groups.
+  //    Each group contributes proportional to its share of total tiles.
+  //    split_factor = 1 (no StreamK for grouped GEMM, matching hipblaslt).
+  constexpr size_t split_factor = 1;
+  double weighted_latency = 0.0;
+
+  for (size_t g = 0; g < G; ++g) {
+    if (tiles_per_group[g] == 0) continue;
+
+    double weight = static_cast<double>(tiles_per_group[g]) / static_cast<double>(total_tiles);
+
+    // Check LDS capacity for this group's problem
+    const auto& prob = grouped_problem.groups[g];
+    if (!check_lds_capacity(hardware, config_with_wgm.mt, prob.a_dtype, prob.b_dtype)) {
+      return std::numeric_limits<double>::max();
+    }
+
+    // Compute tile latency for this group with reduced effective CUs
+    double L_tile_g = compute_tile_latency(
+        prob, hardware, config_with_wgm, effective_cus_per_group, split_factor);
+
+    weighted_latency += weight * L_tile_g;
+  }
+
+  // 6) Total latency = compute + overhead
+  //    Compute: weighted tile latency * number of timesteps
+  //    Overhead: grouped kernel base + per-group marginal cost
+  double compute_latency = weighted_latency * static_cast<double>(num_timesteps);
+  double overhead = grouped_kernel_base_overhead + per_group_overhead * static_cast<double>(G);
+  double total_latency = compute_latency + overhead;
+
+  if (debug) {
+    OLOG_DEBUG("======== Grouped GEMM Debug Info ========");
+    OLOG_DEBUG("num_groups: " << G);
+    OLOG_DEBUG("total_tiles: " << total_tiles);
+    OLOG_DEBUG("num_timesteps: " << num_timesteps);
+    OLOG_DEBUG("concurrent_groups: " << concurrent_groups);
+    OLOG_DEBUG("effective_cus_per_group: " << effective_cus_per_group);
+    OLOG_DEBUG("weighted_latency: " << weighted_latency);
+    OLOG_DEBUG("compute_latency: " << compute_latency);
+    OLOG_DEBUG("overhead (base + per_group): " << overhead);
+    OLOG_DEBUG("total_latency: " << total_latency);
+    OLOG_DEBUG("=========================================");
+  }
+
+  return total_latency;
+}
+
 }  // namespace origami

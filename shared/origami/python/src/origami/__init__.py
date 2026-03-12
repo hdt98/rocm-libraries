@@ -25,6 +25,7 @@ try:
         workgroup_mapping_t,
         staggerU_t,
         problem_t,
+        grouped_problem_t,
         hardware_t,
         # Hardware functions
         get_hardware_for_device,
@@ -39,6 +40,8 @@ try:
         rank_configs,
         select_config_mnk,
         select_topk_configs,
+        select_config_grouped,
+        rank_configs_grouped,
         # Performance functions
         compute_perf_gflops,
         compute_total_latency,
@@ -59,6 +62,9 @@ try:
         compute_number_of_output_tiles,
         # Reduction functions
         int_to_reduction_t,
+        # Grouped GEMM functions
+        compute_total_latency_grouped,
+        estimate_concurrent_groups,
     )
 except ImportError as e:
     raise ImportError(
@@ -85,6 +91,7 @@ __all__ = [
     "prediction_result_t",
     "workgroup_mapping_t",
     "problem_t",
+    "grouped_problem_t",
     "hardware_t",
     # Hardware functions
     "get_hardware_for_device",
@@ -99,6 +106,8 @@ __all__ = [
     "rank_configs",
     "select_config_mnk",
     "select_topk_configs",
+    "select_config_grouped",
+    "rank_configs_grouped",
     # Performance functions
     "compute_perf_gflops",
     "compute_total_latency",
@@ -119,6 +128,9 @@ __all__ = [
     "compute_number_of_output_tiles",
     # Reduction functions
     "int_to_reduction_t",
+    # Grouped GEMM functions
+    "compute_total_latency_grouped",
+    "estimate_concurrent_groups",
 ]
 
 try:

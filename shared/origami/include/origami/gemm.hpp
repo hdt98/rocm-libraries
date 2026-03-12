@@ -244,4 +244,40 @@ double compute_total_latency(const problem_t& problem,
                              const config_t& config,
                              size_t max_cus);
 
+/**
+ * @brief Estimate the number of concurrently active groups during execution.
+ *
+ * Groups are laid out sequentially in the workgroup table (matching hipblaslt's
+ * wgTable prefix-sum). At any timestep, CUs may process tiles from multiple groups.
+ * This function estimates the average number of groups sharing CU resources.
+ *
+ * @param grouped_problem Grouped GEMM problem description
+ * @param hardware Hardware characteristics
+ * @param config Kernel configuration
+ * @return double Average number of concurrently active groups
+ */
+double estimate_concurrent_groups(const grouped_problem_t& grouped_problem,
+                                  const hardware_t& hardware,
+                                  const config_t& config);
+
+/**
+ * @brief Compute the total latency of a grouped GEMM.
+ *
+ * Models a single-kernel dispatch of multiple GEMM groups with one shared tile
+ * configuration, matching hipblaslt's grouped GEMM dispatch. Accounts for:
+ * - Timestep expansion from summing per-group tile counts
+ * - L2/MALL reuse degradation from cross-group cache pollution
+ * - Per-group work utilization variance with a single tile size
+ *
+ * @param grouped_problem Grouped GEMM problem description
+ * @param hardware Hardware characteristics
+ * @param config Kernel configuration
+ * @param max_cus Maximum number of CUs to use
+ * @return double Total latency in cycles
+ */
+double compute_total_latency_grouped(const grouped_problem_t& grouped_problem,
+                                     const hardware_t& hardware,
+                                     const config_t& config,
+                                     size_t max_cus);
+
 }  // namespace origami
