@@ -87,10 +87,6 @@ Plugin-specific namespace:
 Standard global knobs
 =====================
 
-.. |br| raw:: html
-
-    <br />
-
 These are the global knobs available in hipDNN:
 
 .. list-table::
@@ -105,7 +101,7 @@ These are the global knobs available in hipDNN:
      - Integer (int64)
      - 0 (disabled)
      - Enable benchmarking mode for kernel selection. When enabled, engines may run multiple kernel variants and select the fastest. First run may be slower due to benchmarking overhead.
-   * - ``global.workspace``|br|``_size_limit``
+   * - ``global.workspace_size_limit``
      - Integer (int64)
      - The maximum size needed for optimal performance.
      - Limits the maximum workspace memory that solvers can use for convolution operations (Forward, Backward Data, Backward Weights). Refer to :ref:`plugin-support` for specific details.

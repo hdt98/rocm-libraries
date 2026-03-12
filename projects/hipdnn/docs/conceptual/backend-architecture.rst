@@ -79,7 +79,7 @@ Graph configuration
 -------------------
 
 .. list-table::
-   :widths: 5 3
+   :widths: 6 2
    :header-rows: 1
 
    * - Function
@@ -115,7 +115,7 @@ Operation methods (adds nodes to graph DAG)
 All operations create a node in the graph's internal DAG. Backend calls are deferred until ``build()``.
 
 .. list-table::
-   :widths: 3 3 3
+   :widths: 5 3 2
    :header-rows: 1
 
    * - Function
@@ -265,7 +265,7 @@ Descriptor management
 ---------------------
 
 .. list-table::
-   :widths: 3 3
+   :widths: 5 3
    :header-rows: 1
 
    * - Function
@@ -396,7 +396,7 @@ Common plugin API (``PluginApi.h``)
 -----------------------------------
 
 .. list-table::
-   :widths: 3 3 3
+   :widths: 5 3 3
    :header-rows: 1
 
    * - Function
@@ -425,7 +425,7 @@ Engine plugin API (``EnginePluginApi.h``)
 -----------------------------------------
 
 .. list-table::
-   :widths: 3 3 3
+   :widths: 5 3 3
    :header-rows: 1
 
    * - Function

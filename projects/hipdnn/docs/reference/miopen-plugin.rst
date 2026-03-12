@@ -113,7 +113,7 @@ Activation node
 - Compute data type: FP32
 - Activation mode: RELU_FORWARD
 - Supports
-    - no clipping
+    - No clipping
     - ``relu_lower_clip`` set
     - ``relu_lower_clip`` and ``relu_upper_clip`` set
 

@@ -17,8 +17,8 @@ Prerequisites
 
 ROCm and hipDNN installed with dependencies. See :ref:`prerequisites`.
 
-Add the hipdnn_frontend package to your project files
-=====================================================
+Add the ``hipdnn_frontend`` package to your project files
+=========================================================
 
 1. Add ``hipdnn_frontend`` in your ``CMakeLists.txt`` file:
 
