@@ -23,6 +23,10 @@ class FmhaKernelInstance
     [[nodiscard]] virtual bool supports(const FmhaProblem& problem) const = 0;
     [[nodiscard]] virtual std::string get_name() const                    = 0;
 
+    // Short aliases (preferred for new code)
+    [[nodiscard]] const FmhaKernelKey& key() const { return get_key(); }
+    [[nodiscard]] std::string name() const { return get_name(); }
+
     virtual void launch(const FmhaInvocation& invocation,
                         const ck_tile::stream_config& stream_config) const = 0;
 

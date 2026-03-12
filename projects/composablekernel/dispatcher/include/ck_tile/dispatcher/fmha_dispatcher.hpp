@@ -91,7 +91,7 @@ class FmhaDispatcher
     std::string gfx_arch_;
     int cold_niters_           = 5;
     int nrepeat_               = 10;
-    bool benchmarking_enabled_ = true;
+    bool benchmarking_enabled_ = false;
 
     public:
     /// Enable or disable benchmarking (GPU timing).

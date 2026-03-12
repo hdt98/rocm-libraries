@@ -31,13 +31,18 @@ inline bool fmha_mask_compatible(int kernel_mask, int problem_mask)
 
 inline bool fmha_signature_matches(const FmhaKernelKey& key, const FmhaProblem& problem)
 {
-    const auto& sig              = key.signature;
-    const bool compare_page_size = sig.family == FmhaKernelFamily::FwdPagedKv ||
-                                   problem.requested_family == FmhaKernelFamily::FwdPagedKv ||
-                                   sig.family == FmhaKernelFamily::FwdAppendKv ||
-                                   problem.requested_family == FmhaKernelFamily::FwdAppendKv ||
-                                   sig.family == FmhaKernelFamily::BatchPrefill ||
-                                   problem.requested_family == FmhaKernelFamily::BatchPrefill;
+    const auto& sig = key.signature;
+    const bool compare_page_size =
+        sig.family == FmhaKernelFamily::FwdPagedKv ||
+        problem.requested_family == FmhaKernelFamily::FwdPagedKv ||
+        sig.family == FmhaKernelFamily::FwdAppendKv ||
+        problem.requested_family == FmhaKernelFamily::FwdAppendKv ||
+        sig.family == FmhaKernelFamily::FwdSplitKv ||
+        problem.requested_family == FmhaKernelFamily::FwdSplitKv ||
+        sig.family == FmhaKernelFamily::FwdSplitKvCombine ||
+        problem.requested_family == FmhaKernelFamily::FwdSplitKvCombine ||
+        sig.family == FmhaKernelFamily::BatchPrefill ||
+        problem.requested_family == FmhaKernelFamily::BatchPrefill;
     const bool compare_kv_layout_lookup =
         sig.family == FmhaKernelFamily::BatchPrefill ||
         problem.requested_family == FmhaKernelFamily::BatchPrefill;
@@ -78,6 +83,11 @@ inline bool fmha_signature_matches(const FmhaKernelKey& key, const FmhaProblem& 
 inline bool fmha_algorithm_supports(const FmhaKernelKey& key, const FmhaProblem& problem)
 {
     const auto& alg = key.algorithm;
+
+    if(problem.is_group_mode && problem.max_seqlen_q <= 0)
+    {
+        return false;
+    }
 
     if(!alg.pad_s && alg.tile_shape.m0 > 0 &&
        problem.effective_max_seqlen_q() % alg.tile_shape.m0 != 0)
@@ -220,8 +230,10 @@ make_timed_fmha_kernel(FmhaKernelKey key,
                        TimedCallable&& timed_callable,
                        GeneratedFmhaKernelInstance::SupportsFn extra_support = {})
 {
-    auto launch_fn = [timed_callable = std::forward<TimedCallable>(timed_callable)](
-                         const FmhaInvocation& invocation, const ck_tile::stream_config& sc) {
+    auto callable = std::forward<TimedCallable>(timed_callable);
+
+    auto launch_fn = [callable](const FmhaInvocation& invocation,
+                                const ck_tile::stream_config& sc) {
         const auto* args = std::get_if<ArgsType>(&invocation.args);
         if(!args)
         {
@@ -229,17 +241,16 @@ make_timed_fmha_kernel(FmhaKernelKey key,
         }
         auto untimed         = sc;
         untimed.time_kernel_ = false;
-        (void)timed_callable(untimed, *args);
+        (void)callable(untimed, *args);
     };
 
-    auto run_fn = [timed_callable = std::forward<TimedCallable>(timed_callable)](
-                      const FmhaInvocation& invocation, const ck_tile::stream_config& sc) {
+    auto run_fn = [callable](const FmhaInvocation& invocation, const ck_tile::stream_config& sc) {
         const auto* args = std::get_if<ArgsType>(&invocation.args);
         if(!args)
         {
             throw std::invalid_argument("FMHA invocation args do not match generated kernel type");
         }
-        return timed_callable(sc, *args);
+        return callable(sc, *args);
     };
 
     auto supports_fn = make_default_supports_fn(key, std::move(extra_support));

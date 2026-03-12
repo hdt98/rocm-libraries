@@ -15,6 +15,9 @@ namespace dispatcher {
 
 struct FmhaKernelKey
 {
+    // Runtime signature -- corresponds to fmha_decl::FmhaSignature (build-time).
+    // FmhaSignature uses strings for enums; Signature uses ints for matching speed.
+    // When adding fields here, also update FmhaSignature and tie().
     struct Signature
     {
         FmhaKernelFamily family = FmhaKernelFamily::Fwd;
@@ -40,6 +43,7 @@ struct FmhaKernelKey
         int page_size            = 1;
         std::uint16_t hdim_q     = 0;
         std::uint16_t hdim_v     = 0;
+        int receipt              = -1;
     } signature;
 
     struct Algorithm
@@ -125,7 +129,8 @@ struct FmhaKernelKey
             << algorithm.use_trload << "_bpc" << unsigned(algorithm.block_per_cu) << "_wg"
             << unsigned(algorithm.num_wave_groups) << "_ms" << unsigned(algorithm.max_splits_log2)
             << "_mq" << algorithm.max_seq_len_q << "_aq" << algorithm.hdim_q_alignment << "_av"
-            << algorithm.hdim_v_alignment << "_r" << algorithm.selection_rank;
+            << algorithm.hdim_v_alignment << "_r" << algorithm.selection_rank << "_rc"
+            << signature.receipt;
         return oss.str();
     }
 
@@ -192,7 +197,8 @@ struct FmhaKernelKey
                         algorithm.hdim_v_alignment,
                         algorithm.selection_rank,
                         algorithm.constraint_tag,
-                        gfx_arch);
+                        gfx_arch,
+                        signature.receipt);
     }
 
     friend bool operator==(const FmhaKernelKey& lhs, const FmhaKernelKey& rhs)

@@ -88,15 +88,15 @@ struct fmha_fwd_args
     void* lse_ptr;
     void* o_ptr;
 
-    const void* seqstart_q_ptr  = nullptr;
-    const void* seqstart_k_ptr  = nullptr;
-    const void* seqlen_q_ptr    = nullptr;
-    const void* seqlen_k_ptr    = nullptr;
-    const void* cu_seqlen_q_ptr = nullptr;
-    const void* cu_seqlen_k_ptr = nullptr;
-    const void* block_scale_seqstart_q_ptr;
-    const void* block_scale_seqstart_k_ptr;
-    const void* sink_ptr;
+    const void* seqstart_q_ptr             = nullptr;
+    const void* seqstart_k_ptr             = nullptr;
+    const void* seqlen_q_ptr               = nullptr;
+    const void* seqlen_k_ptr               = nullptr;
+    const void* cu_seqlen_q_ptr            = nullptr;
+    const void* cu_seqlen_k_ptr            = nullptr;
+    const void* block_scale_seqstart_q_ptr = nullptr;
+    const void* block_scale_seqstart_k_ptr = nullptr;
+    const void* sink_ptr                   = nullptr;
 
     ck_tile::index_t seqlen_q;
     ck_tile::index_t seqlen_k;
@@ -589,10 +589,10 @@ struct fmha_bwd_traits
 // would produce. This catches silent struct drift between the dispatcher's
 // fallback types and the upstream example headers.
 #if defined(CK_TILE_FMHA_FWD_TYPES_FROM_EXAMPLE)
-static_assert(sizeof(fmha_fwd_traits) >= 8, "fmha_fwd_traits layout may have changed upstream");
-static_assert(sizeof(fmha_fwd_args) >= 64, "fmha_fwd_args layout may have changed upstream");
+static_assert(sizeof(fmha_fwd_traits) >= 40, "fmha_fwd_traits layout may have changed upstream");
+static_assert(sizeof(fmha_fwd_args) >= 300, "fmha_fwd_args layout may have changed upstream");
 #endif
 #if defined(CK_TILE_FMHA_BWD_TYPES_FROM_EXAMPLE)
-static_assert(sizeof(fmha_bwd_traits) >= 8, "fmha_bwd_traits layout may have changed upstream");
-static_assert(sizeof(fmha_bwd_args) >= 64, "fmha_bwd_args layout may have changed upstream");
+static_assert(sizeof(fmha_bwd_traits) >= 32, "fmha_bwd_traits layout may have changed upstream");
+static_assert(sizeof(fmha_bwd_args) >= 350, "fmha_bwd_args layout may have changed upstream");
 #endif

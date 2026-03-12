@@ -225,8 +225,10 @@ FmhaKernelInstancePtr FmhaDispatcher::select_first_fit(const FmhaProblem& proble
         }
     }
 
-    FmhaKernelInstancePtr best = nullptr;
-    int best_score             = std::numeric_limits<int>::max();
+    FmhaKernelInstancePtr best           = nullptr;
+    std::tuple<int, int, int> best_score = {std::numeric_limits<int>::max(),
+                                            std::numeric_limits<int>::max(),
+                                            std::numeric_limits<int>::max()};
 
     for(const auto& kernel : kernels)
     {
@@ -238,7 +240,7 @@ FmhaKernelInstancePtr FmhaDispatcher::select_first_fit(const FmhaProblem& proble
         int rank        = key.algorithm.selection_rank;
         bool aligned    = (tile_m0 > 0) && (max_sq > 0) && (max_sq % tile_m0 == 0);
 
-        // Seqtune scoring (lower is better):
+        // Seqtune scoring (lower tuple is better):
         //   Category 0: seqlen_q <= tile_m0 AND aligned (perfect fit, smallest tile wins)
         //   Category 1: tile_m0 == 64 (unconditional fallback)
         //   Category 2: tile_m0 == max_tile_m0 (catch-all)
@@ -256,8 +258,7 @@ FmhaKernelInstancePtr FmhaDispatcher::select_first_fit(const FmhaProblem& proble
         else
             category = 4;
 
-        // Within category: prefer lower rank, then smaller tile
-        int score = category * 100000 + rank * 1000 + tile_m0;
+        auto score = std::make_tuple(category, rank, tile_m0);
 
         if(score < best_score)
         {
@@ -311,6 +312,10 @@ float FmhaDispatcher::run_plan(const FmhaExecutionPlan& plan,
         return kernel->run(invocation, sc);
     }
 
+    // Multi-stage lambdas capture by reference. This is safe because
+    // launch_kernel dispatches all stages on the same HIP stream before
+    // returning. If launch_kernel ever becomes async, these must capture
+    // by value or use shared_ptr.
     if(plan.stages.size() == 2)
     {
         auto first  = registry_->lookup(plan.stages[0].kernel_id);

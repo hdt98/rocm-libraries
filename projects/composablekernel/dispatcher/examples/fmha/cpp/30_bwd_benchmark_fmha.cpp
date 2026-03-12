@@ -321,6 +321,7 @@ int main(int argc, char* argv[])
         fwd_args.block_scale_size_kv = 0;
 
         // Warmup
+        dispatcher.set_benchmarking(true);
         dispatcher.set_timing(1, 1);
         try
         {

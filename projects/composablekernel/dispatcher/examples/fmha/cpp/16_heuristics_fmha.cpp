@@ -226,6 +226,7 @@ int main(int argc, char* argv[])
         else
             return {kernel_b_id, kernel_a_id};
     });
+    dispatcher.set_benchmarking(true);
     dispatcher.set_timing(1, 3);
 
     // Step 3: Plan different problems to show kernel selection

@@ -496,6 +496,7 @@ int main(int argc, char* argv[])
     run_args.block_scale_size_kv = 0;
 
     FmhaDispatcher ck_disp(&receipts[0].registry);
+    ck_disp.set_benchmarking(true);
     ck_disp.set_timing(1, 3);
 
     bool passed = false;
