@@ -63,6 +63,7 @@ int fmha_dispatcher_initialize(const char* arch)
         return -1;
 
     g_dispatcher = std::make_unique<FmhaDispatcher>(g_registry.get());
+    g_dispatcher->set_benchmarking(true);
     g_dispatcher->set_timing(1, 3);
     g_initialized = true;
     return 0;

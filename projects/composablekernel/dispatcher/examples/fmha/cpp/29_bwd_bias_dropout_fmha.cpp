@@ -308,6 +308,7 @@ int main(int argc, char* argv[])
     std::cout << "  Registered " << registry.size() << " kernel(s)\n";
 
     FmhaDispatcher dispatcher(&registry);
+    dispatcher.set_benchmarking(true);
     dispatcher.set_timing(1, 3);
 
     // Step 2: Plan backward (non-deterministic) with alibi + dropout

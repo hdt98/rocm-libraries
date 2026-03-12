@@ -543,6 +543,7 @@ int main(int argc, char* argv[])
     run_args.block_scale_size_kv = 0;
 
     bool passed = false;
+    aiter_disp.set_benchmarking(true);
     aiter_disp.set_timing(1, 3);
     try
     {

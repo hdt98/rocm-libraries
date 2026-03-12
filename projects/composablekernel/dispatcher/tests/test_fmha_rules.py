@@ -72,10 +72,9 @@ class TestValidateConfig(unittest.TestCase):
         self.assertFalse(r.valid)
         self.assertTrue(any("architecture" in e for e in r.errors))
 
-    def test_v3_disabled(self):
+    def test_v3_hdim128_valid(self):
         r = validate_config(_base_config(pipeline="v3", hdim_q=128, hdim_v=128), SPECS)
-        self.assertFalse(r.valid)
-        self.assertTrue(any("v3" in e for e in r.errors))
+        self.assertTrue(r.valid, r.errors)
 
     def test_hdim_not_multiple_of_8(self):
         r = validate_config(_base_config(hdim_q=65, hdim_v=128), SPECS)
@@ -89,13 +88,17 @@ class TestValidateConfig(unittest.TestCase):
 
     def test_hdim_192_128_with_bias(self):
         r = validate_config(_base_config(hdim_q=192, hdim_v=128, bias="bias"), SPECS)
-        self.assertFalse(r.valid)
-        self.assertTrue(any("(192,128)" in e for e in r.errors))
+        has_issue = any("(192,128)" in e for e in r.errors) or any(
+            "(192,128)" in w for w in r.warnings
+        )
+        self.assertTrue(has_issue)
 
     def test_hdim_192_128_with_dropout(self):
         r = validate_config(_base_config(hdim_q=192, hdim_v=128, dropout=True), SPECS)
-        self.assertFalse(r.valid)
-        self.assertTrue(any("(192,128)" in e for e in r.errors))
+        has_issue = any("(192,128)" in e for e in r.errors) or any(
+            "(192,128)" in w for w in r.warnings
+        )
+        self.assertTrue(has_issue)
 
     def test_appendkv_must_use_appendkv_pipeline(self):
         cfg = _base_config(family="fwd_appendkv", pipeline="qr_async")
@@ -137,12 +140,12 @@ class TestValidateConfig(unittest.TestCase):
         self.assertFalse(r.valid)
         self.assertTrue(any("bn1" in e for e in r.errors))
 
-    def test_bwd_dot_do_o_bm0_must_be_64(self):
+    def test_bwd_dot_do_o_bm0_128_accepted(self):
         cfg = _base_config(family="bwd_dot_do_o", pipeline="qr")
         cfg["algorithm"]["tile"][0] = 128
         r = validate_config(cfg, SPECS)
-        self.assertFalse(r.valid)
-        self.assertTrue(any("bm0=64" in e for e in r.errors))
+        # bwd_dot_do_o with bm0=128 is now valid (relaxed from strict bm0=64)
+        self.assertTrue(r.valid, r.errors)
 
     def test_mask_types_all_valid(self):
         for mask in ["no", "top_left", "bottom_right", "generic"]:

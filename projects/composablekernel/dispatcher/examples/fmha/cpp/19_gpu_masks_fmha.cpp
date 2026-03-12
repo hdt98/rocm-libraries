@@ -223,6 +223,7 @@ int main(int argc, char* argv[])
     std::cout << "  Registered " << registry.size() << " kernel(s)\n";
 
     FmhaDispatcher dispatcher(&registry);
+    dispatcher.set_benchmarking(true);
     dispatcher.set_timing(1, 3);
 
     const float scale = 1.0f / std::sqrt(static_cast<float>(hdim));

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -148,25 +149,20 @@ class BaseRegistry
         auto_export_path_        = path;
         auto_export_stats_       = include_statistics;
         auto_export_on_register_ = export_on_every_registration;
-        auto_export_enabled_     = true;
+        auto_export_enabled_.store(true, std::memory_order_release);
     }
 
-    void disable_auto_export()
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        auto_export_enabled_ = false;
-    }
+    void disable_auto_export() { auto_export_enabled_.store(false, std::memory_order_release); }
 
     [[nodiscard]] bool is_auto_export_enabled() const
     {
-        std::lock_guard<std::mutex> lock(mutex_);
-        return auto_export_enabled_;
+        return auto_export_enabled_.load(std::memory_order_acquire);
     }
 
     /// Call after registration to trigger auto-export if enabled.
     void perform_auto_export()
     {
-        if(auto_export_enabled_ && auto_export_on_register_)
+        if(auto_export_enabled_.load(std::memory_order_acquire) && auto_export_on_register_)
         {
             static_cast<Derived*>(this)->export_json_to_file(auto_export_path_, auto_export_stats_);
         }
@@ -187,7 +183,7 @@ class BaseRegistry
     std::unordered_map<KeyType, Entry, KeyHash> entries_;
     std::string name_ = "default";
 
-    bool auto_export_enabled_     = false;
+    std::atomic<bool> auto_export_enabled_{false};
     bool auto_export_on_register_ = true;
     bool auto_export_stats_       = true;
     std::string auto_export_path_;

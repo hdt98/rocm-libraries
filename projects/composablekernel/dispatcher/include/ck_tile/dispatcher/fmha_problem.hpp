@@ -202,12 +202,12 @@ struct FmhaProblem
         return has_seqstart_k_ptr || has_seqlen_k_ptr || has_cu_seqlen_k_ptr || is_gappy;
     }
 
-    [[nodiscard]] std::int64_t num_ops() const
+    [[nodiscard]] std::uint64_t num_ops() const
     {
-        const auto sq = effective_max_seqlen_q();
-        const auto sk = effective_max_seqlen_k();
-        // Q*K^T: 2*B*Hq*Sq*Sk*Dq  +  attn*V: 2*B*Hq*Sq*Sk*Dv
-        return 2 * batch * nhead_q * sq * sk * (hdim_q + hdim_v);
+        const auto sq = static_cast<std::uint64_t>(effective_max_seqlen_q());
+        const auto sk = static_cast<std::uint64_t>(effective_max_seqlen_k());
+        return 2ULL * static_cast<std::uint64_t>(batch) * static_cast<std::uint64_t>(nhead_q) * sq *
+               sk * static_cast<std::uint64_t>(hdim_q + hdim_v);
     }
 
     [[nodiscard]] std::string to_string() const
@@ -236,20 +236,21 @@ struct FmhaProblem
     /// Safe to use as a cache key (unlike to_string() which omits many fields).
     [[nodiscard]] std::string canonical_key() const
     {
+        constexpr char S = '\x1f'; // ASCII unit separator -- unambiguous delimiter
         std::string k;
         k.reserve(256);
         k += ck_tile::dispatcher::to_string(api_family);
-        k += '|';
+        k += S;
         k += ck_tile::dispatcher::to_string(requested_family);
-        k += '|';
+        k += S;
         k += data_type;
-        k += '|';
+        k += S;
         k += gfx_arch;
-        k += '|';
+        k += S;
         k += std::to_string(hdim_q);
         k += ',';
         k += std::to_string(hdim_v);
-        k += '|';
+        k += S;
         k += is_group_mode ? '1' : '0';
         k += is_v_rowmajor ? '1' : '0';
         k += has_logits_soft_cap ? '1' : '0';
@@ -262,7 +263,7 @@ struct FmhaProblem
         k += has_dbias ? '1' : '0';
         k += is_store_randval ? '1' : '0';
         k += is_deterministic ? '1' : '0';
-        k += '|';
+        k += S;
         k += std::to_string(mask_type);
         k += ',';
         k += std::to_string(bias_type);
@@ -270,7 +271,7 @@ struct FmhaProblem
         k += std::to_string(qscale_type);
         k += ',';
         k += std::to_string(rope_type);
-        k += '|';
+        k += S;
         k += std::to_string(kv_memory_layout);
         k += ',';
         k += std::to_string(kv_lookup_table);
@@ -687,6 +688,22 @@ class FmhaProblemBuilder
         {
             throw std::invalid_argument("Invalid FMHA problem: " + problem_.to_string());
         }
+
+        const auto fam = problem_.api_family;
+        if(fam == FmhaApiFamily::Bwd)
+        {
+            if(problem_.has_lse == false)
+            {
+                throw std::invalid_argument(
+                    "FMHA BWD requires has_lse=true (LSE from forward pass)");
+            }
+        }
+
+        if(problem_.is_group_mode && problem_.max_seqlen_q <= 0)
+        {
+            throw std::invalid_argument("FMHA group mode requires max_seqlen_q > 0");
+        }
+
         return problem_;
     }
 

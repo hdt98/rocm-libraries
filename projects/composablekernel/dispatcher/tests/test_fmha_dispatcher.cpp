@@ -395,9 +395,57 @@ TEST(FmhaDispatcherTest, SetBenchmarkingControlsTimingFlag)
     FmhaRegistry registry;
     FmhaDispatcher dispatcher(&registry);
 
-    EXPECT_TRUE(dispatcher.benchmarking_enabled());
-    dispatcher.set_benchmarking(false);
     EXPECT_FALSE(dispatcher.benchmarking_enabled());
     dispatcher.set_benchmarking(true);
     EXPECT_TRUE(dispatcher.benchmarking_enabled());
+    dispatcher.set_benchmarking(false);
+    EXPECT_FALSE(dispatcher.benchmarking_enabled());
+}
+
+// Verify tie() covers all Signature and Algorithm fields.
+// If a new field is added to FmhaKernelKey but not to tie(),
+// two keys differing only in that field would compare equal (silent bug).
+TEST(FmhaKernelKeyTest, TieCoversAllSignatureFields)
+{
+    FmhaKernelKey a{};
+    a.signature.data_type = "fp16";
+    a.gfx_arch            = "gfx950";
+
+    auto flip = [&](auto mutator) {
+        FmhaKernelKey b = a;
+        mutator(b);
+        EXPECT_NE(a, b) << "tie() does not distinguish a Signature/Algorithm field";
+    };
+
+    flip([](FmhaKernelKey& k) { k.signature.family = FmhaKernelFamily::BwdDqDkDv; });
+    flip([](FmhaKernelKey& k) { k.signature.data_type = "bf16"; });
+    flip([](FmhaKernelKey& k) { k.signature.is_group_mode = true; });
+    flip([](FmhaKernelKey& k) { k.signature.is_v_rowmajor = false; });
+    flip([](FmhaKernelKey& k) { k.signature.has_logits_soft_cap = true; });
+    flip([](FmhaKernelKey& k) { k.signature.mask_type = 1; });
+    flip([](FmhaKernelKey& k) { k.signature.bias_type = 1; });
+    flip([](FmhaKernelKey& k) { k.signature.has_lse = true; });
+    flip([](FmhaKernelKey& k) { k.signature.has_dropout = true; });
+    flip([](FmhaKernelKey& k) { k.signature.qscale_type = 1; });
+    flip([](FmhaKernelKey& k) { k.signature.rope_type = 1; });
+    flip([](FmhaKernelKey& k) { k.signature.use_paged_kv = true; });
+    flip([](FmhaKernelKey& k) { k.signature.do_fp8_static_quant = true; });
+    flip([](FmhaKernelKey& k) { k.signature.skip_min_seqlen_q = true; });
+    flip([](FmhaKernelKey& k) { k.signature.has_sink = true; });
+    flip([](FmhaKernelKey& k) { k.signature.has_dbias = true; });
+    flip([](FmhaKernelKey& k) { k.signature.is_store_randval = true; });
+    flip([](FmhaKernelKey& k) { k.signature.is_deterministic = true; });
+    flip([](FmhaKernelKey& k) { k.signature.kv_memory_layout = 1; });
+    flip([](FmhaKernelKey& k) { k.signature.kv_lookup_table = 1; });
+    flip([](FmhaKernelKey& k) { k.signature.page_size = 64; });
+    flip([](FmhaKernelKey& k) { k.signature.hdim_q = 256; });
+    flip([](FmhaKernelKey& k) { k.signature.hdim_v = 256; });
+    flip([](FmhaKernelKey& k) { k.signature.receipt = 1; });
+
+    flip([](FmhaKernelKey& k) { k.algorithm.tile_shape.m0 = 64; });
+    flip([](FmhaKernelKey& k) { k.algorithm.pipeline = "qr_async"; });
+    flip([](FmhaKernelKey& k) { k.algorithm.pad_s = false; });
+    flip([](FmhaKernelKey& k) { k.algorithm.selection_rank = 5; });
+    flip([](FmhaKernelKey& k) { k.algorithm.constraint_tag = "special"; });
+    flip([](FmhaKernelKey& k) { k.gfx_arch = "gfx942"; });
 }

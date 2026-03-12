@@ -557,6 +557,9 @@ class FmhaKernelSet
     std::string tag_;
 };
 
+/// Singleton registry for declarative kernel sets.
+/// Thread safety: only populated during static initialization (pre-main)
+/// via DECL_FMHA_KERNEL_SET macros. Do NOT call add() after main() starts.
 class FmhaKernelSetRegistry
 {
     public:
@@ -631,7 +634,13 @@ using FmhaKernelSetRegistry = fmha_decl::FmhaKernelSetRegistry;
 #define CK_FMHA_DECL_CAT_(a, b) CK_FMHA_DECL_CAT_IMPL_(a, b)
 #define CK_FMHA_DECL_CAT_IMPL_(a, b) a##b
 
-#define DECL_FMHA_KERNEL_SET(name, ...)                                           \
-    __extension__ static ::ck_tile::dispatcher::fmha_decl::FmhaKernelSetRegistrar \
-    CK_FMHA_DECL_CAT_(_fmha_kset_reg_, __COUNTER__)(                              \
+#if defined(__GNUC__) || defined(__clang__)
+#define CK_FMHA_DECL_EXT_ __extension__
+#else
+#define CK_FMHA_DECL_EXT_
+#endif
+
+#define DECL_FMHA_KERNEL_SET(name, ...)                                               \
+    CK_FMHA_DECL_EXT_ static ::ck_tile::dispatcher::fmha_decl::FmhaKernelSetRegistrar \
+    CK_FMHA_DECL_CAT_(_fmha_kset_reg_, __COUNTER__)(                                  \
         #name, ::ck_tile::dispatcher::fmha_decl::FmhaKernelSet() __VA_ARGS__.tag(#name))

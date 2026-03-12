@@ -187,7 +187,6 @@ function(add_gpu_example NAME SOURCE KERNEL_HEADER)
     if(HEADER_NAME STREQUAL "register_all_kernels.hpp")
         # Registration header - examples include it directly
         target_compile_options(${NAME} PRIVATE
-            -DGEMM_KERNEL_AVAILABLE=1
             -mllvm -enable-noalias-to-md-conversion=0
             -Wno-undefined-func-template
             -Wno-float-equal
@@ -323,7 +322,6 @@ function(add_declarative_gpu_example NAME SOURCE)
     # Force-include the generated registration header
     target_compile_options(${NAME} PRIVATE
         -include ${EXAMPLE_HEADER}
-        -DGEMM_KERNEL_AVAILABLE=1
         -mllvm -enable-noalias-to-md-conversion=0
         -Wno-undefined-func-template
         -Wno-float-equal

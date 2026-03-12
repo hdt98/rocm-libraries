@@ -113,6 +113,19 @@ set_tests_properties(dispatcher_test_fmha_rules PROPERTIES
     ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/../python:${CMAKE_CURRENT_SOURCE_DIR}/../codegen:${CMAKE_CURRENT_SOURCE_DIR}/../scripts"
 )
 
+# FMHA parity test (requires GPU)
+add_test(
+    NAME dispatcher_test_fmha_parity
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_fmha_parity.py
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+set_tests_properties(dispatcher_test_fmha_parity PROPERTIES
+    LABELS "dispatcher;python;fmha;parity;gpu"
+    TIMEOUT 600
+    ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/../python:${CMAKE_CURRENT_SOURCE_DIR}/../codegen:${CMAKE_CURRENT_SOURCE_DIR}/../scripts"
+)
+
 # Stress Test Script
 add_test(
     NAME dispatcher_stress_test
