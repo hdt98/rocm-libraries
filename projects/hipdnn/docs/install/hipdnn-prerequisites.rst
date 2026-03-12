@@ -8,12 +8,11 @@
 hipDNN installation
 *******************
 
-Ensure your system has these requirements before installing hipDNN.
-
 The hipDNN frontend API is distributed as a header-only library, requiring the development ROCm packages to be installed.
 The base ROCm install package does *not* include the hipDNN frontend API header files.
 
 These development packages contain the ``dev`` prefix. 
+
 For example, on Linux with a gfx950 GPU, install the ``amdrocm-core-dev7.12-gfx950`` package instead of the ``amdrocm7.12-gfx950`` package (``amdrocm-core-dev7.12-gfx950`` includes the ``amdrocm7.121-gfx950`` package, so only the ``amdrocm-core-dev7.12-gfx950`` package needs to be installed).
 
 System requirements
