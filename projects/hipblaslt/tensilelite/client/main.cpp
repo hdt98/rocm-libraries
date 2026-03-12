@@ -287,6 +287,7 @@ namespace TensileLite
                 ("use-gpu-timer",            po::value<bool>()->default_value(true), "Use GPU timer")
                 ("sleep-percent",            po::value<int>()->default_value(0), "Sleep percentage")
                 ("hardware-monitor",         po::value<bool>()->default_value(true), "Use hardware monitor.")
+                ("benchmark-timer",          po::value<bool>()->default_value(true), "Enable benchmark timing. Disable for correctness-only runs.")
 
                 ("perf-l2-read-hits",        po::value<double>()->default_value(0.0), "L2 read hits")
                 ("perf-l2-write-hits",       po::value<double>()->default_value(0.5), "L2 write hits")
@@ -540,6 +541,7 @@ namespace TensileLite
             DUMP_OPT("use-gpu-timer", bool);
             DUMP_OPT("sleep-percent", int);
             DUMP_OPT("hardware-monitor", bool);
+            DUMP_OPT("benchmark-timer", bool);
             DUMP_OPT("perf-l2-read-hits", double);
             DUMP_OPT("perf-l2-write-hits", double);
             DUMP_OPT("perf-l2-read-bw-mul", double);
