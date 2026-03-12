@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "grouped_convolution_utils.hpp"
+#include "ck_tile/ops/gemm/kernel/streamk_gemm/streamk_gemm_tile_partitioner.hpp"
 
-struct GroupedConvolutionBackwardWeightInvoker
+struct GroupedConvolutionBackwardWeightStreamKInvoker
 {
     template <ck_tile::index_t NDimSpatial,
               typename ConvConfig,
@@ -20,7 +21,6 @@ struct GroupedConvolutionBackwardWeightInvoker
     static InvokerResult grouped_conv_bwd_weight(const ck_tile::GroupedConvBwdWeightHostArgs& args,
                                                  const ck_tile::stream_config& s)
     {
-        // Implicit GEMM Traits
         using GemmShape = ck_tile::TileGemmShape<
             ck_tile::sequence<ConvConfig::M_Tile, ConvConfig::N_Tile, ConvConfig::K_Tile>,
             ck_tile::sequence<ConvConfig::M_Warp, ConvConfig::N_Warp, ConvConfig::K_Warp>,
@@ -40,10 +40,9 @@ struct GroupedConvolutionBackwardWeightInvoker
                                                                  ConvConfig::VectorSizeC,
                                                                  ConvConfig::NumGroupsToMerge>;
 
-        using TilePartitioner = ck_tile::GemmSpatiallyLocalTilePartitioner<
-            GemmShape,
-            GroupedConvTraitsType::FixedGemmParams::TilePartitionerGroupNum,
-            GroupedConvTraitsType::FixedGemmParams::TilePartitionerM01>;
+        // StreamK tile partitioner (Linear reduction, non-persistent)
+        using TilePartitioner = ck_tile::
+            StreamKTilePartitioner<GemmShape, ck_tile::StreamKReductionStrategy::Linear, false>;
 
         using GemmUniversalTraits = ck_tile::TileGemmUniversalTraits<
             GroupedConvTraitsType::FixedGemmParams::kPadM,
