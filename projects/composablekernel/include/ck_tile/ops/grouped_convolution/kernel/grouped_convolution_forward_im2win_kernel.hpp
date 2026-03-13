@@ -316,7 +316,8 @@ struct GroupedConvolutionForwardIm2winKernel
     using OutLayout = remove_cvref_t<typename GroupedConvTraitsType_::OutLayout>;
     using DsLayout  = remove_cvref_t<typename GroupedConvTraitsType_::DsLayout>;
 
-    using GemmDsLayout                  = remove_cvref_t<typename EpiloguePipeline::DsLayout>;
+    using GemmDsLayout                  = sequence<>;
+        //remove_cvref_t<typename EpiloguePipeline::DsLayout>;
     static constexpr index_t NumDTensor = GroupedConvTraitsType_::NumDTensor;
 
     static constexpr index_t kBlockSize = GemmPipeline::BlockSize;
@@ -326,9 +327,11 @@ struct GroupedConvolutionForwardIm2winKernel
 
     using InDataType  = remove_cvref_t<typename GemmPipeline::ADataType>;
     using WeiDataType = remove_cvref_t<typename GemmPipeline::BDataType>;
-    using DsDataType  = remove_cvref_t<typename EpiloguePipeline::DsDataType>;
+    using DsDataType  = sequence<>;
+        //remove_cvref_t<typename EpiloguePipeline::DsDataType>;
     using OutDataType = remove_cvref_t<typename EpiloguePipeline::ODataType>;
-    using CDElementwise = typename EpiloguePipeline::CDElementwise;
+    using CDElementwise = ck_tile::element_wise::PassThrough;
+        //typename EpiloguePipeline::CDElementwise;
 
     using KernelArgs = GroupedConvFwdIm2winKernelArgs<GroupedConvTraitsType_, CDElementwise>;
 
@@ -581,7 +584,7 @@ struct GroupedConvolutionForwardIm2winKernel
                 MakeCBlockWindow(c_ptr, kargs.c_grid_desc_m_n, block_idx_m, block_idx_n);
             auto ds_block_windows = generate_tuple([&](auto) { return c_block_window; },
                                                    number<NumDTensor>{});
-            EpiloguePipeline{kargs.elfunc}.template operator()(
+            EpiloguePipeline{/*kargs.elfunc*/}.template operator()(
                 c_block_window, c_block_tile, ds_block_windows, smem);
         }
         else
@@ -616,7 +619,7 @@ struct GroupedConvolutionForwardIm2winKernel
                     MakeCBlockWindow(c_ptr, kargs.c_grid_desc_m_n, block_idx_m, block_idx_n);
                 auto ds_block_windows = generate_tuple([&](auto) { return c_block_window; },
                                                        number<NumDTensor>{});
-                EpiloguePipeline{kargs.elfunc}.template operator()(
+                EpiloguePipeline{/*kargs.elfunc*/}.template operator()(
                     c_block_window, c_block_tile, ds_block_windows, smem);
 
                 if constexpr(g_local + 1 < KernelArgs::NumGroupsToMerge)

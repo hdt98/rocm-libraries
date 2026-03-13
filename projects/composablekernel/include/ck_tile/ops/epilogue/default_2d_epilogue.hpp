@@ -183,6 +183,19 @@ struct Default2DEpilogue
             storeOrUpdateTile(o_acc_tile);
         }
     }
+
+    [[nodiscard]] CK_TILE_HOST static const std::string GetName()
+    {
+        // clang-format off
+        return concat('_', "Default2DEpilogue",
+                       '_',
+                       UseRawStore ? "RawStore" : "RegularStore",
+                       '_',
+                       kPadM ? "PadM" : "NoPadM",
+                       '_',
+                       kPadN ? "PadN" : "NoPadN");
+        // clang-format on
+    }
 };
 
 template <typename Problem_, typename Policy_ = void>

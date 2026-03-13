@@ -104,26 +104,32 @@ struct GroupedConvolutionFwdIm2winInvoker
             ConvConfig::Pipeline>::template GemmPipeline<UniversalGemmProblem>;
 
         // ── Epilogue ──────────────────────────────────────────────────────
-        using ConvEpilogue = ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<
-            InDataType,
-            WeiDataType,
-            ck_tile::tuple<>,
+        // using ConvEpilogue = ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<
+        //     InDataType,
+        //     WeiDataType,
+        //     ck_tile::tuple<>,
+        //     AccDataType,
+        //     OutDataType,
+        //     typename GroupedConvTraitsType::ImplicitGemmDsLayout,
+        //     typename GroupedConvTraitsType::FixedGemmParams::ELayout,
+        //     CDElementWise,
+        //     TilePartitioner::MPerBlock,
+        //     TilePartitioner::NPerBlock,
+        //     ConvConfig::M_Warp,
+        //     ConvConfig::N_Warp,
+        //     ConvConfig::M_Warp_Tile,
+        //     ConvConfig::N_Warp_Tile,
+        //     ConvConfig::K_Warp_Tile,
+        //     GroupedConvTraitsType::FixedGemmParams::TransposeC,
+        //     ConvConfig::NumWaveGroups,
+        //     GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
+        //     GroupedConvTraitsType::VectorSizeC>>;
+
+        using ConvEpilogue = ck_tile::Default2DEpilogue<ck_tile::Default2DEpilogueProblem<
             AccDataType,
-            OutDataType,
-            typename GroupedConvTraitsType::ImplicitGemmDsLayout,
-            typename GroupedConvTraitsType::FixedGemmParams::ELayout,
-            CDElementWise,
-            TilePartitioner::MPerBlock,
-            TilePartitioner::NPerBlock,
-            ConvConfig::M_Warp,
-            ConvConfig::N_Warp,
-            ConvConfig::M_Warp_Tile,
-            ConvConfig::N_Warp_Tile,
-            ConvConfig::K_Warp_Tile,
-            GroupedConvTraitsType::FixedGemmParams::TransposeC,
-            ConvConfig::NumWaveGroups,
-            GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
-            GroupedConvTraitsType::VectorSizeC>>;
+            OutDataType, 
+            true,
+            true>>;
 
         // ── Kernel type ───────────────────────────────────────────────────
         using Kernel = ck_tile::GroupedConvolutionForwardIm2winKernel<GroupedConvTraitsType,

@@ -226,6 +226,10 @@ struct Im2winConfig_CV3_M16N64K64 : public Im2winConvConfigBase
     static constexpr ck_tile::index_t M_Warp_Tile = 16;
     static constexpr ck_tile::index_t N_Warp_Tile = 16;
     static constexpr ck_tile::index_t K_Warp_Tile = 32;
+
+    static constexpr ck_tile::index_t VectorSizeA = 4;
+    static constexpr ck_tile::index_t VectorSizeB = 8;
+    static constexpr ck_tile::index_t VectorSizeC = 4;
 };
 
 // ── Config 2: ComputeV3, larger M tile — more spatial parallelism
