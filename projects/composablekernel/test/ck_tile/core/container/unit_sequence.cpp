@@ -380,6 +380,32 @@ TEST(SequenceUniqueSort, UniqueSortAllSame)
     EXPECT_TRUE((std::is_same<Result, Expected>::value));
 }
 
+// Test sequence_unique_count
+TEST(SequenceUniqueCount, UniqueCount)
+{
+    EXPECT_TRUE(sequence_unique_count(sequence<>{}) == 0);
+    EXPECT_TRUE(sequence_unique_count(sequence<3, 1, 4, 1, 5, 9, 2, 6, 5>{}) == 7);
+    EXPECT_TRUE(sequence_unique_count(sequence<31, 33, 31, 33>{}) == 2);
+}
+
+TEST(SequenceUniqueCount, UniqueCountNoDuplicates)
+{
+    EXPECT_TRUE(sequence_unique_count(sequence<5, 2, 8, 1, 9>{}) == 5);
+    EXPECT_TRUE(sequence_unique_count(sequence<0, 5, 2, 8, 1, 9, 11, 7, 34>{}) == 9);
+}
+
+TEST(SequenceUniqueCount, UniqueCountAllSame)
+{
+    EXPECT_TRUE(sequence_unique_count(sequence<5, 5, 5, 5>{}) == 1);
+    EXPECT_TRUE(sequence_unique_count(sequence<63, 63, 63>{}) == 1);
+}
+
+TEST(SequenceUniqueCount, UniqueCountOutOfRange)
+{
+    EXPECT_TRUE(sequence_unique_count(sequence<1, 2, -5, 3>{}) == -1);
+    EXPECT_TRUE(sequence_unique_count(sequence<100, 102>{}) == -1);
+}
+
 // Test is_valid_sequence_map
 TEST(SequenceMap, ValidMap)
 {

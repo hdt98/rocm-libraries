@@ -672,6 +672,31 @@ struct sequence_unique_sort
     using sorted2unsorted_map = typename sorted_seqs::ids_type;
 };
 
+/**
+ * @brief Count the number of unique values in a sequence, all values must be in range [0, 63]
+ * otherwise returns -1. For such cases use sequence_unique_sort.
+ * @tparam Seq sequence.
+ * @return the number of unique values or -1 if any of values is not in range [0, 63].
+ */
+template <typename Seq>
+__host__ __device__ constexpr index_t sequence_unique_count(Seq)
+{
+    uint64_t set = 0;
+    for(index_t i = 0; i < Seq::Size(); ++i)
+    {
+        const index_t v = Seq::At(i);
+        if(v >= 0 && v < 64)
+        {
+            set |= (1ull << v);
+        }
+        else
+        {
+            return -1;
+        }
+    }
+    return __builtin_popcountll(set);
+}
+
 template <typename SeqMap>
 struct is_valid_sequence_map : is_same<typename arithmetic_sequence_gen<0, SeqMap::Size(), 1>::type,
                                        typename sequence_sort<SeqMap, math::less<index_t>>::type>
