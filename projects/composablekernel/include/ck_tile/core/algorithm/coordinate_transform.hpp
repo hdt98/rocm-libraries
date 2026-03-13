@@ -1552,24 +1552,45 @@ struct xor_lds_bank_4d_t : public base_transform<4, 4>
         const auto n_vec    = idx_up[number<2>{}];
         const auto vec_elem = idx_up[number<3>{}];
 
-        // Pass through m_coarse and m_layer unchanged
+        // Pass through m_coarse unchanged
         idx_low(number<0>{}) = m_coarse;
-        idx_low(number<1>{}) = m_layer;
 
-        // Compute merged M index for XOR calculation
+        // APPROACH 15: Dual-XOR - XOR both M_layer and N_vec for ~50% coverage
+        //
+        // Key insight: At 4D level (after unmerge, before merge), XOR is safe because:
+        // - Merge is ADDITIVE: N = N_vec × VectorLen + Vec
+        // - Vec appears only as addition, never through XOR
+        // - Therefore: (π(N_vec) × VectorLen + Vec) % VectorLen = Vec ✓
+        // - Thread assignment of vec ∈ [0, VectorLen) is ALWAYS preserved
+        //
+        // Dual-XOR transformation:
+        //   new_m_layer = m_layer ^ (n_vec & (m_layer_len - 1))
+        //   new_n_vec   = n_vec   ^ ((merged_m & (XorMask - 1)) * XorMult % n_vectors)
+        //
+        // Bijectivity proof: T(m, n) = (m ⊕ f(n), n ⊕ g(m))
+        //   Inverse: T⁻¹(m', n') = (m' ⊕ f(n' ⊕ g(m')), n' ⊕ g(m'))
+        //   XOR is self-inverse, so this always works.
+
+        // XOR M_layer based on N_vec (NEW!)
+        // This adds 4 more XOR patterns for better bank distribution
+        const auto m_layer_len = up_lengths_[number<1>{}];
+        const auto m_xor_val = n_vec & (m_layer_len - 1);
+        const auto new_m_layer = m_layer ^ m_xor_val;
+        idx_low(number<1>{}) = new_m_layer;
+
+        // Compute merged M index for N_vec XOR calculation
+        // Use ORIGINAL m_layer for merged_m (g(m) must use original m, not XOR'd m)
         const auto merged_m = m_coarse * mlds_layer_ + m_layer;
 
-        // Apply XOR to N_vector dimension with modulo for safety
-        // Modulo ensures XOR value stays within valid N_vector range even with
-        // aggressive multipliers (prevents aliasing/out-of-bounds access)
+        // XOR N_vec based on merged M (existing logic, enhanced with modulo)
         const auto xor_base = (merged_m & (XorMask - 1)) * XorMult;
-        const auto n_vectors = up_lengths_[number<2>{}];  // Get N_vectors from descriptor
-        const auto xor_val = xor_base % n_vectors;
-        const auto new_n_vec = n_vec ^ xor_val;
-
+        const auto n_vectors = up_lengths_[number<2>{}];
+        const auto n_xor_val = xor_base % n_vectors;
+        const auto new_n_vec = n_vec ^ n_xor_val;
         idx_low(number<2>{}) = new_n_vec;
 
-        // Pass through VectorLen element index unchanged
+        // Pass through VectorLen element index unchanged (CRITICAL!)
+        // This is what makes 4D XOR safe - Vec is never modified
         idx_low(number<3>{}) = vec_elem;
     }
 
@@ -1751,6 +1772,137 @@ CK_TILE_HOST_DEVICE constexpr auto
 make_xor_lds_bank_2d_transform(const LowLengths& low_lengths)
 {
     return xor_lds_bank_2d_t<LowLengths, XorMask, XorMult>(low_lengths);
+}
+
+// 3D XOR transform for LDS bank conflict reduction (Approach 14: 3D XOR at Level 0)
+// Operates on lds_block_desc_0: [M_coarse, N_interleaved, Vec]
+// XORs N_interleaved (dim 1) based on M_coarse (dim 0), leaving Vec (dim 2) UNTOUCHED
+//
+// Key insight: At lds_block_desc_0, Vec is a SEPARATE dimension (not merged into N).
+// This allows XOR to operate on N_interleaved without corrupting vector structure.
+//
+// Coverage: N_interleaved = MLdsLayer × N_vectors (e.g., 4 × 4 = 16 values)
+// With XorMask=8, XorMult=2: 8 distinct XOR values across 16 positions = 50% coverage
+//
+// Parameters:
+//   LowLengths: tuple<M_coarse_len, N_interleaved_len, Vec_len>
+//   XorMask: mask for M_coarse index (e.g., 8 means use M_coarse & 7)
+//   XorMult: XOR multiplier for spreading (e.g., 2 spreads by 2 positions)
+template <typename LowLengths, index_t XorMask, index_t XorMult>
+struct xor_lds_bank_3d_t : public base_transform<3, 3>
+{
+    static constexpr auto type_enum = coord_transform_enum::xor_t;
+
+    using LowerIndex = multi_index<3>;
+    using UpperIndex = multi_index<3>;
+    using UpLengths = LowLengths;
+
+    UpLengths up_lengths_;
+
+    CK_TILE_HOST_DEVICE constexpr xor_lds_bank_3d_t() : up_lengths_{} {}
+
+    CK_TILE_HOST_DEVICE constexpr xor_lds_bank_3d_t(const LowLengths& low_lengths)
+        : up_lengths_{low_lengths}
+    {
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr auto get_type_enum()
+    {
+        return coord_transform_enum::xor_t;
+    }
+
+    CK_TILE_HOST_DEVICE constexpr const auto& get_upper_lengths() const { return up_lengths_; }
+
+    template <typename LowIdx, typename UpIdx>
+    CK_TILE_HOST_DEVICE constexpr void calculate_lower_index(LowIdx& idx_low,
+                                                             const UpIdx& idx_up) const
+    {
+        static_assert(LowIdx::size() == 3 && UpIdx::size() == 3,
+                      "wrong! inconsistent # of dimension");
+
+        const auto m_coarse = idx_up[number<0>{}];
+        const auto n_interleaved = idx_up[number<1>{}];
+        const auto vec = idx_up[number<2>{}];
+
+        // Pass through M_coarse unchanged
+        idx_low(number<0>{}) = m_coarse;
+
+        // XOR N_interleaved based on M_coarse with modulo for safety
+        const auto n_interleaved_len = up_lengths_[number<1>{}];
+        const auto xor_base = (m_coarse & (XorMask - 1)) * XorMult;
+        const auto xor_val = xor_base % n_interleaved_len;
+        const auto new_n_interleaved = n_interleaved ^ xor_val;
+
+        idx_low(number<1>{}) = new_n_interleaved;
+
+        // Pass through Vec unchanged - THIS IS THE KEY INSIGHT!
+        // Vec is a separate dimension, preserving thread ownership
+        idx_low(number<2>{}) = vec;
+    }
+
+    template <typename LowIdxDiff, typename UpIdxDiff, typename LowIdx, typename UpIdx>
+    CK_TILE_HOST_DEVICE void update_lower_index(LowIdxDiff& idx_diff_low,
+                                                const UpIdxDiff&,
+                                                LowIdx& idx_low,
+                                                const UpIdx& idx_up) const
+    {
+        static_assert(LowIdxDiff::size() == 3 && UpIdxDiff::size() == 3 && LowIdx::size() == 3 &&
+                          UpIdx::size() == 3,
+                      "wrong! inconsistent # of dimension");
+
+        const auto idx_low_old = idx_low;
+
+        calculate_lower_index(idx_low, idx_up);
+
+        idx_diff_low = idx_low - idx_low_old;
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr bool
+    is_valid_upper_index_always_mapped_to_valid_lower_index()
+    {
+        return true;
+    }
+
+    template <typename UpIdx>
+    CK_TILE_HOST_DEVICE static constexpr bool
+    is_valid_upper_index_mapped_to_valid_lower_index(const UpIdx& /* idx_up */)
+    {
+        return true;
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr bool is_known_at_compile_time()
+    {
+        return ck_tile::is_known_at_compile_time<UpLengths>::value;
+    }
+
+    // MUST be static function
+    template <typename LowVectorLengths, typename LowVectorStrides>
+    CK_TILE_HOST_DEVICE constexpr auto calculate_upper_dimension_safe_vector_length_strides(
+        const LowVectorLengths& low_vector_lengths,
+        const LowVectorStrides& low_vector_strides) const
+    {
+        array<index_t, 3> up_vector_lengths = low_vector_lengths;
+        array<index_t, 3> up_vector_strides = low_vector_strides;
+
+        return make_tuple(up_vector_lengths, up_vector_strides);
+    }
+};
+
+template <typename LowLengths, index_t XorMask, index_t XorMult>
+CK_TILE_HOST_DEVICE static void print(const xor_lds_bank_3d_t<LowLengths, XorMask, XorMult>& x)
+{
+    printf("xor_lds_bank_3d_t{");
+    printf("up_lengths_: ");
+    print(x.up_lengths_);
+    printf(", xor_mask: %d, xor_mult: %d}", XorMask, XorMult);
+}
+
+// Helper function to create 3D XOR transform
+template <index_t XorMask, index_t XorMult, typename LowLengths>
+CK_TILE_HOST_DEVICE constexpr auto
+make_xor_lds_bank_3d_transform(const LowLengths& low_lengths)
+{
+    return xor_lds_bank_3d_t<remove_cvref_t<LowLengths>, XorMask, XorMult>(low_lengths);
 }
 
 template <typename LowLength, typename OffsetLength>
