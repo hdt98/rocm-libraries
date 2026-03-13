@@ -8,6 +8,8 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <chrono>
 
 using Epilogue = ck_tile::BenchmarkEpilogue<
     @A_TYPE@, @B_TYPE@, @ACC_TYPE@, @O_TYPE@,
@@ -63,6 +65,41 @@ int main(int argc, char** argv)
     }
 
     std::cout << "=== @CONFIG_NAME@ ===" << std::endl;
+
+    // #region agent log
+    {
+        std::ofstream log(
+            "/home/AMD/mpodkory/cursor_projects/rocm-libraries/projects/composablekernel/.cursor/debug-344d72.log",
+            std::ios::app);
+        if(log)
+        {
+            const auto ts = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                std::chrono::system_clock::now().time_since_epoch())
+                                .count();
+            log << "{\"sessionId\":\"344d72\",\"runId\":\"pre-fix\",\"hypothesisId\":\"H1\","
+                << "\"location\":\"benchmark_template.cpp:main\","
+                << "\"message\":\"Capture benchmark/store-load shape and vector width\","
+                << "\"data\":{\"config\":\"@CONFIG_NAME@\",\"kBlockSize\":" << StoreSetup::kBlockSize
+                << ",\"kBytes\":" << StoreSetup::kBytes
+                << ",\"MPerIterationShuffle\":" << Epilogue::MPerIterationShuffle
+                << ",\"NPerIterationShuffle\":" << Epilogue::NPerIterationShuffle
+                << ",\"GetVectorSizeC\":" << Epilogue::GetVectorSizeC() << "},\"timestamp\":" << ts
+                << "}\n";
+            log << "{\"sessionId\":\"344d72\",\"runId\":\"pre-fix\",\"hypothesisId\":\"H2\","
+                << "\"location\":\"benchmark_template.cpp:main\","
+                << "\"message\":\"Descriptor stride likely maps lane-varying accesses to same bank group during store phases\","
+                << "\"data\":{\"target\":\"store\"},\"timestamp\":" << ts << "}\n";
+            log << "{\"sessionId\":\"344d72\",\"runId\":\"pre-fix\",\"hypothesisId\":\"H3\","
+                << "\"location\":\"benchmark_template.cpp:main\","
+                << "\"message\":\"Load path uses thread_raked read distribution and may naturally avoid conflicts\","
+                << "\"data\":{\"target\":\"load\"},\"timestamp\":" << ts << "}\n";
+            log << "{\"sessionId\":\"344d72\",\"runId\":\"pre-fix\",\"hypothesisId\":\"H4\","
+                << "\"location\":\"benchmark_template.cpp:main\","
+                << "\"message\":\"Conflicts may be specific to gfx950 bank phase behavior with ds_write_b128\","
+                << "\"data\":{\"arch_hint\":\"gfx950\"},\"timestamp\":" << ts << "}\n";
+        }
+    }
+    // #endregion
 
     ck_tile::stream_config stream{nullptr, true, 0, warmup, iters, true};
 

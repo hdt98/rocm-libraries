@@ -1444,12 +1444,17 @@ struct xor_fp8_bank_t : public base_transform<2, 2>
 
         idx_low(number<1>{}) = new_n;
 
-        // Debug: print first few calculations
-        if(threadIdx.x < 4 && blockIdx.x == 0)
+        // Debug: print calculations for representative threads
+        // Check threads 0, 16, 32, 48 to see conflict pattern
+        if((threadIdx.x == 0 || threadIdx.x == 16 || threadIdx.x == 32 || threadIdx.x == 48) &&
+           blockIdx.x == 0)
         {
-            printf("XOR tid=%d: m=%d n=%d -> n_word=%d xor_val=%d new_n_word=%d new_n=%d\n",
-                   (int)threadIdx.x, (int)m, (int)n, (int)n_word, (int)xor_val,
-                   (int)new_n_word, (int)new_n);
+            // Calculate physical offset (assuming stride ~260 for 32 N + padding)
+            // offset = m * 260 + new_n
+            const auto offset = m * 260 + new_n;
+            const auto bank = (offset / 4) % 64;
+            printf("XOR tid=%d: m=%d n=%d -> new_n=%d offset=%d bank=%d\n",
+                   (int)threadIdx.x, (int)m, (int)n, (int)new_n, (int)offset, (int)bank);
         }
     }
 
