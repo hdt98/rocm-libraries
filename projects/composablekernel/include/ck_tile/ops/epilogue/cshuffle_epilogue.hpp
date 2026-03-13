@@ -346,74 +346,50 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
                 make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
 
+            // First merge the 4D descriptor to 2D [M, N]
+            constexpr auto lds_block_desc_2 = transform_tensor_descriptor(
+                lds_block_desc_1,
+                make_tuple(make_merge_transform_v3_division_mod(make_tuple(
+                               number<MPerIterationShuffle / MLdsLayer>{}, number<MLdsLayer>{})),
+                           make_merge_transform_v3_division_mod(make_tuple(
+                               number<NPerIterationShuffle / VectorLen>{}, number<VectorLen>{}))),
+                make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}));
+
 #if defined(__gfx950__)
-            // Apply XOR to N_vector dimension before merge to avoid VectorLen corruption
-            // lds_block_desc_1 is 4D: [M_coarse, MLdsLayer, N_vec, VectorLen]
-            // We XOR dimension 2 (N_vec) based on merged M index to reduce bank conflicts
-
-            constexpr index_t N_vectors = NPerIterationShuffle / VectorLen;
-
-            // APPROACH 12: Adaptive XOR with modulo for safe bank conflict reduction
+            // APPROACH 13: Safe 2D XOR with modulo for bank conflict reduction
             //
-            // XorMask: Scale mask to match N_vectors (power of 2) for full M range utilization
-            // - Large configs (N_vectors >= 8): Use mask=8 to vary across 8 M rows
-            // - Small configs (N_vectors < 8): Use mask=N_vectors to utilize all available vectors
+            // Apply XOR to the merged 2D (M,N) descriptor (like Approach 7) but with
+            // modulo safety to prevent index aliasing and corruption.
             //
-            // XorMult: Scale multiplier to increase bank spreading for larger configs
-            // - Very large (N_vectors >= 32): mult=4 for maximum spread
-            // - Medium (N_vectors >= 8): mult=2 for balanced spread
-            // - Small (N_vectors < 8): mult=1 for basic spread
+            // Key differences from Approach 7:
+            // - Adds modulo operation: xor_val = xor_base % N (prevents aliasing)
+            // - Works for any N size (not just N >= 32)
+            // - Safe for all MPerXdl/NPerXdl configs (no NaN values)
             //
-            // Modulo safety: XOR value is taken modulo N_vectors in the transform
-            // to prevent aliasing, so we can safely use larger multipliers
-            constexpr index_t XorMask = (N_vectors >= 8) ? 8 : N_vectors;
-            constexpr index_t XorMult = (N_vectors >= 32) ? 4
-                                       : (N_vectors >= 8) ? 2
-                                       : 1;
+            // Key differences from Approaches 10-12 (4D XOR):
+            // - Operates on final merged N coordinate (not just N_vector)
+            // - XOR affects full element range, not just coarse granularity
+            // - Should provide actual bank conflict reduction like Approach 7
+            //
+            // XorMask: Use mask=8 to vary XOR across 8 M rows
+            // XorMult: Use mult=4 (same as Approach 7) for effective bank spreading
+            constexpr index_t XorMask = 8;
+            constexpr index_t XorMult = 4;
 
-            // Enable XOR for any config with at least 2 N_vectors
-            // Modulo in transform ensures no out-of-bounds access
-            // Even FP8 with N_vectors=2 can benefit from XOR spreading
-            constexpr bool CanApplyXor = (N_vectors >= 2);
+            // Always enable for gfx950 - modulo makes it safe for all configs
+            constexpr auto lds_block_desc = transform_tensor_descriptor(
+                lds_block_desc_2,
+                make_tuple(make_xor_lds_bank_2d_transform<XorMask, XorMult>(
+                    make_tuple(number<MPerIterationShuffle>{},
+                               number<NPerIterationShuffle>{}))),
+                make_tuple(sequence<0, 1>{}),
+                make_tuple(sequence<0, 1>{}));
 
-            if constexpr(CanApplyXor)
-            {
-                constexpr auto lds_block_desc_1_xor = transform_tensor_descriptor(
-                    lds_block_desc_1,
-                    make_tuple(make_xor_lds_bank_4d_transform<XorMask, XorMult>(
-                        make_tuple(number<MPerIterationShuffle / MLdsLayer>{},
-                                   number<MLdsLayer>{},
-                                   number<N_vectors>{},
-                                   number<VectorLen>{}),
-                        MLdsLayer)),
-                    make_tuple(sequence<0, 1, 2, 3>{}),
-                    make_tuple(sequence<0, 1, 2, 3>{}));
-
-                constexpr auto lds_block_desc_2 = transform_tensor_descriptor(
-                    lds_block_desc_1_xor,  // Use XOR'd descriptor
-                    make_tuple(make_merge_transform_v3_division_mod(make_tuple(
-                                   number<MPerIterationShuffle / MLdsLayer>{}, number<MLdsLayer>{})),
-                               make_merge_transform_v3_division_mod(make_tuple(
-                                   number<N_vectors>{}, number<VectorLen>{}))),
-                    make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
-                    make_tuple(sequence<0>{}, sequence<1>{}));
-
-                return lds_block_desc_2;
-            }
-            else
+            return lds_block_desc;
+#else
+            return lds_block_desc_2;
 #endif
-            {
-                constexpr auto lds_block_desc_2 = transform_tensor_descriptor(
-                    lds_block_desc_1,
-                    make_tuple(make_merge_transform_v3_division_mod(make_tuple(
-                                   number<MPerIterationShuffle / MLdsLayer>{}, number<MLdsLayer>{})),
-                               make_merge_transform_v3_division_mod(make_tuple(
-                                   number<NPerIterationShuffle / VectorLen>{}, number<VectorLen>{}))),
-                    make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
-                    make_tuple(sequence<0>{}, sequence<1>{}));
-
-                return lds_block_desc_2;
-            }
         }
         // M is contiguous dimension
         else if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::ColumnMajor>)

@@ -1638,6 +1638,121 @@ make_xor_lds_bank_4d_transform(const LowLengths& low_lengths, index_t mlds_layer
     return xor_lds_bank_4d_t<LowLengths, XorMask, XorMult>(low_lengths, mlds_layer);
 }
 
+// 2D XOR transform for bank conflict reduction (Approach 13: Safe 2D XOR with Modulo)
+// Applies XOR to merged (M,N) descriptor with modulo safety to prevent aliasing
+// This combines Approach 7's effectiveness (operates on final N) with correctness guarantees
+template <typename LowLengths, index_t XorMask, index_t XorMult>
+struct xor_lds_bank_2d_t : public base_transform<2, 2>
+{
+    static constexpr auto type_enum = coord_transform_enum::xor_t;
+
+    using LowerIndex = multi_index<2>;
+    using UpperIndex = multi_index<2>;
+    using UpLengths = LowLengths;
+
+    UpLengths up_lengths_;
+
+    CK_TILE_HOST_DEVICE constexpr xor_lds_bank_2d_t() : up_lengths_{} {}
+
+    CK_TILE_HOST_DEVICE constexpr xor_lds_bank_2d_t(const LowLengths& low_lengths)
+        : up_lengths_{low_lengths}
+    {
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr auto get_type_enum()
+    {
+        return coord_transform_enum::xor_t;
+    }
+
+    CK_TILE_HOST_DEVICE constexpr const auto& get_upper_lengths() const { return up_lengths_; }
+
+    template <typename LowIdx, typename UpIdx>
+    CK_TILE_HOST_DEVICE constexpr void calculate_lower_index(LowIdx& idx_low,
+                                                             const UpIdx& idx_up) const
+    {
+        static_assert(LowIdx::size() == 2 && UpIdx::size() == 2,
+                      "wrong! inconsistent # of dimension");
+
+        const auto m = idx_up[number<0>{}];
+        const auto n = idx_up[number<1>{}];
+
+        idx_low(number<0>{}) = m;
+
+        // Apply XOR to N dimension with modulo for safety
+        // Modulo ensures XOR value stays within valid N range, preventing aliasing
+        const auto xor_base = (m & (XorMask - 1)) * XorMult;
+        const auto n_length = up_lengths_[number<1>{}];  // Get N from descriptor
+        const auto xor_val = xor_base % n_length;
+        const auto new_n = n ^ xor_val;
+
+        idx_low(number<1>{}) = new_n;
+    }
+
+    template <typename LowIdxDiff, typename UpIdxDiff, typename LowIdx, typename UpIdx>
+    CK_TILE_HOST_DEVICE void update_lower_index(LowIdxDiff& idx_diff_low,
+                                                const UpIdxDiff&,
+                                                LowIdx& idx_low,
+                                                const UpIdx& idx_up) const
+    {
+        static_assert(LowIdxDiff::size() == 2 && UpIdxDiff::size() == 2 && LowIdx::size() == 2 &&
+                          UpIdx::size() == 2,
+                      "wrong! inconsistent # of dimension");
+
+        const auto idx_low_old = idx_low;
+
+        calculate_lower_index(idx_low, idx_up);
+
+        idx_diff_low = idx_low - idx_low_old;
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr bool
+    is_valid_upper_index_always_mapped_to_valid_lower_index()
+    {
+        return true;
+    }
+
+    template <typename UpIdx>
+    CK_TILE_HOST_DEVICE static constexpr bool
+    is_valid_upper_index_mapped_to_valid_lower_index(const UpIdx& /* idx_up */)
+    {
+        return true;
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr bool is_known_at_compile_time()
+    {
+        return ck_tile::is_known_at_compile_time<UpLengths>::value;
+    }
+
+    // MUST be static function
+    template <typename LowVectorLengths, typename LowVectorStrides>
+    CK_TILE_HOST_DEVICE constexpr auto calculate_upper_dimension_safe_vector_length_strides(
+        const LowVectorLengths& low_vector_lengths,
+        const LowVectorStrides& low_vector_strides) const
+    {
+        array<index_t, 2> up_vector_lengths = low_vector_lengths;
+        array<index_t, 2> up_vector_strides = low_vector_strides;
+
+        return make_tuple(up_vector_lengths, up_vector_strides);
+    }
+};
+
+template <typename LowLengths, index_t XorMask, index_t XorMult>
+CK_TILE_HOST_DEVICE static void print(const xor_lds_bank_2d_t<LowLengths, XorMask, XorMult>& x)
+{
+    printf("xor_lds_bank_2d_t{");
+    printf("up_lengths_: ");
+    print(x.up_lengths_);
+    printf(", xor_mask: %d, xor_mult: %d}", XorMask, XorMult);
+}
+
+// Helper function to create 2D XOR transform
+template <index_t XorMask, index_t XorMult, typename LowLengths>
+CK_TILE_HOST_DEVICE constexpr auto
+make_xor_lds_bank_2d_transform(const LowLengths& low_lengths)
+{
+    return xor_lds_bank_2d_t<LowLengths, XorMask, XorMult>(low_lengths);
+}
+
 template <typename LowLength, typename OffsetLength>
 struct offset : public base_transform<1, 1>
 {
