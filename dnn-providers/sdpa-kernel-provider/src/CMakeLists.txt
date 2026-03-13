@@ -47,13 +47,17 @@ set_target_properties(
 # ============================================================================
 # Tests
 # ============================================================================
-if(SDPAKERNELPROVIDER_ENABLE_TESTS)
+if(NOT SDPAKERNELPROVIDER_SKIP_TESTS)
     add_subdirectory(tests)
     add_subdirectory(integration_tests)
 
     # Keep this after all build folders have been added so they have a chance to register their tests
     # using add_*_test_target()
-    finalize_test_targets()
+    # Test targets are prefixed with PROJECT_NAME to allow coexistence in superbuild
+    finalize_test_targets("${PROJECT_NAME}")
 
-    install_sdpa_kernel_plugin_ctest_files()
+    # Install ctest files for standalone (non-superbuild) builds
+    if(NOT ROCM_LIBS_SUPERBUILD)
+        install_sdpa_kernel_plugin_ctest_files()
+    endif()
 endif()

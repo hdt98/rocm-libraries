@@ -4,7 +4,7 @@
 cmake_minimum_required(VERSION 3.25.2)
 add_compile_definitions(__HIP_PLATFORM_AMD__)
 
-set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/cmake/ClangToolChain.cmake"
+set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/ClangToolChain.cmake"
     CACHE STRING "Toolchain file"
 )
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -36,7 +36,7 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${ROCM_PATH}/lib
      ${HIP_DIR}/cmake
 )
 
-option(SDPAKERNELPROVIDER_ENABLE_TESTS "Build tests" ON)
+option(SDPAKERNELPROVIDER_SKIP_TESTS "Skip building tests" OFF)
 
 option(BUILD_ADDRESS_SANITIZER "Build with Address Sanitizer enabled" OFF)
 option(ENABLE_CLANG_FORMAT "Enable Clang-Format checks" ON)
@@ -51,6 +51,11 @@ if(SDPAKERNELPROVIDER_ENABLE_COVERAGE)
     message(VERBOSE "Enabling compile flags for coverage-mapping")
     add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
     add_link_options(-fprofile-instr-generate -fcoverage-mapping)
+endif()
+
+# HIPDNN_SKIP_TESTS is the superbuild-level variable that controls test skipping
+if(HIPDNN_SKIP_TESTS)
+    set(SDPAKERNELPROVIDER_SKIP_TESTS ON)
 endif()
 
 list(
@@ -81,11 +86,20 @@ list(
 list(APPEND CMAKE_PREFIX_PATH ${ROCM_PATH}/llvm ${ROCM_PATH} ${ROCM_PATH}/hip)
 
 find_package(hip REQUIRED)
-find_package(hipdnn_data_sdk CONFIG REQUIRED)
-find_package(hipdnn_plugin_sdk CONFIG REQUIRED)
+
+# SDK dependencies - use targets directly in superbuild, find_package otherwise
+if(NOT TARGET hipdnn_data_sdk)
+    find_package(hipdnn_data_sdk CONFIG REQUIRED)
+endif()
+
+if(NOT TARGET hipdnn_plugin_sdk)
+    find_package(hipdnn_plugin_sdk CONFIG REQUIRED)
+endif()
 
 include(CheckToolVersion)
-include(ClangCheck)
+if(ENABLE_CLANG_FORMAT)
+    include(ClangCheck)
+endif()
 include(ClangTidy)
 
 # Setup testing dependencies
@@ -163,12 +177,19 @@ if(SDPAKERNELPROVIDER_ENABLE_COVERAGE)
         # cmake-format: on
     endfunction()
 
-    add_custom_coverage_target(code_coverage check)
-    add_custom_coverage_target(unit-coverage unit-check)
-    add_custom_coverage_target(integration-coverage integration-check)
+    if(SDPAKERNELPROVIDER_SKIP_TESTS)
+        message(
+            WARNING
+                "\nThe code coverage targets depend on test targets but test targets don't exist because SDPAKERNELPROVIDER_SKIP_TESTS is enabled."
+        )
+    else()
+        add_custom_coverage_target(code_coverage check)
+        add_custom_coverage_target(unit-coverage unit-check)
+        add_custom_coverage_target(integration-coverage integration-check)
 
-    # Alias target
-    add_custom_target(coverage DEPENDS code_coverage COMMENT "Alias for code_coverage")
+        # Alias target
+        add_custom_target(coverage DEPENDS code_coverage COMMENT "Alias for code_coverage")
+    endif()
 
     # Standalone coverage report from existing profdata (does not run tests)
     add_custom_coverage_target(current-coverage "")
