@@ -168,16 +168,146 @@ struct TransformConvFwdToIm2win
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    // Im2Win transformation: I → I'
+    //
+    // Implements the transformation defined in im2win_transform.md:
+    //
+    //   I'(i, r, m, k·Y + u) = I(i, r, m + u, k)   [unit stride/dilation/pad]
+    //
+    // More generally, for stride Sy, dilation Dy, and left-padding LPH:
+    //
+    //   I'[n, c, ho, wi, u] = I[n, c, ho·Sy + u·Dy - LPH, wi]
+    //
+    // where:
+    //   m = ho ∈ [0, Ho)   — output row (height)
+    //   k = wi ∈ [0, Wi)   — input column (width, kept as-is!)
+    //   u       ∈ [0, Y)   — filter row within the height window
+    //
+    // Shape of I': [N, C, Ho, Wi_padded, Y]
+    //   • The HEIGHT dimension is windowed (Ho × Y height windows replace Hi)
+    //   • The WIDTH dimension is unchanged (Wi_padded = Wi + LPW + RPW)
+    //   • The X (width filter) direction is NOT in I' — it is applied
+    //     separately by the GEMM via MakeBDescriptor_N_K_Composite.
+    //
+    // Physical descriptor chain:
+    //   Step 1: I[N, C, Hi, Wi]                         (physical, NCHW)
+    //   Step 2: I_pad[N, C, Hi+LPH+RPH, Wi+LPW+RPW]    (pad for filter footprint)
+    //   Step 3: I'[N, C, Ho, Wi_pad, Y]                 ← im2win tensor!
+    //             hi_pad = ho·Sy + u·Dy  (height windowing)
+    //             wi_pad = wi_pad        (width unchanged)
+    //
+    // Output dimension order: [N=0, C=1, Ho=2, Wi_pad=3, Y=4]
+    // ═══════════════════════════════════════════════════════════════════
+    template <typename BLayout,
+              typename std::enable_if<
+                  NDimSpatial == 2 &&
+                      std::is_same_v<BLayout, tensor_layout::convolution::GNCHW>,
+                  bool>::type = false>
+    CK_TILE_HOST auto MakeIm2winDescriptor() const
+    {
+        static_assert(NumGroupsToMerge == 1,
+                      "GNCHW input only supports NumGroupsToMerge==1.");
+
+        // Step 1: Physical I[N, C, Hi, Wi]
+        const auto in_n_c_hi_wi_desc = make_naive_tensor_descriptor(
+            make_tuple(N_, C_, Hi_, Wi_),
+            make_tuple(NStride_, CStride_, HiStride_, WiStride_),
+            number<VectorSizeB>{}, I1);
+
+        // Step 2: Pad Hi and Wi to allow the filter footprint to overlap borders.
+        //   Padded height: Hi_pad = Hi + LPH + RPH
+        //   Padded width:  Wi_pad = Wi + LPW + RPW
+        const IndexType Wi_pad = Wi_ + InLeftPadW_ + InRightPadW_;
+        const auto in_n_c_hip_wip_desc = transform_tensor_descriptor(
+            in_n_c_hi_wi_desc,
+            make_tuple(make_pass_through_transform(N_),
+                       make_pass_through_transform(C_),
+                       make_pad_transform(Hi_, InLeftPadH_, InRightPadH_),
+                       make_pad_transform(Wi_, InLeftPadW_, InRightPadW_)),
+            make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+            make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}));
+
+        // Step 3: Im2win transformation — embed H direction only.
+        //   hi_pad = ho·Sy + u·Dy   (height windowing: Ho output rows, Y filter rows)
+        //   wi_pad = wi_pad          (width is unchanged)
+        //
+        //   Result: I'[N=0, C=1, Ho=2, Wi_pad=3, Y=4]
+        //
+        // For Filter3x3: Y is a compile-time constant (number<3>{}).
+        if constexpr(ConvSpecialization == ConvolutionSpecialization::Filter3x3)
+        {
+            return transform_tensor_descriptor(
+                in_n_c_hip_wip_desc,
+                make_tuple(make_pass_through_transform(N_),
+                           make_pass_through_transform(C_),
+                           make_embed_transform(make_tuple(Ho_, number<3>{}),
+                                               make_tuple(ConvStrideH_, ConvDilationH_)),
+                           make_pass_through_transform(Wi_pad)),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2, 4>{}, sequence<3>{}));
+        }
+        else if constexpr(ConvSpecialization == ConvolutionSpecialization::Filter1x1Stride1Pad0)
+        {
+            // Y=1, Sy=1, no padding: hi_pad = ho·1 + u·1, u∈[0,1) so u=0 always.
+            // I' degenerates to [N, C, Ho, Wi, Y=1] = I[N, C, Hi=Ho, Wi] with Y dim added.
+            return transform_tensor_descriptor(
+                in_n_c_hip_wip_desc,
+                make_tuple(make_pass_through_transform(N_),
+                           make_pass_through_transform(C_),
+                           make_embed_transform(make_tuple(Ho_, number<1>{}),
+                                               make_tuple(I1, I1)),
+                           make_pass_through_transform(Wi_pad)),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2, 4>{}, sequence<3>{}));
+        }
+        else if constexpr(ConvSpecialization == ConvolutionSpecialization::Filter1x1Pad0)
+        {
+            // Y=1, no H padding: hi_pad = ho·Sy + u·Dy, u=0 always.
+            return transform_tensor_descriptor(
+                in_n_c_hip_wip_desc,
+                make_tuple(make_pass_through_transform(N_),
+                           make_pass_through_transform(C_),
+                           make_embed_transform(make_tuple(Ho_, number<1>{}),
+                                               make_tuple(ConvStrideH_, ConvDilationH_)),
+                           make_pass_through_transform(Wi_pad)),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2, 4>{}, sequence<3>{}));
+        }
+        else
+        {
+            // General: arbitrary Y, stride, dilation, padding.
+            return transform_tensor_descriptor(
+                in_n_c_hip_wip_desc,
+                make_tuple(make_pass_through_transform(N_),
+                           make_pass_through_transform(C_),
+                           make_embed_transform(make_tuple(Ho_, Y_),
+                                               make_tuple(ConvStrideH_, ConvDilationH_)),
+                           make_pass_through_transform(Wi_pad)),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2, 4>{}, sequence<3>{}));
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     // B descriptor — Approach 1 (composite transforms)
     //
-    // Maps I[N,C,Hi,Wi] (GNCHW, per group) to B[N=N×Ho×Wo, K_gemm=C×Y×X]
-    // via the chain: physical → pad Hi/Wi → embed (Y,Ho)×(X,Wo) → merge.
+    // Maps I[N,C,Hi,Wi] → B[N=N×Ho×Wo, K_gemm=C×Y×X] in two stages:
     //
-    // This is the same approach as transform_conv_fwd_to_gemm.hpp:
-    //   Step 1: I[N, C, Hi, Wi]                (physical, NCHW strides)
-    //   Step 2: I[N, C, Hi+LPH+RPH, Wi+LPW+RPW] (pad to allow filter overlap)
-    //   Step 3: I[N, C, Y, Ho, X, Wo]           (embed: hi=y*Dy+ho*Sy, wi=x*Dx+wo*Sx)
-    //   Step 4: B[N×Ho×Wo, C×Y×X]               (merge to GEMM shape)
+    //   Stage A — im2win transformation (MakeIm2winDescriptor):
+    //     I[N,C,Hi,Wi] → pad → embed H → I'[N,C,Ho,Wi_pad,Y]
+    //     (height windowing only; width kept as input columns)
+    //
+    //   Stage B — width sliding window + merge to GEMM:
+    //     I'[N,C,Ho,Wi_pad,Y] → embed W → I''[N,C,Ho,Wo,Y,X] → merge → B
+    //
+    // This two-stage decomposition explicitly follows im2win_transform.md:
+    //   I' is the im2win tensor (height windows),
+    //   the GEMM B matrix is I' further transformed by the X sliding window.
+    //
+    // Dimension trace:
+    //   I'  dims: [N=0, C=1, Ho=2, Wi_pad=3, Y=4]
+    //   I'' dims: [N=0, C=1, Ho=2, Wo=3, Y=4, X=5]  (after W embed)
+    //   B   dims: [N×Ho×Wo, C×Y×X]                   (after merge)
     // ═══════════════════════════════════════════════════════════════════
     template <typename BLayout,
               typename std::enable_if<
@@ -189,78 +319,69 @@ struct TransformConvFwdToIm2win
         static_assert(NumGroupsToMerge == 1,
                       "GNCHW input only supports NumGroupsToMerge==1.");
 
+        // ── Stage A: im2win transformation → I'[N,C,Ho,Wi_pad,Y] ─────
+        const auto im2win_desc = MakeIm2winDescriptor<BLayout>();
+        // Dimensions after MakeIm2winDescriptor:
+        //   [N=0, C=1, Ho=2, Wi_pad=3, Y=4]
+
+        // ── Stage B: width sliding window + merge to GEMM shape ───────
+
         if constexpr(ConvSpecialization == ConvolutionSpecialization::Filter1x1Stride1Pad0)
         {
-            // 1×1, stride=1, no padding: I[N,C,Hi,Wi] directly becomes B[N×Ho×Wo, C].
-            const auto in_n_c_ho_wo_desc = make_naive_tensor_descriptor(
-                make_tuple(N_, C_, Ho_, Wo_),
-                make_tuple(NStride_, CStride_, HiStride_, WiStride_),
-                number<VectorSizeB>{}, I1);
-
+            // Y=X=1, Sy=Sx=1, no padding: I' = I (trivial).
+            // Width embed: wi_pad = wo·Sx = wo (no-op), X=1 so no X dim added.
+            // Merge: [N,Ho,Wo] → N_gemm,  [C,Y=1,X=1] → K_gemm = C.
             return transform_tensor_descriptor(
-                in_n_c_ho_wo_desc,
+                im2win_desc,
                 make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
                            make_pass_through_transform(C_)),
                 make_tuple(sequence<0, 2, 3>{}, sequence<1>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
+            // Note: Wi_pad=Wi (no pad), Y=1 is already embedded, X=1 disappears.
         }
         else if constexpr(ConvSpecialization == ConvolutionSpecialization::Filter3x3)
         {
-            // Step 1: I[N, C, Hi, Wi]
-            const auto in_n_c_hi_wi_desc = make_naive_tensor_descriptor(
-                make_tuple(N_, C_, Hi_, Wi_),
-                make_tuple(NStride_, CStride_, HiStride_, WiStride_),
-                number<VectorSizeB>{}, I1);
-
-            // Step 2: pad Hi and Wi
-            const auto in_n_c_hip_wip_desc = transform_tensor_descriptor(
-                in_n_c_hi_wi_desc,
+            // Width embed: wi_pad = wo·Sx + x·Dx  (X=3 compile-time)
+            // I'' dims: [N=0, C=1, Ho=2, Wo=3, X=4, Y=5]
+            const auto i_double_prime = transform_tensor_descriptor(
+                im2win_desc,
                 make_tuple(make_pass_through_transform(N_),
                            make_pass_through_transform(C_),
-                           make_pad_transform(Hi_, InLeftPadH_, InRightPadH_),
-                           make_pad_transform(Wi_, InLeftPadW_, InRightPadW_)),
-                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
-                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}));
-
-            // Step 3: embed (Y=3,Ho) onto padded Hi and (X=3,Wo) onto padded Wi
-            const auto in_n_c_y_ho_x_wo_desc = transform_tensor_descriptor(
-                in_n_c_hip_wip_desc,
-                make_tuple(make_pass_through_transform(N_),
-                           make_pass_through_transform(C_),
-                           make_embed_transform(make_tuple(number<3>{}, Ho_),
-                                               make_tuple(ConvDilationH_, ConvStrideH_)),
+                           make_pass_through_transform(Ho_),
                            make_embed_transform(make_tuple(number<3>{}, Wo_),
-                                               make_tuple(ConvDilationW_, ConvStrideW_))),
-                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
-                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2, 3>{}, sequence<4, 5>{}));
-
-            // Step 4: merge → B[N=N×Ho×Wo, K_gemm=C×Y×X]
+                                               make_tuple(ConvDilationW_, ConvStrideW_)),
+                           make_pass_through_transform(number<3>{})),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{},
+                           sequence<3>{}, sequence<4>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{},
+                           sequence<3, 4>{}, sequence<5>{}));
+            // Dims: [N=0, C=1, Ho=2, X=3, Wo=4, Y=5]
+            // Merge: N_gemm = [N=0, Ho=2, Wo=4], K_gemm = [C=1, Y=5, X=3]
             return transform_tensor_descriptor(
-                in_n_c_y_ho_x_wo_desc,
+                i_double_prime,
                 make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
                            make_merge_transform(make_tuple(C_, number<3>{}, number<3>{}))),
-                make_tuple(sequence<0, 3, 5>{}, sequence<1, 2, 4>{}),
+                make_tuple(sequence<0, 2, 4>{}, sequence<1, 5, 3>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
         }
         else if constexpr(ConvSpecialization == ConvolutionSpecialization::Filter1x1Pad0)
         {
-            // 1×1 filter, no padding: embed stride into spatial.
-            const auto in_n_c_hi_wi_desc = make_naive_tensor_descriptor(
-                make_tuple(N_, C_, Hi_, Wi_),
-                make_tuple(NStride_, CStride_, HiStride_, WiStride_),
-                number<VectorSizeB>{}, I1);
-
-            const auto in_n_c_ho_wo_desc = transform_tensor_descriptor(
-                in_n_c_hi_wi_desc,
+            // Y=X=1, stride possible, no padding.
+            // Width embed: wi_pad = wo·Sx  (X=1, no extra dim).
+            const auto i_double_prime = transform_tensor_descriptor(
+                im2win_desc,
                 make_tuple(make_pass_through_transform(N_),
                            make_pass_through_transform(C_),
-                           make_embed_transform(make_tuple(Ho_), make_tuple(ConvStrideH_)),
-                           make_embed_transform(make_tuple(Wo_), make_tuple(ConvStrideW_))),
-                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
-                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}));
-
+                           make_pass_through_transform(Ho_),
+                           make_embed_transform(make_tuple(Wo_), make_tuple(ConvStrideW_)),
+                           make_pass_through_transform(number<1>{})),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{},
+                           sequence<3>{}, sequence<4>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{},
+                           sequence<3>{}, sequence<4>{}));
+            // Dims: [N=0, C=1, Ho=2, Wo=3, Y=1(=4)]
             return transform_tensor_descriptor(
-                in_n_c_ho_wo_desc,
+                i_double_prime,
                 make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
                            make_pass_through_transform(C_)),
                 make_tuple(sequence<0, 2, 3>{}, sequence<1>{}),
@@ -269,36 +390,26 @@ struct TransformConvFwdToIm2win
         else
         {
             // General: arbitrary Y, X, stride, dilation, padding.
-            const auto in_n_c_hi_wi_desc = make_naive_tensor_descriptor(
-                make_tuple(N_, C_, Hi_, Wi_),
-                make_tuple(NStride_, CStride_, HiStride_, WiStride_),
-                number<VectorSizeB>{}, I1);
-
-            const auto in_n_c_hip_wip_desc = transform_tensor_descriptor(
-                in_n_c_hi_wi_desc,
+            // Width embed: wi_pad = x·Dx + wo·Sx
+            const auto i_double_prime = transform_tensor_descriptor(
+                im2win_desc,
                 make_tuple(make_pass_through_transform(N_),
                            make_pass_through_transform(C_),
-                           make_pad_transform(Hi_, InLeftPadH_, InRightPadH_),
-                           make_pad_transform(Wi_, InLeftPadW_, InRightPadW_)),
-                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
-                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}));
-
-            const auto in_n_c_y_ho_x_wo_desc = transform_tensor_descriptor(
-                in_n_c_hip_wip_desc,
-                make_tuple(make_pass_through_transform(N_),
-                           make_pass_through_transform(C_),
-                           make_embed_transform(make_tuple(Y_, Ho_),
-                                               make_tuple(ConvDilationH_, ConvStrideH_)),
+                           make_pass_through_transform(Ho_),
                            make_embed_transform(make_tuple(X_, Wo_),
-                                               make_tuple(ConvDilationW_, ConvStrideW_))),
-                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
-                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2, 3>{}, sequence<4, 5>{}));
-
+                                               make_tuple(ConvDilationW_, ConvStrideW_)),
+                           make_pass_through_transform(Y_)),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{},
+                           sequence<3>{}, sequence<4>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{},
+                           sequence<3, 4>{}, sequence<5>{}));
+            // Dims: [N=0, C=1, Ho=2, X=3, Wo=4, Y=5]
+            // Merge: N_gemm = [N=0, Ho=2, Wo=4], K_gemm = [C=1, Y=5, X=3]
             return transform_tensor_descriptor(
-                in_n_c_y_ho_x_wo_desc,
+                i_double_prime,
                 make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
                            make_merge_transform(make_tuple(C_, Y_, X_))),
-                make_tuple(sequence<0, 3, 5>{}, sequence<1, 2, 4>{}),
+                make_tuple(sequence<0, 2, 4>{}, sequence<1, 5, 3>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
         }
     }
