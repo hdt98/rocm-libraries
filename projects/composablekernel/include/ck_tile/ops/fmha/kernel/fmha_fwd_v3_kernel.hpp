@@ -479,14 +479,12 @@ struct FmhaFwdV3Kernel
             FmhaPipeline::Policy::template GetSmemSizeKV<typename FmhaPipeline::Problem>();
         __shared__ char smem_k[2][smem_size_kv];
         __shared__ char smem_v[2][smem_size_kv];
-        constexpr auto smem_epilogue_size = max(1, EpiloguePipeline::GetSmemSize());
-        __shared__ char smem_epilogue_buf[smem_epilogue_size];
 
-        auto* smem_k0  = reinterpret_cast<KDataType*>(smem_k[0]);
-        auto* smem_k1  = reinterpret_cast<KDataType*>(smem_k[1]);
-        auto* smem_v0  = reinterpret_cast<VDataType*>(smem_v[0]);
-        auto* smem_v1  = reinterpret_cast<VDataType*>(smem_v[1]);
-        void* smem_ptr = smem_epilogue_buf;
+        auto* smem_k0 = reinterpret_cast<KDataType*>(smem_k[0]);
+        auto* smem_k1 = reinterpret_cast<KDataType*>(smem_k[1]);
+        auto* smem_v0 = reinterpret_cast<VDataType*>(smem_v[0]);
+        auto* smem_v1 = reinterpret_cast<VDataType*>(smem_v[1]);
+        ;
 
         // divide problem
         const auto [i_tile_m, i_tile_n, i_nhead, i_batch] = GetTileIndex(kargs);
@@ -752,8 +750,7 @@ struct FmhaFwdV3Kernel
                     smem_k0,
                     smem_k1,
                     smem_v0,
-                    smem_v1,
-                    smem_ptr);
+                    smem_v1);
             }
             else
             {
@@ -769,8 +766,7 @@ struct FmhaFwdV3Kernel
                                       smem_k0,
                                       smem_k1,
                                       smem_v0,
-                                      smem_v1,
-                                      smem_ptr);
+                                      smem_v1);
             }
         }();
 

@@ -206,10 +206,13 @@ float {F_func_name}([[maybe_unused]] fmha_fwd_traits t, [[maybe_unused]] fmha_fw
 """
 FMHA_FWD_API_FOOTER_TEMPLATE = """
 float fmha_fwd(fmha_fwd_traits traits, fmha_fwd_args args, const ck_tile::stream_config& config) {{
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunreachable-code"
     if ({F_is_v3_enabled}) {{
         float r = fmha_fwd_v3(traits, args, config);
         if (r >= 0) return r;
     }}
+#pragma clang diagnostic pop
     return fmha_fwd_v2(traits, args, config);
 }}
 """

@@ -414,8 +414,7 @@ struct BlockFmhaFwdV3Pipeline
                KDataType* __restrict__ smem_k0,
                KDataType* __restrict__ smem_k1,
                VDataType* __restrict__ smem_v0,
-               VDataType* __restrict__ smem_v1,
-               void* __restrict__ smem_ptr) const
+               VDataType* __restrict__ smem_v1) const
     {
         using namespace ck_tile;
 
@@ -1232,8 +1231,7 @@ struct BlockFmhaFwdV3Pipeline
                KDataType* __restrict__ smem_k0,
                KDataType* __restrict__ smem_k1,
                VDataType* __restrict__ smem_v0,
-               VDataType* __restrict__ smem_v1,
-               void* __restrict__ smem_ptr) const
+               VDataType* __restrict__ smem_v1) const
     {
         using namespace ck_tile;
 
@@ -1256,8 +1254,7 @@ struct BlockFmhaFwdV3Pipeline
                           smem_k0,
                           smem_k1,
                           smem_v0,
-                          smem_v1,
-                          smem_ptr);
+                          smem_v1);
     }
 };
 
