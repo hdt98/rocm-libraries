@@ -1500,6 +1500,140 @@ CK_TILE_HOST_DEVICE static void print(const xor_lds_bank_t<LowLengths, MLdsLayer
     printf(", mlds_layer: %d, xor_mult: %d}", MLdsLayer, XorMultiplier);
 }
 
+// 4D XOR transform for LDS bank conflict reduction (applies before VectorLen merge)
+// Maps: [m_coarse, m_layer, n_vec, vec_elem] -> [m_coarse, m_layer, n_vec ^ xor_val, vec_elem]
+// where xor_val = ((m_coarse * MLdsLayer + m_layer) & XorMask) * XorMult
+//
+// This transform applies XOR only to the N_vector dimension (dimension 2), leaving the
+// VectorLen dimension (dimension 3) unchanged. This ensures vectorized loads/stores remain
+// correct while spreading N-vectors across banks based on M position.
+//
+// Parameters:
+//   LowLengths: tuple<M_coarse_len, MLdsLayer_len, N_vec_len, VectorLen_len>
+//   XorMask: mask for M index (typically 8 for best results)
+//   XorMult: XOR multiplier (typically 4 elements)
+template <typename LowLengths, index_t XorMask, index_t XorMult>
+struct xor_lds_bank_4d_t : public base_transform<4, 4>
+{
+    static constexpr auto type_enum = coord_transform_enum::xor_t; // reuse enum
+
+    using LowerIndex = multi_index<4>;
+    using UpperIndex = multi_index<4>;
+
+    using UpLengths = LowLengths;
+
+    UpLengths up_lengths_;
+    index_t mlds_layer_; // Store MLdsLayer value for merged M calculation
+
+    CK_TILE_HOST_DEVICE constexpr xor_lds_bank_4d_t() : up_lengths_{}, mlds_layer_{1} {}
+
+    CK_TILE_HOST_DEVICE constexpr xor_lds_bank_4d_t(const LowLengths& low_lengths,
+                                                      index_t mlds_layer)
+        : up_lengths_{low_lengths}, mlds_layer_{mlds_layer}
+    {
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr auto get_type_enum()
+    {
+        return coord_transform_enum::xor_t;
+    }
+
+    CK_TILE_HOST_DEVICE constexpr const auto& get_upper_lengths() const { return up_lengths_; }
+
+    template <typename LowIdx, typename UpIdx>
+    CK_TILE_HOST_DEVICE constexpr void calculate_lower_index(LowIdx& idx_low,
+                                                             const UpIdx& idx_up) const
+    {
+        static_assert(LowIdx::size() == 4 && UpIdx::size() == 4,
+                      "wrong! inconsistent # of dimension");
+
+        const auto m_coarse = idx_up[number<0>{}];
+        const auto m_layer  = idx_up[number<1>{}];
+        const auto n_vec    = idx_up[number<2>{}];
+        const auto vec_elem = idx_up[number<3>{}];
+
+        // Pass through m_coarse and m_layer unchanged
+        idx_low(number<0>{}) = m_coarse;
+        idx_low(number<1>{}) = m_layer;
+
+        // Compute merged M index for XOR calculation
+        const auto merged_m = m_coarse * mlds_layer_ + m_layer;
+
+        // Apply XOR to N_vector dimension only
+        const auto xor_val = (merged_m & (XorMask - 1)) * XorMult;
+        const auto new_n_vec = n_vec ^ xor_val;
+
+        idx_low(number<2>{}) = new_n_vec;
+
+        // Pass through VectorLen element index unchanged
+        idx_low(number<3>{}) = vec_elem;
+    }
+
+    template <typename LowIdxDiff, typename UpIdxDiff, typename LowIdx, typename UpIdx>
+    CK_TILE_HOST_DEVICE void update_lower_index(LowIdxDiff& idx_diff_low,
+                                                const UpIdxDiff&,
+                                                LowIdx& idx_low,
+                                                const UpIdx& idx_up) const
+    {
+        static_assert(LowIdxDiff::size() == 4 && UpIdxDiff::size() == 4 && LowIdx::size() == 4 &&
+                          UpIdx::size() == 4,
+                      "wrong! inconsistent # of dimension");
+
+        const auto idx_low_old = idx_low;
+
+        calculate_lower_index(idx_low, idx_up);
+
+        idx_diff_low = idx_low - idx_low_old;
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr bool
+    is_valid_upper_index_always_mapped_to_valid_lower_index()
+    {
+        return true;
+    }
+
+    template <typename UpIdx>
+    CK_TILE_HOST_DEVICE static constexpr bool
+    is_valid_upper_index_mapped_to_valid_lower_index(const UpIdx& /* idx_up */)
+    {
+        return true;
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr bool is_known_at_compile_time()
+    {
+        return ck_tile::is_known_at_compile_time<UpLengths>::value;
+    }
+
+    // MUST be static function
+    template <typename LowVectorLengths, typename LowVectorStrides>
+    CK_TILE_HOST_DEVICE constexpr auto calculate_upper_dimension_safe_vector_length_strides(
+        const LowVectorLengths& low_vector_lengths,
+        const LowVectorStrides& low_vector_strides) const
+    {
+        array<index_t, 4> up_vector_lengths = low_vector_lengths;
+        array<index_t, 4> up_vector_strides = low_vector_strides;
+
+        return make_tuple(up_vector_lengths, up_vector_strides);
+    }
+};
+
+template <typename LowLengths, index_t XorMask, index_t XorMult>
+CK_TILE_HOST_DEVICE static void print(const xor_lds_bank_4d_t<LowLengths, XorMask, XorMult>& x)
+{
+    printf("xor_lds_bank_4d_t{");
+    printf("up_lengths_: ");
+    print(x.up_lengths_);
+    printf(", xor_mask: %d, xor_mult: %d, mlds_layer: %d}", XorMask, XorMult, x.mlds_layer_);
+}
+
+// Helper function to create 4D XOR transform
+template <index_t XorMask, index_t XorMult, typename LowLengths>
+CK_TILE_HOST_DEVICE constexpr auto
+make_xor_lds_bank_4d_transform(const LowLengths& low_lengths, index_t mlds_layer)
+{
+    return xor_lds_bank_4d_t<LowLengths, XorMask, XorMult>(low_lengths, mlds_layer);
+}
+
 template <typename LowLength, typename OffsetLength>
 struct offset : public base_transform<1, 1>
 {
