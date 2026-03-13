@@ -1391,11 +1391,15 @@ CK_TILE_HOST_DEVICE static void print(const xor_t<LowLengths>& x)
     printf("}");
 }
 
-// 2D XOR transform for FP8 bank conflict avoidance
-// Maps: new_n = n ^ ((m & 0x3) << 2)
-// This spreads 4 consecutive N positions across 4 different banks based on M row
-template <typename LowLengths>
-struct xor_fp8_bank_t : public base_transform<2, 2>
+// 2D XOR transform for LDS bank conflict avoidance
+// Maps: new_n = n ^ ((m % 8) * ElemsPerBankWord)
+// This spreads consecutive N positions across different banks based on M row
+// ElemsPerBankWord = BytesPerBank / sizeof(element) = 4 / DataTypeSize
+//   - FP8 (1 byte):  4 elements per bank word
+//   - FP16 (2 bytes): 2 elements per bank word
+//   - FP32 (4 bytes): 1 element per bank word
+template <typename LowLengths, index_t ElemsPerBankWord>
+struct xor_lds_bank_t : public base_transform<2, 2>
 {
     static constexpr auto type_enum = coord_transform_enum::xor_t; // reuse enum
 
@@ -1406,9 +1410,9 @@ struct xor_fp8_bank_t : public base_transform<2, 2>
 
     UpLengths up_lengths_;
 
-    CK_TILE_HOST_DEVICE constexpr xor_fp8_bank_t() : up_lengths_{} {}
+    CK_TILE_HOST_DEVICE constexpr xor_lds_bank_t() : up_lengths_{} {}
 
-    CK_TILE_HOST_DEVICE constexpr xor_fp8_bank_t(const LowLengths& low_lengths)
+    CK_TILE_HOST_DEVICE constexpr xor_lds_bank_t(const LowLengths& low_lengths)
         : up_lengths_{low_lengths}
     {
     }
@@ -1432,10 +1436,9 @@ struct xor_fp8_bank_t : public base_transform<2, 2>
 
         idx_low(number<0>{}) = m;
 
-        // XOR N with ((M%8)*4) to spread across banks accounting for MLdsLayer=8 interleaving
-        // The interleaved layout has (M%8)*32 byte offset, contributing (M%8)*8 to bank index
-        // XOR with (M%8)*4 shifts the N-word contribution to avoid cross-M conflicts
-        const auto xor_val = (m & 7) << 2;  // (M%8)*4
+        // XOR N with ((M%8)*ElemsPerBankWord) to spread across banks
+        // accounting for MLdsLayer=8 interleaving in the LDS layout
+        const auto xor_val = (m & 7) * ElemsPerBankWord;
         const auto new_n = n ^ xor_val;
 
         idx_low(number<1>{}) = new_n;
@@ -1489,13 +1492,13 @@ struct xor_fp8_bank_t : public base_transform<2, 2>
     }
 };
 
-template <typename LowLengths>
-CK_TILE_HOST_DEVICE static void print(const xor_fp8_bank_t<LowLengths>& x)
+template <typename LowLengths, index_t ElemsPerBankWord>
+CK_TILE_HOST_DEVICE static void print(const xor_lds_bank_t<LowLengths, ElemsPerBankWord>& x)
 {
-    printf("xor_fp8_bank_t{");
+    printf("xor_lds_bank_t{");
     printf("up_lengths_: ");
     print(x.up_lengths_);
-    printf("}");
+    printf(", elems_per_bank_word: %d}", ElemsPerBankWord);
 }
 
 template <typename LowLength, typename OffsetLength>
@@ -1850,10 +1853,10 @@ CK_TILE_HOST_DEVICE constexpr auto make_xor_transform(const LowLengths& low_leng
     return xor_t<LowLengths>{low_lengths};
 }
 
-template <typename LowLengths>
-CK_TILE_HOST_DEVICE constexpr auto make_xor_fp8_bank_transform(const LowLengths& low_lengths)
+template <index_t ElemsPerBankWord, typename LowLengths>
+CK_TILE_HOST_DEVICE constexpr auto make_xor_lds_bank_transform(const LowLengths& low_lengths)
 {
-    return xor_fp8_bank_t<LowLengths>{low_lengths};
+    return xor_lds_bank_t<LowLengths, ElemsPerBankWord>{low_lengths};
 }
 
 template <typename LowLength, typename OffsetLength>

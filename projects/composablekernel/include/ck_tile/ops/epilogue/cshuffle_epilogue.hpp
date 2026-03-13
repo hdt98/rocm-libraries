@@ -355,11 +355,13 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
 
-            // For sub-4-byte types (FP8), apply XOR swizzle to avoid bank conflicts
-            // XOR formula: new_n = n ^ ((m % 8) * 4) to spread across banks
+            // For sub-4-byte types, apply XOR swizzle to avoid bank conflicts
+            // XOR formula: new_n = n ^ ((m % 8) * ElemsPerBankWord) to spread across banks
+            // ElemsPerBankWord = BytesPerBank / DataTypeSize (4/1=4 for FP8, 4/2=2 for FP16)
+            constexpr index_t ElemsPerBankWord = BytesPerBank / DataTypeSize;
             constexpr auto lds_block_desc = transform_tensor_descriptor(
                 lds_block_desc_2,
-                make_tuple(make_xor_fp8_bank_transform(
+                make_tuple(make_xor_lds_bank_transform<ElemsPerBankWord>(
                     make_tuple(number<MPerIterationShuffle>{},
                                number<NPerIterationShuffle>{}))),
                 make_tuple(sequence<0, 1>{}),
