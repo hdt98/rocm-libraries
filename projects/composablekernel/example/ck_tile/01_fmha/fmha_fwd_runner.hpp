@@ -17,6 +17,7 @@
 #include <iomanip>
 #include <numeric>
 #include <ostream>
+#include <sstream>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -1574,6 +1575,40 @@ fwd_result fmha_fwd_run(mode_enum mode,
             std::cout << ", no matching instances" << std::flush << std::endl;
             return fwd_result::no_instance;
         }
+
+        // Identify which kernel the heuristic would select
+        std::string heuristic_full_kname;
+        {
+            std::ostringstream oss;
+            auto* oldbuf = std::cout.rdbuf(oss.rdbuf());
+            ck_tile::stream_config hsc{nullptr, false, /*log_level=*/1,
+                                       /*warmup=*/0, /*repeat=*/1, false};
+            fmha_fwd(fmha_traits, fmha_args, hsc);
+            std::cout.rdbuf(oldbuf);
+            std::string captured = oss.str();
+            auto pos = captured.find("fmha_fwd_");
+            if(pos != std::string::npos)
+            {
+                heuristic_full_kname = captured.substr(pos);
+                auto end = heuristic_full_kname.find_last_not_of(" \n\r\t");
+                if(end != std::string::npos)
+                    heuristic_full_kname.resize(end + 1);
+            }
+        }
+
+        // Match short kname against the heuristic's full kname
+        // Short: "fmha_fwd_d128_bf16_batch_b32x32x128x128x32x128_npad"
+        // Full:  "fmha_fwd_d128_bf16_batch_b32x32x128x128x32x128_r1x1x1_..._vr_npad_nlogits_..."
+        auto is_heuristic = [&](const std::string& short_name) -> bool {
+            if(heuristic_full_kname.empty()) return false;
+            auto last_sep = short_name.rfind('_');
+            if(last_sep == std::string::npos) return false;
+            std::string tile_prefix = short_name.substr(0, last_sep);
+            std::string pad_suffix  = short_name.substr(last_sep);
+            return heuristic_full_kname.find(tile_prefix) != std::string::npos &&
+                   heuristic_full_kname.find(pad_suffix) != std::string::npos;
+        };
+
         std::cout << std::endl;
         // sort by time (fastest first)
         std::sort(all_results.begin(), all_results.end(),
@@ -1598,6 +1633,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
                       << ", " << std::setw(7) << std::setprecision(3) << total_t << " ms"
                       << ", " << std::setw(8) << std::setprecision(2) << tf << " TFlops"
                       << ", " << std::setw(8) << std::setprecision(2) << bw << " GB/s"
+                      << (is_heuristic(kname) ? "  <-- heuristic" : "")
                       << std::endl;
         }
         return fwd_result::success;
