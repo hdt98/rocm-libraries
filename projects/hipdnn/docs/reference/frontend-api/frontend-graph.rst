@@ -7,4 +7,4 @@
 hipDNN frontend graph C++ API
 *****************************
 
-.. doxygenfile:: graph.hpp
+.. doxygenfile:: Graph.hpp
