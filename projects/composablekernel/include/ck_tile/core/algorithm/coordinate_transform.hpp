@@ -1392,13 +1392,12 @@ CK_TILE_HOST_DEVICE static void print(const xor_t<LowLengths>& x)
 }
 
 // 2D XOR transform for LDS bank conflict avoidance
-// Maps: new_n = n ^ ((m % 8) * ElemsPerBankWord)
+// Maps: new_n = n ^ ((m % MLdsLayer) * XorMultiplier)
 // This spreads consecutive N positions across different banks based on M row
-// ElemsPerBankWord = BytesPerBank / sizeof(element) = 4 / DataTypeSize
-//   - FP8 (1 byte):  4 elements per bank word
-//   - FP16 (2 bytes): 2 elements per bank word
-//   - FP32 (4 bytes): 1 element per bank word
-template <typename LowLengths, index_t ElemsPerBankWord>
+// Parameters:
+//   MLdsLayer: number of M rows interleaved in LDS (determines mask)
+//   XorMultiplier: number of elements to XOR (should equal BytesPerBank / DataTypeSize)
+template <typename LowLengths, index_t MLdsLayer, index_t XorMultiplier>
 struct xor_lds_bank_t : public base_transform<2, 2>
 {
     static constexpr auto type_enum = coord_transform_enum::xor_t; // reuse enum
@@ -1436,9 +1435,9 @@ struct xor_lds_bank_t : public base_transform<2, 2>
 
         idx_low(number<0>{}) = m;
 
-        // XOR N with ((M%8)*ElemsPerBankWord) to spread across banks
-        // accounting for MLdsLayer=8 interleaving in the LDS layout
-        const auto xor_val = (m & 7) * ElemsPerBankWord;
+        // XOR N with ((M % MLdsLayer) * XorMultiplier) to spread across banks
+        // MLdsLayer determines the interleaving pattern in the LDS layout
+        const auto xor_val = (m & (MLdsLayer - 1)) * XorMultiplier;
         const auto new_n = n ^ xor_val;
 
         idx_low(number<1>{}) = new_n;
@@ -1492,13 +1491,13 @@ struct xor_lds_bank_t : public base_transform<2, 2>
     }
 };
 
-template <typename LowLengths, index_t ElemsPerBankWord>
-CK_TILE_HOST_DEVICE static void print(const xor_lds_bank_t<LowLengths, ElemsPerBankWord>& x)
+template <typename LowLengths, index_t MLdsLayer, index_t XorMultiplier>
+CK_TILE_HOST_DEVICE static void print(const xor_lds_bank_t<LowLengths, MLdsLayer, XorMultiplier>& x)
 {
     printf("xor_lds_bank_t{");
     printf("up_lengths_: ");
     print(x.up_lengths_);
-    printf(", elems_per_bank_word: %d}", ElemsPerBankWord);
+    printf(", mlds_layer: %d, xor_mult: %d}", MLdsLayer, XorMultiplier);
 }
 
 template <typename LowLength, typename OffsetLength>
@@ -1853,10 +1852,10 @@ CK_TILE_HOST_DEVICE constexpr auto make_xor_transform(const LowLengths& low_leng
     return xor_t<LowLengths>{low_lengths};
 }
 
-template <index_t ElemsPerBankWord, typename LowLengths>
+template <index_t MLdsLayer, index_t XorMultiplier, typename LowLengths>
 CK_TILE_HOST_DEVICE constexpr auto make_xor_lds_bank_transform(const LowLengths& low_lengths)
 {
-    return xor_lds_bank_t<LowLengths, ElemsPerBankWord>{low_lengths};
+    return xor_lds_bank_t<LowLengths, MLdsLayer, XorMultiplier>{low_lengths};
 }
 
 template <typename LowLength, typename OffsetLength>

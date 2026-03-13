@@ -356,13 +356,15 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0>{}, sequence<1>{}));
 
             // Apply XOR swizzle to avoid bank conflicts
-            // XOR formula: new_n = n ^ ((m % 8) * 4) to spread across banks
-            // The constant 4 works for both FP8 (ElemsPerBankWord=4) and FP16 (halves conflicts)
-            // because it spreads N indices across bank-word boundaries regardless of element size
-            constexpr index_t XorAmount = 4; // 4 elements = 1 bank word for FP8, 2 for FP16
+            // XOR formula: new_n = n ^ ((m % MLdsLayer) * XorMultiplier)
+            // MLdsLayer determines the M interleaving pattern
+            // XorMultiplier = BytesPerBank / DataTypeSize (elements per bank word)
+            //   - FP8:  MLdsLayer=8, XorMultiplier=4 -> (m & 7) * 4
+            //   - FP16: MLdsLayer=4, XorMultiplier=2 -> (m & 3) * 2
+            constexpr index_t XorMultiplier = BytesPerBank / DataTypeSize;
             constexpr auto lds_block_desc = transform_tensor_descriptor(
                 lds_block_desc_2,
-                make_tuple(make_xor_lds_bank_transform<XorAmount>(
+                make_tuple(make_xor_lds_bank_transform<MLdsLayer, XorMultiplier>(
                     make_tuple(number<MPerIterationShuffle>{},
                                number<NPerIterationShuffle>{}))),
                 make_tuple(sequence<0, 1>{}),
