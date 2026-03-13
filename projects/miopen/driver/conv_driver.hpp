@@ -4037,7 +4037,7 @@ int ConvDriver<Tgpu, Tref>::VerifyForward()
     if(!is_fwd_run_failed)
         if(!TryReadVerificationCache(Direction::Fwd, outputTensor, outhost.data.data()))
         {
-            ScopedKernelPhase phase_scope(KernelPhase::Validation);
+            miopen::ScopedKernelPhase phase_scope(miopen::KernelPhase::Validation);
             if(UseGPUReference())
                 RunForwardGPUReference();
             else
@@ -4109,7 +4109,7 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
         if(!is_bwd_run_failed)
             if(!TryReadVerificationCache(Direction::Bwd, inputTensor, din_host.data.data()))
             {
-                ScopedKernelPhase phase_scope(KernelPhase::Validation);
+                miopen::ScopedKernelPhase phase_scope(miopen::KernelPhase::Validation);
                 if(UseGPUReference())
                     RunBackwardDataGPUReference();
                 else

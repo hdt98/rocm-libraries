@@ -264,7 +264,7 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
             // Log solution name for grouped kernel logging
             const auto solver_id_obj = solver::Id{sol.solver_id};
 
-            if(IsPerformanceLoggingEnabled())
+            if(IsLoggingKernel())
             {
                 LogSolutionName(sol.solver_id, solver_id_obj.Value());
                 
@@ -324,7 +324,7 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
                 // the mean.
                 elapsed = miopen::removeHighOutliersAndGetMean(samples, 2.0f);
                 
-                if(IsPerformanceLoggingEnabled())
+                if(IsLoggingKernel())
                 {
                     // Update the performance config with the collected samples
                     // Pass kernel name, config string as descriptor, and samples

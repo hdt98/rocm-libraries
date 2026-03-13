@@ -259,6 +259,13 @@ inline bool IsLoggingKernel()
     return false;
 }
 
+/// Check if Performance Logs are enabled mode is enabled
+inline bool IsPerformanceLoggingEnabled() 
+{ 
+    const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+    return log_level > 0; 
+}
+
 /// Add a new performance config with its name and descriptor
 /// This creates a new performance config entry. Call AddInvokerTimes() afterwards
 /// to add timing samples to this config.
@@ -273,6 +280,11 @@ inline void AddPerformanceConfig(const std::string& config_name,
         // Finalize the previous config if it exists
         data.FinalizeCurrentConfig();
         
+        // Always clear current_config to prevent kernel bleeding across configs
+        // FinalizeCurrentConfig only clears if the config had kernels/times,
+        // but we need to clear even if it was empty to prevent state contamination
+        data.current_config.Clear();
+        
         // Start a new config
         data.current_config.config_name = config_name;
         data.current_config.config_descriptor = config_descriptor;
@@ -283,9 +295,6 @@ inline void AddPerformanceConfig(const std::string& config_name,
 /// This should be called after AddPerformanceConfig() and after kernel execution completes
 inline void AddInvokerTimes(const std::vector<float>& invoker_times_ms)
 {
-    if(!IsPerformanceLoggingEnabled())
-        return;
-
     const bool logging_enabled = IsLoggingKernel();
     if(!logging_enabled)
         return;
@@ -533,13 +542,6 @@ inline void AddKernelToJsonAccumulator(size_t exec_id,
         time_ms,
         is_transform
     });
-}
-
-/// Check if Performance Logs are enabled mode is enabled
-inline bool IsPerformanceLoggingEnabled() 
-{ 
-    const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-    return log_level > 0; 
 }
 
 /// Log solution name if appropriate for the current log level

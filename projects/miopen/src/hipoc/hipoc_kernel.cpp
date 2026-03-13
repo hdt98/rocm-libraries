@@ -205,8 +205,7 @@ void HIPOCKernelInvoke::run_cooperative(void** kern_args) const
         status = hipEventSynchronize(stop.get());
         if(status != hipSuccess)
             MIOPEN_THROW_HIP_STATUS(status, "hipEventSynchronize() failed");
-        const KernelPhase current_phase = GetKernelPhase();
-        if(IsLoggingKernel(current_phase))
+        if(IsLoggingKernel())
         {
             float elapsed_time = 0.0f;
             (void)hipEventElapsedTime(&elapsed_time, start.get(), stop.get());

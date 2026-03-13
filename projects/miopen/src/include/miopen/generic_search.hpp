@@ -554,7 +554,7 @@ auto GenericSearch(const Solver s,
                     invoker = profile_h.PrepareInvoker(*current_solution.invoker_factory,
                                                        current_solution.construction_params);
                     
-                    if(IsPerformanceLoggingEnabled())
+                    if(IsLoggingKernel())
                     {
                         // Log solution name for grouped kernel logging (only once per solution)
                         const auto solver_name = s.SolverDbId();
@@ -624,6 +624,12 @@ auto GenericSearch(const Solver s,
                                   << elapsed_time << " was greater than cutoff: " << cutoff_time);
                     for(const auto& kernelInfo : current_solution.construction_params)
                         profile_h.ClearProgram(kernelInfo.kernel_file, kernelInfo.comp_options);
+
+                    if(IsLoggingKernel())
+                    {
+                        // Add the timing samples to the current performance config
+                        AddInvokerTimes(samples);
+                    }
                     break;
                 }
 
@@ -657,7 +663,7 @@ auto GenericSearch(const Solver s,
                     {
                         is_passed = true;
                         
-                        if(IsPerformanceLoggingEnabled())
+                        if(IsLoggingKernel())
                         {
                             // Add the timing samples to the current performance config
                             AddInvokerTimes(samples);
@@ -685,6 +691,14 @@ auto GenericSearch(const Solver s,
                             MIOPEN_LOG_I2("Mean is not better: " << elapsed_time
                                                                  << " >= " << best_time);
                         }
+                    }
+                }
+                else
+                {
+                    // Config didn't pass threshold for additional runs, but still add the single sample
+                    if(IsLoggingKernel())
+                    {
+                        AddInvokerTimes(samples);
                     }
                 }
                 if(rec_results)
