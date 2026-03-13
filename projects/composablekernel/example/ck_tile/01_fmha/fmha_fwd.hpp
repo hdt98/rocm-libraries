@@ -1715,6 +1715,9 @@ float fmha_fwd_splitkv(fmha_fwd_splitkv_traits,
                        fmha_fwd_splitkv_args,
                        const ck_tile::stream_config&);
 
+// Run ALL matching splitkv kernel instances for benchmarking; returns vector of (kernel_name, time_ms).
+std::vector<std::pair<std::string, float>> fmha_fwd_splitkv_all(fmha_fwd_splitkv_traits, fmha_fwd_splitkv_args, const ck_tile::stream_config&);
+
 struct fmha_fwd_appendkv_traits
 {
     int hdim_q;

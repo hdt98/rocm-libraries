@@ -1563,37 +1563,80 @@ fwd_result fmha_fwd_run(mode_enum mode,
     // --- run_all_kernels path: benchmark every matching instance ---
     if(run_all_kernels)
     {
-        fmha_fwd_traits fmha_traits;
-        init_traits(fmha_traits);
+        std::vector<std::pair<std::string, float>> all_results;
+        std::string heuristic_full_kname;
 
-        fmha_fwd_args fmha_args;
-        init_args(fmha_args);
+#if CK_TILE_FMHA_FWD_SPLITKV_API
+        const bool use_splitkv_all = (1 < num_splits || use_kvcache);
+        if(use_splitkv_all)
+        {
+            fmha_fwd_splitkv_traits fmha_splitkv_traits;
+            init_traits(fmha_splitkv_traits);
 
-        auto all_results = fmha_fwd_all(fmha_traits, fmha_args, stream_config);
+            fmha_fwd_splitkv_args fmha_splitkv_args;
+            init_args(fmha_splitkv_args);
+
+            all_results = fmha_fwd_splitkv_all(fmha_splitkv_traits, fmha_splitkv_args, stream_config);
+
+            // Identify which kernel the heuristic would select
+            {
+                std::ostringstream oss;
+                auto* oldbuf = std::cout.rdbuf(oss.rdbuf());
+                ck_tile::stream_config hsc{nullptr, false, /*log_level=*/1,
+                                           /*warmup=*/0, /*repeat=*/1, false};
+                fmha_fwd_splitkv(fmha_splitkv_traits, fmha_splitkv_args, hsc);
+                std::cout.rdbuf(oldbuf);
+                std::string captured = oss.str();
+                auto pos = captured.find("fmha_fwd_splitkv_");
+                if(pos != std::string::npos)
+                {
+                    // extract just the main kernel name (before the combine kernel name)
+                    heuristic_full_kname = captured.substr(pos);
+                    // the output has ", <combine_name>" after the main name
+                    auto comma_pos = heuristic_full_kname.find(", ");
+                    if(comma_pos != std::string::npos)
+                        heuristic_full_kname.resize(comma_pos);
+                    auto end = heuristic_full_kname.find_last_not_of(" \n\r\t");
+                    if(end != std::string::npos)
+                        heuristic_full_kname.resize(end + 1);
+                }
+            }
+        }
+        else
+#endif // CK_TILE_FMHA_FWD_SPLITKV_API
+        {
+            fmha_fwd_traits fmha_traits;
+            init_traits(fmha_traits);
+
+            fmha_fwd_args fmha_args;
+            init_args(fmha_args);
+
+            all_results = fmha_fwd_all(fmha_traits, fmha_args, stream_config);
+
+            // Identify which kernel the heuristic would select
+            {
+                std::ostringstream oss;
+                auto* oldbuf = std::cout.rdbuf(oss.rdbuf());
+                ck_tile::stream_config hsc{nullptr, false, /*log_level=*/1,
+                                           /*warmup=*/0, /*repeat=*/1, false};
+                fmha_fwd(fmha_traits, fmha_args, hsc);
+                std::cout.rdbuf(oldbuf);
+                std::string captured = oss.str();
+                auto pos = captured.find("fmha_fwd_");
+                if(pos != std::string::npos)
+                {
+                    heuristic_full_kname = captured.substr(pos);
+                    auto end = heuristic_full_kname.find_last_not_of(" \n\r\t");
+                    if(end != std::string::npos)
+                        heuristic_full_kname.resize(end + 1);
+                }
+            }
+        }
+
         if(all_results.empty())
         {
             std::cout << ", no matching instances" << std::flush << std::endl;
             return fwd_result::no_instance;
-        }
-
-        // Identify which kernel the heuristic would select
-        std::string heuristic_full_kname;
-        {
-            std::ostringstream oss;
-            auto* oldbuf = std::cout.rdbuf(oss.rdbuf());
-            ck_tile::stream_config hsc{nullptr, false, /*log_level=*/1,
-                                       /*warmup=*/0, /*repeat=*/1, false};
-            fmha_fwd(fmha_traits, fmha_args, hsc);
-            std::cout.rdbuf(oldbuf);
-            std::string captured = oss.str();
-            auto pos = captured.find("fmha_fwd_");
-            if(pos != std::string::npos)
-            {
-                heuristic_full_kname = captured.substr(pos);
-                auto end = heuristic_full_kname.find_last_not_of(" \n\r\t");
-                if(end != std::string::npos)
-                    heuristic_full_kname.resize(end + 1);
-            }
         }
 
         // Match short kname against the heuristic's full kname
@@ -1604,9 +1647,22 @@ fwd_result fmha_fwd_run(mode_enum mode,
             auto last_sep = short_name.rfind('_');
             if(last_sep == std::string::npos) return false;
             std::string tile_prefix = short_name.substr(0, last_sep);
-            std::string pad_suffix  = short_name.substr(last_sep);
-            return heuristic_full_kname.find(tile_prefix) != std::string::npos &&
-                   heuristic_full_kname.find(pad_suffix) != std::string::npos;
+            std::string pad_suffix  = short_name.substr(last_sep); // e.g. "_npad" or "_ps"
+            // Check tile prefix matches
+            if(heuristic_full_kname.find(tile_prefix) == std::string::npos)
+                return false;
+            // Match pad suffix as a delimited token: suffix must be followed by '_' or end-of-string
+            // to avoid "_ps" matching "_psk" or "_psskddv"
+            auto pos = heuristic_full_kname.find(pad_suffix);
+            while(pos != std::string::npos)
+            {
+                auto end_pos = pos + pad_suffix.size();
+                if(end_pos == heuristic_full_kname.size() ||
+                   heuristic_full_kname[end_pos] == '_')
+                    return true;
+                pos = heuristic_full_kname.find(pad_suffix, pos + 1);
+            }
+            return false;
         };
 
         std::cout << std::endl;
@@ -1620,6 +1676,10 @@ fwd_result fmha_fwd_run(mode_enum mode,
         for(const auto& [kname, t] : all_results)
             max_kname_len = std::max(max_kname_len, kname.size());
 
+        // compute index width for alignment
+        int idx_width = 1;
+        { size_t n = all_results.size(); while(n >= 10) { ++idx_width; n /= 10; } }
+
         for(size_t i = 0; i < all_results.size(); i++)
         {
             const auto& [kname, t] = all_results[i];
@@ -1627,7 +1687,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
             const float tf =
                 static_cast<float>(flop) / 1.E9 / total_t;
             const float bw = num_byte / 1.E6 / total_t;
-            std::cout << std::fixed << "  [" << (i + 1) << "] "
+            std::cout << std::fixed << "  [" << std::setw(idx_width) << (i + 1) << "] "
                       << std::left << std::setw(max_kname_len) << kname
                       << std::right
                       << ", " << std::setw(7) << std::setprecision(3) << total_t << " ms"
