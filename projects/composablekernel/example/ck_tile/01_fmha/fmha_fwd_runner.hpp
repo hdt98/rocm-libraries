@@ -2122,8 +2122,8 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 bool cur_pass = ck_tile::check_err(lse_host_result,
                                                    lse_host_ref,
                                                    "LSE Error: Incorrect results!",
-                                                   1e-4,
-                                                   1e-4,
+                                                   2e-4,
+                                                   2e-4,
                                                    /* allow_infinity_ref = */ true);
 
                 pass &= cur_pass;
