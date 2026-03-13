@@ -207,7 +207,8 @@ class Compiler(Component):
     def __init__(self, compiler_path: Path, build_id_kind: str, asan_build: bool=False, save_temps: bool=False):
         """Constructs an instance of a Compiler."""
         super(Compiler, self).__init__(compiler_path)
-
+        compiler_path = "/src/true16/tru16compiler/llvm/bin/amdclang++"
+        print(f'------------ Compiler path: {compiler_path}, type: {type(compiler_path)}')
         self.default_args = [
             *split(environ.get("Tensile_CXX_COMPILER_LAUNCHER", "")),
              compiler_path,
@@ -239,8 +240,11 @@ class Compiler(Component):
         """
         archFlags = [f"--offload-arch={gfx}" for gfx in target_list]
         args = [
-            *(self.default_args), "-I", include_path, *archFlags, srcPath, "-c", "-o", destPath
+            # *(self.default_args), "-I", include_path, *archFlags, srcPath, "-c", "-o", destPath
+            *(self.default_args), "-I", include_path, *archFlags, "-Xclang", "-target-feature", "-Xclang", "+real-true16", srcPath, "-c", "-o", destPath
+            # *(self.default_args), "-I", include_path, *archFlags, "-Xarch_device", "-mattr=+real-true16", srcPath, "-c", "-o", destPath
         ]
+        print(f'----------------- args: {args}')
         return _invoke(args, f"Compiling HIP source kernels into objects (.cpp -> .o)")
 
 
