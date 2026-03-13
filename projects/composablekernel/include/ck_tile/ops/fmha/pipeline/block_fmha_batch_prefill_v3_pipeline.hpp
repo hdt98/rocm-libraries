@@ -8,8 +8,8 @@
 #include "ck_tile/ops/fmha/block/block_attention_kvcache_layout_enum.hpp"
 #include "ck_tile/ops/fmha/block/block_attention_quant_scale_enum.hpp"
 #include "ck_tile/ops/fmha/pipeline/block_fmha_batch_prefill_pipeline_qr_ks_vs_async.hpp"
+#include "ck_tile/ops/fmha/pipeline/block_fmha_batch_prefill_v3_pipeline_default_policy.hpp"
 #include "ck_tile/ops/fmha/pipeline/block_fmha_fwd_v3_pipeline.hpp"
-#include "ck_tile/ops/fmha/pipeline/block_fmha_fwd_v3_pipeline_default_policy.hpp"
 #include "ck_tile/ops/reduce/block/block_reduce.hpp"
 
 namespace ck_tile {
@@ -25,7 +25,7 @@ namespace ck_tile {
 ///   - Per-iteration page offset recomputation (load_physical_pages + kv_offset_array_transform)
 ///   - Additional operator() parameters: page_idx, stride_k/v, page_stride_k/v
 ///   - Problem type requires kPageBlockSize, kVectorSize, kKVMemoryLayout
-template <typename Problem_, typename Policy_ = BlockFmhaV3PipelineDefaultPolicy>
+template <typename Problem_, typename Policy_ = BlockFmhaBatchPrefillV3PipelineDefaultPolicy>
 struct BlockFmhaBatchPrefillV3Pipeline
 {
     using Problem             = ck_tile::remove_cvref_t<Problem_>;
@@ -423,6 +423,23 @@ struct BlockFmhaBatchPrefillV3Pipeline
                                      k_dist,
                                      k_offsets);
 
+        // SRD rebasing: move the buffer descriptor base pointer to each page's start
+        // address using 48-bit pointer arithmetic, so voffset only needs the small
+        // within-page offset. Only applies when kPageBlockSize >= kN0.
+        auto rebase_k_window = [&](auto& window, index_t physical_page) {
+            if constexpr(kPageBlockSize >= kN0)
+            {
+                physical_page = __builtin_amdgcn_readfirstlane(physical_page);
+                const auto* base_ptr =
+                    k_dram_block_window_tmp.get_bottom_tensor_view().buf_.p_data_;
+                const auto* page_ptr =
+                    base_ptr + static_cast<long_index_t>(physical_page) * page_stride_k;
+                window.set_bottom_tensor_view_data_ptr(page_ptr);
+            }
+        };
+
+        rebase_k_window(k_dram_window, k_physical_pages[number<0>{}]);
+
         // =====================================================================
         // Scatter-gather V DRAM window setup
         // =====================================================================
@@ -506,6 +523,20 @@ struct BlockFmhaBatchPrefillV3Pipeline
                                      number<0>{}, // HsGatherDim: sequence is first Hs dim in V3
                                      number<1>{}, // NumCoord
                                      VPageIndexYDims);
+
+        auto rebase_v_window = [&](auto& window, index_t physical_page) {
+            if constexpr(kPageBlockSize >= kN0)
+            {
+                physical_page = __builtin_amdgcn_readfirstlane(physical_page);
+                const auto* base_ptr =
+                    v_dram_block_window_tmp.get_bottom_tensor_view().buf_.p_data_;
+                const auto* page_ptr =
+                    base_ptr + static_cast<long_index_t>(physical_page) * page_stride_v;
+                window.set_bottom_tensor_view_data_ptr(page_ptr);
+            }
+        };
+
+        rebase_v_window(v_dram_window, v_physical_pages[number<0>{}]);
 
         // prefetch K tile
         index_t i_total_loops      = 0;
@@ -591,6 +622,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
                                       kVectorSize>(
                 k_physical_pages, stride_k, page_stride_k, k_coord, k_offsets, current_k_seq);
             k_dram_window.update_page_idx(k_offsets);
+            rebase_k_window(k_dram_window, k_physical_pages[number<0>{}]);
         };
 
         auto V_page_issue = [&]() {
@@ -605,11 +637,12 @@ struct BlockFmhaBatchPrefillV3Pipeline
             s_waitcnt<V_mem_su_ld_insts>();
             update_v_offsets(number<0>{});
             v_dram_window.update_page_idx(v_offsets);
+            rebase_v_window(v_dram_window, v_physical_pages[number<0>{}]);
         };
 
         auto V_lds_load = [&](auto v_lds_read_idx) {
-            kv_tile.v_tile = load_tile_transpose_with_offset(v_lds_window_load(v_lds_read_idx),
-                                                             v_lds_load_offset);
+            load_tile_transpose_with_offset(
+                kv_tile.v_tile, v_lds_window_load(v_lds_read_idx), v_lds_load_offset);
         };
 
         decltype(m) m_old;
@@ -700,8 +733,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
                 // Fold k_descale into scalar row_max: max(s_raw) * d_i == max(s_raw * d_i)
                 m_latest.thread_buf_[0] *= saved_k_descale[si];
                 // Running max in descaled domain (same leaky-max as before)
-                m_latest.thread_buf_[0] =
-                    f_max(m_latest.thread_buf_[0], m_old.thread_buf_[0]);
+                m_latest.thread_buf_[0] = f_max(m_latest.thread_buf_[0], m_old.thread_buf_[0]);
                 // FP8 shift: exp2(s*ss_k - ss*m) implicitly scales P by 2^shift
 #if CK_TILE_USE_OCP_FP8
                 m_latest.thread_buf_[0] -= OCP_FP8_SHIFT;
@@ -740,9 +772,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
                         // fma(s_raw, scale_s * k_descale, -scale_s * m)
                         // = scale_s * (s_raw * k_descale - m_latest + S)
                         sp_delta(sp_reg_idx)(i_j_idx) = detail::fma_impl_vsv(
-                            sp(sp_reg_idx).sp_compute(i_j_idx),
-                            scale_s_k,
-                            -scale_s * m(i_j_idx));
+                            sp(sp_reg_idx).sp_compute(i_j_idx), scale_s_k, -scale_s * m(i_j_idx));
                     }
                     else
                     {
