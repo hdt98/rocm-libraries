@@ -1432,30 +1432,11 @@ struct xor_fp8_bank_t : public base_transform<2, 2>
 
         idx_low(number<0>{}) = m;
 
-        // XOR pattern for FP8 (1-byte elements):
-        // 4 consecutive N values (N & ~3) share the same 4-byte bank word
-        // We XOR the N word-offset (N >> 2) with (M & 3) to spread across banks
-        // Then reconstruct N: new_n = ((n >> 2) ^ (m & 3)) << 2 | (n & 3)
-        const auto n_word = n >> 2;  // Which 4-byte word in N dimension
-        const auto n_byte = n & 3;   // Byte offset within word
-        const auto xor_val = m & 3;  // XOR pattern based on M row
-        const auto new_n_word = n_word ^ xor_val;
-        const auto new_n = (new_n_word << 2) | n_byte;
+        // DISABLED: XOR was making conflicts worse by creating new collisions
+        // Keep original N for now to establish baseline
+        idx_low(number<1>{}) = n;
 
-        idx_low(number<1>{}) = new_n;
-
-        // Debug: print calculations for representative threads
-        // Check threads 0, 16, 32, 48 to see conflict pattern
-        if((threadIdx.x == 0 || threadIdx.x == 16 || threadIdx.x == 32 || threadIdx.x == 48) &&
-           blockIdx.x == 0)
-        {
-            // Calculate physical offset (assuming stride ~260 for 32 N + padding)
-            // offset = m * 260 + new_n
-            const auto offset = m * 260 + new_n;
-            const auto bank = (offset / 4) % 64;
-            printf("XOR tid=%d: m=%d n=%d -> new_n=%d offset=%d bank=%d\n",
-                   (int)threadIdx.x, (int)m, (int)n, (int)new_n, (int)offset, (int)bank);
-        }
+        // Debug disabled
     }
 
     template <typename LowIdxDiff, typename UpIdxDiff, typename LowIdx, typename UpIdx>
