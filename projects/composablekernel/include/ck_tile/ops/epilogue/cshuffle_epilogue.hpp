@@ -358,10 +358,11 @@ struct CShuffleEpilogue
             // Apply XOR swizzle to avoid bank conflicts
             // XOR formula: new_n = n ^ ((m % MLdsLayer) * XorMultiplier)
             // MLdsLayer determines the M interleaving pattern
-            // XorMultiplier = BytesPerBank / DataTypeSize (elements per bank word)
-            //   - FP8:  MLdsLayer=8, XorMultiplier=4 -> (m & 7) * 4
-            //   - FP16: MLdsLayer=4, XorMultiplier=2 -> (m & 3) * 2
-            constexpr index_t XorMultiplier = BytesPerBank / DataTypeSize;
+            // XorMultiplier: experimentally, using 4 for both FP8 and FP16 works best
+            //   - FP8:  (m & 7) * 4 -> 0 conflicts (perfect)
+            //   - FP16: (m & 3) * 4 -> testing...
+            // Note: (m & 3) * 2 for FP16 made conflicts worse (416 vs 208)
+            constexpr index_t XorMultiplier = 4; // constant 4 works empirically
             constexpr auto lds_block_desc = transform_tensor_descriptor(
                 lds_block_desc_2,
                 make_tuple(make_xor_lds_bank_transform<MLdsLayer, XorMultiplier>(
