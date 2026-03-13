@@ -5,8 +5,8 @@
 // Provides a C API for Python ctypes integration.
 // Kernel header included via -include at compile time.
 //
-// Thread safety: NOT thread-safe. All calls must be serialized by the caller
-// (Python GIL provides this when called from ctypes).
+// Thread safety: NOT thread-safe. Python ctypes releases the GIL during
+// foreign calls, so single-threaded usage must be enforced by the caller.
 
 #include <hip/hip_runtime.h>
 #include <cstdint>
@@ -46,16 +46,27 @@ static inline void safe_hip_free(void*& ptr)
     }
 }
 
-static int dtype_element_bytes(const char* dtype)
+static int dtype_input_bytes(const char* dtype)
 {
     if(!dtype)
         return 2;
     if(std::strcmp(dtype, "fp32") == 0)
         return 4;
     if(std::strcmp(dtype, "fp8bf16") == 0 || std::strcmp(dtype, "fp8fp32") == 0 ||
-       std::strcmp(dtype, "bf8") == 0)
+       std::strcmp(dtype, "bf8") == 0 || std::strcmp(dtype, "fp8") == 0)
         return 1;
     return 2; // fp16, bf16
+}
+
+static int dtype_output_bytes(const char* dtype)
+{
+    if(!dtype)
+        return 2;
+    if(std::strcmp(dtype, "fp32") == 0 || std::strcmp(dtype, "fp8fp32") == 0)
+        return 4;
+    if(std::strcmp(dtype, "fp8") == 0 || std::strcmp(dtype, "bf8") == 0)
+        return 1;
+    return 2; // fp16, bf16, fp8bf16 (output is bf16)
 }
 
 extern "C" {
@@ -110,15 +121,16 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     if(!g_initialized)
         return -1;
 
-    const int elem_bytes = dtype_element_bytes(data_type_str);
+    const int in_bytes  = dtype_input_bytes(data_type_str);
+    const int out_bytes = dtype_output_bytes(data_type_str);
 
     int rc                = 0;
-    const int64_t q_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * elem_bytes;
-    const int64_t k_bytes = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * elem_bytes;
-    const int64_t v_bytes = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * elem_bytes;
-    const int64_t o_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v * elem_bytes;
+    const int64_t q_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * in_bytes;
+    const int64_t k_bytes = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * in_bytes;
+    const int64_t v_bytes = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * in_bytes;
+    const int64_t o_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v * out_bytes;
     const int64_t bias_bytes =
-        static_cast<int64_t>(batch) * nhead_q * seqlen_q * seqlen_k * elem_bytes;
+        static_cast<int64_t>(batch) * nhead_q * seqlen_q * seqlen_k * out_bytes;
     const int64_t lse_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
     float elapsed           = 0.0f;
 
@@ -350,17 +362,18 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     if(!g_initialized)
         return -1;
 
-    const int elem_bytes = dtype_element_bytes(data_type_str);
+    const int in_bytes  = dtype_input_bytes(data_type_str);
+    const int out_bytes = dtype_output_bytes(data_type_str);
 
-    int rc                 = 0;
-    const int64_t q_bytes  = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * elem_bytes;
-    const int64_t k_bytes  = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * elem_bytes;
-    const int64_t v_bytes  = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * elem_bytes;
-    const int64_t o_bytes  = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v * elem_bytes;
-    const int64_t do_bytes = o_bytes;
-    const int64_t dq_bytes = q_bytes;
-    const int64_t dk_bytes = k_bytes;
-    const int64_t dv_bytes = v_bytes;
+    int rc                  = 0;
+    const int64_t q_bytes   = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * in_bytes;
+    const int64_t k_bytes   = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * in_bytes;
+    const int64_t v_bytes   = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * in_bytes;
+    const int64_t o_bytes   = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v * out_bytes;
+    const int64_t do_bytes  = o_bytes;
+    const int64_t dq_bytes  = q_bytes;
+    const int64_t dk_bytes  = k_bytes;
+    const int64_t dv_bytes  = v_bytes;
     const int64_t lse_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
     const int64_t d_bytes   = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
     const int64_t dq_acc_bytes =

@@ -162,7 +162,10 @@ class BaseRegistry
     /// Call after registration to trigger auto-export if enabled.
     void perform_auto_export()
     {
-        if(auto_export_enabled_.load(std::memory_order_acquire) && auto_export_on_register_)
+        if(!auto_export_enabled_.load(std::memory_order_acquire))
+            return;
+        std::lock_guard<std::mutex> lock(mutex_);
+        if(auto_export_on_register_)
         {
             static_cast<Derived*>(this)->export_json_to_file(auto_export_path_, auto_export_stats_);
         }

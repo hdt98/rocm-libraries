@@ -151,10 +151,11 @@ class FmhaKernelConfig:
     warp_k2: int = 16
 
     # -- Algorithm: padding --
-    pad_s: bool = True  # pad seqlen_q
-    pad_sk: bool = True  # pad seqlen_k
-    pad_d: bool = True  # pad hdim_q
-    pad_dv: bool = True  # pad hdim_v
+    # Values: 0=no pad, 1=pad, 8=pad with 8-byte alignment (BWD-specific)
+    pad_s: int = 1
+    pad_sk: int = 1
+    pad_d: int = 1
+    pad_dv: int = 1
 
     # -- Algorithm: pipeline --
     pipeline: str = "qr_async"
@@ -172,6 +173,13 @@ class FmhaKernelConfig:
     paged_kv: bool = False
     sink: bool = False
     skip_min_seqlen_q: bool = False
+    page_size: int = 1
+    kv_memory_layout: str = "vectorized"
+    kv_lookup_table: str = "sglang"
+    deterministic: bool = False
+    dbias: bool = False
+    dropout_variant: str = ""  # BWD: "no"/"dropout_wg16"/"dropout_wg16_storerandval"
+    tile_tag: str = ""  # extra tile variant discriminator (e.g. "trload", "small")
 
     @property
     def tile(self) -> Tuple[int, ...]:
@@ -218,10 +226,10 @@ class FmhaKernelConfig:
 
     @property
     def name(self) -> str:
-        s = int(self.pad_s)
-        k = int(self.pad_sk)
-        d = int(self.pad_d)
-        v = int(self.pad_dv)
+        s = self.pad_s
+        k = self.pad_sk
+        d = self.pad_d
+        v = self.pad_dv
         parts = [
             f"fmha_{self.family}_{self.data_type}",
             self.mode,
@@ -229,7 +237,8 @@ class FmhaKernelConfig:
             if self.hdim_q != self.hdim_v
             else f"h{self.hdim_q}",
             self.pipeline,
-            f"{self.tile_m0}x{self.tile_n0}x{self.tile_k0}",
+            f"t{self.tile_m0}x{self.tile_n0}x{self.tile_k0}x{self.tile_n1}x{self.tile_k1}x{self.tile_k0max}"
+            + (f".{self.tile_tag}" if self.tile_tag else ""),
             f"pad{s}{k}{d}{v}",
             f"mask={self.mask}",
             f"bias={self.bias}",
@@ -246,6 +255,22 @@ class FmhaKernelConfig:
             parts.append("skip=1")
         if self.qscale != "no":
             parts.append(f"qs={self.qscale}")
+        if self.paged_kv:
+            parts.append("pkv=1")
+        if self.rope != "none":
+            parts.append(f"rope={self.rope}")
+        if self.page_size != 1:
+            parts.append(f"ps={self.page_size}")
+        if self.kv_memory_layout != "vectorized":
+            parts.append(f"kvl={self.kv_memory_layout}")
+        if self.kv_lookup_table != "sglang":
+            parts.append(f"kvt={self.kv_lookup_table}")
+        if self.deterministic:
+            parts.append("det=1")
+        if self.dbias:
+            parts.append("dbias=1")
+        if self.dropout_variant and self.dropout_variant != "no":
+            parts.append(f"drv={self.dropout_variant}")
         return "_".join(parts)
 
     def to_codegen_json(self) -> str:
@@ -273,9 +298,9 @@ class FmhaKernelConfig:
                     "dbias": False,
                     "store_randval": False,
                     "deterministic": False,
-                    "kv_memory_layout": "vectorized",
-                    "kv_lookup_table": "sglang",
-                    "page_size": 1,
+                    "kv_memory_layout": self.kv_memory_layout,
+                    "kv_lookup_table": self.kv_lookup_table,
+                    "page_size": self.page_size,
                 },
                 "algorithm": {
                     "pipeline": self.pipeline,

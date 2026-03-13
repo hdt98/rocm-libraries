@@ -204,10 +204,13 @@ struct FmhaProblem
 
     [[nodiscard]] std::uint64_t num_ops() const
     {
-        const auto sq = static_cast<std::uint64_t>(effective_max_seqlen_q());
-        const auto sk = static_cast<std::uint64_t>(effective_max_seqlen_k());
-        return 2ULL * static_cast<std::uint64_t>(batch) * static_cast<std::uint64_t>(nhead_q) * sq *
-               sk * static_cast<std::uint64_t>(hdim_q + hdim_v);
+        const auto sq = effective_max_seqlen_q();
+        const auto sk = effective_max_seqlen_k();
+        if(batch <= 0 || nhead_q <= 0 || sq <= 0 || sk <= 0 || hdim_q <= 0 || hdim_v <= 0)
+            return 0;
+        return 2ULL * static_cast<std::uint64_t>(batch) * static_cast<std::uint64_t>(nhead_q) *
+               static_cast<std::uint64_t>(sq) * static_cast<std::uint64_t>(sk) *
+               static_cast<std::uint64_t>(hdim_q + hdim_v);
     }
 
     [[nodiscard]] std::string to_string() const

@@ -77,16 +77,16 @@ enum class rope_enum
 
 struct fmha_fwd_args
 {
-    const void* q_ptr;
-    const void* k_ptr;
-    const void* v_ptr;
-    const void* bias_ptr;
-    const void* q_descale_ptr;
-    const void* k_descale_ptr;
-    const void* v_descale_ptr;
-    void* rand_val_ptr;
-    void* lse_ptr;
-    void* o_ptr;
+    const void* q_ptr         = nullptr;
+    const void* k_ptr         = nullptr;
+    const void* v_ptr         = nullptr;
+    const void* bias_ptr      = nullptr;
+    const void* q_descale_ptr = nullptr;
+    const void* k_descale_ptr = nullptr;
+    const void* v_descale_ptr = nullptr;
+    void* rand_val_ptr        = nullptr;
+    void* lse_ptr             = nullptr;
+    void* o_ptr               = nullptr;
 
     const void* seqstart_q_ptr             = nullptr;
     const void* seqstart_k_ptr             = nullptr;
