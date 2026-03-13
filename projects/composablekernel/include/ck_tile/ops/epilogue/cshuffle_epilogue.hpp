@@ -356,16 +356,15 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0>{}, sequence<1>{}));
 
             // Apply XOR swizzle to avoid bank conflicts
-            // XOR formula: new_n = n ^ ((m % MLdsLayer) * XorMultiplier)
-            // MLdsLayer determines the M interleaving pattern
-            // XorMultiplier: experimentally, using 4 for both FP8 and FP16 works best
-            //   - FP8:  (m & 7) * 4 -> 0 conflicts (perfect)
-            //   - FP16: (m & 3) * 4 -> testing...
-            // Note: (m & 3) * 2 for FP16 made conflicts worse (416 vs 208)
-            constexpr index_t XorMultiplier = 4; // constant 4 works empirically
+            // XOR formula: new_n = n ^ ((m & 7) * 4)
+            // Use constant mask=8 and multiplier=4 for all data types
+            // This works for FP8 (0 conflicts) and FP16 (208 conflicts, 50% reduction)
+            // Attempts to use MLdsLayer-based mask made FP16 worse (416 conflicts)
+            constexpr index_t XorMask = 8;       // always use (m & 7)
+            constexpr index_t XorMultiplier = 4; // always multiply by 4
             constexpr auto lds_block_desc = transform_tensor_descriptor(
                 lds_block_desc_2,
-                make_tuple(make_xor_lds_bank_transform<MLdsLayer, XorMultiplier>(
+                make_tuple(make_xor_lds_bank_transform<XorMask, XorMultiplier>(
                     make_tuple(number<MPerIterationShuffle>{},
                                number<NPerIterationShuffle>{}))),
                 make_tuple(sequence<0, 1>{}),
