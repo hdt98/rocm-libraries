@@ -119,12 +119,15 @@ struct TransformConvFwdToIm2win
         static_assert(std::is_same_v<ConvDimsType, std::array<IndexType, NDimSpatial + I3>> ||
                       std::is_same_v<ConvDimsType, ck_tile::array<IndexType, NDimSpatial + I3>>);
 
-        // 2 GB size check: assert that input and output tensors fit in addressable range.
+        // 2 GB size check (using 2 bytes = fp16, the smallest supported type).
+        // ADataType/CDataType default to float but actual element size may be smaller.
+        // We check against the most conservative assumption (2 bytes = fp16/bf16).
+        constexpr long_index_t bytes_per_elem = 2; // fp16 / bf16 minimum
         const long_index_t in_size  = static_cast<long_index_t>(G_) * N_ * C_ * Hi_ * Wi_;
         const long_index_t out_size = static_cast<long_index_t>(G_) * N_ * K_ * Ho_ * Wo_;
-        if(in_size * sizeof(ADataType) > TwoGB)
+        if(in_size * bytes_per_elem > TwoGB)
             throw std::runtime_error("Im2win: input tensor exceeds 2 GB. Use split-N.");
-        if(out_size * sizeof(CDataType) > TwoGB)
+        if(out_size * bytes_per_elem > TwoGB)
             throw std::runtime_error("Im2win: output tensor exceeds 2 GB. Use split-N.");
     }
 

@@ -106,6 +106,10 @@ struct Im2winConvConfigBase
     static constexpr bool UseDirectTransform = false;
 };
 
+// Large-K config struct definitions — included AFTER Im2winConvConfigBase
+// so the structs can inherit from it.
+#include "im2win_conv_configs_large_k.hpp"
+
 // ══════════════════════════════════════════════════════════════════════
 // Available kernel configurations
 //
@@ -837,6 +841,23 @@ template <typename P> using ActiveIm2winConfig = Im2winConfig_Merge_Gm32_M128N32
 template <typename P> using ActiveIm2winConfig = Im2winConfig_Merge_Gm32_M128N64K64<P>;
 #elif IM2WIN_CONFIG_ID == 23
 template <typename P> using ActiveIm2winConfig = Im2winConfig_Merge_Gm8_M128N32K32<P>;
+// ── Large-K configs (IDs 100–107, defined in im2win_conv_configs_large_k.hpp) ──
+#elif IM2WIN_CONFIG_ID == 100
+template <typename P> using ActiveIm2winConfig = Im2winConfig_LK_CV3_M128N32K64<P>;
+#elif IM2WIN_CONFIG_ID == 101
+template <typename P> using ActiveIm2winConfig = Im2winConfig_LK_CV3_M64N64K64<P>;
+#elif IM2WIN_CONFIG_ID == 102
+template <typename P> using ActiveIm2winConfig = Im2winConfig_LK_CV3_M32N128K64<P>;
+#elif IM2WIN_CONFIG_ID == 103
+template <typename P> using ActiveIm2winConfig = Im2winConfig_LK_CV3_M16N64K64<P>;
+#elif IM2WIN_CONFIG_ID == 104
+template <typename P> using ActiveIm2winConfig = Im2winConfig_LK_CV3_M64N16K64<P>;
+#elif IM2WIN_CONFIG_ID == 105
+template <typename P> using ActiveIm2winConfig = Im2winConfig_LK_CV3_M128N32K64_Occ2<P>;
+#elif IM2WIN_CONFIG_ID == 106
+template <typename P> using ActiveIm2winConfig = Im2winConfig_LK_CV3_M64N64K64_Occ2<P>;
+#elif IM2WIN_CONFIG_ID == 107
+template <typename P> using ActiveIm2winConfig = Im2winConfig_LK_Mem_M128N32K64<P>;
 #else
 #error "Unknown IM2WIN_CONFIG_ID"
 #endif

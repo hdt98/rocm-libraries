@@ -93,6 +93,15 @@ ALL_CONFIGS: list[str] = [
     "Merge_Gm32_M128N32K64",
     "Merge_Gm32_M128N64K64",
     "Merge_Gm8_M128N32K32",
+    # Large-K configs (compute-bound: K=2376, C=256)
+    "LK_CV3_M128N32K64",
+    "LK_CV3_M64N64K64",
+    "LK_CV3_M32N128K64",
+    "LK_CV3_M16N64K64",
+    "LK_CV3_M64N16K64",
+    "LK_CV3_M128N32K64_Occ2",
+    "LK_CV3_M64N64K64_Occ2",
+    "LK_Mem_M128N32K64",
 ]
 
 BINARY_PREFIX = "tile_example_grouped_conv_fwd_im2win_"
