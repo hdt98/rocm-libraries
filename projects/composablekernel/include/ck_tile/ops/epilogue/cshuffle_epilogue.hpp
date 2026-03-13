@@ -425,7 +425,7 @@ struct CShuffleEpilogue
                 return tile_distribution_encoding<sequence<>,
                                                   tuple<sequence<NumMXdlPerWavePerShuffle, MWave>,
                                                         sequence<NumNXdlPerWavePerShuffle, NWave>>,
-                                                  tuple<sequence<2, 1>>,
+                                                  tuple<sequence<1, 2>>,
                                                   tuple<sequence<1, 1>>,
                                                   sequence<1, 2>,
                                                   sequence<0, 0>>{};
