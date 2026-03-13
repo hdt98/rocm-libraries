@@ -1432,11 +1432,13 @@ struct xor_fp8_bank_t : public base_transform<2, 2>
 
         idx_low(number<0>{}) = m;
 
-        // DISABLED: XOR was making conflicts worse by creating new collisions
-        // Keep original N for now to establish baseline
-        idx_low(number<1>{}) = n;
+        // XOR N with ((M%8)*4) to spread across banks accounting for MLdsLayer=8 interleaving
+        // The interleaved layout has (M%8)*32 byte offset, contributing (M%8)*8 to bank index
+        // XOR with (M%8)*4 shifts the N-word contribution to avoid cross-M conflicts
+        const auto xor_val = (m & 7) << 2;  // (M%8)*4
+        const auto new_n = n ^ xor_val;
 
-        // Debug disabled
+        idx_low(number<1>{}) = new_n;
     }
 
     template <typename LowIdxDiff, typename UpIdxDiff, typename LowIdx, typename UpIdx>

@@ -355,8 +355,17 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
 
-            // XOR swizzle disabled - need to analyze baseline conflict pattern first
-            return lds_block_desc_2;
+            // For sub-4-byte types (FP8), apply XOR swizzle to avoid bank conflicts
+            // XOR formula: new_n = n ^ ((m % 8) * 4) to spread across banks
+            constexpr auto lds_block_desc = transform_tensor_descriptor(
+                lds_block_desc_2,
+                make_tuple(make_xor_fp8_bank_transform(
+                    make_tuple(number<MPerIterationShuffle>{},
+                               number<NPerIterationShuffle>{}))),
+                make_tuple(sequence<0, 1>{}),
+                make_tuple(sequence<0, 1>{}));
+
+            return lds_block_desc;
         }
         // M is contiguous dimension
         else if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::ColumnMajor>)
