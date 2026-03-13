@@ -353,11 +353,20 @@ struct CShuffleEpilogue
 
             constexpr index_t N_vectors = NPerIterationShuffle / VectorLen;
 
-            // Only apply XOR if we have enough N_vectors for meaningful spread
-            // and XOR won't cause N_vector aliasing
-            constexpr index_t XorMask = 8;
-            constexpr index_t XorMult = 4;
-            constexpr bool CanApplyXor = (N_vectors >= 32) &&
+            // Scale XOR parameters based on available N_vectors
+            // Small N configs (4-7): Use XorMask=4, XorMult=1 for limited spread
+            // Medium N configs (8-31): Use XorMask=8, XorMult=1 for more M variation
+            // Large N configs (32+): Use XorMask=8, XorMult=4 for maximum spread
+            constexpr index_t XorMask = (N_vectors >= 8) ? 8 : 4;
+            constexpr index_t XorMult = (N_vectors >= 32) ? 4 : 1;
+
+            // Apply XOR if we have at least 4 N_vectors and won't cause aliasing
+            // Aliasing check: (XorMask - 1) * XorMult must be < N_vectors
+            // Examples:
+            //   N_vectors=4: (4-1)*1 = 3 < 4 ✓
+            //   N_vectors=8: (8-1)*1 = 7 < 8 ✓
+            //   N_vectors=32: (8-1)*4 = 28 < 32 ✓
+            constexpr bool CanApplyXor = (N_vectors >= 4) &&
                                           ((XorMask - 1) * XorMult < N_vectors);
 
             if constexpr(CanApplyXor)
