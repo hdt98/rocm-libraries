@@ -355,19 +355,26 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
 
-            // For sub-4-byte types, apply XOR swizzle to avoid bank conflicts
-            // XOR formula: new_n = n ^ ((m % 8) * ElemsPerBankWord) to spread across banks
-            // ElemsPerBankWord = BytesPerBank / DataTypeSize (4/1=4 for FP8, 4/2=2 for FP16)
-            constexpr index_t ElemsPerBankWord = BytesPerBank / DataTypeSize;
-            constexpr auto lds_block_desc = transform_tensor_descriptor(
-                lds_block_desc_2,
-                make_tuple(make_xor_lds_bank_transform<ElemsPerBankWord>(
-                    make_tuple(number<MPerIterationShuffle>{},
-                               number<NPerIterationShuffle>{}))),
-                make_tuple(sequence<0, 1>{}),
-                make_tuple(sequence<0, 1>{}));
-
-            return lds_block_desc;
+            // For 1-byte types (FP8), apply XOR swizzle to avoid bank conflicts
+            // XOR formula: new_n = n ^ ((m % 8) * 4) to spread across banks
+            // Only FP8 has MLdsLayer=8 which matches the (m & 7) mask
+            // FP16 has MLdsLayer=4, requiring a different approach (TODO)
+            if constexpr(DataTypeSize == 1)
+            {
+                constexpr index_t ElemsPerBankWord = BytesPerBank / DataTypeSize; // 4 for FP8
+                constexpr auto lds_block_desc = transform_tensor_descriptor(
+                    lds_block_desc_2,
+                    make_tuple(make_xor_lds_bank_transform<ElemsPerBankWord>(
+                        make_tuple(number<MPerIterationShuffle>{},
+                                   number<NPerIterationShuffle>{}))),
+                    make_tuple(sequence<0, 1>{}),
+                    make_tuple(sequence<0, 1>{}));
+                return lds_block_desc;
+            }
+            else
+            {
+                return lds_block_desc_2;
+            }
         }
         // M is contiguous dimension
         else if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::ColumnMajor>)
