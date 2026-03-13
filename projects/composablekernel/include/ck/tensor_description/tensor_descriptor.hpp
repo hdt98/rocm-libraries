@@ -44,11 +44,22 @@ struct TensorDescriptor
 
         constexpr auto all_dim_ids = merge_sequences(all_low_dim_ids, all_up_dim_ids);
 
-        using unique_sort_all_dim_ids = typename sequence_unique_sort<decltype(all_dim_ids),
-                                                                      math::less<index_t>,
-                                                                      math::equal<index_t>>::type;
+        // Fast path: all ids must be in the 0..63 range
+        constexpr index_t count = sequence_unique_count(all_dim_ids);
+        if constexpr(count >= 0)
+        {
+            return count;
+        }
+        else
+        {
+            // Fallback for theoretically possible ids > 63: use sorting
+            using unique_sort_all_dim_ids =
+                typename sequence_unique_sort<decltype(all_dim_ids),
+                                              math::less<index_t>,
+                                              math::equal<index_t>>::type;
 
-        return unique_sort_all_dim_ids::Size();
+            return unique_sort_all_dim_ids::Size();
+        }
     }
 
     __host__ __device__ static constexpr auto InitializeElementSize(const Transforms& transforms)
