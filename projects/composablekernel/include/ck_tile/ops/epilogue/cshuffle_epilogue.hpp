@@ -422,11 +422,9 @@ struct CShuffleEpilogue
         constexpr auto block_outer_dstr_encoding = [] {
             if constexpr(BlockedXDLN_PerWarp == 1)
             {
-                // Attempt-1 remap: make N the first H dimension so lane-varying traversal
-                // maps to the bank-spreading dimension in LDS for store phases.
                 return tile_distribution_encoding<sequence<>,
-                                                  tuple<sequence<NumNXdlPerWavePerShuffle, NWave>,
-                                                        sequence<NumMXdlPerWavePerShuffle, MWave>>,
+                                                  tuple<sequence<NumMXdlPerWavePerShuffle, MWave>,
+                                                        sequence<NumNXdlPerWavePerShuffle, NWave>>,
                                                   tuple<sequence<1, 2>>,
                                                   tuple<sequence<1, 1>>,
                                                   sequence<1, 2>,
