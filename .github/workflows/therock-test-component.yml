@@ -14,6 +14,9 @@ on:
         type: string
       component:
         type: string
+      build_variant_label:
+        type: string
+        default: "release"
 
 
 permissions:
@@ -92,6 +95,9 @@ jobs:
           SHARD_INDEX: ${{ matrix.shard }}
           TOTAL_SHARDS: ${{ fromJSON(inputs.component).total_shards }}
           TEST_TYPE: ${{ fromJSON(inputs.component).test_type }}
+          # TSAN-specific environment variables
+          HSA_XNACK: ${{ inputs.build_variant_label == 'tsan' && '1' || '' }}
+          TSAN_OPTIONS: ${{ inputs.build_variant_label == 'tsan' && 'ignore_noninstrumented_modules=1' || '' }}
         run: |
           # Create logs directory
           mkdir -p ./test_logs

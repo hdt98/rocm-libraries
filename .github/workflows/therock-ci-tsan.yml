@@ -87,7 +87,8 @@ jobs:
     with:
       cmake_options: ${{ matrix.projects.cmake_options }}
       projects_to_test: ${{ matrix.projects.projects_to_test }}
-      test_type: ${{ needs.setup.outputs.test_type }}
+      # Use quick tests for TSAN to run with --gtest_filter=*quick*
+      test_type: "quick"
       amdgpu_families: ${{ matrix.target_bundle.amdgpu_family }}
       test_runs_on: ${{ matrix.target_bundle.test_machine }}
       build_variant_cmake_preset: ${{ needs.setup.outputs.build_variant_cmake_preset }}

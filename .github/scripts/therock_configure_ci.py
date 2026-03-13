@@ -27,7 +27,7 @@ from config_loader import load_repo_config
 BUILD_VARIANT_CONFIG = {
     "release": ("linux-release-package", "release", False),
     "asan": ("linux-release-asan", "asan", True),
-    "tsan": ("linux-release-tsan", "tsan", True),
+    "tsan": ("linux-release-tsan", "tsan", False),
 }
 
 
