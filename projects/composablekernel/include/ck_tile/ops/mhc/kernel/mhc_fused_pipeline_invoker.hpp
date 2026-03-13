@@ -8,8 +8,12 @@
 #include "ck_tile/ops/mhc/pipeline/mhc_problem.hpp"
 #include "ck_tile/ops/mhc/kernel/mhc_kernel_fused_pipeline.hpp"
 #include "ck_tile/ops/mhc/kernel/mhc_reduction_kernel_optimized.hpp"
+// Sinkhorn kernels
 #include "ck_tile/ops/mhc/kernel/mhc_sinkhorn_kernel.hpp"
 #include "ck_tile/ops/mhc/kernel/mhc_sinkhorn_log_kernel.hpp"
+#include "ck_tile/ops/mhc/kernel/mhc_sinkhorn_log_kernel_cktile_v2.hpp"
+#include "ck_tile/ops/mhc/kernel/mhc_sinkhorn_kernel_cktile_v2.hpp"
+#include "ck_tile/ops/mhc/kernel/mhc_sinkhorn_kernel_cktile_unified.hpp"
 #include "ck_tile/ops/gemm/pipeline/gemm_universal_pipeline_ag_bg_cr_policy.hpp"
 
 namespace ck_tile {
@@ -40,10 +44,16 @@ struct MHCFusedPipelineInvoker
     using GemmKernel     = ck_tile::
         MHCKernelFusedPipeline<Problem, ck_tile::UniversalGemmPipelineAgBgCrPolicy, ActivationFunc>;
     using ReductionKernel = ck_tile::MHCReductionKernelOptimized<Problem, ActivationFunc>;
+    // Sinkhorn kernel - supports arbitrary n
+    // Testing unified V2 kernel (old kernels commented out)
     using SinkhornKernel =
-        std::conditional_t<UseLogSinkhorn,
-                           ck_tile::MHCSinkhornLogKernel<YDataType, ComputeDataType>,
-                           ck_tile::MHCSinkhornKernel<YDataType, ComputeDataType>>;
+        // Old kernels:
+        // std::conditional_t<UseLogSinkhorn,
+        //                    ck_tile::MHCSinkhornLogKernel<YDataType, ComputeDataType>,
+        //                    ck_tile::MHCSinkhornKernel<YDataType, ComputeDataType>>;
+        // Unified V2 kernel (testing):
+        ck_tile::
+            MHCSinkhornKernelTileV2UnifiedDispatcher<YDataType, ComputeDataType, UseLogSinkhorn>;
 
     // Helper methods
     CK_TILE_HOST static constexpr auto GetGemmBlockSize() { return GemmKernel::BlockSize(); }
