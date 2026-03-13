@@ -678,7 +678,7 @@ public:
     static void FillForReading(const TDbConstructor& db_constructor)
     {
         decltype(db_constructor()) db = db_constructor();
-        CommonPartSection(0u, common_part_size, [&db]() -> decltype(db) { return db; });
+        CommonPartSection(0u, common_part_size, [&db]() -> auto& { return db; });
     }
 
     template <class TDbConstructor>
@@ -743,7 +743,7 @@ private:
             LoggingLevel::Default, "Test", "Common part. Section with common db instance.");
         {
             decltype(db_constructor()) db = db_constructor();
-            ReadCommonPartSection(0u, common_part_size / 2, [&db]() -> decltype(db) { return db; });
+            ReadCommonPartSection(0u, common_part_size / 2, [&db]() -> auto& { return db; });
         }
 
         MIOPEN_LOG_CUSTOM(
@@ -779,7 +779,7 @@ private:
             LoggingLevel::Default, "Test", "Common part. Section with common db instance.");
         {
             decltype(db_constructor()) db = db_constructor();
-            CommonPartSection(0u, common_part_size / 2, [&db]() -> decltype(db) { return db; });
+            CommonPartSection(0u, common_part_size / 2, [&db]() -> auto& { return db; });
         }
 
         MIOPEN_LOG_CUSTOM(
@@ -814,7 +814,7 @@ private:
             LoggingLevel::Default, "Test", "Unique part. Section with common db instance.");
         {
             decltype(db_constructor()) db = db_constructor();
-            UniquePartSection(rnd, 0, unique_part_size / 2, [&db]() -> decltype(db) { return db; });
+            UniquePartSection(rnd, 0, unique_part_size / 2, [&db]() -> auto& { return db; });
         }
 
         MIOPEN_LOG_CUSTOM(
