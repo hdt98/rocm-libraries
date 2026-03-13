@@ -261,7 +261,7 @@ std::vector<Solution> EvaluateConvSolutions(const ExecutionContext& ctx,
                                             bool model_result = false)
 {
     // Set verification phase for kernel logging
-    ScopedKernelPhase phase_scope(KernelPhase::Validation);
+    ScopedKernelPhase phase_scope(KernelPhase::SolverTuning);
 
     std::vector<Solution> eval_sols;
 

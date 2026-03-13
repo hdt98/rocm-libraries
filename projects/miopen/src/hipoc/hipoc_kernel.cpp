@@ -121,8 +121,7 @@ void HIPOCKernelInvoke::run(void* args, std::size_t size) const
 #else
         (void)hipEventSynchronize(stop.get());
 #endif
-        const KernelPhase current_phase = GetKernelPhase();
-        if(IsLoggingKernel(current_phase))
+        if(IsLoggingKernel())
         {
             float elapsed_time = 0.0f;
             (void)hipEventElapsedTime(&elapsed_time, start.get(), stop.get());

@@ -2269,10 +2269,13 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
     // Log the selected solver for execution phase kernel tracking
     
     miopen::ScopedKernelPhase phase_scope(miopen::KernelPhase::Execution);
-    std::string solution_name = (found_solution.solution_id != 0) ? miopen::solver::Id(found_solution.solution_id).ToString()
-                                                             : std::string("UNKNOWN");
-    miopen::LogSolutionName(solution_name, found_solution.solution_id);
-    miopen::AddPerformanceConfig(solution_name, "");
+    if(performance_logging_enabled)
+    {
+        std::string solution_name = (found_solution.solution_id != 0) ? miopen::solver::Id(found_solution.solution_id).ToString()
+                                                                : std::string("UNKNOWN");
+        miopen::LogSolutionName(solution_name, found_solution.solution_id);
+        miopen::AddPerformanceConfig(solution_name, "");
+    }
     
     // Prepare to collect timing samples
     std::vector<float> time_samples;
@@ -4034,6 +4037,7 @@ int ConvDriver<Tgpu, Tref>::VerifyForward()
     if(!is_fwd_run_failed)
         if(!TryReadVerificationCache(Direction::Fwd, outputTensor, outhost.data.data()))
         {
+            ScopedKernelPhase phase_scope(KernelPhase::Validation);
             if(UseGPUReference())
                 RunForwardGPUReference();
             else
@@ -4105,6 +4109,7 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
         if(!is_bwd_run_failed)
             if(!TryReadVerificationCache(Direction::Bwd, inputTensor, din_host.data.data()))
             {
+                ScopedKernelPhase phase_scope(KernelPhase::Validation);
                 if(UseGPUReference())
                     RunBackwardDataGPUReference();
                 else

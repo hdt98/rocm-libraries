@@ -407,8 +407,7 @@ ConvSolution InitAnyInvokerFactory(const ProblemDescriptionType& problem,
                     float elapsed_time = handle.GetKernelTime();
                     
                     // Kernel logging for CK kernels
-                    const KernelPhase current_phase = GetKernelPhase();
-                    if(IsLoggingKernel(current_phase))
+                    if(IsLoggingKernel())
                     {                   
                         const auto exec_id = GetKernelExecutionCounter();
                         AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed_time, false);
@@ -1276,8 +1275,7 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
                 elapsed += handle.GetKernelTime();
 
                 // Kernel logging for CK kernels
-                const KernelPhase current_phase = GetKernelPhase();
-                if(IsLoggingKernel(current_phase))
+                if(IsLoggingKernel())
                 {
                     const auto exec_id = GetKernelExecutionCounter();
                     AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false);
@@ -1396,8 +1394,7 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     elapsed += handle.GetKernelTime();
                     
                     // Kernel logging for CK kernels
-                    const KernelPhase current_phase = GetKernelPhase();
-                    if(IsLoggingKernel(current_phase))
+                    if(IsLoggingKernel())
                     {
                         const auto exec_id = GetKernelExecutionCounter();
                         AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false);
@@ -1459,8 +1456,7 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     elapsed += handle.GetKernelTime();
                     
                     // Kernel logging for CK kernels
-                    const KernelPhase current_phase = GetKernelPhase();
-                    if(IsLoggingKernel(current_phase))
+                    if(IsLoggingKernel())
                     {
                         const auto exec_id = GetKernelExecutionCounter();
                         AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false);
