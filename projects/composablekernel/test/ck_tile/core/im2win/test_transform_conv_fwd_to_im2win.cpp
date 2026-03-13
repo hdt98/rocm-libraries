@@ -526,7 +526,7 @@ TEST(TransformConvFwdToIm2win, SmallChannelsTargetCase)
     EXPECT_TRUE(run_im2win_gemm_and_compare(tr, I, Wt, O_ref, N, K, Ho, Wo, 1e-3f));
 }
 
-// ── 10. C descriptor shape check ─────────────────────────────────────
+// ── 10. C descriptor shape check — NHWGK and GNKHW ───────────────────
 TEST(TransformConvFwdToIm2win, CDescriptorShape)
 {
     const int G=1,N=2,C=4,Hi=5,Wi=5,K=8,Y=3,X=3,Ho=5,Wo=5;
@@ -544,8 +544,16 @@ TEST(TransformConvFwdToIm2win, CDescriptorShape)
 
     Tr tr{a,b,c,s,d,lp,rp};
 
-    // True im2win C descriptor: [M=K, N=N×Ho×Wo] in NHWGK layout.
-    auto c_desc = tr.template MakeCDescriptor_M_N<tensor_layout::convolution::NHWGK>();
-    EXPECT_EQ(c_desc.get_length(number<0>{}), K);          // M = K
-    EXPECT_EQ(c_desc.get_length(number<1>{}), N * Ho * Wo); // N = spatial
+    // True im2win C descriptor: [M=K, N=N×Ho×Wo] — same logical shape for both layouts.
+    auto c_nhwgk = tr.template MakeCDescriptor_M_N<tensor_layout::convolution::NHWGK>();
+    EXPECT_EQ(c_nhwgk.get_length(number<0>{}), K);           // M = K
+    EXPECT_EQ(c_nhwgk.get_length(number<1>{}), N * Ho * Wo); // N = spatial
+
+    auto c_gnkhw = tr.template MakeCDescriptor_M_N<tensor_layout::convolution::GNKHW>();
+    EXPECT_EQ(c_gnkhw.get_length(number<0>{}), K);           // M = K
+    EXPECT_EQ(c_gnkhw.get_length(number<1>{}), N * Ho * Wo); // N = spatial
+
+    // Group stride differences: NHWGK stride(G)=K, GNKHW stride(G)=N*K*Ho*Wo.
+    EXPECT_EQ(tr.GetGroupStrideC(),       static_cast<long_index_t>(K));
+    EXPECT_EQ(tr.GetGroupStrideCGnkhw(), static_cast<long_index_t>(N) * K * Ho * Wo);
 }

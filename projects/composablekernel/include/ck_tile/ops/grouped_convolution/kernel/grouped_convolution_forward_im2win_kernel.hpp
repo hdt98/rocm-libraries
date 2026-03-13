@@ -175,8 +175,9 @@ struct GroupedConvFwdIm2winKernelArgs
         }
         else
         {
-            // GNKHW: one group = N*K*Ho*Wo. For Gm groups: advance by Gm * N*K*Ho*Wo.
-            group_stride_c      = transformer_.GetGroupStrideC() * NumGroupsToMerge;
+            // GNKHW = [G, N, K, Ho, Wo]: stride(G) = N*K*Ho*Wo.
+            // stride(N within group) = K*Ho*Wo.
+            group_stride_c      = transformer_.GetGroupStrideCGnkhw() * NumGroupsToMerge;
             output_batch_stride = static_cast<index_t>(transformer_.K_) *
                                   static_cast<index_t>(transformer_.Ho_) *
                                   static_cast<index_t>(transformer_.Wo_);

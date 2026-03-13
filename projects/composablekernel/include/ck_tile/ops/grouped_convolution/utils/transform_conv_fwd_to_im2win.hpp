@@ -12,28 +12,23 @@ namespace ck_tile {
 // TransformConvFwdToIm2win
 // ═══════════════════════════════════════════════════════════════════════
 //
-// Implements the *true* im2win GEMM mapping:
-//   A[M=K*Gm, K_gemm=Y×X×C]    ← weight   (channels-last: GKYXC)
-//   B[N=Gm×N×Ho×Wo, K_gemm]    ← input    (channels-last: NHWGC)
-//   C[M=K*Gm, N=Gm×N×Ho×Wo]   ← output   (NHWGK, with XOR diagonal)
+// Implements the *true* im2win GEMM mapping (paper: arXiv:2306.14316):
 //
-// where Gm = NumGroupsToMerge (1 = no merging, >1 = group merging).
+//   A[M=K, K_gemm=C×Y×X]   ← weight W[K,C,Y,X]          (GKCYX, channels-first)
+//   B[N=N×Ho×Wo, K_gemm]   ← input  I[N,C,Hi,Wi]         (GNCHW, channels-first)
+//   C[M=K, N=N×Ho×Wo]      ← output O[G,N,K,Ho,Wo]       (GNKHW, channels-first)
 //
-// For NumGroupsToMerge=1:
-//   M = K,  N = N×Ho×Wo — single-group GEMM per blockIdx.z batch.
+// Unlike im2col (M=N×Ho×Wo, N=K), true im2win has M=K (output channels) as
+// the row dimension.  For small K the 4×64×16 MFMA instruction matches M=K=4
+// exactly, eliminating the M-tile waste that im2col suffers in the N direction.
 //
-// For NumGroupsToMerge=Gm (channels-last NHWGC/GKYXC only):
-//   M = Gm*K — Gm groups' output channels fill the M tile.
-//   N = Gm*N*Ho×Wo — XOR-diagonal trick ensures only g_M==g_N pairs write.
-//   GemmBatch = G/Gm — fewer blocks, better dispatch efficiency.
+// Additional layouts supported:
+//   MakeADescriptor_M_K<GKYXC>()  — channels-last weight (K_gemm=Y×X×C)
+//   MakeBDescriptor_N_K<NHWGC>()  — channels-last input  (enables group merging)
+//   MakeCDescriptor_M_N<NHWGK>()  — channels-last output (K unit-stride)
 //
-// Supported weight layouts: GKCYX (channels-first) or GKYXC (channels-last)
-// Supported input layouts:  GNCHW (channels-first) or NHWGC (channels-last)
-// Output layout:            NHWGK (K innermost — vectorised epilogue stores)
-//
-// Group merging requires channels-last (NHWGC/GKYXC) and Gm must be a
-// power-of-2 (XOR constraint).  Channels-first (GNCHW/GKCYX) only supports
-// NumGroupsToMerge == 1.
+// Channels-first (GNCHW/GKCYX/GNKHW) only supports NumGroupsToMerge == 1.
+// Group merging requires channels-last (NHWGC/GKYXC) and Gm power-of-2.
 // ═══════════════════════════════════════════════════════════════════════
 
 template <index_t NDimSpatial,
@@ -683,6 +678,51 @@ struct TransformConvFwdToIm2win
         }
     }
 
+    // ── C descriptor: Output O → C[M=K, N=N×Ho×Wo] (GNKHW) ──────────────
+    //
+    // Channels-first output layout: O[G, N, K, Ho, Wo] (group stripped).
+    // In GNKHW, K has stride Ho×Wo (not unit), so vectorised epilogue stores
+    // are along the N_gemm dimension (Wo innermost, stride 1).
+    //
+    // Descriptor mapping (c_ptr = out_ptr + g * N*K*Ho*Wo):
+    //   C[m=k, n=n*Ho*Wo+ho*Wo+wo] → physical = n*(K*Ho*Wo) + k*(Ho*Wo) + ho*Wo + wo
+    //   stride(M=k)     = Ho*Wo      ← non-unit (K not innermost in GNKHW)
+    //   stride(N=spatial) = 1 for Wo (innermost of the merged spatial dims)
+    //
+    // Note: For NumGroupsToMerge=1 only.
+    template <typename CLayout,
+              typename std::enable_if<
+                  NDimSpatial == 2 &&
+                      std::is_same_v<CLayout, tensor_layout::convolution::GNKHW>,
+                  bool>::type = false>
+    CK_TILE_HOST auto MakeCDescriptor_M_N() const
+    {
+        static_assert(NumGroupsToMerge == 1,
+                      "GNKHW output only supports NumGroupsToMerge==1.");
+
+        // Physical strides for O[N, K, Ho, Wo] (NKHW order, group stripped).
+        const IndexType NStride  = K_ * Ho_ * Wo_;
+        const IndexType KStride  = Ho_ * Wo_; // stride(M=K) — non-unit
+        const IndexType HoStride = Wo_;
+        const IndexType WoStride = 1; // unit stride (innermost of N merge)
+
+        const auto out_n_k_ho_wo_desc = make_naive_tensor_descriptor(
+            make_tuple(N_, K_, Ho_, Wo_),
+            make_tuple(NStride, KStride, HoStride, WoStride),
+            number<VectorSizeC>{},
+            I1);
+
+        // C[M=K, N=N×Ho×Wo]:
+        //   M = K → dimension 1 (KStride = Ho*Wo)
+        //   N = merge(N=dim0, Ho=dim2, Wo=dim3) with Wo innermost (stride 1)
+        return transform_tensor_descriptor(
+            out_n_k_ho_wo_desc,
+            make_tuple(make_pass_through_transform(K_),
+                       make_merge_transform(make_tuple(N_, Ho_, Wo_))),
+            make_tuple(sequence<1>{}, sequence<0, 2, 3>{}),
+            make_tuple(sequence<0>{}, sequence<1>{}));
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // GEMM dimension queries
     // ─────────────────────────────────────────────────────────────────────
@@ -728,6 +768,12 @@ struct TransformConvFwdToIm2win
     CK_TILE_HOST long_index_t GetGroupStrideC() const
     {
         return static_cast<long_index_t>(K_);
+    }
+
+    /// Output stride per group in GNKHW: N*K*Ho*Wo elements (G is outermost).
+    CK_TILE_HOST long_index_t GetGroupStrideCGnkhw() const
+    {
+        return static_cast<long_index_t>(original_N_) * K_ * Ho_ * Wo_;
     }
 
     // ─────────────────────────────────────────────────────────────────────
