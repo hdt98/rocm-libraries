@@ -300,16 +300,14 @@ check_err(const Range& out,
     int err_count  = 0;
     double err     = 0;
     double max_err = std::numeric_limits<double>::min();
-    double sum_err = 0;
     for(std::size_t i = 0; i < ref.size(); ++i)
     {
         const double o = *std::next(std::begin(out), i);
         const double r = *std::next(std::begin(ref), i);
         err            = std::abs(o - r);
-        sum_err += err;
-        max_err = err > max_err ? err : max_err;
         if(err > atol + rtol * std::abs(r) || is_infinity_error(o, r))
         {
+            max_err = err > max_err ? err : max_err;
             err_count++;
             if(err_count < ERROR_DETAIL_LIMIT)
             {
@@ -319,9 +317,6 @@ check_err(const Range& out,
             res = false;
         }
     }
-    double avg_err = sum_err / ref.size();
-    std::cout << "Max error: " << std::setprecision(9) << max_err 
-              << ", Average error: " << avg_err << std::endl;
     if(!res)
     {
         report_error_stats(err_count, max_err, ref.size());
@@ -373,16 +368,14 @@ check_err(const Range& out,
     double err    = 0;
     // TODO: This is a hack. We should have proper specialization for bf16_t data type.
     double max_err = std::numeric_limits<float>::min();
-    double sum_err = 0;
     for(std::size_t i = 0; i < ref.size(); ++i)
     {
         const double o = type_convert<float>(*std::next(std::begin(out), i));
         const double r = type_convert<float>(*std::next(std::begin(ref), i));
         err            = std::abs(o - r);
-        sum_err += err;
-        max_err = err > max_err ? err : max_err;
         if(err > atol + rtol * std::abs(r) || is_infinity_error(o, r))
         {
+            max_err = err > max_err ? err : max_err;
             err_count++;
             if(err_count < ERROR_DETAIL_LIMIT)
             {
@@ -392,9 +385,6 @@ check_err(const Range& out,
             res = false;
         }
     }
-    double avg_err = sum_err / ref.size();
-    std::cout << "Max error: " << std::setprecision(9) << max_err 
-              << ", Average error: " << avg_err << std::endl;
     if(!res)
     {
         report_error_stats(err_count, max_err, ref.size());
@@ -446,16 +436,14 @@ check_err(const Range& out,
     int err_count  = 0;
     double err     = 0;
     double max_err = static_cast<double>(std::numeric_limits<ranges::range_value_t<Range>>::min());
-    double sum_err = 0;
     for(std::size_t i = 0; i < ref.size(); ++i)
     {
         const double o = type_convert<float>(*std::next(std::begin(out), i));
         const double r = type_convert<float>(*std::next(std::begin(ref), i));
         err            = std::abs(o - r);
-        sum_err += err;
-        max_err = err > max_err ? err : max_err;
         if(err > atol + rtol * std::abs(r) || is_infinity_error(o, r))
         {
+            max_err = err > max_err ? err : max_err;
             err_count++;
             if(err_count < ERROR_DETAIL_LIMIT)
             {
@@ -465,9 +453,6 @@ check_err(const Range& out,
             res = false;
         }
     }
-    double avg_err = sum_err / ref.size();
-    std::cout << "Max error: " << std::setprecision(9) << max_err 
-              << ", Average error: " << avg_err << std::endl;
     if(!res)
     {
         report_error_stats(err_count, max_err, ref.size());
@@ -512,16 +497,15 @@ std::enable_if_t<(std::is_same_v<ranges::range_value_t<Range>, ranges::range_val
     int err_count   = 0;
     int64_t err     = 0;
     int64_t max_err = std::numeric_limits<int64_t>::min();
-    int64_t sum_err = 0;
     for(std::size_t i = 0; i < ref.size(); ++i)
     {
         const int64_t o = *std::next(std::begin(out), i);
         const int64_t r = *std::next(std::begin(ref), i);
         err             = std::abs(o - r);
-        sum_err += err;
-        max_err = err > max_err ? err : max_err;
+
         if(err > atol)
         {
+            max_err = err > max_err ? err : max_err;
             err_count++;
             if(err_count < ERROR_DETAIL_LIMIT)
             {
@@ -531,9 +515,6 @@ std::enable_if_t<(std::is_same_v<ranges::range_value_t<Range>, ranges::range_val
             res = false;
         }
     }
-    double avg_err = static_cast<double>(sum_err) / ref.size();
-    std::cout << "Max error: " << std::setprecision(9) << static_cast<double>(max_err) 
-              << ", Average error: " << avg_err << std::endl;
     if(!res)
     {
         report_error_stats(err_count, static_cast<double>(max_err), ref.size());
@@ -599,7 +580,6 @@ std::enable_if_t<(std::is_same_v<ranges::range_value_t<Range>, ranges::range_val
     int err_count  = 0;
     double err     = 0;
     double max_err = std::numeric_limits<float>::min();
-    double sum_err = 0;
     for(std::size_t i = 0; i < ref.size(); ++i)
     {
         const fp8_t o_fp8   = *std::next(std::begin(out), i);
@@ -607,12 +587,11 @@ std::enable_if_t<(std::is_same_v<ranges::range_value_t<Range>, ranges::range_val
         const double o_fp64 = type_convert<float>(o_fp8);
         const double r_fp64 = type_convert<float>(r_fp8);
         err                 = std::abs(o_fp64 - r_fp64);
-        sum_err += err;
-        max_err = err > max_err ? err : max_err;
         if(!(less_equal<double>{}(err, atol) ||
              get_rounding_point_distance(o_fp8, r_fp8) <= max_rounding_point_distance) ||
            is_infinity_error(o_fp64, r_fp64))
         {
+            max_err = err > max_err ? err : max_err;
             err_count++;
             if(err_count < ERROR_DETAIL_LIMIT)
             {
@@ -622,9 +601,6 @@ std::enable_if_t<(std::is_same_v<ranges::range_value_t<Range>, ranges::range_val
             res = false;
         }
     }
-    double avg_err = sum_err / ref.size();
-    std::cout << "Max error: " << std::setprecision(9) << max_err 
-              << ", Average error: " << avg_err << std::endl;
     if(!res)
     {
         report_error_stats(err_count, max_err, ref.size());
@@ -674,16 +650,14 @@ std::enable_if_t<(std::is_same_v<ranges::range_value_t<Range>, ranges::range_val
     int err_count  = 0;
     double err     = 0;
     double max_err = std::numeric_limits<float>::min();
-    double sum_err = 0;
     for(std::size_t i = 0; i < ref.size(); ++i)
     {
         const double o = type_convert<float>(*std::next(std::begin(out), i));
         const double r = type_convert<float>(*std::next(std::begin(ref), i));
         err            = std::abs(o - r);
-        sum_err += err;
-        max_err = err > max_err ? err : max_err;
         if(err > atol + rtol * std::abs(r) || is_infinity_error(o, r))
         {
+            max_err = err > max_err ? err : max_err;
             err_count++;
             if(err_count < ERROR_DETAIL_LIMIT)
             {
@@ -693,9 +667,6 @@ std::enable_if_t<(std::is_same_v<ranges::range_value_t<Range>, ranges::range_val
             res = false;
         }
     }
-    double avg_err = sum_err / ref.size();
-    std::cout << "Max error: " << std::setprecision(9) << max_err 
-              << ", Average error: " << avg_err << std::endl;
     if(!res)
     {
         report_error_stats(err_count, max_err, ref.size());
@@ -730,19 +701,13 @@ std::enable_if_t<(std::is_same_v<ranges::range_value_t<Range>, ranges::range_val
         return false;
 
     int err_count = 0;
-    double sum_err = 0;
-    double max_err = std::numeric_limits<float>::min();
 
     auto update_err = [&](pk_fp4_raw_t o, pk_fp4_raw_t r, std::size_t index) {
-        float o_f = type_convert<float>(pk_fp4_t{o});
-        float r_f = type_convert<float>(pk_fp4_t{r});
-        double err = std::abs(o_f - r_f);
-        sum_err += err;
-        max_err = err > max_err ? err : max_err;
         if(o != r)
         {
             std::cerr << msg << " out[" << index << "] != ref[" << index
-                      << "]: " << o_f << " != " << r_f << std::endl;
+                      << "]: " << type_convert<float>(pk_fp4_t{o})
+                      << " != " << type_convert<float>(pk_fp4_t{r}) << std::endl;
             ++err_count;
         }
     };
@@ -754,12 +719,9 @@ std::enable_if_t<(std::is_same_v<ranges::range_value_t<Range>, ranges::range_val
         update_err(o._unpack(number<0>{}), r._unpack(number<0>{}), i * 2);
         update_err(o._unpack(number<1>{}), r._unpack(number<1>{}), i * 2 + 1);
     }
-    double avg_err = sum_err / (ref.size() * 2);
-    std::cout << "Max error: " << std::setprecision(9) << max_err 
-              << ", Average error: " << avg_err << std::endl;
     if(err_count > 0)
     {
-        report_error_stats(err_count, max_err, ref.size() * 2);
+        report_error_stats(err_count, numeric<pk_fp4_t>::max(), ref.size());
     }
     return err_count == 0;
 }
@@ -792,16 +754,13 @@ std::enable_if_t<(std::is_same_v<ranges::range_value_t<Range>, ranges::range_val
 
     int err_count   = 0;
     float max_err   = 0.0f;
-    double sum_err  = 0.0;
     auto update_err = [&](float o, float r, std::size_t index) {
-        double err = std::fabs(o - r);
-        sum_err += err;
-        max_err = max_err < err ? err : max_err;
-        if(err > 1e-8)
+        if(std::fabs(o - r) > 1e-8)
         {
             std::cerr << msg << " out[" << index << "] != ref[" << index << "]: " << o
                       << " != " << r << std::endl;
             ++err_count;
+            max_err = max_err < std::fabs(o - r) ? o : max_err;
         }
     };
     for(std::size_t i = 0; i < ref.size(); ++i)
@@ -813,9 +772,6 @@ std::enable_if_t<(std::is_same_v<ranges::range_value_t<Range>, ranges::range_val
             update_err(o.unpack(j), r.unpack(j), i * numeric_traits<pk_fp6x16_t>::PackedSize + j);
         }
     }
-    double avg_err = sum_err / (ref.size() * numeric_traits<pk_fp6x16_t>::PackedSize);
-    std::cout << "Max error: " << std::setprecision(9) << static_cast<double>(max_err) 
-              << ", Average error: " << avg_err << std::endl;
     if(err_count > 0)
     {
         report_error_stats(err_count, max_err, ref.size());
