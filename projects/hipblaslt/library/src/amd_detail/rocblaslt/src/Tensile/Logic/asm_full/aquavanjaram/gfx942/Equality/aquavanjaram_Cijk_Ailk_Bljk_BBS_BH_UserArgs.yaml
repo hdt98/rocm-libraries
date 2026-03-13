@@ -18532,7 +18532,7 @@
     UnrollMajorLDSB: true
     UnrollMajorLDSMetadata: true
     Use64bShadowLimit: 1
-    UseCustomMainLoopSchedule: 1
+    UseCustomMainLoopSchedule: -1
     UseInstOffsetForGRO: 0
     UseSgprForGRO: -1
     Valid: true
