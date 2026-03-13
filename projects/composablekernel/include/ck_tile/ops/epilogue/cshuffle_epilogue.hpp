@@ -355,27 +355,10 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
 
-            // Apply XOR swizzle to avoid bank conflicts
-            // XOR formula: new_n = n ^ ((m & (XorMask-1)) * XorMultiplier)
-            // The max XOR value is (XorMask-1) * XorMultiplier, which must be < N
-            // to avoid index aliasing. We use the largest multiplier that satisfies:
-            //   (XorMask - 1) * XorMultiplier < NPerIterationShuffle
-            // For N=32: max multiplier = 32/7 = 4 (7*4=28 < 32)
-            // For N=64: max multiplier = 64/7 = 9, use 8 (7*8=56 < 64)
-            constexpr index_t XorMask = 8;       // always use (m & 7)
-            // Base multiplier: 4 for FP8, prefer 8 for FP16 but constrained by N
-            constexpr index_t BaseXorMult = (DataTypeSize == 1) ? 4 : 8;
-            // Limit: (7 * mult) must be < N, so mult <= (N-1)/7
-            constexpr index_t MaxSafeXorMult = (NPerIterationShuffle - 1) / (XorMask - 1);
-            constexpr index_t XorMultiplier = min(BaseXorMult, MaxSafeXorMult);
-            constexpr auto lds_block_desc = transform_tensor_descriptor(
-                lds_block_desc_2,
-                make_tuple(make_xor_lds_bank_transform<XorMask, XorMultiplier>(
-                    make_tuple(number<MPerIterationShuffle>{},
-                               number<NPerIterationShuffle>{}))),
-                make_tuple(sequence<0, 1>{}),
-                make_tuple(sequence<0, 1>{}));
-            return lds_block_desc;
+            // TODO: XOR swizzle for LDS bank conflict reduction
+            // Disabled due to correctness issues - causes NaN values in certain configs
+            // See XOR_LDS_SWIZZLE_LEDGER.md for investigation details
+            return lds_block_desc_2;
         }
         // M is contiguous dimension
         else if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::ColumnMajor>)
