@@ -3775,7 +3775,6 @@ rocblas_status rocsolver_lacn2_template(rocblas_handle handle,
 
         HIP_CHECK(hipMemcpyAsync(h_jump, d_jump, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream));
         HIP_CHECK(hipMemcpyAsync(h_kase, d_kase, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream));
-        HIP_CHECK(hipStreamSynchronize(stream));
 
         return rocblas_status_success;
         break;
@@ -3785,7 +3784,6 @@ rocblas_status rocsolver_lacn2_template(rocblas_handle handle,
 
         HIP_CHECK(hipMemcpyAsync(h_jump, d_jump, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream));
         HIP_CHECK(hipMemcpyAsync(h_kase, d_kase, sizeof(rocblas_int), hipMemcpyDeviceToHost, stream));
-        HIP_CHECK(hipStreamSynchronize(stream));
 
         if(*h_jump == 3)
             *h_iters = *h_iters + 1;
