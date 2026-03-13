@@ -272,10 +272,10 @@ def shouldRunCICheck() {
             script: '''
                 if [ "$CHANGE_ID" != "" ]; then
                     # For PR builds, compare against target branch
-                    git diff --name-only origin/$CHANGE_TARGET...HEAD
+                    git diff --name-only origin/$CHANGE_TARGET...HEAD -- projects/composablekernel/
                 else
                     # For regular builds, compare against previous commit
-                    git diff --name-only HEAD~1..HEAD
+                    git diff --name-only HEAD~1..HEAD -- projects/composablekernel/
                 fi
             '''
         ).trim().split('\n')
@@ -938,7 +938,7 @@ def Build_CK_and_Reboot(Map conf=[:]){
 
 def process_results(Map conf=[:]){
 
-    checkout scm
+    checkoutComposableKernel()
     //use older image that has user jenkins
     def image = "${env.CK_DOCKERHUB}:ck_ub22.04_rocm6.3"
 
