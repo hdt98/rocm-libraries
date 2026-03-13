@@ -449,3 +449,43 @@ TEST(FmhaKernelKeyTest, TieCoversAllSignatureFields)
     flip([](FmhaKernelKey& k) { k.algorithm.constraint_tag = "special"; });
     flip([](FmhaKernelKey& k) { k.gfx_arch = "gfx942"; });
 }
+
+TEST(FmhaDispatcherTest, SelectKernelReturnsNullptrOnEmptyRegistry)
+{
+    FmhaRegistry registry;
+    FmhaDispatcher dispatcher(&registry);
+
+    fmha_fwd_traits traits{};
+    traits.hdim_q    = 128;
+    traits.hdim_v    = 128;
+    traits.data_type = "fp16";
+    traits.mask_type = mask_enum::no_mask;
+    traits.bias_type = bias_enum::no_bias;
+
+    auto problem =
+        FmhaProblem::from_invocation(FmhaInvocation::make(traits, fmha_fwd_args{}), "gfx950");
+    auto selected = dispatcher.select_kernel(problem);
+    EXPECT_EQ(selected, nullptr);
+}
+
+TEST(FmhaDispatcherTest, SelectKernelReturnsNullptrOnNoMatch)
+{
+    FmhaRegistry registry;
+    auto key  = make_fwd_key(128, 128, "fp16", "gfx950");
+    auto mock = std::make_shared<MockFmhaKernel>(key, "fp16_h128");
+    registry.register_kernel(mock);
+
+    FmhaDispatcher dispatcher(&registry);
+
+    fmha_fwd_traits traits{};
+    traits.hdim_q    = 256;
+    traits.hdim_v    = 256;
+    traits.data_type = "bf16";
+    traits.mask_type = mask_enum::no_mask;
+    traits.bias_type = bias_enum::no_bias;
+
+    auto problem =
+        FmhaProblem::from_invocation(FmhaInvocation::make(traits, fmha_fwd_args{}), "gfx950");
+    auto selected = dispatcher.select_kernel(problem);
+    EXPECT_EQ(selected, nullptr);
+}

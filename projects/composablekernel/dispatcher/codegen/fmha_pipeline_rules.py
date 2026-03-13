@@ -524,8 +524,8 @@ _DT_FP32 = {"fp32"}
 # Supported dtypes per arch family
 ARCH_DTYPES = {
     "gfx90a": ["fp16", "bf16", "fp32"],
-    "gfx942": ["fp16", "bf16", "fp32", "fp8bf16", "fp8fp32"],
-    "gfx950": ["fp16", "bf16", "fp32", "fp8bf16", "fp8fp32"],
+    "gfx942": ["fp16", "bf16", "fp32", "fp8bf16", "fp8fp32", "fp8", "bf8"],
+    "gfx950": ["fp16", "bf16", "fp32", "fp8bf16", "fp8fp32", "fp8", "bf8"],
     "gfx1100": ["fp16", "bf16"],
     "gfx1201": ["fp16", "bf16"],
 }
@@ -565,6 +565,726 @@ def get_pipelines_for_config(
         result.append(spec)
 
     return result
+
+
+# ===== Variant-specific tile tables =====
+# These are separate from the fwd hdim_tile_combos in fmha_arch_specs.json.
+# Each variant has its own (typically smaller) tile set per hdim.
+
+SPLITKV_TILES_FP16 = {
+    (32, 32): (32, 64, 16, 32, 32, 32),
+    (64, 64): (64, 64, 32, 64, 32, 64),
+    (96, 128): (64, 128, 32, 128, 32, 96),
+    (128, 128): (64, 128, 32, 128, 32, 128),
+    (256, 256): (64, 128, 32, 256, 32, 256),
+}
+
+SPLITKV_TILES_FP8 = {
+    (64, 64): (128, 64, 32, 64, 32, 64),
+    (128, 128): (128, 128, 32, 128, 32, 128),
+}
+
+SPLITKV_COMBINE_HDIMS_FP16 = [32, 64, 96, 128, 256]
+SPLITKV_COMBINE_HDIMS_FP8 = [64, 128, 256]
+
+PAGEDKV_TILES_FP16 = {
+    (128, 128): (64, 128, 32, 128, 32, 128),
+}
+
+PAGEDKV_TILES_FP8 = {
+    (64, 64): (128, 64, 32, 64, 32, 64),
+    (128, 128): (128, 128, 32, 128, 32, 128),
+    (256, 256): (64, 128, 32, 256, 32, 256),
+}
+
+# Append-KV tiles: (bs, bsk, bd, bdv)
+APPENDKV_TILES_FP16 = {
+    32: (64, 64, 32, 32),
+    64: (64, 64, 64, 64),
+    128: (64, 64, 128, 128),
+    256: (64, 64, 256, 256),
+}
+
+APPENDKV_TILES_FP8 = {
+    64: (64, 64, 64, 64),
+    128: (64, 64, 128, 128),
+    256: (64, 64, 256, 256),
+}
+
+# Batch prefill tiles (hdim -> tile, same as fwd for the hdims that exist)
+BATCH_PREFILL_TILES_FP16 = {
+    (128, 128): [
+        (128, 128, 32, 128, 32, 128),
+        (64, 128, 64, 128, 64, 128),  # CustomFactory extra tile
+    ],
+    (256, 256): [
+        (128, 128, 32, 256, 32, 256),
+    ],
+}
+
+BATCH_PREFILL_TILES_FP8 = {
+    (128, 128): [
+        (128, 128, 32, 128, 32, 128),
+    ],
+}
+
+# BWD dq_dk_dv: simple single tile per hdim (the "main" tile).
+# Multiple tiles per hdim exist in CK (trload, small, bn192 variants) but
+# we only enumerate the main tile for now. The feature product per tile is
+# 3 masks x 4 (bias,dbias) x 3 dropout x 2 deterministic x 7 pads = 504.
+BWD_DQ_DK_DV_TILES_FP16 = {
+    (32, 32): (32, 128, 32, 32, 32, 32, 64, 32, 32),
+    (64, 64): (32, 128, 64, 32, 64, 32, 32, 64, 64),
+    (96, 128): (32, 128, 96, 32, 96, 32, 32, 96, 96),
+    (128, 128): (16, 128, 128, 16, 128, 16, 32, 128, 128),
+    (256, 256): (16, 64, 256, 16, 256, 16, 32, 256, 256),
+}
+
+# Additional tiles for h64 (2 extra) and h128 (3 extra).
+# Each entry: (tile_tuple, tag, is_batch_only)
+BWD_DQ_DK_DV_EXTRA_TILES = {
+    (64, 64): [
+        ((32, 128, 64, 32, 64, 32, 32, 64, 64), "trload", False),
+        ((32, 16, 64, 32, 64, 32, 16, 64, 64), "small", True),
+    ],
+    (128, 128): [
+        ((16, 16, 128, 16, 128, 16, 16, 128, 128), "small", True),
+        ((16, 192, 128, 16, 128, 16, 32, 128, 128), "bn192", False),
+        ((32, 128, 128, 32, 128, 32, 32, 128, 128), "trload", False),
+    ],
+}
+
+# Extra tiles use reduced pad combos
+BWD_EXTRA_PAD_COMBOS = [
+    ("f", "f"),  # dpad=0, dvpad=0
+    ("8", "8"),  # dpad=8, dvpad=8
+]
+
+BWD_SMALL_DROPOUTS = ["no"]  # small tiles: no dropout
+
+BWD_DOT_DO_O_HDIMS = [32, 64, 96, 128, 256]
+BWD_CONVERT_DQ_HDIMS = [32, 64, 96, 128, 256]
+
+# Per-hdim number of associated dq_dk_dv tile groups for convert_dq.
+# h128 has 3 tile groups (main, bn192, trload) that produce convert_dq kernels.
+# Others have 1 tile group (main only). Small tiles don't produce convert_dq.
+# h128 has extra convert_dq variants for the bn192 and trload tiles.
+# These are captured via extra (spad, dpad) combos, not via tile_groups.
+BWD_CONVERT_DQ_TILE_GROUPS = {32: 1, 64: 1, 96: 1, 128: 1, 256: 1}
+
+
+# ===== Split-KV pipeline rules (matches fmha_fwd_splitkv.py) =====
+
+
+@dataclass(frozen=True)
+class SplitKVPipelineSpec:
+    """Split-KV main kernel pipeline variant."""
+
+    tag: str  # "qr" always for split-KV
+    mask: str
+    bias: str
+    logits: str
+    sink: str
+    pagedkv: str = "f"
+    squant: str = "f"
+    spad: str = "f"
+    skpad: str = "f"
+    dpad: str = "f"
+    dvpad: str = "f"
+    lse: str = "t"  # split-KV always has lse
+
+
+@dataclass(frozen=True)
+class SplitKVCombineSpec:
+    """Split-KV combine kernel pipeline variant."""
+
+    spad: str
+    dvpad: str
+    lse: str
+    squant: str = "f"
+
+
+def get_splitkv_pipelines(
+    dtype: str, hdim: int, receipt: int = 0
+) -> List[SplitKVPipelineSpec]:
+    """Split-KV main kernel pipelines (matches KernelComponentFactoryBase.get_pipelines)."""
+    specs: List[SplitKVPipelineSpec] = []
+
+    if dtype in _DT_FP16_BF16:
+        for logits, mask, bias, pagedkv, sink in itertools.product(
+            BOOLS,
+            MASKS,
+            BIASES,
+            BOOLS,
+            BOOLS,
+        ):
+            if logits == "t" and bias != "no":
+                continue
+            specs.append(
+                SplitKVPipelineSpec(
+                    "qr",
+                    mask,
+                    bias,
+                    logits,
+                    sink,
+                    pagedkv,
+                    spad="f",
+                    skpad="t",
+                    dpad="f",
+                    dvpad="f",
+                )
+            )
+            specs.append(
+                SplitKVPipelineSpec(
+                    "qr",
+                    mask,
+                    bias,
+                    logits,
+                    sink,
+                    pagedkv,
+                    spad="t",
+                    skpad="f",
+                    dpad="f",
+                    dvpad="f",
+                )
+            )
+            specs.append(
+                SplitKVPipelineSpec(
+                    "qr",
+                    mask,
+                    bias,
+                    logits,
+                    sink,
+                    pagedkv,
+                    spad="t",
+                    skpad="t",
+                    dpad="f",
+                    dvpad="f",
+                )
+            )
+            specs.append(
+                SplitKVPipelineSpec(
+                    "qr",
+                    mask,
+                    bias,
+                    logits,
+                    sink,
+                    pagedkv,
+                    spad="t",
+                    skpad="t",
+                    dpad="t",
+                    dvpad="t",
+                )
+            )
+    elif dtype in ("fp8", "bf8"):
+        for logits, mask, bias in itertools.product(BOOLS, MASKS, BIASES):
+            if logits == "t" and bias != "no":
+                continue
+            specs.append(
+                SplitKVPipelineSpec(
+                    "qr",
+                    mask,
+                    bias,
+                    logits,
+                    "f",
+                    "f",
+                    squant="t",
+                    spad="f",
+                    skpad="f",
+                    dpad="f",
+                    dvpad="f",
+                )
+            )
+            specs.append(
+                SplitKVPipelineSpec(
+                    "qr",
+                    mask,
+                    bias,
+                    logits,
+                    "f",
+                    "f",
+                    squant="t",
+                    spad="t",
+                    skpad="t",
+                    dpad="f",
+                    dvpad="f",
+                )
+            )
+
+    if receipt != 0:
+        specs = [s for s in specs if _splitkv_receipt_filter(receipt, dtype, s)]
+
+    return specs
+
+
+def _splitkv_receipt_filter(
+    receipt: int, dtype: str, spec: SplitKVPipelineSpec
+) -> bool:
+    if receipt == 2:
+        return (
+            dtype in ("fp16", "bf16")
+            and spec.bias in ("no", "alibi")
+            and spec.squant == "f"
+            and spec.sink == "f"
+        )
+    if receipt == 4:
+        return (
+            dtype in ("fp16", "bf16")
+            and spec.bias in ("no", "bias")
+            and spec.squant == "f"
+            and spec.sink == "f"
+        )
+    if receipt == 200:
+        return dtype in ("fp16", "bf16") and spec.squant == "f"
+    if receipt == 600:
+        return dtype in ("fp16", "bf16") and spec.squant == "f"
+    if receipt in (800, 801):
+        return dtype == "fp32"
+    return True
+
+
+def get_splitkv_combine_pipelines(
+    dtype: str, receipt: int = 0
+) -> List[SplitKVCombineSpec]:
+    """Split-KV combine kernel pipelines (matches KernelComponentFactoryBase.get_combine_pipelines)."""
+    specs: List[SplitKVCombineSpec] = []
+    squant = "t" if dtype in ("fp8", "bf8") else "f"
+
+    if dtype in _DT_FP16_BF16:
+        for spad, dvpad, lse in itertools.product(BOOLS, BOOLS, BOOLS):
+            specs.append(SplitKVCombineSpec(spad, dvpad, lse, squant))
+    elif dtype in ("fp8", "bf8"):
+        for spad, dvpad in itertools.product(BOOLS, BOOLS):
+            specs.append(SplitKVCombineSpec(spad, dvpad, "f", squant))
+
+    return specs
+
+
+# ===== PagedKV pipeline rules (matches fmha_pagedkv_prefill.py) =====
+
+
+def get_pagedkv_pipelines(
+    dtype: str, hdim: int, receipt: int = 0
+) -> List[PipelineSpec]:
+    """PagedKV prefill pipelines (matches fmha_pagedkv_prefill.py KernelComponentFactoryBase.get_pipelines)."""
+    specs: List[PipelineSpec] = []
+
+    if dtype in _DT_FP16_BF16:
+        for logits, mask, bias, sink in itertools.product(
+            BOOLS,
+            MASKS,
+            BIASES,
+            BOOLS,
+        ):
+            if logits == "t" and bias != "no":
+                continue
+            # pagedkv=t, skip=f always; 2 pad variants (skpad varies)
+            specs.append(
+                PipelineSpec(
+                    "qr_pagedkv",
+                    mask,
+                    bias,
+                    "f",
+                    "f",
+                    logits,
+                    "f",
+                    sink,
+                    spad="t",
+                    skpad="f",
+                    dpad="f",
+                    dvpad="f",
+                )
+            )
+            specs.append(
+                PipelineSpec(
+                    "qr_pagedkv",
+                    mask,
+                    bias,
+                    "f",
+                    "f",
+                    logits,
+                    "f",
+                    sink,
+                    spad="t",
+                    skpad="t",
+                    dpad="f",
+                    dvpad="f",
+                )
+            )
+    elif dtype in ("fp8", "bf8"):
+        for logits, mask, bias in itertools.product(BOOLS, MASKS, BIASES):
+            if logits == "t" and bias != "no":
+                continue
+            # fp8: pagedkv=t, skip=f, sink=f; 2 pad variants
+            specs.append(
+                PipelineSpec(
+                    "qr_pagedkv",
+                    mask,
+                    bias,
+                    "f",
+                    "f",
+                    logits,
+                    "f",
+                    "f",
+                    spad="f",
+                    skpad="f",
+                    dpad="f",
+                    dvpad="f",
+                )
+            )
+            specs.append(
+                PipelineSpec(
+                    "qr_pagedkv",
+                    mask,
+                    bias,
+                    "f",
+                    "f",
+                    logits,
+                    "f",
+                    "f",
+                    spad="t",
+                    skpad="t",
+                    dpad="f",
+                    dvpad="f",
+                )
+            )
+
+    if receipt != 0:
+        specs = [s for s in specs if receipt_filter(receipt, dtype, s)]
+
+    return specs
+
+
+# ===== Append-KV pipeline rules (matches fmha_fwd_appendkv.py) =====
+
+
+@dataclass(frozen=True)
+class AppendKVPipelineSpec:
+    """Append-KV pipeline variant."""
+
+    rope: str = "none"  # none, interleaved, half_rotated
+    pagedkv: str = "f"
+    spad: str = "t"
+    skpad: str = "t"
+    dpad: str = "t"
+    dvpad: str = "t"
+
+
+def get_appendkv_pipelines(
+    dtype: str, hdim: int, receipt: int = 0
+) -> List[AppendKVPipelineSpec]:
+    """Append-KV pipelines (matches KernelComponentFactoryBase.get_pipelines for appendkv)."""
+    specs: List[AppendKVPipelineSpec] = []
+
+    if dtype in _DT_FP16_BF16:
+        for pagedkv in ["t", "f"]:
+            # rope=no: 2 pad variants
+            specs.append(
+                AppendKVPipelineSpec(
+                    rope="none",
+                    pagedkv=pagedkv,
+                    spad="f",
+                    skpad="t",
+                    dpad="f",
+                    dvpad="f",
+                )
+            )
+            specs.append(
+                AppendKVPipelineSpec(
+                    rope="none",
+                    pagedkv=pagedkv,
+                    spad="t",
+                    skpad="t",
+                    dpad="t",
+                    dvpad="t",
+                )
+            )
+            # rope=interleaved: 2 pad variants (dpad=t always for rope)
+            specs.append(
+                AppendKVPipelineSpec(
+                    rope="interleaved",
+                    pagedkv=pagedkv,
+                    spad="f",
+                    skpad="t",
+                    dpad="t",
+                    dvpad="f",
+                )
+            )
+            specs.append(
+                AppendKVPipelineSpec(
+                    rope="interleaved",
+                    pagedkv=pagedkv,
+                    spad="t",
+                    skpad="t",
+                    dpad="t",
+                    dvpad="t",
+                )
+            )
+            # rope=half_rotated: 2 pad variants
+            specs.append(
+                AppendKVPipelineSpec(
+                    rope="half_rotated",
+                    pagedkv=pagedkv,
+                    spad="f",
+                    skpad="t",
+                    dpad="t",
+                    dvpad="f",
+                )
+            )
+            specs.append(
+                AppendKVPipelineSpec(
+                    rope="half_rotated",
+                    pagedkv=pagedkv,
+                    spad="t",
+                    skpad="t",
+                    dpad="t",
+                    dvpad="t",
+                )
+            )
+    elif dtype in ("fp8", "bf8"):
+        specs.append(
+            AppendKVPipelineSpec(
+                rope="none", pagedkv="f", spad="t", skpad="t", dpad="t", dvpad="t"
+            )
+        )
+
+    return specs
+
+
+# ===== Batch Prefill pipeline rules (matches fmha_batch_prefill.py) =====
+
+
+@dataclass(frozen=True)
+class BatchPrefillPipelineSpec:
+    """Batch prefill pipeline variant -- extends PipelineSpec with paged-KV fields."""
+
+    mask: str
+    bias: str
+    logits: str
+    sink: str
+    lse: str = "f"
+    dropout: str = "f"
+    skip: str = "f"
+    qscale: str = "no"
+    page_size: int = 1
+    kv_memory_layout: str = "vectorized"
+    kv_lookup_table: str = "sglang"
+    spad: str = "t"
+    skpad: str = "t"
+    dpad: str = "t"
+    dvpad: str = "t"
+
+
+def get_batch_prefill_pipelines(
+    dtype: str, hdim: int, receipt: int = 0
+) -> List[BatchPrefillPipelineSpec]:
+    """Batch prefill pipelines (matches fmha_batch_prefill.py KernelComponentFactory.get_pipelines).
+
+    Note: page_size is NOT part of the pipeline -- it's iterated at kernel level.
+    This function returns pipeline specs without page_size; the builder adds page_size.
+    """
+    specs: List[BatchPrefillPipelineSpec] = []
+
+    if dtype in _DT_FP16_BF16:
+        for logits, mask, bias, lse, dropout, kvl, kvt in itertools.product(
+            BOOLS,
+            MASKS,
+            BIASES,
+            BOOLS,
+            BOOLS,
+            ["vectorized", "linear"],
+            ["vllm", "sglang"],
+        ):
+            if logits == "t" and bias != "no":
+                continue
+            # Single pad variant: all t
+            specs.append(
+                BatchPrefillPipelineSpec(
+                    mask,
+                    bias,
+                    logits,
+                    "f",
+                    lse,
+                    dropout,
+                    "f",
+                    page_size=0,
+                    kv_memory_layout=kvl,
+                    kv_lookup_table=kvt,
+                    spad="t",
+                    skpad="t",
+                    dpad="t",
+                    dvpad="t",
+                )
+            )
+    elif dtype == "fp8bf16":
+        for logits, qscale, mask, bias, kvl, kvt in itertools.product(
+            BOOLS,
+            ["pertensor", "kv_blockscale"],
+            MASKS,
+            ["no"],
+            ["vectorized", "linear"],
+            ["vllm", "sglang"],
+        ):
+            if logits == "t" and bias != "no":
+                continue
+            specs.append(
+                BatchPrefillPipelineSpec(
+                    mask,
+                    bias,
+                    logits,
+                    "f",
+                    "f",
+                    "f",
+                    "f",
+                    qscale=qscale,
+                    page_size=0,
+                    kv_memory_layout=kvl,
+                    kv_lookup_table=kvt,
+                    spad="t",
+                    skpad="t",
+                    dpad="t",
+                    dvpad="t",
+                )
+            )
+
+    return specs
+
+
+# ===== BWD pipeline rules (matches fmha_bwd.py) =====
+
+
+@dataclass(frozen=True)
+class BwdPipelineSpec:
+    """BWD pipeline variant."""
+
+    family: str  # "bwd_dot_do_o", "bwd_dq_dk_dv", "bwd_convert_dq"
+    mask: str = "no"
+    bias: str = "no"
+    dbias: str = "f"
+    dropout: str = "f"
+    deterministic: str = "f"
+    spad: str = "t"
+    skpad: str = "t"
+    dpad: str = "t"
+    dvpad: str = "t"
+
+
+BWD_DROPOUTS = ["no", "dropout_wg16", "dropout_wg16_storerandval"]
+BWD_PAD_COMBOS = [
+    ("f", "f"),  # dpad=0, dvpad=0
+    ("f", "t"),  # dpad=0, dvpad=1
+    ("f", "8"),  # dpad=0, dvpad=8
+    ("t", "f"),  # dpad=1, dvpad=0
+    ("t", "t"),  # dpad=1, dvpad=1
+    ("t", "8"),  # dpad=1, dvpad=8
+    ("8", "8"),  # dpad=8, dvpad=8
+]
+
+
+def get_bwd_dq_dk_dv_pipelines(dtype: str, receipt: int = 0) -> List[BwdPipelineSpec]:
+    """BWD dq_dk_dv feature product (matches fmha_bwd.py iteration).
+
+    72 features x 7 pad combos = 504 per (hdim, tile, mode).
+    Features: 3 masks x 4 (bias,dbias) x 3 dropout x 2 deterministic = 72.
+    """
+    if dtype not in _DT_FP16_BF16:
+        return []
+    specs: List[BwdPipelineSpec] = []
+    for mask, bias, dbias, dropout, deterministic in itertools.product(
+        MASKS,
+        BIASES,
+        BOOLS,
+        BWD_DROPOUTS,
+        BOOLS,
+    ):
+        if bias != "bias" and dbias == "t":
+            continue
+        for dpad, dvpad in BWD_PAD_COMBOS:
+            specs.append(
+                BwdPipelineSpec(
+                    "bwd_dq_dk_dv",
+                    mask,
+                    bias,
+                    dbias,
+                    dropout,
+                    deterministic,
+                    dpad=dpad,
+                    dvpad=dvpad,
+                )
+            )
+    return specs
+
+
+def get_bwd_dot_do_o_pipelines(dtype: str) -> List[BwdPipelineSpec]:
+    """BWD dot_do_o: spad x dvpad variants only."""
+    if dtype not in _DT_FP16_BF16:
+        return []
+    specs: List[BwdPipelineSpec] = []
+    for spad, dvpad in itertools.product(BOOLS, BOOLS):
+        specs.append(BwdPipelineSpec("bwd_dot_do_o", spad=spad, dvpad=dvpad))
+    return specs
+
+
+def get_bwd_convert_dq_pipelines(dtype: str, hdim: int = 0) -> List[BwdPipelineSpec]:
+    """BWD convert_dq: spad x deterministic x dpad variants.
+    h128 has dpad in {f, t, 8} (3 values); others have {f, t} (2 values).
+    """
+    if dtype not in _DT_FP16_BF16:
+        return []
+    dpads = ["f", "t", "8"] if hdim == 128 else BOOLS
+    specs: List[BwdPipelineSpec] = []
+    for spad, deterministic, dpad in itertools.product(BOOLS, BOOLS, dpads):
+        specs.append(
+            BwdPipelineSpec(
+                "bwd_convert_dq", spad=spad, deterministic=deterministic, dpad=dpad
+            )
+        )
+    return specs
+
+
+def get_bwd_pipelines(dtype: str, hdim: int, receipt: int = 0) -> List[BwdPipelineSpec]:
+    """All BWD pipelines combined."""
+    return (
+        get_bwd_dot_do_o_pipelines(dtype)
+        + get_bwd_dq_dk_dv_pipelines(dtype, receipt)
+        + get_bwd_convert_dq_pipelines(dtype)
+    )
+
+
+def get_bwd_dq_dk_dv_extra_pipelines(
+    dtype: str, is_small: bool = False, receipt: int = 0
+) -> List[BwdPipelineSpec]:
+    """Reduced feature product for BWD extra tiles.
+    trload/bn192: 72 features x 2 pads = 144 per mode.
+    small: 24 features (no dropout) x 2 pads = 48, batch-only.
+    """
+    if dtype not in _DT_FP16_BF16:
+        return []
+    dropouts = BWD_SMALL_DROPOUTS if is_small else BWD_DROPOUTS
+    specs: List[BwdPipelineSpec] = []
+    for mask, bias, dbias, dropout, deterministic in itertools.product(
+        MASKS,
+        BIASES,
+        BOOLS,
+        dropouts,
+        BOOLS,
+    ):
+        if bias != "bias" and dbias == "t":
+            continue
+        for dpad, dvpad in BWD_EXTRA_PAD_COMBOS:
+            specs.append(
+                BwdPipelineSpec(
+                    "bwd_dq_dk_dv",
+                    mask,
+                    bias,
+                    dbias,
+                    dropout,
+                    deterministic,
+                    dpad=dpad,
+                    dvpad=dvpad,
+                )
+            )
+    return specs
 
 
 def tile_compatible(
