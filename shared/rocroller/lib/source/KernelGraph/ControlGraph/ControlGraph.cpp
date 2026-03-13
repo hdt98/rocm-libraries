@@ -1,168 +1,185 @@
 // Copyright Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+
 #include <algorithm>
-#include <bitset>
+#include <array>
 #include <cmath>
+#include <deque>
 #include <iomanip>
 #include <rocRoller/KernelGraph/ControlGraph/ControlGraph.hpp>
 #include <rocRoller/Utilities/Settings.hpp>
 #include <rocRoller/Utilities/Timer.hpp>
+#include <unordered_set>
+
 namespace rocRoller::KernelGraph::ControlGraph
 {
-    //=========================================================================
-    // Anonymous helpers (file-local, used only by cache build/read methods).
-    //=========================================================================
+
     namespace
     {
-        // Edge variant indices matching ControlEdge = variant<Sequence, Initialize, ForLoopIncrement, Body, Else>.
-        constexpr uint8_t kSeq  = 0;
-        constexpr uint8_t kInit = 1;
-        constexpr uint8_t kInc  = 2;
-        constexpr uint8_t kBody = 3;
-        constexpr uint8_t kElse = 4;
-        // How many uint64_t words are needed to hold `bits` bits.
-        inline size_t wordsForBits(size_t bits)
-        {
-            return (bits + 63) >> 6;
-        }
-        // Pointer to the beginning of row `r` in a row-major bit matrix.
-        inline uint64_t* matRow(std::vector<uint64_t>& mat, size_t words, int r)
-        {
-            return mat.data() + static_cast<size_t>(r) * words;
-        }
-        inline uint64_t const* matRow(std::vector<uint64_t> const& mat, size_t words, int r)
-        {
-            return mat.data() + static_cast<size_t>(r) * words;
-        }
-        // Bitwise OR src into dst (both length `words`).
         inline void rowOr(uint64_t* dst, uint64_t const* src, size_t words)
         {
             for(size_t i = 0; i < words; ++i)
                 dst[i] |= src[i];
         }
-        // True if any bit is set.
+        inline void rowAndNot(uint64_t* dst, uint64_t const* mask, size_t words)
+        {
+            for(size_t i = 0; i < words; ++i)
+                dst[i] &= ~mask[i];
+        }
         inline bool rowAny(uint64_t const* row, size_t words)
         {
             for(size_t i = 0; i < words; ++i)
-                if(row[i])
+                if(row[i] != 0)
                     return true;
             return false;
         }
-        // True if a[i] & b[i] is nonzero for any word.
         inline bool rowOverlap(uint64_t const* a, uint64_t const* b, size_t words)
         {
             for(size_t i = 0; i < words; ++i)
-                if(a[i] & b[i])
+                if((a[i] & b[i]) != 0)
                     return true;
             return false;
         }
-        // Call fn(denseIndex) for every set bit in a fixed-size Bitset.
-        template <typename Fn>
-        inline void forEachBit(Bitset const& bs, Fn&& fn)
+        inline void collectNonZeroWordIndices(Bitset const& bs, std::vector<int>& out)
         {
+            out.clear();
             for(size_t w = 0; w < bs.size(); ++w)
             {
-                uint64_t bits = bs[w];
-                while(bits)
+                if(bs[w] != 0)
+                    out.push_back(static_cast<int>(w));
+            }
+        }
+        inline void rowOrWords(uint64_t* dst, Bitset const& src, std::vector<int> const& words)
+        {
+            for(int w : words)
+                dst[w] |= src[static_cast<size_t>(w)];
+        }
+        template <typename Func>
+        inline void forEachSetBit(Bitset const& bits, int bitLimit, Func&& f)
+        {
+            for(size_t w = 0; w < bits.size(); ++w)
+            {
+                uint64_t word = bits[w];
+                while(word)
                 {
-                    int bit = std::countr_zero(bits);
-                    fn(static_cast<int>(w * 64 + bit));
-                    bits &= bits - 1;
+                    int bit = std::countr_zero(word);
+                    int id  = static_cast<int>(w * 64 + bit);
+                    if(id < bitLimit)
+                        f(id);
+                    word &= word - 1;
                 }
             }
         }
-        // Call fn(denseIndex) for every set bit in a raw row pointer.
-        template <typename Fn>
-        inline void forEachBit(uint64_t const* row, size_t words, Fn&& fn)
+        template <typename Func>
+        inline void forEachSetBitRow(uint64_t const* row, size_t words, int bitLimit, Func&& f)
         {
             for(size_t w = 0; w < words; ++w)
             {
-                uint64_t bits = row[w];
-                while(bits)
+                uint64_t word = row[w];
+                while(word)
                 {
-                    int bit = std::countr_zero(bits);
-                    fn(static_cast<int>(w * 64 + bit));
-                    bits &= bits - 1;
+                    int bit = std::countr_zero(word);
+                    int id  = static_cast<int>(w * 64 + bit);
+                    if(id < bitLimit)
+                        f(id);
+                    word &= word - 1;
                 }
             }
         }
-        // Set/clear a single bit in a fixed-size Bitset by dense index.
-        inline void dSet(Bitset& bs, int d)
-        {
-            bs[static_cast<size_t>(d) >> 6] |= uint64_t(1) << (d & 63);
-        }
-        inline void dClear(Bitset& bs, int d)
-        {
-            bs[static_cast<size_t>(d) >> 6] &= ~(uint64_t(1) << (d & 63));
-        }
-        inline void dOr(Bitset& dst, Bitset const& src)
-        {
-            for(size_t i = 0; i < dst.size(); ++i)
-                dst[i] |= src[i];
-        }
-        // dst &= ~mask (clear bits present in mask).
-        inline void dAndNot(Bitset& dst, Bitset const& mask)
-        {
-            for(size_t i = 0; i < dst.size(); ++i)
-                dst[i] &= ~mask[i];
-        }
-    } // anonymous namespace
-    //=========================================================================
-    // denseOfTag / selectCacheMatrix
-    //=========================================================================
+    } // namespace
+
+    size_t ControlGraph::wordsForBits(size_t bitCount)
+    {
+        return (bitCount + 63) >> 6;
+    }
     int ControlGraph::denseOfTag(int tag) const
     {
         auto it = m_cacheTagToDense.find(tag);
-        if(it == m_cacheTagToDense.end())
-            return -1;
-        return it->second;
+        return it == m_cacheTagToDense.end() ? -1 : it->second;
     }
-    std::vector<uint64_t>& ControlGraph::selectCacheMatrix(NodeOrdering order) const
+    uint64_t* ControlGraph::rowPtr(std::vector<uint64_t>& matrix, int denseRow) const
     {
-        switch(order)
-        {
-        case NodeOrdering::LeftFirst:
-            return m_cacheAfter;
-        case NodeOrdering::RightFirst:
-            return m_cacheBefore;
-        case NodeOrdering::RightInBodyOfLeft:
-            return m_cacheInBody;
-        case NodeOrdering::LeftInBodyOfRight:
-            return m_cacheContaining;
-        default:
-            break;
-        }
-        AssertFatal(false, "Invalid NodeOrdering", ShowValue(order));
-        return m_cacheAfter;
+        return matrix.data() + static_cast<size_t>(denseRow) * m_cacheWordsPerRow;
     }
+    uint64_t const* ControlGraph::rowPtr(std::vector<uint64_t> const& matrix, int denseRow) const
+    {
+        return matrix.data() + static_cast<size_t>(denseRow) * m_cacheWordsPerRow;
+    }
+    bool
+        ControlGraph::bitTest(std::vector<uint64_t> const& matrix, int denseRow, int denseCol) const
+    {
+        auto const* row = rowPtr(matrix, denseRow);
+        size_t      w   = static_cast<size_t>(denseCol) >> 6;
+        return ((row[w] >> (denseCol & 63)) & 1ULL) != 0;
+    }
+    void ControlGraph::ensureTransposeCache() const
+    {
+        if(m_transposeValid)
+            return;
+        size_t const nodeCount   = m_cacheDenseToTag.size();
+        size_t const matrixWords = nodeCount * m_cacheWordsPerRow;
+        m_cacheAfterT.assign(matrixWords, 0);
+        m_cacheInBodyT.assign(matrixWords, 0);
+        auto setBitInRow = [&](std::vector<uint64_t>& matrix, int row, int col) {
+            auto* dst = rowPtr(matrix, row);
+            dst[static_cast<size_t>(col) >> 6] |= uint64_t(1) << (col & 63);
+        };
+        for(int i = 0; i < static_cast<int>(nodeCount); ++i)
+        {
+            auto const* afterRow  = rowPtr(m_cacheAfter, i);
+            auto const* inBodyRow = rowPtr(m_cacheInBody, i);
+            forEachSetBitRow(afterRow, m_cacheWordsPerRow, static_cast<int>(nodeCount), [&](int j) {
+                setBitInRow(m_cacheAfterT, j, i);
+            });
+            forEachSetBitRow(inBodyRow,
+                             m_cacheWordsPerRow,
+                             static_cast<int>(nodeCount),
+                             [&](int j) { setBitInRow(m_cacheInBodyT, j, i); });
+        }
+        m_transposeValid = true;
+    }
+
     //=========================================================================
-    // nodeOrderTable / nodeOrderTableString
+    // isModificationAllowed (unchanged)
     //=========================================================================
+    bool ControlGraph::isModificationAllowed(int index) const
+    {
+        if(not Settings::getInstance()->get(Settings::EnforceGraphConstraints))
+            return true;
+        if(not m_changesRestricted)
+            return true;
+        auto const& el = getElement(index);
+        if(std::holds_alternative<Operation>(el))
+        {
+            return std::visit(
+                [](auto&& arg) {
+                    using OpType = std::decay_t<decltype(arg)>;
+                    return !(
+                        std::is_same_v<OpType, ForLoopOp> or std::is_same_v<OpType, SetCoordinate>);
+                },
+                std::get<Operation>(el));
+        }
+        else
+        {
+            return true;
+        }
+    }
+
     std::unordered_map<int, std::unordered_map<int, NodeOrdering>>
         ControlGraph::nodeOrderTable() const
     {
         populateOrderCache();
         std::unordered_map<int, std::unordered_map<int, NodeOrdering>> table;
-        int const n = static_cast<int>(m_cacheDenseToTag.size());
-        for(int aDense = 0; aDense < n; ++aDense)
+        std::vector<int>                                               tags = m_cacheDenseToTag;
+        std::sort(tags.begin(), tags.end());
+        for(size_t i = 0; i < tags.size(); ++i)
         {
-            int const aTag = m_cacheDenseToTag[aDense];
-            forEachBit(matRow(m_cacheAfter, m_cacheWords, aDense), m_cacheWords, [&](int bDense) {
-                if(bDense >= n)
-                    return;
-                int const bTag = m_cacheDenseToTag[bDense];
-                if(aTag < bTag)
-                    table[aTag][bTag] = NodeOrdering::LeftFirst;
-            });
-            forEachBit(matRow(m_cacheInBody, m_cacheWords, aDense), m_cacheWords, [&](int bDense) {
-                if(bDense >= n)
-                    return;
-                int const bTag = m_cacheDenseToTag[bDense];
-                if(aTag < bTag)
-                    table[aTag][bTag] = NodeOrdering::RightInBodyOfLeft;
-                else if(bTag < aTag)
-                    table[bTag][aTag] = NodeOrdering::LeftInBodyOfRight;
-            });
+            for(size_t j = i + 1; j < tags.size(); ++j)
+            {
+                auto ord = lookupOrder(CacheOnly, tags[i], tags[j]);
+                if(ord != NodeOrdering::Undefined)
+                    table[tags[i]][tags[j]] = ord;
+            }
         }
         return table;
     }
@@ -170,12 +187,13 @@ namespace rocRoller::KernelGraph::ControlGraph
     {
         populateOrderCache();
         if(nodes.empty())
-        {
             return "Empty order cache.\n";
-        }
         std::ostringstream msg;
-        int                width = std::ceil(std::log10(static_cast<float>(*nodes.rbegin())));
-        width                    = std::max(width, 3);
+        int                maxNode = *nodes.rbegin();
+        int                width   = maxNode > 0
+                                         ? static_cast<int>(std::ceil(std::log10(static_cast<double>(maxNode + 1))))
+                                         : 1;
+        width                      = std::max(width, 3);
         msg << std::setw(width) << " "
             << "\\";
         for(int n : nodes)
@@ -211,36 +229,9 @@ namespace rocRoller::KernelGraph::ControlGraph
     {
         populateOrderCache();
         TIMER(t, "nodeOrderTable");
-        std::set<int> nodes;
-        int const     n = static_cast<int>(m_cacheDenseToTag.size());
-        for(int d = 0; d < n; ++d)
-        {
-            int const   tag  = m_cacheDenseToTag[d];
-            auto const* aRow = matRow(m_cacheAfter, m_cacheWords, d);
-            auto const* bRow = matRow(m_cacheBefore, m_cacheWords, d);
-            auto const* iRow = matRow(m_cacheInBody, m_cacheWords, d);
-            auto const* cRow = matRow(m_cacheContaining, m_cacheWords, d);
-            if(rowAny(aRow, m_cacheWords) || rowAny(bRow, m_cacheWords)
-               || rowAny(iRow, m_cacheWords) || rowAny(cRow, m_cacheWords))
-            {
-                nodes.insert(tag);
-            }
-            auto addNodes = [&](uint64_t const* row) {
-                forEachBit(row, m_cacheWords, [&](int otherDense) {
-                    if(otherDense < n)
-                        nodes.insert(m_cacheDenseToTag[otherDense]);
-                });
-            };
-            addNodes(aRow);
-            addNodes(bRow);
-            addNodes(iRow);
-            addNodes(cRow);
-        }
+        std::set<int> nodes(m_cacheDenseToTag.begin(), m_cacheDenseToTag.end());
         return nodeOrderTableString(nodes);
     }
-    //=========================================================================
-    // clearCache
-    //=========================================================================
     void ControlGraph::clearCache(Graph::GraphModification modification)
     {
         Hypergraph<Operation, ControlEdge, false>::clearCache(modification);
@@ -253,401 +244,254 @@ namespace rocRoller::KernelGraph::ControlGraph
         {
             m_cacheStatus = CacheStatus::Invalid;
         }
+        m_cacheAfter.clear();
+        m_cacheInBody.clear();
+        m_cacheAfterT.clear();
+        m_cacheInBodyT.clear();
         m_cacheDenseToTag.clear();
         m_cacheTagToDense.clear();
-        m_cacheWords = 0;
-        m_cacheAfter.clear();
-        m_cacheBefore.clear();
-        m_cacheInBody.clear();
-        m_cacheContaining.clear();
+        m_cacheWordsPerRow = 0;
+        m_transposeValid   = false;
     }
-    //=========================================================================
-    // isModificationAllowed (unchanged)
-    //=========================================================================
-    bool ControlGraph::isModificationAllowed(int index) const
-    {
-        if(not Settings::getInstance()->get(Settings::EnforceGraphConstraints))
-            return true;
-        if(not m_changesRestricted)
-            return true;
-        auto const& el = getElement(index);
-        if(std::holds_alternative<Operation>(el))
-        {
-            return std::visit(
-                [](auto&& arg) {
-                    using OpType = std::decay_t<decltype(arg)>;
-                    return !(
-                        std::is_same_v<OpType, ForLoopOp> or std::is_same_v<OpType, SetCoordinate>);
-                },
-                std::get<Operation>(el));
-        }
-        else
-        {
-            return true;
-        }
-    }
-    //=========================================================================
-    // validateOrderCache
-    //=========================================================================
     void ControlGraph::validateOrderCache() const
     {
-        int const n = static_cast<int>(m_cacheDenseToTag.size());
-        for(int r = 0; r < n; ++r)
+        int const nodeCount = static_cast<int>(m_cacheDenseToTag.size());
+        for(int i = 0; i < nodeCount; ++i)
         {
-            auto const* aRow = matRow(m_cacheAfter, m_cacheWords, r);
-            auto const* bRow = matRow(m_cacheBefore, m_cacheWords, r);
-            auto const* iRow = matRow(m_cacheInBody, m_cacheWords, r);
-            auto const* cRow = matRow(m_cacheContaining, m_cacheWords, r);
-            AssertFatal(!rowOverlap(aRow, bRow, m_cacheWords),
-                        "Node has conflicting orders (after & before)");
-            AssertFatal(!rowOverlap(aRow, iRow, m_cacheWords),
+            auto const* afterRow  = rowPtr(m_cacheAfter, i);
+            auto const* inBodyRow = rowPtr(m_cacheInBody, i);
+            // Same-direction conflict: cannot be both "after" and "inBody" simultaneously.
+            AssertFatal(!rowOverlap(afterRow, inBodyRow, m_cacheWordsPerRow),
                         "Node has conflicting orders (after & inBody)");
-            AssertFatal(!rowOverlap(aRow, cRow, m_cacheWords),
-                        "Node has conflicting orders (after & containing)");
-            AssertFatal(!rowOverlap(bRow, iRow, m_cacheWords),
-                        "Node has conflicting orders (before & inBody)");
-            AssertFatal(!rowOverlap(bRow, cRow, m_cacheWords),
-                        "Node has conflicting orders (before & containing)");
-            AssertFatal(!rowOverlap(iRow, cRow, m_cacheWords),
-                        "Node has conflicting orders (inBody & containing)");
+            // Self relation is invalid.
+            size_t   diagWord = static_cast<size_t>(i) >> 6;
+            uint64_t diagMask = uint64_t(1) << (i & 63);
+            AssertFatal((afterRow[diagWord] & diagMask) == 0, "Self relation in after");
+            AssertFatal((inBodyRow[diagWord] & diagMask) == 0, "Self relation in inBody");
+            // Cross-direction conflicts:
+            // after(i,j) conflicts with after(j,i) and inBody(j,i)
+            forEachSetBitRow(afterRow, m_cacheWordsPerRow, nodeCount, [&](int j) {
+                AssertFatal(!bitTest(m_cacheAfter, j, i),
+                            "Conflicting orders: after and before simultaneously");
+                AssertFatal(!bitTest(m_cacheInBody, j, i),
+                            "Conflicting orders: after and containing simultaneously");
+            });
+            // inBody(i,j) conflicts with inBody(j,i) and after(j,i)
+            forEachSetBitRow(inBodyRow, m_cacheWordsPerRow, nodeCount, [&](int j) {
+                AssertFatal(!bitTest(m_cacheInBody, j, i),
+                            "Conflicting orders: inBody and containing simultaneously");
+                AssertFatal(!bitTest(m_cacheAfter, j, i),
+                            "Conflicting orders: inBody and before simultaneously");
+            });
         }
     }
-    //=========================================================================
-    // populateOrderCache  (ancestor-upward algorithm -- my idea)
-    //=========================================================================
     void ControlGraph::populateOrderCache() const
     {
         TIMER(t, "populateOrderCache");
         if(m_cacheStatus == CacheStatus::Valid)
             return;
-        // ---- Reset all cache storage ----
+        m_cacheAfter.clear();
+        m_cacheInBody.clear();
+        m_cacheAfterT.clear();
+        m_cacheInBodyT.clear();
         m_cacheDenseToTag.clear();
         m_cacheTagToDense.clear();
-        m_cacheWords = 0;
-        m_cacheAfter.clear();
-        m_cacheBefore.clear();
-        m_cacheInBody.clear();
-        m_cacheContaining.clear();
-        static_assert(std::variant_size_v<ControlEdge> == 5,
-                      "Assumes Sequence(0), Initialize(1), ForLoopIncrement(2), Body(3), Else(4).");
-        using GD = Graph::Direction;
-        // Collect all node tags.
-        auto nodeTags = getNodes().to<std::vector>();
-        if(nodeTags.empty())
+        m_cacheWordsPerRow = 0;
+        m_transposeValid   = false;
+        // Dense id assignment for all control-graph nodes.
+        // This decouples storage width from sparse graph tags.
+        m_cacheDenseToTag = getNodes<Operation>().template to<std::vector>();
+        if(m_cacheDenseToTag.empty())
         {
             m_cacheStatus = CacheStatus::Valid;
             return;
         }
-        int const nodeCount = static_cast<int>(nodeTags.size());
-        // ---- Build dense <-> tag mapping ----
-        // Dense indices are [0, nodeCount). All hot-path operations use dense indices.
-        // The single unordered_map is only touched at boundary (build + query entry).
-        m_cacheDenseToTag = nodeTags;
-        m_cacheTagToDense.reserve(nodeCount * 2);
-        for(int d = 0; d < nodeCount; ++d)
-            m_cacheTagToDense.emplace(m_cacheDenseToTag[d], d);
-        // ---- Allocate row-major bit matrices ----
-        // Each matrix has nodeCount rows, each row has m_cacheWords uint64_t words.
-        // Bit position is a dense node index, NOT a graph tag.
-        m_cacheWords             = wordsForBits(static_cast<size_t>(nodeCount));
-        size_t const matrixWords = static_cast<size_t>(nodeCount) * m_cacheWords;
+        m_cacheTagToDense.reserve(m_cacheDenseToTag.size());
+        for(size_t i = 0; i < m_cacheDenseToTag.size(); ++i)
+            m_cacheTagToDense.emplace(m_cacheDenseToTag[i], static_cast<int>(i));
+        size_t const nodeCount   = m_cacheDenseToTag.size();
+        m_cacheWordsPerRow       = wordsForBits(nodeCount);
+        size_t const matrixWords = nodeCount * m_cacheWordsPerRow;
         m_cacheAfter.assign(matrixWords, 0);
-        m_cacheBefore.assign(matrixWords, 0);
         m_cacheInBody.assign(matrixWords, 0);
-        m_cacheContaining.assign(matrixWords, 0);
-        // ---- Build node-level adjacency in dense space ----
-        // childrenByType[u][edgeType] = list of direct child dense indices via that edge type.
-        // parents[v] = list of (parent_dense, edgeType) pairs.
-        std::vector<std::array<std::vector<int>, 5>>      childrenByType(nodeCount);
-        std::vector<std::vector<std::pair<int, uint8_t>>> parents(nodeCount);
-        for(int u = 0; u < nodeCount; ++u)
+        static_assert(std::variant_size_v<ControlEdge> == 5,
+                      "Expected edge types: Sequence(0), Initialize(1), "
+                      "ForLoopIncrement(2), Body(3), Else(4).");
+        constexpr int kSequence = 0;
+        constexpr int kInit     = 1;
+        constexpr int kInc      = 2;
+        constexpr int kBody     = 3;
+        constexpr int kElse     = 4;
+        using ChildBuckets      = std::array<std::vector<int>, std::variant_size_v<ControlEdge>>;
+        std::vector<ChildBuckets> childrenByType(nodeCount);
+        std::vector<int>          indegree(nodeCount, 0);
+        using GD = Graph::Direction;
+        // One-time typed adjacency build in dense id space.
+        for(size_t parentDense = 0; parentDense < nodeCount; ++parentDense)
         {
-            int const parentTag = m_cacheDenseToTag[u];
+            int parentTag = m_cacheDenseToTag[parentDense];
             for(int edgeTag : getNeighbours<GD::Downstream>(parentTag))
             {
-                uint8_t const edgeType = static_cast<uint8_t>(getEdge(edgeTag).index());
+                int   edgeType = static_cast<int>(getEdge(edgeTag).index());
+                auto& bucket   = childrenByType[parentDense][edgeType];
                 for(int childTag : getNeighbours<GD::Downstream>(edgeTag))
                 {
-                    int const v = denseOfTag(childTag);
-                    if(v < 0)
+                    auto it = m_cacheTagToDense.find(childTag);
+                    if(it == m_cacheTagToDense.end())
                         continue;
-                    childrenByType[u][edgeType].push_back(v);
-                    parents[v].emplace_back(u, edgeType);
+                    bucket.push_back(it->second);
                 }
             }
-        }
-        // Dedup adjacency (a node can be reached via multiple edges of same type).
-        std::vector<int> indegree(nodeCount, 0);
-        for(int u = 0; u < nodeCount; ++u)
-        {
-            for(auto& bucket : childrenByType[u])
+            // Deduplicate to avoid redundant downstream work.
+            for(auto& bucket : childrenByType[parentDense])
             {
                 std::sort(bucket.begin(), bucket.end());
                 bucket.erase(std::unique(bucket.begin(), bucket.end()), bucket.end());
-                for(int v : bucket)
-                    ++indegree[v];
+                for(int childDense : bucket)
+                    ++indegree[childDense];
             }
-            auto& p = parents[u];
-            std::sort(p.begin(), p.end());
-            p.erase(std::unique(p.begin(), p.end()), p.end());
         }
-        // ---- Topological order (Kahn's algorithm) ----
-        std::vector<int> topoQueue;
-        topoQueue.reserve(nodeCount);
-        for(int i = 0; i < nodeCount; ++i)
+        // Kahn topo order.
+        std::deque<int> ready;
+        for(size_t i = 0; i < nodeCount; ++i)
+        {
             if(indegree[i] == 0)
-                topoQueue.push_back(i);
+                ready.push_back(static_cast<int>(i));
+        }
         std::vector<int> topo;
         topo.reserve(nodeCount);
-        for(size_t head = 0; head < topoQueue.size(); ++head)
+        while(!ready.empty())
         {
-            int const u = topoQueue[head];
-            topo.push_back(u);
-            for(auto const& bucket : childrenByType[u])
-                for(int v : bucket)
-                    if(--indegree[v] == 0)
-                        topoQueue.push_back(v);
+            int node = ready.front();
+            ready.pop_front();
+            topo.push_back(node);
+            for(auto const& bucket : childrenByType[node])
+            {
+                for(int child : bucket)
+                {
+                    if(--indegree[child] == 0)
+                        ready.push_back(child);
+                }
+            }
         }
-        AssertFatal(static_cast<int>(topo.size()) == nodeCount,
-                    "ControlGraph must be acyclic for order-cache construction.");
-        // ---- Phase 1: Bottom-up DP to precompute "before" sets per ancestor ----
-        //
-        // For each node u we compute:
-        //   allDesc[u]  = all descendants of u (dense bitset)
-        //   beforeByArrival[u].viaBody = descendants reachable via Init edges from u
-        //   beforeByArrival[u].viaElse = Init | Body descendants
-        //   beforeByArrival[u].viaInc  = Init | Body | Else descendants
-        //   beforeByArrival[u].viaSeq  = Init | Body | Else | Inc descendants
-        //
-        // These represent: if a target node arrives at ancestor u via a given
-        // edge type, which of u's descendants are known to be before the target?
-        //
-        // Edge precedence: Initialize -> Body -> Else -> ForLoopIncrement -> Sequence.
-        struct BeforeByArrival
-        {
-            Bitset viaBody; // descendants before if target arrives via Body
-            Bitset viaElse; // descendants before if target arrives via Else
-            Bitset viaInc; // descendants before if target arrives via Inc
-            Bitset viaSeq; // descendants before if target arrives via Sequence
+        AssertFatal(topo.size() == nodeCount,
+                    "Cycle detected in control graph; populateOrderCache requires DAG.");
+        // allDescendants[row] memoizes full descendant set of row node.
+        std::vector<uint64_t> allDescendants(matrixWords, 0);
+        // Reused temporaries.
+        Bitset           initNodes(m_cacheWordsPerRow, 0);
+        Bitset           bodyNodes(m_cacheWordsPerRow, 0);
+        Bitset           elseNodes(m_cacheWordsPerRow, 0);
+        Bitset           incNodes(m_cacheWordsPerRow, 0);
+        Bitset           seqNodes(m_cacheWordsPerRow, 0);
+        Bitset           tmpNodes(m_cacheWordsPerRow, 0);
+        Bitset           laterNodes(m_cacheWordsPerRow, 0);
+        Bitset           allNodes(m_cacheWordsPerRow, 0);
+        std::vector<int> nonZeroWords;
+        auto             dSet = [](Bitset& bs, int denseNode) {
+            bs[static_cast<size_t>(denseNode) >> 6] |= uint64_t(1) << (denseNode & 63);
         };
-        std::vector<BeforeByArrival> beforeByArrival(nodeCount);
-        for(auto& s : beforeByArrival)
-        {
-            s.viaBody.assign(m_cacheWords, 0);
-            s.viaElse.assign(m_cacheWords, 0);
-            s.viaInc.assign(m_cacheWords, 0);
-            s.viaSeq.assign(m_cacheWords, 0);
-        }
-        std::vector<Bitset> allDesc(nodeCount, Bitset(m_cacheWords, 0));
-        // Reused temporaries (avoid per-node allocation).
-        std::array<Bitset, 5> typed;
-        for(auto& bs : typed)
-            bs.assign(m_cacheWords, 0);
-        Bitset seen(m_cacheWords, 0);
-        // Process in reverse topological order so children are done before parents.
+        auto gatherGroup = [&](int nodeDense, int edgeType, Bitset& out) {
+            std::fill(out.begin(), out.end(), 0);
+            for(int childDense : childrenByType[nodeDense][edgeType])
+            {
+                dSet(out, childDense);
+                rowOr(out.data(), rowPtr(allDescendants, childDense), m_cacheWordsPerRow);
+            }
+        };
+        // Forward-only write: no opposite writes in hot path.
+        auto writeOneToSetForward = [&](int nodeA, Bitset const& nodesB, bool toAfterMatrix) {
+            if(!bitsetAny(nodesB))
+                return;
+            collectNonZeroWordIndices(nodesB, nonZeroWords);
+            auto* row = toAfterMatrix ? rowPtr(m_cacheAfter, nodeA) : rowPtr(m_cacheInBody, nodeA);
+            rowOrWords(row, nodesB, nonZeroWords);
+        };
+        auto writeSetToSetForward
+            = [&](Bitset const& nodesA, Bitset const& nodesB, bool toAfterMatrix) {
+                  if(!bitsetAny(nodesA) || !bitsetAny(nodesB))
+                      return;
+                  collectNonZeroWordIndices(nodesB, nonZeroWords);
+                  forEachSetBit(nodesA, static_cast<int>(nodeCount), [&](int nodeA) {
+                      auto* row = toAfterMatrix ? rowPtr(m_cacheAfter, nodeA)
+                                                : rowPtr(m_cacheInBody, nodeA);
+                      rowOrWords(row, nodesB, nonZeroWords);
+                  });
+              };
+        // Bottom-up DP in reverse topo order.
         for(auto it = topo.rbegin(); it != topo.rend(); ++it)
         {
-            int const u = *it;
-            // Zero out temporaries.
-            for(auto& bs : typed)
-                std::fill(bs.begin(), bs.end(), 0);
-            std::fill(seen.begin(), seen.end(), 0);
-            // typed[t] = descendants whose first edge from u is type t.
-            for(uint8_t t = 0; t < 5; ++t)
-            {
-                for(int c : childrenByType[u][t])
-                {
-                    dSet(typed[t], c); // direct child
-                    dOr(typed[t], allDesc[c]); // all of child's descendants
-                }
-            }
-            // Make partitions disjoint by precedence to prevent A-before-B AND B-before-A.
-            // If a descendant is reachable via multiple edge types, keep the earliest one.
-            seen = typed[kInit];
-            dAndNot(typed[kBody], seen);
-            dOr(seen, typed[kBody]);
-            dAndNot(typed[kElse], seen);
-            dOr(seen, typed[kElse]);
-            dAndNot(typed[kInc], seen);
-            dOr(seen, typed[kInc]);
-            dAndNot(typed[kSeq], seen);
-            // Build cumulative "before" sets.
-            // viaBody: if target arrives via Body, Init descendants are before it.
-            beforeByArrival[u].viaBody = typed[kInit];
-            // viaElse: Init | Body descendants are before it.
-            beforeByArrival[u].viaElse = beforeByArrival[u].viaBody;
-            dOr(beforeByArrival[u].viaElse, typed[kBody]);
-            // viaInc: Init | Body | Else descendants are before it.
-            beforeByArrival[u].viaInc = beforeByArrival[u].viaElse;
-            dOr(beforeByArrival[u].viaInc, typed[kElse]);
-            // viaSeq: Init | Body | Else | Inc descendants are before it.
-            beforeByArrival[u].viaSeq = beforeByArrival[u].viaInc;
-            dOr(beforeByArrival[u].viaSeq, typed[kInc]);
-            // All descendants = viaSeq set | Sequence descendants.
-            allDesc[u] = beforeByArrival[u].viaSeq;
-            dOr(allDesc[u], typed[kSeq]);
-            dClear(allDesc[u], u); // node is not its own descendant
+            int node = *it;
+            gatherGroup(node, kInit, initNodes);
+            gatherGroup(node, kBody, bodyNodes);
+            gatherGroup(node, kElse, elseNodes);
+            gatherGroup(node, kInc, incNodes);
+            gatherGroup(node, kSequence, seqNodes);
+            // Make partitions disjoint in precedence order:
+            // Init -> Body -> Else -> Inc -> Sequence
+            rowAndNot(bodyNodes.data(), initNodes.data(), m_cacheWordsPerRow);
+            std::copy(initNodes.begin(), initNodes.end(), tmpNodes.begin());
+            rowOr(tmpNodes.data(), bodyNodes.data(), m_cacheWordsPerRow);
+            rowAndNot(elseNodes.data(), tmpNodes.data(), m_cacheWordsPerRow);
+            rowOr(tmpNodes.data(), elseNodes.data(), m_cacheWordsPerRow);
+            rowAndNot(incNodes.data(), tmpNodes.data(), m_cacheWordsPerRow);
+            rowOr(tmpNodes.data(), incNodes.data(), m_cacheWordsPerRow);
+            rowAndNot(seqNodes.data(), tmpNodes.data(), m_cacheWordsPerRow);
+            // Remove self from all partitions defensively.
+            auto clearSelf = [&](Bitset& bs) {
+                bs[static_cast<size_t>(node) >> 6] &= ~(uint64_t(1) << (node & 63));
+            };
+            clearSelf(initNodes);
+            clearSelf(bodyNodes);
+            clearSelf(elseNodes);
+            clearSelf(incNodes);
+            clearSelf(seqNodes);
+            // Parent/body relations:
+            writeOneToSetForward(node, initNodes, false);
+            writeOneToSetForward(node, bodyNodes, false);
+            writeOneToSetForward(node, elseNodes, false);
+            writeOneToSetForward(node, incNodes, false);
+            // Parent/sequence relation:
+            writeOneToSetForward(node, seqNodes, true);
+            // Cross partition precedence (cumulative form reduces calls):
+            // init < body|else|inc|seq
+            std::copy(bodyNodes.begin(), bodyNodes.end(), laterNodes.begin());
+            rowOr(laterNodes.data(), elseNodes.data(), m_cacheWordsPerRow);
+            rowOr(laterNodes.data(), incNodes.data(), m_cacheWordsPerRow);
+            rowOr(laterNodes.data(), seqNodes.data(), m_cacheWordsPerRow);
+            writeSetToSetForward(initNodes, laterNodes, true);
+            // body < else|inc|seq
+            std::copy(elseNodes.begin(), elseNodes.end(), laterNodes.begin());
+            rowOr(laterNodes.data(), incNodes.data(), m_cacheWordsPerRow);
+            rowOr(laterNodes.data(), seqNodes.data(), m_cacheWordsPerRow);
+            writeSetToSetForward(bodyNodes, laterNodes, true);
+            // else < inc|seq
+            std::copy(incNodes.begin(), incNodes.end(), laterNodes.begin());
+            rowOr(laterNodes.data(), seqNodes.data(), m_cacheWordsPerRow);
+            writeSetToSetForward(elseNodes, laterNodes, true);
+            // inc < seq
+            writeSetToSetForward(incNodes, seqNodes, true);
+            // Memo full descendants for parent use.
+            std::fill(allNodes.begin(), allNodes.end(), 0);
+            rowOr(allNodes.data(), initNodes.data(), m_cacheWordsPerRow);
+            rowOr(allNodes.data(), bodyNodes.data(), m_cacheWordsPerRow);
+            rowOr(allNodes.data(), elseNodes.data(), m_cacheWordsPerRow);
+            rowOr(allNodes.data(), incNodes.data(), m_cacheWordsPerRow);
+            rowOr(allNodes.data(), seqNodes.data(), m_cacheWordsPerRow);
+            std::copy(allNodes.begin(), allNodes.end(), rowPtr(allDescendants, node));
         }
-        // ---- Phase 2: Per-target upward ancestor traversal ----
-        //
-        // My idea:
-        // For each target node, climb upward through all ancestors.
-        // At each ancestor, based on the edge type connecting the ancestor
-        // to the path towards the target:
-        //   - If edge is Sequence: ancestor is before target (LeftFirst).
-        //   - If edge is Init/Body/Else/Inc: target is in ancestor's body (RightInBodyOfLeft).
-        //   - Also, ancestor's descendants that come before the target (from Phase 1)
-        //     are all before the target (LeftFirst).
-        //
-        // We accumulate two dense bitsets per target:
-        //   rowsAfter     = nodes that should be "before target" (target goes in their .after)
-        //   rowsContaining = nodes that should "contain target" (target goes in their .inBody)
-        //
-        // Then we do two many-to-one writes per target, which is efficient:
-        // one bit set per source row + one bulk OR on target's row.
-        // Dedup state: stamp per node, plus the best (earliest precedence) edge type seen.
-        // "Best" means the numerically smallest index in the precedence order
-        // {Init=1, Body=3, Else=4, Inc=2, Seq=0}, but we remap to a precedence rank
-        // so that comparison is just <.
-        // Precedence rank: Init(0) < Body(1) < Else(2) < Inc(3) < Seq(4).
-        auto precedenceRank = [](uint8_t edgeType) -> uint8_t {
-            switch(edgeType)
-            {
-            case kInit:
-                return 0;
-            case kBody:
-                return 1;
-            case kElse:
-                return 2;
-            case kInc:
-                return 3;
-            case kSeq:
-                return 4;
-            default:
-                return 5;
-            }
-        };
-        std::vector<uint32_t> visitStamp(nodeCount, 0);
-        std::vector<uint8_t>  bestEdgeType(nodeCount, 0xFF);
-        uint32_t              stamp = 0;
-        // Track which ancestors were reached for this target (to avoid scanning all nodes).
-        std::vector<int> reachedAncestors;
-        reachedAncestors.reserve(64);
-        // DFS stack for upward traversal.
-        std::vector<int> stack;
-        stack.reserve(64);
-        Bitset rowsAfter(m_cacheWords, 0);
-        Bitset rowsContaining(m_cacheWords, 0);
-        for(int target = 0; target < nodeCount; ++target)
+        // Remove diagonal bits.
+        for(int i = 0; i < static_cast<int>(nodeCount); ++i)
         {
-            // ---- Upward BFS/DFS from target to collect all ancestors ----
-            // For each ancestor, record the "best" (earliest-precedence) edge type
-            // through which the target is reachable from it.
-            if(++stamp == 0)
-            {
-                // Handle extremely unlikely uint32 wrap.
-                std::fill(visitStamp.begin(), visitStamp.end(), 0);
-                stamp = 1;
-            }
-            reachedAncestors.clear();
-            stack.clear();
-            // Seed: target's direct parents.
-            for(auto const& [p, eType] : parents[target])
-            {
-                if(visitStamp[p] != stamp)
-                {
-                    visitStamp[p]   = stamp;
-                    bestEdgeType[p] = eType;
-                    reachedAncestors.push_back(p);
-                    stack.push_back(p);
-                }
-                else if(precedenceRank(eType) < precedenceRank(bestEdgeType[p]))
-                {
-                    bestEdgeType[p] = eType;
-                }
-            }
-            // Climb upward: each ancestor's parents inherit "best reachable edge type"
-            // propagated through the path. An ancestor's own edge type toward its child
-            // is what matters (not the child->grandchild type), because the ordering rule
-            // depends on which bucket of the ancestor the target falls into.
-            while(!stack.empty())
-            {
-                int const node = stack.back();
-                stack.pop_back();
-                for(auto const& [p, eType] : parents[node])
-                {
-                    if(visitStamp[p] != stamp)
-                    {
-                        visitStamp[p]   = stamp;
-                        bestEdgeType[p] = eType;
-                        reachedAncestors.push_back(p);
-                        stack.push_back(p);
-                    }
-                    else if(precedenceRank(eType) < precedenceRank(bestEdgeType[p]))
-                    {
-                        bestEdgeType[p] = eType;
-                    }
-                }
-            }
-            // ---- Gather relation sets from ancestors ----
-            std::fill(rowsAfter.begin(), rowsAfter.end(), 0);
-            std::fill(rowsContaining.begin(), rowsContaining.end(), 0);
-            for(int anc : reachedAncestors)
-            {
-                uint8_t const viaType = bestEdgeType[anc];
-                // Direct ancestor relation.
-                if(viaType == kSeq)
-                    dSet(rowsAfter, anc); // ancestor is before target
-                else
-                    dSet(rowsContaining, anc); // target is in ancestor's body
-                // Descendants of ancestor that are before target by edge precedence.
-                switch(viaType)
-                {
-                case kInit:
-                    // Nothing is before Init descendants.
-                    break;
-                case kBody:
-                    dOr(rowsAfter, beforeByArrival[anc].viaBody);
-                    break;
-                case kElse:
-                    dOr(rowsAfter, beforeByArrival[anc].viaElse);
-                    break;
-                case kInc:
-                    dOr(rowsAfter, beforeByArrival[anc].viaInc);
-                    break;
-                case kSeq:
-                    dOr(rowsAfter, beforeByArrival[anc].viaSeq);
-                    break;
-                default:
-                    AssertFatal(false, "Unexpected edge type", ShowValue(viaType));
-                }
-            }
-            // Target should not be before/contain itself.
-            dClear(rowsAfter, target);
-            dClear(rowsContaining, target);
-            // ---- Write into cache matrices ----
-            // Many-to-one pattern:
-            //   For each source in rowsAfter: set bit `target` in source's After row.
-            //   Then OR rowsAfter into target's Before row (the opposite relation).
-            //   Same pattern for rowsContaining -> InBody/Containing.
-            size_t const   colWord = static_cast<size_t>(target) >> 6;
-            uint64_t const colMask = uint64_t(1) << (target & 63);
-            // LeftFirst: source.after[target]=1, target.before |= sources
-            forEachBit(rowsAfter, [&](int srcDense) {
-                matRow(m_cacheAfter, m_cacheWords, srcDense)[colWord] |= colMask;
-            });
-            rowOr(matRow(m_cacheBefore, m_cacheWords, target), rowsAfter.data(), m_cacheWords);
-            // RightInBodyOfLeft: source.inBody[target]=1, target.containing |= sources
-            forEachBit(rowsContaining, [&](int srcDense) {
-                matRow(m_cacheInBody, m_cacheWords, srcDense)[colWord] |= colMask;
-            });
-            rowOr(matRow(m_cacheContaining, m_cacheWords, target),
-                  rowsContaining.data(),
-                  m_cacheWords);
+            size_t   w    = static_cast<size_t>(i) >> 6;
+            uint64_t mask = ~(uint64_t(1) << (i & 63));
+            rowPtr(m_cacheAfter, i)[w] &= mask;
+            rowPtr(m_cacheInBody, i)[w] &= mask;
         }
         validateOrderCache();
         m_cacheStatus = CacheStatus::Valid;
     }
+
     //=========================================================================
     // lookupOrder(IgnoreCache) -- unchanged algorithm, no cache involved
     //=========================================================================

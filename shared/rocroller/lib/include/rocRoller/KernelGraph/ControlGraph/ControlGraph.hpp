@@ -6,6 +6,14 @@
 #include <functional>
 #include <variant>
 
+#include <array>
+#include <bit>
+#include <cstddef>
+#include <cstdint>
+#include <set>
+#include <unordered_map>
+#include <vector>
+
 #include <bit>
 #include <cstdint>
 
@@ -206,28 +214,33 @@ namespace rocRoller
             void         validateOrderCache() const;
             NodeOrdering lookupOrder(CacheOnlyPolicy const, int nodeA, int nodeB) const;
             NodeOrdering lookupOrder(IgnoreCachePolicy const, int nodeA, int nodeB) const;
-            /**
-                 * Convert graph tag to dense cache index, or -1 if not present.
-                 */
+            // Dense id lookup for external graph tag.
             int denseOfTag(int tag) const;
-            /**
-                 * Select the row-major cache matrix corresponding to a NodeOrdering.
-                 * Resolved once per write call so inner loops have no branching.
-                 */
-            std::vector<uint64_t>& selectCacheMatrix(NodeOrdering order) const;
-            // Dense index -> graph node tag.
-            mutable std::vector<int> m_cacheDenseToTag;
-            // Graph tag -> dense index. Single generic lookup structure.
-            mutable std::unordered_map<int, int> m_cacheTagToDense;
-            // Number of uint64_t words per row in the dense bit matrices.
-            mutable size_t m_cacheWords = 0;
-            // Row-major dense bit matrices (row = node_dense, bit = other_dense).
+            // Lazily build transpose caches for nodesBefore()/nodesContaining().
+            void ensureTransposeCache() const;
+            // Utility for row-major bit matrices.
+            static size_t   wordsForBits(size_t bitCount);
+            uint64_t*       rowPtr(std::vector<uint64_t>& matrix, int denseRow) const;
+            uint64_t const* rowPtr(std::vector<uint64_t> const& matrix, int denseRow) const;
+            bool bitTest(std::vector<uint64_t> const& matrix, int denseRow, int denseCol) const;
+            // Forward relation matrices:
+            // after[a][b] => a is definitely before b (LeftFirst)
+            // inBody[a][b] => b is in body of a (RightInBodyOfLeft)
             mutable std::vector<uint64_t> m_cacheAfter;
-            mutable std::vector<uint64_t> m_cacheBefore;
             mutable std::vector<uint64_t> m_cacheInBody;
-            mutable std::vector<uint64_t> m_cacheContaining;
-            mutable CacheStatus           m_cacheStatus       = CacheStatus::Invalid;
-            mutable bool                  m_changesRestricted = false;
+            // Lazy transpose caches:
+            // afterT[b][a] == after[a][b]  (used as "before")
+            // inBodyT[b][a] == inBody[a][b] (used as "containing")
+            mutable std::vector<uint64_t> m_cacheAfterT;
+            mutable std::vector<uint64_t> m_cacheInBodyT;
+            mutable bool                  m_transposeValid = false;
+            // Dense <-> tag mapping
+            mutable std::vector<int>             m_cacheDenseToTag;
+            mutable std::unordered_map<int, int> m_cacheTagToDense;
+            // Number of uint64 words in one row
+            mutable size_t      m_cacheWordsPerRow  = 0;
+            mutable CacheStatus m_cacheStatus       = CacheStatus::Invalid;
+            mutable bool        m_changesRestricted = false;
         };
 
         std::string name(ControlGraph::Element const& el);
