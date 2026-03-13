@@ -353,21 +353,28 @@ struct CShuffleEpilogue
 
             constexpr index_t N_vectors = NPerIterationShuffle / VectorLen;
 
-            // Scale XOR parameters based on available N_vectors
-            // Small N configs (4-7): Use XorMask=4, XorMult=1 for limited spread
-            // Medium N configs (8-31): Use XorMask=8, XorMult=1 for more M variation
-            // Large N configs (32+): Use XorMask=8, XorMult=4 for maximum spread
-            constexpr index_t XorMask = (N_vectors >= 8) ? 8 : 4;
-            constexpr index_t XorMult = (N_vectors >= 32) ? 4 : 1;
+            // APPROACH 12: Adaptive XOR with modulo for safe bank conflict reduction
+            //
+            // XorMask: Scale mask to match N_vectors (power of 2) for full M range utilization
+            // - Large configs (N_vectors >= 8): Use mask=8 to vary across 8 M rows
+            // - Small configs (N_vectors < 8): Use mask=N_vectors to utilize all available vectors
+            //
+            // XorMult: Scale multiplier to increase bank spreading for larger configs
+            // - Very large (N_vectors >= 32): mult=4 for maximum spread
+            // - Medium (N_vectors >= 8): mult=2 for balanced spread
+            // - Small (N_vectors < 8): mult=1 for basic spread
+            //
+            // Modulo safety: XOR value is taken modulo N_vectors in the transform
+            // to prevent aliasing, so we can safely use larger multipliers
+            constexpr index_t XorMask = (N_vectors >= 8) ? 8 : N_vectors;
+            constexpr index_t XorMult = (N_vectors >= 32) ? 4
+                                       : (N_vectors >= 8) ? 2
+                                       : 1;
 
-            // Apply XOR if we have at least 4 N_vectors and won't cause aliasing
-            // Aliasing check: (XorMask - 1) * XorMult must be < N_vectors
-            // Examples:
-            //   N_vectors=4: (4-1)*1 = 3 < 4 ✓
-            //   N_vectors=8: (8-1)*1 = 7 < 8 ✓
-            //   N_vectors=32: (8-1)*4 = 28 < 32 ✓
-            constexpr bool CanApplyXor = (N_vectors >= 4) &&
-                                          ((XorMask - 1) * XorMult < N_vectors);
+            // Enable XOR for any config with at least 2 N_vectors
+            // Modulo in transform ensures no out-of-bounds access
+            // Even FP8 with N_vectors=2 can benefit from XOR spreading
+            constexpr bool CanApplyXor = (N_vectors >= 2);
 
             if constexpr(CanApplyXor)
             {

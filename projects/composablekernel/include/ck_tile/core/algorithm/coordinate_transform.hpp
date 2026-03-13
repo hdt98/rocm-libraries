@@ -1559,8 +1559,12 @@ struct xor_lds_bank_4d_t : public base_transform<4, 4>
         // Compute merged M index for XOR calculation
         const auto merged_m = m_coarse * mlds_layer_ + m_layer;
 
-        // Apply XOR to N_vector dimension only
-        const auto xor_val = (merged_m & (XorMask - 1)) * XorMult;
+        // Apply XOR to N_vector dimension with modulo for safety
+        // Modulo ensures XOR value stays within valid N_vector range even with
+        // aggressive multipliers (prevents aliasing/out-of-bounds access)
+        const auto xor_base = (merged_m & (XorMask - 1)) * XorMult;
+        const auto n_vectors = up_lengths_[number<2>{}];  // Get N_vectors from descriptor
+        const auto xor_val = xor_base % n_vectors;
         const auto new_n_vec = n_vec ^ xor_val;
 
         idx_low(number<2>{}) = new_n_vec;
