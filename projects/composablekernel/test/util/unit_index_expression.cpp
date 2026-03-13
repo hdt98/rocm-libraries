@@ -35,9 +35,9 @@ TEST(IndexExpression, EvalAddMultDivMod)
 
 TEST(IndexExpression, EvalNestedExpression)
 {
-    using Expr = index_expr::Div<
-        index_expr::Add<index_expr::Ik, index_expr::Mult<Number<2>, Number<5>>>,
-        Number<2>>;
+    using Expr =
+        index_expr::Div<index_expr::Add<index_expr::Ik, index_expr::Mult<Number<2>, Number<5>>>,
+                        Number<2>>;
 
     static_assert(index_expr::eval_v<Expr, 6> == 8);
     EXPECT_EQ((index_expr::eval_v<Expr, 6>), 8);
