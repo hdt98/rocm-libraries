@@ -526,6 +526,39 @@ TEST(TransformConvFwdToIm2win, SmallChannelsTargetCase)
     EXPECT_TRUE(run_im2win_gemm_and_compare(tr, I, Wt, O_ref, N, K, Ho, Wo, 1e-3f));
 }
 
+// ── Approach 2 (direct formula) test ────────────────────────────────────────
+// Verifies that MakeBDescriptor_N_K_Direct<GNCHW>() produces the same logical
+// GEMM shape [N×Ho×Wo, C×Y×X] as the composite Approach 1.
+// The actual offset calculations differ (Approach 2 uses flat strides with
+// negative values handled at the kernel level), but the shape must match.
+TEST(TransformConvFwdToIm2win, BDescriptorDirectShape)
+{
+    const int G=1,N=1,C=4,Hi=5,Wi=5,K=4,Y=3,X=3,Ho=5,Wo=5;
+    using Tr = TransformConvFwdToIm2win<2,
+                                        ConvolutionSpecialization::Default,
+                                        1,1,1>;
+    Tr tr{make_a_lens(G,N,C,Hi,Wi), make_b_lens(G,K,C,Y,X), make_c_lens(G,N,K,Ho,Wo),
+          make_spatial(1,1), make_spatial(1,1), make_spatial(1,1), make_spatial(1,1)};
+
+    const int N_gemm = N * Ho * Wo;
+    const int K_gemm = C * Y * X;
+
+    // Approach 1 (composite)
+    auto b1 = tr.MakeBDescriptor_N_K_Composite<tensor_layout::convolution::GNCHW>();
+    EXPECT_EQ(b1.get_length(number<0>{}), N_gemm);
+    EXPECT_EQ(b1.get_length(number<1>{}), K_gemm);
+
+    // Approach 2 (direct formula) — same logical shape
+    auto b2 = tr.MakeBDescriptor_N_K_Direct<tensor_layout::convolution::GNCHW>();
+    EXPECT_EQ(b2.get_length(number<0>{}), N_gemm);
+    EXPECT_EQ(b2.get_length(number<1>{}), K_gemm);
+
+    // Default alias selects Approach 1
+    auto b_default = tr.MakeBDescriptor_N_K<tensor_layout::convolution::GNCHW>();
+    EXPECT_EQ(b_default.get_length(number<0>{}), N_gemm);
+    EXPECT_EQ(b_default.get_length(number<1>{}), K_gemm);
+}
+
 // ── 10. C descriptor shape check — NHWGK and GNKHW ───────────────────
 TEST(TransformConvFwdToIm2win, CDescriptorShape)
 {
