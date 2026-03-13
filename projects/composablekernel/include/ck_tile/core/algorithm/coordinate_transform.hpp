@@ -1427,12 +1427,30 @@ struct xor_fp8_bank_t : public base_transform<2, 2>
         static_assert(LowIdx::size() == 2 && UpIdx::size() == 2,
                       "wrong! inconsistent # of dimension");
 
-        idx_low(number<0>{}) = idx_up[number<0>{}];
+        const auto m = idx_up[number<0>{}];
+        const auto n = idx_up[number<1>{}];
 
-        // XOR N with ((M / 4) & 3) << 2 to spread across banks
-        // M indices come in strides of 4 (MLdsLayer), so divide by 4 first
-        const auto m_row = idx_up[number<0>{}] >> 2; // Divide by 4
-        idx_low(number<1>{}) = idx_up[number<1>{}] ^ ((m_row & 3) << 2);
+        idx_low(number<0>{}) = m;
+
+        // XOR pattern for FP8 (1-byte elements):
+        // 4 consecutive N values (N & ~3) share the same 4-byte bank word
+        // We XOR the N word-offset (N >> 2) with (M & 3) to spread across banks
+        // Then reconstruct N: new_n = ((n >> 2) ^ (m & 3)) << 2 | (n & 3)
+        const auto n_word = n >> 2;  // Which 4-byte word in N dimension
+        const auto n_byte = n & 3;   // Byte offset within word
+        const auto xor_val = m & 3;  // XOR pattern based on M row
+        const auto new_n_word = n_word ^ xor_val;
+        const auto new_n = (new_n_word << 2) | n_byte;
+
+        idx_low(number<1>{}) = new_n;
+
+        // Debug: print first few calculations
+        if(threadIdx.x < 4 && blockIdx.x == 0)
+        {
+            printf("XOR tid=%d: m=%d n=%d -> n_word=%d xor_val=%d new_n_word=%d new_n=%d\n",
+                   (int)threadIdx.x, (int)m, (int)n, (int)n_word, (int)xor_val,
+                   (int)new_n_word, (int)new_n);
+        }
     }
 
     template <typename LowIdxDiff, typename UpIdxDiff, typename LowIdx, typename UpIdx>
