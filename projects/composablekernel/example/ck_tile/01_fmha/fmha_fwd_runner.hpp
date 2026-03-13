@@ -1670,7 +1670,11 @@ fwd_result fmha_fwd_run(mode_enum mode,
         std::sort(all_results.begin(), all_results.end(),
                   [](const auto& a, const auto& b) { return a.second < b.second; });
         std::cout << "[run_all_kernels] " << all_results.size()
-                  << " instance(s) benchmarked:" << std::endl;
+                  << " instance(s) benchmarked:"
+#if CK_TILE_FMHA_FWD_SPLITKV_API
+                  << (use_splitkv_all ? " (num_splits=" + std::to_string(num_splits) + ")" : "")
+#endif
+                  << std::endl;
         // find max kernel name length for alignment
         size_t max_kname_len = 0;
         for(const auto& [kname, t] : all_results)
