@@ -135,7 +135,8 @@ struct GroupedConvolutionFwdIm2winInvoker
         using Kernel = ck_tile::GroupedConvolutionForwardIm2winKernel<GroupedConvTraitsType,
                                                                        TilePartitioner,
                                                                        GemmPipeline,
-                                                                       ConvEpilogue>;
+                                                                       ConvEpilogue,
+                                                                       ConvConfig::UseDirectTransform>;
 
         auto kargs = Kernel::MakeKernelArgs(args);
 

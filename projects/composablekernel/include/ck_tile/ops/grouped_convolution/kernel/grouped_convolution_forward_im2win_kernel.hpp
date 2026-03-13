@@ -28,9 +28,12 @@ namespace ck_tile {
 //   Weight : GKCYX  (G, K, C,  Y,  X)
 //   Output : GNKHW  (G, N, K, Ho, Wo)
 // ═══════════════════════════════════════════════════════════════════════
-template <typename GroupedConvTraitsType_, typename CDElementwise_>
+template <typename GroupedConvTraitsType_, typename CDElementwise_,
+          bool UseDirectTransform_ = false>
 struct GroupedConvFwdIm2winKernelArgs
 {
+    static constexpr bool UseDirectTransform = UseDirectTransform_;
+
     using ConvToIm2winTransformer =
         TransformConvFwdToIm2win<GroupedConvTraitsType_::NDimSpatial,
                                  GroupedConvTraitsType_::ConvSpecialization,
@@ -38,7 +41,8 @@ struct GroupedConvFwdIm2winKernelArgs
                                  GroupedConvTraitsType_::VectorSizeB,
                                  GroupedConvTraitsType_::VectorSizeC,
                                  GroupedConvTraitsType_::NumGroupsToMerge,
-                                 /*SplitN=*/true>;
+                                 /*SplitN=*/true,
+                                 UseDirectTransform_>;
     using CDElementwise                       = CDElementwise_;
     static constexpr index_t NumDTensor       = GroupedConvTraitsType_::NumDTensor;
     static constexpr index_t NumGroupsToMerge = GroupedConvTraitsType_::NumGroupsToMerge;
@@ -201,11 +205,16 @@ struct GroupedConvFwdIm2winKernelArgs
                                  static_cast<index_t>(transformer_.Wi_);
         }
 
+        // b_ptr adjustment for Approach 2 (direct transform).
+        b_ptr_adjust = transformer_.GetBPtrAdjust();
+
         if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
         {
             std::cout << "[im2win] GemmM=" << GemmM << " GemmN=" << GemmN << " GemmK=" << GemmK
                       << " GemmBatch=" << GemmBatch
                       << " NumGroupsToMerge=" << NumGroupsToMerge
+                      << " UseDirectTransform=" << UseDirectTransform_
+                      << " b_ptr_adjust=" << b_ptr_adjust
                       << " group_stride_a=" << group_stride_a
                       << " group_stride_b=" << group_stride_b
                       << " group_stride_c=" << group_stride_c
@@ -255,6 +264,7 @@ struct GroupedConvFwdIm2winKernelArgs
     long_index_t group_stride_a; ///< Elements per group in weight tensor (A = weight in true im2win)
     long_index_t group_stride_b; ///< Elements per group in input tensor  (B = input  in true im2win)
     long_index_t group_stride_c; ///< Elements per group in output tensor
+    long_index_t b_ptr_adjust   = 0; ///< b_ptr correction for UseDirectTransform (= -LPH*HiStride - LPW*WiStride)
 
     // Split-N support
     index_t n_splits        = 1; ///< Number of batch splits
@@ -301,7 +311,8 @@ struct GroupedConvFwdIm2winKernelArgs
 template <typename GroupedConvTraitsType_,
           typename TilePartitioner_,
           typename GemmPipeline_,
-          typename EpiloguePipeline_>
+          typename EpiloguePipeline_,
+          bool UseDirectTransform_ = false>
 struct GroupedConvolutionForwardIm2winKernel
 {
     using TilePartitioner  = remove_cvref_t<TilePartitioner_>;
@@ -333,7 +344,8 @@ struct GroupedConvolutionForwardIm2winKernel
     using CDElementwise = ck_tile::element_wise::PassThrough;
         //typename EpiloguePipeline::CDElementwise;
 
-    using KernelArgs = GroupedConvFwdIm2winKernelArgs<GroupedConvTraitsType_, CDElementwise>;
+    using KernelArgs = GroupedConvFwdIm2winKernelArgs<GroupedConvTraitsType_, CDElementwise,
+                                                       UseDirectTransform_>;
 
     static_assert(GemmPipeline::kPadM && GemmPipeline::kPadN && GemmPipeline::kPadK,
                   "im2win kernel requires padded GEMM pipeline (kPadM/N/K must be true).");
@@ -567,7 +579,7 @@ struct GroupedConvolutionForwardIm2winKernel
             const auto* b_ptr =
                 reinterpret_cast<const InDataType*>(kargs.in_ptr) +
                 static_cast<long_index_t>(merged_batch_idx) * kargs.group_stride_b +
-                split_n_offset_b;
+                split_n_offset_b + kargs.b_ptr_adjust;
 
             auto* c_ptr =
                 reinterpret_cast<OutDataType*>(kargs.out_ptr) +
@@ -602,7 +614,7 @@ struct GroupedConvolutionForwardIm2winKernel
                     reinterpret_cast<const InDataType*>(kargs.in_ptr) +
                     static_cast<long_index_t>(g_base + g_local) * kargs.group_stride_b /
                         KernelArgs::NumGroupsToMerge +
-                    split_n_offset_b;
+                    split_n_offset_b + kargs.b_ptr_adjust;
                 auto* c_ptr =
                     reinterpret_cast<OutDataType*>(kargs.out_ptr) +
                     static_cast<long_index_t>(g_base + g_local) * kargs.group_stride_c /

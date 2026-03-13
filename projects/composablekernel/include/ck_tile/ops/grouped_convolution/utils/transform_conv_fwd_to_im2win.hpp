@@ -45,11 +45,12 @@ template <index_t NDimSpatial,
           index_t VectorSizeA,
           index_t VectorSizeB,
           index_t VectorSizeC,
-          index_t NumGroupsToMerge = 1,
-          bool SplitN              = false,
-          typename ADataType       = float,
-          typename CDataType       = float,
-          typename IndexType       = index_t>
+          index_t NumGroupsToMerge    = 1,
+          bool SplitN                 = false,
+          bool UseDirectTransform     = false, // select B descriptor approach
+          typename ADataType          = float,
+          typename CDataType          = float,
+          typename IndexType          = index_t>
 struct TransformConvFwdToIm2win
 {
     static_assert(NDimSpatial == 2,
@@ -385,15 +386,41 @@ struct TransformConvFwdToIm2win
             make_tuple(sequence<0>{}, sequence<1>{}));
     }
 
-    // Default B descriptor — selects Approach 1 (composite) for GNCHW.
-    // To use Approach 2 (direct formula), call MakeBDescriptor_N_K_Direct<GNCHW>().
+    // Default B descriptor for GNCHW — dispatches on the UseDirectTransform
+    // template parameter:
+    //   false (default) → Approach 1: composite transforms
+    //   true            → Approach 2: direct formula
+    //
+    // When UseDirectTransform=true the kernel must adjust b_ptr by
+    // GetBPtrAdjust() so that the descriptor's zero-based addressing
+    // correctly maps to the padded physical input space.
     template <typename BLayout,
               typename std::enable_if<
                   std::is_same_v<BLayout, tensor_layout::convolution::GNCHW>,
                   bool>::type = false>
     CK_TILE_HOST auto MakeBDescriptor_N_K() const
     {
-        return MakeBDescriptor_N_K_Composite<BLayout>();
+        if constexpr(UseDirectTransform)
+            return MakeBDescriptor_N_K_Direct<BLayout>();
+        else
+            return MakeBDescriptor_N_K_Composite<BLayout>();
+    }
+
+    // Returns the byte-offset to add to b_ptr when UseDirectTransform=true.
+    // The direct descriptor's index-0 corresponds to (ho=0, wo=0, fy=0, fx=0)
+    // which maps to physical input position (i_h = -LPH, i_w = -LPW) —
+    // in the left-padding zone.  Subtracting this offset from b_ptr brings
+    // the origin of the descriptor to the physical start of the input tensor,
+    // so that index arithmetic produces the correct physical addresses.
+    //
+    // For UseDirectTransform=false (composite) this is always 0.
+    CK_TILE_HOST long_index_t GetBPtrAdjust() const
+    {
+        if constexpr(UseDirectTransform)
+            return -(static_cast<long_index_t>(InLeftPadH_) * HiStride_ +
+                     static_cast<long_index_t>(InLeftPadW_) * WiStride_);
+        else
+            return 0;
     }
 
     // ── GKYXC A descriptor (channels-last weight, for NHWGC path) ─────

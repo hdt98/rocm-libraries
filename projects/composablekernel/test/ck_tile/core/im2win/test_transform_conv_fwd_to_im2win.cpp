@@ -526,11 +526,9 @@ TEST(TransformConvFwdToIm2win, SmallChannelsTargetCase)
     EXPECT_TRUE(run_im2win_gemm_and_compare(tr, I, Wt, O_ref, N, K, Ho, Wo, 1e-3f));
 }
 
-// ── Approach 2 (direct formula) test ────────────────────────────────────────
-// Verifies that MakeBDescriptor_N_K_Direct<GNCHW>() produces the same logical
-// GEMM shape [N×Ho×Wo, C×Y×X] as the composite Approach 1.
-// The actual offset calculations differ (Approach 2 uses flat strides with
-// negative values handled at the kernel level), but the shape must match.
+// ── Approach 2 (direct formula) tests ────────────────────────────────────────
+
+// Shape check: Approach 2 must produce the same logical [N×Ho×Wo, C×Y×X] shape.
 TEST(TransformConvFwdToIm2win, BDescriptorDirectShape)
 {
     const int G=1,N=1,C=4,Hi=5,Wi=5,K=4,Y=3,X=3,Ho=5,Wo=5;
@@ -543,20 +541,135 @@ TEST(TransformConvFwdToIm2win, BDescriptorDirectShape)
     const int N_gemm = N * Ho * Wo;
     const int K_gemm = C * Y * X;
 
-    // Approach 1 (composite)
-    auto b1 = tr.MakeBDescriptor_N_K_Composite<tensor_layout::convolution::GNCHW>();
-    EXPECT_EQ(b1.get_length(number<0>{}), N_gemm);
-    EXPECT_EQ(b1.get_length(number<1>{}), K_gemm);
+    auto b1       = tr.MakeBDescriptor_N_K_Composite<tensor_layout::convolution::GNCHW>();
+    auto b2       = tr.MakeBDescriptor_N_K_Direct   <tensor_layout::convolution::GNCHW>();
+    auto b_default= tr.MakeBDescriptor_N_K          <tensor_layout::convolution::GNCHW>();
 
-    // Approach 2 (direct formula) — same logical shape
-    auto b2 = tr.MakeBDescriptor_N_K_Direct<tensor_layout::convolution::GNCHW>();
-    EXPECT_EQ(b2.get_length(number<0>{}), N_gemm);
-    EXPECT_EQ(b2.get_length(number<1>{}), K_gemm);
+    for(auto len0 : {b1.get_length(number<0>{}),
+                     b2.get_length(number<0>{}),
+                     b_default.get_length(number<0>{})})
+        EXPECT_EQ(len0, N_gemm);
+    for(auto len1 : {b1.get_length(number<1>{}),
+                     b2.get_length(number<1>{}),
+                     b_default.get_length(number<1>{})})
+        EXPECT_EQ(len1, K_gemm);
+}
 
-    // Default alias selects Approach 1
-    auto b_default = tr.MakeBDescriptor_N_K<tensor_layout::convolution::GNCHW>();
-    EXPECT_EQ(b_default.get_length(number<0>{}), N_gemm);
-    EXPECT_EQ(b_default.get_length(number<1>{}), K_gemm);
+// Numerical equivalence check: for every VALID (non-padded) input position,
+// Approach 1 and Approach 2 must address the same physical memory element.
+//
+// Relationship (derived in im2win_transform.md):
+//   b2_offset(n_merged, kg) = b1_offset(n_merged, kg) + LPH*HiStride + LPW*WiStride
+//
+// because Approach 2 uses b_ptr adjusted by -LPH*HiStride - LPW*WiStride
+// (GetBPtrAdjust()) so that both approaches resolve to the same physical address.
+TEST(TransformConvFwdToIm2win, BDescriptorDirectNumericalEquivalence)
+{
+    // Use padding so the non-trivial (LPH>0, LPW>0) path is exercised.
+    const int G=1,N=2,C=4,Hi=7,Wi=7,K=4,Y=3,X=3,Ho=7,Wo=7;
+    const int LPH=1, LPW=1, Sy=1, Sx=1;
+    // Use UseDirectTransform=true so GetBPtrAdjust() returns the non-zero offset.
+    using Tr = TransformConvFwdToIm2win<2, ConvolutionSpecialization::Default,
+                                         1,1,1, /*NumGroupsToMerge=*/1,
+                                         /*SplitN=*/false, /*UseDirectTransform=*/true>;
+    // Also keep a composite transformer for offset comparison.
+    using TrC = TransformConvFwdToIm2win<2, ConvolutionSpecialization::Default,
+                                          1,1,1, /*NumGroupsToMerge=*/1,
+                                          /*SplitN=*/false, /*UseDirectTransform=*/false>;
+    Tr  tr {make_a_lens(G,N,C,Hi,Wi), make_b_lens(G,K,C,Y,X), make_c_lens(G,N,K,Ho,Wo),
+            make_spatial(Sy,Sx), make_spatial(1,1),
+            make_spatial(LPH,LPW), make_spatial(LPH,LPW)};
+    TrC trc{make_a_lens(G,N,C,Hi,Wi), make_b_lens(G,K,C,Y,X), make_c_lens(G,N,K,Ho,Wo),
+            make_spatial(Sy,Sx), make_spatial(1,1),
+            make_spatial(LPH,LPW), make_spatial(LPH,LPW)};
+
+    auto b1 = trc.MakeBDescriptor_N_K_Composite<tensor_layout::convolution::GNCHW>();
+    auto b2 = tr .MakeBDescriptor_N_K_Direct   <tensor_layout::convolution::GNCHW>();
+
+    // Physical strides of I[N,C,Hi,Wi] (NCHW, packed, per group).
+    const int HiStride = Wi, WiStride = 1;
+    // Adjustment magnitude: how much b_ptr_direct is shifted below b_ptr_composite.
+    const long_index_t adjust = LPH * HiStride + LPW * WiStride;
+    // GetBPtrAdjust() returns -adjust for UseDirectTransform=true.
+    EXPECT_EQ(-tr.GetBPtrAdjust(),  static_cast<long_index_t>(adjust));
+    EXPECT_EQ(-trc.GetBPtrAdjust(), static_cast<long_index_t>(0));
+
+    bool all_valid = true;
+    for(int n = 0; n < N && all_valid; ++n)
+        for(int ho = 0; ho < Ho && all_valid; ++ho)
+            for(int wo = 0; wo < Wo && all_valid; ++wo)
+                for(int c = 0; c < C && all_valid; ++c)
+                    for(int fy = 0; fy < Y && all_valid; ++fy)
+                        for(int fx = 0; fx < X && all_valid; ++fx)
+                        {
+                            int i_h = ho * Sy + fy - LPH;
+                            int i_w = wo * Sx + fx - LPW;
+                            if(i_h < 0 || i_h >= Hi || i_w < 0 || i_w >= Wi)
+                                continue; // skip padded positions
+
+                            int n_merged = n * Ho * Wo + ho * Wo + wo;
+                            int kg       = c * Y * X + fy * X + fx;
+
+                            auto off1 = b1.calculate_offset(
+                                make_tuple(index_t(n_merged), index_t(kg)));
+                            auto off2 = b2.calculate_offset(
+                                make_tuple(index_t(n_merged), index_t(kg)));
+
+                            // b2_offset == b1_offset + adjust
+                            if(static_cast<long_index_t>(off2) !=
+                               static_cast<long_index_t>(off1) + adjust)
+                            {
+                                all_valid = false;
+                                FAIL() << "Offset mismatch at (n=" << n << ",ho=" << ho
+                                       << ",wo=" << wo << ",c=" << c << ",fy=" << fy
+                                       << ",fx=" << fx << "): b1=" << off1
+                                       << " b2=" << off2 << " expected b2=" << off1+adjust;
+                            }
+                        }
+    EXPECT_TRUE(all_valid);
+}
+
+// Full GEMM equivalence: both approaches should produce identical convolution output.
+// UseDirectTransform=false transformer vs UseDirectTransform=true transformer.
+TEST(TransformConvFwdToIm2win, DirectTransformGemmEquivalence)
+{
+    const int G=1,N=1,C=4,Hi=5,Wi=5,K=4,Y=3,X=3,Ho=5,Wo=5;
+    // Template param order: NDimSpatial, ConvSpec, VA, VB, VC, NumGroupsToMerge,
+    //                        SplitN, UseDirectTransform [, ADataType, CDataType, IndexType]
+    using TrComposite = TransformConvFwdToIm2win<2, ConvolutionSpecialization::Default,
+                                                  1,1,1, /*NumGroupsToMerge=*/1,
+                                                  /*SplitN=*/false,
+                                                  /*UseDirectTransform=*/false>;
+    using TrDirect    = TransformConvFwdToIm2win<2, ConvolutionSpecialization::Default,
+                                                  1,1,1, /*NumGroupsToMerge=*/1,
+                                                  /*SplitN=*/false,
+                                                  /*UseDirectTransform=*/true>;
+
+    std::vector<float> I(N*C*Hi*Wi), Wt(K*C*Y*X), O_ref(N*K*Ho*Wo);
+    for(int i = 0; i < static_cast<int>(I.size());  ++i) I[i]  = float((i*3+1) % 13);
+    for(int i = 0; i < static_cast<int>(Wt.size()); ++i) Wt[i] = float((i*7+2) % 11);
+    reference_conv2d(I, Wt, O_ref, N,C,K,Hi,Wi,Ho,Wo,Y,X,1,1,1,1,1,1);
+
+    auto a  = make_a_lens(G,N,C,Hi,Wi);
+    auto b  = make_b_lens(G,K,C,Y,X);
+    auto c  = make_c_lens(G,N,K,Ho,Wo);
+    auto s  = make_spatial(1,1);
+    auto d  = make_spatial(1,1);
+    auto lp = make_spatial(1,1);
+    auto rp = make_spatial(1,1);
+
+    TrComposite tr_composite{a,b,c,s,d,lp,rp};
+    TrDirect    tr_direct   {a,b,c,s,d,lp,rp};
+
+    // Both should agree with the reference convolution.
+    EXPECT_TRUE(run_im2win_gemm_and_compare(tr_composite, I, Wt, O_ref, N, K, Ho, Wo));
+
+    // For Approach 2, run_im2win_gemm_and_compare uses A[k,kg] via calculate_offset
+    // (no padding in A) and B via direct logical indexing (bypasses descriptor for
+    // padded positions).  So the test verifies the GEMM output matches the reference.
+    // The b_ptr_adjust is applied in the kernel at runtime; the host test uses
+    // logical indexing for B so no b_ptr_adjust is needed here.
+    EXPECT_TRUE(run_im2win_gemm_and_compare(tr_direct, I, Wt, O_ref, N, K, Ho, Wo));
 }
 
 // ── 10. C descriptor shape check — NHWGK and GNKHW ───────────────────

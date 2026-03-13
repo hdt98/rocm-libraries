@@ -95,6 +95,15 @@ struct Im2winConvConfigBase
     // cutting block-dispatch overhead at the cost of Gm sequential GEMM calls
     // per block. Useful when K is tiny (N_Tile >> K) and G is large.
     static constexpr ck_tile::index_t NumGroupsToMerge = 1;
+
+    // B-descriptor approach for the sliding-window input.
+    //   false (default) → Approach 1: composite elementary transforms
+    //                     (pad → embed → merge)
+    //   true            → Approach 2: direct stride formula
+    //                     (flat 6D descriptor using index formulas from
+    //                      im2win_transform.md, no explicit pad transform)
+    // Change a single config to 'true' to benchmark Approach 2.
+    static constexpr bool UseDirectTransform = false;
 };
 
 // ══════════════════════════════════════════════════════════════════════
