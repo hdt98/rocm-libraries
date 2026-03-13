@@ -132,7 +132,7 @@ float fmha_fwd_<trait, {F_arch.tag}>(const ck_tile::stream_config& s, fmha_fwd_a
 {{
     using k_ = fmha_kernel;
     if(s.log_level_ > 0)
-        std::cout << ", {F_kname}" << std::flush;
+        std::cout << "\\n  {F_kname}" << std::flush;
     auto [kargs, grids] = {F_kargs_creator}<k_>(a);
     const dim3 blocks                      = k_::BlockSize();
     constexpr ck_tile::index_t kBlockPerCu = k_::kBlockPerCu;
@@ -686,10 +686,17 @@ class FmhaFwdApiPool:
                         trait for trait in pool_by_hdim if filter_fn(trait)
                     ):
                         # Build the kernel name string matching FmhaFwdKernel.name format
+                        pad_suffix = ""
+                        for flag, tag in [(trait.spad, "s"), (trait.skpad, "sk"),
+                                          (trait.dpad, "d"), (trait.dvpad, "dv")]:
+                            if flag == "t":
+                                pad_suffix += tag
+                        pad_suffix = f"_p{pad_suffix}" if pad_suffix else "_npad"
                         kname = (
                             f"fmha_fwd_d{hdim}_{dtype}"
                             f"_{'group' if trait.mode == 'group' else 'batch'}"
                             f"_b{trait.bm0}x{trait.bn0}x{trait.bk0}x{trait.bn1}x{trait.bk1}x{trait.bk0max}"
+                            f"{pad_suffix}"
                         )
                         inners += FMHA_FWD_ALL_API_INNER_DISPATCH.format(
                             F_arch=arch,
@@ -1096,6 +1103,7 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                 ( 80, 96)  : [FmhaFwdTileSize(128, 128,  16,  96,  32,  80,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1)],
                 ( 96, 128) : [FmhaFwdTileSize(128, 128,  32, 128,  32,  96,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1)],
                 (128, 128) : [FmhaFwdTileSize( 16,  32,  64, 128,  32, 128,  1, 1, 1,  1, 1, 1,  16, 16, 32,  16, 16, 32,  -1),
+                              FmhaFwdTileSize( 16, 128,  64, 128,  32, 128,  1, 1, 1,  1, 1, 1,  16, 16, 32,  16, 16, 32,  -1),
                               FmhaFwdTileSize( 32,  32, 128, 128,  32, 128,  1, 1, 1,  1, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
                               FmhaFwdTileSize( 64, 128,  32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  16, 16, 32,  16, 16, 16,  -1, CppConstraint('get_num_blocks(64) <= num_cus')),
                               FmhaFwdTileSize(128,  64,  32, 128,  16, 128,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1),

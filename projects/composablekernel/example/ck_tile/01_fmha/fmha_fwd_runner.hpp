@@ -9,10 +9,12 @@
 #include "utils.hpp"
 #include "ck_tile/utility/json_dump.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <functional>
 #include <cmath>
+#include <iomanip>
 #include <numeric>
 #include <ostream>
 #include <string>
@@ -1573,8 +1575,16 @@ fwd_result fmha_fwd_run(mode_enum mode,
             return fwd_result::no_instance;
         }
         std::cout << std::endl;
+        // sort by time (fastest first)
+        std::sort(all_results.begin(), all_results.end(),
+                  [](const auto& a, const auto& b) { return a.second < b.second; });
         std::cout << "[run_all_kernels] " << all_results.size()
                   << " instance(s) benchmarked:" << std::endl;
+        // find max kernel name length for alignment
+        size_t max_kname_len = 0;
+        for(const auto& [kname, t] : all_results)
+            max_kname_len = std::max(max_kname_len, kname.size());
+
         for(size_t i = 0; i < all_results.size(); i++)
         {
             const auto& [kname, t] = all_results[i];
@@ -1582,10 +1592,13 @@ fwd_result fmha_fwd_run(mode_enum mode,
             const float tf =
                 static_cast<float>(flop) / 1.E9 / total_t;
             const float bw = num_byte / 1.E6 / total_t;
-            std::cout << std::fixed << "  [" << i << "] " << kname << ", "
-                      << std::setprecision(3) << total_t << " ms, "
-                      << std::setprecision(2) << tf << " TFlops, "
-                      << std::setprecision(2) << bw << " GB/s" << std::endl;
+            std::cout << std::fixed << "  [" << (i + 1) << "] "
+                      << std::left << std::setw(max_kname_len) << kname
+                      << std::right
+                      << ", " << std::setw(7) << std::setprecision(3) << total_t << " ms"
+                      << ", " << std::setw(8) << std::setprecision(2) << tf << " TFlops"
+                      << ", " << std::setw(8) << std::setprecision(2) << bw << " GB/s"
+                      << std::endl;
         }
         return fwd_result::success;
     }
