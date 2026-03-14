@@ -82,15 +82,7 @@ int main(int argc, char* argv[])
             return rc;
         }        
 
-
-
-        drv->GetandSetData();       
-        
-        // Enable timing if performance logging is enabled (to populate average_time_ms in JSON output)
-        if(json_mode && drv->GetInputFlags().GetValueInt("time") != 1)
-        {
-            drv->GetInputFlags().SetValue("time", "1");
-        }
+        drv->GetandSetData();
 
         rc = drv->AllocateBuffersAndCopy();
         
