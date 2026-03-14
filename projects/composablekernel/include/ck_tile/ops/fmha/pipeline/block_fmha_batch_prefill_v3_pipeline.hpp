@@ -14,6 +14,147 @@
 
 namespace ck_tile {
 
+// ---------------------------------------------------------------------------
+// BatchPrefillCoreLoopScheduler: FP8-tuned scheduler for batch prefill V3.
+//
+// Forked from the feature branch CoreLoopScheduler with higher VALU budgets
+// that account for v_pk_mul_f32 asm volatile being invisible to the compiler
+// scheduler.  bf16/fp16 inherit the default base unchanged.
+// ---------------------------------------------------------------------------
+template <typename PipelineProblem>
+struct BatchPrefillCoreLoopSchedulerBase
+{
+    using Params = CoreLoopSchedulingParams<PipelineProblem>;
+
+    CK_TILE_DEVICE static constexpr void schedule_gemm0_compute()
+    {
+        static_for<0, Params::kMfmaPerWarpGemm0, 1>{}([&](auto) {
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::MFMA, 1, 0);
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::TRANS, 2, 0);
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::VALU, 2, 0);
+        });
+    }
+
+    CK_TILE_DEVICE static constexpr void schedule_gemm1_compute()
+    {
+        static_for<0, Params::kMfmaPerWarpGemm1, 1>{}([&](auto) {
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::MFMA, 1, 0);
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::VALU, 5, 0);
+        });
+    }
+
+    CK_TILE_DEVICE static constexpr void schedule_load_phase()
+    {
+        __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::VALU, 2, 0);
+        __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::SALU, 1, 0);
+        __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::VMEM_READ, 1, 0);
+        __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::SALU, 1, 0);
+        __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::VMEM_READ, 1, 0);
+        __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::SALU, 2, 0);
+    }
+
+    template <ck_tile::index_t WaveGroup, ck_tile::index_t Phase>
+    CK_TILE_DEVICE static constexpr void schedule(ck_tile::number<WaveGroup>,
+                                                  ck_tile::number<Phase>)
+    {
+        constexpr ck_tile::index_t effective = (WaveGroup == 0) ? Phase : (Phase + 3) % 4;
+        if constexpr(effective == 0)
+            schedule_gemm0_compute();
+        else if constexpr(effective == 2)
+            schedule_gemm1_compute();
+        else
+            schedule_load_phase();
+    }
+};
+
+template <typename PipelineProblem, typename QDataType, typename KDataType, typename VDataType>
+struct BatchPrefillCoreLoopSchedulerImpl;
+
+template <typename PipelineProblem>
+struct BatchPrefillCoreLoopSchedulerImpl<PipelineProblem,
+                                         ck_tile::bf16_t,
+                                         ck_tile::bf16_t,
+                                         ck_tile::bf16_t>
+    : BatchPrefillCoreLoopSchedulerBase<PipelineProblem>
+{
+};
+
+template <typename PipelineProblem>
+struct BatchPrefillCoreLoopSchedulerImpl<PipelineProblem,
+                                         ck_tile::half_t,
+                                         ck_tile::half_t,
+                                         ck_tile::half_t>
+    : BatchPrefillCoreLoopSchedulerBase<PipelineProblem>
+{
+};
+
+template <typename PipelineProblem>
+struct BatchPrefillCoreLoopSchedulerImpl<PipelineProblem,
+                                         ck_tile::fp8_t,
+                                         ck_tile::fp8_t,
+                                         ck_tile::fp8_t>
+    : BatchPrefillCoreLoopSchedulerBase<PipelineProblem>
+{
+    using Base   = BatchPrefillCoreLoopSchedulerBase<PipelineProblem>;
+    using Params = typename Base::Params;
+
+    CK_TILE_DEVICE static constexpr void schedule_gemm0_compute()
+    {
+        // K iter 0: 32 TRANS (v_exp_f32) + 29 VALU (v_add reduction + v_sub + permlane)
+        static_for<0, Params::kMfmaPerWarpGemm0 / 2, 1>{}([&](auto) {
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::MFMA, 1, 0);
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::TRANS, 4, 0);
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::VALU, 4, 0);
+        });
+        // K iter 1: ~89 VALU (v_mul scale + v_cvt_pk_fp8 + o_acc rescale)
+        static_for<0, Params::kMfmaPerWarpGemm0 / 2, 1>{}([&](auto) {
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::MFMA, 1, 0);
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::VALU, 6, 0);
+        });
+    }
+
+    CK_TILE_DEVICE static constexpr void schedule_gemm1_compute()
+    {
+#if !CK_TILE_DISABLE_PACKED_FP32
+        __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::VALU, 4, 0);
+#endif
+        // First half: v_perm + v_max3 + permlane chain + v_fma (~57 VALU)
+        static_for<0, Params::kMfmaPerWarpGemm1 / 2, 1>{}([&](auto) {
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::MFMA, 1, 0);
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::VALU, 6, 0);
+        });
+        // Second half: v_fma chain + v_mul O rescale (~33 VALU)
+        // pk_mul (16 ops in asm volatile) invisible to scheduler
+        static_for<0, Params::kMfmaPerWarpGemm1 / 2, 1>{}([&](auto) {
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::MFMA, 1, 0);
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::VALU, 6, 0);
+        });
+    }
+
+    template <ck_tile::index_t WaveGroup, ck_tile::index_t Phase>
+    CK_TILE_DEVICE static constexpr void schedule(ck_tile::number<WaveGroup>,
+                                                  ck_tile::number<Phase>)
+    {
+        constexpr ck_tile::index_t effective = (WaveGroup == 0) ? Phase : (Phase + 3) % 4;
+
+        if constexpr(effective == 0)
+            schedule_gemm0_compute();
+        else if constexpr(effective == 2)
+            schedule_gemm1_compute();
+        else
+            Base::schedule_load_phase();
+    }
+};
+
+template <typename PipelineProblem>
+struct BatchPrefillCoreLoopScheduler
+    : BatchPrefillCoreLoopSchedulerImpl<PipelineProblem,
+                                        typename PipelineProblem::QDataType,
+                                        typename PipelineProblem::KDataType,
+                                        typename PipelineProblem::VDataType>
+{
+};
+
 /// V3 pipeline adapted for batch prefill with scatter-gather KV loads (paged KV cache).
 ///
 /// This pipeline inherits the V3 4-phase double warp group architecture
@@ -1031,7 +1172,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
             auto memV = number<0>{};
             auto memK = number<1>{};
 
-            using Scheduler = CoreLoopScheduler<Problem>;
+            using Scheduler = BatchPrefillCoreLoopScheduler<Problem>;
 
             auto iteration = [&](auto pi) {
                 auto xdl_SP_p01_reg_idx = number<1>{} - pi;
