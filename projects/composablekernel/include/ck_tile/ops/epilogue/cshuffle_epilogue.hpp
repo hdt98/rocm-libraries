@@ -347,54 +347,8 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
                 make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
 
-#if defined(__gfx950__)
-            // APPROACH 15: 4D Dual-XOR for bank conflict reduction
-            //
-            // Key insight: XOR is SAFE at 4D level (after unmerge, before merge) because:
-            // - Merge is ADDITIVE: N = N_vec × VectorLen + Vec
-            // - Vec appears ONLY as addition, never through XOR
-            // - Therefore: (π(N_vec) × VectorLen + Vec) % VectorLen = Vec ✓
-            // - Thread assignment of vec ∈ [0, VectorLen) is ALWAYS preserved
-            //
-            // Dual-XOR doubles coverage from 12.5% to ~50%:
-            // - XOR M_layer based on N_vec: 4 patterns
-            // - XOR N_vec based on merged M: 4 patterns
-            // - Combined: 4×4 = 16 distinct patterns
-            //
-            // Transform chain:
-            //   lds_block_desc_0: [M_coarse, N_interleaved, Vec]  ← 3D naive
-            //       ↓ unmerge: N_interleaved → [M_layer, N_vec]
-            //   lds_block_desc_1: [M_coarse, M_layer, N_vec, Vec]  ← 4D
-            //       ↓ XOR at 4D level (THIS IS SAFE!)
-            //   lds_block_desc_1_xor: [M_coarse, M_layer', N_vec', Vec]
-            //       ↓ merge: N = N_vec × VectorLen + Vec (ADDITIVE!)
-            //   lds_block_desc: [M, N]  ← 2D final
-            constexpr index_t XorMask = 8;
-            constexpr index_t XorMult = 2;
-
-            // Apply 4D dual-XOR AFTER unmerge, BEFORE merge
-            constexpr auto lds_block_desc_1_xor = transform_tensor_descriptor(
-                lds_block_desc_1,
-                make_tuple(make_xor_lds_bank_4d_transform<XorMask, XorMult>(
-                    make_tuple(number<MPerIterationShuffle / MLdsLayer>{},  // M_coarse
-                               number<MLdsLayer>{},                          // M_layer
-                               number<NPerIterationShuffle / VectorLen>{},   // N_vec
-                               number<VectorLen>{}),                         // Vec
-                    MLdsLayer)),  // mlds_layer for merged_m calculation
-                make_tuple(sequence<0, 1, 2, 3>{}),
-                make_tuple(sequence<0, 1, 2, 3>{}));
-
-            // Merge the 4D XOR'd descriptor to 2D [M, N]
-            constexpr auto lds_block_desc = transform_tensor_descriptor(
-                lds_block_desc_1_xor,
-                make_tuple(make_merge_transform_v3_division_mod(make_tuple(
-                               number<MPerIterationShuffle / MLdsLayer>{}, number<MLdsLayer>{})),
-                           make_merge_transform_v3_division_mod(make_tuple(
-                               number<NPerIterationShuffle / VectorLen>{}, number<VectorLen>{}))),
-                make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
-                make_tuple(sequence<0>{}, sequence<1>{}));
-#else
-            // Non-gfx950: Merge the 4D descriptor to 2D [M, N] without XOR
+            // Merge the 4D descriptor to 2D [M, N]
+            // Note: XOR transforms disabled - testing column-major wave ordering only
             constexpr auto lds_block_desc = transform_tensor_descriptor(
                 lds_block_desc_1,
                 make_tuple(make_merge_transform_v3_division_mod(make_tuple(
@@ -403,7 +357,6 @@ struct CShuffleEpilogue
                                number<NPerIterationShuffle / VectorLen>{}, number<VectorLen>{}))),
                 make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
-#endif
 
             return lds_block_desc;
         }
@@ -451,35 +404,8 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
                 make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
 
-#if defined(__gfx950__)
-            // APPROACH 15: 4D Dual-XOR for ColumnMajor layout
-            // Same principle as RowMajor - XOR at 4D level preserves Vec through additive merge
-            constexpr index_t XorMask = 8;
-            constexpr index_t XorMult = 2;
-
-            // Apply 4D dual-XOR AFTER unmerge, BEFORE merge
-            constexpr auto lds_block_desc_1_xor = transform_tensor_descriptor(
-                lds_block_desc_1,
-                make_tuple(make_xor_lds_bank_4d_transform<XorMask, XorMult>(
-                    make_tuple(number<NPerIterationShuffle / NLdsLayer>{},  // N_coarse
-                               number<NLdsLayer>{},                          // N_layer
-                               number<MPerIterationShuffle / VectorLen>{},   // M_vec
-                               number<VectorLen>{}),                         // Vec
-                    NLdsLayer)),  // nlds_layer for merged calculation
-                make_tuple(sequence<0, 1, 2, 3>{}),
-                make_tuple(sequence<0, 1, 2, 3>{}));
-
-            // Merge the 4D XOR'd descriptor to 2D [N, M]
-            constexpr auto lds_block_desc = transform_tensor_descriptor(
-                lds_block_desc_1_xor,
-                make_tuple(make_merge_transform_v3_division_mod(make_tuple(
-                               number<NPerIterationShuffle / NLdsLayer>{}, number<NLdsLayer>{})),
-                           make_merge_transform_v3_division_mod(make_tuple(
-                               number<MPerIterationShuffle / VectorLen>{}, number<VectorLen>{}))),
-                make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
-                make_tuple(sequence<0>{}, sequence<1>{}));
-#else
-            // Non-gfx950: Merge the 4D descriptor to 2D [N, M] without XOR
+            // Merge the 4D descriptor to 2D [N, M]
+            // Note: XOR transforms disabled - testing column-major wave ordering only
             constexpr auto lds_block_desc = transform_tensor_descriptor(
                 lds_block_desc_1,
                 make_tuple(make_merge_transform_v3_division_mod(make_tuple(
@@ -488,7 +414,6 @@ struct CShuffleEpilogue
                                number<MPerIterationShuffle / VectorLen>{}, number<VectorLen>{}))),
                 make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
-#endif
 
             return lds_block_desc;
         }
