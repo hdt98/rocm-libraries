@@ -346,7 +346,7 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
                 make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
 
-            constexpr auto lds_block_desc_plain = transform_tensor_descriptor(
+            constexpr auto lds_block_desc = transform_tensor_descriptor(
                 lds_block_desc_1,
                 make_tuple(make_merge_transform_v3_division_mod(make_tuple(
                                number<MPerIterationShuffle / MLdsLayer>{}, number<MLdsLayer>{})),
@@ -355,21 +355,7 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
 
-#if defined(__gfx950__)
-            if constexpr(BlockedXDLN_PerWarp == 1)
-            {
-                // Swizzle M by N to spread lane-varying stores across bank groups while
-                // preserving logical (M,N) coordinates for both LDS write and readback paths.
-                constexpr auto lds_block_desc_swizzled = transform_tensor_descriptor(
-                    lds_block_desc_plain,
-                    make_tuple(make_xor_transform(make_tuple(number<NPerIterationShuffle>{},
-                                                            number<MPerIterationShuffle>{}))),
-                    make_tuple(sequence<1, 0>{}),
-                    make_tuple(sequence<1, 0>{}));
-                return lds_block_desc_swizzled;
-            }
-#endif
-            return lds_block_desc_plain;
+            return lds_block_desc;
         }
         // M is contiguous dimension
         else if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::ColumnMajor>)
