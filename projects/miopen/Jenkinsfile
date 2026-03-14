@@ -658,7 +658,7 @@ pipeline {
                     }
                 }
                 // GFX90A Tests
-                stage('Fp32 Hip Debug gfx90a') {
+                stage('Fp32 Hip Debug CTEST gfx90a') {
                     when {
                         beforeAgent true
                         expression { params.TARGET_GFX90A }
