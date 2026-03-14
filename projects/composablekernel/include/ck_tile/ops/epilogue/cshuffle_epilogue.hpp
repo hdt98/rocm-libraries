@@ -348,7 +348,6 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
 
             // Merge the 4D descriptor to 2D [M, N]
-            // Note: XOR transforms disabled - testing column-major wave ordering only
             constexpr auto lds_block_desc = transform_tensor_descriptor(
                 lds_block_desc_1,
                 make_tuple(make_merge_transform_v3_division_mod(make_tuple(
@@ -405,7 +404,6 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
 
             // Merge the 4D descriptor to 2D [N, M]
-            // Note: XOR transforms disabled - testing column-major wave ordering only
             constexpr auto lds_block_desc = transform_tensor_descriptor(
                 lds_block_desc_1,
                 make_tuple(make_merge_transform_v3_division_mod(make_tuple(
@@ -428,18 +426,6 @@ struct CShuffleEpilogue
         constexpr auto block_outer_dstr_encoding = [] {
             if constexpr(BlockedXDLN_PerWarp == 1)
             {
-#if defined(__gfx950__)
-                // Column-major wave ordering for gfx950 to reduce LDS bank conflicts
-                // Row-major: wave_id = m_wave * NWave + n_wave (sequence<1, 2>)
-                // Column-major: wave_id = n_wave * MWave + m_wave (sequence<2, 1>)
-                return tile_distribution_encoding<sequence<>,
-                                                  tuple<sequence<NumMXdlPerWavePerShuffle, MWave>,
-                                                        sequence<NumNXdlPerWavePerShuffle, NWave>>,
-                                                  tuple<sequence<2, 1>>,
-                                                  tuple<sequence<1, 1>>,
-                                                  sequence<1, 2>,
-                                                  sequence<0, 0>>{};
-#else
                 return tile_distribution_encoding<sequence<>,
                                                   tuple<sequence<NumMXdlPerWavePerShuffle, MWave>,
                                                         sequence<NumNXdlPerWavePerShuffle, NWave>>,
@@ -447,7 +433,6 @@ struct CShuffleEpilogue
                                                   tuple<sequence<1, 1>>,
                                                   sequence<1, 2>,
                                                   sequence<0, 0>>{};
-#endif
             }
             else
             {

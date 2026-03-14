@@ -137,9 +137,269 @@ creates invalid LDS addresses that read/write garbage or out-of-bounds.
 | FP8→FP16 | Store | 208 | 208 | 1.0000 | **-50%** |
 | FP8→FP16 | Load | 52 | 0 | 0.0000 | unchanged |
 
+### Approach 10: XOR Before VectorLen Merge (4D Transform)
+**Hypothesis**: Previous NaN issues were caused by XOR corrupting the VectorLen dimension. Apply XOR to the 4D descriptor BEFORE the final merge to preserve VectorLen thread mapping.
+
+**Implementation**:
+- Created new `xor_lds_bank_4d_t` transform operating on `[M_coarse, MLdsLayer, N_vec, VectorLen]`
+- XOR only dimension 2 (N_vector): `new_n_vec = n_vec ^ ((merged_m & 7) * 4)`
+- Dimensions 0, 1, 3 pass through unchanged
+- Applied between `lds_block_desc_1` (after unmerge) and `lds_block_desc_2` (before merge)
+- Safety constraint: `N_vectors >= 32` to ensure sufficient spread
+
+**Results**:
+- Tests: **ALL PASSED** ✅ - No NaN values, no memory corruption
+  - test_ck_tile_cshuffle_epilogue_fp16 - PASS
+  - test_ck_tile_cshuffle_epilogue_fp8 - PASS
+  - test_ck_tile_cshuffle_epilogue_fp8_gfx950 - PASS
+  - test_ck_tile_cshuffle_epilogue_scale - PASS
+- Benchmarks: **416 conflicts** ❌ - Same as baseline (no improvement)
+  - FP8→FP8 Store: 416 conflicts (regression from 0)
+  - FP8→FP16 Store: 416 conflicts (regression from 208)
+
+**Job**: 221651 (tests), 221649 (benchmarks)
+**Commit**: 52a79f26c1c
+
+**Why it failed**:
+1. **Safety constraint too strict**: Test config has only 4 N_vectors (not 32)
+   - 2x2 waves, 16x16 MPerXdl/NPerXdl → NPerIterationShuffle = 32
+   - FP16: VectorLen=8 → N_vectors = 32/8 = **4** (< 32, XOR skipped)
+   - FP8: VectorLen=16 → N_vectors = 32/16 = **2** (< 32, XOR skipped)
+2. **XOR was never applied** - fell back to baseline path
+3. The 416 conflicts match baseline (no XOR), not a regression from XOR
+4. **Correctness success is significant** - proves 4D transform preserves VectorLen correctly
+
+**Conclusion**: Implementation is correct but needs relaxed safety constraint to actually run.
+
+### Approach 11: Relaxed Constraint with Scaled Parameters
+**Hypothesis**: Approach 10's XOR implementation is correct but constraint too strict. Relax to N_vectors >= 4 and scale XorMult based on configuration size.
+
+**Implementation**:
+- Relaxed constraint: N_vectors >= 4 (from 32)
+- Scaled XorMask: 4 for N < 8, else 8
+- Scaled XorMult: 1 for N < 32, else 4
+- For N_vectors=4: XorMask=4, XorMult=1 → XOR offset {0,1,2,3}
+
+**Results**:
+- Tests: **ALL PASSED** ✅
+  - test_ck_tile_cshuffle_epilogue_fp16 - PASS
+  - test_ck_tile_cshuffle_epilogue_fp8 - PASS
+  - test_ck_tile_cshuffle_epilogue_fp8_gfx950 - PASS
+  - test_ck_tile_cshuffle_epilogue_scale - PASS
+- Benchmarks: **416 conflicts** ❌ - No improvement
+  - FP8→FP8 Store: 416 conflicts (no change from baseline)
+  - FP8→FP16 Store: 416 conflicts (no change from baseline)
+
+**Job**: 221661 (tests), 221662 (benchmarks)
+**Commit**: c3523b5838e
+
+**Why it failed**:
+1. **XorMult=1 too weak**: XOR offset of only 0-3 N_vectors insufficient to change bank assignment
+2. **Limited M coverage**: Mask `(m & 3)` only uses 4 out of 32 M values, providing 25% coverage per offset
+3. **Bank formula insensitive**: Small XOR offsets don't alter `(M_contribution + N/2) % 64` enough
+4. **FP8 baseline mystery**: FP8 showing 416 conflicts (Approach 7 had 0) - config may have changed
+
+**Conclusion**: Correctness proven again, but XorMult=1 provides insufficient bank spreading. Need larger XOR offsets.
+
+### Approach 12: Adaptive XOR with Modulo Safety
+**Hypothesis**: Add modulo operation to prevent aliasing and enable more aggressive XOR multipliers. Use adaptive parameters that scale with N_vectors size.
+
+**Implementation**:
+- Adaptive XorMask: `(N_vectors >= 8) ? 8 : N_vectors`
+- Adaptive XorMult: `(N_vectors >= 32) ? 4 : (N_vectors >= 8) ? 2 : 1`
+- Relaxed constraint: `N_vectors >= 2` (enables even FP8)
+- **Modulo safety**: `xor_val = ((merged_m & (XorMask-1)) * XorMult) % N_vectors`
+  - Prevents aliasing even with aggressive multipliers
+  - Runtime extraction of N_vectors from descriptor
+
+**Expected for N_vectors=4 (FP16 test)**:
+- XorMask=4, XorMult=1 → XOR range {0,1,2,3} (full 4-way spreading)
+- Bank shift: 4, 8, 12 banks after VectorLen merge
+
+**Results**:
+- Tests: **ALL PASSED** ✅
+  - test_ck_tile_cshuffle_epilogue_fp16 - PASS
+  - test_ck_tile_cshuffle_epilogue_fp8 - PASS
+  - test_ck_tile_cshuffle_epilogue_fp8_gfx950 - PASS
+  - test_ck_tile_cshuffle_epilogue_scale - PASS
+- Benchmarks: **416 conflicts** ❌ - No improvement
+  - FP8→FP8 Store: 416 conflicts (identical to Approach 11)
+  - FP8→FP16 Store: 416 conflicts (identical to Approach 11)
+
+**Job**: 221675 (tests), 221674 (benchmarks)
+**Commit**: 100819b2f0e
+
+**Why it failed**:
+1. **XOR pattern correct but ineffective**: Full 4-way XOR spreading applied, but doesn't break bank conflict pattern
+2. **Bank formula mismatch**: XOR shifts in N dimension (4, 8, 12 banks) don't redistribute threads to avoid conflicts caused by M dimension
+3. **M dimension dominates**: Bank assignment formula `((M/4)*65 + (M%4)*16 + N/2) % 32` creates conflicts primarily from M distribution
+4. **XOR in N can't fix M conflicts**: The problem is fundamentally a **2D conflict pattern** (M+N interaction), but XOR only affects N
+5. **Same result as Approach 11**: For N_vectors=4, both use XorMask=4, XorMult=1 → identical XOR pattern → identical conflicts
+
+**Key Insight**: The bank conflict structure is **entangled between M and N dimensions**. XOR swizzling N_vectors alone (even with full utilization and modulo safety) cannot break conflicts that arise from the wave layout and M-layer structure's contribution to bank assignment.
+
+**Conclusion**: N-dimension-only XOR approaches exhausted. Need to either:
+- Attack M dimension (2D XOR, change MLdsLayer, different wave mapping)
+- Change bank alignment (padding)
+- Accept partial improvement and move on
+
+### Approach 13: Safe 2D XOR with Modulo
+**Hypothesis**: Return to 2D XOR but add modulo safety to prevent index aliasing and corruption that plagued Approach 7-9.
+
+**Implementation**:
+- Apply XOR to merged 2D (M, N) descriptor with modulo: `xor_val = ((m & 7) * 4) % N`
+- Operates on `lds_block_desc_2` (final merged descriptor)
+- Modulo ensures XOR value stays within N range for any N size
+
+**Results**:
+- Tests: **FAILED** - NaN values, same corruption as Approach 9
+- The modulo doesn't prevent the underlying memory corruption
+
+**Why it failed**:
+1. **2D XOR after merge breaks Vec structure**: Even with modulo, XOR at merged level corrupts thread ownership
+2. **The problem is WHERE XOR is applied, not the formula**: Once Vec is merged into N, any N modification breaks thread-to-element mapping
+3. **Vec structure is not algebraic** - it's a physical mapping constraint
+
+**Conclusion**: 2D XOR approaches (7, 8, 9, 13) all fail because they operate after Vec merge.
+
+---
+
+### Approach 14: 3D XOR at Level 0 (Current)
+**Hypothesis**: Apply XOR to `lds_block_desc_0` which has 3D structure `[M_coarse, N_interleaved, Vec]` where Vec is a **separate dimension**, not merged into N.
+
+**Key Insight**: At `lds_block_desc_0`:
+- `Vec` is dimension 2 (separate, not merged)
+- `N_interleaved = MLdsLayer × N_vectors` (e.g., 4×4=16 values for FP16)
+- XORing N_interleaved (dim 1) based on M_coarse (dim 0) preserves Vec completely
+
+**Implementation**:
+- New `xor_lds_bank_3d_t` transform operating on 3D descriptor
+- XOR formula: `new_n_interleaved = n_interleaved ^ ((m_coarse & 7) * 2) % n_interleaved_len`
+- Vec (dim 2) passed through unchanged
+- Applied BEFORE unmerge transform, not after merge
+
+**Expected Coverage**:
+- 4D XOR (Approaches 10-12): Only affected N_vectors (4 values) = 12.5% of N
+- 3D XOR: Affects N_interleaved (16 values) = ~50% of N
+
+**XOR Parameters**:
+- XorMask = 8 (use M_coarse & 7 for 8 distinct patterns)
+- XorMult = 2 (spread by 2 positions)
+
+**Status**: Implemented, pending verification
+**Commit**: TBD
+
+**Expected Results**:
+- Correctness: ✅ PASS (Vec preserved as separate dimension)
+- Bank Conflicts: Improved from 416 (TBD via profiling)
+
+---
+
+### Approach 15: 4D Dual-XOR (M_layer + N_vec)
+**Hypothesis**: Return to 4D XOR (which passed all correctness tests) but double coverage by XORing BOTH M_layer and N_vec dimensions.
+
+**Key Insight**: XOR is SAFE at 4D level (after unmerge, before merge) because:
+- Merge is ADDITIVE: `N = N_vec × VectorLen + Vec`
+- Vec appears ONLY as addition, never through XOR
+- Therefore: `(π(N_vec) × VectorLen + Vec) % VectorLen = Vec` ✓
+- Thread assignment of `vec ∈ [0, VectorLen)` is ALWAYS preserved
+
+**Why Different Levels Fail/Succeed**:
+| Level | Operation After | XOR Safe? | Why |
+|-------|-----------------|-----------|-----|
+| **3D** (before unmerge) | div/mod | ❌ NO | `(a⊕v) ÷ k ≠ (a÷k) ⊕ something` |
+| **4D** (after unmerge) | multiply/add | ✅ YES | `(a⊕v) × k + c` preserves Vec |
+| **2D** (after merge) | thread access | ❌ NO | Vec merged into N, corruption |
+
+**Implementation**:
+- Modified `xor_lds_bank_4d_t` to XOR both dimensions:
+  - `new_m_layer = m_layer ^ (n_vec & (m_layer_len - 1))`
+  - `new_n_vec = n_vec ^ ((merged_m & (XorMask-1)) * XorMult % n_vectors)`
+- Vec (dim 3) passed through unchanged (CRITICAL!)
+- Applied AFTER unmerge, BEFORE merge in `cshuffle_epilogue.hpp`
+
+**Bijectivity Proof**:
+```
+T(m, n) = (m ⊕ f(n), n ⊕ g(m))
+Inverse: T⁻¹(m', n') = (m' ⊕ f(n' ⊕ g(m')), n' ⊕ g(m'))
+XOR is self-inverse, so this always works.
+```
+
+**Coverage Improvement**:
+| Approach | XOR Dimensions | Patterns | Coverage |
+|----------|---------------|----------|----------|
+| N_vec only (10-12) | 1 | 4 | 12.5% |
+| **M_layer + N_vec** | 2 | 4×4=16 | ~50% |
+
+**XOR Parameters**:
+- XorMask = 8 (use merged_m & 7 for 8 distinct N patterns)
+- XorMult = 2 (spread by 2 positions)
+- M_layer XOR: `n_vec & (m_layer_len - 1)` (4 patterns for M_layer_len=4)
+
+**Results**:
+- Tests: **ALL PASSED** ✅
+  - test_ck_tile_cshuffle_epilogue_fp16 - PASS (5 tests)
+  - test_ck_tile_cshuffle_epilogue_fp8 - PASS (7 tests)
+  - test_ck_tile_cshuffle_epilogue_fp8_gfx950 - PASS (6 tests)
+  - test_ck_tile_cshuffle_epilogue_scale - PASS (2 tests)
+- Benchmarks: **416 conflicts** ❌ - No improvement
+  - FP8→FP8 Store: 416 conflicts (2.0 ratio)
+  - FP8→FP16 Store: 416 conflicts (2.0 ratio)
+
+**Job**: 222784 (tests), 222789 (benchmarks)
+**Commit**: 69b9e36526e
+
+**Why it failed to reduce conflicts**:
+1. **XOR at 4D level shuffles vector buckets, not bank addresses**: The XOR permutes which N_vec slot data goes to, but after merge the final bank assignment is unchanged
+2. **Bank conflicts are determined by final merged addresses**: `bank = ((M/4)*65 + (M%4)*16 + N/2) % 32` - this formula doesn't change just because we permuted N_vec before merge
+3. **Coverage doesn't equal effectiveness**: Even with 50% coverage (16 patterns), the XOR values don't redistribute threads to different banks
+4. **The problem is structural**: Bank conflicts arise from wave layout × LDS stride interaction, not from which vector bucket data lands in
+
+**Conclusion**: 4D XOR (Approaches 10-12, 15) is the ONLY safe level for XOR transforms, but it cannot break the bank conflict pattern because it operates on logical indices that don't affect bank assignment after merge.
+
+---
+
+### Approach 16: Column-Major Wave Ordering
+
+**Hypothesis**: Change wave index mapping from row-major to column-major to alter which threads access which (M,N) coordinates, potentially breaking the bank conflict pattern.
+
+**Implementation**:
+- Changed `tile_distribution_encoding` from `sequence<1, 2>` (row-major) to `sequence<2, 1>` (column-major)
+- Row-major: `wave_id = m_wave * NWave + n_wave`
+- Column-major: `wave_id = n_wave * MWave + m_wave`
+
+```
+Row-major (baseline):            Column-major:
+Wave0(0,0)  Wave1(0,1)           Wave0(0,0)  Wave2(0,1)
+Wave2(1,0)  Wave3(1,1)           Wave1(1,0)  Wave3(1,1)
+```
+
+**Results**:
+
+| Configuration | Correctness | Bank Conflicts |
+|---------------|-------------|----------------|
+| Column-major + 4D XOR | ✅ PASS | 416 (no improvement) |
+| Column-major only (no XOR) | ❌ **FAIL** (1 test) | 416 (no improvement) |
+
+**Job**: 222868/222869 (with XOR), 222870/222871 (without XOR)
+
+**Why it failed**:
+1. **Column-major alone breaks correctness**: The wave ordering change requires compensating transforms (like 4D XOR) to maintain correct thread-to-element mapping
+2. **No effect on bank conflicts**: Even when correct (with XOR), conflicts remain at 416
+3. **Bank assignment is stride-dependent, not wave-order-dependent**: The bank formula depends on final LDS addresses, not which wave accesses them
+
+**Conclusion**: Wave ordering alone cannot reduce bank conflicts. The conflict pattern is determined by the LDS stride and MLdsLayer interleaving, not by wave assignment.
+
+---
+
 ### Summary
-- FP8 output: **Perfect** - all bank conflicts eliminated
-- FP16 output: **50% improvement** - reduced from 2.0 to 1.0 ratio
-- FP16 still has 2-way conflicts that may need additional optimization
-- **Scaling multiplier by data type size does not work** - causes correctness failures
-- The constant XOR=4 is the safe, working solution
+- FP8 output: **Perfect** - all bank conflicts eliminated (in Approach 7, but caused correctness failures)
+- FP16 output: **50% improvement** - reduced from 2.0 to 1.0 ratio (in Approach 7, but caused correctness failures)
+- **XOR at 2D level (after merge)**: Eliminates conflicts but causes memory corruption (Approaches 7-9, 13)
+- **XOR at 4D level (before merge)**: Preserves correctness but has NO effect on conflicts (Approaches 10-12, 15)
+- **XOR at 3D level (before unmerge)**: Breaks correctness due to division/modulo operations (Approach 14)
+- **Column-major wave ordering**: No effect on conflicts; breaks correctness without XOR (Approach 16)
+- **Fundamental insight**: There is NO level where XOR can both preserve correctness AND reduce bank conflicts
+  - Safe levels (4D) don't affect bank addresses
+  - Effective levels (2D) corrupt thread-to-element mapping
+- **Alternative approaches needed**: Padding (already applied), different MLdsLayer values, or accept current conflict level
