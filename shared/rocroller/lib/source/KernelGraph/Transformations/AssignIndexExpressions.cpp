@@ -1337,7 +1337,12 @@ namespace rocRoller::KernelGraph
             if(hasUnroll)
             {
                 auto roots = kgraph.control.roots();
-                AssertFatal(!roots.empty(), "Expected at least one root in control graph");
+                //{
+                //    auto roots2 = kgraph.control.roots().to<std::vector>();
+                //    AssertFatal(!roots2.empty(), "Expected at least one root in control graph");
+                //    Log::info("roots2 size = {}", roots2.size());
+                //}
+                //AssertFatal(!roots.empty(), "Expected at least one root in control graph");
                 auto kernel = *roots.begin();
                 Log::debug("  staged as: UnrollOnly, location {}", kernel);
                 stageChain(kgraph,

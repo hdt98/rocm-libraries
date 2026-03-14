@@ -1,5 +1,28 @@
-// Copyright Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier: MIT
+/*******************************************************************************
+ *
+ * MIT License
+ *
+ * Copyright 2024-2025 AMD ROCm(TM) Software
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ *
+ *******************************************************************************/
 
 #pragma once
 
@@ -40,36 +63,10 @@
 #include <ranges>
 #include <utility>
 
-#include <rocRoller/Utilities/Concepts.hpp>
+#include "Concepts.hpp"
 
 namespace rocRoller
 {
-    enum class GeneratorState
-    {
-        /// Does not have a value.  Will have to resume the coroutine in order to obtain a value.
-        NoValue = 0,
-
-        /// Has a single value.
-        HasValue,
-
-        /// Has a range which may or may not contain at least one more value.
-        HasRange,
-
-        /// Has a value from a range.
-        HasRangeValue,
-
-        /// Has a value which has been copied into the iterator. Only possible for an
-        /// iterator that has been returned from the postfix increment operator.
-        /// e.g. auto x = iter++; -> x will be in the HasCopiedValue state.
-        HasCopiedValue,
-
-        // Has completed the coroutine, and has no value.
-        Done,
-        Count
-    };
-    std::string   toString(GeneratorState s);
-    std::ostream& operator<<(std::ostream&, GeneratorState const&);
-
     /**
      * Range/ConcreteRange wraps a collection object behind a virtual interface,
      * which allows the Generator implementation to store a yielded collection
@@ -344,9 +341,11 @@ namespace rocRoller
             constexpr std::suspend_always yield_value(T v) noexcept;
 
             template <CInputRangeOf<T> ARange>
-            constexpr std::suspend_always yield_value(ARange&& r) noexcept;
+            auto yield_value(ARange&& r) noexcept;
 
-            constexpr std::suspend_always yield_value(std::initializer_list<T> r) noexcept;
+            auto yield_value(std::initializer_list<T> r) noexcept;
+
+            auto yield_value(Generator<T>&& r) noexcept;
 
             /****
              * Implementation & Interface
@@ -354,16 +353,16 @@ namespace rocRoller
 
             void check_exception() const;
 
-            constexpr GeneratorState state() const;
-
             constexpr std::optional<T> const& value() const;
 
             void discard_value();
-            void advance_range();
+
+            void advance();
 
         private:
-            mutable std::optional<T>  m_value;
-            std::unique_ptr<Range<T>> m_range;
+            mutable std::optional<T> m_value;
+
+            mutable std::coroutine_handle<promise_type> m_coroutine;
 
             mutable std::exception_ptr m_exception = nullptr;
         };
@@ -392,9 +391,8 @@ namespace rocRoller
             using Handle = std::coroutine_handle<promise_type>;
 
             Iterator& operator++();
-            Iterator  operator++(int);
+            void      operator++(int);
 
-            T const* get() const;
             T const& operator*() const;
             T const* operator->() const;
 
@@ -409,15 +407,11 @@ namespace rocRoller
             Iterator();
             // cppcheck-suppress noExplicitConstructor
             Iterator(Handle const& coroutine);
-            // cppcheck-suppress noExplicitConstructor
-            Iterator(T value);
 
         private:
-            bool           isDone() const;
-            GeneratorState state() const;
+            bool isDone() const;
 
-            std::optional<T> m_value;
-            mutable Handle   m_coroutine;
+            mutable Handle m_coroutine;
         };
 
         using iterator   = std::common_iterator<Iterator, std::default_sentinel_t>;
@@ -442,8 +436,6 @@ namespace rocRoller
         // cppcheck-suppress functionConst
         // cppcheck-suppress functionStatic
         constexpr iterator end();
-
-        constexpr GeneratorState state() const;
 
         /**
          * Returns a `Container<T>` constructed with `begin()` and `end()` as arguments.
@@ -565,4 +557,4 @@ namespace rocRoller
         zip(ARange&& a, Rest&&... rest);
 }
 
-#include <rocRoller/Utilities/Generator_impl.hpp>
+#include "Generator_impl.hpp"
