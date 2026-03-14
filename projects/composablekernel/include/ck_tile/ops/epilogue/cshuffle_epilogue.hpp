@@ -116,7 +116,7 @@ struct CShuffleEpilogue
     static constexpr index_t isCTransposed = Problem::isCTransposed;
     static constexpr bool FixedVectorSize  = Problem::FixedVectorSize;
     static constexpr bool TiledMMAPermuteN = Problem::TiledMMAPermuteN;
-#if defined(__gfx950__)
+#if defined(CK_USE_GFX950)
     static constexpr bool EightWave = (MWave * NWave == 8);
 #else
     static constexpr bool EightWave = false;
