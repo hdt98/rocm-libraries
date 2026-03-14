@@ -193,8 +193,7 @@ struct SolutionExecutionData
     void FinalizeCurrentConfig()
     {
         // Finalize if we have a config name and either kernels OR invoker times
-        if(!current_config.config_name.empty() && 
-           (!current_config.kernels.empty() || !current_config.invoker_times_ms.empty()))
+        if(!current_config.config_name.empty())
         {
             performance_configs.push_back(current_config);
             current_config.Clear();
@@ -279,11 +278,6 @@ inline void AddPerformanceConfig(const std::string& config_name,
         
         // Finalize the previous config if it exists
         data.FinalizeCurrentConfig();
-        
-        // Always clear current_config to prevent kernel bleeding across configs
-        // FinalizeCurrentConfig only clears if the config had kernels/times,
-        // but we need to clear even if it was empty to prevent state contamination
-        data.current_config.Clear();
         
         // Start a new config
         data.current_config.config_name = config_name;
@@ -389,26 +383,21 @@ inline void FlushJsonAccumulator()
             all_exec_times = config.invoker_times_ms;
             min_exec_number = 1;  // Invoker timings start from execution 1
         }
-        else
+
+        if(show_kernels)
         {
             // Fallback to original kernel accumulation logic
             for(const auto& k : config.kernels)
             {
                 auto& grouped = grouped_kernels[k.kernel_name];
-
                 // Initialize on first occurrence
                 if(grouped.time_executions_ms.empty())
                 {
                     grouped.kernel_name = k.kernel_name;
                     grouped.is_transformation = k.is_transformation;
                 }
-
                 // Append timing data
                 grouped.time_executions_ms.push_back(k.time_ms);
-                
-                // Accumulate for config-level stats
-                all_exec_times.push_back(k.time_ms);
-                min_exec_number = std::min(min_exec_number, k.exec_id);
             }
         }
         
@@ -525,14 +514,15 @@ inline void FinalizeJsonLogging() { FlushJsonAccumulator(); }
 
 /// Add kernel to JSON accumulator
 /// All kernels are stored individually when logging is enabled
-inline void AddKernelToJsonAccumulator(size_t exec_id,
-                                       const std::string& kernel_name,
+inline void AddKernelToJsonAccumulator(const std::string& kernel_name,
                                        float time_ms,
                                        bool is_transform)
 {
     const bool logging_enabled = IsLoggingKernel();
     if(!logging_enabled)
         return;
+
+    const auto exec_id = GetKernelExecutionCounter();
 
     // Always store kernels individually
     auto& data = GetJsonAccumulator();

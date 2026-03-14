@@ -76,8 +76,7 @@ void OCLKernelInvoke::run() const
 
             auto kernel_name = GetName();
             const bool is_transpose = IsTransposeOrTransformKernel(kernel_name);
-            const auto exec_id = GetKernelExecutionCounter();
-            AddKernelToJsonAccumulator(exec_id, kernel_name, elapsed_time, is_transpose);
+            AddKernelToJsonAccumulator(kernel_name, elapsed_time, is_transpose);
         }
         callback(ev);
     }

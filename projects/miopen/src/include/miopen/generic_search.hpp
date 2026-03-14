@@ -554,37 +554,37 @@ auto GenericSearch(const Solver s,
                     invoker = profile_h.PrepareInvoker(*current_solution.invoker_factory,
                                                        current_solution.construction_params);
                     
-                    if(IsLoggingKernel())
+                    
+                    // Log solution name for grouped kernel logging (only once per solution)
+                    const auto solver_name = s.SolverDbId();
+                    const auto solver_id = miopen::solver::Id(solver_name).Value();
+                    
+                    // LogSolutionName only sets up the solution context once
+                    LogSolutionName(solver_name, solver_id);
+                    
+                    // Add this specific performance config with kernel name extracted from solution
+                    const auto config_string = current_config.ToString();
+                    
+                    // Extract kernel name from first kernel in solution (if available)
+                    std::string kernel_name;
+                    if(!current_solution.construction_params.empty() && 
+                    !current_solution.construction_params[0].kernel_name.empty())
                     {
-                        // Log solution name for grouped kernel logging (only once per solution)
-                        const auto solver_name = s.SolverDbId();
-                        const auto solver_id = miopen::solver::Id(solver_name).Value();
-                        
-                        // LogSolutionName only sets up the solution context once
-                        LogSolutionName(solver_name, solver_id);
-                        
-                        // Add this specific performance config with kernel name extracted from solution
-                        const auto config_string = current_config.ToString();
-                        
-                        // Extract kernel name from first kernel in solution (if available)
-                        std::string kernel_name;
-                        if(!current_solution.construction_params.empty() && 
-                        !current_solution.construction_params[0].kernel_name.empty())
-                        {
-                            kernel_name = current_solution.construction_params[0].kernel_name;
-                        }
-                        else
-                        {
-                            kernel_name = solver_name;  // Fallback to solver name
-                        }
-                        
-                        // Pass kernel name and config string as descriptor
-                        AddPerformanceConfig(kernel_name, config_string);
+                        kernel_name = current_solution.construction_params[0].kernel_name;
                     }
+                    else
+                    {
+                        kernel_name = solver_name;  // Fallback to solver name
+                    }
+                    
+                    // Pass kernel name and config string as descriptor
+                    AddPerformanceConfig(kernel_name, config_string);
 
                     // Warm-up run for every configuration to eliminate cold-start bias
                     IncrementKernelExecutionCounter();
                     invoker(profile_h, invoke_ctx);
+                    elapsed_time = profile_h.GetKernelTime();
+                    samples.push_back(elapsed_time);
                     profile_h.ResetKernelTime();
 
                     IncrementKernelExecutionCounter();
@@ -625,11 +625,8 @@ auto GenericSearch(const Solver s,
                     for(const auto& kernelInfo : current_solution.construction_params)
                         profile_h.ClearProgram(kernelInfo.kernel_file, kernelInfo.comp_options);
 
-                    if(IsLoggingKernel())
-                    {
-                        // Add the timing samples to the current performance config
-                        AddInvokerTimes(samples);
-                    }
+                    // Add the timing samples to the current performance config
+                    AddInvokerTimes(samples);
                     break;
                 }
 

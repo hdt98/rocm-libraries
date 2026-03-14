@@ -733,7 +733,7 @@ int ConvDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
         std::cout << "Fatal: Number of iterations must be > 0: " << num_iterations << std::endl;
         return 1;
     }
-    time_enabled = (inflags.GetValueInt("time") != 0);
+    time_enabled = (inflags.GetValueInt("time") != 0) || miopen::IsPerformanceLoggingEnabled();
     {
         const int val = inflags.GetValueInt("wall");
         if(val >= 1)
@@ -751,7 +751,7 @@ int ConvDriver<Tgpu, Tref>::ParseCmdLineArgs(int argc, char* argv[])
         }
     }
 
-    if(time_enabled || miopen::IsPerformanceLoggingEnabled())
+    if(time_enabled)
     {
         miopenEnableProfiling(GetHandle(), true);
     }

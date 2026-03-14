@@ -405,13 +405,8 @@ ConvSolution InitAnyInvokerFactory(const ProblemDescriptionType& problem,
                 if(handle.IsProfilingEnabled())
                 {
                     float elapsed_time = handle.GetKernelTime();
-                    
-                    // Kernel logging for CK kernels
-                    if(IsLoggingKernel())
-                    {                   
-                        const auto exec_id = GetKernelExecutionCounter();
-                        AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed_time, false);
-                    }
+                      
+                    AddKernelToJsonAccumulator(kernel_id, elapsed_time, false);
                     handle.ResetKernelTime();
                     handle.AccumKernelTime(elapsed_time);
                 }
@@ -1277,8 +1272,7 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
                 // Kernel logging for CK kernels
                 if(IsLoggingKernel())
                 {
-                    const auto exec_id = GetKernelExecutionCounter();
-                    AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false);
+                    AddKernelToJsonAccumulator(kernel_id, elapsed, false);
                 }
                 handle.ResetKernelTime();
                 handle.AccumKernelTime(elapsed);
@@ -1396,8 +1390,7 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     // Kernel logging for CK kernels
                     if(IsLoggingKernel())
                     {
-                        const auto exec_id = GetKernelExecutionCounter();
-                        AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false);
+                        AddKernelToJsonAccumulator(kernel_id, elapsed, false);
                     }
                     handle.ResetKernelTime();
                     handle.AccumKernelTime(elapsed);
@@ -1458,8 +1451,7 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     // Kernel logging for CK kernels
                     if(IsLoggingKernel())
                     {
-                        const auto exec_id = GetKernelExecutionCounter();
-                        AddKernelToJsonAccumulator(exec_id, kernel_id, elapsed, false);
+                        AddKernelToJsonAccumulator(kernel_id, elapsed, false);
                     }
 
                     handle.ResetKernelTime();
