@@ -356,22 +356,20 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0>{}, sequence<1>{}));
 
 #if defined(__gfx950__)
-            constexpr bool enable_xor_swizzle = (BlockedXDLN_PerWarp == 1);
-#else
-            constexpr bool enable_xor_swizzle = false;
+            if constexpr(BlockedXDLN_PerWarp == 1)
+            {
+                // Swizzle M by N to spread lane-varying stores across bank groups while
+                // preserving logical (M,N) coordinates for both LDS write and readback paths.
+                constexpr auto lds_block_desc_swizzled = transform_tensor_descriptor(
+                    lds_block_desc_plain,
+                    make_tuple(make_xor_transform(make_tuple(number<NPerIterationShuffle>{},
+                                                            number<MPerIterationShuffle>{}))),
+                    make_tuple(sequence<1, 0>{}),
+                    make_tuple(sequence<1, 0>{}));
+                return lds_block_desc_swizzled;
+            }
 #endif
-            constexpr index_t XorN = enable_xor_swizzle ? NPerIterationShuffle : 1;
-            constexpr index_t XorM = enable_xor_swizzle ? MPerIterationShuffle : 1;
-
-            // Swizzle M by N to spread lane-varying stores across bank groups while preserving
-            // logical (M,N) coordinates. When disabled, (1,1) XOR is an identity transform.
-            constexpr auto lds_block_desc_swizzled = transform_tensor_descriptor(
-                lds_block_desc_plain,
-                make_tuple(make_xor_transform(make_tuple(number<XorN>{}, number<XorM>{}))),
-                make_tuple(sequence<1, 0>{}),
-                make_tuple(sequence<1, 0>{}));
-
-            return lds_block_desc_swizzled;
+            return lds_block_desc_plain;
         }
         // M is contiguous dimension
         else if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::ColumnMajor>)
