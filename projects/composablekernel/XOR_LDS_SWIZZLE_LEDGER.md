@@ -392,9 +392,39 @@ Wave2(1,0)  Wave3(1,1)           Wave1(1,0)  Wave3(1,1)
 
 ---
 
+### Wave Layout Comparison (16x16x128 MFMA Baseline)
+
+Benchmarked all wave layouts WITHOUT any XOR transforms to find if any layout naturally avoids conflicts.
+
+**Results** (Job 222884):
+
+| Wave Layout | FP8→FP8 Store | FP8→FP16 Store | Loads |
+|-------------|---------------|----------------|-------|
+| **4x1** | **0** ✅ | 416 | 0 |
+| **2x2** | 416 | 416 | 0 |
+| **1x4** | 416 | 416 | 0 |
+
+**Key Finding**: The **4x1 wave layout with FP8→FP8 output** achieves **ZERO bank conflicts** without any XOR swizzle!
+
+**Why 4x1 + FP8 works**:
+- FP8 output: VectorLen=16, MLdsLayer=8
+- 4x1 layout: 4 waves stacked in M direction, 1 wave in N direction
+- This specific combination aligns thread access patterns to avoid bank conflicts
+
+**Why FP8→FP16 still has conflicts**:
+- FP16 output: VectorLen=8, MLdsLayer=4
+- Different interleaving factor changes the stride pattern
+- All wave layouts produce 416 conflicts for FP16 output
+
+**Conclusion**: For 16x16x128 MFMA:
+- **FP8→FP8**: Use 4x1 wave layout for zero conflicts (no code changes needed, just config selection)
+- **FP8→FP16**: No wave layout eliminates conflicts; still needs investigation
+
+---
+
 ### Summary
-- FP8 output: **Perfect** - all bank conflicts eliminated (in Approach 7, but caused correctness failures)
-- FP16 output: **50% improvement** - reduced from 2.0 to 1.0 ratio (in Approach 7, but caused correctness failures)
+- **FP8→FP8 with 4x1 wave layout**: **ZERO conflicts** ✅ (baseline, no XOR needed)
+- **FP8→FP16**: 416 conflicts across all wave layouts (unsolved)
 - **XOR at 2D level (after merge)**: Eliminates conflicts but causes memory corruption (Approaches 7-9, 13)
 - **XOR at 4D level (before merge)**: Preserves correctness but has NO effect on conflicts (Approaches 10-12, 15)
 - **XOR at 3D level (before unmerge)**: Breaks correctness due to division/modulo operations (Approach 14)
@@ -402,4 +432,4 @@ Wave2(1,0)  Wave3(1,1)           Wave1(1,0)  Wave3(1,1)
 - **Fundamental insight**: There is NO level where XOR can both preserve correctness AND reduce bank conflicts
   - Safe levels (4D) don't affect bank addresses
   - Effective levels (2D) corrupt thread-to-element mapping
-- **Alternative approaches needed**: Padding (already applied), different MLdsLayer values, or accept current conflict level
+- **Recommendation**: Use 4x1 wave layout for FP8→FP8 workloads; FP8→FP16 requires further investigation (padding, different MFMA tiles)
