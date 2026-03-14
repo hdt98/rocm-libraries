@@ -503,6 +503,18 @@ struct CShuffleEpilogue
         constexpr auto block_outer_dstr_encoding = [] {
             if constexpr(BlockedXDLN_PerWarp == 1)
             {
+#if defined(__gfx950__)
+                // Column-major wave ordering for gfx950 to reduce LDS bank conflicts
+                // Row-major: wave_id = m_wave * NWave + n_wave (sequence<1, 2>)
+                // Column-major: wave_id = n_wave * MWave + m_wave (sequence<2, 1>)
+                return tile_distribution_encoding<sequence<>,
+                                                  tuple<sequence<NumMXdlPerWavePerShuffle, MWave>,
+                                                        sequence<NumNXdlPerWavePerShuffle, NWave>>,
+                                                  tuple<sequence<2, 1>>,
+                                                  tuple<sequence<1, 1>>,
+                                                  sequence<1, 2>,
+                                                  sequence<0, 0>>{};
+#else
                 return tile_distribution_encoding<sequence<>,
                                                   tuple<sequence<NumMXdlPerWavePerShuffle, MWave>,
                                                         sequence<NumNXdlPerWavePerShuffle, NWave>>,
@@ -510,6 +522,7 @@ struct CShuffleEpilogue
                                                   tuple<sequence<1, 1>>,
                                                   sequence<1, 2>,
                                                   sequence<0, 0>>{};
+#endif
             }
             else
             {
