@@ -9,7 +9,7 @@
 #include "ck_tile/ops/fmha/block/block_attention_quant_scale_enum.hpp"
 #include "ck_tile/ops/fmha/pipeline/block_fmha_batch_prefill_pipeline_qr_ks_vs_async.hpp"
 #include "ck_tile/ops/fmha/pipeline/block_fmha_batch_prefill_v3_pipeline_default_policy.hpp"
-#include "ck_tile/ops/fmha/pipeline/block_fmha_fwd_v3_pipeline.hpp"
+#include "ck_tile/ops/fmha/pipeline/block_fmha_fwd_v3_detail.hpp"
 #include "ck_tile/ops/reduce/block/block_reduce.hpp"
 
 namespace ck_tile {
@@ -20,6 +20,26 @@ namespace ck_tile {
 // Forked from the feature branch CoreLoopScheduler with higher VALU budgets
 // that account for v_pk_mul_f32 asm volatile being invisible to the compiler
 // scheduler.  bf16/fp16 inherit the default base unchanged.
+//
+// Design: the scheduler is intentionally NOT specialized for QScaleEnum
+// (pertensor vs KV_BLOCKSCALE) or kHasLogitsSoftCap. Rationale:
+//
+//   - KV_BLOCKSCALE: GEMM0 K iter 1 has ~28 VALU (3.5/MFMA) vs PERTENSOR's
+//     ~60 VALU (7.5/MFMA). The VALU:6 budget over-requests for KV_BLOCKSCALE,
+//     leaving MFMAs 10-11 empty. But benchmarking showed this is neutral
+//     (0.99-1.00x): the compiler handles over-budget gracefully by skipping
+//     empty slots without stalling. GEMM1 KV_BLOCKSCALE has +17 VALU for
+//     v_descale ratio, also handled well by compiler overflow into last MFMA.
+//
+//   - LogitsSoftCap: fmha_logits_trans adds ~160 ops (32x softsign/tanh) to
+//     GEMM0 K iter 1, all piling into MFMA 16 (62T + 176V in one slot).
+//     Tried TRANS:8+VALU:24 per MFMA to spread them: 10-12% REGRESSION.
+//     v_rcp_f32 has ~30-cycle latency with data dependency chains across
+//     elements; forced interleaving breaks the compiler's batched v_rcp
+//     scheduling which amortizes latency across all 32 elements.
+//
+// The compiler's default handling (batch at end, overflow into last MFMA)
+// outperforms forced spreading for both cases.
 // ---------------------------------------------------------------------------
 template <typename PipelineProblem>
 struct BatchPrefillCoreLoopSchedulerBase
@@ -97,7 +117,6 @@ struct BatchPrefillCoreLoopSchedulerImpl<PipelineProblem,
 {
     using Base   = BatchPrefillCoreLoopSchedulerBase<PipelineProblem>;
     using Params = typename Base::Params;
-
     CK_TILE_DEVICE static constexpr void schedule_gemm0_compute()
     {
         // K iter 0: 32 TRANS (v_exp_f32) + 29 VALU (v_add reduction + v_sub + permlane)
@@ -115,9 +134,10 @@ struct BatchPrefillCoreLoopSchedulerImpl<PipelineProblem,
 
     CK_TILE_DEVICE static constexpr void schedule_gemm1_compute()
     {
-#if !CK_TILE_DISABLE_PACKED_FP32
+        // V3 batch prefill uses kernel_attr_for<gfx950_t, kernel_attr<true>> to disable
+        // packed FP32 ops via target attribute, so pk_mul_f32 is always present (asm volatile).
+        // This VALU:4 preamble accounts for the pk_mul instructions invisible to the scheduler.
         __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::VALU, 4, 0);
-#endif
         // First half: v_perm + v_max3 + permlane chain + v_fma (~57 VALU)
         static_for<0, Params::kMfmaPerWarpGemm1 / 2, 1>{}([&](auto) {
             __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::MFMA, 1, 0);
@@ -166,6 +186,9 @@ struct BatchPrefillCoreLoopScheduler
 ///   - Per-iteration page offset recomputation (load_physical_pages + kv_offset_array_transform)
 ///   - Additional operator() parameters: page_idx, stride_k/v, page_stride_k/v
 ///   - Problem type requires kPageBlockSize, kVectorSize, kKVMemoryLayout
+/// V3 batch prefill pipeline for gfx950 (MI350). Uses permlane32_swap, 8-warp
+/// tile (256x64), paged KV cache with scatter-gather, and double-buffered LDS.
+/// On non-gfx950 targets, operator() is a no-op returning -1.
 template <typename Problem_, typename Policy_ = BlockFmhaBatchPrefillV3PipelineDefaultPolicy>
 struct BlockFmhaBatchPrefillV3Pipeline
 {
@@ -326,6 +349,14 @@ struct BlockFmhaBatchPrefillV3Pipeline
                index_t nblock_stride_kv_block_descale = 0,
                index_t nhead_stride_kv_block_descale  = 0) const
     {
+#if defined(__HIP_DEVICE_COMPILE__) && !defined(__gfx950__)
+        // V3 pipeline is gfx950-only; return empty output on other targets.
+        ignore = q_dram_block_window_tmp;
+        decltype(gemm_1.MakeCBlockTile()) o_acc;
+        auto lse_acc = make_static_distributed_tensor<LSEDataType>(
+            Policy::template MakeLSEDDramTileDistribution<Problem>());
+        return ck_tile::make_tuple(o_acc, lse_acc);
+#else
         using namespace ck_tile;
 
         static_assert(
@@ -856,7 +887,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
             }();
             auto m_latest = block_tile_reduce<SMPLComputeDataType>(
                 sp(sp_reg_idx).sp_compute, sequence<1>{}, f_max, m_init);
-#if defined(__gfx950__)
+            // permlane32_swap cross-warp reduction (gfx950 only, 32x32 mfma)
             int32x2_t swapped_regs =
                 __builtin_amdgcn_permlane32_swap(bit_cast<int32_t>(m_latest.thread_buf_[0]),
                                                  bit_cast<int32_t>(m_latest.thread_buf_[0]),
@@ -864,9 +895,6 @@ struct BlockFmhaBatchPrefillV3Pipeline
                                                  false);
             m_latest.thread_buf_[0] = f_max(bit_cast<SMPLComputeDataType>(swapped_regs.x),
                                             bit_cast<SMPLComputeDataType>(swapped_regs.y));
-#else
-            block_tile_reduce_sync(m_latest, f_max, bool_constant<false>{});
-#endif
 
             if constexpr(kFoldKDescale)
             {
@@ -942,7 +970,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
                 SMPLComputeDataType{0}); // rowsum(Pcompute{j})
             static_assert(rowsum_p.thread_buf_.size() == 1,
                           "assuming that each thread holds 1 rowsum value");
-#if defined(__gfx950__)
+            // permlane32_swap cross-warp reduction (gfx950 only, 32x32 mfma)
             int32x2_t swapped_regs =
                 __builtin_amdgcn_permlane32_swap(bit_cast<int32_t>(rowsum_p.thread_buf_[0]),
                                                  bit_cast<int32_t>(rowsum_p.thread_buf_[0]),
@@ -950,9 +978,6 @@ struct BlockFmhaBatchPrefillV3Pipeline
                                                  false);
             rowsum_p.thread_buf_[0] = f_sum(bit_cast<SMPLComputeDataType>(swapped_regs.x),
                                             bit_cast<SMPLComputeDataType>(swapped_regs.y));
-#else
-            block_tile_reduce_sync(rowsum_p, f_sum, bool_constant<false>{});
-#endif
 
             // l{j}
             constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
@@ -1196,15 +1221,15 @@ struct BlockFmhaBatchPrefillV3Pipeline
                     // phase0
                     if constexpr(pi == 0)
                     {
-                        ASM_MARKER("phase0 Wave0-3 (pi=0)");
+                        CK_TILE_FMHA_V3_ASM_MARKER("phase0 Wave0-3 (pi=0)");
                     }
                     else
                     {
-                        ASM_MARKER("phase0 Wave0-3 (pi=1)");
+                        CK_TILE_FMHA_V3_ASM_MARKER("phase0 Wave0-3 (pi=1)");
                     }
                     s_waitcnt<waitcnt_arg::kMaxVmCnt, waitcnt_arg::kMaxExpCnt, 0>();
                     __builtin_amdgcn_sched_barrier(0);
-#if ADD_SBARRIER_FOR_PHASE0
+#if CK_TILE_FMHA_V3_ADD_SBARRIER_FOR_PHASE0
                     __builtin_amdgcn_s_barrier();
                     __builtin_amdgcn_sched_barrier(0);
 #endif
@@ -1236,7 +1261,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
                     Scheduler::schedule(cl_p, number<0>{});
                     __builtin_amdgcn_sched_barrier(0);
                     // phase1
-                    ASM_MARKER("phase1 Wave0-3");
+                    CK_TILE_FMHA_V3_ASM_MARKER("phase1 Wave0-3");
                     s_waitcnt<K_mem_su_ld_insts + V_mem_su_ld_insts>();
                     __builtin_amdgcn_sched_barrier(0);
                     __builtin_amdgcn_s_barrier();
@@ -1252,7 +1277,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
 
                     __builtin_amdgcn_sched_barrier(0);
                     // phase2
-                    ASM_MARKER("phase2 Wave0-3");
+                    CK_TILE_FMHA_V3_ASM_MARKER("phase2 Wave0-3");
                     s_waitcnt<waitcnt_arg::kMaxVmCnt, waitcnt_arg::kMaxExpCnt, 0>();
                     __builtin_amdgcn_sched_barrier(0);
                     __builtin_amdgcn_s_barrier();
@@ -1270,7 +1295,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
 
                     __builtin_amdgcn_sched_barrier(0);
                     // phase3
-                    ASM_MARKER("phase3 Wave0-3");
+                    CK_TILE_FMHA_V3_ASM_MARKER("phase3 Wave0-3");
                     s_waitcnt<K_mem_su_ld_insts + V_mem_su_ld_insts>();
                     __builtin_amdgcn_sched_barrier(0);
                     __builtin_amdgcn_s_barrier();
@@ -1290,7 +1315,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
                 }
                 else
                 {
-#if ADD_SBARRIER_FOR_PHASE0
+#if CK_TILE_FMHA_V3_ADD_SBARRIER_FOR_PHASE0
                     __builtin_amdgcn_sched_barrier(0);
                     __builtin_amdgcn_s_barrier();
 #endif
@@ -1298,11 +1323,11 @@ struct BlockFmhaBatchPrefillV3Pipeline
                     // phase0
                     if constexpr(pi == 0)
                     {
-                        ASM_MARKER("phase0 Wave4-7 (pi=0)");
+                        CK_TILE_FMHA_V3_ASM_MARKER("phase0 Wave4-7 (pi=0)");
                     }
                     else
                     {
-                        ASM_MARKER("phase0 Wave4-7 (pi=1)");
+                        CK_TILE_FMHA_V3_ASM_MARKER("phase0 Wave4-7 (pi=1)");
                     }
                     V_page_issue();                                  // global_load_dword FIRST
                     __builtin_amdgcn_sched_barrier(0);               // prevent reorder
@@ -1312,7 +1337,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
                     V_page_consume();                  // vmcnt(V_mem_su_ld_insts)
                     __builtin_amdgcn_sched_barrier(0);
                     // phase1
-                    ASM_MARKER("phase1 Wave4-7");
+                    CK_TILE_FMHA_V3_ASM_MARKER("phase1 Wave4-7");
                     s_waitcnt<K_mem_su_ld_insts + V_mem_su_ld_insts, waitcnt_arg::kMaxExpCnt, 0>();
                     __builtin_amdgcn_sched_barrier(0);
                     __builtin_amdgcn_s_barrier();
@@ -1335,7 +1360,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
                     Scheduler::schedule(cl_p, number<1>{});
                     __builtin_amdgcn_sched_barrier(0);
                     // phase2
-                    ASM_MARKER("phase2 Wave4-7");
+                    CK_TILE_FMHA_V3_ASM_MARKER("phase2 Wave4-7");
                     __builtin_amdgcn_s_barrier();
                     __builtin_amdgcn_sched_barrier(0);
                     save_descales(K_w4_lds_wr_idx);
@@ -1356,7 +1381,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
 
                     __builtin_amdgcn_sched_barrier(0);
                     // phase3
-                    ASM_MARKER("phase3 Wave4-7");
+                    CK_TILE_FMHA_V3_ASM_MARKER("phase3 Wave4-7");
                     s_waitcnt<K_mem_su_ld_insts + V_mem_su_ld_insts, waitcnt_arg::kMaxExpCnt, 0>();
                     __builtin_amdgcn_sched_barrier(0);
                     __builtin_amdgcn_s_barrier();
@@ -1414,7 +1439,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
         {
             // pre-stage
             {
-                ASM_MARKER("before pre-stage");
+                CK_TILE_FMHA_V3_ASM_MARKER("before pre-stage");
                 // Save descales for K0 (buf 0) before K_page_issue overwrites k_physical_pages
                 save_descales(0);
                 // (1) load K0 to LDS & VGPR
@@ -1470,7 +1495,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
                     __builtin_amdgcn_s_barrier();
                 }
 
-                ASM_MARKER("end pre-stage");
+                CK_TILE_FMHA_V3_ASM_MARKER("end pre-stage");
             }
 
             if(1 < num_total_loop)
@@ -1551,6 +1576,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
         o_acc = tile_elementwise_in(o_acc_element_func, o_acc);
 
         return o_acc;
+#endif // !defined(__HIP_DEVICE_COMPILE__) || defined(__gfx950__)
     }
 
     template <typename QDramBlockWindowTmp,
