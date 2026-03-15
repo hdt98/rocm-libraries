@@ -96,7 +96,7 @@ namespace rocRoller
         {
             auto& promise = m_coroutine.promise();
             promise.advance();
-            m_value = promise.value();
+            m_value = std::move(promise.value());
 
             if(not m_value)
             {
@@ -177,7 +177,7 @@ namespace rocRoller
             m_coroutine = awaitable.gen.m_coroutine;
 
             m_coroutine.resume();
-            m_value = m_coroutine.promise().value();
+            m_value = std::move(m_coroutine.promise().value());
 
             if(m_value)
             {
@@ -367,7 +367,7 @@ namespace rocRoller
     requires(std::predicate<Predicate, std::ranges::range_value_t<Range>>)
         Generator<std::ranges::range_value_t<Range>> filter(Predicate predicate, Range range)
     {
-        for(auto val : range)
+        for(auto const& val : range)
         {
             if(predicate(val))
                 co_yield val;
@@ -379,7 +379,7 @@ namespace rocRoller
         Generator<std::invoke_result_t<Func, std::ranges::range_value_t<Range>>> map(Func  func,
                                                                                      Range range)
     {
-        for(auto val : range)
+        for(auto const& val : range)
             co_yield func(val);
     }
 
