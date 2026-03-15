@@ -94,8 +94,21 @@ def apply_print_exception(item, *args):
 def OverwriteGlobalParameters(newGlobalParameters):
     from . import GlobalParameters
 
-    GlobalParameters.globalParameters.clear()
-    GlobalParameters.globalParameters.update(newGlobalParameters)
+    current = GlobalParameters.globalParameters
+
+    # Fast path: when the caller passes the same dict object, clear+update would
+    # be a semantic no-op (and previously risked self-clear bugs). Skip work.
+    if newGlobalParameters is current:
+        return
+
+    # Another fast path: equal content but different dict instance.
+    # ParallelMap2 now passes a snapshot dict, so non-identical objects are safe
+    # to compare directly without copying per task.
+    if newGlobalParameters == current:
+        return
+
+    current.clear()
+    current.update(newGlobalParameters)
 
 
 def ProcessingPool(enable=True, maxTasksPerChild=None):
@@ -234,7 +247,10 @@ def ParallelMap2(
     currentTime = time.time()
 
     pcall = pcallWithGlobalParamsMultiArg if multiArg else pcallWithGlobalParamsSingleArg
-    pargs = zip(objects, itertools.repeat(globalParameters))
+    # Pass a snapshot instead of the live global dict object to avoid aliasing
+    # when joblib executes tasks in-process (nested parallel fallback paths).
+    paramsSnapshot = dict(globalParameters)
+    pargs = zip(objects, itertools.repeat(paramsSnapshot))
 
     if joblibParallelSupportsGenerator():
         rv = Parallel(n_jobs=threadCount, timeout=99999, return_as=return_as)(
