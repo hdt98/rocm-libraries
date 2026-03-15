@@ -949,6 +949,10 @@ class KernelComponentFactoryGfx950(CustomFactory, CompatibilityRuleFactoryGfx9):
                     SUPPORTED_KV_LOOKUP_TABLE,
                     ["pertensor", "kv_blockscale"],
                 ):
+                    # V3 uses LINEAR layout only. VECTORIZED layout requires sub-dword
+                    # async loads that violate V3's buffer addressing constraints, and
+                    # the KV layout optimization has not been done for V3. VECTORIZED
+                    # requests fall back to V2 transparently via trait matching.
                     pipelines.append(FmhaFwdPipeline("qr_async_trload_v3", "row", "t", "t", "f", "f",
                         logits, "no", "f", "f", qscale, mask, "linear", lookup))  # fmt: skip
         return pipelines
