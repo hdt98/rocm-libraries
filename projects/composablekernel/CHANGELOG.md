@@ -23,6 +23,7 @@ Documentation for Composable Kernel available at [https://rocm.docs.amd.com/proj
 * Added gfx11 support for FMHA.
 * Added microscaling (MX) FP8/FP4 support on gfx950 for FMHA forward kernel ("qr" pipeline only).
 * Added FP8 per-tensor quantization support for FMHA forward V3 pipeline on gfx950.
+* Added new FMHA batch prefill kernel on gfx950 with FP8 per-tensor and per-block KV quantization support.
 
 ### Changed
 
