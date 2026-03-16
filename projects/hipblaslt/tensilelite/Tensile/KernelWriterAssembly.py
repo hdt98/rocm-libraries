@@ -10023,27 +10023,27 @@ class KernelWriterAssembly(KernelWriter):
 
     if tc == "A" and kernel["enableTDMA"]:
       comp: TensorDataMoverLoad = TensorDataMoverLoad.find(self)
-      imod.add(comp.issueLoad("tdmAGroup0", "tdmAGroup1", None, None))
+      imod.middle.add(comp.issueLoad("tdmAGroup0", "tdmAGroup1", None, None))
       return imod
 
     if tc == "MXSA" and kernel["enableTDMA"]:
       comp: TensorDataMoverLoad = TensorDataMoverLoad.find(self)
       if kernel["ProblemType"]["MXBlockA"]:
-        imod.add(comp.issueLoad("tdmMXSAGroup0", "tdmMXSAGroup1", None, None))
+        imod.middle.add(comp.issueLoad("tdmMXSAGroup0", "tdmMXSAGroup1", None, None))
       return imod
 
     if tc == "B" and kernel["enableTDMB"]:
       #TODO: TDM refactor, wave separated TDM only issues 1 tensor load
       if prod(kernel["MIWaveGroup"]) == 1:
         comp: TensorDataMoverLoad = TensorDataMoverLoad.find(self)
-        imod.add(comp.issueLoad("tdmBGroup0", "tdmBGroup1", None, None))
+        imod.middle.add(comp.issueLoad("tdmBGroup0", "tdmBGroup1", None, None))
       return imod
 
     if tc == "MXSB" and kernel["enableTDMB"]:
       #TODO: TDM refactor, wave separated TDM only issues 1 tensor load
       if prod(kernel["MIWaveGroup"]) == 1:
         comp: TensorDataMoverLoad = TensorDataMoverLoad.find(self)
-        imod.add(comp.issueLoad("tdmMXSBGroup0", "tdmMXSBGroup1", None, None))
+        imod.middle.add(comp.issueLoad("tdmMXSBGroup0", "tdmMXSBGroup1", None, None))
       return imod
 
     # sizeK % LOCAL_DEPTHU
@@ -16793,7 +16793,6 @@ class KernelWriterAssembly(KernelWriter):
     return comp.calculateStartAddr(self, kernel, tP, f"Address{tc}")
 
   def tdmGlobalOffsetWaveSeparated(self, kernel: Mapping, tPA: Mapping, tPB: Mapping) -> Module:
-    #TODO: TDM implement
     mod = Module("TDM Global Offset Wave Separated")
     comp: TensorDataMoverLoad = TensorDataMoverLoad.find(self)
     tcA: str = tPA["tensorChar"]
@@ -16811,11 +16810,29 @@ class KernelWriterAssembly(KernelWriter):
       mod.add(SBitcmp1B32(sgpr(waveIdSgprIdx), 0, "Check parity of wId"))
       mod.add(SCBranchSCC1(tdmGlobalOffsetLblB.getLabelName(), "Jump to B if wId is odd"))
 
-    mod.add(comp.calculateStartAddrWaveSeparated(self, kernel, tPA, f"Address{tcA}"))
+    dstGroup0A = f"tdm{tcA}Group0"
+    dstGroup0B = f"tdm{tcB}Group0"
+    mod.add(comp.calculateStartAddrWaveSeparated(self, kernel, tPA, f"Address{tcA}", dstGroup0A))
     mod.add(SBranch(tdmGlobalOffsetLblEnd.getLabelName()))
     mod.add(tdmGlobalOffsetLblB)
-    mod.add(comp.calculateStartAddrWaveSeparated(self, kernel, tPB, f"Address{tcB}"))
+    mod.add(comp.calculateStartAddrWaveSeparated(self, kernel, tPB, f"Address{tcB}", dstGroup0B))
     mod.add(tdmGlobalOffsetLblEnd)
+    return mod
+
+  def tdmApplyStreamKOffsetWaveSeparated(self, kernel: Mapping, tPA: Mapping, tPB: Mapping) -> Module:
+    mod = Module("TDM StreamK K-offset Wave Separated")
+    tcA: str = tPA["tensorChar"]
+    tcB: str = tPB["tensorChar"]
+    incSgprName = f"tdm{tcA}{tcB}Incs"
+    group0Name = f"tdm{tcA}Group0"
+
+    with self.allocTmpSgpr(1) as tmpSgprRes:
+      tmpSgpr = tmpSgprRes.idx
+      mod.add(SMulI32(dst=sgpr(tmpSgpr), src0=sgpr("StreamKLocalStart"), src1=sgpr(incSgprName),
+                       comment="StreamK K-offset = localStart * increment"))
+      mod.add(SAddU32(dst=sgpr(f"{group0Name}+2"), src0=sgpr(f"{group0Name}+2"), src1=sgpr(tmpSgpr),
+                       comment="Apply StreamK K-offset to TDM global addr"))
+
     return mod
 
   def tdmIncrementAB(self, kernel, tP) -> Module:
