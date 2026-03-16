@@ -37,7 +37,7 @@
 #include <cstdint>
 #include <vector>
 
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
+#if defined(HIPCUB_ROCPRIM_API)
     #include <rocprim/device/config_types.hpp>
 #endif
 
@@ -240,7 +240,7 @@ void sort_keys()
 
     hipStream_t stream = 0; // default
     
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
+#if defined(HIPCUB_ROCPRIM_API)
     rocprim::detail::target_arch arch;
     if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
         GTEST_FAIL() << "Unable to retrieve GPU architecture";
@@ -510,7 +510,7 @@ void sort_pairs()
 
     hipStream_t stream = 0; // default
 
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
+#if defined(HIPCUB_ROCPRIM_API)
     rocprim::detail::target_arch arch;
     if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
         GTEST_FAIL() << "Unable to retrieve GPU architecture";
@@ -816,7 +816,7 @@ void sort_keys_double_buffer()
 
     hipStream_t stream = 0; // default
 
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
+#if defined(HIPCUB_ROCPRIM_API)
     rocprim::detail::target_arch arch;
     if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
         GTEST_FAIL() << "Unable to retrieve GPU architecture";
@@ -1065,7 +1065,7 @@ void sort_pairs_double_buffer()
 
     hipStream_t stream = 0; // default
 
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
+#if defined(HIPCUB_ROCPRIM_API)
     rocprim::detail::target_arch arch;
     if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
         GTEST_FAIL() << "Unable to retrieve GPU architecture";
@@ -1276,7 +1276,7 @@ inline void sort_keys_over_4g()
     hipDeviceProp_t dev_prop;
     HIP_CHECK(hipGetDeviceProperties(&dev_prop, device_id));
 
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
+#if defined(HIPCUB_ROCPRIM_API)
     rocprim::detail::target_arch arch;
     if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
         GTEST_FAIL() << "Unable to retrieve GPU architecture";
@@ -1386,7 +1386,7 @@ inline void sort_keys_large_sizes()
     constexpr unsigned int end_bit    = 8;
 
     hipStream_t stream = 0;
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
+#if defined(HIPCUB_ROCPRIM_API)
     rocprim::detail::target_arch arch;
     if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
         GTEST_FAIL() << "Unable to retrieve GPU architecture";
