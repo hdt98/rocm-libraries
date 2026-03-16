@@ -455,7 +455,7 @@ def getDockerImage(Map conf=[:]){
 
 // Build and push a docker image, capturing its digest into the specified env var.
 // If forceBuild is false, will skip building if the image already exists in the registry.
-def buildAndPushDockerImage(String image_name, String dockerExtraArgs, boolean forceBuild, String digestEnvVar){
+def buildAndPushDockerImage(String install_prefix, String image_name, String dockerExtraArgs, boolean forceBuild, String digestEnvVar){
     show_node_info()
     env.DOCKER_BUILDKIT=1
     checkoutComposableKernel()
@@ -500,13 +500,13 @@ def buildDockerBase(install_prefix){
     if(params.COMPILER_VERSION == "develop" || params.COMPILER_VERSION == "amd-mainline" || params.COMPILER_COMMIT != ""){
         dockerExtraArgs = " --no-cache --build-arg BASE_DOCKER='${base_image_name}' -f projects/composablekernel/Dockerfile.compiler . "
     }
-    buildAndPushDockerImage(image_name, dockerExtraArgs, params.BUILD_DOCKER.toBoolean(), "CK_BASE_IMAGE_DIGEST")
+    buildAndPushDockerImage(install_prefix, image_name, dockerExtraArgs, params.BUILD_DOCKER.toBoolean(), "CK_BASE_IMAGE_DIGEST")
 }
 
 def buildDockerAiter(install_prefix){
     def image_name = "${env.CK_DOCKERHUB_PRIVATE}:ck_aiter"
     def dockerExtraArgs = " --no-cache -f projects/composablekernel/Dockerfile.aiter --build-arg AITER_BRANCH='${params.aiter_branch}' --build-arg CK_AITER_BRANCH='${params.ck_aiter_branch}' . "
-    buildAndPushDockerImage(image_name, dockerExtraArgs, true, "CK_AITER_IMAGE_DIGEST")
+    buildAndPushDockerImage(install_prefix, image_name, dockerExtraArgs, true, "CK_AITER_IMAGE_DIGEST")
 }
 
 def buildDockerFa(install_prefix){
@@ -517,13 +517,13 @@ def buildDockerFa(install_prefix){
     dockerExtraArgs += " --build-arg CK_FA_BRANCH='${params.ck_fa_branch}'"
     dockerExtraArgs += " --build-arg GPU_ARCHS='gfx942;gfx950'"
     dockerExtraArgs += " . "
-    buildAndPushDockerImage(image_name, dockerExtraArgs, true, "CK_FA_IMAGE_DIGEST")
+    buildAndPushDockerImage(install_prefix, image_name, dockerExtraArgs, true, "CK_FA_IMAGE_DIGEST")
 }
 
 def buildDockerPytorch(install_prefix){
     def image_name = "${env.CK_DOCKERHUB}:ck_pytorch"
     def dockerExtraArgs = " --no-cache -f projects/composablekernel/Dockerfile.pytorch --build-arg CK_PYTORCH_BRANCH='${params.ck_pytorch_branch}' . "
-    buildAndPushDockerImage(image_name, dockerExtraArgs, true, "CK_PYTORCH_IMAGE_DIGEST")
+    buildAndPushDockerImage(install_prefix, image_name, dockerExtraArgs, true, "CK_PYTORCH_IMAGE_DIGEST")
 }
 
 def get_docker_options(){
@@ -1492,7 +1492,6 @@ pipeline {
                     }
                     agent{ label rocmnode("nogpu") }
                     steps{ buildDockerFa('/opt/rocm'); cleanWs() }
-                    }
                 }
                 stage('Docker Pytorch'){
                     when {
