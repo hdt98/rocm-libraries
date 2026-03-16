@@ -138,12 +138,32 @@ class LDSFamily(InstructionFamily):
             },
         )
 
+    @staticmethod
+    def _instr_width_bytes(mnemonic: str) -> int:
+        """Return the data width in bytes for a ds_read/ds_write mnemonic."""
+        m = re.search(r"_b(\d+)", mnemonic)
+        return int(m.group(1)) // 8 if m else 4
+
     def read_lanes(self, frame, instr, uint32_type, addr_fmt):
         reg = f"v{instr.meta['addr_reg']}"
         offset = instr.meta["offset"]
         raw = read_vgpr_lanes(frame, instr.meta["addr_reg"], uint32_type)
+        effective = [v + offset for v in raw]
+
+        # LDS has 64 banks, each 4 bytes (1 dword) wide.
+        # first_bank[lane]        = (effective_addr // 4) % 64
+        # In units of the instruction width (e.g. dwordx4 for ds_read_b128):
+        #   dwords_per_instr       = instr_width_bytes / 4
+        #   first_bank_in_units   = first_bank // dwords_per_instr
+        width_bytes = self._instr_width_bytes(instr.mnemonic)
+        dwords_per_instr = max(1, width_bytes // 4)
+        first_bank = [((addr // 4) % 64) // dwords_per_instr for addr in effective]
+
         return {
-            "derived": {"effective_addr": [addr_fmt(v + offset) for v in raw]},
+            "derived": {
+                "effective_addr": [addr_fmt(v) for v in effective],
+                "first_bank": first_bank,
+            },
             "vgpr": {reg: raw},
         }
 
@@ -154,10 +174,33 @@ class BufferFamily(InstructionFamily):
     Decodes the 128-bit Shader Resource Descriptor (4 SGPRs) and per-lane
     VGPR offset to compute each lane's effective address.
 
-    Matched format: buffer_<load|store>_<width> <dst>, v<voff>, s[<srd_base>:...], ...
+    Two operand layouts are supported:
+      Normal:     buffer_<load|store>_<width> <dst>, v<voff>, s[<srd_base>:...], ...
+      LDS-direct: buffer_load_<width>          v<voff>, s[<srd_base>:...], ...  lds
+    In the LDS-direct form there is no destination VGPR; data flows from
+    global memory straight into LDS. The LDS write address per lane is:
+      lds_effective_addr[lane] = M0 + lane * width_bytes
     """
 
+    # Normal: has a destination operand before the voffset register.
     _RE = re.compile(r"buffer_(?:load|store)_\S+\s+\S+,\s*v(\d+),\s*s\[(\d+):")
+    # LDS-direct: voffset is the first (and only) operand before the SRD.
+    _RE_LDS_DIRECT = re.compile(r"buffer_load_\S+\s+v(\d+),\s*s\[(\d+):")
+
+    @staticmethod
+    def _instr_width_bytes(mnemonic: str) -> int:
+        """Return the data width in bytes for a buffer_load/store mnemonic."""
+        suffix = mnemonic.rsplit("_", 1)[-1]  # e.g. "dwordx4", "dword", "short"
+        if suffix in ("byte", "ubyte"):
+            return 1
+        if suffix in ("short", "ushort"):
+            return 2
+        if suffix == "dword":
+            return 4
+        m = re.match(r"dwordx(\d+)$", suffix)
+        if m:
+            return int(m.group(1)) * 4
+        return 4  # fallback
 
     @property
     def name(self):
@@ -167,7 +210,8 @@ class BufferFamily(InstructionFamily):
         return mnemonic.startswith("buffer_load") or mnemonic.startswith("buffer_store")
 
     def parse(self, mnemonic, asm, address):
-        m = self._RE.match(asm)
+        lds_direct = bool(re.search(r"\blds\b", asm))
+        m = (self._RE_LDS_DIRECT if lds_direct else self._RE).match(asm)
         if not m:
             return None
         return FoundInstruction(
@@ -178,6 +222,7 @@ class BufferFamily(InstructionFamily):
             meta={
                 "voffset_reg": int(m.group(1)),
                 "srd_base_reg": int(m.group(2)),
+                "lds_direct": lds_direct,
             },
         )
 
@@ -188,17 +233,27 @@ class BufferFamily(InstructionFamily):
         s = [read_uint32(frame, f"s{srd_base + i}", uint32_type) for i in range(4)]
         base_pointer = (s[1] << 32) + s[0]
         srd_raw = (s[3] << 96) | (s[2] << 64) | (s[1] << 32) | s[0]
+        derived = {
+            "base_pointer": addr_fmt(base_pointer),
+            "size": s[2],
+            "buffer_descriptor": addr_fmt(srd_raw),
+            "effective_addr": [
+                addr_fmt(base_pointer + voffsets[i]) for i in range(64)
+            ],
+        }
+        sgpr = {f"s[{srd_base}:{srd_base+3}]": s}
+        if instr.meta["lds_direct"]:
+            m0 = read_uint32(frame, "m0", uint32_type)
+            width = self._instr_width_bytes(instr.mnemonic)
+            derived["lds_direct"] = True
+            derived["lds_effective_addr"] = [
+                addr_fmt(m0 + lane * width) for lane in range(64)
+            ]
+            sgpr["m0"] = m0
         return {
-            "derived": {
-                "base_pointer": addr_fmt(base_pointer),
-                "size": s[2],
-                "buffer_descriptor": addr_fmt(srd_raw),
-                "effective_addr": [
-                    addr_fmt(base_pointer + voffsets[i]) for i in range(64)
-                ],
-            },
+            "derived": derived,
             "vgpr": {f"v{voffset_idx}": voffsets},
-            "sgpr": {f"s[{srd_base}:{srd_base+3}]": s},
+            "sgpr": sgpr,
         }
 
 
@@ -286,7 +341,7 @@ def trace_loop(
                     {
                         "family": instr.family,
                         "instruction": instr.instruction,
-                        "address": addr_fmt(instr.address),
+                        "address": hex(instr.address),
                         "workgroup": list(wg),
                         "wave": wave,
                         **family.read_lanes(frame, instr, uint32_type, addr_fmt),
