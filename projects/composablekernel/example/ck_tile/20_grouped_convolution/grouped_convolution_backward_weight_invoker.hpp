@@ -2,7 +2,28 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "grouped_convolution_utils.hpp"
+#include "ck_tile/ops/gemm/kernel/streamk_gemm/streamk_gemm_tile_partitioner.hpp"
 
+/// @brief Partitioner policies for the conv bwd weight invoker.
+/// SplitKPartitionerPolicy is the default (data-parallel + split-K).
+/// StreamKPartitionerPolicy selects StreamK work distribution.
+struct SplitKPartitionerPolicy
+{
+    template <typename GemmShape, typename GroupedConvTraitsType>
+    using type = ck_tile::GemmSpatiallyLocalTilePartitioner<
+        GemmShape,
+        GroupedConvTraitsType::FixedGemmParams::TilePartitionerGroupNum,
+        GroupedConvTraitsType::FixedGemmParams::TilePartitionerM01>;
+};
+
+template <ck_tile::StreamKReductionStrategy ReductionStrategy>
+struct StreamKPartitionerPolicy
+{
+    template <typename GemmShape, typename>
+    using type = ck_tile::StreamKTilePartitioner<GemmShape, ReductionStrategy, false>;
+};
+
+template <typename PartitionerPolicy = SplitKPartitionerPolicy>
 struct GroupedConvolutionBackwardWeightInvoker
 {
     template <ck_tile::index_t NDimSpatial,
@@ -40,10 +61,8 @@ struct GroupedConvolutionBackwardWeightInvoker
                                                                  ConvConfig::VectorSizeC,
                                                                  ConvConfig::NumGroupsToMerge>;
 
-        using TilePartitioner = ck_tile::GemmSpatiallyLocalTilePartitioner<
-            GemmShape,
-            GroupedConvTraitsType::FixedGemmParams::TilePartitionerGroupNum,
-            GroupedConvTraitsType::FixedGemmParams::TilePartitionerM01>;
+        using TilePartitioner =
+            typename PartitionerPolicy::template type<GemmShape, GroupedConvTraitsType>;
 
         using GemmUniversalTraits = ck_tile::TileGemmUniversalTraits<
             GroupedConvTraitsType::FixedGemmParams::kPadM,

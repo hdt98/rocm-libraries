@@ -11,7 +11,7 @@
 
 #include "ck_tile/host.hpp"
 #include "grouped_convolution_utils.hpp"
-#include "grouped_convolution_backward_weight_streamk_invoker.hpp"
+#include "grouped_convolution_backward_weight_invoker.hpp"
 #include "run_grouped_convolution_bwd_weight_example.inc"
 
 template <template <typename PrecType> typename ConvConfig, typename Invoker>
@@ -59,14 +59,14 @@ int main(int argc, char* argv[])
 
         if(reduction == "linear")
         {
-            using Invoker = GroupedConvolutionBackwardWeightStreamKInvoker<
-                ck_tile::StreamKReductionStrategy::Linear>;
+            using Invoker = GroupedConvolutionBackwardWeightInvoker<
+                StreamKPartitionerPolicy<ck_tile::StreamKReductionStrategy::Linear>>;
             return !run_grouped_conv_bwd_weight_example<ConvConfigComputeV3, Invoker>(arg_parser);
         }
         else if(reduction == "tree")
         {
-            using Invoker = GroupedConvolutionBackwardWeightStreamKInvoker<
-                ck_tile::StreamKReductionStrategy::Tree>;
+            using Invoker = GroupedConvolutionBackwardWeightInvoker<
+                StreamKPartitionerPolicy<ck_tile::StreamKReductionStrategy::Tree>>;
             return !run_grouped_conv_bwd_weight_example<ConvConfigComputeV3, Invoker>(arg_parser);
         }
         else
