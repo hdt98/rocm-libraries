@@ -470,6 +470,7 @@
       "hdim_tile_constraints": {
         "qr_async": {
           "128_128": {
+            "required_bm0": 128,
             "required_bn0": 128
           },
           "_default": {
@@ -1043,6 +1044,7 @@
       "hdim_tile_constraints": {
         "qr_async": {
           "128_128": {
+            "required_bm0": 128,
             "required_bn0": 128
           },
           "_default": {
@@ -1635,6 +1637,7 @@
       "hdim_tile_constraints": {
         "qr_async": {
           "128_128": {
+            "required_bm0": 128,
             "required_bn0": 128
           },
           "_default": {

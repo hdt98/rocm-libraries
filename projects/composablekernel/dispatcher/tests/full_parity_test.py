@@ -596,6 +596,7 @@ lib.fmha_dispatcher_run_fwd.argtypes = [
     ctypes.c_int,
     ctypes.c_char_p,ctypes.c_int,
     ctypes.c_int,ctypes.c_int,
+    ctypes.c_int,ctypes.c_int,ctypes.c_int,
     ctypes.POINTER(ctypes.c_float)]
 lib.fmha_dispatcher_run_fwd.restype = ctypes.c_int
 lib.fmha_dispatcher_cleanup.argtypes = []
@@ -624,7 +625,7 @@ t=ctypes.c_float(0.0)
 rc=lib.fmha_dispatcher_run_fwd(Q.ctypes.data,K.ctypes.data,V.ctypes.data,O.ctypes.data,\
 {case.batch},{case.nhead_q},{nk},{case.seqlen_q},{case.seqlen_k},{dq},{dv},\
 {scale},{mi},{bi},{case.lse},{int(case.p_drop > 0)},{traits_dq},{traits_dv},1,{case.perm},b"{case.prec}",{case.mode},\
-{-1 if mi == 0 else -1},{-1 if mi == 0 else 0},ctypes.byref(t))
+{-1 if mi == 0 else -1},{-1 if mi == 0 else 0},0,0,0,ctypes.byref(t))
 lib.fmha_dispatcher_cleanup()
 if rc!=0: print(f"RC{{rc}}"); sys.exit(1)
 nz=int(np.count_nonzero(O))

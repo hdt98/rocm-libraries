@@ -116,6 +116,9 @@ int fmha_dispatcher_run_fwd(const void* q_host,
                             int is_group_mode,
                             int window_left,
                             int window_right,
+                            int has_logits,
+                            int has_sink,
+                            int has_skip,
                             float* time_ms_out)
 {
     if(!g_initialized)
@@ -139,16 +142,19 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     void *seqstart_q_dev = nullptr, *seqstart_k_dev = nullptr, *seqlen_k_dev = nullptr;
 
     fmha_fwd_traits traits{};
-    traits.hdim_q        = (traits_hdim_q > 0) ? traits_hdim_q : hdim_q;
-    traits.hdim_v        = (traits_hdim_v > 0) ? traits_hdim_v : hdim_v;
-    traits.data_type     = data_type_str ? data_type_str : "fp16";
-    traits.is_group_mode = (is_group_mode != 0);
-    traits.is_v_rowmajor = (is_v_rowmajor != 0);
-    traits.mask_type     = static_cast<mask_enum>(mask_type_int);
-    traits.bias_type     = static_cast<bias_enum>(bias_type_int);
-    traits.has_lse       = (has_lse != 0);
-    traits.has_dropout   = (has_dropout != 0);
-    traits.qscale_type   = quant_scale_enum::no_scale;
+    traits.hdim_q              = (traits_hdim_q > 0) ? traits_hdim_q : hdim_q;
+    traits.hdim_v              = (traits_hdim_v > 0) ? traits_hdim_v : hdim_v;
+    traits.data_type           = data_type_str ? data_type_str : "fp16";
+    traits.is_group_mode       = (is_group_mode != 0);
+    traits.is_v_rowmajor       = (is_v_rowmajor != 0);
+    traits.mask_type           = static_cast<mask_enum>(mask_type_int);
+    traits.bias_type           = static_cast<bias_enum>(bias_type_int);
+    traits.has_lse             = (has_lse != 0);
+    traits.has_dropout         = (has_dropout != 0);
+    traits.qscale_type         = quant_scale_enum::no_scale;
+    traits.has_logits_soft_cap = (has_logits != 0);
+    traits.skip_min_seqlen_q   = (has_skip != 0);
+    traits.has_sink            = (has_sink != 0);
 
     fmha_fwd_args args{};
 
@@ -532,6 +538,700 @@ cleanup:
     safe_hip_free(dv_dev);
     safe_hip_free(dq_acc_dev);
 
+    return rc;
+}
+
+// ---------------------------------------------------------------------------
+// Split-KV forward: 2-stage (split + combine)
+// Allocates o_acc / lse_acc internally for the split stage.
+// ---------------------------------------------------------------------------
+int fmha_dispatcher_run_splitkv(const void* q_host,
+                                const void* k_host,
+                                const void* v_host,
+                                void* o_host,
+                                int batch,
+                                int nhead_q,
+                                int nhead_k,
+                                int seqlen_q,
+                                int seqlen_k,
+                                int hdim_q,
+                                int hdim_v,
+                                float scale,
+                                int mask_type_int,
+                                int num_splits,
+                                int is_v_rowmajor,
+                                const char* data_type_str,
+                                int has_lse,
+                                float* time_ms_out)
+{
+    if(!g_initialized)
+        return -1;
+
+    const int in_bytes  = dtype_input_bytes(data_type_str);
+    const int out_bytes = dtype_output_bytes(data_type_str);
+
+    int rc                = 0;
+    const int64_t q_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * in_bytes;
+    const int64_t k_bytes = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * in_bytes;
+    const int64_t v_bytes = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * in_bytes;
+    const int64_t o_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v * out_bytes;
+    const int64_t o_acc_bytes =
+        static_cast<int64_t>(num_splits) * batch * nhead_q * seqlen_q * hdim_v * sizeof(float);
+    const int64_t lse_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
+    const int64_t lse_acc_bytes =
+        static_cast<int64_t>(num_splits) * batch * nhead_q * seqlen_q * sizeof(float);
+    float elapsed = 0.0f;
+
+    void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
+    void *o_acc_dev = nullptr, *lse_dev = nullptr, *lse_acc_dev = nullptr;
+
+    fmha_fwd_splitkv_traits traits{};
+    traits.hdim_q              = hdim_q;
+    traits.hdim_v              = hdim_v;
+    traits.data_type           = data_type_str ? data_type_str : "fp16";
+    traits.is_group_mode       = false;
+    traits.is_v_rowmajor       = (is_v_rowmajor != 0);
+    traits.has_logits_soft_cap = false;
+    traits.mask_type           = static_cast<mask_enum>(mask_type_int);
+    traits.bias_type           = bias_enum::no_bias;
+    traits.has_lse             = (has_lse != 0);
+
+    fmha_fwd_splitkv_args args{};
+
+    HIP_CHECK(hipMalloc(&q_dev, q_bytes));
+    HIP_CHECK(hipMalloc(&k_dev, k_bytes));
+    HIP_CHECK(hipMalloc(&v_dev, v_bytes));
+    HIP_CHECK(hipMalloc(&o_dev, o_bytes));
+    HIP_CHECK(hipMalloc(&o_acc_dev, o_acc_bytes));
+    HIP_CHECK(hipMalloc(&lse_dev, lse_bytes));
+    HIP_CHECK(hipMalloc(&lse_acc_dev, lse_acc_bytes));
+
+    HIP_CHECK(hipMemcpy(q_dev, q_host, q_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(k_dev, k_host, k_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(v_dev, v_host, v_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemset(o_dev, 0, o_bytes));
+    HIP_CHECK(hipMemset(o_acc_dev, 0, o_acc_bytes));
+    HIP_CHECK(hipMemset(lse_dev, 0, lse_bytes));
+    HIP_CHECK(hipMemset(lse_acc_dev, 0, lse_acc_bytes));
+
+    args.q_ptr                    = q_dev;
+    args.k_ptr                    = k_dev;
+    args.v_ptr                    = v_dev;
+    args.bias_ptr                 = nullptr;
+    args.lse_acc_ptr              = lse_acc_dev;
+    args.o_acc_ptr                = o_acc_dev;
+    args.lse_ptr                  = lse_dev;
+    args.o_ptr                    = o_dev;
+    args.block_table_ptr          = nullptr;
+    args.batch_stride_block_table = 0;
+    args.page_block_size          = 0;
+    args.is_gappy                 = false;
+    args.cache_batch_idx          = nullptr;
+    args.seqstart_q_ptr           = nullptr;
+    args.seqstart_k_ptr           = nullptr;
+    args.seqlen_k_ptr             = nullptr;
+    args.sink_ptr                 = nullptr;
+    args.seqlen_q                 = seqlen_q;
+    args.seqlen_k                 = seqlen_k;
+    args.batch                    = batch;
+    args.max_seqlen_q             = seqlen_q;
+    args.hdim_q                   = hdim_q;
+    args.hdim_v                   = hdim_v;
+    args.nhead_q                  = nhead_q;
+    args.nhead_k                  = nhead_k;
+    args.num_splits               = num_splits;
+    args.scale_s                  = scale;
+    args.scale_p                  = 1.0f;
+    args.scale_o                  = 1.0f;
+    args.logits_soft_cap          = 0.0f;
+
+    // BHSD strides
+    args.stride_q             = hdim_q;
+    args.stride_k             = hdim_q;
+    args.stride_v             = hdim_v;
+    args.stride_bias          = 0;
+    args.stride_o_acc         = hdim_v;
+    args.stride_o             = hdim_v;
+    args.nhead_stride_q       = static_cast<int64_t>(seqlen_q) * hdim_q;
+    args.nhead_stride_k       = static_cast<int64_t>(seqlen_k) * hdim_q;
+    args.nhead_stride_v       = static_cast<int64_t>(seqlen_k) * hdim_v;
+    args.nhead_stride_bias    = 0;
+    args.nhead_stride_lse     = seqlen_q;
+    args.nhead_stride_lse_acc = seqlen_q;
+    args.nhead_stride_o_acc   = static_cast<int64_t>(seqlen_q) * hdim_v;
+    args.nhead_stride_o       = static_cast<int64_t>(seqlen_q) * hdim_v;
+    args.batch_stride_q       = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
+    args.batch_stride_k       = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_q;
+    args.batch_stride_v       = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_v;
+    args.batch_stride_bias    = 0;
+    args.batch_stride_lse     = static_cast<int64_t>(nhead_q) * seqlen_q;
+    args.batch_stride_lse_acc = static_cast<int64_t>(nhead_q) * seqlen_q;
+    args.batch_stride_o_acc   = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
+    args.batch_stride_o       = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
+    args.split_stride_lse_acc = static_cast<int64_t>(batch) * nhead_q * seqlen_q;
+    args.split_stride_o_acc   = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v;
+    args.window_size_left     = -1;
+    args.window_size_right    = -1;
+    args.sink_size            = 0;
+    args.mask_type            = mask_type_int;
+
+    try
+    {
+        elapsed = g_dispatcher->run_fwd_splitkv(traits, args, nullptr);
+    }
+    catch(const std::exception& e)
+    {
+        fprintf(stderr, "FMHA_ERR: %s\n", e.what());
+        rc = -2;
+        goto cleanup;
+    }
+    catch(...)
+    {
+        rc = -2;
+        goto cleanup;
+    }
+
+    {
+        hipError_t cpy = hipMemcpy(o_host, o_dev, o_bytes, hipMemcpyDeviceToHost);
+        if(cpy != hipSuccess)
+            rc = -1;
+    }
+    if(time_ms_out)
+        *time_ms_out = elapsed;
+
+cleanup:
+    safe_hip_free(q_dev);
+    safe_hip_free(k_dev);
+    safe_hip_free(v_dev);
+    safe_hip_free(o_dev);
+    safe_hip_free(o_acc_dev);
+    safe_hip_free(lse_dev);
+    safe_hip_free(lse_acc_dev);
+    return rc;
+}
+
+// ---------------------------------------------------------------------------
+// Paged-KV forward: Q in standard layout, K/V in paged blocks
+// Creates a trivial contiguous page table for benchmarking.
+// ---------------------------------------------------------------------------
+int fmha_dispatcher_run_pagedkv(const void* q_host,
+                                const void* k_host,
+                                const void* v_host,
+                                void* o_host,
+                                int batch,
+                                int nhead_q,
+                                int nhead_k,
+                                int seqlen_q,
+                                int seqlen_k,
+                                int hdim_q,
+                                int hdim_v,
+                                float scale,
+                                int mask_type_int,
+                                int page_block_size,
+                                int is_v_rowmajor,
+                                const char* data_type_str,
+                                int has_lse,
+                                float* time_ms_out)
+{
+    if(!g_initialized)
+        return -1;
+
+    const int in_bytes  = dtype_input_bytes(data_type_str);
+    const int out_bytes = dtype_output_bytes(data_type_str);
+
+    int rc                  = 0;
+    const int64_t q_bytes   = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * in_bytes;
+    const int64_t k_bytes   = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * in_bytes;
+    const int64_t v_bytes   = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * in_bytes;
+    const int64_t o_bytes   = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v * out_bytes;
+    const int64_t lse_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
+    float elapsed           = 0.0f;
+
+    if(page_block_size <= 0)
+        page_block_size = 64;
+    const int pages_per_seq = (seqlen_k + page_block_size - 1) / page_block_size;
+    const int total_pages   = batch * pages_per_seq;
+
+    void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
+    void *lse_dev = nullptr, *block_table_dev = nullptr;
+    void* seqlen_k_dev = nullptr;
+
+    // Declare vectors before any HIP_CHECK to avoid goto-over-init
+    std::vector<int> block_table(total_pages);
+    for(int i = 0; i < total_pages; ++i)
+        block_table[i] = i;
+    std::vector<int> seqlen_k_vec(batch, seqlen_k);
+
+    fmha_fwd_pagedkv_traits traits{};
+    traits.hdim_q              = hdim_q;
+    traits.hdim_v              = hdim_v;
+    traits.data_type           = data_type_str ? data_type_str : "fp16";
+    traits.is_group_mode       = true;
+    traits.is_v_rowmajor       = (is_v_rowmajor != 0);
+    traits.has_logits_soft_cap = false;
+    traits.mask_type           = static_cast<mask_enum>(mask_type_int);
+    traits.bias_type           = bias_enum::no_bias;
+    traits.has_lse             = (has_lse != 0);
+    traits.use_pagedkv         = true;
+
+    fmha_fwd_pagedkv_args args{};
+
+    HIP_CHECK(hipMalloc(&q_dev, q_bytes));
+    HIP_CHECK(hipMalloc(&k_dev, k_bytes));
+    HIP_CHECK(hipMalloc(&v_dev, v_bytes));
+    HIP_CHECK(hipMalloc(&o_dev, o_bytes));
+
+    HIP_CHECK(hipMalloc(&block_table_dev, total_pages * sizeof(int)));
+    HIP_CHECK(hipMemcpy(
+        block_table_dev, block_table.data(), total_pages * sizeof(int), hipMemcpyHostToDevice));
+
+    HIP_CHECK(hipMalloc(&seqlen_k_dev, batch * sizeof(int)));
+    HIP_CHECK(
+        hipMemcpy(seqlen_k_dev, seqlen_k_vec.data(), batch * sizeof(int), hipMemcpyHostToDevice));
+
+    if(has_lse)
+    {
+        HIP_CHECK(hipMalloc(&lse_dev, lse_bytes));
+        HIP_CHECK(hipMemset(lse_dev, 0, lse_bytes));
+    }
+
+    HIP_CHECK(hipMemcpy(q_dev, q_host, q_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(k_dev, k_host, k_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(v_dev, v_host, v_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemset(o_dev, 0, o_bytes));
+
+    args.q_ptr                    = q_dev;
+    args.k_ptr                    = k_dev;
+    args.v_ptr                    = v_dev;
+    args.bias_ptr                 = nullptr;
+    args.lse_ptr                  = lse_dev;
+    args.o_ptr                    = o_dev;
+    args.block_table_ptr          = block_table_dev;
+    args.batch_stride_block_table = pages_per_seq;
+    args.page_block_size          = page_block_size;
+    args.is_gappy                 = false;
+    args.cache_batch_idx          = nullptr;
+    args.seqstart_q_ptr           = nullptr;
+    args.seqstart_k_ptr           = nullptr;
+    args.seqlen_k_ptr             = seqlen_k_dev;
+    args.sink_ptr                 = nullptr;
+    args.seqlen_q                 = seqlen_q;
+    args.seqlen_k                 = seqlen_k;
+    args.batch                    = batch;
+    args.max_seqlen_q             = seqlen_q;
+    args.hdim_q                   = hdim_q;
+    args.hdim_v                   = hdim_v;
+    args.nhead_q                  = nhead_q;
+    args.nhead_k                  = nhead_k;
+    args.scale_s                  = scale;
+    args.scale_p                  = 1.0f;
+    args.scale_o                  = 1.0f;
+    args.logits_soft_cap          = 0.0f;
+
+    // K/V stored in page table: [total_pages, nhead_k, page_block_size, hdim]
+    args.stride_q          = hdim_q;
+    args.stride_k          = hdim_q;
+    args.stride_v          = hdim_v;
+    args.stride_bias       = 0;
+    args.stride_o          = hdim_v;
+    args.nhead_stride_q    = static_cast<int64_t>(seqlen_q) * hdim_q;
+    args.nhead_stride_k    = static_cast<int64_t>(page_block_size) * hdim_q;
+    args.nhead_stride_v    = static_cast<int64_t>(page_block_size) * hdim_v;
+    args.nhead_stride_bias = 0;
+    args.nhead_stride_lse  = seqlen_q;
+    args.nhead_stride_o    = static_cast<int64_t>(seqlen_q) * hdim_v;
+    args.batch_stride_q    = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
+    args.batch_stride_k    = static_cast<int64_t>(nhead_k) * page_block_size * hdim_q;
+    args.batch_stride_v    = static_cast<int64_t>(nhead_k) * page_block_size * hdim_v;
+    args.batch_stride_bias = 0;
+    args.batch_stride_lse  = static_cast<int64_t>(nhead_q) * seqlen_q;
+    args.batch_stride_o    = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
+    args.window_size_left  = -1;
+    args.window_size_right = -1;
+    args.sink_size         = 0;
+    args.mask_type         = mask_type_int;
+    args.min_seqlen_q      = 0;
+
+    try
+    {
+        elapsed = g_dispatcher->run_fwd_pagedkv(traits, args, nullptr);
+    }
+    catch(const std::exception& e)
+    {
+        fprintf(stderr, "FMHA_ERR: %s\n", e.what());
+        rc = -2;
+        goto cleanup;
+    }
+    catch(...)
+    {
+        rc = -2;
+        goto cleanup;
+    }
+
+    {
+        hipError_t cpy = hipMemcpy(o_host, o_dev, o_bytes, hipMemcpyDeviceToHost);
+        if(cpy != hipSuccess)
+            rc = -1;
+    }
+    if(time_ms_out)
+        *time_ms_out = elapsed;
+
+cleanup:
+    safe_hip_free(q_dev);
+    safe_hip_free(k_dev);
+    safe_hip_free(v_dev);
+    safe_hip_free(o_dev);
+    safe_hip_free(lse_dev);
+    safe_hip_free(block_table_dev);
+    safe_hip_free(seqlen_k_dev);
+    return rc;
+}
+
+// ---------------------------------------------------------------------------
+// Append-KV: appends knew/vnew into K/V cache, optionally with RoPE
+// ---------------------------------------------------------------------------
+int fmha_dispatcher_run_appendkv(const void* q_host,
+                                 const void* knew_host,
+                                 const void* vnew_host,
+                                 int batch,
+                                 int nhead_q,
+                                 int nhead_k,
+                                 int seqlen_q,
+                                 int seqlen_knew,
+                                 int hdim_q,
+                                 int hdim_v,
+                                 int is_v_rowmajor,
+                                 const char* data_type_str,
+                                 float* time_ms_out)
+{
+    if(!g_initialized)
+        return -1;
+
+    const int in_bytes = dtype_input_bytes(data_type_str);
+    int rc             = 0;
+
+    const int seqlen_k    = seqlen_q + seqlen_knew;
+    const int64_t q_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * in_bytes;
+    const int64_t knew_bytes =
+        static_cast<int64_t>(batch) * nhead_k * seqlen_knew * hdim_q * in_bytes;
+    const int64_t vnew_bytes =
+        static_cast<int64_t>(batch) * nhead_k * seqlen_knew * hdim_v * in_bytes;
+    const int64_t k_bytes = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * in_bytes;
+    const int64_t v_bytes = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * in_bytes;
+    float elapsed         = 0.0f;
+
+    void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr;
+    void *knew_dev = nullptr, *vnew_dev = nullptr;
+    void* seqlen_k_dev = nullptr;
+
+    fmha_fwd_appendkv_traits traits{};
+    traits.hdim_q        = hdim_q;
+    traits.hdim_v        = hdim_v;
+    traits.data_type     = data_type_str ? data_type_str : "fp16";
+    traits.is_v_rowmajor = (is_v_rowmajor != 0);
+    traits.rope_type     = rope_enum::none;
+
+    std::vector<int> sk_vec(batch, seqlen_k - seqlen_knew);
+
+    fmha_fwd_appendkv_args args{};
+
+    HIP_CHECK(hipMalloc(&q_dev, q_bytes));
+    HIP_CHECK(hipMalloc(&k_dev, k_bytes));
+    HIP_CHECK(hipMalloc(&v_dev, v_bytes));
+    HIP_CHECK(hipMalloc(&knew_dev, knew_bytes));
+    HIP_CHECK(hipMalloc(&vnew_dev, vnew_bytes));
+
+    HIP_CHECK(hipMalloc(&seqlen_k_dev, batch * sizeof(int)));
+    HIP_CHECK(hipMemcpy(seqlen_k_dev, sk_vec.data(), batch * sizeof(int), hipMemcpyHostToDevice));
+
+    HIP_CHECK(hipMemcpy(q_dev, q_host, q_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(knew_dev, knew_host, knew_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(vnew_dev, vnew_host, vnew_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemset(k_dev, 0, k_bytes));
+    HIP_CHECK(hipMemset(v_dev, 0, v_bytes));
+
+    args.q_ptr                    = q_dev;
+    args.k_ptr                    = k_dev;
+    args.knew_ptr                 = knew_dev;
+    args.v_ptr                    = v_dev;
+    args.vnew_ptr                 = vnew_dev;
+    args.seqlen_k_ptr             = seqlen_k_dev;
+    args.seqlen_q                 = seqlen_q;
+    args.seqlen_knew              = seqlen_knew;
+    args.batch                    = batch;
+    args.hdim_q                   = hdim_q;
+    args.hdim_v                   = hdim_v;
+    args.nhead_q                  = nhead_q;
+    args.nhead_k                  = nhead_k;
+    args.rotary_cos_ptr           = nullptr;
+    args.rotary_sin_ptr           = nullptr;
+    args.rotary_dim               = 0;
+    args.has_mask                 = false;
+    args.block_table_ptr          = nullptr;
+    args.batch_stride_block_table = 0;
+    args.page_block_size          = 0;
+    args.cache_batch_idx          = nullptr;
+    args.sink_ptr                 = nullptr;
+
+    // BHSD strides
+    args.stride_q          = hdim_q;
+    args.stride_k          = hdim_q;
+    args.stride_knew       = hdim_q;
+    args.stride_v          = hdim_v;
+    args.stride_vnew       = hdim_v;
+    args.nhead_stride_q    = static_cast<int64_t>(seqlen_q) * hdim_q;
+    args.nhead_stride_k    = static_cast<int64_t>(seqlen_k) * hdim_q;
+    args.nhead_stride_knew = static_cast<int64_t>(seqlen_knew) * hdim_q;
+    args.nhead_stride_v    = static_cast<int64_t>(seqlen_k) * hdim_v;
+    args.nhead_stride_vnew = static_cast<int64_t>(seqlen_knew) * hdim_v;
+    args.batch_stride_q    = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
+    args.batch_stride_k    = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_q;
+    args.batch_stride_knew = static_cast<int64_t>(nhead_k) * seqlen_knew * hdim_q;
+    args.batch_stride_v    = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_v;
+    args.batch_stride_vnew = static_cast<int64_t>(nhead_k) * seqlen_knew * hdim_v;
+
+    try
+    {
+        elapsed = g_dispatcher->run_fwd_appendkv(traits, args, nullptr);
+    }
+    catch(const std::exception& e)
+    {
+        fprintf(stderr, "FMHA_ERR: %s\n", e.what());
+        rc = -2;
+        goto cleanup;
+    }
+    catch(...)
+    {
+        rc = -2;
+        goto cleanup;
+    }
+
+    if(time_ms_out)
+        *time_ms_out = elapsed;
+
+cleanup:
+    safe_hip_free(q_dev);
+    safe_hip_free(k_dev);
+    safe_hip_free(v_dev);
+    safe_hip_free(knew_dev);
+    safe_hip_free(vnew_dev);
+    safe_hip_free(seqlen_k_dev);
+    return rc;
+}
+
+// ---------------------------------------------------------------------------
+// Batch Prefill: group-mode forward with paged KV cache
+// ---------------------------------------------------------------------------
+int fmha_dispatcher_run_batch_prefill(const void* q_host,
+                                      const void* k_host,
+                                      const void* v_host,
+                                      void* o_host,
+                                      int batch,
+                                      int nhead_q,
+                                      int nhead_k,
+                                      int seqlen_q,
+                                      int seqlen_k,
+                                      int hdim_q,
+                                      int hdim_v,
+                                      float scale,
+                                      int mask_type_int,
+                                      int page_block_size,
+                                      int is_v_rowmajor,
+                                      const char* data_type_str,
+                                      int has_lse,
+                                      float* time_ms_out)
+{
+    if(!g_initialized)
+        return -1;
+
+    const int in_bytes  = dtype_input_bytes(data_type_str);
+    const int out_bytes = dtype_output_bytes(data_type_str);
+
+    int rc                  = 0;
+    const int64_t q_bytes   = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * in_bytes;
+    const int64_t o_bytes   = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v * out_bytes;
+    const int64_t lse_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
+    float elapsed           = 0.0f;
+
+    if(page_block_size <= 0)
+        page_block_size = 64;
+    const int pages_per_seq     = (seqlen_k + page_block_size - 1) / page_block_size;
+    const int total_pages       = batch * pages_per_seq;
+    const int64_t kv_page_bytes = static_cast<int64_t>(total_pages) * nhead_k * page_block_size *
+                                  std::max(hdim_q, hdim_v) * in_bytes;
+
+    void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
+    void *lse_dev = nullptr, *seqstart_q_dev = nullptr;
+    void *kv_indptr_dev = nullptr, *kv_page_indices_dev = nullptr, *kv_last_page_dev = nullptr;
+    void* seqlen_k_dev = nullptr;
+
+    fmha_batch_prefill_traits traits{};
+    traits.hdim_q              = hdim_q;
+    traits.hdim_v              = hdim_v;
+    traits.data_type           = data_type_str ? data_type_str : "fp16";
+    traits.is_group_mode       = true;
+    traits.is_v_rowmajor       = (is_v_rowmajor != 0);
+    traits.mask_type           = static_cast<mask_enum>(mask_type_int);
+    traits.bias_type           = bias_enum::no_bias;
+    traits.has_lse             = (has_lse != 0);
+    traits.has_dropout         = false;
+    traits.has_logits_soft_cap = false;
+    traits.skip_min_seqlen_q   = false;
+    traits.has_sink            = false;
+    traits.qscale_type         = quant_scale_enum::no_scale;
+    traits.kv_memory_layout    = ck_tile::BlockAttentionKVCacheMemoryLayoutEnum::VECTORIZED_LAYOUT;
+    traits.kv_lookup_table = ck_tile::BlockAttentionKVCacheLookupTableEnum::SGLANG_PAGE_TABLE_1D;
+    traits.page_size       = page_block_size;
+
+    // Declare all vectors before HIP_CHECK to avoid goto-over-init
+    std::vector<int> seqstart_q(batch + 1);
+    for(int b = 0; b <= batch; ++b)
+        seqstart_q[b] = b * seqlen_q;
+    std::vector<int> kv_indptr(batch + 1);
+    for(int b = 0; b <= batch; ++b)
+        kv_indptr[b] = b * pages_per_seq;
+    std::vector<int> kv_page_indices(total_pages);
+    for(int i = 0; i < total_pages; ++i)
+        kv_page_indices[i] = i;
+    std::vector<int> last_page(batch);
+    for(int b = 0; b < batch; ++b)
+        last_page[b] = seqlen_k - (pages_per_seq - 1) * page_block_size;
+    std::vector<int> sk_vec(batch, seqlen_k);
+
+    fmha_batch_prefill_args args{};
+
+    HIP_CHECK(hipMalloc(&q_dev, q_bytes));
+    HIP_CHECK(hipMalloc(&k_dev, kv_page_bytes));
+    HIP_CHECK(hipMalloc(&v_dev, kv_page_bytes));
+    HIP_CHECK(hipMalloc(&o_dev, o_bytes));
+
+    HIP_CHECK(hipMalloc(&seqstart_q_dev, (batch + 1) * sizeof(int)));
+    HIP_CHECK(hipMemcpy(
+        seqstart_q_dev, seqstart_q.data(), (batch + 1) * sizeof(int), hipMemcpyHostToDevice));
+
+    HIP_CHECK(hipMalloc(&kv_indptr_dev, (batch + 1) * sizeof(int)));
+    HIP_CHECK(hipMemcpy(
+        kv_indptr_dev, kv_indptr.data(), (batch + 1) * sizeof(int), hipMemcpyHostToDevice));
+
+    HIP_CHECK(hipMalloc(&kv_page_indices_dev, total_pages * sizeof(int)));
+    HIP_CHECK(hipMemcpy(kv_page_indices_dev,
+                        kv_page_indices.data(),
+                        total_pages * sizeof(int),
+                        hipMemcpyHostToDevice));
+
+    HIP_CHECK(hipMalloc(&kv_last_page_dev, batch * sizeof(int)));
+    HIP_CHECK(
+        hipMemcpy(kv_last_page_dev, last_page.data(), batch * sizeof(int), hipMemcpyHostToDevice));
+
+    HIP_CHECK(hipMalloc(&seqlen_k_dev, batch * sizeof(int)));
+    HIP_CHECK(hipMemcpy(seqlen_k_dev, sk_vec.data(), batch * sizeof(int), hipMemcpyHostToDevice));
+
+    if(has_lse)
+    {
+        HIP_CHECK(hipMalloc(&lse_dev, lse_bytes));
+        HIP_CHECK(hipMemset(lse_dev, 0, lse_bytes));
+    }
+
+    HIP_CHECK(hipMemcpy(q_dev, q_host, q_bytes, hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemset(k_dev, 0, kv_page_bytes));
+    HIP_CHECK(hipMemset(v_dev, 0, kv_page_bytes));
+    HIP_CHECK(hipMemset(o_dev, 0, o_bytes));
+
+    args.q_ptr             = q_dev;
+    args.k_ptr             = k_dev;
+    args.v_ptr             = v_dev;
+    args.bias_ptr          = nullptr;
+    args.q_descale_ptr     = nullptr;
+    args.k_descale_ptr     = nullptr;
+    args.v_descale_ptr     = nullptr;
+    args.rand_val_ptr      = nullptr;
+    args.lse_ptr           = lse_dev;
+    args.o_ptr             = o_dev;
+    args.seqstart_q_ptr    = seqstart_q_dev;
+    args.sink_ptr          = nullptr;
+    args.seqlen_q          = seqlen_q;
+    args.seqlen_k          = seqlen_k;
+    args.batch             = batch;
+    args.max_seqlen_q      = seqlen_q;
+    args.hdim_q            = hdim_q;
+    args.hdim_v            = hdim_v;
+    args.nhead_q           = nhead_q;
+    args.nhead_k           = nhead_k;
+    args.num_total_pages   = total_pages;
+    args.page_block_size   = page_block_size;
+    args.kv_memory_layout  = ck_tile::BlockAttentionKVCacheMemoryLayoutEnum::VECTORIZED_LAYOUT;
+    args.kv_lookup_table   = ck_tile::BlockAttentionKVCacheLookupTableEnum::SGLANG_PAGE_TABLE_1D;
+    args.kv_indptr         = kv_indptr_dev;
+    args.kv_page_indices   = kv_page_indices_dev;
+    args.kv_last_page_lens = kv_last_page_dev;
+    args.seqlen_k_ptr      = seqlen_k_dev;
+    args.batch_stride_block_table = pages_per_seq;
+    args.scale_s                  = scale;
+    args.scale_p                  = 1.0f;
+    args.scale_o                  = 1.0f;
+    args.logits_soft_cap          = 0.0f;
+
+    // Group-mode strides: [total_tokens, nhead, hdim]
+    args.stride_q             = nhead_q * hdim_q;
+    args.stride_k             = hdim_q;
+    args.stride_v             = hdim_v;
+    args.stride_bias          = 0;
+    args.stride_randval       = 0;
+    args.stride_o             = nhead_q * hdim_v;
+    args.nhead_stride_q       = hdim_q;
+    args.nhead_stride_k       = static_cast<int64_t>(page_block_size) * hdim_q;
+    args.nhead_stride_v       = static_cast<int64_t>(page_block_size) * hdim_v;
+    args.nhead_stride_bias    = 0;
+    args.nhead_stride_randval = 0;
+    args.nhead_stride_lse     = seqlen_q;
+    args.nhead_stride_o       = hdim_v;
+    args.batch_stride_q       = 0;
+    args.batch_stride_k       = static_cast<int64_t>(nhead_k) * page_block_size * hdim_q;
+    args.batch_stride_v       = static_cast<int64_t>(nhead_k) * page_block_size * hdim_v;
+    args.batch_stride_bias    = 0;
+    args.batch_stride_randval = 0;
+    args.batch_stride_lse     = static_cast<int64_t>(nhead_q) * seqlen_q;
+    args.batch_stride_o       = 0;
+    args.window_size_left     = -1;
+    args.window_size_right    = -1;
+    args.sink_size            = 0;
+    args.mask_type            = mask_type_int;
+
+    try
+    {
+        elapsed = g_dispatcher->run_batch_prefill(traits, args, nullptr);
+    }
+    catch(const std::exception& e)
+    {
+        fprintf(stderr, "FMHA_ERR: %s\n", e.what());
+        rc = -2;
+        goto cleanup;
+    }
+    catch(...)
+    {
+        rc = -2;
+        goto cleanup;
+    }
+
+    {
+        hipError_t cpy = hipMemcpy(o_host, o_dev, o_bytes, hipMemcpyDeviceToHost);
+        if(cpy != hipSuccess)
+            rc = -1;
+    }
+    if(time_ms_out)
+        *time_ms_out = elapsed;
+
+cleanup:
+    safe_hip_free(q_dev);
+    safe_hip_free(k_dev);
+    safe_hip_free(v_dev);
+    safe_hip_free(o_dev);
+    safe_hip_free(lse_dev);
+    safe_hip_free(seqstart_q_dev);
+    safe_hip_free(kv_indptr_dev);
+    safe_hip_free(kv_page_indices_dev);
+    safe_hip_free(kv_last_page_dev);
+    safe_hip_free(seqlen_k_dev);
     return rc;
 }
 

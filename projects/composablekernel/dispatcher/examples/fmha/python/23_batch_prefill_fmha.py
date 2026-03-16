@@ -363,7 +363,7 @@ def main():
         prob = FmhaProblem(
             batch=1,
             nhead_q=args.nhead_q,
-            nhead_k=args.nhead_q,
+            nhead_k=args.nhead_k,
             seqlen_q=64,
             seqlen_k=256,
             hdim_q=args.hdim,

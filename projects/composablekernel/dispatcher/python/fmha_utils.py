@@ -348,6 +348,54 @@ def cpu_attention_fwd(
     return np.matmul(P, V)
 
 
+def cpu_attention_fwd_with_intermediates(
+    Q: np.ndarray, K: np.ndarray, V: np.ndarray, scale: float
+) -> tuple:
+    """CPU reference forward returning (output, P) for backward use.
+
+    Same as cpu_attention_fwd but also returns the softmax probability matrix P.
+    """
+    nhead_q = Q.shape[1]
+    nhead_k = K.shape[1]
+    if nhead_q != nhead_k:
+        ratio = nhead_q // nhead_k
+        K = np.repeat(K, ratio, axis=1)
+        V = np.repeat(V, ratio, axis=1)
+    S = np.matmul(Q, K.transpose(0, 1, 3, 2)) * scale
+    S_max = S.max(axis=-1, keepdims=True)
+    S_exp = np.exp(S - S_max)
+    P = S_exp / S_exp.sum(axis=-1, keepdims=True)
+    out = np.matmul(P, V)
+    return out, P
+
+
+def cpu_attention_bwd(
+    Q: np.ndarray,
+    K: np.ndarray,
+    V: np.ndarray,
+    out: np.ndarray,
+    dO: np.ndarray,
+    P: np.ndarray,
+    scale: float,
+) -> tuple:
+    """CPU reference backward. Returns (dQ, dK, dV).
+
+    Args:
+        Q, K, V: forward inputs [batch, heads, seq, dim]
+        out: forward output
+        dO: gradient of output
+        P: softmax probabilities from forward
+        scale: attention scale factor
+    """
+    D = (dO * out).sum(axis=-1, keepdims=True)
+    dP = np.matmul(dO, V.transpose(0, 1, 3, 2))
+    dS = P * (dP - D)
+    dQ = np.matmul(dS, K) * scale
+    dK = np.matmul(dS.transpose(0, 1, 3, 2), Q) * scale
+    dV = np.matmul(P.transpose(0, 1, 3, 2), dO)
+    return dQ, dK, dV
+
+
 # =============================================================================
 # Low-level ctypes wrapper
 # =============================================================================
@@ -396,6 +444,9 @@ class FmhaDispatcherLib:
             ctypes.c_int,  # is_group_mode
             ctypes.c_int,  # window_left (-1=no window)
             ctypes.c_int,  # window_right (-1=no window, 0=causal)
+            ctypes.c_int,  # has_logits
+            ctypes.c_int,  # has_sink
+            ctypes.c_int,  # has_skip
             ctypes.POINTER(ctypes.c_float),  # time_ms_out
         ]
         lib.fmha_dispatcher_run_fwd.restype = ctypes.c_int
@@ -421,6 +472,94 @@ class FmhaDispatcherLib:
             ctypes.POINTER(ctypes.c_float),  # time_ms_out
         ]
         lib.fmha_dispatcher_run_bwd.restype = ctypes.c_int
+
+        # Split-KV forward
+        lib.fmha_dispatcher_run_splitkv.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_float,
+            ctypes.c_int,  # mask_type
+            ctypes.c_int,  # num_splits
+            ctypes.c_int,  # is_v_rowmajor
+            ctypes.c_char_p,
+            ctypes.c_int,  # data_type, has_lse
+            ctypes.POINTER(ctypes.c_float),
+        ]
+        lib.fmha_dispatcher_run_splitkv.restype = ctypes.c_int
+
+        # Paged-KV forward
+        lib.fmha_dispatcher_run_pagedkv.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_float,
+            ctypes.c_int,  # mask_type
+            ctypes.c_int,  # page_block_size
+            ctypes.c_int,  # is_v_rowmajor
+            ctypes.c_char_p,
+            ctypes.c_int,  # data_type, has_lse
+            ctypes.POINTER(ctypes.c_float),
+        ]
+        lib.fmha_dispatcher_run_pagedkv.restype = ctypes.c_int
+
+        # Append-KV
+        lib.fmha_dispatcher_run_appendkv.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.POINTER(ctypes.c_float),
+        ]
+        lib.fmha_dispatcher_run_appendkv.restype = ctypes.c_int
+
+        # Batch Prefill
+        lib.fmha_dispatcher_run_batch_prefill.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.c_float,
+            ctypes.c_int,  # mask_type
+            ctypes.c_int,  # page_block_size
+            ctypes.c_int,  # is_v_rowmajor
+            ctypes.c_char_p,
+            ctypes.c_int,  # data_type, has_lse
+            ctypes.POINTER(ctypes.c_float),
+        ]
+        lib.fmha_dispatcher_run_batch_prefill.restype = ctypes.c_int
+
         lib.fmha_dispatcher_kernel_count.argtypes = []
         lib.fmha_dispatcher_kernel_count.restype = ctypes.c_int
         lib.fmha_dispatcher_cleanup.argtypes = []
@@ -566,7 +705,11 @@ class FmhaRunner:
         bias_type: int = 0,
         has_lse: int = 0,
         has_dropout: int = 0,
-    ) -> FmhaResult:
+        has_logits: int = 0,
+        has_sink: int = 0,
+        has_skip: int = 0,
+        api_family: str = "fwd",
+    ) -> "FmhaResult":
         """Run FMHA forward on GPU with automatic HIP memory management.
 
         Args:
@@ -596,33 +739,118 @@ class FmhaRunner:
             self._hip.hipMemset(d_o, 0, O_c.nbytes)
 
             time_ms = ctypes.c_float(0.0)
-            rc = self._lib._lib.fmha_dispatcher_run_fwd(
-                d_q,
-                d_k,
-                d_v,
-                d_o,
-                prob.batch,
-                prob.nhead_q,
-                prob.nhead_k,
-                prob.seqlen_q,
-                prob.seqlen_k,
-                prob.hdim_q,
-                prob.hdim_v,
-                prob.scale,
-                mask_type,
-                bias_type,
-                has_lse,
-                has_dropout,
-                0,
-                0,  # traits_hdim_q/v (0 = same as hdim)
-                1,  # is_v_rowmajor
-                1,  # perm (1=BHSD)
-                b"fp16",
-                0,  # is_group_mode
-                -1,  # window_left (no window)
-                -1,  # window_right (no window)
-                ctypes.byref(time_ms),
-            )
+            lib = self._lib._lib
+
+            if api_family == "splitkv":
+                rc = lib.fmha_dispatcher_run_splitkv(
+                    d_q,
+                    d_k,
+                    d_v,
+                    d_o,
+                    prob.batch,
+                    prob.nhead_q,
+                    prob.nhead_k,
+                    prob.seqlen_q,
+                    prob.seqlen_k,
+                    prob.hdim_q,
+                    prob.hdim_v,
+                    prob.scale,
+                    mask_type,
+                    4,
+                    1,
+                    b"fp16",
+                    has_lse,
+                    ctypes.byref(time_ms),
+                )
+            elif api_family == "pagedkv":
+                rc = lib.fmha_dispatcher_run_pagedkv(
+                    d_q,
+                    d_k,
+                    d_v,
+                    d_o,
+                    prob.batch,
+                    prob.nhead_q,
+                    prob.nhead_k,
+                    prob.seqlen_q,
+                    prob.seqlen_k,
+                    prob.hdim_q,
+                    prob.hdim_v,
+                    prob.scale,
+                    mask_type,
+                    64,
+                    1,
+                    b"fp16",
+                    has_lse,
+                    ctypes.byref(time_ms),
+                )
+            elif api_family == "appendkv":
+                rc = lib.fmha_dispatcher_run_appendkv(
+                    d_q,
+                    d_k,
+                    d_v,
+                    prob.batch,
+                    prob.nhead_q,
+                    prob.nhead_k,
+                    prob.seqlen_q,
+                    prob.seqlen_k,
+                    prob.hdim_q,
+                    prob.hdim_v,
+                    1,
+                    b"fp16",
+                    ctypes.byref(time_ms),
+                )
+            elif api_family == "batch_prefill":
+                rc = lib.fmha_dispatcher_run_batch_prefill(
+                    d_q,
+                    d_k,
+                    d_v,
+                    d_o,
+                    prob.batch,
+                    prob.nhead_q,
+                    prob.nhead_k,
+                    prob.seqlen_q,
+                    prob.seqlen_k,
+                    prob.hdim_q,
+                    prob.hdim_v,
+                    prob.scale,
+                    mask_type,
+                    64,
+                    1,
+                    b"fp16",
+                    has_lse,
+                    ctypes.byref(time_ms),
+                )
+            else:
+                rc = lib.fmha_dispatcher_run_fwd(
+                    d_q,
+                    d_k,
+                    d_v,
+                    d_o,
+                    prob.batch,
+                    prob.nhead_q,
+                    prob.nhead_k,
+                    prob.seqlen_q,
+                    prob.seqlen_k,
+                    prob.hdim_q,
+                    prob.hdim_v,
+                    prob.scale,
+                    mask_type,
+                    bias_type,
+                    has_lse,
+                    has_dropout,
+                    0,
+                    0,
+                    1,
+                    1,
+                    b"fp16",
+                    0,
+                    -1,
+                    -1,
+                    has_logits,
+                    has_sink,
+                    has_skip,
+                    ctypes.byref(time_ms),
+                )
 
             if rc != 0:
                 return FmhaResult(success=False, error=f"Kernel failed (rc={rc})")
@@ -640,6 +868,74 @@ class FmhaRunner:
 
         finally:
             for d in [d_q, d_k, d_v, d_o]:
+                if d.value:
+                    self._hip.hipFree(d)
+
+    def run_bwd(
+        self,
+        Q: np.ndarray,
+        K: np.ndarray,
+        V: np.ndarray,
+        out: np.ndarray,
+        LSE: np.ndarray,
+        dO: np.ndarray,
+        prob: FmhaProblem,
+        data_type: str = "fp16",
+    ) -> "FmhaResult":
+        """Run FMHA backward on GPU with automatic HIP memory management.
+
+        Returns FmhaResult with dQ, dK, dV packed in output as a tuple.
+        """
+        Q_c = np.ascontiguousarray(Q.astype(np.float16))
+        K_c = np.ascontiguousarray(K.astype(np.float16))
+        V_c = np.ascontiguousarray(V.astype(np.float16))
+        O_c = np.ascontiguousarray(out.astype(np.float16))
+        LSE_c = np.ascontiguousarray(LSE.astype(np.float32))
+        dO_c = np.ascontiguousarray(dO.astype(np.float16))
+        dQ_c = np.zeros_like(Q_c)
+        dK_c = np.zeros_like(K_c)
+        dV_c = np.zeros_like(V_c)
+
+        ptrs = [ctypes.c_void_p() for _ in range(9)]
+        d_q, d_k, d_v, d_o, d_lse, d_do, d_dq, d_dk, d_dv = ptrs
+
+        try:
+            for d, arr in zip(ptrs[:6], [Q_c, K_c, V_c, O_c, LSE_c, dO_c]):
+                self._hip.hipMalloc(ctypes.byref(d), arr.nbytes)
+                self._hip.hipMemcpy(d, arr.ctypes.data, arr.nbytes, self.HIP_MEMCPY_H2D)
+            for d, arr in zip(ptrs[6:], [dQ_c, dK_c, dV_c]):
+                self._hip.hipMalloc(ctypes.byref(d), arr.nbytes)
+                self._hip.hipMemset(d, 0, arr.nbytes)
+
+            rc, elapsed = self._lib.run_bwd(
+                d_q,
+                d_k,
+                d_v,
+                d_o,
+                d_lse,
+                d_do,
+                d_dq,
+                d_dk,
+                d_dv,
+                prob,
+                data_type,
+            )
+
+            if rc != 0:
+                return FmhaResult(success=False, error=f"BWD kernel failed (rc={rc})")
+
+            for d, arr in zip(ptrs[6:], [dQ_c, dK_c, dV_c]):
+                self._hip.hipMemcpy(arr.ctypes.data, d, arr.nbytes, self.HIP_MEMCPY_D2H)
+
+            tflops = prob.num_ops / (elapsed * 1e-3) / 1e12 if elapsed > 0 else 0.0
+            return FmhaResult(
+                success=True,
+                output=(dQ_c, dK_c, dV_c),
+                time_ms=elapsed,
+                tflops=tflops,
+            )
+        finally:
+            for d in ptrs:
                 if d.value:
                     self._hip.hipFree(d)
 
@@ -1136,39 +1432,3 @@ def spec_to_config(
 # =============================================================================
 # Split-K heuristic (from fmhaarch.md Section 9.5)
 # =============================================================================
-
-
-def num_splits_heuristic_ck(
-    batch: int,
-    nheads: int,
-    seqlen_q: int,
-    tile_m0: int = 128,
-    num_cus: int = 304,
-    min_util_rate: float = 0.85,
-) -> int:
-    """Recommend num_splits for split-KV, matching CK's heuristic.
-
-    Args:
-        batch: batch size
-        nheads: number of Q heads
-        seqlen_q: query sequence length
-        tile_m0: tile size in seqlen_q dimension
-        num_cus: number of compute units on GPU (gfx950: 304)
-        min_util_rate: minimum CU utilization threshold
-
-    Returns:
-        Recommended num_splits (1 means no split)
-    """
-    import math
-
-    m_blocks = math.ceil(seqlen_q / tile_m0) if tile_m0 > 0 else 1
-    batch_nheads_mblocks = batch * nheads * m_blocks
-
-    if batch_nheads_mblocks >= num_cus * min_util_rate:
-        return 1
-
-    for splits in [2, 4, 8, 16, 32]:
-        if batch_nheads_mblocks * splits >= num_cus * min_util_rate:
-            return splits
-
-    return 1

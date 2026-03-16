@@ -39,42 +39,12 @@ from fmha_utils import (
     FmhaProblem,
     setup_fmha_dispatcher,
     detect_gpu_arch,
+    cpu_attention_fwd_with_intermediates,
+    cpu_attention_bwd,
 )
 
 
-def cpu_fwd_with_intermediates(
-    Q: np.ndarray,
-    K: np.ndarray,
-    V: np.ndarray,
-    scale: float,
-) -> tuple:
-    """Forward returning out, P for backward."""
-    S = np.matmul(Q, K.transpose(0, 1, 3, 2)) * scale
-    S_max = S.max(axis=-1, keepdims=True)
-    S_exp = np.exp(S - S_max)
-    S_sum = S_exp.sum(axis=-1, keepdims=True)
-    P = S_exp / S_sum
-    out = np.matmul(P, V)
-    return out, P
-
-
-def cpu_attention_bwd(
-    Q: np.ndarray,
-    K: np.ndarray,
-    V: np.ndarray,
-    out: np.ndarray,
-    dO: np.ndarray,
-    P: np.ndarray,
-    scale: float,
-) -> tuple:
-    """CPU backward. Returns (dQ, dK, dV)."""
-    D = (dO * out).sum(axis=-1, keepdims=True)
-    dP = np.matmul(dO, V.transpose(0, 1, 3, 2))
-    dS = P * (dP - D)
-    dQ = np.matmul(dS, K) * scale
-    dK = np.matmul(dS.transpose(0, 1, 3, 2), Q) * scale
-    dV = np.matmul(P.transpose(0, 1, 3, 2), dO)
-    return dQ, dK, dV
+cpu_fwd_with_intermediates = cpu_attention_fwd_with_intermediates
 
 
 def bwd_flops(prob: FmhaProblem) -> int:

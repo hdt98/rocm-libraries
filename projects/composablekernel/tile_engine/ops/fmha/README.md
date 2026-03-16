@@ -1,65 +1,95 @@
 # FMHA Tile Engine
 
-Benchmarking and kernel enumeration for Fused Multi-Head Attention via the CK dispatcher's JIT pipeline.
+Benchmarking and kernel enumeration for Fused Multi-Head Attention (FMHA) via the CK dispatcher's pipelined JIT compilation.
+
+Covers all 9 FMHA kernel families: Forward, Split-KV (main + combine), Paged-KV, Append-KV, Batch Prefill, and Backward (dot\_do\_o, dq\_dk\_dv, convert\_dq) -- totaling 33,541 unique kernel specializations on gfx950.
+
+## Directory Layout
+
+```
+fmha/
+  fmha_instance_builder.py     Kernel enumeration from JSON config + pipeline rules
+  fmha_benchmark.py            Single-config JIT compile and GPU benchmark
+  fmha_full_benchmark.py       Full sweep: compile all kernels, benchmark across test shapes
+  ck_fmha_testing_matrix.yaml  Test shapes (smoke / full / nightly)
+  CMakeLists.txt               CMake targets
+  README.md                    This file
+  configs/                     Sweep definitions (JSON)
+    receipt0_fwd.json             Full receipt-0 forward: ~12K kernels
+    fwd.json                      Forward variants
+    fwd_ci.json                   Minimal CI subset
+    bwd.json                      Backward variants
+    splitkv.json                  Split-KV
+    appendkv.json                 Append-KV
+    pagedkv.json                  Paged-KV
+    batch_prefill.json            Batch prefill
+  filters/                     Sample Python filter scripts
+    h128_no_dropout.py            Keep only h128 without dropout
+```
 
 ## Quick Start
 
 ```bash
-# Minimal CI test (16 kernels, ~1 min)
+# Count kernels without compiling
+python fmha_instance_builder.py configs/receipt0_fwd.json --count-only
+
+# Minimal CI build + run (~16 kernels, <1 min)
 python fmha_benchmark.py configs/fwd_ci.json --workers 128 --verify
 
-# Full receipt-0 sweep (11,980 kernels, ~35 min with 256 workers)
+# Full forward receipt-0 compile-only (12K kernels, ~10 min with 256 workers)
 python fmha_benchmark.py configs/receipt0_fwd.json --workers 256 --compile-only
 
-# Count configs without building
-python fmha_instance_builder.py configs/receipt0_fwd.json --count-only
+# Full sweep: compile every fwd kernel, benchmark against all smoke shapes
+python fmha_full_benchmark.py --category smoke --variant fwd --workers 256
+
+# Quick end-to-end test (2 kernels, 1 shape)
+python fmha_full_benchmark.py --category smoke --variant fwd --max-kernels 2 --workers 4
 ```
 
-## Architecture
+## How It Works
+
+### Kernel Enumeration
 
 ```
-fmha/
-  fmha_instance_builder.py   # Kernel enumeration (JSON config + pipeline rules)
-  fmha_benchmark.py          # JIT compile + GPU benchmark runner
-  CMakeLists.txt             # CMake targets (benchmark_fmha, benchmark_fmha_ci, etc.)
-  configs/                   # Sweep definitions (JSON)
-    receipt0_fwd.json        # Full receipt-0: 11,980 kernels on gfx950
-    fwd_ci.json              # Minimal CI: fp16, qr_async, batch, no features
-    fwd.json                 # Forward variants
-    bwd.json                 # Backward variants
-    splitkv.json             # Split-KV
-    appendkv.json            # Append-KV
-    pagedkv.json             # Paged-KV
-    batch_prefill.json       # Batch prefill
-  filters/                   # Sample Python filter files
-    h128_no_dropout.py       # Example: keep only h128 without dropout
+JSON config (variant + trait_config allow-list)
+  --> fmha_instance_builder.py
+    --> fmha_pipeline_rules.py (self-contained CK parity logic)
+      --> fmha_arch_specs.json (tile tables per arch / dtype / hdim)
+        --> list of FmhaKernelConfig (33,541 total on gfx950)
+          --> optional --filter / --filter-file
 ```
 
-The kernel enumeration pipeline:
+The pipeline rules in `dispatcher/codegen/fmha_pipeline_rules.py` reproduce the exact kernel enumeration from CK Tile's `01_fmha/codegen/`, including per-arch tile constraints, pipeline selection, padding variants, and feature products. Parity is verified by `dispatcher/tests/validate_arch_specs_parity.py`.
 
-```
-JSON config (trait_config allow-list)
-  --> fmha_pipeline_rules.py (self-contained CK parity rules)
-    --> fmha_arch_specs.json (tile tables per arch/dtype/hdim)
-      --> FmhaKernelConfig list (11,980 for receipt-0 gfx950)
-        --> optional --filter / --filter-file
-          --> setup_multiple_fmha_dispatchers() (3-stage pipelined JIT)
-            --> GPU benchmark
-```
+### Benchmark Tools
+
+**`fmha_benchmark.py`** -- single-config benchmark. Input: one JSON config (kernel definitions). JIT-compiles all matching kernels, runs each on a given problem size, reports per-kernel timing and optional CPU validation. Optionally writes `--csv` output.
+
+**`fmha_full_benchmark.py`** -- full sweep benchmark. Input: `ck_fmha_testing_matrix.yaml` (test shapes) + JSON configs (kernel definitions). Compiles all kernel variants for selected families, then iterates over test shapes, matching each shape to compatible compiled kernels and benchmarking every match. Writes `--csv` and `--json` output.
+
+### JIT Compilation Pipeline
+
+Both tools use the dispatcher's `setup_multiple_fmha_dispatchers()` which implements a 3-stage pipelined build:
+
+1. **Codegen** (parallel) -- generate C++ kernel specializations and ctypes wrappers
+2. **Compile** (parallel) -- `hipcc` compile each kernel and ctypes lib
+3. **Link + Load** (parallel) -- produce `.so` libraries, load via ctypes
+
+With 256 workers, throughput is roughly 5-10 kernels/sec depending on kernel complexity.
 
 ## JSON Config Format
 
-Each JSON config specifies a `variant` and an optional `trait_config` that acts as an allow-list filter over the pipeline rules output.
+Each config specifies a `variant` and an optional `trait_config` that acts as an allow-list filter:
 
 ```json
 {
   "variant": "fwd",
   "trait_config": {
-    "data_type": {"values": ["fp16"]},
+    "data_type": {"values": ["fp16", "bf16"]},
     "pipeline": {"values": ["qr_async"]},
+    "mode": {"values": ["batch"]},
     "mask": {"values": ["no"]},
     "bias": {"values": ["no"]},
-    "mode": {"values": ["batch"]},
     "lse": {"values": [false]},
     "dropout": {"values": [false]},
     "logits": {"values": [false]},
@@ -68,42 +98,67 @@ Each JSON config specifies a `variant` and an optional `trait_config` that acts 
 }
 ```
 
-If a trait key is absent, all values pass (no filtering on that dimension). The `receipt0_fwd.json` config only specifies `data_type` to exclude fp32, letting everything else through for the full 11,980-kernel set.
+If a trait key is absent, all values pass. The `receipt0_fwd.json` config only restricts `data_type` to exclude fp32, giving the full ~12K forward kernel set.
 
 ## Filtering
 
-### CLI expression filter
+### CLI expression
 
 ```bash
-# Only h128 qr_async kernels
 python fmha_benchmark.py configs/receipt0_fwd.json \
     --filter "c.hdim_q == 128 and c.pipeline == 'qr_async'"
 
-# Only fp8 kernels with blockscale
-python fmha_instance_builder.py configs/receipt0_fwd.json \
-    --filter "c.qscale == 'blockscale'" --count-only
+python fmha_full_benchmark.py --variant fwd \
+    --filter "c.hdim_q == 128 and c.hdim_v == 128 and c.data_type == 'fp16'"
 ```
 
-The expression has access to `c` (the `FmhaKernelConfig` dataclass) with fields: `data_type`, `mode`, `hdim_q`, `hdim_v`, `pipeline`, `tile_m0`, `tile_n0`, `tile_k0`, `pad_s`, `pad_sk`, `pad_d`, `pad_dv`, `mask`, `bias`, `lse`, `dropout`, `logits`, `sink`, `skip_min_seqlen_q`, `qscale`.
+The expression accesses `c` (an `FmhaKernelConfig` dataclass) with fields: `data_type`, `mode`, `hdim_q`, `hdim_v`, `pipeline`, `tile_m0`, `tile_n0`, `tile_k0`, `pad_s`, `pad_sk`, `pad_d`, `pad_dv`, `mask`, `bias`, `lse`, `dropout`, `logits`, `sink`, `skip_min_seqlen_q`, `qscale`, `paged_kv`, `rope`, `deterministic`, `dbias`, `dropout_variant`.
 
 ### Python file filter
 
 ```bash
-python fmha_benchmark.py configs/receipt0_fwd.json \
-    --filter-file filters/h128_no_dropout.py
+python fmha_benchmark.py configs/receipt0_fwd.json --filter-file filters/h128_no_dropout.py
 ```
 
-The file must define `filter_config(c) -> bool`. See `filters/h128_no_dropout.py` for a template.
+The file must define `filter_config(c) -> bool`. Both `--filter` and `--filter-file` combine with AND logic.
 
-Both `--filter` and `--filter-file` can be combined (AND logic).
+## Test Shape Matrix
 
-## Parity with CK
+`ck_fmha_testing_matrix.yaml` defines test problems in three tiers:
 
-The dispatcher's `fmha_pipeline_rules.py` reproduces the exact kernel filtering logic from CK Tile's `01_fmha/codegen/ops/fmha_fwd.py` -- including per-arch tile constraints, pipeline selection rules, and receipt filters. Run the parity test to verify:
+| Category | Purpose | Shapes |
+|----------|---------|--------|
+| `smoke`  | Pre-submit sanity, <5 min | ~365 |
+| `full`   | Post-submit validation | smoke + ~1,500 |
+| `nightly`| Exhaustive sweep | all |
 
-```bash
-python dispatcher/tests/validate_arch_specs_parity.py --arch gfx950 --receipt 0
-# PASS: 11,980 kernels, 37 categories all match
+Shapes cover representative configurations: GQA ratios, asymmetric head dims, non-power-of-2 sequences, FP8 variants, long sequences, and cross-attention patterns.
+
+## Output Format
+
+### CSV
+
+```
+problem_name,batch,seqlen_q,seqlen_k,nhead_q,nhead_k,hdim_q,hdim_v,dtype,
+kernel,family,mode,pipeline,tile_m0,tile_n0,tile_k0,...,
+latency_ms,tflops,bandwidth_gb_s
+```
+
+Every column needed to fully reconstruct the kernel identity is included. TFLOPS and latency come directly from CK's internal HIP event timing.
+
+### JSON
+
+```json
+{
+  "metadata": {
+    "arch": "gfx950",
+    "category": "smoke",
+    "total_kernels": 600,
+    "shapes_benchmarked": 42,
+    "total_measurements": 12600
+  },
+  "results": [...]
+}
 ```
 
 ## CMake Targets
@@ -116,18 +171,22 @@ make benchmark_fmha_all      # All variants
 make benchmark_fmha_splitkv  # Split-KV only
 ```
 
-## Benchmark Output
+## Parity Verification
 
 ```bash
-python fmha_benchmark.py configs/fwd_ci.json --workers 128 --verify --best
+python dispatcher/tests/validate_arch_specs_parity.py --arch gfx950 --receipt 0
+# PASS: 33,541 kernels across all 9 families
 ```
 
-Produces per-kernel timing and optional CPU reference validation:
+This confirms the dispatcher's self-contained enumeration exactly matches CK Tile's upstream codegen.
 
-```
-  Kernel                                 Time(ms)  TFLOPS  MaxErr  Status
-  fmha_fwd_fp16_batch_h128_qr_async...     0.013   40.55  9.7e-06  PASS
-  fmha_fwd_fp16_batch_h256_qr_async...     0.024   22.72  9.7e-06  PASS
-```
+## Example: Single-Shape All-Kernel Benchmark
 
-Use `--csv` or `--json` to export results for analysis.
+Run every compiled fwd fp16 h128 kernel against one shape:
+
+```bash
+python fmha_full_benchmark.py \
+    --category smoke --variant fwd --workers 256 \
+    --filter "c.hdim_q == 128 and c.hdim_v == 128 and c.data_type == 'fp16'" \
+    --csv results.csv
+```
