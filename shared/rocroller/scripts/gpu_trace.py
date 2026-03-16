@@ -154,10 +154,11 @@ class LDSFamily(InstructionFamily):
         dwords_per_instr = max(1, width_bytes // 4)
         first_bank = [((addr // 4) % 64) // dwords_per_instr for addr in effective]
 
+        min_addr = min(effective)
         return {
             "derived": {
                 "first_bank": first_bank,
-                "effective_addr": [addr_fmt(v) for v in effective],
+                "effective_addr": [addr_fmt(v - min_addr) for v in effective],
             },
             "vgpr": {reg: raw},
         }
@@ -228,11 +229,13 @@ class BufferFamily(InstructionFamily):
         s = [read_uint32(frame, f"s{srd_base + i}", uint32_type) for i in range(4)]
         base_pointer = (s[1] << 32) + s[0]
         srd_raw = (s[3] << 96) | (s[2] << 64) | (s[1] << 32) | s[0]
+        effective = [base_pointer + voffsets[i] for i in range(64)]
+        min_eff = min(effective)
         derived = {
             "base_pointer": addr_fmt(base_pointer),
             "size": s[2],
             "buffer_descriptor": addr_fmt(srd_raw),
-            "effective_addr": [addr_fmt(base_pointer + voffsets[i]) for i in range(64)],
+            "effective_addr": [addr_fmt(v - min_eff) for v in effective],
         }
         sgpr = {f"s[{srd_base}:{srd_base+3}]": s}
         if instr.meta["lds_direct"]:
@@ -298,7 +301,7 @@ def walk_disassembly(families: list) -> list:
 
 
 def trace_loop(
-    instructions, workgroups, waves, trace_count, one_per_wave, uint32_type, addr_fmt, emit
+    instructions, workgroups, waves, trace_count, unique_workgroups, uint32_type, addr_fmt, emit
 ):
     """Trace instructions sequentially, one breakpoint at a time.
 
@@ -309,7 +312,9 @@ def trace_loop(
     trace_count controls how many hits to collect per instruction (1 = first
     hit only, 0 = unlimited until the inferior exits).
 
-    one_per_wave limits output to one record per wave index per instruction.
+    unique_workgroups limits output to one workgroup's worth of data per
+    instruction: all waves from the first workgroup seen are emitted, all
+    subsequent workgroups are skipped.
     """
     inferior = gdb.selected_inferior()
 
@@ -320,7 +325,7 @@ def trace_loop(
         family = ALL_FAMILIES[instr.family]
         bp = gdb.Breakpoint(f"*{hex(instr.address)}", temporary=(trace_count == 1))
         hits = 0
-        seen_waves = set()
+        chosen_wg = None
         gdb.execute("continue")
 
         while inferior.is_valid() and (trace_count == 0 or hits < trace_count):
@@ -336,8 +341,11 @@ def trace_loop(
                     continue
                 if waves is not None and wave not in waves:
                     continue
-                if one_per_wave and wave in seen_waves:
-                    continue
+                if unique_workgroups:
+                    if chosen_wg is None:
+                        chosen_wg = wg
+                    elif wg != chosen_wg:
+                        continue
                 emit(
                     {
                         "family": instr.family,
@@ -348,7 +356,6 @@ def trace_loop(
                         **family.read_lanes(frame, instr, uint32_type, addr_fmt),
                     }
                 )
-                seen_waves.add(wave)
                 hits += 1
 
             if not at_our_bp:
@@ -424,12 +431,12 @@ class GPUTrace(gdb.Command):
             help="Print addresses in hex (default: base 10).",
         )
         self.parser.add_argument(
-            "--one-per-wave",
+            "--unique-workgroups",
             action="store_true",
             default=False,
-            help="Emit at most one record per wave index per instruction. "
-            "Useful without --workgroup to get a representative sample across "
-            "the 4 waves rather than one entry per wavefront.",
+            help="Emit all waves from only one workgroup per instruction. "
+            "Skips duplicate workgroups so you get one workgroup's worth of "
+            "data rather than repeating the same pattern across many workgroups.",
         )
 
     def invoke(self, args_str, from_tty):
@@ -496,7 +503,7 @@ class GPUTrace(gdb.Command):
                 workgroups,
                 waves,
                 args.trace_count,
-                args.one_per_wave,
+                args.unique_workgroups,
                 uint32_type,
                 addr_fmt,
                 emit,
