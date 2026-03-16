@@ -83,7 +83,10 @@ TIMING_HIERARCHY = {
             "reporter_setup": {},
             "pre_problem": {
                 "cpu_data_init": {},
-                "cpu_reference_gemm": {},
+                "cpu_reference_gemm": {
+                    "solve_cpu_fast_f32": {},
+                    "solve_cpu_templates": {},
+                },
             },
             "validate_warmups": {
                 "validate_gpu_sync": {},
