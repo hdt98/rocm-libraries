@@ -176,6 +176,20 @@ struct LoadAndConvertKernel
                 // Similar to QuantGemmKernel::PermuteB: reinterpret the output logical layout via
                 // descriptor transform so YDataType distribution can be used without row-group
                 // permutation artifacts in mixed-precision transpose loads.
+                using TransposeGroupType = std::conditional_t<(sizeof(XDataType) >= sizeof(YDataType)),
+                                                              XDataType,
+                                                              YDataType>;
+                constexpr index_t thread_elements = S::Warp_N * S::Warp_K / get_warp_size();
+                constexpr index_t n_group_0       =
+                    thread_elements / GetVectorSize<TransposeGroupType>();
+                constexpr index_t n_group_1       = 2;
+                constexpr index_t n_group_2       = S::Vector_N / n_group_0;
+                constexpr index_t n_perm_group    = n_group_0 * n_group_1 * n_group_2;
+
+                static_assert(n_group_0 > 0, "Invalid derived transpose grouping factor");
+                static_assert(S::Vector_N % n_group_0 == 0,
+                              "Vector_N must be divisible by derived grouping factor");
+
                 const auto c_m_n_desc = make_naive_tensor_descriptor(
                     make_tuple(M, N), make_tuple(1, M), number<1>{}, number<1>{});
 
@@ -183,7 +197,8 @@ struct LoadAndConvertKernel
                     c_m_n_desc,
                     make_tuple(
                         make_pass_through_transform(M),
-                        make_unmerge_transform(make_tuple(N / 16, number<2>{}, number<2>{}, number<4>{}))),
+                        make_unmerge_transform(
+                            make_tuple(N / n_perm_group, number<n_group_0>{}, number<n_group_1>{}, number<n_group_2>{}))),
                     make_tuple(sequence<0>{}, sequence<1>{}),
                     make_tuple(sequence<0>{}, sequence<1, 2, 3, 4>{}));
 
@@ -191,7 +206,10 @@ struct LoadAndConvertKernel
                     c_m_n0_b0_b1_n4_desc,
                     make_tuple(make_pass_through_transform(M),
                                make_merge_transform(
-                                   make_tuple(N / 16, number<2>{}, number<2>{}, number<4>{}))),
+                                   make_tuple(N / n_perm_group,
+                                              number<n_group_0>{},
+                                              number<n_group_1>{},
+                                              number<n_group_2>{}))),
                     make_tuple(sequence<0>{}, sequence<1, 3, 2, 4>{}),
                     make_tuple(sequence<0>{}, sequence<1>{}));
 
