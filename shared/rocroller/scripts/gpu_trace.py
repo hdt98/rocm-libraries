@@ -3,20 +3,15 @@
 """
 GPU instruction tracer for rocGDB. Supports LDS (ds_*) and global (buffer_*) instructions.
 
-Usage (run from build_release/):
+Usage:
   rocgdb --batch -ex "source ../scripts/gpu_trace.py" -ex "gpu_trace --help"
   rocgdb --batch -ex "source ../scripts/gpu_trace.py" -ex 'gpu_trace --kernel <label>' --args /path/to/executable [exe-args...]
 
-  Preferred: use rocgdb's --args to keep the executable and its arguments together.
-  Alternatively, pass executable arguments via --run= (note: use = when args start with '-').
-  NOTE: --kernel is the base kernel symbol name; _exec_begin is appended internally for the entry breakpoint.
+Examples:
+  rocgdb --batch -ex "source ../scripts/gpu_trace.py" -ex 'gpu_trace --workgroup 0,0,0 --output trace1.jsonl --kernel GEMMTest_GEMMTestSuiteGPU_GEMM_DataType_FP32_Basic_0_kernel' --args ./test/rocroller-tests --gtest_filter='*GPU_GEMM_DataType_FP32_Basic/0'
 
-Examples (run from build_release/):
-
-  rocgdb --batch -ex "source ../scripts/gpu_trace.py" -ex 'gpu_trace --workgroup 0,0,0 --families lds buffer --output trace.jsonl --kernel GEMMTest_GEMMTestSuiteGPU_GEMM_DataType_FP32_Basic_0_kernel' --args ./test/rocroller-tests --gtest_filter='*GPU_GEMM_DataType_FP32_Basic/0'
-
-  # Paste from rrperf client command adjusted with --num_warmup=0 --num_outer=1 --num_inner=1
-  rocgdb --batch -ex "source ../scripts/gpu_trace.py" -ex 'gpu_trace --families lds buffer --output trace.jsonl --kernel RRGEMM_TN_mxfp4_stE8M0_bs32_mxfp4_stE8M0_bs32_half_half_float_PreSWPreSwizzleScale_WGTS256x256x256_WGS128x2_WGMXCC0_LABufferToLDS_LBBufferToLDS_SDVGPRToGlobalMemoryWithBuffer_LSABufferToL_c03209e827442f0a' --args client/rocroller-gemm --mac_m=256 --mac_n=256 --mac_k=256 --wave_m=16 --wave_n=16 --wave_k=128 --wave_b=1 --workgroup_size_x=128 --workgroup_size_y=2 --workgroupRemapXCC=False --workgroupRemapXCCValue=-1 --load_A=BufferToLDS --load_B=BufferToLDS --store=VGPRToGlobalMemoryWithBuffer --betaInFma=True --padLDS_A=0,0 --padLDS_B=0,0 --scheduler=Priority --schedulerCost=LinearWeightedSimple --prefetch=True --prefetchInFlight=2 --prefetchLDSFactor=1 --prefetchMixMemOps=False --loadScale_A=BufferToLDS --loadScale_B=BufferToLDS --swizzleScale=True --sts=64x8/64x8 --prefetchScale=False --pretileScale=False --streamK=None --numWGs=0 --tailLoops=True --M=4096 --N=4096 --K=32768 --alpha=2.0 --beta=0.0 --type_A=fp4 --type_B=fp4 --type_C=half --type_D=half --type_acc=float --trans_A=T --trans_B=N --scale_A=Separate --scaleType_A=E8M0 --scale_B=Separate --scaleType_B=E8M0 --scaleBlockSize=-1 --scaleSkipPermlane=PreSwizzleScale --scaleValue_A=1.0 --scaleValue_B=1.0 --initMode_A=Bounded --initMode_B=Bounded --initMode_C=Bounded --workgroupMappingDim=-1 --workgroupMappingValue=-1 --num_warmup=0 --num_outer=1 --num_inner=1
+  # Pasted from rrperf client command adjusted with --num_warmup=0 --num_outer=1 --num_inner=1
+  rocgdb --batch -ex "source ../scripts/gpu_trace.py" -ex 'gpu_trace --output trace2.jsonl --kernel RRGEMM_TN_mxfp4_stE8M0_bs32_mxfp4_stE8M0_bs32_half_half_float_PreSWPreSwizzleScale_WGTS256x256x256_WGS128x2_WGMXCC0_LABufferToLDS_LBBufferToLDS_SDVGPRToGlobalMemoryWithBuffer_LSABufferToL_c03209e827442f0a' --args client/rocroller-gemm --mac_m=256 --mac_n=256 --mac_k=256 --wave_m=16 --wave_n=16 --wave_k=128 --wave_b=1 --workgroup_size_x=128 --workgroup_size_y=2 --workgroupRemapXCC=False --workgroupRemapXCCValue=-1 --load_A=BufferToLDS --load_B=BufferToLDS --store=VGPRToGlobalMemoryWithBuffer --betaInFma=True --padLDS_A=0,0 --padLDS_B=0,0 --scheduler=Priority --schedulerCost=LinearWeightedSimple --prefetch=True --prefetchInFlight=2 --prefetchLDSFactor=1 --prefetchMixMemOps=False --loadScale_A=BufferToLDS --loadScale_B=BufferToLDS --swizzleScale=True --sts=64x8/64x8 --prefetchScale=False --pretileScale=False --streamK=None --numWGs=0 --tailLoops=True --M=4096 --N=4096 --K=32768 --alpha=2.0 --beta=0.0 --type_A=fp4 --type_B=fp4 --type_C=half --type_D=half --type_acc=float --trans_A=T --trans_B=N --scale_A=Separate --scaleType_A=E8M0 --scale_B=Separate --scaleType_B=E8M0 --scaleBlockSize=-1 --scaleSkipPermlane=PreSwizzleScale --scaleValue_A=1.0 --scaleValue_B=1.0 --initMode_A=Bounded --initMode_B=Bounded --initMode_C=Bounded --workgroupMappingDim=-1 --workgroupMappingValue=-1 --num_warmup=0 --num_outer=1 --num_inner=1
 """
 
 import argparse
@@ -237,9 +232,7 @@ class BufferFamily(InstructionFamily):
             "base_pointer": addr_fmt(base_pointer),
             "size": s[2],
             "buffer_descriptor": addr_fmt(srd_raw),
-            "effective_addr": [
-                addr_fmt(base_pointer + voffsets[i]) for i in range(64)
-            ],
+            "effective_addr": [addr_fmt(base_pointer + voffsets[i]) for i in range(64)],
         }
         sgpr = {f"s[{srd_base}:{srd_base+3}]": s}
         if instr.meta["lds_direct"]:
@@ -333,9 +326,9 @@ def trace_loop(
                     continue
                 at_our_bp = True
                 wg, wave = work_coordinates()
-                if workgroups is not None and (
-                    wg not in workgroups or wave not in waves
-                ):
+                if workgroups is not None and wg not in workgroups:
+                    continue
+                if waves is not None and wave not in waves:
                     continue
                 emit(
                     {
@@ -381,15 +374,6 @@ class GPUTrace(gdb.Command):
             help="Base kernel symbol name. The script appends '_exec_begin' to set the breakpoint.",
         )
         self.parser.add_argument(
-            "--run",
-            required=False,
-            default=None,
-            dest="run_command",
-            help="Arguments passed to the executable. If omitted, the executable and its "
-            "arguments should be specified via rocgdb's --args flag instead. "
-            "Use = syntax when args start with '-': --run=\"--gtest_filter=*MyTest/0\"",
-        )
-        self.parser.add_argument(
             "--families",
             nargs="+",
             choices=["lds", "buffer", "all"],
@@ -408,9 +392,9 @@ class GPUTrace(gdb.Command):
             "--wave",
             type=int,
             nargs="+",
-            default=[0],
+            default=None,
             metavar="N",
-            help="Wave indices within the workgroup to trace (default: 0). Multiple allowed.",
+            help="Wave indices within the workgroup to trace. Multiple allowed. Default: all waves.",
         )
         self.parser.add_argument(
             "--output",
@@ -422,7 +406,7 @@ class GPUTrace(gdb.Command):
             "--trace_count",
             type=int,
             default=1,
-            help="Max hits per instruction (default: 1, 0 = unlimited).",
+            help="Max hits per instruction -- e.g. due to loops (default: 1, 0 = unlimited).",
         )
         self.parser.add_argument(
             "--hex",
@@ -440,15 +424,13 @@ class GPUTrace(gdb.Command):
             else [ALL_FAMILIES[f] for f in args.families]
         )
         workgroups = set(map(tuple, args.workgroup)) if args.workgroup else None
-        waves = set(args.wave)
+        waves = set(args.wave) if args.wave else None
 
         # --- Get to kernel ---
         gdb.execute("set pagination off")
         gdb.execute("set breakpoint pending on")
         gdb.Breakpoint(args.kernel + "_exec_begin", temporary=True)
-        gdb.execute(
-            f"run {args.run_command}" if args.run_command is not None else "run"
-        )
+        gdb.execute("run")
 
         # --- Walk disassembly ---
         instructions = walk_disassembly(families)
