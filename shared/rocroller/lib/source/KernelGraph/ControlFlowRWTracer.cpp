@@ -397,9 +397,6 @@ namespace rocRoller::KernelGraph
         auto init = m_graph.control.getOutputNodeIndices<Initialize>(tag).to<std::set>();
         generate(init);
 
-        auto incr = m_graph.control.getOutputNodeIndices<ForLoopIncrement>(tag).to<std::set>();
-        generate(incr);
-
         CollectDataFlowExpressionVisitor visitor;
         visitor.call(op.condition);
         for(auto src : visitor.tags)
@@ -409,6 +406,9 @@ namespace rocRoller::KernelGraph
 
         auto body = m_graph.control.getOutputNodeIndices<Body>(tag).to<std::set>();
         generate(body);
+
+        auto incr = m_graph.control.getOutputNodeIndices<ForLoopIncrement>(tag).to<std::set>();
+        generate(incr);
     }
 
     void ControlFlowRWTracer::operator()(Kernel const& op, int tag)

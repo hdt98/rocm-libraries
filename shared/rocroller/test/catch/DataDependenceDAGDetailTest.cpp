@@ -109,10 +109,13 @@ namespace DataDependenceDAGDetailTest
         auto vgprI = graph.coordinates.addElement(VGPR());
         auto exprI = dataFlowTag(vgprI, Register::Type::Scalar, DataType::UInt32);
         // for(I = 2; I <=N, I++)
-        auto forLoop = graph.control.addElement(ForLoopOp(exprI <= exprN, "loop"));
-        graph.mapper.connect(forLoop, vgprI, NaryArgument::DEST);
+        // node id 12
         auto forInit = graph.control.addElement(Assign{Register::Type::Scalar, literal(2u)});
         graph.mapper.connect(forInit, vgprI, NaryArgument::DEST);
+        // node id 13
+        auto forLoop = graph.control.addElement(ForLoopOp(exprI <= exprN, "loop"));
+        graph.mapper.connect(forLoop, vgprI, NaryArgument::DEST);
+        // node id 14
         int forInc = graph.control.addElement(Assign{Register::Type::Scalar, exprI + literal(1u)});
         graph.mapper.connect(forInc, vgprI, NaryArgument::DEST);
 
@@ -153,15 +156,51 @@ namespace DataDependenceDAGDetailTest
 
             auto depDAG = obj.getDataDependenceDAG();
 
-            CHECK(graph.control.findEdge(kernel, loadN).has_value());
-            CHECK(!depDAG.findEdge(kernel, loadN).has_value());
+            // kernel node has no data dependence with any other node
+            {
+                auto inNodes = depDAG.getInputNodeIndices<Sequence>(kernel).to<std::vector>();
+                CHECK(inNodes.empty());
+
+                auto outNodes = depDAG.getOutputNodeIndices<Sequence>(kernel).to<std::vector>();
+                CHECK(outNodes.empty());
+                CHECK(!depDAG.findEdge(kernel, loadN).has_value());
+                CHECK(graph.control.findEdge(kernel, loadN).has_value());
+            }
+
+            // loadN
+            {
+                auto inNodes = depDAG.getInputNodeIndices<Sequence>(loadN).to<std::vector>();
+                CHECK(inNodes.empty());
+
+                auto outNodes = depDAG.getOutputNodeIndices<Sequence>(loadN).to<std::vector>();
+                CHECK(outNodes.size() == 1);
+                CHECK(outNodes[0] == conditional);
+            }
 
             // conditional if(N <= 1) reads loadN
             // WR (flow) dependency
-            CHECK(graph.control.findEdge(loadN, conditional).has_value());
-            CHECK(depDAG.findEdge(loadN, conditional).has_value());
-            CHECK(obj.getBodyParent(loadN) == kernel);
-            CHECK(obj.getBodyParent(conditional) == kernel);
+            {
+                auto inNodes = depDAG.getInputNodeIndices<Sequence>(conditional).to<std::vector>();
+                CHECK(inNodes.size() == 1);
+                CHECK(inNodes[0] == loadN);
+                CHECK(graph.control.findEdge(loadN, conditional).has_value());
+                CHECK(depDAG.findEdge(loadN, conditional).has_value());
+                CHECK(obj.getBodyParent(loadN) == kernel);
+                CHECK(obj.getBodyParent(conditional) == kernel);
+
+                auto outNodes
+                    = depDAG.getOutputNodeIndices<Sequence>(conditional).to<std::vector>();
+                CHECK(outNodes.empty());
+            }
+
+            for(auto inNode : depDAG.getInputNodeIndices<Sequence>(assignResult))
+            {
+                std::cout << "\t" << inNode << " -->" << std::endl;
+            }
+            for(auto outNode : depDAG.getOutputNodeIndices<Sequence>(assignResult))
+            {
+                std::cout << "\t--> " << outNode << std::endl;
+            }
 
             CHECK(graph.control.findEdge(conditional, assignResult).has_value());
             CHECK(!depDAG.findEdge(conditional, assignResult).has_value());
@@ -175,11 +214,14 @@ namespace DataDependenceDAGDetailTest
             CHECK(graph.control.findEdge(assignF1, forLoop).has_value());
             CHECK(!depDAG.findEdge(assignF1, forLoop).has_value());
 
-            // WW (output) dependency
+            // No WW (output) dependency between forInit and forInc
+            // because they belong to different basic blocks.
+            // Note: they have same body parent.
             CHECK(!graph.control.findEdge(forInit, forInc).has_value());
-            CHECK(depDAG.findEdge(forInit, forInc).has_value());
+            CHECK(!depDAG.findEdge(forInit, forInc).has_value());
             CHECK(obj.getBodyParent(forInit) == forLoop);
             CHECK(obj.getBodyParent(forInc) == forLoop);
+            CHECK(obj.belongToSameBasicBlock(forInit, forInc) == false);
 
             // F2 = F0 + F1 reads both F0 and F1,
             // but assignF0 and assignF2 have different body parents
@@ -220,7 +262,8 @@ namespace DataDependenceDAGDetailTest
 
             for(auto iter = records.begin(); iter != records.end();)
             {
-                std::cout << iter->control << std::endl;
+                std::cout << iter->control << " " << iter->coordinate << " " << iter->rw
+                          << std::endl;
                 switch(iter->control)
                 {
                 case 2:
@@ -256,6 +299,8 @@ namespace DataDependenceDAGDetailTest
                     obj.processReadWriteRecord(*iter);
                     iter++;
 
+                    std::cout << iter->control << " " << iter->coordinate << " " << iter->rw
+                              << std::endl;
                     depDAG = obj.getDataDependenceDAG();
                     CHECK(obj.getBodyParent(loadN) != obj.getBodyParent(assignResult));
                     CHECK(obj.getBodyParent(loadN) == kernel);
@@ -272,6 +317,26 @@ namespace DataDependenceDAGDetailTest
 
                     CHECK(iter->control == assignResult);
                     CHECK(iter->coordinate == vgprResult);
+                    CHECK(iter->rw
+                          == rocRoller::KernelGraph::ControlFlowRWTracer::ReadWrite::WRITE);
+                    obj.processReadWriteRecord(*iter);
+                    iter++;
+                    break;
+                }
+                case 8:
+                {
+                    CHECK(iter->control == assignF0);
+                    CHECK(iter->coordinate == vgprF0);
+                    CHECK(iter->rw
+                          == rocRoller::KernelGraph::ControlFlowRWTracer::ReadWrite::WRITE);
+                    obj.processReadWriteRecord(*iter);
+                    iter++;
+                    break;
+                }
+                case 9:
+                {
+                    CHECK(iter->control == assignF1);
+                    CHECK(iter->coordinate == vgprF1);
                     CHECK(iter->rw
                           == rocRoller::KernelGraph::ControlFlowRWTracer::ReadWrite::WRITE);
                     obj.processReadWriteRecord(*iter);
