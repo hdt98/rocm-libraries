@@ -264,6 +264,7 @@ class TestCkTileGemmPipeline : public ::testing::Test
             GTEST_SKIP() << "Unsupported data type combination for gemm pipeline test.";
         }
         if constexpr(PipelineType == GemmPipelineType::CompV4 ||
+                     PipelineType == GemmPipelineType::CompAsync ||
                      PipelineType == GemmPipelineType::CompAsyncEightWaves ||
                      std::is_same_v<BDataType, ck_tile::pk_int4_t>)
         {
@@ -286,7 +287,7 @@ class TestCkTileGemmPipeline : public ::testing::Test
              const int StrideC = 0)
     {
         // Some unsupported tests don't compile, so we check here before attempting to.
-        if constexpr(Derived::check_data_type())
+        if(Derived::check_data_type(M, N, K, PadM, PadN, PadK))
         {
             for(auto kb : k_batches_)
             {
