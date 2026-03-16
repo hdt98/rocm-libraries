@@ -39,6 +39,10 @@ Comprehensive coverage including both unit and integration tests.
 
 ---
 
-### Current Code Coverage status
+### Current Code Coverage status on `develop` branch
+
+On GFX942 : 46.84%
+On GFX950 : 25.51%
+Combined:   47.66%
 
 
