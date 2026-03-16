@@ -3,11 +3,10 @@
 
 #include <queue>
 
+#include <rocRoller/Graph/GraphUtilities.hpp>
 #include <rocRoller/KernelGraph/ControlGraph/ControlFlowRWTracer.hpp>
 #include <rocRoller/KernelGraph/Transforms/AliasDataFlowTags_detail.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
-
-#include <rocRoller/Graph/GraphUtilities.hpp>
 
 namespace rocRoller
 {
@@ -37,27 +36,33 @@ namespace rocRoller
         Liveness queryLiveness(KernelGraph const& kgraph, int op, TagExtent const& tagExtent)
         {
             // Is node2 after node1 ?
-            auto const isAfter = [&](int node1, int node2){
-                auto const order = kgraph.control.compareNodes(
-                        rocRoller::UpdateCache, node1, node2);
+            auto const isAfter = [&](int node1, int node2) {
+                auto const order
+                    = kgraph.control.compareNodes(rocRoller::UpdateCache, node1, node2);
                 return order == ControlGraph::NodeOrdering::LeftFirst;
             };
 
-            auto const isWithin = [&](AliasDataFlowTagsDetail::GraphExtent const& gap, int const op) {
-                return std::ranges::any_of(gap.begin, [&](int node){ return not isAfter(node, op); }) &&
-                    std::ranges::any_of(gap.end, [&](int node){ return not isAfter(op, node); });
-            };
+            auto const isWithin
+                = [&](AliasDataFlowTagsDetail::GraphExtent const& gap, int const op) {
+                      return std::ranges::any_of(gap.begin,
+                                                 [&](int node) { return not isAfter(node, op); })
+                             && std::ranges::any_of(
+                                 gap.end, [&](int node) { return not isAfter(op, node); });
+                  };
 
             // If the op is WITHIN a gap, then it is alive (no overlap)
-            if(std::ranges::any_of(tagExtent.gaps, [&](auto const& gap) { return isWithin(gap, op); }))
+            if(std::ranges::any_of(tagExtent.gaps,
+                                   [&](auto const& gap) { return isWithin(gap, op); }))
                 return Liveness::Alive;
 
             // If the op comes BEFORE the first op of the exten, it is dead (no overlap)
-            if(std::ranges::all_of(tagExtent.extent.begin, [&](auto const node) { return isAfter(op, node); }))
+            if(std::ranges::all_of(tagExtent.extent.begin,
+                                   [&](auto const node) { return isAfter(op, node); }))
                 return Liveness::Dead;
 
             // If the op comes AFTER the first op of the exten, it is dead (no overlap)
-            if(std::ranges::all_of(tagExtent.extent.end, [&](auto const node) { return isAfter(node, op); }))
+            if(std::ranges::all_of(tagExtent.extent.end,
+                                   [&](auto const node) { return isAfter(node, op); }))
                 return Liveness::Dead;
 
             // Unknown
@@ -101,39 +106,40 @@ namespace rocRoller
             return result;
         }
 
-        std::unordered_map<int, LivenessClassification> buildLivenessClassifications(KernelGraph const& kgraph)
+        std::unordered_map<int, LivenessClassification>
+            buildLivenessClassifications(KernelGraph const& kgraph)
         {
             auto coordExtents = getAllCoordExtents(kgraph);
 
             // For each op, classify all coordinates based on
             // their liveness
             std::unordered_map<int, LivenessClassification> classifications;
-            for(auto op: kgraph.control.getNodes())
+            for(auto op : kgraph.control.getNodes())
             {
                 // We probably can skip ForLoop/Conditional/Assert
 
                 auto& classification = classifications[op];
-                for(auto const& [coord, extent]: coordExtents)
+                for(auto const& [coord, extent] : coordExtents)
                 {
-                   auto liveness = queryLiveness(kgraph, op, extent);
-                   switch (liveness)
-                   {
-                       case Liveness::Alive:
-                           classification.alive.push_back(coord);
-                           break;
+                    auto liveness = queryLiveness(kgraph, op, extent);
+                    switch(liveness)
+                    {
+                    case Liveness::Alive:
+                        classification.alive.push_back(coord);
+                        break;
 
-                       case Liveness::MaybeAlive:
-                           classification.maybeAlive.push_back(coord);
-                           break;
+                    case Liveness::MaybeAlive:
+                        classification.maybeAlive.push_back(coord);
+                        break;
 
-                       case Liveness::Dead:
-                           classification.dead.push_back(coord);
-                           break;
+                    case Liveness::Dead:
+                        classification.dead.push_back(coord);
+                        break;
 
-                       case Liveness::Count:
-                           AssertFatal(false, "Invalid liveness");
-                           break;
-                   }
+                    case Liveness::Count:
+                        AssertFatal(false, "Invalid liveness");
+                        break;
+                    }
                 }
             }
 
