@@ -335,7 +335,6 @@ struct BlockFmhaBatchPrefillV3Pipeline
                KDataType* __restrict__ smem_k1,
                VDataType* __restrict__ smem_v0,
                VDataType* __restrict__ smem_v1,
-               void* __restrict__ smem_ptr,
                // Paged KV cache parameters
                const index_t* page_idx,
                index_t stride_k,
@@ -630,8 +629,6 @@ struct BlockFmhaBatchPrefillV3Pipeline
         constexpr index_t V_KIterInner = VDstrEncode::hs_lengthss_[number<0>{}][number<0>{}];
 
         constexpr index_t V_KIterOuter = 1;
-
-        constexpr index_t V_KLanes = VDstrEncode::hs_lengthss_[number<0>{}][number<0>{}];
 
         constexpr index_t V_PageIdxRepeat = V_KIterInner * V_KIterOuter;
 
@@ -1600,7 +1597,6 @@ struct BlockFmhaBatchPrefillV3Pipeline
                KDataType* __restrict__ smem_k1,
                VDataType* __restrict__ smem_v0,
                VDataType* __restrict__ smem_v1,
-               void* __restrict__ smem_ptr,
                // Paged KV cache parameters
                const index_t* page_idx,
                index_t stride_k,
@@ -1637,7 +1633,6 @@ struct BlockFmhaBatchPrefillV3Pipeline
                           smem_k1,
                           smem_v0,
                           smem_v1,
-                          smem_ptr,
                           page_idx,
                           stride_k,
                           stride_v,
