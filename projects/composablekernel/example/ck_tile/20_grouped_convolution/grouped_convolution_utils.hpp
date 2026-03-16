@@ -129,6 +129,7 @@ auto create_args(
         .insert("init", "0", "0:random, 1:linear, 2:constant(1)")
         .insert("json", "0", "0: No Json, 1: Dump Results in Json format");
 
+    // Allow per-binary CLI customization (e.g., StreamK adds --streamk_reduction).
     for(const auto& [key, default_val, help] : extra_args)
     {
         arg_parser.insert(key, default_val, help);

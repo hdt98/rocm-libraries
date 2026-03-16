@@ -477,6 +477,8 @@ struct GroupedConvolutionBackwardWeightKernel
     static_assert(GroupedConvTraitsType_::ExplicitGemm == false ||
                       GroupedConvTraitsType_::NumGroupsToMerge == 1,
                   "Not supported!");
+    static_assert(!IsStreamK || NumDTensor == 0,
+                  "D tensor per-group offsets not implemented for StreamK path");
 
     // StreamK helper types (only meaningful when IsStreamK, but defined unconditionally
     // to avoid SFINAE complexity — the methods are guarded by if constexpr).
@@ -652,6 +654,9 @@ struct GroupedConvolutionBackwardWeightKernel
             return 0;
     }
 
+    // Post-construction setter: workspace is allocated by the caller after
+    // GetWorkSpaceSize() and must outlive the kernel launch. Can't be moved into
+    // the constructor because kargs is a POD value type copied to GPU constant memory.
     CK_TILE_HOST static void SetWorkSpacePointer(GroupedConvBwdWeightKernelArgsSpecialized& kargs,
                                                  void* workspace_ptr)
     {
@@ -717,7 +722,9 @@ struct GroupedConvolutionBackwardWeightKernel
     }
 
     CK_TILE_HOST static GroupedConvBwdWeightKernelArgsSpecialized
-    MakeKernelArgs(const GroupedConvBwdWeightHostArgs& hostArgs, int num_cu = 0, int occupancy = 0)
+    MakeKernelArgs(const GroupedConvBwdWeightHostArgs& hostArgs,
+                   [[maybe_unused]] int num_cu    = 0,
+                   [[maybe_unused]] int occupancy = 0)
     {
         LogInfo("MPerBlock: ",
                 number<TilePartitioner::MPerBlock>{},
@@ -750,9 +757,6 @@ struct GroupedConvolutionBackwardWeightKernel
         }
         else
         {
-            (void)num_cu;
-            (void)occupancy;
-
             using KernelImpl = GroupedConvolutionBackwardWeightKernel<GroupedConvTraitsType_,
                                                                       TilePartitioner_,
                                                                       GemmPipeline_,
@@ -784,6 +788,21 @@ struct GroupedConvolutionBackwardWeightKernel
         {
             if(get_device_name() != "gfx950")
             {
+                return false;
+            }
+        }
+        // Runtime arch check — complements the static_assert in operator().
+        // Both are needed: this check runs on the host (where get_compiler_target()
+        // isn't available since HIP's host pass doesn't define __gfx*__ macros),
+        // while the static_assert in operator() catches misuse at device compile time.
+        if constexpr(IsStreamK)
+        {
+            const auto name = get_device_name();
+            if(name != "gfx90a" && name != "gfx942" && name != "gfx950")
+            {
+                LogInfo("StreamK requires cross-CU buffer coherence. "
+                        "Supported: gfx90a, gfx942, gfx950. Got: ",
+                        name);
                 return false;
             }
         }
@@ -1183,8 +1202,10 @@ struct GroupedConvolutionBackwardWeightKernel
     {
         if constexpr(IsStreamK)
         {
-            static_assert(NumDTensor == 0,
-                          "D tensor per-group offsets not implemented for StreamK path");
+            // Device-side compile-time arch check — complements the runtime check in
+            // IsSupportedArgument(). Both are needed: the runtime check runs on the host
+            // (where get_compiler_target() isn't available since HIP's host pass doesn't
+            // define __gfx*__ macros), while this catches misuse at device compile time.
             static_assert(
                 StreamKCoherency<decltype(core::arch::get_compiler_target())>::BUFFER_COHERENCE !=
                     amd_buffer_coherence_enum::coherence_default,
@@ -1215,7 +1236,9 @@ struct GroupedConvolutionBackwardWeightKernel
             kargs.workspace_ptr =
                 static_cast<char*>(kargs.workspace_ptr) + blockIdY * per_group_ws_size;
 
-            // Non-persistent StreamK: DP workgroups first, then SK workgroups
+            // Non-persistent StreamK: Data-Parallel (DP) workgroups first, then
+            // Stream-K (SK) workgroups. DP workgroups each process one full tile;
+            // SK workgroups share the remaining tiles' K-iterations.
             const index_t dp_ctas = kargs.tile_partitioner.get_dp_ctas();
             const bool is_dp      = cta_idx < dp_ctas;
 
