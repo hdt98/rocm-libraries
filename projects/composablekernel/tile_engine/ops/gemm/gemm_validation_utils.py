@@ -8,16 +8,7 @@ GEMM_PIPELINES = ["mem", "compv3", "compv4"]
 
 GEMM_PRESHUFFLE_PIPELINES = ["preshufflev2"]
 
-GEMM_AQUANT_PIPELINES = ["mem", "compv3"]
-
-# BQuant only supports compv3 pipeline (no mem pipeline header exists).
 GEMM_BQUANT_PIPELINES = ["compv3"]
-
-GEMM_ROWCOL_PIPELINES = ["compv3"]
-
-GEMM_ABQUANT_PIPELINES = ["compv3"]
-
-GEMM_TENSOR_PIPELINES = ["compv3"]
 
 LAYOUT_MAP = {
     "r": "ck_tile::tensor_layout::gemm::RowMajor",
