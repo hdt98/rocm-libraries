@@ -446,6 +446,8 @@ def _check_hdim_tile_gfx9(
         return True
     if (hdim, hdim_v) == (128, 128) and tile_bn0 != 128:
         return False
+    if (hdim, hdim_v) == (128, 128) and pipeline_tag == "qr_async" and tile_bm0 != 128:
+        return False
     if (hdim, hdim_v) != (128, 128) and tile_bm0 != 128:
         return False
     if (hdim, hdim_v) == (128, 128) and pipeline_tag != "qr_async" and tile_bk0 == 64:

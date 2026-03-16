@@ -40,6 +40,7 @@ from fmha_utils import (
     FmhaProblem,
     setup_fmha_dispatcher,
     detect_gpu_arch,
+    cpu_attention_bwd,
 )
 
 HDIMS = [32, 64, 128, 256]
@@ -62,25 +63,6 @@ def cpu_fwd_with_intermediates(
     out = np.matmul(P, V)
     lse = (np.log(S_sum.squeeze(-1)) + S_max.squeeze(-1)).astype(np.float32)
     return out, P, lse
-
-
-def cpu_attention_bwd(
-    Q: np.ndarray,
-    K: np.ndarray,
-    V: np.ndarray,
-    out: np.ndarray,
-    dO: np.ndarray,
-    P: np.ndarray,
-    scale: float,
-) -> tuple:
-    """CPU backward. Returns (dQ, dK, dV)."""
-    D = (dO * out).sum(axis=-1, keepdims=True)
-    dP = np.matmul(dO, V.transpose(0, 1, 3, 2))
-    dS = P * (dP - D)
-    dQ = np.matmul(dS, K) * scale
-    dK = np.matmul(dS.transpose(0, 1, 3, 2), Q) * scale
-    dV = np.matmul(P.transpose(0, 1, 3, 2), dO)
-    return dQ, dK, dV
 
 
 def bwd_flops(prob: FmhaProblem) -> int:
