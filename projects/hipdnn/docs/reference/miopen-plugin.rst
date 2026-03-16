@@ -20,9 +20,9 @@ Operation support
 
 These are the supported datatypes:
 
-- **``FP16``**: Half-precision floating point (16-bit)
-- **``BFP16``**: Brain floating point (16-bit)
-- **``FP32``**: Single-precision floating point (32-bit)
+- ``FP16``: Half-precision floating point (16-bit)
+- ``BFP16``: Brain floating point (16-bit)
+- ``FP32``: Single-precision floating point (32-bit)
 
 These are the supported layouts:
 
