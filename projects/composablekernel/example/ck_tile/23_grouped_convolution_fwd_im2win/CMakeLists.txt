@@ -19,6 +19,7 @@ if(GPU_TARGETS MATCHES "gfx94|gfx95")
         0  1  2  3  4  5  6  7  8  9  10  11  12
         #13  14  15  16  17
         #18 19 20 21 22 23
+        24
         # Large-K configs (K=2376, C=256)
         100 101 102 103 104 105 106 107
         )
@@ -51,6 +52,7 @@ if(GPU_TARGETS MATCHES "gfx94|gfx95")
         # Merge_Gm32_M128N32K64
         # Merge_Gm32_M128N64K64
         # Merge_Gm8_M128N32K32
+        Merge_Gm32_M128N64K64_512T
         # Large-K configs (compute-bound, K=2376, C=256)
         LK_CV3_M128N32K64
         LK_CV3_M64N64K64

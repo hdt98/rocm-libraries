@@ -765,6 +765,54 @@ struct Im2winConfig_Merge_Gm8_M128N32K32 : public Im2winConvConfigBase
     static constexpr ck_tile::index_t NumGroupsToMerge = 8;
 };
 
+// ── Config Merge_Gm32_M128N64K64_512T: 512 threads, 32×32×8 MFMA ─────────
+//
+// Motivation (see im2win_tile_design_32x32x8.md):
+//   With 256 threads and M_Tile=128=K×Gm, only 1 N-warp is available
+//   → N_Tile=32 (small).  Adding a 2nd N-warp (512 threads total) doubles
+//   N_Tile to 64 → 2× more valid outputs per block, 2× fewer blocks.
+//
+// Key design choices:
+//   • 32×32×8 MFMA (K_Warp_Tile=8) verified in WarpGemmDispatcher for fp16/bf16
+//   • K_Tile=64 → 8 MFMA steps per K_Tile (vs 4 for K_WT=16): better ILP
+//   • DoubleSmemBuffer=false (single buffer) to keep LDS at 24 KB:
+//       A LDS: 128×64×2 = 16 KB,  B LDS: 64×64×2 = 8 KB  → 24 KB total
+//       gfx950 LDS = 64 KB/CU → ~2 blocks/CU → reasonable occupancy
+//   • Memory pipeline (Intrawave); ComputeV3 can be tried separately
+//   • NumGroupsToMerge = 32 (merge all G=32 groups)
+//
+// Tile shape:
+//   BlockSize = M_Warp × N_Warp × 64 = 4 × 2 × 64 = 512 threads
+//   M_Tile = 4 × 32 = 128 = K × Gm  (zero M waste, perfect fit)
+//   N_Tile = 2 × 32 = 64             (2× larger than 256-thread version)
+//
+// Expected vs Merge_Gm32_M128N32K64 (256T):
+//   Valid outputs/block: 256 vs 128  (+2×)
+//   Grid blocks:         640K vs 1.28M  (–2×)
+template <typename PrecType>
+struct Im2winConfig_Merge_Gm32_M128N64K64_512T : public Im2winConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 128;
+    static constexpr ck_tile::index_t N_Tile = 64;
+    static constexpr ck_tile::index_t K_Tile = 64;
+
+    static constexpr ck_tile::index_t M_Warp = 4;  // 4×32 = 128 = K×Gm ✓
+    static constexpr ck_tile::index_t N_Warp = 2;  // 2×32 = 64  (2nd N-warp)
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 32; // 32×32×8 MFMA
+    static constexpr ck_tile::index_t N_Warp_Tile = 32;
+    static constexpr ck_tile::index_t K_Warp_Tile = 8;  // ← K_WT=8 (8 steps/K_Tile)
+
+    static constexpr bool DoubleSmemBuffer = false; // single buffer: 24 KB LDS
+    static constexpr int  kBlockPerCu      = 1;
+
+    static constexpr ck_tile::GemmPipeline         Pipeline  = ck_tile::GemmPipeline::MEMORY;
+    static constexpr ck_tile::GemmPipelineScheduler Scheduler =
+        ck_tile::GemmPipelineScheduler::Intrawave;
+    static constexpr ck_tile::index_t NumGroupsToMerge = 32;
+};
+
 // ══════════════════════════════════════════════════════════════════════
 // Config registry and compile-time selection
 //
@@ -841,6 +889,8 @@ template <typename P> using ActiveIm2winConfig = Im2winConfig_Merge_Gm32_M128N32
 template <typename P> using ActiveIm2winConfig = Im2winConfig_Merge_Gm32_M128N64K64<P>;
 #elif IM2WIN_CONFIG_ID == 23
 template <typename P> using ActiveIm2winConfig = Im2winConfig_Merge_Gm8_M128N32K32<P>;
+#elif IM2WIN_CONFIG_ID == 24
+template <typename P> using ActiveIm2winConfig = Im2winConfig_Merge_Gm32_M128N64K64_512T<P>;
 // ── Large-K configs (IDs 100–107, defined in im2win_conv_configs_large_k.hpp) ──
 #elif IM2WIN_CONFIG_ID == 100
 template <typename P> using ActiveIm2winConfig = Im2winConfig_LK_CV3_M128N32K64<P>;

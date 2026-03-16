@@ -55,9 +55,9 @@ struct TransformConvFwdToIm2win
 {
     static_assert(NDimSpatial == 2,
                   "TransformConvFwdToIm2win currently supports 2D convolution only.");
-    static_assert(NumGroupsToMerge == 1,
-                  "Channels-first GNCHW/GKCYX only supports NumGroupsToMerge == 1. "
-                  "Use NHWGC/GKYXC for group merging.");
+    // Note: NumGroupsToMerge > 1 is supported for channels-last (NHWGC/GKYXC).
+    // Channels-first (GNCHW/GKCYX) descriptor methods enforce NumGroupsToMerge==1
+    // individually via per-method static_assert.
 
     private:
     static constexpr auto I0 = number<0>{};
@@ -729,8 +729,9 @@ struct TransformConvFwdToIm2win
                   bool>::type = false>
     CK_TILE_HOST auto MakeCDescriptor_M_N() const
     {
-        static_assert(NumGroupsToMerge == 1,
-                      "NHWGK output with NumGroupsToMerge==1 only in this path.");
+        // This single-group path is used for NumGroupsToMerge==1.
+        // For NumGroupsToMerge>1 the XOR-diagonal C descriptor is used instead
+        // (via the NHWGC group-merging path in MakeCDescriptor_M_N for Gm>1).
 
         // Physical O[N,Ho,Wo,G,K]; group G stripped by pointer offset.
         // c_ptr = out_ptr + g_base * K  (stride of G dimension in NHWGK = K).

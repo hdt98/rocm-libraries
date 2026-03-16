@@ -93,6 +93,7 @@ ALL_CONFIGS: list[str] = [
     "Merge_Gm32_M128N32K64",
     "Merge_Gm32_M128N64K64",
     "Merge_Gm8_M128N32K32",
+    "Merge_Gm32_M128N64K64_512T",   # 512 threads, 32x32x8 MFMA, single buffer
     # Large-K configs (compute-bound: K=2376, C=256)
     "LK_CV3_M128N32K64",
     "LK_CV3_M64N64K64",
@@ -169,6 +170,9 @@ def benchmark_config(
     m = _TIMING_RE.search(output)
     if not m:
         result.skip_reason = "no timing line in output"
+        # Print stdout contents in case of errors
+        print(f"  [ERROR: timing line not found in output of {bin_path}]\n"
+              f"  Output was:\n{output}")
         return result
 
     result.ms     = float(m.group("ms"))
