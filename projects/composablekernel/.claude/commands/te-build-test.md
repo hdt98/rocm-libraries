@@ -11,6 +11,8 @@ The user wants to clean-build and benchmark a tile engine operator. The operator
 
 If no operator name is provided, ask the user which operator to test.
 
+Set `OPERATOR` to the value of `$ARGUMENTS` (e.g. `gemm_aquant` or `gemm_bquant`).
+
 Run the following 4 steps sequentially from the project root (`/dockerx/rocm-libraries/projects/composablekernel`). Stop and report if any step fails.
 
 ### Step 1: Clean and create build directory
@@ -30,8 +32,6 @@ cd /dockerx/rocm-libraries/projects/composablekernel/build && ../script/cmake-ck
 ```
 cd /dockerx/rocm-libraries/projects/composablekernel/build && ninja -j256 benchmark_${OPERATOR}_all
 ```
-
-Where `${OPERATOR}` is the operator name (e.g. `gemm_aquant`).
 
 ### Step 4: Run the benchmark
 

@@ -152,8 +152,8 @@ inline std::string get_rocm_version()
 }
 
 template <typename ADataType_,
-          typename BQDataType_,
           typename BDataType_,
+          typename BQDataType_,
           typename AccDataType_,
           typename CDataType_>
 auto calculate_rtol_atol_bquant(const ck_tile::index_t K,
@@ -188,7 +188,7 @@ bool compare_bquant(std::string instanceName,
                                                                  std::abs(static_cast<float>(b));
                                                       })));
     const auto rtol_atol =
-        calculate_rtol_atol_bquant<ADataType, BQDataType, BDataType, AccDataType, CDataType>(
+        calculate_rtol_atol_bquant<ADataType, BDataType, BQDataType, AccDataType, CDataType>(
             K, kbatch, max_accumulated_value);
     bool pass = ck_tile::check_err(c_m_n_dev_result,
                                    c_m_n_host_result,

@@ -11,9 +11,9 @@ set(GEMM_BQUANT_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR})
 
 # Function to create individual GEMM BQuant targets
 function(create_individual_gemm_bquant_target datatype layout trait tile_config config_json)
+    # GEMM_BQUANT_GPU_TARGETS_INDIVIDUAL is guaranteed non-empty here (caller checks at line 192)
     if(NOT GEMM_BQUANT_GPU_TARGETS_INDIVIDUAL)
-        message(WARNING "Skipping individual GEMM BQuant target ${datatype}_${layout}_${trait}_${tile_config}: No supported GPU targets")
-        return()
+        message(FATAL_ERROR "BUG: create_individual_gemm_bquant_target called with no GPU targets")
     endif()
 
     # Parse tile configuration: format is tile_mxtile_nxtile_k_warp_mxwarp_nxwarp_k_warp_tile_mxwarp_tile_nxwarp_tile_k

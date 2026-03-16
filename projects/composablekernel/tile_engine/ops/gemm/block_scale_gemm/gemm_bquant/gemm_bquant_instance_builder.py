@@ -433,8 +433,8 @@ constexpr const char* KERNEL_NAME = "{kernel_name}";
 
 // Wrapper for simplified launch interface
 struct SelectedKernel {{
-    // Tile configuration
-    static constexpr ck_tile::index_t BlockSize = 256;
+    // Tile configuration (BlockSize = WarpPerBlock_M * WarpPerBlock_N * WarpPerBlock_K * warpSize)
+    static constexpr ck_tile::index_t BlockSize = {tile_config["warp_m"] * tile_config["warp_n"] * tile_config["warp_k"] * 64};
     static constexpr ck_tile::index_t TileM = {tile_config["tile_m"]};
     static constexpr ck_tile::index_t TileN = {tile_config["tile_n"]};
     static constexpr ck_tile::index_t TileK = {tile_config["tile_k"]};

@@ -25,6 +25,8 @@ class BQuantGemmProfiler
         return instance;
     }
 
+    void reset() { kernel_instances_.clear(); }
+
     void benchmark(BQuantGemmProblem& problem,
                    std::function<float(const ck_tile::QuantGemmHostArgs&,
                                        const ck_tile::stream_config&)> kernel_func)

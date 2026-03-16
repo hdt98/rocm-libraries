@@ -109,7 +109,8 @@ class BQuantGemmBenchmark:
             config["optimization_flags"]["b_preshuffle_quant"] = bool_sequence[3]
             config["optimization_flags"]["preshuffle_b"] = bool_sequence[4]
 
-        # Extract dimension groups (e.g., 128x128x128)
+        # Extract dimension groups (e.g., 128x128x128) in positional order.
+        # Kernel names encode groups as: tile_MxNxK_warp_MxNxK_warp_tile_MxNxK
         dimension_groups = []
         for part in parts:
             if "x" in part and len(part.split("x")) == 3:
@@ -121,16 +122,16 @@ class BQuantGemmBenchmark:
                     continue
 
         if len(dimension_groups) >= 3:
-            sorted_groups = sorted(dimension_groups, key=lambda x: max(x), reverse=True)
-            config["tile_sizes"]["tile_m"] = sorted_groups[0][0]
-            config["tile_sizes"]["tile_n"] = sorted_groups[0][1]
-            config["tile_sizes"]["tile_k"] = sorted_groups[0][2]
-            config["warp_config"]["warp_m"] = sorted_groups[2][0]
-            config["warp_config"]["warp_n"] = sorted_groups[2][1]
-            config["warp_config"]["warp_k"] = sorted_groups[2][2]
-            config["warp_tile"]["warp_tile_m"] = sorted_groups[1][0]
-            config["warp_tile"]["warp_tile_n"] = sorted_groups[1][1]
-            config["warp_tile"]["warp_tile_k"] = sorted_groups[1][2]
+            # Use positional order: tile, warp, warp_tile
+            config["tile_sizes"]["tile_m"] = dimension_groups[0][0]
+            config["tile_sizes"]["tile_n"] = dimension_groups[0][1]
+            config["tile_sizes"]["tile_k"] = dimension_groups[0][2]
+            config["warp_config"]["warp_m"] = dimension_groups[1][0]
+            config["warp_config"]["warp_n"] = dimension_groups[1][1]
+            config["warp_config"]["warp_k"] = dimension_groups[1][2]
+            config["warp_tile"]["warp_tile_m"] = dimension_groups[2][0]
+            config["warp_tile"]["warp_tile_n"] = dimension_groups[2][1]
+            config["warp_tile"]["warp_tile_k"] = dimension_groups[2][2]
 
         return config
 
@@ -408,6 +409,17 @@ def main():
         default=100,
         help="Number of benchmark iterations",
     )
+    parser.add_argument(
+        "--no-flush-cache",
+        action="store_true",
+        help="Disable cache flushing between iterations",
+    )
+    parser.add_argument(
+        "--rotating-count",
+        type=int,
+        default=1000,
+        help="Number of iterations to rotate the cache (default: 1000)",
+    )
     parser.add_argument("--json", help="JSON output filename (optional)")
 
     args = parser.parse_args()
@@ -433,6 +445,8 @@ def main():
         verify=args.verify,
         warmup=args.warmup,
         repeat=args.repeat,
+        flush_cache=not args.no_flush_cache,
+        rotating_count=args.rotating_count,
     )
 
     elapsed_time = time.time() - start_time
