@@ -167,7 +167,7 @@ auto run(const ck_tile::ArgParser& arg_parser)
     std::string init_method          = arg_parser.get_str("init");
     uint32_t seed                    = arg_parser.get_uint32("seed");
     int init_sink_value              = arg_parser.get_int("init_sink");
-    bool run_all_kernels              = arg_parser.get_bool("run_all_kernels");
+    bool run_all_kernels             = arg_parser.get_bool("run_all_kernels");
 
     ck_tile::stream_config stream_config{nullptr,
                                          true,
