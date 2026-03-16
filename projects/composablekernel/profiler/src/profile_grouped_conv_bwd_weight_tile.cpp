@@ -208,6 +208,14 @@ int profile_grouped_conv_bwd_weight_tile(int argc, char* argv[])
                     split_k,
                     time_kernel);
             }
+            else if(data_type == ConvDataType::F32_F32_F32)
+            {
+                constexpr auto SIGNATURE = ckp::SIGNATURE_NHWGC_FP32_BWD_WEIGHT;
+                return call_profiler<SIGNATURE>(
+                    ckp::parse_conv_args<SIGNATURE>(conv_params_start_idx, argv),
+                    split_k,
+                    time_kernel);
+            }
         }
         else if(num_dim_spatial == 3)
         {
@@ -222,6 +230,14 @@ int profile_grouped_conv_bwd_weight_tile(int argc, char* argv[])
             else if(data_type == ConvDataType::BF16_BF16_BF16)
             {
                 constexpr auto SIGNATURE = ckp::SIGNATURE_NDHWGC_BF16_BWD_WEIGHT;
+                return call_profiler<SIGNATURE>(
+                    ckp::parse_conv_args<SIGNATURE>(conv_params_start_idx, argv),
+                    split_k,
+                    time_kernel);
+            }
+            else if(data_type == ConvDataType::F32_F32_F32)
+            {
+                constexpr auto SIGNATURE = ckp::SIGNATURE_NDHWGC_FP32_BWD_WEIGHT;
                 return call_profiler<SIGNATURE>(
                     ckp::parse_conv_args<SIGNATURE>(conv_params_start_idx, argv),
                     split_k,
