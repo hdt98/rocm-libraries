@@ -23,18 +23,16 @@ CK_TILE_HOST void reference_mhc(const HostTensor<XDataType>& x_b_nc,       // [B
                                 HostTensor<YDataType>& output_b_out,       // [B, 2n+n^2]
                                 int n,                                     // expansion factor
                                 int C,                                     // channels per stream
-                                [[maybe_unused]] float r               = 1.0f,
-                                [[maybe_unused]] float alpha_pre       = 1.0f,
-                                [[maybe_unused]] float alpha_post      = 1.0f,
-                                [[maybe_unused]] float alpha_res       = 1.0f,
-                                [[maybe_unused]] float bias            = 0.0f,
-                                [[maybe_unused]] int sinkhorn_iters    = 0,
-                                [[maybe_unused]] Activation activation = Activation{},
-                                [[maybe_unused]] bool use_log_sinkhorn = false)
+                                float alpha_pre       = 1.0f,
+                                float alpha_post      = 1.0f,
+                                float alpha_res       = 1.0f,
+                                float bias            = 0.0f,
+                                int sinkhorn_iters    = 0,
+                                Activation activation = Activation{},
+                                bool use_log_sinkhorn = false)
 {
     const int B  = x_b_nc.get_length(0);
     const int nC = n * C;
-    (void)nC; // May not be used in all code paths
 
     // Process each batch element
     auto f_batch = [&](auto b) {
@@ -51,8 +49,6 @@ CK_TILE_HOST void reference_mhc(const HostTensor<XDataType>& x_b_nc,       // [B
 
         // Step 2 & 3: Perform GEMM and apply elementwise operations
 
-        // Step 2 & 3: Perform GEMM and apply elementwise operations
-
         // Process H^{pre}: x * phi[:, 0:n] -> sigma(output[:, 0:n])
         for(int out_idx = 0; out_idx < n; out_idx++)
         {
@@ -62,7 +58,7 @@ CK_TILE_HOST void reference_mhc(const HostTensor<XDataType>& x_b_nc,       // [B
                 sum += type_convert<ComputeDataType>(x_b_nc(b, k)) *
                        type_convert<ComputeDataType>(phi_nc_out(k, out_idx));
             }
-            // Step 4: Apply activation σ(H^{pre})
+            // Step 4: Apply activation sigma(H^{pre})
             ComputeDataType activated_value;
             activation(activated_value, sum);
             output_b_out(b, out_idx) =
@@ -78,7 +74,7 @@ CK_TILE_HOST void reference_mhc(const HostTensor<XDataType>& x_b_nc,       // [B
                 sum += type_convert<ComputeDataType>(x_b_nc(b, k)) *
                        type_convert<ComputeDataType>(phi_nc_out(k, n + out_idx));
             }
-            // Step 5: Apply 2*σ(H^{post})
+            // Step 5: Apply 2*sigma(H^{post})
             ComputeDataType activated_value;
             activation(activated_value, sum);
             output_b_out(b, n + out_idx) =
@@ -86,11 +82,11 @@ CK_TILE_HOST void reference_mhc(const HostTensor<XDataType>& x_b_nc,       // [B
         }
 
         // Process H^{res}: x * phi[:, 2n:2n+n^2] -> output[:, 2n:2n+n^2]
-        // Create temporary tensors for H^res matrix (n×n)
+        // Create temporary tensors for H^res matrix (nxn)
         HostTensor<ComputeDataType> h_res_input({n, n});
         HostTensor<ComputeDataType> h_res_output({n, n});
 
-        // Compute GEMM result and reshape into n×n matrix
+        // Compute GEMM result and reshape into nxn matrix
         for(int row = 0; row < n; row++)
         {
             for(int col = 0; col < n; col++)
@@ -145,10 +141,6 @@ CK_TILE_HOST void reference_mhc(const HostTensor<XDataType>& x_b_nc,       // [B
                 }
             }
         }
-
-        // Note: norm is computed but not currently used in the output
-        // It could be used for additional normalization if needed
-        // (void)norm;
     };
 
     // Use single-threaded execution to avoid potential race conditions

@@ -29,7 +29,7 @@ struct MHCDefaultPolicy
             return false;
         }
 
-        // Check supported input types: bf16, fp16 (half_t), fp8, or float
+        // Check supported input types
         constexpr bool is_supported_type =
             std::is_same_v<ADataType, bf16_t> || std::is_same_v<ADataType, half_t> ||
             std::is_same_v<ADataType, fp8_t> || std::is_same_v<ADataType, float>;
@@ -87,55 +87,36 @@ struct MHCDefaultPolicy
         constexpr index_t kN = Problem::BlockGemmShape::kN;
         constexpr index_t kK = Problem::BlockGemmShape::kK;
 
-        // Validate argument types
-        static_assert(IsSupportedArguments<ADataType, BDataType, CDataType>(),
-                      "MHC kernel requires: A and B must be the same type (bf16, fp16, fp8, or "
-                      "float), and C must be float");
-
+        // Validate argument types:
         // Check if we support this configuration with MFMA
-        if constexpr(IsSupportedArguments<ADataType, BDataType, CDataType>())
-        {
-            // Get warp tile dimensions based on data type and block shape
-            constexpr auto warp_dims = GetWarpTileDimensions<ADataType, kM, kN, kK>();
-            constexpr index_t kWarpM = warp_dims.template at<0>().value;
-            constexpr index_t kWarpN = warp_dims.template at<1>().value;
-            constexpr index_t kWarpK = warp_dims.template at<2>().value;
+        static_assert(IsSupportedArguments<ADataType, BDataType, CDataType>(),
+                      "MHC kernel requires: A and B must be the same type"
+                      ", and C must be float");
 
-            // Get number of warps in M and N dimensions
-            constexpr auto num_warps = GetNumWarps<kM, kN, kWarpM, kWarpN>();
-            constexpr index_t kMWarp = num_warps.template at<0>().value;
-            constexpr index_t kNWarp = num_warps.template at<1>().value;
+        // Get warp tile dimensions based on data type and block shape
+        constexpr auto warp_dims = GetWarpTileDimensions<ADataType, kM, kN, kK>();
+        constexpr index_t kWarpM = warp_dims.template at<0>().value;
+        constexpr index_t kWarpN = warp_dims.template at<1>().value;
+        constexpr index_t kWarpK = warp_dims.template at<2>().value;
 
-            // Create WarpGemm dispatcher with computed dimensions
-            using WG = WarpGemmDispatcher<ADataType,
-                                          BDataType,
-                                          CDataType,
-                                          kWarpM,
-                                          kWarpN,
-                                          kWarpK,
-                                          true,  // TransposeC
-                                          false, // SwizzleA
-                                          false, // UseStructuredSparsity
-                                          WGAttrNumAccessEnum::Single>;
+        // Get number of warps in M and N dimensions
+        constexpr auto num_warps = GetNumWarps<kM, kN, kWarpM, kWarpN>();
+        constexpr index_t kMWarp = num_warps.template at<0>().value;
+        constexpr index_t kNWarp = num_warps.template at<1>().value;
 
-            return make_tuple(WG{}, kMWarp, kNWarp);
-        }
-        else
-        {
-            // For unsupported data types, delegate to default policy
-            return BlockGemmASmemBSmemCRegV1DefaultPolicy::GetWarpGemmMWarpNWarp<Problem>();
-        }
-    }
+        // Create WarpGemm dispatcher with computed dimensions
+        using WG = WarpGemmDispatcher<ADataType,
+                                      BDataType,
+                                      CDataType,
+                                      kWarpM,
+                                      kWarpN,
+                                      kWarpK,
+                                      true,  // TransposeC
+                                      false, // SwizzleA
+                                      false, // UseStructuredSparsity
+                                      WGAttrNumAccessEnum::Single>;
 
-    // Get shared memory size needed for the kernel
-    template <typename Problem>
-    CK_TILE_HOST_DEVICE static constexpr index_t GetSmemSize()
-    {
-        // For MHC, we need shared memory for the BlockGemm operations
-        // The size depends on the block shape and data types
-        // This is a placeholder - actual size calculation would depend on
-        // the specific BlockGemm implementation requirements
-        return 0; // Will be calculated by BlockGemm internally
+        return make_tuple(WG{}, kMWarp, kNWarp);
     }
 };
 

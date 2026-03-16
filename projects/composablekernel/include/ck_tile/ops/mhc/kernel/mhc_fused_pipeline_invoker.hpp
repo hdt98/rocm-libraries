@@ -7,13 +7,8 @@
 #include "ck_tile/host.hpp"
 #include "ck_tile/ops/mhc/pipeline/mhc_problem.hpp"
 #include "ck_tile/ops/mhc/kernel/mhc_kernel_fused_pipeline.hpp"
-#include "ck_tile/ops/mhc/kernel/mhc_reduction_kernel_optimized.hpp"
-// Sinkhorn kernels
+#include "ck_tile/ops/mhc/kernel/mhc_reduction_kernel.hpp"
 #include "ck_tile/ops/mhc/kernel/mhc_sinkhorn_kernel.hpp"
-#include "ck_tile/ops/mhc/kernel/mhc_sinkhorn_log_kernel.hpp"
-#include "ck_tile/ops/mhc/kernel/mhc_sinkhorn_log_kernel_cktile_v2.hpp"
-#include "ck_tile/ops/mhc/kernel/mhc_sinkhorn_kernel_cktile_v2.hpp"
-#include "ck_tile/ops/mhc/kernel/mhc_sinkhorn_kernel_cktile_unified.hpp"
 #include "ck_tile/ops/gemm/pipeline/gemm_universal_pipeline_ag_bg_cr_policy.hpp"
 
 namespace ck_tile {
@@ -39,21 +34,14 @@ struct MHCFusedPipelineInvoker
     static constexpr bool UseLogSinkhorn    = UseLogSinkhorn_;
 
     // Kernel type definitions
-    using Problem = ck_tile::MHCProblemV5GemmDist<XDataType, ComputeDataType, YDataType, MTile>;
+    using Problem = ck_tile::MHCProblemGemmDist<XDataType, ComputeDataType, YDataType, MTile>;
     using BlockGemmShape = typename Problem::BlockGemmShape;
     using GemmKernel     = ck_tile::
         MHCKernelFusedPipeline<Problem, ck_tile::UniversalGemmPipelineAgBgCrPolicy, ActivationFunc>;
-    using ReductionKernel = ck_tile::MHCReductionKernelOptimized<Problem, ActivationFunc>;
-    // Sinkhorn kernel - supports arbitrary n
-    // Testing unified V2 kernel (old kernels commented out)
+    using ReductionKernel = ck_tile::MHCReductionKernel<Problem, ActivationFunc>;
+
     using SinkhornKernel =
-        // Old kernels:
-        // std::conditional_t<UseLogSinkhorn,
-        //                    ck_tile::MHCSinkhornLogKernel<YDataType, ComputeDataType>,
-        //                    ck_tile::MHCSinkhornKernel<YDataType, ComputeDataType>>;
-        // Unified V2 kernel (testing):
-        ck_tile::
-            MHCSinkhornKernelTileV2UnifiedDispatcher<YDataType, ComputeDataType, UseLogSinkhorn>;
+        ck_tile::MHCSinkhornKernelDispatcher<YDataType, ComputeDataType, UseLogSinkhorn>;
 
     // Helper methods
     CK_TILE_HOST static constexpr auto GetGemmBlockSize() { return GemmKernel::BlockSize(); }
@@ -96,7 +84,7 @@ struct MHCFusedPipelineInvoker
         constexpr ck_tile::index_t kN = BlockGemmShape::kN;
         constexpr ck_tile::index_t kK = BlockGemmShape::kK;
 
-        // Base calculation: A (M×K) + B (N×K) with type sizes
+        // Base calculation: A (MxK) + B (NxK) with type sizes
         constexpr ck_tile::index_t base_a = kM * kK * sizeof(ADataType);
         constexpr ck_tile::index_t base_b = kN * kK * sizeof(BDataType);
 

@@ -11,13 +11,10 @@
 #include "ck_tile/ops/reduce/pipeline/reduce2d_default_policy.hpp"
 #include "ck_tile/ops/mhc/pipeline/mhc_problem.hpp"
 
-// Optimized MHC Reduction Kernel using CK-Tile's block_reduce2d pattern
+// MHC Reduction Kernel
 // ======================================================================
-// This kernel follows the EXACT same pattern as CK-Tile's ReduceKernel
-// (reduce2d_kernel.hpp) used in 2-stage split-k GEMM reduction.
-//
 // Pattern:
-// 1. Transform workspace tensor [batch, grid_k, output_dim] → [batch*output_dim, grid_k]
+// 1. Transform workspace tensor [batch, grid_k, output_dim] -> [batch*output_dim, grid_k]
 // 2. Create tile windows with proper distributions
 // 3. Iterate over grid_k dimension with block_reduce2d
 // 4. Apply warp-level and cross-warp synchronization
@@ -26,7 +23,7 @@
 namespace ck_tile {
 
 template <typename Problem_, typename Activation_ = element_wise::Sigmoid>
-struct MHCReductionKernelOptimized
+struct MHCReductionKernel
 {
     using Activation      = ck_tile::remove_cvref_t<Activation_>;
     using Problem         = ck_tile::remove_cvref_t<Problem_>;
@@ -67,37 +64,24 @@ struct MHCReductionKernelOptimized
     }
 
     CK_TILE_DEVICE void operator()(const ComputeDataType* p_workspace,
-                                   [[maybe_unused]] const ComputeDataType* p_partial_norms,
+                                   const ComputeDataType* p_partial_norms,
                                    YDataType* p_output,
                                    index_t batch,
-                                   [[maybe_unused]] index_t nC,
+                                   index_t nC,
                                    index_t output_dim,
                                    index_t n,
                                    index_t grid_k,
                                    float alpha_pre,
                                    float alpha_post,
                                    float alpha_res,
-                                   float bias,
-                                   [[maybe_unused]] index_t sinkhorn_iters = 0) const
+                                   float bias) const
     {
         using S       = ReduceShape;
         const auto iM = get_block_id() * S::Block_M;
 
         // Workspace layout: [batch, grid_k, output_dim]
-        // Actual memory layout: workspace[batch_idx * (grid_k * output_dim) + k_idx * output_dim +
-        // out_idx] We want to reduce over grid_k (dimension 1) Transform to [batch*output_dim,
-        // grid_k] for 2D reduction pattern
-        const index_t total_output = batch * output_dim;
 
-        // Create workspace tensor view with correct strides
-        // For each (batch, output) pair, we need to gather grid_k values
-        // workspace[b][k][o] = workspace[b * grid_k * output_dim + k * output_dim + o]
-        // Reinterpreted as [b*output_dim + o][k] = workspace[(b*output_dim + o) * grid_k + k]
-        // But our actual layout is: workspace[b * grid_k * output_dim + k * output_dim + o]
-        // So for position (b*output_dim + o, k), the offset is: b * grid_k * output_dim + k *
-        // output_dim + o Let flat_idx = b * output_dim + o, then offset = (flat_idx / output_dim) *
-        // grid_k * output_dim + k * output_dim + (flat_idx % output_dim) This doesn't fit a simple
-        // stride pattern, so we need to use the actual 3D layout
+        const index_t total_output = batch * output_dim;
 
         // Create 3D workspace tensor view
         auto workspace_tensor_3d = make_naive_tensor_view<address_space_enum::global>(
@@ -173,8 +157,8 @@ struct MHCReductionKernelOptimized
             if(global_idx >= total_output)
                 return;
 
-            [[maybe_unused]] const index_t global_m = global_idx / output_dim;
-            const index_t global_n                  = global_idx % output_dim;
+            const index_t global_m = global_idx / output_dim;
+            const index_t global_n = global_idx % output_dim;
 
             // Get reduced value
             ComputeDataType value = y_compute[make_tuple(idx0)];
@@ -192,7 +176,7 @@ struct MHCReductionKernelOptimized
             YDataType final_value;
             if(global_n < n)
             {
-                // H^pre: (alpha_pre/norm) * σ(value) + bias
+                // H^pre: (alpha_pre/norm) * sigma(value) + bias
                 YDataType activated;
                 Activation{}(activated, type_convert<YDataType>(value));
                 final_value = type_convert<YDataType>(
@@ -200,7 +184,7 @@ struct MHCReductionKernelOptimized
             }
             else if(global_n < 2 * n)
             {
-                // H^post: (alpha_post/norm) * 2*σ(value) + bias
+                // H^post: (alpha_post/norm) * 2*sigma(value) + bias
                 YDataType activated;
                 Activation{}(activated, type_convert<YDataType>(value));
                 final_value = type_convert<YDataType>(

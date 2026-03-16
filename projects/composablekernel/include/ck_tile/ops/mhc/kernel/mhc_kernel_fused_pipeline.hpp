@@ -14,12 +14,6 @@
 // This kernel uses the MhcGemmPipelineAgBgCrCompV3Fused pipeline which
 // supports optional fusion functions. This enables single-pass fusion of
 // operations like norm computation with the GEMM operation.
-//
-// Key features:
-// 1. Full GEMM V3 pipeline optimizations (60 TFLOPS baseline)
-// 2. Optional fusion function for norm computation (single memory pass)
-// 3. Clean lambda-based interface for custom fusion operations
-// 4. Maintains all V3 scheduling and prefetch optimizations
 
 namespace ck_tile {
 
@@ -65,18 +59,21 @@ struct MHCKernelFusedPipeline
 
     CK_TILE_HOST_DEVICE static constexpr index_t GetTargetGridK(index_t nC)
     {
-        if(nC >= 32768)
-            return 16;
-        else if(nC >= 16384)
-            return 16;
-        else if(nC >= 8192)
-            return 16;
-        else if(nC >= 4096)
+#if defined(__gfx950__) || defined(CK_GFX950_SUPPORT) || defined(CK_USE_GFX950)
+        if(nC >= 4096)
+            return 32;
+        else if(nC >= 2048)
+            return 64;
+        else
+            return 128;
+#else
+        if(nC >= 4096)
             return 16;
         else if(nC >= 2048)
             return 32;
         else
             return 64;
+#endif
     }
 
     CK_TILE_HOST_DEVICE static constexpr index_t GetKTilesPerBlock(index_t nC)
@@ -115,17 +112,13 @@ struct MHCKernelFusedPipeline
     CK_TILE_DEVICE void operator()(const XDataType* p_x,
                                    const PhiDataType* p_phi,
                                    ComputeDataType* p_workspace,
-                                   [[maybe_unused]] ComputeDataType* p_partial_norms,
+                                   ComputeDataType* p_partial_norms,
                                    index_t batch,
                                    index_t nC,
-                                   index_t output_dim,
-                                   [[maybe_unused]] index_t n,
-                                   [[maybe_unused]] float r          = 1.0f,
-                                   [[maybe_unused]] float alpha_pre  = 1.0f,
-                                   [[maybe_unused]] float alpha_post = 1.0f,
-                                   [[maybe_unused]] float alpha_res  = 1.0f,
-                                   [[maybe_unused]] float bias       = 0.0f) const
+                                   index_t output_dim) const
     {
+        using PassThrough = ck_tile::element_wise::PassThrough;
+
         const index_t k_tiles_per_block = GetKTilesPerBlock(nC);
         const index_t k_per_block       = kKTile * k_tiles_per_block;
 
@@ -161,7 +154,7 @@ struct MHCKernelFusedPipeline
                                               {batch_start, k_start});
 
         // Setup Phi (B) tensor and window
-        // Note: We pad to kNTile (not kNTileLogical) for pipeline compatibility
+        // Note: kNTile is padded for pipeline compatibility
         auto phi_tensor_full = make_naive_tensor_view<address_space_enum::global>(
             p_phi, make_tuple(output_dim, nC), make_tuple(1, output_dim), number<1>{}, number<1>{});
         auto phi_tensor_padded = pad_tensor_view(phi_tensor_full,
@@ -172,9 +165,6 @@ struct MHCKernelFusedPipeline
                                                 make_tuple(number<kNTile>{}, number<kKTile>{}),
                                                 {out_start, k_start});
 
-        // Element-wise functions (pass-through for now)
-        constexpr auto PassThrough = [](auto& e, const auto& x) { e = x; };
-
         // Create the fused pipeline
         Pipeline pipeline;
 
@@ -182,8 +172,7 @@ struct MHCKernelFusedPipeline
         // For M=64, this is 64 floats = 256 bytes in VGPRs
         // Trade-off: 20% performance loss but correct norm computation
         ComputeDataType norm_accum[kMTile];
-        for(index_t m = 0; m < kMTile; ++m)
-            norm_accum[m] = 0.0f;
+        static_for<0, kMTile, 1>{}([&](auto m) { norm_accum[m.value] = 0.0f; });
 
         // Track which K tile we're on for bounds checking
         index_t current_k_tile = 0;
@@ -240,9 +229,9 @@ struct MHCKernelFusedPipeline
         };
 
         auto c_block_tile = pipeline(x_dram_window,
-                                     PassThrough,
+                                     PassThrough{},
                                      phi_dram_window,
-                                     PassThrough,
+                                     PassThrough{},
                                      k_tiles_per_block,
                                      smem_ptr,
                                      fusion_func);
@@ -250,8 +239,16 @@ struct MHCKernelFusedPipeline
         // After all tiles, reduce norms and store
         __shared__ ComputeDataType norm_sums[kMTile];
         const index_t thread_id = get_thread_id();
-        for(index_t i = thread_id; i < kMTile; i += kBlockSize)
-            norm_sums[i] = 0.0f;
+
+        static_for<0, (kMTile + kBlockSize - 1) / kBlockSize, 1>{}([&](auto i) {
+            constexpr index_t idx = i.value * kBlockSize;
+            if constexpr(idx < kMTile)
+            {
+                if(thread_id + idx < kMTile)
+                    norm_sums[thread_id + idx] = 0.0f;
+            }
+        });
+
         block_sync_lds();
 
         // Two-level reduction: warp-level shuffle + cross-warp atomic
@@ -260,7 +257,7 @@ struct MHCKernelFusedPipeline
         {
             ComputeDataType partial_sum = norm_accum[m];
 
-// Level 1: Warp-level reduction using shuffle
+            // Level 1: Warp-level reduction using shuffle
 #pragma unroll
             for(index_t offset = get_warp_size() / 2; offset > 0; offset >>= 1)
                 partial_sum += __shfl_down(partial_sum, offset);

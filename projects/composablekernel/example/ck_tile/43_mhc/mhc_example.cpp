@@ -20,11 +20,10 @@ auto create_args(int argc, char* argv[])
     ck_tile::ArgParser arg_parser;
     arg_parser.insert("B", "8192", "Batch size")
         .insert("n", "4", "Expansion factor (number of streams)")
-        .insert("C", "32768", "Channels per stream")
+        .insert("C", "32768", "Layer dim")
         .insert("v", "1", "CPU validation (0=no, 1=yes)")
         .insert("warmup", "5", "Number of warmup iterations")
         .insert("repeat", "20", "Number of benchmark iterations")
-        .insert("r", "1.0", "Norm scaling factor")
         .insert("alpha_pre", "1.0", "Alpha for pre-activation")
         .insert("alpha_post", "1.0", "Alpha for post-activation")
         .insert("alpha_res", "1.0", "Alpha for residual")
@@ -41,7 +40,7 @@ template <typename XDataType,
           typename ComputeDataType,
           typename ActivationFunc = ck_tile::element_wise::Sigmoid,
           ck_tile::index_t MTile  = 32>
-bool run_mhc_fused_pipeline(const ck_tile::ArgParser& arg_parser)
+bool run_mhc(const ck_tile::ArgParser& arg_parser)
 {
     const int B = arg_parser.get_int("B");
     const int n = arg_parser.get_int("n");
@@ -54,7 +53,6 @@ bool run_mhc_fused_pipeline(const ck_tile::ArgParser& arg_parser)
     const int warmup        = arg_parser.get_int("warmup");
     const int repeat        = arg_parser.get_int("repeat");
 
-    const float r            = arg_parser.get_float("r");
     const float alpha_pre    = arg_parser.get_float("alpha_pre");
     const float alpha_post   = arg_parser.get_float("alpha_post");
     const float alpha_res    = arg_parser.get_float("alpha_res");
@@ -62,16 +60,15 @@ bool run_mhc_fused_pipeline(const ck_tile::ArgParser& arg_parser)
     const int sinkhorn_iters = arg_parser.get_int("sinkhorn_iters");
 
     std::cout << "\n========================================" << std::endl;
-    std::cout << "MHC Fused Pipeline Kernel Benchmark (BF16)" << std::endl;
+    std::cout << "MHC Kernel Benchmark (BF16)" << std::endl;
     std::cout << "========================================" << std::endl;
     std::cout << "Configuration:" << std::endl;
     std::cout << "  Batch size (B): " << B << std::endl;
     std::cout << "  Expansion factor (n): " << n << std::endl;
-    std::cout << "  Channels per stream (C): " << C << std::endl;
+    std::cout << "  Layer dimensions (C): " << C << std::endl;
     std::cout << "  Input dimension (nC): " << nC << std::endl;
     std::cout << "  Output dimension (2n+n^2): " << output_dim << std::endl;
     std::cout << "  M Tile size: " << MTile << std::endl;
-    std::cout << "  Kernel: Fused Pipeline V3 (with optional fusion support)" << std::endl;
     std::cout << "  Warmup iterations: " << warmup << std::endl;
     std::cout << "  Benchmark iterations: " << repeat << std::endl;
     std::cout << "========================================" << std::endl;
@@ -124,7 +121,6 @@ bool run_mhc_fused_pipeline(const ck_tile::ArgParser& arg_parser)
     std::cout << "  Block size: " << kBlockSize << " threads" << std::endl;
     std::cout << "  Shared memory: " << smem_size << " bytes" << std::endl;
     std::cout << "  Split-K factor: " << grid_k << std::endl;
-    std::cout << "  Reduction: OPTIMIZED (CK-Tile block_reduce2d pattern)" << std::endl;
 
     // Allocate workspace for split-K partial results
     const std::size_t workspace_size     = grid_k * B * output_dim * sizeof(ComputeDataType);
@@ -166,13 +162,7 @@ bool run_mhc_fused_pipeline(const ck_tile::ArgParser& arg_parser)
                 static_cast<ComputeDataType*>(d_partial_norms_mem.GetDeviceBuffer()),
                 B,
                 nC,
-                output_dim,
-                n,
-                r,
-                alpha_pre,
-                alpha_post,
-                alpha_res,
-                bias));
+                output_dim));
 
         // Stage 2: Launch reduction kernel
         ck_tile::launch_kernel(
@@ -193,8 +183,7 @@ bool run_mhc_fused_pipeline(const ck_tile::ArgParser& arg_parser)
                 alpha_pre,
                 alpha_post,
                 alpha_res,
-                bias,
-                0));
+                bias));
 
         // Stage 3: Launch Sinkhorn kernel if enabled
         if(sinkhorn_iters > 0)
@@ -251,7 +240,7 @@ bool run_mhc_fused_pipeline(const ck_tile::ArgParser& arg_parser)
     float tflops          = num_flops / 1.E9 / ave_time;
 
     std::cout << "\n========================================" << std::endl;
-    std::cout << "Performance Results (Fused Pipeline):" << std::endl;
+    std::cout << "Performance Results:" << std::endl;
     std::cout << "  Average time: " << ave_time << " ms" << std::endl;
     std::cout << "  Bandwidth: " << gb_per_sec << " GB/s" << std::endl;
     std::cout << "  Throughput: " << tflops << " TFLOPS" << std::endl;
@@ -276,7 +265,6 @@ bool run_mhc_fused_pipeline(const ck_tile::ArgParser& arg_parser)
             h_output_ref,
             n,
             C,
-            r,
             alpha_pre,
             alpha_post,
             alpha_res,
@@ -289,11 +277,8 @@ bool run_mhc_fused_pipeline(const ck_tile::ArgParser& arg_parser)
         float rtol = std::is_same_v<XDataType, ck_tile::bf16_t> ? 1e-2f : 1e-3f;
         float atol = std::is_same_v<XDataType, ck_tile::bf16_t> ? 1e-2f : 1e-3f;
 
-        pass = ck_tile::check_err(h_output,
-                                  h_output_ref,
-                                  "Error: MHC fused pipeline kernel output mismatch!",
-                                  rtol,
-                                  atol);
+        pass = ck_tile::check_err(
+            h_output, h_output_ref, "Error: MHC kernel output mismatch!", rtol, atol);
 
         std::cout << "Validation: " << (pass ? "PASS ✓" : "FAIL ✗") << std::endl;
     }
@@ -315,12 +300,12 @@ int main(int argc, char* argv[])
     std::cout << "╚════════════════════════════════════════════════════════════╝" << std::endl;
 
     // Run with BF16 inputs, float output and compute, M=32 tile
-    bool pass = run_mhc_fused_pipeline<ck_tile::bf16_t, // XDataType
-                                       ck_tile::bf16_t, // PhiDataType
-                                       float,           // YDataType
-                                       float,           // ComputeDataType
-                                       ck_tile::element_wise::Sigmoid,
-                                       64>(arg_parser); // MTile=64
+    bool pass = run_mhc<ck_tile::bf16_t, // XDataType
+                        ck_tile::bf16_t, // PhiDataType
+                        float,           // YDataType
+                        float,           // ComputeDataType
+                        ck_tile::element_wise::Sigmoid,
+                        64>(arg_parser); // MTile=64
 
     return pass ? 0 : -2;
 }
