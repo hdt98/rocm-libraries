@@ -287,11 +287,14 @@ class TestCkTileGemmPipeline : public ::testing::Test
              const int StrideC = 0)
     {
         // Some unsupported tests don't compile, so we check here before attempting to.
-        if(Derived::check_data_type(M, N, K, PadM, PadN, PadK))
+        if constexpr(Derived::check_data_type())
         {
-            for(auto kb : k_batches_)
+            if(Derived::check_data_shape(M, N, K, PadM, PadN, PadK))
             {
-                RunSingle<PadM, PadN, PadK, Preshuffle>(M, N, K, StrideA, StrideB, StrideC, kb);
+                for(auto kb : k_batches_)
+                {
+                    RunSingle<PadM, PadN, PadK, Preshuffle>(M, N, K, StrideA, StrideB, StrideC, kb);
+                }
             }
         }
     }
