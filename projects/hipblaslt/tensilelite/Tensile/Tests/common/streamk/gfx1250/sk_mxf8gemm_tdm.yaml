@@ -14,8 +14,6 @@ GlobalParameters:
   DataInitTypeBeta: 0
   Architecture: gfx1250
   PrintLevel: 2
-  MaxLDS: 163840
-  DeviceLDS: 163840
   PrintSolutionRejectionReason: True
   ForceGenerateKernel: True
   ISA: [[12, 5, 0]]
