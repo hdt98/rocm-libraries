@@ -236,6 +236,17 @@ def run(args):
     build_variant = args.get("build_variant", "release")
     cmake_preset, variant_label, expect_failure = retrieve_build_variant(build_variant)
 
+    # For TSAN builds, only run hipblaslt quick tests
+    if build_variant == "tsan":
+        logging.info("TSAN build detected - limiting to hipblaslt only with quick tests")
+        project_to_run = [
+            {
+                "cmake_options": "-DTHEROCK_ENABLE_BLAS=ON -DTHEROCK_ENABLE_ALL=OFF",
+                "projects_to_test": "hipblaslt",
+            }
+        ]
+        test_type = "quick"
+
     outputs = {
         f"{platform}_projects": json.dumps(project_to_run),
         "test_type": test_type,
