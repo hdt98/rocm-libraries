@@ -4,10 +4,6 @@
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-import re
-
-from rocm_docs import ROCmDocs
-
 """
 html_theme is usually unchanged (rocm_docs_theme).
 flavor defines the site header display, select the flavor for the corresponding portals
@@ -29,24 +25,37 @@ html_theme_options = {
     },
     "link_main_doc": False,
 }
+# This section turns on/off article info
+setting_all_article_info = True
+all_article_info_os = ["linux"]
+all_article_info_author = ""
 
 name = "hipDNN (Beta)"
 version_number = "0.1.0"
-
-# for PDF output on Read the Docs
 project = f"{name}"
 author = "Advanced Micro Devices, Inc."
 copyright = "Copyright (c) 2026 Advanced Micro Devices, Inc. All rights reserved."
 version = version_number
 release = version_number
-
 external_toc_path = "./sphinx/_toc.yml"
 
-docs_core = ROCmDocs(f"{name} {version_number} documentation")
-docs_core.run_doxygen(doxygen_root="doxygen", doxygen_path="doxygen/xml")
-docs_core.setup()
+'''
+Doxygen Settings
+Ensure Doxyfile is located at docs/doxygen.
+If the component does not need doxygen, delete this section for optimal build time
+'''
+doxygen_root = "doxygen"
+doxysphinx_enabled = True
+doxygen_project = {
+     "name": "doxygen",
+     "path": "doxygen/doxyfile",
+}
 
-external_projects_current_project = "hipDNN"
+# Add more addtional package accordingly
+extensions = [
+    "rocm_docs", 
+    "rocm_docs.doxygen",
+] 
 
-for sphinx_var in ROCmDocs.SPHINX_VARS:
-    globals()[sphinx_var] = getattr(docs_core, sphinx_var)
+html_title = f"{project} {version_number} documentation"
+external_projects_current_project = "hipDNN (Beta)"
