@@ -238,7 +238,9 @@ def run(args):
 
     # For TSAN builds, only run hipblaslt quick tests
     if build_variant == "tsan":
-        logging.info("TSAN build detected - limiting to hipblaslt only with quick tests")
+        logging.info(
+            "TSAN build detected - limiting to hipblaslt only with quick tests"
+        )
         project_to_run = [
             {
                 "cmake_options": "-DTHEROCK_ENABLE_BLAS=ON -DTHEROCK_ENABLE_ALL=OFF",
