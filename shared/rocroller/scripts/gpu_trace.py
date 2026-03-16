@@ -156,8 +156,8 @@ class LDSFamily(InstructionFamily):
 
         return {
             "derived": {
-                "effective_addr": [addr_fmt(v) for v in effective],
                 "first_bank": first_bank,
+                "effective_addr": [addr_fmt(v) for v in effective],
             },
             "vgpr": {reg: raw},
         }
@@ -238,10 +238,13 @@ class BufferFamily(InstructionFamily):
         if instr.meta["lds_direct"]:
             m0 = read_uint32(frame, "m0", uint32_type)
             width = self._instr_width_bytes(instr.mnemonic)
+            lds_effective = [m0 + lane * width for lane in range(64)]
+            dwords_per_instr = max(1, width // 4)
             derived["lds_direct"] = True
-            derived["lds_effective_addr"] = [
-                addr_fmt(m0 + lane * width) for lane in range(64)
+            derived["lds_first_bank"] = [
+                ((addr // 4) % 64) // dwords_per_instr for addr in lds_effective
             ]
+            derived["lds_effective_addr"] = [addr_fmt(a) for a in lds_effective]
             sgpr["m0"] = m0
         return {
             "derived": derived,
@@ -295,7 +298,7 @@ def walk_disassembly(families: list) -> list:
 
 
 def trace_loop(
-    instructions, workgroups, waves, trace_count, uint32_type, addr_fmt, emit
+    instructions, workgroups, waves, trace_count, one_per_wave, uint32_type, addr_fmt, emit
 ):
     """Trace instructions sequentially, one breakpoint at a time.
 
@@ -305,6 +308,8 @@ def trace_loop(
 
     trace_count controls how many hits to collect per instruction (1 = first
     hit only, 0 = unlimited until the inferior exits).
+
+    one_per_wave limits output to one record per wave index per instruction.
     """
     inferior = gdb.selected_inferior()
 
@@ -315,6 +320,7 @@ def trace_loop(
         family = ALL_FAMILIES[instr.family]
         bp = gdb.Breakpoint(f"*{hex(instr.address)}", temporary=(trace_count == 1))
         hits = 0
+        seen_waves = set()
         gdb.execute("continue")
 
         while inferior.is_valid() and (trace_count == 0 or hits < trace_count):
@@ -330,6 +336,8 @@ def trace_loop(
                     continue
                 if waves is not None and wave not in waves:
                     continue
+                if one_per_wave and wave in seen_waves:
+                    continue
                 emit(
                     {
                         "family": instr.family,
@@ -340,6 +348,7 @@ def trace_loop(
                         **family.read_lanes(frame, instr, uint32_type, addr_fmt),
                     }
                 )
+                seen_waves.add(wave)
                 hits += 1
 
             if not at_our_bp:
@@ -403,7 +412,7 @@ class GPUTrace(gdb.Command):
             help="JSON Lines output file (default: stdout)",
         )
         self.parser.add_argument(
-            "--trace_count",
+            "--trace-count",
             type=int,
             default=1,
             help="Max hits per instruction -- e.g. due to loops (default: 1, 0 = unlimited).",
@@ -413,6 +422,14 @@ class GPUTrace(gdb.Command):
             action="store_true",
             default=False,
             help="Print addresses in hex (default: base 10).",
+        )
+        self.parser.add_argument(
+            "--one-per-wave",
+            action="store_true",
+            default=False,
+            help="Emit at most one record per wave index per instruction. "
+            "Useful without --workgroup to get a representative sample across "
+            "the 4 waves rather than one entry per wavefront.",
         )
 
     def invoke(self, args_str, from_tty):
@@ -479,6 +496,7 @@ class GPUTrace(gdb.Command):
                 workgroups,
                 waves,
                 args.trace_count,
+                args.one_per_wave,
                 uint32_type,
                 addr_fmt,
                 emit,
