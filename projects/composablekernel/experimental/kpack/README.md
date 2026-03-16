@@ -21,12 +21,13 @@ This experimental demo starts with a simple vector-add kernel where the host/dev
 ## Pipeline
 
 ```
-vector_add_kernel.hip
+vector_add.hip
     | (clang++ --cuda-device-only per arch)
     v
 vector_add_gfx90a.hsaco
 vector_add_gfx942.hsaco
-    | (create_kpack_archive.py)
+vector_add_gfx950.hsaco
+    | (pack.py)
     v
 kernels.kpack  (single archive, multiple architectures)
     | (loaded at runtime by kpack C API)
@@ -38,27 +39,30 @@ kpack_hello_world  (demo executable, uses hipModuleLoadData)
 
 ```
 experimental/kpack/
-├── CMakeLists.txt                  # Top-level build
-├── vector_add_kernel.hip           # Simple device-only HIP kernel
-├── create_kpack_archive.py         # Packs .hsaco files into .kpack archive
-├── kpack_hello_world.cpp           # Demo: open .kpack, detect GPU, load & run kernel
+├── CMakeLists.txt                  # Top-level (delegates to example)
 ├── README.md
-└── rocm_kpack/                     # Vendored kpack C runtime library (from TheRock)
-    ├── CMakeLists.txt
-    ├── include/rocm_kpack/
-    │   ├── kpack.h
-    │   ├── kpack_types.h
-    │   └── kpack_export.h
-    └── src/
-        ├── kpack_internal.h
-        ├── isa_target_match.h
-        ├── kpack.cpp
-        ├── archive.cpp
-        ├── compression.cpp
-        ├── toc_parser.cpp
-        ├── loader.cpp
-        ├── path_resolution.cpp
-        └── isa_target_match.cpp
+├── rocm_kpack/                     # Vendored kpack C runtime library (from TheRock)
+│   ├── CMakeLists.txt
+│   ├── include/rocm_kpack/
+│   │   ├── kpack.h
+│   │   ├── kpack_types.h
+│   │   └── kpack_export.h
+│   └── src/
+│       ├── kpack_internal.h
+│       ├── isa_target_match.h
+│       ├── kpack.cpp
+│       ├── archive.cpp
+│       ├── compression.cpp
+│       ├── toc_parser.cpp
+│       ├── loader.cpp
+│       ├── path_resolution.cpp
+│       └── isa_target_match.cpp
+└── examples/
+    └── hello_world/
+        ├── CMakeLists.txt          # Standalone build
+        ├── vector_add.hip          # Device kernel (compiled per-arch)
+        ├── pack.py                 # Packs .hsaco files into .kpack archive
+        └── main.cpp                # Demo: open archive, detect GPU, load & run kernel
 ```
 
 ## Dependencies
@@ -69,8 +73,10 @@ experimental/kpack/
 
 ## Build
 
+The hello_world example is standalone — build it directly:
+
 ```bash
-cd experimental/kpack
+cd experimental/kpack/examples/hello_world
 
 cmake -B build -S . -G Ninja \
     -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++ \
@@ -91,21 +97,14 @@ On a machine with a supported GPU:
 Expected output:
 
 ```
-=== Kpack Hello World ===
-Opened archive: build/kernels.kpack
-  Architectures: gfx90a, gfx942
-  Binaries: vector_add_kernel
-
-Detected GPU: gfx942 (base: gfx942)
-Loading kernel for gfx942... OK (41200 bytes)
-Loading HIP module... OK
-Got function handle: vectorAdd
-
+Opened build/kernels.kpack — architectures: gfx90a, gfx942
+Detected GPU: gfx942
+Loaded kernel: 41200 bytes
 Running vectorAdd (N=1024)...
 Verification PASSED!
 ```
 
-If the current GPU's architecture is not in the archive, the demo prints a clear error listing the available architectures.
+If the current GPU's architecture is not in the archive, the demo prints a clear error and exits.
 
 ## Inspect the Archive
 
@@ -125,9 +124,9 @@ for binary, archs in toc['toc'].items():
 
 ## How It Works
 
-1. **Compile**: `clang++ --cuda-device-only` compiles `vector_add_kernel.hip` into per-architecture `.hsaco` code objects
-2. **Pack**: `create_kpack_archive.py` concatenates the `.hsaco` blobs after a 16-byte KPAK header, then appends a MessagePack table of contents (TOC) recording each blob's offset, size, and architecture
-3. **Load**: `kpack_hello_world.cpp` opens the archive via the kpack C API, queries the detected GPU's architecture, extracts the matching code object, and loads it into HIP via `hipModuleLoadData`
+1. **Compile**: `clang++ --cuda-device-only` compiles `vector_add.hip` into per-architecture `.hsaco` code objects
+2. **Pack**: `pack.py` concatenates the `.hsaco` blobs after a 16-byte KPAK header, then appends a MessagePack table of contents (TOC) recording each blob's offset, size, and architecture
+3. **Load**: `main.cpp` opens the archive via the kpack C API, queries the detected GPU's architecture, extracts the matching code object, and loads it into HIP via `hipModuleLoadData`
 
 ## Kpack Archive Format
 

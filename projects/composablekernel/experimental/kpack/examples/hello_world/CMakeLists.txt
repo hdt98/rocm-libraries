@@ -1,0 +1,63 @@
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+#
+# Standalone build for the kpack hello_world example.
+# Compiles vector_add.hip per-architecture, packs into a .kpack archive,
+# and builds the host-side loader that runs the kernel at runtime.
+#
+# Usage:
+#   cmake -B build -S . -G Ninja \
+#       -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++ \
+#       -DCMAKE_PREFIX_PATH=/opt/rocm \
+#       -DGPU_TARGETS="gfx90a;gfx942"
+#   ninja -C build
+
+cmake_minimum_required(VERSION 3.21)
+project(kpack_hello_world LANGUAGES CXX)
+
+enable_language(HIP)
+find_package(hip REQUIRED)
+
+set(GPU_TARGETS "gfx90a;gfx942;gfx950" CACHE STRING "GPU architectures to compile .hsaco for")
+set(KPACK_ROCM_PATH "/opt/rocm" CACHE PATH "ROCm installation path (for --rocm-path)")
+
+# Pull in the vendored kpack runtime library
+add_subdirectory(../../rocm_kpack rocm_kpack_build)
+
+# --- Compile vector_add.hip into per-architecture .hsaco code objects ---
+# Uses --cuda-device-only to produce raw code objects without host stubs.
+set(HSACO_FILES "")
+foreach(arch IN LISTS GPU_TARGETS)
+    set(hsaco_output "${CMAKE_BINARY_DIR}/vector_add_${arch}.hsaco")
+    add_custom_command(
+        OUTPUT ${hsaco_output}
+        COMMAND ${CMAKE_HIP_COMPILER}
+                --offload-arch=${arch}
+                --cuda-device-only
+                -x hip
+                --rocm-path=${KPACK_ROCM_PATH}
+                -o ${hsaco_output}
+                ${CMAKE_CURRENT_SOURCE_DIR}/vector_add.hip
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/vector_add.hip
+        COMMENT "Compiling vector_add.hip -> ${arch}.hsaco"
+    )
+    list(APPEND HSACO_FILES ${hsaco_output})
+endforeach()
+
+# --- Pack .hsaco files into a kpack archive ---
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/kernels.kpack
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/pack.py ${CMAKE_BINARY_DIR}
+    DEPENDS ${HSACO_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/pack.py
+    COMMENT "Creating kernels.kpack archive"
+)
+add_custom_target(kpack_archive ALL DEPENDS ${CMAKE_BINARY_DIR}/kernels.kpack)
+
+# --- Build the host-side loader executable ---
+# Links against hip::host (host-only HIP runtime) and rocm_kpack (archive reader).
+# Device code is loaded at runtime via hipModuleLoadData, not compiled into this binary.
+add_executable(kpack_hello_world main.cpp)
+target_link_libraries(kpack_hello_world PRIVATE rocm_kpack hip::host)
+add_dependencies(kpack_hello_world kpack_archive)
