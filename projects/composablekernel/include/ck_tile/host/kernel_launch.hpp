@@ -80,13 +80,15 @@ KENTRY_LAUNCH_BOUNDS __global__ void kentry(Args... args)
 }
 template <typename Attr, int MinBlockPerCu, typename Kernel, typename... Args>
 KENTRY_LAUNCH_BOUNDS __global__ //
-    std::enable_if_t<!kattr_no_packed_fp32_ops_v<Attr>> kentry(Args... args)
+    std::enable_if_t<!kattr_no_packed_fp32_ops_v<Attr>>
+    kentry(Args... args)
 {
     KENTRY_BODY;
 }
 template <typename Attr, int MinBlockPerCu, typename Kernel, typename... Args>
 KENTRY_LAUNCH_BOUNDS KENTRY_ATTR_NO_PACKED_FP32_OPS __global__ //
-    std::enable_if_t<kattr_no_packed_fp32_ops_v<Attr>> kentry(Args... args)
+    std::enable_if_t<kattr_no_packed_fp32_ops_v<Attr>>
+    kentry(Args... args)
 {
     KENTRY_BODY;
 }
