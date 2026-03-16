@@ -34,6 +34,7 @@
 #include "ProgramOptions.hpp"
 #include "Reference.hpp"
 #include "rocisa/include/enum.hpp"
+#include <Tensile/Activation.hpp>
 
 /*
  * CPU GEMM Driver and Validator
@@ -92,21 +93,21 @@ namespace
 
     // A naive, slow, golden reference implementation of GEMM.
     // Used strictly for validating the correctness of the optimized path.
-    // Calculates D = alpha * (A * B) + beta * C
-    //
-    // We can all the various bells and whistles that tensile supports
-    // (activations, etc) as needed.
-    void columnMajorGemm(const float* a,
-                         const float* b,
-                         const float* c,
-                         float*       d,
-                         size_t       m,
-                         size_t       n,
-                         size_t       k,
-                         bool         transA,
-                         bool         transB,
-                         float        alpha,
-                         float        beta)
+    // Calculates D = activation(alpha * scaleAlphaVec[i] * (A * B) + beta * C + bias[i])
+    void columnMajorGemm(const float*   a,
+                         const float*   b,
+                         const float*   c,
+                         float*         d,
+                         size_t         m,
+                         size_t         n,
+                         size_t         k,
+                         bool           transA,
+                         bool           transB,
+                         float          alpha,
+                         float          beta,
+                         const float*   biasVec       = nullptr,
+                         const float*   scaleAlphaVec = nullptr,
+                         ActivationType activation    = ActivationType::None)
     {
         size_t strideAK = transA ? 1 : m;
         size_t strideAM = transA ? k : 1;
@@ -124,7 +125,19 @@ namespace
                     float bVal = b[l * strideBK + j * strideBN];
                     sum += aVal * bVal;
                 }
-                d[i + j * m] = alpha * sum + beta * c[i + j * m];
+                float effectiveAlpha = alpha;
+                if(scaleAlphaVec)
+                    effectiveAlpha *= scaleAlphaVec[i];
+
+                float result = effectiveAlpha * sum + beta * c[i + j * m];
+
+                if(biasVec)
+                    result += biasVec[i];
+
+                if(activation == ActivationType::Relu)
+                    result = std::max(0.0f, result);
+
+                d[i + j * m] = result;
             }
         }
     }
@@ -138,15 +151,18 @@ namespace
  * AccumulateT: The type used for accumulation (currently restricted to float).
  */
 template <typename InputT, typename AccumulateT = float>
-int runGemm(size_t m,
-            size_t n,
-            size_t k,
-            bool   transA,
-            bool   transB,
-            float  alpha,
-            float  beta,
-            bool   validate,
-            bool   tryFastPath)
+int runGemm(size_t         m,
+            size_t         n,
+            size_t         k,
+            bool           transA,
+            bool           transB,
+            float          alpha,
+            float          beta,
+            bool           validate,
+            bool           tryFastPath,
+            bool           useBias,
+            ActivationType activation,
+            bool           useScaleAlphaVec)
 {
     constexpr rocisa::DataType dtypeEnum = TypeTraits<InputT>::value;
     static_assert(std::is_same<AccumulateT, float>::value,
@@ -181,6 +197,8 @@ int runGemm(size_t m,
                                                static_cast<double>(beta));
 
     contraction.setComputeInputType(dtypeEnum);
+    contraction.setAlphaType(rocisa::DataType::Float);
+    contraction.setBetaType(rocisa::DataType::Float);
 
     // Allocate host memory for inputs and outputs
     std::vector<InputT> a(m * k);
@@ -199,7 +217,34 @@ int runGemm(size_t m,
     std::generate(b.begin(), b.end(), [&]() { return static_cast<InputT>(randomGen()); });
     std::generate(c.begin(), c.end(), [&]() { return static_cast<float>(randomGen()); });
 
+    // Optional feature buffers
+    std::vector<float> biasVec;
+    std::vector<float> scaleAlphaVecBuf;
+
+    if(useBias)
+    {
+        biasVec.resize(m);
+        std::generate(biasVec.begin(), biasVec.end(), randomGen);
+        contraction.setUseBias(1);
+        contraction.setBias(rocisa::DataType::Float, m, m);
+    }
+
+    if(useScaleAlphaVec)
+    {
+        scaleAlphaVecBuf.resize(m);
+        std::generate(scaleAlphaVecBuf.begin(), scaleAlphaVecBuf.end(), randomGen);
+        contraction.setUseScaleAlphaVec(1);
+    }
+
+    if(activation != ActivationType::None)
+    {
+        contraction.setActivationType(ActivationType::All);
+        contraction.setParams().setActivationEnum(activation);
+    }
+
     ContractionInputs inputs(a.data(), b.data(), c.data(), d.data(), alpha, beta);
+    inputs.bias          = useBias ? biasVec.data() : nullptr;
+    inputs.scaleAlphaVec = useScaleAlphaVec ? scaleAlphaVecBuf.data() : nullptr;
 
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -234,7 +279,10 @@ int runGemm(size_t m,
                         transA,
                         transB,
                         alpha,
-                        beta);
+                        beta,
+                        useBias ? biasVec.data() : nullptr,
+                        useScaleAlphaVec ? scaleAlphaVecBuf.data() : nullptr,
+                        activation);
 
         // Compare results
         bool  allClose = true;
@@ -273,6 +321,8 @@ int runGemm(size_t m,
 
 int main(int argc, char* argv[])
 {
+    using namespace TensileLite;
+
     po::options_description desc("Allowed options");
     desc.add_options()("help,h", "Produce help message")(
         "M", po::value<size_t>()->default_value(128), "Matrix M dimension")(
@@ -284,7 +334,10 @@ int main(int argc, char* argv[])
         "beta", po::value<float>()->default_value(0.0f), "Beta scalar")(
         "type", po::value<std::string>()->default_value("f32"), "Data type (f32, f16, bf16)")(
         "validate", po::value<bool>()->default_value(true), "Run validation against ref")(
-        "tryFastPath", po::value<bool>()->default_value(true), "Use optimized path");
+        "tryFastPath", po::value<bool>()->default_value(true), "Use optimized path")(
+        "bias", po::value<bool>()->default_value(false), "Enable bias vector")(
+        "activation", po::value<std::string>()->default_value("none"), "Activation (none, relu)")(
+        "scaleAlphaVec", po::value<bool>()->default_value(false), "Enable per-row alpha scaling");
 
     po::variables_map vm;
     try
@@ -304,16 +357,28 @@ int main(int argc, char* argv[])
         return 0;
     }
 
-    size_t      m           = vm["M"].as<size_t>();
-    size_t      n           = vm["N"].as<size_t>();
-    size_t      k           = vm["K"].as<size_t>();
-    bool        transA      = vm["transA"].as<bool>();
-    bool        transB      = vm["transB"].as<bool>();
-    float       alpha       = vm["alpha"].as<float>();
-    float       beta        = vm["beta"].as<float>();
-    std::string typeStr     = vm["type"].as<std::string>();
-    bool        validate    = vm["validate"].as<bool>();
-    bool        tryFastPath = vm["tryFastPath"].as<bool>();
+    size_t      m                = vm["M"].as<size_t>();
+    size_t      n                = vm["N"].as<size_t>();
+    size_t      k                = vm["K"].as<size_t>();
+    bool        transA           = vm["transA"].as<bool>();
+    bool        transB           = vm["transB"].as<bool>();
+    float       alpha            = vm["alpha"].as<float>();
+    float       beta             = vm["beta"].as<float>();
+    std::string typeStr          = vm["type"].as<std::string>();
+    bool        validate         = vm["validate"].as<bool>();
+    bool        tryFastPath      = vm["tryFastPath"].as<bool>();
+    bool        useBias          = vm["bias"].as<bool>();
+    std::string activationStr    = vm["activation"].as<std::string>();
+    bool        useScaleAlphaVec = vm["scaleAlphaVec"].as<bool>();
+
+    ActivationType activation = ActivationType::None;
+    if(activationStr == "relu")
+        activation = ActivationType::Relu;
+    else if(activationStr != "none")
+    {
+        std::cerr << "Unknown activation: " << activationStr << std::endl;
+        return 1;
+    }
 
     std::cout << "Running GEMM with: M=" << m << " N=" << n << " K=" << k << " Type=" << typeStr
               << " FastPath=" << tryFastPath << std::endl;
@@ -322,17 +387,21 @@ int main(int argc, char* argv[])
     {
         if(typeStr == "f32")
         {
-            return runGemm<float>(m, n, k, transA, transB, alpha, beta, validate, tryFastPath);
+            return runGemm<float>(
+                m, n, k, transA, transB, alpha, beta, validate, tryFastPath,
+                useBias, activation, useScaleAlphaVec);
         }
         else if(typeStr == "bf16")
         {
-            return runGemm<TensileLite::BFloat16>(
-                m, n, k, transA, transB, alpha, beta, validate, tryFastPath);
+            return runGemm<BFloat16>(
+                m, n, k, transA, transB, alpha, beta, validate, tryFastPath,
+                useBias, activation, useScaleAlphaVec);
         }
         else if(typeStr == "f16")
         {
-            return runGemm<TensileLite::Half>(
-                m, n, k, transA, transB, alpha, beta, validate, tryFastPath);
+            return runGemm<Half>(
+                m, n, k, transA, transB, alpha, beta, validate, tryFastPath,
+                useBias, activation, useScaleAlphaVec);
         }
         else
         {
