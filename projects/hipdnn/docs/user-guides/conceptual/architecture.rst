@@ -299,7 +299,7 @@ Memory management
 hipDNN adopts a caller-owned memory model:
 
 -  **Tensor data**: The user is responsible for allocating and managing device memory for input and output tensors. These pointers are passed to the backend via the *Variant Pack*.
--  **Workspace memory**: Some graph executions require temporary scratch memory. The backend calculates the required size during the Execution Plan phase (``HIPDNN_ATTR_EXECUTION_PLAN_WORKSPACE_SIZE``). The user must allocate this memory and pass the pointer during execution.
+-  **Workspace memory**: Some graph executions require temporary scratch memory. The backend calculates the required size during the execution plan phase (``HIPDNN_ATTR_EXECUTION_PLAN_WORKSPACE_SIZE``). The user must allocate this memory and pass the pointer during execution.
 -  **Host memory**: API descriptors and graph structures manage their own host resources. Backend API users must explicitly destroy descriptors using ``hipdnnBackendDestroyDescriptor``.
 
 Thread safety
