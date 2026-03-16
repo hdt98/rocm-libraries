@@ -350,7 +350,35 @@ struct BlockFmhaBatchPrefillV3Pipeline
     {
 #if defined(__HIP_DEVICE_COMPILE__) && !defined(__gfx950__)
         // V3 pipeline is gfx950-only; return empty output on other targets.
-        ignore = q_dram_block_window_tmp;
+        ignore                = partition_index;
+        ignore                = q_dram_block_window_tmp;
+        ignore                = q_element_func;
+        ignore                = k_dram_block_window_tmp;
+        ignore                = v_dram_block_window_tmp;
+        ignore                = lse_dram_window_tmp;
+        ignore                = lse_element_func;
+        ignore                = p_compute_element_func;
+        ignore                = o_acc_element_func;
+        ignore                = mask;
+        ignore                = scale_s;
+        ignore                = variant;
+        ignore                = variant_params;
+        ignore                = block_indices;
+        ignore                = smem_k0;
+        ignore                = smem_k1;
+        ignore                = smem_v0;
+        ignore                = smem_v1;
+        ignore                = page_idx;
+        ignore                = stride_k;
+        ignore                = stride_v;
+        ignore                = page_stride_k;
+        ignore                = page_stride_v;
+        ignore                = max_page_table_idx;
+        ignore                = k_descale_ptr;
+        ignore                = v_descale_ptr;
+        ignore                = nblock_stride_kv_block_descale;
+        ignore                = nhead_stride_kv_block_descale;
+        constexpr auto gemm_1 = Policy::template GetPVBlockGemm<Problem>();
         decltype(gemm_1.MakeCBlockTile()) o_acc;
         auto lse_acc = make_static_distributed_tensor<LSEDataType>(
             Policy::template MakeLSEDDramTileDistribution<Problem>());

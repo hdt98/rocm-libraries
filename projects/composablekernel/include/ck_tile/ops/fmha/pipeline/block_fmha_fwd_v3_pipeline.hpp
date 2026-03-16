@@ -307,7 +307,24 @@ struct BlockFmhaFwdV3Pipeline
     {
 #if defined(__HIP_DEVICE_COMPILE__) && !defined(__gfx950__)
         // V3 pipeline is gfx950-only; return empty output on other targets.
-        ignore = q_dram_block_window_tmp;
+        ignore                = q_dram_block_window_tmp;
+        ignore                = q_element_func;
+        ignore                = k_dram_block_window_tmp;
+        ignore                = v_dram_block_window_tmp;
+        ignore                = lse_dram_window_tmp;
+        ignore                = lse_element_func;
+        ignore                = p_compute_element_func;
+        ignore                = o_acc_element_func;
+        ignore                = mask;
+        ignore                = scale_s;
+        ignore                = variant;
+        ignore                = variant_params;
+        ignore                = block_indices;
+        ignore                = smem_k0;
+        ignore                = smem_k1;
+        ignore                = smem_v0;
+        ignore                = smem_v1;
+        constexpr auto gemm_0 = Policy::template GetQKBlockGemm<Problem>();
         decltype(gemm_0.MakeCBlockTile()) o_acc;
         auto lse_acc = make_static_distributed_tensor<LSEDataType>(
             Policy::template MakeLSEDDramTileDistribution<Problem>());
