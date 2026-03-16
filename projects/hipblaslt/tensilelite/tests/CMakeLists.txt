@@ -70,40 +70,66 @@ endfunction()
 
 # 2. Basic Sanity Check (F32)
 add_cpu_gemm_test(F32_Sanity
-    ARGS --M 31 --N 41 --K 51 --type f32 --validate 1
+    ARGS -M 31 -N 41 -K 51 --type f32 --validate
 )
 
 # 3. Transpose Combinations (T/N, N/T, T/T)
 add_cpu_gemm_test(F32_TransA
-    ARGS --M 31 --N 41 --K 51 --transA 1 --transB 0 --type f32 --validate 1
+    ARGS -M 31 -N 41 -K 51 --transA --type f32 --validate
 )
 add_cpu_gemm_test(F32_TransB
-    ARGS --M 31 --N 41 --K 51 --transA 0 --transB 1 --type f32 --validate 1
+    ARGS -M 31 -N 41 -K 51 --transB --type f32 --validate
 )
 add_cpu_gemm_test(F32_TransAB
-    ARGS --M 31 --N 41 --K 51 --transA 1 --transB 1 --type f32 --validate 1
+    ARGS -M 31 -N 41 -K 51 --transA --transB --type f32 --validate
 )
 
 # 4. Small sizes
 add_cpu_gemm_test(F32_Odd_Sizes
-    ARGS --M 2 --N 3 --K 5 --type f32 --validate 1
+    ARGS -M 2 -N 3 -K 5 --type f32 --validate
 )
 
 # 5. BFloat16 Tests
 # These verify your "cast to f32 -> compute -> cast back" logic
 add_cpu_gemm_test(BF16_Standard
-    ARGS --M 128 --N 128 --K 128 --type bf16 --validate 1
+    ARGS -M 128 -N 128 -K 128 --type bf16 --validate
 )
 
 # 6. FP16 Tests
 add_cpu_gemm_test(F16_Standard
-    ARGS --M 128 --N 128 --K 128 --type f16 --validate 1
+    ARGS -M 128 -N 128 -K 128 --type f16 --validate
 )
 
 # 7. Verify fast flag on / off works
 add_cpu_gemm_test(FastPath_On
-    ARGS --M 256 --N 256 --K 256 --tryFastPath 1 --validate 1 --type f32
+    ARGS -M 256 -N 256 -K 256 --tryFastPath --validate --type f32
 )
 add_cpu_gemm_test(FastPath_Off
-    ARGS --M 256 --N 256 --K 256 --tryFastPath 0 --validate 1 --type f32
+    ARGS -M 256 -N 256 -K 256 --validate --type f32
+)
+
+# 8. Cross-validate fast path against golden reference with features
+add_cpu_gemm_test(CrossValidate_F32_NN
+    ARGS -M 33 -N 47 -K 65 --type f32 --validate
+)
+add_cpu_gemm_test(CrossValidate_F32_TN
+    ARGS -M 33 -N 47 -K 65 --transA --type f32 --validate
+)
+add_cpu_gemm_test(CrossValidate_F16_TN
+    ARGS -M 31 -N 41 -K 51 --transA --type f16 --validate
+)
+add_cpu_gemm_test(CrossValidate_BF16_TN
+    ARGS -M 31 -N 41 -K 51 --transA --type bf16 --validate
+)
+add_cpu_gemm_test(CrossValidate_F32_Bias
+    ARGS -M 33 -N 47 -K 65 --type f32 --validate --bias
+)
+add_cpu_gemm_test(CrossValidate_F32_Relu
+    ARGS -M 33 -N 47 -K 65 --type f32 --validate --activation relu
+)
+add_cpu_gemm_test(CrossValidate_F32_ScaleAlphaVec
+    ARGS -M 33 -N 47 -K 65 --type f32 --validate --scaleAlphaVec
+)
+add_cpu_gemm_test(CrossValidate_F32_AllFeatures
+    ARGS -M 33 -N 47 -K 65 --type f32 --validate --bias --activation relu --scaleAlphaVec
 )
