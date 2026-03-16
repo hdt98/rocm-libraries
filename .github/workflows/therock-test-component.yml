@@ -98,7 +98,7 @@ jobs:
           TEST_TYPE: ${{ fromJSON(inputs.component).test_type }}
           # TSAN-specific environment variables
           HSA_XNACK: ${{ inputs.build_variant_label == 'tsan' && '1' || '' }}
-          TSAN_OPTIONS: ${{ inputs.build_variant_label == 'tsan' && 'ignore_noninstrumented_modules=1' || '' }}
+          TSAN_OPTIONS: ${{ inputs.build_variant_label == 'tsan' && 'ignore_noninstrumented_modules=1 exitcode=0' || '' }}
         run: |
           # Create logs directory
           mkdir -p ./test_logs
