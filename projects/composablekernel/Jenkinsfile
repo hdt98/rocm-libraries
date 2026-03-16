@@ -1112,7 +1112,7 @@ def process_results(Map conf=[:]){
     }
 }
 
-def run_downstream_tests(String image, String[] execute_cmds, Map conf=[:]){
+def run_downstream_tests(Map conf=[:]){
     show_node_info()
     checkoutComposableKernel()
     def dockerOpts = get_docker_options() + ' --group-add irc '
@@ -1120,24 +1120,24 @@ def run_downstream_tests(String image, String[] execute_cmds, Map conf=[:]){
     gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
         try
         {
-            echo "Pulling image: ${image}"
-            retimage = docker.image("${image}")
+            echo "Pulling image: ${conf.image}"
+            retimage = docker.image("${conf.image}")
             withDockerRegistry([ credentialsId: "ck_docker_cred", url: "" ]) {
                 retimage.pull()
             }
         }
         catch(Exception ex)
         {
-            error "Unable to locate image: ${image}"
+            error "Unable to locate image: ${conf.image}"
         }
     }
 
-    withDockerContainer(image: image, args: dockerOpts) {
+    withDockerContainer(image: conf.image, args: dockerOpts) {
         timeout(time: 5, unit: 'HOURS'){
             try{
                 sh "rocminfo"
                 sh "python3 --version"
-                for (cmd in execute_cmds) {
+                for (cmd in conf.execute_cmds) {
                     sh "${cmd}"
                 }
             }
@@ -1153,36 +1153,27 @@ def run_downstream_tests(String image, String[] execute_cmds, Map conf=[:]){
     }
 }
 
-
-def run_pytorch_tests(Map conf=[:]){
-    run_downstream_tests(env.CK_PYTORCH_IMAGE, [
-        "python3 /tmp/pytorch/tools/amd_build/build_amd.py",
-        "USE_ROCM_CK_SDPA=1 PYTORCH_ROCM_ARCH=gfx942 python /tmp/pytorch/setup.py develop"
-    ])
-}
-
-def run_aiter_tests(Map conf=[:]){
-    run_downstream_tests(env.CK_AITER_IMAGE, [
-        "python3 /home/jenkins/workspace/aiter/op_tests/test_gemm_a8w8.py",
-        "python3 /home/jenkins/workspace/aiter/op_tests/test_gemm_a8w8_blockscale.py",
-        "python3 /home/jenkins/workspace/aiter/op_tests/test_mha.py",
-        "python3 /home/jenkins/workspace/aiter/op_tests/test_mha_varlen.py",
-        "python3 /home/jenkins/workspace/aiter/op_tests/test_batch_prefill.py",
-        "python3 /home/jenkins/workspace/aiter/op_tests/test_moe.py",
-        "python3 /home/jenkins/workspace/aiter/op_tests/test_moe_2stage.py",
-        "python3 /home/jenkins/workspace/aiter/op_tests/test_moe_blockscale.py",
-        "python3 /home/jenkins/workspace/aiter/op_tests/test_moe_ep.py",
-        "python3 /home/jenkins/workspace/aiter/op_tests/test_moe_sorting.py",
-        "python3 /home/jenkins/workspace/aiter/op_tests/test_moe_sorting_mxfp4.py",
-        "python3 /home/jenkins/workspace/aiter/op_tests/test_moe_tkw1.py"
-    ])
-}
-
-def run_fa_tests(Map conf=[:]){
-    run_downstream_tests(env.CK_FA_IMAGE, [
-        "python3 -u -m pytest /home/jenkins/workspace/flash-attention/tests/test_flash_attn_ck.py"
-    ])
-}
+RUN_PYTORCH_TESTS_CMDS = [
+    "python3 /tmp/pytorch/tools/amd_build/build_amd.py",
+    "USE_ROCM_CK_SDPA=1 PYTORCH_ROCM_ARCH=gfx942 python /tmp/pytorch/setup.py develop"
+]
+RUN_AITER_TESTS_CMDS = [
+    "python3 /home/jenkins/workspace/aiter/op_tests/test_gemm_a8w8.py",
+    "python3 /home/jenkins/workspace/aiter/op_tests/test_gemm_a8w8_blockscale.py",
+    "python3 /home/jenkins/workspace/aiter/op_tests/test_mha.py",
+    "python3 /home/jenkins/workspace/aiter/op_tests/test_mha_varlen.py",
+    "python3 /home/jenkins/workspace/aiter/op_tests/test_batch_prefill.py",
+    "python3 /home/jenkins/workspace/aiter/op_tests/test_moe.py",
+    "python3 /home/jenkins/workspace/aiter/op_tests/test_moe_2stage.py",
+    "python3 /home/jenkins/workspace/aiter/op_tests/test_moe_blockscale.py",
+    "python3 /home/jenkins/workspace/aiter/op_tests/test_moe_ep.py",
+    "python3 /home/jenkins/workspace/aiter/op_tests/test_moe_sorting.py",
+    "python3 /home/jenkins/workspace/aiter/op_tests/test_moe_sorting_mxfp4.py",
+    "python3 /home/jenkins/workspace/aiter/op_tests/test_moe_tkw1.py"
+]
+RUN_FA_TESTS_CMDS = [
+    "python3 -u -m pytest /home/jenkins/workspace/flash-attention/tests/test_flash_attn_ck.py"
+]
 
 //launch develop branch daily jobs
 CRON_SETTINGS = BRANCH_NAME == "develop" ? '''0 23 * * * % RUN_FULL_QA=true;RUN_CK_TILE_FMHA_TESTS=true;RUN_PERFORMANCE_TESTS=true;FORCE_CI=true
@@ -1489,7 +1480,7 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx942")}
                     steps{
-                        run_pytorch_tests()
+                        run_downstream_tests(image: "${env.CK_PYTORCH_IMAGE}", execute_cmds: RUN_PYTORCH_TESTS_CMDS)
                         cleanWs()
                     }
                 }
@@ -1501,7 +1492,7 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx942")}
                     steps{
-                        run_aiter_tests()
+                        run_downstream_tests(image: "${env.CK_AITER_IMAGE}", execute_cmds: RUN_AITER_TESTS_CMDS)
                         cleanWs()
                     }
                 }
@@ -1513,7 +1504,7 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx950")}
                     steps{
-                        run_aiter_tests()
+                        run_downstream_tests(image: "${env.CK_AITER_IMAGE}", execute_cmds: RUN_AITER_TESTS_CMDS)
                         cleanWs()
                     }
                 }
@@ -1525,7 +1516,7 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx942")}
                     steps{
-                        run_fa_tests()
+                        run_downstream_tests(image: "${env.CK_FA_IMAGE}", execute_cmds: RUN_FA_TESTS_CMDS)
                         cleanWs()
                     }
                 }
@@ -1537,7 +1528,7 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx950")}
                     steps{
-                        run_fa_tests()
+                        run_downstream_tests(image: "${env.CK_FA_IMAGE}", execute_cmds: RUN_FA_TESTS_CMDS)
                         cleanWs()
                     }
                 }
