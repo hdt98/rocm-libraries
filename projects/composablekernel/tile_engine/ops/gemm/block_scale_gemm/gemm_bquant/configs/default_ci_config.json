@@ -85,7 +85,8 @@
         },
         "preshuffle_b": {
             "values": [
-                false
+                false,
+                true
             ]
         }
     },

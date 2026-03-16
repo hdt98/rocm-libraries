@@ -266,6 +266,16 @@ class GemmBQuantKernelBuilder(GemmKernelBuilder):
                 )
                 continue
 
+            # PreshuffleQuant with BQuantGrouped only supports ColumnMajor BQ layout.
+            # BQ layout follows B layout, so skip when B is RowMajor (layout[1] == 'r').
+            layout_code = self.layout.lower()
+            if b_preshuffle_quant in [True, "true"] and layout_code[1] == "r":
+                logging.debug(
+                    f"Skipping b_preshuffle_quant=True for layout {layout_code}: "
+                    f"BQ layout would be RowMajor, but PreshuffleQuant requires ColumnMajor"
+                )
+                continue
+
             combinations.append(combo)
         return combinations
 

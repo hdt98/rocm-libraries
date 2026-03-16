@@ -181,12 +181,12 @@ bool compare_bquant(std::string instanceName,
                     ck_tile::HostTensor<CDataType>& c_m_n_host_result)
 {
     const float max_accumulated_value =
-        std::abs(*std::max_element(c_m_n_host_result.mData.begin(),
-                                   c_m_n_host_result.mData.end(),
-                                   [](const auto& a, const auto& b) {
-                                       return std::abs(static_cast<float>(a)) <
-                                              std::abs(static_cast<float>(b));
-                                   }));
+        std::abs(static_cast<float>(*std::max_element(c_m_n_host_result.mData.begin(),
+                                                      c_m_n_host_result.mData.end(),
+                                                      [](const auto& a, const auto& b) {
+                                                          return std::abs(static_cast<float>(a)) <
+                                                                 std::abs(static_cast<float>(b));
+                                                      })));
     const auto rtol_atol =
         calculate_rtol_atol_bquant<ADataType, BQDataType, BDataType, AccDataType, CDataType>(
             K, kbatch, max_accumulated_value);
