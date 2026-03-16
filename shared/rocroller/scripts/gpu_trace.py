@@ -11,7 +11,7 @@ Examples:
   rocgdb --batch -ex "source ../scripts/gpu_trace.py" -ex 'gpu_trace --workgroup 0,0,0 --output trace1.jsonl --kernel GEMMTest_GEMMTestSuiteGPU_GEMM_DataType_FP32_Basic_0_kernel' --args ./test/rocroller-tests --gtest_filter='*GPU_GEMM_DataType_FP32_Basic/0'
 
   # Pasted from rrperf client command adjusted with --num_warmup=0 --num_outer=1 --num_inner=1
-  rocgdb --batch -ex "source ../scripts/gpu_trace.py" -ex 'gpu_trace --output trace2.jsonl --kernel RRGEMM_TN_mxfp4_stE8M0_bs32_mxfp4_stE8M0_bs32_half_half_float_PreSWPreSwizzleScale_WGTS256x256x256_WGS128x2_WGMXCC0_LABufferToLDS_LBBufferToLDS_SDVGPRToGlobalMemoryWithBuffer_LSABufferToL_c03209e827442f0a' --args client/rocroller-gemm --mac_m=256 --mac_n=256 --mac_k=256 --wave_m=16 --wave_n=16 --wave_k=128 --wave_b=1 --workgroup_size_x=128 --workgroup_size_y=2 --workgroupRemapXCC=False --workgroupRemapXCCValue=-1 --load_A=BufferToLDS --load_B=BufferToLDS --store=VGPRToGlobalMemoryWithBuffer --betaInFma=True --padLDS_A=0,0 --padLDS_B=0,0 --scheduler=Priority --schedulerCost=LinearWeightedSimple --prefetch=True --prefetchInFlight=2 --prefetchLDSFactor=1 --prefetchMixMemOps=False --loadScale_A=BufferToLDS --loadScale_B=BufferToLDS --swizzleScale=True --sts=64x8/64x8 --prefetchScale=False --pretileScale=False --streamK=None --numWGs=0 --tailLoops=True --M=4096 --N=4096 --K=32768 --alpha=2.0 --beta=0.0 --type_A=fp4 --type_B=fp4 --type_C=half --type_D=half --type_acc=float --trans_A=T --trans_B=N --scale_A=Separate --scaleType_A=E8M0 --scale_B=Separate --scaleType_B=E8M0 --scaleBlockSize=-1 --scaleSkipPermlane=PreSwizzleScale --scaleValue_A=1.0 --scaleValue_B=1.0 --initMode_A=Bounded --initMode_B=Bounded --initMode_C=Bounded --workgroupMappingDim=-1 --workgroupMappingValue=-1 --num_warmup=0 --num_outer=1 --num_inner=1
+  rocgdb --batch -ex "source ../scripts/gpu_trace.py" -ex 'gpu_trace --workgroup 15,15,0 --output trace4.jsonl --kernel RRGEMM_TN_mxfp4_stE8M0_bs32_mxfp4_stE8M0_bs32_half_half_float_PreSWPreSwizzleScale_WGTS256x256x256_WGS128x2_WGMXCC0_LABufferToLDS_LBBufferToLDS_SDVGPRToGlobalMemoryWithBuffer_LSABufferToL_c03209e827442f0a' --args client/rocroller-gemm --mac_m=256 --mac_n=256 --mac_k=256 --wave_m=16 --wave_n=16 --wave_k=128 --wave_b=1 --workgroup_size_x=128 --workgroup_size_y=2 --workgroupRemapXCC=False --workgroupRemapXCCValue=-1 --load_A=BufferToLDS --load_B=BufferToLDS --store=VGPRToGlobalMemoryWithBuffer --betaInFma=True --padLDS_A=0,0 --padLDS_B=0,0 --scheduler=Priority --schedulerCost=LinearWeightedSimple --prefetch=True --prefetchInFlight=2 --prefetchLDSFactor=1 --prefetchMixMemOps=False --loadScale_A=BufferToLDS --loadScale_B=BufferToLDS --swizzleScale=True --sts=64x8/64x8 --prefetchScale=False --pretileScale=False --streamK=None --numWGs=0 --tailLoops=True --M=4096 --N=4096 --K=32768 --alpha=2.0 --beta=0.0 --type_A=fp4 --type_B=fp4 --type_C=half --type_D=half --type_acc=float --trans_A=T --trans_B=N --scale_A=Separate --scaleType_A=E8M0 --scale_B=Separate --scaleType_B=E8M0 --scaleBlockSize=-1 --scaleSkipPermlane=PreSwizzleScale --scaleValue_A=1.0 --scaleValue_B=1.0 --initMode_A=Bounded --initMode_B=Bounded --initMode_C=Bounded --workgroupMappingDim=-1 --workgroupMappingValue=-1 --num_warmup=0 --num_outer=1 --num_inner=1
 """
 
 import argparse
@@ -261,31 +261,31 @@ ALL_FAMILIES: dict = {
 # ---------------------------------------------------------------------------
 
 
-def walk_disassembly(families: list) -> list:
-    """Walk disassembly from the current PC using structured arch.disassemble().
+_DISASM_LINE_RE = re.compile(r"^\s+(0x[0-9a-f]+)\s+<[^>]+>:\s+(.*)")
 
-    Stops at s_endpgm, an 'illegal' instruction, or a memory access error.
+
+def walk_disassembly(families: list) -> list:
+    """Walk disassembly of the current function using gdb's disassemble command.
+
+    Parses the text output of 'disassemble' rather than using arch.disassemble(),
+    which can produce spurious <illegal instruction> results on some rocgdb builds.
     Returns a list of FoundInstruction in program order.
     """
-    arch = gdb.selected_frame().architecture()
-    pc = gdb.selected_frame().pc()
+    text = gdb.execute("disassemble", to_string=True)
     found = []
-    while True:
-        try:
-            inst = arch.disassemble(pc)[0]
-        except gdb.MemoryError:
-            break
-        asm = inst["asm"].strip()
+    for line in text.splitlines():
+        m = _DISASM_LINE_RE.match(line)
+        if not m:
+            continue
+        addr = int(m.group(1), 16)
+        asm = m.group(2).strip()
         mnemonic = asm.split()[0] if asm.split() else ""
         for family in families:
             if family.match(mnemonic):
-                fi = family.parse(mnemonic, asm, inst["addr"])
+                fi = family.parse(mnemonic, asm, addr)
                 if fi:
                     found.append(fi)
                 break
-        if mnemonic == "s_endpgm" or "illegal" in asm:
-            break
-        pc += inst["length"]
     return found
 
 
@@ -371,7 +371,7 @@ class GPUTrace(gdb.Command):
         self.parser.add_argument(
             "--kernel",
             required=True,
-            help="Base kernel symbol name. The script appends '_exec_begin' to set the breakpoint.",
+            help="Base kernel symbol name.",
         )
         self.parser.add_argument(
             "--families",
@@ -429,8 +429,22 @@ class GPUTrace(gdb.Command):
         # --- Get to kernel ---
         gdb.execute("set pagination off")
         gdb.execute("set breakpoint pending on")
+        gdb.Breakpoint(args.kernel, temporary=True)
+        # rocRoller kernels have extra label for after kernel argument setup
         gdb.Breakpoint(args.kernel + "_exec_begin", temporary=True)
         gdb.execute("run")
+
+        # After stopping, switch to a GPU thread so that walk_disassembly
+        # disassembles from the GPU frame rather than a CPU host frame.
+        # $_dispatch_pos is only defined on GPU threads.
+        for t in gdb.selected_inferior().threads():
+            t.switch()
+            wg, _ = work_coordinates()
+            if wg is not None:
+                break
+        else:
+            print("No GPU thread found after reaching kernel.")
+            return
 
         # --- Walk disassembly ---
         instructions = walk_disassembly(families)
