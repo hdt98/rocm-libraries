@@ -21,7 +21,7 @@ hipDNN provides two environment variables to control logging behavior:
 ``HIPDNN_LOG_LEVEL``
 --------------------
 
-Sets the minimum severity that will be emitted. Levels are inclusive: choosing a level enables messages at that level and all higher severities.
+Sets the minimum severity for which logs will be emitted. Levels are inclusive: choosing a level enables messages at that level and all higher severities.
 
 - ``off``: Disables all logging (default)
 - ``info``: General informational messages
@@ -38,7 +38,7 @@ Here's an example:
 ``HIPDNN_LOG_FILE``
 -------------------
 
-Specifies the file path where logs will be appended. If not set, logs are written to ``stderr``.
+Specifies the file path where logs will be appended. If this variable isn't set, logs are written to ``stderr``.
 
 Here's an example:
 
@@ -53,7 +53,7 @@ Here's an example:
 Plugin loading
 ==============
 
-The following environment variable can be used to control which folders hipDNN looks in to load plugins.
+The following environment variable can be used to control which folders hipDNN will scan for plugins to load.
 
 ``HIPDNN_PLUGIN_DIR``
 ---------------------

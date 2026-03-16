@@ -1,6 +1,6 @@
 .. meta::
-  :description: hipDNN has a plugin-based architecture in order to allow contributors and users to extend hipDNN without modifying the core library.
-  :keywords: hipDNN, ROCm, API,
+  :description: hipDNN has a plugin-based architecture to allow contributors and users to extend hipDNN without modifying the core library.
+  :keywords: hipDNN, ROCm, frontend, C++, architecture
 
 .. _architecture:
 
@@ -8,18 +8,18 @@
 hipDNN high-level architecture
 ******************************
 
-hipDNN has a plugin-based architecture in order to allow contributors and users to extend hipDNN without modifying the core library.
+hipDNN has a plugin-based architecture to allow contributors and users to extend hipDNN without modifying the core library.
 hipDNN has support for engine plugins, which provide the kernels to solve graphs.
 
 .. note::
 
   See :ref:`backend-architecture` for a more granular breakdown of the system architecture and the backend API.
 
-The Hipdnn library is structured as three primary components:
+The hipdnn library is structured as three primary components:
 
 - **Frontend**: The hipDNN frontend is a header-only C++ library that provides an industry standard API for interacting with hipDNN. The frontend wraps the backend C API to provide a more user-friendly C++ interface, encapsulating much of the detail required when creating graphs using the backend API.
-- **Backend**: The hipDNN backend is a shared library which provides a C API for hipDNN. The backend is the core component of hipDNN which acts as a plugin loader and manager, connecting problems to engines optimized to solve them.
-- **Engine plugins**: The hipDNN engine provider plugins are shared libraries responsible for matching the operations they provide to graphs, and executing the operations on the supported hardware. Plugins will continue to be added over time to provide additional operational support or performance improvements. See :ref:`plugin-support` for more information.
+- **Backend**: The hipDNN backend is a shared library which provides a C API for hipDNN. The backend is the core component of hipDNN. It acts as a plugin loader and manager, connecting problems to engines optimized to solve them.
+- **Engine plugins**: The hipDNN engine provider plugins are shared libraries responsible for matching the operations they provide to graphs and executing the operations on the supported hardware. Plugins will continue to be added over time to provide additional operational support or performance improvements. See :ref:`plugin-support` for more information.
 
 The frontend API defines tensors and attaches them to operational nodes on a graph. The graph is then lowered through the backend APIs where it's examined by each plugin's engine to determine a match, at which point an execution plan is established with the preferred matched engine.
 The frontend then allocates memory and populates the data used by the graph, which is then dispatched to the selected plugin's engine to run.
@@ -67,7 +67,7 @@ The central abstraction in the frontend is the ``Graph`` class, which:
 Nodes
 ^^^^^
 
-Nodes represent individual operations within a graph (for example, ``BatchnormNode``, ``PointwiseNode``).
+Nodes represent individual operations within a graph (for example, ``BatchnormNode`` and ``PointwiseNode``).
 
 - Nodes encapsulate their specific attributes and tensor connections.
 - The frontend uses the backend API to convert the graph to backend descriptors for engine consumption.
@@ -82,7 +82,7 @@ Attributes
 Attributes configure the behavior of nodes.
 
 - Each node type has corresponding attribute classes (for example, ``Batchnorm_attributes``).
-- Attributes include operation-specific parameters like epsilon, momentum, etc.
+- Attributes include operation-specific parameters like epsilon and momentum.
 
 .. _tensor-attributes:
 
@@ -94,7 +94,7 @@ Tensors are attached to graph operation nodes and determine:
 
 - The dimensions of the data.
 - How the data is packed in memory.
-- The data's type.
+- The data type.
 
 
 Simplified workflow example
@@ -127,7 +127,7 @@ The serialized structures allow data to be marshalled and passed between the bac
 
   - ``FlatBuffer`` schema definitions for graphs, nodes, and attributes.
   - Data structures for deserializing serialized graphs.
-  - Logging utilities and type helpers (``half``, ``bfloat16``, etc.).
+  - Logging utilities and type helpers (for example, ``half`` and ``bfloat16``).
 
 .. _plugin-sdk:
 
@@ -180,7 +180,7 @@ Engine types
 Static kernel engines
 ~~~~~~~~~~~~~~~~~~~~~
 
-- Provides pre-compiled kernels for specific operations.
+- Provides precompiled kernels for specific operations.
 - Only handles specific configurations.
 - For example, :ref:`miopen`.
 - **Advantages**:
@@ -194,7 +194,7 @@ Dynamic kernel engines
 
 - Generate kernels at runtime based on graph structure.
 - Broad support: Handles general graph patterns.
-- For example, future JIT-compilation plugins
+- For example, future JIT-compilation plugins.
 - **Advantages**:
 
   - Flexible operation fusion.
@@ -216,7 +216,7 @@ Engine management
 ~~~~~~~~~~~~~~~~~
 
 - Each plugin can provide multiple engines.
-- Engines must have fixed globally-unique IDs that remain constant for each run.
+- Engines must have fixed globally unique IDs that remain constant for each run.
 - Plugins determine which engines are applicable for a given graph.
 
 Key plugin functions
@@ -246,7 +246,7 @@ The backend is the core engine of hipDNN responsible for managing plugins and or
 Key characteristics
 ~~~~~~~~~~~~~~~~~~~
 
-- **Installable library**: C API with API for language interoperability, which is dynamically loadable.
+- **Installable library**: C API with an API for language interoperability, which is dynamically loadable.
 - **Dependencies**: :ref:`data`.
 - **Purpose**: Provides a stable C API for interacting with the hipDNN kernel providers.
 - **Expected usage**: Library linked to the frontend API and expert user projects that provides access to the backend API.
@@ -254,11 +254,11 @@ Key characteristics
 Workflow
 ~~~~~~~~
 
-1. **Create a Graph**: Build an operation graph using the frontend.
+1. **Create a graph**: Build an operation graph using the frontend.
 2. **Create heuristic descriptor**: Initialize with the graph and desired heuristic mode.
-3. **Get engine configs**: Query available engine configurations from the heuristic.
-4. **Create execution plan**: Combine selected engine config with the graph.
-5. **Run execution plan**: Execute with variant pack containing tensor data.
+3. **Get engine configs**: Query the available engine configurations from the heuristic.
+4. **Create execution plan**: Combine the selected engine configuration with the graph.
+5. **Run execution plan**: Execute with a variant pack containing the tensor data.
 
 .. code:: c
 
@@ -305,5 +305,5 @@ hipDNN adopts a caller-owned memory model:
 Thread safety
 =============
 
-- **Library Handle** (``hipdnnHandle_t``): This handle is *not* thread-safe. Users should create a unique handle for each thread or use external synchronization locks when sharing a handle across threads.
+- **Library handle** (``hipdnnHandle_t``): This handle is *not* thread-safe. Users should create a unique handle for each thread or use external synchronization locks when sharing a handle across threads.
 - **Descriptors**: Read-only access to finalized descriptors is thread-safe. Modifying a descriptor while it is being used in another thread is undefined behavior.

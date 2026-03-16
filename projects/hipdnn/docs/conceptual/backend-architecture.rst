@@ -1,6 +1,6 @@
 .. meta::
   :description: A granular breakdown of the hipDNN system architecture and the backend API.
-  :keywords: hipDNN, ROCm, API,
+  :keywords: hipDNN, ROCm, framework, C, frontend, backend
 
 .. _backend-architecture:
 
@@ -8,13 +8,13 @@
 hipDNN backend architecture
 ***************************
 
+The hipDNN framework consists of a frontend (C++ Graph API), a backend (core runtime), and a plugin system. The backend prepares and dispatches execution to dynamically loaded plugins via a C-API interface.
+
 .. important::
 
   This page is for advanced users who want a more granular breakdown of the system architecture and the backend API. See :ref:`architecture` for a high-level overview of the system architecture.
 
-The hipDNN framework consists of a frontend (C++ Graph API), a backend (core runtime), and a plugin system. The backend prepares and dispatches execution to dynamically loaded plugins via a C-API interface.
-
-The plugin C-API separates the plugin implementation from the hipDNN backend and effectively separates the plugin engine implementation details from the hipDNN backend.
+The C-API plugin separates the plugin implementation and engine details from the hipDNN backend.
 
 SDKs are provided to assist plugin developers, but the implementation details are otherwise at the discretion of the developer. 
 The goal of the Plugin SDK is to standardize and provide these as reusable components for plugin development so developers can focus on the implementations of the underlying kernels and libraries.
@@ -471,7 +471,7 @@ Engine plugin API (``EnginePluginApi.h``)
 Detailed control flow traces
 ============================
 
-``setEnginePluginPaths`` (Frontend -> Backend)
+``setEnginePluginPaths`` (frontend -> backend)
 ----------------------------------------------
 
 .. code::
@@ -482,7 +482,7 @@ Detailed control flow traces
          [No plugin calls -- paths stored for later use during hipdnnCreate]
 
 
-``createHipdnnHandle`` (Frontend -> Backend -> Plugin)
+``createHipdnnHandle`` (frontend -> backend -> plugin)
 ------------------------------------------------------
 
 .. code::
@@ -508,7 +508,7 @@ Detailed control flow traces
          -> For each plugin handle:
             1.  Plugin: hipdnnEnginePluginSetStream(handle, stream)
 
-``setHipdnnHandleStream`` (Frontend -> Backend -> Plugin)
+``setHipdnnHandleStream`` (frontend -> backend -> plugin)
 ---------------------------------------------------------
 
 .. code::
@@ -660,52 +660,52 @@ Plugin lifecycle
 =================
 
 1. **Discovery**: ``Plugin.so`` loaded, metadata queried (name, version, type)
-2. **Instance creation**: ``PluginCreate`` + ``GetAllEngineIds`` during handle creation
-3. **Engine selection**: ``GetApplicableEngineIds`` + ``GetEngineDetails`` during graph build
-4. **Context creation**: ``CreateExecutionContext`` + ``GetWorkspaceSize`` during plan finalization
+2. **Instance creation**: ``PluginCreate`` and ``GetAllEngineIds`` during handle creation
+3. **Engine selection**: ``GetApplicableEngineIds`` and ``GetEngineDetails`` during graph build
+4. **Context creation**: ``CreateExecutionContext`` and ``GetWorkspaceSize`` during plan finalization
 5. **Execution**: ``ExecuteOpGraph``
-6. **Cleanup**: ``DestroyExecutionContext`` + ``DestroyEngineDetails`` + `Plug`inDestroy`
+6. **Cleanup**: ``DestroyExecutionContext``, ``DestroyEngineDetails``, and ``PluginDestroy``
 
 Backend descriptor types
 ========================
 
 The backend uses descriptors as opaque handles to manage different aspects of graph execution:
 
-Operation Graph Descriptor (``HIPDNN_BACKEND_OPERATIONGRAPH_DESCRIPTOR``)
+Operation graph descriptor (``HIPDNN_BACKEND_OPERATIONGRAPH_DESCRIPTOR``)
 -------------------------------------------------------------------------
 
 - Represents the computational graph to be executed.
 - Contains nodes, tensors, and their connections.
 
-Engine Heuristic Descriptor (``HIPDNN_BACKEND_ENGINEHEUR_DESCRIPTOR``)
+Engine heuristic descriptor (``HIPDNN_BACKEND_ENGINEHEUR_DESCRIPTOR``)
 ----------------------------------------------------------------------
 
 - Manages the selection of appropriate engines for a graph.
 - Queries plugins for applicable engines.
 - Extensible plugin design to control engine selection.
 
-Engine Config Descriptor (``HIPDNN_BACKEND_ENGINECFG_DESCRIPTOR``)
+Engine config descriptor (``HIPDNN_BACKEND_ENGINECFG_DESCRIPTOR``)
 ------------------------------------------------------------------
 
 - Represents a specific engine configuration.
 - Contains engine ID and configuration parameters.
 - Retrieved from heuristic results.
 
-Engine Descriptor (``HIPDNN_BACKEND_ENGINE_DESCRIPTOR``)
+Engine descriptor (``HIPDNN_BACKEND_ENGINE_DESCRIPTOR``)
 --------------------------------------------------------
 
 - Represents a backend engine.
-- Contains engine ID, and a set of behavioral notes + configurable settings.
-- Retrieved from engine config Descriptor.
+- Contains engine ID, and a set of behavioral notes and configurable settings.
+- Retrieved from engine config descriptor.
 
-Execution Plan Descriptor (``HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR``)
+Execution plan descriptor (``HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR``)
 ------------------------------------------------------------------------
 
 - Combines an engine configuration with a graph.
 - Manages workspace requirements.
 - Prepares for actual execution.
 
-Variant Pack Descriptor (``HIPDNN_BACKEND_VARIANT_PACK_DESCRIPTOR``)
+Variant pack descriptor (``HIPDNN_BACKEND_VARIANT_PACK_DESCRIPTOR``)
 --------------------------------------------------------------------
 
 - Contains runtime data for execution.

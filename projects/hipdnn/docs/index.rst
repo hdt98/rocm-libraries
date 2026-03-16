@@ -1,6 +1,6 @@
 .. meta::
   :description: hipDNN (Deep Neural Network) is a graph-based library providing improved performance for deep learning workloads with AMD GPUs.
-  :keywords: hipDNN, ROCm, documentation,
+  :keywords: hipDNN, ROCm, documentation
 
 ********************
 hipDNN documentation
@@ -10,7 +10,7 @@ hipDNN (Deep Neural Network) is a graph-based library providing improved perform
 
 hipDNN uses operation graphs as an intermediate representation to describe computations, allowing different backend engines to optimize and execute these graphs efficiently.
 
-hipDNN provides an interace that follows established deep learning conventions, and has a plugin-based architecture which allows advanced users to extend hipDNN without modifying the core library.
+hipDNN provides an interface that follows established deep learning conventions, and has a plugin-based architecture which allows advanced users to extend hipDNN without modifying the core library.
 
 The public repository for hipDNN is located at `https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn>`_.
 
@@ -35,8 +35,8 @@ The public repository for hipDNN is located at `https://github.com/ROCm/rocm-lib
   .. grid-item-card:: How to
 
     * :doc:`Build and execute operation graphs <how-to/build-execute-hipdnn>`
-    * :doc:`Get/set engine knob configurations <how-to/get-set-engine-knob>`
-    * :doc:`Migrate a cudNN project to hipDNN <how-to/migrate-cudnn>`
+    * :doc:`Get and set engine knob configurations <how-to/get-set-engine-knob>`
+    * :doc:`Migrate a cuDNN project to hipDNN <how-to/migrate-cudnn>`
     * :doc:`Develop plugins <how-to/develop-plugins>`
 
   .. grid-item-card:: Reference

@@ -1,14 +1,14 @@
 .. meta::
-  :description: Learn how to get/set engine knob configurations in hipDNN
-  :keywords: hipDNN, ROCm, API, how-to 
+  :description: Learn how to get and set engine knob configurations in hipDNN.
+  :keywords: hipDNN, ROCm, knobs
 
 .. _set-engine-knobs:
 
 ********************************************
-Get/set engine knob configurations in hipDNN
+Get and set engine knob configurations in hipDNN
 ********************************************
 
-hipDNN has a flexible engine configuration knobs system that allows plugin developers to expose custom runtime settings and enables end-users to adjust these settings. 
+hipDNN has a flexible system of engine configuration knobs that lets plugin developers expose custom runtime settings that end users can then adjust.
 
 .. note::
 
@@ -17,7 +17,7 @@ hipDNN has a flexible engine configuration knobs system that allows plugin devel
 Query available knobs
 =====================
 
-Use the hipDNN frontend to discover what knobs an engine supports and their constraints:
+Use the hipDNN frontend to discover which knobs an engine supports and their constraints:
 
 .. code:: cpp
 
@@ -82,7 +82,7 @@ Use the lookup method to access the knob ID:
 Set knob values
 ===============
 
-You can set knob values when creating an execution plan. Here's an example:
+You can set the knob values when creating an execution plan. Here's an example:
 
 .. code:: cpp
 
@@ -120,7 +120,7 @@ You can set knob values when creating an execution plan. Here's an example:
 Use type-safe knob setting
 --------------------------
 
-Refer to this sample code for type-safe knob setting:
+Refer to this sample code to implement type-safe knob settings:
 
 .. code:: cpp
 
@@ -135,7 +135,7 @@ Refer to this sample code for type-safe knob setting:
 Use the default knob values
 ===========================
 
-If you don't specify a knob setting, the engine will use the default value defined by the knob. To explicitly use defaults for all knobs:
+If you don't specify a knob setting, the engine will use the default value defined by the knob. To explicitly use defaults for all knobs, follow this example:
 
 .. code:: cpp
 
@@ -161,8 +161,8 @@ For development
 
 - **Start with defaults**: Use default knob values during initial development.
 - **Profile first**: Measure baseline performance before tuning knobs.
-- **Query knobs**: Always check available knobs and their constraints using ``get_knobs_for_engine()``.
-- **Test incremental changes**: Modify one knob at a time to understand impact.
+- **Query knobs**: Always check the available knobs and their constraints using ``get_knobs_for_engine()``.
+- **Test incremental changes**: Modify one knob at a time to understand the impact.
 
 For production
 --------------
@@ -181,7 +181,7 @@ For production
         graph.execute(handle, variantPack, workspace);
     }
 
-- **Use cached results in production**: After warm-up, benchmarking can be disabled as results are cached.
+- **Use cached results in production**: After warm-up, benchmarking can be disabled because the results are cached.
 - **Document knob settings**: Keep a record of knob configurations used in production for reproducibility.
 
 For memory-constrained environments

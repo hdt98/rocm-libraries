@@ -1,6 +1,6 @@
 .. meta::
   :description: This quick start guide demonstrates how to include hipDNN in a CMake project.
-  :keywords: hipDNN, ROCm, install, Windows
+  :keywords: hipDNN, ROCm, install, CMake
 
 **************************
 Add hipDNN to your project
@@ -11,7 +11,7 @@ This guide demonstrates how to include hipDNN in a CMake project on a system wit
 Prerequisites
 ==============
 
-ROCm and hipDNN installed with dependencies. See :ref:`prerequisites`.
+ROCm and hipDNN must be installed along with the dependencies. See :ref:`prerequisites`.
 
 Steps
 =====
@@ -29,8 +29,8 @@ Steps
      add_executable(my_app main.cpp)
      target_link_libraries(my_app PRIVATE hipdnn_frontend)
 
-   - ``find_package(hipdnn_frontend)`` transitively brings in ``hipdnn_backend``, ``hipdnn_data_sdk``, and ``hip`` — only one ``find_package`` call is needed. HIP runtime APIs (``hipMalloc``, ``hipFree``, etc.) are available through the transitive ``hip::host`` link dependency.
-   - If CMake can't find the packages, set ``CMAKE_PREFIX_PATH`` to the ROCm install location. hipDNN CMake files are installed to ``<ROCM Install Path>/lib/cmake`` by default, which CMake may already search automatically depending on your system configuration. For example: ``-DCMAKE_PREFIX_PATH=/opt/rocm/lib/cmake``.
+   - ``find_package(hipdnn_frontend)`` transitively brings in ``hipdnn_backend``, ``hipdnn_data_sdk``, and ``hip``, so only one ``find_package`` call is needed. HIP runtime APIs (``hipMalloc``, ``hipFree``, etc.) are available through the transitive ``hip::host`` link dependency.
+   - If CMake can't find the packages, set ``CMAKE_PREFIX_PATH`` to the ROCm install location. hipDNN CMake files are installed to ``<ROCM Install Path>/lib/cmake`` by default, which CMake might already be searching automatically depending on your system configuration. For example: ``-DCMAKE_PREFIX_PATH=/opt/rocm/lib/cmake``.
 
 2. Include the frontend header to access the hipDNN graph API:
 

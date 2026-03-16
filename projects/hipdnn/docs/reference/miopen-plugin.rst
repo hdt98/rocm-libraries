@@ -1,6 +1,6 @@
 .. meta::
   :description: The MIOpen provider plugin serves as the kernel provider. It employs a modular C++ architecture, largely decoupled from the API layer.
-  :keywords: hipDNN, ROCm, API, 
+  :keywords: hipDNN, ROCm, API, MIOpen
 
 .. _miopen:
 
@@ -8,9 +8,9 @@
 MIOpen provider operation support
 *********************************
 
-The MIOpen provider adds a number of operations available from MIOpen to hipDNN.
+The MIOpen provider adds a number of MIOpen operations to hipDNN.
 MIOpen is the AMD deep-learning primitives library for GPUs. 
-It implements fusion to optimize for memory bandwidth and GPU launch overheads. 
+It implements fusion to optimize memory bandwidth and GPU launch overheads. 
 It also implements different algorithms to optimize convolutions for different filter and input sizes.
 
 .. _operation-support:
@@ -20,9 +20,9 @@ Operation support
 
 These are the supported datatypes:
 
-- **FP16**: Half-precision floating point (16-bit)
-- **BFP16**: Brain floating point (16-bit)
-- **FP32**: Single-precision floating point (32-bit)
+- **``FP16``**: Half-precision floating point (16-bit)
+- **``BFP16``**: Brain floating point (16-bit)
+- **``FP32``**: Single-precision floating point (32-bit)
 
 These are the supported layouts:
 
@@ -42,45 +42,45 @@ This table lists all operations supported in hipDNN:
      - Layouts
      - Notes
    * - Batchnorm Inference with Variance 
-     - FP16, BFP16, FP32
+     - ``FP16``, ``BFP16``, ``FP32``
      - NCHW, NHWC, NCDHW, NDHWC
      - Spatial mode only¹
    * - Batchnorm Inference + DRelu + Backward 
-     - FP16, BFP16, FP32 
+     - ``FP16``, ``BFP16``, ``FP32`` 
      - NCHW, NHWC, NCDHW, NDHWC
      - Fused graph³
    * - Batchnorm Training
-     - FP16, BFP16, FP32
+     - ``FP16``, ``BFP16``, ``FP32``
      - NCHW, NHWC, NCDHW, NDHWC
-     - Spatial mode only¹, No running stats⁴
+     - Spatial mode only¹, no running stats⁴
    * - Batchnorm Training + Activation
-     - FP16, BFP16, FP32
+     - ``FP16``, ``BFP16``, ``FP32``
      - NCHW, NHWC, NCDHW, NDHWC
      - Fused graph³ ⁴
    * - Batchnorm Backward 
-     - FP16, BFP16, FP32
+     - ``FP16``, ``BFP16``, ``FP32``
      - NCHW, NHWC, NCDHW, NDHWC
      - Spatial mode only¹
    * - Convolution Dgrad 
-     - FP16, BFP16, FP32
+     - ``FP16``, ``BFP16``, ``FP32``
      - NCHW, NHWC, NCDHW, NDHWC
      - Cross-correlation only²
    * - Convolution Forward
-     - FP16, BFP16, FP32
+     - ``FP16``, ``BFP16``, ``FP32``
      - NCHW, NHWC, NCDHW, NDHWC
      - Cross-correlation only²
    * - Convolution Forward + (Bias) + Activation⁵ 
-     - FP16, BFP16, FP32
+     - ``FP16``, ``BFP16``, ``FP32``
      - NCHW, NHWC, NCDHW, NDHWC
      - Fused graph²³
    * - Convolution Wgrad 
-     - FP16, BFP16, FP32
+     - ``FP16``, ``BFP16``, ``FP32``
      - NCHW, NHWC, NCDHW, NDHWC
      - Cross-correlation only²
 
 .. note::
 
-  - For annotations ¹ through ⁴, refer to :ref:`operations`.
+  - For annotations ¹ through ⁴, see :ref:`operations`.
   - For annotation ⁵, see :ref:`detailed` for more information.
 
 .. _detailed:
@@ -94,10 +94,12 @@ Convolution Forward + (Bias) + Activation
 Convolution forward node
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-- Compute data type: FP32
+- Compute data type: ``FP32``
+
 - Y tensor
+
     - Virtual
-    - Data type: FP32 or the input data type (the latter only if bias is used)
+    - Data type: ``FP32`` or the input data type (the latter only if bias is used)
 
 Bias node (optional)
 ~~~~~~~~~~~~~~~~~~~~
@@ -105,12 +107,12 @@ Bias node (optional)
 - Compute data type: input data type
 - Output tensor
     - Virtual
-    - Data type: FP32 or the input data type
+    - Data type: ``FP32`` or the input data type
 
 Activation node
 ~~~~~~~~~~~~~~~
 
-- Compute data type: FP32
+- Compute data type: ``FP32``
 - Activation mode: RELU_FORWARD
 - Supports
     - No clipping
@@ -138,12 +140,12 @@ Operation notes
 Knobs
 =====
 
-The MIOpen Provider plugin supports :ref:`knobs` that control kernel selection, performance tuning, and memory usage. These knobs allow you to optimize MIOpen's behavior for your specific workload and hardware configuration.
+The MIOpen provider plugin supports :ref:`knobs` that control kernel selection, performance tuning, and memory usage. These knobs allow you to optimize MIOpen's behavior for your specific workload and hardware configuration.
 
-The MIOpen Provider plugin supports two types of knobs:
+The MIOpen provider plugin supports two types of knobs:
 
 - **Global Knobs**: Standard knobs available for all engines (namespace: ``global.*``)
-- **Custom Knobs**: Operation-specific knobs provided dynamically based on the graph (no custom knobs currently) 
+- **Custom Knobs**: Operation-specific knobs provided dynamically based on the graph (there are no custom knobs yet) 
 .. Is custom knob support not operational yet?
 
 This table lists all configuration knobs supported by the MIOpen Provider plugin:
@@ -164,7 +166,7 @@ This table lists all configuration knobs supported by the MIOpen Provider plugin
      - Description
    * - ``global.benchmarking``
      - Integer (int64)
-     - All Operations
+     - All operations
      - 0 (disabled)
      - 0-1
      - Enable benchmarking mode for kernel selection
@@ -177,21 +179,21 @@ This table lists all configuration knobs supported by the MIOpen Provider plugin
 
 .. note::
 
-  The ``global.workspace_size_limit`` knob is *only available* for convolution operations (Forward, Backward Data, Backward Weights). It's not supported for batchnorm or other operations.
+  The ``global.workspace_size_limit`` knob is only available for convolution operations (Forward, Backward Data, Backward Weights). It's not supported for batchnorm or other operations.
 
 Knob benchmarking
 -----------------
 
-The MIOpen Provider plugin uses the ``global.benchmarking`` knob to control whether MIOpen performs kernel benchmarking to find the optimal solver for a given operation. It's an Integer (int64) type Knob, and it has these values:
+The MIOpen Provider plugin uses the ``global.benchmarking`` knob to control whether MIOpen performs kernel benchmarking to find the optimal solver for a given operation. It's an int64 integer-type knob and has these values:
 
 - ``0`` (Benchmarking disabled (default)): MIOpen uses heuristics to select a kernel. The first execution is relatively fast, but it may not use the optimal kernel for your specific configuration.
-- ``1`` (Benchmarking enabled): MIOpen benchmarks multiple solver candidates. The first execution is slower, but subsequent executions use the cached optimal solver which provides the best performance for production workloads. It has minimal overhead and typically results in 10-50% performance improvement over the default heuristic selection.
+- ``1`` (Benchmarking enabled): MIOpen benchmarks multiple solver candidates. The first execution is slower, but subsequent executions use the cached optimal solver which provides the best performance for production workloads. It has minimal overhead and typically results in a 10-50% performance improvement over the default heuristic selection.
 
 Caching
 ~~~~~~~
 
 Benchmark results are cached in MIOpen's performance database. The default location is ``~/.config/miopen/`` on Linux.
-Cache persists across application runs. It's specific to the GPU model, operation parameters, tensor dimensions, and data types.
+The cache persists across application runs. It's specific to the GPU model, operation parameters, tensor dimensions, and data types.
 
 Code sample
 ~~~~~~~~~~~
@@ -206,9 +208,9 @@ Code sample
 Workspace size limit
 --------------------
 
-The MIOpen Provider plugin uses the ``global.workspace_size_limit`` knob (Integer (int64)) to limit the maximum workspace memory that MIOpen solvers can use for convolution operations (Forward, Backward Data, Backward Weights).
+The MIOpen provider plugin uses the ``global.workspace_size_limit`` knob (Integer (int64)) to limit the maximum workspace memory that MIOpen solvers can use for convolution operations (Forward, Backward Data, and Backward Weights).
 
-The valid range for the knob is dynamic, i.e., determined at runtime based on the available MIOpen solvers with this workflow:
+The valid range for the knob is dynamic, that is, determined at runtime based on the available MIOpen solvers with this workflow:
 
 1. MIOpen queries all available solvers for the specific operation and tensor configuration.
 2. Each solver reports its workspace memory requirement.
@@ -223,7 +225,7 @@ The range is operation-specific and depends on the:
 - Available MIOpen solvers for the configuration
 - GPU memory constraints
 
-Here's an example range for a specific convultion forward operation:
+Here's an example range for a specific convolution forward operation:
 
 - **Minimum**: 512 KB (lightweight kernel with minimal workspace)
 - **Maximum**: 128 MB (high-performance kernel with large workspace)
@@ -232,7 +234,7 @@ Here's an example range for a specific convultion forward operation:
 Setting ``global.workspace_size_limit`` to a value lower than the maximum range:
 
 - Constrains solver selection to only those requiring less than the specified workspace.
-- May reduce performance if optimal solvers require more workspace.
+- Can reduce performance if optimal solvers require more workspace.
 - Is useful for memory-constrained systems where total GPU memory is limited.
 
 Setting ``global.workspace_size_limit`` to the maximum range (or not setting it):
@@ -243,7 +245,7 @@ Setting ``global.workspace_size_limit`` to the maximum range (or not setting it)
 
 .. important::
 
-  The ``global.workspace_size_limit`` knob is dynamically provided *only* when applicable. It won't appear in the knobs list for non-convolution operations (e.g., batchnorm, pointwise).
+  The ``global.workspace_size_limit`` knob is dynamically provided *only* when applicable. It won't appear in the knobs list for non-convolution operations (for example, batchnorm, pointwise).
 
 .. warning::
 

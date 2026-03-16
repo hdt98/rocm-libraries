@@ -1,8 +1,8 @@
 .. meta::
   :description: 
-  :keywords: hipDNN, ROCm, coding, naming
+  :keywords: 
 
-******************************
+********************
 hipDNN API reference
-******************************
+********************
 

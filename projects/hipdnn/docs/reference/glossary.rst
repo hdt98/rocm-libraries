@@ -1,6 +1,6 @@
 .. meta::
-  :description: hipDNN glossary
-  :keywords: hipDNN, ROCm, coding, naming
+  :description: Learn about common terms used in hipDNN.
+  :keywords: hipDNN, ROCm, terms, definitions
 
 .. _glossary:
 

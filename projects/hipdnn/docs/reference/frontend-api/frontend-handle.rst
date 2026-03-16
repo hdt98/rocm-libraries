@@ -1,6 +1,6 @@
 .. :meta::
   :description: 
-  :keywords: hipDNN, ROCm, API, 
+  :keywords: hipDNN, ROCm, API 
 
 
 ******************************

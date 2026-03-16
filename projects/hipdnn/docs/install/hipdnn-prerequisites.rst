@@ -1,5 +1,5 @@
 .. meta::
-  :description: Learn how to install hipDNN through ROCm.
+  :description: Learn about the prerequisites and dependencies required to install hipDNN.
   :keywords: hipDNN, ROCm, install, prerequisites
 
 .. _prerequisites:
@@ -20,7 +20,7 @@ These development packages contain the ``dev`` prefix.
 System requirements
 ===================
 
-- An AMD GPU with ROCm support (see `ROCm compatibility matrix <https://advanced-micro-devices-rocm-internal--692.com.readthedocs.build/en/692/compatibility/compatibility-matrix.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_)
+- An AMD GPU with ROCm support (see the `ROCm compatibility matrix <https://advanced-micro-devices-rocm-internal--692.com.readthedocs.build/en/692/compatibility/compatibility-matrix.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_)
 - Linux or Windows operating system (see `Install AMD ROCm <https://advanced-micro-devices-rocm-internal--692.com.readthedocs.build/en/692/install/rocm.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_)
 
 Dependencies
@@ -33,8 +33,8 @@ Dependencies
    * - Dependency
      - Version
      - Description
-   * - ROCm Development Install
-     - ROCm version 7.12.0 or later
+   * - ROCm development installation
+     - ROCm 7.12.0 or later
      - AMD GPU programming stack
    * - CMake
      - 3.25.2 or later

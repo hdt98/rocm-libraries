@@ -1,6 +1,6 @@
 .. meta::
-  :description: 
-  :keywords: hipDNN, ROCm, coding, naming
+  :description: How to guides for hipDNN plugin developers.
+  :keywords: hipDNN, ROCm
 
 .. _how-to-plugin:
 
@@ -13,4 +13,4 @@ These guides demonstrate how to extend hipDNN's operation support using the hipD
 .. important::
 
   These instructions are appropriate for developers who have experience with hipDNN and are familiar with building and compiling shared libraries (Linux) or DLLs (Windows).
-  If you're a new to hipDNN, see :ref:`how-to-users`.
+  If you're new to hipDNN, see :ref:`how-to-users`.

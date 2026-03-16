@@ -1,6 +1,6 @@
 .. meta::
-  :description: hipDNN engine configuration knobs provide a flexible mechanism for controlling runtime behavior of hipDNN engines.
-  :keywords: hipDNN, ROCm, API,
+  :description: hipDNN engine configuration knobs provide a flexible mechanism for controlling the runtime behavior of hipDNN engines.
+  :keywords: hipDNN, ROCm, API, knobs
 
 .. _knobs:
 
@@ -8,9 +8,9 @@
 hipDNN engine configuration knobs
 *********************************
 
-Engine configuration knobs provide a flexible mechanism for controlling runtime behavior of hipDNN engines. They allow you to tune performance, configure algorithmic choices, and adjust memory usage without recompiling code.
+Engine configuration knobs provide a flexible mechanism for controlling the runtime behavior of hipDNN engines. They let you tune performance, configure algorithmic choices, and adjust memory usage without recompiling code.
 
-The knobs system is designed to be:
+This system is designed to be:
 
 - **Optional**: Plugins can opt-in to exposing knobs.
 - **Flexible**: Support for multiple data types beyond ``int64_t``.
@@ -41,7 +41,7 @@ Global knobs
 ------------
 
 Global knobs are standard knobs available across all or most engines. They're defined in the ``global.*`` namespace and provide common functionality.
-These knobs use the namespace prefix: ``global.*``. They have consistent behavior across engines, they're defined by the hipDNN specification, and can't be registered by custom plugins.
+These knobs use the namespace prefix ``global.*``. They have consistent behavior across engines, are defined by the hipDNN specification, and can't be registered by custom plugins.
 
 **Examples**:
 
@@ -52,12 +52,12 @@ Custom knobs
 ------------
 
 Custom knobs are engine-specific or plugin-specific parameters. Plugin developers can register custom knobs to expose their own tuning parameters.
-These knobs use the namespace prefix: ``<plugin>.*`` or ``<plugin>.<operation>.*``. They configure engine-specific behavior, they're defined by plugin developers, and they extend hipDNN functionality for specific use cases.
+These knobs use the namespace prefix ``<plugin>.*`` or ``<plugin>.<operation>.*``. They configure engine-specific behavior, are defined by plugin developers, and they extend hipDNN functionality for specific use cases.
 
 **Examples**:
 
 - ``miopen.conv.tile_size``: Set the convolution tile size for MIOpen.
-- ``rocblas.gemm.algo``: Select the GEMM algorithm for ROCm BLAS.
+- ``rocblas.gemm.algo``: Select the GEMM algorithm for ROCm BLAS operations.
 
 Naming conventions
 ==================
@@ -100,7 +100,7 @@ These are the global knobs available in hipDNN:
    * - ``global.benchmarking``
      - Integer (int64)
      - 0 (disabled)
-     - Enable benchmarking mode for kernel selection. When enabled, engines may run multiple kernel variants and select the fastest. First run may be slower due to benchmarking overhead.
+     - Enable benchmarking mode for kernel selection. When enabled, engines can run multiple kernel variants and select the fastest. The first run might be slower due to benchmarking overhead.
    * - ``global.workspace_size_limit``
      - Integer (int64)
      - The maximum size needed for optimal performance.
@@ -113,11 +113,11 @@ These are the global knobs available in hipDNN:
 Provider-specific knobs
 =======================
 
-Different engine providers may expose their own custom knobs. Refer to :ref:`plugin-support` for specific details.
+Different engine providers may expose their own custom knobs. See :ref:`plugin-support` for specific details.
 
 .. tip::
 
-  When developing with multiple providers, use ``get_knobs_for_engine()`` to programmatically discover available knobs rather than hard-coding knob names.
+  When developing with multiple providers, use ``get_knobs_for_engine()`` to programmatically discover the available knobs rather than hard-coding knob names.
 
 Validation
 ==========
@@ -127,7 +127,7 @@ The backend:
 - Deserializes the knob settings from the ``EngineConfig``.
 - Queries the engine for its supported knobs.
 - Validates each setting against the knob's constraints.
-- Use the default values for any unspecified knob settings.
+- Uses the default values for any unspecified knob settings.
 
 If the validation fails, hipDNN returns ``HIPDNN_STATUS_BAD_PARAM``.
 
@@ -142,7 +142,7 @@ Best practices
 For users
 ---------
 
-- **Query before setting**: Always call ``get_knobs_for_engine()`` to understand available knobs and their constraints before setting values.
+- **Query before setting**: Always call ``get_knobs_for_engine()`` to understand the available knobs and their constraints before setting values.
 - **Validate constraints**: Check the constraint object to ensure your values are valid before creating execution plans.
 - **Use default values when possible**: Only customize knobs when you have a specific performance or behavior requirement.
 - **Handle errors gracefully**: Always check the error return value when setting knobs or creating execution plans.

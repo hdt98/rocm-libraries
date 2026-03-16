@@ -1,6 +1,6 @@
 .. meta::
-  :description: 
-  :keywords: hipDNN, ROCm, coding, naming
+  :description: How to guides for hipDNN users.
+  :keywords: hipDNN, ROCm
 
 .. _how-to-users:
 

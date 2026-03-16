@@ -1,6 +1,6 @@
 .. meta::
   :description: Learn how to develop plugins for hipDNN.
-  :keywords: hipDNN, ROCm, API, how-to
+  :keywords: hipDNN, ROCm, plugins
 
 .. _develop-plugins:
 
@@ -15,12 +15,12 @@ The backend discovers and manages these plugins, leveraging them for different a
 
   This page is for advanced users such as senior developers, engineers, and system administrators who are looking to extend hipDNN with customized plugins. Most users should use the default plugins described in :ref:`build-execute`.
 
-It is recommended to review the :ref:`architecture` and :ref:`backend-architecture` documents for context before beginning plugin development.
+It's recommended that you review the :ref:`architecture` and :ref:`backend-architecture` documents for context before beginning plugin development.
 
 Plugin types
 ============
 
-Kernel engine plugins provide the actual kernel implementations for operations. They contain the compute kernels that execute on the target hardware (GPUs, accelerators, etc.).
+Kernel engine plugins provide the actual kernel implementations for operations. They contain the compute kernels that execute on the target hardware (GPUs, accelerators, and so on).
 
 SDK libraries
 =============
@@ -53,7 +53,7 @@ The Test SDK provides utilities for testing plugins. It includes:
 - `CPU reference implementation <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/docs/OperationSupport-ReferenceImpl.md>`_ for validation (convolution, batchnorm, etc.). This implementation:
 
   - Provides ground-truth results for validating GPU implementations.
-  - Supports core operations (Convolution, Batchnorm, Pointwise).
+  - Supports core operations (convolution, batchnorm, pointwise).
   - Isn't intended for performance or production use.
 
 - Test utilities (tolerances, seeds, logging).
@@ -65,10 +65,10 @@ Plugin API
 
 The plugin API defines how kernel engine plugins interact with hipDNN:
 
-- **Graph Processing**: Topologically sorted graphs are passed in a serialized format to plugins using FlatBuffers.
-- **Data SDK Objects**: Plugins use Data SDK objects to deserialize and process graphs.
-- **Capability Reporting**: Plugins analyze graphs and report whether they can execute them.
-- **Execution Interface**: Plugins provide execution methods for supported operations.
+- **Graph processing**: Topologically sorted graphs are passed in a serialized format to plugins using FlatBuffers.
+- **Data SDK objects**: Plugins use Data SDK objects to deserialize and process graphs.
+- **Capability reporting**: Plugins analyze graphs and report whether they can execute them.
+- **Execution interface**: Plugins provide execution methods for supported operations.
 
 Engine IDs
 ==========
@@ -84,26 +84,26 @@ This registers the name globally (verifying that it doesn't conflict with plugin
 
 Here's the workflow:
 
-1. **Engine Names**: Define human-readable string names for your engines (for example, ``MY_CUSTOM_ENGINE``).
-2. **Hash Function**: The ``hipdnn_plugin_sdk::engine_names::engineNameToId()`` function converts names to IDs using a FNV-1a hash algorithm.
+1. **Engine names**: Define human-readable string names for your engines (for example, ``MY_CUSTOM_ENGINE``).
+2. **Hash function**: The ``hipdnn_plugin_sdk::engine_names::engineNameToId()`` function converts names to IDs using a FNV-1a hash algorithm.
 3. **Registration**: Engine names are registered with the Plugin SDK for discoverability.
 
 Benefits
 --------
 
-- **Deterministic**: Same name always produces same ID.
-- **No Collisions**: Hash algorithm minimizes collision risk.
-- **Human-Readable**: Debug logs can show meaningful engine names.
-- **Forward Compatible**: New engines can be used without registry updates.
+- **Deterministic**: The same name always produces the same ID.
+- **No collisions**: Hash algorithm minimizes collision risk.
+- **Human-readable**: Debug logs can show meaningful engine names.
+- **Forward compatible**: New engines can be used without registry updates.
 
-Use Engine IDs
+Use engine IDs
 --------------
 
 .. code:: cpp
 
   #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
 
-  // This macro register the engine name and creates helper variables
+  // This macro registers the engine name and creates helper variables
   // such as EXAMPLE_PLUGIN_RELU_ENGINE_ID for this engine.
   HIPDNN_REGISTER_ENGINE(MY_CUSTOM_ENGINE, "MY_CUSTOM_ENGINE")
 
@@ -142,9 +142,9 @@ Before creating a plugin, ensure you've installed hipDNN. Plugins depend on the 
 Steps
 -----
 
-1. Create plugin structure.
+1. Create the plugin structure.
 
-   1. Create a new project/repository for your plugin.
+   1. Create a new project or repository for your plugin.
    2. Add definitions for the plugin interface defined in `plugin_sdk/include/hipdnn_plugin_sdk/EnginePluginApi.h <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/plugin_sdk/include/hipdnn_plugin_sdk/EnginePluginApi.h>`_. See :ref:`miopen` for an implementation reference.
 
 2. Implement the plugin API functions.
@@ -159,19 +159,19 @@ Steps
 3. Build and deploy the plugin.
 
    - Configure CMake to build the plugin as a shared library.
-   - Install to the ROCm hipDNN plugin directory where hipDNN can discover it at runtime, or use the ``HIPDNN_PLUGIN_DIR`` environment variable to force hipDNN to load plugins from only the folder specified in that environment variable.
+   - Install it to the ROCm hipDNN plugin directory where hipDNN can discover it at runtime or use the ``HIPDNN_PLUGIN_DIR`` environment variable to force hipDNN to only load plugins from the folder specified in the environment variable.
 
 Typical implementation details
 ------------------------------
 
-The **Engine Manager** is responsible for:
+The **Engine manager** is responsible for:
 
 - Creating and managing engine instances.
 - Reporting supported operations.
 - Handling resource allocation.
 - Managing device-specific contexts.
 
-For **Engine Implementations**:
+For **Engine implementations**:
 
 - Each engine must have a globally unique ``int64_t`` identifier.
 - Implement ``isApplicable()`` to check if the engine solves the given graph.
@@ -191,9 +191,9 @@ In general, the best practices consist of:
 
 - Organizing kernels by operation type.
 - Efficiently managing device memory allocations and transfers.
-- Validating inputs and provide meaningful error messages and logs via the sdk.
+- Validating inputs and providing meaningful error messages and logs via the SDK.
 - Properly managing compute streams for asynchronous execution.
-- Profiling kernels and optimize for target hardware.
+- Profiling kernels and optimizing for target hardware.
 - Validating and documenting supported operations, hardware requirements, and limitations.
 - Including unit tests and integration tests.
 
@@ -213,9 +213,9 @@ Your plugin's ``CMakeLists.txt`` must:
 
 - Build as a shared library.
 - Enable Position Independent Code (PIC) compilation for the library.
-- Link against hipDNN Data SDK and Plugin SDK.
+- Link against the hipDNN Data SDK and Plugin SDK.
 - Set appropriate install paths.
-- Link to required compute libraries (that is, HIP).
+- Link to the required compute libraries (that is, HIP).
 
 Use hipDNN SDKs in external plugins
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -225,7 +225,7 @@ When building an external plugin, the hipDNN Data SDK provides CMake variables t
 - Absolute path: (``HIPDNN_FULL_INSTALL_PLUGIN_ENGINE_DIR``):
 
   - Hardcoded at CMake configure time.
-  - This is intended for developer use *only*.
+  - This is intended for *developer use only*.
 
 - Relative path (``HIPDNN_RELATIVE_INSTALL_PLUGIN_ENGINE_DIR``):
 
@@ -271,7 +271,7 @@ Default plugin loading
 ----------------------
 
 By default, hipDNN loads plugins from ``./hipdnn_plugins/engines/``.
-This path is relative to the backend shared library location, typically: ``/opt/rocm/lib/``.
+This path is relative to the backend shared library location, typically ``/opt/rocm/lib/``.
 
 Default structure example:
 
@@ -319,7 +319,7 @@ Plugin symbol resolution
 ------------------------
 
 On Linux, all plugins are loaded with ``RTLD_NOW | RTLD_LOCAL`` to ensure that all symbols are resolved at load time.
-This means that all dependencies must be satisfied when the plugin is loaded. To avoid symbol conflicts, all plugins must be built with with ``-fvisibility=hidden`` to limit symbol exposure.
+This means that all dependencies must be satisfied when the plugin is loaded. To avoid symbol conflicts, all plugins must be built with ``-fvisibility=hidden`` to limit symbol exposure.
 
 Path resolution
 ~~~~~~~~~~~~~~~
@@ -429,7 +429,7 @@ Unit tests focus on the internal implementation of your plugin components:
 - **Requirements**:
 
   - Must be fast-running.
-  - Typically, unit tests should never access GPU hardware. If unit tests require accessing GPU hardware, use the ``SKIP_IF_NO_DEVICE()`` macro to automatically skip the test if no HIP devices are found.
+  - Typically, unit tests should never access GPU hardware. If unit tests need to access the GPU hardware, use the ``SKIP_IF_NO_DEVICE()`` macro to automatically skip the test if no HIP devices are found.
   - Use mocking/stubbing for dependencies where appropriate.
   - Should work on both Windows and Linux.
 
@@ -446,19 +446,19 @@ Integration tests validate end-to-end functionality of your plugin:
   - Validate against reference implementations.
   - Test different data types, layouts, dimensions, and edge-cases for each.
   - Enable tests for all supported ASICs.
-  - A GPU is typically required for meaningful validation; use the ``SKIP_IF_NO_DEVICE()`` macro to automatically skip the test if no HIP devices are found.
-  - Tests are divided into two categories described by the prefix argument passed to ``INSTANTIATE_TEST_SUITE_P``.
+  - A GPU is typically required for meaningful validation. Use the ``SKIP_IF_NO_DEVICE()`` macro to automatically skip the test if no HIP devices are found.
+  - Tests are divided into two categories designated by the prefix argument passed to ``INSTANTIATE_TEST_SUITE_P``.
 
-    - **Smoke** - These tests are designed to test features using the smallest possible shape and run quickly (combined smoke test run time must be under 5 mins).
-    - **Full** - These tests can contain regression shapes, large shapes, or slow shapes.
+    - **Smoke**: These tests are designed to test features using the smallest possible shape and run quickly (the combined smoke test run time must be under 5 mins).
+    - **Full**: These tests can contain regression shapes, large shapes, or slow shapes.
 
 For a comprehensive example of an integration test, see `IntegrationGpuBatchnormForwardInference.cpp <https://github.com/ROCm/rocm-libraries/blob/develop/dnn-providers/miopen-provider/integration_tests/IntegrationGpuBatchnormForwardInference.cpp>`_.
 
 .. important::
 
-  See our `general testing requirements <https://github.com/ROCm/rocm-libraries/blob/develop/dnn-providers/miopen-provider/integration_tests/IntegrationGpuBatchnormForwardInference.cpp>`_.
+  See the `general testing requirements <https://github.com/ROCm/rocm-libraries/blob/develop/dnn-providers/miopen-provider/integration_tests/IntegrationGpuBatchnormForwardInference.cpp>`_.
 
-Example: MIOpen Provider Plugin
+Example: MIOpen provider plugin
 ================================
 
 See :ref:`miopen` for more information.
@@ -477,7 +477,7 @@ Plugin handle creation fails
 If you see errors like ``"Failed to create handle for plugin 'PluginName'"``, this typically indicates:
 
 - Missing dependencies that the plugin requires at runtime.
-- GPU initialization failures (e.g., no compatible device found).
+- GPU initialization failures (for example, no compatible device found).
 - Plugin internal initialization errors.
 
 **Solution**: Check that all plugin dependencies are satisfied, library load paths are set correctly, and a compatible GPU device is available.
@@ -499,7 +499,7 @@ When multiple plugins are loaded and one or more plugins don't properly hide the
 - Crashes or undefined behavior during plugin operations.
 
 This occurs because dynamically loaded shared libraries can inadvertently share symbols, causing one plugin's function to override another plugin's function.
-If the plugin loads successfully in isolation, then this may be the issue.
+If the plugin loads successfully in isolation, then this could be the issue.
 
 Example error log
 ~~~~~~~~~~~~~~~~~

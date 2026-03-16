@@ -1,16 +1,16 @@
 .. meta::
-  :description: Learn how to migrate your frontend code from cudNN to hipDNN.
-  :keywords: hipDNN, ROCm, API, how-to
+  :description: Learn how to migrate your frontend code from cuDNN to hipDNN.
+  :keywords: hipDNN, ROCm, migrate, cuDNN
 
 .. _migrate-cudnn:
 
 *********************************
-Migrate a cudNN project to hipDNN
+Migrate a cuDNN project to hipDNN
 *********************************
 
 This guide demonstrates how to migrate a cuDNN code project to hipDNN.
 
-Before you begin, ensure hipDNN (ROCm) is installed. See :ref:`install` for more information.
+Before you begin, ensure hipDNN (ROCm) is installed. See :ref:`prerequisites` for more information.
 
 Here's a minimal example of a hipDNN project in ``CMakeLists.txt``:
 
@@ -29,10 +29,10 @@ Here's a minimal example of a hipDNN project in ``CMakeLists.txt``:
 
   See `Working examples in the Porting Guide <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/docs/PortingGuide.md#working-examples>`_ for ported code samples.
 
-Key differences cuDNN vs. hipDNN
-================================
+Key differences between cuDNN and hipDNN
+========================================
 
-Review this table to see a high-level overview of the differences between cuDNN vs. hipDNN:
+Review this table to see a high-level overview of the differences between cuDNN and hipDNN:
 
 .. list-table::
    :widths: 3 3 3
@@ -55,7 +55,7 @@ Review this table to see a high-level overview of the differences between cuDNN 
      - Currently only ``HeurMode_t::FALLBACK``
    * - Operation support
      - All cuDNN operations
-     - See `Operation support <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/docs/OperationSupport.md>`_ for more information.
+     - See :ref:`plugin-support` for more information.
    * - Device memory utility
      - ``Surface<type>``
      - ``MigratableMemory<type>``
@@ -71,7 +71,7 @@ PyTorch and cuDNN. The *memory layout* (channel-first vs channel-last) is always
 strides and stride order, not by the order of the tensor dimension vector that always holds values as [N,C,H,W] or [N,C,D,H,W]. 
 
 For example, memory arranged as NCHW corresponds to stride order {3,2,1,0} (W is the most tightly packed), and NDHWC corresponds to stride order {4,0,3,2,1} (C is the most tightly packed). 
-Use the ``TensorLayout`` constants and ``generateStrides()`` utility to compute strides for common layouts.
+Use the ``TensorLayout`` constants and the ``generateStrides()`` utility to compute strides for common layouts.
 
 Convolution
 -----------
@@ -146,7 +146,7 @@ Layer normalization
    * - Scale, Bias
      -  ``(1, ...)`` 
      - Batch dim = 1, remaining dims match input feature dims
-   * - Mean, inv variance
+   * - Mean, Inv variance
      - Stats dims
      - Batch dims from input, normalized dims = 1
 
@@ -189,25 +189,25 @@ Batch dimensions support broadcasting (dims must be equal or divisible).
 Pointwise operations
 --------------------
 
-Pointwise operations (ReLU, Sigmoid, Add, Mul, etc.) are *dimension-agnostic* — they accept
+Pointwise operations (ReLU, Sigmoid, Add, Mul, and so on) are *dimension-agnostic* — they accept
 tensors of any shape. For binary and ternary operations, inputs are broadcast using NumPy-style
 broadcasting rules (dimensions compared right-to-left; compatible if equal or 1).
 
 Troubleshooting
 ===============
 
-Error: ``Missing Heuristic modes A and B``
-------------------------------------------
+Error: Missing Heuristic modes A and B
+--------------------------------------
 
 The heuristic implementation in hipDNN has yet to be implemented
 
-TO fix the problem, use a combination of ``graph::get_ranked_engine_ids()`` and ``graph::set_preferred_engine_id_ext()`` if you need more detailed control over engine selection.
+To fix the problem, use a combination of ``graph::get_ranked_engine_ids()`` and ``graph::set_preferred_engine_id_ext()`` if you need more detailed control over engine selection.
 
-Error: ``Different memory utilities for allocating device memory.``
--------------------------------------------------------------------
+Error: Different memory utilities for allocating device memory
+--------------------------------------------------------------
 
-The memory utilities are typically consumer dependent, and written on an as-needed basis.
+The memory utilities are typically consumer dependent and written on an as-needed basis.
 cuDNN provides a surface utility for their samples, for example.
 
-To fix the issue, use ``MigratableMemory<type>``; its a utility that can automatically migrate data between the host and device (its also works as a stand-in).
-If you want to manage dims/strides more carefully, use the ``Tensor`` utility class ̶̶  both of these classes can be found in the ``hipdnn_data_sdk::utilities`` namespace.
+To fix the issue, use ``MigratableMemory<type>``, a utility that can automatically migrate data between the host and device (it also works as a stand-in).
+If you want to manage dims/strides more carefully, use the ``Tensor`` utility class. Both of these classes can be found in the ``hipdnn_data_sdk::utilities`` namespace.

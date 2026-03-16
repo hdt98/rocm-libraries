@@ -1,6 +1,6 @@
 .. meta::
   :description: Learn how to build and execute operation graphs in hipDNN.
-  :keywords: hipDNN, ROCm, API, how-to
+  :keywords: hipDNN, ROCm, graphs
 
 .. _build-execute:
 
@@ -25,7 +25,7 @@ Here's the basic frontend file structure with links to the GitHub repository:
 Frontend architecture
 =====================
 
-Refer to :ref:`architecture` for a conceptual description of the hipDNN graph, tensors, nodes, and attributes.
+See :ref:`architecture` for a conceptual description of the hipDNN graph, tensors, nodes, and attributes.
 
 See :ref:`plugin-support` for a detailed list of the supported operations.
 
@@ -58,9 +58,9 @@ This is the basic frontend workflow:
 
 1. Instantiate a :ref:`graph` that houses tensors and operations.
 2. Create input tensors for the operations within the graph.
-3. Add operations which become :ref:`nodes`, attaching the input Tensors to the nodes and creating output tensors from the node's operation. Any :ref:`attributes` you add configure the behavior of these nodes.
-4. Continue adding operations and attributes using the output Tensors from prior nodes as input Tensors for new nodes.
+3. Add operations, which become :ref:`nodes`, attaching the input tensors to the nodes and creating output tensors from the node's operation. Any :ref:`attributes` you add configure the behavior of these nodes.
+4. Continue adding operations and attributes using the output tensors from prior nodes as input tensors for new nodes.
 
-The graph is then processed to find a matching engine, the configuration knobs are applied and execution plans are built, memory is allocated, tensor data is supplied, and the resulting plan is executed on the GPU hardware.
+The graph is then processed to find a matching engine, the configuration knobs are applied, execution plans are built, memory is allocated, tensor data is supplied, and the resulting plan is executed on the GPU hardware.
 
 For complete working examples, see the official `samples on GitHub <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn/samples>`_.

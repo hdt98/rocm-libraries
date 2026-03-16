@@ -1,6 +1,6 @@
 .. meta::
-  :description: 
-  :keywords: hipDNN, ROCm, coding, naming
+  :description: Learn about the methods and classes for knobs in hipDNN.
+  :keywords: hipDNN, ROCm, knobs, API
 
 .. _knob-api:
 
@@ -21,7 +21,7 @@ Describes metadata for an available knob.
 - ``const std::string& description()``: Get a human-readable description.
 - ``bool isDeprecated()``: Check if a knob is deprecated.
 - ``KnobValueType valueType()``: Get value type (``INT64``, ``FLOAT64``, or ``STRING``).
-- ``const KnobValueVariant& defaultValue()``: Get default value as a variant.
+- ``const KnobValueVariant& defaultValue()``: Get the default value as a variant.
 - ``const IConstraint* constraint()``: Get the constraint validator.
 - ``Error validate(const KnobSetting& setting)``: Validate a setting.
 

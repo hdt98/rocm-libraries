@@ -1,6 +1,6 @@
 .. meta::
-  :description: 
-  :keywords: hipDNN, ROCm, API, 
+  :description: Learn about the operations supported in hipDNN.
+  :keywords: hipDNN, ROCm, operations
 
 .. _plugin-support:
 
