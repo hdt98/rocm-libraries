@@ -1,7 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Simple vector addition kernel for kpack demo.
-// Compiled as device-only code object (.hsaco) per architecture.
+// Device-only vector addition kernel.
+// Compiled per-architecture into .hsaco code objects for the kpack archive.
 
 #include <hip/hip_runtime.h>
 
