@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -20,13 +20,15 @@
 # CTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ################################################################################
 
-from rocisa.code import Module
-from rocisa.container import EXEC, VCC, vgpr, sgpr
+from rocisa.code import Module, Label
+from rocisa.container import EXEC, VCC, vgpr, sgpr, ContinuousRegister
 from rocisa.instruction import MacroInstruction, SAddCU32, SAddU32, SAndB32, \
     SAndB64, SLShiftLeftB32, SMovB32, SMovB64, SMulI32, SSubBU32, SSubU32, \
     VAddCCOU32, VAddCOU32, VAddI32, VAddLShiftLeftU32, VAddU32, VAndB32, VBfiB32, \
     VCmpEQU32, VCmpGtU32, VCmpLtU32, VCmpXNeU32, VCndMaskB32, VLShiftLeftB32, \
-    VMadI32I24, VMovB32, VMulLOU32, VSubI32, VSubU32
+    VMadI32I24, VMovB32, VMulLOU32, VSubI32, VSubU32, VLShiftLeftB64, \
+    SCmpEQU32, SBranch, SCBranchSCC1
+from rocisa.functions import vectorMultiply64Bpe
 
 from .Common import INDEX_CHARS, DataDirection, log2
 
@@ -564,7 +566,7 @@ class AddrCalculation:
         return module
 
     # TODO - mask should be part of AddrCalc state not passed as parm
-    def emitAddressSetupCode(self, kernel, tPB, ss, tmpVgpr, tmpS01, edge, beta, atomic, elementIdx, addrVgpr):
+    def emitAddressSetupCode(self, kernel, ss, tc, tmpVgpr, tmpS01, edge, beta, atomic, elementIdx, addrVgpr):
         """
         Generate code to set up the address vgpr
         Input:
@@ -579,10 +581,13 @@ class AddrCalculation:
         kw = self.kernelWriter
 
         updateCoord1 = (edge or len(kernel["PackedC1IndicesX"]) > 1)
-        module.add(self.emitAddressCoordIncrement(kernel, ss, tmpVgpr, tmpS01, updateCoord1))
+        if tc == 'C':
+            module.add(self.emitAddressCoordIncrement(kernel, ss, tmpVgpr, tmpS01, updateCoord1))
+            if not kernel["BufferStore"] and not beta: # Skip extra code for C if no beta
+              return module
 
         # calculate flat load offset
-        if not kernel["BufferStore"]:
+        if not kernel["BufferStore"] and (tc == 'D' or (tc == 'C' and beta)):
             # flat: in-bounds exec mask
             # global offset macro (requires 3 tmpVgpr)
             # final address = C + index*bytes
@@ -595,8 +600,24 @@ class AddrCalculation:
                 else: # just a group index
                     params.append("sgprWorkGroup%u"%i)
             params.append("%s" % (tmpVgpr+2))
-            module.add(MacroInstruction(name="GLOBAL_OFFSET_C", args=params))
-            module.add(vectorMultiply64Bpe(addrVgpr, addrVgpr, tPB["bpeGR"]))
+            module.add(MacroInstruction(name="GLOBAL_OFFSET_%s"%tc, args=params))
+            src0 = log2(kw.states.bpeCexternal) if tc == 'C' else sgpr("GSULog2Bpe%s"%tc)
+            #if tc == 'D':
+            #    gsuLabel = Label(label=kw.labels.getNameInc("GSU_DADDR"), comment="")
+            #    gsuLabelEnd = Label(label=kw.labels.getNameInc("GSU_DADDR_END"), comment="")
+            #    module.add(SAndB32(dst=sgpr(tmpS01), src0=sgpr("GSU"), src1=hex(0x3FFF), comment="Restore GSU"))
+            #    module.add(SCmpEQU32(src0=sgpr(tmpS01), src1=1, comment="GSU == 1 ?"))
+            #    module.add(SCBranchSCC1(labelName=gsuLabelEnd.getLabelName(), comment="branch if GSU == 1"))
+            #    module.add(gsuLabel)
+            #    # GSU>1 case, use bpeCinternal
+            #    src0 = log2(kw.states.bpeCinternal)
+            #    module.add(VLShiftLeftB64(dst=vgpr(addrVgpr, 2), shiftHex=src0, src=vgpr(addrVgpr,2), comment=""))
+            #    module.add(SBranch(labelName=gsuLabel.getLabelName(), comment="branch to GSU_DADDR_END"))
+            ## C or D+GSU=1, use bpeCexternal
+            #src0 = log2(kw.states.bpeCexternal)
+            module.add(VLShiftLeftB64(dst=vgpr(addrVgpr, 2), shiftHex=src0, src=vgpr(addrVgpr,2), comment=""))
+            #if tc == 'D':
+            #    module.add(gsuLabelEnd)
             module.add(VMovB32(dst=vgpr(tmpVgpr+2), src=vgpr(addrVgpr+0), comment="temp store offset 0"))
             module.add(VMovB32(dst=vgpr(tmpVgpr+3), src=vgpr(addrVgpr+1), comment="temp store offset 1"))
 
@@ -777,9 +798,9 @@ class AddrCalculation:
             else:
                 # store a copy of the offset in 2 of the tmpVgpr for D
                 module.add(VAddCOU32(dst=vgpr(addrVgpr+0), dst1=VCC(), src0=vgpr(BufAddr+0), src1=vgpr(tmpVgpr+2), \
-                            comment="addrVgpr = C(D) + index*bytes (lo)" ))
+                            comment="addrVgpr = %s + index*bytes (lo)"%tc ))
                 module.add(VAddCCOU32(dst=vgpr(addrVgpr+1), dst1=VCC(), src0=vgpr(BufAddr+1), src1=vgpr(tmpVgpr+3), \
-                            src2=VCC(), comment="addrVgpr = C(D) + index*bytes (hi)"))
+                            src2=VCC(), comment="addrVgpr = %s + index*bytes (hi)"%tc))
         return module
 
     @staticmethod

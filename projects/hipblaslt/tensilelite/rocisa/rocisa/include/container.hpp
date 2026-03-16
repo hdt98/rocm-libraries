@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2025 Advanced Micro Devices, Inc.
+ * Copyright (C) 2025-2026 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -107,6 +107,7 @@ namespace rocisa
                       bool       slc      = false,
                       bool       dlc      = false,
                       CacheScope scope    = CacheScope::SCOPE_NONE,
+                      bool       nt       = false,
                       bool       lds      = false,
                       bool       isStore  = false)
             : Container()
@@ -115,6 +116,7 @@ namespace rocisa
             , slc(slc)
             , dlc(dlc)
             , scope(scope)
+            , nt(nt)
             , lds(lds)
             , isStore(isStore)
         {
@@ -127,6 +129,7 @@ namespace rocisa
             , slc(other.slc)
             , dlc(other.dlc)
             , scope(other.scope)
+            , nt(other.nt)
             , lds(other.lds)
             , isStore(other.isStore)
         {
@@ -141,6 +144,7 @@ namespace rocisa
         {
             auto        hasDLCModifier   = rocIsa::getInstance().getAsmCaps()["HasDLCModifier"];
             auto        hasSCOPEModifier = rocIsa::getInstance().getAsmCaps()["HasSCOPEModifier"];
+            auto        hasNTModifier    = rocIsa::getInstance().getAsmCaps()["HasNTModifier"];
             std::string kStr;
             if(offset12 != 0)
             {
@@ -162,6 +166,10 @@ namespace rocisa
             {
                 kStr += " scope:" + ::rocisa::toString(scope);
             }
+            if(hasNTModifier && nt)
+            {
+                kStr += " nt";
+            }
             if(lds)
             {
                 kStr += " lds";
@@ -174,6 +182,7 @@ namespace rocisa
         bool       slc;
         bool       dlc;
         CacheScope scope;
+        bool       nt;
         bool       lds;
         bool       isStore;
     };

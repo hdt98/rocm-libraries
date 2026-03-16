@@ -180,6 +180,7 @@ BenchmarkProblems:
         - SourceSwap: [1]
         - NumElementsPerBatchStore: [0]
         - StorePriorityOpt: [0]
+        - BufferStore: [0,1]
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:

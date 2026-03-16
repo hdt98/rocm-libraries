@@ -120,8 +120,14 @@ class GSU(Component):
                     module.add(SAddU32(dst=sgpr(tmpSgpr0), src0=sgpr(tmpSgpr0), src1=sgpr(tmpSgpr2), comment="Free%u" % i))
                     module.add(SAddCU32(dst=sgpr(tmpSgpr1), src0=sgpr(tmpSgpr1), src1=sgpr(tmpSgpr3), comment="Free%u" % i))
                 module.add(SLShiftLeftB64(dst=sgpr(tmpSgprX2,2), src=sgpr(tmpSgprX2,2), shiftHex=log2(writer.states.bpeCinternal), comment="scale by bpe"))
-                module.add(SAddU32(dst=sgpr("SrdD+0"), src0=sgpr("SrdD+0"), src1=sgpr(tmpSgprX2), comment="add lo GSU offset to SRD"))
-                module.add(SAddCU32(dst=sgpr("SrdD+1"), src0=sgpr("SrdD+1"), src1=sgpr(tmpSgpr1), comment="add hi GSU offset to SRD"))
+                if kernel["BufferStore"]:
+                    module.add(SAddU32(dst=sgpr("SrdD+0"), src0=sgpr("SrdD+0"), src1=sgpr(tmpSgprX2), comment="add lo GSU offset to SRD"))
+                    module.add(SAddCU32(dst=sgpr("SrdD+1"), src0=sgpr("SrdD+1"), src1=sgpr(tmpSgpr1), comment="add hi GSU offset to SRD"))
+                else:
+                    module.add(SAddU32(dst=sgpr(tmpSgprX2), src0=sgpr("AddressD+0"), src1=sgpr(tmpSgprX2), comment="add lo to SRD"))
+                    module.add(SAddCU32(dst=sgpr(tmpSgpr1), src0=sgpr("AddressD+1"), src1=sgpr(tmpSgpr1), comment="add hi to SRD"))
+                    module.add(VMovB32(dst=vgpr(writer.vgprs.addrD+0), src=sgpr(tmpSgprX2), comment="sgpr -> vgpr"))
+                    module.add(VMovB32(dst=vgpr(writer.vgprs.addrD+1), src=sgpr(tmpSgpr1), comment="sgpr -> vgpr"))
             module.add(gsuLabel)
 
         return module

@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -409,7 +409,7 @@ class GlobalWriteBatchWriter:
       vc0 = element[3]
       sumIdxGSUSYNC = self.ss.elementSumIdx[elementIdx]
 
-      module.add(addrCalc.emitAddressSetupCode(self.kernel, self.tPB, self.ss, self.tmpVgpr, self.tmpS01, self.edge, self.beta, self.atomic, elementIdx, addrDVgpr))
+      module.add(addrCalc.emitAddressSetupCode(self.kernel, self.ss, 'C', self.tmpVgpr, self.tmpS01, self.edge, self.beta, self.atomic, elementIdx, addrDVgpr))
 
       if self.edge:
         module.add(addrCalc.edgeProtectCode(self.kernel, self.edge, self.beta, self.atomic, mask, self.tmpSgpr))
@@ -426,6 +426,13 @@ class GlobalWriteBatchWriter:
           loadedDataBeta[dataBeta] = ceil(self.kernel["ProblemType"]["DestDataType"].numBytes() * self.ss.cfg.gwvw / 16)
           self.loadsBetaIssued += ceil(self.kernel["ProblemType"]["DestDataType"].numBytes() * self.gwvw / 16)
       self.betaLoadIssued.append(len(loadedDataBeta) * ceil(self.kernel["ProblemType"]["DestDataType"].numBytes() * self.ss.cfg.gwvw / 16))
+
+      if not self.kernel["BufferStore"]:
+        module.add(addrCalc.emitAddressSetupCode(self.kernel, self.ss, 'D', self.tmpVgpr, self.tmpS01, self.edge, self.beta, self.atomic, elementIdx, addrDVgpr))
+        if self.edge:
+          module.add(addrCalc.edgeProtectCode(self.kernel, self.edge, self.beta, self.atomic, mask, self.tmpSgpr))
+          if self.kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel":
+            module.addComment1("edge Protect")
 
       if (self.kernel["ProblemType"]["UseE"] and self.kernel["ProblemType"]["Gradient"] and self.kernel["ProblemType"]["ActivationType"] != 'none') and ((self.kernel["GlobalSplitU"] == 1 or self.kernel["GlobalSplitU"] == -1) or self.kernel["StreamK"] > 0):
         module.add(addrCalc.emitLdChange(self.kernel, self.ss, 'E', self.edge, self.beta, mask, bufferOOB, (elementIdx == 0), self.tmpVgpr, self.tmpSgpr, addrEVgpr, self.addrE, 0))
@@ -552,12 +559,11 @@ class GlobalWriteBatchWriter:
         module.add(self._applyAlpha(self.kernel, self.gwvw, self.ss.elementSumIdx, elementIdx, self.tmpS01))
 
       if not self.kernel["BufferStore"]:
-        offsetSrc = (self.tmpVgpr + 2) if self.beta else addrDVgpr
-
-        module.add(VAddCOU32(vgpr(addrDVgpr+0), VCC(), vgpr(self.addrD+0), \
-            vgpr(offsetSrc+0), "addrDVgpr = D + index*bytes (lo)"))
-        module.add(VAddCCOU32(vgpr(addrDVgpr+1), VCC(), vgpr(self.addrD+1), \
-            vgpr(offsetSrc+1), VCC(), "addrDVgpr = D + index*bytes (hi)"))
+        #offsetSrc = (self.tmpVgpr + 2) if self.beta else addrDVgpr
+        #module.add(VAddCOU32(vgpr(addrDVgpr+0), VCC(), vgpr(self.addrD+0), \
+        #    vgpr(offsetSrc+0), "addrDVgpr = D + index*bytes (lo)"))
+        #module.add(VAddCCOU32(vgpr(addrDVgpr+1), VCC(), vgpr(self.addrD+1), \
+        #    vgpr(offsetSrc+1), VCC(), "addrDVgpr = D + index*bytes (hi)"))
 
         # restore full exec mask for calculating addr of next element
         if self.edge and (self.beta or self.loadE or self.atomic):

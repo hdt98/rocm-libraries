@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2025 Advanced Micro Devices, Inc.
+ * Copyright (C) 2025-2026 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -1523,6 +1523,48 @@ namespace rocisa
         }
     };
 
+    struct FlatStoreD16HIB8 : public FLATStoreInstruction
+    {
+        FlatStoreD16HIB8(const std::shared_ptr<RegisterContainer>& vaddr,
+                         const std::shared_ptr<RegisterContainer>& src,
+                         std::optional<FLATModifiers>              flat    = std::nullopt,
+                         const std::string&                        comment = "")
+            : FLATStoreInstruction(InstType::INST_D16_HI_B8, vaddr, src, flat, comment)
+        {
+        }
+
+        FlatStoreD16HIB8(const FlatStoreD16HIB8& other)
+            : FLATStoreInstruction(other)
+        {
+        }
+
+        std::shared_ptr<Item> clone() const override
+        {
+            return std::make_shared<FlatStoreD16HIB8>(*this);
+        }
+    };
+
+    struct FlatStoreB8 : public FLATStoreInstruction
+    {
+        FlatStoreB8(const std::shared_ptr<RegisterContainer>& vaddr,
+                    const std::shared_ptr<RegisterContainer>& src,
+                    std::optional<FLATModifiers>              flat    = std::nullopt,
+                    const std::string&                        comment = "")
+            : FLATStoreInstruction(InstType::INST_B8, vaddr, src, flat, comment)
+        {
+        }
+
+        FlatStoreB8(const FlatStoreB8& other)
+            : FLATStoreInstruction(other)
+        {
+        }
+
+        std::shared_ptr<Item> clone() const override
+        {
+            return std::make_shared<FlatStoreB8>(*this);
+        }
+    };
+
     struct FlatStoreD16HIB16 : public FLATStoreInstruction
     {
         FlatStoreD16HIB16(const std::shared_ptr<RegisterContainer>& vaddr,
@@ -1550,7 +1592,7 @@ namespace rocisa
                         const std::shared_ptr<RegisterContainer>& src,
                         std::optional<FLATModifiers>              flat    = std::nullopt,
                         const std::string&                        comment = "")
-            : FLATStoreInstruction(InstType::INST_D16_B16, vaddr, src, flat, comment)
+            : FLATStoreInstruction(InstType::INST_B16, vaddr, src, flat, comment)
         {
         }
 

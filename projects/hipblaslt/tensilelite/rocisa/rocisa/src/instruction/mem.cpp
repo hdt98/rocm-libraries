@@ -851,13 +851,39 @@ void mem_inst(nb::module_ m_mem)
             return new rocisa::BufferAtomicCmpswapB64(self);
         });
 
+    nb::class_<rocisa::FlatStoreD16HIB8, rocisa::FLATStoreInstruction>(m_mem, "FlatStoreD16HIB8")
+        .def(nb::init<const std::shared_ptr<rocisa::RegisterContainer>&,
+                      const std::shared_ptr<rocisa::RegisterContainer>&,
+                      std::optional<rocisa::FLATModifiers>,
+                      const std::string&>(),
+             nb::arg("vaddr"),
+             nb::arg("src"),
+             nb::arg("flat")    = std::nullopt,
+             nb::arg("comment") = "")
+        .def("__deepcopy__", [](const rocisa::FlatStoreD16HIB8& self, const nb::dict&) {
+            return new rocisa::FlatStoreD16HIB8(self);
+        });
+
+    nb::class_<rocisa::FlatStoreB8, rocisa::FLATStoreInstruction>(m_mem, "FlatStoreB8")
+        .def(nb::init<const std::shared_ptr<rocisa::RegisterContainer>&,
+                      const std::shared_ptr<rocisa::RegisterContainer>&,
+                      std::optional<rocisa::FLATModifiers>,
+                      const std::string&>(),
+             nb::arg("vaddr"),
+             nb::arg("src"),
+             nb::arg("flat")    = std::nullopt,
+             nb::arg("comment") = "")
+        .def("__deepcopy__", [](const rocisa::FlatStoreB8& self, const nb::dict&) {
+            return new rocisa::FlatStoreB8(self);
+        });
+
     nb::class_<rocisa::FlatStoreD16HIB16, rocisa::FLATStoreInstruction>(m_mem, "FlatStoreD16HIB16")
         .def(nb::init<const std::shared_ptr<rocisa::RegisterContainer>&,
                       const std::shared_ptr<rocisa::RegisterContainer>&,
                       std::optional<rocisa::FLATModifiers>,
                       const std::string&>(),
-             nb::arg("src"),
              nb::arg("vaddr"),
+             nb::arg("src"),
              nb::arg("flat")    = std::nullopt,
              nb::arg("comment") = "")
         .def("__deepcopy__", [](const rocisa::FlatStoreD16HIB16& self, const nb::dict&) {
@@ -869,8 +895,8 @@ void mem_inst(nb::module_ m_mem)
                       const std::shared_ptr<rocisa::RegisterContainer>&,
                       std::optional<rocisa::FLATModifiers>,
                       const std::string&>(),
-             nb::arg("src"),
              nb::arg("vaddr"),
+             nb::arg("src"),
              nb::arg("flat")    = std::nullopt,
              nb::arg("comment") = "")
         .def("__deepcopy__", [](const rocisa::FlatStoreD16B16& self, const nb::dict&) {
@@ -882,8 +908,8 @@ void mem_inst(nb::module_ m_mem)
                       const std::shared_ptr<rocisa::RegisterContainer>&,
                       std::optional<rocisa::FLATModifiers>,
                       const std::string&>(),
-             nb::arg("src"),
              nb::arg("vaddr"),
+             nb::arg("src"),
              nb::arg("flat")    = std::nullopt,
              nb::arg("comment") = "")
         .def("__deepcopy__", [](const rocisa::FlatStoreB32& self, const nb::dict&) {
@@ -895,8 +921,8 @@ void mem_inst(nb::module_ m_mem)
                       const std::shared_ptr<rocisa::RegisterContainer>&,
                       std::optional<rocisa::FLATModifiers>,
                       const std::string&>(),
-             nb::arg("src"),
              nb::arg("vaddr"),
+             nb::arg("src"),
              nb::arg("flat")    = std::nullopt,
              nb::arg("comment") = "")
         .def("__deepcopy__", [](const rocisa::FlatStoreB64& self, const nb::dict&) {
@@ -908,8 +934,8 @@ void mem_inst(nb::module_ m_mem)
                       const std::shared_ptr<rocisa::RegisterContainer>&,
                       std::optional<rocisa::FLATModifiers>,
                       const std::string&>(),
-             nb::arg("src"),
              nb::arg("vaddr"),
+             nb::arg("src"),
              nb::arg("flat")    = std::nullopt,
              nb::arg("comment") = "")
         .def("__deepcopy__", [](const rocisa::FlatStoreB128& self, const nb::dict&) {

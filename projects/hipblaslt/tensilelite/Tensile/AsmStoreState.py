@@ -72,13 +72,16 @@ class StoreState:
         def __init__(self, kernelWriter, kernel, ss, gwvw, edge, beta, atomic, isWorkspace=False):
             self.gwvw = gwvw
             self.lsu = kernel["LocalSplitU"]
+            # Workaround: always use BufferStore for WS
+            # TODO: enable BufferStore0 for WS
+            BufferStore = kernel["BufferStore"] or isWorkspace
 
             if ss.optSingleColVgpr:
                 # use one vgpr (allocated in ss.sharedColDVgprs) for all addressing
                 # - need 0 additional vgpr per element.
                 self.numVgprsPerAddr = 0
             else:
-                self.numVgprsPerAddr = kernelWriter.states.rpgo if kernel["BufferStore"] else kernelWriter.states.rpga
+                self.numVgprsPerAddr = kernelWriter.states.rpgo if BufferStore else kernelWriter.states.rpga
 
             if ss.optSGPRUsage == 'BufferLoad_Mask':
                 self.numMaskSgprPerElement = 0
@@ -112,7 +115,7 @@ class StoreState:
 
             if atomic:
                 # flat atomics have another VGPR to allow different data for return#
-                regsPerElement = 2 if kernel["BufferStore"] else (3 + 1) # + 1 for alignment
+                regsPerElement = 2 if BufferStore else (3 + 1) # + 1 for alignment
                 # The atomic loop processes multiple elements in single instruction
                 # so will use VGPR from consec elements? TODO
                 self.numVgprsPerDataPerVI = (1.0 * regsPerElement * bpeC) / kernelWriter.states.bpr
@@ -181,7 +184,8 @@ class StoreState:
         # the address for each load.  Memops in same row can use offsets
         # and share a base register but Memops in different rows need
         # different registers or need to inteligently reset the SRD.
-        if kernel["BufferStore"] and not edge and not atomic:
+        BufferStore = kernel["BufferStore"] or isWorkspace
+        if BufferStore and not edge and not atomic:
             if len(kernel["PackedC0IndicesX"]) > 1:
                 # packed mode needs a unique VGPR address calc for each column.
                 self.optSharedColVgpr = 1
@@ -202,7 +206,7 @@ class StoreState:
             self.optSharedColVgpr = 0# BOZO, hack to disable this
 
         self.optSGPRUsage = None
-        if kernel["BufferStore"] and (not atomic):
+        if BufferStore and (not atomic):
             self.optSGPRUsage = 'BufferLoad_Edge_Mask' if edge else 'BufferLoad_Mask'
 
         # can't have both of these enabled:

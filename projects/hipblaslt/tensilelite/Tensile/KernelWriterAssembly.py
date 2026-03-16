@@ -30,7 +30,7 @@ from rocisa.code import KernelBody, Label, Macro, Module, RegSet, SrdUpperValue,
 from rocisa.container import DSModifiers, SDWAModifiers, VOP3PModifiers, \
                       MUBUFModifiers, SMEMModifiers, EXEC, VCC, RegisterContainer, \
                       DPPModifiers, vgpr, sgpr, accvgpr, mgpr, ContinuousRegister, \
-                      HWRegContainer, GLOBALModifiers
+                      HWRegContainer, GLOBALModifiers, FLATModifiers
 from rocisa.instruction import SGetPositivePCOffset, SLongBranchPositive, SCLongBranchScc0, SCLongBranchScc1, SCLongBranchVccnz, \
                         SMulInt64to32, VCvtBF16toFP32
 from rocisa.functions import vectorStaticDivide, vectorStaticRemainder, vectorUInt32CeilDivideAndRemainder, \
@@ -47,7 +47,8 @@ from rocisa.instruction import BranchInstruction, BufferLoadB128, BufferLoadB32,
   BufferStoreB8, BufferStoreD16HIB16, CommonInstruction, DSBPermuteB32, DSLoadB128, \
   DSLoadB16, DSLoadB32, DSLoadB64, DSLoadU16, DSStoreB128, DSStoreB16, DSStoreB32, \
   DSStoreB64, DSStoreB8, DSStoreInstruction, FlatLoadB128, FlatLoadB32, FlatLoadB64, \
-  FlatLoadD16B16, FlatLoadD16HIB16, FlatStoreB128, FlatStoreB32, FlatStoreB64, \
+  FlatLoadD16B16, FlatLoadD16HIB16, FlatLoadD16U8, FlatLoadD16HIU8, \
+  FlatStoreB128, FlatStoreB32, FlatStoreB64, FlatStoreB8, FlatStoreD16HIB8, \
   FlatStoreD16B16, FlatStoreD16HIB16, MFMAInstruction, MXMFMAInstruction, MUBUFReadInstruction, \
   MacroInstruction, SAShiftRightI32, SAbsI32, SAddCU32, SAddI32, SAddU32, SAndB32, \
   SAndB64, SAndN2B32, SAtomicDec, SBarrier, SBfmB32, SBitcmp1B32, SBranch, SCBranchSCC0, \
@@ -1356,6 +1357,7 @@ class KernelWriterAssembly(KernelWriter):
     # Flat addressing modes expect the GLOBAL_OFFSET to initialize a full 64-bit address
 
     GOList =  [ \
+        ("D", list(range(0, kernel["ProblemType"]["NumIndicesC"])), kernel["BufferStore"], None, False), \
         ("C", list(range(0, kernel["ProblemType"]["NumIndicesC"])), kernel["BufferStore"], None, False), \
         ("A", kernel["ProblemType"]["IndexAssignmentsA"], kernel["BufferLoad"], tPA, False), \
         ("B", kernel["ProblemType"]["IndexAssignmentsB"], kernel["BufferLoad"], tPB, False) ]
@@ -1373,7 +1375,7 @@ class KernelWriterAssembly(KernelWriter):
     for (tc, indices, justOffset32, tP, isSwizzled) in GOList:
 
       # BufferStore does not use this macro so don't generate it:
-      if tc == "C" and kernel["BufferStore"]:
+      if kernel["BufferStore"] and (tc == "C" or tc == "D"):
         continue
 
       # function name and comment
@@ -1389,7 +1391,7 @@ class KernelWriterAssembly(KernelWriter):
       mirrorSumDims = []
       macroArgs = []
       for i in range(0, numDim):
-        if tc == 'C':
+        if tc == 'C' or tc == 'D':
           useInitialStrides = kernel["ProblemType"]["UseInitialStridesCD"]
           idxChar = self.states.indexChars[i]
         else:
@@ -1398,8 +1400,8 @@ class KernelWriterAssembly(KernelWriter):
 
         # tile index or unroll vgpr or summation
         # other summation (other than unroll) are included in the GLOBAL_OFFSET macro but not used in address calc
-        if     tc in ('A','C') and indices[i] == kernel["ProblemType"]["Index0"] \
-            or tc in ('B','C', "Metadata") and indices[i] == kernel["ProblemType"]["Index1"] \
+        if     tc in ('A','C','D') and indices[i] == kernel["ProblemType"]["Index0"] \
+            or tc in ('B','C','D', "Metadata") and indices[i] == kernel["ProblemType"]["Index1"] \
             or indices[i] == kernel["ProblemType"]["IndexUnroll"]:
           macroArgs.append("vgprOffset%s:req" % idxChars[i])
           calcDims.append(i)
@@ -11536,6 +11538,7 @@ class KernelWriterAssembly(KernelWriter):
 
   def globalWriteWorkGroupInit(self, kernel):
     module = Module("globalWriteWorkGroupInit")
+    bpeDoneLabel = Label(label=self.labels.getNameInc("BPEDone"), comment="")
     if kernel["BufferStore"]:
       module.add(self.allocPostLoopSrd("D"))
       module.add(self.allocPostLoopSrd("C"))
@@ -11548,8 +11551,6 @@ class KernelWriterAssembly(KernelWriter):
 
         module.add(SMovB32(dst=sgpr(sgprLog2BpeC), src=log2(self.states.bpeCexternalGSU1)))
         module.add(SMovB32(dst=sgpr(sgprLog2BpeD), src=log2(self.states.bpeCexternalGSU1)))
-
-        bpeDoneLabel = Label(label=self.labels.getNameInc("BPEDone"), comment="")
 
         module.add(SCmpEQU64(src0=sgpr("AddressFlags", 2), src1=hex(0), comment="Check for synchronizer"))
         module.add(SCBranchSCC0(labelName=bpeDoneLabel.getLabelName(), comment="If synchronizer, use regular output BPE"))
@@ -11572,6 +11573,18 @@ class KernelWriterAssembly(KernelWriter):
       if kernel["StreamK"] == 3:
         self.sgprPool.checkIn(sgprLog2BpeD)
         self.sgprPool.checkIn(sgprLog2BpeC)
+    else:
+      if kernel["StreamK"] == 3:
+        # BS0 + SK3 case, we still need GSULog2BpeD for BS0 store
+        sgprLog2BpeD = "GSULog2BpeD"
+        module.add(SMovB32(dst=sgpr(sgprLog2BpeD), src=log2(self.states.bpeCexternalGSU1)))
+        module.add(SCmpEQU64(src0=sgpr("AddressFlags", 2), src1=hex(0), comment="Check for synchronizer"))
+        module.add(SCBranchSCC0(labelName=bpeDoneLabel.getLabelName(), comment="If synchronizer, use regular output BPE"))
+        module.add(SCmpEQU32(src0=sgpr("skTiles"), src1=1, comment="split == 1 ?"))
+        module.add(SCBranchSCC1(labelName=bpeDoneLabel.getLabelName(), comment="If split == 1, use reguler output BPE"))
+        # BPE for parallel reduction
+        module.add(SMovB32(dst=sgpr(sgprLog2BpeD), src=log2(self.states.bpeCinternal)))
+        module.add(bpeDoneLabel)
     return module
 
   ##############################################################################
@@ -11629,16 +11642,16 @@ class KernelWriterAssembly(KernelWriter):
     self.vgprPool.checkIn(self.vgprs.coord0InMT)
     self.vgprPool.checkIn(self.vgprs.coord1InMT)
 
+    self.vgprs.addrE    = -1
+    self.vgprs.addrBias = -1
+    self.vgprs.addrScaleAVec = -1
+    self.vgprs.addrScaleBVec = -1
+    self.vgprs.addrScaleAlphaVec = -1
     if kernel["BufferStore"]:
       #print "----AddressC-LocalSplitU"
       #print self.vgprPool.state()
-      self.vgprs.addrE    = -1
       self.vgprs.addrD    = -1
       self.vgprs.addrC    = -1
-      self.vgprs.addrBias = -1
-      self.vgprs.addrScaleAVec = -1
-      self.vgprs.addrScaleBVec = -1
-      self.vgprs.addrScaleAlphaVec = -1
     else:
       self.vgprs.addrD = self.vgprPool.checkOut(2)
       module.add(VMovB32(
@@ -11716,6 +11729,8 @@ class KernelWriterAssembly(KernelWriter):
             comment="sgpr -> vgpr"))
       if kernel["GlobalSplitU"] != 0:
         module.add(gsuLabel)
+        gsuComponent = Component.GSU.find(self)
+        module.add(gsuComponent.computeStoreSrdStart(self, kernel))
 
     return module
 
@@ -11745,16 +11760,16 @@ class KernelWriterAssembly(KernelWriter):
                                         tid0Scale = kernel["VectorWidthA"],
                                         tid1Scale = kernel["VectorWidthB"]))
 
+    self.vgprs.addrE    = -1
+    self.vgprs.addrBias = -1
+    self.vgprs.addrScaleAVec = -1
+    self.vgprs.addrScaleBVec = -1
+    self.vgprs.addrScaleAlphaVec = -1
     if kernel["BufferStore"]:
       #print "----AddressC-nonLSU-----"
       #print self.vgprPool.state()
-      self.vgprs.addrE    = -1
       self.vgprs.addrD    = -1
       self.vgprs.addrC    = -1
-      self.vgprs.addrBias = -1
-      self.vgprs.addrScaleAVec = -1
-      self.vgprs.addrScaleBVec = -1
-      self.vgprs.addrScaleAlphaVec = -1
     else:
       self.vgprs.addrD = self.vgprPool.checkOut(2, 'addrD')
       module.add(VMovB32(
@@ -11832,6 +11847,8 @@ class KernelWriterAssembly(KernelWriter):
             comment="sgpr -> vgpr"))
       if kernel["GlobalSplitU"] != 0:
         module.add(gsuLabel)
+        gsuComponent = Component.GSU.find(self)
+        module.add(gsuComponent.computeStoreSrdStart(self, kernel))
     return module
 
   ##############################################################################
@@ -13107,8 +13124,6 @@ class KernelWriterAssembly(KernelWriter):
       # BufferOOB
       if (kernel["_GlobalAccumulation"] == "MultipleBufferSingleKernel") or kernel["BufferStore"]:
         numTmpVgpr += 1
-      else:
-        numTmpVgpr = None
       # dot2: for WaveSplitK reduction
       if kernel["NumWaveSplitK"] > 1:
         numTmpVgpr += 1
@@ -13578,7 +13593,7 @@ class KernelWriterAssembly(KernelWriter):
       edgeModule.add(actLoopEndLabel)
 
     if len(factorDims) == 1:
-      if currentInstLength >= 16384:
+      if currentInstLength >= 16384 or (currentInstLength >= 16384//2 and not kernel["BufferStore"]): # tentative: enable long jump in BS0 case
         with self.allocTmpSgpr(3) as tmpSgprInfo:
           edgeModule.add(SLongBranchPositive(endLabel, tmpSgprInfo, comment="jump to end"))
       else:
@@ -13730,7 +13745,11 @@ class KernelWriterAssembly(KernelWriter):
         return GlobalLoadTR16B128(dst=vgpr(destVgpr, rpv), vaddr=addr0, saddr=addr1, modifier=modifier, comment=comment)
     else:
       flat = FLATModifiers(glc=glc, slc=slc, lds=lds)
-      if bpl==2 and hi16:
+      if bpl==1 and hi16:
+        return FlatLoadD16HIU8(dst=vgpr(destVgpr, rpv*4), vaddr=addr0, flat=flat, comment=comment)
+      elif bpl==1 and not hi16:
+        return FlatLoadD16U8(dst=vgpr(destVgpr, rpv*4), vaddr=addr0, flat=flat, comment=comment)
+      elif bpl==2 and hi16:
         return FlatLoadD16HIB16(dst=vgpr(destVgpr, rpv*2), vaddr=addr0, flat=flat, comment=comment)
       elif bpl==2 and not hi16:
         return FlatLoadD16B16(dst=vgpr(destVgpr, rpv*2), vaddr=addr0, flat=flat, comment=comment)
@@ -13741,7 +13760,7 @@ class KernelWriterAssembly(KernelWriter):
       elif bpl==16:
         return FlatLoadB128(dst=vgpr(destVgpr, rpv), vaddr=addr0, flat=flat, comment=comment)
       else:
-        assert 0, "chooseGlobalRead: bad bpl"
+        assert 0, "chooseGlobalRead: bad bpl %d"%bpl
 
   ##############################################################################
   def chooseGlobalWrite(self, useBuffer, bps, srcVgpr, rpv, \
@@ -13796,7 +13815,7 @@ class KernelWriterAssembly(KernelWriter):
           module.add(BufferStoreB128(src=vgpr(vgprOff, shiftRpv), vaddr=addr0, \
                 saddr=addr1, soffset=tmpSgpr, mubuf=mubuf2, comment=comment))
       else:
-        assert 0, "bad bps"
+        assert 0, "bad bps: %d"%bps
 
     if useBuffer:
       mubuf = MUBUFModifiers(offen=True, offset12=offset, glc=glc, slc=slc, dlc=dlc, scope=scope, nt=nt, isStore=True)
@@ -13816,8 +13835,12 @@ class KernelWriterAssembly(KernelWriter):
         bufferStoreImpl(soffset, mubuf)
 
     else:
-      flat = FLATModifiers(glc=glc, slc=slc, dlc=dlc, scope=scope, isStore=True)
-      if bps==2 and hi16:
+      flat = FLATModifiers(glc=glc, slc=slc, dlc=dlc, scope=scope, nt=nt, isStore=True)
+      if bps==1 and hi16:
+        module.add(FlatStoreD16HIB8(vaddr=addr0, src=vgpr(srcVgpr*4), flat=flat, comment=comment))
+      elif bps==1 and not hi16:
+        module.add(FlatStoreB8(vaddr=addr0, src=vgpr(srcVgpr, rpv*4), flat=flat, comment=comment))
+      elif bps==2 and hi16:
         module.add(FlatStoreD16HIB16(vaddr=addr0, src=vgpr(srcVgpr*2), flat=flat, comment=comment))
       elif bps==2 and not hi16:
         module.add(FlatStoreD16B16(vaddr=addr0, src=vgpr(srcVgpr, rpv*2), flat=flat, comment=comment))
@@ -13827,8 +13850,20 @@ class KernelWriterAssembly(KernelWriter):
         module.add(FlatStoreB64(vaddr=addr0, src=vgpr(srcVgpr, rpv), flat=flat, comment=comment))
       elif bps==16:
         module.add(FlatStoreB128(vaddr=addr0, src=vgpr(srcVgpr, rpv), flat=flat, comment=comment))
+      elif bps >= 32 and bps % 32 == 0:
+        # split into several dwordx4 loads. Offset the next by +0.5 bps
+        rounds = bps // 16
+        shiftByte = bps // rounds
+        shiftRpv = rpv // rounds
+        module.add(FlatStoreB128(vaddr=addr0, src=vgpr(srcVgpr, shiftRpv), flat=flat, comment=comment))
+        for i in range(1, rounds):
+          offset2 = offset+shiftByte*i
+          if offset2 >= 4096:
+            assert 0, "flat + offset2>=4096 not implemented yet"
+          flat2 = FLATModifiers(offset12=offset2, glc=glc, slc=slc, dlc=dlc, scope=scope, nt=nt, isStore=True)
+          module.add(FlatStoreB128(vaddr=addr0, src=vgpr(srcVgpr, shiftRpv), flat=flat2, comment=comment))
       else:
-         assert 0, "bad bps"
+        assert 0, "bad bps: %d"%bps
 
     return module
 
@@ -13993,7 +14028,7 @@ class KernelWriterAssembly(KernelWriter):
 
         bps = self.states.bpeCinternal * ss.cfg.gwvw
         rpv = self.states.bpeCinternal * ss.cfg.gwvw / self.states.bpr
-        if kernel["BufferStore"]:
+        if not self.states.bufferStore0ForSKWS:
           addr0 = vgpr(addrCalc.addrDVgpr)
           addr1 = sgpr("SrdWS", 4)
         else:
@@ -14032,7 +14067,9 @@ class KernelWriterAssembly(KernelWriter):
       else:
         printExit("Unsupported store tc %s"%tc)
 
-      useBuffer = kernel["BufferStore"]
+      # Workaround: always use BufferStore for WS
+      # TODO: enable BufferStore0 for WS
+      useBuffer = kernel["BufferStore"] or tc == 'WS'
       if dataType.isHalf() or dataType.isBFloat16():
         if not kernel["ProblemType"]["HighPrecisionAccumulate"]:
           # (H,H,H,H,H,H), internal H
@@ -14077,9 +14114,11 @@ class KernelWriterAssembly(KernelWriter):
   def readInput(self, kernel, ss, tc: str, dataType, addrCalc, vc0, data, gwvw, addr, tmpS01):
     module = Module("read%sInput"%tc)
     bps = dataType.numBytes() * gwvw
-    useBuffer = kernel["BufferStore"]
+    # workaround: always use BufferStore for WS
+    # TODO: enable non BufferStore for WS
+    useBuffer = kernel["BufferStore"] or tc == 'WS'
 
-    if kernel["BufferStore"]:
+    if useBuffer:
       addr0 = vgpr(addr)
       addr1 = sgpr("Srd%s"%tc, 4)
     else:

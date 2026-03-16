@@ -4115,6 +4115,9 @@ class Solution(collections.abc.Mapping):
     if state["ProblemType"]["UseBias"] != 0 and state["ProblemType"]["UseScaleAlphaVec"] != 0 and state["ProblemType"]["UseBias"] != state["ProblemType"]["UseScaleAlphaVec"]:
       reject(state, printRejectionReason, "When both UseBias and UseScaleAlphaVec are enabled then UseBias and UseScaleAlphaVec must have same settings.")
 
+    if state["ProblemType"]["UseScaleAlphaVec"] and not state["BufferStore"]:
+        reject(state, printRejectionReason, "UseScaleAlphaVec not support BufferStore=0 yet")
+
     # ScaleAB or ScaleABVec
     if state["ProblemType"]["DataTypeA"] != state["ProblemType"]["MacDataTypeA"] and \
       state["ProblemType"]["DataTypeB"] != state["ProblemType"]["MacDataTypeB"] and \
@@ -4142,6 +4145,8 @@ class Solution(collections.abc.Mapping):
         reject(state, printRejectionReason, "MultipleBufferSingleKernel not support BiasSrc not D yet")
       if state["ProblemType"]["MacDataTypeA"].isDouble():
         reject(state, printRejectionReason, "MultipleBufferSingleKernel not support " + str(state["ProblemType"]["MacDataTypeA"])  + " yet")
+      if not state["BufferStore"]:
+        reject(state, printRejectionReason, "MultipleBufferSingleKernel not support BufferStore=0 yet")
 
     #Need to force disabling PreloadKernArgs if compiler does not support
     #Can not just reject the solution since the user library may find any solutions

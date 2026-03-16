@@ -636,7 +636,7 @@ class StreamK(Component):
             tmpLocal = writer.sgprPool.checkOut(1, "SKMappingTemp")
             tmpSgpr = tmpLocal
 
-        assert kernel["BufferStore"]
+        #assert kernel["BufferStore"]
         module.addSpaceLine()
         module.add(SMulI32(dst=sgpr(tmpSgpr), src0=hex(kernel["MacroTile0"]*kernel["MacroTile1"]*writer.states.bpeCinternal), src1=sCtaIdx, comment="Offset to correct partials tile"))
         module.add(SAddU32(dst=sgpr("SrdWS+0"), src0=sgpr("SrdWS+0"), src1=sgpr(tmpSgpr), comment="add lo to SRD"))

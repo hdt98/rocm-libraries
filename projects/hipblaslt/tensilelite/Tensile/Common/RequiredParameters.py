@@ -39,6 +39,7 @@ def getRequiredParametersMin() -> set:
         'AssertFree0ElementMultiple',
         'AssertFree1ElementMultiple',
         'AssertSummationElementMultiple',
+        'BufferStore',
         'ClusterLocalRead',
         'ConvertAfterDS',
         'DirectToVgprA',

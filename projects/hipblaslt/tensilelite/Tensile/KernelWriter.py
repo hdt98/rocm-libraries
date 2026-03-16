@@ -337,6 +337,7 @@ class StateValues:
   doPackPreSchedulingNextLoop: bool      = False
   doFullPackCodePrefetch: bool           = False
   useCommonSgprSwap: bool                = False
+  bufferStore0ForSKWS: bool              = False
 
   # Epilogue states
   preloadScaleA = False
@@ -3757,9 +3758,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if kernel["PrefetchGlobalRead"]:
       if self.states.doShadowInit:
         module.add(self.openShadowInit())
-        # SrdD/SrdC are used starting now, remove from sgpr pool
-        self.removeSgprVarFromPool("SrdD")
-        self.removeSgprVarFromPool("SrdC")
+        if kernel["BufferStore"]:
+          # SrdD/SrdC are used starting now, remove from sgpr pool
+          self.removeSgprVarFromPool("SrdD")
+          self.removeSgprVarFromPool("SrdC")
         module.add(self.globalWriteWorkGroupInit(kernel))
         if self.states.doShadowInit == 2:
           module.add(self.initC(kernel)) # initC while waiting for global reads
@@ -4950,6 +4952,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
          kernel["StoreSwapAddr"] and not kernel["UseCustomMainLoopSchedule"]):
       self.states.useCommonSgprSwap = True
 
+    # BufferStore=0 (64bit address) for StreamK WS
+    # Workaround: always use BufferStore for SKWS
+    # TODO: enable BufferStore0 for SKWS
+    self.states.bufferStore0ForSKWS = False # not kernel["BufferStore"]
+
     # NamedTuple is immutable
     class intermediateTPValues(NamedTuple):
       numReadsTile: int = -1
@@ -5081,7 +5088,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # For Beta:
     # Rather than waiting for all loads to finish with s_waitcnt vmcnt(0), interleave
     # appropriate vmcnts into the stores so they issue as loads become available
-    self.states.interleaveStoreVmcnt = (not kernel["GroupLoadStore"]) and kernel["BufferStore"]
+    #self.states.interleaveStoreVmcnt = (not kernel["GroupLoadStore"]) and kernel["BufferStore"]
+    self.states.interleaveStoreVmcnt = (not kernel["GroupLoadStore"])
 
     # if >0, shift the start of the SRD left by specified #elements (not bytes)
     # Gives pointer shift some room to move left, even into the previous macro-tile
@@ -6548,6 +6556,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if kernel["GlobalSplitU"] != 0:
       self.defineSgpr("GSUSumIdx", 2, 2)
       self.defineSgpr("GSULog2BpeC", 1)
+    # use GSULog2BpeD for BS0 as well as 
+    if kernel["GlobalSplitU"] != 0 or not kernel["BufferStore"]:
       self.defineSgpr("GSULog2BpeD", 1)
     self.defineSgpr("StaggerU", 1)
     self.defineSgpr("WGM", 1)
@@ -6723,13 +6733,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("StreamKLocalEnd", 1)
       if len(kernel["SpaceFillingAlgo"]):
         self.defineSgpr("StreamKTileID", 1)
-      if kernel["StreamKAtomic"] == 0:
+      if kernel["StreamKAtomic"] == 0 and not self.states.bufferStore0ForSKWS:
         self.defineSgpr("SrdWS", 4, 4)
 
     # These SGPRs aren't used right away, add them to spr pool temporarily
     if self.states.doShadowInit and kernel["BufferStore"]:
       self.addSgprVarToPool("SrdC")
-    if kernel["StreamK"] and kernel["StreamKAtomic"] == 0:
+    if kernel["StreamK"] and kernel["StreamKAtomic"] == 0 and not self.states.bufferStore0ForSKWS:
       self.addSgprVarToPool("SrdWS")
 
     #------------------------

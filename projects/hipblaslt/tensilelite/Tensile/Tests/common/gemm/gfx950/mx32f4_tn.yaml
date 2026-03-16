@@ -163,6 +163,7 @@ BenchmarkProblems:
         - ScheduleIterAlg: [3]
         - 1LDSBuffer: [0]
         - DirectToLds: [1,2,3]
+        - BufferStore: [0,1]
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
