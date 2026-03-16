@@ -431,8 +431,8 @@ TEST(CPU_UnitTestLockFile_NONE, ConcurrentSharedLockCreation)
 
 TEST(CPU_UnitTestLockFile_NONE, AlternatingExclusiveSharedLocks)
 {
-    auto lockpath = miopen::LockFilePath(miopen::fs::path{
-        "/tmp/config/miopen/test_alternating." + std::to_string(getpid())});
+    auto lockpath = miopen::LockFilePath(
+        miopen::fs::path{"/tmp/config/miopen/test_alternating." + std::to_string(getpid())});
     miopen::fs::path fs_lock_path = lockpath.string() + ".fslock";
 
     for(int i = 0; i < 10; ++i)
@@ -767,8 +767,8 @@ TEST(CPU_UnitTestLockFile_NONE, StdSharedLockBasic)
 
 TEST(CPU_UnitTestLockFile_NONE, StdSharedLockWithTimeout)
 {
-    auto lockpath = miopen::LockFilePath(
-        miopen::fs::path{"/tmp/config/miopen/test_shared_timeout_lock." + std::to_string(getpid())});
+    auto lockpath = miopen::LockFilePath(miopen::fs::path{
+        "/tmp/config/miopen/test_shared_timeout_lock." + std::to_string(getpid())});
 
     miopen::FSLockFile lockfile(lockpath);
 
@@ -784,8 +784,8 @@ TEST(CPU_UnitTestLockFile_NONE, StdSharedLockWithTimeout)
 
 TEST(CPU_UnitTestLockFile_NONE, MultipleSharedLockInstances)
 {
-    auto lockpath = miopen::LockFilePath(
-        miopen::fs::path{"/tmp/config/miopen/test_multi_shared_instances." + std::to_string(getpid())});
+    auto lockpath = miopen::LockFilePath(miopen::fs::path{
+        "/tmp/config/miopen/test_multi_shared_instances." + std::to_string(getpid())});
 
     miopen::FSLockFile lockfile1(lockpath);
     miopen::FSLockFile lockfile2(lockpath);
