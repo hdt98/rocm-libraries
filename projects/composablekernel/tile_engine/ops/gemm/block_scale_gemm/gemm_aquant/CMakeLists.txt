@@ -95,11 +95,13 @@ function(create_individual_gemm_aquant_target datatype layout trait tile_config 
     add_dependencies(benchmark_gemm_aquant_${layout} ${target_name})
     add_dependencies(benchmark_gemm_aquant_${datatype}_${layout} ${target_name})
 
-    # Add to pipeline-specific targets
+    # Add to pipeline-specific and scheduler-specific targets
     string(REPLACE "_" ";" trait_parts ${trait})
     list(GET trait_parts 0 pipeline)
+    list(GET trait_parts 2 scheduler)
 
     add_dependencies(benchmark_gemm_aquant_${pipeline}_pipeline ${target_name})
+    add_dependencies(benchmark_gemm_aquant_${scheduler}_scheduler ${target_name})
 endfunction()
 
 # Function to build individual GEMM AQuant targets
@@ -123,8 +125,21 @@ function(build_individual_gemm_aquant_targets datatype layout)
         message(FATAL_ERROR "Config file not found: ${json_blob}")
     endif()
 
+    # Determine number of workers for parallel generation
+    if(DEFINED ENV{CMAKE_BUILD_PARALLEL_LEVEL})
+        set(num_workers $ENV{CMAKE_BUILD_PARALLEL_LEVEL})
+    else()
+        cmake_host_system_information(RESULT num_cores QUERY NUMBER_OF_LOGICAL_CORES)
+        math(EXPR num_workers "${num_cores}")
+        if(num_workers GREATER 8)
+            set(num_workers 8)
+        endif()
+    endif()
+
     # Create working directory
     file(MAKE_DIRECTORY ${working_path})
+
+    message(VERBOSE "Generating individual AQuant kernels for ${datatype} ${layout} using ${num_workers} workers...")
 
     # List kernels
     message(VERBOSE "  Listing AQuant kernel configurations for ${datatype} ${layout}...")
@@ -194,6 +209,12 @@ if(NOT GEMM_AQUANT_GPU_TARGETS_INDIVIDUAL)
 else()
     message(VERBOSE "Building individual GEMM AQuant targets for GPU targets: ${GEMM_AQUANT_GPU_TARGETS_INDIVIDUAL}")
 
+    # Enable parallel compilation optimizations
+    set_property(GLOBAL PROPERTY JOB_POOLS
+        compile_heavy=4    # Limit heavy compilations to prevent OOM
+        compile_normal=16  # Allow more parallel normal compilations
+    )
+
     # Enable compiler cache if requested
     if(ENABLE_CCACHE_GEMM_AQUANT)
         find_program(CCACHE_PROGRAM ccache)
@@ -227,6 +248,12 @@ else()
     set(GEMM_AQUANT_PIPELINES "mem;compv3")
     foreach(pipeline IN LISTS GEMM_AQUANT_PIPELINES)
         add_custom_target(benchmark_gemm_aquant_${pipeline}_pipeline)
+    endforeach()
+
+    # Create scheduler-specific collection targets
+    set(GEMM_AQUANT_SCHEDULERS "intrawave;interwave")
+    foreach(scheduler IN LISTS GEMM_AQUANT_SCHEDULERS)
+        add_custom_target(benchmark_gemm_aquant_${scheduler}_scheduler)
     endforeach()
 
     # Build individual targets for each datatype/layout combination

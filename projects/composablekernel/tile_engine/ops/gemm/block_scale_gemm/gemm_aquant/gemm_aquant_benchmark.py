@@ -3,6 +3,7 @@
 
 import sys
 import json
+import csv
 import subprocess
 import argparse
 import time
@@ -128,6 +129,18 @@ class AQuantGemmBenchmark:
             config["warp_tile"]["warp_tile_m"] = sorted_groups[1][0]
             config["warp_tile"]["warp_tile_n"] = sorted_groups[1][1]
             config["warp_tile"]["warp_tile_k"] = sorted_groups[1][2]
+        elif len(dimension_groups) == 2:
+            sorted_groups = sorted(dimension_groups, key=lambda x: max(x), reverse=True)
+            config["tile_sizes"]["tile_m"] = sorted_groups[0][0]
+            config["tile_sizes"]["tile_n"] = sorted_groups[0][1]
+            config["tile_sizes"]["tile_k"] = sorted_groups[0][2]
+            config["warp_config"]["warp_m"] = sorted_groups[1][0]
+            config["warp_config"]["warp_n"] = sorted_groups[1][1]
+            config["warp_config"]["warp_k"] = sorted_groups[1][2]
+        elif len(dimension_groups) == 1:
+            config["tile_sizes"]["tile_m"] = dimension_groups[0][0]
+            config["tile_sizes"]["tile_n"] = dimension_groups[0][1]
+            config["tile_sizes"]["tile_k"] = dimension_groups[0][2]
 
         return config
 
@@ -144,6 +157,18 @@ class AQuantGemmBenchmark:
         if tile_sizes.get("tile_m", 0) > 0:
             parts.append(
                 f"{tile_sizes['tile_m']}x{tile_sizes['tile_n']}x{tile_sizes['tile_k']}"
+            )
+
+        warp_config = info.get("warp_config", {})
+        if warp_config.get("warp_m", 0) > 0:
+            parts.append(
+                f"w{warp_config['warp_m']}x{warp_config['warp_n']}x{warp_config['warp_k']}"
+            )
+
+        warp_tile = info.get("warp_tile", {})
+        if warp_tile.get("warp_tile_m", 0) > 0:
+            parts.append(
+                f"wt{warp_tile['warp_tile_m']}x{warp_tile['warp_tile_n']}x{warp_tile['warp_tile_k']}"
             )
 
         return "_".join(parts)
@@ -345,6 +370,43 @@ class AQuantGemmBenchmark:
         self.results = all_results
         return best_kernels
 
+    def export_csv(self, filename: str):
+        """Export all results to CSV."""
+        if not self.results:
+            print("No results to export")
+            return
+
+        all_keys = set()
+        for result in self.results:
+            all_keys.update(result.keys())
+
+        fieldnames = sorted(all_keys)
+
+        with open(filename, "w", newline="") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(self.results)
+
+        print(f"Results exported to {filename}")
+
+    def export_best_kernels(self, best_kernels: Dict, filename: str):
+        """Export best kernel selections to file."""
+        with open(filename, "w") as f:
+            f.write("# Best AQuant kernel selections\n")
+            f.write(
+                "# Format: problem_size -> kernel_name (TFLOPS, bandwidth, latency)\n\n"
+            )
+
+            for key, kernel in sorted(best_kernels.items()):
+                f.write(
+                    f"{key}: {kernel['name']} "
+                    f"({kernel['tflops']:.2f} TFLOPS, "
+                    f"{kernel['bandwidth_gb_s']:.2f} GB/s, "
+                    f"{kernel['time_ms']:.2f}ms)\n"
+                )
+
+        print(f"Best kernels exported to {filename}")
+
     def export_json(self, filename: str, best_kernels: Dict = None):
         """Export results to JSON."""
         from datetime import datetime
@@ -405,6 +467,16 @@ def main():
         default=100,
         help="Number of benchmark iterations",
     )
+    parser.add_argument(
+        "--csv",
+        default="gemm_aquant_benchmark_results.csv",
+        help="CSV output filename (default: gemm_aquant_benchmark_results.csv)",
+    )
+    parser.add_argument(
+        "--best",
+        default="best_aquant_kernels.txt",
+        help="Best kernels output filename (default: best_aquant_kernels.txt)",
+    )
     parser.add_argument("--json", help="JSON output filename (optional)")
 
     args = parser.parse_args()
@@ -434,6 +506,10 @@ def main():
 
     elapsed_time = time.time() - start_time
     print(f"\nBenchmark completed in {elapsed_time:.2f} seconds")
+
+    # Export results
+    benchmark.export_csv(args.csv)
+    benchmark.export_best_kernels(best_kernels, args.best)
 
     if args.json:
         benchmark.export_json(args.json, best_kernels)

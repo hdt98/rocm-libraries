@@ -61,16 +61,17 @@ def is_aquant_trait_combination_valid(
     """Check if an AQuant trait combination is valid.
 
     Rules:
-    - mem pipeline: APreshuffleQuant must be false, scheduler must be interwave
-    - compv3 pipeline: APreshuffleQuant must be true, scheduler must be intrawave
+    - mem pipeline: APreshuffleQuant must be false (static_assert in pipeline impl),
+      scheduler must be interwave
+    - compv3 pipeline: supports both APreshuffleQuant=true and APreshuffleQuant=false,
+      scheduler must be intrawave
     """
     if (pipeline, epilogue, scheduler) in AQUANT_TRAIT_UNSUPPORTED_COMBINATIONS:
         return False
 
-    # Enforce pipeline ↔ a_preshuffle_quant coupling
+    # Only mem pipeline forbids preshuffle (static_assert in
+    # gemm_aquant_pipeline_ag_bg_cr_mem.hpp)
     if pipeline == "mem" and a_preshuffle_quant:
-        return False
-    if pipeline == "compv3" and not a_preshuffle_quant:
         return False
 
     return True
