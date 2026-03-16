@@ -321,6 +321,14 @@ struct NHWGK : public BaseTensorLayout
     static constexpr const char* name = "NHWGK";
 };
 
+// ── Im2win tensor I' (height-windowed input, channels-first) ──────────
+// Layout: I'[G, N, C, Ho, Wi_pad, Y]  (Y innermost, packed)
+// Used as the input to Stage-2 of the two-stage im2win convolution.
+struct GNCHW_Im2win : public BaseTensorLayout
+{
+    static constexpr const char* name = "GNCHW_Im2win";
+};
+
 struct NDHWGK : public BaseTensorLayout
 {
     static constexpr const char* name = "NDHWGK";

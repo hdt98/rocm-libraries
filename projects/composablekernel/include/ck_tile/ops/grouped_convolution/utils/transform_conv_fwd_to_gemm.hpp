@@ -22,7 +22,8 @@ template <index_t NDimSpatial,
           bool SplitN              = false,
           typename ADataType       = float,
           typename CDataType       = float,
-          typename IndexType       = index_t>
+          typename IndexType       = index_t,
+          bool UseIm2Win           = false> // when true, apply im2win I' transform (2D, Default only)
 struct TransformConvFwdToGemm
 {
     private:
@@ -875,32 +876,118 @@ struct TransformConvFwdToGemm
                     number<VectorSizeA>{},
                     I1);
 
-                const auto in_n_hip_wip_c_desc = transform_tensor_descriptor(
-                    in_n_hi_wi_c_desc,
-                    make_tuple(make_pass_through_transform(N_),
-                               make_pad_transform(Hi_, InLeftPadH_, InRightPadH_),
-                               make_pad_transform(Wi_, InLeftPadW_, InRightPadW_),
-                               make_pass_through_transform(C_)),
-                    make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
-                    make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}));
+                if constexpr(UseIm2Win && NDimSpatial == 2)
+                {
+                    // // ── Im2win two-stage path (explicit I' intermediate) ──────────
+                    // // Following im2win_transform.md:
+                    // //   I'[n, ho, wi_pad, c, y] = I_padded[n, ho·Sy + y·Dy, wi_pad, c]
+                    // //   I''[n, ho, wo, c, y, x] = I'[n, ho, wo·Sx + x·Dx, c, y]
+                    // //   A[M=N×Ho×Wo, K=Y×X×C]   after merge
+                    // //
+                    // // Stage 1: embed H only → I'[N, (Y,Ho), Wi_pad, C]
+                    // //   Dims: [N=0, Y=1, Ho=2, Wi_pad=3, C=4]
+                    // const auto i_prime_desc = transform_tensor_descriptor(
+                    //     in_n_hip_wip_c_desc,
+                    //     make_tuple(make_pass_through_transform(N_),
+                    //                make_embed_transform(make_tuple(Y_, Ho_),
+                    //                                     make_tuple(ConvDilationH_, ConvStrideH_)),
+                    //                make_pass_through_transform(Wi_ + InLeftPadW_ + InRightPadW_),
+                    //                make_pass_through_transform(C_)),
+                    //     make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+                    //     make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}, sequence<4>{}));
 
-                const auto in_n_y_ho_x_wo_c_desc = transform_tensor_descriptor(
-                    in_n_hip_wip_c_desc,
-                    make_tuple(make_pass_through_transform(N_),
-                               make_embed_transform(make_tuple(Y_, Ho_),
-                                                    make_tuple(ConvDilationH_, ConvStrideH_)),
-                               make_embed_transform(make_tuple(X_, Wo_),
-                                                    make_tuple(ConvDilationW_, ConvStrideW_)),
-                               make_pass_through_transform(C_)),
-                    make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
-                    make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3, 4>{}, sequence<5>{}));
+                    // // Stage 2: embed W only → I''[N, Y, Ho, (X,Wo), C]
+                    // //   Dims: [N=0, Y=1, Ho=2, X=3, Wo=4, C=5]
+                    // const auto i_dbl_prime_desc = transform_tensor_descriptor(
+                    //     i_prime_desc,
+                    //     make_tuple(make_pass_through_transform(N_),
+                    //                make_pass_through_transform(Y_),
+                    //                make_pass_through_transform(Ho_),
+                    //                make_embed_transform(make_tuple(X_, Wo_),
+                    //                                     make_tuple(ConvDilationW_, ConvStrideW_)),
+                    //                make_pass_through_transform(C_)),
+                    //     make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{},
+                    //                sequence<3>{}, sequence<4>{}),
+                    //     make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{},
+                    //                sequence<3, 4>{}, sequence<5>{}));
 
-                return transform_tensor_descriptor(
-                    in_n_y_ho_x_wo_c_desc,
-                    make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
-                               make_merge_transform(make_tuple(Y_, X_, C_))),
-                    make_tuple(sequence<0, 2, 4>{}, sequence<1, 3, 5>{}),
-                    make_tuple(sequence<0>{}, sequence<1>{}));
+                    // // Merge: [N,Ho,Wo] → M,  [Y,X,C] → K_gemm
+                    // return transform_tensor_descriptor(
+                    //     i_dbl_prime_desc,
+                    //     make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
+                    //                make_merge_transform(make_tuple(Y_, X_, C_))),
+                    //     make_tuple(sequence<0, 2, 4>{}, sequence<1, 3, 5>{}),
+                    //     make_tuple(sequence<0>{}, sequence<1>{}));
+
+                    const auto im2win_desc = transform_tensor_descriptor(
+                        in_n_hi_wi_c_desc,
+                        make_tuple(make_pass_through_transform(N_),
+                                   make_embed_transform(make_tuple(Y_, Ho_),
+                                                        make_tuple(ConvDilationH_, ConvStrideH_)),
+                                   make_pass_through_transform(Wi_ + InLeftPadW_ + InRightPadW_),
+                                   make_pass_through_transform(C_)),
+                        make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+                        make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}, sequence<4>{}));
+
+                    const auto in_n_hip_wip_c_desc = transform_tensor_descriptor(
+                        im2win_desc,
+                        make_tuple(make_pass_through_transform(N_),
+                                make_pad_transform(Hi_, InLeftPadH_, InRightPadH_),
+                                make_pad_transform(Wi_, InLeftPadW_, InRightPadW_),
+                                make_pass_through_transform(C_)),
+                        make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+                        make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}));
+
+                    const auto in_n_y_ho_x_wo_c_desc = transform_tensor_descriptor(
+                        in_n_hip_wip_c_desc,
+                        make_tuple(make_pass_through_transform(N_),
+                                   make_embed_transform(make_tuple(Y_, Ho_),
+                                                        make_tuple(ConvDilationH_, ConvStrideH_)),
+                                   make_embed_transform(make_tuple(X_, Wo_),
+                                                        make_tuple(ConvDilationW_, ConvStrideW_)),
+                                   make_pass_through_transform(C_)),
+                        make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+                        make_tuple(
+                            sequence<0>{}, sequence<1, 2>{}, sequence<3, 4>{}, sequence<5>{}));
+
+                    return transform_tensor_descriptor(
+                        in_n_y_ho_x_wo_c_desc,
+                        make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
+                                   make_merge_transform(make_tuple(Y_, X_, C_))),
+                        make_tuple(sequence<0, 2, 4>{}, sequence<1, 3, 5>{}),
+                        make_tuple(sequence<0>{}, sequence<1>{}));
+                }
+                else
+                {
+                    const auto in_n_hip_wip_c_desc = transform_tensor_descriptor(
+                        in_n_hi_wi_c_desc,
+                        make_tuple(make_pass_through_transform(N_),
+                                make_pad_transform(Hi_, InLeftPadH_, InRightPadH_),
+                                make_pad_transform(Wi_, InLeftPadW_, InRightPadW_),
+                                make_pass_through_transform(C_)),
+                        make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+                        make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}));
+
+                    // Standard im2col path: embed H and W in one step
+                    const auto in_n_y_ho_x_wo_c_desc = transform_tensor_descriptor(
+                        in_n_hip_wip_c_desc,
+                        make_tuple(make_pass_through_transform(N_),
+                                   make_embed_transform(make_tuple(Y_, Ho_),
+                                                        make_tuple(ConvDilationH_, ConvStrideH_)),
+                                   make_embed_transform(make_tuple(X_, Wo_),
+                                                        make_tuple(ConvDilationW_, ConvStrideW_)),
+                                   make_pass_through_transform(C_)),
+                        make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+                        make_tuple(
+                            sequence<0>{}, sequence<1, 2>{}, sequence<3, 4>{}, sequence<5>{}));
+
+                    return transform_tensor_descriptor(
+                        in_n_y_ho_x_wo_c_desc,
+                        make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
+                                   make_merge_transform(make_tuple(Y_, X_, C_))),
+                        make_tuple(sequence<0, 2, 4>{}, sequence<1, 3, 5>{}),
+                        make_tuple(sequence<0>{}, sequence<1>{}));
+                }
             }
             else
             {
@@ -939,6 +1026,100 @@ struct TransformConvFwdToGemm
                     make_tuple(sequence<0>{}, sequence<1>{}));
             }
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // A descriptor for I' (the im2win height-windowed tensor)
+    //
+    // Input:  I'[N, C, Ho, Wi_pad, Y]  (packed, Y innermost)
+    //         layout tag: tensor_layout::convolution::GNCHW_Im2win
+    //
+    // Output: A[M = N×Ho×Wo, K_gemm = C×Y×X]
+    //
+    // The X sliding window is applied here (not in the im2win Stage-1 kernel):
+    //   wi_pad = wo·Sx + x·Dx  →  embed Wi_pad → (X, Wo)
+    //
+    // Descriptor chain:
+    //   Step 1: Naive I'[N, C, Ho, Wi_pad, Y] with packed strides.
+    //           Wi_pad = Wi + LPW + RPW  (passed via transformer constructor).
+    //   Step 2: Embed Wi_pad → (X, Wo):
+    //           wi_pad = x·Dx + wo·Sx   →   I''[N, C, Ho, X, Wo, Y]
+    //   Step 3: Merge [N, Ho, Wo] → M,  [C, Y, X] → K_gemm.
+    //
+    // Note: No padding is needed because I' was already materialised with
+    // the height-padded data (the Stage-1 kernel wrote zeros for OOB rows).
+    // ═══════════════════════════════════════════════════════════════════
+    template <typename ALayout,
+              typename std::enable_if<
+                  NDimSpatial == 2 &&
+                      std::is_same_v<ALayout, tensor_layout::convolution::GNCHW_Im2win>,
+                  bool>::type = false>
+    CK_TILE_HOST auto MakeADescriptor_M_K() const
+    {
+        static_assert(NumGroupsToMerge == 1, "GNCHW_Im2win only supports NumGroupsToMerge==1.");
+
+        // Wi_pad = Wi + InLeftPadW + InRightPadW (stored in Wi_ after constructor adjustment
+        // is NOT done here — we store Wi_pad directly via a helper below).
+        // We derive it from the transformer's stored fields:
+        const IndexType Wi_pad = Wi_ + InLeftPadW_ + InRightPadW_;
+
+        // Strides for I' as produced by the ImageToIm2win Stage-1 kernel.
+        //
+        // Stage-1 writes I' as a 2D flat array [M, K] where:
+        //   M = N × Ho × Wi_pad   (spatial, N outermost, Wi_pad innermost)
+        //   K = C × Y             (channel × filter-height, C outermost, Y innermost)
+        //
+        // Physical offset of element (n, c, ho, wi_pad, y):
+        //   flat_m = n*(Ho*Wi_pad) + ho*Wi_pad + wi_pad
+        //   flat_k = c*Y + y
+        //   offset = flat_m * (C*Y) + flat_k
+        //          = (n*Ho*Wi_pad + ho*Wi_pad + wi_pad)*(C*Y) + c*Y + y
+        //
+        // Effective strides for the 5D [N, C, Ho, Wi_pad, Y] view:
+        //   stride(Y)      = 1
+        //   stride(C)      = Y
+        //   stride(Wi_pad) = C*Y
+        //   stride(Ho)     = Wi_pad*C*Y
+        //   stride(N)      = Ho*Wi_pad*C*Y
+        const IndexType YStride_ip  = 1;
+        const IndexType CStride_ip  = Y_;
+        const IndexType WiStride_ip = C_ * Y_;
+        const IndexType HoStride_ip = Wi_pad * C_ * Y_;
+        const IndexType NStride_ip  = Ho_ * Wi_pad * C_ * Y_;
+
+        // Step 1: Naive I'[N, C, Ho, Wi_pad, Y]
+        const auto i_prime_desc = make_naive_tensor_descriptor(
+            make_tuple(N_, C_, Ho_, Wi_pad, Y_),
+            make_tuple(NStride_ip, CStride_ip, HoStride_ip, WiStride_ip, YStride_ip),
+            number<VectorSizeA>{},
+            I1);
+        // Dims: [N=0, C=1, Ho=2, Wi_pad=3, Y=4]
+
+        // Step 2: Embed Wi_pad → (X, Wo) — apply the X sliding window
+        //   wi_pad = x * ConvDilationW + wo * ConvStrideW
+        const auto i_dbl_prime_desc = transform_tensor_descriptor(
+            i_prime_desc,
+            make_tuple(make_pass_through_transform(N_),
+                       make_pass_through_transform(C_),
+                       make_pass_through_transform(Ho_),
+                       make_embed_transform(make_tuple(X_, Wo_),
+                                            make_tuple(ConvDilationW_, ConvStrideW_)),
+                       make_pass_through_transform(Y_)),
+            make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{},
+                       sequence<3>{}, sequence<4>{}),
+            make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{},
+                       sequence<3, 4>{}, sequence<5>{}));
+        // Dims: [N=0, C=1, Ho=2, X=3, Wo=4, Y=5]
+
+        // Step 3: Merge → A[M = N×Ho×Wo, K_gemm = C×Y×X]
+        //   M: dims [N=0, Ho=2, Wo=4]
+        //   K: dims [C=1, Y=5, X=3]
+        return transform_tensor_descriptor(
+            i_dbl_prime_desc,
+            make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
+                       make_merge_transform(make_tuple(C_, Y_, X_))),
+            make_tuple(sequence<0, 2, 4>{}, sequence<1, 5, 3>{}),
+            make_tuple(sequence<0>{}, sequence<1>{}));
     }
 
     template <typename ALayout,
@@ -1316,6 +1497,60 @@ struct TransformConvFwdToGemm
                     make_tuple(sequence<0>{}, sequence<1>{}));
             }
         }
+    }
+
+    // ── GKCYX B descriptor (channels-first weight, for GNCHW_Im2win Stage-2 path) ────
+    // W[K, C, Y, X] (KCYX order per group, packed).
+    // B[N_gemm=K, K_gemm=C×Y×X] with K innermost axis of K_gemm (C×Y×X).
+    template <typename BLayout,
+              typename std::enable_if<
+                  NDimSpatial == 2 &&
+                      std::is_same_v<BLayout, tensor_layout::convolution::GKCYX>,
+                  bool>::type = false>
+    CK_TILE_HOST auto MakeBDescriptor_N_K() const
+    {
+        static_assert(NumGroupsToMerge == 1, "GKCYX weight only supports NumGroupsToMerge==1.");
+        // Packed strides: W[K, C, Y, X], C×Y×X innermost group
+        const IndexType KStride = C_ * Y_ * X_;
+        const IndexType XStride = 1;
+        // B[N=K, K_gemm=C×Y×X]:  stride(N=K) = C*Y*X,  stride(K_gemm) = 1
+        return make_naive_tensor_descriptor(make_tuple(K_, C_ * Y_ * X_),
+                                            make_tuple(KStride, XStride),
+                                            number<VectorSizeB>{},
+                                            I1);
+    }
+
+    // ── GNKHW C descriptor (channels-first output, for GNCHW_Im2win Stage-2 path) ────
+    // O[N, K, Ho, Wo] per group (NKHW order, packed).
+    // C[M_gemm=N×Ho×Wo, N_gemm=K] — K has stride Ho×Wo (non-unit).
+    template <typename CLayout,
+              index_t NDimSp = NDimSpatial,
+              typename std::enable_if<
+                  NDimSp == 2 &&
+                      std::is_same_v<CLayout, tensor_layout::convolution::GNKHW>,
+                  bool>::type = false>
+    CK_TILE_HOST auto MakeCDescriptor_M_N() const
+    {
+        static_assert(NumGroupsToMerge == 1, "GNKHW output only supports NumGroupsToMerge==1.");
+        // Packed O[N, K, Ho, Wo] per group.
+        const IndexType NStride  = K_ * Ho_ * Wo_;
+        const IndexType KStride  = Ho_ * Wo_;
+        const IndexType HoStride = Wo_;
+        const IndexType WoStride = 1;
+
+        const auto out_n_k_ho_wo_desc = make_naive_tensor_descriptor(
+            make_tuple(N_, K_, Ho_, Wo_),
+            make_tuple(NStride, KStride, HoStride, WoStride),
+            number<VectorSizeC>{},
+            I1);
+
+        // C[M=N×Ho×Wo, N=K]:  M = merge(N, Ho, Wo),  N = K
+        return transform_tensor_descriptor(
+            out_n_k_ho_wo_desc,
+            make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
+                       make_pass_through_transform(K_)),
+            make_tuple(sequence<0, 2, 3>{}, sequence<1>{}),
+            make_tuple(sequence<0>{}, sequence<1>{}));
     }
 
     template <typename CLayout,

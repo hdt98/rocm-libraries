@@ -35,7 +35,11 @@ struct GroupedConvFwdKernelArgs
                                GroupedConvTraitsType_::VectorSizeB,
                                GroupedConvTraitsType_::VectorSizeC,
                                GroupedConvTraitsType_::NumGroupsToMerge,
-                               true>; // Split N enabled
+                               true,         // Split N enabled
+                               float,        // ADataType (default)
+                               float,        // CDataType (default)
+                               index_t,      // IndexType (default)
+                               GroupedConvTraitsType_::UseIm2Win>;
     using CDElementwise                 = CDElementwise_;
     static constexpr index_t NumDTensor = GroupedConvTraitsType_::NumDTensor;
 
@@ -425,6 +429,114 @@ struct GroupedConvFwdKernelArgs
 
     index_t num_spatial_pieces = 1; // Number of spatial pieces (1 = no split)
     SplitImageInfo split_image;     // Nested structure with common + per-piece data
+
+    // ── GNCHW_Im2win / GKCYX / GNKHW constructor ─────────────────────────────
+    // For the two-stage im2win pipeline Stage 2:
+    //   Input:  I'[G, N, C, Ho, Wi_pad, Y]  (layout tag = GNCHW_Im2win)
+    //   Weight: W[G, K, C, Y, X]             (GKCYX, channels-first)
+    //   Output: O[G, N, K, Ho, Wo]           (GNKHW, channels-first)
+    //
+    // in_ptr must point to I' (the height-windowed tensor from Stage 1).
+    // GemmM = N×Ho×Wo,  GemmN = K,  GemmK = C×Y×X.
+    template <
+        typename InLay  = typename GroupedConvTraitsType_::InLayout,
+        typename WeiLay = typename GroupedConvTraitsType_::WeiLayout,
+        typename OutLay = typename GroupedConvTraitsType_::OutLayout,
+        typename std::enable_if<
+            std::is_same_v<InLay,  tensor_layout::convolution::GNCHW_Im2win> &&
+                std::is_same_v<WeiLay, tensor_layout::convolution::GKCYX> &&
+                (std::is_same_v<OutLay, tensor_layout::convolution::GNKHW> ||
+                 std::is_same_v<OutLay, tensor_layout::convolution::NHWGK>),
+            bool>::type = false>
+    CK_TILE_HOST GroupedConvFwdKernelArgs(const GroupedConvFwdHostArgs<CDElementwise>& args)
+        : elfunc(args.elfunc)
+    {
+        in_g_n_c_wis_lengths  = {static_cast<index_t>(args.G_),
+                                 static_cast<index_t>(args.N_),
+                                 static_cast<index_t>(args.C_),
+                                 static_cast<index_t>(args.input_spatial_lengths_[0]),
+                                 static_cast<index_t>(args.input_spatial_lengths_[1])};
+        wei_g_k_c_xs_lengths  = {static_cast<index_t>(args.G_),
+                                 static_cast<index_t>(args.K_),
+                                 static_cast<index_t>(args.C_),
+                                 static_cast<index_t>(args.filter_spatial_lengths_[0]),
+                                 static_cast<index_t>(args.filter_spatial_lengths_[1])};
+        out_g_n_k_wos_lengths = {static_cast<index_t>(args.G_),
+                                 static_cast<index_t>(args.N_),
+                                 static_cast<index_t>(args.K_),
+                                 static_cast<index_t>(args.output_spatial_lengths_[0]),
+                                 static_cast<index_t>(args.output_spatial_lengths_[1])};
+
+        conv_filter_strides   = {static_cast<index_t>(args.conv_filter_strides_[0]),
+                                 static_cast<index_t>(args.conv_filter_strides_[1])};
+        conv_filter_dilations = {static_cast<index_t>(args.conv_filter_dilations_[0]),
+                                 static_cast<index_t>(args.conv_filter_dilations_[1])};
+        input_left_pads       = {static_cast<index_t>(args.input_left_pads_[0]),
+                                 static_cast<index_t>(args.input_left_pads_[1])};
+        input_right_pads      = {static_cast<index_t>(args.input_right_pads_[0]),
+                                 static_cast<index_t>(args.input_right_pads_[1])};
+
+        k_batch = args.k_batch;
+        in_ptr  = args.in_ptr;    // must point to I' (from Stage 1)
+        wei_ptr = args.wei_ptr;
+        for(index_t d = 0; d < NumDTensor; d++)
+            ds_ptr[d] = args.ds_ptr[d];
+        out_ptr = args.out_ptr;
+
+        transformer_ = ConvToGemmFwdTransformer{in_g_n_c_wis_lengths,
+                                                wei_g_k_c_xs_lengths,
+                                                out_g_n_k_wos_lengths,
+                                                conv_filter_strides,
+                                                conv_filter_dilations,
+                                                input_left_pads,
+                                                input_right_pads};
+
+        a_grid_desc_m_k =
+            transformer_.template MakeADescriptor_M_K<tensor_layout::convolution::GNCHW_Im2win>();
+        b_grid_desc_n_k =
+            transformer_.template MakeBDescriptor_N_K<tensor_layout::convolution::GKCYX>();
+        c_grid_desc_m_n =
+            transformer_.template MakeCDescriptor_M_N<OutLay>();
+
+        NumGroupsToMerge = GroupedConvTraitsType_::NumGroupsToMerge;
+        // group_stride_a: stride over I' per group = N*C*Ho*Wi_pad*Y (packed).
+        // The transformer's GetGroupStrideA() returns K*C*Y*X (weight stride) — not what we want.
+        // Compute directly:
+        {
+            const index_t Ho    = static_cast<index_t>(args.output_spatial_lengths_[0]);
+            const index_t Wi_pad = static_cast<index_t>(args.input_spatial_lengths_[1]) +
+                                   static_cast<index_t>(args.input_left_pads_[1]) +
+                                   static_cast<index_t>(args.input_right_pads_[1]);
+            const index_t Y    = static_cast<index_t>(args.filter_spatial_lengths_[0]);
+            group_stride_a =
+                static_cast<long_index_t>(args.N_) * args.C_ * Ho * Wi_pad * Y;
+        }
+        group_stride_b = static_cast<long_index_t>(args.K_) * args.C_ *
+                         args.filter_spatial_lengths_[0] * args.filter_spatial_lengths_[1];
+        if constexpr(std::is_same_v<OutLay, tensor_layout::convolution::NHWGK>)
+        {
+            // NHWGK: stride of G dimension = K (G and K adjacent, K innermost)
+            group_stride_c = static_cast<long_index_t>(args.K_);
+        }
+        else
+        {
+            // GNKHW: stride of G dimension = N*K*Ho*Wo
+            group_stride_c = static_cast<long_index_t>(args.N_) * args.K_ *
+                             args.output_spatial_lengths_[0] * args.output_spatial_lengths_[1];
+        }
+
+        // No Split-N for GNCHW_Im2win (not needed for channels-first).
+        n_per_split         = static_cast<index_t>(args.N_);
+        original_n          = static_cast<index_t>(args.N_);
+        n_splits            = 1;
+        input_batch_stride  = 0;
+        output_batch_stride = 0;
+
+        GemmM     = a_grid_desc_m_k.get_length(number<0>{});
+        GemmN     = b_grid_desc_n_k.get_length(number<0>{});
+        GemmK     = a_grid_desc_m_k.get_length(number<1>{});
+        GemmBatch = integer_divide_ceil(static_cast<index_t>(args.G_), NumGroupsToMerge);
+    }
 };
 
 /// @brief The Grouped Convolution Forward kernel template.
@@ -778,6 +890,20 @@ struct GroupedConvolutionForwardKernel
                 }
             }
         }
+        else if constexpr(std::is_same_v<InLayout, ctc::GNCHW_Im2win>)
+        {
+            // I' (height-windowed input) — C*Y must be divisible by VectorSizeA.
+            // I' innermost dimension is Y, and C*Y is K_gemm. Check Y*C % VectorSizeA.
+            const index_t ConvY = kargs.wei_g_k_c_xs_lengths[number<3>{}];
+            if((ConvC * ConvY) % GroupedConvTraitsType_::VectorSizeA != 0)
+            {
+                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                {
+                    CK_TILE_ERROR("C*Y is not a multiple of VectorSizeA for GNCHW_Im2win input!");
+                }
+                return false;
+            }
+        }
         else
         {
             if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
@@ -798,6 +924,18 @@ struct GroupedConvolutionForwardKernel
                 if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
                 {
                     CK_TILE_ERROR("Conv C is not a multiple of vector load size for weight!");
+                }
+                return false;
+            }
+        }
+        else if constexpr(std::is_same_v<WeiLayout, ctc::GKCYX>)
+        {
+            // GKCYX: weight B[K, C*Y*X] — C must be divisible by VectorSizeB.
+            if(ConvC % GroupedConvTraitsType_::VectorSizeB != 0)
+            {
+                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                {
+                    CK_TILE_ERROR("Conv C is not a multiple of VectorSizeB for GKCYX weight!");
                 }
                 return false;
             }
@@ -842,6 +980,18 @@ struct GroupedConvolutionForwardKernel
                     }
                     return false;
                 }
+            }
+        }
+        else if constexpr(std::is_same_v<OutLayout, ctc::GNKHW>)
+        {
+            // GNKHW: output C[M=N×Ho×Wo, N=K] — K must be divisible by VectorSizeC.
+            if(ConvK % GroupedConvTraitsType_::VectorSizeC != 0)
+            {
+                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                {
+                    CK_TILE_ERROR("ConvK is not a multiple of VectorSizeC for GNKHW output!");
+                }
+                return false;
             }
         }
         else
