@@ -1749,7 +1749,7 @@ pipeline {
                                             -D GEMM_PRESHUFFLE_DATATYPE="fp16;fp8;bf16;bf8" \
                                             -D GEMM_PRESHUFFLE_LAYOUT="rcr" \
                                             -D GROUPED_GEMM_DATATYPE="fp8;fp16" \
-                                            -D GROUPED_GEMM_LAYOUT="rcr;rrr;crr;ccr"
+                                            -D GROUPED_GEMM_LAYOUT="rcr;rrr;crr;ccr" \
                                             -D GEMM_AQUANT_DATATYPE="fp8" \
                                             -D GEMM_AQUANT_LAYOUT="rcr" .. && \
                                            ninja -j${nthreads()} benchmark_gemm_universal_all benchmark_gemm_preshuffle_all benchmark_gemm_multi_d_all benchmark_gemm_streamk_all benchmark_grouped_gemm_all  benchmark_gemm_aquant_all && \
