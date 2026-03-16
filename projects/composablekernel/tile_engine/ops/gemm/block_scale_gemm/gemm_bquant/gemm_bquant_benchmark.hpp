@@ -196,10 +196,10 @@ bool compare_bquant(std::string instanceName,
                                    rtol_atol.at(ck_tile::number<0>{}),
                                    rtol_atol.at(ck_tile::number<1>{}));
 
-    std::cerr << "For " << instanceName << " Relative error threshold is "
+    std::cout << "For " << instanceName << " Relative error threshold is "
               << rtol_atol.at(ck_tile::number<0>{}) << " Absolute error threshold is "
               << rtol_atol.at(ck_tile::number<1>{}) << std::endl;
-    std::cerr << "The verification result is:" << (pass ? "correct" : "fail") << std::endl;
+    std::cout << "The verification result is:" << (pass ? "correct" : "fail") << std::endl;
 
     return pass;
 }

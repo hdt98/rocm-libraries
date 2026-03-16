@@ -54,14 +54,11 @@ BQUANT_TRAIT_UNSUPPORTED_COMBINATIONS = {
 }
 
 
-def is_bquant_trait_combination_valid(
-    pipeline, epilogue, scheduler, b_preshuffle_quant, preshuffle_b
-):
+def is_bquant_trait_combination_valid(pipeline, epilogue, scheduler):
     """Check if a BQuant trait combination is valid.
 
     Rules:
     - Only compv3 pipeline with intrawave scheduler is supported
-    - preshuffle_b and b_preshuffle_quant are independent flags
     """
     if (pipeline, epilogue, scheduler) in BQUANT_TRAIT_UNSUPPORTED_COMBINATIONS:
         return False
@@ -256,9 +253,7 @@ class GemmBQuantKernelBuilder(GemmKernelBuilder):
             pipeline, epilogue, scheduler = combo[:3]
             b_preshuffle_quant = combo[6]
             preshuffle_b = combo[7]
-            if not is_bquant_trait_combination_valid(
-                pipeline, epilogue, scheduler, b_preshuffle_quant, preshuffle_b
-            ):
+            if not is_bquant_trait_combination_valid(pipeline, epilogue, scheduler):
                 logging.debug(
                     f"Skipping unsupported BQuant trait: "
                     f"{pipeline}-{epilogue}-{scheduler}-bpreshuffle={b_preshuffle_quant}"
@@ -536,7 +531,7 @@ struct SelectedKernel {{
         auto kargs = Kernel::MakeKernelArgs(args);
 
         if (!Kernel::IsSupportedArgument(kargs)) {{
-            throw std::runtime_error("Unsupported kernel arguments; skipping GEMM launch.");
+            throw std::runtime_error("Wrong! Arguments not supported! Skipping gemm!");
         }}
 
         // Get grid and block sizes
