@@ -672,29 +672,61 @@ struct sequence_unique_sort
     using sorted2unsorted_map = typename sorted_seqs::ids_type;
 };
 
+namespace detail {
+
+// All values must be in range [0, 63], otherwise returns -1
+template <index_t... Is>
+__host__ __device__ constexpr index_t sequence_unique_count_impl(Sequence<Is...>)
+{
+    constexpr index_t size = sizeof...(Is);
+    if constexpr(size == 0)
+    {
+        return 0;
+    }
+    else
+    {
+        constexpr index_t input[] = {Is...};
+
+        uint64_t set = 0;
+        for(index_t i = 0; i < size; ++i)
+        {
+            const index_t v = input[i];
+            if(v >= 0 && v < 64)
+            {
+                set |= (uint64_t{1} << v);
+            }
+            else
+            {
+                return -1;
+            }
+        }
+        return __builtin_popcountll(set);
+    }
+}
+
+} // namespace detail
+
 /**
- * @brief Count the number of unique values in a sequence, all values must be in range [0, 63]
- * otherwise returns -1. For such cases use sequence_unique_sort.
- * @tparam Seq sequence.
- * @return the number of unique values or -1 if any of values is not in range [0, 63].
+ * @brief Count the number of unique values in a sequence.
+ * @tparam Seq The input sequence.
+ * @return The number of unique values.
  */
 template <typename Seq>
 __host__ __device__ constexpr index_t sequence_unique_count(Seq)
 {
-    uint64_t set = 0;
-    for(index_t i = 0; i < Seq::Size(); ++i)
+    // Fast path when all values are in range [0, 63]
+    constexpr index_t count = detail::sequence_unique_count_impl(Seq{});
+    if constexpr(count >= 0)
     {
-        const index_t v = Seq::At(i);
-        if(v >= 0 && v < 64)
-        {
-            set |= (1ull << v);
-        }
-        else
-        {
-            return -1;
-        }
+        return count;
     }
-    return __builtin_popcountll(set);
+    else
+    {
+        // Use sorting as a universal fallback
+        using unique_sort =
+            typename sequence_unique_sort<Seq, math::less<index_t>, math::equal<index_t>>::type;
+        return unique_sort::Size();
+    }
 }
 
 template <typename SeqMap>

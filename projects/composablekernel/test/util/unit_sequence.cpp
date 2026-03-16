@@ -524,25 +524,22 @@ TEST(SequenceUniqueCount, UniqueCount)
 {
     EXPECT_TRUE(sequence_unique_count(Sequence<>{}) == 0);
     EXPECT_TRUE(sequence_unique_count(Sequence<3, 1, 4, 1, 5, 9, 2, 6, 5>{}) == 7);
-    EXPECT_TRUE(sequence_unique_count(Sequence<31, 33, 31, 33>{}) == 2);
+    EXPECT_TRUE(sequence_unique_count(Sequence<63, 65, 63, 65>{}) == 2);
+    EXPECT_TRUE(sequence_unique_count(Sequence<1, -3, 2, -3, 3>{}) == 4);
 }
 
 TEST(SequenceUniqueCount, UniqueCountNoDuplicates)
 {
     EXPECT_TRUE(sequence_unique_count(Sequence<5, 2, 8, 1, 9>{}) == 5);
     EXPECT_TRUE(sequence_unique_count(Sequence<0, 5, 2, 8, 1, 9, 11, 7, 34>{}) == 9);
+    EXPECT_TRUE(sequence_unique_count(Sequence<-3, 2>{}) == 2);
+    EXPECT_TRUE(sequence_unique_count(Sequence<60, 80>{}) == 2);
 }
 
 TEST(SequenceUniqueCount, UniqueCountAllSame)
 {
     EXPECT_TRUE(sequence_unique_count(Sequence<5, 5, 5, 5>{}) == 1);
-    EXPECT_TRUE(sequence_unique_count(Sequence<63, 63, 63>{}) == 1);
-}
-
-TEST(SequenceUniqueCount, UniqueCountOutOfRange)
-{
-    EXPECT_TRUE(sequence_unique_count(Sequence<1, 2, -5, 3>{}) == -1);
-    EXPECT_TRUE(sequence_unique_count(Sequence<100, 102>{}) == -1);
+    EXPECT_TRUE(sequence_unique_count(Sequence<123, 123>{}) == 1);
 }
 
 // Test is_valid_sequence_map
