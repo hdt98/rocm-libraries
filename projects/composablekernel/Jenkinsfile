@@ -493,21 +493,18 @@ def buildDockerBase(install_prefix){
         dockerExtraArgs = " --no-cache --build-arg BASE_DOCKER='${base_image_name}' -f projects/composablekernel/Dockerfile.compiler . "
     }
     env.CK_BASE_IMAGE = buildAndPushDockerImage(install_prefix, image_name, dockerExtraArgs, params.BUILD_DOCKER.toBoolean())
-    cleanWs()
 }
 
 def buildDockerPytorch(install_prefix){
     def image_name = "${env.CK_DOCKERHUB}:ck_pytorch"
     def dockerExtraArgs = " --no-cache -f projects/composablekernel/Dockerfile.pytorch --build-arg CK_PYTORCH_BRANCH='${params.ck_pytorch_branch}' . "
     env.CK_PYTORCH_IMAGE = buildAndPushDockerImage(install_prefix, image_name, dockerExtraArgs, true)
-    cleanWs()
 }
 
 def buildDockerAiter(install_prefix){
     def image_name = "${env.CK_DOCKERHUB_PRIVATE}:ck_aiter"
     def dockerExtraArgs = " --no-cache -f projects/composablekernel/Dockerfile.aiter --build-arg AITER_BRANCH='${params.aiter_branch}' --build-arg CK_AITER_BRANCH='${params.ck_aiter_branch}' . "
     env.CK_AITER_IMAGE = buildAndPushDockerImage(install_prefix, image_name, dockerExtraArgs, true)
-    cleanWs()
 }
 
 def buildDockerFa(install_prefix){
@@ -519,7 +516,6 @@ def buildDockerFa(install_prefix){
     dockerExtraArgs += " --build-arg GPU_ARCHS='gfx942;gfx950'"
     dockerExtraArgs += " . "
     env.CK_FA_IMAGE = buildAndPushDockerImage(install_prefix, image_name, dockerExtraArgs, true)
-    cleanWs()
 }
 
 def buildDocker(install_prefix){
