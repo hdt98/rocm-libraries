@@ -12,8 +12,9 @@
 
 #pragma once
 
-#include "Types.hpp"
+#include <ostream>
 #include <string>
+#include <vector>
 
 /**
  * @brief Check an Error return value and propagate if an error occurred
@@ -165,7 +166,7 @@ inline std::ostream& operator<<(std::ostream& os, const Error& error)
     return os << "{" << error.code << ", " << error.get_message() << "}";
 }
 
-typedef Error error_object; ///< @brief Type alias for Error (cuDNN compatibility)
+typedef Error error_object; ///< @brief Type alias for Error (compatibility)
 typedef Error error_t; ///< @brief Type alias for Error
 
 #define HIPDNN_RETURN_IF_NE(x, y, error_status, message) \
