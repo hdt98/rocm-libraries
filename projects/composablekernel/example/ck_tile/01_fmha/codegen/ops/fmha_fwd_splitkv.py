@@ -664,8 +664,12 @@ class FmhaFwdSplitKVApiPool:
                     for trait in pool_by_hdim:
                         # Build the kernel name string with padding suffix
                         pad_suffix = ""
-                        for flag, tag in [(trait.spad, "s"), (trait.skpad, "sk"),
-                                          (trait.dpad, "d"), (trait.dvpad, "dv")]:
+                        for flag, tag in [
+                            (trait.spad, "s"),
+                            (trait.skpad, "sk"),
+                            (trait.dpad, "d"),
+                            (trait.dvpad, "dv"),
+                        ]:
                             if flag == "t":
                                 pad_suffix += tag
                         pad_suffix = f"_p{pad_suffix}" if pad_suffix else "_npad"
@@ -1062,7 +1066,7 @@ def get_fwd_splitkv_blobs(
                             continue
                     # PyTorch integration
                     elif receipt == 4:
-                        cond = dtype in ["fp16, bf16"]
+                        cond = dtype in ["fp16", "bf16"]
                         cond &= pipeline.F_vlayout == "row"
                         cond &= pipeline.F_bias in ["no", "bias"]
                         cond &= pipeline.F_squant == "f"
@@ -1262,4 +1266,7 @@ def list_blobs(
         )
         for kernel in kernels:
             f.write((file_path.parent / GEN_DIR / kernel.filename).as_posix() + "\n")
-        f.write((file_path.parent / GEN_DIR / FMHA_FWD_SPLITKV_API_FILENAME).as_posix() + "\n")
+        f.write(
+            (file_path.parent / GEN_DIR / FMHA_FWD_SPLITKV_API_FILENAME).as_posix()
+            + "\n"
+        )
