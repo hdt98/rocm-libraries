@@ -2155,17 +2155,17 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
                                         std::vector<size_t>&       outputItems,
                                         const std::string&         itemGroup)
 {
-    const auto   local_comm_rank = get_local_comm_rank();
+    const auto   local_comm_rank = desc.get_local_comm_rank();
     const size_t ndevices        = inField.bricks.size();
 
     // compute all intersections and check alltoall eligibility
     struct IntersectionInfo
     {
-        size_t         inBrickIdx;
-        size_t         outBrickIdx;
-        rocfft_brick_t intersection;
-        size_t         count;
-        bool           same_device;
+        size_t        inBrickIdx;
+        size_t        outBrickIdx;
+        data_layout_t intersection;
+        size_t        count;
+        bool          same_device;
     };
     std::vector<IntersectionInfo> intersections;
 
@@ -2180,15 +2180,15 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
         {
             const auto& outBrick = outField.bricks[outBrickIdx];
 
-            auto xsect = inBrick.intersect(outBrick);
-            if(xsect.empty())
+            auto xsect
+                = data_layout_t::make_contiguous_intersection_of(inBrick.layout, outBrick.layout);
+            if(xsect.is_empty())
                 continue;
-            xsect.stride = xsect.contiguous_strides();
 
             bool same_dev = (inBrick.location.device == outBrick.location.device
                              && inBrick.location.comm_rank == outBrick.location.comm_rank);
 
-            size_t count = xsect.count_elems();
+            size_t count = xsect.logical_count();
             intersections.push_back({inBrickIdx, outBrickIdx, std::move(xsect), count, same_dev});
 
             if(!same_dev)
@@ -2222,9 +2222,6 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
     }
 
     // handle same-device intersections (identical for both paths)
-
-    // map from outBrickIdx -> plan item index of the local transpose, so
-    // we can set up antecedents properly for both paths
     for(const auto& info : intersections)
     {
         if(!info.same_device)
@@ -2236,17 +2233,15 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
         auto transposeIdx
             = AddMultiPlanItem(transpose_brick(local_comm_rank,
                                                inBrick.location,
-                                               info.intersection.length(),
+                                               info.intersection.lengths_and_batches(),
                                                precision,
                                                desc.inArrayType,
                                                input[info.inBrickIdx],
-                                               info.intersection.offset_in_field(inBrick.stride)
-                                                   - inBrick.offset_in_field(inBrick.stride),
-                                               inBrick.stride,
+                                               info.intersection.offset_in(inBrick.layout),
+                                               inBrick.layout.strides_and_distances(),
                                                output[info.outBrickIdx],
-                                               info.intersection.offset_in_field(outBrick.stride)
-                                                   - outBrick.offset_in_field(outBrick.stride),
-                                               outBrick.stride,
+                                               info.intersection.offset_in(outBrick.layout),
+                                               outBrick.layout.strides_and_distances(),
                                                "local transpose"),
                                {inputAntecedents[info.inBrickIdx]});
         multiPlan[transposeIdx]->group = itemGroup;
@@ -2291,20 +2286,18 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
             size_t src_brick_idx = device_to_brick[inBrick.location.device];
             size_t dst_brick_idx = device_to_brick[outBrick.location.device];
 
-            // pack from input into alltoall send buffer at the peer's slot
             auto packIdx
                 = AddMultiPlanItem(transpose_brick(local_comm_rank,
                                                    inBrick.location,
-                                                   info.intersection.length(),
+                                                   info.intersection.lengths_and_batches(),
                                                    precision,
                                                    desc.inArrayType,
                                                    input[info.inBrickIdx],
-                                                   info.intersection.offset_in_field(inBrick.stride)
-                                                       - inBrick.offset_in_field(inBrick.stride),
-                                                   inBrick.stride,
+                                                   info.intersection.offset_in(inBrick.layout),
+                                                   inBrick.layout.strides_and_distances(),
                                                    BufferPtr::temp(a2aBufs[src_brick_idx].data()),
                                                    dst_brick_idx * uniform_count,
-                                                   info.intersection.stride,
+                                                   info.intersection.strides_and_distances(),
                                                    "pack for ncclAllToAll"),
                                    {inputAntecedents[info.inBrickIdx]});
             multiPlan[packIdx]->group = itemGroup;
@@ -2348,21 +2341,20 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
             size_t src_brick_idx = device_to_brick[inBrick.location.device];
             size_t dst_brick_idx = device_to_brick[outBrick.location.device];
 
-            auto unpackIdx = AddMultiPlanItem(
-                transpose_brick(local_comm_rank,
-                                outBrick.location,
-                                info.intersection.length(),
-                                precision,
-                                desc.inArrayType,
-                                BufferPtr::temp(a2aBufs[dst_brick_idx].data()),
-                                src_brick_idx * uniform_count,
-                                info.intersection.stride,
-                                output[info.outBrickIdx],
-                                info.intersection.offset_in_field(outBrick.stride)
-                                    - outBrick.offset_in_field(outBrick.stride),
-                                outBrick.stride,
-                                "unpack from ncclAllToAll"),
-                {a2aIdx});
+            auto unpackIdx
+                = AddMultiPlanItem(transpose_brick(local_comm_rank,
+                                                   outBrick.location,
+                                                   info.intersection.lengths_and_batches(),
+                                                   precision,
+                                                   desc.inArrayType,
+                                                   BufferPtr::temp(a2aBufs[dst_brick_idx].data()),
+                                                   src_brick_idx * uniform_count,
+                                                   info.intersection.strides_and_distances(),
+                                                   output[info.outBrickIdx],
+                                                   info.intersection.offset_in(outBrick.layout),
+                                                   outBrick.layout.strides_and_distances(),
+                                                   "unpack from ncclAllToAll"),
+                                   {a2aIdx});
             multiPlan[unpackIdx]->group = itemGroup;
             outputItems.push_back(unpackIdx);
         }
@@ -2399,16 +2391,15 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
             auto packIdx
                 = AddMultiPlanItem(transpose_brick(local_comm_rank,
                                                    inBrick.location,
-                                                   info.intersection.length(),
+                                                   info.intersection.lengths_and_batches(),
                                                    precision,
                                                    desc.inArrayType,
                                                    input[info.inBrickIdx],
-                                                   info.intersection.offset_in_field(inBrick.stride)
-                                                       - inBrick.offset_in_field(inBrick.stride),
-                                                   inBrick.stride,
+                                                   info.intersection.offset_in(inBrick.layout),
+                                                   inBrick.layout.strides_and_distances(),
                                                    BufferPtr::temp(pack.data()),
                                                    0,
-                                                   info.intersection.stride,
+                                                   info.intersection.strides_and_distances(),
                                                    "pack brick for RCCL transpose"),
                                    {inputAntecedents[info.inBrickIdx]});
             multiPlan[packIdx]->group = itemGroup;
@@ -2438,21 +2429,20 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
                                          local_comm_rank);
             }
 
-            auto unpackIdx = AddMultiPlanItem(
-                transpose_brick(local_comm_rank,
-                                outBrick.location,
-                                info.intersection.length(),
-                                precision,
-                                desc.inArrayType,
-                                BufferPtr::temp(recv.data()),
-                                0,
-                                info.intersection.stride,
-                                output[info.outBrickIdx],
-                                info.intersection.offset_in_field(outBrick.stride)
-                                    - outBrick.offset_in_field(outBrick.stride),
-                                outBrick.stride,
-                                "unpack brick for RCCL transpose"),
-                {}); // antecedents set below
+            auto unpackIdx
+                = AddMultiPlanItem(transpose_brick(local_comm_rank,
+                                                   outBrick.location,
+                                                   info.intersection.lengths_and_batches(),
+                                                   precision,
+                                                   desc.inArrayType,
+                                                   BufferPtr::temp(recv.data()),
+                                                   0,
+                                                   info.intersection.strides_and_distances(),
+                                                   output[info.outBrickIdx],
+                                                   info.intersection.offset_in(outBrick.layout),
+                                                   outBrick.layout.strides_and_distances(),
+                                                   "unpack brick for RCCL transpose"),
+                                   {}); // antecedents set below
             multiPlan[unpackIdx]->group = itemGroup;
             outputItems.push_back(unpackIdx);
         }

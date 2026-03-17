@@ -155,7 +155,8 @@ namespace rocfft_rccl
 
             // save and restore the caller's active device
             int original_device = 0;
-            hipGetDevice(&original_device);
+            if(hipGetDevice(&original_device) != hipSuccess)
+                throw std::runtime_error("hipGetDevice failed during RCCL communicator init");
 
             new_comm->pimpl->comms.resize(ndevices, nullptr);
 
@@ -164,19 +165,24 @@ namespace rocfft_rccl
             ncclGroupStart();
             for(int i = 0; i < ndevices; ++i)
             {
-                hipSetDevice(i);
+                if(hipSetDevice(i) != hipSuccess)
+                    throw std::runtime_error("hipSetDevice failed for device " + std::to_string(i));
                 new_comm->pimpl->device_to_rank[i] = i;
                 result = ncclCommInitRank(&new_comm->pimpl->comms[i], ndevices, id, i);
                 if(result != ncclSuccess)
                 {
                     ncclGroupEnd();
-                    hipSetDevice(original_device);
+                    if(hipSetDevice(original_device) != hipSuccess)
+                        throw std::runtime_error("hipSetDevice failed restoring device "
+                                                 + std::to_string(original_device));
                     return {};
                 }
             }
             result = ncclGroupEnd();
 
-            hipSetDevice(original_device);
+            if(hipSetDevice(original_device) != hipSuccess)
+                throw std::runtime_error("hipSetDevice failed restoring device "
+                                         + std::to_string(original_device));
 
             if(result != ncclSuccess)
             {
