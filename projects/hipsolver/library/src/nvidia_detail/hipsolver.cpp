@@ -4018,6 +4018,17 @@ hipsolverStatus_t hipsolverZgetrfBatched_bufferSize(hipsolverHandle_t handle,
     return HIPSOLVER_STATUS_SUCCESS;
 }
 
+static hipsolverStatus_t getCublasHandle(cublasHandle_t* cublas_handle)
+{
+    static thread_local cublasHandle_t handle = nullptr;
+    if(!handle)
+    {
+        CHECK_CUBLAS_ERROR(cublasCreate(&handle));
+    }
+    *cublas_handle = handle;
+    return HIPSOLVER_STATUS_SUCCESS;
+}
+
 hipsolverStatus_t hipsolverSgetrfBatched(hipsolverHandle_t handle,
                                          int               m,
                                          int               n,
@@ -4041,17 +4052,16 @@ try
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
     cudaStream_t stream;
-    cusolverDnGetStream((cusolverDnHandle_t)handle, &stream);
+    CHECK_CUSOLVER_ERROR(cusolverDnGetStream((cusolverDnHandle_t)handle, &stream));
 
     cublasHandle_t cublas_handle;
-    cublasCreate(&cublas_handle);
-    cublasSetStream(cublas_handle, stream);
+    CHECK_HIPSOLVER_ERROR(getCublasHandle(&cublas_handle));
+    CHECK_CUBLAS_ERROR(cublasSetStream(cublas_handle, stream));
 
-    cublasStatus_t status
-        = cublasSgetrfBatched(cublas_handle, n, A, lda, devIpiv, devInfo, batch_count);
+    CHECK_CUBLAS_ERROR(
+        cublasSgetrfBatched(cublas_handle, n, A, lda, devIpiv, devInfo, batch_count));
 
-    cublasDestroy(cublas_handle);
-    return hipsolver::cuda2hip_status(status);
+    return HIPSOLVER_STATUS_SUCCESS;
 }
 catch(...)
 {
@@ -4081,17 +4091,16 @@ try
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
     cudaStream_t stream;
-    cusolverDnGetStream((cusolverDnHandle_t)handle, &stream);
+    CHECK_CUSOLVER_ERROR(cusolverDnGetStream((cusolverDnHandle_t)handle, &stream));
 
     cublasHandle_t cublas_handle;
-    cublasCreate(&cublas_handle);
-    cublasSetStream(cublas_handle, stream);
+    CHECK_HIPSOLVER_ERROR(getCublasHandle(&cublas_handle));
+    CHECK_CUBLAS_ERROR(cublasSetStream(cublas_handle, stream));
 
-    cublasStatus_t status
-        = cublasDgetrfBatched(cublas_handle, n, A, lda, devIpiv, devInfo, batch_count);
+    CHECK_CUBLAS_ERROR(
+        cublasDgetrfBatched(cublas_handle, n, A, lda, devIpiv, devInfo, batch_count));
 
-    cublasDestroy(cublas_handle);
-    return hipsolver::cuda2hip_status(status);
+    return HIPSOLVER_STATUS_SUCCESS;
 }
 catch(...)
 {
@@ -4121,17 +4130,16 @@ try
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
     cudaStream_t stream;
-    cusolverDnGetStream((cusolverDnHandle_t)handle, &stream);
+    CHECK_CUSOLVER_ERROR(cusolverDnGetStream((cusolverDnHandle_t)handle, &stream));
 
     cublasHandle_t cublas_handle;
-    cublasCreate(&cublas_handle);
-    cublasSetStream(cublas_handle, stream);
+    CHECK_HIPSOLVER_ERROR(getCublasHandle(&cublas_handle));
+    CHECK_CUBLAS_ERROR(cublasSetStream(cublas_handle, stream));
 
-    cublasStatus_t status
-        = cublasCgetrfBatched(cublas_handle, n, (cuComplex**)A, lda, devIpiv, devInfo, batch_count);
+    CHECK_CUBLAS_ERROR(
+        cublasCgetrfBatched(cublas_handle, n, (cuComplex**)A, lda, devIpiv, devInfo, batch_count));
 
-    cublasDestroy(cublas_handle);
-    return hipsolver::cuda2hip_status(status);
+    return HIPSOLVER_STATUS_SUCCESS;
 }
 catch(...)
 {
@@ -4161,17 +4169,16 @@ try
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
     cudaStream_t stream;
-    cusolverDnGetStream((cusolverDnHandle_t)handle, &stream);
+    CHECK_CUSOLVER_ERROR(cusolverDnGetStream((cusolverDnHandle_t)handle, &stream));
 
     cublasHandle_t cublas_handle;
-    cublasCreate(&cublas_handle);
-    cublasSetStream(cublas_handle, stream);
+    CHECK_HIPSOLVER_ERROR(getCublasHandle(&cublas_handle));
+    CHECK_CUBLAS_ERROR(cublasSetStream(cublas_handle, stream));
 
-    cublasStatus_t status = cublasZgetrfBatched(
-        cublas_handle, n, (cuDoubleComplex**)A, lda, devIpiv, devInfo, batch_count);
+    CHECK_CUBLAS_ERROR(cublasZgetrfBatched(
+        cublas_handle, n, (cuDoubleComplex**)A, lda, devIpiv, devInfo, batch_count));
 
-    cublasDestroy(cublas_handle);
-    return hipsolver::cuda2hip_status(status);
+    return HIPSOLVER_STATUS_SUCCESS;
 }
 catch(...)
 {
