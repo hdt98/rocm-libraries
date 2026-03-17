@@ -24,9 +24,16 @@ namespace rocRoller
 
         struct LivenessClassification
         {
-            std::vector<int> alive;
-            std::vector<int> maybeAlive;
-            std::vector<int> dead;
+            // Store TagExtent:
+            //
+            //  Use tag extents to estimate register usage
+            //
+            // Use register allocator as gold reference in LowerFromKernelGraph to figure out
+            // the actual usage and do a comparison
+            //
+            std::vector<TagExtent> alive;
+            std::vector<TagExtent> maybeAlive;
+            std::vector<TagExtent> dead;
         };
 
         /**
@@ -42,35 +49,34 @@ namespace rocRoller
                 return order == ControlGraph::NodeOrdering::LeftFirst;
             };
 
-            auto const isWithin
-                = [&](AliasDataFlowTagsDetail::GraphExtent const& gap, int const op) {
-                      return std::ranges::any_of(gap.begin,
-                                                 [&](int node) { return not isAfter(node, op); })
-                             && std::ranges::any_of(
-                                 gap.end, [&](int node) { return not isAfter(op, node); });
-                  };
-
-            // If the op is WITHIN a gap, then it is alive (no overlap)
-            if(std::ranges::any_of(tagExtent.gaps,
-                                   [&](auto const& gap) { return isWithin(gap, op); }))
-                return Liveness::Alive;
-
-            // If the op comes BEFORE the first op of the exten, it is dead (no overlap)
+            // If the op comes BEFORE the first op of the extent, it is dead (no overlap)
             if(std::ranges::all_of(tagExtent.extent.begin,
                                    [&](auto const node) { return isAfter(op, node); }))
                 return Liveness::Dead;
 
-            // If the op comes AFTER the first op of the exten, it is dead (no overlap)
+            // If the op comes AFTER the last op of the extent, it is dead (no overlap)
             if(std::ranges::all_of(tagExtent.extent.end,
                                    [&](auto const node) { return isAfter(node, op); }))
                 return Liveness::Dead;
+
+            // At this point:
+            //    op would be after or ambiguous with one of the begins,
+            //    op might be before or ambiguous with one of the ends.
+
+            // if the op is after one of the begin nodes AND before one of the end nodes
+            //  then this is Alive
+            if(std::ranges::any_of(tagExtent.extent.begin,
+                                   [&](auto const node) { return isAfter(node, op); })
+               && std::ranges::any_of(tagExtent.extent.end,
+                                      [&](auto const node) { return isAfter(op, node); }))
+                return Liveness::Alive;
 
             // Unknown
             return Liveness::MaybeAlive;
         }
 
         /**
-         * Compute extens for ALL coordinates traced by ControlFlowRWTracer.
+         * Compute extents for ALL coordinates traced by ControlFlowRWTracer.
          * Returns a map from coordinate tag -> TagExtent.
          */
         std::map<int, TagExtent> getAllCoordExtents(KernelGraph const& kgraph)
@@ -125,15 +131,15 @@ namespace rocRoller
                     switch(liveness)
                     {
                     case Liveness::Alive:
-                        classification.alive.push_back(coord);
+                        classification.alive.push_back(extent);
                         break;
 
                     case Liveness::MaybeAlive:
-                        classification.maybeAlive.push_back(coord);
+                        classification.maybeAlive.push_back(extent);
                         break;
 
                     case Liveness::Dead:
-                        classification.dead.push_back(coord);
+                        classification.dead.push_back(extent);
                         break;
 
                     case Liveness::Count:
