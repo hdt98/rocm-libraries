@@ -150,20 +150,10 @@
 
 #if __has_builtin(__builtin_amdgcn_processor_is)
     #if !defined(ROCPRIM_THREAD_LOAD_USE_CACHE_MODIFIERS)
-        // TODO: enable cache modifiers on RDNA5 once the assembly for the arch is updated in thread_load.hpp / thread_store.hpp.
-        #if defined(ROCPRIM_TARGET_RDNA5)
-          #define ROCPRIM_THREAD_LOAD_USE_CACHE_MODIFIERS 0
-        #else
-          #define ROCPRIM_THREAD_LOAD_USE_CACHE_MODIFIERS 1
-        #endif
+        #define ROCPRIM_THREAD_LOAD_USE_CACHE_MODIFIERS 1
     #endif
     #if !defined(ROCPRIM_THREAD_STORE_USE_CACHE_MODIFIERS)
-        // TODO: enable cache modifiers on RDNA5 once the assembly for the arch is updated in thread_load.hpp / thread_store.hpp.
-        #if defined(ROCPRIM_TARGET_RDNA5)
-          #define ROCPRIM_THREAD_STORE_USE_CACHE_MODIFIERS 0
-        #else
-          #define ROCPRIM_THREAD_STORE_USE_CACHE_MODIFIERS 1
-        #endif
+        #define ROCPRIM_THREAD_STORE_USE_CACHE_MODIFIERS 1
     #endif
     #define ROCPRIM_IS_CDNA3()                                                              \
         (__builtin_amdgcn_processor_is("gfx942") || __builtin_amdgcn_processor_is("gfx950") \
@@ -175,14 +165,15 @@
          || __builtin_amdgcn_processor_is("gfx904") || __builtin_amdgcn_processor_is("gfx906") \
          || __builtin_amdgcn_processor_is("gfx90c")                                            \
          || __builtin_amdgcn_processor_is("gfx9-generic"))
-    #define ROCPRIM_IS_RDNA5()                    \
+    #define ROCPRIM_IS_RDNA5()                                                                 \
         (__builtin_amdgcn_processor_is("gfx1310"))
          // TODO: enable once compiler accepts "gfx13-generic" identifier:
          // || __builtin_amdgcn_processor_is("gfx13-generic"))
     #define ROCPRIM_IS_RDNA4()                                                                \
         (__builtin_amdgcn_processor_is("gfx1200") || __builtin_amdgcn_processor_is("gfx1201") \
          || __builtin_amdgcn_processor_is(                                                    \
-             "gfx12-generic")) // TODO: Re-enable gfx1250 when supported by compiler
+             "gfx12-generic"))
+         // TODO: Re-enable gfx1250 when supported by compiler
     #define ROCPRIM_IS_RDNA3()                                                                   \
         (__builtin_amdgcn_processor_is("gfx1100") || __builtin_amdgcn_processor_is("gfx1101")    \
          || __builtin_amdgcn_processor_is("gfx1102") || __builtin_amdgcn_processor_is("gfx1103") \
@@ -273,24 +264,14 @@
         #if defined(ROCPRIM_TARGET_SPIRV)
             #define ROCPRIM_THREAD_LOAD_USE_CACHE_MODIFIERS 0
         #else
-            // TODO: enable cache modifiers on RDNA5 once the assembly for the arch is updated in thread_load.hpp / thread_store.hpp.
-            #if defined(ROCPRIM_TARGET_RDNA5)
-              #define ROCPRIM_THREAD_LOAD_USE_CACHE_MODIFIERS 0
-            #else
-              #define ROCPRIM_THREAD_LOAD_USE_CACHE_MODIFIERS 1
-            #endif
+            #define ROCPRIM_THREAD_LOAD_USE_CACHE_MODIFIERS 1
         #endif
     #endif
     #if !defined(ROCPRIM_THREAD_STORE_USE_CACHE_MODIFIERS)
         #if defined(ROCPRIM_TARGET_SPIRV)
             #define ROCPRIM_THREAD_STORE_USE_CACHE_MODIFIERS 0
         #else
-            // TODO: enable cache modifiers on RDNA5 once the assembly for the arch is updated in thread_load.hpp / thread_store.hpp.
-            #if defined(ROCPRIM_TARGET_RDNA5)
-              #define ROCPRIM_THREAD_STORE_USE_CACHE_MODIFIERS 0
-            #else
-              #define ROCPRIM_THREAD_STORE_USE_CACHE_MODIFIERS 1
-            #endif
+            #define ROCPRIM_THREAD_STORE_USE_CACHE_MODIFIERS 1
         #endif
     #endif
 #endif
