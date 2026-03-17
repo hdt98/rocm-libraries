@@ -93,7 +93,8 @@ namespace
 
     // A naive, slow, golden reference implementation of GEMM.
     // Used strictly for validating the correctness of the optimized path.
-    // Calculates D = activation(alpha * scaleA[i] * scaleB[j] * scaleAlphaVec[i] * (A * B) + beta * C + bias[i])
+    // Calculates D = activation(alpha * scaleA[i] * scaleB[j] * scaleAlphaVec[d] * (A * B) + beta * C + bias[i])
+    // where d = i (row/M) when factorDim==0, or d = j (col/N) when factorDim==1.
     void columnMajorGemm(const float*   a,
                          const float*   b,
                          const float*   c,
@@ -109,7 +110,8 @@ namespace
                          const float*   scaleAlphaVec = nullptr,
                          ActivationType activation    = ActivationType::None,
                          const float*   scaleAVec     = nullptr,
-                         const float*   scaleBVec     = nullptr)
+                         const float*   scaleBVec     = nullptr,
+                         int            factorDim     = 0)
     {
         size_t strideAK = transA ? 1 : m;
         size_t strideAM = transA ? k : 1;
@@ -133,7 +135,7 @@ namespace
                 if(scaleBVec)
                     effectiveAlpha *= scaleBVec[j];
                 if(scaleAlphaVec)
-                    effectiveAlpha *= scaleAlphaVec[i];
+                    effectiveAlpha *= scaleAlphaVec[factorDim == 0 ? i : j];
 
                 float result = effectiveAlpha * sum + beta * c[i + j * m];
 
@@ -169,7 +171,8 @@ int runGemm(size_t         m,
             bool           useBias,
             ActivationType activation,
             bool               useScaleAlphaVec,
-            const std::string& useScaleAB)
+            const std::string& useScaleAB,
+            int                factorDim)
 {
     constexpr rocisa::DataType dtypeEnum = TypeTraits<InputT>::value;
     static_assert(std::is_same<AccumulateT, float>::value,
@@ -238,9 +241,11 @@ int runGemm(size_t         m,
 
     if(useScaleAlphaVec)
     {
-        scaleAlphaVecBuf.resize(m);
+        size_t scaleAlphaVecLen = (factorDim == 0) ? m : n;
+        scaleAlphaVecBuf.resize(scaleAlphaVecLen);
         std::generate(scaleAlphaVecBuf.begin(), scaleAlphaVecBuf.end(), randomGen);
         contraction.setUseScaleAlphaVec(1);
+        contraction.setScaleAlphaVec(rocisa::DataType::Float, scaleAlphaVecLen, factorDim);
     }
 
     // Random scale generator: magnitude in [1.1, 100], sign random.
@@ -259,6 +264,9 @@ int runGemm(size_t         m,
     {
         scaleABuf = {scaleGen()};
         scaleBBuf = {scaleGen()};
+        // setUseScaleAB must be called before setScaleA/setScaleB,
+        // because setScaleA/B silently skips tensor registration when
+        // m_useScaleAB is still empty.
         contraction.setUseScaleAB("Scalar");
         contraction.setScaleA(rocisa::DataType::Float, 1);
         contraction.setScaleB(rocisa::DataType::Float, 1);
@@ -324,7 +332,8 @@ int runGemm(size_t         m,
                         useScaleAlphaVec ? scaleAlphaVecBuf.data() : nullptr,
                         activation,
                         (useScaleAB == "Vector") ? scaleABuf.data() : nullptr,
-                        (useScaleAB == "Vector") ? scaleBBuf.data() : nullptr);
+                        (useScaleAB == "Vector") ? scaleBBuf.data() : nullptr,
+                        factorDim);
 
         // Compare results
         bool  allClose = true;
@@ -380,6 +389,7 @@ int main(int argc, char* argv[])
         "bias", po::value<bool>()->default_value(false), "Enable bias vector")(
         "activation", po::value<std::string>()->default_value("none"), "Activation (none, relu)")(
         "scaleAlphaVec", po::value<bool>()->default_value(false), "Enable per-row alpha scaling")(
+        "factorDim", po::value<int>()->default_value(0), "ScaleAlphaVec dimension: 0=row(M), 1=col(N)")(
         "useScaleAB", po::value<std::string>()->default_value("none"), "ScaleAB mode (none, Scalar, Vector)");
 
     po::variables_map vm;
@@ -413,11 +423,18 @@ int main(int argc, char* argv[])
     bool        useBias          = vm["bias"].as<bool>();
     std::string activationStr    = vm["activation"].as<std::string>();
     bool        useScaleAlphaVec = vm["scaleAlphaVec"].as<bool>();
+    int         factorDim        = vm["factorDim"].as<int>();
     std::string useScaleAB       = vm["useScaleAB"].as<std::string>();
 
     if(useScaleAB != "none" && useScaleAB != "Scalar" && useScaleAB != "Vector")
     {
         std::cerr << "Unknown useScaleAB mode: " << useScaleAB << std::endl;
+        return 1;
+    }
+
+    if(factorDim != 0 && factorDim != 1)
+    {
+        std::cerr << "Invalid factorDim: " << factorDim << " (must be 0 or 1)" << std::endl;
         return 1;
     }
 
@@ -439,19 +456,19 @@ int main(int argc, char* argv[])
         {
             return runGemm<float>(
                 m, n, k, transA, transB, alpha, beta, validate, tryFastPath,
-                useBias, activation, useScaleAlphaVec, useScaleAB);
+                useBias, activation, useScaleAlphaVec, useScaleAB, factorDim);
         }
         else if(typeStr == "bf16")
         {
             return runGemm<BFloat16>(
                 m, n, k, transA, transB, alpha, beta, validate, tryFastPath,
-                useBias, activation, useScaleAlphaVec, useScaleAB);
+                useBias, activation, useScaleAlphaVec, useScaleAB, factorDim);
         }
         else if(typeStr == "f16")
         {
             return runGemm<Half>(
                 m, n, k, transA, transB, alpha, beta, validate, tryFastPath,
-                useBias, activation, useScaleAlphaVec, useScaleAB);
+                useBias, activation, useScaleAlphaVec, useScaleAB, factorDim);
         }
         else
         {
