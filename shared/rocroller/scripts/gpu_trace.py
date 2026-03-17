@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 """
@@ -158,7 +159,8 @@ class LDSFamily(InstructionFamily):
         return {
             "derived": {
                 "first_bank": first_bank,
-                "effective_addr": [addr_fmt(v - min_addr) for v in effective],
+                "effective_addr": [addr_fmt(v) for v in effective],
+                "relative_addr": [addr_fmt(v - min_addr) for v in effective],
             },
             "vgpr": {reg: raw},
         }
@@ -175,7 +177,7 @@ class BufferFamily(InstructionFamily):
       LDS-direct: buffer_load_<width>          v<voff>, s[<srd_base>:...], ...  lds
     In the LDS-direct form there is no destination VGPR; data flows from
     global memory straight into LDS. The LDS write address per lane is:
-      lds_effective_addr[lane] = M0 + lane * width_bytes
+      lds_relative_addr[lane] = lane * width_bytes  (normalized: M0 subtracted)
     """
 
     # Normal: has a destination operand before the voffset register.
@@ -228,26 +230,26 @@ class BufferFamily(InstructionFamily):
         voffsets = read_vgpr_lanes(frame, voffset_idx, uint32_type)
         s = [read_uint32(frame, f"s{srd_base + i}", uint32_type) for i in range(4)]
         base_pointer = (s[1] << 32) + s[0]
-        srd_raw = (s[3] << 96) | (s[2] << 64) | (s[1] << 32) | s[0]
         effective = [base_pointer + voffsets[i] for i in range(64)]
         min_eff = min(effective)
+        sgpr = {f"s[{srd_base}:{srd_base+3}]": s}
         derived = {
             "base_pointer": addr_fmt(base_pointer),
-            "size": s[2],
-            "buffer_descriptor": addr_fmt(srd_raw),
-            "effective_addr": [addr_fmt(v - min_eff) for v in effective],
+            "effective_addr": [addr_fmt(v) for v in effective],
+            "relative_addr": [addr_fmt(v - min_eff) for v in effective],
         }
-        sgpr = {f"s[{srd_base}:{srd_base+3}]": s}
         if instr.meta["lds_direct"]:
             m0 = read_uint32(frame, "m0", uint32_type)
             width = self._instr_width_bytes(instr.mnemonic)
             lds_effective = [m0 + lane * width for lane in range(64)]
             dwords_per_instr = max(1, width // 4)
-            derived["lds_direct"] = True
+            min_lds = min(lds_effective)
+            derived["lds_effective_addr"] = [addr_fmt(a) for a in lds_effective]
+            derived["lds_relative_addr"] = [addr_fmt(a - min_lds) for a in lds_effective]
             derived["lds_first_bank"] = [
                 ((addr // 4) % 64) // dwords_per_instr for addr in lds_effective
             ]
-            derived["lds_effective_addr"] = [addr_fmt(a) for a in lds_effective]
+            derived["lds_direct"] = True
             sgpr["m0"] = m0
         return {
             "derived": derived,
