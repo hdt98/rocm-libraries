@@ -1135,7 +1135,7 @@ def run_downstream_tests(Map conf=[:]){
     }
 
     withDockerContainer(image: conf.image, args: dockerOpts) {
-        timeout(time: 5, unit: 'HOURS'){
+        timeout(time: conf.get("timeoutHours", 2), unit: 'HOURS'){
             try{
                 sh "rocminfo"
                 sh "python3 --version"
@@ -1482,7 +1482,7 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx942")}
                     steps{
-                        run_downstream_tests(image: "${env.CK_PYTORCH_IMAGE}", execute_cmds: RUN_PYTORCH_TESTS_CMDS)
+                        run_downstream_tests(image: "${env.CK_PYTORCH_IMAGE}", timeoutHours: 2, execute_cmds: RUN_PYTORCH_TESTS_CMDS)
                         cleanWs()
                     }
                 }
@@ -1494,7 +1494,7 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx942")}
                     steps{
-                        run_downstream_tests(image: "${env.CK_AITER_IMAGE}", execute_cmds: RUN_AITER_TESTS_CMDS)
+                        run_downstream_tests(image: "${env.CK_AITER_IMAGE}", timeoutHours: 5, execute_cmds: RUN_AITER_TESTS_CMDS)
                         cleanWs()
                     }
                 }
@@ -1506,7 +1506,7 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx950")}
                     steps{
-                        run_downstream_tests(image: "${env.CK_AITER_IMAGE}", execute_cmds: RUN_AITER_TESTS_CMDS)
+                        run_downstream_tests(image: "${env.CK_AITER_IMAGE}", timeoutHours: 5, execute_cmds: RUN_AITER_TESTS_CMDS)
                         cleanWs()
                     }
                 }
@@ -1518,7 +1518,7 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx942")}
                     steps{
-                        run_downstream_tests(image: "${env.CK_FA_IMAGE}", execute_cmds: RUN_FA_TESTS_CMDS)
+                        run_downstream_tests(image: "${env.CK_FA_IMAGE}", timeoutHours: 5, execute_cmds: RUN_FA_TESTS_CMDS)
                         cleanWs()
                     }
                 }
@@ -1530,7 +1530,7 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx950")}
                     steps{
-                        run_downstream_tests(image: "${env.CK_FA_IMAGE}", execute_cmds: RUN_FA_TESTS_CMDS)
+                        run_downstream_tests(image: "${env.CK_FA_IMAGE}", timeoutHours: 5, execute_cmds: RUN_FA_TESTS_CMDS)
                         cleanWs()
                     }
                 }
