@@ -4766,7 +4766,8 @@ inline hipsolverStatus_t hipsolver_getrf_bufferSize(testAPI_t           API,
                                                     float*              A,
                                                     int                 lda,
                                                     int*                lworkOnDevice,
-                                                    int*                lworkOnHost)
+                                                    int*                lworkOnHost,
+                                                    int                 bc)
 {
     *lworkOnHost = 0;
     switch(API)
@@ -4791,7 +4792,8 @@ inline hipsolverStatus_t hipsolver_getrf_bufferSize(testAPI_t           API,
                                                     double*             A,
                                                     int                 lda,
                                                     int*                lworkOnDevice,
-                                                    int*                lworkOnHost)
+                                                    int*                lworkOnHost,
+                                                    int                 bc)
 {
     *lworkOnHost = 0;
     switch(API)
@@ -4816,7 +4818,8 @@ inline hipsolverStatus_t hipsolver_getrf_bufferSize(testAPI_t           API,
                                                     hipsolverComplex*   A,
                                                     int                 lda,
                                                     int*                lworkOnDevice,
-                                                    int*                lworkOnHost)
+                                                    int*                lworkOnHost,
+                                                    int                 bc)
 {
     *lworkOnHost = 0;
     switch(API)
@@ -4842,7 +4845,8 @@ inline hipsolverStatus_t hipsolver_getrf_bufferSize(testAPI_t               API,
                                                     hipsolverDoubleComplex* A,
                                                     int                     lda,
                                                     int*                    lworkOnDevice,
-                                                    int*                    lworkOnHost)
+                                                    int*                    lworkOnHost,
+                                                    int                     bc)
 {
     *lworkOnHost = 0;
     switch(API)
@@ -4868,7 +4872,8 @@ inline hipsolverStatus_t hipsolver_getrf_bufferSize(testAPI_t           API,
                                                     float*              A,
                                                     int64_t             lda,
                                                     size_t*             lworkOnDevice,
-                                                    size_t*             lworkOnHost)
+                                                    size_t*             lworkOnHost,
+                                                    int                 bc)
 {
     switch(API)
     {
@@ -4890,7 +4895,8 @@ inline hipsolverStatus_t hipsolver_getrf_bufferSize(testAPI_t           API,
                                                     double*             A,
                                                     int64_t             lda,
                                                     size_t*             lworkOnDevice,
-                                                    size_t*             lworkOnHost)
+                                                    size_t*             lworkOnHost,
+                                                    int                 bc)
 {
     switch(API)
     {
@@ -4912,7 +4918,8 @@ inline hipsolverStatus_t hipsolver_getrf_bufferSize(testAPI_t           API,
                                                     hipsolverComplex*   A,
                                                     int64_t             lda,
                                                     size_t*             lworkOnDevice,
-                                                    size_t*             lworkOnHost)
+                                                    size_t*             lworkOnHost,
+                                                    int                 bc)
 {
     switch(API)
     {
@@ -4934,7 +4941,8 @@ inline hipsolverStatus_t hipsolver_getrf_bufferSize(testAPI_t               API,
                                                     hipsolverDoubleComplex* A,
                                                     int64_t                 lda,
                                                     size_t*                 lworkOnDevice,
-                                                    size_t*                 lworkOnHost)
+                                                    size_t*                 lworkOnHost,
+                                                    int                     bc)
 {
     switch(API)
     {
@@ -5361,14 +5369,15 @@ inline hipsolverStatus_t hipsolver_getrf_bufferSize(testAPI_t           API,
                                                     float*              A[],
                                                     int                 lda,
                                                     int*                lworkOnDevice,
-                                                    int*                lworkOnHost)
+                                                    int*                lworkOnHost,
+                                                    int                 bc)
 {
     *lworkOnHost = 0;
     switch(API)
     {
     case API_NORMAL:
         return hipsolverSgetrfBatched_bufferSize(
-            handle, m, n, A, lda, std::min(m, n), lworkOnDevice, 0);
+            handle, m, n, A, lda, std::min(m, n), lworkOnDevice, bc);
     default:
         *lworkOnDevice = 0;
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
@@ -5383,14 +5392,15 @@ inline hipsolverStatus_t hipsolver_getrf_bufferSize(testAPI_t           API,
                                                     double*             A[],
                                                     int                 lda,
                                                     int*                lworkOnDevice,
-                                                    int*                lworkOnHost)
+                                                    int*                lworkOnHost,
+                                                    int                 bc)
 {
     *lworkOnHost = 0;
     switch(API)
     {
     case API_NORMAL:
         return hipsolverDgetrfBatched_bufferSize(
-            handle, m, n, A, lda, std::min(m, n), lworkOnDevice, 0);
+            handle, m, n, A, lda, std::min(m, n), lworkOnDevice, bc);
     default:
         *lworkOnDevice = 0;
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
@@ -5405,14 +5415,15 @@ inline hipsolverStatus_t hipsolver_getrf_bufferSize(testAPI_t           API,
                                                     hipsolverComplex*   A[],
                                                     int                 lda,
                                                     int*                lworkOnDevice,
-                                                    int*                lworkOnHost)
+                                                    int*                lworkOnHost,
+                                                    int                 bc)
 {
     *lworkOnHost = 0;
     switch(API)
     {
     case API_NORMAL:
         return hipsolverCgetrfBatched_bufferSize(
-            handle, m, n, (hipFloatComplex**)A, lda, std::min(m, n), lworkOnDevice, 0);
+            handle, m, n, (hipFloatComplex**)A, lda, std::min(m, n), lworkOnDevice, bc);
     default:
         *lworkOnDevice = 0;
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
@@ -5427,14 +5438,15 @@ inline hipsolverStatus_t hipsolver_getrf_bufferSize(testAPI_t               API,
                                                     hipsolverDoubleComplex* A[],
                                                     int                     lda,
                                                     int*                    lworkOnDevice,
-                                                    int*                    lworkOnHost)
+                                                    int*                    lworkOnHost,
+                                                    int                     bc)
 {
     *lworkOnHost = 0;
     switch(API)
     {
     case API_NORMAL:
         return hipsolverZgetrfBatched_bufferSize(
-            handle, m, n, (hipDoubleComplex**)A, lda, std::min(m, n), lworkOnDevice, 0);
+            handle, m, n, (hipDoubleComplex**)A, lda, std::min(m, n), lworkOnDevice, bc);
     default:
         *lworkOnDevice = 0;
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
