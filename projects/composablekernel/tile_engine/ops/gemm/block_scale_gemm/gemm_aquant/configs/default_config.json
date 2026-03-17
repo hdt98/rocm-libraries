@@ -2,43 +2,26 @@
     "tile_config": {
         "tile_m": {
             "values": [
-                16,
-                32,
-                64,
-                128,
-                192,
-                256
+                16, 32
             ]
         },
         "tile_n": {
             "values": [
-                32,
-                64,
-                128,
-                192,
-                256
+                64, 128
             ]
         },
         "tile_k": {
             "values": [
-                64,
-                128,
-                192,
-                256,
-                512
+                128, 256
             ]
         },
         "warp_m": {
             "values": [
-                1,
-                2,
-                4
+                1
             ]
         },
         "warp_n": {
             "values": [
-                1,
-                2,
                 4
             ]
         },
@@ -49,25 +32,17 @@
         },
         "warp_tile_m": {
             "values": [
-                4,
-                16,
-                32
+                16, 32
             ]
         },
         "warp_tile_n": {
             "values": [
-                16,
-                32,
-                64
+                16, 32
             ]
         },
         "warp_tile_k": {
             "values": [
-                8,
-                16,
-                32,
-                64,
-                128
+                32, 64, 128
             ]
         }
     },
@@ -80,13 +55,14 @@
         },
         "scheduler": {
             "values": [
-                "intrawave",
-                "interwave"
+                "interwave",
+                "intrawave"
             ]
         },
         "epilogue": {
             "values": [
-                "default"
+                "default",
+                "cshuffle"
             ]
         },
         "pad_m": {
@@ -101,7 +77,7 @@
         },
         "pad_k": {
             "values": [
-                true
+                false
             ]
         },
         "a_preshuffle_quant": {

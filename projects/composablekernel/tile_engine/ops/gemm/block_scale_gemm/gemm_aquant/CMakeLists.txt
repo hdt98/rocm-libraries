@@ -98,9 +98,11 @@ function(create_individual_gemm_aquant_target datatype layout trait tile_config 
     # Add to pipeline-specific and scheduler-specific targets
     string(REPLACE "_" ";" trait_parts ${trait})
     list(GET trait_parts 0 pipeline)
+    list(GET trait_parts 1 epilogue)
     list(GET trait_parts 2 scheduler)
 
     add_dependencies(benchmark_gemm_aquant_${pipeline}_pipeline ${target_name})
+    add_dependencies(benchmark_gemm_aquant_${epilogue}_epilogue ${target_name})
     add_dependencies(benchmark_gemm_aquant_${scheduler}_scheduler ${target_name})
 endfunction()
 
@@ -248,6 +250,12 @@ else()
     set(GEMM_AQUANT_PIPELINES "mem;compv3")
     foreach(pipeline IN LISTS GEMM_AQUANT_PIPELINES)
         add_custom_target(benchmark_gemm_aquant_${pipeline}_pipeline)
+    endforeach()
+
+    # Create scheduler-specific collection targets
+    set(GEMM_AQUANT_EPILOGUES "default;cshuffle")
+    foreach(scheduler IN LISTS GEMM_AQUANT_EPILOGUES)
+        add_custom_target(benchmark_gemm_aquant_${epilogue}_epilogue)
     endforeach()
 
     # Create scheduler-specific collection targets
