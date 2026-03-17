@@ -22,36 +22,47 @@ from pr_detect_changed_subtrees import get_valid_prefixes, find_matched_subtrees
 from config_loader import load_repo_config
 
 
-# Build variant configuration mapping
-# Maps variant name to (cmake_preset, label, expect_failure)
-BUILD_VARIANT_CONFIG = {
-    "release": ("linux-release-package", "release", False),
-    "asan": ("linux-release-asan", "asan", True),
-    "tsan": ("linux-release-tsan", "tsan", False),
-}
+logging.basicConfig(level=logging.INFO)
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_DIR = SCRIPT_DIR.parent
+
+# Importing TheRock amdgpu_family_matrix.py
+sys.path.append(str(REPO_DIR / "TheRock" / "build_tools" / "github_actions"))
+from amdgpu_family_matrix import all_build_variants
 
 
-def retrieve_build_variant(variant_name: str) -> Tuple[str, str, bool]:
+def retrieve_build_variant(args) -> Tuple[str, str, bool]:
     """
-    Retrieves build variant configuration.
+    Retrieves build variant configuration from TheRock's amdgpu_family_matrix.
 
     Args:
-        variant_name: Name of the build variant (e.g., "release", "asan", "tsan")
+        args: Dictionary containing 'platform' and 'build_variant' keys
 
     Returns:
         Tuple of (cmake_preset, label, expect_failure)
     """
-    if variant_name not in BUILD_VARIANT_CONFIG:
-        logging.warning(
-            f"Unknown build variant '{variant_name}', falling back to 'release'"
+    platform = args.get("platform")
+    build_variant = args.get("build_variant", "release")
+
+    if platform in all_build_variants and build_variant in all_build_variants[platform]:
+        build_variant_cmake_preset = all_build_variants[platform][build_variant][
+            "build_variant_cmake_preset"
+        ]
+        build_variant_label = all_build_variants[platform][build_variant][
+            "build_variant_label"
+        ]
+        expect_failure = all_build_variants[platform][build_variant].get(
+            "expect_failure", False
         )
-        variant_name = "release"
+    else:
+        logging.warning(
+            f"Unknown build variant '{build_variant}' for platform '{platform}', using defaults"
+        )
+        build_variant_cmake_preset = ""
+        build_variant_label = ""
+        expect_failure = False
 
-    return BUILD_VARIANT_CONFIG[variant_name]
-
-
-logging.basicConfig(level=logging.INFO)
-SCRIPT_DIR = Path(__file__).resolve().parent
+    return build_variant_cmake_preset, build_variant_label, expect_failure
 
 # Paths matching any of these patterns are considered to have no influence over
 # build or test workflows so any related jobs can be skipped if all paths
@@ -232,29 +243,17 @@ def run(args):
     platform = args.get("platform")
     project_to_run, test_type = retrieve_projects(args)
 
-    # Get build variant configuration
-    build_variant = args.get("build_variant", "release")
-    cmake_preset, variant_label, expect_failure = retrieve_build_variant(build_variant)
-
-    # For TSAN builds, only run hipblaslt quick tests
-    if build_variant == "tsan":
-        logging.info(
-            "TSAN build detected - limiting to hipblaslt only with quick tests"
-        )
-        project_to_run = [
-            {
-                "cmake_options": "-DTHEROCK_ENABLE_BLAS=ON -DTHEROCK_ENABLE_ALL=OFF",
-                "projects_to_test": "hipblaslt",
-            }
-        ]
-        test_type = "quick"
+    # Get build variant configuration from TheRock
+    build_variant_cmake_preset, build_variant_label, expect_failure = (
+        retrieve_build_variant(args)
+    )
 
     outputs = {
         f"{platform}_projects": json.dumps(project_to_run),
         "test_type": test_type,
-        "build_variant_cmake_preset": cmake_preset,
-        "build_variant_label": variant_label,
-        "expect_failure": str(expect_failure).lower(),
+        "build_variant_cmake_preset": build_variant_cmake_preset,
+        "build_variant_label": build_variant_label,
+        "expect_failure": json.dumps(expect_failure),
     }
     set_github_output(outputs)
 
