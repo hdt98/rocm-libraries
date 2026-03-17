@@ -30,10 +30,22 @@
 
 #include <Tensile/PredictionLibrary.hpp>
 
+#include <cstdlib>
+#include <cstring>
+
 namespace TensileLite
 {
     namespace Serialization
     {
+        inline origami::prediction_modes_t getPredictionModeFromEnv()
+        {
+            const char* env = std::getenv("ANALYTICAL_GEMM_PREDICTION_MODE");
+            if(env && std::strcmp(env, "1") == 0)
+            {
+                return origami::prediction_modes_t::simulation;
+            }
+            return origami::prediction_modes_t::estimation;
+        }
 
         template <typename MyProblem, typename MySolution, typename IO>
         struct MappingTraits<ProblemPredictionLibrary<MyProblem, MySolution>, IO>
@@ -116,8 +128,36 @@ namespace TensileLite
                                 .cache_hints_b             = solution->sizeMapping.nonTemporalB,
                                 .workspace_size            = std::numeric_limits<size_t>::max(),
                                 .workspace_size_per_elem_c = std::numeric_limits<size_t>::max(),
+                                .prediction_mode           = getPredictionModeFromEnv(),
                                 .index                     = local_index,
+                                .grvw_a                    = solution->sizeMapping.grvwA,
+                                .grvw_b                    = solution->sizeMapping.grvwB,
+                                .gwvw_d                    = solution->sizeMapping.gwvwD,
+                                .vector_width_a            = solution->sizeMapping.VectorWidthA,
+                                .vector_width_b            = solution->sizeMapping.VectorWidthB,
                             };
+
+                            // Populate tensile_params_t for Formocast simulation mode
+                            auto& tensile_params = origami_config.tensile();
+                            tensile_params.depth_u = solution->sizeMapping.depthU;
+                            tensile_params.global_split_u = solution->sizeMapping.globalSplitU;
+                            tensile_params.global_accumulation = solution->sizeMapping.globalAccumulation;
+                            tensile_params.local_split_u = solution->sizeMapping.LocalSplitU;
+                            tensile_params.direct_to_vgpr_a = solution->sizeMapping.DirectToVgprA;
+                            tensile_params.direct_to_vgpr_b = solution->sizeMapping.DirectToVgprB;
+                            tensile_params.direct_to_lds_a = solution->sizeMapping.DirectToLdsA;
+                            tensile_params.direct_to_lds_b = solution->sizeMapping.DirectToLdsB;
+                            tensile_params.num_loads_coalesced_a = solution->sizeMapping.NumLoadsCoalescedA;
+                            tensile_params.num_loads_coalesced_b = solution->sizeMapping.NumLoadsCoalescedB;
+                            tensile_params.wave_num = solution->sizeMapping.waveNum;
+                            tensile_params.wave_group_m = solution->sizeMapping.waveGroup[0];
+                            tensile_params.wave_group_n = solution->sizeMapping.waveGroup[1];
+                            tensile_params.prefetch_global_read = solution->sizeMapping.PrefetchGlobalRead;
+                            tensile_params.math_clocks_unrolled_loop = solution->sizeMapping.MathClocksUnrolledLoop;
+                            tensile_params.workgroup_mapping_xcc = solution->sizeMapping.workGroupMappingXCC;
+                            tensile_params.workgroup_mapping_xcc_group = solution->sizeMapping.workGroupMappingXCCGroup;
+                            tensile_params.global_split_u_coalesced = solution->sizeMapping.globalSplitUCoalesced;
+                            tensile_params.global_split_u_wgm_round_robin = solution->sizeMapping.globalSplitUWorkGroupMappingRoundRobin;
 
                             lib.origami_config_list.emplace_back(origami_config);
                         }

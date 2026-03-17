@@ -125,6 +125,11 @@ For more information, see :doc:`Use Stream-K with hipBLASLt <../how-to/how-to-us
         | Example: 32 (limits GEMM kernels to 32 compute units)
         | Default: All available compute units
 
+    * - | ``ANALYTICAL_GEMM_PREDICTION_MODE``
+        | Controls the prediction model used by Origami for kernel selection.
+      - | 0: Estimation mode (fast analytical estimation, default)
+        | 1: Simulation mode (uses Formocast for more accurate performance prediction)
+
 Type overrides
 ======================
 
