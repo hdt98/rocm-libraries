@@ -851,7 +851,6 @@ namespace TensileLite
                 return rejectFast("scaleCD");
             }
 
-
             if(problem.boundIndices().size() != 1 || problem.freeIndicesA().size() != 1
                || problem.freeIndicesB().size() != 1)
             {
@@ -933,17 +932,29 @@ namespace TensileLite
             size_t sizeM     = problem.freeSizeA(0);
             size_t sizeN     = problem.freeSizeB(0);
 
-            std::string  useScaleAB = problem.useScaleAB();
+            enum class ScaleABMode { None, Scalar, Vector };
+            ScaleABMode  scaleABMode = ScaleABMode::None;
             ShadowBuffer shadowScaleA, shadowScaleB;
-            if(useScaleAB == "Vector")
+            float        scaleABScalar = 1.0f; // pre-multiplied scalar for Scalar mode
             {
-                shadowScaleA = ShadowBuffer(inputs.scaleA, problem.alphaType(), sizeM);
-                shadowScaleB = ShadowBuffer(inputs.scaleB, problem.alphaType(), sizeN);
-            }
-            else if(useScaleAB == "Scalar")
-            {
-                shadowScaleA = ShadowBuffer(inputs.scaleA, problem.alphaType(), 1);
-                shadowScaleB = ShadowBuffer(inputs.scaleB, problem.alphaType(), 1);
+                std::string useScaleAB = problem.useScaleAB();
+                if(useScaleAB == "Vector")
+                {
+                    if(!inputs.scaleA || !inputs.scaleB)
+                        return rejectFast("null_scaleAB_ptr");
+                    scaleABMode  = ScaleABMode::Vector;
+                    shadowScaleA = ShadowBuffer(inputs.scaleA, problem.alphaType(), sizeM);
+                    shadowScaleB = ShadowBuffer(inputs.scaleB, problem.alphaType(), sizeN);
+                }
+                else if(useScaleAB == "Scalar")
+                {
+                    if(!inputs.scaleA || !inputs.scaleB)
+                        return rejectFast("null_scaleAB_ptr");
+                    scaleABMode = ScaleABMode::Scalar;
+                    ShadowBuffer tmpA(inputs.scaleA, problem.alphaType(), 1);
+                    ShadowBuffer tmpB(inputs.scaleB, problem.alphaType(), 1);
+                    scaleABScalar = tmpA[0] * tmpB[0];
+                }
             }
 
             constexpr size_t BLOCK_M = 32;
@@ -1071,15 +1082,14 @@ namespace TensileLite
                                     auto   startingC = curBatchC[idxC];
                                     auto   current   = curBatchD[idxD];
                                     float  alpha     = originalAlpha;
-                                    if(useScaleAB == "Vector")
+                                    if(scaleABMode == ScaleABMode::Vector)
                                     {
                                         alpha *= shadowScaleA[global_m];
                                         alpha *= shadowScaleB[global_n];
                                     }
-                                    else if(useScaleAB == "Scalar")
+                                    else if(scaleABMode == ScaleABMode::Scalar)
                                     {
-                                        alpha *= shadowScaleA[0];
-                                        alpha *= shadowScaleB[0];
+                                        alpha *= scaleABScalar;
                                     }
                                     if(useScaleAlphaVec)
                                     {
