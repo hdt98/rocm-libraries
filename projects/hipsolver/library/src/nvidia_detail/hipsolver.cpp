@@ -3946,7 +3946,6 @@ hipsolverStatus_t hipsolverSgetrfBatched_bufferSize(hipsolverHandle_t handle,
                                                     int               strideP,
                                                     int*              lwork,
                                                     int               batch_count)
-try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
@@ -3957,10 +3956,6 @@ try
 
     *lwork = 0;
     return HIPSOLVER_STATUS_SUCCESS;
-}
-catch(...)
-{
-    return hipsolver::exception2hip_status();
 }
 
 hipsolverStatus_t hipsolverDgetrfBatched_bufferSize(hipsolverHandle_t handle,
@@ -3971,7 +3966,6 @@ hipsolverStatus_t hipsolverDgetrfBatched_bufferSize(hipsolverHandle_t handle,
                                                     int               strideP,
                                                     int*              lwork,
                                                     int               batch_count)
-try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
@@ -3982,10 +3976,6 @@ try
 
     *lwork = 0;
     return HIPSOLVER_STATUS_SUCCESS;
-}
-catch(...)
-{
-    return hipsolver::exception2hip_status();
 }
 
 hipsolverStatus_t hipsolverCgetrfBatched_bufferSize(hipsolverHandle_t handle,
@@ -3996,7 +3986,6 @@ hipsolverStatus_t hipsolverCgetrfBatched_bufferSize(hipsolverHandle_t handle,
                                                     int               strideP,
                                                     int*              lwork,
                                                     int               batch_count)
-try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
@@ -4007,10 +3996,6 @@ try
 
     *lwork = 0;
     return HIPSOLVER_STATUS_SUCCESS;
-}
-catch(...)
-{
-    return hipsolver::exception2hip_status();
 }
 
 hipsolverStatus_t hipsolverZgetrfBatched_bufferSize(hipsolverHandle_t handle,
@@ -4021,7 +4006,6 @@ hipsolverStatus_t hipsolverZgetrfBatched_bufferSize(hipsolverHandle_t handle,
                                                     int               strideP,
                                                     int*              lwork,
                                                     int               batch_count)
-try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
@@ -4032,10 +4016,6 @@ try
 
     *lwork = 0;
     return HIPSOLVER_STATUS_SUCCESS;
-}
-catch(...)
-{
-    return hipsolver::exception2hip_status();
 }
 
 hipsolverStatus_t hipsolverSgetrfBatched(hipsolverHandle_t handle,
