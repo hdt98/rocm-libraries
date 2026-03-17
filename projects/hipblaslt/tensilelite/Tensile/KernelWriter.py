@@ -223,6 +223,7 @@ class StateValues:
   globalReadIncsUseVgpr: bool            = False
   groOffsetInMacroTile: int              = 0
   use64bShadowLimit: bool                = True
+  use64bShadowLimitMX: bool              = False
   preventVgprOverflowDuringNewTile: int  = -1
   interleaveStoreVmcnt: bool             = False
   srdShiftLeft:dict                      = field(init=False)
@@ -5072,6 +5073,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # use 64-bit buffer limit shadow register
     # but not implemented or tested
     self.states.use64bShadowLimit = kernel["Use64bShadowLimit"] and kernel["BufferLoad"]
+    self.states.use64bShadowLimitMX = kernel["Use64bShadowLimitMX"] and kernel["BufferLoad"]
 
     # Check if the address setup code for LWA and GRO causes register growth.
     # This is not an error condition but bears further investigation.
@@ -6218,10 +6220,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     vgprIdx += numVgprAddressDbg
 
     # for cgemm or zgemm + MIAV case, allocate 2 or 4 vgpr for alpha calculation (cannot use tmp vgpr in write batch)
-    if kernel["ProblemType"]["MacDataTypeA"].isComplex() \
-      and kernel["MIArchVgpr"] \
-      and (kernel["_GlobalAccumulation"] == 'SingleBuffer' or kernel["_GlobalAccumulation"] == None):
-
+    if kernel["ProblemType"]["MacDataTypeA"].isComplex() and kernel["MIArchVgpr"]:
       # need proper alignment
       vgprIdx = ((vgprIdx+2 - 1)//2)*2
       self.states.startVgprAlphaTmp = vgprIdx
@@ -6905,7 +6904,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.localReadDoCntMetadata  = 0
 
     if kernel["EnableMatrixInstruction"]:
-      #TODO:import getMXMFMAIssueLatency
       from rocisa.instruction import getMFMAIssueLatency, getSMFMAIssueLatency
       miInputType = getMiInputType(kernel)
 
