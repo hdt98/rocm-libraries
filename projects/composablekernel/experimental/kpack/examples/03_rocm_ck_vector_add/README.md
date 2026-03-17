@@ -21,8 +21,8 @@ and compiles multiple kernel variants into one kpack archive.
 
 | File | Purpose |
 |------|---------|
-| `rocm_ck_vector_add_args.hpp` | Shared ABI + config (no CK Tile dependency) |
-| `rocm_ck_vector_add.hpp` | Device interface — maps config to CK Tile types |
+| `rocm_vector_add_api.hpp` | Shared ABI + config (no CK Tile dependency) |
+| `rocm_vector_add_dev.hpp` | Device interface — maps config to CK Tile types |
 | `vector_add_block{256,512,1024}.hip` | Variant instantiations (~6 lines each) |
 | `pack.py` | Multi-binary archive packer |
 | `main.cpp` | Host loader — runs and verifies all variants |
