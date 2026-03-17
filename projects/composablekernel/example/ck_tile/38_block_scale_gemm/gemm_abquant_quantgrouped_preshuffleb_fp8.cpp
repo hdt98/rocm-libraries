@@ -16,7 +16,7 @@ static auto _ = []() {
         using TypeConfig =
             decltype(GemmQuantTypeConfig<ck_tile::fp8_t, ck_tile::fp8_t, ck_tile::half_t, float>{});
         return run_gemm_example_prec_type<
-            GemmConfigPrefill<ck_tile::fp8_t, false>, // make the TranposeC false
+            GemmConfigPrefill<ck_tile::fp8_t>,
             TypeConfig,
             AQuantGroupSize,
             BQuantGroupSize,
@@ -32,7 +32,7 @@ static auto _ = []() {
         using TypeConfig =
             decltype(GemmQuantTypeConfig<ck_tile::fp8_t, ck_tile::fp8_t, ck_tile::half_t, float>{});
         return run_gemm_example_prec_type<
-            GemmConfigPrefill<ck_tile::fp8_t, false>, // make the TranposeC false
+            GemmConfigPrefill<ck_tile::fp8_t>,
             TypeConfig,
             AQuantGroupSize,
             BQuantGroupSize,
