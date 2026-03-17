@@ -130,7 +130,8 @@ struct GroupedConvolutionBackwardWeightInvoker
             throw std::runtime_error("Wrong! Arguments not supported! Skipping conv!\n");
         }
 
-        // Workspace: non-zero for StreamK, zero (no-op) for Split-K
+        // Workspace: may be non-zero for StreamK (depends on SK/DP tile split),
+        // always zero for Split-K.
         auto ws_size = Kernel::GetWorkSpaceSize(kargs);
         ck_tile::DeviceMem workspace_dev(ws_size);
         Kernel::SetWorkSpacePointer(kargs, workspace_dev.GetDeviceBuffer());
@@ -151,11 +152,14 @@ struct GroupedConvolutionBackwardWeightInvoker
         }
 
         auto preprocess = [&]() {
-            if(ws_size > 0)
+            if constexpr(Kernel::IsStreamK)
             {
                 // StreamK: zero workspace flags before each kernel launch
-                ck_tile::hip_check_error(
-                    hipMemsetAsync(workspace_dev.GetDeviceBuffer(), 0, ws_size, s.stream_id_));
+                if(ws_size > 0)
+                {
+                    ck_tile::hip_check_error(
+                        hipMemsetAsync(workspace_dev.GetDeviceBuffer(), 0, ws_size, s.stream_id_));
+                }
             }
             else if(args.k_batch > 1)
             {
