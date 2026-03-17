@@ -3,7 +3,8 @@
 
 #include "rocm_vector_add_dev.hpp"
 
-static constexpr auto kernel = rocm_ck::make_kernel({.block_size = 512});
+static constexpr auto kernel =
+    rocm_ck::make_kernel({.block_size = 512, .compute_type = rocm_ck::DataType::FP32});
 
 extern "C" __global__ void vector_add_block512(rocm_ck::VectorAddArgs args)
 {
