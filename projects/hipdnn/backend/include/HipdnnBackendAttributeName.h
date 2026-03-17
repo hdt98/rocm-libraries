@@ -48,6 +48,7 @@
  * - 2400-2499: RMSNorm operation attributes
  * - 2500-2599: Matmul operation attributes
  * - 2600-2699: SDPA forward propagation operation attributes
+ * - 2700-2799: Layernorm operation attributes
  * - 60000+: Extension attributes
  */
 typedef enum
@@ -765,6 +766,41 @@ typedef enum
     /** @} */
 
     /**
+     * @name Layernorm Operation Attributes (2700-2799)
+     * Attributes for HIPDNN_BACKEND_OPERATION_LAYERNORM_DESCRIPTOR_EXT
+     * @{
+     */
+
+    /** @brief Input tensor for layernorm */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_X_EXT = 2700,
+
+    /** @brief Scale tensor for layernorm */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_SCALE_EXT = 2701,
+
+    /** @brief Bias tensor for layernorm */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_BIAS_EXT = 2702,
+
+    /** @brief Epsilon tensor for layernorm */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_EPSILON_EXT = 2703,
+
+    /** @brief Output tensor for layernorm */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_Y_EXT = 2704,
+
+    /** @brief Mean output tensor for layernorm (optional) */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_MEAN_EXT = 2705,
+
+    /** @brief Inverse variance output tensor for layernorm (optional) */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_INV_VARIANCE_EXT = 2706,
+
+    /** @brief Forward phase for layernorm (TRAINING or INFERENCE) */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_FWD_PHASE_EXT = 2707,
+
+    /** @brief Math precision (compute data type) for layernorm */
+    HIPDNN_ATTR_LAYERNORM_MATH_PREC_EXT = 2708,
+
+    /** @} */
+
+    /**
      * @name Extension Attributes (60000+)
      * hipDNN-specific extension attributes
      * @{
@@ -785,6 +821,24 @@ typedef enum
      * Type: HIPDNN_TYPE_FLATBUFFER_DATA_STRUCT_EXT
      */
     HIPDNN_ATTR_KNOB_CHOICE_SERIALIZED_VALUE_EXT = 60100,
+
+    /**
+     * @brief Operation type of an operation descriptor (read-only extension)
+     *
+     * Returns the hipdnnOperationType_t of an operation descriptor, enabling
+     * type-based dispatch without trial-and-error probing.
+     * Type: HIPDNN_TYPE_OPERATION_TYPE_EXT
+     */
+    HIPDNN_ATTR_OPERATION_TYPE_EXT = 60200,
+
+    /**
+     * @brief Name of an operation descriptor (extension)
+     *
+     * Gets or sets a human-readable name for an operation node, useful for
+     * debugging, logging, and round-tripping through serialized graphs.
+     * Type: HIPDNN_TYPE_CHAR
+     */
+    HIPDNN_ATTR_OPERATION_NAME_EXT = 60300,
 
     /** @} */
 
