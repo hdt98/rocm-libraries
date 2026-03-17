@@ -89,66 +89,67 @@ macro(get_trans_flags TRANS OUT_FLAGS)
     endif()
 endmacro()
 
-# 2-6. Basic sanity, transpose combos, odd sizes, type coverage
-add_cpu_gemm_test(F32_Sanity
-    ARGS -M 31 -N 41 -K 51 --type f32 --validate
-)
-add_cpu_gemm_test(F32_Odd_Sizes
-    ARGS -M 2 -N 3 -K 5 --type f32 --validate
-)
-foreach(TYPE f32 f16 bf16)
-    get_test_sizes(${TYPE} SIZES)
-    foreach(TRANS NN TN NT TT)
-        get_trans_flags(${TRANS} TFLAGS)
-        add_cpu_gemm_test(${TYPE}_${TRANS}
-            ARGS ${SIZES} ${TFLAGS} --type ${TYPE} --validate
+# Run all tests against both fast and slow paths
+foreach(PATH fast slow)
+    if(PATH STREQUAL "fast")
+        set(PATH_FLAGS --tryFastPath)
+    else()
+        set(PATH_FLAGS "")
+    endif()
+
+    # Basic sanity, transpose combos, odd sizes, type coverage
+    add_cpu_gemm_test(${PATH}_F32_Sanity
+        ARGS -M 31 -N 41 -K 51 --type f32 --validate ${PATH_FLAGS}
+    )
+    add_cpu_gemm_test(${PATH}_F32_Odd_Sizes
+        ARGS -M 2 -N 3 -K 5 --type f32 --validate ${PATH_FLAGS}
+    )
+    foreach(TYPE f32 f16 bf16)
+        get_test_sizes(${TYPE} SIZES)
+        foreach(TRANS NN TN NT TT)
+            get_trans_flags(${TRANS} TFLAGS)
+            add_cpu_gemm_test(${PATH}_${TYPE}_${TRANS}
+                ARGS ${SIZES} ${TFLAGS} --type ${TYPE} --validate ${PATH_FLAGS}
+            )
+        endforeach()
+    endforeach()
+
+    # Cross-validate: features per type
+    foreach(TYPE f32 f16 bf16)
+        get_test_sizes(${TYPE} SIZES)
+        add_cpu_gemm_test(${PATH}_${TYPE}_Beta
+            ARGS ${SIZES} --type ${TYPE} --beta 1.0 --validate ${PATH_FLAGS}
+        )
+        add_cpu_gemm_test(${PATH}_${TYPE}_Bias
+            ARGS ${SIZES} --type ${TYPE} --validate --bias ${PATH_FLAGS}
+        )
+        add_cpu_gemm_test(${PATH}_${TYPE}_AllFeatures
+            ARGS ${SIZES} --type ${TYPE} --validate --bias --activation relu --scaleAlphaVec ${PATH_FLAGS}
+        )
+        add_cpu_gemm_test(${PATH}_${TYPE}_TN_AllFeatures
+            ARGS ${SIZES} --transA --type ${TYPE} --validate --bias --activation relu --scaleAlphaVec ${PATH_FLAGS}
         )
     endforeach()
-endforeach()
 
-# 7. Fast path on/off
-add_cpu_gemm_test(FastPath_On
-    ARGS -M 256 -N 256 -K 256 --tryFastPath --validate --type f32
-)
-add_cpu_gemm_test(FastPath_Off
-    ARGS -M 256 -N 256 -K 256 --validate --type f32
-)
+    # F32-only individual feature tests
+    add_cpu_gemm_test(${PATH}_f32_Relu
+        ARGS -M 33 -N 47 -K 65 --type f32 --validate --activation relu ${PATH_FLAGS}
+    )
+    add_cpu_gemm_test(${PATH}_f32_ScaleAlphaVec
+        ARGS -M 33 -N 47 -K 65 --type f32 --validate --scaleAlphaVec ${PATH_FLAGS}
+    )
+    add_cpu_gemm_test(${PATH}_f32_Beta_AllFeatures
+        ARGS -M 33 -N 47 -K 65 --type f32 --beta 0.5 --validate --bias --activation relu --scaleAlphaVec ${PATH_FLAGS}
+    )
 
-# 8. Cross-validate: features per type
-foreach(TYPE f32 f16 bf16)
-    get_test_sizes(${TYPE} SIZES)
-    add_cpu_gemm_test(${TYPE}_Beta
-        ARGS ${SIZES} --type ${TYPE} --beta 1.0 --validate
-    )
-    add_cpu_gemm_test(${TYPE}_Bias
-        ARGS ${SIZES} --type ${TYPE} --validate --bias
-    )
-    add_cpu_gemm_test(${TYPE}_AllFeatures
-        ARGS ${SIZES} --type ${TYPE} --validate --bias --activation relu --scaleAlphaVec
-    )
-    add_cpu_gemm_test(${TYPE}_TN_AllFeatures
-        ARGS ${SIZES} --transA --type ${TYPE} --validate --bias --activation relu --scaleAlphaVec
-    )
-endforeach()
-
-# 9. F32-only individual feature tests
-add_cpu_gemm_test(f32_Relu
-    ARGS -M 33 -N 47 -K 65 --type f32 --validate --activation relu
-)
-add_cpu_gemm_test(f32_ScaleAlphaVec
-    ARGS -M 33 -N 47 -K 65 --type f32 --validate --scaleAlphaVec
-)
-add_cpu_gemm_test(f32_Beta_AllFeatures
-    ARGS -M 33 -N 47 -K 65 --type f32 --beta 0.5 --validate --bias --activation relu --scaleAlphaVec
-)
-
-# 10. Edge cases: dimensions at or below tile size (BLOCK_M=32, BLOCK_N=32, BLOCK_K=8)
-foreach(CASE "M1;1;47;65" "N1;33;1;65" "K1;33;47;1" "1x1;1;1;1" "ExactBlock;32;32;8")
-    list(GET CASE 0 NAME)
-    list(GET CASE 1 EM)
-    list(GET CASE 2 EN)
-    list(GET CASE 3 EK)
-    add_cpu_gemm_test(f32_${NAME}
-        ARGS -M ${EM} -N ${EN} -K ${EK} --type f32 --validate
-    )
+    # Edge cases: dimensions at or below tile size (BLOCK_M=32, BLOCK_N=32, BLOCK_K=8)
+    foreach(CASE "M1;1;47;65" "N1;33;1;65" "K1;33;47;1" "1x1;1;1;1" "ExactBlock;32;32;8")
+        list(GET CASE 0 NAME)
+        list(GET CASE 1 EM)
+        list(GET CASE 2 EN)
+        list(GET CASE 3 EK)
+        add_cpu_gemm_test(${PATH}_f32_${NAME}
+            ARGS -M ${EM} -N ${EN} -K ${EK} --type f32 --validate ${PATH_FLAGS}
+        )
+    endforeach()
 endforeach()
