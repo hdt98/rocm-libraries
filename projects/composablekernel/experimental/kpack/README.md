@@ -58,11 +58,16 @@ experimental/kpack/
 │       ├── path_resolution.cpp
 │       └── isa_target_match.cpp
 └── examples/
-    └── hello_world/
-        ├── CMakeLists.txt          # Standalone build
-        ├── vector_add.hip          # Device kernel (compiled per-arch)
-        ├── pack.py                 # Packs .hsaco files into .kpack archive
-        └── main.cpp                # Demo: open archive, detect GPU, load & run kernel
+    ├── 01_hello_world/
+    │   ├── CMakeLists.txt          # Standalone build
+    │   ├── vector_add.hip          # Device kernel (compiled per-arch)
+    │   ├── pack.py                 # Packs .hsaco files into .kpack archive
+    │   └── main.cpp                # Demo: open archive, detect GPU, load & run kernel
+    └── 02_ck_tile_vector_add/
+        ├── CMakeLists.txt          # Standalone build with CK Tile includes
+        ├── ck_tile_add.hip         # Device kernel: extern "C" bridge around ElementWiseKernel
+        ├── pack.py                 # Packer with CK Tile include paths
+        └── main.cpp                # Demo: same pattern, CK Tile kernel
 ```
 
 ## Dependencies
@@ -73,10 +78,10 @@ experimental/kpack/
 
 ## Build
 
-The hello_world example is standalone — build it directly:
+The 01_hello_world example is standalone — build it directly:
 
 ```bash
-cd experimental/kpack/examples/hello_world
+cd experimental/kpack/examples/01_hello_world
 
 cmake -B build -S . -G Ninja \
     -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++ \
