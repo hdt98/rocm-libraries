@@ -482,7 +482,9 @@ struct GroupedConvolutionBackwardWeightKernel
 
     // StreamK reduction helpers (partial store/load, flag signaling, tile accumulation).
     // Shared with the StreamK GEMM kernel via StreamKReductionOps in streamk_common.hpp.
-    using StreamKOps = StreamKReductionOps<TilePartitioner, GemmPipeline>;
+    using StreamKOps = StreamKReductionOps<TilePartitioner,
+                                           GemmPipeline,
+                                           GroupedConvBwdWeightKernelArgsSpecialized>;
 
     CK_TILE_HOST static index_t
     GetWorkSpaceSize(const GroupedConvBwdWeightKernelArgsSpecialized& kargs)
