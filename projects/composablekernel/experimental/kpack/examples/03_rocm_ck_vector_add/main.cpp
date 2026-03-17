@@ -7,7 +7,7 @@
 // This file includes only rocm_ck_vector_add_args.hpp (no CK Tile dependency).
 // The consteval variant table ensures host and device agree on configuration.
 
-#include "rocm_ck_vector_add_args.hpp"
+#include "rocm_vector_add_api.hpp"
 
 #include <hip/hip_runtime.h>
 

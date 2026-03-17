@@ -1,7 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-#include "rocm_ck_vector_add.hpp"
+#include "rocm_vector_add_dev.hpp"
 
 static constexpr rocm_ck::vector_add_config config{.block_size = 1024};
 

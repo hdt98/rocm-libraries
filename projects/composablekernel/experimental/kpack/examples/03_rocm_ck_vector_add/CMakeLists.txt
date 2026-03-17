@@ -51,8 +51,8 @@ foreach(variant IN LISTS KERNEL_VARIANTS)
                     -o ${hsaco_output}
                     ${CMAKE_CURRENT_SOURCE_DIR}/${variant}.hip
             DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${variant}.hip
-                    ${CMAKE_CURRENT_SOURCE_DIR}/rocm_ck_vector_add.hpp
-                    ${CMAKE_CURRENT_SOURCE_DIR}/rocm_ck_vector_add_args.hpp
+                    ${CMAKE_CURRENT_SOURCE_DIR}/rocm_vector_add_dev.hpp
+                    ${CMAKE_CURRENT_SOURCE_DIR}/rocm_vector_add_api.hpp
             COMMENT "Compiling ${variant}.hip -> ${arch}.hsaco"
         )
         list(APPEND HSACO_FILES ${hsaco_output})
