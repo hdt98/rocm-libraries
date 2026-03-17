@@ -43,9 +43,12 @@ struct variant_info
 };
 
 static constexpr variant_info VARIANTS[] = {
-    {"vector_add_block256", rocm_ck::make_kernel({.block_size = 256})},
-    {"vector_add_block512", rocm_ck::make_kernel({.block_size = 512})},
-    {"vector_add_block1024", rocm_ck::make_kernel({.block_size = 1024})},
+    {"vector_add_block256",
+     rocm_ck::make_kernel({.block_size = 256, .compute_type = rocm_ck::DataType::FP32})},
+    {"vector_add_block512",
+     rocm_ck::make_kernel({.block_size = 512, .compute_type = rocm_ck::DataType::FP32})},
+    {"vector_add_block1024",
+     rocm_ck::make_kernel({.block_size = 1024, .compute_type = rocm_ck::DataType::FP32})},
 };
 
 int main(int argc, char** argv)
