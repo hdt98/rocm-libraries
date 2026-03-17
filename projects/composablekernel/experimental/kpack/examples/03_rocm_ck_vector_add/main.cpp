@@ -39,13 +39,13 @@
 struct variant_info
 {
     const char* name;
-    rocm_ck::vector_add_kernel_info kernel;
+    rocm_ck::vector_add_struct kernel;
 };
 
 static constexpr variant_info VARIANTS[] = {
-    {"vector_add_block256", rocm_ck::make_vector_add_kernel({.block_size = 256})},
-    {"vector_add_block512", rocm_ck::make_vector_add_kernel({.block_size = 512})},
-    {"vector_add_block1024", rocm_ck::make_vector_add_kernel({.block_size = 1024})},
+    {"vector_add_block256", rocm_ck::make_kernel({.block_size = 256})},
+    {"vector_add_block512", rocm_ck::make_kernel({.block_size = 512})},
+    {"vector_add_block1024", rocm_ck::make_kernel({.block_size = 1024})},
 };
 
 int main(int argc, char** argv)

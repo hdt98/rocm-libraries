@@ -11,6 +11,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <type_traits>
 
 namespace rocm_ck {
@@ -39,27 +40,30 @@ static_assert(offsetof(VectorAddArgs, b) == 16, "unexpected offset for b");
 static_assert(offsetof(VectorAddArgs, c) == 24, "unexpected offset for c");
 
 /// Compile-time configuration for a vector add variant.
-/// Used as a non-type template parameter (C++20 struct NTTP).
+/// This is the user-facing input — it may contain non-structural members
+/// (e.g. std::optional) that prevent direct use as an NTTP.
 struct vector_add_config
 {
     int block_size; // Elements processed per thread block (BlockTile)
+    std::optional<int> unroll_hint = std::nullopt; // Proof-of-concept non-structural member
 };
 
-/// Information needed by the host to launch a configured kernel.
-struct vector_add_kernel_info
+/// Structural output used as NTTP and host launch info.
+/// All members must be structural types (no std::optional, no pointers, etc.).
+struct vector_add_struct
 {
     int block_size;        // Elements per thread block (for grid calculation)
     int thread_block_size; // Threads per block (for launch config)
 };
 
-/// Validate a vector_add_config and produce launch parameters.
+/// Validate a vector_add_config and produce a structural kernel descriptor.
 ///
 /// block_size must be a positive multiple of 256, which is the CK Tile
 /// granularity for BlockWarps=1, float (vector_width=4), warp_size=64:
 ///   256 = 1 warp × 64 threads/warp × 4 elements/thread
 ///
 /// Invalid configs produce a compile-time error (consteval).
-consteval vector_add_kernel_info make_vector_add_kernel(vector_add_config cfg)
+consteval vector_add_struct make_kernel(vector_add_config cfg)
 {
     if(cfg.block_size <= 0 || cfg.block_size % 256 != 0)
         throw "block_size must be a positive multiple of 256";
