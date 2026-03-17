@@ -72,9 +72,9 @@ endfunction()
 # that differ from f16/bf16 to increase coverage diversity.
 macro(get_test_sizes TYPE OUT_SIZES)
     if("${TYPE}" STREQUAL "f32")
-        set(${OUT_SIZES} -M 33 -N 47 -K 65)
+        set(${OUT_SIZES} -M 133 -N 147 -K 165)
     else()
-        set(${OUT_SIZES} -M 31 -N 41 -K 51)
+        set(${OUT_SIZES} -M 131 -N 141 -K 151)
     endif()
 endmacro()
 
@@ -99,10 +99,10 @@ foreach(PATH fast slow)
 
     # Basic sanity, transpose combos, odd sizes, type coverage
     add_cpu_gemm_test(${PATH}_F32_Sanity
-        ARGS -M 31 -N 41 -K 51 --type f32 --validate ${PATH_FLAGS}
+        ARGS -M 131 -N 141 -K 151 --type f32 --validate ${PATH_FLAGS}
     )
     add_cpu_gemm_test(${PATH}_F32_Odd_Sizes
-        ARGS -M 2 -N 3 -K 5 --type f32 --validate ${PATH_FLAGS}
+        ARGS -M 102 -N 103 -K 105 --type f32 --validate ${PATH_FLAGS}
     )
     foreach(TYPE f32 f16 bf16)
         get_test_sizes(${TYPE} SIZES)
@@ -133,17 +133,17 @@ foreach(PATH fast slow)
 
     # F32-only individual feature tests
     add_cpu_gemm_test(${PATH}_f32_Relu
-        ARGS -M 33 -N 47 -K 65 --type f32 --validate --activation relu ${PATH_FLAGS}
+        ARGS -M 133 -N 147 -K 165 --type f32 --validate --activation relu ${PATH_FLAGS}
     )
     add_cpu_gemm_test(${PATH}_f32_ScaleAlphaVec
-        ARGS -M 33 -N 47 -K 65 --type f32 --validate --scaleAlphaVec ${PATH_FLAGS}
+        ARGS -M 133 -N 147 -K 165 --type f32 --validate --scaleAlphaVec ${PATH_FLAGS}
     )
     add_cpu_gemm_test(${PATH}_f32_Beta_AllFeatures
-        ARGS -M 33 -N 47 -K 65 --type f32 --beta 0.5 --validate --bias --activation relu --scaleAlphaVec ${PATH_FLAGS}
+        ARGS -M 133 -N 147 -K 165 --type f32 --beta 0.5 --validate --bias --activation relu --scaleAlphaVec ${PATH_FLAGS}
     )
 
     # Edge cases: dimensions at or below tile size (BLOCK_M=32, BLOCK_N=32, BLOCK_K=8)
-    foreach(CASE "M1;1;47;65" "N1;33;1;65" "K1;33;47;1" "1x1;1;1;1" "ExactBlock;32;32;8")
+    foreach(CASE "M1;1;147;165" "N1;133;1;165" "K1;133;147;1" "1x1;1;1;1" "ExactBlock;128;128;128")
         list(GET CASE 0 NAME)
         list(GET CASE 1 EM)
         list(GET CASE 2 EN)
@@ -163,6 +163,6 @@ foreach(MODE Scalar Vector)
         )
     endforeach()
     add_cpu_gemm_test(slow_f32_ScaleAB_${MODE}_AllFeatures
-        ARGS -M 33 -N 47 -K 65 --type f32 --beta 0.5 --validate --useScaleAB ${MODE} --bias --activation relu --scaleAlphaVec
+        ARGS -M 133 -N 147 -K 165 --type f32 --beta 0.5 --validate --useScaleAB ${MODE} --bias --activation relu --scaleAlphaVec
     )
 endforeach()
