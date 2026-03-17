@@ -172,6 +172,10 @@ using LinearPartitioner =
     StreamKTilePartitioner<TestGemmShape, StreamKReductionStrategy::Linear, false>;
 using TreePartitioner =
     StreamKTilePartitioner<TestGemmShape, StreamKReductionStrategy::Tree, false>;
+using LinearPersistentPartitioner =
+    StreamKTilePartitioner<TestGemmShape, StreamKReductionStrategy::Linear, true>;
+using TreePersistentPartitioner =
+    StreamKTilePartitioner<TestGemmShape, StreamKReductionStrategy::Tree, true>;
 
 template <typename Partitioner>
 using TestKernel = typename BuildKernel<PrecType,
@@ -583,6 +587,31 @@ TEST(StreamKConvBwdWeight, Tree_EndToEnd_HigherOccupancy)
 {
     EXPECT_TRUE((run_streamk_vs_splitk_test<TestKernel<TreePartitioner>>(
         1, 4, 128, 128, 3, 3, 16, 16, 4, 2)));
+}
+
+// Persistent DP — workgroups loop over DP tiles, then do SK work.
+TEST(StreamKConvBwdWeight, LinearPersistent_EndToEnd_SmallShape)
+{
+    EXPECT_TRUE((run_streamk_vs_splitk_test<TestKernel<LinearPersistentPartitioner>>(
+        1, 4, 128, 128, 3, 3, 16, 16, 2, 1)));
+}
+
+TEST(StreamKConvBwdWeight, TreePersistent_EndToEnd_SmallShape)
+{
+    EXPECT_TRUE((run_streamk_vs_splitk_test<TestKernel<TreePersistentPartitioner>>(
+        1, 4, 128, 128, 3, 3, 16, 16, 2, 1)));
+}
+
+TEST(StreamKConvBwdWeight, LinearPersistent_EndToEnd_MultiGroup)
+{
+    EXPECT_TRUE((run_streamk_vs_splitk_test<TestKernel<LinearPersistentPartitioner>>(
+        2, 4, 128, 128, 3, 3, 16, 16, 4, 1)));
+}
+
+TEST(StreamKConvBwdWeight, TreePersistent_EndToEnd_MultiGroup)
+{
+    EXPECT_TRUE((run_streamk_vs_splitk_test<TestKernel<TreePersistentPartitioner>>(
+        2, 4, 128, 128, 3, 3, 16, 16, 4, 1)));
 }
 
 // ============================================================================

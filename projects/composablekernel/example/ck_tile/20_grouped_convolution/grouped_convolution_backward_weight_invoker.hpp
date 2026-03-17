@@ -16,11 +16,11 @@ struct SplitKPartitionerPolicy
         GroupedConvTraitsType::FixedGemmParams::TilePartitionerM01>;
 };
 
-template <ck_tile::StreamKReductionStrategy ReductionStrategy>
+template <ck_tile::StreamKReductionStrategy ReductionStrategy, bool Persistent = false>
 struct StreamKPartitionerPolicy
 {
     template <typename GemmShape, typename>
-    using type = ck_tile::StreamKTilePartitioner<GemmShape, ReductionStrategy, false>;
+    using type = ck_tile::StreamKTilePartitioner<GemmShape, ReductionStrategy, Persistent>;
 };
 
 template <typename PartitionerPolicy = SplitKPartitionerPolicy>

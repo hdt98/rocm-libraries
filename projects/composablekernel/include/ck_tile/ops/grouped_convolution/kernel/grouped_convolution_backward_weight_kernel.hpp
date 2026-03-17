@@ -1051,10 +1051,7 @@ struct GroupedConvolutionBackwardWeightKernel
             "StreamK requires cross-CU buffer coherence (StreamKCoherency specialization). "
             "Currently supported: gfx90a, gfx942, gfx950.");
 
-        const StreamKOps sk_ops{};
         __shared__ char smem_ptr[GetSmemSize()];
-
-        const index_t cta_idx = amd_wave_read_first_lane(static_cast<index_t>(blockIdx.x));
 
         // Group offset (blockIdx.y = group batch index)
         const auto blockIdY       = amd_wave_read_first_lane(blockIdx.y);
@@ -1074,38 +1071,44 @@ struct GroupedConvolutionBackwardWeightKernel
         kargs.workspace_ptr =
             static_cast<char*>(kargs.workspace_ptr) + blockIdY * per_group_ws_size;
 
-        // Non-persistent StreamK: Data-Parallel (DP) workgroups first, then
-        // Stream-K (SK) workgroups. DP workgroups each process one full tile;
-        // SK workgroups share the remaining tiles' K-iterations.
-        const index_t dp_ctas = kargs.tile_partitioner.get_dp_ctas();
-        const bool is_dp      = cta_idx < dp_ctas;
+        const index_t dp_num_loop = kargs.tile_partitioner.get_iters_per_tile();
 
-        if(is_dp)
-        {
-            // Data-parallel workgroup: process one full tile
-            const index_t dp_tile_idx = cta_idx;
-            const index_t dp_num_loop = kargs.tile_partitioner.get_iters_per_tile();
-            const auto dp_tile_mn     = kargs.tile_partitioner.get_output_tile_index(dp_tile_idx);
-            const index_t dp_i_m =
-                amd_wave_read_first_lane(dp_tile_mn[I0] * TilePartitioner::MPerBlock);
-            const index_t dp_i_n =
-                amd_wave_read_first_lane(dp_tile_mn[I1] * TilePartitioner::NPerBlock);
+        StreamKDispatch(
+            kargs.tile_partitioner,
+            [&](index_t tile_idx) {
+                // Data-parallel workgroup: process one full tile
+                const auto tile_mn = kargs.tile_partitioner.get_output_tile_index(tile_idx);
+                const index_t i_m =
+                    amd_wave_read_first_lane(tile_mn[I0] * TilePartitioner::MPerBlock);
+                const index_t i_n =
+                    amd_wave_read_first_lane(tile_mn[I1] * TilePartitioner::NPerBlock);
 
-            RunGemm(a_ptr,
-                    b_ptr,
-                    kargs.ds_ptr,
-                    c_ptr,
-                    smem_ptr,
-                    kargs,
-                    dp_num_loop,
-                    dp_i_m,
-                    dp_i_n,
-                    /*block_idx_k=*/0);
-            return;
-        }
+                RunGemm(a_ptr,
+                        b_ptr,
+                        kargs.ds_ptr,
+                        c_ptr,
+                        smem_ptr,
+                        kargs,
+                        dp_num_loop,
+                        i_m,
+                        i_n,
+                        /*block_idx_k=*/0);
+            },
+            [&](index_t sk_cta_idx) {
+                RunStreamKLoop(kargs, sk_cta_idx, a_ptr, b_ptr, c_ptr, smem_ptr);
+            });
+    }
 
-        // Stream-K workgroup: cta_idx is relative to start of SK section
-        const index_t sk_cta_idx = cta_idx - dp_ctas;
+    /// @brief Stream-K loop: iterate over assigned K-iterations, run GEMM pipeline,
+    ///        and perform Linear or Tree reduction to accumulate partial results.
+    CK_TILE_DEVICE void RunStreamKLoop(GroupedConvBwdWeightKernelArgsSpecialized& kargs,
+                                       index_t sk_cta_idx,
+                                       const OutDataType* a_ptr,
+                                       const InDataType* b_ptr,
+                                       WeiDataType* c_ptr,
+                                       char* smem_ptr) const
+    {
+        const StreamKOps sk_ops{};
 
         index_t iter_start, iter_end;
         kargs.tile_partitioner.get_iter_boundaries(iter_start, iter_end, sk_cta_idx);

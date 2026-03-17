@@ -49,6 +49,7 @@ int main(int argc, char* argv[])
                     argv,
                     {
                         {"streamk_reduction", "tree", "StreamK reduction strategy: linear or tree"},
+                        {"streamk_persistent", "0", "Use persistent DP (1) or non-persistent (0)"},
                     });
     if(!result)
         return -1;
@@ -56,17 +57,31 @@ int main(int argc, char* argv[])
     try
     {
         const std::string reduction = arg_parser.get_str("streamk_reduction");
+        const bool persistent       = arg_parser.get_int("streamk_persistent") != 0;
 
-        if(reduction == "linear")
+        // Dispatch on reduction strategy × persistent DP
+        if(reduction == "linear" && !persistent)
         {
             using Invoker = GroupedConvolutionBackwardWeightInvoker<
-                StreamKPartitionerPolicy<ck_tile::StreamKReductionStrategy::Linear>>;
+                StreamKPartitionerPolicy<ck_tile::StreamKReductionStrategy::Linear, false>>;
             return !run_grouped_conv_bwd_weight_example<ConvConfigComputeV3, Invoker>(arg_parser);
         }
-        else if(reduction == "tree")
+        else if(reduction == "linear" && persistent)
         {
             using Invoker = GroupedConvolutionBackwardWeightInvoker<
-                StreamKPartitionerPolicy<ck_tile::StreamKReductionStrategy::Tree>>;
+                StreamKPartitionerPolicy<ck_tile::StreamKReductionStrategy::Linear, true>>;
+            return !run_grouped_conv_bwd_weight_example<ConvConfigComputeV3, Invoker>(arg_parser);
+        }
+        else if(reduction == "tree" && !persistent)
+        {
+            using Invoker = GroupedConvolutionBackwardWeightInvoker<
+                StreamKPartitionerPolicy<ck_tile::StreamKReductionStrategy::Tree, false>>;
+            return !run_grouped_conv_bwd_weight_example<ConvConfigComputeV3, Invoker>(arg_parser);
+        }
+        else if(reduction == "tree" && persistent)
+        {
+            using Invoker = GroupedConvolutionBackwardWeightInvoker<
+                StreamKPartitionerPolicy<ck_tile::StreamKReductionStrategy::Tree, true>>;
             return !run_grouped_conv_bwd_weight_example<ConvConfigComputeV3, Invoker>(arg_parser);
         }
         else

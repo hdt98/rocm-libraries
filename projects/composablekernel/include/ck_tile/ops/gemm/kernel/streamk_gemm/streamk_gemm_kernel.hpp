@@ -516,66 +516,26 @@ struct StreamKKernel
     }
 
     /**
-     * @brief Entry point for the Stream-K Kernel with non-persistent DP.
+     * @brief Entry point for the Stream-K kernel.
      *
      * @par Overview
-     *     For the Non-Persistent kernel, each data parallel workgroup will
-     *     compute the results for their assigned macro-tile by calling `BaseGemm()`.
-     *     The Stream-K workgroups will do their assigned work by calling
-     *     `StreamKGemm()`, which calls `BaseGemm()` in the Stream-K loop.
+     *     Uses StreamKDispatch to handle both persistent and non-persistent DP sections.
+     *     Non-persistent: dedicated DP workgroups process full tiles, then dedicated SK
+     *     workgroups share remaining K-iterations.
+     *     Persistent: each workgroup loops over DP tiles (round-robin), then proceeds
+     *     to SK work.
      */
-    template <bool U = PersistentDP>
-    CK_TILE_DEVICE typename std::enable_if_t<!U> operator()(StreamKKernelArgs kargs) const
+    CK_TILE_DEVICE void operator()(StreamKKernelArgs kargs) const
     {
-        // Allocate LDS
         __shared__ char smem_ptr_0[UniversalGemmKernel::GetSmemSize()];
+        const index_t dp_num_loop = kargs.tile_partitioner.get_iters_per_tile();
 
-        index_t block_idx   = ck_tile::get_block_1d_id();
-        index_t dp_num_loop = kargs.tile_partitioner.get_iters_per_tile();
-        index_t dp_ctas     = kargs.tile_partitioner.get_dp_ctas();
-        bool is_dp_ctas     = block_idx < kargs.tile_partitioner.get_dp_ctas();
-
-        // Check if at the data parallel section
-        if(is_dp_ctas)
-        {
-            BaseGemm(kargs, block_idx, dp_num_loop, 0, 0, kargs.K, smem_ptr_0);
-        }
-        else
-        {
-            // Stream-K
-            StreamKGemm(kargs, block_idx - dp_ctas, smem_ptr_0);
-        }
-    }
-
-    /**
-     * @brief Entry point for the Stream-K Kernel with persistent DP.
-     *
-     * @par Overview
-     *     For the Persistent kernel, each workgroup will first compute their
-     *     assigned data-parallel tiles. Each data parallel tile will be computed
-     *     by calling `BaseGemm()`. Then the workgroups will proceed with the
-     *     Stream-K portion by calling `StreamKGemm()`, which calls `BaseGemm()`
-     *     in the Stream-K loop.
-     */
-    template <bool U = PersistentDP>
-    CK_TILE_DEVICE typename std::enable_if_t<U> operator()(StreamKKernelArgs kargs) const
-    {
-        // Allocate LDS
-        __shared__ char smem_ptr_0[UniversalGemmKernel::GetSmemSize()];
-
-        index_t block_idx   = ck_tile::get_block_1d_id();
-        index_t dp_num_loop = kargs.tile_partitioner.get_iters_per_tile();
-
-        // Data-parallel section
-        for(index_t tile_idx = block_idx; tile_idx < kargs.tile_partitioner.get_dp_tiles();
-            tile_idx += kargs.tile_partitioner.get_grid())
-        {
-            BaseGemm(kargs, tile_idx, dp_num_loop, 0, 0, kargs.K, smem_ptr_0);
-            block_sync_lds();
-        }
-
-        // Stream-K section
-        StreamKGemm(kargs, block_idx, smem_ptr_0);
+        StreamKDispatch(
+            kargs.tile_partitioner,
+            [&](index_t tile_idx) {
+                BaseGemm(kargs, tile_idx, dp_num_loop, 0, 0, kargs.K, smem_ptr_0);
+            },
+            [&](index_t sk_cta_idx) { StreamKGemm(kargs, sk_cta_idx, smem_ptr_0); });
     }
 
     private:
