@@ -52,3 +52,7 @@ html_theme_options = {
     },
     "link_main_doc": False,
 }
+
+setting_all_article_info = True
+all_article_info_os = ["linux"]
+all_article_info_author = ""
