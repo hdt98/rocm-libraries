@@ -161,7 +161,7 @@ struct GroupedConvolutionBackwardWeightInvoker
                         hipMemsetAsync(workspace_dev.GetDeviceBuffer(), 0, ws_size, s.stream_id_));
                 }
             }
-            else if(args.k_batch > 1)
+            else if(kargs.k_batch > 1)
             {
                 // Split-K: zero weight buffer for atomic accumulation
                 ck_tile::hip_check_error(hipMemsetAsync(
