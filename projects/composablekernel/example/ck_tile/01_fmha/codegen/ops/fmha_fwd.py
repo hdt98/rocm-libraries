@@ -682,13 +682,15 @@ class FmhaFwdApiPool:
                     item for item in pool_by_dtype.items() if has_traits(item[1])
                 ):
                     inners = str()
-                    for trait in (
-                        trait for trait in pool_by_hdim if filter_fn(trait)
-                    ):
+                    for trait in (trait for trait in pool_by_hdim if filter_fn(trait)):
                         # Build the kernel name string matching FmhaFwdKernel.name format
                         pad_suffix = ""
-                        for flag, tag in [(trait.spad, "s"), (trait.skpad, "sk"),
-                                          (trait.dpad, "d"), (trait.dvpad, "dv")]:
+                        for flag, tag in [
+                            (trait.spad, "s"),
+                            (trait.skpad, "sk"),
+                            (trait.dpad, "d"),
+                            (trait.dvpad, "dv"),
+                        ]:
                             if flag == "t":
                                 pad_suffix += tag
                         pad_suffix = f"_p{pad_suffix}" if pad_suffix else "_npad"
@@ -962,7 +964,7 @@ class CompatibilityRuleFactory:
                     kernel_ctx.pipeline.F_bias != "no"
                     or kernel_ctx.pipeline.F_dropout == "t"
                 ):
-                    False
+                    return False
             return True
 
         def check_feature(
