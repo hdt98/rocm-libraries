@@ -475,12 +475,14 @@ def buildAndPushDockerImage(String install_prefix, String image_name, String doc
     }
 
     echo "Building image: ${image_name} with args: ${dockerArgs}"
-    retimage = docker.build("${image_name}", dockerArgs)
+    def retimage = docker.build("${image_name}", dockerArgs)
     withDockerRegistry([ credentialsId: "ck_docker_cred", url: "" ]) {
         retimage.push()
     }
-    digest = sh(returnStdout: true, script: "docker inspect --format='{{index .RepoDigests 0}}' ${image_name}").trim()
+    def digest = sh(returnStdout: true, script: "docker inspect --format='{{index .RepoDigests 0}}' ${image_name}").trim()
     echo "Built image digest: ${digest}"
+    echo "Pruning dangling Docker images to free disk space on CI agent"
+    sh "docker image prune -f --filter 'dangling=true' || true"
     return digest
 }
 
