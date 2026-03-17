@@ -42,4 +42,29 @@ namespace rocRoller::KernelGraph
     {
         return get(control, Connections::JustNaryArgument{arg});
     }
+
+    /**
+     * @brief Connect a control node to a coordinate using a WaveGroupBranch specifier.
+     *
+     * Used by MergeConditionalLoads. waveGroup=0 for A-side, waveGroup=1 for B-side.
+     */
+    template <typename T>
+    inline void ControlToCoordinateMapper::connectWaveGroup(int control,
+                                                            int coordinate,
+                                                            int waveGroup)
+    {
+        connect(control, coordinate, Connections::WaveGroupBranch{name<T>(), waveGroup});
+    }
+
+    /**
+     * @brief Retrieve the coordinate connected via WaveGroupBranch for the given wave group.
+     *
+     * Returns -1 if no such connection exists (non-merged op).
+     * Presence of waveGroup=0 signals a merged (conditional) load.
+     */
+    template <typename T>
+    inline int ControlToCoordinateMapper::getWaveGroup(int control, int waveGroup) const
+    {
+        return get(control, Connections::WaveGroupBranch{name<T>(), waveGroup});
+    }
 }

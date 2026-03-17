@@ -89,12 +89,41 @@ namespace rocRoller::KernelGraph
             return a.id < b.id;
         }
 
+        /**
+         * @brief Connection specifier for conditional (wave-group-based) mapper connections.
+         *
+         * Used by `MergeConditionalLoads` to represent two branches of a conditional load:
+         * - `waveGroup=0`: A-side (loaded by waves with waveID%2 == 0)
+         * - `waveGroup=1`: B-side (loaded by waves with waveID%2 == 1)
+         *
+         * Both branches use `WaveGroupBranch` symmetrically. Detecting a `WaveGroupBranch{0}`
+         * connection signals that the operation is a merged (conditional) load.
+         */
+        struct WaveGroupBranch
+        {
+            std::string id;        ///< Coordinate type name (e.g. name<User>() or name<LDS>())
+            int         waveGroup; ///< 0 = A-side (waveGroup==0), 1 = B-side (waveGroup==1)
+
+            bool operator==(WaveGroupBranch const& other) const
+            {
+                return this->id == other.id && this->waveGroup == other.waveGroup;
+            }
+        };
+
+        bool inline operator<(WaveGroupBranch const& a, WaveGroupBranch const& b)
+        {
+            if(a.id == b.id)
+                return a.waveGroup < b.waveGroup;
+            return a.id < b.id;
+        }
+
         using ConnectionSpec = std::variant<std::monostate,
                                             JustNaryArgument,
                                             TypeAndSubDimension,
                                             TypeAndNaryArgument,
                                             UnrollStride,
-                                            BaseOffset>;
+                                            BaseOffset,
+                                            WaveGroupBranch>;
 
         std::string   name(ConnectionSpec const& cs);
         std::string   toString(ConnectionSpec const& cs);
@@ -203,6 +232,25 @@ namespace rocRoller::KernelGraph
          */
         template <typename T>
         int get(int control, int subDimension = 0) const;
+
+        /**
+         * @brief Connect the control flow node `control` to the coordinate `coordinate`
+         * using a WaveGroupBranch specifier (for conditional/merged loads).
+         *
+         * waveGroup=0: A-side (waveID%2 == 0)
+         * waveGroup=1: B-side (waveID%2 == 1)
+         */
+        template <typename T>
+        void connectWaveGroup(int control, int coordinate, int waveGroup);
+
+        /**
+         * @brief Get the coordinate connected via WaveGroupBranch for the given wave group.
+         *
+         * Returns -1 if not found (non-merged op).
+         * Presence of waveGroup=0 signals a merged (conditional) load.
+         */
+        template <typename T>
+        int getWaveGroup(int control, int waveGroup) const;
 
         /**
          * @brief Get the coordinate index associated with the control

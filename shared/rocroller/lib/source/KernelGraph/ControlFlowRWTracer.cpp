@@ -487,17 +487,38 @@ namespace rocRoller::KernelGraph
 
     void ControlFlowRWTracer::operator()(LoadTiled const& op, int tag)
     {
-        auto user = m_graph.mapper.get<User>(tag);
-
         auto dst = m_graph.mapper.get<MacroTile>(tag);
 
         dst = only(m_graph.coordinates.getInputNodeIndices(dst, CT::isEdge<CT::View>))
                   .value_or(dst);
 
-        trackRegister(tag, user, ReadWrite::READ);
-        trackRegister(tag, dst, ReadWrite::WRITE);
-
-        trackConnections(tag, {user, dst}, ReadWrite::READ);
+        // Handle merged (conditional) LoadTiled: check WaveGroupBranch{0} and {1}.
+        // For non-merged ops, use the normal plain User lookup.
+        auto userA = m_graph.mapper.getWaveGroup<User>(tag, /*waveGroup=*/0);
+        auto userB = m_graph.mapper.getWaveGroup<User>(tag, /*waveGroup=*/1);
+        if(userA != -1 || userB != -1)
+        {
+            std::unordered_set<int> except{dst};
+            if(userA != -1)
+            {
+                except.insert(userA);
+                trackRegister(tag, userA, ReadWrite::READ);
+            }
+            if(userB != -1)
+            {
+                except.insert(userB);
+                trackRegister(tag, userB, ReadWrite::READ);
+            }
+            trackRegister(tag, dst, ReadWrite::WRITE);
+            trackConnections(tag, except, ReadWrite::READ);
+        }
+        else
+        {
+            auto user = m_graph.mapper.get<User>(tag);
+            trackRegister(tag, user, ReadWrite::READ);
+            trackRegister(tag, dst, ReadWrite::WRITE);
+            trackConnections(tag, {user, dst}, ReadWrite::READ);
+        }
         trackOffsetAndStride(tag, ReadWrite::READ);
         trackBuffer(tag, ReadWrite::READ);
     }
@@ -582,20 +603,66 @@ namespace rocRoller::KernelGraph
     void ControlFlowRWTracer::operator()(StoreLDSTile const& op, int tag)
     {
         auto dst = m_graph.mapper.get<MacroTile>(tag);
-        auto lds = m_graph.mapper.get<LDS>(tag);
         trackRegister(tag, dst, ReadWrite::READ);
-        trackConnections(tag, {dst, lds}, ReadWrite::READ);
-        trackRegister(tag, lds, ReadWrite::WRITE);
+
+        // Handle merged (conditional) ops: check WaveGroupBranch{0} and WaveGroupBranch{1}.
+        // For non-merged ops, fall back to the plain LDS lookup.
+        auto ldsA = m_graph.mapper.getWaveGroup<LDS>(tag, /*waveGroup=*/0);
+        auto ldsB = m_graph.mapper.getWaveGroup<LDS>(tag, /*waveGroup=*/1);
+        if(ldsA != -1 || ldsB != -1)
+        {
+            std::unordered_set<int> except{dst};
+            if(ldsA != -1)
+            {
+                except.insert(ldsA);
+                trackRegister(tag, ldsA, ReadWrite::WRITE);
+            }
+            if(ldsB != -1)
+            {
+                except.insert(ldsB);
+                trackRegister(tag, ldsB, ReadWrite::WRITE);
+            }
+            trackConnections(tag, except, ReadWrite::READ);
+        }
+        else
+        {
+            auto lds = m_graph.mapper.get<LDS>(tag);
+            trackConnections(tag, {dst, lds}, ReadWrite::READ);
+            trackRegister(tag, lds, ReadWrite::WRITE);
+        }
         trackOffsetAndStride(tag, ReadWrite::READ);
     }
 
     void ControlFlowRWTracer::operator()(LoadTileDirect2LDS const& op, int tag)
     {
         auto source = m_graph.mapper.get<MacroTile>(tag);
-        auto dst    = m_graph.mapper.get<LDS>(tag);
         trackRegister(tag, source, ReadWrite::READ);
-        trackRegister(tag, dst, ReadWrite::WRITE);
-        trackConnections(tag, {source, dst}, ReadWrite::READ);
+
+        // Handle merged (conditional) ops: check WaveGroupBranch{0} and WaveGroupBranch{1}.
+        // For non-merged ops, fall back to the plain LDS lookup.
+        auto ldsA = m_graph.mapper.getWaveGroup<LDS>(tag, /*waveGroup=*/0);
+        auto ldsB = m_graph.mapper.getWaveGroup<LDS>(tag, /*waveGroup=*/1);
+        if(ldsA != -1 || ldsB != -1)
+        {
+            std::unordered_set<int> except{source};
+            if(ldsA != -1)
+            {
+                except.insert(ldsA);
+                trackRegister(tag, ldsA, ReadWrite::WRITE);
+            }
+            if(ldsB != -1)
+            {
+                except.insert(ldsB);
+                trackRegister(tag, ldsB, ReadWrite::WRITE);
+            }
+            trackConnections(tag, except, ReadWrite::READ);
+        }
+        else
+        {
+            auto dst = m_graph.mapper.get<LDS>(tag);
+            trackRegister(tag, dst, ReadWrite::WRITE);
+            trackConnections(tag, {source, dst}, ReadWrite::READ);
+        }
         trackOffsetAndStride(tag, ReadWrite::READ);
         trackBuffer(tag, ReadWrite::READ);
     }

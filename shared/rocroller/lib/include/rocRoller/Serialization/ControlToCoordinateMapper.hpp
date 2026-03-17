@@ -123,6 +123,26 @@ namespace rocRoller
             }
         };
 
+        template <typename IO, typename Context>
+        struct MappingTraits<KernelGraph::Connections::WaveGroupBranch, IO, Context>
+        {
+            using iot = IOTraits<IO>;
+
+            static void mapping(IO& io, KernelGraph::Connections::WaveGroupBranch& x, Context& ctx)
+            {
+                iot::mapRequired(io, "id", x.id);
+                iot::mapRequired(io, "waveGroup", x.waveGroup);
+            }
+
+            static void mapping(IO& io, KernelGraph::Connections::WaveGroupBranch& x)
+            {
+                AssertFatal((std::same_as<EmptyContext, Context>));
+
+                Context ctx;
+                mapping(io, x, ctx);
+            }
+        };
+
         static_assert(CNamedVariant<KernelGraph::Connections::ConnectionSpec>);
 
         template <typename IO, typename Context>

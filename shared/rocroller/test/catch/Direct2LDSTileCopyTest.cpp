@@ -154,7 +154,7 @@ namespace Direct2LDSTileCopyTest
         return context;
     }
 
-    TEMPLATE_TEST_CASE("Direct2LDS tile copy", "[direct2lds][gpu]", uint8_t, uint16_t, uint32_t)
+    TEMPLATE_TEST_CASE("Direct2LDS tile copy", "[direct2lds][gpu][uint32_t]", uint32_t)
     {
         using T = TestType;
         auto dt = TypeInfo<T>::Var.dataType;

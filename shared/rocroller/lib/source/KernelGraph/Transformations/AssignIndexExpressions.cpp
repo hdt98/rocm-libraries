@@ -78,6 +78,7 @@ namespace rocRoller::KernelGraph
         DataType offsetType  = DataType::Count;
         DataType strideType  = DataType::Count;
         bool     isStorePartOfGlobalToLDSOp = false;
+        int      opTag       = -1; // Control op tag (for conditional buffer descriptor detection)
     };
 
     struct IndexChain
@@ -607,6 +608,8 @@ namespace rocRoller::KernelGraph
                                                  offsetDataType,
                                                  strideDataType,
                                                  spec.isStorePartOfGlobalToLDSOp);
+            // Record the control op tag so createAssignsForPlaceholder can detect merged ops
+            nodeInfo.opTag = op;
             chain.push_back(nodeInfo.nopTag);
             nodeInfos.push_back(nodeInfo);
 
@@ -1048,12 +1051,38 @@ namespace rocRoller::KernelGraph
             return assignTag;
         }
 
+        /**
+         * Build a buffer descriptor expression for a single User coordinate.
+         */
+        Expression::ExpressionPtr BuildBufferDescExpr(User const&               user,
+                                                      IndexComputeParams const& params,
+                                                      ContextPtr                context,
+                                                      CommandPtr                command)
+        {
+            auto arg = findArgumentByName(command, user.argumentName);
+            AssertFatal(arg,
+                        "Argument for buffer descriptor base pointer not found.",
+                        ShowValue(user.argumentName));
+            Expression::ExpressionPtr basePointer = arg->expression();
+            if(user.offset)
+                basePointer = basePointer + user.offset;
+
+            Expression::ExpressionPtr bufferExpr = L(rocRoller::Buffer{0, 0, 0, 0});
+            bufferExpr = BufferDescriptor::SetBasePointer(bufferExpr, basePointer);
+            bufferExpr = BufferDescriptor::SetOptions(bufferExpr,
+                                                      BufferDescriptor::GetDefaultOptions(context));
+            bufferExpr
+                = BufferDescriptor::SetSize(bufferExpr, ToBytes(user.size, params.valueType));
+            return bufferExpr;
+        }
+
         int MakeBuffer(KernelGraph&              graph,
                        IndexComputeParams const& params,
                        int                       target,
                        int                       buffer,
                        ContextPtr                context,
-                       CommandPtr                command)
+                       CommandPtr                command,
+                       int                       opTag = -1)
         {
             // Check if target has a User coordinate
             auto user = graph.coordinates.get<User>(target);
@@ -1062,22 +1091,53 @@ namespace rocRoller::KernelGraph
 
             AssertFatal(user->size, "Invalid User dimension: missing size.", ShowValue(target));
 
-            // Get the base pointer from command arguments
-            auto arg = findArgumentByName(command, user->argumentName);
-            AssertFatal(arg,
-                        "Argument for buffer descriptor base pointer not found.",
-                        ShowValue(user->argumentName));
-            Expression::ExpressionPtr basePointer = arg->expression();
-            if(user->offset)
-                basePointer = basePointer + user->offset;
+            Expression::ExpressionPtr bufferExpr;
 
-            // Build the buffer descriptor
-            Expression::ExpressionPtr bufferExpr = L(rocRoller::Buffer{0, 0, 0, 0});
-            bufferExpr = BufferDescriptor::SetBasePointer(bufferExpr, basePointer);
-            bufferExpr = BufferDescriptor::SetOptions(bufferExpr,
-                                                      BufferDescriptor::GetDefaultOptions(context));
-            bufferExpr
-                = BufferDescriptor::SetSize(bufferExpr, ToBytes(user->size, params.valueType));
+            // Detect merged (conditional) LoadTiled: check for WaveGroupBranch{1} User on the op.
+            // If present, the op loads either A-side (userA=target) or B-side (userB) depending
+            // on the waveGroup SGPR computed in the prolog.
+            int userBTag = -1;
+            int waveGroupAdhocTag = -1;
+            if(opTag != -1)
+            {
+                userBTag = graph.mapper.getWaveGroup<User>(opTag, /*waveGroup=*/1);
+                waveGroupAdhocTag = graph.mapper.get<Adhoc>(opTag);
+            }
+
+            if(userBTag != -1 && waveGroupAdhocTag != -1)
+            {
+                // Conditional buffer descriptor:
+                // waveGroup==0 → use A-side (target=userA), waveGroup==1 → use B-side (userB)
+                auto userBOpt = graph.coordinates.get<User>(userBTag);
+                AssertFatal(userBOpt,
+                            "MergeConditionalLoads: B-side User coordinate not found.",
+                            ShowValue(userBTag));
+
+                // Build expressions for both sides
+                auto bufDescA = BuildBufferDescExpr(*user, params, context, command);
+                auto bufDescB = BuildBufferDescExpr(*userBOpt, params, context, command);
+
+                // waveGroupExpr: DataFlowTag on the Adhoc coord → scalar SGPR
+                auto waveGroupDF = std::make_shared<Expression::Expression>(
+                    Expression::DataFlowTag{waveGroupAdhocTag,
+                                           Register::Type::Scalar,
+                                           DataType::UInt32});
+
+                // Build: (waveGroup == 0) ? bufDescA : bufDescB
+                bufferExpr = Expression::conditional(waveGroupDF == L(0u), bufDescA, bufDescB);
+
+                Log::debug("KernelGraph::makeBuffer: merged conditional buffer for op={} "
+                           "userA={} (target) userB={} waveGroupAdhoc={}",
+                           opTag,
+                           target,
+                           userBTag,
+                           waveGroupAdhocTag);
+            }
+            else
+            {
+                // Normal single-user buffer descriptor
+                bufferExpr = BuildBufferDescExpr(*user, params, context, command);
+            }
 
             // Create the Assign node
             auto bufferVarType      = VariableType{DataType::None, PointerType::Buffer};
@@ -1641,8 +1701,8 @@ namespace rocRoller::KernelGraph
 
             if(nodeInfo.buffer > 0)
             {
-                assignBufferTag
-                    = MakeBuffer(kgraph, params, target, nodeInfo.buffer, context, command);
+                assignBufferTag = MakeBuffer(
+                    kgraph, params, target, nodeInfo.buffer, context, command, nodeInfo.opTag);
             }
 
             // Insert Assign nodes after the NOP placeholder

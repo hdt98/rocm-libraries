@@ -105,6 +105,11 @@ namespace rocRoller
         bool swizzleScale  = false;
         bool prefetchScale = false;
 
+        /// Enable conditional load optimization (MergeConditionalLoads transform).
+        /// When true, pairs of A-side and B-side LoadTiled operations are merged into one,
+        /// with half the waves loading A-side data and the other half loading B-side data.
+        bool enableConditionalLoad = false;
+
         bool prefetch          = false;
         int  prefetchInFlight  = 1;
         int  prefetchLDSFactor = 0;

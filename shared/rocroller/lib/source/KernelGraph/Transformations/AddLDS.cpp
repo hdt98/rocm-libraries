@@ -133,8 +133,34 @@ namespace rocRoller
 
         void AddLDSVisitor::stage(KernelGraph const& k, int opTag)
         {
-            auto [userTag, user] = k.getDimension<User>(opTag);
-            auto [tileTag, tile] = k.getDimension<MacroTile>(opTag);
+            // Detect merged (conditional) LoadTiled: has WaveGroupBranch{0} User connection.
+            // For merged ops, the normal getDimension<User> won't work (no TypeAndSubDimension),
+            // so we check for WaveGroupBranch{0} first and fall back to the normal path.
+            int  userTag    = -1;
+            int  tileTag    = -1;
+            bool isMerged   = false;
+
+            int wgUserA = k.mapper.getWaveGroup<User>(opTag, /*waveGroup=*/0);
+            if(wgUserA != -1)
+            {
+                // Merged (conditional) LoadTiled
+                isMerged = true;
+                userTag  = wgUserA;
+                tileTag  = k.mapper.get<MacroTile>(opTag);
+                AssertFatal(tileTag != -1,
+                            "MergeConditionalLoads: merged LoadTiled missing MacroTile.",
+                            ShowValue(opTag));
+            }
+            else
+            {
+                // Normal LoadTiled — existing path
+                auto [ut, u] = k.getDimension<User>(opTag);
+                auto [tt, t] = k.getDimension<MacroTile>(opTag);
+                userTag      = ut;
+                tileTag      = tt;
+            }
+
+            auto tile = k.coordinates.getNode<MacroTile>(tileTag);
 
             if(not(tile.memoryType == MemoryType::WAVE_LDS || tile.memoryType == MemoryType::LDS
                    || tile.memoryType == MemoryType::WAVE_Direct2LDS
@@ -142,7 +168,8 @@ namespace rocRoller
                 return;
 
             rocRoller::Log::getLogger()->debug(
-                "KernelGraph::AddLDS()::stage({}): User {}, MacroTile {}", opTag, userTag, tileTag);
+                "KernelGraph::AddLDS()::stage({}): User {}, MacroTile {}{}", opTag, userTag, tileTag,
+                isMerged ? " [merged/conditional]" : "");
 
             m_operations.insert(opTag);
         }
@@ -156,7 +183,111 @@ namespace rocRoller
             {
                 Log::debug("KernelGraph::AddLDS()::commit({})", opTag);
 
-                auto isLoad  = k.control.get<LoadTiled>(opTag).has_value();
+                auto isLoad = k.control.get<LoadTiled>(opTag).has_value();
+
+                // Detect merged (conditional) op: WaveGroupBranch{0} User connection present.
+                int wgUserA = k.mapper.getWaveGroup<User>(opTag, /*waveGroup=*/0);
+                bool isMerged = (wgUserA != -1) && isLoad;
+
+                if(isMerged)
+                {
+                    // -- Conditional (merged) LoadTiled path --
+                    // Retrieve both A-side and B-side User tags and the shared MacroTile.
+                    int userATag = wgUserA;
+                    int userBTag = k.mapper.getWaveGroup<User>(opTag, /*waveGroup=*/1);
+                    AssertFatal(userBTag != -1,
+                                "MergeConditionalLoads: merged LoadTiled missing B-side User.",
+                                ShowValue(opTag));
+
+                    int tileTag = k.mapper.get<MacroTile>(opTag);
+                    AssertFatal(tileTag != -1,
+                                "MergeConditionalLoads: merged LoadTiled missing MacroTile.",
+                                ShowValue(opTag));
+
+                    auto varType = getVariableType(k, opTag);
+                    auto tile    = k.coordinates.getNode<MacroTile>(tileTag);
+
+                    const bool isDirect2LDS = tile.memoryType == MemoryType::WAVE_Direct2LDS;
+
+                    // Create 2 separate LDS nodes (one per side)
+                    auto ldsTagA = k.coordinates.addElement(LDS());
+                    auto ldsTagB = k.coordinates.addElement(LDS());
+
+                    // Create 1 shared internal VGPR tile (equal sizes → single tile)
+                    auto internalTag = createInternalTile(
+                        k, varType, tileTag, {1, 1}, /*splitStore=*/false, m_params, m_context);
+
+                    // Connect coordinate DataFlow edges for the A-side LDS
+                    insertInstead<Graph::Direction::Downstream>(k.coordinates, internalTag, tileTag);
+                    k.coordinates.addElement(DataFlow(), {internalTag}, {ldsTagA});
+                    k.coordinates.addElement(DataFlow(), {ldsTagA}, {tileTag});
+                    // B-side LDS: also connects ldsTagB → tileTag (both sides feed the same tile)
+                    k.coordinates.addElement(DataFlow(), {internalTag}, {ldsTagB});
+                    k.coordinates.addElement(DataFlow(), {ldsTagB}, {tileTag});
+
+                    // Create StoreLDSTile (1 shared, writes conditionally to ldsA or ldsB)
+                    auto storeLDSOp = k.control.addElement(StoreLDSTile(varType.dataType));
+                    // Create 2 LoadLDSTile ops (A reads ldsA, B reads ldsB)
+                    auto loadLDSOpA = k.control.addElement(LoadLDSTile(varType));
+                    auto loadLDSOpB = k.control.addElement(LoadLDSTile(varType));
+
+                    // Update external tile memoryType (same logic as normal path)
+                    if(tile.memoryType == MemoryType::WAVE_Direct2LDS)
+                        tile.memoryType = MemoryType::WAVE;
+                    else if(tile.memoryType == MemoryType::WAVE_LDS)
+                        tile.memoryType = MemoryType::WAVE;
+                    else if(tile.memoryType == MemoryType::LDS)
+                        tile.memoryType = MemoryType::VGPR;
+                    else if(tile.memoryType == MemoryType::WAVE_LDS_FROM_GLOBAL)
+                        tile.memoryType = MemoryType::WAVE_FROM_GLOBAL;
+                    k.coordinates.setElement(tileTag, tile);
+
+                    // Chain: opTag → storeLDSOp → loadLDSOpA → loadLDSOpB → (successors)
+                    // insertAfter(opTag, storeLDSOp, loadLDSOpB) wires opTag→storeLDSOp
+                    // and rewires existing successors of opTag to come after loadLDSOpB.
+                    k.control.addElement(Sequence(), {storeLDSOp}, {loadLDSOpA});
+                    k.control.addElement(Sequence(), {loadLDSOpA}, {loadLDSOpB});
+                    insertAfter(k, opTag, storeLDSOp, loadLDSOpB);
+
+                    // Rebuild LoadTiled mapper connections using WaveGroupBranch
+                    k.mapper.purge(opTag);
+                    k.mapper.connectWaveGroup<User>(opTag, userATag, /*waveGroup=*/0);
+                    k.mapper.connectWaveGroup<User>(opTag, userBTag, /*waveGroup=*/1);
+                    k.mapper.connect<MacroTile>(opTag, internalTag);
+                    // For WAVE_Direct2LDS: both LDS connections (both sides) on LoadTiled
+                    if(isDirect2LDS)
+                    {
+                        k.mapper.connectWaveGroup<LDS>(opTag, ldsTagA, /*waveGroup=*/0);
+                        k.mapper.connectWaveGroup<LDS>(opTag, ldsTagB, /*waveGroup=*/1);
+                    }
+
+                    // StoreLDSTile: conditional LDS connections (both sides)
+                    k.mapper.connectWaveGroup<User>(storeLDSOp, userATag, /*waveGroup=*/0);
+                    k.mapper.connectWaveGroup<User>(storeLDSOp, userBTag, /*waveGroup=*/1);
+                    k.mapper.connect<MacroTile>(storeLDSOp, internalTag);
+                    k.mapper.connectWaveGroup<LDS>(storeLDSOp, ldsTagA, /*waveGroup=*/0);
+                    k.mapper.connectWaveGroup<LDS>(storeLDSOp, ldsTagB, /*waveGroup=*/1);
+
+                    // LoadLDSTile A reads from ldsA
+                    k.mapper.connect<User>(loadLDSOpA, userATag);
+                    k.mapper.connect<LDS>(loadLDSOpA, ldsTagA);
+                    k.mapper.connect<MacroTile>(loadLDSOpA, tileTag);
+
+                    // LoadLDSTile B reads from ldsB
+                    k.mapper.connect<User>(loadLDSOpB, userBTag);
+                    k.mapper.connect<LDS>(loadLDSOpB, ldsTagB);
+                    k.mapper.connect<MacroTile>(loadLDSOpB, tileTag);
+
+                    Log::debug("KernelGraph::AddLDS()::commit({}): conditional — "
+                               "ldsA={}, ldsB={}, internalTag={}, storeLDS={}, "
+                               "loadLDSA={}, loadLDSB={}",
+                               opTag, ldsTagA, ldsTagB, internalTag,
+                               storeLDSOp, loadLDSOpA, loadLDSOpB);
+
+                    continue; // done with this merged op
+                }
+
+                // -- Normal (non-merged) LoadTiled / StoreTiled path (unchanged) --
                 auto tileTag = k.mapper.get<MacroTile>(opTag);
                 auto userTag = k.mapper.get<User>(opTag);
                 auto varType = getVariableType(k, opTag);

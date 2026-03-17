@@ -220,6 +220,7 @@ namespace rocRoller::KernelGraph
                                   [](TypeAndNaryArgument const&) { return "TypeAndNaryArgument"; },
                                   [](UnrollStride const&) { return "UnrollStride"; },
                                   [](BaseOffset const&) { return "BaseOffset"; },
+                                  [](WaveGroupBranch const&) { return "WaveGroupBranch"; },
                               },
                               cs);
         }
@@ -254,6 +255,11 @@ namespace rocRoller::KernelGraph
             std::string operator()(TypeAndNaryArgument const& ci) const
             {
                 return concatenate(ci.id, ": (", ci.argument, ")");
+            }
+
+            std::string operator()(WaveGroupBranch const& ci) const
+            {
+                return concatenate("WaveGroupBranch{", ci.id, ", waveGroup=", ci.waveGroup, "}");
             }
         };
 

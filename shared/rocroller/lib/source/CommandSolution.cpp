@@ -324,6 +324,11 @@ namespace rocRoller
         transforms.push_back(std::make_shared<KernelGraph::OrderMemory>(
             !m_commandParameters->allowAmbiguousMemoryNodes));
         transforms.push_back(std::make_shared<KernelGraph::UpdateParameters>(m_commandParameters));
+        if(m_commandParameters->enableConditionalLoad)
+        {
+            transforms.push_back(std::make_shared<KernelGraph::MergeConditionalLoads>(
+                m_context, m_commandParameters));
+        }
         transforms.push_back(std::make_shared<KernelGraph::AddLDS>(m_commandParameters, m_context));
         transforms.push_back(std::make_shared<KernelGraph::LowerLinear>(m_context));
         transforms.push_back(

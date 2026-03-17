@@ -735,16 +735,39 @@ namespace rocRoller
                     [&](CIsAnyOf<CG::LoadTileDirect2LDS> auto const& op) -> result {
                         if(isStorePartOfBidirectionalOp)
                         {
-                            return {kgraph.mapper.get<CT::LDS>(tag), GD::Upstream};
+                            // For merged (conditional) ops, plain LDS connection is absent;
+                            // use A-side (waveGroup=0) as representative for index computation.
+                            int ldsTag = kgraph.mapper.get<CT::LDS>(tag);
+                            if(ldsTag == -1)
+                                ldsTag = kgraph.mapper.getWaveGroup<CT::LDS>(tag, 0);
+                            return {ldsTag, GD::Upstream};
                         }
-                        return {kgraph.mapper.get<CT::User>(tag), GD::Downstream};
+                        // For merged (conditional) ops, plain User connection is absent;
+                        // use A-side (waveGroup=0) as representative for index computation
+                        // (stride/offset are equal for both sides).
+                        int userTag = kgraph.mapper.get<CT::User>(tag);
+                        if(userTag == -1)
+                            userTag = kgraph.mapper.getWaveGroup<CT::User>(tag, 0);
+                        return {userTag, GD::Downstream};
                     },
                     [&](CIsAnyOf<CG::LoadTiled, CG::LoadVGPR, CG::LoadSGPR> auto const& op)
                         -> result {
-                        return {kgraph.mapper.get<CT::User>(tag), GD::Downstream};
+                        // For merged (conditional) LoadTiled, the plain User connection is
+                        // absent; both branches use WaveGroupBranch. Fall back to the A-side
+                        // (waveGroup=0) User, which is used as the representative target for
+                        // index-chain computation (strides are equal for both sides).
+                        int userTag = kgraph.mapper.get<CT::User>(tag);
+                        if(userTag == -1)
+                            userTag = kgraph.mapper.getWaveGroup<CT::User>(tag, 0);
+                        return {userTag, GD::Downstream};
                     },
                     [&](CG::StoreLDSTile const& op) -> result {
-                        return {kgraph.mapper.get<CT::LDS>(tag), GD::Upstream};
+                        // For merged (conditional) ops, plain LDS connection is absent;
+                        // use A-side (waveGroup=0) as representative for index computation.
+                        int ldsTag = kgraph.mapper.get<CT::LDS>(tag);
+                        if(ldsTag == -1)
+                            ldsTag = kgraph.mapper.getWaveGroup<CT::LDS>(tag, 0);
+                        return {ldsTag, GD::Upstream};
                     },
                     [&](CG::LoadLDSTile const& op) -> result {
                         return {kgraph.mapper.get<CT::LDS>(tag), GD::Downstream};

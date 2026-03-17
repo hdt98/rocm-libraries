@@ -990,11 +990,108 @@ namespace rocRoller
         Generator<Instruction> LoadStoreTileGenerator::loadMacroTileDirect2LDS(
             int tag, LoadTileDirect2LDS const& load, Transformer coords)
         {
-            auto [ldsTag, lds]   = m_graph->getDimension<LDS>(tag);
             auto [tileTag, tile] = m_graph->getDimension<MacroTile>(tag);
             auto varType         = load.varType;
 
             auto packing = DataTypeInfo::Get(varType).packing;
+
+            // Detect merged (conditional) op: WaveGroupBranch{0} LDS connection present.
+            int ldsTagA = m_graph->mapper.getWaveGroup<LDS>(tag, /*waveGroup=*/0);
+            const bool isMerged = (ldsTagA != -1);
+
+            if(isMerged)
+            {
+                // -- Conditional (merged) LoadTileDirect2LDS path --
+                int ldsTagB           = m_graph->mapper.getWaveGroup<LDS>(tag, /*waveGroup=*/1);
+                int waveGroupAdhocTag = m_graph->mapper.get<Adhoc>(tag);
+                AssertFatal(ldsTagB != -1 && waveGroupAdhocTag != -1,
+                            "MergeConditionalLoads: merged LoadTileDirect2LDS missing B-side LDS "
+                            "or waveGroup Adhoc coordinate.",
+                            ShowValue(tag),
+                            ShowValue(ldsTagA),
+                            ShowValue(ldsTagB),
+                            ShowValue(waveGroupAdhocTag));
+
+                rocRoller::Log::getLogger()->debug(
+                    "KernelGraph::LoadStoreTileGenerator::loadMacroTileDirect2LDS: "
+                    "OP {} (conditional) ldsA={} ldsB={} MacroTile {}",
+                    tag,
+                    ldsTagA,
+                    ldsTagB,
+                    tileTag);
+                co_yield Instruction::Comment(concatenate(
+                    "GEN: loadMacroTileDirect2LDS (conditional) OP ",
+                    tag,
+                    " ldsA=",
+                    ldsTagA,
+                    " ldsB=",
+                    ldsTagB,
+                    " MacroTile ",
+                    tileTag));
+
+                // Allocate both LDS regions
+                auto allocateLDS = [&](int ldsTag) -> Register::ValuePtr {
+                    if(!m_context->registerTagManager()->hasRegister(ldsTag))
+                    {
+                        auto numElements = GetNumLDSElements(*m_graph, ldsTag) / packing;
+                        auto alloc = Register::Value::AllocateLDS(m_context, varType, numElements);
+                        m_context->registerTagManager()->addRegister(ldsTag, alloc);
+                        return alloc;
+                    }
+                    return m_context->registerTagManager()->getRegister(ldsTag);
+                };
+
+                auto ldsAllocA = allocateLDS(ldsTagA);
+                auto ldsAllocB = allocateLDS(ldsTagB);
+
+                auto offsetA = static_cast<uint32_t>(ldsAllocA->getLDSAllocation()->offset());
+                auto offsetB = static_cast<uint32_t>(ldsAllocB->getLDSAllocation()->offset());
+
+                // Build conditional: ldsOffset = (waveGroup==0) ? offsetA : offsetB
+                // waveGroupAdhocTag → scalar SGPR computed in the prolog by the Assign node.
+                auto waveGroupDF = std::make_shared<Expression::Expression>(
+                    Expression::DataFlowTag{waveGroupAdhocTag,
+                                           Register::Type::Scalar,
+                                           DataType::UInt32});
+                auto condExpr
+                    = Expression::conditional(waveGroupDF == L(0u), L(offsetA), L(offsetB));
+
+                // Allocate a scalar SGPR to hold the selected LDS offset
+                auto ldsOffsetReg = Register::Value::Placeholder(
+                    m_context, Register::Type::Scalar, DataType::UInt32, 1);
+                ldsOffsetReg->setName("waveGroupLDSOffset");
+                co_yield ldsOffsetReg->allocate();
+                co_yield generate(ldsOffsetReg, condExpr);
+
+                auto [elemXTag, elemX] = m_graph->getDimension<ElementNumber>(tag, 0);
+                auto [elemYTag, elemY] = m_graph->getDimension<ElementNumber>(tag, 1);
+                auto const m           = getUnsignedInt(evaluate(elemX.size));
+                auto       n           = getUnsignedInt(evaluate(elemY.size));
+
+                AssertFatal(n % packing == 0,
+                            ShowValue(m),
+                            ShowValue(n),
+                            ShowValue(packing),
+                            ShowValue(load.varType));
+                n /= packing;
+
+                LoadStoreTileInfo info{.tag     = tag,
+                                       .kind    = MemoryInstructions::MemoryKind::Buffer2LDS,
+                                       .m       = m,
+                                       .n       = n,
+                                       .data    = ldsOffsetReg,
+                                       .varType = varType,
+                                       .bufDesc = nullptr,
+                                       .bufOpts = {}};
+                // Both LDS allocations are live destinations; chain addExtraDst for each.
+                co_yield moveTile<MemoryInstructions::MemoryDirection::Load>(info, coords)
+                    .map(MemoryInstructions::addExtraDst(ldsAllocA))
+                    .map(MemoryInstructions::addExtraDst(ldsAllocB));
+                co_return;
+            }
+
+            // -- Normal (non-merged) path --
+            auto [ldsTag, lds] = m_graph->getDimension<LDS>(tag);
 
             rocRoller::Log::getLogger()->debug("KernelGraph::LoadStoreTileGenerator::"
                                                "loadMacroTileDirect2LDS: OP {} LDS {} MacroTile {}",
@@ -1645,11 +1742,6 @@ namespace rocRoller
                                                                        StoreLDSTile const& store,
                                                                        Transformer         coords)
         {
-            auto info = getStoreLDSTileInfo(tag, store);
-
-            for(auto const& comment : info.comments)
-                co_yield Instruction::Comment(comment);
-
             auto modelledAddresses = m_graph->modelledAddresses.find(tag);
             auto applyAddresses    = [&](Instruction inst) {
                 if(modelledAddresses != m_graph->modelledAddresses.end())
@@ -1661,6 +1753,99 @@ namespace rocRoller
                 }
                 return inst;
             };
+
+            // Detect merged (conditional) StoreLDSTile: WaveGroupBranch{0} LDS connection present.
+            int ldsTagA = m_graph->mapper.getWaveGroup<LDS>(tag, /*waveGroup=*/0);
+            if(ldsTagA != -1)
+            {
+                // -- Conditional (merged) StoreLDSTile path --
+                int ldsTagB           = m_graph->mapper.getWaveGroup<LDS>(tag, /*waveGroup=*/1);
+                int waveGroupAdhocTag = m_graph->mapper.get<Adhoc>(tag);
+                AssertFatal(ldsTagB != -1 && waveGroupAdhocTag != -1,
+                            "MergeConditionalLoads: merged StoreLDSTile missing B-side LDS "
+                            "or waveGroup Adhoc coordinate.",
+                            ShowValue(tag),
+                            ShowValue(ldsTagA),
+                            ShowValue(ldsTagB),
+                            ShowValue(waveGroupAdhocTag));
+
+                co_yield Instruction::Comment(concatenate(
+                    "GEN: genStoreLDSTile (conditional) OP ",
+                    tag,
+                    " ldsA=",
+                    ldsTagA,
+                    " ldsB=",
+                    ldsTagB));
+
+                // Use storeMacroTileLDSInfo with the A-side LDS for dimension/size info.
+                // We override the offset with a conditional selection below.
+                auto info = storeMacroTileLDSInfo(tag, store);
+
+                // Allocate both LDS regions (may already be allocated by loadMacroTileDirect2LDS
+                // or a previous call).
+                auto varType = store.varType;
+                auto packing = DataTypeInfo::Get(varType).packing;
+
+                auto allocateLDS = [&](int ldsTag) -> Register::ValuePtr {
+                    if(!m_context->registerTagManager()->hasRegister(ldsTag))
+                    {
+                        auto numElements = GetNumLDSElements(*m_graph, ldsTag);
+                        auto alloc       = Register::Value::AllocateLDS(
+                            m_context, varType, numElements / packing, /*alignment*/ 4,
+                            m_graph->coordinates.getNode<MacroTile>(m_graph->mapper.get<MacroTile>(tag)).paddingBytes());
+                        m_context->registerTagManager()->addRegister(ldsTag, alloc);
+                        return alloc;
+                    }
+                    return m_context->registerTagManager()->getRegister(ldsTag);
+                };
+
+                Register::ValuePtr ldsAllocA = nullptr, ldsAllocB = nullptr;
+                if(m_context)
+                {
+                    ldsAllocA = allocateLDS(ldsTagA);
+                    ldsAllocB = allocateLDS(ldsTagB);
+
+                    auto offsetA = static_cast<uint32_t>(ldsAllocA->getLDSAllocation()->offset());
+                    auto offsetB = static_cast<uint32_t>(ldsAllocB->getLDSAllocation()->offset());
+
+                    // Build conditional: ldsOffset = (waveGroup==0) ? offsetA : offsetB
+                    auto waveGroupDF = std::make_shared<Expression::Expression>(
+                        Expression::DataFlowTag{waveGroupAdhocTag,
+                                               Register::Type::Scalar,
+                                               DataType::UInt32});
+                    auto condExpr = Expression::conditional(
+                        waveGroupDF == L(0u), L(offsetA), L(offsetB));
+
+                    auto ldsOffsetReg = Register::Value::Placeholder(
+                        m_context, Register::Type::Scalar, DataType::UInt32, 1);
+                    ldsOffsetReg->setName("waveGroupStoreLDSOffset");
+                    co_yield ldsOffsetReg->allocate();
+                    co_yield generate(ldsOffsetReg, condExpr);
+
+                    // Override the offset field in info with the conditional scalar
+                    info.offset = ldsOffsetReg;
+                }
+
+                if(m_context && ldsAllocA)
+                {
+                    co_yield moveTile<MemoryInstructions::MemoryDirection::Store>(info, coords)
+                        .map(MemoryInstructions::addExtraDst(ldsAllocA))
+                        .map(MemoryInstructions::addExtraDst(ldsAllocB))
+                        .map(applyAddresses);
+                }
+                else
+                {
+                    co_yield moveTile<MemoryInstructions::MemoryDirection::Store>(info, coords)
+                        .map(applyAddresses);
+                }
+                co_return;
+            }
+
+            // -- Normal (non-merged) StoreLDSTile path --
+            auto info = getStoreLDSTileInfo(tag, store);
+
+            for(auto const& comment : info.comments)
+                co_yield Instruction::Comment(comment);
 
             auto [ldsTag, _lds] = m_graph->getDimension<LDS>(tag);
 
