@@ -68,13 +68,17 @@ function(add_cpu_gemm_test TEST_NAME)
     )
 endfunction()
 
-# Helper: get default test sizes per type. f32 uses non-tile-aligned sizes
-# that differ from f16/bf16 to increase coverage diversity.
+# Default test sizes. Non-tile-aligned to stress remainder handling.
+# f32 and f16/bf16 use different sizes to increase coverage diversity.
+set(F32_SIZES -M 133 -N 147 -K 165)
+set(ALT_SIZES -M 131 -N 141 -K 151)
+set(ODD_SIZES -M 102 -N 103 -K 105)
+
 macro(get_test_sizes TYPE OUT_SIZES)
     if("${TYPE}" STREQUAL "f32")
-        set(${OUT_SIZES} -M 133 -N 147 -K 165)
+        set(${OUT_SIZES} ${F32_SIZES})
     else()
-        set(${OUT_SIZES} -M 131 -N 141 -K 151)
+        set(${OUT_SIZES} ${ALT_SIZES})
     endif()
 endmacro()
 
@@ -99,10 +103,10 @@ foreach(PATH fast slow)
 
     # Basic sanity, transpose combos, odd sizes, type coverage
     add_cpu_gemm_test(${PATH}_F32_Sanity
-        ARGS -M 131 -N 141 -K 151 --type f32 --validate ${PATH_FLAGS}
+        ARGS ${ALT_SIZES} --type f32 --validate ${PATH_FLAGS}
     )
     add_cpu_gemm_test(${PATH}_F32_Odd_Sizes
-        ARGS -M 102 -N 103 -K 105 --type f32 --validate ${PATH_FLAGS}
+        ARGS ${ODD_SIZES} --type f32 --validate ${PATH_FLAGS}
     )
     foreach(TYPE f32 f16 bf16)
         get_test_sizes(${TYPE} SIZES)
@@ -133,13 +137,13 @@ foreach(PATH fast slow)
 
     # F32-only individual feature tests
     add_cpu_gemm_test(${PATH}_f32_Relu
-        ARGS -M 133 -N 147 -K 165 --type f32 --validate --activation relu ${PATH_FLAGS}
+        ARGS ${F32_SIZES} --type f32 --validate --activation relu ${PATH_FLAGS}
     )
     add_cpu_gemm_test(${PATH}_f32_ScaleAlphaVec
-        ARGS -M 133 -N 147 -K 165 --type f32 --validate --scaleAlphaVec ${PATH_FLAGS}
+        ARGS ${F32_SIZES} --type f32 --validate --scaleAlphaVec ${PATH_FLAGS}
     )
     add_cpu_gemm_test(${PATH}_f32_Beta_AllFeatures
-        ARGS -M 133 -N 147 -K 165 --type f32 --beta 0.5 --validate --bias --activation relu --scaleAlphaVec ${PATH_FLAGS}
+        ARGS ${F32_SIZES} --type f32 --beta 0.5 --validate --bias --activation relu --scaleAlphaVec ${PATH_FLAGS}
     )
 
     # Edge cases: dimensions at or below tile size (BLOCK_M=32, BLOCK_N=32, BLOCK_K=8)
@@ -163,6 +167,6 @@ foreach(MODE Scalar Vector)
         )
     endforeach()
     add_cpu_gemm_test(slow_f32_ScaleAB_${MODE}_AllFeatures
-        ARGS -M 133 -N 147 -K 165 --type f32 --beta 0.5 --validate --useScaleAB ${MODE} --bias --activation relu --scaleAlphaVec
+        ARGS ${F32_SIZES} --type f32 --beta 0.5 --validate --useScaleAB ${MODE} --bias --activation relu --scaleAlphaVec
     )
 endforeach()
