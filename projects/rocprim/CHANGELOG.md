@@ -18,6 +18,8 @@ Full documentation for rocPRIM is available at [https://rocm.docs.amd.com/projec
 * Benchmarking now requires [AMD SMI](https://rocm.docs.amd.com/projects/amdsmi/en/latest/) to be installed.
   * rocPRIM now uses the new single-header library 'primbench' for benchmarks, rather than Google Benchmark. primbench requires AMD SMI.
   * See `shared/primbench/README.md` for primbench its documentation.
+  * A CMake-level check has been added to prevent benchmarks from being built on Windows, since AMD SMI is not available there.
+  * The rmake.py build script no longer builds benchmarks by default on Windows when passed the `--clients` option.
 
 ### Removed
 
