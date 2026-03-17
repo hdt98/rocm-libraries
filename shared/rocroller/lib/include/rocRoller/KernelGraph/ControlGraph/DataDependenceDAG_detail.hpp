@@ -29,8 +29,11 @@ namespace rocRoller::KernelGraph::DataDependenceDAG::Detail
          * Adds a dependence edge(represented via `Sequence`) between the given
          * source and destination nodes in the dependence DAG (`m_dependenceDAG),
          * if both the nodes have the same body-parent.
+         *
+         * Returns true if a dependence edge is added or exists between the
+         * given source and destination nodes, otherwise returns false.
          */
-        void addDependenceEdge(int source, int dest);
+        bool addDependenceEdge(int source, int dest);
         /**
          * Makes necessary updates to `m_latestWriteToCoord`, `m_latestReadsToCoord`
          * and `m_dependenceDAG` structures for the given `ReadWriteRecord`.

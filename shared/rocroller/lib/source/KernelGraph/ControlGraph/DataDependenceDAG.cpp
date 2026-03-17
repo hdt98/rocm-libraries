@@ -134,17 +134,19 @@ namespace rocRoller::KernelGraph
                 return false;
             }
 
-            void DataDependenceDAGDetail::addDependenceEdge(int source, int dest)
+            bool DataDependenceDAGDetail::addDependenceEdge(int source, int dest)
             {
                 AssertFatal(source != dest, ShowValue(source), ShowValue(dest));
 
                 if(!belongToSameBasicBlock(source, dest))
-                    return;
+                    return false;
 
                 if(!m_dependenceDAG.findEdge(source, dest).has_value())
                 {
                     m_dependenceDAG.addElement(ControlGraph::Sequence(), {source}, {dest});
                 }
+
+                return true;
             }
 
             void DataDependenceDAGDetail::processReadWriteRecord(
@@ -165,7 +167,20 @@ namespace rocRoller::KernelGraph
                                 ShowValue(record.rw));
 
                     // adds WW(output dep) or WR(flow dep) edge
-                    addDependenceEdge(writeIter->second, record.control);
+                    auto depAdded = addDependenceEdge(writeIter->second, record.control);
+
+                    if(depAdded)
+                    {
+                        auto order = m_graph.control.compareNodes(
+                            UseCacheIfAvailable, writeIter->second, record.control);
+                        AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst
+                                        || order == ControlGraph::NodeOrdering::RightInBodyOfLeft,
+                                    ShowValue(order),
+                                    ShowValue(writeIter->second),
+                                    ShowValue(record.control),
+                                    ShowValue(record.coordinate),
+                                    ShowValue(record.rw));
+                    }
                 }
 
                 if(record.rw == ReadWrite::WRITE || record.rw == ReadWrite::READWRITE)
@@ -176,7 +191,21 @@ namespace rocRoller::KernelGraph
                             continue;
 
                         // adds RW(anti dep) edges
-                        addDependenceEdge(readControl, record.control);
+                        auto depAdded = addDependenceEdge(readControl, record.control);
+
+                        if(depAdded)
+                        {
+                            auto order = m_graph.control.compareNodes(
+                                UseCacheIfAvailable, readControl, record.control);
+                            AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst
+                                            || order
+                                                   == ControlGraph::NodeOrdering::RightInBodyOfLeft,
+                                        ShowValue(order),
+                                        ShowValue(readControl),
+                                        ShowValue(record.control),
+                                        ShowValue(record.coordinate),
+                                        ShowValue(record.rw));
+                        }
                     }
 
                     // Since the current control node writes into this coord,
