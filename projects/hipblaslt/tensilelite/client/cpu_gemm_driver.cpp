@@ -334,7 +334,7 @@ int main(int argc, char* argv[])
         "beta", po::value<float>()->default_value(0.0f), "Beta scalar")(
         "type", po::value<std::string>()->default_value("f32"), "Data type (f32, f16, bf16)")(
         "validate", po::value<bool>()->default_value(true), "Run validation against ref")(
-        "tryFastPath", po::value<bool>()->default_value(true), "Use optimized path")(
+        "tryFastPath", po::value<bool>()->default_value(false), "Use optimized path")(
         "bias", po::value<bool>()->default_value(false), "Enable bias vector")(
         "activation", po::value<std::string>()->default_value("none"), "Activation (none, relu)")(
         "scaleAlphaVec", po::value<bool>()->default_value(false), "Enable per-row alpha scaling");
