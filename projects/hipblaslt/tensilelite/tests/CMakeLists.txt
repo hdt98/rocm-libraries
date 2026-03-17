@@ -155,12 +155,14 @@ foreach(PATH fast slow)
 endforeach()
 
 # ScaleAB tests (slow path only — fast path does not support useScaleAB)
-foreach(TYPE f32 f16 bf16)
-    get_test_sizes(${TYPE} SIZES)
-    add_cpu_gemm_test(slow_${TYPE}_ScaleAB
-        ARGS ${SIZES} --type ${TYPE} --validate --useScaleAB
+foreach(MODE Scalar Vector)
+    foreach(TYPE f32 f16 bf16)
+        get_test_sizes(${TYPE} SIZES)
+        add_cpu_gemm_test(slow_${TYPE}_ScaleAB_${MODE}
+            ARGS ${SIZES} --type ${TYPE} --validate --useScaleAB ${MODE}
+        )
+    endforeach()
+    add_cpu_gemm_test(slow_f32_ScaleAB_${MODE}_AllFeatures
+        ARGS -M 33 -N 47 -K 65 --type f32 --beta 0.5 --validate --useScaleAB ${MODE} --bias --activation relu --scaleAlphaVec
     )
 endforeach()
-add_cpu_gemm_test(slow_f32_ScaleAB_AllFeatures
-    ARGS -M 33 -N 47 -K 65 --type f32 --beta 0.5 --validate --useScaleAB --bias --activation relu --scaleAlphaVec
-)
