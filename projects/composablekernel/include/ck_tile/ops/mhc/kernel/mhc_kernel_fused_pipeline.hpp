@@ -11,6 +11,8 @@
 
 // MHC Kernel with Fused GEMM Pipeline V3
 // =====================================================================
+// Implementing equations 14 and 15 of https://arxiv.org/pdf/2512.24880
+//
 // This kernel uses the MhcGemmPipelineAgBgCrCompV3Fused pipeline which
 // supports optional fusion functions. This enables single-pass fusion of
 // operations like norm computation with the GEMM operation.

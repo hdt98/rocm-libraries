@@ -13,12 +13,15 @@
 
 // MHC Reduction Kernel
 // ======================================================================
+// Implementing equations 16, 17 and 18 of https://arxiv.org/pdf/2512.24880
+//
 // Pattern:
-// 1. Transform workspace tensor [batch, grid_k, output_dim] -> [batch*output_dim, grid_k]
-// 2. Create tile windows with proper distributions
-// 3. Iterate over grid_k dimension with block_reduce2d
-// 4. Apply warp-level and cross-warp synchronization
-// 5. Store results with activation/scaling
+// 1. Workspace tensor layout: [batch, grid_k, output_dim]
+// 2. Output tensor layout: [batch * output_dim] (1D merged for coalesced writes)
+// 3. Each block handles Block_M elements from the merged dimension
+// 4. Reduce over grid_k dimension with block_reduce2d
+// 5. Apply warp-level and cross-warp synchronization
+// 6. Store results with activation/scaling using coalesced tile writes
 
 namespace ck_tile {
 
@@ -30,10 +33,11 @@ struct MHCReductionKernel
     using ComputeDataType = ck_tile::remove_cvref_t<typename Problem::ComputeDataType>;
     using YDataType       = ck_tile::remove_cvref_t<typename Problem::YDataType>;
 
-    // Reduction shape matching CK-Tile's pattern
-    // Tuned for MHC: even smaller blocks for maximum parallelism
+    // Reduction shape for the input processing
+    // Block_M covers the merged [batch * output_dim] dimension
+    // Block_N covers the grid_k reduction dimension
     using BlockWarps  = ck_tile::sequence<1, 1>;
-    using BlockTile   = ck_tile::sequence<64, 1>; // Block_M=64, Block_N=1 (maximum parallelism)
+    using BlockTile   = ck_tile::sequence<64, 1>; // Block_M=64, Block_N=1
     using WarpTile    = ck_tile::sequence<64, 1>;
     using ThreadTile  = ck_tile::sequence<1, 1>;
     using ReduceShape = ck_tile::Reduce2dShape<BlockWarps, BlockTile, WarpTile, ThreadTile>;
@@ -80,7 +84,6 @@ struct MHCReductionKernel
         const auto iM = get_block_id() * S::Block_M;
 
         // Workspace layout: [batch, grid_k, output_dim]
-
         const index_t total_output = batch * output_dim;
 
         // Create 3D workspace tensor view
@@ -144,60 +147,97 @@ struct MHCReductionKernel
         // Cross-warp reduction
         block_reduce2d_cross_warp_sync(y_compute, smem, reduce_func);
 
-        // Apply activation and scaling, then store
-        // We need to apply different formulas based on output section
+        // Apply element-wise transformations in place
+        // We iterate through the distributed spans and apply transforms based on position
         constexpr auto result_spans = decltype(y_compute)::get_distributed_spans();
+
         sweep_tile_span(result_spans[number<0>{}], [&](auto idx0) {
+            // Get the tile index from the distributed index
             const auto tile_idx = get_x_indices_from_distributed_indices(
                 y_compute.get_tile_distribution(), make_tuple(idx0));
 
             const index_t local_idx  = tile_idx.at(number<0>{});
             const index_t global_idx = iM + local_idx;
 
-            if(global_idx >= total_output)
-                return;
-
-            const index_t global_m = global_idx / output_dim;
-            const index_t global_n = global_idx % output_dim;
-
-            // Get reduced value
+            // Get reduced value using tile's operator[]
             ComputeDataType value = y_compute[make_tuple(idx0)];
+            ComputeDataType final_value;
 
-            // Compute norm from partial norms
-            ComputeDataType norm        = 1.0f;
-            ComputeDataType sum_squares = 0.0f;
-            for(index_t k = 0; k < grid_k; ++k)
-                sum_squares += p_partial_norms[k * batch + global_m];
-            const ComputeDataType sqrt_nC = ck_tile::sqrt(static_cast<ComputeDataType>(nC));
-            norm                          = ck_tile::sqrt(sum_squares) / sqrt_nC;
-            norm                          = (norm > 1e-12f) ? norm : 1.0f;
-
-            // Apply activation and scaling based on output section
-            YDataType final_value;
-            if(global_n < n)
+            // Check bounds
+            if(global_idx >= total_output)
             {
-                // H^pre: (alpha_pre/norm) * sigma(value) + bias
-                YDataType activated;
-                Activation{}(activated, type_convert<YDataType>(value));
-                final_value = type_convert<YDataType>(
-                    (alpha_pre / norm) * type_convert<ComputeDataType>(activated) + bias);
-            }
-            else if(global_n < 2 * n)
-            {
-                // H^post: (alpha_post/norm) * 2*sigma(value) + bias
-                YDataType activated;
-                Activation{}(activated, type_convert<YDataType>(value));
-                final_value = type_convert<YDataType>(
-                    (alpha_post / norm) * 2.0f * type_convert<ComputeDataType>(activated) + bias);
+                final_value = type_convert<ComputeDataType>(0);
             }
             else
             {
-                // H^res: (alpha_res/norm) * value + bias
-                final_value = type_convert<YDataType>((alpha_res / norm) * value + bias);
+                const index_t global_m = global_idx / output_dim;
+                const index_t global_n = global_idx % output_dim;
+
+                // Compute norm from partial norms for this batch element
+                ComputeDataType sum_squares = 0.0f;
+                for(index_t k = 0; k < grid_k; ++k)
+                {
+                    sum_squares += p_partial_norms[k * batch + global_m];
+                }
+                const ComputeDataType sqrt_nC_val = ck_tile::sqrt(static_cast<ComputeDataType>(nC));
+                ComputeDataType norm              = ck_tile::sqrt(sum_squares) / sqrt_nC_val;
+                norm                              = (norm > 1e-12f) ? norm : 1.0f;
+
+                // Apply activation and scaling based on output section
+                if(global_n < n)
+                {
+                    // H^pre: (alpha_pre/norm) * sigma(value) + bias
+                    YDataType activated;
+                    Activation{}(activated, type_convert<YDataType>(value));
+                    final_value =
+                        (alpha_pre / norm) * type_convert<ComputeDataType>(activated) + bias;
+                }
+                else if(global_n < 2 * n)
+                {
+                    // H^post: (alpha_post/norm) * 2*sigma(value) + bias
+                    YDataType activated;
+                    Activation{}(activated, type_convert<YDataType>(value));
+                    final_value =
+                        (alpha_post / norm) * 2.0f * type_convert<ComputeDataType>(activated) +
+                        bias;
+                }
+                else
+                {
+                    // H^res: (alpha_res/norm) * value + bias
+                    final_value = (alpha_res / norm) * value + bias;
+                }
             }
 
-            p_output[global_idx] = final_value;
+            // Store transformed value back using tile's operator()
+            y_compute(make_tuple(idx0)) = final_value;
         });
+
+        // Create 1D output tensor view for coalesced store
+        // Output layout: [batch * output_dim] (merged)
+        // Vector size for coalesced access
+        constexpr index_t output_vector_size = ck_tile::min(
+            static_cast<index_t>(16 / sizeof(YDataType)), static_cast<index_t>(S::Block_M));
+
+        auto y_tensor_view =
+            make_naive_tensor_view<address_space_enum::global>(p_output,
+                                                               make_tuple(total_output),
+                                                               make_tuple(1),
+                                                               number<output_vector_size>{},
+                                                               number<1>{});
+
+        // Pad output tensor to block tile size
+        auto y_tensor_padded =
+            pad_tensor_view(y_tensor_view, make_tuple(number<S::Block_M>{}), sequence<false>{});
+
+        // Create tile window for output with the same distribution as y_compute
+        // This ensures store_tile correctly maps tile elements to memory
+        auto y_window = make_tile_window(y_tensor_padded,
+                                         make_tuple(number<S::Block_M>{}),
+                                         {iM},
+                                         y_compute.get_tile_distribution());
+
+        // Store with coalesced access pattern
+        store_tile(y_window, cast_tile<YDataType>(y_compute));
     }
 };
 

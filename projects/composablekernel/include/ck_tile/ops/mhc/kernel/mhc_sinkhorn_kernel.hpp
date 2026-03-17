@@ -360,8 +360,7 @@ struct MHCSinkhornKernelDispatcher
         }
         else
         {
-            throw std::runtime_error(
-                std::string("MHCSinkhornKernelDispatcher only supports n in the set (4,8)"))
+            assert(false && "MHCSinkhornKernelDispatcher only supports n in the set (4,8)");
         }
     }
 };
