@@ -524,7 +524,8 @@ struct GroupedConvolutionBackwardWeightKernel
             "SplitImage",
             EnableSplitImage,
             "ExplicitGemm",
-            GroupedConvTraitsType_::ExplicitGemm
+            GroupedConvTraitsType_::ExplicitGemm,
+            IsStreamK ? "StreamK" : "SplitK"
         );
         // clang-format on
     }
