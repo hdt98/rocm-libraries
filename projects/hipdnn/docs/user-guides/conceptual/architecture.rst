@@ -34,7 +34,7 @@ hipDNN provides three SDKs:
 Architecture overview
 =====================
 
-.. image:: ../images/hipDNN_Architecture.png
+.. image:: ../images/hipDNN_Architecture.svg
 
 Frontend
 --------
