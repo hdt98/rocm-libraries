@@ -839,15 +839,6 @@ namespace TensileLite
                 return false;
             }
 
-            if(problem.useScaleAB() == "Scalar")
-            {
-                return false;
-            }
-
-            if(problem.useScaleAB() == "Vector")
-            {
-                return false;
-            }
 
             if(problem.boundIndices().size() != 1 || problem.freeIndicesA().size() != 1
                || problem.freeIndicesB().size() != 1)
@@ -929,6 +920,19 @@ namespace TensileLite
             size_t sizeK     = problem.boundSize(0);
             size_t sizeM     = problem.freeSizeA(0);
             size_t sizeN     = problem.freeSizeB(0);
+
+            std::string  useScaleAB = problem.useScaleAB();
+            ShadowBuffer shadowScaleA, shadowScaleB;
+            if(useScaleAB == "Vector")
+            {
+                shadowScaleA = ShadowBuffer(inputs.scaleA, problem.alphaType(), sizeM);
+                shadowScaleB = ShadowBuffer(inputs.scaleB, problem.alphaType(), sizeN);
+            }
+            else if(useScaleAB == "Scalar")
+            {
+                shadowScaleA = ShadowBuffer(inputs.scaleA, problem.alphaType(), 1);
+                shadowScaleB = ShadowBuffer(inputs.scaleB, problem.alphaType(), 1);
+            }
 
             constexpr size_t BLOCK_M = 32;
             constexpr size_t BLOCK_N = 32;
@@ -1055,6 +1059,16 @@ namespace TensileLite
                                     auto   startingC = curBatchC[idxC];
                                     auto   current   = curBatchD[idxD];
                                     float  alpha     = originalAlpha;
+                                    if(useScaleAB == "Vector")
+                                    {
+                                        alpha *= shadowScaleA[global_m];
+                                        alpha *= shadowScaleB[global_n];
+                                    }
+                                    else if(useScaleAB == "Scalar")
+                                    {
+                                        alpha *= shadowScaleA[0];
+                                        alpha *= shadowScaleB[0];
+                                    }
                                     if(useScaleAlphaVec)
                                     {
                                         if(factorDim == 1)
