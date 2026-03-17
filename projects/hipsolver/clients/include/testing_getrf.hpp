@@ -154,7 +154,8 @@ void testing_getrf_bad_arg()
         CHECK_HIP_ERROR(dInfo.memcheck());
 
         int size_dW, size_hW;
-        hipsolver_getrf_bufferSize(API, handle, params, m, n, dA.data(), lda, &size_dW, &size_hW);
+        CHECK_HIP_ERROR(hipsolver_getrf_bufferSize(
+            API, handle, params, m, n, dA.data(), lda, &size_dW, &size_hW));
         int                            size_dW_elems = (size_dW + sizeof(T) - 1) / sizeof(T);
         host_strided_batch_vector<T>   hWork(size_hW, 1, size_hW, 1);
         device_strided_batch_vector<T> dWork(size_dW_elems, 1, size_dW_elems, 1);
@@ -189,7 +190,8 @@ void testing_getrf_bad_arg()
         CHECK_HIP_ERROR(dInfo.memcheck());
 
         SIZE size_dW, size_hW;
-        hipsolver_getrf_bufferSize(API, handle, params, m, n, dA.data(), lda, &size_dW, &size_hW);
+        CHECK_HIP_ERROR(hipsolver_getrf_bufferSize(
+            API, handle, params, m, n, dA.data(), lda, &size_dW, &size_hW));
         host_strided_batch_vector<T>   hWork(size_hW, 1, size_hW, 1);
         device_strided_batch_vector<T> dWork(size_dW, 1, size_dW, 1);
         if(size_dW)
@@ -589,11 +591,11 @@ void testing_getrf(Arguments& argus)
     {
         SIZE size_dW, size_hW;
         if constexpr(BATCHED)
-            hipsolver_getrf_bufferSize(
-                API, handle, params, m, n, (T**)nullptr, lda, &size_dW, &size_hW);
+            CHECK_HIP_ERROR(hipsolver_getrf_bufferSize(
+                API, handle, params, m, n, (T**)nullptr, lda, &size_dW, &size_hW));
         else
-            hipsolver_getrf_bufferSize(
-                API, handle, params, m, n, (T*)nullptr, lda, &size_dW, &size_hW);
+            CHECK_HIP_ERROR(hipsolver_getrf_bufferSize(
+                API, handle, params, m, n, (T*)nullptr, lda, &size_dW, &size_hW));
 
         if(argus.mem_query)
         {
@@ -605,8 +607,8 @@ void testing_getrf(Arguments& argus)
     if constexpr(BATCHED)
     {
         int size_dW, size_hW;
-        hipsolver_getrf_bufferSize(
-            API, handle, params, m, n, (T**)nullptr, lda, &size_dW, &size_hW);
+        CHECK_HIP_ERROR(hipsolver_getrf_bufferSize(
+            API, handle, params, m, n, (T**)nullptr, lda, &size_dW, &size_hW));
         int size_dW_elems = (size_dW + sizeof(T) - 1) / sizeof(T);
 
         // memory allocations
@@ -683,7 +685,8 @@ void testing_getrf(Arguments& argus)
     else
     {
         SIZE size_dW, size_hW;
-        hipsolver_getrf_bufferSize(API, handle, params, m, n, (T*)nullptr, lda, &size_dW, &size_hW);
+        CHECK_HIP_ERROR(hipsolver_getrf_bufferSize(
+            API, handle, params, m, n, (T*)nullptr, lda, &size_dW, &size_hW));
 
         // memory allocations
         host_strided_batch_vector<T>     hA(size_A, 1, stA, bc);
