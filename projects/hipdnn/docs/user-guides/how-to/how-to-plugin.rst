@@ -13,4 +13,4 @@ These guides demonstrate how to extend hipDNN's operation support using the hipD
 These instructions are appropriate for developers who have experience with hipDNN and are familiar with building and compiling shared libraries (Linux) or DLLs (Windows).
 If you're new to hipDNN, see :ref:`how-to-users`.
 
-- :doc:`Develop plugins <how-to/develop-plugins>`
+- :ref:`develop-plugins`

@@ -181,7 +181,7 @@ Static kernel engines
 
 - Provides precompiled kernels for specific operations.
 - Only handles specific configurations.
-- For example, :ref:`miopen`.
+- For example, :ref:`miopen-provider`.
 - **Advantages**:
 
   - Highly optimized for supported cases.

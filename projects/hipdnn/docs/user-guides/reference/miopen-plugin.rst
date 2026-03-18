@@ -2,7 +2,7 @@
   :description: The MIOpen provider plugin serves as the kernel provider. It employs a modular C++ architecture, largely decoupled from the API layer.
   :keywords: hipDNN, ROCm, API, MIOpen
 
-.. _miopen:
+.. _miopen-provider:
 
 *********************************
 MIOpen provider operation support

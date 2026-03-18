@@ -13,7 +13,7 @@ hipDNN operations are implemented through plugins. Each plugin provides its own 
 Plugins
 =======
 
-- :ref:`miopen`: Provides integration with AMD's `MIOpen library <https://rocm.docs.amd.com/projects/MIOpen/en/latest/index.html>`_ for GPU-accelerated deep learning operations.
+- :ref:`miopen-provider`: Provides integration with AMD's `MIOpen library <https://rocm.docs.amd.com/projects/MIOpen/en/latest/index.html>`_ for GPU-accelerated deep learning operations.
 
   - Convolution operations (Forward, Dgrad, Wgrad)
   - Batchnorm operations (Training, Backward, Inference)

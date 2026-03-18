@@ -145,7 +145,7 @@ Steps
 1. Create the plugin structure.
 
    1. Create a new project or repository for your plugin.
-   2. Add definitions for the plugin interface defined in `plugin_sdk/include/hipdnn_plugin_sdk/EnginePluginApi.h <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/plugin_sdk/include/hipdnn_plugin_sdk/EnginePluginApi.h>`_. See :ref:`miopen` for an implementation reference.
+   2. Add definitions for the plugin interface defined in `plugin_sdk/include/hipdnn_plugin_sdk/EnginePluginApi.h <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/plugin_sdk/include/hipdnn_plugin_sdk/EnginePluginApi.h>`_. See :ref:`miopen-provider` for an implementation reference.
 
 2. Implement the plugin API functions.
 
@@ -461,7 +461,7 @@ For a comprehensive example of an integration test, see `IntegrationGpuBatchnorm
 Example: MIOpen provider plugin
 ================================
 
-See :ref:`miopen` for more information.
+See :ref:`miopen-provider` for more information.
 
 Troubleshooting
 ===============
