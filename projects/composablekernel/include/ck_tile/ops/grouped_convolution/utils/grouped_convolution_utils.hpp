@@ -71,7 +71,8 @@ template <index_t NDimSpatial_,
           index_t VectorSizeC_      = 1,
           index_t NumGroupsToMerge_ = 1,
           bool EnableSplitImage_    = false,
-          bool ExplicitGemm_        = false>
+          bool ExplicitGemm_        = false,
+          bool UseIm2Win_           = false> // apply im2win I' transform in A descriptor (2D NHWGC)
 struct GroupedConvTraits
 {
     private:
@@ -100,6 +101,7 @@ struct GroupedConvTraits
     static constexpr index_t NumGroupsToMerge                     = NumGroupsToMerge_;
     static constexpr bool EnableSplitImage                        = EnableSplitImage_;
     static constexpr bool ExplicitGemm                            = ExplicitGemm_;
+    static constexpr bool UseIm2Win                               = UseIm2Win_;
     static constexpr index_t NDimSpatial                          = NDimSpatial_;
     static constexpr ConvolutionSpecialization ConvSpecialization = ConvSpecialization_;
     using InLayout                                                = InLayout_;
