@@ -1607,6 +1607,8 @@ namespace rocRoller
             return bodyParents(control, graph.control);
         }
 
+        // TODO: return pair<nodeID, ControlEdge> to indicate the associated edge
+        // type with the bodyParent.
         Generator<int> bodyParents(int control, ControlGraph::ControlGraph const& graph)
         {
             std::unordered_set<int> visitedNodes = {control};

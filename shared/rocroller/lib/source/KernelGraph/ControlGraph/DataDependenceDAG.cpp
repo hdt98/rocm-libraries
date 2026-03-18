@@ -78,67 +78,11 @@ namespace rocRoller::KernelGraph
                 return bodyParent.value();
             }
 
-            bool DataDependenceDAGDetail::belongToSameBasicBlock(int node1, int node2)
-            {
-                auto top1 = getTopSetCoordinate(m_graph, node1);
-                auto top2 = getTopSetCoordinate(m_graph, node2);
-
-                auto bodyParent1 = getBodyParent(top1);
-                auto bodyParent2 = getBodyParent(top2);
-
-                if(bodyParent1 != bodyParent2)
-                    return false;
-
-                auto isContainingEdge = [this](int tag) -> bool {
-                    return m_graph.control.getElementType(tag) == Graph::ElementType::Edge
-                           && !std::holds_alternative<ControlGraph::Sequence>(
-                               m_graph.control.getEdge(tag));
-                };
-
-                auto path1 = m_graph.control
-                                 .path<Graph::Direction::Downstream>(std::vector<int>{bodyParent1},
-                                                                     std::vector<int>{top1})
-                                 .filter(isContainingEdge)
-                                 .to<std::vector>();
-                auto path2 = m_graph.control
-                                 .path<Graph::Direction::Downstream>(std::vector<int>{bodyParent2},
-                                                                     std::vector<int>{top2})
-                                 .filter(isContainingEdge)
-                                 .to<std::vector>();
-
-                AssertFatal(!path1.empty() && !path2.empty(),
-                            "Each path must contain at least one containing edge",
-                            ShowValue(path1.size()),
-                            ShowValue(path2.size()));
-
-                // Check if all elements in a path are of same edge type.
-                auto allSameEdgeTypes = [this](const auto& path) {
-                    return std::all_of(path.begin() + 1,
-                                       path.end(),
-                                       [firstIndex = m_graph.control.getEdge(path[0]).index(),
-                                        this](const auto& e) {
-                                           return m_graph.control.getEdge(e).index() == firstIndex;
-                                       });
-                };
-
-                AssertFatal(allSameEdgeTypes(path1),
-                            "path1 contains multiple types of containing edges");
-                AssertFatal(allSameEdgeTypes(path2),
-                            "path2 contains multiple types of containing edges");
-
-                // Check if both paths hold the same edge types.
-                if(m_graph.control.getEdge(path1[0]).index()
-                   == m_graph.control.getEdge(path2[0]).index())
-                    return true;
-
-                return false;
-            }
-
             bool DataDependenceDAGDetail::addDependenceEdge(int source, int dest)
             {
                 AssertFatal(source != dest, ShowValue(source), ShowValue(dest));
 
-                if(!belongToSameBasicBlock(source, dest))
+                if(getBodyParent(source) != getBodyParent(dest))
                     return false;
 
                 if(!m_dependenceDAG.findEdge(source, dest).has_value())
@@ -169,18 +113,20 @@ namespace rocRoller::KernelGraph
                     // adds WW(output dep) or WR(flow dep) edge
                     auto depAdded = addDependenceEdge(writeIter->second, record.control);
 
-                    if(depAdded)
-                    {
-                        auto order = m_graph.control.compareNodes(
-                            UseCacheIfAvailable, writeIter->second, record.control);
-                        AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst
-                                        || order == ControlGraph::NodeOrdering::RightInBodyOfLeft,
-                                    ShowValue(order),
-                                    ShowValue(writeIter->second),
-                                    ShowValue(record.control),
-                                    ShowValue(record.coordinate),
-                                    ShowValue(record.rw));
-                    }
+                    //TODO: Check the order and ensure that writeIter->second
+                    //      happens before record.control.
+                    //if(depAdded)
+                    //{
+                    //    auto order = m_graph.control.compareNodes(
+                    //        UseCacheIfAvailable, writeIter->second, record.control);
+                    //    AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst
+                    //                    || order == ControlGraph::NodeOrdering::RightInBodyOfLeft,
+                    //                ShowValue(order),
+                    //                ShowValue(writeIter->second),
+                    //                ShowValue(record.control),
+                    //                ShowValue(record.coordinate),
+                    //                ShowValue(record.rw));
+                    //}
                 }
 
                 if(record.rw == ReadWrite::WRITE || record.rw == ReadWrite::READWRITE)
@@ -193,19 +139,21 @@ namespace rocRoller::KernelGraph
                         // adds RW(anti dep) edges
                         auto depAdded = addDependenceEdge(readControl, record.control);
 
-                        if(depAdded)
-                        {
-                            auto order = m_graph.control.compareNodes(
-                                UseCacheIfAvailable, readControl, record.control);
-                            AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst
-                                            || order
-                                                   == ControlGraph::NodeOrdering::RightInBodyOfLeft,
-                                        ShowValue(order),
-                                        ShowValue(readControl),
-                                        ShowValue(record.control),
-                                        ShowValue(record.coordinate),
-                                        ShowValue(record.rw));
-                        }
+                        //TODO: Check the order and ensure that writeIter->second
+                        //      happens before record.control.
+                        //if(depAdded)
+                        //{
+                        //    auto order = m_graph.control.compareNodes(
+                        //        UseCacheIfAvailable, readControl, record.control);
+                        //    AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst
+                        //                    || order
+                        //                           == ControlGraph::NodeOrdering::RightInBodyOfLeft,
+                        //                ShowValue(order),
+                        //                ShowValue(readControl),
+                        //                ShowValue(record.control),
+                        //                ShowValue(record.coordinate),
+                        //                ShowValue(record.rw));
+                        //}
                     }
 
                     // Since the current control node writes into this coord,

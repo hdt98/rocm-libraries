@@ -221,7 +221,6 @@ namespace DataDependenceDAGDetailTest
             CHECK(!depDAG.findEdge(forInit, forInc).has_value());
             CHECK(obj.getBodyParent(forInit) == forLoop);
             CHECK(obj.getBodyParent(forInc) == forLoop);
-            CHECK(obj.belongToSameBasicBlock(forInit, forInc) == false);
 
             // F2 = F0 + F1 reads both F0 and F1,
             // but assignF0 and assignF2 have different body parents

@@ -12,6 +12,8 @@ namespace rocRoller::KernelGraph::NodeScheduling
     {
         auto theNodes = graph.control.getNodes().filter(pred);
 
+        // TODO: Use key as pair<nodeID, ControlEdge> to indicate the associated edge
+        // type with the bodyParent.
         std::unordered_map<int, std::vector<int>> rv;
         for(auto node : theNodes)
         {

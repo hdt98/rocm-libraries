@@ -21,11 +21,6 @@ namespace rocRoller::KernelGraph::DataDependenceDAG::Detail
          */
         int getBodyParent(int control);
         /**
-         * Returns true if the given nodes belong to the same basic block,
-         * otherwise returns false.
-         */
-        bool belongToSameBasicBlock(int node1, int node2);
-        /**
          * Adds a dependence edge(represented via `Sequence`) between the given
          * source and destination nodes in the dependence DAG (`m_dependenceDAG),
          * if both the nodes have the same body-parent.
