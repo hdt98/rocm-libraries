@@ -3,7 +3,8 @@
 
 #include "rocm_vector_add_dev.hpp"
 
-// Narrowing variant: fp32 inputs, fp16 output.
+// Narrowing: FP32 inputs -> FP16 output. Same kVectorM=4 constraint as widening
+// (wider type always governs). Output stored in FP16 for reduced memory footprint.
 static constexpr auto kernel = rocm_ck::make_kernel(
     rocm_ck::ElementwiseConfig{
         .signature = {.in_dtype = rocm_ck::DataType::FP32, .out_dtype = rocm_ck::DataType::FP16},

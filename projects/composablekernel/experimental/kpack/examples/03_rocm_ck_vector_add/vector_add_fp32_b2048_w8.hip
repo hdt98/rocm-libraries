@@ -3,8 +3,9 @@
 
 #include "rocm_vector_add_dev.hpp"
 
-// Multi-warp variant matching CK Tile example 21 ElementWise config:
-// 8 warps × 64 threads = 512 threads, each block processes 2048 elements.
+// Multi-warp FP32: 8 warps x 64 = 512 threads, 2048 elements per block.
+// Small warp_tile (64) forces kVectorM=1 (minimum vectorization) — contrast
+// with fp16_b1024_w2 where the narrow type allows kVectorM=8.
 static constexpr auto kernel = rocm_ck::make_kernel(
     rocm_ck::ElementwiseConfig{
         .signature = {.dtype = rocm_ck::DataType::FP32},

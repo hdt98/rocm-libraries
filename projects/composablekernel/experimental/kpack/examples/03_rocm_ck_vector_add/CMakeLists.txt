@@ -33,13 +33,13 @@ add_subdirectory(../../include rocm_ck_build)
 set(KERNEL_VARIANTS
     vector_add_fp32_b256  vector_add_fp32_b512  vector_add_fp32_b1024
     vector_add_fp16_b512  vector_add_fp16_b1024
-    vector_add_bf16_b512
-    vector_add_fp32_b256_sa
+    vector_add_bf16_b512  vector_add_bf16_b1024
     vector_add_fp32_b2048_w8
     vector_add_fp16_b1024_w2
     # Mixed-type variants
     vector_add_fp16_fp32_b1024
     vector_add_fp32_fp16_b1024
+    vector_add_bf16_fp32_b1024
 )
 
 # --- Compile each variant × architecture into .hsaco code objects ---

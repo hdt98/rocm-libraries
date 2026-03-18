@@ -3,6 +3,8 @@
 
 #include "rocm_vector_add_dev.hpp"
 
+// Tile scaling: same type and warp count as fp32_b256, 2x tile.
+// Doubling block_tile doubles kRepeatM (1 -> 2); threads stay at 64.
 static constexpr auto kernel = rocm_ck::make_kernel(
     rocm_ck::ElementwiseConfig{
         .signature = {.dtype = rocm_ck::DataType::FP32},

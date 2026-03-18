@@ -3,14 +3,14 @@
 
 #include "rocm_vector_add_dev.hpp"
 
-// Widening: FP16 inputs -> FP32 output. Uses .in_dtype + .out_dtype signature.
-// The wider type (FP32) constrains kVectorM to 4 (vs 8 for homogeneous FP16).
+// BF16 widening: BF16 inputs -> FP32 output. The most common mixed-type pattern
+// in ML training (BF16 storage, FP32 accumulation). Same geometry as fp16_fp32_b1024.
 static constexpr auto kernel = rocm_ck::make_kernel(
     rocm_ck::ElementwiseConfig{
-        .signature = {.in_dtype = rocm_ck::DataType::FP16, .out_dtype = rocm_ck::DataType::FP32},
+        .signature = {.in_dtype = rocm_ck::DataType::BF16, .out_dtype = rocm_ck::DataType::FP32},
         .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}});
 
-extern "C" __global__ void vector_add_fp16_fp32_b1024(rocm_ck::VectorAddArgs args)
+extern "C" __global__ void vector_add_bf16_fp32_b1024(rocm_ck::VectorAddArgs args)
 {
     rocm_ck::runVectorAdd<kernel>(args);
 }

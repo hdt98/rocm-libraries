@@ -3,6 +3,8 @@
 
 #include "rocm_vector_add_dev.hpp"
 
+// Baseline single-warp FP32 variant. Smallest tile in the set.
+// Geometry: kVectorM=4 (128-bit / 32-bit), kRepeatM=1, 64 threads.
 static constexpr auto kernel = rocm_ck::make_kernel(
     rocm_ck::ElementwiseConfig{
         .signature = {.dtype = rocm_ck::DataType::FP32},
