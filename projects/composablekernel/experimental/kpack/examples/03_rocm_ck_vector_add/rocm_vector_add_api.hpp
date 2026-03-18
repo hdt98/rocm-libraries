@@ -23,9 +23,16 @@ using index_t = std::int32_t;
 
 /// Kernel arguments passed by value through hipModuleLaunchKernel.
 /// Layout must match exactly between host and device.
+///
+/// Always computes c = alpha * a + beta * b. For plain addition, pass
+/// alpha = 1.0f and beta = 1.0f. This matches the BLAS convention where
+/// scalar parameters are always present.
 struct VectorAddArgs
 {
     index_t n;
+    float alpha;
+    float beta;
+    // 4 bytes implicit padding (pointers need 8-byte alignment)
     const void* a;
     const void* b;
     void* c;
@@ -33,19 +40,25 @@ struct VectorAddArgs
 
 static_assert(std::is_trivially_copyable_v<VectorAddArgs>,
               "VectorAddArgs must be trivially copyable for kernarg passing");
-static_assert(sizeof(VectorAddArgs) == 32, "unexpected VectorAddArgs size");
+static_assert(sizeof(VectorAddArgs) == 40, "unexpected VectorAddArgs size");
 static_assert(alignof(VectorAddArgs) == 8, "unexpected VectorAddArgs alignment");
 static_assert(offsetof(VectorAddArgs, n) == 0, "unexpected offset for n");
-static_assert(offsetof(VectorAddArgs, a) == 8, "unexpected offset for a");
-static_assert(offsetof(VectorAddArgs, b) == 16, "unexpected offset for b");
-static_assert(offsetof(VectorAddArgs, c) == 24, "unexpected offset for c");
+static_assert(offsetof(VectorAddArgs, alpha) == 4, "unexpected offset for alpha");
+static_assert(offsetof(VectorAddArgs, beta) == 8, "unexpected offset for beta");
+static_assert(offsetof(VectorAddArgs, a) == 16, "unexpected offset for a");
+static_assert(offsetof(VectorAddArgs, b) == 24, "unexpected offset for b");
+static_assert(offsetof(VectorAddArgs, c) == 32, "unexpected offset for c");
 
 /// Signature: describes WHAT the kernel computes (types).
 /// In CK Tile's builder pattern, this is the "what" — independent of
 /// how the kernel is tiled, scheduled, or padded.
+///
+/// Each operation defines its own signature struct. Vector add uses
+/// {in_type, out_type}. GEMM will use {a_type, b_type, c_type}, etc.
 struct ElementwiseSignature
 {
-    DataType compute_type;
+    DataType in_type;
+    DataType out_type;
 };
 
 /// Algorithm: describes HOW the kernel executes (tile geometry, pipeline).
@@ -73,7 +86,8 @@ struct VectorAddKernel
 {
     int block_tile;        // Elements per thread block (for grid calculation)
     int thread_block_size; // Threads per block (= warp_size * block_warps)
-    DataType compute_type; // Data type (always set by make_kernel)
+    DataType in_type;      // Input storage type (a, b)
+    DataType out_type;     // Output storage type (c)
     int block_warps;       // Warps per block
     int warp_tile;         // Warp tile size
     bool pad;              // Padding enabled
@@ -85,10 +99,13 @@ constexpr int warp_size = 64;
 /// Validate a signature + algorithm pair and produce a structural kernel descriptor.
 ///
 /// Validates CK Tile ElementWiseShape compatibility:
-///   kVectorM = min(128 / type_bits, warp_tile / warp_size) — must be >= 1
+///   kVectorM = min(128 / max_type_bits, warp_tile / warp_size) — must be >= 1
 ///   kRepeatM = block_tile / (block_warps * kVectorM * warp_size) — must be >= 1, integer
 ///   block_warps must be power of 2 (required by CK Tile reduce_on_sequence)
 ///   thread_block_size = warp_size * block_warps (NOT block_tile)
+///
+/// For mixed types, kVectorM is constrained by the wider type (fewer elements
+/// per 128-bit register).
 ///
 /// Invalid configs produce a compile-time error (consteval).
 consteval VectorAddKernel make_kernel(ElementwiseSignature sig, ElementwiseAlgorithm algo)
@@ -104,8 +121,10 @@ consteval VectorAddKernel make_kernel(ElementwiseSignature sig, ElementwiseAlgor
     if(algo.warp_tile < warp_size)
         throw "warp_tile must be >= warp_size (64)";
 
-    int type_bits  = data_type_bits(sig.compute_type);
-    int kVectorM_a = 128 / type_bits;            // max vector from type width
+    int in_bits    = data_type_bits(sig.in_type);
+    int out_bits   = data_type_bits(sig.out_type);
+    int max_bits   = in_bits > out_bits ? in_bits : out_bits;
+    int kVectorM_a = 128 / max_bits;             // max vector from wider type
     int kVectorM_b = algo.warp_tile / warp_size; // max vector from warp tile
     int kVectorM   = kVectorM_a < kVectorM_b ? kVectorM_a : kVectorM_b;
 
@@ -122,7 +141,8 @@ consteval VectorAddKernel make_kernel(ElementwiseSignature sig, ElementwiseAlgor
 
     return {algo.block_tile,
             warp_size * algo.block_warps,
-            sig.compute_type,
+            sig.in_type,
+            sig.out_type,
             algo.block_warps,
             algo.warp_tile,
             algo.pad};

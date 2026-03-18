@@ -41,7 +41,8 @@ HEADER_SIZE = 16  # 4 (magic) + 4 (version) + 8 (toc_offset)
 VARIANTS = [
     {
         "name": "vector_add_fp32_b256",
-        "compute_type": "fp32",
+        "in_type": "fp32",
+        "out_type": "fp32",
         "block_tile": 256,
         "block_warps": 1,
         "warp_tile": 256,
@@ -49,7 +50,8 @@ VARIANTS = [
     },
     {
         "name": "vector_add_fp32_b512",
-        "compute_type": "fp32",
+        "in_type": "fp32",
+        "out_type": "fp32",
         "block_tile": 512,
         "block_warps": 1,
         "warp_tile": 512,
@@ -57,7 +59,8 @@ VARIANTS = [
     },
     {
         "name": "vector_add_fp32_b1024",
-        "compute_type": "fp32",
+        "in_type": "fp32",
+        "out_type": "fp32",
         "block_tile": 1024,
         "block_warps": 1,
         "warp_tile": 1024,
@@ -65,7 +68,8 @@ VARIANTS = [
     },
     {
         "name": "vector_add_fp16_b512",
-        "compute_type": "fp16",
+        "in_type": "fp16",
+        "out_type": "fp16",
         "block_tile": 512,
         "block_warps": 1,
         "warp_tile": 512,
@@ -73,7 +77,8 @@ VARIANTS = [
     },
     {
         "name": "vector_add_fp16_b1024",
-        "compute_type": "fp16",
+        "in_type": "fp16",
+        "out_type": "fp16",
         "block_tile": 1024,
         "block_warps": 1,
         "warp_tile": 1024,
@@ -81,7 +86,8 @@ VARIANTS = [
     },
     {
         "name": "vector_add_bf16_b512",
-        "compute_type": "bf16",
+        "in_type": "bf16",
+        "out_type": "bf16",
         "block_tile": 512,
         "block_warps": 1,
         "warp_tile": 512,
@@ -89,7 +95,8 @@ VARIANTS = [
     },
     {
         "name": "vector_add_fp32_b256_sa",
-        "compute_type": "fp32",
+        "in_type": "fp32",
+        "out_type": "fp32",
         "block_tile": 256,
         "block_warps": 1,
         "warp_tile": 256,
@@ -97,7 +104,8 @@ VARIANTS = [
     },
     {
         "name": "vector_add_fp32_b2048_w8",
-        "compute_type": "fp32",
+        "in_type": "fp32",
+        "out_type": "fp32",
         "block_tile": 2048,
         "block_warps": 8,
         "warp_tile": 64,
@@ -105,10 +113,30 @@ VARIANTS = [
     },
     {
         "name": "vector_add_fp16_b1024_w2",
-        "compute_type": "fp16",
+        "in_type": "fp16",
+        "out_type": "fp16",
         "block_tile": 1024,
         "block_warps": 2,
         "warp_tile": 512,
+        "pad": True,
+    },
+    # Mixed-type variants
+    {
+        "name": "vector_add_fp16_fp32_b1024",
+        "in_type": "fp16",
+        "out_type": "fp32",
+        "block_tile": 1024,
+        "block_warps": 1,
+        "warp_tile": 1024,
+        "pad": True,
+    },
+    {
+        "name": "vector_add_fp32_fp16_b1024",
+        "in_type": "fp32",
+        "out_type": "fp16",
+        "block_tile": 1024,
+        "block_warps": 1,
+        "warp_tile": 1024,
         "pad": True,
     },
 ]
@@ -176,7 +204,8 @@ def main() -> None:
         for v in VARIANTS:
             if v["name"] in variant_map:
                 variant_metadata[v["name"]] = {
-                    "compute_type": v["compute_type"],
+                    "in_type": v["in_type"],
+                    "out_type": v["out_type"],
                     "block_tile": v["block_tile"],
                     "block_warps": v["block_warps"],
                     "warp_tile": v["warp_tile"],

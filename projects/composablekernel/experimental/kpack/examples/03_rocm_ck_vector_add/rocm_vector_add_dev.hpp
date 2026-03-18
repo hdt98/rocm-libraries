@@ -1,9 +1,8 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// Device-side interface for rocm_ck vector add. Wraps CK Tile behind a
-// clean config-driven API. This is the only header that .hip files need
-// to include.
+// Device-side kernel for rocm_ck vector add. Uses CK Tile tile primitives
+// directly to compute c = alpha * a + beta * b with mixed input/output types.
 //
 // Uses C++20 struct NTTPs: template <VectorAddKernel K>.
 
@@ -42,42 +41,103 @@ struct CkTypeMap<DataType::FP8>
     using type = ck_tile::fp8_t;
 };
 
-/// Maps a VectorAddKernel to the CK Tile type machinery.
-template <VectorAddKernel K>
-struct VectorAddTypes
-{
-    using XDataType       = typename CkTypeMap<K.compute_type>::type;
-    using ComputeDataType = float;
-    using YDataType       = typename CkTypeMap<K.compute_type>::type;
-
-    using BlockTile  = ck_tile::sequence<K.block_tile>;
-    using BlockWarps = ck_tile::sequence<K.block_warps>;
-    using WarpTile   = ck_tile::sequence<K.warp_tile>;
-    using Shape      = ck_tile::ElementWiseShape<BlockWarps, BlockTile, WarpTile, XDataType>;
-
-    using Problem = ck_tile::ElementWisePipelineProblem<XDataType,
-                                                        ComputeDataType,
-                                                        YDataType,
-                                                        Shape,
-                                                        ck_tile::element_wise::Add>;
-    using Kernel  = ck_tile::ElementWiseKernel<Problem, ck_tile::ElementWiseDefaultPolicy>;
-};
-
-/// Device function that bridges VectorAddArgs to CK Tile's kernel.
+/// Device function that computes c = alpha * a + beta * b.
+///
+/// Uses CK Tile tile primitives directly (not the stock ElementWiseKernel)
+/// to support scalar parameters and mixed input/output types.
+///
 /// Call this from an extern "C" __global__ wrapper.
 template <VectorAddKernel K>
 __device__ void runVectorAdd(VectorAddArgs args)
 {
-    using Types = VectorAddTypes<K>;
-    using X     = typename Types::XDataType;
-    using Y     = typename Types::YDataType;
+    using X = typename CkTypeMap<K.in_type>::type;
+    using Y = typename CkTypeMap<K.out_type>::type;
 
-    auto lens = ck_tile::make_tuple(static_cast<ck_tile::index_t>(args.n));
+    // Use the wider type for ElementWiseShape so kVectorM is valid for both
+    // input loads and output stores.
+    using WiderType = std::conditional_t<(sizeof(X) >= sizeof(Y)), X, Y>;
+    using Shape     = ck_tile::ElementWiseShape<ck_tile::sequence<K.block_warps>,
+                                                ck_tile::sequence<K.block_tile>,
+                                                ck_tile::sequence<K.warp_tile>,
+                                                WiderType>;
+
     static_assert(sizeof(rocm_ck::index_t) == sizeof(ck_tile::index_t),
                   "rocm_ck::index_t and ck_tile::index_t must match");
-    auto strides = ck_tile::make_tuple(ck_tile::index_t{1});
-    auto inputs = ck_tile::make_tuple(static_cast<const X*>(args.a), static_cast<const X*>(args.b));
-    typename Types::Kernel{}(lens, strides, strides, inputs, static_cast<Y*>(args.c));
+
+    const auto n       = static_cast<ck_tile::index_t>(args.n);
+    const auto iM      = ck_tile::get_block_id() * Shape::kBlockM;
+    const auto lens    = ck_tile::make_tuple(n);
+    const auto strides = ck_tile::make_tuple(ck_tile::index_t{1});
+
+    // Tile distribution — same encoding as ElementWiseDefaultPolicy.
+    constexpr auto dist = ck_tile::make_static_tile_distribution(
+        ck_tile::tile_distribution_encoding<
+            ck_tile::sequence<>,
+            ck_tile::tuple<ck_tile::sequence<Shape::kRepeatM,
+                                             Shape::kWarpPerBlockM,
+                                             Shape::kThreadPerWarpM,
+                                             Shape::kVectorM>>,
+            ck_tile::tuple<ck_tile::sequence<1>, ck_tile::sequence<1>>,
+            ck_tile::tuple<ck_tile::sequence<1>, ck_tile::sequence<2>>,
+            ck_tile::sequence<1, 1>,
+            ck_tile::sequence<0, 3>>{});
+
+    const auto merge_transform = ck_tile::make_merge_transform(lens);
+
+    // Helper: create a padded, transformed tile window for a global input pointer.
+    auto make_input_window = [&](const X* ptr) {
+        const auto view = ck_tile::make_naive_tensor_view<ck_tile::address_space_enum::global>(
+            ptr, lens, strides, ck_tile::number<Shape::kVectorM>{}, ck_tile::number<1>{});
+
+        const auto transformed = ck_tile::pad_tensor_view(
+            ck_tile::transform_tensor_view(view,
+                                           ck_tile::make_tuple(merge_transform),
+                                           ck_tile::make_tuple(ck_tile::make_index_sequence<1>{}),
+                                           ck_tile::make_tuple(ck_tile::sequence<0>{})),
+            ck_tile::make_tuple(ck_tile::number<Shape::kBlockM>{}),
+            ck_tile::sequence<K.pad>{});
+
+        return ck_tile::make_tile_window(
+            transformed, ck_tile::make_tuple(ck_tile::number<Shape::kBlockM>{}), {iM}, dist);
+    };
+
+    // Load input tiles.
+    auto a_tile = ck_tile::load_tile(make_input_window(static_cast<const X*>(args.a)));
+    auto b_tile = ck_tile::load_tile(make_input_window(static_cast<const X*>(args.b)));
+
+    // Compute: y = alpha * a + beta * b (in float, then cast to Y).
+    auto y_tile = ck_tile::make_static_distributed_tensor<Y>(a_tile.get_tile_distribution());
+
+    const float alpha = args.alpha;
+    const float beta  = args.beta;
+
+    const auto spans = a_tile.get_distributed_spans();
+    ck_tile::sweep_tile_span(spans[ck_tile::number<0>{}], [&](auto idx) {
+        const auto tile_idx = ck_tile::make_tuple(idx);
+        const float a_val   = ck_tile::type_convert<float>(a_tile(tile_idx));
+        const float b_val   = ck_tile::type_convert<float>(b_tile(tile_idx));
+        y_tile(tile_idx)    = ck_tile::type_convert<Y>(alpha * a_val + beta * b_val);
+    });
+
+    // Store output tile.
+    const auto y_view = ck_tile::make_naive_tensor_view<ck_tile::address_space_enum::global>(
+        static_cast<Y*>(args.c), lens, strides, ck_tile::number<Shape::kVectorM>{});
+
+    const auto y_transformed = ck_tile::pad_tensor_view(
+        ck_tile::transform_tensor_view(y_view,
+                                       ck_tile::make_tuple(merge_transform),
+                                       ck_tile::make_tuple(ck_tile::make_index_sequence<1>{}),
+                                       ck_tile::make_tuple(ck_tile::sequence<0>{})),
+        ck_tile::make_tuple(ck_tile::number<Shape::kBlockM>{}),
+        ck_tile::sequence<K.pad>{});
+
+    auto y_window =
+        ck_tile::make_tile_window(y_transformed,
+                                  ck_tile::make_tuple(ck_tile::number<Shape::kBlockM>{}),
+                                  {iM},
+                                  y_tile.get_tile_distribution());
+
+    ck_tile::store_tile(y_window, y_tile);
 }
 
 } // namespace rocm_ck
