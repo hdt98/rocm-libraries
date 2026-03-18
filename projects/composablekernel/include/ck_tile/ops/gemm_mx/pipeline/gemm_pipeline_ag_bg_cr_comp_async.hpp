@@ -172,6 +172,17 @@ struct MXGemmPipelineAgBgCrCompAsync : public BaseMXGemmPipelineAgBgCrCompAsync<
     static constexpr auto is_a_load_tr_v = bool_constant<PipelineImplBase::is_a_load_tr>{};
     static constexpr auto is_b_load_tr_v = bool_constant<PipelineImplBase::is_b_load_tr>{};
 
+#if defined(__gfx950__)
+    static_assert(!(std::is_same_v<ALayout, tensor_layout::gemm::ColumnMajor> &&
+                    !PipelineImplBase::is_a_load_tr),
+                  "A=ColumnMajor requires transpose load (ds_read_tr), but it is disabled for "
+                  "this K warp tile size. Use a smaller K warp tile (e.g. 32x32x64 MFMA).");
+    static_assert(!(std::is_same_v<BLayout, tensor_layout::gemm::RowMajor> &&
+                    !PipelineImplBase::is_b_load_tr),
+                  "B=RowMajor requires transpose load (ds_read_tr), but it is disabled for "
+                  "this K warp tile size. Use a smaller K warp tile (e.g. 32x32x64 MFMA).");
+#endif
+
     [[nodiscard]] CK_TILE_HOST static const std::string GetPipelineName()
     {
         // clang-format off
@@ -504,7 +515,6 @@ struct MXGemmPipelineAgBgCrCompAsync : public BaseMXGemmPipelineAgBgCrCompAsync<
 
             // Load scales for iteration 0 (ping)
             load_scales_from_dram(scale_a_tile_ping, scale_b_tile_ping);
-
             // Load scales for iteration 1 (pong) if needed
             if(num_loop > 1)
             {

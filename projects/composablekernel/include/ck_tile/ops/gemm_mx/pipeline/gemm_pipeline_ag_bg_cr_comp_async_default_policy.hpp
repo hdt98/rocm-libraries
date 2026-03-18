@@ -106,23 +106,13 @@ struct MXGemmPipelineAgBgCrCompAsyncDefaultPolicy
         using BDataType = typename Problem::BDataType;
         using CDataType = typename Problem::CDataType;
 
-        constexpr auto APackedSize = numeric_traits<ADataType>::PackedSize;
-        constexpr index_t vector_size =
-            DS_READ_TR_SIZE() * APackedSize / sizeof(ADataType);
-        constexpr index_t thread_elements =
-            WarpTile::at(I1) * WarpTile::at(I2) / get_warp_size();
+        // FP8 needs Double access (K split into 2 blocks in MFMA register layout).
+        // FP4 needs Single access (K contiguous in MFMA register layout).
         constexpr auto wg_attr_num_access =
-            !(is_a_load_tr<Problem> || is_b_load_tr<Problem>)
-                ? WGAttrNumAccessEnum::Single
-            : vector_size == thread_elements
-                ? WGAttrNumAccessEnum::Single
-            : vector_size * 2 == thread_elements
+            (std::is_same_v<ADataType, fp8_t> || std::is_same_v<BDataType, fp8_t>)
                 ? WGAttrNumAccessEnum::Double
-            : vector_size * 4 == thread_elements
-                ? WGAttrNumAccessEnum::Quad
-                : WGAttrNumAccessEnum::Invalid;
+                : WGAttrNumAccessEnum::Single;
 
-        constexpr bool force_pack = !std::is_same_v<ADataType, fp8_t> && !std::is_same_v<BDataType, fp8_t>;
         using WarpGemm = WarpGemmDispatcher<ADataType,
                                             BDataType,
                                             CDataType, // AccDataType
@@ -132,9 +122,7 @@ struct MXGemmPipelineAgBgCrCompAsyncDefaultPolicy
                                             Problem::TransposeC,
                                             false,
                                             false,
-                                            wg_attr_num_access,
-                                            wg_attr_num_access,
-                                            force_pack>;
+                                            wg_attr_num_access>;
 
         using BlockGemmPolicy = BlockGemmARegBRegCRegV1CustomPolicy<ADataType,
                                                                     BDataType,

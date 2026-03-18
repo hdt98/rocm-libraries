@@ -80,20 +80,49 @@ struct WarpGemmAttributeMfma
     static_assert(Impl::kAMBlock == 1 && Impl::kBNBlock == 1,
                   "Multi-block WarpGemmAttributeMfmaImpl is not supported");
 
-    template <index_t kMNLane, index_t AttrNumAccessV_>
+    // ds_read_tr loads SubtileMinorDim elements per instruction (= 64 / bits_per_element).
+    // When kABKPerLane (per access group) exceeds SubtileMinorDim, the last K-dim element
+    // must be split to match, so the distribution encoding is compatible with the
+    // TransposeTileDistributionTraits suffix validation used by load_tile_transpose.
+    // The physical data in VGPRs is identical — this is purely a compile-time encoding change.
+    template <index_t kMNLane, index_t AttrNumAccessV_, typename DataType_>
     static constexpr auto get_warp_dstr_encoding()
     {
         static_assert(kKPerThread % AttrNumAccessV_ == 0,
                       "kKPerThread must be divisible by NumAccess");
+
+        constexpr index_t kNumBitsPerElem =
+            sizeof(DataType_) * 8 / numeric_traits<remove_cvref_t<DataType_>>::PackedSize;
+        constexpr index_t kSubtileMinorDim = 64 / kNumBitsPerElem;
+        constexpr index_t kPerLane = Impl::kABKPerLane / AttrNumAccessV_;
+        constexpr index_t kNeedsSplit = (kPerLane > kSubtileMinorDim) &&
+                                        (kPerLane % kSubtileMinorDim == 0);
+        constexpr index_t kSplitFactor = kNeedsSplit ? (kPerLane / kSubtileMinorDim) : 1;
+        constexpr index_t kLastDim = kNeedsSplit ? kSubtileMinorDim : kPerLane;
+
         if constexpr(AttrNumAccessV_ == 1)
         {
-            return tile_distribution_encoding<
-                sequence<>,
-                tuple<sequence<kMNLane>, sequence<Impl::kABKLane, Impl::kABKPerLane>>,
-                tuple<sequence<2, 1>>,
-                tuple<sequence<0, 0>>,
-                sequence<2>,
-                sequence<1>>{};
+            if constexpr(kSplitFactor > 1)
+            {
+                return tile_distribution_encoding<
+                    sequence<>,
+                    tuple<sequence<kMNLane>,
+                          sequence<Impl::kABKLane, kSplitFactor, kLastDim>>,
+                    tuple<sequence<2, 1>>,
+                    tuple<sequence<0, 0>>,
+                    sequence<2, 2>,
+                    sequence<1, 2>>{};
+            }
+            else
+            {
+                return tile_distribution_encoding<
+                    sequence<>,
+                    tuple<sequence<kMNLane>, sequence<Impl::kABKLane, Impl::kABKPerLane>>,
+                    tuple<sequence<2, 1>>,
+                    tuple<sequence<0, 0>>,
+                    sequence<2>,
+                    sequence<1>>{};
+            }
         }
         else
         {
@@ -108,34 +137,70 @@ struct WarpGemmAttributeMfma
             // In this way the data in register are consistent between A and B
             if constexpr(UsePackNumAccess)
             {
-                return tile_distribution_encoding<
-                    sequence<>,
-                    tuple<sequence<kMNLane>,
-                          sequence<Impl::kABKLane,
-                                   AttrNumAccessV_,
-                                   Impl::kABKPerLane / AttrNumAccessV_>>,
-                    tuple<sequence<2, 1>>,
-                    tuple<sequence<0, 0>>,
-                    sequence<2, 2>,
-                    sequence<1, 2>>{};
+                if constexpr(kSplitFactor > 1)
+                {
+                    return tile_distribution_encoding<
+                        sequence<>,
+                        tuple<sequence<kMNLane>,
+                              sequence<Impl::kABKLane,
+                                       AttrNumAccessV_,
+                                       kSplitFactor,
+                                       kLastDim>>,
+                        tuple<sequence<2, 1>>,
+                        tuple<sequence<0, 0>>,
+                        sequence<2, 2, 2>,
+                        sequence<1, 2, 3>>{};
+                }
+                else
+                {
+                    return tile_distribution_encoding<
+                        sequence<>,
+                        tuple<sequence<kMNLane>,
+                              sequence<Impl::kABKLane,
+                                       AttrNumAccessV_,
+                                       kLastDim>>,
+                        tuple<sequence<2, 1>>,
+                        tuple<sequence<0, 0>>,
+                        sequence<2, 2>,
+                        sequence<1, 2>>{};
+                }
             }
             else
             {
-                return tile_distribution_encoding<
-                    sequence<>,
-                    tuple<sequence<kMNLane>,
-                          sequence<AttrNumAccessV_,
-                                   Impl::kABKLane,
-                                   Impl::kABKPerLane / AttrNumAccessV_>>,
-                    tuple<sequence<2, 1>>,
-                    tuple<sequence<1, 0>>,
-                    sequence<2, 2>,
-                    sequence<0, 2>>{};
+                if constexpr(kSplitFactor > 1)
+                {
+                    return tile_distribution_encoding<
+                        sequence<>,
+                        tuple<sequence<kMNLane>,
+                              sequence<AttrNumAccessV_,
+                                       Impl::kABKLane,
+                                       kSplitFactor,
+                                       kLastDim>>,
+                        tuple<sequence<2, 1>>,
+                        tuple<sequence<1, 0>>,
+                        sequence<2, 2, 2>,
+                        sequence<0, 2, 3>>{};
+                }
+                else
+                {
+                    return tile_distribution_encoding<
+                        sequence<>,
+                        tuple<sequence<kMNLane>,
+                              sequence<AttrNumAccessV_,
+                                       Impl::kABKLane,
+                                       kLastDim>>,
+                        tuple<sequence<2, 1>>,
+                        tuple<sequence<1, 0>>,
+                        sequence<2, 2>,
+                        sequence<0, 2>>{};
+                }
             }
         }
     }
-    using AWarpDstrEncoding = decltype(get_warp_dstr_encoding<Impl::kAMLane, AttrNumAccessAV>());
-    using BWarpDstrEncoding = decltype(get_warp_dstr_encoding<Impl::kBNLane, AttrNumAccessBV>());
+    using AWarpDstrEncoding =
+        decltype(get_warp_dstr_encoding<Impl::kAMLane, AttrNumAccessAV, ADataType>());
+    using BWarpDstrEncoding =
+        decltype(get_warp_dstr_encoding<Impl::kBNLane, AttrNumAccessBV, BDataType>());
 
     using CWarpDstrEncoding = tile_distribution_encoding<
         sequence<>,

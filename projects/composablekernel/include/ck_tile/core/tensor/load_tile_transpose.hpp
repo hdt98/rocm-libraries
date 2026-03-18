@@ -471,7 +471,9 @@ CK_TILE_DEVICE void load_tile_transpose_with_offset(
     constexpr index_t num_of_access =
         reduce_on_sequence(y_in_lengths, multiplies<>{}, number<1>{}) / vecLoadSize;
 
-    using DataVec = array<typename BottomTensorView_::DataType, vecLoadSize>;
+    constexpr index_t packed_size =
+        numeric_traits<remove_cvref_t<typename BottomTensorView_::DataType>>::PackedSize;
+    using DataVec = array<typename BottomTensorView_::DataType, vecLoadSize / packed_size>;
     static_for<0, num_of_access, 1>{}([&](auto iAccess) {
         out_tensor.get_thread_buffer().template set_as<DataVec>(
             number<iAccess>{},
