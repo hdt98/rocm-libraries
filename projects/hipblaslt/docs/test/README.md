@@ -106,8 +106,7 @@ Tests:
 The script is a **test case expander and serializer**. It is not part of the test
 binary — it runs at build time to produce the binary data file the test binary reads.
 
-
-### Expansion Example
+![pipeline-diagram](https://github.com/user-attachments/assets/20ca56cc-e2a6-4c9c-9818-ff095e794f68)
 
 A YAML entry like:
 
@@ -133,9 +132,9 @@ Produces **4 binary records** (2 M values × 2 transA values):
 
 ---
 
-## Phase 2: Binary Loading and GTest Registration (Runtime)
+#### Phase 2: Binary Loading and GTest Registration
 
-### Binary File Format
+***Binary File Format***
 
 ```
 hipblaslt_gtest.data
@@ -153,7 +152,7 @@ hipblaslt_gtest.data
 └─────────────────────────────────────────────────────┘
 ```
 
-### Test Suite Registration
+***Test Suite Registration***
 
 Each operation type registers a test suite via a macro in its `*_gtest.cpp` file:
 
@@ -182,9 +181,40 @@ INSTANTIATE_TEST_CATEGORIES(matmul_test);
 //                       HipBlasLt_TestData::end()))
 ```
 
+***Filtering Pipeline***
 
+When GTest collects test cases, `HipBlasLt_TestData` streams `Arguments` records
+through a chain of filters. A record reaches execution only if it passes all of them:
 
+![filter-pipeline-diagram](https://github.com/user-attachments/assets/2b6fb3e8-b49f-4121-a849-78f422b6476c)
 
+#### Single Test Execution
+
+For each `Arguments` record that passes all filters, GTest calls the test functor:
+
+![matmul-execution-diagram](https://github.com/user-attachments/assets/1ed0d4ad-a427-449c-b789-50a212b99534)
+
+#### How the Pieces Connect
+
+```
+  Authoring              Build                      Runtime
+  ─────────              ─────                      ───────
+
+  Edit YAML          CMakeLists.txt runs         hipblaslt-test starts
+  test entries  ──►  hipblaslt_gentest.py   ──►  reads .data file
+                     to produce                  streams Arguments
+                     hipblaslt_gtest.data        through filters
+                                                 executes each test
+                                                 reports PASS/FAIL
+
+  Edit C++ test      Compile test binary
+  logic in       ──►  (links testing_matmul.hpp,
+  testing_           hipblaslt library,
+  matmul.hpp         HIP runtime)
+```
+
+Most test additions only require editing YAML. The C++ layer only needs to change
+when a new operation type, API call, or validation method is introduced.
 
 ### 2. Test envinronment, configuration and build
 
