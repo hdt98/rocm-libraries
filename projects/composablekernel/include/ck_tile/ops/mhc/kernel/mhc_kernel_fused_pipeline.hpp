@@ -11,7 +11,7 @@
 
 // MHC Kernel with Fused GEMM Pipeline V3
 // =====================================================================
-// Implementing equations 14 and 15 of https://arxiv.org/pdf/2512.24880
+// Implementing equations 14 and 15 of https://arxiv.org/abs/2512.24880
 //
 // This kernel uses the MhcGemmPipelineAgBgCrCompV3Fused pipeline which
 // supports optional fusion functions. This enables single-pass fusion of
@@ -170,9 +170,7 @@ struct MHCKernelFusedPipeline
         // Create the fused pipeline
         Pipeline pipeline;
 
-        // Simpler approach: Use full kMTile array but accept the register pressure
-        // For M=64, this is 64 floats = 256 bytes in VGPRs
-        // Trade-off: 20% performance loss but correct norm computation
+        // Use full kMTile array
         ComputeDataType norm_accum[kMTile];
         static_for<0, kMTile, 1>{}([&](auto m) { norm_accum[m.value] = 0.0f; });
 
@@ -188,7 +186,7 @@ struct MHCKernelFusedPipeline
             const index_t tile_k_end   = ck_tile::min(tile_k_start + kKTile, k_end);
             const bool is_last_tile    = (tile_k_end < tile_k_start + kKTile);
 
-            // Fast path: If not the last tile, no padding - accumulate everything
+            // Fast path: If not the last tile, no padding, accumulate everything
             if(!is_last_tile)
             {
                 sweep_tile_span(tile_spans[number<0>{}], [&](auto idx_m) {
@@ -205,7 +203,7 @@ struct MHCKernelFusedPipeline
             }
             else
             {
-                // Slow path: Last tile may have padding - check bounds
+                // Slow path: Last tile may have padding, check bounds
                 sweep_tile_span(tile_spans[number<0>{}], [&](auto idx_m) {
                     sweep_tile_span(tile_spans[number<1>{}], [&](auto idx_k) {
                         const auto tile_idx = get_x_indices_from_distributed_indices(
@@ -254,7 +252,7 @@ struct MHCKernelFusedPipeline
         block_sync_lds();
 
         // Two-level reduction: warp-level shuffle + cross-warp atomic
-        // This is critical for multi-warp blocks (kBlockSize=128 = 2 or 4 warps)
+        // This is necessary for multi-warp blocks (kBlockSize=128 = 2 or 4 warps)
         for(index_t m = 0; m < kMTile; ++m)
         {
             ComputeDataType partial_sum = norm_accum[m];

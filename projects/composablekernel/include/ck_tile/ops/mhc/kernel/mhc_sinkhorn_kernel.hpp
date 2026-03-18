@@ -360,7 +360,7 @@ struct MHCSinkhornKernelDispatcher
         }
         else
         {
-            assert(false && "MHCSinkhornKernelDispatcher only supports n in the set (4,8)");
+            assert(false && "MHCSinkhornKernelDispatcher only supports n in the set (4, 8)");
         }
     }
 };

@@ -17,6 +17,10 @@ namespace ck_tile {
 // from DRAM but before storing to LDS. This enables single-pass fusion of
 // operations like norm computation with the GEMM operation.
 //
+// *Note* that fusion_func, the norm calculation in our case, could not fit easily and efficiently
+// within the a_element_func. Part of the reasons are the norm computation being stateful and
+// requiring index info to map elements to M-rows
+//
 // Usage:
 //   auto pipeline = MhcGemmPipelineAgBgCrCompV3Fused<Problem>{};
 //

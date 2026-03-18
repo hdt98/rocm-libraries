@@ -13,6 +13,7 @@
 namespace ck_tile {
 
 // Reference implementation for Manifold Constrained Hyper Connection
+// https://arxiv.org/abs/2512.24880
 template <typename XDataType,
           typename PhiDataType,
           typename YDataType,
@@ -143,8 +144,6 @@ CK_TILE_HOST void reference_mhc(const HostTensor<XDataType>& x_b_nc,       // [B
         }
     };
 
-    // Use single-threaded execution to avoid potential race conditions
-    // make_ParallelTensorFunctor(f_batch, B)(std::thread::hardware_concurrency());
     make_ParallelTensorFunctor(f_batch, B)(1);
 }
 

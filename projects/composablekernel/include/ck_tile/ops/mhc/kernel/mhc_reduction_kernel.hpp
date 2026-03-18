@@ -13,7 +13,7 @@
 
 // MHC Reduction Kernel
 // ======================================================================
-// Implementing equations 16, 17 and 18 of https://arxiv.org/pdf/2512.24880
+// Implementing equations 16, 17 and 18 of https://arxiv.org/abs/2512.24880
 //
 // Pattern:
 // 1. Workspace tensor layout: [batch, grid_k, output_dim]
