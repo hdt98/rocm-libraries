@@ -894,7 +894,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
         gen_scales(q_descale_host, QDataType{}, 3);
         gen_scales(k_descale_host, KDataType{}, 3);
         // When P is fp4, only 8 values (0, 0.5, 1, 1.5, 2, 3, 4, 6) are used to quantize P.
-        // When P is fp8, only 32 values (0 .. 7.5) are used.
+        // When P is fp6, only 32 values (0 .. 7.5) are used.
         // Too large V values can create rare error outliers between host (no quantization) and
         // device ("running" FA softmax + quantization), here we reduce max value by using smaller
         // range of V scales.
