@@ -8,19 +8,19 @@
 Develop plugins for hipDNN
 **************************
 
-hipDNN supports a plugin architecture that allows for modular extensions to the framework. Plugins are designed to be separate projects that extend hipDNN's capabilities without being part of the core repository.
-The backend discovers and manages these plugins, leveraging them for different aspects of deep learning routines. This architecture provides flexibility in implementation choices and enables optimizations for specific hardware or use cases.
+hipDNN supports a plugin architecture that allows for modular extensions to the framework. Plugins are designed to be separate projects that extend the capabilities of hipDNN without being part of the core repository.
+The backend discovers and manages these plugins, leveraging them across different aspects of deep learning routines. This architecture provides flexibility in implementation choices and enables optimizations for specific hardware or use cases.
 
 .. important::
 
-  This page is for advanced users such as senior developers, engineers, and system administrators who are looking to extend hipDNN with customized plugins. Most users should use the default plugins described in :ref:`build-execute`.
+  This topic is for advanced users such as senior developers, engineers, and system administrators who are looking to extend hipDNN with custom plugins. Most users should use the default plugins described in :ref:`build-execute`.
 
-It's recommended that you review the :ref:`architecture` and :ref:`backend-architecture` documents for context before beginning plugin development.
+Review the :ref:`architecture` and :ref:`backend-architecture` topics for context before beginning plugin development.
 
 Plugin types
 ============
 
-Kernel engine plugins provide the actual kernel implementations for operations. They contain the compute kernels that execute on the target hardware (GPUs, accelerators, and so on).
+Kernel engine plugins provide the actual kernel implementations for operations. They contain the compute kernels that execute on the target hardware (GPUs).
 
 SDK libraries
 =============
@@ -78,7 +78,7 @@ Every engine used by hipDNN requires a unique engine ID. Plugins that provide mo
 hipDNN uses a deterministic hash-based system for managing engine IDs. This system converts human-readable engine names to unique ``int64_t`` identifiers.
 The engine ID system ensures globally unique identifiers across all plugins.
 
-When creating a new engine, select a unique descriptive name for the new engine.
+When creating a new engine, select a unique descriptive name.
 During development, add the ``HIPDNN_REGISTER_ENGINE(MY_NEW_ENGINE, "MY_NEW_ENGINE")`` macro to a source file in your project.
 This registers the name globally (verifying that it doesn't conflict with plugin names from the official distribution) and creates variables that can be used to retrieve the unique ID for this engine.
 
@@ -127,7 +127,7 @@ To add your engine name to the official registry, submit a GitHub pull request t
 
   HIPDNN_REGISTER_ENGINE(MY_CUSTOM_ENGINE, "MY_CUSTOM_ENGINE")
 
-Test it locally. You can use unregistered names during development, but you'll need to remove the ``HIPDNN_REGISTER_ENGINE()`` macro from your plugin before it's added to the official registry as the duplicated registries will be interpreted as an engine ID collision error.
+Test it locally. You can use unregistered names during development, but you'll need to remove the ``HIPDNN_REGISTER_ENGINE()`` macro from your plugin before it's added to the official registry, as the duplicated registries are interpreted as an engine ID collision error.
 
 Create a kernel engine plugin
 =============================
@@ -159,7 +159,7 @@ Steps
 3. Build and deploy the plugin.
 
    - Configure CMake to build the plugin as a shared library.
-   - Install it to the ROCm hipDNN plugin directory where hipDNN can discover it at runtime or use the ``HIPDNN_PLUGIN_DIR`` environment variable to force hipDNN to only load plugins from the folder specified in the environment variable.
+   - Install it in the ROCm hipDNN plugin directory where hipDNN can discover it at runtime or use the ``HIPDNN_PLUGIN_DIR`` environment variable to force hipDNN to only load plugins from the folder specified in the environment variable.
 
 Typical implementation details
 ------------------------------

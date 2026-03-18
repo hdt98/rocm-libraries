@@ -4,11 +4,11 @@
 
 .. _migrate-cudnn:
 
-*********************************
-Migrate a cuDNN project to hipDNN
-*********************************
+********************************************
+Migrate NVIDIA CUDA cuDNN projects to hipDNN
+********************************************
 
-This guide demonstrates how to migrate a cuDNN code project to hipDNN.
+This topic demonstrates how to migrate a NVIDIA CUDA cuDNN project to hipDNN.
 
 Before you begin, ensure hipDNN (ROCm) is installed. See :ref:`prerequisites` for more information.
 

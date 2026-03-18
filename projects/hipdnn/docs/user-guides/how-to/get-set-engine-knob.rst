@@ -4,11 +4,13 @@
 
 .. _set-engine-knobs:
 
-********************************************
+************************************************
 Get and set engine knob configurations in hipDNN
-********************************************
+************************************************
 
-hipDNN has a flexible system of engine configuration knobs that lets plugin developers expose custom runtime settings that end users can then adjust.
+hipDNN has a flexible system of engine configuration knobs that lets hipDNN plugin developers expose custom runtime settings for end users can to adjust.
+
+This topic demonstrates how to query knobs and how to set their values.
 
 .. note::
 

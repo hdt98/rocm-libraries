@@ -32,7 +32,7 @@ See :ref:`plugin-support` for a detailed list of the supported operations.
 Simplified workflow example
 ===========================
 
-This example demonstrates sample code that creates a graph, creates tensors, and adds operations before building and executing them. Here's a simplified workflow example:
+This sample code creates a graph, creates tensors, and adds operations before building and executing them:
 
 .. code:: cpp
 
