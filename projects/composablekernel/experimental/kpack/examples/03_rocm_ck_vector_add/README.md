@@ -1,31 +1,72 @@
-# Example 03 — `rocm_ck` Vector Add (Multi-Variant)
+# Example 03 — `rocm_ck` Vector Add (Full Tuning Surface)
 
-Builds on [Example 02](../02_ck_tile_vector_add/) by introducing a `rocm_ck`
-abstraction layer that hides CK Tile behind a clean, config-driven interface
-and compiles multiple kernel variants into one kpack archive.
+Demonstrates CK Tile's **Signature + Algorithm** pattern for distributing
+pre-compiled GPU kernels with full control over the ElementWise tuning surface.
 
-## What This Teaches
+## Key Concepts
 
-- **Shared ABI**: A plain C++ struct (`VectorAddArgs`) defines the kernel
-  argument layout, shared between host and device with no CK Tile dependency
-  on the host side.
-- **`consteval` validation**: `make_vector_add_kernel()` validates configuration
-  at compile time. Invalid block sizes are compile-time errors, not runtime
-  surprises.
-- **Parameterized variants**: Three block sizes (256, 512, 1024) are compiled
-  from the same device template, each as a separate `.hip` → `.hsaco` file.
-- **Multi-binary archives**: `pack.py` packages all variants × architectures
-  into a single `.kpack` file. The host selects variants by name at runtime.
+### Signature / Algorithm Separation
+
+Following CK Tile's builder pattern, kernel configuration is split into two
+orthogonal concerns:
+
+- **Signature** (`elementwise_signature`): *What* the kernel computes — data types.
+- **Algorithm** (`elementwise_algorithm`): *How* the kernel executes — tile geometry,
+  warp count, vector width, padding.
+
+This separation lets the same operation (vector add) be compiled with many
+different tuning configurations, each producing a distinct `.hsaco` binary.
+
+### Tuning Surface
+
+The algorithm exposes four independent knobs matching CK Tile's `ElementWiseShape`:
+
+| Parameter | Field | Description |
+|-----------|-------|-------------|
+| BlockTile | `block_tile` | Elements processed per thread block |
+| BlockWarps | `block_warps` | Warps per thread block (must be power of 2) |
+| WarpTile | `warp_tile` | Controls vector load width (`kVectorM`) |
+| Pad | `pad` | Enable padding for unaligned problem sizes |
+
+Derived quantities (validated at compile time by `make_kernel`):
+- `kVectorM = min(128 / type_bits, warp_tile / 64)` — vector elements per thread
+- `kRepeatM = block_tile / (block_warps × kVectorM × 64)` — iterations per warp
+- `thread_block_size = 64 × block_warps` — actual threads launched
+
+### Variant Registry
+
+`rocm_vector_add_registry.hpp` provides programmatic variant selection:
+- `ALL_VARIANTS[]` — constexpr table of all compiled kernel variants
+- `find_variant(DataType, problem_size)` — selects the best variant: largest
+  `block_tile` that divides `problem_size` cleanly, or padded fallback
+
+## Compiled Variants
+
+| Variant | Type | BlockTile | BlockWarps | WarpTile | Threads |
+|---------|------|-----------|------------|----------|---------|
+| `fp32_b256` | FP32 | 256 | 1 | 256 | 64 |
+| `fp32_b512` | FP32 | 512 | 1 | 512 | 64 |
+| `fp32_b1024` | FP32 | 1024 | 1 | 1024 | 64 |
+| `fp16_b512` | FP16 | 512 | 1 | 512 | 64 |
+| `fp16_b1024` | FP16 | 1024 | 1 | 1024 | 64 |
+| `bf16_b512` | BF16 | 512 | 1 | 512 | 64 |
+| `fp32_b256_sa` | FP32 | 256 | 1 | 256 | 64 |
+| `fp32_b2048_w8` | FP32 | 2048 | 8 | 64 | 512 |
+| `fp16_b1024_w2` | FP16 | 1024 | 2 | 512 | 128 |
+
+The `_sa` suffix indicates explicit Signature+Algorithm API (functionally
+identical to `fp32_b256`). The `_w8`/`_w2` suffixes indicate multi-warp variants.
 
 ## File Roles
 
 | File | Purpose |
 |------|---------|
-| `rocm_vector_add_api.hpp` | Shared ABI + config (no CK Tile dependency) |
+| `rocm_vector_add_api.hpp` | Shared ABI, Signature/Algorithm types, `make_kernel` validation |
 | `rocm_vector_add_dev.hpp` | Device interface — maps config to CK Tile types |
-| `vector_add_block{256,512,1024}.hip` | Variant instantiations (~6 lines each) |
-| `pack.py` | Multi-binary archive packer |
-| `main.cpp` | Host loader — runs and verifies all variants |
+| `rocm_vector_add_registry.hpp` | Variant table and `find_variant` selection (host-only) |
+| `vector_add_*.hip` | Variant instantiations (~15 lines each) |
+| `pack.py` | Archive packer with variant metadata |
+| `main.cpp` | Host loader — variant selection demo + verify-all mode |
 | `CMakeLists.txt` | Build system (variant × arch nested loop) |
 
 ## Build
@@ -35,7 +76,7 @@ cd experimental/kpack/examples/03_rocm_ck_vector_add
 cmake -B build -S . -G Ninja \
     -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++ \
     -DCMAKE_PREFIX_PATH=/opt/rocm \
-    -DGPU_TARGETS="gfx942"
+    -DGPU_TARGETS="gfx90a;gfx942"
 ninja -C build
 ```
 
@@ -47,26 +88,32 @@ ninja -C build
 
 Expected output:
 ```
-Opened build/kernels.kpack — architectures: gfx942
-Detected GPU: gfx942
-  vector_add_block256 (grid=16, block=256): PASSED
-  vector_add_block512 (grid=8, block=512): PASSED
-  vector_add_block1024 (grid=4, block=1024): PASSED
+Opened build/kernels.kpack — architectures: gfx90a, gfx942
+
+Variant selection for N=4096:
+  FP32 -> vector_add_fp32_b2048_w8 (tile=2048, warps=8)
+  FP16 -> vector_add_fp16_b1024 (tile=1024, warps=1)
+  BF16 -> vector_add_bf16_b512 (tile=512, warps=1)
+
+Running all 9 variants:
+  vector_add_fp32_b256: tile=256, warps=1, threads=64, N=4096 (aligned)
+  vector_add_fp32_b256 (grid=16, block=64): PASSED
+  ...
+  vector_add_fp32_b2048_w8: tile=2048, warps=8, threads=512, N=4096 (aligned)
+  vector_add_fp32_b2048_w8 (grid=2, block=512): PASSED
+  vector_add_fp16_b1024_w2: tile=1024, warps=2, threads=128, N=4096 (aligned)
+  vector_add_fp16_b1024_w2 (grid=4, block=128): PASSED
 ```
 
-## Design Decisions
+## Design Notes
 
-**C++20 required.** Struct NTTPs (`template <vector_add_config Config>`) and
-`consteval` are C++20 features. The device compiler (clang 17+) supports both.
+**C++20 required.** Struct NTTPs and `consteval` validation are C++20 features.
 
-**`block_size` = thread block size for launch.** CK Tile's actual thread count
-is `warp_size × BlockWarps` (= 64 for this example). Launching with more
-threads than needed wastes occupancy but is harmless — extra threads do no
-work. This keeps the host-side launch logic simple: grid = N / block_size.
+**`thread_block_size = 64 × block_warps`, not `block_tile`.** The number of
+GPU threads equals the warp count times the wavefront size (64 on AMD CDNA).
+Each warp iterates `kRepeatM` times to cover its share of the block tile.
 
-**BlockWarps always 1.** `block_size` is the only configuration knob. The
-number of warps per block stays at 1, so varying `block_size` changes how many
-elements each warp processes (via `kRepeatM`), not the parallelism structure.
-
-**NUM_ELEMENTS = 4096.** Divisible by 256, 512, and 1024. Avoids partial-block
-edge cases that would obscure the multi-variant pattern being demonstrated.
+**Archive metadata.** `pack.py` writes a `variant_metadata` section in the
+kpack TOC containing each variant's tuning parameters (compute_type,
+block_tile, block_warps, warp_tile, pad). This is ignored by the kpack reader
+but available for tooling that inspects archives.

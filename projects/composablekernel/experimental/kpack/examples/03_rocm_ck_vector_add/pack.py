@@ -35,16 +35,82 @@ KPACK_MAGIC = b"KPAK"
 KPACK_VERSION = 1
 HEADER_SIZE = 16  # 4 (magic) + 4 (version) + 8 (toc_offset)
 
+# Variant metadata mirrors the constexpr ALL_VARIANTS table in
+# rocm_vector_add_registry.hpp. Each entry carries the make_kernel
+# parameters so the archive TOC can describe the tuning surface.
 VARIANTS = [
-    "vector_add_fp32_b256",
-    "vector_add_fp32_b512",
-    "vector_add_fp32_b1024",
-    "vector_add_fp16_b512",
-    "vector_add_fp16_b1024",
-    "vector_add_bf16_b512",
-    "vector_add_fp32_b256_sa",
-    "vector_add_fp32_b2048_w8",
-    "vector_add_fp16_b1024_w2",
+    {
+        "name": "vector_add_fp32_b256",
+        "compute_type": "fp32",
+        "block_tile": 256,
+        "block_warps": 1,
+        "warp_tile": 256,
+        "pad": True,
+    },
+    {
+        "name": "vector_add_fp32_b512",
+        "compute_type": "fp32",
+        "block_tile": 512,
+        "block_warps": 1,
+        "warp_tile": 512,
+        "pad": True,
+    },
+    {
+        "name": "vector_add_fp32_b1024",
+        "compute_type": "fp32",
+        "block_tile": 1024,
+        "block_warps": 1,
+        "warp_tile": 1024,
+        "pad": True,
+    },
+    {
+        "name": "vector_add_fp16_b512",
+        "compute_type": "fp16",
+        "block_tile": 512,
+        "block_warps": 1,
+        "warp_tile": 512,
+        "pad": True,
+    },
+    {
+        "name": "vector_add_fp16_b1024",
+        "compute_type": "fp16",
+        "block_tile": 1024,
+        "block_warps": 1,
+        "warp_tile": 1024,
+        "pad": True,
+    },
+    {
+        "name": "vector_add_bf16_b512",
+        "compute_type": "bf16",
+        "block_tile": 512,
+        "block_warps": 1,
+        "warp_tile": 512,
+        "pad": True,
+    },
+    {
+        "name": "vector_add_fp32_b256_sa",
+        "compute_type": "fp32",
+        "block_tile": 256,
+        "block_warps": 1,
+        "warp_tile": 256,
+        "pad": True,
+    },
+    {
+        "name": "vector_add_fp32_b2048_w8",
+        "compute_type": "fp32",
+        "block_tile": 2048,
+        "block_warps": 8,
+        "warp_tile": 64,
+        "pad": True,
+    },
+    {
+        "name": "vector_add_fp16_b1024_w2",
+        "compute_type": "fp16",
+        "block_tile": 1024,
+        "block_warps": 2,
+        "warp_tile": 512,
+        "pad": True,
+    },
 ]
 ARCHITECTURES = ["gfx90a", "gfx942", "gfx950"]
 
@@ -64,11 +130,12 @@ def main() -> None:
     variant_map: dict[str, dict[str, int]] = {}
 
     for variant in VARIANTS:
+        name = variant["name"]
         variant_entries: dict[str, int] = {}
         for arch in ARCHITECTURES:
-            hsaco_path = build_dir / f"{variant}_{arch}.hsaco"
+            hsaco_path = build_dir / f"{name}_{arch}.hsaco"
             if not hsaco_path.exists():
-                print(f"  Skipping {variant}/{arch}: {hsaco_path.name} not found")
+                print(f"  Skipping {name}/{arch}: {hsaco_path.name} not found")
                 continue
             blob = hsaco_path.read_bytes()
             ordinal = len(blobs)
@@ -78,7 +145,7 @@ def main() -> None:
             print(f"  Read {hsaco_path.name} ({len(blob)} bytes)")
 
         if variant_entries:
-            variant_map[variant] = variant_entries
+            variant_map[name] = variant_entries
 
     if not blobs:
         print("Error: no .hsaco files found in build/", file=sys.stderr)
@@ -103,10 +170,24 @@ def main() -> None:
 
         # Build and write the MessagePack TOC
         toc_offset = out.tell()
+
+        # Variant metadata: tuning surface parameters for each variant
+        variant_metadata = {}
+        for v in VARIANTS:
+            if v["name"] in variant_map:
+                variant_metadata[v["name"]] = {
+                    "compute_type": v["compute_type"],
+                    "block_tile": v["block_tile"],
+                    "block_warps": v["block_warps"],
+                    "warp_tile": v["warp_tile"],
+                    "pad": v["pad"],
+                }
+
         toc = {
             "compression_scheme": "none",
             "gfx_arches": sorted_arches,
             "blobs": blob_infos,
+            "variant_metadata": variant_metadata,
             "toc": {
                 variant_name: {
                     arch: {
