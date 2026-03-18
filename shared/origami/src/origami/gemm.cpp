@@ -1046,7 +1046,7 @@ static double compute_formocast_latency(const problem_t& problem,
   // Use depth_u if set, otherwise use mt.k
   size_mapping.depthU = (config.tensile().depth_u > 0) ? config.tensile().depth_u : config.mt.k;
 
-  size_mapping.globalSplitU = config.tensile().global_split_u;
+  size_mapping.globalSplitU = std::max(static_cast<int16_t>(1), config.tensile().global_split_u);
   size_mapping.globalAccumulation = config.tensile().global_accumulation;
   size_mapping.LocalSplitU = config.tensile().local_split_u;
 
