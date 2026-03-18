@@ -43,6 +43,8 @@ VARIANTS = [
     "vector_add_fp16_b1024",
     "vector_add_bf16_b512",
     "vector_add_fp32_b256_sa",
+    "vector_add_fp32_b2048_w8",
+    "vector_add_fp16_b1024_w2",
 ]
 ARCHITECTURES = ["gfx90a", "gfx942", "gfx950"]
 

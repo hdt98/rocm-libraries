@@ -61,6 +61,13 @@ static constexpr variant_info VARIANTS[] = {
     {"vector_add_fp32_b256_sa",
      rocm_ck::make_kernel(rocm_ck::elementwise_signature{rocm_ck::DataType::FP32},
                           rocm_ck::elementwise_algorithm{256, 1, 256, true})},
+    // Multi-warp variants: thread_block_size != block_tile
+    {"vector_add_fp32_b2048_w8",
+     rocm_ck::make_kernel(rocm_ck::elementwise_signature{rocm_ck::DataType::FP32},
+                          rocm_ck::elementwise_algorithm{2048, 8, 64, true})},
+    {"vector_add_fp16_b1024_w2",
+     rocm_ck::make_kernel(rocm_ck::elementwise_signature{rocm_ck::DataType::FP16},
+                          rocm_ck::elementwise_algorithm{1024, 2, 512, true})},
 };
 
 // --- Host-side type conversion utilities ---
