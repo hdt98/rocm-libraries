@@ -355,52 +355,55 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
 
-            // Apply XOR swizzle for 16x16 XDL to avoid bank conflicts
-            // For 16x16 tiles, rows 0,4,8,12 (and 1,5,9,13, etc.) access same banks.
-            // The conflicting rows differ in bits 2,3: row % 16 / 4 = (row >> 2) & 3
-            // XOR row bits 2,3 into col bits that affect bank selection.
+            // Apply XOR swizzle to avoid LDS bank conflicts
+            // LDS has 32 banks with 4-byte words. Bank = (byte_addr / 4) % 32
+            // For stores, gfx950 (64 physical banks) also behaves like 32 banks.
             //
-            // Constraint: MPerIterationShuffle must be <= 32 for row bits 2,3 to be unique.
-            // For MRepeat > 2 (e.g., 4x1 layout), MPerIterationShuffle = 64, causing
-            // rows 0 and 16 to collide. TODO: fix by using row % MPerXdl.
+            // Conflict patterns by XDL size:
+            // - 16x16 XDL: rows 0,4,8,12 conflict (stride 4) - differ in bits 2,3
+            // - 32x32 XDL: rows 0,8,16,24 conflict (stride 8) - differ in bits 3,4
             //
-            // For FP16 (2B): bank = (col * 2 / 4) % 32 = (col / 2) % 32
-            //   Col bits 1-5 determine bank
-            // For FP8 (1B): bank = (col / 4) % 32
-            //   Col bits 2-6 determine bank
-            constexpr bool xor_swizzle_safe = MPerIterationShuffle <= 32;
-            if constexpr(MPerXdl == 16 && banks == 32 && xor_swizzle_safe)
-            {
-                // Determine which col bits to XOR based on data type size and vector length
-                // We want to XOR into bits that affect bank selection but are above VectorLen
-                constexpr index_t log2_vec      = [] {
-                    index_t v = VectorLen, l = 0;
-                    while(v > 1) { v >>= 1; ++l; }
-                    return l;
-                }();
-                // For 32 banks with 4B words: bank bits start at col bit (2 - log2(DataTypeSize))
-                // We XOR row bits 2,3 (which distinguish conflicting rows) into col bits
-                // just above vector boundary
-                constexpr index_t col_bit_start = log2_vec;
+            // We use RowPeriod = MPerXdl to handle wave layouts where
+            // MPerIterationShuffle > MPerXdl (e.g., 4x1 with MPerIterationShuffle=64)
+            constexpr index_t log2_vec = [] {
+                index_t v = VectorLen, l = 0;
+                while(v > 1) { v >>= 1; ++l; }
+                return l;
+            }();
+            constexpr index_t col_bit_start = log2_vec;
 
-                // Row bits 2,3 distinguish rows 0,4,8,12 within 16-row XDL tile
+            if constexpr(MPerXdl == 16)
+            {
+                // 16x16 XDL: rows 0,4,8,12 conflict - XOR row bits 2,3
                 using RowBits = sequence<2, 3>;
                 using ColBits = sequence<col_bit_start, col_bit_start + 1>;
 
-                // Static asserts to ensure XOR swizzle is a valid bijection:
-                // 1. Row bits must be within the MPerIterationShuffle range
-                static_assert((1 << (RowBits::at(number<RowBits::size() - 1>{}) + 1)) <=
-                                  MPerIterationShuffle,
-                              "Row bits exceed MPerIterationShuffle range");
-                // 2. Col bits must be within the column range for valid XOR targets
                 static_assert((1 << (ColBits::at(number<ColBits::size() - 1>{}) + 1)) <=
                                   NPerIterationShuffle,
-                              "Col bits exceed column range - XOR would produce out-of-bounds "
-                              "addresses");
+                              "Col bits exceed column range");
 
                 constexpr auto lds_block_desc = transform_tensor_descriptor(
                     lds_block_desc_2,
-                    make_tuple(make_xor_bits_transform<RowBits, ColBits>(
+                    make_tuple(make_xor_bits_transform<RowBits, ColBits, MPerXdl>(
+                        make_tuple(number<MPerIterationShuffle>{}, number<NPerIterationShuffle>{}))),
+                    make_tuple(sequence<0, 1>{}),
+                    make_tuple(sequence<0, 1>{}));
+
+                return lds_block_desc;
+            }
+            else if constexpr(MPerXdl == 32)
+            {
+                // 32x32 XDL: rows 0,8,16,24 conflict - XOR row bits 3,4
+                using RowBits = sequence<3, 4>;
+                using ColBits = sequence<col_bit_start, col_bit_start + 1>;
+
+                static_assert((1 << (ColBits::at(number<ColBits::size() - 1>{}) + 1)) <=
+                                  NPerIterationShuffle,
+                              "Col bits exceed column range");
+
+                constexpr auto lds_block_desc = transform_tensor_descriptor(
+                    lds_block_desc_2,
+                    make_tuple(make_xor_bits_transform<RowBits, ColBits, MPerXdl>(
                         make_tuple(number<MPerIterationShuffle>{}, number<NPerIterationShuffle>{}))),
                     make_tuple(sequence<0, 1>{}),
                     make_tuple(sequence<0, 1>{}));

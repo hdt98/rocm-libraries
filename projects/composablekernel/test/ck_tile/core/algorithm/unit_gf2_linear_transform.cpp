@@ -553,11 +553,9 @@ TEST(XorBitsTransform, BankConflictAvoidance16x16)
 {
     // For 16x16 XDL tiles with FP16:
     // - Rows 0,4,8,12 (and 1,5,9,13, etc.) conflict - they differ in bits 2,3
-    // - 16 threads per row, 8-element vectors
     // - Column stride = 2 bytes (FP16)
     // - Bank = (col * 2 / 4) % 32 = (col / 2) % 32
 
-    // Row bits 2,3 distinguish conflicting rows: (row >> 2) & 3
     using RowBits = sequence<2, 3>;
     using ColBits = sequence<3, 4>;
     using Lengths = tuple<number<64>, number<128>>;
@@ -589,4 +587,78 @@ TEST(XorBitsTransform, BankConflictAvoidance16x16)
     EXPECT_NE(bank4, bank8);
     EXPECT_NE(bank4, bank12);
     EXPECT_NE(bank8, bank12);
+}
+
+TEST(XorBitsTransform, RowPeriod16x16)
+{
+    // Test RowPeriod for 4x1 wave layout (MPerIterationShuffle=64, MPerXdl=16)
+    // Without RowPeriod, rows 0 and 16 would have same bits 2,3 = 0
+    // With RowPeriod=16, we use (row % 16) so rows 0 and 16 both map to local row 0
+
+    using RowBits = sequence<2, 3>;
+    using ColBits = sequence<3, 4>;
+    using Lengths = tuple<number<64>, number<128>>;
+    constexpr index_t RowPeriod = 16;
+
+    auto transform = make_xor_bits_transform<RowBits, ColBits, RowPeriod>(Lengths{});
+
+    auto get_bank = [](index_t col) { return (col / 2) % 32; };
+
+    // Rows 0 and 16 are in different XDL tiles but same position within tile
+    // They should get the same XOR pattern (local row 0)
+    multi_index<2> r0{0, 0}, r16{16, 0};
+    multi_index<2> s0, s16;
+
+    transform.calculate_lower_index(s0, r0);
+    transform.calculate_lower_index(s16, r16);
+
+    // Same swizzled column for same local position
+    EXPECT_EQ(s0[1], s16[1]);
+
+    // But rows 0 and 4 (same XDL tile) should get different banks
+    multi_index<2> r4{4, 0};
+    multi_index<2> s4;
+    transform.calculate_lower_index(s4, r4);
+
+    EXPECT_NE(get_bank(s0[1]), get_bank(s4[1]));
+}
+
+TEST(XorBitsTransform, BankConflictAvoidance32x32)
+{
+    // For 32x32 XDL tiles:
+    // - Rows 0,8,16,24 conflict (stride 8) - they differ in bits 3,4
+    // - Bank = (col / 2) % 32 for FP16
+
+    using RowBits = sequence<3, 4>;
+    using ColBits = sequence<3, 4>;
+    using Lengths = tuple<number<64>, number<128>>;
+    constexpr index_t RowPeriod = 32;
+
+    auto transform = make_xor_bits_transform<RowBits, ColBits, RowPeriod>(Lengths{});
+
+    auto get_bank = [](index_t col) { return (col / 2) % 32; };
+
+    // Check that rows 0,8,16,24 (conflicting rows in 32x32) get different banks
+    index_t col = 0;
+
+    multi_index<2> r0{0, col}, r8{8, col}, r16{16, col}, r24{24, col};
+    multi_index<2> s0, s8, s16, s24;
+
+    transform.calculate_lower_index(s0, r0);
+    transform.calculate_lower_index(s8, r8);
+    transform.calculate_lower_index(s16, r16);
+    transform.calculate_lower_index(s24, r24);
+
+    index_t bank0  = get_bank(s0[1]);
+    index_t bank8  = get_bank(s8[1]);
+    index_t bank16 = get_bank(s16[1]);
+    index_t bank24 = get_bank(s24[1]);
+
+    // All different banks for the conflicting rows
+    EXPECT_NE(bank0, bank8);
+    EXPECT_NE(bank0, bank16);
+    EXPECT_NE(bank0, bank24);
+    EXPECT_NE(bank8, bank16);
+    EXPECT_NE(bank8, bank24);
+    EXPECT_NE(bank16, bank24);
 }

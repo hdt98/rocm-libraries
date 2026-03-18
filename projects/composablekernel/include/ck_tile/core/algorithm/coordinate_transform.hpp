@@ -1406,11 +1406,17 @@ CK_TILE_HOST_DEVICE static void print(const xor_t<LowLengths>& x)
 //   xor_bits_t<sequence<0,1>, sequence<3,4>> swizzles row bits 0,1 into col bits 3,4
 //   This spreads rows 0,1,2,3 across different banks.
 
-template <typename LowLengths, typename RowBits, typename ColBits>
+// xor_bits_t: XOR transform with optional row periodicity
+// RowPeriod: when > 0, bits are extracted from (row % RowPeriod) instead of row
+//            This is essential for wave layouts where MPerIterationShuffle > MPerXdl,
+//            ensuring the XOR pattern repeats every MPerXdl rows (typically 16)
+template <typename LowLengths, typename RowBits, typename ColBits, index_t RowPeriod = 0>
 struct xor_bits_t : public base_transform<2, 2>
 {
     static_assert(RowBits::size() == ColBits::size(),
                   "RowBits and ColBits must have same length");
+    static_assert(RowPeriod == 0 || (RowPeriod & (RowPeriod - 1)) == 0,
+                  "RowPeriod must be 0 or a power of 2");
 
     static constexpr auto type_enum = coord_transform_enum::xor_bits_t;
     static constexpr index_t NumXorBits = RowBits::size();
@@ -1446,12 +1452,20 @@ struct xor_bits_t : public base_transform<2, 2>
         const auto row = idx_up[number<0>{}];
         auto col       = idx_up[number<1>{}];
 
+        // For RowPeriod > 0, extract bits from (row % RowPeriod) to handle
+        // cases where MPerIterationShuffle > MPerXdl (e.g., 4x1 wave layout)
+        auto local_row = row;
+        if constexpr(RowPeriod > 0)
+        {
+            local_row = row & (RowPeriod - 1); // row % RowPeriod (power of 2)
+        }
+
         // XOR specified row bits into column bits
         static_for<0, NumXorBits, 1>{}([&](auto i) {
             constexpr index_t row_bit = RowBits::at(i);
             constexpr index_t col_bit = ColBits::at(i);
-            // Extract bit from row, shift to col position, XOR into col
-            const auto bit = (row >> row_bit) & 1;
+            // Extract bit from local_row, shift to col position, XOR into col
+            const auto bit = (local_row >> row_bit) & 1;
             col ^= (bit << col_bit);
         });
 
@@ -1506,21 +1520,33 @@ struct xor_bits_t : public base_transform<2, 2>
     }
 };
 
-template <typename LowLengths, typename RowBits, typename ColBits>
-CK_TILE_HOST_DEVICE static void print(const xor_bits_t<LowLengths, RowBits, ColBits>&)
+template <typename LowLengths, typename RowBits, typename ColBits, index_t RowPeriod>
+CK_TILE_HOST_DEVICE static void print(const xor_bits_t<LowLengths, RowBits, ColBits, RowPeriod>&)
 {
     printf("xor_bits_t{row_bits: ");
     print(RowBits{});
     printf(", col_bits: ");
     print(ColBits{});
+    if constexpr(RowPeriod > 0)
+    {
+        printf(", row_period: %d", RowPeriod);
+    }
     printf("}");
 }
 
-// Factory function for xor_bits_t transform
+// Factory function for xor_bits_t transform (no row period - uses absolute row)
 template <typename RowBits, typename ColBits, typename LowLengths>
-CK_TILE_HOST_DEVICE constexpr auto make_xor_bits_transform(const LowLengths& low_lengths)
+[[nodiscard]] CK_TILE_HOST_DEVICE constexpr auto make_xor_bits_transform(const LowLengths& low_lengths)
 {
-    return xor_bits_t<LowLengths, RowBits, ColBits>{low_lengths};
+    return xor_bits_t<LowLengths, RowBits, ColBits, 0>{low_lengths};
+}
+
+// Factory function for xor_bits_t transform with row period
+// RowPeriod: bits are extracted from (row % RowPeriod) - use MPerXdl for wave layouts
+template <typename RowBits, typename ColBits, index_t RowPeriod, typename LowLengths>
+[[nodiscard]] CK_TILE_HOST_DEVICE constexpr auto make_xor_bits_transform(const LowLengths& low_lengths)
+{
+    return xor_bits_t<LowLengths, RowBits, ColBits, RowPeriod>{low_lengths};
 }
 
 template <typename LowLength, typename OffsetLength>
