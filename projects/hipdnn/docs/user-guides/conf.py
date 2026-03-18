@@ -5,7 +5,6 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
 
-
 import re
 
 from rocm_docs import ROCmDocs
@@ -54,5 +53,5 @@ html_theme_options = {
 }
 
 setting_all_article_info = True
-all_article_info_os = ["linux"]
+all_article_info_os = ["linux", "Windows"]
 all_article_info_author = ""

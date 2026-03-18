@@ -9,9 +9,9 @@ subtrees:
 
 - caption: Install
   entries:
-  - file: install/hipdnn-prerequisites.rst
+  - file: install/installation.rst
     title: Installation
-  - file: install/quickstart.rst
+  - file: install/add-project.rst
     title: Add hipDNN to your project
 
 - caption: Conceptual

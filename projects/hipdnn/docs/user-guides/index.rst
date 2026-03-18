@@ -23,8 +23,8 @@ The public repository for hipDNN is located at `https://github.com/ROCm/rocm-lib
 
   .. grid-item-card:: Install
 
-    * :doc:`hipDNN installation <./install/hipdnn-prerequisites>`
-    * :doc:`Add hipDNN to your project <./install/quickstart>`
+    * :doc:`hipDNN installation <./install/installation>`
+    * :doc:`Add hipDNN to your project <./install/add-project>`
   
   .. grid-item-card:: Conceptual
 
