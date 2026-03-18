@@ -32,7 +32,7 @@ Here's a minimal example of a hipDNN project in ``CMakeLists.txt``:
 Key differences between cuDNN and hipDNN
 ========================================
 
-Review this table to see a high-level overview of the differences between cuDNN and hipDNN:
+This table provides a high-level overview of the differences between cuDNN and hipDNN:
 
 .. list-table::
    :widths: 3 3 3
@@ -199,7 +199,7 @@ Troubleshooting
 Error: Missing Heuristic modes A and B
 --------------------------------------
 
-The heuristic implementation in hipDNN has yet to be implemented
+The heuristic implementation in hipDNN is not implemented.
 
 To fix the problem, use a combination of ``graph::get_ranked_engine_ids()`` and ``graph::set_preferred_engine_id_ext()`` if you need more detailed control over engine selection.
 

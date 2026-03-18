@@ -151,9 +151,9 @@ If you don't specify a knob setting, the engine will use the default value defin
 
 .. note::
 
-  - All knob settings are validated against their constraints when creating an execution plan. Invalid values will result in an error with a descriptive message.
-  - If you specify a knob that doesn't exist for the engine, hipDNN will log a warning but continue. This allows forward compatibility when new knobs are added.
-  - If a knob is marked as deprecated, hipDNN will log a warning when you use it, but the knob will still function normally.
+  - All knob settings are validated against their constraints when creating an execution plan. Invalid values result in an error with a descriptive message.
+  - If you specify a knob that doesn't exist for the engine, hipDNN logs a warning and continues. This allows forward compatibility when new knobs are added.
+  - If a knob is marked as deprecated, hipDNN logs a warning when you use it. The knob functions normally.
 
 Best practices
 ==============
