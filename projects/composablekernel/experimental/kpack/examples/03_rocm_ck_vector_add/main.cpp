@@ -244,6 +244,14 @@ int main(int argc, char** argv)
         const int grid_size =
             (NUM_ELEMENTS + variant.kernel.block_tile - 1) / variant.kernel.block_tile;
         const int block_size = variant.kernel.thread_block_size;
+        const bool aligned   = rocm_ck::is_aligned(variant.kernel, NUM_ELEMENTS);
+        std::printf("  %s: tile=%d, warps=%d, threads=%d, N=%d %s\n",
+                    variant.name,
+                    variant.kernel.block_tile,
+                    variant.kernel.block_warps,
+                    block_size,
+                    NUM_ELEMENTS,
+                    aligned ? "(aligned)" : "(padded)");
 
         rocm_ck::VectorAddArgs kernel_args = {NUM_ELEMENTS, device_a, device_b, device_result};
         size_t kernel_args_size            = sizeof(kernel_args);
