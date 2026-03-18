@@ -3,6 +3,7 @@
 
 #include "rocm_vector_add_dev.hpp"
 
+// BF16 baseline. Same geometry as fp16_b512 (both 16-bit -> kVectorM=8, kRepeatM=1).
 static constexpr auto kernel = rocm_ck::make_kernel(
     rocm_ck::ElementwiseConfig{
         .signature = {.dtype = rocm_ck::DataType::BF16},

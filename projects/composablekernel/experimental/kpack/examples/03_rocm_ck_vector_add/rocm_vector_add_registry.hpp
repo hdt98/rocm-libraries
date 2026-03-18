@@ -39,9 +39,9 @@ static constexpr VariantDescriptor ALL_VARIANTS[] = {
     {"vector_add_bf16_b512", make_kernel(ElementwiseConfig{
          .signature = {.dtype = DataType::BF16},
          .algorithm = {.block_tile = 512, .block_warps = 1, .warp_tile = 512, .pad = true}})},
-    {"vector_add_fp32_b256_sa", make_kernel(ElementwiseConfig{
-         .signature = {.dtype = DataType::FP32},
-         .algorithm = {.block_tile = 256, .block_warps = 1, .warp_tile = 256, .pad = true}})},
+    {"vector_add_bf16_b1024", make_kernel(ElementwiseConfig{
+         .signature = {.dtype = DataType::BF16},
+         .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}})},
     {"vector_add_fp32_b2048_w8", make_kernel(ElementwiseConfig{
          .signature = {.dtype = DataType::FP32},
          .algorithm = {.block_tile = 2048, .block_warps = 8, .warp_tile = 64, .pad = true}})},
@@ -54,6 +54,9 @@ static constexpr VariantDescriptor ALL_VARIANTS[] = {
          .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}})},
     {"vector_add_fp32_fp16_b1024", make_kernel(ElementwiseConfig{
          .signature = {.in_dtype = DataType::FP32, .out_dtype = DataType::FP16},
+         .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}})},
+    {"vector_add_bf16_fp32_b1024", make_kernel(ElementwiseConfig{
+         .signature = {.in_dtype = DataType::BF16, .out_dtype = DataType::FP32},
          .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}})},
 };
 // clang-format on

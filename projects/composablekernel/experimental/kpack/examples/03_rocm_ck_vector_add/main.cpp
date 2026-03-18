@@ -202,7 +202,7 @@ int main(int argc, char** argv)
         host_b[i] = static_cast<float>((i * 2) % 32);
     }
 
-    // --- Demonstrate findVariant (same-type lookups) ---
+    // --- Demonstrate findVariant (same-type and mixed-type lookups) ---
     std::printf("\nVariant selection for N=%d:\n", NUM_ELEMENTS);
     for(auto dt : {rocm_ck::DataType::FP32, rocm_ck::DataType::FP16, rocm_ck::DataType::BF16})
     {
@@ -213,6 +213,16 @@ int main(int argc, char** argv)
                         best->name,
                         best->kernel.block_tile,
                         best->kernel.block_warps);
+    }
+    // Mixed-type: widening variants (narrow input -> FP32 output)
+    for(auto in_dt : {rocm_ck::DataType::FP16, rocm_ck::DataType::BF16})
+    {
+        const auto* best = rocm_ck::findVariant(in_dt, rocm_ck::DataType::FP32, NUM_ELEMENTS);
+        if(best)
+            std::printf("  %s->FP32 -> %s (tile=%d)\n",
+                        rocm_ck::data_type_name(in_dt),
+                        best->name,
+                        best->kernel.block_tile);
     }
 
     // --- Verify all variants with plain add (alpha=1, beta=1) ---

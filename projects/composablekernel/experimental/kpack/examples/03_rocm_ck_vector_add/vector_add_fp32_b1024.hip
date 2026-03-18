@@ -3,6 +3,7 @@
 
 #include "rocm_vector_add_dev.hpp"
 
+// Largest single-warp FP32 tile. kRepeatM=4 — each thread processes 4 chunks.
 static constexpr auto kernel = rocm_ck::make_kernel(
     rocm_ck::ElementwiseConfig{
         .signature = {.dtype = rocm_ck::DataType::FP32},

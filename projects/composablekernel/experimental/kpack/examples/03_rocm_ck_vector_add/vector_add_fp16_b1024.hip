@@ -3,6 +3,7 @@
 
 #include "rocm_vector_add_dev.hpp"
 
+// FP16 large tile. kVectorM=8, kRepeatM=2.
 static constexpr auto kernel = rocm_ck::make_kernel(
     rocm_ck::ElementwiseConfig{
         .signature = {.dtype = rocm_ck::DataType::FP16},

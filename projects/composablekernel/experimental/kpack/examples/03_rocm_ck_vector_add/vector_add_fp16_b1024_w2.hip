@@ -3,8 +3,9 @@
 
 #include "rocm_vector_add_dev.hpp"
 
-// Multi-warp fp16 variant: 2 warps × 64 threads = 128 threads,
-// each block processes 1024 elements with large vector width (kVectorM=8).
+// Multi-warp FP16: 2 warps x 64 = 128 threads, same block_tile as fp16_b1024.
+// Larger warp_tile (512) preserves kVectorM=8 (max for 16-bit). Compare with
+// single-warp fp16_b1024: same work, but kRepeatM drops from 2 to 1.
 static constexpr auto kernel = rocm_ck::make_kernel(
     rocm_ck::ElementwiseConfig{
         .signature = {.dtype = rocm_ck::DataType::FP16},
