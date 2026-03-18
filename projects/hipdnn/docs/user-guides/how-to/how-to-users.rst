@@ -1,5 +1,5 @@
 .. meta::
-  :description: How to guides for hipDNN users.
+  :description: How to topics for hipDNN users.
   :keywords: hipDNN, ROCm
 
 .. _how-to-users:

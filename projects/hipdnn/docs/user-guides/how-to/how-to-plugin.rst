@@ -1,5 +1,5 @@
 .. meta::
-  :description: How to guides for hipDNN plugin developers.
+  :description: How to topics for hipDNN plugin developers.
   :keywords: hipDNN, ROCm
 
 .. _how-to-plugin:
@@ -16,4 +16,4 @@ If you're new to hipDNN, see :ref:`how-to-users`.
 Topics
 ======
 
-:ref:`develop-plugins`
+- :ref:`develop-plugins`

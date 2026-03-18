@@ -1,5 +1,5 @@
 .. meta::
-  :description: This quick start guide demonstrates how to include hipDNN in a CMake project.
+  :description: Learn how to include hipDNN in a CMake project.
   :keywords: hipDNN, ROCm, install, CMake
 
 **************************

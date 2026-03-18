@@ -1,5 +1,5 @@
 .. :meta::
-  :description: 
+  :description: Learn about the hipDNN frontend logging C++ API.
   :keywords: hipDNN, ROCm, API 
 
 .. _frontend-logging:

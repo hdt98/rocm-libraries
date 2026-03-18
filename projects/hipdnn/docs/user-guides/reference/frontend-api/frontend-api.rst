@@ -1,6 +1,6 @@
 .. :meta::
-  :description: 
-  :keywords: hipDNN, ROCm, API, 
+  :description: Learn about the hipDNN frontend C++ API.
+  :keywords: hipDNN, ROCm, API
 
 .. _frontend-api:
 

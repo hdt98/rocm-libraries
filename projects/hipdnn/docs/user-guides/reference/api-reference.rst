@@ -1,6 +1,6 @@
 .. meta::
-  :description: 
-  :keywords: 
+  :description: Learn about the frontend C++, backend C, and Knob APIs used in hipDNN.
+  :keywords: hipDNN, ROCm, API
 
 ********************
 hipDNN API reference
