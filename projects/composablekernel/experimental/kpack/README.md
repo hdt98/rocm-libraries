@@ -1,45 +1,63 @@
-# Kpack Multi-Architecture Hello World
+# Kpack — CK Tile Kernel Distribution via Archive
 
 ## Motivation
 
 [Kpack](https://github.com/ROCm/TheRock/blob/develop/docs/rfcs/rfc0008_kpack.md) (kernel pack) is a binary archive format that separates GPU device code from host code for efficient multi-architecture distribution. Instead of shipping fat binaries that embed kernels for every supported GPU, kpack packages per-architecture `.hsaco` code objects into compressed archives that are loaded at runtime based on the detected GPU.
 
-We want to understand how kpack can work with CK Tile kernels. The challenge is that kpack assumes a clean separation between host and device code, but CK Tile's current design doesn't have that separation:
+This project demonstrates how kpack works with CK Tile kernels, progressing from a minimal hello-world to a production-ready pattern with multi-variant tuning and runtime kernel selection.
 
-- **Architecture-dependent host code**: CK Tile kernel objects contain host-side logic (tile sizes, pipeline configuration, launch parameters) that varies by GPU architecture. The host code is not architecture-independent.
-- **Coupled launch and device code**: Kernel launches happen inside the same template-instantiated objects that contain the device code. There is no standalone device-only kernel file that can be compiled in isolation.
+The core challenge is that CK Tile kernels are C++ template instantiations — host and device code share the same translation unit, and there is no standalone device-only kernel file. The **bridge pattern** (introduced in example 02) solves this with a thin `extern "C" __global__` wrapper that delegates to CK Tile on-device, cleanly separating compilation: device code compiles with CK Tile headers, the host binary only needs HIP runtime and kpack.
 
-This experimental demo starts with a simple vector-add kernel where the host/device separation is trivial, so we can validate the kpack build and load pipeline end-to-end. The real work is figuring out how to satisfy kpack's requirements given CK Tile's current object design.
+## Examples
 
-## Open Questions for CK Tile Integration
+Three progressive examples, each building on the last:
 
-- How do we separate device code compilation from the host-side kernel objects that currently contain both?
-- Can the architecture-dependent host logic (tile sizes, pipeline selection) be made architecture-independent, or do we need per-arch host code too?
-- How does `hipModuleLoadData` / `hipModuleGetFunction` interact with CK Tile's current kernel launch patterns?
-- What changes to the CK Tile kernel instantiation layer are needed to support runtime code object loading?
+| Example | What it demonstrates |
+|---------|---------------------|
+| [01_hello_world](examples/01_hello_world/) | Minimal kpack pipeline — hand-written HIP kernel, one binary per arch |
+| [02_ck_tile_vector_add](examples/02_ck_tile_vector_add/) | Bridge pattern — `extern "C"` wrapper around CK Tile's `ElementWiseKernel` |
+| [03_rocm_ck_vector_add](examples/03_rocm_ck_vector_add/) | Full tuning surface — Signature/Algorithm split, 9 compiled variants, registry-based selection |
+
+### Example 01: Hello World
+
+Validates the end-to-end pipeline with a trivial hand-written vector-add kernel. One kernel source, compiled per architecture, packed into a single archive, loaded at runtime.
+
+### Example 02: CK Tile Bridge
+
+Proves that CK Tile kernels can be compiled into standalone `.hsaco` code objects via the bridge pattern. The device kernel (`ck_tile_add.hip`) wraps `ElementWiseKernel<Add>` behind an `extern "C"` entry point with flat arguments compatible with `hipModuleLaunchKernel`.
+
+### Example 03: Full Tuning Surface
+
+Production-ready pattern with:
+
+- **Signature/Algorithm separation** — *what* (data types) vs *how* (tile geometry, warp count, vector width, padding)
+- **9 compiled variants** across FP32, FP16, BF16 with different block sizes and multi-warp configurations
+- **Constexpr validation** via `make_kernel` that catches invalid configurations at compile time
+- **Variant registry** with `find_variant(DataType, problem_size)` for automatic kernel selection
+- **Archive metadata** — tuning parameters stored in the kpack TOC for tooling
+
+See the [example 03 README](examples/03_rocm_ck_vector_add/README.md) for full details.
 
 ## Pipeline
 
-```
-vector_add.hip
-    | (clang++ --cuda-device-only per arch)
+```text
+*.hip kernel sources
+    | (clang++ --cuda-device-only, per arch × per variant)
     v
-vector_add_gfx90a.hsaco
-vector_add_gfx942.hsaco
-vector_add_gfx950.hsaco
-    | (pack.py)
+*.hsaco code objects
+    | (pack.py — variant-aware packer)
     v
-kernels.kpack  (single archive, multiple architectures)
+kernels.kpack  (single archive: multiple architectures × multiple variants)
     | (loaded at runtime by kpack C API)
     v
-kpack_hello_world  (demo executable, uses hipModuleLoadData)
+host executable  (variant selection → hipModuleLoadData → hipModuleLaunchKernel)
 ```
 
 ## Directory Structure
 
-```
+```text
 experimental/kpack/
-├── CMakeLists.txt                  # Top-level (delegates to example)
+├── CMakeLists.txt                  # Top-level (delegates to examples)
 ├── README.md
 ├── rocm_kpack/                     # Vendored kpack C runtime library (from TheRock)
 │   ├── CMakeLists.txt
@@ -58,16 +76,24 @@ experimental/kpack/
 │       ├── path_resolution.cpp
 │       └── isa_target_match.cpp
 └── examples/
-    ├── 01_hello_world/
-    │   ├── CMakeLists.txt          # Standalone build
-    │   ├── vector_add.hip          # Device kernel (compiled per-arch)
-    │   ├── pack.py                 # Packs .hsaco files into .kpack archive
-    │   └── main.cpp                # Demo: open archive, detect GPU, load & run kernel
-    └── 02_ck_tile_vector_add/
-        ├── CMakeLists.txt          # Standalone build with CK Tile includes
-        ├── ck_tile_add.hip         # Device kernel: extern "C" bridge around ElementWiseKernel
-        ├── pack.py                 # Packer with CK Tile include paths
-        └── main.cpp                # Demo: same pattern, CK Tile kernel
+    ├── 01_hello_world/             # Minimal: hand-written HIP kernel
+    │   ├── CMakeLists.txt
+    │   ├── vector_add.hip
+    │   ├── pack.py
+    │   └── main.cpp
+    ├── 02_ck_tile_vector_add/      # Bridge pattern: extern "C" + CK Tile
+    │   ├── CMakeLists.txt
+    │   ├── ck_tile_add.hip
+    │   ├── pack.py
+    │   └── main.cpp
+    └── 03_rocm_ck_vector_add/      # Full tuning surface: variants + registry
+        ├── CMakeLists.txt
+        ├── rocm_vector_add_api.hpp     # Signature/Algorithm types, make_kernel validation
+        ├── rocm_vector_add_dev.hpp     # Device interface — maps config to CK Tile types
+        ├── rocm_vector_add_registry.hpp # Variant table + find_variant selection
+        ├── vector_add_*.hip            # 9 variant instantiations
+        ├── pack.py                     # Variant-aware packer with metadata
+        └── main.cpp                    # Variant selection demo + verify-all mode
 ```
 
 ## Dependencies
@@ -78,10 +104,10 @@ experimental/kpack/
 
 ## Build
 
-The 01_hello_world example is standalone — build it directly:
+Each example is standalone — build from its directory:
 
 ```bash
-cd experimental/kpack/examples/01_hello_world
+cd experimental/kpack/examples/01_hello_world  # or 02_ or 03_
 
 cmake -B build -S . -G Ninja \
     -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++ \
@@ -91,22 +117,21 @@ cmake -B build -S . -G Ninja \
 ninja -C build
 ```
 
+Example 03 requires C++20 for struct NTTPs and `consteval` validation.
+
 ## Run
 
 On a machine with a supported GPU:
 
 ```bash
+# Example 01
 ./build/kpack_hello_world build/kernels.kpack
-```
 
-Expected output:
+# Example 02
+./build/kpack_ck_tile_vector_add build/kernels.kpack
 
-```
-Opened build/kernels.kpack — architectures: gfx90a, gfx942
-Detected GPU: gfx942
-Loaded kernel: 41200 bytes
-Running vectorAdd (N=1024)...
-Verification PASSED!
+# Example 03
+./build/kpack_rocm_ck_vector_add build/kernels.kpack
 ```
 
 If the current GPU's architecture is not in the archive, the demo prints a clear error and exits.
@@ -129,13 +154,13 @@ for binary, archs in toc['toc'].items():
 
 ## How It Works
 
-1. **Compile**: `clang++ --cuda-device-only` compiles `vector_add.hip` into per-architecture `.hsaco` code objects
+1. **Compile**: `clang++ --cuda-device-only` compiles `.hip` sources into per-architecture `.hsaco` code objects
 2. **Pack**: `pack.py` concatenates the `.hsaco` blobs after a 16-byte KPAK header, then appends a MessagePack table of contents (TOC) recording each blob's offset, size, and architecture
-3. **Load**: `main.cpp` opens the archive via the kpack C API, queries the detected GPU's architecture, extracts the matching code object, and loads it into HIP via `hipModuleLoadData`
+3. **Load**: The host binary opens the archive via the kpack C API, queries the detected GPU's architecture, extracts the matching code object, and loads it via `hipModuleLoadData`
 
 ## Kpack Archive Format
 
-```
+```text
 [0x00]  "KPAK"              4 bytes   Magic
 [0x04]  version             4 bytes   Little-endian uint32 (currently 1)
 [0x08]  toc_offset          8 bytes   Little-endian uint64
@@ -145,15 +170,17 @@ for binary, archs in toc['toc'].items():
 [toc_offset]  MessagePack TOC     variable  Compression scheme, arch list, blob metadata, nested TOC
 ```
 
+The TOC can also carry optional `variant_metadata` sections (used by example 03) containing tuning parameters for each kernel variant.
+
 ## Vendored Runtime
 
-The `rocm_kpack/` directory contains a local copy of the kpack C runtime library, taken from [TheRock](https://github.com/ROCm/TheRock) (`base/rocm-kpack/runtime/`) for this experimental demo. This avoids requiring a full TheRock build as a dependency -- the runtime is small and self-contained. Once kpack ships as part of a ROCm release, this vendored copy should be replaced with a proper `find_package(rocm_kpack)`.
+The `rocm_kpack/` directory contains a local copy of the kpack C runtime library, taken from [TheRock](https://github.com/ROCm/TheRock) (`base/rocm-kpack/runtime/`) for this experimental demo. This avoids requiring a full TheRock build as a dependency — the runtime is small and self-contained. Once kpack ships as part of a ROCm release, this vendored copy should be replaced with a proper `find_package(rocm_kpack)`.
 
 It provides:
 
-- `kpack_open` / `kpack_close` -- archive lifecycle
-- `kpack_get_architecture_count` / `kpack_get_architecture` -- enumerate architectures
-- `kpack_get_binary_count` / `kpack_get_binary` -- enumerate binaries
-- `kpack_get_kernel` / `kpack_free_kernel` -- extract a code object by binary name + architecture
+- `kpack_open` / `kpack_close` — archive lifecycle
+- `kpack_get_architecture_count` / `kpack_get_architecture` — enumerate architectures
+- `kpack_get_binary_count` / `kpack_get_binary` — enumerate binaries
+- `kpack_get_kernel` / `kpack_free_kernel` — extract a code object by binary name + architecture
 - NoOp and Zstd per-kernel decompression
 - Higher-level loader/cache API for runtime integration
