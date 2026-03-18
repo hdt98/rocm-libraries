@@ -107,6 +107,28 @@ ALL_CONFIGS: list[str] = [
 
 BINARY_PREFIX = "tile_example_grouped_conv_fwd_im2win_"
 
+# ── NHWGC im2col config registry ─────────────────────────────────────────────
+# Standard im2col GEMM shape (M=N×Ho×Wo, N=K) with channels-last NHWGC input.
+# Must stay in sync with nhwgc_im2col_configs.hpp and CMakeLists.txt.
+IC_CONFIGS: list[str] = [
+    # Standard im2col (UseIm2Win=false, Gm=1), single GEMM per conv group.
+    "IC_CV3_M16N64K64",
+    "IC_Mem_M128N32K64",
+    "IC_CV3_M128N128K64",
+    "IC_CV3_M64N64K64",
+    "IC_Mem_M128N16K64",
+    "IC_Mem_M128N32K64_Occ2",
+    "IC_CV3_M64N32K64",
+    # Im2win A descriptor variants (UseIm2Win=true): same tile shapes, explicit I' step.
+    # Compare IC_* vs IW_* pairs to see if im2win descriptor order affects performance.
+    "IW_CV3_M16N64K64",
+    "IW_Mem_M128N32K64",
+    "IW_CV3_M128N128K64",
+    "IW_CV3_M64N64K64",
+]
+
+IC_BINARY_PREFIX = "tile_example_nhwgc_im2col_"
+
 # Patterns for parsing binary stdout
 _TIMING_RE  = re.compile(
     r"^(?P<ms>[0-9]+\.[0-9]+)\s+ms,\s+"
@@ -309,8 +331,16 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
     p.add_argument(
         "--configs",
         default=None,
-        help="Comma-separated subset of config names to run "
-             "(default: all configs)",
+        help="Comma-separated subset of im2win config names to run "
+             "(default: all im2win configs)",
+    )
+    p.add_argument(
+        "--ic-configs",
+        default=None,
+        help="Comma-separated subset of NHWGC im2col config names to run; "
+             "use 'all' to run all IC configs, 'none' to skip (default: all IC configs). "
+             "IC config names start with 'IC_' and use binary prefix "
+             "tile_example_nhwgc_im2col_.",
     )
     # Everything after '--' is forwarded to the binaries as conv args.
     return p.parse_known_args()
@@ -331,15 +361,28 @@ def main() -> None:
         sys.exit(f"Error: binary directory not found: {bin_dir}\n"
                  "Run this script from the build directory or pass --bin-dir.")
 
-    # ── Config selection ──────────────────────────────────────────────────
+    # ── Im2win config selection ───────────────────────────────────────────
     if ns.configs:
         configs = [c.strip() for c in ns.configs.split(",") if c.strip()]
         unknown = set(configs) - set(ALL_CONFIGS)
         if unknown:
-            sys.exit(f"Error: unknown configs: {', '.join(sorted(unknown))}\n"
+            sys.exit(f"Error: unknown im2win configs: {', '.join(sorted(unknown))}\n"
                      f"Available: {', '.join(ALL_CONFIGS)}")
     else:
         configs = ALL_CONFIGS
+
+    # ── NHWGC im2col config selection ─────────────────────────────────────
+    ic_flag = getattr(ns, "ic_configs", None)
+    if ic_flag == "none":
+        ic_configs: list[str] = []
+    elif ic_flag and ic_flag != "all":
+        ic_configs = [c.strip() for c in ic_flag.split(",") if c.strip()]
+        unknown = set(ic_configs) - set(IC_CONFIGS)
+        if unknown:
+            sys.exit(f"Error: unknown IC configs: {', '.join(sorted(unknown))}\n"
+                     f"Available: {', '.join(IC_CONFIGS)}")
+    else:
+        ic_configs = IC_CONFIGS
 
     validate = not ns.no_validate
 
@@ -349,14 +392,14 @@ def main() -> None:
 
     # ── Print header ──────────────────────────────────────────────────────
     print(_SEP)
-    print(" im2win config sweep")
+    print(" im2win + nhwgc_im2col config sweep")
     print(f" Binary dir: {bin_dir}")
     print(f" Conv args:  {' '.join(conv_args)}")
     print(f" Validation: {'GPU reference (v=2)' if validate else 'disabled (--no-validate)'}")
     print(_SEP)
     print_header(validate)
 
-    # ── Run configs ───────────────────────────────────────────────────────
+    # ── Run im2win configs ────────────────────────────────────────────────
     results: list[ConfigResult] = []
     for cfg_name in configs:
         bin_path = bin_dir / f"{BINARY_PREFIX}{cfg_name}"
@@ -376,6 +419,31 @@ def main() -> None:
         results.append(r)
         print_result(r, validate)
         # Flush immediately so progress is visible for long sweeps.
+        sys.stdout.flush()
+
+    # ── Run NHWGC im2col configs ──────────────────────────────────────────
+    if ic_configs:
+        print(_DASH)
+        print(f" {'NHWGC im2col configs (M=N×Ho×Wo, N=K):':}")
+        print(_DASH)
+
+    for cfg_name in ic_configs:
+        bin_path = bin_dir / f"{IC_BINARY_PREFIX}{cfg_name}"
+        if not bin_path.exists():
+            r = ConfigResult(name=cfg_name, skip_reason="binary not found")
+            results.append(r)
+            print_result(r, validate)
+            continue
+
+        r = benchmark_config(
+            bin_path=bin_path,
+            conv_args=conv_args,
+            warmup=ns.warmup,
+            repeat=ns.repeat,
+            validate=validate,
+        )
+        results.append(r)
+        print_result(r, validate)
         sys.stdout.flush()
 
     # ── Summary ───────────────────────────────────────────────────────────

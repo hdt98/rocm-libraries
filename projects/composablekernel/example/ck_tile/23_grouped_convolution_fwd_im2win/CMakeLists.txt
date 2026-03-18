@@ -204,4 +204,46 @@ if(GPU_TARGETS MATCHES "gfx94|gfx95")
 
     add_dependencies(tile_example_grouped_conv_fwd_im2win_all
         tile_example_grouped_conv_fwd_im2win_2stage)
+
+    # ── Explicit GEMM solver: full im2col materialisation + pure GEMM ─────────
+    # Stage 1: ImageToColumn (materialise A[G, M=N×Ho×Wo, K=C×Y×X])
+    # Stage 2: BatchedGemmKernel (pure GEMM, zero descriptor overhead)
+    # EXPLICIT_GEMM_CONFIG selects the Stage-2 GEMM tile (0-5).
+    set(EXGEMM_CONFIG_IDS   0  1  2  3  4  5)
+    set(EXGEMM_CONFIG_NAMES
+        Mem_M128N32K64
+        CV3_M64N64K64
+        CV3_M128N64K64
+        CV3_M64N64K64_Occ2
+        CV3_M128N64K64_Occ2
+        CV3_M64N128K64)
+
+    list(LENGTH EXGEMM_CONFIG_IDS _num_exg)
+    math(EXPR _exg_last "${_num_exg} - 1")
+
+    add_custom_target(tile_example_explicit_gemm_conv_all)
+
+    foreach(_i RANGE 0 ${_exg_last})
+        list(GET EXGEMM_CONFIG_IDS   ${_i} _id)
+        list(GET EXGEMM_CONFIG_NAMES ${_i} _name)
+        set(_tgt "tile_example_explicit_gemm_conv_${_name}")
+
+        add_executable(${_tgt} grouped_convolution_fwd_explicit_gemm.cpp)
+        target_compile_definitions(${_tgt} PRIVATE EXPLICIT_GEMM_CONFIG=${_id})
+        target_compile_options(${_tgt} PRIVATE ${EXAMPLE_IM2WIN_COMPILE_OPTIONS})
+        target_include_directories(${_tgt} PRIVATE ${IM2WIN_INCLUDE_DIRS})
+
+        add_dependencies(tile_example_explicit_gemm_conv_all ${_tgt})
+        add_dependencies(tile_example_grouped_conv_fwd_im2win_all ${_tgt})
+    endforeach()
+
+    # Convenience alias (config 3 = CV3_M64N64K64_Occ2)
+    add_executable(tile_example_explicit_gemm_conv
+        grouped_convolution_fwd_explicit_gemm.cpp)
+    target_compile_definitions(tile_example_explicit_gemm_conv PRIVATE
+        EXPLICIT_GEMM_CONFIG=3)
+    target_compile_options(tile_example_explicit_gemm_conv PRIVATE
+        ${EXAMPLE_IM2WIN_COMPILE_OPTIONS})
+    target_include_directories(tile_example_explicit_gemm_conv PRIVATE
+        ${IM2WIN_INCLUDE_DIRS})
 endif()
