@@ -356,12 +356,13 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0>{}, sequence<1>{}));
 
             // Apply XOR swizzle for 16x16 XDL to avoid bank conflicts
-            // For 16x16 tiles, 4 rows per warp access same banks without swizzle.
-            // XOR row bits 0,1 into col bits that affect bank selection.
+            // For 16x16 tiles, rows 0,4,8,12 (and 1,5,9,13, etc.) access same banks.
+            // The conflicting rows differ in bits 2,3: row % 16 / 4 = (row >> 2) & 3
+            // XOR row bits 2,3 into col bits that affect bank selection.
             // For FP16 (2B): bank = (col * 2 / 4) % 32 = (col / 2) % 32
-            //   Col bits 1-5 determine bank, so XOR into bits 2,3 (above vector alignment)
+            //   Col bits 1-5 determine bank
             // For FP8 (1B): bank = (col / 4) % 32
-            //   Col bits 2-6 determine bank, so XOR into bits 3,4
+            //   Col bits 2-6 determine bank
             if constexpr(MPerXdl == 16 && banks == 32)
             {
                 // Determine which col bits to XOR based on data type size and vector length
@@ -372,10 +373,12 @@ struct CShuffleEpilogue
                     return l;
                 }();
                 // For 32 banks with 4B words: bank bits start at col bit (2 - log2(DataTypeSize))
-                // We XOR row bits 0,1 into col bits just above vector boundary
+                // We XOR row bits 2,3 (which distinguish conflicting rows) into col bits
+                // just above vector boundary
                 constexpr index_t col_bit_start = log2_vec;
 
-                using RowBits = sequence<0, 1>;
+                // Row bits 2,3 distinguish rows 0,4,8,12 within 16-row XDL tile
+                using RowBits = sequence<2, 3>;
                 using ColBits = sequence<col_bit_start, col_bit_start + 1>;
 
                 constexpr auto lds_block_desc = transform_tensor_descriptor(

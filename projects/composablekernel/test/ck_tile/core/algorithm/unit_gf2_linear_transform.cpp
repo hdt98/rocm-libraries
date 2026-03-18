@@ -551,13 +551,14 @@ TEST(XorBitsTransform, SelfInverse)
 
 TEST(XorBitsTransform, BankConflictAvoidance16x16)
 {
-    // For 16x16 tiles with FP16:
-    // - 4 rows per warp (rows 0,1,2,3)
+    // For 16x16 XDL tiles with FP16:
+    // - Rows 0,4,8,12 (and 1,5,9,13, etc.) conflict - they differ in bits 2,3
     // - 16 threads per row, 8-element vectors
     // - Column stride = 2 bytes (FP16)
     // - Bank = (col * 2 / 4) % 32 = (col / 2) % 32
 
-    using RowBits = sequence<0, 1>;
+    // Row bits 2,3 distinguish conflicting rows: (row >> 2) & 3
+    using RowBits = sequence<2, 3>;
     using ColBits = sequence<3, 4>;
     using Lengths = tuple<number<64>, number<128>>;
 
@@ -565,27 +566,27 @@ TEST(XorBitsTransform, BankConflictAvoidance16x16)
 
     auto get_bank = [](index_t col) { return (col / 2) % 32; };
 
-    // Check that rows 0,1,2,3 at same logical column get different banks
+    // Check that rows 0,4,8,12 (conflicting rows) at same logical column get different banks
     index_t col = 0;
 
-    multi_index<2> r0{0, col}, r1{1, col}, r2{2, col}, r3{3, col};
-    multi_index<2> s0, s1, s2, s3;
+    multi_index<2> r0{0, col}, r4{4, col}, r8{8, col}, r12{12, col};
+    multi_index<2> s0, s4, s8, s12;
 
     transform.calculate_lower_index(s0, r0);
-    transform.calculate_lower_index(s1, r1);
-    transform.calculate_lower_index(s2, r2);
-    transform.calculate_lower_index(s3, r3);
+    transform.calculate_lower_index(s4, r4);
+    transform.calculate_lower_index(s8, r8);
+    transform.calculate_lower_index(s12, r12);
 
-    index_t bank0 = get_bank(s0[1]);
-    index_t bank1 = get_bank(s1[1]);
-    index_t bank2 = get_bank(s2[1]);
-    index_t bank3 = get_bank(s3[1]);
+    index_t bank0  = get_bank(s0[1]);
+    index_t bank4  = get_bank(s4[1]);
+    index_t bank8  = get_bank(s8[1]);
+    index_t bank12 = get_bank(s12[1]);
 
-    // All different banks
-    EXPECT_NE(bank0, bank1);
-    EXPECT_NE(bank0, bank2);
-    EXPECT_NE(bank0, bank3);
-    EXPECT_NE(bank1, bank2);
-    EXPECT_NE(bank1, bank3);
-    EXPECT_NE(bank2, bank3);
+    // All different banks for the conflicting rows
+    EXPECT_NE(bank0, bank4);
+    EXPECT_NE(bank0, bank8);
+    EXPECT_NE(bank0, bank12);
+    EXPECT_NE(bank4, bank8);
+    EXPECT_NE(bank4, bank12);
+    EXPECT_NE(bank8, bank12);
 }
