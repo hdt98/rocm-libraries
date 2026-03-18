@@ -10,9 +10,10 @@ pre-compiled GPU kernels with full control over the ElementWise tuning surface.
 Following CK Tile's builder pattern, kernel configuration is split into two
 orthogonal concerns:
 
-- **Signature** (`elementwise_signature`): *What* the kernel computes — data types.
-- **Algorithm** (`elementwise_algorithm`): *How* the kernel executes — tile geometry,
+- **Signature** (`ElementwiseSignature`): *What* the kernel computes — data types.
+- **Algorithm** (`ElementwiseAlgorithm`): *How* the kernel executes — tile geometry,
   warp count, vector width, padding.
+- **Config** (`ElementwiseConfig`): User-facing API combining Signature + Algorithm.
 
 This separation lets the same operation (vector add) be compiled with many
 different tuning configurations, each producing a distinct `.hsaco` binary.
@@ -37,7 +38,7 @@ Derived quantities (validated at compile time by `make_kernel`):
 
 `rocm_vector_add_registry.hpp` provides programmatic variant selection:
 - `ALL_VARIANTS[]` — constexpr table of all compiled kernel variants
-- `find_variant(DataType, problem_size)` — selects the best variant: largest
+- `findVariant(DataType, problem_size)` — selects the best variant: largest
   `block_tile` that divides `problem_size` cleanly, or padded fallback
 
 ## Compiled Variants
@@ -61,9 +62,9 @@ identical to `fp32_b256`). The `_w8`/`_w2` suffixes indicate multi-warp variants
 
 | File | Purpose |
 |------|---------|
-| `rocm_vector_add_api.hpp` | Shared ABI, Signature/Algorithm types, `make_kernel` validation |
-| `rocm_vector_add_dev.hpp` | Device interface — maps config to CK Tile types |
-| `rocm_vector_add_registry.hpp` | Variant table and `find_variant` selection (host-only) |
+| `rocm_vector_add_api.hpp` | Shared ABI, Config/Signature/Algorithm types, `make_kernel` validation |
+| `rocm_vector_add_dev.hpp` | Device interface — maps `VectorAddKernel` to CK Tile types |
+| `rocm_vector_add_registry.hpp` | `VariantDescriptor` table and `findVariant` selection (host-only) |
 | `vector_add_*.hip` | Variant instantiations (~15 lines each) |
 | `pack.py` | Archive packer with variant metadata |
 | `main.cpp` | Host loader — variant selection demo + verify-all mode |

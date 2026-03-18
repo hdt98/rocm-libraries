@@ -3,10 +3,12 @@
 
 #include "rocm_vector_add_dev.hpp"
 
-static constexpr auto kernel =
-    rocm_ck::make_kernel({.block_size = 1024, .compute_type = rocm_ck::DataType::FP16});
+static constexpr auto kernel = rocm_ck::make_kernel(
+    rocm_ck::ElementwiseConfig{
+        .signature = {rocm_ck::DataType::FP16},
+        .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}});
 
 extern "C" __global__ void vector_add_fp16_b1024(rocm_ck::VectorAddArgs args)
 {
-    rocm_ck::run_vector_add<kernel>(args);
+    rocm_ck::runVectorAdd<kernel>(args);
 }

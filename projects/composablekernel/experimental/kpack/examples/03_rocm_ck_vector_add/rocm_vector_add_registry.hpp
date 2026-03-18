@@ -11,28 +11,48 @@
 namespace rocm_ck {
 
 /// Descriptor for a compiled kernel variant in the kpack archive.
-struct variant_descriptor
+struct VariantDescriptor
 {
     const char* name;
-    vector_add_struct kernel;
+    VectorAddKernel kernel;
 };
 
 /// Complete table of all compiled variants, matching the kpack archive contents.
 /// Each entry corresponds to a .hip file and its make_kernel configuration.
-static constexpr variant_descriptor ALL_VARIANTS[] = {
-    {"vector_add_fp32_b256", make_kernel({.block_size = 256, .compute_type = DataType::FP32})},
-    {"vector_add_fp32_b512", make_kernel({.block_size = 512, .compute_type = DataType::FP32})},
-    {"vector_add_fp32_b1024", make_kernel({.block_size = 1024, .compute_type = DataType::FP32})},
-    {"vector_add_fp16_b512", make_kernel({.block_size = 512, .compute_type = DataType::FP16})},
-    {"vector_add_fp16_b1024", make_kernel({.block_size = 1024, .compute_type = DataType::FP16})},
-    {"vector_add_bf16_b512", make_kernel({.block_size = 512, .compute_type = DataType::BF16})},
+// clang-format off
+static constexpr VariantDescriptor ALL_VARIANTS[] = {
+    {"vector_add_fp32_b256", make_kernel(ElementwiseConfig{
+         .signature = {DataType::FP32},
+         .algorithm = {.block_tile = 256, .block_warps = 1, .warp_tile = 256, .pad = true}})},
+    {"vector_add_fp32_b512", make_kernel(ElementwiseConfig{
+         .signature = {DataType::FP32},
+         .algorithm = {.block_tile = 512, .block_warps = 1, .warp_tile = 512, .pad = true}})},
+    {"vector_add_fp32_b1024", make_kernel(ElementwiseConfig{
+         .signature = {DataType::FP32},
+         .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}})},
+    {"vector_add_fp16_b512", make_kernel(ElementwiseConfig{
+         .signature = {DataType::FP16},
+         .algorithm = {.block_tile = 512, .block_warps = 1, .warp_tile = 512, .pad = true}})},
+    {"vector_add_fp16_b1024", make_kernel(ElementwiseConfig{
+         .signature = {DataType::FP16},
+         .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}})},
+    {"vector_add_bf16_b512", make_kernel(ElementwiseConfig{
+         .signature = {DataType::BF16},
+         .algorithm = {.block_tile = 512, .block_warps = 1, .warp_tile = 512, .pad = true}})},
     {"vector_add_fp32_b256_sa",
-     make_kernel(elementwise_signature{DataType::FP32}, elementwise_algorithm{256, 1, 256, true})},
+     make_kernel(ElementwiseSignature{DataType::FP32},
+                 ElementwiseAlgorithm{.block_tile = 256, .block_warps = 1,
+                                      .warp_tile = 256, .pad = true})},
     {"vector_add_fp32_b2048_w8",
-     make_kernel(elementwise_signature{DataType::FP32}, elementwise_algorithm{2048, 8, 64, true})},
+     make_kernel(ElementwiseSignature{DataType::FP32},
+                 ElementwiseAlgorithm{.block_tile = 2048, .block_warps = 8,
+                                      .warp_tile = 64, .pad = true})},
     {"vector_add_fp16_b1024_w2",
-     make_kernel(elementwise_signature{DataType::FP16}, elementwise_algorithm{1024, 2, 512, true})},
+     make_kernel(ElementwiseSignature{DataType::FP16},
+                 ElementwiseAlgorithm{.block_tile = 1024, .block_warps = 2,
+                                      .warp_tile = 512, .pad = true})},
 };
+// clang-format on
 
 static constexpr int ALL_VARIANTS_COUNT = sizeof(ALL_VARIANTS) / sizeof(ALL_VARIANTS[0]);
 
@@ -40,10 +60,10 @@ static constexpr int ALL_VARIANTS_COUNT = sizeof(ALL_VARIANTS) / sizeof(ALL_VARI
 /// Prefers the largest block_tile that divides problem_size cleanly (aligned).
 /// Falls back to the largest padded variant if none aligns.
 /// Returns nullptr if no variant matches the data type.
-constexpr const variant_descriptor* find_variant(DataType dt, int problem_size)
+constexpr const VariantDescriptor* findVariant(DataType dt, int problem_size)
 {
-    const variant_descriptor* best_aligned = nullptr;
-    const variant_descriptor* best_padded  = nullptr;
+    const VariantDescriptor* best_aligned = nullptr;
+    const VariantDescriptor* best_padded  = nullptr;
 
     for(int i = 0; i < ALL_VARIANTS_COUNT; ++i)
     {
@@ -51,7 +71,7 @@ constexpr const variant_descriptor* find_variant(DataType dt, int problem_size)
         if(v.kernel.compute_type != dt)
             continue;
 
-        if(is_aligned(v.kernel, problem_size))
+        if(isAligned(v.kernel, problem_size))
         {
             if(!best_aligned || v.kernel.block_tile > best_aligned->kernel.block_tile)
                 best_aligned = &ALL_VARIANTS[i];
