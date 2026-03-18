@@ -11,9 +11,10 @@ Supports mixed input/output types and scaled addition (`c = alpha * a + beta * b
 Following CK Tile's builder pattern, kernel configuration is split into two
 orthogonal concerns:
 
-- **Signature** (`ElementwiseSignature`): *What* the kernel computes — input and
-  output data types. Each operation defines its own signature struct; vector add
-  uses `{in_type, out_type}`, while GEMM would use `{a_type, b_type, c_type}`.
+- **Signature** (`ElementwiseSignature`): *What* the kernel computes — data types,
+  specified via an optional dtype hierarchy. Users set only what differs:
+  `{.dtype = FP32}` for homogeneous, `{.in_dtype = FP16, .out_dtype = FP32}` for
+  mixed. `resolve_types()` flattens the hierarchy into concrete types at compile time.
 - **Algorithm** (`ElementwiseAlgorithm`): *How* the kernel executes — tile geometry,
   warp count, vector width, padding.
 - **Config** (`ElementwiseConfig`): User-facing API combining Signature + Algorithm.
@@ -21,19 +22,37 @@ orthogonal concerns:
 This separation lets the same operation (vector add) be compiled with many
 different tuning configurations, each producing a distinct `.hsaco` binary.
 
-### Mixed Input/Output Types
+### Optional dtype Hierarchy
 
-The signature supports different types for inputs and outputs:
+The signature uses an optional hierarchy so users specify the minimum:
+
+```
+dtype                    (kernel-level default)
+├── in_dtype             (input default, overrides dtype for inputs)
+│   ├── a_dtype          (overrides in_dtype)
+│   └── b_dtype          (overrides in_dtype)
+└── out_dtype            (overrides dtype for output)
+```
+
+Resolution chains:
+- `a_dtype   = a_dtype   ?? in_dtype ?? dtype ?? error`
+- `b_dtype   = b_dtype   ?? in_dtype ?? dtype ?? error`
+- `out_dtype = out_dtype ?? dtype    ?? error`
+
+Note: `in_dtype` does NOT cascade to `out_dtype` — they are separate branches.
 
 ```cpp
-// Same-type: fp16 in, fp16 out
-.signature = {.in_type = DataType::FP16, .out_type = DataType::FP16}
+// Same-type: all FP32
+.signature = {.dtype = DataType::FP32}
 
-// Widening: fp16 in, fp32 out
-.signature = {.in_type = DataType::FP16, .out_type = DataType::FP32}
+// Widening: fp16 inputs, fp32 output
+.signature = {.in_dtype = DataType::FP16, .out_dtype = DataType::FP32}
 
-// Narrowing: fp32 in, fp16 out
-.signature = {.in_type = DataType::FP32, .out_type = DataType::FP16}
+// Narrowing: fp32 inputs, fp16 output
+.signature = {.in_dtype = DataType::FP32, .out_dtype = DataType::FP16}
+
+// Asymmetric inputs (future operations like GEMM — vector add requires a == b)
+.signature = {.a_dtype = DataType::FP16, .b_dtype = DataType::BF16, .out_dtype = DataType::FP32}
 ```
 
 For mixed types, `kVectorM` is constrained by the wider type (fewer elements
@@ -74,7 +93,7 @@ Derived quantities (validated at compile time by `make_kernel`):
 
 `rocm_vector_add_registry.hpp` provides programmatic variant selection:
 - `ALL_VARIANTS[]` — constexpr table of all compiled kernel variants
-- `findVariant(in_type, out_type, problem_size)` — selects the best variant:
+- `findVariant(in_dtype, out_dtype, problem_size)` — selects the best variant:
   largest `block_tile` that divides `problem_size` cleanly, or padded fallback
 
 ## Compiled Variants
@@ -93,14 +112,14 @@ Derived quantities (validated at compile time by `make_kernel`):
 | `fp16_fp32_b1024` | FP16 | FP32 | 1024 | 1 | 1024 | 64 |
 | `fp32_fp16_b1024` | FP32 | FP16 | 1024 | 1 | 1024 | 64 |
 
-The `_sa` suffix indicates explicit Signature+Algorithm API (functionally
+The `_sa` suffix indicates a standalone allocation variant (functionally
 identical to `fp32_b256`). The `_w8`/`_w2` suffixes indicate multi-warp variants.
 
 ## File Roles
 
 | File | Purpose |
 |------|---------|
-| `rocm_vector_add_api.hpp` | Shared ABI, Config/Signature/Algorithm types, `make_kernel` validation |
+| `rocm_vector_add_api.hpp` | Shared ABI, Config/Signature/Algorithm types, `resolve_types`, `make_kernel` validation |
 | `rocm_vector_add_dev.hpp` | Device kernel — uses CK Tile tile primitives for `c = alpha*a + beta*b` |
 | `rocm_vector_add_registry.hpp` | `VariantDescriptor` table and `findVariant` selection (host-only) |
 | `vector_add_*.hip` | Variant instantiations (~15 lines each) |
@@ -157,11 +176,11 @@ GPU threads equals the warp count times the wavefront size (64 on AMD CDNA).
 Each warp iterates `kRepeatM` times to cover its share of the block tile.
 
 **Archive metadata.** `pack.py` writes a `variant_metadata` section in the
-kpack TOC containing each variant's tuning parameters (in_type, out_type,
+kpack TOC containing each variant's tuning parameters (in_dtype, out_dtype,
 block_tile, block_warps, warp_tile, pad). This is ignored by the kpack reader
 but available for tooling that inspects archives.
 
 **Per-operation signatures.** Each operation defines its own signature struct
-with the DataType fields it needs. This is intentionally not a universal struct —
-GEMM, convolution, and FMHA will each define their own signatures with different
-type fields.
+with optional DataType fields organized in a hierarchy. This is intentionally
+not a universal struct — GEMM, convolution, and FMHA will each define their
+own signatures with different type hierarchies.

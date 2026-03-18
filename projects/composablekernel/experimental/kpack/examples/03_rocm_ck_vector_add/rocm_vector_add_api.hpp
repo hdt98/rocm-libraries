@@ -13,6 +13,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <type_traits>
 
 namespace rocm_ck {
@@ -50,15 +51,26 @@ static_assert(offsetof(VectorAddArgs, b) == 24, "unexpected offset for b");
 static_assert(offsetof(VectorAddArgs, c) == 32, "unexpected offset for c");
 
 /// Signature: describes WHAT the kernel computes (types).
-/// In CK Tile's builder pattern, this is the "what" — independent of
-/// how the kernel is tiled, scheduled, or padded.
 ///
-/// Each operation defines its own signature struct. Vector add uses
-/// {in_type, out_type}. GEMM will use {a_type, b_type, c_type}, etc.
+/// Uses an optional dtype hierarchy for concise specification:
+///
+///     dtype                    (kernel-level default)
+///     ├── in_dtype             (input default, overrides dtype for inputs)
+///     │   ├── a_dtype          (overrides in_dtype)
+///     │   └── b_dtype          (overrides in_dtype)
+///     └── out_dtype            (overrides dtype for output)
+///
+/// Specify only what differs — use {.dtype = FP32} for homogeneous kernels,
+/// {.in_dtype = FP16, .out_dtype = FP32} for mixed types, or override
+/// individual fields for asymmetric inputs. Call resolve_types() to flatten
+/// the hierarchy into concrete types.
 struct ElementwiseSignature
 {
-    DataType in_type;
-    DataType out_type;
+    std::optional<DataType> dtype;     // kernel-level default
+    std::optional<DataType> in_dtype;  // input default (overrides dtype)
+    std::optional<DataType> a_dtype;   // input A (overrides in_dtype)
+    std::optional<DataType> b_dtype;   // input B (overrides in_dtype)
+    std::optional<DataType> out_dtype; // output (overrides dtype; NOT from in_dtype)
 };
 
 /// Algorithm: describes HOW the kernel executes (tile geometry, pipeline).
@@ -86,8 +98,8 @@ struct VectorAddKernel
 {
     int block_tile;        // Elements per thread block (for grid calculation)
     int thread_block_size; // Threads per block (= warp_size * block_warps)
-    DataType in_type;      // Input storage type (a, b)
-    DataType out_type;     // Output storage type (c)
+    DataType in_dtype;     // Input storage type (a, b)
+    DataType out_dtype;    // Output storage type (c)
     int block_warps;       // Warps per block
     int warp_tile;         // Warp tile size
     bool pad;              // Padding enabled
@@ -96,9 +108,76 @@ struct VectorAddKernel
 /// AMD GCN/CDNA wavefront size.
 constexpr int warp_size = 64;
 
-/// Validate a signature + algorithm pair and produce a structural kernel descriptor.
+/// Resolved types from an ElementwiseSignature.
+/// Contains the concrete DataType for each kernel operand after applying the
+/// optional dtype hierarchy.
+struct ResolvedElementwiseTypes
+{
+    DataType a_dtype;
+    DataType b_dtype;
+    DataType out_dtype;
+};
+
+/// Resolve the optional dtype hierarchy into concrete types.
 ///
-/// Validates CK Tile ElementWiseShape compatibility:
+/// Resolution chains:
+///   a_dtype   = a_dtype   ?? in_dtype ?? dtype ?? error
+///   b_dtype   = b_dtype   ?? in_dtype ?? dtype ?? error
+///   out_dtype = out_dtype ?? dtype    ?? error
+///
+/// Note: in_dtype does NOT cascade to out_dtype — they are separate branches.
+consteval ResolvedElementwiseTypes resolve_types(ElementwiseSignature sig)
+{
+    DataType a = sig.a_dtype    ? *sig.a_dtype
+                 : sig.in_dtype ? *sig.in_dtype
+                 : sig.dtype    ? *sig.dtype
+                                : throw "a_dtype unresolvable: set a_dtype, in_dtype, or dtype";
+
+    DataType b = sig.b_dtype    ? *sig.b_dtype
+                 : sig.in_dtype ? *sig.in_dtype
+                 : sig.dtype    ? *sig.dtype
+                                : throw "b_dtype unresolvable: set b_dtype, in_dtype, or dtype";
+
+    DataType out = sig.out_dtype ? *sig.out_dtype
+                   : sig.dtype   ? *sig.dtype
+                                 : throw "out_dtype unresolvable: set out_dtype or dtype";
+
+    return {a, b, out};
+}
+
+// --- resolve_types compile-time tests ---
+// clang-format off
+
+// Homogeneous: dtype sets everything
+static_assert(resolve_types({.dtype = DataType::FP32}).a_dtype == DataType::FP32);
+static_assert(resolve_types({.dtype = DataType::FP32}).b_dtype == DataType::FP32);
+static_assert(resolve_types({.dtype = DataType::FP32}).out_dtype == DataType::FP32);
+
+// Mixed-type: dtype or in_dtype for inputs, out_dtype for output
+static_assert(resolve_types({.dtype = DataType::FP16, .out_dtype = DataType::FP32}).a_dtype == DataType::FP16);
+static_assert(resolve_types({.dtype = DataType::FP16, .out_dtype = DataType::FP32}).out_dtype == DataType::FP32);
+static_assert(resolve_types({.in_dtype = DataType::FP16, .out_dtype = DataType::FP32}).a_dtype == DataType::FP16);
+
+// Override chain: in_dtype overrides dtype for inputs, NOT for output
+static_assert(resolve_types({.dtype = DataType::FP32, .in_dtype = DataType::FP16}).a_dtype == DataType::FP16);
+static_assert(resolve_types({.dtype = DataType::FP32, .in_dtype = DataType::FP16}).out_dtype == DataType::FP32);
+
+// Per-operand overrides: a_dtype/b_dtype override in_dtype
+static_assert(resolve_types({.a_dtype = DataType::FP16, .b_dtype = DataType::FP16, .out_dtype = DataType::FP32}).a_dtype == DataType::FP16);
+static_assert(resolve_types({.dtype = DataType::FP32, .a_dtype = DataType::FP16, .b_dtype = DataType::FP16}).out_dtype == DataType::FP32);
+
+// Error cases (uncommenting would produce consteval compile errors):
+// resolve_types({})                                     — nothing resolvable
+// resolve_types({.a_dtype = DataType::FP16})            — b_dtype, out_dtype unknown
+// resolve_types({.in_dtype = DataType::FP16})           — out_dtype unknown
+// resolve_types({.out_dtype = DataType::FP32})          — inputs unknown
+// clang-format on
+
+/// Validate an elementwise config and produce a structural kernel descriptor.
+///
+/// Resolves the signature's optional dtype hierarchy, validates that vector add
+/// inputs match (a_dtype == b_dtype), then checks CK Tile ElementWiseShape
+/// compatibility:
 ///   kVectorM = min(128 / max_type_bits, warp_tile / warp_size) — must be >= 1
 ///   kRepeatM = block_tile / (block_warps * kVectorM * warp_size) — must be >= 1, integer
 ///   block_warps must be power of 2 (required by CK Tile reduce_on_sequence)
@@ -108,8 +187,14 @@ constexpr int warp_size = 64;
 /// per 128-bit register).
 ///
 /// Invalid configs produce a compile-time error (consteval).
-consteval VectorAddKernel make_kernel(ElementwiseSignature sig, ElementwiseAlgorithm algo)
+consteval VectorAddKernel make_kernel(ElementwiseConfig cfg)
 {
+    ResolvedElementwiseTypes resolved = resolve_types(cfg.signature);
+    ElementwiseAlgorithm algo         = cfg.algorithm;
+
+    if(resolved.a_dtype != resolved.b_dtype)
+        throw "vector add requires a_dtype == b_dtype";
+
     if(algo.block_tile <= 0)
         throw "block_tile must be positive";
     if(algo.block_warps <= 0)
@@ -121,8 +206,8 @@ consteval VectorAddKernel make_kernel(ElementwiseSignature sig, ElementwiseAlgor
     if(algo.warp_tile < warp_size)
         throw "warp_tile must be >= warp_size (64)";
 
-    int in_bits    = data_type_bits(sig.in_type);
-    int out_bits   = data_type_bits(sig.out_type);
+    int in_bits    = data_type_bits(resolved.a_dtype);
+    int out_bits   = data_type_bits(resolved.out_dtype);
     int max_bits   = in_bits > out_bits ? in_bits : out_bits;
     int kVectorM_a = 128 / max_bits;             // max vector from wider type
     int kVectorM_b = algo.warp_tile / warp_size; // max vector from warp tile
@@ -141,8 +226,8 @@ consteval VectorAddKernel make_kernel(ElementwiseSignature sig, ElementwiseAlgor
 
     return {algo.block_tile,
             warp_size * algo.block_warps,
-            sig.in_type,
-            sig.out_type,
+            resolved.a_dtype,
+            resolved.out_dtype,
             algo.block_warps,
             algo.warp_tile,
             algo.pad};
@@ -150,11 +235,5 @@ consteval VectorAddKernel make_kernel(ElementwiseSignature sig, ElementwiseAlgor
 
 /// Check if problem size N is aligned to a variant's block_tile (no padding needed).
 constexpr bool isAligned(VectorAddKernel k, int n) { return n > 0 && n % k.block_tile == 0; }
-
-/// Convenience: extract signature and algorithm from config.
-consteval VectorAddKernel make_kernel(ElementwiseConfig cfg)
-{
-    return make_kernel(cfg.signature, cfg.algorithm);
-}
 
 } // namespace rocm_ck

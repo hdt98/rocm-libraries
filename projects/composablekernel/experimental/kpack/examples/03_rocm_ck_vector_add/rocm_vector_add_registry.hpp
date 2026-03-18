@@ -22,41 +22,38 @@ struct VariantDescriptor
 // clang-format off
 static constexpr VariantDescriptor ALL_VARIANTS[] = {
     {"vector_add_fp32_b256", make_kernel(ElementwiseConfig{
-         .signature = {.in_type = DataType::FP32, .out_type = DataType::FP32},
+         .signature = {.dtype = DataType::FP32},
          .algorithm = {.block_tile = 256, .block_warps = 1, .warp_tile = 256, .pad = true}})},
     {"vector_add_fp32_b512", make_kernel(ElementwiseConfig{
-         .signature = {.in_type = DataType::FP32, .out_type = DataType::FP32},
+         .signature = {.dtype = DataType::FP32},
          .algorithm = {.block_tile = 512, .block_warps = 1, .warp_tile = 512, .pad = true}})},
     {"vector_add_fp32_b1024", make_kernel(ElementwiseConfig{
-         .signature = {.in_type = DataType::FP32, .out_type = DataType::FP32},
+         .signature = {.dtype = DataType::FP32},
          .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}})},
     {"vector_add_fp16_b512", make_kernel(ElementwiseConfig{
-         .signature = {.in_type = DataType::FP16, .out_type = DataType::FP16},
+         .signature = {.dtype = DataType::FP16},
          .algorithm = {.block_tile = 512, .block_warps = 1, .warp_tile = 512, .pad = true}})},
     {"vector_add_fp16_b1024", make_kernel(ElementwiseConfig{
-         .signature = {.in_type = DataType::FP16, .out_type = DataType::FP16},
+         .signature = {.dtype = DataType::FP16},
          .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}})},
     {"vector_add_bf16_b512", make_kernel(ElementwiseConfig{
-         .signature = {.in_type = DataType::BF16, .out_type = DataType::BF16},
+         .signature = {.dtype = DataType::BF16},
          .algorithm = {.block_tile = 512, .block_warps = 1, .warp_tile = 512, .pad = true}})},
-    {"vector_add_fp32_b256_sa",
-     make_kernel(ElementwiseSignature{.in_type = DataType::FP32, .out_type = DataType::FP32},
-                 ElementwiseAlgorithm{.block_tile = 256, .block_warps = 1,
-                                      .warp_tile = 256, .pad = true})},
-    {"vector_add_fp32_b2048_w8",
-     make_kernel(ElementwiseSignature{.in_type = DataType::FP32, .out_type = DataType::FP32},
-                 ElementwiseAlgorithm{.block_tile = 2048, .block_warps = 8,
-                                      .warp_tile = 64, .pad = true})},
-    {"vector_add_fp16_b1024_w2",
-     make_kernel(ElementwiseSignature{.in_type = DataType::FP16, .out_type = DataType::FP16},
-                 ElementwiseAlgorithm{.block_tile = 1024, .block_warps = 2,
-                                      .warp_tile = 512, .pad = true})},
+    {"vector_add_fp32_b256_sa", make_kernel(ElementwiseConfig{
+         .signature = {.dtype = DataType::FP32},
+         .algorithm = {.block_tile = 256, .block_warps = 1, .warp_tile = 256, .pad = true}})},
+    {"vector_add_fp32_b2048_w8", make_kernel(ElementwiseConfig{
+         .signature = {.dtype = DataType::FP32},
+         .algorithm = {.block_tile = 2048, .block_warps = 8, .warp_tile = 64, .pad = true}})},
+    {"vector_add_fp16_b1024_w2", make_kernel(ElementwiseConfig{
+         .signature = {.dtype = DataType::FP16},
+         .algorithm = {.block_tile = 1024, .block_warps = 2, .warp_tile = 512, .pad = true}})},
     // Mixed-type variants
     {"vector_add_fp16_fp32_b1024", make_kernel(ElementwiseConfig{
-         .signature = {.in_type = DataType::FP16, .out_type = DataType::FP32},
+         .signature = {.in_dtype = DataType::FP16, .out_dtype = DataType::FP32},
          .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}})},
     {"vector_add_fp32_fp16_b1024", make_kernel(ElementwiseConfig{
-         .signature = {.in_type = DataType::FP32, .out_type = DataType::FP16},
+         .signature = {.in_dtype = DataType::FP32, .out_dtype = DataType::FP16},
          .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}})},
 };
 // clang-format on
@@ -68,7 +65,7 @@ static constexpr int ALL_VARIANTS_COUNT = sizeof(ALL_VARIANTS) / sizeof(ALL_VARI
 /// Falls back to the largest padded variant if none aligns.
 /// Returns nullptr if no variant matches the type pair.
 constexpr const VariantDescriptor*
-findVariant(DataType in_type, DataType out_type, int problem_size)
+findVariant(DataType in_dtype, DataType out_dtype, int problem_size)
 {
     const VariantDescriptor* best_aligned = nullptr;
     const VariantDescriptor* best_padded  = nullptr;
@@ -76,7 +73,7 @@ findVariant(DataType in_type, DataType out_type, int problem_size)
     for(int i = 0; i < ALL_VARIANTS_COUNT; ++i)
     {
         const auto& v = ALL_VARIANTS[i];
-        if(v.kernel.in_type != in_type || v.kernel.out_type != out_type)
+        if(v.kernel.in_dtype != in_dtype || v.kernel.out_dtype != out_dtype)
             continue;
 
         if(isAligned(v.kernel, problem_size))
