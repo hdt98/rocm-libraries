@@ -713,6 +713,21 @@ def main():
 
     args = parser.parse_args()
 
+    assert args.datatype in ["fp16", "bf16", "fp8", "bf8"], (
+        f"Invalid datatype string: {args.datatype} (supported datatypes are [fp16, bf16, fp8, and bf8])"
+    )
+
+    layout_parts = args.layout.lower()
+    assert len(layout_parts) == 3, (
+        f"Invalid layout string: {args.layout} (must be 3 characters like 'rcr' where r stands for row major and c stands for column major)"
+    )
+    assert layout_parts[0] in ["r", "c"] and layout_parts[1] in ["r", "c"], (
+        f"Invalid matrix_a layout : {layout_parts[0]} or matrix_b layout: {layout_parts[1]} (matrix_a and matrix_b must be either 'r' for row major or 'c' for column major)"
+    )
+    assert layout_parts[2] == "r", (
+        f"Invalid matrix_c layout: {layout_parts[2]} (must be 'r' only as currently we are supporting only row major)"
+    )
+
     kernel_name_prefix = "gemm_aquant"
     builder = GemmAQuantKernelBuilder(
         kernel_name_prefix,
