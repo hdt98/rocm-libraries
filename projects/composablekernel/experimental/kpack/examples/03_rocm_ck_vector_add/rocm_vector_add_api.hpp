@@ -13,7 +13,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <optional>
 #include <type_traits>
 
 namespace rocm_ck {
@@ -44,7 +43,7 @@ static_assert(offsetof(VectorAddArgs, c) == 24, "unexpected offset for c");
 /// Signature: describes WHAT the kernel computes (types).
 /// In CK Tile's builder pattern, this is the "what" — independent of
 /// how the kernel is tiled, scheduled, or padded.
-struct elementwise_signature
+struct ElementwiseSignature
 {
     DataType compute_type;
 };
@@ -52,7 +51,7 @@ struct elementwise_signature
 /// Algorithm: describes HOW the kernel executes (tile geometry, pipeline).
 /// In CK Tile's builder pattern, this is the "how" — independent of
 /// the data types being computed.
-struct elementwise_algorithm
+struct ElementwiseAlgorithm
 {
     int block_tile;  // Elements processed per thread block (BlockTile)
     int block_warps; // Number of warps per thread block (BlockWarps)
@@ -60,21 +59,17 @@ struct elementwise_algorithm
     bool pad;        // Enable padding for unaligned problem sizes
 };
 
-/// Compile-time configuration for a vector add variant.
-/// This is the user-facing input — it may contain non-structural members
-/// (e.g. std::optional) that prevent direct use as an NTTP.
-/// Backward-compatible: constructs sig+algo with defaults (block_warps=1,
-/// warp_tile=block_size, pad=true).
-struct vector_add_config
+/// Compile-time configuration for an elementwise kernel variant.
+/// This is the user-facing API — contains a Signature (what) and Algorithm (how).
+struct ElementwiseConfig
 {
-    int block_size; // Elements processed per thread block (BlockTile)
-    DataType compute_type          = DataType::FP32; // Data type for granularity validation
-    std::optional<int> unroll_hint = std::nullopt;   // Proof-of-concept non-structural member
+    ElementwiseSignature signature;
+    ElementwiseAlgorithm algorithm;
 };
 
-/// Structural output used as NTTP and host launch info.
-/// All members must be structural types (no std::optional, no pointers, etc.).
-struct vector_add_struct
+/// Validated kernel descriptor used as NTTP and host launch info.
+/// All members are structural types (no std::optional, no pointers, etc.).
+struct VectorAddKernel
 {
     int block_tile;        // Elements per thread block (for grid calculation)
     int thread_block_size; // Threads per block (= warp_size * block_warps)
@@ -96,7 +91,7 @@ constexpr int warp_size = 64;
 ///   thread_block_size = warp_size * block_warps (NOT block_tile)
 ///
 /// Invalid configs produce a compile-time error (consteval).
-consteval vector_add_struct make_kernel(elementwise_signature sig, elementwise_algorithm algo)
+consteval VectorAddKernel make_kernel(ElementwiseSignature sig, ElementwiseAlgorithm algo)
 {
     if(algo.block_tile <= 0)
         throw "block_tile must be positive";
@@ -134,14 +129,12 @@ consteval vector_add_struct make_kernel(elementwise_signature sig, elementwise_a
 }
 
 /// Check if problem size N is aligned to a variant's block_tile (no padding needed).
-constexpr bool is_aligned(vector_add_struct k, int n) { return n > 0 && n % k.block_tile == 0; }
+constexpr bool isAligned(VectorAddKernel k, int n) { return n > 0 && n % k.block_tile == 0; }
 
-/// Backward-compatible: vector_add_config → sig + algo with defaults.
-/// Defaults: block_warps=1, warp_tile=block_size, pad=true.
-consteval vector_add_struct make_kernel(vector_add_config cfg)
+/// Convenience: extract signature and algorithm from config.
+consteval VectorAddKernel make_kernel(ElementwiseConfig cfg)
 {
-    return make_kernel(elementwise_signature{cfg.compute_type},
-                       elementwise_algorithm{cfg.block_size, 1, cfg.block_size, true});
+    return make_kernel(cfg.signature, cfg.algorithm);
 }
 
 } // namespace rocm_ck

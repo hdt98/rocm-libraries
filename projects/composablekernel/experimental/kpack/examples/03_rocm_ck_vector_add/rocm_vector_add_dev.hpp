@@ -5,7 +5,7 @@
 // clean config-driven API. This is the only header that .hip files need
 // to include.
 //
-// Uses C++20 struct NTTPs: template <vector_add_struct K>.
+// Uses C++20 struct NTTPs: template <VectorAddKernel K>.
 
 #pragma once
 
@@ -19,36 +19,36 @@ namespace rocm_ck {
 /// Maps a DataType enum value to the corresponding CK Tile numeric type.
 /// Primary template is intentionally undefined — only valid specializations compile.
 template <DataType>
-struct ck_type_map;
+struct CkTypeMap;
 
 template <>
-struct ck_type_map<DataType::FP32>
+struct CkTypeMap<DataType::FP32>
 {
     using type = float;
 };
 template <>
-struct ck_type_map<DataType::FP16>
+struct CkTypeMap<DataType::FP16>
 {
     using type = ck_tile::half_t;
 };
 template <>
-struct ck_type_map<DataType::BF16>
+struct CkTypeMap<DataType::BF16>
 {
     using type = ck_tile::bf16_t;
 };
 template <>
-struct ck_type_map<DataType::FP8>
+struct CkTypeMap<DataType::FP8>
 {
     using type = ck_tile::fp8_t;
 };
 
-/// Maps a vector_add_struct to the CK Tile type machinery.
-template <vector_add_struct K>
+/// Maps a VectorAddKernel to the CK Tile type machinery.
+template <VectorAddKernel K>
 struct VectorAddTypes
 {
-    using XDataType       = typename ck_type_map<K.compute_type>::type;
+    using XDataType       = typename CkTypeMap<K.compute_type>::type;
     using ComputeDataType = float;
-    using YDataType       = typename ck_type_map<K.compute_type>::type;
+    using YDataType       = typename CkTypeMap<K.compute_type>::type;
 
     using BlockTile  = ck_tile::sequence<K.block_tile>;
     using BlockWarps = ck_tile::sequence<K.block_warps>;
@@ -65,8 +65,8 @@ struct VectorAddTypes
 
 /// Device function that bridges VectorAddArgs to CK Tile's kernel.
 /// Call this from an extern "C" __global__ wrapper.
-template <vector_add_struct K>
-__device__ void run_vector_add(VectorAddArgs args)
+template <VectorAddKernel K>
+__device__ void runVectorAdd(VectorAddArgs args)
 {
     using Types = VectorAddTypes<K>;
     using X     = typename Types::XDataType;

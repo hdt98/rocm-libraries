@@ -77,11 +77,11 @@ int main(int argc, char** argv)
         host_b[i] = static_cast<float>((i * 2) % 32);
     }
 
-    // --- Demonstrate find_variant ---
+    // --- Demonstrate findVariant ---
     std::printf("\nVariant selection for N=%d:\n", NUM_ELEMENTS);
     for(auto dt : {rocm_ck::DataType::FP32, rocm_ck::DataType::FP16, rocm_ck::DataType::BF16})
     {
-        const auto* best = rocm_ck::find_variant(dt, NUM_ELEMENTS);
+        const auto* best = rocm_ck::findVariant(dt, NUM_ELEMENTS);
         if(best)
             std::printf("  %s -> %s (tile=%d, warps=%d)\n",
                         rocm_ck::data_type_name(dt),
@@ -147,7 +147,7 @@ int main(int argc, char** argv)
         const int grid_size =
             (NUM_ELEMENTS + variant.kernel.block_tile - 1) / variant.kernel.block_tile;
         const int block_size = variant.kernel.thread_block_size;
-        const bool aligned   = rocm_ck::is_aligned(variant.kernel, NUM_ELEMENTS);
+        const bool aligned   = rocm_ck::isAligned(variant.kernel, NUM_ELEMENTS);
         std::printf("  %s: tile=%d, warps=%d, threads=%d, N=%d %s\n",
                     variant.name,
                     variant.kernel.block_tile,
