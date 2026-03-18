@@ -35,7 +35,14 @@ KPACK_MAGIC = b"KPAK"
 KPACK_VERSION = 1
 HEADER_SIZE = 16  # 4 (magic) + 4 (version) + 8 (toc_offset)
 
-VARIANTS = ["vector_add_block256", "vector_add_block512", "vector_add_block1024"]
+VARIANTS = [
+    "vector_add_fp32_b256",
+    "vector_add_fp32_b512",
+    "vector_add_fp32_b1024",
+    "vector_add_fp16_b512",
+    "vector_add_fp16_b1024",
+    "vector_add_bf16_b512",
+]
 ARCHITECTURES = ["gfx90a", "gfx942", "gfx950"]
 
 

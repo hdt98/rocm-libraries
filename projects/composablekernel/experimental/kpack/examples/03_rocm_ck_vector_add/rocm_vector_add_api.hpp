@@ -51,9 +51,9 @@ constexpr int data_type_bits(DataType dt)
 struct VectorAddArgs
 {
     index_t n;
-    const float* a;
-    const float* b;
-    float* c;
+    const void* a;
+    const void* b;
+    void* c;
 };
 
 static_assert(std::is_trivially_copyable_v<VectorAddArgs>,

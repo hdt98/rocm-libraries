@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 #
 # Build for the rocm_ck kpack vector-add example with multiple variants.
-# Compiles three block-size variants per architecture, packs into a .kpack
+# Compiles multiple type × block-size variants per architecture, packs into a .kpack
 # archive, and builds the host-side loader.
 #
 # Usage:
@@ -29,7 +29,11 @@ get_filename_component(CK_INCLUDE_DIR "${CK_INCLUDE_DIR}" ABSOLUTE)
 add_subdirectory(../../rocm_kpack rocm_kpack_build)
 
 # --- Kernel variants ---
-set(KERNEL_VARIANTS vector_add_block256 vector_add_block512 vector_add_block1024)
+set(KERNEL_VARIANTS
+    vector_add_fp32_b256  vector_add_fp32_b512  vector_add_fp32_b1024
+    vector_add_fp16_b512  vector_add_fp16_b1024
+    vector_add_bf16_b512
+)
 
 # --- Compile each variant × architecture into .hsaco code objects ---
 # Uses --cuda-device-only to produce raw code objects without host stubs.
