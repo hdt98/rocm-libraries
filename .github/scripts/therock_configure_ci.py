@@ -64,6 +64,7 @@ def retrieve_build_variant(args) -> Tuple[str, str, bool]:
 
     return build_variant_cmake_preset, build_variant_label, expect_failure
 
+
 # Paths matching any of these patterns are considered to have no influence over
 # build or test workflows so any related jobs can be skipped if all paths
 # modified by a commit/PR match a pattern in this list.
