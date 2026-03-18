@@ -6,7 +6,10 @@
 hipDNN API reference
 ********************
 
-Review these topics for detailed information on the frontend C++, backend C, and Knob APIs used in hipDNN:
+Review these topics for detailed information on the frontend C++, backend C, and Knob APIs used in hipDNN.
+
+Topics
+======
 
 - :ref:`frontend-api`
 
