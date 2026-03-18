@@ -492,6 +492,8 @@ CK_TILE_HOST_DEVICE constexpr bool gf2_bit_is_self_inverse(const gf2_bit_matrix<
 template <index_t... DimBits>
 struct coordinate_packer
 {
+    static_assert(sizeof...(DimBits) > 0, "At least one dimension required");
+
     static constexpr index_t NDims     = sizeof...(DimBits);
     static constexpr index_t TotalBits = (DimBits + ...);
 
@@ -548,6 +550,8 @@ struct coordinate_packer
 template <index_t... DimBits>
 struct gf2_bit_transform
 {
+    static_assert(sizeof...(DimBits) > 0, "At least one dimension required");
+
     static constexpr index_t NDims     = sizeof...(DimBits);
     static constexpr index_t TotalBits = (DimBits + ...);
 
