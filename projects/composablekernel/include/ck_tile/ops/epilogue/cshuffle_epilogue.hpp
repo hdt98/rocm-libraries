@@ -359,11 +359,17 @@ struct CShuffleEpilogue
             // For 16x16 tiles, rows 0,4,8,12 (and 1,5,9,13, etc.) access same banks.
             // The conflicting rows differ in bits 2,3: row % 16 / 4 = (row >> 2) & 3
             // XOR row bits 2,3 into col bits that affect bank selection.
+            //
+            // Constraint: MPerIterationShuffle must be <= 32 for row bits 2,3 to be unique.
+            // For MRepeat > 2 (e.g., 4x1 layout), MPerIterationShuffle = 64, causing
+            // rows 0 and 16 to collide. TODO: fix by using row % MPerXdl.
+            //
             // For FP16 (2B): bank = (col * 2 / 4) % 32 = (col / 2) % 32
             //   Col bits 1-5 determine bank
             // For FP8 (1B): bank = (col / 4) % 32
             //   Col bits 2-6 determine bank
-            if constexpr(MPerXdl == 16 && banks == 32)
+            constexpr bool xor_swizzle_safe = MPerIterationShuffle <= 32;
+            if constexpr(MPerXdl == 16 && banks == 32 && xor_swizzle_safe)
             {
                 // Determine which col bits to XOR based on data type size and vector length
                 // We want to XOR into bits that affect bank selection but are above VectorLen
@@ -380,6 +386,17 @@ struct CShuffleEpilogue
                 // Row bits 2,3 distinguish rows 0,4,8,12 within 16-row XDL tile
                 using RowBits = sequence<2, 3>;
                 using ColBits = sequence<col_bit_start, col_bit_start + 1>;
+
+                // Static asserts to ensure XOR swizzle is a valid bijection:
+                // 1. Row bits must be within the MPerIterationShuffle range
+                static_assert((1 << (RowBits::at(number<RowBits::size() - 1>{}) + 1)) <=
+                                  MPerIterationShuffle,
+                              "Row bits exceed MPerIterationShuffle range");
+                // 2. Col bits must be within the column range for valid XOR targets
+                static_assert((1 << (ColBits::at(number<ColBits::size() - 1>{}) + 1)) <=
+                                  NPerIterationShuffle,
+                              "Col bits exceed column range - XOR would produce out-of-bounds "
+                              "addresses");
 
                 constexpr auto lds_block_desc = transform_tensor_descriptor(
                     lds_block_desc_2,
