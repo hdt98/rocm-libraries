@@ -8,7 +8,7 @@
 hipDNN user guides
 ******************
 
-These guides demonstrate how to use hipDNN's standard frontend functionality. 
+These topics demonstrate how to use hipDNN's standard frontend functionality. 
 
 .. important::
 
