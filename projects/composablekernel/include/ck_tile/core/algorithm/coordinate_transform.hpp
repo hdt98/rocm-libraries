@@ -26,6 +26,7 @@ enum struct coord_transform_enum
     unmerge,
     replicate,
     xor_t,
+    xor_bits_t,
     offset,
     indexing,
 };
@@ -1389,6 +1390,137 @@ CK_TILE_HOST_DEVICE static void print(const xor_t<LowLengths>& x)
     printf("up_lengths_: ");
     print(x.up_lengths_);
     printf("}");
+}
+
+// =============================================================================
+// Bit-level XOR transform for bank conflict avoidance
+// =============================================================================
+// XORs specified bits from dimension 0 (row) into dimension 1 (column).
+// This allows fine-grained control over which row bits affect which column bits,
+// enabling optimal bank conflict avoidance for various tile sizes and data types.
+//
+// Template parameters:
+//   RowBits, ColBits: sequence of bit indices to XOR (row_bits[i] -> col_bits[i])
+//
+// Example: For 16x16 tiles with 4 rows per warp hitting same banks:
+//   xor_bits_t<sequence<0,1>, sequence<3,4>> swizzles row bits 0,1 into col bits 3,4
+//   This spreads rows 0,1,2,3 across different banks.
+
+template <typename LowLengths, typename RowBits, typename ColBits>
+struct xor_bits_t : public base_transform<2, 2>
+{
+    static_assert(RowBits::size() == ColBits::size(),
+                  "RowBits and ColBits must have same length");
+
+    static constexpr auto type_enum = coord_transform_enum::xor_bits_t;
+    static constexpr index_t NumXorBits = RowBits::size();
+
+    using LowerIndex = multi_index<2>;
+    using UpperIndex = multi_index<2>;
+
+    using UpLengths = LowLengths;
+
+    UpLengths up_lengths_;
+
+    CK_TILE_HOST_DEVICE constexpr xor_bits_t() : up_lengths_{} {}
+
+    CK_TILE_HOST_DEVICE constexpr xor_bits_t(const LowLengths& low_lengths)
+        : up_lengths_{low_lengths}
+    {
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr auto get_type_enum()
+    {
+        return coord_transform_enum::xor_bits_t;
+    }
+
+    CK_TILE_HOST_DEVICE constexpr const auto& get_upper_lengths() const { return up_lengths_; }
+
+    template <typename LowIdx, typename UpIdx>
+    CK_TILE_HOST_DEVICE constexpr void calculate_lower_index(LowIdx& idx_low,
+                                                             const UpIdx& idx_up) const
+    {
+        static_assert(LowIdx::size() == 2 && UpIdx::size() == 2,
+                      "wrong! inconsistent # of dimension");
+
+        const auto row = idx_up[number<0>{}];
+        auto col       = idx_up[number<1>{}];
+
+        // XOR specified row bits into column bits
+        static_for<0, NumXorBits, 1>{}([&](auto i) {
+            constexpr index_t row_bit = RowBits::at(i);
+            constexpr index_t col_bit = ColBits::at(i);
+            // Extract bit from row, shift to col position, XOR into col
+            const auto bit = (row >> row_bit) & 1;
+            col ^= (bit << col_bit);
+        });
+
+        idx_low(number<0>{}) = row;
+        idx_low(number<1>{}) = col;
+    }
+
+    template <typename LowIdxDiff, typename UpIdxDiff, typename LowIdx, typename UpIdx>
+    CK_TILE_HOST_DEVICE void update_lower_index(LowIdxDiff& idx_diff_low,
+                                                const UpIdxDiff&,
+                                                LowIdx& idx_low,
+                                                const UpIdx& idx_up) const
+    {
+        static_assert(LowIdxDiff::size() == 2 && UpIdxDiff::size() == 2 && LowIdx::size() == 2 &&
+                          UpIdx::size() == 2,
+                      "wrong! inconsistent # of dimension");
+
+        const auto idx_low_old = idx_low;
+
+        calculate_lower_index(idx_low, idx_up);
+
+        idx_diff_low = idx_low - idx_low_old;
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr bool
+    is_valid_upper_index_always_mapped_to_valid_lower_index()
+    {
+        return true;
+    }
+
+    template <typename UpIdx>
+    CK_TILE_HOST_DEVICE static constexpr bool
+    is_valid_upper_index_mapped_to_valid_lower_index(const UpIdx& /* idx_up */)
+    {
+        return true;
+    }
+
+    CK_TILE_HOST_DEVICE static constexpr bool is_known_at_compile_time()
+    {
+        return ck_tile::is_known_at_compile_time<UpLengths>::value;
+    }
+
+    template <typename LowVectorLengths, typename LowVectorStrides>
+    CK_TILE_HOST_DEVICE constexpr auto calculate_upper_dimension_safe_vector_length_strides(
+        const LowVectorLengths& low_vector_lengths,
+        const LowVectorStrides& low_vector_strides) const
+    {
+        array<index_t, 2> up_vector_lengths = low_vector_lengths;
+        array<index_t, 2> up_vector_strides = low_vector_strides;
+
+        return make_tuple(up_vector_lengths, up_vector_strides);
+    }
+};
+
+template <typename LowLengths, typename RowBits, typename ColBits>
+CK_TILE_HOST_DEVICE static void print(const xor_bits_t<LowLengths, RowBits, ColBits>&)
+{
+    printf("xor_bits_t{row_bits: ");
+    print(RowBits{});
+    printf(", col_bits: ");
+    print(ColBits{});
+    printf("}");
+}
+
+// Factory function for xor_bits_t transform
+template <typename RowBits, typename ColBits, typename LowLengths>
+CK_TILE_HOST_DEVICE constexpr auto make_xor_bits_transform(const LowLengths& low_lengths)
+{
+    return xor_bits_t<LowLengths, RowBits, ColBits>{low_lengths};
 }
 
 template <typename LowLength, typename OffsetLength>

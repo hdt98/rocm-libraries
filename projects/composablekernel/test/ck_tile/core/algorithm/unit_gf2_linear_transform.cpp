@@ -478,3 +478,114 @@ TEST(GF2CompileTime, CustomSwizzle)
     // Verify it's invertible
     static_assert(gf2_bit_is_invertible(swizzle));
 }
+
+// =============================================================================
+// Part 9: xor_bits_t Coordinate Transform Tests
+// =============================================================================
+
+#include "ck_tile/core/algorithm/coordinate_transform.hpp"
+
+TEST(XorBitsTransform, BasicSwizzle)
+{
+    // XOR row bits 0,1 into col bits 3,4
+    using RowBits = sequence<0, 1>;
+    using ColBits = sequence<3, 4>;
+    using Lengths = tuple<number<64>, number<128>>;
+
+    auto transform = make_xor_bits_transform<RowBits, ColBits>(Lengths{});
+
+    // Test row 0: no change to col
+    multi_index<2> in0{0, 0};
+    multi_index<2> out0;
+    transform.calculate_lower_index(out0, in0);
+    EXPECT_EQ(out0[0], 0);
+    EXPECT_EQ(out0[1], 0);
+
+    // Test row 1: col bit 3 flipped (col ^= 8)
+    multi_index<2> in1{1, 0};
+    multi_index<2> out1;
+    transform.calculate_lower_index(out1, in1);
+    EXPECT_EQ(out1[0], 1);
+    EXPECT_EQ(out1[1], 8);  // 1 << 3 = 8
+
+    // Test row 2: col bit 4 flipped (col ^= 16)
+    multi_index<2> in2{2, 0};
+    multi_index<2> out2;
+    transform.calculate_lower_index(out2, in2);
+    EXPECT_EQ(out2[0], 2);
+    EXPECT_EQ(out2[1], 16);  // 1 << 4 = 16
+
+    // Test row 3: col bits 3,4 flipped (col ^= 24)
+    multi_index<2> in3{3, 0};
+    multi_index<2> out3;
+    transform.calculate_lower_index(out3, in3);
+    EXPECT_EQ(out3[0], 3);
+    EXPECT_EQ(out3[1], 24);  // (1 << 3) | (1 << 4) = 24
+}
+
+TEST(XorBitsTransform, SelfInverse)
+{
+    using RowBits = sequence<0, 1>;
+    using ColBits = sequence<3, 4>;
+    using Lengths = tuple<number<64>, number<128>>;
+
+    auto transform = make_xor_bits_transform<RowBits, ColBits>(Lengths{});
+
+    // XOR swizzle is self-inverse: apply twice = identity
+    for(index_t row = 0; row < 16; ++row)
+    {
+        for(index_t col = 0; col < 128; col += 17)
+        {
+            multi_index<2> original{row, col};
+            multi_index<2> swizzled;
+            multi_index<2> restored;
+
+            transform.calculate_lower_index(swizzled, original);
+            transform.calculate_lower_index(restored, swizzled);
+
+            EXPECT_EQ(restored[0], original[0]) << "row=" << row << " col=" << col;
+            EXPECT_EQ(restored[1], original[1]) << "row=" << row << " col=" << col;
+        }
+    }
+}
+
+TEST(XorBitsTransform, BankConflictAvoidance16x16)
+{
+    // For 16x16 tiles with FP16:
+    // - 4 rows per warp (rows 0,1,2,3)
+    // - 16 threads per row, 8-element vectors
+    // - Column stride = 2 bytes (FP16)
+    // - Bank = (col * 2 / 4) % 32 = (col / 2) % 32
+
+    using RowBits = sequence<0, 1>;
+    using ColBits = sequence<3, 4>;
+    using Lengths = tuple<number<64>, number<128>>;
+
+    auto transform = make_xor_bits_transform<RowBits, ColBits>(Lengths{});
+
+    auto get_bank = [](index_t col) { return (col / 2) % 32; };
+
+    // Check that rows 0,1,2,3 at same logical column get different banks
+    index_t col = 0;
+
+    multi_index<2> r0{0, col}, r1{1, col}, r2{2, col}, r3{3, col};
+    multi_index<2> s0, s1, s2, s3;
+
+    transform.calculate_lower_index(s0, r0);
+    transform.calculate_lower_index(s1, r1);
+    transform.calculate_lower_index(s2, r2);
+    transform.calculate_lower_index(s3, r3);
+
+    index_t bank0 = get_bank(s0[1]);
+    index_t bank1 = get_bank(s1[1]);
+    index_t bank2 = get_bank(s2[1]);
+    index_t bank3 = get_bank(s3[1]);
+
+    // All different banks
+    EXPECT_NE(bank0, bank1);
+    EXPECT_NE(bank0, bank2);
+    EXPECT_NE(bank0, bank3);
+    EXPECT_NE(bank1, bank2);
+    EXPECT_NE(bank1, bank3);
+    EXPECT_NE(bank2, bank3);
+}
