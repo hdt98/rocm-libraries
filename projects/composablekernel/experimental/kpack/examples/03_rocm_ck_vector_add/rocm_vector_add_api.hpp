@@ -116,6 +116,7 @@ constexpr int warp_size = 64;
 /// Validates CK Tile ElementWiseShape compatibility:
 ///   kVectorM = min(128 / type_bits, warp_tile / warp_size) — must be >= 1
 ///   kRepeatM = block_tile / (block_warps * kVectorM * warp_size) — must be >= 1, integer
+///   block_warps must be power of 2 (required by CK Tile reduce_on_sequence)
 ///   thread_block_size = warp_size * block_warps (NOT block_tile)
 ///
 /// Invalid configs produce a compile-time error (consteval).
@@ -125,6 +126,8 @@ consteval vector_add_struct make_kernel(elementwise_signature sig, elementwise_a
         throw "block_tile must be positive";
     if(algo.block_warps <= 0)
         throw "block_warps must be positive";
+    if((algo.block_warps & (algo.block_warps - 1)) != 0)
+        throw "block_warps must be a power of 2 (required by CK Tile reduce_on_sequence)";
     if(algo.warp_tile <= 0)
         throw "warp_tile must be positive";
     if(algo.warp_tile < warp_size)
@@ -153,6 +156,9 @@ consteval vector_add_struct make_kernel(elementwise_signature sig, elementwise_a
             algo.warp_tile,
             algo.pad};
 }
+
+/// Check if problem size N is aligned to a variant's block_tile (no padding needed).
+constexpr bool is_aligned(vector_add_struct k, int n) { return n > 0 && n % k.block_tile == 0; }
 
 /// Backward-compatible: vector_add_config → sig + algo with defaults.
 /// Defaults: block_warps=1, warp_tile=block_size, pad=true.
