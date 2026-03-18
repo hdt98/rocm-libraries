@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include <rocm_ck/datatype_utils.hpp>
+
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -19,32 +21,6 @@ namespace rocm_ck {
 /// Fixed-width integer type for kernel index/size arguments.
 /// Matches ck_tile::index_t but avoids pulling in CK Tile headers.
 using index_t = std::int32_t;
-
-/// Data type tag for compile-time kernel configuration.
-/// Modeled on ck_tile::builder::DataType but independent of CK Tile headers.
-/// No UNDEFINED — every config must specify a valid type.
-enum class DataType
-{
-    FP32,
-    FP16,
-    BF16,
-    FP8
-};
-
-/// Returns the bit-width of a DataType. Uses bits (not bytes) so future
-/// sub-byte types (fp4, fp6, int4) are clean integers.
-/// No default case — lets -Wswitch catch unhandled enum values.
-constexpr int data_type_bits(DataType dt)
-{
-    switch(dt)
-    {
-    case DataType::FP32: return 32;
-    case DataType::FP16: return 16;
-    case DataType::BF16: return 16;
-    case DataType::FP8: return 8;
-    }
-    return 0;
-}
 
 /// Kernel arguments passed by value through hipModuleLaunchKernel.
 /// Layout must match exactly between host and device.
