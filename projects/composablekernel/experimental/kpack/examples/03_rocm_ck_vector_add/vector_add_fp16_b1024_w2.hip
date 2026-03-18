@@ -6,9 +6,9 @@
 // Multi-warp fp16 variant: 2 warps × 64 threads = 128 threads,
 // each block processes 1024 elements with large vector width (kVectorM=8).
 static constexpr auto kernel = rocm_ck::make_kernel(
-    rocm_ck::ElementwiseSignature{.in_type = rocm_ck::DataType::FP16, .out_type = rocm_ck::DataType::FP16},
-    rocm_ck::ElementwiseAlgorithm{
-        .block_tile = 1024, .block_warps = 2, .warp_tile = 512, .pad = true});
+    rocm_ck::ElementwiseConfig{
+        .signature = {.dtype = rocm_ck::DataType::FP16},
+        .algorithm = {.block_tile = 1024, .block_warps = 2, .warp_tile = 512, .pad = true}});
 
 extern "C" __global__ void vector_add_fp16_b1024_w2(rocm_ck::VectorAddArgs args)
 {

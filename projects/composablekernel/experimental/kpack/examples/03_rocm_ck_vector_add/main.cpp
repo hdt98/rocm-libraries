@@ -38,12 +38,12 @@ static bool runVariant(const rocm_ck::VariantDescriptor& variant,
                        float beta)
 {
     const int num_elements    = static_cast<int>(host_a.size());
-    const auto in_type        = variant.kernel.in_type;
-    const auto out_type       = variant.kernel.out_type;
-    const int in_type_bytes   = rocm_ck::data_type_bits(in_type) / 8;
-    const int out_type_bytes  = rocm_ck::data_type_bits(out_type) / 8;
-    const size_t in_buf_size  = static_cast<size_t>(num_elements) * in_type_bytes;
-    const size_t out_buf_size = static_cast<size_t>(num_elements) * out_type_bytes;
+    const auto in_dtype       = variant.kernel.in_dtype;
+    const auto out_dtype      = variant.kernel.out_dtype;
+    const int in_dtype_bytes  = rocm_ck::data_type_bits(in_dtype) / 8;
+    const int out_dtype_bytes = rocm_ck::data_type_bits(out_dtype) / 8;
+    const size_t in_buf_size  = static_cast<size_t>(num_elements) * in_dtype_bytes;
+    const size_t out_buf_size = static_cast<size_t>(num_elements) * out_dtype_bytes;
 
     // Load kernel code object
     void* kernel_code_object       = nullptr;
@@ -75,8 +75,8 @@ static bool runVariant(const rocm_ck::VariantDescriptor& variant,
     std::vector<char> typed_b(in_buf_size);
     for(int i = 0; i < num_elements; ++i)
     {
-        rocm_ck::float_to_typed(in_type, host_a[i], typed_a.data() + i * in_type_bytes);
-        rocm_ck::float_to_typed(in_type, host_b[i], typed_b.data() + i * in_type_bytes);
+        rocm_ck::float_to_typed(in_dtype, host_a[i], typed_a.data() + i * in_dtype_bytes);
+        rocm_ck::float_to_typed(in_dtype, host_b[i], typed_b.data() + i * in_dtype_bytes);
     }
 
     HIP_CHECK(hipMemcpy(device_a, typed_a.data(), in_buf_size, hipMemcpyHostToDevice));
@@ -117,11 +117,11 @@ static bool runVariant(const rocm_ck::VariantDescriptor& variant,
     std::vector<char> typed_result(out_buf_size);
     HIP_CHECK(hipMemcpy(typed_result.data(), device_result, out_buf_size, hipMemcpyDeviceToHost));
 
-    const float tol = rocm_ck::tolerance_for(out_type);
+    const float tol = rocm_ck::tolerance_for(out_dtype);
     bool passed     = true;
     for(int i = 0; i < num_elements; ++i)
     {
-        float got = rocm_ck::typed_to_float(out_type, typed_result.data() + i * out_type_bytes);
+        float got = rocm_ck::typed_to_float(out_dtype, typed_result.data() + i * out_dtype_bytes);
         float expected = alpha * host_a[i] + beta * host_b[i];
         if(std::fabs(got - expected) > tol)
         {

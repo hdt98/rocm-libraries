@@ -50,8 +50,8 @@ struct CkTypeMap<DataType::FP8>
 template <VectorAddKernel K>
 __device__ void runVectorAdd(VectorAddArgs args)
 {
-    using X = typename CkTypeMap<K.in_type>::type;
-    using Y = typename CkTypeMap<K.out_type>::type;
+    using X = typename CkTypeMap<K.in_dtype>::type;
+    using Y = typename CkTypeMap<K.out_dtype>::type;
 
     // Use the wider type for ElementWiseShape so kVectorM is valid for both
     // input loads and output stores.

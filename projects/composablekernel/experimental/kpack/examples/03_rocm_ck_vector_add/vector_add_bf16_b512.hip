@@ -5,7 +5,7 @@
 
 static constexpr auto kernel = rocm_ck::make_kernel(
     rocm_ck::ElementwiseConfig{
-        .signature = {.in_type = rocm_ck::DataType::BF16, .out_type = rocm_ck::DataType::BF16},
+        .signature = {.dtype = rocm_ck::DataType::BF16},
         .algorithm = {.block_tile = 512, .block_warps = 1, .warp_tile = 512, .pad = true}});
 
 extern "C" __global__ void vector_add_bf16_b512(rocm_ck::VectorAddArgs args)
