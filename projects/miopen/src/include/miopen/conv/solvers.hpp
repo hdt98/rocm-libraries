@@ -2740,6 +2740,24 @@ struct MIOPEN_INTERNALS_EXPORT ConvDirectNaiveConvFwd final : ConvSolver
                              const miopen::conv::ProblemDescription&) const override;
 };
 
+struct MIOPEN_INTERNALS_EXPORT ConvHipconvDirectFwd final : ConvSolver
+{
+    const std::string& SolverDbId() const override
+    {
+        return GetSolverDbId<ConvHipconvDirectFwd>();
+    }
+
+    bool IsApplicable(const ExecutionContext&,
+                      const miopen::conv::ProblemDescription&) const override;
+    bool IsDynamic() const override { return true; }
+    float GetWti(const ExecutionContext&, const miopen::conv::ProblemDescription&) const override
+    {
+        return 0.5f;
+    }
+    ConvSolution GetSolution(const ExecutionContext&,
+                             const miopen::conv::ProblemDescription&) const override;
+};
+
 struct MIOPEN_INTERNALS_EXPORT ConvDirectNaiveConvBwd final : ConvSolver
 {
     const std::string& SolverDbId() const override
