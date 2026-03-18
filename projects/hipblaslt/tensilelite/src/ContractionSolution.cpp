@@ -55,122 +55,26 @@ namespace TensileLite
 {
     std::string toString(CustomArgSemantic arg)
     {
-        switch(arg)
-        {
-        case CustomArgSemantic::SizeFree0:
-            return "SizeFree0";
-        case CustomArgSemantic::SizeFree1:
-            return "SizeFree1";
-        case CustomArgSemantic::SizeFree2:
-            return "SizeFree2";
-        case CustomArgSemantic::SizeSum:
-            return "SizeSum";
-        case CustomArgSemantic::AddressA:
-            return "AddressA";
-        case CustomArgSemantic::AddressB:
-            return "AddressB";
-        case CustomArgSemantic::AddressC:
-            return "AddressC";
-        case CustomArgSemantic::AddressD:
-            return "AddressD";
-        case CustomArgSemantic::StrideA0:
-            return "StrideA0";
-        case CustomArgSemantic::StrideA1:
-            return "StrideA1";
-        case CustomArgSemantic::StrideB0:
-            return "StrideB0";
-        case CustomArgSemantic::StrideB1:
-            return "StrideB1";
-        case CustomArgSemantic::StrideC0:
-            return "StrideC0";
-        case CustomArgSemantic::StrideC1:
-            return "StrideC1";
-        case CustomArgSemantic::StrideD0:
-            return "StrideD0";
-        case CustomArgSemantic::StrideD1:
-            return "StrideD1";
-        case CustomArgSemantic::Alpha:
-            return "Alpha";
-        case CustomArgSemantic::Beta:
-            return "Beta";
-        case CustomArgSemantic::SplitK:
-            return "SplitK";
-        case CustomArgSemantic::OutputBF16:
-            return "OutputBF16";
-        case CustomArgSemantic::StrideA0Bytes:
-            return "StrideA0Bytes";
-        case CustomArgSemantic::StrideB0Bytes:
-            return "StrideB0Bytes";
-        case CustomArgSemantic::StrideC0Bytes:
-            return "StrideC0Bytes";
-        case CustomArgSemantic::StrideD0Bytes:
-            return "StrideD0Bytes";
-        case CustomArgSemantic::DebugPattern:
-            return "DebugPattern";
-        case CustomArgSemantic::CustomArgSemantic_Count:
-            break;
-        }
-
-        throw std::runtime_error(
-            concatenate("Invalid CustomArgSemantic value: ", static_cast<int>(arg)));
+        static const std::array<std::string, static_cast<int>(CustomArgSemantic::COUNT)> CustomArgSemanticStrings = {
+            #define X(name) TENSILELITE_TO_STR(name),
+            CustomArgSemantic_MACRO
+            #undef X
+        };
+        return CustomArgSemanticStrings[static_cast<int>(arg)];
     }
 
     CustomArgSemantic fromStringCustomArgSemantic(std::string& str)
     {
-        
-        if(str == toString(CustomArgSemantic::SizeFree0))
-            return CustomArgSemantic::SizeFree0;
-        else if(str == toString(CustomArgSemantic::SizeFree1))
-            return CustomArgSemantic::SizeFree1;
-        else if(str == toString(CustomArgSemantic::SizeFree2))
-            return CustomArgSemantic::SizeFree2;
-        else if(str == toString(CustomArgSemantic::SizeSum))
-            return CustomArgSemantic::SizeSum;
-        else if(str == toString(CustomArgSemantic::AddressA))
-            return CustomArgSemantic::AddressA;
-        else if(str == toString(CustomArgSemantic::AddressB))
-            return CustomArgSemantic::AddressB;
-        else if(str == toString(CustomArgSemantic::AddressC))
-            return CustomArgSemantic::AddressC;
-        else if(str == toString(CustomArgSemantic::AddressD))
-            return CustomArgSemantic::AddressD;
-        else if(str == toString(CustomArgSemantic::StrideA0))
-            return CustomArgSemantic::StrideA0;
-        else if(str == toString(CustomArgSemantic::StrideA1))
-            return CustomArgSemantic::StrideA1;
-        else if(str == toString(CustomArgSemantic::StrideB0))
-            return CustomArgSemantic::StrideB0;
-        else if(str == toString(CustomArgSemantic::StrideB1))
-            return CustomArgSemantic::StrideB1;
-        else if(str == toString(CustomArgSemantic::StrideC0))
-            return CustomArgSemantic::StrideC0;
-        else if(str == toString(CustomArgSemantic::StrideC1))
-            return CustomArgSemantic::StrideC1;
-        else if(str == toString(CustomArgSemantic::StrideD0))
-            return CustomArgSemantic::StrideD0;
-        else if(str == toString(CustomArgSemantic::StrideD1))
-            return CustomArgSemantic::StrideD1;
-        else if(str == toString(CustomArgSemantic::Alpha))
-            return CustomArgSemantic::Alpha;
-        else if(str == toString(CustomArgSemantic::Beta))
-            return CustomArgSemantic::Beta;
-        else if(str == toString(CustomArgSemantic::SplitK))
-            return CustomArgSemantic::SplitK;
-        else if(str == toString(CustomArgSemantic::OutputBF16))
-            return CustomArgSemantic::OutputBF16;
-        else if(str == toString(CustomArgSemantic::StrideA0Bytes))
-            return CustomArgSemantic::StrideA0Bytes;
-        else if(str == toString(CustomArgSemantic::StrideB0Bytes))
-            return CustomArgSemantic::StrideB0Bytes;
-        else if(str == toString(CustomArgSemantic::StrideC0Bytes))
-            return CustomArgSemantic::StrideC0Bytes;
-        else if(str == toString(CustomArgSemantic::StrideD0Bytes))
-            return CustomArgSemantic::StrideD0Bytes;
-        else if(str == toString(CustomArgSemantic::DebugPattern))
-            return CustomArgSemantic::DebugPattern;
-        else
-            throw std::runtime_error(concatenate("Invalid argument type: ", str));
-        return CustomArgSemantic::CustomArgSemantic_Count;
+        static const std::map<std::string, CustomArgSemantic> CustomArgSemanticMap = {
+            #define X(name) {TENSILELITE_TO_STR(name), CustomArgSemantic::name},
+            CustomArgSemantic_MACRO
+            #undef X
+        };
+
+        auto it = CustomArgSemanticMap.find(str);
+        if(it == CustomArgSemanticMap.end())
+            throw std::runtime_error(concatenate("Invalid CustomArgSemantic value: ", str));
+        return it->second;
     }
 
     std::ostream& operator<<(std::ostream& stream, const CustomArgSemantic& t)
@@ -1762,6 +1666,18 @@ namespace TensileLite
                 case CustomArgSemantic::AddressD:
                     rv.args.template append<void const*>("AddressD", inputs.d);
                     break;
+                case CustomArgSemantic::AddressE:
+                    rv.args.template append<void const*>("AddressE", inputs.e);
+                    break;
+                case CustomArgSemantic::AddressWorkspace:
+                    rv.args.template append<void const*>("AddressWorkspace", inputs.ws);
+                    break;
+                case CustomArgSemantic::AddressSynchronizer:
+                    rv.args.template append<void const*>("AddressSynchronizer", inputs.Synchronizer);
+                    break;
+                case CustomArgSemantic::AddressMetadata:
+                    rv.args.template append<void const*>("AddressMetadata", inputs.metadata);
+                    break;
                 case CustomArgSemantic::StrideA0:
                     rv.args.appendCustomType("StrideA0", problem.a().strides()[1], arg.type);
                     break;
@@ -1786,6 +1702,84 @@ namespace TensileLite
                 case CustomArgSemantic::StrideD1:
                     rv.args.appendCustomType("StrideD1", problem.d().strides()[2], arg.type);
                     break;
+                case CustomArgSemantic::StrideE0:
+                    rv.args.appendCustomType("StrideE0", problem.e().strides()[1], arg.type);
+                    break;
+                case CustomArgSemantic::StrideE1:
+                    rv.args.appendCustomType("StrideE1", problem.e().strides()[2], arg.type);
+                    break;
+                case CustomArgSemantic::StrideWorkspace0:
+                    // TODO Workspace stride depends on accumulation algo
+                    throw std::runtime_error("StrideWorkspace0 is not implemented yet");
+                    break;
+                case CustomArgSemantic::StrideWorkspace1:
+                    // TODO Workspace stride depends on accumulation algo
+                    throw std::runtime_error("StrideWorkspace1 is not implemented yet");
+                    break;
+                case CustomArgSemantic::StrideMetadata0:
+                    // TODO Metadata stride depends on sparse settings
+                    throw std::runtime_error("StrideMetadata0 is not implemented yet");
+                    break;
+                case CustomArgSemantic::StrideMetadata1:
+                    // TODO Metadata stride depends on sparse settings
+                    throw std::runtime_error("StrideMetadata1 is not implemented yet");
+                    break;
+                case CustomArgSemantic::StrideA0Bytes:
+                    rv.args.appendCustomType("StrideA0Bytes",
+                        problem.a().strides()[1] * problem.a().elementBytes(), arg.type);
+                    break;
+                case CustomArgSemantic::StrideA1Bytes:
+                    rv.args.appendCustomType("StrideA1Bytes",
+                        problem.a().strides()[2] * problem.a().elementBytes(), arg.type);
+                    break;
+                case CustomArgSemantic::StrideB0Bytes:
+                    rv.args.appendCustomType("StrideB0Bytes",
+                        problem.b().strides()[1] * problem.b().elementBytes(), arg.type);
+                    break;
+                case CustomArgSemantic::StrideB1Bytes:
+                    rv.args.appendCustomType("StrideB1Bytes",
+                        problem.b().strides()[2] * problem.b().elementBytes(), arg.type);
+                    break;
+                case CustomArgSemantic::StrideC0Bytes:
+                    rv.args.appendCustomType("StrideC0Bytes",
+                        problem.c().strides()[1] * problem.c().elementBytes(), arg.type);
+                    break;
+                case CustomArgSemantic::StrideC1Bytes:
+                    rv.args.appendCustomType("StrideC1Bytes",
+                        problem.c().strides()[2] * problem.c().elementBytes(), arg.type);
+                    break;
+                case CustomArgSemantic::StrideD0Bytes:
+                    rv.args.appendCustomType("StrideD0Bytes",
+                        problem.d().strides()[1] * problem.d().elementBytes(), arg.type);
+                    break;
+                case CustomArgSemantic::StrideD1Bytes:
+                    rv.args.appendCustomType("StrideD1Bytes",
+                        problem.d().strides()[2] * problem.d().elementBytes(), arg.type);
+                    break;
+                case CustomArgSemantic::StrideE0Bytes:
+                    rv.args.appendCustomType("StrideE0Bytes",
+                        problem.e().strides()[1] * problem.e().elementBytes(), arg.type);
+                    break;
+                case CustomArgSemantic::StrideE1Bytes:
+                    rv.args.appendCustomType("StrideE1Bytes",
+                        problem.e().strides()[2] * problem.e().elementBytes(), arg.type);
+                    break;
+                case CustomArgSemantic::StrideWorkspace0Bytes:
+                    // TODO Workspace stride depends on accumulation algo
+                    throw std::runtime_error("StrideWorkspace0Bytes is not implemented yet");
+                    break;
+                case CustomArgSemantic::StrideWorkspace1Bytes:
+                    // TODO Workspace stride depends on accumulation algo
+                    throw std::runtime_error("StrideWorkspace1Bytes is not implemented yet");
+                    break;
+                case CustomArgSemantic::StrideMetadata0Bytes:
+                    // TODO Metadata stride depends on sparse settings
+                    throw std::runtime_error("StrideMetadata0Bytes is not implemented yet");
+                    break;
+                case CustomArgSemantic::StrideMetadata1Bytes:
+                    // TODO Metadata stride depends on sparse settings
+                    throw std::runtime_error("StrideMetadata1Bytes is not implemented yet");
+                    break;
                 case CustomArgSemantic::Alpha:
                     rv.args.appendCustomType("Alpha", inputs.alpha, arg.type);
                     break;
@@ -1804,21 +1798,26 @@ namespace TensileLite
                     rv.args.appendCustomType("OutputBF16", isBF16, arg.type);
                     break;
                 }
-                case CustomArgSemantic::StrideA0Bytes:
-                    rv.args.appendCustomType("StrideA0Bytes",
-                        problem.a().strides()[1] * problem.a().elementBytes(), arg.type);
+                case CustomArgSemantic::ItersPerTile:
+                    throw std::runtime_error("ItersPerTile is not implemented yet");
                     break;
-                case CustomArgSemantic::StrideB0Bytes:
-                    rv.args.appendCustomType("StrideB0Bytes",
-                        problem.b().strides()[1] * problem.b().elementBytes(), arg.type);
+                case CustomArgSemantic::MagicNumberItersPerTile:
+                    throw std::runtime_error("MagicNumberItersPerTile is not implemented yet");
                     break;
-                case CustomArgSemantic::StrideC0Bytes:
-                    rv.args.appendCustomType("StrideC0Bytes",
-                        problem.c().strides()[1] * problem.c().elementBytes(), arg.type);
+                case CustomArgSemantic::MagicShiftItersPerTile:
+                    throw std::runtime_error("MagicShiftItersPerTile is not implemented yet");
                     break;
-                case CustomArgSemantic::StrideD0Bytes:
-                    rv.args.appendCustomType("StrideD0Bytes",
-                        problem.d().strides()[1] * problem.d().elementBytes(), arg.type);
+                case CustomArgSemantic::TotalIters:
+                    throw std::runtime_error("TotalIters is not implemented yet");
+                    break;
+                case CustomArgSemantic::SKItersPerWG:
+                    throw std::runtime_error("SKItersPerWG is not implemented yet");
+                    break;
+                case CustomArgSemantic::SKGrid:
+                    throw std::runtime_error("SKGrid is not implemented yet");
+                    break;
+                case CustomArgSemantic::SKTiles:
+                    throw std::runtime_error("SKTiles is not implemented yet");
                     break;
                 case CustomArgSemantic::DebugPattern:
                     rv.args.template append<uint32_t>("DebugPattern", debugPattern);

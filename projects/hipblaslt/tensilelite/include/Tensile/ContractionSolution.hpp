@@ -50,34 +50,67 @@
 
 namespace TensileLite
 {
-    enum CustomArgSemantic
+
+    #define CustomArgSemantic_MACRO \
+        X(SizeFree0) \
+        X(SizeFree1) \
+        X(SizeFree2) \
+        X(SizeSum) \
+        X(AddressA) \
+        X(AddressB) \
+        X(AddressC) \
+        X(AddressD) \
+        X(AddressE) \
+        X(AddressWorkspace) \
+        X(AddressSynchronizer) \
+        X(AddressMetadata) \
+        X(StrideA0) \
+        X(StrideA1) \
+        X(StrideB0) \
+        X(StrideB1) \
+        X(StrideC0) \
+        X(StrideC1) \
+        X(StrideD0) \
+        X(StrideD1) \
+        X(StrideE0) \
+        X(StrideE1) \
+        X(StrideWorkspace0) \
+        X(StrideWorkspace1) \
+        X(StrideMetadata0) \
+        X(StrideMetadata1) \
+        X(StrideA0Bytes) \
+        X(StrideA1Bytes) \
+        X(StrideB0Bytes) \
+        X(StrideB1Bytes) \
+        X(StrideC0Bytes) \
+        X(StrideC1Bytes) \
+        X(StrideD0Bytes) \
+        X(StrideD1Bytes) \
+        X(StrideE0Bytes) \
+        X(StrideE1Bytes) \
+        X(StrideWorkspace0Bytes) \
+        X(StrideWorkspace1Bytes) \
+        X(StrideMetadata0Bytes) \
+        X(StrideMetadata1Bytes) \
+        X(Alpha) \
+        X(Beta) \
+        X(SplitK) \
+        X(OutputBF16) \
+        X(ItersPerTile) \
+        X(MagicNumberItersPerTile) \
+        X(MagicShiftItersPerTile) \
+        X(TotalIters) \
+        X(SKItersPerWG) \
+        X(SKGrid) \
+        X(SKTiles) \
+        X(DebugPattern)
+
+    enum class CustomArgSemantic
     {
-        SizeFree0,  // 0
-        SizeFree1,  // 1
-        SizeFree2,  // 2
-        SizeSum,    // 3
-        AddressA,   // 4
-        AddressB,   // 5
-        AddressC,   // 6
-        AddressD,   // 7
-        StrideA0,   // 8
-        StrideA1,   // 9
-        StrideB0,   // 10
-        StrideB1,   // 11
-        StrideC0,   // 12
-        StrideC1,   // 13
-        StrideD0,   // 14
-        StrideD1,   // 15
-        Alpha,      // 16
-        Beta,       // 17
-        SplitK,            // 18
-        OutputBF16,        // 19
-        StrideA0Bytes,     // 20
-        StrideB0Bytes,     // 21
-        StrideC0Bytes,     // 22
-        StrideD0Bytes,     // 23
-        DebugPattern,      // 24
-        CustomArgSemantic_Count,      // 25
+        #define X(name) name,
+        CustomArgSemantic_MACRO
+        #undef X
+        COUNT,
     };
     
     std::string toString(CustomArgSemantic arg);
