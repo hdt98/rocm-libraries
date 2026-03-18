@@ -4,6 +4,9 @@
 // Kpack Hello World — demonstrates the full kpack consumer pipeline:
 //   Open archive → detect GPU → load kernel → launch → verify
 
+#include <rocm_ck/gpu_arch.hpp>
+#include <rocm_ck/hip_check.hpp>
+
 #include <hip/hip_runtime.h>
 
 #include <rocm_kpack/kpack.h>
@@ -12,24 +15,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <string>
 #include <vector>
-
-#define HIP_CHECK(call)                                  \
-    do                                                   \
-    {                                                    \
-        hipError_t err = (call);                         \
-        if(err != hipSuccess)                            \
-        {                                                \
-            std::fprintf(stderr,                         \
-                         "HIP error %d (%s) at %s:%d\n", \
-                         err,                            \
-                         hipGetErrorString(err),         \
-                         __FILE__,                       \
-                         __LINE__);                      \
-            std::exit(1);                                \
-        }                                                \
-    } while(0)
 
 int main(int argc, char** argv)
 {
@@ -62,16 +48,12 @@ int main(int argc, char** argv)
     std::printf("\n");
 
     // --- Detect the current GPU architecture ---
-    // HIP reports the full ISA string (e.g. "gfx942:sramecc+:xnack-").
-    // The archive uses the base name ("gfx942"), so strip the feature flags.
-    hipDeviceProp_t device_props;
-    HIP_CHECK(hipGetDeviceProperties(&device_props, 0));
-
-    std::string gpu_arch = device_props.gcnArchName;
-    size_t colon_pos     = gpu_arch.find(':');
-    if(colon_pos != std::string::npos)
+    std::string gpu_arch = rocm_ck::get_gpu_arch();
+    if(gpu_arch.empty())
     {
-        gpu_arch = gpu_arch.substr(0, colon_pos);
+        std::fprintf(stderr, "Failed to detect GPU architecture\n");
+        kpack_close(archive);
+        return 1;
     }
     std::printf("Detected GPU: %s\n", gpu_arch.c_str());
 

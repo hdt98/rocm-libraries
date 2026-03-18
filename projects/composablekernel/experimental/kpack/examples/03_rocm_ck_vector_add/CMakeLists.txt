@@ -25,8 +25,9 @@ set(KPACK_ROCM_PATH "/opt/rocm" CACHE PATH "ROCm installation path (for --rocm-p
 set(CK_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../include")
 get_filename_component(CK_INCLUDE_DIR "${CK_INCLUDE_DIR}" ABSOLUTE)
 
-# Pull in the vendored kpack runtime library
+# Pull in the vendored kpack runtime library and shared rocm_ck headers
 add_subdirectory(../../rocm_kpack rocm_kpack_build)
+add_subdirectory(../../include rocm_ck_build)
 
 # --- Kernel variants ---
 set(KERNEL_VARIANTS
@@ -55,11 +56,13 @@ foreach(variant IN LISTS KERNEL_VARIANTS)
                     --rocm-path=${KPACK_ROCM_PATH}
                     -I${CK_INCLUDE_DIR}
                     -I${CMAKE_CURRENT_SOURCE_DIR}
+                    -I${CMAKE_CURRENT_SOURCE_DIR}/../../include
                     -o ${hsaco_output}
                     ${CMAKE_CURRENT_SOURCE_DIR}/${variant}.hip
             DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${variant}.hip
                     ${CMAKE_CURRENT_SOURCE_DIR}/rocm_vector_add_dev.hpp
                     ${CMAKE_CURRENT_SOURCE_DIR}/rocm_vector_add_api.hpp
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/rocm_ck/datatype_utils.hpp
             COMMENT "Compiling ${variant}.hip -> ${arch}.hsaco"
         )
         list(APPEND HSACO_FILES ${hsaco_output})
@@ -83,5 +86,5 @@ add_custom_target(kpack_archive ALL DEPENDS ${CMAKE_BINARY_DIR}/kernels.kpack)
 add_executable(kpack_rocm_ck_vector_add main.cpp)
 target_compile_features(kpack_rocm_ck_vector_add PRIVATE cxx_std_20)
 target_include_directories(kpack_rocm_ck_vector_add PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(kpack_rocm_ck_vector_add PRIVATE rocm_kpack hip::host)
+target_link_libraries(kpack_rocm_ck_vector_add PRIVATE rocm_ck rocm_kpack hip::host)
 add_dependencies(kpack_rocm_ck_vector_add kpack_archive)

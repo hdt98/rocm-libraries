@@ -25,8 +25,9 @@ set(KPACK_ROCM_PATH "/opt/rocm" CACHE PATH "ROCm installation path (for --rocm-p
 set(CK_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../../../include")
 get_filename_component(CK_INCLUDE_DIR "${CK_INCLUDE_DIR}" ABSOLUTE)
 
-# Pull in the vendored kpack runtime library
+# Pull in the vendored kpack runtime library and shared rocm_ck headers
 add_subdirectory(../../rocm_kpack rocm_kpack_build)
+add_subdirectory(../../include rocm_ck_build)
 
 # --- Compile ck_tile_add.hip into per-architecture .hsaco code objects ---
 # Uses --cuda-device-only to produce raw code objects without host stubs.
@@ -65,5 +66,5 @@ add_custom_target(kpack_archive ALL DEPENDS ${CMAKE_BINARY_DIR}/kernels.kpack)
 # Links against hip::host (host-only HIP runtime) and rocm_kpack (archive reader).
 # Device code is loaded at runtime via hipModuleLoadData, not compiled into this binary.
 add_executable(kpack_ck_tile_vector_add main.cpp)
-target_link_libraries(kpack_ck_tile_vector_add PRIVATE rocm_kpack hip::host)
+target_link_libraries(kpack_ck_tile_vector_add PRIVATE rocm_ck rocm_kpack hip::host)
 add_dependencies(kpack_ck_tile_vector_add kpack_archive)

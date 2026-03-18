@@ -9,101 +9,22 @@
 
 #include "rocm_vector_add_registry.hpp"
 
+#include <rocm_ck/datatype_utils.hpp>
+#include <rocm_ck/gpu_arch.hpp>
+#include <rocm_ck/hip_check.hpp>
+
 #include <hip/hip_runtime.h>
 
 #include <rocm_kpack/kpack.h>
 
 #include <cmath>
-#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <string>
 #include <vector>
-
-#define HIP_CHECK(call)                                  \
-    do                                                   \
-    {                                                    \
-        hipError_t err = (call);                         \
-        if(err != hipSuccess)                            \
-        {                                                \
-            std::fprintf(stderr,                         \
-                         "HIP error %d (%s) at %s:%d\n", \
-                         err,                            \
-                         hipGetErrorString(err),         \
-                         __FILE__,                       \
-                         __LINE__);                      \
-            std::exit(1);                                \
-        }                                                \
-    } while(0)
 
 using rocm_ck::ALL_VARIANTS;
 using rocm_ck::ALL_VARIANTS_COUNT;
-
-// --- Host-side type conversion utilities ---
-// main.cpp is compiled with GCC (not hipcc), so hip's half/bfloat16 operator
-// overloads are not available. We use _Float16 (GCC built-in) for fp16 and
-// raw bit manipulation for bf16.
-
-static std::uint16_t float_to_bf16_bits(float f)
-{
-    std::uint32_t u;
-    std::memcpy(&u, &f, sizeof(u));
-    // Round to nearest even: add rounding bias based on LSB + trailing bits
-    u += 0x7FFF + ((u >> 16) & 1);
-    return static_cast<std::uint16_t>(u >> 16);
-}
-
-static float bf16_bits_to_float(std::uint16_t bits)
-{
-    std::uint32_t u = static_cast<std::uint32_t>(bits) << 16;
-    float f;
-    std::memcpy(&f, &u, sizeof(f));
-    return f;
-}
-
-/// Convert a float to the device type and store into a byte buffer.
-static void float_to_typed(rocm_ck::DataType dt, float value, void* dst)
-{
-    switch(dt)
-    {
-    case rocm_ck::DataType::FP32: *static_cast<float*>(dst) = value; break;
-    case rocm_ck::DataType::FP16:
-        *static_cast<_Float16*>(dst) = static_cast<_Float16>(value);
-        break;
-    case rocm_ck::DataType::BF16:
-        *static_cast<std::uint16_t*>(dst) = float_to_bf16_bits(value);
-        break;
-    case rocm_ck::DataType::FP8: break; // not used
-    }
-}
-
-/// Read a typed value from a byte buffer and convert to float.
-static float typed_to_float(rocm_ck::DataType dt, const void* src)
-{
-    switch(dt)
-    {
-    case rocm_ck::DataType::FP32: return *static_cast<const float*>(src);
-    case rocm_ck::DataType::FP16: return static_cast<float>(*static_cast<const _Float16*>(src));
-    case rocm_ck::DataType::BF16:
-        return bf16_bits_to_float(*static_cast<const std::uint16_t*>(src));
-    case rocm_ck::DataType::FP8: return 0.0f;
-    }
-    return 0.0f;
-}
-
-/// Tolerance for verification based on data type.
-static float tolerance_for(rocm_ck::DataType dt)
-{
-    switch(dt)
-    {
-    case rocm_ck::DataType::FP32: return 1e-5f;
-    case rocm_ck::DataType::FP16: return 1e-2f;
-    case rocm_ck::DataType::BF16: return 1e-1f;
-    case rocm_ck::DataType::FP8: return 1.0f;
-    }
-    return 1e-5f;
-}
 
 int main(int argc, char** argv)
 {
@@ -134,14 +55,12 @@ int main(int argc, char** argv)
     std::printf("\n");
 
     // --- Detect current GPU architecture ---
-    hipDeviceProp_t device_props;
-    HIP_CHECK(hipGetDeviceProperties(&device_props, 0));
-
-    std::string gpu_arch = device_props.gcnArchName;
-    size_t colon_pos     = gpu_arch.find(':');
-    if(colon_pos != std::string::npos)
+    std::string gpu_arch = rocm_ck::get_gpu_arch();
+    if(gpu_arch.empty())
     {
-        gpu_arch = gpu_arch.substr(0, colon_pos);
+        std::fprintf(stderr, "Failed to detect GPU architecture\n");
+        kpack_close(archive);
+        return 1;
     }
     std::printf("Detected GPU: %s\n", gpu_arch.c_str());
 
@@ -165,9 +84,7 @@ int main(int argc, char** argv)
         const auto* best = rocm_ck::find_variant(dt, NUM_ELEMENTS);
         if(best)
             std::printf("  %s -> %s (tile=%d, warps=%d)\n",
-                        dt == rocm_ck::DataType::FP32   ? "FP32"
-                        : dt == rocm_ck::DataType::FP16 ? "FP16"
-                                                        : "BF16",
+                        rocm_ck::data_type_name(dt),
                         best->name,
                         best->kernel.block_tile,
                         best->kernel.block_warps);
@@ -218,8 +135,8 @@ int main(int argc, char** argv)
         std::vector<char> typed_b(buf_size);
         for(int i = 0; i < NUM_ELEMENTS; ++i)
         {
-            float_to_typed(dt, host_a[i], typed_a.data() + i * type_bytes);
-            float_to_typed(dt, host_b[i], typed_b.data() + i * type_bytes);
+            rocm_ck::float_to_typed(dt, host_a[i], typed_a.data() + i * type_bytes);
+            rocm_ck::float_to_typed(dt, host_b[i], typed_b.data() + i * type_bytes);
         }
 
         HIP_CHECK(hipMemcpy(device_a, typed_a.data(), buf_size, hipMemcpyHostToDevice));
@@ -264,11 +181,11 @@ int main(int argc, char** argv)
         std::vector<char> typed_result(buf_size);
         HIP_CHECK(hipMemcpy(typed_result.data(), device_result, buf_size, hipMemcpyDeviceToHost));
 
-        const float tol = tolerance_for(dt);
+        const float tol = rocm_ck::tolerance_for(dt);
         bool passed     = true;
         for(int i = 0; i < NUM_ELEMENTS; ++i)
         {
-            float got      = typed_to_float(dt, typed_result.data() + i * type_bytes);
+            float got      = rocm_ck::typed_to_float(dt, typed_result.data() + i * type_bytes);
             float expected = host_a[i] + host_b[i];
             if(std::fabs(got - expected) > tol)
             {

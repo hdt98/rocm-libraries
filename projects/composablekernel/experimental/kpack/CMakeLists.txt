@@ -16,4 +16,5 @@
 cmake_minimum_required(VERSION 3.21)
 project(kpack_experiment)
 
+add_subdirectory(include)
 add_subdirectory(examples/01_hello_world)

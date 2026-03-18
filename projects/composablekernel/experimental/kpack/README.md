@@ -57,8 +57,14 @@ host executable  (variant selection → hipModuleLoadData → hipModuleLaunchKer
 
 ```text
 experimental/kpack/
-├── CMakeLists.txt                  # Top-level (delegates to examples)
+├── CMakeLists.txt                  # Top-level (delegates to include/ and examples)
 ├── README.md
+├── include/                        # Shared host-side headers (header-only)
+│   ├── CMakeLists.txt              # INTERFACE library target "rocm_ck"
+│   └── rocm_ck/
+│       ├── hip_check.hpp           # HIP_CHECK error-checking macro
+│       ├── gpu_arch.hpp            # get_gpu_arch() — GPU architecture detection
+│       └── datatype_utils.hpp      # DataType enum, type conversions, tolerances
 ├── rocm_kpack/                     # Vendored kpack C runtime library (from TheRock)
 │   ├── CMakeLists.txt
 │   ├── include/rocm_kpack/

@@ -21,8 +21,9 @@ find_package(hip REQUIRED)
 set(GPU_TARGETS "gfx90a;gfx942;gfx950" CACHE STRING "GPU architectures to compile .hsaco for")
 set(KPACK_ROCM_PATH "/opt/rocm" CACHE PATH "ROCm installation path (for --rocm-path)")
 
-# Pull in the vendored kpack runtime library
+# Pull in the vendored kpack runtime library and shared rocm_ck headers
 add_subdirectory(../../rocm_kpack rocm_kpack_build)
+add_subdirectory(../../include rocm_ck_build)
 
 # --- Compile vector_add.hip into per-architecture .hsaco code objects ---
 # Uses --cuda-device-only to produce raw code objects without host stubs.
@@ -59,5 +60,5 @@ add_custom_target(kpack_archive ALL DEPENDS ${CMAKE_BINARY_DIR}/kernels.kpack)
 # Links against hip::host (host-only HIP runtime) and rocm_kpack (archive reader).
 # Device code is loaded at runtime via hipModuleLoadData, not compiled into this binary.
 add_executable(kpack_hello_world main.cpp)
-target_link_libraries(kpack_hello_world PRIVATE rocm_kpack hip::host)
+target_link_libraries(kpack_hello_world PRIVATE rocm_ck rocm_kpack hip::host)
 add_dependencies(kpack_hello_world kpack_archive)
