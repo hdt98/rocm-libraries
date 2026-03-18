@@ -1798,6 +1798,11 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
         {
             if(!is_tf32_supported())
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "TF32 is not supported on this device." << " In " << __FILE__
+                              << ":" << __LINE__ << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
             if constexpr(!is_same_v<ComputeTypeA, ComputeTypeB>)
@@ -1823,12 +1828,26 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                 {
                     if(num_k_loop <= GridwiseGemm64::BlockwiseGemmPipe::PrefetchStages)
                     {
+                        if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                        {
+                            std::cout << "num_k_loop=" << num_k_loop
+                                      << " <= PrefetchStages="
+                                      << GridwiseGemm64::BlockwiseGemmPipe::PrefetchStages
+                                      << " for wave64." << " In " << __FILE__ << ":" << __LINE__
+                                      << ", in function: " << __func__ << std::endl;
+                        }
                         return false;
                     }
                 }
             }
             else
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "NXdlPerWave64=0, wave64 path not available." << " In "
+                              << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
+                              << std::endl;
+                }
                 return false;
             }
         }
@@ -1844,17 +1863,37 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                 {
                     if(num_k_loop <= GridwiseGemm32::BlockwiseGemmPipe::PrefetchStages)
                     {
+                        if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                        {
+                            std::cout << "num_k_loop=" << num_k_loop
+                                      << " <= PrefetchStages="
+                                      << GridwiseGemm32::BlockwiseGemmPipe::PrefetchStages
+                                      << " for wave32." << " In " << __FILE__ << ":" << __LINE__
+                                      << ", in function: " << __func__ << std::endl;
+                        }
                         return false;
                     }
                 }
             }
             else
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "NXdlPerWave32=0, wave32 path not available." << " In "
+                              << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
+                              << std::endl;
+                }
                 return false;
             }
             // TODO: this is needed because there is a bug
             if(arg.k_batch_ > 1)
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "wave32 with k_batch_>1 not supported (bug workaround), k_batch_="
+                              << arg.k_batch_ << "." << " In " << __FILE__ << ":" << __LINE__
+                              << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
         }
@@ -1874,6 +1913,12 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
         }
         if(!ck::is_xdl_wmma_supported<ComputeTypeA, ComputeTypeB, MPerXDL, NPerXDL>())
         {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Current device does not support xdl/wmma instructions!" << " In "
+                          << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
+                          << std::endl;
+            }
             return false;
         }
         if constexpr(NDimSpatial == 2)
@@ -1881,6 +1926,12 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
             if constexpr(!(is_NHWGC_GKYXC_NHWGK<InLayout, WeiLayout, OutLayout>() ||
                            is_NGCHW_NGKHW<InLayout, WeiLayout, OutLayout>()))
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "Unsupported layout combination for NDimSpatial=2." << " In "
+                              << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
+                              << std::endl;
+                }
                 return false;
             }
         }
@@ -1889,11 +1940,23 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
             if constexpr(!(is_NDHWGC_GKZYXC_NDHWGK<InLayout, WeiLayout, OutLayout>() ||
                            is_NGCDHW_NGKDHW<InLayout, WeiLayout, OutLayout>()))
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "Unsupported layout combination for NDimSpatial=3." << " In "
+                              << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
+                              << std::endl;
+                }
                 return false;
             }
         }
         else
         {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Unsupported layout combination for NDimSpatial=" << NDimSpatial
+                          << "." << " In " << __FILE__ << ":" << __LINE__
+                          << ", in function: " << __func__ << std::endl;
+            }
             return false;
         }
 
@@ -1906,6 +1969,16 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                 if(!(arg.filter_spatial_lengths_[i] == 1 && arg.conv_filter_strides_[i] == 1 &&
                      arg.input_left_pads_[i] == 0 && arg.input_right_pads_[i] == 0))
                 {
+                    if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                    {
+                        std::cout << "Filter1x1Stride1Pad0: dim " << i
+                                  << " does not match (filter="
+                                  << arg.filter_spatial_lengths_[i]
+                                  << ", stride=" << arg.conv_filter_strides_[i]
+                                  << ", pad=" << arg.input_left_pads_[i] << ")." << " In "
+                                  << __FILE__ << ":" << __LINE__
+                                  << ", in function: " << __func__ << std::endl;
+                    }
                     return false;
                 }
             }
@@ -1916,14 +1989,35 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
             // support only if whole M and N can be proccessed on one block
             if(!(GemmM <= MPerBlock && GemmN <= NPerBlock))
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "NumGroupsToMerge>1: GemmM=" << GemmM << " or GemmN=" << GemmN
+                              << " exceeds block size (MPerBlock=" << MPerBlock
+                              << ", NPerBlock=" << NPerBlock << ")." << " In " << __FILE__ << ":"
+                              << __LINE__ << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
             if(!(arg.Conv_C_ == 1 && arg.Conv_K_ == 1))
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "NumGroupsToMerge>1: Conv_C_=" << arg.Conv_C_
+                              << " and Conv_K_=" << arg.Conv_K_ << " must both be 1." << " In "
+                              << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
+                              << std::endl;
+                }
                 return false;
             }
             if(arg.Conv_G_ % NumGroupsToMerge != 0)
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "NumGroupsToMerge>1: Conv_G_=" << arg.Conv_G_
+                              << " not divisible by NumGroupsToMerge=" << NumGroupsToMerge << "."
+                              << " In " << __FILE__ << ":" << __LINE__
+                              << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
         }
@@ -1941,11 +2035,27 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
             if(!(arg.Conv_K_ == 1 && arg.compute_ptr_offset_of_batch_.BatchStrideA_ == 1 &&
                  NumGroupsToMerge > 1))
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "Conv_K_=" << arg.Conv_K_
+                              << " not multiple of ABlockTransferSrcScalarPerVector="
+                              << ABlockTransferSrcScalarPerVector
+                              << " and fallback conditions not met." << " In " << __FILE__ << ":"
+                              << __LINE__ << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
             if(!(arg.Conv_C_ == 1 && arg.compute_ptr_offset_of_batch_.BatchStrideB_ == 1 &&
                  NumGroupsToMerge > 1))
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "Conv_C_=" << arg.Conv_C_
+                              << " not multiple of BBlockTransferSrcScalarPerVector="
+                              << BBlockTransferSrcScalarPerVector
+                              << " and fallback conditions not met." << " In " << __FILE__ << ":"
+                              << __LINE__ << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
         }
@@ -1953,12 +2063,27 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
         // vector load A/B matrix from global memory
         if(!(ABlockTransferSrcVectorDim == 1 && BBlockTransferSrcVectorDim == 1))
         {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "ABlockTransferSrcVectorDim=" << ABlockTransferSrcVectorDim
+                          << " or BBlockTransferSrcVectorDim=" << BBlockTransferSrcVectorDim
+                          << " is not 1 (required for this solver)." << " In " << __FILE__ << ":"
+                          << __LINE__ << ", in function: " << __func__ << std::endl;
+            }
             return false;
         }
 
         // vector store C matrix into global memory
         if(!(arg.Conv_C_ % CBlockTransferScalarPerVector_NWaveNPerXdl == 0))
         {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Conv_C_=" << arg.Conv_C_
+                          << " not multiple of CBlockTransferScalarPerVector_NWaveNPerXdl="
+                          << CBlockTransferScalarPerVector_NWaveNPerXdl << "." << " In "
+                          << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
+                          << std::endl;
+            }
             return false;
         }
 
@@ -1967,11 +2092,25 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
         {
             if((arg.Conv_G_ * arg.Conv_C_) % TransposeTransferDstScalarPerVector != 0)
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "Conv_G_ * Conv_C_=" << (arg.Conv_G_ * arg.Conv_C_)
+                              << " not multiple of TransposeTransferDstScalarPerVector="
+                              << TransposeTransferDstScalarPerVector << "." << " In " << __FILE__
+                              << ":" << __LINE__ << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
 
             if((arg.Conv_G_ * arg.Conv_K_) % TransposeTransferDstScalarPerVector != 0)
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "Conv_G_ * Conv_K_=" << (arg.Conv_G_ * arg.Conv_K_)
+                              << " not multiple of TransposeTransferDstScalarPerVector="
+                              << TransposeTransferDstScalarPerVector << "." << " In " << __FILE__
+                              << ":" << __LINE__ << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
 
@@ -1982,11 +2121,25 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
 
             if(input_spatial_acum % TransposeTransferSrcScalarPerVector != 0)
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "input_spatial_acum=" << input_spatial_acum
+                              << " not multiple of TransposeTransferSrcScalarPerVector="
+                              << TransposeTransferSrcScalarPerVector << "." << " In " << __FILE__
+                              << ":" << __LINE__ << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
 
             if(output_spatial_acum % TransposeTransferSrcScalarPerVector != 0)
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "output_spatial_acum=" << output_spatial_acum
+                              << " not multiple of TransposeTransferSrcScalarPerVector="
+                              << TransposeTransferSrcScalarPerVector << "." << " In " << __FILE__
+                              << ":" << __LINE__ << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
 
@@ -1994,6 +2147,15 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
             if(!(arg.a_out_transpose_desc_.GetElementSpaceSize() * sizeof(ADataType) <= TwoGB &&
                  arg.b_out_transpose_desc_.GetElementSpaceSize() * sizeof(BDataType) <= TwoGB))
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "Tensor(s) exceed 2GB limit (a_transpose="
+                              << arg.a_out_transpose_desc_.GetElementSpaceSize() * sizeof(ADataType)
+                              << ", b_transpose="
+                              << arg.b_out_transpose_desc_.GetElementSpaceSize() * sizeof(BDataType)
+                              << ", limit=" << TwoGB << ")." << " In " << __FILE__ << ":"
+                              << __LINE__ << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
         }

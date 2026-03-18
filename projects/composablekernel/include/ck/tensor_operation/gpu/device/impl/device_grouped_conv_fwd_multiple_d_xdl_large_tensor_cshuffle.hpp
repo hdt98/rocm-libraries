@@ -854,12 +854,25 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
 
         if(!ds_valid)
         {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Ds tensor shape/stride mismatch with E tensor." << " In " << __FILE__
+                          << ":" << __LINE__ << ", in function: " << __func__ << std::endl;
+            }
             return false;
         }
 
         // Check if all descs are valid
         if(!(arg.is_split_valid_ && arg.gemms_count_ == arg.valid_gemms_count_))
         {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Invalid split descriptors: is_split_valid_=" << arg.is_split_valid_
+                          << ", gemms_count_=" << arg.gemms_count_
+                          << ", valid_gemms_count_=" << arg.valid_gemms_count_ << "." << " In "
+                          << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
+                          << std::endl;
+            }
             return false;
         }
         // check device
@@ -868,6 +881,12 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
             // FIXME: re-enable fp64 when SWDEV-335738 is fixed
             if constexpr(!(is_same_v<AccDataType, float> || is_same_v<AccDataType, int32_t>))
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "On gfx908 the accumulation data type must be fp32 or int32."
+                              << " In " << __FILE__ << ":" << __LINE__
+                              << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
         }
@@ -876,6 +895,12 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
                                       Wave32MaxMNPerXDL,
                                       Wave32MaxMNPerXDL>())
         {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Current device does not support xdl/wmma instructions!" << " In "
+                          << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
+                          << std::endl;
+            }
             return false;
         }
         if constexpr(is_same_v<AComputeDataType, ck::tf32_t> ||
@@ -883,6 +908,11 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
         {
             if(!is_tf32_supported())
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "TF32 is not supported on this device." << " In " << __FILE__
+                              << ":" << __LINE__ << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
             if constexpr(!is_same_v<AComputeDataType, BComputeDataType>)
@@ -909,6 +939,14 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
 
                 if(!(X == 1 && ConvStride == 1 && LeftPad == 0 && RightPad == 0))
                 {
+                    if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                    {
+                        std::cout << "Filter1x1Stride1Pad0 specialization: dim " << i
+                                  << " does not match (filter_size=" << X
+                                  << ", stride=" << ConvStride << ", left_pad=" << LeftPad
+                                  << ", right_pad=" << RightPad << ")." << " In " << __FILE__
+                                  << ":" << __LINE__ << ", in function: " << __func__ << std::endl;
+                    }
                     return false;
                 }
             }
@@ -925,6 +963,14 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
 
                 if(!(X == 1 && LeftPad == 0 && RightPad == 0))
                 {
+                    if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                    {
+                        std::cout << "Filter1x1Pad0 specialization: dim " << i
+                                  << " does not match (filter_size=" << X
+                                  << ", left_pad=" << LeftPad << ", right_pad=" << RightPad << ")."
+                                  << " In " << __FILE__ << ":" << __LINE__
+                                  << ", in function: " << __func__ << std::endl;
+                    }
                     return false;
                 }
             }
@@ -933,6 +979,12 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
         {
             if(C != 1)
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "Filter3x3 specialization requires C=1, but C=" << C << "."
+                              << " In " << __FILE__ << ":" << __LINE__
+                              << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
             for(index_t i = 0; i < NDimSpatial; ++i)
@@ -941,11 +993,24 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
 
                 if(filter_spatial_dim != I3)
                 {
+                    if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                    {
+                        std::cout << "Filter3x3 specialization: dim " << i
+                                  << " filter_size=" << filter_spatial_dim << " != 3." << " In "
+                                  << __FILE__ << ":" << __LINE__
+                                  << ", in function: " << __func__ << std::endl;
+                    }
                     return false;
                 }
             }
             if constexpr(!is_NSpatialGC_GKSpatial_NSpatialGK<ALayout, BLayout, ELayout>())
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "Filter3x3 specialization: unsupported layout combination."
+                              << " In " << __FILE__ << ":" << __LINE__
+                              << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
         }
@@ -961,11 +1026,25 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
             // Check access per C
             if(!(ABlockTransferSrcVectorDim == 2 && C % ABlockTransferSrcScalarPerVector == 0))
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "[A Layout] C=" << C
+                              << " is not a multiple of ABlockTransferSrcScalarPerVector="
+                              << ABlockTransferSrcScalarPerVector
+                              << " (ABlockTransferSrcVectorDim=" << ABlockTransferSrcVectorDim
+                              << ")." << " In " << __FILE__ << ":" << __LINE__
+                              << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
         }
         else
         {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Unsupported A Layout!" << " In " << __FILE__ << ":" << __LINE__
+                          << ", in function: " << __func__ << std::endl;
+            }
             return false;
         }
 
@@ -980,11 +1059,25 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
         {
             if(!(BBlockTransferSrcVectorDim == 2 && C % BBlockTransferSrcScalarPerVector == 0))
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "[B Layout] C=" << C
+                              << " is not a multiple of BBlockTransferSrcScalarPerVector="
+                              << BBlockTransferSrcScalarPerVector
+                              << " (BBlockTransferSrcVectorDim=" << BBlockTransferSrcVectorDim
+                              << ")." << " In " << __FILE__ << ":" << __LINE__
+                              << ", in function: " << __func__ << std::endl;
+                }
                 return false;
             }
         }
         else
         {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Unsupported B Layout!" << " In " << __FILE__ << ":" << __LINE__
+                          << ", in function: " << __func__ << std::endl;
+            }
             return false;
         }
 
@@ -997,11 +1090,24 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
         {
             if(!(K % CDEBlockTransferScalarPerVector_NPerBlock == 0))
             {
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "[E Layout] K=" << K
+                              << " is not a multiple of CDEBlockTransferScalarPerVector_NPerBlock="
+                              << CDEBlockTransferScalarPerVector_NPerBlock << "." << " In "
+                              << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
+                              << std::endl;
+                }
                 return false;
             }
         }
         else
         {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Unsupported E Layout!" << " In " << __FILE__ << ":" << __LINE__
+                          << ", in function: " << __func__ << std::endl;
+            }
             return false;
         }
 
