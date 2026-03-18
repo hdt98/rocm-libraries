@@ -307,42 +307,78 @@ struct CShuffleEpilogue
         // N is contiguous dimension
         if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::RowMajor>)
         {
+            // Compute LdsVectorLen: largest power-of-2 <= VectorLen that allows 2-bit XOR
+            // Constraint: NPerIterationShuffle >= 2^(log2(LdsVectorLen) + 2)
+            // Therefore: LdsVectorLen <= NPerIterationShuffle / 4
+            constexpr index_t LdsVectorLen = []() constexpr {
+                constexpr index_t max_for_xor = NPerIterationShuffle / 4;
+                index_t v = VectorLen;
+                while(v > max_for_xor && v > 1)
+                    v >>= 1;
+                return v;
+            }();
+
             constexpr index_t MLdsLayerRequired =
                 banks * BytesPerBank / NPerIterationShuffle / DataTypeSize;
             constexpr auto MLdsLayer = max(1, MLdsLayerRequired);
 
+            // XOR swizzle constraint: NPerIterationShuffle >= 2^(log2(VectorLen) + 2)
+            // With VectorLen=16 (fp16), need N >= 64
+            // With VectorLen=32 (fp8), need N >= 128
+            // The LdsVectorLen reduction allows smaller N, but we also need enough
+            // column bits after the reduction. Use the simpler conservative check.
+            constexpr bool xor_swizzle_effective = NPerIterationShuffle >= (VectorLen * 4);
+
             constexpr index_t BaseStrideElems = NPerIterationShuffle * MLdsLayer;
-            static_assert((BaseStrideElems * DataTypeSize) % BytesPerBank == 0,
+            constexpr index_t StrideBytes     = BaseStrideElems * DataTypeSize;
+            static_assert(StrideBytes % BytesPerBank == 0,
                           "LDS row stride must be 4B-aligned for bank-word padding logic");
-            // calculate how many elements to pad to avoid bank conflict
+
+            // When XOR swizzle can't be used (insufficient column bits), add padding
+            // For 16x16 XDL: rows 0,4,8,12 conflict when stride_bytes % 32 == 0
+            // For 32x32 XDL: rows 0,8,16,24 conflict when stride_bytes % 64 == 0
+            // Adding 8 bytes (e.g., 4 fp16 elements) shifts banks by 8 every 4 rows
+            constexpr index_t ConflictPadBytes = []() constexpr {
+                if constexpr(!xor_swizzle_effective && MPerXdl == 16)
+                    return (StrideBytes % 32 == 0) ? 8 : 0;
+                else if constexpr(!xor_swizzle_effective && MPerXdl == 32)
+                    return (StrideBytes % 64 == 0) ? 8 : 0;
+                else
+                    return 0; // XOR swizzle handles conflicts
+            }();
+            constexpr index_t ConflictPadElems = ConflictPadBytes / DataTypeSize;
+
+            // After conflict padding, calculate gfx950 even-word padding
+            constexpr index_t StrideWithConflictPad = BaseStrideElems + ConflictPadElems;
 #if defined(__gfx950__)
             constexpr index_t ElemsPer4B = BytesPerBank / ck_tile::gcd(BytesPerBank, DataTypeSize);
             constexpr auto ToWords       = [](index_t elems) constexpr {
                 return (elems * DataTypeSize) / BytesPerBank;
             };
-            constexpr index_t BaseWords  = ToWords(BaseStrideElems);
-            constexpr index_t PadWords   = ((BaseWords % 2) == 0) ? 1 : 0;
-            constexpr auto PaddingAmount = PadWords * ElemsPer4B;
+            constexpr index_t WordsWithConflictPad = ToWords(StrideWithConflictPad);
+            constexpr index_t Gfx950PadWords       = ((WordsWithConflictPad % 2) == 0) ? 1 : 0;
+            constexpr index_t Gfx950PadElems       = Gfx950PadWords * ElemsPer4B;
 #else
-            constexpr auto PaddingAmount = 0;
+            constexpr index_t Gfx950PadElems = 0;
 #endif
+            constexpr auto PaddingAmount = ConflictPadElems + Gfx950PadElems;
 
             constexpr auto lds_block_desc_0 = make_naive_tensor_descriptor(
                 make_tuple(number<MPerIterationShuffle / MLdsLayer>{},
-                           number<NPerIterationShuffle / VectorLen * MLdsLayer>{},
-                           number<VectorLen>{}),
+                           number<NPerIterationShuffle / LdsVectorLen * MLdsLayer>{},
+                           number<LdsVectorLen>{}),
                 make_tuple(number<NPerIterationShuffle * MLdsLayer + PaddingAmount>{},
-                           number<VectorLen>{},
+                           number<LdsVectorLen>{},
                            number<1>{}),
-                number<VectorLen>{},
+                number<LdsVectorLen>{},
                 number<1>{});
 
             constexpr auto lds_block_desc_1 = transform_tensor_descriptor(
                 lds_block_desc_0,
                 make_tuple(make_pass_through_transform(number<MPerIterationShuffle / MLdsLayer>{}),
                            make_unmerge_transform(make_tuple(
-                               number<MLdsLayer>{}, number<NPerIterationShuffle / VectorLen>{})),
-                           make_pass_through_transform(number<VectorLen>{})),
+                               number<MLdsLayer>{}, number<NPerIterationShuffle / LdsVectorLen>{})),
+                           make_pass_through_transform(number<LdsVectorLen>{})),
                 make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
                 make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
 
@@ -351,11 +387,11 @@ struct CShuffleEpilogue
                 make_tuple(make_merge_transform_v3_division_mod(make_tuple(
                                number<MPerIterationShuffle / MLdsLayer>{}, number<MLdsLayer>{})),
                            make_merge_transform_v3_division_mod(make_tuple(
-                               number<NPerIterationShuffle / VectorLen>{}, number<VectorLen>{}))),
+                               number<NPerIterationShuffle / LdsVectorLen>{}, number<LdsVectorLen>{}))),
                 make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
 
-            // Apply XOR swizzle to avoid LDS bank conflicts
+            // Apply XOR swizzle to avoid LDS bank conflicts when effective
             // LDS has 32 banks with 4-byte words. Bank = (byte_addr / 4) % 32
             // For stores, gfx950 (64 physical banks) also behaves like 32 banks.
             //
@@ -365,52 +401,61 @@ struct CShuffleEpilogue
             //
             // We use RowPeriod = MPerXdl to handle wave layouts where
             // MPerIterationShuffle > MPerXdl (e.g., 4x1 with MPerIterationShuffle=64)
-            constexpr index_t log2_vec = [] {
-                index_t v = VectorLen, l = 0;
-                while(v > 1) { v >>= 1; ++l; }
-                return l;
-            }();
-            constexpr index_t col_bit_start = log2_vec;
-
-            // Check if we have enough column bits for the XOR transform
-            // We need col bits [col_bit_start, col_bit_start+1], so max bit is col_bit_start+1
-            // This requires NPerIterationShuffle >= 2^(col_bit_start+2)
-            constexpr bool has_enough_col_bits =
-                (1 << (col_bit_start + 2)) <= NPerIterationShuffle;
-
-            if constexpr(MPerXdl == 16 && has_enough_col_bits)
+            //
+            // For narrow N (xor_swizzle_effective=false), we use padding instead
+            // of XOR swizzle - see ConflictPadBytes calculation above
+            if constexpr(xor_swizzle_effective)
             {
-                // 16x16 XDL: rows 0,4,8,12 conflict - XOR row bits 2,3
-                using RowBits = sequence<2, 3>;
-                using ColBits = sequence<col_bit_start, col_bit_start + 1>;
+                constexpr index_t log2_lds_vec = [] {
+                    index_t v = LdsVectorLen, l = 0;
+                    while(v > 1)
+                    {
+                        v >>= 1;
+                        ++l;
+                    }
+                    return l;
+                }();
+                constexpr index_t col_bit_start = log2_lds_vec;
 
-                constexpr auto lds_block_desc = transform_tensor_descriptor(
-                    lds_block_desc_2,
-                    make_tuple(make_xor_bits_transform<RowBits, ColBits, MPerXdl>(
-                        make_tuple(number<MPerIterationShuffle>{}, number<NPerIterationShuffle>{}))),
-                    make_tuple(sequence<0, 1>{}),
-                    make_tuple(sequence<0, 1>{}));
+                if constexpr(MPerXdl == 16)
+                {
+                    // 16x16 XDL: rows 0,4,8,12 conflict - XOR row bits 2,3
+                    using RowBits = sequence<2, 3>;
+                    using ColBits = sequence<col_bit_start, col_bit_start + 1>;
 
-                return lds_block_desc;
-            }
-            else if constexpr(MPerXdl == 32 && has_enough_col_bits)
-            {
-                // 32x32 XDL: rows 0,8,16,24 conflict - XOR row bits 3,4
-                using RowBits = sequence<3, 4>;
-                using ColBits = sequence<col_bit_start, col_bit_start + 1>;
+                    constexpr auto lds_block_desc = transform_tensor_descriptor(
+                        lds_block_desc_2,
+                        make_tuple(make_xor_bits_transform<RowBits, ColBits, MPerXdl>(
+                            make_tuple(number<MPerIterationShuffle>{}, number<NPerIterationShuffle>{}))),
+                        make_tuple(sequence<0, 1>{}),
+                        make_tuple(sequence<0, 1>{}));
 
-                constexpr auto lds_block_desc = transform_tensor_descriptor(
-                    lds_block_desc_2,
-                    make_tuple(make_xor_bits_transform<RowBits, ColBits, MPerXdl>(
-                        make_tuple(number<MPerIterationShuffle>{}, number<NPerIterationShuffle>{}))),
-                    make_tuple(sequence<0, 1>{}),
-                    make_tuple(sequence<0, 1>{}));
+                    return lds_block_desc;
+                }
+                else if constexpr(MPerXdl == 32)
+                {
+                    // 32x32 XDL: rows 0,8,16,24 conflict - XOR row bits 3,4
+                    using RowBits = sequence<3, 4>;
+                    using ColBits = sequence<col_bit_start, col_bit_start + 1>;
 
-                return lds_block_desc;
+                    constexpr auto lds_block_desc = transform_tensor_descriptor(
+                        lds_block_desc_2,
+                        make_tuple(make_xor_bits_transform<RowBits, ColBits, MPerXdl>(
+                            make_tuple(number<MPerIterationShuffle>{}, number<NPerIterationShuffle>{}))),
+                        make_tuple(sequence<0, 1>{}),
+                        make_tuple(sequence<0, 1>{}));
+
+                    return lds_block_desc;
+                }
+                else
+                {
+                    // Fallback: no XOR swizzle for unsupported XDL sizes
+                    return lds_block_desc_2;
+                }
             }
             else
             {
-                // Fallback: no XOR swizzle (either unsupported XDL size or narrow N)
+                // Narrow N: XOR swizzle not effective, rely on padding for conflict avoidance
                 return lds_block_desc_2;
             }
         }
