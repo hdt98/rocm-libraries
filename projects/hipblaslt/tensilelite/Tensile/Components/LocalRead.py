@@ -578,9 +578,8 @@ class LocalReadMFMA(LocalRead):
             valOffset = baseValuiIdx + index
             dstValOffset = baseValuiIdx + index // 2
             v0H, v1H, v2H, v3H = self.get4VgprForEmu(writer, kernel, tc, index, valOffset, iui, lrvwTile, dst=True)
-            packCodeT.add(VCmpClassF32(dst=VCC(), src0=v0H, src1=vgpr(writer.states.startVgprInfCheck), comment="Check if high bits are Inf"))
             # packCodeT.add(VMovB32(vgpr(tmp), "0x7F800000", comment="set to inf"))
-            packCodeT.add(VCndMaskB32(dst=v0, src1=v0, src0=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
+            # packCodeT.add(VCndMaskB32(dst=v0, src1=v0, src0=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
             # packCodeT.add(VCndMaskB32(dst=v1, src1=v1, src0=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
             # packCodeT.add(VCndMaskB32(dst=v2, src1=v2, src0=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
             # packCodeT.add(VCndMaskB32(dst=v3, src1=v3, src0=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
@@ -604,6 +603,14 @@ class LocalReadMFMA(LocalRead):
             packCodeT.add(VCvtPkF32toBF16(dst=v5d, src0=v2, src1=v3))
             commentStr = "" if noComment else "__TF32_2_" + tc + "_%d pack final end"%(baseValuiIdx//8)
             packCodeT.add(VCvtPkF32toBF16(dst=v4d, src0=v0, src1=v1, comment=commentStr))
+            packCodeT.add(VCmpClassF32(dst=VCC(), src0=v0H, src1=vgpr(writer.states.startVgprInfCheck), comment="Check if high bits are Inf"))
+            packCodeT.add(VCndMaskB32(dst=v4d, src0=v4d, src1=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
+            packCodeT.add(VCmpClassF32(dst=VCC(), src0=v1H, src1=vgpr(writer.states.startVgprInfCheck), comment="Check if high bits are Inf"))
+            packCodeT.add(VCndMaskB32(dst=v5d, src0=v5d, src1=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
+            packCodeT.add(VCmpClassF32(dst=VCC(), src0=v2H, src1=vgpr(writer.states.startVgprInfCheck), comment="Check if high bits are Inf"))
+            packCodeT.add(VCndMaskB32(dst=v6d, src0=v6d, src1=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
+            packCodeT.add(VCmpClassF32(dst=VCC(), src0=v3H, src1=vgpr(writer.states.startVgprInfCheck), comment="Check if high bits are Inf"))
+            packCodeT.add(VCndMaskB32(dst=v7d, src1=v7d, src0=vgpr(writer.states.startVgprInf), src2=VCC(), comment="if input was inf, set low bits to inf to avoid nan"))
     """
     Local Read: Do It A/B
     iui = Inner Unroll Idx
