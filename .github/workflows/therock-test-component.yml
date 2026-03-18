@@ -14,6 +14,9 @@ on:
         type: string
       component:
         type: string
+      therock_ref:
+        type: string
+        required: true
 
 
 permissions:
@@ -57,6 +60,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: "ROCm/TheRock"
+          ref: ${{ inputs.therock_ref }}
           sparse-checkout: build_tools
           path: "prejob"
 
@@ -70,7 +74,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: "ROCm/TheRock"
-          ref: 2d9260c2b1c87175539a9fc45a2e9513ed36aff6 # 2026-04-16
+          ref: ${{ inputs.therock_ref }}
 
       - name: Configure git for long paths on Windows
         if: ${{ runner.os == 'Windows' }}

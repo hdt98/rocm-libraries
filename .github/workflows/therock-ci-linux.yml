@@ -158,4 +158,5 @@ jobs:
       test_runs_on: ${{ inputs.test_runs_on }}
       platform: "linux"
       test_type: ${{ inputs.test_type }}
+      therock_ref: ${{ inputs.therock_ref }}
     secrets: inherit
