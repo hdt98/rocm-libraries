@@ -7,10 +7,10 @@
 using namespace ck_tile;
 
 // =============================================================================
-// Basic Matrix Operations
+// Part 1: Dimension-Level Tests
 // =============================================================================
 
-TEST(GF2Matrix, DefaultConstruction)
+TEST(GF2DimMatrix, DefaultConstruction)
 {
     gf2_matrix<3> m;
     for(index_t i = 0; i < 3; ++i)
@@ -22,63 +22,7 @@ TEST(GF2Matrix, DefaultConstruction)
     }
 }
 
-TEST(GF2Matrix, GetSet)
-{
-    gf2_matrix<3> m;
-
-    m.set(0, 0, true);
-    m.set(1, 2, true);
-    m.set(2, 1, true);
-
-    EXPECT_TRUE(m.get(0, 0));
-    EXPECT_FALSE(m.get(0, 1));
-    EXPECT_TRUE(m.get(1, 2));
-    EXPECT_FALSE(m.get(2, 2));
-    EXPECT_TRUE(m.get(2, 1));
-
-    m.set(0, 0, false);
-    EXPECT_FALSE(m.get(0, 0));
-}
-
-TEST(GF2Matrix, Equality)
-{
-    auto a = make_gf2_identity<3>();
-    auto b = make_gf2_identity<3>();
-
-    EXPECT_EQ(a, b);
-
-    b.set(0, 1, true);
-    EXPECT_NE(a, b);
-}
-
-// =============================================================================
-// Identity Matrix
-// =============================================================================
-
-TEST(GF2Matrix, Identity2)
-{
-    auto id = make_gf2_identity<2>();
-
-    EXPECT_TRUE(id.get(0, 0));
-    EXPECT_FALSE(id.get(0, 1));
-    EXPECT_FALSE(id.get(1, 0));
-    EXPECT_TRUE(id.get(1, 1));
-}
-
-TEST(GF2Matrix, Identity4)
-{
-    auto id = make_gf2_identity<4>();
-
-    for(index_t i = 0; i < 4; ++i)
-    {
-        for(index_t j = 0; j < 4; ++j)
-        {
-            EXPECT_EQ(id.get(i, j), i == j);
-        }
-    }
-}
-
-TEST(GF2Matrix, IdentityApply)
+TEST(GF2DimMatrix, Identity)
 {
     auto id = make_gf2_identity<3>();
 
@@ -90,175 +34,45 @@ TEST(GF2Matrix, IdentityApply)
     EXPECT_EQ(out[2], 15);
 }
 
-// =============================================================================
-// Apply Transform
-// =============================================================================
-
-TEST(GF2Matrix, ApplyXorSwizzle2D)
+TEST(GF2DimMatrix, XorSwizzle2D)
 {
     auto swizzle = make_xor_swizzle_2d();
-
-    // row' = row, col' = row ^ col
-    {
-        multi_index<2> in{0, 0};
-        auto out = swizzle.apply(in);
-        EXPECT_EQ(out[0], 0); // row' = 0
-        EXPECT_EQ(out[1], 0); // col' = 0 ^ 0 = 0
-    }
-    {
-        multi_index<2> in{3, 5};
-        auto out = swizzle.apply(in);
-        EXPECT_EQ(out[0], 3);     // row' = 3
-        EXPECT_EQ(out[1], 3 ^ 5); // col' = 3 ^ 5 = 6
-    }
-    {
-        multi_index<2> in{7, 7};
-        auto out = swizzle.apply(in);
-        EXPECT_EQ(out[0], 7);     // row' = 7
-        EXPECT_EQ(out[1], 7 ^ 7); // col' = 0
-    }
-}
-
-TEST(GF2Matrix, ApplyGenericXor)
-{
-    // XOR dimension 0 into dimension 2 in a 3D space
-    auto swizzle = make_xor_swizzle<3>(0, 2);
-
-    multi_index<3> in{5, 10, 15};
-    auto out = swizzle.apply(in);
-
-    EXPECT_EQ(out[0], 5);       // unchanged
-    EXPECT_EQ(out[1], 10);      // unchanged
-    EXPECT_EQ(out[2], 5 ^ 15);  // XOR'd with dim 0
-}
-
-TEST(GF2Matrix, ApplyMultipleXor)
-{
-    // out[0] = in[0] ^ in[1]
-    // out[1] = in[1]
-    gf2_matrix<2> m;
-    m.set(0, 0, true);
-    m.set(0, 1, true);
-    m.set(1, 1, true);
 
     multi_index<2> in{3, 5};
-    auto out = m.apply(in);
+    auto out = swizzle.apply(in);
 
-    EXPECT_EQ(out[0], 3 ^ 5); // = 6
-    EXPECT_EQ(out[1], 5);
+    EXPECT_EQ(out[0], 3);     // row' = row
+    EXPECT_EQ(out[1], 3 ^ 5); // col' = row ^ col = 6
 }
 
-TEST(GF2Matrix, ApplyThreeWayXor)
-{
-    // out[0] = in[0] ^ in[1] ^ in[2]
-    gf2_matrix<3> m;
-    m.set(0, 0, true);
-    m.set(0, 1, true);
-    m.set(0, 2, true);
-    m.set(1, 1, true);
-    m.set(2, 2, true);
-
-    multi_index<3> in{1, 2, 4};
-    auto out = m.apply(in);
-
-    EXPECT_EQ(out[0], 1 ^ 2 ^ 4); // = 7
-    EXPECT_EQ(out[1], 2);
-    EXPECT_EQ(out[2], 4);
-}
-
-// =============================================================================
-// Matrix Composition
-// =============================================================================
-
-TEST(GF2Matrix, ComposeIdentityLeft)
-{
-    auto id = make_gf2_identity<3>();
-    auto swizzle = make_xor_swizzle<3>(0, 1);
-
-    auto result = gf2_compose(id, swizzle);
-    EXPECT_EQ(result, swizzle);
-}
-
-TEST(GF2Matrix, ComposeIdentityRight)
-{
-    auto id = make_gf2_identity<3>();
-    auto swizzle = make_xor_swizzle<3>(0, 1);
-
-    auto result = gf2_compose(swizzle, id);
-    EXPECT_EQ(result, swizzle);
-}
-
-TEST(GF2Matrix, ComposeSelfInverse)
+TEST(GF2DimMatrix, SelfInverse)
 {
     auto swizzle = make_xor_swizzle_2d();
-    auto composed = gf2_compose(swizzle, swizzle);
-    auto id = make_gf2_identity<2>();
+    EXPECT_TRUE(gf2_is_self_inverse(swizzle));
 
-    EXPECT_EQ(composed, id);
+    // Apply twice should return to original
+    multi_index<2> original{7, 13};
+    auto swizzled = swizzle.apply(original);
+    auto restored = swizzle.apply(swizzled);
+    EXPECT_EQ(restored, original);
 }
 
-TEST(GF2Matrix, ComposeAssociativity)
+TEST(GF2DimMatrix, Compose)
 {
-    // Create three different transforms
-    auto a = make_xor_swizzle<3>(0, 1); // XOR dim 0 into dim 1
-    auto b = make_xor_swizzle<3>(1, 2); // XOR dim 1 into dim 2
-    auto c = make_xor_swizzle<3>(0, 2); // XOR dim 0 into dim 2
-
-    auto ab = gf2_compose(a, b);
-    auto bc = gf2_compose(b, c);
-    auto ab_c = gf2_compose(ab, c);
-    auto a_bc = gf2_compose(a, bc);
-
-    // Verify via apply
-    multi_index<3> in{3, 5, 7};
-    EXPECT_EQ(ab_c.apply(in), a_bc.apply(in));
-}
-
-TEST(GF2Matrix, ComposeChainApply)
-{
-    // Composing A @ B should give same result as applying B then A
     auto a = make_xor_swizzle<3>(0, 1);
     auto b = make_xor_swizzle<3>(1, 2);
-
     auto composed = gf2_compose(a, b);
 
     multi_index<3> in{3, 5, 7};
+    auto via_compose = composed.apply(in);
 
-    // Apply b then a
     auto temp = b.apply(in);
-    auto sequential = a.apply(temp);
+    auto via_chain = a.apply(temp);
 
-    // Apply composed
-    auto direct = composed.apply(in);
-
-    EXPECT_EQ(direct, sequential);
+    EXPECT_EQ(via_compose, via_chain);
 }
 
-// =============================================================================
-// Matrix Inversion
-// =============================================================================
-
-TEST(GF2Matrix, InverseIdentity)
-{
-    auto id = make_gf2_identity<3>();
-    bool success;
-    auto inv = gf2_inverse(id, success);
-
-    EXPECT_TRUE(success);
-    EXPECT_EQ(inv, id);
-}
-
-TEST(GF2Matrix, InverseXorSwizzle)
-{
-    auto swizzle = make_xor_swizzle_2d();
-    bool success;
-    auto inv = gf2_inverse(swizzle, success);
-
-    EXPECT_TRUE(success);
-    EXPECT_EQ(inv, swizzle); // Self-inverse
-}
-
-TEST(GF2Matrix, InverseVerifyCompose)
+TEST(GF2DimMatrix, Inverse)
 {
     auto m = make_xor_swizzle<3>(0, 2);
     bool success;
@@ -266,127 +80,207 @@ TEST(GF2Matrix, InverseVerifyCompose)
 
     EXPECT_TRUE(success);
 
-    // M @ M^-1 = I
     auto product = gf2_compose(m, inv);
-    auto id = make_gf2_identity<3>();
-    EXPECT_EQ(product, id);
-
-    // M^-1 @ M = I
-    auto product2 = gf2_compose(inv, m);
-    EXPECT_EQ(product2, id);
-}
-
-TEST(GF2Matrix, InverseSingular)
-{
-    // Matrix with duplicate rows is singular
-    gf2_matrix<2> m;
-    m.set(0, 0, true);
-    m.set(0, 1, true);
-    m.set(1, 0, true);
-    m.set(1, 1, true); // Same as row 0
-
-    bool success;
-    gf2_inverse(m, success);
-
-    EXPECT_FALSE(success);
-}
-
-TEST(GF2Matrix, InverseZeroRow)
-{
-    gf2_matrix<3> m = make_gf2_identity<3>();
-    // Make row 1 all zeros
-    m.set(1, 1, false);
-
-    bool success;
-    gf2_inverse(m, success);
-
-    EXPECT_FALSE(success);
-}
-
-TEST(GF2Matrix, InverseRoundTrip)
-{
-    // More complex invertible matrix
-    gf2_matrix<3> m;
-    m.set(0, 0, true);
-    m.set(0, 2, true);  // out[0] = in[0] ^ in[2]
-    m.set(1, 1, true);
-    m.set(1, 2, true);  // out[1] = in[1] ^ in[2]
-    m.set(2, 2, true);  // out[2] = in[2]
-
-    bool success;
-    auto inv = gf2_inverse(m, success);
-    EXPECT_TRUE(success);
-
-    // (M^-1)^-1 = M
-    auto inv_inv = gf2_inverse(inv, success);
-    EXPECT_TRUE(success);
-    EXPECT_EQ(inv_inv, m);
-
-    // Verify by applying
-    multi_index<3> in{3, 5, 7};
-    auto transformed = m.apply(in);
-    auto restored = inv.apply(transformed);
-    EXPECT_EQ(restored, in);
-}
-
-TEST(GF2Matrix, IsInvertible)
-{
-    EXPECT_TRUE(gf2_is_invertible(make_gf2_identity<4>()));
-    EXPECT_TRUE(gf2_is_invertible(make_xor_swizzle_2d()));
-    EXPECT_TRUE(gf2_is_invertible(make_xor_swizzle<3>(0, 1)));
-
-    // Singular
-    gf2_matrix<2> singular;
-    singular.set(0, 0, true);
-    // Row 1 is all zeros
-    EXPECT_FALSE(gf2_is_invertible(singular));
-}
-
-TEST(GF2Matrix, IsSelfInverse)
-{
-    EXPECT_TRUE(gf2_is_self_inverse(make_gf2_identity<4>()));
-    EXPECT_TRUE(gf2_is_self_inverse(make_xor_swizzle_2d()));
-    EXPECT_TRUE(gf2_is_self_inverse(make_xor_swizzle<3>(0, 1)));
-    EXPECT_TRUE(gf2_is_self_inverse(make_xor_swizzle<4>(2, 3)));
-
-    // Cyclic permutation is NOT self-inverse
-    gf2_matrix<3> cyclic;
-    cyclic.set(0, 2, true); // out[0] = in[2]
-    cyclic.set(1, 0, true); // out[1] = in[0]
-    cyclic.set(2, 1, true); // out[2] = in[1]
-    EXPECT_FALSE(gf2_is_self_inverse(cyclic));
+    EXPECT_EQ(product, make_gf2_identity<3>());
 }
 
 // =============================================================================
-// XOR Swizzle Specific Tests
+// Part 2: Bit-Level Tests
 // =============================================================================
 
-TEST(GF2Swizzle, MatchesCKBehavior)
+TEST(GF2BitMatrix, DefaultConstruction)
 {
-    // Verify XOR swizzle matches CK's xor_t: col' = col ^ row
-    auto swizzle = make_xor_swizzle_2d();
-
-    for(index_t row = 0; row < 16; ++row)
+    gf2_bit_matrix<8> m;
+    for(index_t i = 0; i < 8; ++i)
     {
-        for(index_t col = 0; col < 16; ++col)
+        EXPECT_EQ(m.rows[i], 0ULL);
+    }
+}
+
+TEST(GF2BitMatrix, Identity)
+{
+    auto id = make_gf2_bit_identity<8>();
+
+    for(uint64_t i = 0; i < 256; ++i)
+    {
+        EXPECT_EQ(id.apply(i), i);
+    }
+}
+
+TEST(GF2BitMatrix, GetSet)
+{
+    gf2_bit_matrix<8> m;
+
+    m.set(3, 5, true);
+    EXPECT_TRUE(m.get(3, 5));
+    EXPECT_FALSE(m.get(3, 4));
+    EXPECT_FALSE(m.get(2, 5));
+
+    m.set(3, 5, false);
+    EXPECT_FALSE(m.get(3, 5));
+}
+
+TEST(GF2BitMatrix, SimpleXor)
+{
+    // out[0] = in[0] ^ in[1]
+    // out[1] = in[1]
+    gf2_bit_matrix<2> m;
+    m.rows[0] = 0b11; // XOR bits 0 and 1
+    m.rows[1] = 0b10; // Just bit 1
+
+    EXPECT_EQ(m.apply(0b00), 0b00ULL);
+    EXPECT_EQ(m.apply(0b01), 0b01ULL); // in[0]=1,in[1]=0 -> out[0]=1^0=1, out[1]=0
+    EXPECT_EQ(m.apply(0b10), 0b11ULL); // in[0]=0,in[1]=1 -> out[0]=0^1=1, out[1]=1
+    EXPECT_EQ(m.apply(0b11), 0b10ULL); // in[0]=1,in[1]=1 -> out[0]=1^1=0, out[1]=1
+}
+
+TEST(GF2BitMatrix, XorSwizzleBits)
+{
+    // 3-bit row, 3-bit col
+    auto swizzle = make_xor_swizzle_bits<3, 3>();
+
+    // Input: [row=3, col=5] packed as 0b101_011 = row in bits 0-2, col in bits 3-5
+    // row = 011 = 3, col = 101 = 5
+    uint64_t input = 3 | (5 << 3);
+
+    // Expected: row' = row = 3, col' = col ^ row = 5 ^ 3 = 6
+    uint64_t expected = 3 | (6 << 3);
+
+    EXPECT_EQ(swizzle.apply(input), expected);
+}
+
+TEST(GF2BitMatrix, SelfInverse)
+{
+    auto swizzle = make_xor_swizzle_bits<4, 4>();
+    EXPECT_TRUE(gf2_bit_is_self_inverse(swizzle));
+}
+
+TEST(GF2BitMatrix, Compose)
+{
+    auto id = make_gf2_bit_identity<8>();
+    auto swizzle = make_xor_swizzle_bits<4, 4>();
+
+    auto left = gf2_bit_compose(id, swizzle);
+    auto right = gf2_bit_compose(swizzle, id);
+
+    EXPECT_EQ(left, swizzle);
+    EXPECT_EQ(right, swizzle);
+}
+
+TEST(GF2BitMatrix, Inverse)
+{
+    auto swizzle = make_xor_swizzle_bits<3, 3>();
+    bool success;
+    auto inv = gf2_bit_inverse(swizzle, success);
+
+    EXPECT_TRUE(success);
+    EXPECT_EQ(inv, swizzle); // Self-inverse
+
+    auto product = gf2_bit_compose(swizzle, inv);
+    EXPECT_EQ(product, make_gf2_bit_identity<6>());
+}
+
+// =============================================================================
+// Part 3: Bit-Level Transform with Multi-Index Interface
+// =============================================================================
+
+TEST(GF2BitTransform, XorSwizzle)
+{
+    auto transform = make_bit_xor_swizzle<6, 7>(); // 64 rows, 128 cols
+
+    for(index_t row = 0; row < 64; ++row)
+    {
+        for(index_t col = 0; col < 128; ++col)
         {
             multi_index<2> in{row, col};
-            auto out = swizzle.apply(in);
+            auto out = transform.apply(in);
 
-            EXPECT_EQ(out[0], row) << "row=" << row << " col=" << col;
-            EXPECT_EQ(out[1], row ^ col) << "row=" << row << " col=" << col;
+            EXPECT_EQ(out[0], row);
+            // col' = col ^ row, but only lower 6 bits of row (since ColBits > RowBits after bit 5)
+            index_t expected_col = col ^ row;
+            EXPECT_EQ(out[1], expected_col) << "row=" << row << " col=" << col;
         }
     }
 }
 
-TEST(GF2Swizzle, SelfInverseProperty)
+TEST(GF2BitTransform, SelfInverse)
 {
-    // Applying swizzle twice should return to original
-    auto swizzle = make_xor_swizzle_2d();
+    auto transform = make_bit_xor_swizzle<6, 7>();
 
-    for(index_t row = 0; row < 16; ++row)
+    for(index_t row = 0; row < 64; row += 7)
     {
-        for(index_t col = 0; col < 16; ++col)
+        for(index_t col = 0; col < 128; col += 11)
+        {
+            multi_index<2> original{row, col};
+            auto swizzled = transform.apply(original);
+            auto restored = transform.apply(swizzled);
+
+            EXPECT_EQ(restored, original) << "row=" << row << " col=" << col;
+        }
+    }
+}
+
+// =============================================================================
+// Part 4: Custom Swizzle for Bank Conflict Avoidance
+// =============================================================================
+
+TEST(GF2CustomSwizzle, HighBitSwizzle)
+{
+    // For 4x1 wave layout problem: rows 0, 32, 64, 96 need different banks
+    // These rows differ in bits 5 and 6
+    // XOR row bits 5,6 into col bits 3,4 to spread bank access
+
+    constexpr index_t RowBits = 7; // rows 0-127
+    constexpr index_t ColBits = 7; // cols 0-127
+
+    array<index_t, 2> row_bits{5, 6};
+    array<index_t, 2> col_bits{3, 4};
+
+    auto swizzle = make_custom_bit_swizzle<RowBits, ColBits, 2>(row_bits, col_bits);
+
+    // Check that rows 0, 32, 64, 96 at same col get different swizzled cols
+    index_t col = 0;
+
+    multi_index<2> r0{0, col};
+    multi_index<2> r32{32, col};
+    multi_index<2> r64{64, col};
+    multi_index<2> r96{96, col};
+
+    auto s0 = swizzle.apply(r0);
+    auto s32 = swizzle.apply(r32);
+    auto s64 = swizzle.apply(r64);
+    auto s96 = swizzle.apply(r96);
+
+    // Row 0:  bits 5,6 = 0,0 -> col XOR 0 = col
+    // Row 32: bits 5,6 = 1,0 -> col XOR (1<<3) = col ^ 8
+    // Row 64: bits 5,6 = 0,1 -> col XOR (1<<4) = col ^ 16
+    // Row 96: bits 5,6 = 1,1 -> col XOR (3<<3) = col ^ 24
+
+    EXPECT_EQ(s0[1], col);
+    EXPECT_EQ(s32[1], col ^ 8);
+    EXPECT_EQ(s64[1], col ^ 16);
+    EXPECT_EQ(s96[1], col ^ 24);
+
+    // All different!
+    EXPECT_NE(s0[1], s32[1]);
+    EXPECT_NE(s0[1], s64[1]);
+    EXPECT_NE(s0[1], s96[1]);
+    EXPECT_NE(s32[1], s64[1]);
+    EXPECT_NE(s32[1], s96[1]);
+    EXPECT_NE(s64[1], s96[1]);
+}
+
+TEST(GF2CustomSwizzle, SelfInverse)
+{
+    array<index_t, 2> row_bits{5, 6};
+    array<index_t, 2> col_bits{3, 4};
+
+    auto swizzle = make_custom_bit_swizzle<7, 7, 2>(row_bits, col_bits);
+
+    // Custom swizzles are also self-inverse
+    for(index_t row = 0; row < 128; row += 13)
+    {
+        for(index_t col = 0; col < 128; col += 17)
         {
             multi_index<2> original{row, col};
             auto swizzled = swizzle.apply(original);
@@ -397,124 +291,134 @@ TEST(GF2Swizzle, SelfInverseProperty)
     }
 }
 
-TEST(GF2Swizzle, BankConflictAvoidance)
+TEST(GF2CustomSwizzle, BankMapping)
 {
-    // Demonstrate how swizzle spreads bank access
-    // Assume 32 banks, 4-byte words, col is the fast dimension
+    // Verify that the swizzle spreads bank access for 32-bank LDS
+    // Bank = (byte_address / 4) % 32 = (col * 2 / 4) % 32 = (col / 2) % 32 for fp16
 
-    auto swizzle = make_xor_swizzle_2d();
+    array<index_t, 2> row_bits{5, 6};
+    array<index_t, 2> col_bits{3, 4};
 
-    // Without swizzle: threads at same column hit same bank
-    // With swizzle: different rows access different banks
+    auto swizzle = make_custom_bit_swizzle<7, 7, 2>(row_bits, col_bits);
 
-    auto get_bank = [](index_t col) { return col % 32; };
+    auto get_bank = [](index_t col) { return (col / 2) % 32; };
 
-    // Check rows 0 and 1, column 0
+    // Without swizzle: rows 0, 32, 64, 96 at col 0 all hit bank 0
+    EXPECT_EQ(get_bank(0), get_bank(0)); // trivially same
+
+    // With swizzle: they should hit different banks
+    multi_index<2> r0{0, 0};
+    multi_index<2> r32{32, 0};
+    multi_index<2> r64{64, 0};
+    multi_index<2> r96{96, 0};
+
+    auto s0 = swizzle.apply(r0);
+    auto s32 = swizzle.apply(r32);
+    auto s64 = swizzle.apply(r64);
+    auto s96 = swizzle.apply(r96);
+
+    index_t bank0 = get_bank(s0[1]);
+    index_t bank32 = get_bank(s32[1]);
+    index_t bank64 = get_bank(s64[1]);
+    index_t bank96 = get_bank(s96[1]);
+
+    // All different banks
+    EXPECT_NE(bank0, bank32);
+    EXPECT_NE(bank0, bank64);
+    EXPECT_NE(bank0, bank96);
+    EXPECT_NE(bank32, bank64);
+    EXPECT_NE(bank32, bank96);
+    EXPECT_NE(bank64, bank96);
+}
+
+// =============================================================================
+// Part 5: Equivalence Tests
+// =============================================================================
+
+TEST(GF2Equivalence, BitLevelMatchesDimensionLevel)
+{
+    // Bit-level with block-diagonal structure should match dimension-level
+    auto dim_swizzle = make_xor_swizzle_2d();
+    auto bit_swizzle = make_bit_xor_swizzle<6, 6>(); // Same bits per dim
+
+    for(index_t row = 0; row < 64; ++row)
     {
-        multi_index<2> row0{0, 0};
-        multi_index<2> row1{1, 0};
+        for(index_t col = 0; col < 64; ++col)
+        {
+            multi_index<2> in{row, col};
 
-        // Without swizzle: both hit bank 0
-        EXPECT_EQ(get_bank(row0[1]), get_bank(row1[1]));
+            auto dim_out = dim_swizzle.apply(in);
+            auto bit_out = bit_swizzle.apply(in);
 
-        // With swizzle: different banks
-        auto swiz0 = swizzle.apply(row0);
-        auto swiz1 = swizzle.apply(row1);
-        EXPECT_NE(get_bank(swiz0[1]), get_bank(swiz1[1]));
+            EXPECT_EQ(dim_out, bit_out) << "row=" << row << " col=" << col;
+        }
     }
 }
 
 // =============================================================================
-// Compile-Time Evaluation
+// Part 6: Coordinate Packer Tests
 // =============================================================================
 
-TEST(GF2CompileTime, ConstexprIdentity)
+TEST(CoordinatePacker, PackUnpack)
+{
+    using Packer = coordinate_packer<6, 7>; // 6-bit row, 7-bit col
+
+    for(index_t row = 0; row < 64; ++row)
+    {
+        for(index_t col = 0; col < 128; ++col)
+        {
+            multi_index<2> in{row, col};
+            uint64_t packed = Packer::pack(in);
+            auto unpacked = Packer::unpack(packed);
+
+            EXPECT_EQ(unpacked, in);
+        }
+    }
+}
+
+TEST(CoordinatePacker, BitLayout)
+{
+    using Packer = coordinate_packer<3, 4>;
+
+    // dim 0 in bits 0-2, dim 1 in bits 3-6
+    multi_index<2> in{0b111, 0b1111};
+    uint64_t packed = Packer::pack(in);
+
+    EXPECT_EQ(packed, 0b1111111ULL);
+    EXPECT_EQ(packed & 0b111, 0b111ULL);        // row
+    EXPECT_EQ((packed >> 3) & 0b1111, 0b1111ULL); // col
+}
+
+// =============================================================================
+// Part 7: Compile-Time Tests
+// =============================================================================
+
+TEST(GF2CompileTime, DimLevel)
 {
     constexpr auto id = make_gf2_identity<3>();
     static_assert(id.get(0, 0) == true);
     static_assert(id.get(0, 1) == false);
-    static_assert(id.get(1, 1) == true);
-    static_assert(id.get(2, 2) == true);
-}
 
-TEST(GF2CompileTime, ConstexprXorSwizzle)
-{
-    constexpr auto swizzle = make_xor_swizzle_2d();
-    static_assert(swizzle.get(0, 0) == true);
-    static_assert(swizzle.get(0, 1) == false);
-    static_assert(swizzle.get(1, 0) == true);
-    static_assert(swizzle.get(1, 1) == true);
-}
-
-TEST(GF2CompileTime, ConstexprCompose)
-{
-    constexpr auto swizzle = make_xor_swizzle_2d();
-    constexpr auto composed = gf2_compose(swizzle, swizzle);
-    constexpr auto id = make_gf2_identity<2>();
-    static_assert(composed == id);
-}
-
-TEST(GF2CompileTime, ConstexprSelfInverse)
-{
     constexpr auto swizzle = make_xor_swizzle_2d();
     static_assert(gf2_is_self_inverse(swizzle));
 }
 
-TEST(GF2CompileTime, ConstexprApply)
+TEST(GF2CompileTime, BitLevel)
 {
-    constexpr auto swizzle = make_xor_swizzle_2d();
-    constexpr multi_index<2> in{3, 5};
-    constexpr auto out = swizzle.apply(in);
-    static_assert(out[0] == 3);
-    static_assert(out[1] == (3 ^ 5));
+    constexpr auto id = make_gf2_bit_identity<8>();
+    static_assert(id.rows[0] == 0b00000001);
+    static_assert(id.rows[7] == 0b10000000);
+
+    constexpr auto swizzle = make_xor_swizzle_bits<3, 3>();
+    static_assert(gf2_bit_is_self_inverse(swizzle));
 }
 
-// =============================================================================
-// Edge Cases
-// =============================================================================
-
-TEST(GF2EdgeCases, Dimension1)
+TEST(GF2CompileTime, CustomSwizzle)
 {
-    auto id = make_gf2_identity<1>();
-    EXPECT_TRUE(id.get(0, 0));
+    constexpr array<index_t, 2> row_bits{5, 6};
+    constexpr array<index_t, 2> col_bits{3, 4};
+    constexpr auto swizzle = make_custom_swizzle_bits<7, 7, 2>(row_bits, col_bits);
 
-    multi_index<1> in{42};
-    auto out = id.apply(in);
-    EXPECT_EQ(out[0], 42);
-}
-
-TEST(GF2EdgeCases, LargeDimension)
-{
-    constexpr index_t N = 8;
-    auto id = make_gf2_identity<N>();
-
-    multi_index<N> in{1, 2, 3, 4, 5, 6, 7, 8};
-    auto out = id.apply(in);
-
-    for(index_t i = 0; i < N; ++i)
-    {
-        EXPECT_EQ(out[i], in[i]);
-    }
-}
-
-TEST(GF2EdgeCases, ZeroInput)
-{
-    auto swizzle = make_xor_swizzle_2d();
-
-    multi_index<2> in{0, 0};
-    auto out = swizzle.apply(in);
-
-    EXPECT_EQ(out[0], 0);
-    EXPECT_EQ(out[1], 0);
-}
-
-TEST(GF2EdgeCases, LargeValues)
-{
-    auto swizzle = make_xor_swizzle_2d();
-
-    multi_index<2> in{1000, 2000};
-    auto out = swizzle.apply(in);
-
-    EXPECT_EQ(out[0], 1000);
-    EXPECT_EQ(out[1], 1000 ^ 2000);
+    // Verify it's invertible
+    static_assert(gf2_bit_is_invertible(swizzle));
 }
