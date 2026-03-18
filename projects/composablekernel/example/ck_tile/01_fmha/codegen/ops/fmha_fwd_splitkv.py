@@ -7,7 +7,7 @@ import itertools
 from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Callable, List, Optional, Union
 
 from codegen.arch import ArchTrait, get_factories_for_targets
 from codegen.cmake_config import GEN_DIR
@@ -652,16 +652,40 @@ class FmhaFwdSplitKVApiPool:
             F_dispatch=indent(per_arch)
         )
 
-    def render_all(self, func_name) -> str:
+    def render_all(
+        self,
+        func_name,
+        filter_fn: Optional[Callable[[FmhaFwdSplitKVApiTrait], bool]] = None,
+    ) -> str:
         """Render a function that runs ALL matching splitkv kernel instances (no heuristic)."""
+        if filter_fn is None:
+
+            def accept_all(trait: FmhaFwdSplitKVApiTrait) -> bool:
+                return True
+
+            filter_fn = accept_all
+
+        def has_traits(node) -> bool:
+            if isinstance(node, list):
+                return any(filter_fn(elem) for elem in node)
+            elif isinstance(node, OrderedDict):
+                return any(has_traits(val) for val in node.values())
+            return False
+
         per_arch = str()
-        for i_arch, (arch, pool_by_arch) in enumerate(self.pool.items()):
+        for i_arch, (arch, pool_by_arch) in enumerate(
+            item for item in self.pool.items() if has_traits(item[1])
+        ):
             per_dtypes = str()
-            for i_dtype, (dtype, pool_by_dtype) in enumerate(pool_by_arch.items()):
+            for i_dtype, (dtype, pool_by_dtype) in enumerate(
+                item for item in pool_by_arch.items() if has_traits(item[1])
+            ):
                 per_hdim_case = str()
-                for i_hdim, (hdim, pool_by_hdim) in enumerate(pool_by_dtype.items()):
+                for i_hdim, (hdim, pool_by_hdim) in enumerate(
+                    item for item in pool_by_dtype.items() if has_traits(item[1])
+                ):
                     inners = str()
-                    for trait in pool_by_hdim:
+                    for trait in (t for t in pool_by_hdim if filter_fn(t)):
                         # Build the kernel name string with padding suffix
                         pad_suffix = ""
                         for flag, tag in [

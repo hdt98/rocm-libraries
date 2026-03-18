@@ -1568,6 +1568,16 @@ fwd_result fmha_fwd_run(mode_enum mode,
         return fmha_fwd(fmha_traits, fmha_args, sc);
     };
 
+    // RAII guard for std::cout.rdbuf() redirect — restores original buffer
+    // even if the called function throws.
+    struct rdbuf_guard
+    {
+        std::ostream& os;
+        std::streambuf* orig;
+        rdbuf_guard(std::ostream& s, std::streambuf* buf) : os(s), orig(s.rdbuf(buf)) {}
+        ~rdbuf_guard() { os.rdbuf(orig); }
+    };
+
     // --- run_all_kernels path: benchmark every matching instance ---
     if(run_all_kernels)
     {
@@ -1590,7 +1600,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
             // Identify which kernel the heuristic would select
             {
                 std::ostringstream oss;
-                auto* oldbuf = std::cout.rdbuf(oss.rdbuf());
+                rdbuf_guard guard(std::cout, oss.rdbuf());
                 ck_tile::stream_config hsc{nullptr,
                                            false,
                                            /*log_level=*/1,
@@ -1598,7 +1608,6 @@ fwd_result fmha_fwd_run(mode_enum mode,
                                            /*repeat=*/1,
                                            false};
                 fmha_fwd_splitkv(fmha_splitkv_traits, fmha_splitkv_args, hsc);
-                std::cout.rdbuf(oldbuf);
                 std::string captured = oss.str();
                 auto pos             = captured.find("fmha_fwd_splitkv_");
                 if(pos != std::string::npos)
@@ -1629,7 +1638,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
             // Identify which kernel the heuristic would select
             {
                 std::ostringstream oss;
-                auto* oldbuf = std::cout.rdbuf(oss.rdbuf());
+                rdbuf_guard guard(std::cout, oss.rdbuf());
                 ck_tile::stream_config hsc{nullptr,
                                            false,
                                            /*log_level=*/1,
@@ -1637,7 +1646,6 @@ fwd_result fmha_fwd_run(mode_enum mode,
                                            /*repeat=*/1,
                                            false};
                 fmha_fwd(fmha_traits, fmha_args, hsc);
-                std::cout.rdbuf(oldbuf);
                 std::string captured = oss.str();
                 auto pos             = captured.find("fmha_fwd_");
                 if(pos != std::string::npos)
@@ -1652,7 +1660,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
 
         if(all_results.empty())
         {
-            std::cout << ", no matching instances" << std::flush << std::endl;
+            std::cout << " no matching instances" << std::flush << std::endl;
             return fwd_result::no_instance;
         }
 
