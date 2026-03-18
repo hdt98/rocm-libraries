@@ -33,6 +33,7 @@ set(KERNEL_VARIANTS
     vector_add_fp32_b256  vector_add_fp32_b512  vector_add_fp32_b1024
     vector_add_fp16_b512  vector_add_fp16_b1024
     vector_add_bf16_b512
+    vector_add_fp32_b256_sa
 )
 
 # --- Compile each variant × architecture into .hsaco code objects ---

@@ -50,9 +50,9 @@ struct VectorAddTypes
     using ComputeDataType = float;
     using YDataType       = typename ck_type_map<K.compute_type>::type;
 
-    using BlockTile  = ck_tile::sequence<K.block_size>;
-    using BlockWarps = ck_tile::sequence<1>;
-    using WarpTile   = ck_tile::sequence<K.block_size>;
+    using BlockTile  = ck_tile::sequence<K.block_tile>;
+    using BlockWarps = ck_tile::sequence<K.block_warps>;
+    using WarpTile   = ck_tile::sequence<K.warp_tile>;
     using Shape      = ck_tile::ElementWiseShape<BlockWarps, BlockTile, WarpTile, XDataType>;
 
     using Problem = ck_tile::ElementWisePipelineProblem<XDataType,
