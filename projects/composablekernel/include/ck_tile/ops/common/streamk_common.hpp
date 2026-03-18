@@ -113,10 +113,7 @@ struct StreamKReductionOps
                                    kargs.tile_partitioner.get_flags_buffer_size() +
                                    cta_idx * c_block_tile_buffer_size;
 
-        const auto& partial_tensor_view = make_naive_tensor_view<
-            address_space_enum::global,
-            memory_operation_enum::set,
-            StreamKCoherency<decltype(core::arch::get_compiler_target())>::BUFFER_COHERENCE>(
+        const auto& partial_tensor_view = make_naive_tensor_view<address_space_enum::global>(
             static_cast<DataType*>(partial_buffer_ptr),
             make_tuple(number<TilePartitioner::MPerBlock>{}, number<TilePartitioner::NPerBlock>{}),
             make_tuple(TilePartitioner::NPerBlock, 1),
