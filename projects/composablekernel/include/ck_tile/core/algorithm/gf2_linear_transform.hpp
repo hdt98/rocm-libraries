@@ -89,7 +89,7 @@ struct gf2_matrix
 // Dimension-level factory functions
 
 template <index_t NDim>
-CK_TILE_HOST_DEVICE constexpr auto make_gf2_identity()
+[[nodiscard]] CK_TILE_HOST_DEVICE constexpr auto make_gf2_identity()
 {
     gf2_matrix<NDim> result;
     for(index_t i = 0; i < NDim; ++i)
@@ -100,7 +100,7 @@ CK_TILE_HOST_DEVICE constexpr auto make_gf2_identity()
 }
 
 /// @brief Create XOR swizzle for 2D coordinates: row' = row, col' = col ^ row
-CK_TILE_HOST_DEVICE constexpr auto make_xor_swizzle_2d()
+[[nodiscard]] CK_TILE_HOST_DEVICE constexpr auto make_xor_swizzle_2d()
 {
     gf2_matrix<2> result;
     result.data[0][0] = true;  // row' = row
@@ -110,7 +110,7 @@ CK_TILE_HOST_DEVICE constexpr auto make_xor_swizzle_2d()
 }
 
 template <index_t NDim>
-CK_TILE_HOST_DEVICE constexpr auto make_xor_swizzle(index_t src, index_t dst)
+[[nodiscard]] CK_TILE_HOST_DEVICE constexpr auto make_xor_swizzle(index_t src, index_t dst)
 {
     auto result = make_gf2_identity<NDim>();
     result.data[dst][src] = true;
@@ -120,8 +120,8 @@ CK_TILE_HOST_DEVICE constexpr auto make_xor_swizzle(index_t src, index_t dst)
 // Dimension-level matrix operations
 
 template <index_t NDim>
-CK_TILE_HOST_DEVICE constexpr auto gf2_compose(const gf2_matrix<NDim>& a,
-                                                const gf2_matrix<NDim>& b)
+[[nodiscard]] CK_TILE_HOST_DEVICE constexpr auto gf2_compose(const gf2_matrix<NDim>& a,
+                                                              const gf2_matrix<NDim>& b)
 {
     gf2_matrix<NDim> result;
     for(index_t i = 0; i < NDim; ++i)
@@ -140,7 +140,7 @@ CK_TILE_HOST_DEVICE constexpr auto gf2_compose(const gf2_matrix<NDim>& a,
 }
 
 template <index_t NDim>
-CK_TILE_HOST_DEVICE constexpr auto gf2_inverse(const gf2_matrix<NDim>& m, bool& success)
+[[nodiscard]] CK_TILE_HOST_DEVICE constexpr auto gf2_inverse(const gf2_matrix<NDim>& m, bool& success)
 {
     array<array<bool, 2 * NDim>, NDim> aug{};
 
@@ -203,7 +203,7 @@ CK_TILE_HOST_DEVICE constexpr auto gf2_inverse(const gf2_matrix<NDim>& m, bool& 
 }
 
 template <index_t NDim>
-CK_TILE_HOST_DEVICE constexpr auto gf2_inverse(const gf2_matrix<NDim>& m)
+[[nodiscard]] CK_TILE_HOST_DEVICE constexpr auto gf2_inverse(const gf2_matrix<NDim>& m)
 {
     bool success;
     return gf2_inverse(m, success);
@@ -303,7 +303,7 @@ struct gf2_bit_matrix
 // Bit-level factory functions
 
 template <index_t Bits>
-CK_TILE_HOST_DEVICE constexpr auto make_gf2_bit_identity()
+[[nodiscard]] CK_TILE_HOST_DEVICE constexpr auto make_gf2_bit_identity()
 {
     gf2_bit_matrix<Bits> result;
     for(index_t i = 0; i < Bits; ++i)
@@ -321,7 +321,7 @@ CK_TILE_HOST_DEVICE constexpr auto make_gf2_bit_identity()
 /// @tparam RowBits Number of bits for row dimension
 /// @tparam ColBits Number of bits for col dimension
 template <index_t RowBits, index_t ColBits>
-CK_TILE_HOST_DEVICE constexpr auto make_xor_swizzle_bits()
+[[nodiscard]] CK_TILE_HOST_DEVICE constexpr auto make_xor_swizzle_bits()
 {
     constexpr index_t TotalBits = RowBits + ColBits;
     gf2_bit_matrix<TotalBits> result;
@@ -362,7 +362,7 @@ CK_TILE_HOST_DEVICE constexpr auto make_xor_swizzle_bits()
 /// @tparam ColBits Total col bits
 /// @tparam NumXor Number of bit pairs to XOR
 template <index_t RowBits, index_t ColBits, index_t NumXor>
-CK_TILE_HOST_DEVICE constexpr auto make_custom_swizzle_bits(
+[[nodiscard]] CK_TILE_HOST_DEVICE constexpr auto make_custom_swizzle_bits(
     const array<index_t, NumXor>& row_bits,
     const array<index_t, NumXor>& col_bits)
 {
@@ -383,8 +383,8 @@ CK_TILE_HOST_DEVICE constexpr auto make_custom_swizzle_bits(
 // Bit-level matrix operations
 
 template <index_t Bits>
-CK_TILE_HOST_DEVICE constexpr auto gf2_bit_compose(const gf2_bit_matrix<Bits>& a,
-                                                    const gf2_bit_matrix<Bits>& b)
+[[nodiscard]] CK_TILE_HOST_DEVICE constexpr auto gf2_bit_compose(const gf2_bit_matrix<Bits>& a,
+                                                                  const gf2_bit_matrix<Bits>& b)
 {
     gf2_bit_matrix<Bits> result;
 
@@ -409,7 +409,7 @@ CK_TILE_HOST_DEVICE constexpr auto gf2_bit_compose(const gf2_bit_matrix<Bits>& a
 }
 
 template <index_t Bits>
-CK_TILE_HOST_DEVICE constexpr auto gf2_bit_inverse(const gf2_bit_matrix<Bits>& m, bool& success)
+[[nodiscard]] CK_TILE_HOST_DEVICE constexpr auto gf2_bit_inverse(const gf2_bit_matrix<Bits>& m, bool& success)
 {
     // Augmented matrix [M | I] needs 2*Bits columns in 64-bit storage
     static_assert(Bits <= 32, "gf2_bit_inverse requires Bits <= 32 (augmented matrix needs 2*Bits columns)");
@@ -463,7 +463,7 @@ CK_TILE_HOST_DEVICE constexpr auto gf2_bit_inverse(const gf2_bit_matrix<Bits>& m
 }
 
 template <index_t Bits>
-CK_TILE_HOST_DEVICE constexpr auto gf2_bit_inverse(const gf2_bit_matrix<Bits>& m)
+[[nodiscard]] CK_TILE_HOST_DEVICE constexpr auto gf2_bit_inverse(const gf2_bit_matrix<Bits>& m)
 {
     bool success;
     return gf2_bit_inverse(m, success);
@@ -584,7 +584,7 @@ struct gf2_bit_transform
 
 /// @brief Create bit-level transform matching dimension-level XOR swizzle
 template <index_t RowBits, index_t ColBits>
-CK_TILE_HOST_DEVICE constexpr auto make_bit_xor_swizzle()
+[[nodiscard]] CK_TILE_HOST_DEVICE constexpr auto make_bit_xor_swizzle()
 {
     return gf2_bit_transform<RowBits, ColBits>{make_xor_swizzle_bits<RowBits, ColBits>()};
 }
@@ -594,7 +594,7 @@ CK_TILE_HOST_DEVICE constexpr auto make_bit_xor_swizzle()
 /// Example: To XOR row bits 5,6 into col bits 3,4:
 ///   make_custom_bit_swizzle<7, 7>({5, 6}, {3, 4})
 template <index_t RowBits, index_t ColBits, index_t NumXor>
-CK_TILE_HOST_DEVICE constexpr auto make_custom_bit_swizzle(
+[[nodiscard]] CK_TILE_HOST_DEVICE constexpr auto make_custom_bit_swizzle(
     const array<index_t, NumXor>& row_bits,
     const array<index_t, NumXor>& col_bits)
 {
