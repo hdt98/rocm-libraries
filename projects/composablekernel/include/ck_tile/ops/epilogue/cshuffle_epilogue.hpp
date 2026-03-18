@@ -346,7 +346,7 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
                 make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
 
-            constexpr auto lds_block_desc = transform_tensor_descriptor(
+            constexpr auto lds_block_desc_2 = transform_tensor_descriptor(
                 lds_block_desc_1,
                 make_tuple(make_merge_transform_v3_division_mod(make_tuple(
                                number<MPerIterationShuffle / MLdsLayer>{}, number<MLdsLayer>{})),
@@ -355,7 +355,42 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
 
-            return lds_block_desc;
+            // Apply XOR swizzle for 16x16 XDL to avoid bank conflicts
+            // For 16x16 tiles, 4 rows per warp access same banks without swizzle.
+            // XOR row bits 0,1 into col bits that affect bank selection.
+            // For FP16 (2B): bank = (col * 2 / 4) % 32 = (col / 2) % 32
+            //   Col bits 1-5 determine bank, so XOR into bits 2,3 (above vector alignment)
+            // For FP8 (1B): bank = (col / 4) % 32
+            //   Col bits 2-6 determine bank, so XOR into bits 3,4
+            if constexpr(MPerXdl == 16 && banks == 32)
+            {
+                // Determine which col bits to XOR based on data type size and vector length
+                // We want to XOR into bits that affect bank selection but are above VectorLen
+                constexpr index_t log2_vec      = [] {
+                    index_t v = VectorLen, l = 0;
+                    while(v > 1) { v >>= 1; ++l; }
+                    return l;
+                }();
+                // For 32 banks with 4B words: bank bits start at col bit (2 - log2(DataTypeSize))
+                // We XOR row bits 0,1 into col bits just above vector boundary
+                constexpr index_t col_bit_start = log2_vec;
+
+                using RowBits = sequence<0, 1>;
+                using ColBits = sequence<col_bit_start, col_bit_start + 1>;
+
+                constexpr auto lds_block_desc = transform_tensor_descriptor(
+                    lds_block_desc_2,
+                    make_tuple(make_xor_bits_transform<RowBits, ColBits>(
+                        make_tuple(number<MPerIterationShuffle>{}, number<NPerIterationShuffle>{}))),
+                    make_tuple(sequence<0, 1>{}),
+                    make_tuple(sequence<0, 1>{}));
+
+                return lds_block_desc;
+            }
+            else
+            {
+                return lds_block_desc_2;
+            }
         }
         // M is contiguous dimension
         else if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::ColumnMajor>)
