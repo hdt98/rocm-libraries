@@ -53,5 +53,5 @@ html_theme_options = {
 }
 
 setting_all_article_info = True
-all_article_info_os = ["linux", "Windows"]
+all_article_info_os = ["windows", "linux"]
 all_article_info_author = ""
