@@ -915,6 +915,11 @@ double compute_total_latency(const problem_t& problem,
   assert(config.is_valid());
   bool debug = runtime_options::get().debug_enabled;
 
+  // Use Formocast simulation model if prediction_mode is set to simulation
+  if (config.prediction_mode == prediction_modes_t::simulation) {
+    return compute_formocast_latency(problem, hardware, config);
+  }
+
   // Extract parameters from structured types
   size_t M     = problem.size.m;
   size_t N     = problem.size.n;
@@ -968,12 +973,6 @@ double compute_total_latency(const problem_t& problem,
     } else if (config.cache_hints_a || config.cache_hints_b) {
       return std::numeric_limits<double>::max();
     }
-  }
-
-  // Use Formocast simulation model if prediction_mode is set to simulation
-  // (placed after short-circuit filters so known-bad configs are rejected first)
-  if (config.prediction_mode == prediction_modes_t::simulation) {
-    return compute_formocast_latency(problem, hardware, config);
   }
 
   if(debug)
