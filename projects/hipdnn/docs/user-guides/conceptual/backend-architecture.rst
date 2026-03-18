@@ -12,12 +12,12 @@ The hipDNN framework consists of a frontend (C++ Graph API), a backend (core run
 
 .. important::
 
-  This page is for advanced users who want a more granular breakdown of the system architecture and the backend API. See :ref:`architecture` for a high-level overview of the system architecture.
+  This topic is for advanced users who want a more granular breakdown of the system architecture and the backend API. See :ref:`architecture` for a high-level overview of the system architecture.
 
 The C-API plugin separates the plugin implementation and engine details from the hipDNN backend.
 
 SDKs are provided to assist plugin developers, but the implementation details are otherwise at the discretion of the developer.
-The goal of the Plugin SDK is to standardize and provide these as reusable components for plugin development so developers can focus on the implementations of the underlying kernels and libraries.
+The goal of the Plugin SDK is to standardize and provide these as reusable components for plugin development, so developers can focus on implementing the underlying kernels and libraries.
 
 Functions and call flow
 =======================

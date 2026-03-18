@@ -6,7 +6,7 @@
 Add hipDNN to your project
 **************************
 
-This guide demonstrates how to include hipDNN in a CMake project on a system with ROCm installed.
+This topic demonstrates how to include hipDNN in a CMake project on a system with ROCm installed.
 
 Prerequisites
 ==============

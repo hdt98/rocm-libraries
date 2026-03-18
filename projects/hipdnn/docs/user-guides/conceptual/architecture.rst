@@ -8,8 +8,8 @@
 hipDNN high-level architecture
 ******************************
 
-hipDNN has a plugin-based architecture to allow contributors and users to extend hipDNN without modifying the core library.
-hipDNN has support for engine plugins, which provide the kernels to solve graphs.
+hipDNN has a plugin-based architecture that allows contributors and users to extend it without modifying the core library.
+hipDNN supports engine plugins, which provide kernels to solve graphs.
 
 .. note::
 
@@ -18,10 +18,10 @@ hipDNN has support for engine plugins, which provide the kernels to solve graphs
 The hipdnn library is structured as three primary components:
 
 - **Frontend**: The hipDNN frontend is a header-only C++ library that provides an industry standard API for interacting with hipDNN. The frontend wraps the backend C API to provide a more user-friendly C++ interface, encapsulating much of the detail required when creating graphs using the backend API.
-- **Backend**: The hipDNN backend is a shared library which provides a C API for hipDNN. The backend is the core component of hipDNN. It acts as a plugin loader and manager, connecting problems to engines optimized to solve them.
+- **Backend**: The hipDNN backend is a shared library that provides a C API for hipDNN. The backend is the core component of hipDNN. It acts as a plugin loader and manager, connecting problems to engines optimized to solve them.
 - **Engine plugins**: The hipDNN engine provider plugins are shared libraries responsible for matching the operations they provide to graphs and executing the operations on the supported hardware. Plugins will continue to be added over time to provide additional operational support or performance improvements. See :ref:`plugin-support` for more information.
 
-The frontend API defines tensors and attaches them to operational nodes on a graph. The graph is then lowered through the backend APIs where it's examined by each plugin's engine to determine a match, at which point an execution plan is established with the preferred matched engine.
+The frontend API defines tensors and attaches them to operational nodes on a graph. The graph is then lowered through the backend APIs, where each plugin's engine examines it to determine a match, at which point an execution plan is established with the preferred matched engine.
 The frontend then allocates memory and populates the data used by the graph, which is then dispatched to the selected plugin's engine to run.
 
 Header-only SDKs provide shared utilities and interfaces.
@@ -105,7 +105,7 @@ See :ref:`build-execute` for a simplified workflow example.
 SDKs and plugin architecture
 ============================
 
-This section is relevant for plugin developers who want a breakdown of the system architecture for the SDK and plugin components.
+This section is relevant to plugin developers wanting a breakdown of the SDK and plugin components' system architecture.
 
 SDKs
 ----
@@ -118,7 +118,7 @@ Data SDK (``data_sdk``)
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 The Data SDK contains ``FlatBuffers`` schemas and data structures for graph representation.
-The serialized structures allow data to be marshalled and passed between the backend and plugins in a type-safe and highly version-compatible fashion.
+The serialized structures allow data to be marshalled and passed between the backend and plugins in a type-safe and highly version-compatible manner.
 
 - **Purpose**: Provides data structures and serialization for graphs, tensors, and configurations.
 - **Expected usage**: Consumed by the backend and plugins for graph data handling.
@@ -170,7 +170,7 @@ Key characteristics:
 
 - **Separate installable projects**: Independent development and deployment.
 - **Dependencies**: :ref:`data` and :ref:`plugin-sdk` (and plugin-specific dependencies as needed).
-- **Purpose**: Provides engines which are capable of solving graphs.
+- **Purpose**: Provides engines that are capable of solving graphs.
 - **Expected usage**: Loaded at runtime by the backend.
 
 Engine types

@@ -9,7 +9,7 @@ MIOpen provider operation support
 *********************************
 
 The MIOpen provider adds a number of MIOpen operations to hipDNN.
-MIOpen is the AMD deep-learning primitives library for GPUs. 
+MIOpen is an AMD ROCm deep-learning primitives library for GPUs. 
 It implements fusion to optimize memory bandwidth and GPU launch overheads. 
 It also implements different algorithms to optimize convolutions for different filter and input sizes.
 

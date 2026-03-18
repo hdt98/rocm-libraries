@@ -12,7 +12,7 @@ hipDNN (Deep Neural Network) is a graph-based library providing improved perform
 
 hipDNN uses operation graphs as an intermediate representation to describe computations, allowing different backend engines to optimize and execute these graphs efficiently.
 
-hipDNN provides an interface that follows established deep learning conventions and has a plugin-based architecture which allows advanced users to extend hipDNN without modifying the core library.
+hipDNN provides an interface that follows established deep learning conventions and has a plugin-based architecture, which allows advanced users to extend hipDNN without modifying the core library.
 
 .. note::
 
@@ -50,13 +50,13 @@ Features
 - **Graph-based API**: Operations are expressed as computational graphs rather than individual function calls, enabling optimization opportunities.
 - **Plugin architecture**: Backend kernel engines are implemented through plugins, allowing extensibility without modifying the core library.
 - **Increased performance through fusion**: Multiple operations can be fused into single kernels for better performance.
-- **Industry standard API**: Provides a familiar interface that matches established deep learning library conventions.
+- **Industry-standard API**: Provides a familiar interface that matches established deep learning library conventions.
 
 Components
 ==========
 
-- **Frontend**: A header-only C++ library that provides the industry standard API for interacting with hipDNN. The frontend wraps the backend C API to provide a more user-friendly C++ interface.
-- **Backend**: A shared library which provides a C API for hipDNN. The backend is the core component of hipDNN. It acts as a plugin loader and manager, connecting problems to engines (provided via plugins) that can solve them.
+- **Frontend**: A header-only C++ library that provides the industry-standard API for interacting with hipDNN. The frontend wraps the backend C API to provide a more user-friendly C++ interface.
+- **Backend**: A shared library that provides a C API for hipDNN. The backend is the core component of hipDNN. It acts as a plugin loader and manager, connecting problems to engines (provided via plugins) that can solve them.
 - **SDKs**: Header-only libraries that provide shared utilities and interfaces. hipDNN provides three SDKs: the Data SDK (graph schemas and data structures), Plugin SDK (plugin API and utilities), and Test SDK (testing utilities and CPU reference implementations).
 - **Plugins**: Plugins provide additional operational support or performance improvements.
 
