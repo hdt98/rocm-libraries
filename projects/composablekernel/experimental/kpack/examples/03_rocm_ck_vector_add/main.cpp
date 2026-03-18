@@ -7,7 +7,7 @@
 // Supports fp32, fp16, and bf16 variants. Each variant gets typed device
 // buffers with host-side conversion for upload/download/verification.
 
-#include "rocm_vector_add_api.hpp"
+#include "rocm_vector_add_registry.hpp"
 
 #include <hip/hip_runtime.h>
 
@@ -37,38 +37,8 @@
         }                                                \
     } while(0)
 
-struct variant_info
-{
-    const char* name;
-    rocm_ck::vector_add_struct kernel;
-};
-
-static constexpr variant_info VARIANTS[] = {
-    // Existing variants using backward-compatible vector_add_config
-    {"vector_add_fp32_b256",
-     rocm_ck::make_kernel({.block_size = 256, .compute_type = rocm_ck::DataType::FP32})},
-    {"vector_add_fp32_b512",
-     rocm_ck::make_kernel({.block_size = 512, .compute_type = rocm_ck::DataType::FP32})},
-    {"vector_add_fp32_b1024",
-     rocm_ck::make_kernel({.block_size = 1024, .compute_type = rocm_ck::DataType::FP32})},
-    {"vector_add_fp16_b512",
-     rocm_ck::make_kernel({.block_size = 512, .compute_type = rocm_ck::DataType::FP16})},
-    {"vector_add_fp16_b1024",
-     rocm_ck::make_kernel({.block_size = 1024, .compute_type = rocm_ck::DataType::FP16})},
-    {"vector_add_bf16_b512",
-     rocm_ck::make_kernel({.block_size = 512, .compute_type = rocm_ck::DataType::BF16})},
-    // Explicit sig+algo form — same config as fp32_b256, proves new API path
-    {"vector_add_fp32_b256_sa",
-     rocm_ck::make_kernel(rocm_ck::elementwise_signature{rocm_ck::DataType::FP32},
-                          rocm_ck::elementwise_algorithm{256, 1, 256, true})},
-    // Multi-warp variants: thread_block_size != block_tile
-    {"vector_add_fp32_b2048_w8",
-     rocm_ck::make_kernel(rocm_ck::elementwise_signature{rocm_ck::DataType::FP32},
-                          rocm_ck::elementwise_algorithm{2048, 8, 64, true})},
-    {"vector_add_fp16_b1024_w2",
-     rocm_ck::make_kernel(rocm_ck::elementwise_signature{rocm_ck::DataType::FP16},
-                          rocm_ck::elementwise_algorithm{1024, 2, 512, true})},
-};
+using rocm_ck::ALL_VARIANTS;
+using rocm_ck::ALL_VARIANTS_COUNT;
 
 // --- Host-side type conversion utilities ---
 // main.cpp is compiled with GCC (not hipcc), so hip's half/bfloat16 operator
@@ -188,10 +158,26 @@ int main(int argc, char** argv)
         host_b[i] = static_cast<float>((i * 2) % 32);
     }
 
-    // --- Run each variant ---
+    // --- Demonstrate find_variant ---
+    std::printf("\nVariant selection for N=%d:\n", NUM_ELEMENTS);
+    for(auto dt : {rocm_ck::DataType::FP32, rocm_ck::DataType::FP16, rocm_ck::DataType::BF16})
+    {
+        const auto* best = rocm_ck::find_variant(dt, NUM_ELEMENTS);
+        if(best)
+            std::printf("  %s -> %s (tile=%d, warps=%d)\n",
+                        dt == rocm_ck::DataType::FP32   ? "FP32"
+                        : dt == rocm_ck::DataType::FP16 ? "FP16"
+                                                        : "BF16",
+                        best->name,
+                        best->kernel.block_tile,
+                        best->kernel.block_warps);
+    }
+
+    // --- Verify all variants ---
+    std::printf("\nRunning all %d variants:\n", ALL_VARIANTS_COUNT);
     bool all_passed = true;
 
-    for(const auto& variant : VARIANTS)
+    for(const auto& variant : ALL_VARIANTS)
     {
         const auto dt         = variant.kernel.compute_type;
         const int type_bytes  = rocm_ck::data_type_bits(dt) / 8;
