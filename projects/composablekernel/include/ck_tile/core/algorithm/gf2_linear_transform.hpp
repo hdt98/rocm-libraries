@@ -272,14 +272,14 @@ struct gf2_bit_matrix
         {
             // output bit i = popcount(input & rows[i]) mod 2
             uint64_t masked = input & rows[i];
-            // Compute parity (popcount mod 2)
-            uint64_t parity = 0;
-            while(masked)
-            {
-                parity ^= (masked & 1);
-                masked >>= 1;
-            }
-            output |= parity << i;
+            // XOR-folding: compute parity in O(log n) without warp divergence
+            masked ^= masked >> 32;
+            masked ^= masked >> 16;
+            masked ^= masked >> 8;
+            masked ^= masked >> 4;
+            masked ^= masked >> 2;
+            masked ^= masked >> 1;
+            output |= (masked & 1) << i;
         }
         return output;
     }
@@ -411,6 +411,9 @@ CK_TILE_HOST_DEVICE constexpr auto gf2_bit_compose(const gf2_bit_matrix<Bits>& a
 template <index_t Bits>
 CK_TILE_HOST_DEVICE constexpr auto gf2_bit_inverse(const gf2_bit_matrix<Bits>& m, bool& success)
 {
+    // Augmented matrix [M | I] needs 2*Bits columns in 64-bit storage
+    static_assert(Bits <= 32, "gf2_bit_inverse requires Bits <= 32 (augmented matrix needs 2*Bits columns)");
+
     // Augmented matrix [M | I] stored as 2*Bits columns
     array<uint64_t, Bits> aug;
     for(index_t i = 0; i < Bits; ++i)

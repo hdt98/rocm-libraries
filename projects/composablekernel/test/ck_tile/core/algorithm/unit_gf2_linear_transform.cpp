@@ -390,7 +390,63 @@ TEST(CoordinatePacker, BitLayout)
 }
 
 // =============================================================================
-// Part 7: Compile-Time Tests
+// Part 7: Edge Case Tests
+// =============================================================================
+
+TEST(GF2BitMatrix, SingularMatrixInversionFails)
+{
+    gf2_bit_matrix<4> singular;
+    singular.rows[0] = 0b0011;
+    singular.rows[1] = 0b0011;  // Duplicate row = singular matrix
+    singular.rows[2] = 0b0100;
+    singular.rows[3] = 0b1000;
+
+    bool success;
+    gf2_bit_inverse(singular, success);
+    EXPECT_FALSE(success);
+}
+
+TEST(GF2DimMatrix, SingularMatrixInversionFails)
+{
+    gf2_matrix<2> singular;
+    singular.set(0, 0, true);
+    singular.set(0, 1, true);
+    singular.set(1, 0, true);
+    singular.set(1, 1, true);  // Rows are identical = singular
+
+    bool success;
+    gf2_inverse(singular, success);
+    EXPECT_FALSE(success);
+}
+
+TEST(GF2DimMatrix, Dimension1)
+{
+    auto id = make_gf2_identity<1>();
+    EXPECT_TRUE(id.get(0, 0));
+
+    multi_index<1> in{42};
+    auto out = id.apply(in);
+    EXPECT_EQ(out[0], 42);
+
+    EXPECT_TRUE(gf2_is_invertible(id));
+    EXPECT_TRUE(gf2_is_self_inverse(id));
+}
+
+TEST(GF2BitMatrix, Bits1)
+{
+    auto id = make_gf2_bit_identity<1>();
+    EXPECT_EQ(id.apply(0), 0ULL);
+    EXPECT_EQ(id.apply(1), 1ULL);
+}
+
+TEST(GF2DimMatrix, ZeroMatrixNotInvertible)
+{
+    gf2_matrix<2> zero;  // Default = all false
+    EXPECT_FALSE(gf2_is_invertible(zero));
+}
+
+// =============================================================================
+// Part 8: Compile-Time Tests
 // =============================================================================
 
 TEST(GF2CompileTime, DimLevel)
