@@ -372,15 +372,17 @@ struct CShuffleEpilogue
             }();
             constexpr index_t col_bit_start = log2_vec;
 
-            if constexpr(MPerXdl == 16)
+            // Check if we have enough column bits for the XOR transform
+            // We need col bits [col_bit_start, col_bit_start+1], so max bit is col_bit_start+1
+            // This requires NPerIterationShuffle >= 2^(col_bit_start+2)
+            constexpr bool has_enough_col_bits =
+                (1 << (col_bit_start + 2)) <= NPerIterationShuffle;
+
+            if constexpr(MPerXdl == 16 && has_enough_col_bits)
             {
                 // 16x16 XDL: rows 0,4,8,12 conflict - XOR row bits 2,3
                 using RowBits = sequence<2, 3>;
                 using ColBits = sequence<col_bit_start, col_bit_start + 1>;
-
-                static_assert((1 << (ColBits::at(number<ColBits::size() - 1>{}) + 1)) <=
-                                  NPerIterationShuffle,
-                              "Col bits exceed column range");
 
                 constexpr auto lds_block_desc = transform_tensor_descriptor(
                     lds_block_desc_2,
@@ -391,15 +393,11 @@ struct CShuffleEpilogue
 
                 return lds_block_desc;
             }
-            else if constexpr(MPerXdl == 32)
+            else if constexpr(MPerXdl == 32 && has_enough_col_bits)
             {
                 // 32x32 XDL: rows 0,8,16,24 conflict - XOR row bits 3,4
                 using RowBits = sequence<3, 4>;
                 using ColBits = sequence<col_bit_start, col_bit_start + 1>;
-
-                static_assert((1 << (ColBits::at(number<ColBits::size() - 1>{}) + 1)) <=
-                                  NPerIterationShuffle,
-                              "Col bits exceed column range");
 
                 constexpr auto lds_block_desc = transform_tensor_descriptor(
                     lds_block_desc_2,
@@ -412,6 +410,7 @@ struct CShuffleEpilogue
             }
             else
             {
+                // Fallback: no XOR swizzle (either unsupported XDL size or narrow N)
                 return lds_block_desc_2;
             }
         }
