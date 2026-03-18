@@ -252,9 +252,9 @@ else()
         add_custom_target(benchmark_gemm_aquant_${pipeline}_pipeline)
     endforeach()
 
-    # Create scheduler-specific collection targets
+    # Create epilogue-specific collection targets
     set(GEMM_AQUANT_EPILOGUES "default;cshuffle")
-    foreach(scheduler IN LISTS GEMM_AQUANT_EPILOGUES)
+    foreach(epilogue IN LISTS GEMM_AQUANT_EPILOGUES)
         add_custom_target(benchmark_gemm_aquant_${epilogue}_epilogue)
     endforeach()
 
