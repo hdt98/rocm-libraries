@@ -44,6 +44,7 @@ struct variant_info
 };
 
 static constexpr variant_info VARIANTS[] = {
+    // Existing variants using backward-compatible vector_add_config
     {"vector_add_fp32_b256",
      rocm_ck::make_kernel({.block_size = 256, .compute_type = rocm_ck::DataType::FP32})},
     {"vector_add_fp32_b512",
@@ -56,6 +57,10 @@ static constexpr variant_info VARIANTS[] = {
      rocm_ck::make_kernel({.block_size = 1024, .compute_type = rocm_ck::DataType::FP16})},
     {"vector_add_bf16_b512",
      rocm_ck::make_kernel({.block_size = 512, .compute_type = rocm_ck::DataType::BF16})},
+    // Explicit sig+algo form — same config as fp32_b256, proves new API path
+    {"vector_add_fp32_b256_sa",
+     rocm_ck::make_kernel(rocm_ck::elementwise_signature{rocm_ck::DataType::FP32},
+                          rocm_ck::elementwise_algorithm{256, 1, 256, true})},
 };
 
 // --- Host-side type conversion utilities ---
@@ -230,7 +235,7 @@ int main(int argc, char** argv)
 
         // Launch
         const int grid_size =
-            (NUM_ELEMENTS + variant.kernel.block_size - 1) / variant.kernel.block_size;
+            (NUM_ELEMENTS + variant.kernel.block_tile - 1) / variant.kernel.block_tile;
         const int block_size = variant.kernel.thread_block_size;
 
         rocm_ck::VectorAddArgs kernel_args = {NUM_ELEMENTS, device_a, device_b, device_result};
