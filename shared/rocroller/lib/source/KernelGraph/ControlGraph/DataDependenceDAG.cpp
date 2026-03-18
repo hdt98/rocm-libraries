@@ -53,9 +53,28 @@ namespace rocRoller::KernelGraph
                                 "The records for the same control operation are not consecutive.",
                                 ShowValue(currentControl));
 
+                    // The READ records should appear before the WRITE records,
+                    // essentially first READ, then READWRITE and then WRITE.
+                    auto prev = ReadWrite::READ;
                     for(; iter != records.end() && iter->control == currentControl; ++iter)
                     {
+                        switch(iter->rw)
+                        {
+                        case ReadWrite::READ:
+                            AssertFatal(prev == ReadWrite::READ);
+                            break;
+                        case ReadWrite::READWRITE:
+                            AssertFatal(prev == ReadWrite::READ || prev == ReadWrite::READWRITE);
+                            break;
+                        case ReadWrite::WRITE:
+                            break;
+                        default:
+                            Throw<FatalError>("Invalid ReadWrite.");
+                        }
+
                         processReadWriteRecord(*iter);
+
+                        prev = iter->rw;
                     }
 
                     seen.insert(currentControl);
