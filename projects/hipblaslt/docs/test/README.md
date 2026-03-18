@@ -71,10 +71,21 @@ on dockerhub or building from source using TheRock. We we demonstrate both.
 ```
 cd rocm-libraries
 docker run --rm -it -v $(pwd):/mnt/host/rocm-libraries rocm/dev-ubuntu-24.04:7.2-complete
-cd /mnt/host/rocm-libraries
+apt update
+apt install -y cmake git gfortran libopenblas-dev libmsgpack-dev libgtest-dev python3.12-venv
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r tensilelite/requirements.txt
+cd /mnt/host/rocm-libraries/projects/hipblaslt
 cmake -B build -S . \
- \
- \
+  -DHIPBLASLT_ENABLE_BLIS=OFF \
+  -DGPU_TARGETS=<targets> \
+  -DCMAKE_Fortran_COMPILER=gfortran \
+  -DCMAKE_CXX_COMPILER=/opt/rocm/bin/amdclang++ \
+  -DCMAKE_C_COMPILER=/opt/rocm/bin/amdclang \
+  -DCMAKE_PREFIX_PATH="/opt/rocm/lib/llvm;/opt/rocm" \
+  -DROCM_PATH=/opt/rocm \
+  -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel <N>
 ```
 
