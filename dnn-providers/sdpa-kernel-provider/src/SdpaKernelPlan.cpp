@@ -7,10 +7,14 @@
 namespace sdpa_kernel_provider
 {
 
+SdpaKernelPlan::SdpaKernelPlan(size_t workspaceSize)
+    : _workspaceSize(workspaceSize)
+{
+}
+
 size_t SdpaKernelPlan::getWorkspaceSize(const SdpaKernelHandle& /*handle*/) const
 {
-    HIPDNN_PLUGIN_LOG_ERROR("SdpaKernelPlan::getWorkspaceSize not implemented");
-    return 0;
+    return _workspaceSize;
 }
 
 void SdpaKernelPlan::execute(const SdpaKernelHandle& /*handle*/,
