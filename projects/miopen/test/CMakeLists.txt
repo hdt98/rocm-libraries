@@ -59,7 +59,6 @@ option( MIOPEN_TEST_COMPOSABLEKERNEL "Test with composable_kernel library" ${MIO
 option( MIOPEN_TEST_DISCRETE "Build Discrete Test Binaries" ON )
 option( MIOPEN_TEST_DBSYNC "" OFF )
 option( MIOPEN_TEST_PERF "" OFF )
-option( MIOPEN_TEST_ENABLE_TEST_SQLITE_PERFDB "Enable the SQLite Perf DB test" OFF)
 
 if(NOT ENABLE_ASAN_PACKAGING AND MIOPEN_TEST_PERF)
     set( CMAKE_INSTALL_TESTBINDIR "${DATA_INSTALL_DIR}/bin" )
@@ -181,10 +180,6 @@ option( MIOPEN_LIBMLIR_SUPPORTS_GFX103X "libMLIR capability to support GFX10. En
 set_var_to_condition(MIOPEN_TEST_MLIR_DEFAULT ${MIOPEN_USE_MLIR} AND NOT (${MIOPEN_TEST_GFX103X} AND NOT ${MIOPEN_LIBMLIR_SUPPORTS_GFX103X}))
 option( MIOPEN_TEST_MLIR "Test for MLIR compilation backend" ${MIOPEN_TEST_MLIR_DEFAULT} )
 
-if((NOT MIOPEN_ENABLE_SQLITE) OR (NOT MIOPEN_EMBED_DB STREQUAL ""))
-    set(MIOPEN_TEST_ENABLE_TEST_SQLITE_PERFDB OFF)
-endif()
-
 message(STATUS "MIOPEN_NO_GPU ${MIOPEN_NO_GPU}")
 message(STATUS "MIOPEN_TEST_GFX900 ${MIOPEN_TEST_GFX900}")
 message(STATUS "MIOPEN_TEST_GFX906 ${MIOPEN_TEST_GFX906}")
@@ -207,7 +202,6 @@ message(STATUS "MIOPEN_TEST_COMPOSABLEKERNEL ${MIOPEN_TEST_COMPOSABLEKERNEL}")
 message(STATUS "MIOPEN_TEST_DISCRETE ${MIOPEN_TEST_DISCRETE}")
 message(STATUS "MIOPEN_TEST_DBSYNC ${MIOPEN_TEST_DBSYNC}")
 message(STATUS "MIOPEN_TEST_PERF ${MIOPEN_TEST_PERF}")
-message(STATUS "MIOPEN_TEST_ENABLE_TEST_SQLITE_PERFDB ${MIOPEN_TEST_ENABLE_TEST_SQLITE_PERFDB}")
 
 if(MIOPEN_TEST_DRIVER_ITER_MODE)
     add_definitions(-DMIOPEN_TEST_DRIVER_MODE=2)
@@ -301,11 +295,6 @@ elseif(MIOPEN_TEST_BFLOAT16)
               test_conv_igemm_dynamic_xdlops_nhwc_fwd_bf16
               test_conv_igemm_dynamic_xdlops_nhwc_bwd_bf16
               test_pooling2d test_pooling3d)
-endif()
-
-if(MIOPEN_NO_GPU)
-    set(SKIP_ALL_EXCEPT_TESTS
-            test_sqlite_perfdb)
 endif()
 
 #TODO WORKAROUND_ISSUE_1424
@@ -474,14 +463,6 @@ function(rate_added_test NAME)
 endfunction()
 
 set(EXCLUDE_TESTS)
-if(NOT MIOPEN_ENABLE_SQLITE)
-    list(APPEND EXCLUDE_TESTS test_sqlite)
-endif()
-
-if(NOT MIOPEN_TEST_ENABLE_TEST_SQLITE_PERFDB)
-    list(APPEND EXCLUDE_TESTS test_sqlite_perfdb)
-    message(STATUS "Flaky test_sqlite_perfdb currently disabled (May 28 2025)")
-endif()
 
 set(EXCLUDE_TEST_SOURCES)
 foreach(TEST_SOURCE ${TEST_SOURCES})
@@ -501,10 +482,6 @@ foreach(TEST_SOURCE ${TEST_SOURCES})
     get_filename_component(BASE_NAME ${TEST_SOURCE} NAME_WE)
     add_test_executable(test_${BASE_NAME} ${TEST_SOURCE})
 endforeach()
-
-if(MIOPEN_TEST_ENABLE_TEST_SQLITE_PERFDB)
-    set_tests_properties(test_sqlite_perfdb PROPERTIES RUN_SERIAL On)
-endif()
 
 # add_sanitize_test(perfdb.cpp)
 # add_sanitize_test(cache.cpp)

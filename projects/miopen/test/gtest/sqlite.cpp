@@ -24,10 +24,14 @@
  *
  *******************************************************************************/
 
-#include "test.hpp"
-#include "driver.hpp"
+#include <gtest/gtest.h>
+
 #include <miopen/sqlite_db.hpp>
 #include <miopen/temp_file.hpp>
+
+#include <fstream>
+
+namespace {
 
 const char* const lfs_db = R"(version https://git-lfs.github.com/spec/v1
 oid sha256:cc45c32e44560074b5e4b0c0e48472a86e6b3bb1c73c189580f950f098d2a8d7
@@ -40,26 +44,26 @@ struct DummyDB
 bool test_lfs_db(bool is_system)
 {
     miopen::TempFile tmp_db{"test_lfs_db"};
-    // write file to temp file
     std::ofstream tmp_db_file(tmp_db.Path());
     tmp_db_file << lfs_db;
     tmp_db_file.close();
-    // construct a db out of it
     miopen::SQLiteBase<DummyDB> lfs_sqdb{miopen::DbKinds::PerfDb, tmp_db, is_system};
     return lfs_sqdb.dbInvalid;
 }
 
-int main(int argc, char* argv[])
+class CPU_SQLite_NONE : public ::testing::Test
 {
-    std::ignore = argc;
-    std::ignore = argv;
+};
 
-    CHECK(test_lfs_db(
-        true)); // System DB should pass, since the lfs file was installed in the sys directory
+// System DB should pass, since the lfs file was installed in the sys directory
+// cppcheck-suppress syntaxError
+TEST_F(CPU_SQLite_NONE, LfsSystemDbDetection) { ASSERT_TRUE(test_lfs_db(true)); }
+
 // Embedded user dbs ignore the filename and just creates an in-memory database
 #if !MIOPEN_EMBED_DB
-    CHECK(throws(std::bind(
-        test_lfs_db, false))); // User db should fail since MIOpen should not create such a file
-                               // ever, if it exists its a corrupt file which should be reported.
+// User db should fail since MIOpen should not create such a file
+// ever, if it exists its a corrupt file which should be reported.
+TEST_F(CPU_SQLite_NONE, LfsUserDbThrows) { ASSERT_ANY_THROW(test_lfs_db(false)); }
 #endif
-}
+
+} // anonymous namespace
