@@ -13,7 +13,7 @@ Prerequisites
 
 ROCm and hipDNN must be installed along with the dependencies. See :ref:`prerequisites`.
 
-.. _add-hipdnn-steps
+.. _add-hipdnn-steps:
 
 Steps
 =====

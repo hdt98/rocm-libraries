@@ -80,7 +80,7 @@ The engine ID system ensures globally unique identifiers across all plugins.
 
 When creating a new engine, select a unique descriptive name.
 During development, add the ``HIPDNN_REGISTER_ENGINE(MY_CUSTOM_ENGINE, "MY_CUSTOME_ENGINE")`` macro to a source file in your project.
-This verifyies that the new plugin name doesn't conflict with plugin names from the official distribution and creates variables that can be used to retrieve the unique ID for this engine.
+This verifies that the new plugin name doesn't conflict with plugin names from the official distribution and creates variables that can be used to retrieve the unique ID for this engine.
 
 Benefits
 --------
@@ -258,7 +258,7 @@ The hipDNN plugins are installed in the ROCm install folder:
 
 Install your plugin to this folder to have it included automatically by hipDNN. Note that if the ``HIPDNN_PLUGIN_DIR`` environment variable is set, the plugins will only be loaded from that folder and not the ROCm folder.
 
-.. _plugin-loading
+.. _plugin-loading:
 
 Plugin loading
 ==============

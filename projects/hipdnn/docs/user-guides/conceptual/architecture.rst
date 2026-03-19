@@ -207,7 +207,7 @@ Plugin architecture
 Plugin loading
 ~~~~~~~~~~~~~~~
 
-- The backend finds plugins at runtime via the default plugin path, environment variables (see :ref:`plugin-loading-variables`), or by using ``hipdnnSetEnginePluginPaths_ext`` to provide additional paths from which to load the plugins.
+- The backend finds plugins at runtime via the default plugin path, the environment variables (see :ref:`plugin-loading-variables`), or by using ``hipdnnSetEnginePluginPaths_ext`` to provide additional paths to load the plugins.
 - Each plugin exports standard entry points defined in the Plugin SDK.
 
 Engine management

@@ -34,7 +34,7 @@ Simplified workflow example
 
 Add ``hipdnn_frontend`` to your CMake project. See :ref:`add-hipdnn-steps`.
 
-The following simplified sample code creates a graph, creates tensors, and adds operations before building and executing them:
+This simplified sample code creates a graph, creates tensors, and adds operations before building and executing them:
 
 .. code:: cpp
 

@@ -74,7 +74,8 @@ Default structure example (Linux):
           ├── miopen_plugin.so
           └── other_plugin.so
 
-When ``HIPDNN_PLUGIN_DIR`` is set, hipDNN will *only* load plugins from the specified directory and supplementary custom paths, ignoring the default location. This allows complete control over which plugins are loaded.
+When ``HIPDNN_PLUGIN_DIR`` is set, hipDNN *only* loads plugins from the specified directory and supplementary custom paths, ignoring the default location. 
+This allows complete control over which plugins are loaded.
 
 .. code:: bash
 
@@ -84,16 +85,18 @@ When ``HIPDNN_PLUGIN_DIR`` is set, hipDNN will *only* load plugins from the spec
 Path resolution
 ~~~~~~~~~~~~~~~
 
-The ``HIPDNN_PLUGIN_DIR` paths can be:
+The ``HIPDNN_PLUGIN_DIR`` paths can be:
 
 - **Relative paths**: Resolved from the backend shared library location (typically ``/opt/rocm/lib`` on Linux).
-  - For example, in this situation, if ``HIPDNN_PLUGIN_DIR`` is set to ``./test_plugins`` then hipDNN will attempt to load all plugins from ``/opt/rocm/lib/./test_plugins``.
+  
+  - For example, if ``HIPDNN_PLUGIN_DIR`` is set to ``./test_plugins``, then hipDNN tries to load all plugins from ``/opt/rocm/lib/./test_plugins``.
+
 - **Absolute paths**: Used as specified.
 
 For both relative paths and absolute paths:
 
-- If the path specifies a folder, hipDNN will attempt to load all ``.so`` files (Linux) or ``.DLL`` files (Windows) from that folder as plugins.
-- If the path specifies a filename ending in ``.so`` (Linux) or ``.DLL`` (Windows) then only that plugin will be loaded.
-- If the path specifies a filename without an extension, hipDNN will prefix the filename with ``lib`` and add the ``.so`` suffix (Linux) or add the ``.DLL`` suffix (Windows) and load only that file.
+- If the path specifies a folder, hipDNN tries to load all ``.so`` files (Linux) or ``.DLL`` files (Windows) from that folder as plugins.
+- If the path specifies a filename ending in ``.so`` (Linux) or ``.DLL`` (Windows), then only that plugin will be loaded.
+- If the path specifies a filename without an extension, hipDNN prefixes the filename with ``lib`` and adds the ``.so`` suffix (Linux), or adds the ``.DLL`` suffix (Windows) and only loads that file.
 
 See :ref:`plugin-loading` for API functions that provide additional control over which folders plugins are loaded from.
