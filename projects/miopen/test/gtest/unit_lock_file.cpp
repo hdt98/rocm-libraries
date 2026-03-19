@@ -773,6 +773,7 @@ TEST(CPU_UnitTestLockFile_NONE, StdSharedLockWithTimeout)
     miopen::FSLockFile lockfile(lockpath);
 
     auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds{1};
+    // cppcheck-suppress localMutex
     std::shared_lock<miopen::FSLockFile> lock(lockfile, timeout);
 
     EXPECT_TRUE(lock.owns_lock());
@@ -791,8 +792,11 @@ TEST(CPU_UnitTestLockFile_NONE, MultipleSharedLockInstances)
     miopen::FSLockFile lockfile2(lockpath);
     miopen::FSLockFile lockfile3(lockpath);
 
+    // cppcheck-suppress localMutex
     std::shared_lock<miopen::FSLockFile> lock1(lockfile1, std::defer_lock);
+    // cppcheck-suppress localMutex
     std::shared_lock<miopen::FSLockFile> lock2(lockfile2, std::defer_lock);
+    // cppcheck-suppress localMutex
     std::shared_lock<miopen::FSLockFile> lock3(lockfile3, std::defer_lock);
 
     lock1.lock();
@@ -871,6 +875,7 @@ TEST(CPU_UnitTestLockFile_NONE, LockValidationPattern)
 
     miopen::FSLockFile lockfile2(lockpath);
     auto timeout = std::chrono::steady_clock::now() + std::chrono::milliseconds{10};
+    // cppcheck-suppress localMutex
     std::unique_lock<miopen::FSLockFile> lock(lockfile2, timeout);
 
     if(!lock)
@@ -945,18 +950,22 @@ TEST(CPU_UnitTestLockFile_NONE, TryLockForBothTypes)
     miopen::FSLockFile lockfile4(lockpath);
 
     // Test unique_lock try_lock_for
+    // cppcheck-suppress localMutex
     std::unique_lock<miopen::FSLockFile> lock1(lockfile1, std::defer_lock);
     EXPECT_TRUE(lock1.try_lock_for(std::chrono::milliseconds{100}));
 
+    // cppcheck-suppress localMutex
     std::unique_lock<miopen::FSLockFile> lock2(lockfile2, std::defer_lock);
     EXPECT_FALSE(lock2.try_lock_for(std::chrono::milliseconds{50}));
 
     lock1.unlock();
 
     // Test shared_lock try_lock_for
+    // cppcheck-suppress localMutex
     std::shared_lock<miopen::FSLockFile> lock3(lockfile3, std::defer_lock);
     EXPECT_TRUE(lock3.try_lock_for(std::chrono::milliseconds{100}));
 
+    // cppcheck-suppress localMutex
     std::shared_lock<miopen::FSLockFile> lock4(lockfile4, std::defer_lock);
     EXPECT_TRUE(lock4.try_lock_for(std::chrono::milliseconds{100}));
 

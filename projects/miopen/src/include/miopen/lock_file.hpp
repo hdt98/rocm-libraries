@@ -59,6 +59,7 @@ public:
     FSLockFile() : lock_held(false), lock_type(LockType::None) {}
     FSLockFile(const fs::path& path_) : lock_held(false), lock_type(LockType::None)
     {
+        // cppcheck-suppress useInitializationList
         lockfile_path = path_.string() + ".fslock";
 
         auto process_id = generate_process_identifier();
