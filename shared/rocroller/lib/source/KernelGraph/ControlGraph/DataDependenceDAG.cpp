@@ -138,8 +138,7 @@ namespace rocRoller::KernelGraph
                     {
                         auto order = m_graph.control.compareNodes(
                             UseCacheIfAvailable, writeIter->second, record.control);
-                        AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst
-                                        || order == ControlGraph::NodeOrdering::RightInBodyOfLeft,
+                        AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst,
                                     ShowValue(order),
                                     ShowValue(writeIter->second),
                                     ShowValue(record.control),
@@ -164,9 +163,7 @@ namespace rocRoller::KernelGraph
                         {
                             auto order = m_graph.control.compareNodes(
                                 UseCacheIfAvailable, readControl, record.control);
-                            AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst
-                                            || order
-                                                   == ControlGraph::NodeOrdering::RightInBodyOfLeft,
+                            AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst,
                                         ShowValue(order),
                                         ShowValue(readControl),
                                         ShowValue(record.control),
