@@ -1,13 +1,15 @@
 # `hipblaslt` Tests
 
-## 1. Test Overview
+## 1. Overview
 
 hipblaslt and tensilelite have multiple independent test stacks that reflect the different
 components of the project. That is, there are tests of the C++ APIs and tests of the
 assemebly code generation python libraries/applications:
 
-![test-stack-expressive](https://github.com/user-attachments/assets/0fea6feb-ddfa-4538-aef3-a25e2678dce8)
-
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/0fea6feb-ddfa-4538-aef3-a25e2678dce8" width="70%" />
+<p />
+    
 The tests are organized in a directory parallel to the corresponding source code.
 The hipblaslt C++ API tests and test orchestration are located in `projects/hipblaslt/clients`
 while all of the other tests are located in a subdirectory of `projects/hipblaslt/tensilelite`
@@ -21,11 +23,11 @@ In the following sections, we describe each test stack including:
 
 - a summary of the tests and test flow
 - how to setup a test environment, configure, build
-- - how to run the tests
+- how to run the tests
 - how to extend the existing tests
 - what testing automation is in place for the tests
 
-## 2. `hipblaslt-test`
+## 2.  `hipblaslt-test`
 
 The test code and meta data for the `hipblaslt-test` are located in the `clients` directory:
 
@@ -59,15 +61,17 @@ All matmul tests compute a reference result on CPU (via a BLAS librarysuch as op
 and compare to the GPU result using `assert_allclose`-equivalent logic. Tolerances are
 data-type-aware: stricter for FP32, relaxed for FP16/BF16/FP8.
 
-### 1. Test Flow
+### 2.1. Test Flow
 
 This section explains how `hipblaslt-test` works end-to-end, from YAML authoring
 through binary test data generation, GTest registration, and GPU kernel execution.
 The following figure offers a high-level description of the program flow:
 
-![test-flow-diagram](https://github.com/user-attachments/assets/63d61b1e-ec7a-4493-9c5d-dfc31595eed5)
-
-***1. YAML File Structure***
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/63d61b1e-ec7a-4493-9c5d-dfc31595eed5" width="70%" />
+<p />
+    
+#### 2.1.1. YAML File Structure
 
 `matmul_gtest.yaml` opens with `include:` directives that pull in shared definitions:
 
@@ -101,13 +105,15 @@ Tests:
   <<: *alpha_beta_range  # merged → 2 alpha/beta combos each
 ```
 
-***2. What*** `hipblaslt_gentest.py` ***Does***
+#### 2.1.2 What `hipblaslt_gentest.py` Does
 
 The script is a **test case expander and serializer**. It is not part of the test
 binary — it runs at build time to produce the binary data file the test binary reads.
 
-![pipeline-diagram](https://github.com/user-attachments/assets/20ca56cc-e2a6-4c9c-9818-ff095e794f68)
-
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/20ca56cc-e2a6-4c9c-9818-ff095e794f68" width="70%" />
+<p />
+    
 A YAML entry like:
 
 ```yaml
@@ -132,7 +138,7 @@ Produces **4 binary records** (2 M values × 2 transA values):
 
 ---
 
-#### Phase 2: Binary Loading and GTest Registration
+#### 2.1.3. Binary Loading and GTest Registration
 
 ***Binary File Format***
 
@@ -152,7 +158,7 @@ hipblaslt_gtest.data
 └─────────────────────────────────────────────────────┘
 ```
 
-***Test Suite Registration***
+#### 2.1.4. Test Suite Registration
 
 Each operation type registers a test suite via a macro in its `*_gtest.cpp` file:
 
@@ -181,20 +187,24 @@ INSTANTIATE_TEST_CATEGORIES(matmul_test);
 //                       HipBlasLt_TestData::end()))
 ```
 
-***Filtering Pipeline***
+#### 2.1.5. Filtering Pipeline
 
 When GTest collects test cases, `HipBlasLt_TestData` streams `Arguments` records
 through a chain of filters. A record reaches execution only if it passes all of them:
 
-![filter-pipeline-diagram](https://github.com/user-attachments/assets/2b6fb3e8-b49f-4121-a849-78f422b6476c)
-
-#### Single Test Execution
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/2b6fb3e8-b49f-4121-a849-78f422b6476c" width="70%" />
+<p />
+    
+#### 2.1.6. Single Test Execution
 
 For each `Arguments` record that passes all filters, GTest calls the test functor:
 
-![matmul-execution-diagram](https://github.com/user-attachments/assets/1ed0d4ad-a427-449c-b789-50a212b99534)
-
-#### How the Pieces Connect
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/1ed0d4ad-a427-449c-b789-50a212b99534" width="70%" />
+<p />
+    
+#### 2.1.7. How the Pieces Connect
 
 ```
   Authoring              Build                      Runtime
