@@ -571,6 +571,23 @@ def build_client_examples_and_codegen_tests(String arch){
     return cmd
 }
 
+def build_ck_install_and_client_examples(String arch){
+    def cmd = """ CXX=${params.BUILD_COMPILER} CXXFLAGS='-Werror' cmake -G Ninja \
+                -DBUILD_DEV=On \
+                -DCMAKE_BUILD_TYPE=release \
+                -DCMAKE_INSTALL_PREFIX=../install \
+                -DGPU_TARGETS="${arch}" \
+                -DCMAKE_CXX_FLAGS=" -O3 " .. && \
+                ninja -j64 install && \
+                cd ../client_example && rm -rf build && mkdir build && cd build && \
+                cmake -DCMAKE_PREFIX_PATH="${env.WORKSPACE}/projects/composablekernel/install;/opt/rocm" \
+                -DGPU_TARGETS="${arch}" \
+                -DCMAKE_CXX_COMPILER="${params.BUILD_COMPILER}" \
+                -DCMAKE_HIP_COMPILER="${params.BUILD_COMPILER}" \
+                -DCMAKE_CXX_FLAGS=" -O3 " .. && make -j """
+    return cmd
+}
+
 def build_and_run_fmha(String arch){
     def cmd = """ cmake -G Ninja -DCMAKE_PREFIX_PATH="${env.WORKSPACE}/projects/composablekernel/install;/opt/rocm" \
                 -DGPU_TARGETS="${arch}" \
@@ -979,6 +996,10 @@ def Build_CK(Map conf=[:]){
                         }
                     }
                     if (params.hipTensor_test && arch == "gfx90a" ){
+                        // install CK so hipTensor can link against it
+                        dir("projects/composablekernel/build"){
+                            sh "ninja -j64 install"
+                        }
                         // build and test hipTensor on gfx90a node
                         sh """#!/bin/bash
                             rm -rf rocm-libraries
@@ -992,7 +1013,7 @@ def Build_CK(Map conf=[:]){
                             sh """#!/bin/bash
                                 mkdir -p build
                                 ls -ltr
-                                CC=hipcc CXX=hipcc cmake -Bbuild . -D CMAKE_PREFIX_PATH="${env.WORKSPACE}/install"
+                                CC=hipcc CXX=hipcc cmake -Bbuild . -D CMAKE_PREFIX_PATH="${env.WORKSPACE}/projects/composablekernel/install"
                                 cmake --build build -- -j
                                 ctest --test-dir build
                             """
@@ -1402,6 +1423,10 @@ pipeline {
             name: "RUN_ALL_UNIT_TESTS",
             defaultValue: false,
             description: "Run all unit tests (default: OFF)")
+        booleanParam(
+            name: "RUN_CLIENT_EXAMPLE_TESTS",
+            defaultValue: false,
+            description: "Build CK, install, and verify client examples on all enabled GPU targets (default: OFF). Runs automatically on develop branch.")
         booleanParam(
             name: "RUN_PYTORCH_TESTS",
             defaultValue: false,
@@ -1902,10 +1927,9 @@ pipeline {
                     agent{ label rocmnode("gfx942") }
                     environment{
                         setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx942" """
-                        execute_args = build_client_examples("gfx942")
                     }
                     steps{
-                        Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
+                        Build_CK_and_Reboot(setup_args: setup_args, build_type: 'Release', prefixpath: '/usr/local')
                         cleanWs()
                     }
                 }
@@ -1918,10 +1942,9 @@ pipeline {
                     agent{ label rocmnode("gfx950") }
                     environment{
                         setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx950" """
-                        execute_args = build_client_examples("gfx950")
                     }
                     steps{
-                        Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
+                        Build_CK_and_Reboot(setup_args: setup_args, build_type: 'Release', prefixpath: '/usr/local')
                         cleanWs()
                     }
                 }
@@ -1934,10 +1957,9 @@ pipeline {
                     agent{ label rocmnode("gfx908") }
                     environment{
                         setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx908" """
-                        execute_args = build_client_examples("gfx908")
                     }
                     steps{
-                        Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
+                        Build_CK_and_Reboot(setup_args: setup_args, build_type: 'Release', prefixpath: '/usr/local')
                         cleanWs()
                     }
                 }
@@ -1950,10 +1972,12 @@ pipeline {
                     agent{ label rocmnode("gfx90a") }
                     environment{
                         setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx90a" -DCK_CXX_STANDARD="17" """
-                        execute_args = build_client_examples_and_codegen_tests("gfx90a")
+                        execute_args = """ cd ../codegen && rm -rf build && mkdir build && cd build && \
+                                cmake -DCMAKE_PREFIX_PATH=/opt/rocm -DCMAKE_CXX_COMPILER="${params.BUILD_COMPILER}" .. && \
+                                make -j64 check """
                     }
                     steps{
-                        Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
+                        Build_CK_and_Reboot(setup_args: setup_args, build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
                         cleanWs()
                     }
                 }
@@ -1985,10 +2009,9 @@ pipeline {
                     agent{ label rocmnode("gfx1010") }
                     environment{
                         setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx10-1-generic" """
-                        execute_args = build_client_examples("gfx10-1-generic")
                     }
                     steps{
-                        Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
+                        Build_CK_and_Reboot(setup_args: setup_args, build_type: 'Release', prefixpath: '/usr/local')
                         cleanWs()
                     }
                 }
@@ -2001,10 +2024,9 @@ pipeline {
                     agent{ label rocmnode("gfx1030") }
                     environment{
                         setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx10-3-generic" """
-                        execute_args = build_client_examples("gfx10-3-generic")
                     }
                     steps{
-                        Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
+                        Build_CK_and_Reboot(setup_args: setup_args, build_type: 'Release', prefixpath: '/usr/local')
                         cleanWs()
                     }
                 }
@@ -2017,10 +2039,9 @@ pipeline {
                     agent{ label 'miopen && (gfx1101 || gfx1100)' }
                     environment{
                         setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx11-generic" """
-                        execute_args = build_client_examples("gfx11-generic")
                     }
                     steps{
-                        Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
+                        Build_CK_and_Reboot(setup_args: setup_args, build_type: 'Release', prefixpath: '/usr/local')
                         cleanWs()
                     }
                 }
@@ -2033,10 +2054,9 @@ pipeline {
                     agent{ label rocmnode("gfx1201") }
                     environment{
                         setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx12-generic" """
-                        execute_args = build_client_examples("gfx12-generic")
                     }
                     steps{
-                        Build_CK_and_Reboot(setup_args: setup_args, config_targets: "install", build_type: 'Release', execute_cmd: execute_args, prefixpath: '/usr/local')
+                        Build_CK_and_Reboot(setup_args: setup_args, build_type: 'Release', prefixpath: '/usr/local')
                         cleanWs()
                     }
                 }
@@ -2061,6 +2081,144 @@ pipeline {
                         gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
                             echo "Reporting success status for build ck and run tests"
                         }
+                    }
+                }
+            }
+        }
+        stage("Run Client Example Tests")
+        {
+            when {
+                beforeAgent true
+                expression { env.SHOULD_RUN_CI.toBoolean() }
+            }
+            parallel
+            {
+                stage("Run Client Example Tests on gfx942")
+                {
+                    when {
+                        beforeAgent true
+                        expression { (params.RUN_CLIENT_EXAMPLE_TESTS.toBoolean() || env.BRANCH_NAME == "develop") && params.BUILD_GFX942.toBoolean() }
+                    }
+                    agent{ label rocmnode("gfx942") }
+                    environment{
+                        setup_args = "NO_CK_BUILD"
+                        execute_args = build_ck_install_and_client_examples("gfx942")
+                    }
+                    steps{
+                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        cleanWs()
+                    }
+                }
+                stage("Run Client Example Tests on gfx950")
+                {
+                    when {
+                        beforeAgent true
+                        expression { (params.RUN_CLIENT_EXAMPLE_TESTS.toBoolean() || env.BRANCH_NAME == "develop") && params.BUILD_GFX950.toBoolean() }
+                    }
+                    agent{ label rocmnode("gfx950") }
+                    environment{
+                        setup_args = "NO_CK_BUILD"
+                        execute_args = build_ck_install_and_client_examples("gfx950")
+                    }
+                    steps{
+                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        cleanWs()
+                    }
+                }
+                stage("Run Client Example Tests on gfx908")
+                {
+                    when {
+                        beforeAgent true
+                        expression { (params.RUN_CLIENT_EXAMPLE_TESTS.toBoolean() || env.BRANCH_NAME == "develop") && params.BUILD_GFX908.toBoolean() }
+                    }
+                    agent{ label rocmnode("gfx908") }
+                    environment{
+                        setup_args = "NO_CK_BUILD"
+                        execute_args = build_ck_install_and_client_examples("gfx908")
+                    }
+                    steps{
+                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        cleanWs()
+                    }
+                }
+                stage("Run Client Example Tests on gfx90a")
+                {
+                    when {
+                        beforeAgent true
+                        expression { (params.RUN_CLIENT_EXAMPLE_TESTS.toBoolean() || env.BRANCH_NAME == "develop") && params.BUILD_GFX90A.toBoolean() }
+                    }
+                    agent{ label rocmnode("gfx90a") }
+                    environment{
+                        setup_args = "NO_CK_BUILD"
+                        execute_args = build_ck_install_and_client_examples("gfx90a")
+                    }
+                    steps{
+                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        cleanWs()
+                    }
+                }
+                stage("Run Client Example Tests on gfx1010")
+                {
+                    when {
+                        beforeAgent true
+                        expression { (params.RUN_CLIENT_EXAMPLE_TESTS.toBoolean() || env.BRANCH_NAME == "develop") && params.BUILD_GFX101.toBoolean() }
+                    }
+                    agent{ label rocmnode("gfx1010") }
+                    environment{
+                        setup_args = "NO_CK_BUILD"
+                        execute_args = build_ck_install_and_client_examples("gfx10-1-generic")
+                    }
+                    steps{
+                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        cleanWs()
+                    }
+                }
+                stage("Run Client Example Tests on gfx1030")
+                {
+                    when {
+                        beforeAgent true
+                        expression { (params.RUN_CLIENT_EXAMPLE_TESTS.toBoolean() || env.BRANCH_NAME == "develop") && params.BUILD_GFX103.toBoolean() }
+                    }
+                    agent{ label rocmnode("gfx1030") }
+                    environment{
+                        setup_args = "NO_CK_BUILD"
+                        execute_args = build_ck_install_and_client_examples("gfx10-3-generic")
+                    }
+                    steps{
+                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        cleanWs()
+                    }
+                }
+                stage("Run Client Example Tests on gfx11")
+                {
+                    when {
+                        beforeAgent true
+                        expression { (params.RUN_CLIENT_EXAMPLE_TESTS.toBoolean() || env.BRANCH_NAME == "develop") && params.BUILD_GFX11.toBoolean() }
+                    }
+                    agent{ label 'miopen && (gfx1101 || gfx1100)' }
+                    environment{
+                        setup_args = "NO_CK_BUILD"
+                        execute_args = build_ck_install_and_client_examples("gfx11-generic")
+                    }
+                    steps{
+                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        cleanWs()
+                    }
+                }
+                stage("Run Client Example Tests on gfx1201")
+                {
+                    when {
+                        beforeAgent true
+                        expression { (params.RUN_CLIENT_EXAMPLE_TESTS.toBoolean() || env.BRANCH_NAME == "develop") && params.BUILD_GFX12.toBoolean() }
+                    }
+                    agent{ label rocmnode("gfx1201") }
+                    environment{
+                        setup_args = "NO_CK_BUILD"
+                        execute_args = build_ck_install_and_client_examples("gfx12-generic")
+                    }
+                    steps{
+                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        cleanWs()
                     }
                 }
             }
