@@ -19,8 +19,11 @@ add_executable(
     main.cpp
     TestAsmSdpaFwdKernelArgs.cpp
     TestSdpaKernelContainer.cpp
-    TestSdpaKernelHandle.cpp
     TestSdpaKernelContext.cpp
+    TestSdpaKernelEngine.cpp
+    TestSdpaKernelHandle.cpp
+    TestSdpaKernelPlanBuilder.cpp
+    TestSdpaKernelPluginApi.cpp
 )
 
 target_compile_options(sdpa_kernel_plugin_tests PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})
