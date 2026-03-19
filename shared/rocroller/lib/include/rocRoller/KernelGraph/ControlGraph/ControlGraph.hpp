@@ -22,8 +22,8 @@ namespace rocRoller
      * Control flow routines.
      *
      * Control flow is represented as a graph.  Nodes in the control flow graph represent
-     * operations (like load/store or a for loop).  Edges in the graph encode dependencies
-     * between nodes.
+     * operations (like load/store or a for loop). Edges in the graph encode control
+     * dependencies between nodes.
      *
      * The graph answers the question:
      * What are the series of operations needed to solve the problem?
@@ -35,7 +35,7 @@ namespace rocRoller
      *
      * There are two main categories of edges: Sequence edges and Body-like edges.
      *
-     * From a given node, each kind of Body-like edge denodes a separate body
+     * From a given node, each kind of Body-like edge denotes a separate body
      * of that node.
      * For example, a Conditional node may have Body edges and Else edges.
      * The nodes downstream of the Body edges represent the true case, and the

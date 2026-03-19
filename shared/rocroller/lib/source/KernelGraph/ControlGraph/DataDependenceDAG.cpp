@@ -132,20 +132,20 @@ namespace rocRoller::KernelGraph
                     // adds WW(output dep) or WR(flow dep) edge
                     auto depAdded = addDependenceEdge(writeIter->second, record.control);
 
-                    //TODO: Check the order and ensure that writeIter->second
-                    //      happens before record.control.
-                    //if(depAdded)
-                    //{
-                    //    auto order = m_graph.control.compareNodes(
-                    //        UseCacheIfAvailable, writeIter->second, record.control);
-                    //    AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst
-                    //                    || order == ControlGraph::NodeOrdering::RightInBodyOfLeft,
-                    //                ShowValue(order),
-                    //                ShowValue(writeIter->second),
-                    //                ShowValue(record.control),
-                    //                ShowValue(record.coordinate),
-                    //                ShowValue(record.rw));
-                    //}
+                    // Check the order and ensure that writeIter->second
+                    // happens before record.control.
+                    if(depAdded)
+                    {
+                        auto order = m_graph.control.compareNodes(
+                            UseCacheIfAvailable, writeIter->second, record.control);
+                        AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst
+                                        || order == ControlGraph::NodeOrdering::RightInBodyOfLeft,
+                                    ShowValue(order),
+                                    ShowValue(writeIter->second),
+                                    ShowValue(record.control),
+                                    ShowValue(record.coordinate),
+                                    ShowValue(record.rw));
+                    }
                 }
 
                 if(record.rw == ReadWrite::WRITE || record.rw == ReadWrite::READWRITE)
@@ -158,21 +158,21 @@ namespace rocRoller::KernelGraph
                         // adds RW(anti dep) edges
                         auto depAdded = addDependenceEdge(readControl, record.control);
 
-                        //TODO: Check the order and ensure that writeIter->second
-                        //      happens before record.control.
-                        //if(depAdded)
-                        //{
-                        //    auto order = m_graph.control.compareNodes(
-                        //        UseCacheIfAvailable, readControl, record.control);
-                        //    AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst
-                        //                    || order
-                        //                           == ControlGraph::NodeOrdering::RightInBodyOfLeft,
-                        //                ShowValue(order),
-                        //                ShowValue(readControl),
-                        //                ShowValue(record.control),
-                        //                ShowValue(record.coordinate),
-                        //                ShowValue(record.rw));
-                        //}
+                        // Check the order and ensure that readControl
+                        // happens before record.control.
+                        if(depAdded)
+                        {
+                            auto order = m_graph.control.compareNodes(
+                                UseCacheIfAvailable, readControl, record.control);
+                            AssertFatal(order == ControlGraph::NodeOrdering::LeftFirst
+                                            || order
+                                                   == ControlGraph::NodeOrdering::RightInBodyOfLeft,
+                                        ShowValue(order),
+                                        ShowValue(readControl),
+                                        ShowValue(record.control),
+                                        ShowValue(record.coordinate),
+                                        ShowValue(record.rw));
+                        }
                     }
 
                     // Since the current control node writes into this coord,

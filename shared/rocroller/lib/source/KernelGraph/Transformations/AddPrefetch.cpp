@@ -9,10 +9,12 @@
 #include <rocRoller/KernelOptions_detail.hpp>
 
 #include <rocRoller/KernelGraph/ControlGraph/ControlGraph.hpp>
+#include <rocRoller/KernelGraph/ControlGraph/DataDependenceDAG.hpp>
 #include <rocRoller/KernelGraph/ControlGraph/LastRWTracer.hpp>
 #include <rocRoller/KernelGraph/ControlGraph/Operation.hpp>
 #include <rocRoller/KernelGraph/ControlToCoordinateMapper.hpp>
 #include <rocRoller/KernelGraph/CoordinateGraph/Dimension.hpp>
+#include <rocRoller/KernelGraph/NodeSchedulingUtils.hpp>
 #include <rocRoller/KernelGraph/Transforms/Simplify.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
 #include <rocRoller/KernelGraph/Visitors.hpp>
@@ -408,6 +410,8 @@ namespace rocRoller
 
         KernelGraph AddPrefetch::apply(KernelGraph const& original)
         {
+            auto dependenceDAG = DataDependenceDAG::ConstructDataDependenceDAG(original);
+
             auto graph = original;
             removeRedundantBodyEdges(graph);
             removeRedundantNOPs(graph);
@@ -423,6 +427,40 @@ namespace rocRoller
             }
 
             removeRedundantSequenceEdges(graph);
+
+            // check if the data dependent Multiply nodes are ordered,
+            // if not, order them.
+            auto groupedMultiplyNodes = NodeScheduling::getGroupedNodes<Multiply>(graph);
+            for(auto& [parent, nodes] : groupedMultiplyNodes)
+            {
+                for(auto nodeA : nodes)
+                {
+                    for(auto nodeB : nodes)
+                    {
+                        if(nodeA == nodeB)
+                            continue;
+
+                        auto depEdge = dependenceDAG.findEdge(nodeA, nodeB);
+
+                        if(depEdge.has_value())
+                        {
+                            auto order
+                                = graph.control.compareNodes(UseCacheIfAvailable, nodeA, nodeB);
+
+                            if(order == NodeOrdering::Undefined)
+                            {
+                                graph.control.addElement(Sequence(), {nodeA}, {nodeB});
+                            }
+
+                            order = graph.control.compareNodes(UseCacheIfAvailable, nodeA, nodeB);
+                            AssertFatal(order == NodeOrdering::LeftFirst,
+                                        ShowValue(order),
+                                        ShowValue(nodeA),
+                                        ShowValue(nodeB));
+                        }
+                    }
+                }
+            }
 
             return graph;
         }
