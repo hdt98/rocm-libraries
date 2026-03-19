@@ -24,6 +24,10 @@
 - changed-files:
   - any-glob-to-any-file: 'dnn-providers/fusilli-provider/**/*'
 
+"project: hip-kernel-provider":
+- changed-files:
+  - any-glob-to-any-file: 'dnn-providers/hip-kernel-provider/**/*'
+
 "project: hipcub":
 - changed-files:
   - any-glob-to-any-file: 'projects/hipcub/**/*'
