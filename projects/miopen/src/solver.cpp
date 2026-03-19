@@ -488,6 +488,7 @@ inline SolverRegistrar::SolverRegistrar(IdRegistryData& registry)
     RegisterWithSolver(
         registry, ++id, conv::ConvBinWinogradRxSf2x3g1{}, miopenConvolutionAlgoWinograd);
 
+    RegisterWithSolver(registry, ++id, conv::ConvHipConv{}, miopenConvolutionAlgoDirect);
     RegisterWithSolver(registry, ++id, conv::ConvDirectNaiveConvFwd{}, miopenConvolutionAlgoDirect);
     RegisterWithSolver(registry, ++id, conv::ConvDirectNaiveConvBwd{}, miopenConvolutionAlgoDirect);
     RegisterWithSolver(registry, ++id, conv::ConvDirectNaiveConvWrw{}, miopenConvolutionAlgoDirect);
