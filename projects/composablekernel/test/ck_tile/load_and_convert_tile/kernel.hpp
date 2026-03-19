@@ -164,14 +164,7 @@ struct LoadAndConvertKernel
         }();
 
         // Input tensor
-        const auto a_tensor = make_naive_tensor_view<address_space_enum::global>(
-            a, make_tuple(M, K), make_tuple(1, M), number<1>{}, number<1>{});
-
-        auto a_block_window = make_tile_window(
-            a_tensor, block_dims, {m_block_base, 0}, MakeDRAMDistribution<XDataType>());
-
-        // Output tensor
-        auto c_tensor = [&]() {
+        const auto a_tensor = [&]() {
             if constexpr(LoadTranspose::value && !std::is_same_v<XDataType, YDataType>)
             {
                 // Similar to QuantGemmKernel with PermuteB: reinterpret the output logical layout
@@ -189,11 +182,11 @@ struct LoadAndConvertKernel
                 static_assert(S::Vector_N % n_group_0 == 0,
                               "Vector_N must be divisible by derived grouping factor");
 
-                const auto c_m_n_desc = make_naive_tensor_descriptor(
+                const auto a_m_n_desc = make_naive_tensor_descriptor(
                     make_tuple(M, N), make_tuple(1, M), number<1>{}, number<1>{});
 
-                const auto c_m_n0_b0_b1_n4_desc = transform_tensor_descriptor(
-                    c_m_n_desc,
+                const auto a_m_n0_b0_b1_n4_desc = transform_tensor_descriptor(
+                    a_m_n_desc,
                     make_tuple(make_pass_through_transform(M),
                                make_unmerge_transform(make_tuple(N / n_perm_group,
                                                                  number<n_group_0>{},
@@ -202,8 +195,8 @@ struct LoadAndConvertKernel
                     make_tuple(sequence<0>{}, sequence<1>{}),
                     make_tuple(sequence<0>{}, sequence<1, 2, 3, 4>{}));
 
-                const auto c_perm_m_n_desc = transform_tensor_descriptor(
-                    c_m_n0_b0_b1_n4_desc,
+                const auto a_perm_m_n_desc = transform_tensor_descriptor(
+                    a_m_n0_b0_b1_n4_desc,
                     make_tuple(make_pass_through_transform(M),
                                make_merge_transform(make_tuple(N / n_perm_group,
                                                                number<n_group_0>{},
@@ -212,14 +205,21 @@ struct LoadAndConvertKernel
                     make_tuple(sequence<0>{}, sequence<1, 3, 2, 4>{}),
                     make_tuple(sequence<0>{}, sequence<1>{}));
 
-                return make_tensor_view<address_space_enum::global>(c, c_perm_m_n_desc);
+                return make_tensor_view<address_space_enum::global>(a, a_perm_m_n_desc);
             }
             else
             {
                 return make_naive_tensor_view<address_space_enum::global>(
-                    c, make_tuple(M, N), make_tuple(1, M), number<1>{}, number<1>{});
+                    a, make_tuple(M, N), make_tuple(1, M), number<1>{}, number<1>{});
             }
         }();
+
+        auto a_block_window = make_tile_window(
+            a_tensor, block_dims, {m_block_base, 0}, MakeDRAMDistribution<XDataType>());
+
+        // Output tensor
+        auto c_tensor = make_naive_tensor_view<address_space_enum::global>(
+            c, make_tuple(M, K), make_tuple(1, M), number<1>{}, number<1>{});
 
         auto c_block_window = make_tile_window(
             c_tensor, block_dims, {m_block_base, 0}, MakeDRAMDistribution<YDataType>());
