@@ -44,6 +44,7 @@ The public repository for hipDNN is located at `https://github.com/ROCm/rocm-lib
     * :doc:`Operation support <reference/plugins>`
     * :doc:`Environment variables <reference/environment-variables>`
     * :doc:`Glossary <reference/glossary>`
+    * :doc:`API reference <reference/api-reference>`
 
 You can find licensing information on the
 `Licensing <https://rocm.docs.amd.com/en/latest/about/license.html>`_ page.
