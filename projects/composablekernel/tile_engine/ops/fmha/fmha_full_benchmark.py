@@ -83,6 +83,8 @@ ELEM_BYTES = {"fp16": 2, "bf16": 2, "fp32": 4, "fp8bf16": 1, "fp8fp32": 1}
 
 MASK_INT = {"no": 0, "top_left": 1, "generic": 3}
 BIAS_INT = {"no": 0, "bias": 1, "alibi": 2}
+KV_LAYOUT_INT = {"vectorized": 0, "linear": 1}
+KV_LOOKUP_INT = {"vllm": 0, "sglang": 1}
 
 
 @dataclass
@@ -235,7 +237,10 @@ for so_path, cfg in kernels:
             has_lse=cfg["has_lse"], has_dropout=cfg["has_dropout"],
             has_logits=cfg["has_logits"], has_sink=cfg["has_sink"],
             has_skip=cfg["has_skip"],
-            api_family=cfg.get("api_family", "fwd"))
+            api_family=cfg.get("api_family", "fwd"),
+            page_size=cfg.get("page_size", 16),
+            kv_layout=cfg.get("kv_layout", 0),
+            kv_lookup=cfg.get("kv_lookup", 1))
     except Exception:
         continue
     if not result.success:
@@ -313,6 +318,11 @@ def _config_to_serializable(config, so_path: str) -> dict:
         "has_logits": int(config.logits),
         "has_sink": int(config.sink),
         "has_skip": int(config.skip_min_seqlen_q),
+        "page_size": getattr(config, "page_size", 16),
+        "kv_layout": KV_LAYOUT_INT.get(
+            getattr(config, "kv_memory_layout", "vectorized"), 0
+        ),
+        "kv_lookup": KV_LOOKUP_INT.get(getattr(config, "kv_lookup_table", "sglang"), 1),
     }
 
 

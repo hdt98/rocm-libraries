@@ -1036,9 +1036,14 @@ int fmha_dispatcher_run_batch_prefill(const void* q_host,
                                       float scale,
                                       int mask_type_int,
                                       int page_block_size,
+                                      int kv_layout_int,
+                                      int kv_lookup_int,
                                       int is_v_rowmajor,
                                       const char* data_type_str,
                                       int has_lse,
+                                      int has_dropout,
+                                      int has_logits,
+                                      int has_sink,
                                       float* time_ms_out)
 {
     if(!g_initialized)
@@ -1074,14 +1079,16 @@ int fmha_dispatcher_run_batch_prefill(const void* q_host,
     traits.mask_type           = static_cast<mask_enum>(mask_type_int);
     traits.bias_type           = bias_enum::no_bias;
     traits.has_lse             = (has_lse != 0);
-    traits.has_dropout         = false;
-    traits.has_logits_soft_cap = false;
+    traits.has_dropout         = (has_dropout != 0);
+    traits.has_logits_soft_cap = (has_logits != 0);
     traits.skip_min_seqlen_q   = false;
-    traits.has_sink            = false;
+    traits.has_sink            = (has_sink != 0);
     traits.qscale_type         = quant_scale_enum::no_scale;
-    traits.kv_memory_layout    = ck_tile::BlockAttentionKVCacheMemoryLayoutEnum::VECTORIZED_LAYOUT;
-    traits.kv_lookup_table = ck_tile::BlockAttentionKVCacheLookupTableEnum::SGLANG_PAGE_TABLE_1D;
-    traits.page_size       = page_block_size;
+    traits.kv_memory_layout =
+        static_cast<ck_tile::BlockAttentionKVCacheMemoryLayoutEnum>(kv_layout_int);
+    traits.kv_lookup_table =
+        static_cast<ck_tile::BlockAttentionKVCacheLookupTableEnum>(kv_lookup_int);
+    traits.page_size = page_block_size;
 
     // Declare all vectors before HIP_CHECK to avoid goto-over-init
     std::vector<int> seqstart_q(batch + 1);

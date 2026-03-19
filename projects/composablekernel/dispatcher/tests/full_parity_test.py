@@ -331,25 +331,15 @@ def _jit_one(key: tuple, out_dir: Path, arch: str) -> Tuple[bool, str, float]:
     if not dispatch_hdr.exists():
         return (False, "no dispatch header", time.perf_counter() - t0)
 
+    sys.path.insert(0, str(PYTHON_DIR))
+    from fmha_utils import fmha_compile_flags  # noqa: E402
+
     inc = [
-        f"-I{DISPATCHER_DIR.parent / 'include'}",
-        f"-I{DISPATCHER_DIR / 'include'}",
-        f"-I{DISPATCHER_DIR.parent}",
         f"-I{out_dir}",
         f"-I{out_dir / 'dispatcher_wrappers'}",
     ]
-    base_flags = [
-        "-fPIC",
-        "-O3",
-        f"--offload-arch={arch}",
-        "-std=c++17",
-        "-DCK_TILE_FMHA_FWD_FAST_EXP2=1",
-        "-mllvm",
-        "-enable-noalias-to-md-conversion=0",
-        "-Wno-undefined-func-template",
-        "-Wno-float-equal",
-        "--offload-compress",
-    ]
+    # fmha_compile_flags provides hipcc + all standard flags; strip hipcc (element 0)
+    base_flags = fmha_compile_flags(arch, family="fwd")[1:]
 
     # 2. compile kernel .cpp files
     kernel_objs = []
@@ -453,25 +443,13 @@ def _jit_one_bwd(key: tuple, out_dir: Path, arch: str) -> Tuple[bool, str, float
     generate_dispatch_header(out_dir, wrapper_dir)
 
     dispatch_hdr = out_dir / "fmha_python_dispatch.hpp"
+    from fmha_utils import fmha_compile_flags  # noqa: E402
+
     inc = [
-        f"-I{DISPATCHER_DIR.parent / 'include'}",
-        f"-I{DISPATCHER_DIR / 'include'}",
-        f"-I{DISPATCHER_DIR.parent}",
         f"-I{out_dir}",
         f"-I{wrapper_dir}",
     ]
-    base_flags = [
-        "-fPIC",
-        "-O3",
-        f"--offload-arch={arch}",
-        "-std=c++17",
-        "-DCK_TILE_FMHA_FWD_FAST_EXP2=1",
-        "-mllvm",
-        "-enable-noalias-to-md-conversion=0",
-        "-Wno-undefined-func-template",
-        "-Wno-float-equal",
-        "--offload-compress",
-    ]
+    base_flags = fmha_compile_flags(arch, family="bwd")[1:]
 
     # 2. compile all kernel .cpp files
     kernel_objs = []

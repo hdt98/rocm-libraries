@@ -55,6 +55,7 @@ def _validate_tile_against_specs(
     pipeline: str,
     arch_info: dict,
     result: ValidationResult,
+    family: str = "fwd",
 ) -> None:
     """Validate tile config against hdim_tile_combos and hdim_tile_constraints."""
     hdim_key = f"{hdim_q}_{hdim_v}"
@@ -75,7 +76,13 @@ def _validate_tile_against_specs(
             f"{pipeline} with hdim ({hdim_q},{hdim_v}) requires bn0={hdim_constraint['required_bn0']}, "
             f"got bn0={tile[1]}"
         )
-    if "required_bm0" in hdim_constraint and tile[0] != hdim_constraint["required_bm0"]:
+    # batch_prefill uses BlockFmhaBatchPrefillPipelineQRKSVSAsync which supports
+    # smaller bm0 values than the standard fwd pipeline
+    if (
+        "required_bm0" in hdim_constraint
+        and tile[0] != hdim_constraint["required_bm0"]
+        and family != "batch_prefill"
+    ):
         result.add_error(
             f"{pipeline} with hdim ({hdim_q},{hdim_v}) requires bm0={hdim_constraint['required_bm0']}, "
             f"got bm0={tile[0]}"
@@ -194,7 +201,11 @@ def validate_config(
         result.add_error(f"Forward family {family} does not recognize dtype {dtype}")
 
     # --- Pipeline validation ---
-    if pipeline not in arch_info["supported_pipelines"]:
+    # Combine kernels use a reduction pipeline, not an attention pipeline
+    if (
+        family != "fwd_splitkv_combine"
+        and pipeline not in arch_info["supported_pipelines"]
+    ):
         result.add_error(f"pipeline {pipeline} is not supported on {arch}")
 
     if pipeline in {"v3", "qr_async_trload_v3"}:
@@ -224,7 +235,14 @@ def validate_config(
     elif family in {"fwd", "fwd_pagedkv", "fwd_splitkv", "batch_prefill"}:
         if not alg.get("skip_tile_validation", False):
             _validate_tile_against_specs(
-                tile, sig["hdim_q"], sig["hdim_v"], dtype, pipeline, arch_info, result
+                tile,
+                sig["hdim_q"],
+                sig["hdim_v"],
+                dtype,
+                pipeline,
+                arch_info,
+                result,
+                family=family,
             )
 
     if alg["block_per_cu"] <= 0:

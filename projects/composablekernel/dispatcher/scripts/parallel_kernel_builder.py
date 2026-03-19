@@ -45,19 +45,11 @@ namespace {{ volatile bool _k = true; }}
     # Compile to object
     obj_file = output_dir / f"{kernel_name}.o"
 
-    cmd = [
-        hipcc,
-        "-c",
-        "-fPIC",
-        "-std=c++17",
-        "-O3",
-        "--offload-arch=gfx942",
-        "-mllvm",
-        "-enable-noalias-to-md-conversion=0",
-        "-Wno-undefined-func-template",
-        "-Wno-float-equal",
-        "--offload-compress",
-    ]
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
+    from fmha_utils import fmha_compile_flags  # noqa: E402
+
+    arch = args.arch if hasattr(args, "arch") else "gfx942"
+    cmd = fmha_compile_flags(arch, hipcc, family="bwd")
 
     for inc_dir in include_dirs:
         cmd.extend(["-I", str(inc_dir)])
