@@ -1,13 +1,13 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// Host-side loader for the kpack GEMM example. Loads fp32, fp16, and bf16
-// GEMM kernels from a kpack archive, runs each on the detected GPU, and
-// verifies results against a naive CPU reference.
+// Host-side loader for the kpack GEMM example. Loads fp32, fp16, bf16, and
+// fp16_w32 GEMM kernels from a kpack archive, runs each on the detected GPU,
+// and verifies results against a naive CPU reference.
 //
 // This example demonstrates:
-//   - GemmSignature schema: compile-time type resolution via make_kernel()
-//   - Multi-variant iteration with typed buffers (float_to_typed / typed_to_float)
+//   - GemmConfig schema: compile-time type + tile geometry via make_kernel()
+//   - Multi-variant iteration with per-variant grid launch parameters
 //   - Per-type tolerance for correctness verification
 
 #include "gemm_api.hpp"
@@ -26,17 +26,14 @@
 #include <cstdlib>
 #include <vector>
 
-using rocm_ck::BLOCK_SIZE;
 using rocm_ck::DataType;
 using rocm_ck::GemmArgs;
+using rocm_ck::GemmConfig;
 using rocm_ck::GemmKernel;
-using rocm_ck::GemmSignature;
-using rocm_ck::M_TILE;
 using rocm_ck::make_kernel;
-using rocm_ck::N_TILE;
 
 // ============================================================================
-// Variant table — compile-time resolved via GemmSignature schema
+// Variant table — compile-time resolved via GemmConfig schema
 // ============================================================================
 
 struct GemmVariant
@@ -46,9 +43,26 @@ struct GemmVariant
 };
 
 static constexpr GemmVariant ALL_GEMM_VARIANTS[] = {
-    {"gemm_fp32", make_kernel(GemmSignature{.dtype = DataType::FP32})},
-    {"gemm_fp16", make_kernel(GemmSignature{.dtype = DataType::FP16})},
-    {"gemm_bf16", make_kernel(GemmSignature{.dtype = DataType::BF16})},
+    {"gemm_fp32",
+     make_kernel(GemmConfig{.signature = {.dtype = DataType::FP32},
+                            .algorithm = {.block_tile  = {128, 128, 32},
+                                          .block_warps = {2, 2, 1},
+                                          .warp_tile   = {16, 16, 16}}})},
+    {"gemm_fp16",
+     make_kernel(GemmConfig{.signature = {.dtype = DataType::FP16},
+                            .algorithm = {.block_tile  = {128, 128, 32},
+                                          .block_warps = {2, 2, 1},
+                                          .warp_tile   = {16, 16, 16}}})},
+    {"gemm_bf16",
+     make_kernel(GemmConfig{.signature = {.dtype = DataType::BF16},
+                            .algorithm = {.block_tile  = {128, 128, 32},
+                                          .block_warps = {2, 2, 1},
+                                          .warp_tile   = {16, 16, 16}}})},
+    {"gemm_fp16_w32",
+     make_kernel(GemmConfig{.signature = {.dtype = DataType::FP16},
+                            .algorithm = {.block_tile  = {128, 128, 32},
+                                          .block_warps = {2, 2, 1},
+                                          .warp_tile   = {32, 32, 16}}})},
 };
 
 // ============================================================================
@@ -146,11 +160,6 @@ int main(int argc, char** argv)
 
     cpu_gemm(ref_a.data(), ref_b.data(), ref_c.data(), M, N, K, stride_A, stride_B, stride_C);
 
-    // --- Grid launch constants (same tile config for all variants) ---
-    const int grid_m    = (M + M_TILE - 1) / M_TILE;
-    const int grid_n    = (N + N_TILE - 1) / N_TILE;
-    const int grid_size = grid_m * grid_n;
-
     // --- Run each variant ---
     bool all_passed  = true;
     int variants_run = 0;
@@ -158,6 +167,11 @@ int main(int argc, char** argv)
     for(const auto& variant : ALL_GEMM_VARIANTS)
     {
         const GemmKernel& k = variant.kernel;
+
+        // Per-variant grid dimensions from tile geometry
+        int grid_m    = (M + k.block_tile.m - 1) / k.block_tile.m;
+        int grid_n    = (N + k.block_tile.n - 1) / k.block_tile.n;
+        int grid_size = grid_m * grid_n;
 
         // Load kernel code object
         void* kernel_code_object = nullptr;
@@ -232,13 +246,13 @@ int main(int argc, char** argv)
                     N,
                     K,
                     grid_size,
-                    BLOCK_SIZE);
+                    k.thread_block_size);
 
         HIP_CHECK(hipModuleLaunchKernel(kernel_function,
                                         grid_size,
                                         1,
                                         1,
-                                        BLOCK_SIZE,
+                                        k.thread_block_size,
                                         1,
                                         1,
                                         0,
