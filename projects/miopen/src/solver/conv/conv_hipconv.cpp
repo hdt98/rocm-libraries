@@ -75,8 +75,8 @@ bool ConvHipConv::IsApplicable(const ExecutionContext& ctx, const ProblemDescrip
         return false;
     if(!problem.Is2d())
         return false;
-    if(!StartsWith(ctx.GetStream().GetDeviceName(), "gfx12") &&
-       !StartsWith(ctx.GetStream().GetDeviceName(), "gfx9"))
+    if(!StartsWith(ctx.GetStream().GetDeviceName(), "gfx94") &&
+       !StartsWith(ctx.GetStream().GetDeviceName(), "gfx95"))
         return false;
 
     // Initially only fp16 is supported.
