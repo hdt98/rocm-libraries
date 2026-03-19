@@ -19,10 +19,8 @@ class SdpaKernelPlan : public hipdnn_plugin_sdk::IPlan<SdpaKernelHandle>
 public:
     /**
      * @brief Construct a plan with kernel module and precomputed metadata.
-     *
-     * @param workspaceSize Precomputed LSE buffer size in bytes
      */
-    explicit SdpaKernelPlan(size_t workspaceSize);
+    SdpaKernelPlan();
 
     ~SdpaKernelPlan() override = default;
 
@@ -34,7 +32,6 @@ public:
                  void* workspace = nullptr) const override;
 
 private:
-    size_t _workspaceSize;  ///< LSE buffer size: B * H_q * S_q * sizeof(float)
 };
 
 }

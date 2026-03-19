@@ -44,7 +44,7 @@ TEST_F(TestSdpaKernelPlanBuilder, IsApplicableReturnsTrueForSdpaGraph)
 
 TEST_F(TestSdpaKernelPlanBuilder, GetMaxWorkspaceSizeCalculatesCorrectly)
 {
-    // Create an SDPA graph with known dimensions
+    // Create an SDPA graph with known dimensions (withStats = false by default)
     auto builder = hipdnn_test_sdk::utilities::createValidSdpaFpropGraph();
 
     hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(builder.GetBufferPointer(),
@@ -54,11 +54,10 @@ TEST_F(TestSdpaKernelPlanBuilder, GetMaxWorkspaceSizeCalculatesCorrectly)
     SdpaKernelSettings settings;
     size_t workspaceSize = _planBuilder.getMaxWorkspaceSize(_handle, graphWrapper, settings);
 
-    // Workspace = LSE buffer: [B, H_q, S_q] in float32
-    // The test graph has standard dimensions, verify workspace is non-zero and reasonable
-    // For typical SDPA graphs: B=1, H_q=8, S_q=128 → workspace = 1*8*128*4 = 4096 bytes
-    EXPECT_GT(workspaceSize, 0u);
-    EXPECT_TRUE(workspaceSize % 4 == 0);  // Should be multiple of sizeof(float)
+    // Forward-only kernel uses LDS internally, no external workspace needed
+    // LSE (when present) is an optional output tensor (stats_tensor_uid), not workspace
+    // The default test graph has withStats = false, so workspace should be 0
+    EXPECT_EQ(workspaceSize, 0u);
 }
 
 } // namespace
