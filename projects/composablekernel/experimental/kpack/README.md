@@ -10,13 +10,14 @@ The core challenge is that CK Tile kernels are C++ template instantiations — h
 
 ## Examples
 
-Three progressive examples, each building on the last:
+Four progressive examples, each building on the last:
 
 | Example | What it demonstrates |
 |---------|---------------------|
 | [01_hello_world](examples/01_hello_world/) | Minimal kpack pipeline — hand-written HIP kernel, one binary per arch |
 | [02_ck_tile_vector_add](examples/02_ck_tile_vector_add/) | Bridge pattern — `extern "C"` wrapper around CK Tile's `ElementWiseKernel` |
 | [03_rocm_ck_vector_add](examples/03_rocm_ck_vector_add/) | Full tuning surface — Signature/Algorithm split, 9 compiled variants, registry-based selection |
+| [04_gemm](examples/04_gemm/) | GEMM with multi-type variants — GemmSignature schema, fp32/fp16/bf16, mixed-precision epilogue |
 
 ### Example 01: Hello World
 
@@ -37,6 +38,17 @@ Production-ready pattern with:
 - **Archive metadata** — tuning parameters stored in the kpack TOC for tooling
 
 See the [example 03 README](examples/03_rocm_ck_vector_add/README.md) for full details.
+
+### Example 04: GEMM (Multi-Type)
+
+Extends the Signature pattern from elementwise to GEMM:
+
+- **GemmSignature** — two-level optional dtype hierarchy (no `in_dtype`; GEMM's A/B are asymmetric)
+- **Multi-type variants** — fp32, fp16, bf16 compiled from ~15-line `.hip` files via `runGemm<K>` template
+- **Mixed-precision epilogue** — all variants accumulate in fp32; CShuffleEpilogue handles output type conversion
+- **Typed host buffers** — `float_to_typed` / `typed_to_float` for type-agnostic verification
+
+See the [example 04 README](examples/04_gemm/README.md) for full details.
 
 ## Pipeline
 
@@ -92,14 +104,24 @@ experimental/kpack/
     │   ├── ck_tile_add.hip
     │   ├── pack.py
     │   └── main.cpp
-    └── 03_rocm_ck_vector_add/      # Full tuning surface: variants + registry
+    ├── 03_rocm_ck_vector_add/      # Full tuning surface: variants + registry
+    │   ├── CMakeLists.txt
+    │   ├── rocm_vector_add_api.hpp     # Signature/Algorithm types, make_kernel validation
+    │   ├── rocm_vector_add_dev.hpp     # Device interface — maps config to CK Tile types
+    │   ├── rocm_vector_add_registry.hpp # Variant table + find_variant selection
+    │   ├── vector_add_*.hip            # 9 variant instantiations
+    │   ├── pack.py                     # Variant-aware packer with metadata
+    │   └── main.cpp                    # Variant selection demo + verify-all mode
+    └── 04_gemm/                     # GEMM: multi-type via GemmSignature schema
         ├── CMakeLists.txt
-        ├── rocm_vector_add_api.hpp     # Signature/Algorithm types, make_kernel validation
-        ├── rocm_vector_add_dev.hpp     # Device interface — maps config to CK Tile types
-        ├── rocm_vector_add_registry.hpp # Variant table + find_variant selection
-        ├── vector_add_*.hip            # 9 variant instantiations
-        ├── pack.py                     # Variant-aware packer with metadata
-        └── main.cpp                    # Variant selection demo + verify-all mode
+        ├── gemm_api.hpp                # GemmSignature, Layout, GemmKernel, make_kernel
+        ├── gemm_dev.hpp                # CkTypeMap, CkLayoutMap, runGemm<K> template
+        ├── gemm_args.hpp               # GemmArgs ABI struct, tile constants
+        ├── gemm_fp32.hip               # fp32 variant instantiation
+        ├── gemm_fp16.hip               # fp16 variant instantiation
+        ├── gemm_bf16.hip               # bf16 variant instantiation
+        ├── pack.py                     # Variant-aware packer with dtype metadata
+        └── main.cpp                    # Multi-variant loop with typed buffers
 ```
 
 ## Dependencies
@@ -113,7 +135,7 @@ experimental/kpack/
 Each example is standalone — build from its directory:
 
 ```bash
-cd experimental/kpack/examples/01_hello_world  # or 02_ or 03_
+cd experimental/kpack/examples/01_hello_world  # or 02_, 03_, 04_
 
 cmake -B build -S . -G Ninja \
     -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++ \
@@ -123,7 +145,7 @@ cmake -B build -S . -G Ninja \
 ninja -C build
 ```
 
-Example 03 requires C++20 for struct NTTPs and `consteval` validation.
+Examples 03 and 04 require C++20 for struct NTTPs and `consteval` validation.
 
 ## Run
 
@@ -138,6 +160,9 @@ On a machine with a supported GPU:
 
 # Example 03
 ./build/kpack_rocm_ck_vector_add build/kernels.kpack
+
+# Example 04
+./build/kpack_gemm build/gemm.kpack
 ```
 
 If the current GPU's architecture is not in the archive, the demo prints a clear error and exits.

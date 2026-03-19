@@ -13,7 +13,7 @@
 #include <cstdint>
 #include <type_traits>
 
-namespace kpack_gemm {
+namespace rocm_ck {
 
 /// Fixed-width integer type for kernel index/size arguments.
 /// Matches ck_tile::index_t but avoids pulling in CK Tile headers.
@@ -68,4 +68,4 @@ constexpr int M_TILE     = 128;
 constexpr int N_TILE     = 128;
 constexpr int BLOCK_SIZE = 256; // = 2 * 2 * 1 * 64
 
-} // namespace kpack_gemm
+} // namespace rocm_ck

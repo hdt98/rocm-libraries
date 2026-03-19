@@ -1,7 +1,7 @@
 # Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 #
-# Build for the kpack GEMM example. Compiles a single fp32 GEMM kernel variant
+# Build for the kpack GEMM example. Compiles fp32/fp16/bf16 GEMM kernel variants
 # per architecture, packs into a .kpack archive, and builds the host-side loader.
 #
 # Usage:
@@ -28,12 +28,16 @@ get_filename_component(CK_INCLUDE_DIR "${CK_INCLUDE_DIR}" ABSOLUTE)
 add_subdirectory(../../rocm_kpack rocm_kpack_build)
 add_subdirectory(../../include rocm_ck_build)
 
-# --- Single kernel variant: gemm_fp32 ---
-set(KERNEL_VARIANTS gemm_fp32)
+# --- Kernel variants: fp32, fp16, bf16 ---
+set(KERNEL_VARIANTS gemm_fp32 gemm_fp16 gemm_bf16)
+
+# rocm_ck headers for device code (DataType, Layout enums used by gemm_api.hpp)
+set(ROCM_CK_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
+get_filename_component(ROCM_CK_INCLUDE_DIR "${ROCM_CK_INCLUDE_DIR}" ABSOLUTE)
 
 # --- Compile each variant x architecture into .hsaco code objects ---
 # Uses --cuda-device-only to produce raw code objects without host stubs.
-# -std=c++20 is required for CK Tile template metaprogramming.
+# -std=c++20 is required for CK Tile headers and GemmKernel schema (consteval, structural NTTPs).
 set(HSACO_FILES "")
 foreach(variant IN LISTS KERNEL_VARIANTS)
     foreach(arch IN LISTS GPU_TARGETS)
@@ -47,11 +51,14 @@ foreach(variant IN LISTS KERNEL_VARIANTS)
                     -std=c++20
                     --rocm-path=${KPACK_ROCM_PATH}
                     -I${CK_INCLUDE_DIR}
+                    -I${ROCM_CK_INCLUDE_DIR}
                     -I${CMAKE_CURRENT_SOURCE_DIR}
                     -o ${hsaco_output}
                     ${CMAKE_CURRENT_SOURCE_DIR}/${variant}.hip
             DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${variant}.hip
                     ${CMAKE_CURRENT_SOURCE_DIR}/gemm_args.hpp
+                    ${CMAKE_CURRENT_SOURCE_DIR}/gemm_api.hpp
+                    ${CMAKE_CURRENT_SOURCE_DIR}/gemm_dev.hpp
             COMMENT "Compiling ${variant}.hip -> ${arch}.hsaco"
         )
         list(APPEND HSACO_FILES ${hsaco_output})
