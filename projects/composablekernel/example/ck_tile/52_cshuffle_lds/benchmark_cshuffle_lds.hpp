@@ -69,10 +69,19 @@ struct XorDebugInfo
             int log2_base = 0;
             for(int v = BaseVectorLen; v > 1; v >>= 1) ++log2_base;
 
+#if defined(CK_GFX950_SUPPORT)
+            // gfx950: 64-bank LDS needs 3-bit XOR, which requires VectorLen=4
+            bool needs_reduction = (MPerXdl == 16) &&
+                                   ((1 << (log2_base + 3)) > NPerIter) &&  // +3 for 3-bit XOR
+                                   (BaseVectorLen > 4);
+            int vec_len = needs_reduction ? 4 : BaseVectorLen;
+#else
+            // gfx942: 32-bank LDS works with 2-bit XOR, VectorLen=8 sufficient
             bool needs_reduction = (MPerXdl == 16) &&
                                    ((1 << (log2_base + 2)) > NPerIter) &&
                                    (BaseVectorLen > 8);
             int vec_len = needs_reduction ? 8 : BaseVectorLen;
+#endif
 
             int log2_vec = 0;
             for(int v = vec_len; v > 1; v >>= 1) ++log2_vec;
