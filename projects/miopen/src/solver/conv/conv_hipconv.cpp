@@ -75,6 +75,9 @@ bool ConvHipConv::IsApplicable(const ExecutionContext& ctx, const ProblemDescrip
         return false;
     if(!problem.Is2d())
         return false;
+    // Wgrad is not yet supported by hipconv.
+    if(problem.IsDirectionBackwardWrW())
+        return false;
     if(!StartsWith(ctx.GetStream().GetDeviceName(), "gfx95"))
         return false;
 
