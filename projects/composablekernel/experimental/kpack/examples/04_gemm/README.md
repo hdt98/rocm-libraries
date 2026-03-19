@@ -1,7 +1,7 @@
-# Example 04 — GEMM (Multi-Type, Parameterized Tile Geometry)
+# Example 04 — GEMM (Multi-Type, Parameterized Tile Geometry, Fused Epilogue)
 
 Demonstrates kpack distribution of a **GEMM kernel** with multiple data type
-variants and parameterized tile geometry. Extends example 03's
+variants, parameterized tile geometry, and fused epilogues. Extends example 03's
 `{.signature, .algorithm}` pattern to GEMM's multi-type domain.
 
 ## Key Concepts
@@ -99,33 +99,62 @@ All variants accumulate in fp32. For fp16 and bf16, the CShuffleEpilogue
 handles the fp32 → fp16/bf16 conversion when storing to global memory. This is
 CK Tile's standard mixed-precision path.
 
+### Fused Epilogue (EpilogueOp)
+
+The signature includes an `epilogue_op` field that controls post-GEMM fusion:
+
+```cpp
+enum class EpilogueOp { None, Add, Multiply };
+```
+
+- **None** — plain GEMM: `E = A * B` (no D tensors, uses `GemmArgs`)
+- **Add** — fused addition: `E = A * B + D0 [+ D1]` (uses `GemmArgs1D`)
+- **Multiply** — fused scaling: `E = A * B * D0 [* D1]`
+
+D tensors are specified in the signature alongside the epilogue operation:
+
+```cpp
+make_kernel(GemmConfig{
+    .signature = {.dtype       = DataType::FP16,
+                  .epilogue_op = EpilogueOp::Add,
+                  .d0_dtype    = DataType::FP16},
+    .algorithm = {.block_tile  = {128, 128, 32},
+                  .block_warps = {2, 2, 1},
+                  .warp_tile   = {16, 16, 16}}})
+```
+
+The schema validates consistency at compile time: `None` rejects D tensors,
+`Add`/`Multiply` require at least `d0_dtype`. D tensors are M x N (same shape
+as output). Broadcast via stride tricks (1xN bias) is a future extension.
+
 ## Compiled Variants
 
-| Variant | A | B | C | Acc | BlockTile | WarpTile | Threads |
-|---------|---|---|---|-----|-----------|----------|---------|
-| `gemm_fp32` | FP32 | FP32 | FP32 | FP32 | 128×128×32 | 16×16×16 | 256 |
-| `gemm_fp16` | FP16 | FP16 | FP16 | FP32 | 128×128×32 | 16×16×16 | 256 |
-| `gemm_bf16` | BF16 | BF16 | BF16 | FP32 | 128×128×32 | 16×16×16 | 256 |
-| `gemm_fp16_w32` | FP16 | FP16 | FP16 | FP32 | 128×128×32 | 32×32×16 | 256 |
+| Variant | A | B | E | Acc | Epilogue | D0 | BlockTile | WarpTile | Threads |
+|---------|---|---|---|-----|----------|----|-----------|----------|---------|
+| `gemm_fp32` | FP32 | FP32 | FP32 | FP32 | None | — | 128×128×32 | 16×16×16 | 256 |
+| `gemm_fp16` | FP16 | FP16 | FP16 | FP32 | None | — | 128×128×32 | 16×16×16 | 256 |
+| `gemm_bf16` | BF16 | BF16 | BF16 | FP32 | None | — | 128×128×32 | 16×16×16 | 256 |
+| `gemm_fp16_w32` | FP16 | FP16 | FP16 | FP32 | None | — | 128×128×32 | 32×32×16 | 256 |
+| `gemm_fp16_add` | FP16 | FP16 | FP16 | FP32 | Add | FP16 | 128×128×32 | 16×16×16 | 256 |
 
 All variants use 128×128×32 block tile with 2×2×1 warp layout (4 warps =
-256 threads). `gemm_fp16_w32` demonstrates a wider 32×32 warp tile —
-each MFMA instruction processes more elements but with fewer iterations
-per block tile.
+256 threads). `gemm_fp16_w32` demonstrates a wider 32×32 warp tile.
+`gemm_fp16_add` demonstrates a fused epilogue with one D tensor.
 
 ## File Roles
 
 | File | Purpose |
 |------|---------|
-| `gemm_api.hpp` | `GemmSignature`, `GemmAlgorithm`, `GemmConfig`, `GemmKernel`, `is_valid_warp_gemm`, `make_kernel`, static_asserts |
-| `gemm_dev.hpp` | `CkTypeMap`, `CkLayoutMap`, `runGemm<K>` — maps schema to CK Tile types |
-| `gemm_args.hpp` | `GemmArgs` ABI struct |
+| `gemm_api.hpp` | `GemmSignature`, `GemmAlgorithm`, `GemmConfig`, `GemmKernel`, `EpilogueOp`, `is_valid_warp_gemm`, `make_kernel`, static_asserts |
+| `gemm_dev.hpp` | `CkTypeMap`, `CkLayoutMap`, `CkEpilogueOpMap`, `EpilogueTypes`, `runGemm<K>` — maps schema to CK Tile types |
+| `gemm_args.hpp` | `GemmArgs` (plain GEMM) and `GemmArgs1D` (1 D tensor) ABI structs |
 | `gemm_fp32.hip` | fp32 variant (16×16×16 warp tile) |
 | `gemm_fp16.hip` | fp16 variant (16×16×16 warp tile) |
 | `gemm_bf16.hip` | bf16 variant (16×16×16 warp tile) |
 | `gemm_fp16_w32.hip` | fp16 variant (32×32×16 warp tile) |
-| `pack.py` | Archive packer with per-variant dtype and tile metadata |
-| `main.cpp` | Host loader — multi-variant loop with per-variant grid launch, CPU reference verification |
+| `gemm_fp16_add.hip` | fp16 + D0 addition (fused epilogue) |
+| `pack.py` | Archive packer with per-variant dtype, epilogue, and tile metadata |
+| `main.cpp` | Host loader — multi-variant loop with D tensor support, CPU reference verification |
 | `CMakeLists.txt` | Build system (variant × arch nested loop) |
 
 ## Build
@@ -159,6 +188,8 @@ gemm_bf16: M=512, N=512, K=256, grid=16, block=256
 gemm_bf16: PASSED
 gemm_fp16_w32: M=512, N=512, K=256, grid=16, block=256
 gemm_fp16_w32: PASSED
+gemm_fp16_add: M=512, N=512, K=256, grid=16, block=256
+gemm_fp16_add: PASSED
 ```
 
 ## Design Notes

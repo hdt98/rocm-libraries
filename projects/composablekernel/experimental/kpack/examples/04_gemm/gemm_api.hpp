@@ -36,6 +36,26 @@ enum class Layout
 };
 
 // ============================================================================
+// EpilogueOp
+// ============================================================================
+
+/// Fused epilogue operation applied after the GEMM matmul.
+///
+///   None     — E = A * B                    (no D tensors)
+///   Add      — E = A * B + D0 [+ D1]       (bias addition)
+///   Multiply — E = A * B * D0 [* D1]       (scaling)
+///
+/// Maps to CK Tile elementwise functors: PassThrough, MultiDAdd, MultiDMultiply.
+/// Operations with runtime parameters (AddScale) or composed operations
+/// (Add+ReLU) are out of scope — see INSIGHTS.md for future directions.
+enum class EpilogueOp
+{
+    None,
+    Add,
+    Multiply
+};
+
+// ============================================================================
 // GemmSignature — the "WHAT" of a GEMM
 // ============================================================================
 
@@ -62,6 +82,13 @@ struct GemmSignature
     Layout a_layout = Layout::Row;
     Layout b_layout = Layout::Col;
     Layout c_layout = Layout::Row;
+
+    // Fused epilogue: E = f(A*B, D0, D1, ...)
+    EpilogueOp epilogue_op = EpilogueOp::None;
+    std::optional<DataType> d0_dtype; // first D tensor type
+    std::optional<Layout> d0_layout;  // defaults to Row if d0_dtype set
+    std::optional<DataType> d1_dtype; // second D tensor type
+    std::optional<Layout> d1_layout;  // defaults to Row if d1_dtype set
 };
 
 // ============================================================================
@@ -131,6 +158,54 @@ consteval ResolvedGemmTypes resolve_types(GemmSignature sig)
 }
 
 // ============================================================================
+// Epilogue resolution
+// ============================================================================
+
+/// Resolved epilogue from a GemmSignature. Concrete types for D tensors.
+struct ResolvedEpilogue
+{
+    EpilogueOp op;
+    int num_d_tensors; // 0, 1, or 2
+    DataType d0_dtype; // valid when num_d_tensors >= 1
+    Layout d0_layout;
+    DataType d1_dtype; // valid when num_d_tensors >= 2
+    Layout d1_layout;
+};
+
+/// Resolve the epilogue fields into concrete D tensor types and count.
+///
+/// Rules:
+///   - None requires no D tensors (d0_dtype/d1_dtype must not be set)
+///   - Add/Multiply require at least d0_dtype
+///   - d0_layout defaults to Row, d1_layout defaults to Row
+///   - num_d_tensors is 0, 1, or 2 based on which d*_dtype fields are set
+consteval ResolvedEpilogue resolve_epilogue(GemmSignature sig)
+{
+    bool has_d0 = sig.d0_dtype.has_value();
+    bool has_d1 = sig.d1_dtype.has_value();
+
+    if(sig.epilogue_op == EpilogueOp::None)
+    {
+        if(has_d0 || has_d1)
+            throw "EpilogueOp::None must not have D tensors";
+        // All fields below num_d_tensors are unused; zero-init is fine
+        return {EpilogueOp::None, 0, DataType::FP32, Layout::Row, DataType::FP32, Layout::Row};
+    }
+
+    // Add or Multiply requires at least D0
+    if(!has_d0)
+        throw "EpilogueOp::Add/Multiply requires d0_dtype";
+
+    int num_d      = has_d1 ? 2 : 1;
+    DataType d0_dt = *sig.d0_dtype;
+    Layout d0_ly   = sig.d0_layout ? *sig.d0_layout : Layout::Row;
+    DataType d1_dt = has_d1 ? *sig.d1_dtype : DataType::FP32;
+    Layout d1_ly   = sig.d1_layout ? *sig.d1_layout : Layout::Row;
+
+    return {sig.epilogue_op, num_d, d0_dt, d0_ly, d1_dt, d1_ly};
+}
+
+// ============================================================================
 // Warp tile validation
 // ============================================================================
 
@@ -185,6 +260,14 @@ struct GemmKernel
     Dim3 block_warps;
     Dim3 warp_tile;
     int thread_block_size;
+
+    // Epilogue fields
+    EpilogueOp epilogue_op;
+    int num_d_tensors; // 0, 1, or 2
+    DataType d0_dtype; // valid when num_d_tensors >= 1
+    Layout d0_layout;
+    DataType d1_dtype; // valid when num_d_tensors >= 2
+    Layout d1_layout;
 };
 
 /// Resolve and validate a GemmConfig into a GemmKernel (consteval).
@@ -198,8 +281,9 @@ struct GemmKernel
 /// Derives thread_block_size = block_warps.m × block_warps.n × block_warps.k × 64.
 consteval GemmKernel make_kernel(GemmConfig cfg)
 {
-    ResolvedGemmTypes types = resolve_types(cfg.signature);
-    GemmAlgorithm algo      = cfg.algorithm;
+    ResolvedGemmTypes types   = resolve_types(cfg.signature);
+    ResolvedEpilogue epilogue = resolve_epilogue(cfg.signature);
+    GemmAlgorithm algo        = cfg.algorithm;
 
     if(algo.block_tile.m <= 0 || algo.block_tile.n <= 0 || algo.block_tile.k <= 0)
         throw "block_tile dimensions must be positive";
@@ -234,7 +318,13 @@ consteval GemmKernel make_kernel(GemmConfig cfg)
             algo.block_tile,
             algo.block_warps,
             algo.warp_tile,
-            thread_block_size};
+            thread_block_size,
+            epilogue.op,
+            epilogue.num_d_tensors,
+            epilogue.d0_dtype,
+            epilogue.d0_layout,
+            epilogue.d1_dtype,
+            epilogue.d1_layout};
 }
 
 // ============================================================================
@@ -333,6 +423,59 @@ static_assert(make_kernel(
 // block_warps.k != 1 — violates CShuffleEpilogue constraint:
 // make_kernel({.signature = {.dtype = DataType::FP32},
 //              .algorithm = {{128, 128, 32}, {2, 2, 2}, {16, 16, 16}}})
+
+// ============================================================================
+// resolve_epilogue compile-time tests
+// ============================================================================
+
+// --- None with no D tensors: passes ---
+static_assert(resolve_epilogue({.dtype = DataType::FP16}).num_d_tensors == 0);
+static_assert(resolve_epilogue({.dtype = DataType::FP16}).op == EpilogueOp::None);
+
+// --- Add with d0: passes ---
+static_assert(resolve_epilogue(
+    {.dtype = DataType::FP16, .epilogue_op = EpilogueOp::Add, .d0_dtype = DataType::FP16})
+    .num_d_tensors == 1);
+static_assert(resolve_epilogue(
+    {.dtype = DataType::FP16, .epilogue_op = EpilogueOp::Add, .d0_dtype = DataType::FP16})
+    .d0_layout == Layout::Row);
+
+// --- Add with d0 + d1: passes ---
+static_assert(resolve_epilogue(
+    {.dtype = DataType::FP16, .epilogue_op = EpilogueOp::Add,
+     .d0_dtype = DataType::FP16, .d1_dtype = DataType::FP16})
+    .num_d_tensors == 2);
+
+// --- Layout override for d0 ---
+static_assert(resolve_epilogue(
+    {.dtype = DataType::FP16, .epilogue_op = EpilogueOp::Add,
+     .d0_dtype = DataType::FP16, .d0_layout = Layout::Col})
+    .d0_layout == Layout::Col);
+
+// --- make_kernel with epilogue: None (backward compat) ---
+static_assert(make_kernel(
+    {.signature = {.dtype = DataType::FP16},
+     .algorithm = {{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}}).epilogue_op == EpilogueOp::None);
+static_assert(make_kernel(
+    {.signature = {.dtype = DataType::FP16},
+     .algorithm = {{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}}).num_d_tensors == 0);
+
+// --- make_kernel with Add + D0 ---
+static_assert(make_kernel(
+    {.signature = {.dtype = DataType::FP16, .epilogue_op = EpilogueOp::Add,
+                   .d0_dtype = DataType::FP16},
+     .algorithm = {{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}}).num_d_tensors == 1);
+static_assert(make_kernel(
+    {.signature = {.dtype = DataType::FP16, .epilogue_op = EpilogueOp::Add,
+                   .d0_dtype = DataType::FP16},
+     .algorithm = {{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}}).d0_dtype == DataType::FP16);
+
+// Error cases (uncommenting any would produce consteval compile errors):
+// None with D tensor:
+// resolve_epilogue({.dtype = DataType::FP16, .d0_dtype = DataType::FP16})
+//
+// Add without D tensor:
+// resolve_epilogue({.dtype = DataType::FP16, .epilogue_op = EpilogueOp::Add})
 // clang-format on
 
 } // namespace rocm_ck
