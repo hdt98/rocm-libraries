@@ -2742,10 +2742,7 @@ struct MIOPEN_INTERNALS_EXPORT ConvDirectNaiveConvFwd final : ConvSolver
 
 struct MIOPEN_INTERNALS_EXPORT ConvHipconvDirectFwd final : ConvSolver
 {
-    const std::string& SolverDbId() const override
-    {
-        return GetSolverDbId<ConvHipconvDirectFwd>();
-    }
+    const std::string& SolverDbId() const override { return GetSolverDbId<ConvHipconvDirectFwd>(); }
 
     bool IsApplicable(const ExecutionContext&,
                       const miopen::conv::ProblemDescription&) const override;

@@ -105,18 +105,17 @@ ConvSolution ConvHipconvDirectFwd::GetSolution(const ExecutionContext& /*ctx*/,
     else
         kernel.kernel_name = "conv2d_direct_nhwc_cdna4_fwd_bf16";
 
-    kernel.g_wk = {static_cast<size_t>(blocks_k) * block_size,
+    kernel.g_wk         = {static_cast<size_t>(blocks_k) * block_size,
                    static_cast<size_t>(blocks_w),
                    static_cast<size_t>(blocks_h_n)};
-    kernel.l_wk = {block_size, 1, 1};
+    kernel.l_wk         = {block_size, 1, 1};
     kernel.comp_options = "";
 
     result.invoker_factory = [=](const std::vector<Kernel>& kernels) {
         const auto kern = kernels[0];
         return [=](const Handle& handle, const AnyInvokeParams& primitive_parameters) {
-            decltype(auto) data_ctx =
-                primitive_parameters.CastTo<miopen::conv::DataInvokeParams>();
-            const auto& tensors = data_ctx.tensors;
+            decltype(auto) data_ctx = primitive_parameters.CastTo<miopen::conv::DataInvokeParams>();
+            const auto& tensors     = data_ctx.tensors;
 
             // Kernel uses alpha=1.0, beta=0.0 (no bias accumulation)
             handle.Run(kern)(tensors.in,

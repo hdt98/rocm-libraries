@@ -2,8 +2,7 @@
 
 #include "bunnies.hpp"
 
-namespace bunnies
-{
+namespace bunnies {
 
 struct arch_cdna4
 {

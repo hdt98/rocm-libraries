@@ -7,8 +7,7 @@
 #include <concepts>
 #include <type_traits>
 
-namespace bunnies
-{
+namespace bunnies {
 
 using uint32x4 = __attribute__((ext_vector_type(4))) uint32_t;
 using uint32x8 = __attribute__((ext_vector_type(8))) uint32_t;
@@ -105,8 +104,7 @@ struct slice
     IdxT offset = 0, size = 0;
 };
 
-namespace detail
-{
+namespace detail {
 template <typename IdxT>
 __device__ auto offset(IdxT i)
 {
@@ -164,8 +162,7 @@ struct tensor_view
     {
         static_assert(sizeof...(I) == Dim);
         static_assert(((std::is_same_v<std::decay_t<I>, IdxT> ||
-                        std::is_same_v<std::decay_t<I>, slice<IdxT>>) &&
-                       ...));
+                        std::is_same_v<std::decay_t<I>, slice<IdxT>>)&&...));
 
         constexpr int SubDim = (static_cast<int>(std::is_same_v<I, slice<IdxT>>) + ...);
 
