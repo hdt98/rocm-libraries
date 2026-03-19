@@ -1618,19 +1618,10 @@ def compile_kernel(args: Tuple) -> Tuple[str, bool, str]:
 
     obj_file = output_dir / f"{kernel_name}.o"
 
-    cmd = [
-        hipcc,
-        "-c",
-        "-fPIC",
-        "-std=c++17",
-        "-O3",
-        f"--offload-arch={gpu_target}",
-        "-mllvm",
-        "-enable-noalias-to-md-conversion=0",
-        "-Wno-undefined-func-template",
-        "-Wno-float-equal",
-        "--offload-compress",
-    ]
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
+    from fmha_utils import fmha_compile_flags  # noqa: E402
+
+    cmd = fmha_compile_flags(gpu_target, hipcc, family="bwd")
 
     for inc_dir in include_dirs:
         cmd.extend(["-I", str(inc_dir)])

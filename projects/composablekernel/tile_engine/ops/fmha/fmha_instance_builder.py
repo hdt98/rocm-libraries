@@ -170,15 +170,49 @@ def expand_sweep(
                     return tile_lookup[alias]
         return dt
 
-    def _tile_params(tile, hq, dtype):
+    def _tile_params(tile, hq, dtype, var="fwd"):
+        """Compute wave/warp parameters from tile shape, matching CK's codegen.
+
+        Returns (m0, n0, k0, n1, k1, k0max, wave_m, warp_m, warp_k).
+        warp_m/warp_k are the per-warp tile sizes; wave_m is the repeat count.
+        """
         m0, n0, k0 = tile[0], tile[1], tile[2]
         n1 = tile[3] if len(tile) > 3 else hq
         k1 = tile[4] if len(tile) > 4 else k0
         k0max = tile[5] if len(tile) > 5 else hq
         is_fp8 = "fp8" in dtype
-        warp_k = 32 if is_fp8 else 16
-        wave_m = tile[6] if len(tile) > 6 else (2 if is_fp8 else 4)
-        return m0, n0, k0, n1, k1, k0max, wave_m, warp_k
+
+        # Determine warp_m from variant and tile, matching CK's factory tile objects.
+        # FWD: warp_m depends on tile size (trload tiles use 16, standard uses 32)
+        # SplitKV/PagedKV/BatchPrefill: always 16x16x16
+        if is_fp8:
+            warp_m = 32
+            warp_k = 32
+        elif var in ("splitkv", "pagedkv", "appendkv", "batch_prefill"):
+            warp_m = 16
+            warp_k = 16
+        else:
+            # FWD/BWD: warp_m derived from CK's tile objects
+            # CK uses wm0 = min(32, bm0) for the warp M dimension,
+            # with bm0 <= 64 tiles using wm0 = min(bm0, 16 or 32) depending on pipeline
+            if m0 <= 16:
+                warp_m = 16
+            elif m0 <= 64:
+                # bm0=32 standard -> wm0=32, bm0=64 trload -> wm0=16
+                warp_m = 16 if m0 == 64 and n0 < 128 else 32 if m0 == 32 else 16
+            else:
+                warp_m = 32
+            warp_k = 16
+
+        # wave_m: repeat count in M dimension = bm0 / warp_m
+        if len(tile) > 6:
+            wave_m = tile[6]
+        elif is_fp8:
+            wave_m = min(m0 // warp_m, hq // warp_k) if warp_m > 0 and warp_k > 0 else 2
+        else:
+            wave_m = m0 // warp_m if warp_m > 0 else 4
+
+        return m0, n0, k0, n1, k1, k0max, wave_m, warp_m, warp_k
 
     if variant == "fwd":
         for dtype in dtypes:
@@ -219,8 +253,8 @@ def expand_sweep(
                         for tile in tiles:
                             if not tile_compatible(arch, dtype, hq, hv, spec.tag, tile):
                                 continue
-                            m0, n0, k0, n1, k1, k0max, wave_m, warp_k = _tile_params(
-                                tile, hv, dtype
+                            m0, n0, k0, n1, k1, k0max, wave_m, warp_m, warp_k = (
+                                _tile_params(tile, hv, dtype)
                             )
                             configs.append(
                                 FmhaKernelConfig(
@@ -242,7 +276,11 @@ def expand_sweep(
                                     wave_m1=wave_m,
                                     wave_n1=1,
                                     wave_k1=1,
+                                    warp_m0=warp_m,
+                                    warp_n0=warp_m,
                                     warp_k0=warp_k,
+                                    warp_m1=warp_m,
+                                    warp_n1=warp_m,
                                     warp_k1=warp_k,
                                     pad_s=_pad_val(spec.spad),
                                     pad_sk=_pad_val(spec.skpad),
@@ -287,8 +325,8 @@ def expand_sweep(
                             continue
                         if allowed_biases is not None and mb not in allowed_biases:
                             continue
-                        m0, n0, k0, n1, k1, k0max, wave_m, warp_k = _tile_params(
-                            tile, hv, dtype
+                        m0, n0, k0, n1, k1, k0max, wave_m, warp_m, warp_k = (
+                            _tile_params(tile, hv, dtype, var="splitkv")
                         )
                         configs.append(
                             FmhaKernelConfig(
@@ -310,7 +348,11 @@ def expand_sweep(
                                 wave_m1=wave_m,
                                 wave_n1=1,
                                 wave_k1=1,
+                                warp_m0=warp_m,
+                                warp_n0=warp_m,
                                 warp_k0=warp_k,
+                                warp_m1=warp_m,
+                                warp_n1=warp_m,
                                 warp_k1=warp_k,
                                 pad_s=_pad_val(spec.spad),
                                 pad_sk=_pad_val(spec.skpad),
@@ -351,10 +393,11 @@ def expand_sweep(
                                 mode=mode,
                                 hdim_q=hv,
                                 hdim_v=hv,
-                                pipeline="unused",
+                                pipeline="splitkv_combine",
                                 tile_m0=32,
                                 tile_n0=hv,
                                 tile_k0=32,
+                                tile_n1=32,
                                 pad_s=_pad_val(spec.spad),
                                 pad_dv=_pad_val(spec.dvpad),
                                 lse=(spec.lse == "t"),
@@ -389,8 +432,8 @@ def expand_sweep(
                             continue
                         if allowed_biases is not None and mb not in allowed_biases:
                             continue
-                        m0, n0, k0, n1, k1, k0max, wave_m, warp_k = _tile_params(
-                            tile, hv, dtype
+                        m0, n0, k0, n1, k1, k0max, wave_m, warp_m, warp_k = (
+                            _tile_params(tile, hv, dtype, var="pagedkv")
                         )
                         configs.append(
                             FmhaKernelConfig(
@@ -412,7 +455,11 @@ def expand_sweep(
                                 wave_m1=wave_m,
                                 wave_n1=1,
                                 wave_k1=1,
+                                warp_m0=warp_m,
+                                warp_n0=warp_m,
                                 warp_k0=warp_k,
+                                warp_m1=warp_m,
+                                warp_n1=warp_m,
                                 warp_k1=warp_k,
                                 pad_s=_pad_val(spec.spad),
                                 pad_sk=_pad_val(spec.skpad),
@@ -484,9 +531,7 @@ def expand_sweep(
             bp_specs = get_batch_prefill_pipelines(dtype, 128, receipt)
             for (hq, hv), tiles in sorted(bp_tiles.items()):
                 for tile in tiles:
-                    for mode in MODES:
-                        if allowed_modes is not None and mode not in allowed_modes:
-                            continue
+                    for mode in ["group"]:  # batch_prefill is always group mode
                         for spec in bp_specs:
                             mm = _MASK_MAP.get(spec.mask, spec.mask)
                             mb = _BIAS_MAP.get(spec.bias, spec.bias)
@@ -494,8 +539,8 @@ def expand_sweep(
                                 continue
                             if allowed_biases is not None and mb not in allowed_biases:
                                 continue
-                            m0, n0, k0, n1, k1, k0max, wave_m, warp_k = _tile_params(
-                                tile, hv, dtype
+                            m0, n0, k0, n1, k1, k0max, wave_m, warp_m, warp_k = (
+                                _tile_params(tile, hv, dtype, var="batch_prefill")
                             )
                             for ps in page_sizes:
                                 # page_size=1 only with kv_layout=linear
@@ -524,7 +569,11 @@ def expand_sweep(
                                         wave_m1=wave_m,
                                         wave_n1=1,
                                         wave_k1=1,
+                                        warp_m0=warp_m,
+                                        warp_n0=warp_m,
                                         warp_k0=warp_k,
+                                        warp_m1=warp_m,
+                                        warp_n1=warp_m,
                                         warp_k1=warp_k,
                                         pad_s=1,
                                         pad_sk=1,
@@ -573,6 +622,104 @@ def expand_sweep(
                             )
                         )
 
+            # Exact wave/warp lookup for bwd_dq_dk_dv, extracted from CK's codegen.
+            # Key is (bm0, bn0, bk0, trload). warp_k1 differs between trload/non-trload.
+            BWD_DQ_WAVE_WARP = {
+                (16, 16, 128, "t"): {
+                    "wave": (1, 1, 1, 1, 1, 1, 1, 1, 1),
+                    "warp_k1": 16,
+                },
+                (16, 64, 256, "f"): {
+                    "wave": (1, 4, 1, 4, 1, 1, 1, 4, 1),
+                    "warp_k1": 16,
+                },
+                (16, 128, 128, "f"): {
+                    "wave": (1, 4, 1, 4, 1, 1, 1, 4, 1),
+                    "warp_k1": 16,
+                },
+                (16, 192, 128, "t"): {
+                    "wave": (1, 4, 1, 4, 1, 1, 1, 4, 1),
+                    "warp_k1": 16,
+                },
+                (32, 16, 64, "t"): {"wave": (1, 1, 1, 1, 1, 1, 1, 1, 1), "warp_k1": 16},
+                (32, 128, 32, "f"): {
+                    "wave": (1, 4, 1, 4, 1, 1, 2, 2, 1),
+                    "warp_k1": 16,
+                },
+                (32, 128, 64, "f"): {
+                    "wave": (1, 4, 1, 4, 1, 1, 1, 4, 1),
+                    "warp_k1": 16,
+                },
+                (32, 128, 64, "t"): {
+                    "wave": (1, 4, 1, 4, 1, 1, 1, 4, 1),
+                    "warp_k1": 32,
+                },
+                (32, 128, 96, "f"): {
+                    "wave": (1, 4, 1, 4, 1, 1, 2, 2, 1),
+                    "warp_k1": 16,
+                },
+                (32, 128, 128, "t"): {
+                    "wave": (1, 4, 1, 4, 1, 1, 1, 4, 1),
+                    "warp_k1": 32,
+                },
+            }
+
+            def _bwd_dq_wave_warp(tile, hq, trload=False):
+                trl = "t" if trload else "f"
+                key = (tile[0], tile[1], tile[2], trl)
+                entry = BWD_DQ_WAVE_WARP.get(key)
+                if entry is None:
+                    # Fallback: try without trload key, default warp_k1=16
+                    for k, v in BWD_DQ_WAVE_WARP.items():
+                        if k[:3] == (tile[0], tile[1], tile[2]):
+                            entry = v
+                            break
+                if entry is None:
+                    bn0 = tile[1]
+                    wn = min(4, max(1, bn0 // 32))
+                    return {
+                        "wave_m0": 1,
+                        "wave_n0": wn,
+                        "wave_k0": 1,
+                        "wave_m1": 4,
+                        "wave_n1": 1,
+                        "wave_k1": 1,
+                        "wave_m2": 1,
+                        "wave_n2": wn,
+                        "wave_k2": 1,
+                        "warp_m0": 16,
+                        "warp_n0": 16,
+                        "warp_k0": 32,
+                        "warp_m1": 16,
+                        "warp_n1": 16,
+                        "warp_k1": 16,
+                        "warp_m2": 16,
+                        "warp_n2": 16,
+                        "warp_k2": 16,
+                    }
+                w = entry["wave"]
+                wk1 = entry["warp_k1"]
+                return {
+                    "wave_m0": w[0],
+                    "wave_n0": w[1],
+                    "wave_k0": w[2],
+                    "wave_m1": w[3],
+                    "wave_n1": w[4],
+                    "wave_k1": w[5],
+                    "wave_m2": w[6],
+                    "wave_n2": w[7],
+                    "wave_k2": w[8],
+                    "warp_m0": 16,
+                    "warp_n0": 16,
+                    "warp_k0": 32,
+                    "warp_m1": 16,
+                    "warp_n1": 16,
+                    "warp_k1": wk1,
+                    "warp_m2": 16,
+                    "warp_n2": 16,
+                    "warp_k2": 16,
+                }
+
             # --- dq_dk_dv: main tiles ---
             dq_specs = get_bwd_dq_dk_dv_pipelines(dtype, receipt)
             for (hq, hv), tile in sorted(BWD_DQ_DK_DV_TILES_FP16.items()):
@@ -586,6 +733,7 @@ def expand_sweep(
                             continue
                         if allowed_biases is not None and mb not in allowed_biases:
                             continue
+                        ww = _bwd_dq_wave_warp(tile, hq)
                         configs.append(
                             FmhaKernelConfig(
                                 family="bwd_dq_dk_dv",
@@ -597,6 +745,12 @@ def expand_sweep(
                                 tile_m0=tile[0],
                                 tile_n0=tile[1],
                                 tile_k0=tile[2],
+                                tile_n1=tile[3] if len(tile) > 3 else hv,
+                                tile_k1=tile[4] if len(tile) > 4 else tile[2],
+                                tile_k0max=tile[5] if len(tile) > 5 else hq,
+                                tile_bwd6=tile[6] if len(tile) > 6 else 0,
+                                tile_bwd7=tile[7] if len(tile) > 7 else 0,
+                                tile_bwd8=tile[8] if len(tile) > 8 else 0,
                                 pad_s=_pad_val(spec.spad),
                                 pad_sk=_pad_val(spec.skpad),
                                 pad_d=_pad_val(spec.dpad),
@@ -608,6 +762,7 @@ def expand_sweep(
                                 dropout_variant=spec.dropout,
                                 deterministic=(spec.deterministic == "t"),
                                 gfx_arch=arch,
+                                **ww,
                             )
                         )
 
@@ -623,6 +778,7 @@ def expand_sweep(
                         for spec in dq_extra_specs:
                             mm = _MASK_MAP.get(spec.mask, spec.mask)
                             mb = _BIAS_MAP.get(spec.bias, spec.bias)
+                            ww = _bwd_dq_wave_warp(tile, hq, trload=(tag == "trload"))
                             configs.append(
                                 FmhaKernelConfig(
                                     family="bwd_dq_dk_dv",
@@ -634,7 +790,14 @@ def expand_sweep(
                                     tile_m0=tile[0],
                                     tile_n0=tile[1],
                                     tile_k0=tile[2],
+                                    tile_n1=tile[3] if len(tile) > 3 else hv,
+                                    tile_k1=tile[4] if len(tile) > 4 else tile[2],
+                                    tile_k0max=tile[5] if len(tile) > 5 else hq,
+                                    tile_bwd6=tile[6] if len(tile) > 6 else 0,
+                                    tile_bwd7=tile[7] if len(tile) > 7 else 0,
+                                    tile_bwd8=tile[8] if len(tile) > 8 else 0,
                                     tile_tag=tag,
+                                    use_trload=(tag == "trload"),
                                     pad_s=_pad_val(spec.spad),
                                     pad_sk=_pad_val(spec.skpad),
                                     pad_d=_pad_val(spec.dpad),
@@ -646,6 +809,7 @@ def expand_sweep(
                                     dropout_variant=spec.dropout,
                                     deterministic=(spec.deterministic == "t"),
                                     gfx_arch=arch,
+                                    **ww,
                                 )
                             )
 

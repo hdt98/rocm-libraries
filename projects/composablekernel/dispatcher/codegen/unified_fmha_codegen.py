@@ -938,12 +938,16 @@ def _bwd_dq_dk_dv_kernel_body(name: str, config: dict) -> str:
     warp = alg["warp"]
     pad = alg["padding"]
     ns = f"ns_{name}"
+    # BlockDropoutBwd<kHasDropout, kIsWG32, kIsStoreRandval>
+    # wg16 variants use kIsWG32=false; wg32 variants use kIsWG32=true
+    dropout_variant = sig.get("dropout_variant", "")
+    is_wg32 = "wg32" in dropout_variant if dropout_variant else True
+    is_store = "storerandval" in dropout_variant if dropout_variant else False
+    has_dropout = bool(sig["dropout"])
     dropout_cpp = (
-        "ck_tile::BlockDropoutBwd<true, true, true>"
-        if sig["store_randval"] and sig["dropout"]
-        else "ck_tile::BlockDropoutBwd<true, true, false>"
-        if sig["dropout"]
-        else "ck_tile::BlockDropoutBwd<false, true, false>"
+        f"ck_tile::BlockDropoutBwd<{_bool_cpp(has_dropout)}, "
+        f"{_bool_cpp(is_wg32 if has_dropout else True)}, "
+        f"{_bool_cpp(is_store)}>"
     )
     return f"""// SPDX-License-Identifier: MIT
 #pragma once

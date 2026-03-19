@@ -127,6 +127,10 @@ class FmhaKernelConfig:
     tile_n1: int = 128  # hdim_v tile
     tile_k1: int = 32  # seqlen_k tile
     tile_k0max: int = 128  # max k0 (alignment)
+    # BWD extra stages (9-element tile)
+    tile_bwd6: int = 0
+    tile_bwd7: int = 0
+    tile_bwd8: int = 0
 
     # -- Algorithm: wave config (warps per block) --
     wave_m0: int = 4
@@ -180,10 +184,11 @@ class FmhaKernelConfig:
     dbias: bool = False
     dropout_variant: str = ""  # BWD: "no"/"dropout_wg16"/"dropout_wg16_storerandval"
     tile_tag: str = ""  # extra tile variant discriminator (e.g. "trload", "small")
+    use_trload: bool = False  # BWD dq_dk_dv: use trload pipeline path
 
     @property
     def tile(self) -> Tuple[int, ...]:
-        return (
+        base = (
             self.tile_m0,
             self.tile_n0,
             self.tile_k0,
@@ -191,6 +196,9 @@ class FmhaKernelConfig:
             self.tile_k1,
             self.tile_k0max,
         )
+        if self.family == "bwd_dq_dk_dv" and self.tile_bwd6 > 0:
+            return base + (self.tile_bwd6, self.tile_bwd7, self.tile_bwd8)
+        return base
 
     @property
     def wave(self) -> Tuple[int, ...]:
@@ -295,9 +303,10 @@ class FmhaKernelConfig:
                     "fp8_static_quant": False,
                     "skip_min_seqlen_q": self.skip_min_seqlen_q,
                     "sink": self.sink,
-                    "dbias": False,
-                    "store_randval": False,
-                    "deterministic": False,
+                    "dbias": self.dbias,
+                    "store_randval": "storerandval" in self.dropout_variant,
+                    "deterministic": self.deterministic,
+                    "dropout_variant": self.dropout_variant,
                     "kv_memory_layout": self.kv_memory_layout,
                     "kv_lookup_table": self.kv_lookup_table,
                     "page_size": self.page_size,
@@ -312,6 +321,7 @@ class FmhaKernelConfig:
                     "num_wave_groups": self.num_wave_groups,
                     "max_splits_log2": 0,
                     "max_seq_len_q": 0,
+                    "use_trload": self.use_trload,
                 },
             }
         )
@@ -553,9 +563,14 @@ class FmhaDispatcherLib:
             ctypes.c_float,
             ctypes.c_int,  # mask_type
             ctypes.c_int,  # page_block_size
+            ctypes.c_int,  # kv_layout_int
+            ctypes.c_int,  # kv_lookup_int
             ctypes.c_int,  # is_v_rowmajor
             ctypes.c_char_p,
-            ctypes.c_int,  # data_type, has_lse
+            ctypes.c_int,  # has_lse
+            ctypes.c_int,  # has_dropout
+            ctypes.c_int,  # has_logits
+            ctypes.c_int,  # has_sink
             ctypes.POINTER(ctypes.c_float),
         ]
         lib.fmha_dispatcher_run_batch_prefill.restype = ctypes.c_int
@@ -709,6 +724,7 @@ class FmhaRunner:
         has_sink: int = 0,
         has_skip: int = 0,
         api_family: str = "fwd",
+        **kwargs,
     ) -> "FmhaResult":
         """Run FMHA forward on GPU with automatic HIP memory management.
 
@@ -814,10 +830,15 @@ class FmhaRunner:
                     prob.hdim_v,
                     prob.scale,
                     mask_type,
-                    64,
+                    kwargs.get("page_size", 16),
+                    kwargs.get("kv_layout", 0),
+                    kwargs.get("kv_lookup", 0),
                     1,
                     b"fp16",
                     has_lse,
+                    has_dropout,
+                    has_logits,
+                    has_sink,
                     ctypes.byref(time_ms),
                 )
             else:
@@ -857,9 +878,11 @@ class FmhaRunner:
 
             self._hip.hipMemcpy(O_c.ctypes.data, d_o, O_c.nbytes, self.HIP_MEMCPY_D2H)
 
+            # appendkv is a memory op (KV cache copy), not compute -- no TFLOPS
+            ops = 0 if api_family == "appendkv" else prob.num_ops
             tflops = (
-                prob.num_ops / (time_ms.value * 1e-3) / 1e12
-                if time_ms.value > 0
+                ops / (time_ms.value * 1e-3) / 1e12
+                if time_ms.value > 0 and ops > 0
                 else 0.0
             )
             return FmhaResult(
@@ -982,8 +1005,12 @@ def _find_hipcc() -> str:
     return "hipcc"
 
 
-def fmha_compile_flags(arch: str, hipcc: str = "") -> List[str]:
-    """Base hipcc flags for compiling FMHA kernels. Shared by JIT and tile engine."""
+def fmha_compile_flags(arch: str, hipcc: str = "", family: str = "") -> List[str]:
+    """Base hipcc flags for compiling FMHA kernels. Shared by JIT and tile engine.
+
+    Mirrors the flags from example/ck_tile/01_fmha/CMakeLists.txt to ensure
+    parity with CK's own build system.
+    """
     if not hipcc:
         hipcc = _find_hipcc()
     root = get_dispatcher_root()
@@ -1002,9 +1029,22 @@ def fmha_compile_flags(arch: str, hipcc: str = "") -> List[str]:
         "-Wno-undefined-func-template",
         "-Wno-float-equal",
         "--offload-compress",
+        "-fgpu-flush-denormals-to-zero",
     ]
     if arch.startswith("gfx9"):
         flags.append("-DCK_TILE_FMHA_FWD_FAST_EXP2=1")
+    else:
+        flags.append("-DCK_TILE_FMHA_FWD_FAST_EXP2=0")
+
+    # API enablement flags (match CMakeLists.txt conditional defines)
+    flags.append("-DCK_TILE_FMHA_FWD_SPLITKV_API=1")
+    flags.append("-DCK_TILE_FMHA_FWD_APPENDKV_API=1")
+    flags.append("-DCK_TILE_FMHA_FWD_PAGEDKV_API=1")
+
+    # BWD-specific flags
+    if family.startswith("bwd"):
+        flags.append("-DCK_TILE_FLOAT_TO_BFLOAT16_DEFAULT=3")
+
     return flags
 
 
@@ -1083,7 +1123,7 @@ def setup_fmha_dispatcher(
 
     # Step 2: Compile kernel .cpp AND ctypes in parallel
     kernel_cpps = list(output_dir.glob("fmha_*.cpp"))
-    base_flags = fmha_compile_flags(config.gfx_arch, hipcc)
+    base_flags = fmha_compile_flags(config.gfx_arch, hipcc, family=config.family)
 
     compile_jobs = []
     for cpp in kernel_cpps:
@@ -1220,7 +1260,8 @@ def setup_multiple_fmha_dispatchers(
         codegen_results = list(pool.map(_codegen, configs))
 
     # --- Stage 2: Collect ALL compile jobs, run in one pool ---
-    base_flags = fmha_compile_flags(arch, hipcc)
+    # Use bwd family flag to get the superset of all flags (includes BWD-specific defines)
+    base_flags = fmha_compile_flags(arch, hipcc, family="bwd")
     compile_jobs = []  # (cmd, obj_path, kernel_name, label)
 
     config_dirs: dict[str, tuple[FmhaKernelConfig, Path]] = {}

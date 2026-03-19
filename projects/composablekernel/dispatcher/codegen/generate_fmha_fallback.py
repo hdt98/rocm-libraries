@@ -140,6 +140,12 @@ def compile_kernels(output_dir: Path, gpu_target: str, include_dirs: str) -> Pat
 
     import re
 
+    # Use the shared compile flags from fmha_utils
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
+    from fmha_utils import fmha_compile_flags  # noqa: E402
+
+    base_flags = fmha_compile_flags(gpu_target, hipcc, family="bwd")
+
     inc_flags = []
     for d in re.split(r"[;:]", include_dirs):
         d = d.strip()
@@ -149,23 +155,7 @@ def compile_kernels(output_dir: Path, gpu_target: str, include_dirs: str) -> Pat
     objs = []
     for cpp in kernel_cpps:
         obj = cpp.with_suffix(".o")
-        cmd = [
-            hipcc,
-            "-c",
-            "-fPIC",
-            "-O3",
-            f"--offload-arch={gpu_target}",
-            "-std=c++17",
-            *inc_flags,
-            "-mllvm",
-            "-enable-noalias-to-md-conversion=0",
-            "-Wno-undefined-func-template",
-            "-Wno-float-equal",
-            "--offload-compress",
-            str(cpp),
-            "-o",
-            str(obj),
-        ]
+        cmd = base_flags + inc_flags + [str(cpp), "-o", str(obj)]
         print(f"  Compiling {cpp.name}...")
         r = subprocess.run(cmd, capture_output=True, text=True)
         if r.returncode != 0:
