@@ -157,6 +157,98 @@ Update three things:
   Python test script with PyTorch reference
 - ctypes loading, GPU synchronization, error reporting
 
+## Testing Limitations
+
+### PyTorch reference is sufficient for tuning, not for kernel development
+
+This harness validates results against PyTorch's reference implementation
+(`torch.softmax`). This works well when the LLM is only modifying **tuning
+parameters** (tile sizes, vector widths, cluster dimensions) — the kernel logic
+is unchanged, so a single end-to-end correctness check is enough.
+
+However, when the LLM modifies **kernel source code** (e.g., CK grid/block
+kernels, pipeline logic, memory access patterns), PyTorch-only validation has
+limitations:
+
+- **No isolation**: if the output is wrong, the PyTorch comparison only tells
+  you *that* it's wrong, not *where*. The LLM cannot easily test individual
+  components (e.g., just the reduction, just the memory layout transform).
+- **No edge case coverage**: PyTorch reference tests one random input per shape.
+  CK's test infrastructure covers boundary conditions, alignment edge cases,
+  and specific parameter combinations that trigger different code paths.
+- **No unit test granularity**: old CK has limited unit tests, but CK Tile has
+  better coverage. An LLM modifying kernel internals should run the relevant
+  CK/CK Tile unit tests, not just the end-to-end PyTorch comparison.
+
+### Recommendations for kernel development (beyond tuning)
+
+- **Use this harness for fast iteration.** The PyTorch comparison catches gross
+  correctness issues and gives immediate performance feedback. This is the
+  primary loop.
+- **Fall back to CK tests when stuck.** If the LLM produces faulty kernels and
+  cannot diagnose the issue from the PyTorch error alone, CK's test
+  infrastructure provides unit-level granularity to isolate the problem. For
+  CK Tile kernels, the relevant unit tests from the CK Tile test suite can help
+  narrow down which component is broken.
+- **Use CK tests for final correctness.** Before accepting a kernel modification
+  as done, run the full CK test suite for that kernel family. The tests cover
+  edge cases, multiple dtypes, alignment boundaries, and specific parameter
+  combinations that a single PyTorch comparison won't catch.
+
+## Possible Improvements
+
+### Use PyTorch extensions for both kernels (eliminate ctypes and Makefile)
+
+Both kernels could use PyTorch's C++ extension system with pybind11 bindings,
+accepting `torch::Tensor` directly instead of `void*`. This eliminates all
+ctypes boilerplate, Makefile, and compile.py. The two kernels use different
+compilation strategies to preserve the frozen baseline guarantee:
+
+- **Baseline**: `pip install ./baseline` — compiled once into site-packages,
+  never changes unless explicitly reinstalled. Immune to header changes.
+- **Optimized**: `torch.utils.cpp_extension.load()` — JIT-compiled on each
+  test run. Auto-detects GPU arch, auto-recompiles when source changes.
+
+```python
+from torch.utils.cpp_extension import load
+import geak_baseline  # pip-installed, frozen
+
+# Optimized: JIT-compiled, auto-rebuilds when optimized.cpp changes
+optimized = load(name="optimized", sources=["optimized.cpp"],
+                 extra_include_paths=["../../../include"])
+
+# Both use the same torch::Tensor interface — no ctypes
+ms_base = geak_baseline.run_kernel(x, y, [2], 1.0, 0.0, True, 5, 50)
+ms_opt = optimized.run_kernel(x, y, [2], 1.0, 0.0, True, 5, 50)
+```
+
+The baseline `setup.py` would look like:
+
+```python
+from setuptools import setup
+from torch.utils.cpp_extension import CppExtension, BuildExtension
+
+setup(
+    name="geak_baseline",
+    ext_modules=[CppExtension(
+        "geak_baseline",
+        ["baseline.cpp"],
+        include_dirs=["../../../include"],
+        extra_compile_args=["-O3"],
+    )],
+    cmdclass={"build_ext": BuildExtension},
+)
+```
+
+The `.cpp` files would use pybind11 instead of `extern "C"`. The tuning
+parameters section stays identical — only the wrapper at the bottom changes.
+
+`load()` tracks transitive includes and recompiles when CK headers change.
+This is desirable for the optimized kernel (pick up changes during development)
+but would be wrong for the baseline (must stay frozen). Using `pip install` for
+the baseline avoids this — the compiled extension in site-packages is decoupled
+from the source tree.
+
 ## Prerequisites
 
 - ROCm with hipcc (`/opt/rocm/bin/hipcc`)
