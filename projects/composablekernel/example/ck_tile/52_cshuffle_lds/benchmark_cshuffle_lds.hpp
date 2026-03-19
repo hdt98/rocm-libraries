@@ -68,20 +68,6 @@ struct LdsStoreSetup
     {
         alignas(16) __shared__ char smem[Epilogue::GetSmemSize()];
 
-        // DEBUG: Print LDS descriptor info
-        if(threadIdx.x == 0 && blockIdx.x == 0)
-        {
-            printf("DEBUG LdsStoreSetup: MPerXdl=%d, MPerIter=%d, NPerIter=%d, "
-                   "ODataType=%d, BaseVecLen=%d, SmemSize=%d, lds_space=%d\n",
-                   (int)Epilogue::MPerXdl,
-                   (int)Epilogue::MPerIterationShuffle,
-                   (int)Epilogue::NPerIterationShuffle,
-                   (int)sizeof(ODataType),
-                   (int)Epilogue::GetVectorSizeC(),
-                   (int)Epilogue::GetSmemSize(),
-                   (int)lds_desc.get_element_space_size());
-        }
-
         auto lds_view =
             make_tensor_view<address_space_enum::lds>(reinterpret_cast<ODataType*>(smem), lds_desc);
 

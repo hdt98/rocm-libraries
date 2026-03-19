@@ -429,8 +429,8 @@ struct CShuffleEpilogue
             {
 #if defined(CK_GFX950_SUPPORT)
                 // 16x16 XDL on gfx950: use 3-bit XOR for 64-bank LDS
-                // Row bits 1,2,3 give 8-way spread across 64 banks
-                using RowBits = sequence<1, 2, 3>;
+                // Conflicting rows 0,4,8,12,16,20,24,28 differ in bits 2,3,4
+                using RowBits = sequence<2, 3, 4>;
                 using ColBits = sequence<col_bit_start, col_bit_start + 1, col_bit_start + 2>;
 #else
                 // 16x16 XDL on gfx942: use 2-bit XOR for 32-bank LDS
