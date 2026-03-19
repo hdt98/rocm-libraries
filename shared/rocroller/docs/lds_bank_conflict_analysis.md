@@ -267,3 +267,20 @@ from wave 0's LDS region, lanes 4-7 from wave 1's, lanes 8-11 from wave 2's, lan
 from wave 3's. This is what gives the swizzled kernel 4 rotations -> 16/16 bank groups.
 
 Static reference tables: `scripts/print_macro_tiles.py`
+
+## Implementing in rocRoller
+
+Gated by a new kernel option. Two sides need to change: GR voffset and LR address. Both can be expressed as pure per-lane arithmetic in the coordinate graph -- no new instruction emission needed. All parameters are derived from the tile config.
+
+### TODO
+
+Step 1: Match no-swizzle-no-rotate GR pattern
+- New coordinate transform: remap GR voffset to use half-wave split (sequential cols, no rotation or XOR); LDS dest unchanged
+
+Step 2: Enable swizzle
+- Extend transform: add per-wave col rotation + conditional XOR pair-swap on GR; add inverse col rotation (closed-form per-lane arithmetic) on LR
+- Add `LDSBankSwizzleMode` kernel option (None, Swizzle) -- model on `ScaleSkipPermlaneMode.hpp` -- to gate steps 1 and 2
+
+Step 3: Enable direct-to-LDS
+- Enable `buffer_load...lds` path in rocRoller for this kernel
+
