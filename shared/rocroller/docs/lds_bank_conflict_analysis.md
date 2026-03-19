@@ -48,12 +48,9 @@ T10 T30                         T11 T31
 <details>
 <summary>first_bank per lane (all waves identical)</summary>
 
-| laneInSIMD | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| L0-15 | 0 | 8 | 0 | 8 | 0 | 8 | 0 | 8 | 0 | 8 | 0 | 8 | 0 | 8 | 0 | 8 |
-| L16-31 | 1 | 9 | 1 | 9 | 1 | 9 | 1 | 9 | 1 | 9 | 1 | 9 | 1 | 9 | 1 | 9 |
-| L32-47 | 2 | 10 | 2 | 10 | 2 | 10 | 2 | 10 | 2 | 10 | 2 | 10 | 2 | 10 | 2 | 10 |
-| L48-63 | 3 | 11 | 3 | 11 | 3 | 11 | 3 | 11 | 3 | 11 | 3 | 11 | 3 | 11 | 3 | 11 |
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38 | 39 | 40 | 41 | 42 | 43 | 44 | 45 | 46 | 47 | 48 | 49 | 50 | 51 | 52 | 53 | 54 | 55 | 56 | 57 | 58 | 59 | 60 | 61 | 62 | 63 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0 | 8 | 0 | 8 | 0 | 8 | 0 | 8 | 0 | 8 | 0 | 8 | 0 | 8 | 0 | 8 | 1 | 9 | 1 | 9 | 1 | 9 | 1 | 9 | 1 | 9 | 1 | 9 | 1 | 9 | 1 | 9 | 2 | 10 | 2 | 10 | 2 | 10 | 2 | 10 | 2 | 10 | 2 | 10 | 2 | 10 | 2 | 10 | 3 | 11 | 3 | 11 | 3 | 11 | 3 | 11 | 3 | 11 | 3 | 11 | 3 | 11 | 3 | 11 |
 
 Only 4 of 16 bank groups active per phase; each hit by 4 threads -> 4x serialization.
 
@@ -76,12 +73,9 @@ T60 T62 T48 T50 T38 T36 T42 T40 T61 T63 T49 T51 T39 T37 T43 T41
 <details>
 <summary>first_bank per lane (wave 0)</summary>
 
-| laneInSIMD | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| L0-15 | 1 | 9 | 0 | 8 | 3 | 11 | 2 | 10 | 5 | 13 | 4 | 12 | 7 | 15 | 6 | 14 |
-| L16-31 | 0 | 8 | 1 | 9 | 2 | 10 | 3 | 11 | 4 | 12 | 5 | 13 | 6 | 14 | 7 | 15 |
-| L32-47 | 3 | 11 | 2 | 10 | 5 | 13 | 4 | 12 | 7 | 15 | 6 | 14 | 1 | 9 | 0 | 8 |
-| L48-63 | 2 | 10 | 3 | 11 | 4 | 12 | 5 | 13 | 6 | 14 | 7 | 15 | 0 | 8 | 1 | 9 |
+| 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29 | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38 | 39 | 40 | 41 | 42 | 43 | 44 | 45 | 46 | 47 | 48 | 49 | 50 | 51 | 52 | 53 | 54 | 55 | 56 | 57 | 58 | 59 | 60 | 61 | 62 | 63 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 9 | 0 | 8 | 3 | 11 | 2 | 10 | 5 | 13 | 4 | 12 | 7 | 15 | 6 | 14 | 0 | 8 | 1 | 9 | 2 | 10 | 3 | 11 | 4 | 12 | 5 | 13 | 6 | 14 | 7 | 15 | 3 | 11 | 2 | 10 | 5 | 13 | 4 | 12 | 7 | 15 | 6 | 14 | 1 | 9 | 0 | 8 | 2 | 10 | 3 | 11 | 4 | 12 | 5 | 13 | 6 | 14 | 7 | 15 | 0 | 8 | 1 | 9 |
 
 All 16 of 16 bank groups active per phase; each hit by exactly 1 thread -> no serialization.
 
@@ -122,7 +116,20 @@ laneInSIMD = lane % 16    (position within the 16-lane SIMD)
 
 LR lane mapping (same for all three kernels): `SIMDIndex` selects K-chunk column,
 `laneInSIMD` selects M-row (cycles every 16). Wave partition splits at M-row 128.
-Full tables: `scripts/print_macro_tiles.py`.
+Reproduce from traces:
+
+```bash
+# rocRoller (LDA = K = 32768)
+scripts/trace_tile_map.py build_release/trace_fp4.jsonl --lda 32768
+
+# No-swizzle-no-rotate (LDA = 256 = macM)
+scripts/trace_tile_map.py trace_noswizzle.jsonl --lda 256
+
+# Swizzled (same LDA)
+scripts/trace_tile_map.py trace_swizzle.jsonl --lda 256
+```
+
+Static reference tables: `scripts/print_macro_tiles.py`
 
 ## Global Load to LDS
 
@@ -170,7 +177,7 @@ The `% 4` creates a half-wave split (32 lanes -> 4 rows x 8 cols) so that:
 rows 0-1 of each half-wave only (rows 2-3 get rotation without XOR).
 
 The tables below show which `wave.lane` loads each (M-row, K-chunk) from global memory.
-Pattern repeats every 16 M-rows. Full tables: `scripts/print_macro_tiles.py`.
+Pattern repeats every 16 M-rows. Static reference tables: `scripts/print_macro_tiles.py`
 
 ### rocRoller -- 8 contiguous rows per wave, sequential columns
 
@@ -259,4 +266,4 @@ Each wave's LR reads data written by all 4 GR waves: lanes 0-3 (laneInSIMD 0-3) 
 from wave 0's LDS region, lanes 4-7 from wave 1's, lanes 8-11 from wave 2's, lanes 12-15
 from wave 3's. This is what gives the swizzled kernel 4 rotations -> 16/16 bank groups.
 
-Full tables: `scripts/print_macro_tiles.py`.
+Static reference tables: `scripts/print_macro_tiles.py`
