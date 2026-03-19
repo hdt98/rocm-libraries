@@ -1042,10 +1042,14 @@ ConvolutionDescriptor::GetSolutions(const ExecutionContext& ctx,
     {
         if(fallbackPathTaken != nullptr)
             *fallbackPathTaken = FallbackPath::None;
-        return solutions;
+    }
+    else
+    {
+        solutions =
+            GetSolutionsFallback(ctx, problem, maxSolutionCount, fallbackPathTaken, invokeParams);
     }
 
-    return GetSolutionsFallback(ctx, problem, maxSolutionCount, fallbackPathTaken, invokeParams);
+    return solutions;
 }
 
 std::size_t ConvolutionDescriptor::GetForwardSolutionWorkspaceSize(const Handle& handle,
