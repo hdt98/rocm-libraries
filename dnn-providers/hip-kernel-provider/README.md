@@ -36,7 +36,7 @@ This plugin is built as a standalone project outside of the main hipDNN build. I
 The SDK packages can come from either:
 
 - **Building hipDNN from source** (in the `projects/hipdnn` directory of this repository): build hipDNN and run `ninja install` to install the SDK packages. Note that the `CMAKE_INSTALL_PREFIX` may need to be set when configuring the hipDNN CMake project if ROCm was not installed to the default `/opt/rocm` on your system.
-- **A ROCm or TheRock installation** that includes hipDNN: the SDK packages are installed as part of the hipDNN distribution.
+- **A ROCm or TheRock installation** that includes hipDNN: the SDK packages are installed as part of the install.
 
 Either approach works as long as the installed SDK version is compatible with the plugin version being built.
 
