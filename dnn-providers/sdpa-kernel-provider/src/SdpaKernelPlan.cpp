@@ -7,9 +7,13 @@
 namespace sdpa_kernel_provider
 {
 
+SdpaKernelPlan::SdpaKernelPlan()
+{
+}
+
 size_t SdpaKernelPlan::getWorkspaceSize(const SdpaKernelHandle& /*handle*/) const
 {
-    HIPDNN_PLUGIN_LOG_ERROR("SdpaKernelPlan::getWorkspaceSize not implemented");
+    // Forward-only kernel requires no workspace (uses 64KB LDS internally)
     return 0;
 }
 
