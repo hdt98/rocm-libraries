@@ -255,6 +255,8 @@ class StateValues:
   startVgprAddressDbg: int               = -1
   startVgprAlphaTmp: int                 = -1
   startVgprSerial: int                   = -1
+  startVgprSKConsts: int                 = -1
+  numVgprSKConsts: int                   = 0
   startVgprIdentityMatrix: int           = -1 
 
   numSgprSizesSum: int                   = 0
@@ -4047,6 +4049,39 @@ class KernelWriter(metaclass=abc.ABCMeta):
     return module
 
   ##############################################################################
+  # Move StreamK Constants to VGPRs
+  ##############################################################################
+  def moveStreamKConstantsToVgpr(self, kernel):
+    """Move StreamK constant SGPRs (kernel args) to VGPRs to reduce SGPR pressure.
+
+    Uses statically allocated VGPRs (startVgprSKConsts) that don't overlap with
+    MXS/ValuAB/ValuC regions. At usage sites, v_readfirstlane_b32 brings values
+    back to temp SGPRs as needed.
+    """
+    module = Module("Move StreamK constants to VGPRs")
+    self.states.skConstVgprs = {}
+
+    consts = ["ItersPerTile", "MagicNumberItersPerTile", "MagicShiftItersPerTile", "SKItersPerWG"]
+    if kernel["StreamK"] >= 2:
+      consts += ["skGrid", "skTiles"]
+
+    baseVgpr = self.states.startVgprSKConsts
+    for i, name in enumerate(consts):
+      v = baseVgpr + i
+      self.states.skConstVgprs[name] = v
+      module.add(VMovB32(dst=vgpr(v), src=sgpr(name), comment="Save %s to VGPR v%u" % (name, v)))
+
+    # Free the SGPR slots for temp reuse
+    for name in consts:
+      self.addSgprVarToPool(name)
+
+    # StreamKIdx is a var (not kernel arg) — value set later in preLoop
+    v = baseVgpr + len(consts)
+    self.states.skConstVgprs["StreamKIdx"] = v
+
+    return module
+
+  ##############################################################################
   # Kernel Body
   ##############################################################################
   def kernelBody( self, kernel, tensorParametersA, tensorParametersB ):
@@ -4069,6 +4104,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
     module.add(Label("ASM_Start", "Main body of the asm kernel"))
     module.add(self.defineAndResources(kernel, tensorParametersA, tensorParametersB, tPM))
     module.add(self.disableWmmaArbStall())
+
+    # Move StreamK constant SGPRs to VGPRs to reduce SGPR pressure
+    if kernel["StreamK"]:
+      module.add(self.moveStreamKConstantsToVgpr(kernel))
 
     # Initialize stream-k loop
     skComponent = Component.StreamK.find(self)
@@ -7084,6 +7123,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.b.startVgprCvt = vgprIdx
       vgprIdx += numVgprsEmuB # for vgpr 32XEmulation B
 
+    if kernel["StreamK"]:
+      numSKConsts = 5  # ItersPerTile, MagicNumberItersPerTile, MagicShiftItersPerTile, SKItersPerWG, StreamKIdx
+      if kernel["StreamK"] >= 2:
+        numSKConsts += 2  # skGrid, skTiles
+      self.states.startVgprSKConsts = vgprIdx
+      self.states.numVgprSKConsts = numSKConsts
+      vgprIdx += numSKConsts
+
     # TODO: Serial is always the first/last register in the pool so the store
     # code doesn't have to deal with fragmentation
     self.states.startVgprSerial = vgprIdx
@@ -7359,8 +7406,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("GSU", 1)  # Can't move to the front because of the preload arguments
 
     if kernel["StreamK"]:
-      # StreamK vars
-      self.defineSgpr("StreamKIdx", 1)
+      # StreamK vars (StreamKIdx moved to VGPR, see moveStreamKConstantsToVgpr)
       self.defineSgpr("StreamKIter", 1)
       self.defineSgpr("StreamKIterEnd", 1)
       self.defineSgpr("StreamKLocalStart", 1)
@@ -7369,13 +7415,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.defineSgpr("StreamKTileID", 1)
       if kernel["StreamKAtomic"] == 0:
         self.defineSgpr("SrdWS", 4, 4)
-
-    # These SGPRs aren't used right away, add them to spr pool temporarily
+    # These SGPRs aren't used right away, add them to sgpr pool temporarily
     if self.states.doShadowInit and kernel["BufferStore"]:
       self.addSgprVarToPool("SrdC")
     if kernel["StreamK"] and kernel["StreamKAtomic"] == 0:
       self.addSgprVarToPool("SrdWS")
-
+    # SK constant SGPRs are NOT freed here — they are freed in
+    # moveStreamKConstantsToVgpr after their values have been copied to VGPRs.
+    # Freeing them here would allow temp allocs to clobber the kernel arguments.
     #------------------------
     # Registers defined below this point are not available in the post-loop
     # Post-loop is after tail loop exits, ie the store code.

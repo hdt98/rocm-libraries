@@ -6412,7 +6412,10 @@ class KernelWriterAssembly(KernelWriter):
             # StreamK + TailLoopINNLL case
             # skip TailLoopINNLL if StreamK WG not processing final iteration
             # Check if tile finished
-            module.add(SCmpLtU32(src0=sgpr("StreamKLocalEnd"), src1=sgpr("ItersPerTile"), comment="Check if WG processes final iteration of tile"))
+            sIpt = self.sgprPool.checkOut(1, "ItersPerTile")
+            module.add(VReadfirstlaneB32(dst=sgpr(sIpt), src=vgpr(self.states.skConstVgprs["ItersPerTile"])))
+            module.add(SCmpLtU32(src0=sgpr("StreamKLocalEnd"), src1=sgpr(sIpt), comment="Check if WG processes final iteration of tile"))
+            self.sgprPool.checkIn(sIpt)
             module.add(SCMovB32(dst=loopCounter, src=0, comment="This WG not completing tile"))
           module.add(SCmpEQU32(src0=loopCounter, src1=0, comment="numIter%s == 0"%loopChar))
           EndOfTailLoopInNLLLabel = Label("TailLoopInNLLEnd%s"%(loopChar), "" )
@@ -12248,7 +12251,10 @@ class KernelWriterAssembly(KernelWriter):
 
         module.add(SCmpEQU64(src0=sgpr("AddressFlags", 2), src1=hex(0), comment="Check for synchronizer"))
         module.add(SCBranchSCC0(labelName=bpeDoneLabel.getLabelName(), comment="If synchronizer, use regular output BPE"))
-        module.add(SCmpEQU32(src0=sgpr("skTiles"), src1=1, comment="split == 1 ?"))
+        sSkt = self.sgprPool.checkOut(1, "skTiles")
+        module.add(VReadfirstlaneB32(dst=sgpr(sSkt), src=vgpr(self.states.skConstVgprs["skTiles"])))
+        module.add(SCmpEQU32(src0=sgpr(sSkt), src1=1, comment="split == 1 ?"))
+        self.sgprPool.checkIn(sSkt)
         module.add(SCBranchSCC1(labelName=bpeDoneLabel.getLabelName(), comment="If split == 1, use reguler output BPE"))
 
         # BPE for parallel reduction
@@ -13380,7 +13386,10 @@ class KernelWriterAssembly(KernelWriter):
       if kernel["StreamK"]:
         module.add(SCmpEQU64(src0=sgpr("AddressFlags", 2), src1=hex(0), comment="Check for synchronizer"))
         module.add(SCBranchSCC0(labelName=gsuLabel.getLabelName(), comment="Branch to stream-k store code"))
-        module.add(SCmpEQU32(src0=sgpr("skTiles"), src1=1, comment="split == 1 ?"))
+        sSkt = self.sgprPool.checkOut(1, "skTiles")
+        module.add(VReadfirstlaneB32(dst=sgpr(sSkt), src=vgpr(self.states.skConstVgprs["skTiles"])))
+        module.add(SCmpEQU32(src0=sgpr(sSkt), src1=1, comment="split == 1 ?"))
+        self.sgprPool.checkIn(sSkt)
         # TODO May need long branch??
         module.add(SCBranchSCC1(labelName=gsuLabel.getLabelName(), comment="branch if split == 1"))
       else:
