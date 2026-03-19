@@ -8,10 +8,6 @@ GEMM_PIPELINES = ["mem", "compv3", "compv4"]
 
 GEMM_PRESHUFFLE_PIPELINES = ["preshufflev2"]
 
-# Note: AQuant pipelines are a subset of GEMM_PIPELINES, so they are
-# already validated through the GEMM_PIPELINES branch in is_tile_config_valid().
-GEMM_AQUANT_PIPELINES = ["mem", "compv3"]
-
 LAYOUT_MAP = {
     "r": "ck_tile::tensor_layout::gemm::RowMajor",
     "c": "ck_tile::tensor_layout::gemm::ColumnMajor",
@@ -405,6 +401,7 @@ def is_tile_config_valid(
     pipeline: str,
     layout: str,
     gpu_target: str,
+    kernel_name_prefix: str,
 ) -> bool:
     """
     Comprehensive tile configuration validation.
@@ -461,7 +458,7 @@ def is_tile_config_valid(
         logging.debug(f"LDS validation failed: {lds_error}")
         return False
 
-    if pipeline in GEMM_PIPELINES:
+    if kernel_name_prefix in ["gemm_universal", "gemm_multi_d", "grouped_gemm"]:
         gemm_valid, gemm_valid_error = validate_gemm(
             tile_m,
             tile_n,
@@ -497,7 +494,7 @@ def is_tile_config_valid(
             logging.debug(f"Warp tile validation failed: {warp_tile_error}")
             return False
 
-    elif pipeline in GEMM_PRESHUFFLE_PIPELINES:
+    elif kernel_name_prefix == "gemm_preshuffle":
         preshuffle_valid, preshuffle_valid_error = validate_gemm_preshuffle(
             tile_m,
             tile_n,
@@ -536,6 +533,9 @@ def is_tile_config_valid(
         if not warp_tile_valid:
             logging.debug(f"Warp tile validation failed: {warp_tile_error}")
             return False
+
+    elif kernel_name_prefix == "gemm_aquant":
+        pass
 
     return True
 

@@ -92,151 +92,74 @@ class GemmAQuantKernelBuilder(GemmKernelBuilder):
         )
         self.group_size_k = self.config.get("group_size_k", 128)
 
-    def _get_tile_configs(self):
-        """Get tile configurations for the current datatype and layout."""
-        tile_config = self.config["tile_config"]
+    # def _validate_tile_config(
+    #     self,
+    #     tile_m,
+    #     tile_n,
+    #     tile_k,
+    #     warp_m,
+    #     warp_n,
+    #     warp_k,
+    #     warp_tile_m,
+    #     warp_tile_n,
+    #     warp_tile_k,
+    #     pipeline,
+    # ):
+    #     """Validate tile configuration for AQuant GEMM."""
+    #     a_datatype = self.datatype
+    #     b_datatype = self.datatype
+    #     c_datatype = "fp16" if self.datatype in ["fp8", "bf8"] else self.datatype
 
-        # Generate values in the config if default range is given
-        for dim in ["tile_m", "tile_n", "tile_k"]:
-            if tile_config.get(dim).get("values") is None:
-                tile_config.get(dim)["values"] = self._generate_values(
-                    tile_config.get(dim).get("min"),
-                    tile_config.get(dim).get("max"),
-                    tile_config.get(dim).get("step"),
-                )
+    #     # AQuant-specific: tile_k must be a multiple of group_size_k
+    #     # (KPerBlockAQ = KPerBlock / QuantGroupSize::kK must be integer > 0)
+    #     if tile_k % self.group_size_k != 0 or tile_k < self.group_size_k:
+    #         return False
 
-        tile_m_values = tile_config.get("tile_m").get("values")
-        tile_n_values = tile_config.get("tile_n").get("values")
-        tile_k_values = tile_config.get("tile_k").get("values")
-        warp_m_values = tile_config.get("warp_m").get("values")
-        warp_n_values = tile_config.get("warp_n").get("values")
-        warp_k_values = tile_config.get("warp_k").get("values")
-        warp_tile_m_values = tile_config.get("warp_tile_m").get("values")
-        warp_tile_n_values = tile_config.get("warp_tile_n").get("values")
-        warp_tile_k_values = tile_config.get("warp_tile_k").get("values")
+    #     # AQuant-specific: group_size_k must be divisible by warp_tile_k
+    #     # (from pipeline policy static_assert)
+    #     if self.group_size_k % warp_tile_k != 0:
+    #         return False
 
-        # For AQuant, pipeline can be mem or compv3
-        default_pipeline = "compv3"
+    #     # AQuant-specific: enforce warp_tile_m == warp_tile_n (MFMA requirement)
+    #     if warp_tile_m != warp_tile_n:
+    #         return False
 
-        configs = []
-        for combo in itertools.product(
-            tile_m_values,
-            tile_n_values,
-            tile_k_values,
-            warp_m_values,
-            warp_n_values,
-            warp_k_values,
-            warp_tile_m_values,
-            warp_tile_n_values,
-            warp_tile_k_values,
-        ):
-            (
-                tile_m,
-                tile_n,
-                tile_k,
-                warp_m,
-                warp_n,
-                warp_k,
-                warp_tile_m,
-                warp_tile_n,
-                warp_tile_k,
-            ) = combo
+    #     # AQuant-specific: enforce warp_tile_m ↔ warp_tile_k coupling
+    #     # from get_k_warp_tile() in tile_gemm_shape.hpp
+    #     # For fp8/bf8 on non-WMMA, non-gfx950:
+    #     #   warp_tile_m=32 → warp_tile_k=32
+    #     #   warp_tile_m=16 → warp_tile_k=64
+    #     # For fp8/bf8 on gfx950:
+    #     #   warp_tile_m=32 → warp_tile_k=64
+    #     #   warp_tile_m=16 → warp_tile_k=128
+    #     if self.datatype in ["fp8", "bf8"]:
+    #         if self.gpu_target == "gfx950":
+    #             expected_k = 64 if warp_tile_m == 32 else 128
+    #         else:
+    #             expected_k = 32 if warp_tile_m == 32 else 64
+    #         if warp_tile_k != expected_k:
+    #             return False
 
-            if self._validate_tile_config(
-                tile_m,
-                tile_n,
-                tile_k,
-                warp_m,
-                warp_n,
-                warp_k,
-                warp_tile_m,
-                warp_tile_n,
-                warp_tile_k,
-                default_pipeline,
-            ):
-                configs.append(
-                    {
-                        "tile_m": tile_m,
-                        "tile_n": tile_n,
-                        "tile_k": tile_k,
-                        "warp_m": warp_m,
-                        "warp_n": warp_n,
-                        "warp_k": warp_k,
-                        "warp_tile_m": warp_tile_m,
-                        "warp_tile_n": warp_tile_n,
-                        "warp_tile_k": warp_tile_k,
-                    }
-                )
-        return configs
+    #     if not is_tile_config_valid(
+    #         tile_m,
+    #         tile_n,
+    #         tile_k,
+    #         warp_m,
+    #         warp_n,
+    #         warp_k,
+    #         warp_tile_m,
+    #         warp_tile_n,
+    #         warp_tile_k,
+    #         a_datatype,
+    #         b_datatype,
+    #         c_datatype,
+    #         pipeline,
+    #         self.layout,
+    #         self.gpu_target,
+    #     ):
+    #         return False
 
-    def _validate_tile_config(
-        self,
-        tile_m,
-        tile_n,
-        tile_k,
-        warp_m,
-        warp_n,
-        warp_k,
-        warp_tile_m,
-        warp_tile_n,
-        warp_tile_k,
-        pipeline,
-    ):
-        """Validate tile configuration for AQuant GEMM."""
-        a_datatype = self.datatype
-        b_datatype = self.datatype
-        c_datatype = "fp16" if self.datatype in ["fp8", "bf8"] else self.datatype
-
-        # AQuant-specific: tile_k must be a multiple of group_size_k
-        # (KPerBlockAQ = KPerBlock / QuantGroupSize::kK must be integer > 0)
-        if tile_k % self.group_size_k != 0 or tile_k < self.group_size_k:
-            return False
-
-        # AQuant-specific: group_size_k must be divisible by warp_tile_k
-        # (from pipeline policy static_assert)
-        if self.group_size_k % warp_tile_k != 0:
-            return False
-
-        # AQuant-specific: enforce warp_tile_m == warp_tile_n (MFMA requirement)
-        if warp_tile_m != warp_tile_n:
-            return False
-
-        # AQuant-specific: enforce warp_tile_m ↔ warp_tile_k coupling
-        # from get_k_warp_tile() in tile_gemm_shape.hpp
-        # For fp8/bf8 on non-WMMA, non-gfx950:
-        #   warp_tile_m=32 → warp_tile_k=32
-        #   warp_tile_m=16 → warp_tile_k=64
-        # For fp8/bf8 on gfx950:
-        #   warp_tile_m=32 → warp_tile_k=64
-        #   warp_tile_m=16 → warp_tile_k=128
-        if self.datatype in ["fp8", "bf8"]:
-            if self.gpu_target == "gfx950":
-                expected_k = 64 if warp_tile_m == 32 else 128
-            else:
-                expected_k = 32 if warp_tile_m == 32 else 64
-            if warp_tile_k != expected_k:
-                return False
-
-        if not is_tile_config_valid(
-            tile_m,
-            tile_n,
-            tile_k,
-            warp_m,
-            warp_n,
-            warp_k,
-            warp_tile_m,
-            warp_tile_n,
-            warp_tile_k,
-            a_datatype,
-            b_datatype,
-            c_datatype,
-            pipeline,
-            self.layout,
-            self.gpu_target,
-        ):
-            return False
-
-        return True
+    #     return True
 
     def _generate_trait_combinations(self):
         """Generate valid AQuant trait combinations.
@@ -286,7 +209,6 @@ class GemmAQuantKernelBuilder(GemmKernelBuilder):
                     f"{pipeline}-{epilogue}-{scheduler}"
                 )
                 continue
-
             combinations.append(combo)
         return combinations
 
