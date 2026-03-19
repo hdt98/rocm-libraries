@@ -70,16 +70,73 @@ struct CkLayoutMap<Layout::Col>
 };
 
 // ============================================================================
+// CkEpilogueOpMap: EpilogueOp → CK Tile elementwise functor
+// ============================================================================
+
+template <EpilogueOp>
+struct CkEpilogueOpMap;
+
+template <>
+struct CkEpilogueOpMap<EpilogueOp::None>
+{
+    using type = ck_tile::element_wise::PassThrough;
+};
+
+template <>
+struct CkEpilogueOpMap<EpilogueOp::Add>
+{
+    using type = ck_tile::element_wise::MultiDAdd;
+};
+
+template <>
+struct CkEpilogueOpMap<EpilogueOp::Multiply>
+{
+    using type = ck_tile::element_wise::MultiDMultiply;
+};
+
+// ============================================================================
+// EpilogueTypes<K>: derive DsDataType, DsLayout, and Op tuples from GemmKernel
+// ============================================================================
+
+template <GemmKernel K>
+struct EpilogueTypes
+{
+    using Op = typename CkEpilogueOpMap<K.epilogue_op>::type;
+
+    // Always resolved (GemmKernel fields have valid defaults even when unused).
+    // std::conditional_t below selects which ones go into the tuples.
+    using D0Type   = typename CkTypeMap<K.d0_dtype>::type;
+    using D1Type   = typename CkTypeMap<K.d1_dtype>::type;
+    using D0Layout = typename CkLayoutMap<K.d0_layout>::type;
+    using D1Layout = typename CkLayoutMap<K.d1_layout>::type;
+
+    using DsDataType = std::conditional_t<K.num_d_tensors == 0,
+                                          ck_tile::tuple<>,
+                                          std::conditional_t<K.num_d_tensors == 1,
+                                                             ck_tile::tuple<D0Type>,
+                                                             ck_tile::tuple<D0Type, D1Type>>>;
+
+    using DsLayout = std::conditional_t<K.num_d_tensors == 0,
+                                        ck_tile::tuple<>,
+                                        std::conditional_t<K.num_d_tensors == 1,
+                                                           ck_tile::tuple<D0Layout>,
+                                                           ck_tile::tuple<D0Layout, D1Layout>>>;
+};
+
+// ============================================================================
 // runGemm<K>: assemble CK Tile GEMM pipeline from GemmKernel descriptor
 // ============================================================================
 
-/// Device-side GEMM bridge: GemmArgs → CK Tile template stack → ck_tile::GemmKernel.
+/// Device-side GEMM bridge: args → CK Tile template stack → ck_tile::GemmKernel.
 ///
 /// Wires the 7-type CK Tile GEMM stack (shape, traits, problem, pipeline,
 /// partitioner, epilogue, kernel) with types and layouts from the GemmKernel
 /// NTTP. Tile geometry comes from GemmKernel fields (validated at compile time).
-template <GemmKernel K>
-__device__ void runGemm(GemmArgs args)
+///
+/// ArgsType is deduced from the extern "C" function parameter — GemmArgs for
+/// plain GEMM, GemmArgs1D for fused epilogues with one D tensor.
+template <GemmKernel K, typename ArgsType>
+__device__ void runGemm(ArgsType args)
 {
     // --- Map schema types to CK Tile types ---
     using AType   = typename CkTypeMap<K.a_dtype>::type;
@@ -110,44 +167,68 @@ __device__ void runGemm(GemmArgs args)
     // --- Step 5: Partitioner (1D blockIdx → 2D tile coordinates) ---
     using TilePartitioner = ck_tile::GemmTile1DPartitioner<GemmShape>;
 
+    // --- Epilogue types from kernel descriptor ---
+    using EpiOp      = typename EpilogueTypes<K>::Op;
+    using DsDataType = typename EpilogueTypes<K>::DsDataType;
+    using DsLayout   = typename EpilogueTypes<K>::DsLayout;
+
     // --- Step 6: Epilogue (shuffle accumulator through LDS, store to global) ---
-    using GemmEpilogue = ck_tile::CShuffleEpilogue<
-        ck_tile::CShuffleEpilogueProblem<AType,
-                                         BType,
-                                         ck_tile::tuple<>, // DsDataType (no bias/fused)
-                                         AccType,
-                                         OType,            // output (may differ from acc)
-                                         ck_tile::tuple<>, // DsLayout
-                                         CLayout,
-                                         ck_tile::element_wise::PassThrough,
-                                         TilePartitioner::MPerBlock,
-                                         TilePartitioner::NPerBlock,
-                                         K.block_warps.m,
-                                         K.block_warps.n,
-                                         K.warp_tile.m,
-                                         K.warp_tile.n,
-                                         K.warp_tile.k,
-                                         PipelineProblem::TransposeC>>;
+    using GemmEpilogue =
+        ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<AType,
+                                                                   BType,
+                                                                   DsDataType,
+                                                                   AccType,
+                                                                   OType,
+                                                                   DsLayout,
+                                                                   CLayout,
+                                                                   EpiOp,
+                                                                   TilePartitioner::MPerBlock,
+                                                                   TilePartitioner::NPerBlock,
+                                                                   K.block_warps.m,
+                                                                   K.block_warps.n,
+                                                                   K.warp_tile.m,
+                                                                   K.warp_tile.n,
+                                                                   K.warp_tile.k,
+                                                                   PipelineProblem::TransposeC>>;
 
     // --- Step 7: Kernel (ties everything together) ---
     using CkKernel   = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
     using KernelArgs = typename CkKernel::UniversalGemmKernel::KernelArgs;
 
-    // Convert clean ABI struct to CK Tile's internal args
-    const KernelArgs kargs{{args.a},        // as_ptr
-                           {args.b},        // bs_ptr
-                           {},              // ds_ptr  (empty — no D tensors)
-                           args.c,          // e_ptr
-                           args.M,          // M
-                           args.N,          // N
-                           args.K,          // K
-                           {args.stride_A}, // stride_As
-                           {args.stride_B}, // stride_Bs
-                           {},              // stride_Ds (empty)
-                           args.stride_C,   // stride_E
-                           1};              // k_batch (no split-K)
-
-    CkKernel{}(kargs);
+    // Convert clean ABI struct to CK Tile's internal args.
+    // Branch on D tensor count to construct the right KernelArgs initializer.
+    if constexpr(K.num_d_tensors == 0)
+    {
+        const KernelArgs kargs{{args.a},        // as_ptr
+                               {args.b},        // bs_ptr
+                               {},              // ds_ptr  (empty — no D tensors)
+                               args.c,          // e_ptr
+                               args.M,          // M
+                               args.N,          // N
+                               args.K,          // K
+                               {args.stride_A}, // stride_As
+                               {args.stride_B}, // stride_Bs
+                               {},              // stride_Ds (empty)
+                               args.stride_C,   // stride_E
+                               1};              // k_batch (no split-K)
+        CkKernel{}(kargs);
+    }
+    else if constexpr(K.num_d_tensors == 1)
+    {
+        const KernelArgs kargs{{args.a},         // as_ptr
+                               {args.b},         // bs_ptr
+                               {args.d0},        // ds_ptr (1 D tensor)
+                               args.e,           // e_ptr
+                               args.M,           // M
+                               args.N,           // N
+                               args.K,           // K
+                               {args.stride_A},  // stride_As
+                               {args.stride_B},  // stride_Bs
+                               {args.stride_D0}, // stride_Ds (1 stride)
+                               args.stride_E,    // stride_E
+                               1};               // k_batch (no split-K)
+        CkKernel{}(kargs);
+    }
 }
 
 } // namespace rocm_ck

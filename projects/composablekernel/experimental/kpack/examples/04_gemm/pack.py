@@ -100,6 +100,25 @@ VARIANTS = [
         "warp_k": 16,
         "block_size": 256,
     },
+    {
+        "name": "gemm_fp16_add",
+        "a_dtype": "fp16",
+        "b_dtype": "fp16",
+        "c_dtype": "fp16",
+        "acc_dtype": "fp32",
+        "epilogue_op": "add",
+        "d0_dtype": "fp16",
+        "block_m": 128,
+        "block_n": 128,
+        "block_k": 32,
+        "warps_m": 2,
+        "warps_n": 2,
+        "warps_k": 1,
+        "warp_m": 16,
+        "warp_n": 16,
+        "warp_k": 16,
+        "block_size": 256,
+    },
 ]
 ARCHITECTURES = ["gfx90a", "gfx942", "gfx950"]
 
@@ -160,7 +179,7 @@ def main() -> None:
         variant_metadata = {}
         for v in VARIANTS:
             if v["name"] in variant_map:
-                variant_metadata[v["name"]] = {
+                meta = {
                     "a_dtype": v["a_dtype"],
                     "b_dtype": v["b_dtype"],
                     "c_dtype": v["c_dtype"],
@@ -176,6 +195,14 @@ def main() -> None:
                     "warp_k": v["warp_k"],
                     "block_size": v["block_size"],
                 }
+                # Include epilogue metadata when present
+                if "epilogue_op" in v:
+                    meta["epilogue_op"] = v["epilogue_op"]
+                if "d0_dtype" in v:
+                    meta["d0_dtype"] = v["d0_dtype"]
+                if "d1_dtype" in v:
+                    meta["d1_dtype"] = v["d1_dtype"]
+                variant_metadata[v["name"]] = meta
 
         toc = {
             "compression_scheme": "none",

@@ -1,13 +1,14 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// Host-side loader for the kpack GEMM example. Loads fp32, fp16, bf16, and
-// fp16_w32 GEMM kernels from a kpack archive, runs each on the detected GPU,
-// and verifies results against a naive CPU reference.
+// Host-side loader for the kpack GEMM example. Loads fp32, fp16, bf16,
+// fp16_w32, and fp16_add GEMM kernels from a kpack archive, runs each on
+// the detected GPU, and verifies results against a naive CPU reference.
 //
 // This example demonstrates:
 //   - GemmConfig schema: compile-time type + tile geometry via make_kernel()
 //   - Multi-variant iteration with per-variant grid launch parameters
+//   - Fused epilogue: E = A*B + D0 with GemmArgs1D
 //   - Per-type tolerance for correctness verification
 
 #include "gemm_api.hpp"
@@ -27,7 +28,9 @@
 #include <vector>
 
 using rocm_ck::DataType;
+using rocm_ck::EpilogueOp;
 using rocm_ck::GemmArgs;
+using rocm_ck::GemmArgs1D;
 using rocm_ck::GemmConfig;
 using rocm_ck::GemmKernel;
 using rocm_ck::make_kernel;
@@ -63,6 +66,13 @@ static constexpr GemmVariant ALL_GEMM_VARIANTS[] = {
                             .algorithm = {.block_tile  = {128, 128, 32},
                                           .block_warps = {2, 2, 1},
                                           .warp_tile   = {32, 32, 16}}})},
+    {"gemm_fp16_add",
+     make_kernel(GemmConfig{.signature = {.dtype       = DataType::FP16,
+                                          .epilogue_op = EpilogueOp::Add,
+                                          .d0_dtype    = DataType::FP16},
+                            .algorithm = {.block_tile  = {128, 128, 32},
+                                          .block_warps = {2, 2, 1},
+                                          .warp_tile   = {16, 16, 16}}})},
 };
 
 // ============================================================================
@@ -149,16 +159,25 @@ int main(int argc, char** argv)
     // --- CPU reference (fp32, runs once) ---
     // Values kept small (0-7) so all types are exact. Worst case accumulation:
     // 256 × (7 × 7) = 12544, within fp16 exact range.
+    // D0 values are small (0-3) — worst case fused result: 12544 + 3 = 12547.
     std::vector<float> ref_a(M * K);
     std::vector<float> ref_b(K * N);
     std::vector<float> ref_c(M * N, 0.0f);
+    std::vector<float> ref_d0(M * N);
 
     for(int i = 0; i < M * K; ++i)
         ref_a[i] = static_cast<float>(i % 8);
     for(int i = 0; i < K * N; ++i)
         ref_b[i] = static_cast<float>(i % 8);
+    for(int i = 0; i < M * N; ++i)
+        ref_d0[i] = static_cast<float>(i % 4);
 
     cpu_gemm(ref_a.data(), ref_b.data(), ref_c.data(), M, N, K, stride_A, stride_B, stride_C);
+
+    // Fused reference: E = A*B + D0
+    std::vector<float> ref_add(M * N);
+    for(int i = 0; i < M * N; ++i)
+        ref_add[i] = ref_c[i] + ref_d0[i];
 
     // --- Run each variant ---
     bool all_passed  = true;
@@ -221,8 +240,31 @@ int main(int argc, char** argv)
         HIP_CHECK(hipMemcpy(device_b, host_b.data(), K * N * b_elem_bytes, hipMemcpyHostToDevice));
         HIP_CHECK(hipMemset(device_c, 0, M * N * c_elem_bytes));
 
-        // Launch kernel
-        GemmArgs kernel_args = {
+        // Allocate D0 tensor for fused epilogue variants
+        void* device_d0   = nullptr;
+        int d0_elem_bytes = 0;
+        std::vector<char> host_d0_buf;
+        if(k.num_d_tensors >= 1)
+        {
+            d0_elem_bytes = rocm_ck::data_type_bits(k.d0_dtype) / 8;
+            host_d0_buf.resize(M * N * d0_elem_bytes);
+            for(int i = 0; i < M * N; ++i)
+                rocm_ck::float_to_typed(k.d0_dtype, ref_d0[i], &host_d0_buf[i * d0_elem_bytes]);
+            HIP_CHECK(hipMalloc(&device_d0, M * N * d0_elem_bytes));
+            HIP_CHECK(hipMemcpy(
+                device_d0, host_d0_buf.data(), M * N * d0_elem_bytes, hipMemcpyHostToDevice));
+        }
+
+        std::printf("%s: M=%d, N=%d, K=%d, grid=%d, block=%d\n",
+                    variant.name,
+                    M,
+                    N,
+                    K,
+                    grid_size,
+                    k.thread_block_size);
+
+        // Build args struct — type depends on D tensor count
+        GemmArgs base_args = {
             .M        = M,
             .N        = N,
             .K        = K,
@@ -233,20 +275,31 @@ int main(int argc, char** argv)
             .b        = device_b,
             .c        = device_c,
         };
-        size_t kernel_args_size = sizeof(kernel_args);
+        constexpr int stride_D0 = N; // D0 [M x N] RowMajor
+        GemmArgs1D fused_args   = {
+              .M         = M,
+              .N         = N,
+              .K         = K,
+              .stride_A  = stride_A,
+              .stride_B  = stride_B,
+              .stride_E  = stride_C, // output stride matches C layout
+              .a         = device_a,
+              .b         = device_b,
+              .e         = device_c,
+              .stride_D0 = stride_D0,
+              ._pad0     = 0,
+              .d0        = device_d0,
+        };
+
+        // Launch — select args struct by D tensor count
+        void* args_ptr          = (k.num_d_tensors == 0) ? static_cast<void*>(&base_args)
+                                                         : static_cast<void*>(&fused_args);
+        size_t kernel_args_size = (k.num_d_tensors == 0) ? sizeof(base_args) : sizeof(fused_args);
         void* launch_config[]   = {HIP_LAUNCH_PARAM_BUFFER_POINTER,
-                                   &kernel_args,
+                                   args_ptr,
                                    HIP_LAUNCH_PARAM_BUFFER_SIZE,
                                    &kernel_args_size,
                                    HIP_LAUNCH_PARAM_END};
-
-        std::printf("%s: M=%d, N=%d, K=%d, grid=%d, block=%d\n",
-                    variant.name,
-                    M,
-                    N,
-                    K,
-                    grid_size,
-                    k.thread_block_size);
 
         HIP_CHECK(hipModuleLaunchKernel(kernel_function,
                                         grid_size,
@@ -264,12 +317,15 @@ int main(int argc, char** argv)
         // Download and verify
         HIP_CHECK(hipMemcpy(host_c.data(), device_c, M * N * c_elem_bytes, hipMemcpyDeviceToHost));
 
+        // Select correct reference: plain GEMM or fused
+        const float* ref = (k.num_d_tensors == 0) ? ref_c.data() : ref_add.data();
+
         float tol   = rocm_ck::tolerance_for(k.c_dtype);
         bool passed = true;
         for(int i = 0; i < M * N; ++i)
         {
             float got      = rocm_ck::typed_to_float(k.c_dtype, &host_c[i * c_elem_bytes]);
-            float expected = ref_c[i];
+            float expected = ref[i];
             if(std::fabs(got - expected) > tol * std::fabs(expected) + tol)
             {
                 int row = i / N;
@@ -295,6 +351,8 @@ int main(int argc, char** argv)
         HIP_CHECK(hipFree(device_a));
         HIP_CHECK(hipFree(device_b));
         HIP_CHECK(hipFree(device_c));
+        if(device_d0 != nullptr)
+            HIP_CHECK(hipFree(device_d0));
         HIP_CHECK(hipModuleUnload(module));
         kpack_free_kernel(kernel_code_object);
     }
