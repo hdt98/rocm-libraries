@@ -6,14 +6,14 @@
 #include "ck_tile/core.hpp"
 #include "ck_tile/host.hpp"
 #include "ck_tile/ops/mhc/pipeline/mhc_problem.hpp"
-#include "ck_tile/ops/mhc/kernel/mhc_kernel_fused_pipeline.hpp"
+#include "ck_tile/ops/mhc/kernel/mhc_kernel_fused.hpp"
 #include "ck_tile/ops/mhc/kernel/mhc_reduction_kernel.hpp"
 #include "ck_tile/ops/mhc/kernel/mhc_sinkhorn_kernel.hpp"
 #include "ck_tile/ops/gemm/pipeline/gemm_universal_pipeline_ag_bg_cr_policy.hpp"
 
 namespace ck_tile {
 
-// MHC Fused Pipeline Invoker
+// MHC Invoker
 // Provides type definitions and helper methods for the 3-stage MHC pipeline
 template <typename XDataType_,
           typename PhiDataType_,
@@ -22,7 +22,7 @@ template <typename XDataType_,
           typename ActivationFunc_ = ck_tile::element_wise::Sigmoid,
           ck_tile::index_t MTile_  = 64,
           bool UseLogSinkhorn_     = true>
-struct MHCFusedPipelineInvoker
+struct MHCInvoker
 {
     using XDataType       = ck_tile::remove_cvref_t<XDataType_>;
     using PhiDataType     = ck_tile::remove_cvref_t<PhiDataType_>;
@@ -37,7 +37,7 @@ struct MHCFusedPipelineInvoker
     using Problem = ck_tile::MHCProblemGemmDist<XDataType, ComputeDataType, YDataType, MTile>;
     using BlockGemmShape = typename Problem::BlockGemmShape;
     using GemmKernel     = ck_tile::
-        MHCKernelFusedPipeline<Problem, ck_tile::UniversalGemmPipelineAgBgCrPolicy, ActivationFunc>;
+        MHCKernelFused<Problem, ck_tile::UniversalGemmPipelineAgBgCrPolicy, ActivationFunc>;
     using ReductionKernel = ck_tile::MHCReductionKernel<Problem, ActivationFunc>;
 
     using SinkhornKernel =

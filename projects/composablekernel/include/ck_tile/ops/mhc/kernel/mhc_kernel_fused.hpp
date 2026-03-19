@@ -22,7 +22,7 @@ namespace ck_tile {
 template <typename Problem_,
           typename Policy_     = UniversalGemmPipelineAgBgCrPolicy,
           typename Activation_ = element_wise::Sigmoid>
-struct MHCKernelFusedPipeline
+struct MHCKernelFused
 {
     using Activation = ck_tile::remove_cvref_t<Activation_>;
     using Problem    = ck_tile::remove_cvref_t<Problem_>;

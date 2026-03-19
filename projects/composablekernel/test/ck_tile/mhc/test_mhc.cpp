@@ -59,13 +59,13 @@ class MHCTest
 
         // Use invoker for kernel configuration
         constexpr bool use_log_sinkhorn = UseLogSinkhorn;
-        using Invoker                   = ck_tile::MHCFusedPipelineInvoker<XDataType,
-                                                                           PhiDataType,
-                                                                           YDataType,
-                                                                           ComputeDataType,
-                                                                           ActivationFunc,
-                                                                           MTile,
-                                                                           use_log_sinkhorn>;
+        using Invoker                   = ck_tile::MHCInvoker<XDataType,
+                                                              PhiDataType,
+                                                              YDataType,
+                                                              ComputeDataType,
+                                                              ActivationFunc,
+                                                              MTile,
+                                                              use_log_sinkhorn>;
         using GemmKernel                = typename Invoker::GemmKernel;
         using ReductionKernel           = typename Invoker::ReductionKernel;
         using SinkhornKernel            = typename Invoker::SinkhornKernel;

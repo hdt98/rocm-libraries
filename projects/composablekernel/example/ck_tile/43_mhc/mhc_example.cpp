@@ -96,13 +96,13 @@ bool run_mhc(const ck_tile::ArgParser& arg_parser)
     // Use invoker for kernel type definitions
     // Use log-domain Sinkhorn for better numerical stability
     constexpr bool use_log_sinkhorn = true;
-    using Invoker                   = ck_tile::MHCFusedPipelineInvoker<XDataType,
-                                                                       PhiDataType,
-                                                                       YDataType,
-                                                                       ComputeDataType,
-                                                                       ActivationFunc,
-                                                                       MTile,
-                                                                       use_log_sinkhorn>;
+    using Invoker                   = ck_tile::MHCInvoker<XDataType,
+                                                          PhiDataType,
+                                                          YDataType,
+                                                          ComputeDataType,
+                                                          ActivationFunc,
+                                                          MTile,
+                                                          use_log_sinkhorn>;
     using Kernel                    = typename Invoker::GemmKernel;
     using ReductionKernel           = typename Invoker::ReductionKernel;
     using SinkhornKernel            = typename Invoker::SinkhornKernel;
