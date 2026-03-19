@@ -409,6 +409,14 @@ struct DeviceOperationInstanceFactory<ck::tensor_operation::device::DeviceGroupe
                         op_ptrs);
                     add_device_grouped_conv2d_bwd_weight_xdl_nhwgc_gkyxc_nhwgk_f16_wavelet_pad0_instances(
                         op_ptrs);
+                    add_device_grouped_conv2d_bwd_weight_xdl_nhwgc_gkyxc_nhwgk_f16_wavelet_4w2_default_instances(
+                        op_ptrs);
+                    add_device_grouped_conv2d_bwd_weight_xdl_nhwgc_gkyxc_nhwgk_f16_wavelet_4w2_pad0_instances(
+                        op_ptrs);
+                    add_device_grouped_conv2d_bwd_weight_xdl_nhwgc_gkyxc_nhwgk_f16_wavelet_3way_default_instances(
+                        op_ptrs);
+                    add_device_grouped_conv2d_bwd_weight_xdl_nhwgc_gkyxc_nhwgk_f16_wavelet_3way_pad0_instances(
+                        op_ptrs);
 
                     add_device_grouped_conv2d_bwd_weight_two_stage_xdl_nhwgc_gkyxc_nhwgk_f16_pipev1_instances(
                         op_ptrs);
