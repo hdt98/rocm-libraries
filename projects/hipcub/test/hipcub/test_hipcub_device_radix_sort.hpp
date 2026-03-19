@@ -37,10 +37,6 @@
 #include <cstdint>
 #include <vector>
 
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
-    #include <rocprim/device/config_types.hpp>
-#endif
-
 #define HIP_CHECK_MEMORY(condition)                                                         \
     {                                                                                       \
         hipError_t error = condition;                                                       \
@@ -239,14 +235,6 @@ void sort_keys()
     constexpr bool         check_large_sizes = TestFixture::params::check_large_sizes;
 
     hipStream_t stream = 0; // default
-    
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
-    rocprim::detail::target_arch arch;
-    if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
-        GTEST_FAIL() << "Unable to retrieve GPU architecture";
-    if (arch == rocprim::detail::target_arch::gfx1151)
-        GTEST_SKIP() << "Temporarily skipping test on gfx1151.";
-#endif
 
     if(TestFixture::params::use_graphs)
     {
@@ -266,6 +254,15 @@ void sort_keys()
             {
                 continue;
             }
+
+            // We need 2 buffers of size * sizeof(key_type), plus extra space for temp storage
+            // (accounted for by have_available_mem's extra_factor default arg value).
+            if (!test_common_utils::have_available_mem(2 * size * sizeof(key_type)))
+            {
+                std::cout << "Skipping test size - insufficient available global memory." << std::endl;
+                continue;
+            }
+
             SCOPED_TRACE(testing::Message() << "with size= " << size);
             // Generate data
             const std::vector<key_type> keys_input = generate_key_input<key_type>(size, seed_value);
@@ -510,14 +507,6 @@ void sort_pairs()
 
     hipStream_t stream = 0; // default
 
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
-    rocprim::detail::target_arch arch;
-    if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
-        GTEST_FAIL() << "Unable to retrieve GPU architecture";
-    if (arch == rocprim::detail::target_arch::gfx1151)
-        GTEST_SKIP() << "Temporarily skipping test on gfx1151.";
-#endif
-
     if(TestFixture::params::use_graphs)
     {
         // Default stream does not support hipGraph stream capture, so create one
@@ -536,6 +525,15 @@ void sort_pairs()
             {
                 continue;
             }
+
+            // We need 2 key_type buffers, 2 value_type_buffers, plus extra space for temp storage
+            // (accounted for by have_available_mem's extra_factor default arg value).
+            if (!test_common_utils::have_available_mem(2 * size * sizeof(key_type) + 2 * size * sizeof(value_type)))
+            {
+                std::cout << "Skipping test size - insufficient available global memory." << std::endl;
+                continue;
+            }
+
             SCOPED_TRACE(testing::Message() << "with size= " << size);
             // Generate data
             const std::vector<key_type> keys_input = generate_key_input<key_type>(size, seed_value);
@@ -816,14 +814,6 @@ void sort_keys_double_buffer()
 
     hipStream_t stream = 0; // default
 
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
-    rocprim::detail::target_arch arch;
-    if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
-        GTEST_FAIL() << "Unable to retrieve GPU architecture";
-    if (arch == rocprim::detail::target_arch::gfx1151)
-        GTEST_SKIP() << "Temporarily skipping test on gfx1151.";
-#endif
-
     if(TestFixture::params::use_graphs)
     {
         // Default stream does not support hipGraph stream capture, so create one
@@ -842,6 +832,15 @@ void sort_keys_double_buffer()
             {
                 continue;
             }
+
+            // We need 2 buffers of size * sizeof(key_type), plus extra space for temp storage
+            // (accounted for by have_available_mem's extra_factor default arg value).
+            if (!test_common_utils::have_available_mem(2 * size * sizeof(key_type)))
+            {
+                std::cout << "Skipping test size - insufficient available global memory." << std::endl;
+                continue;
+            }
+
             SCOPED_TRACE(testing::Message() << "with size= " << size);
             // Generate data
             const std::vector<key_type> keys_input = generate_key_input<key_type>(size, seed_value);
@@ -1065,14 +1064,6 @@ void sort_pairs_double_buffer()
 
     hipStream_t stream = 0; // default
 
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
-    rocprim::detail::target_arch arch;
-    if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
-        GTEST_FAIL() << "Unable to retrieve GPU architecture";
-    if (arch == rocprim::detail::target_arch::gfx1151)
-        GTEST_SKIP() << "Temporarily skipping test on gfx1151.";
-#endif
-
     if(TestFixture::params::use_graphs)
     {
         // Default stream does not support hipGraph stream capture, so create one
@@ -1091,6 +1082,16 @@ void sort_pairs_double_buffer()
             {
                 continue;
             }
+
+            // We need 2 buffers of key_type, 2 buffers of value_type, plus extra space for temp storage
+            // (accounted for by have_available_mem's extra_factor default arg value).
+            if (!test_common_utils::have_available_mem(2 * size * sizeof(key_type) + 2 * size * sizeof(value_type)))
+            {
+                std::cout << "Skipping test size - insufficient available global memory." << std::endl;
+                continue;
+            }
+
+
             SCOPED_TRACE(testing::Message() << "with size= " << size);
             // Generate data
             const std::vector<key_type> keys_input = generate_key_input<key_type>(size, seed_value);
@@ -1273,20 +1274,10 @@ inline void sort_keys_over_4g()
     constexpr size_t       size                    = (1ull << 32) + 32;
     constexpr size_t       number_of_possible_keys = 1ull << (8ull * sizeof(key_type));
     assert(std::is_unsigned<key_type>::value);
-    hipDeviceProp_t dev_prop;
-    HIP_CHECK(hipGetDeviceProperties(&dev_prop, device_id));
-
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
-    rocprim::detail::target_arch arch;
-    if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
-        GTEST_FAIL() << "Unable to retrieve GPU architecture";
-    if (arch == rocprim::detail::target_arch::gfx1151)
-        GTEST_SKIP() << "Temporarily skipping test on gfx1151.";
-#endif
 
     // Radix sort requires 2 buffers of `size`, so a minimum of 8 GB of vram for this test.
     // This is more than some cards provide.
-    if(static_cast<size_t>(dev_prop.totalGlobalMem * 0.9) < size * 2 * sizeof(key_type))
+    if (!test_common_utils::have_available_mem(size * 2 * sizeof(key_type)))
     {
         GTEST_SKIP() << "insufficient global memory";
     }
@@ -1386,13 +1377,6 @@ inline void sort_keys_large_sizes()
     constexpr unsigned int end_bit    = 8;
 
     hipStream_t stream = 0;
-#if defined(_WIN32) && defined(HIPCUB_ROCPRIM_API)
-    rocprim::detail::target_arch arch;
-    if (rocprim::detail::host_target_arch(stream, arch) != HIP_SUCCESS)
-        GTEST_FAIL() << "Unable to retrieve GPU architecture";
-    if (arch == rocprim::detail::target_arch::gfx1151)
-        GTEST_SKIP() << "Temporarily skipping test on gfx1151.";
-#endif
 
     // Workaround: `hipMalloc` always returns `hipSuccess` even when allocation fails.
     // We limit the maximum size so this bug doesn't occur.
@@ -1401,6 +1385,7 @@ inline void sort_keys_large_sizes()
 #else
     const std::vector<size_t> sizes = test_utils::get_large_sizes(seeds[0]);
 #endif
+
     for(const size_t size : sizes)
     {
         SCOPED_TRACE(testing::Message() << "with size = " << size);
@@ -1416,6 +1401,14 @@ inline void sort_keys_large_sizes()
             continue;
         }
         std::iota(keys_input.begin(), keys_input.end(), 0);
+
+        // We need 1 buffer of size * sizeof(key_type), plus extra space for temp storage
+        // (accounted for by have_available_mem's extra_factor default arg value).
+        if (!test_common_utils::have_available_mem(size * sizeof(key_type)))
+        {
+            std::cout << "Skipping test size - insufficient available global memory." << std::endl;
+            continue;
+        }
 
         key_type* d_keys;
         HIP_CHECK_MEMORY(test_common_utils::hipMallocHelper(&d_keys, size * sizeof(key_type)));

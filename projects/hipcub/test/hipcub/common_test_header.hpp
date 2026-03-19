@@ -150,4 +150,12 @@ hipError_t hipMallocHelper(T** devPtr, size_t size)
     return hipSuccess;
 }
 
+inline bool have_available_mem(size_t num_bytes, float extra_factor=0.1f)
+{
+    size_t free_mem;
+    size_t total_mem;
+    HIP_CHECK(hipMemGetInfo(&free_mem, &total_mem));
+    return num_bytes <= static_cast<size_t>(free_mem * extra_factor);
+}
+
 }
