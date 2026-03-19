@@ -1,11 +1,10 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// Shared argument struct and compile-time configuration for the kpack GEMM example.
+// Shared argument struct for the kpack GEMM example.
 //
 // This header has NO CK Tile dependency. It is included by both host code
-// (main.cpp) and device code (.hip files) to share the kernel ABI and
-// grid launch constants.
+// (main.cpp) and device code (.hip files) to share the kernel ABI.
 
 #pragma once
 
@@ -57,15 +56,5 @@ static_assert(offsetof(GemmArgs, stride_C) == 20, "unexpected offset for stride_
 static_assert(offsetof(GemmArgs, a) == 24, "unexpected offset for a");
 static_assert(offsetof(GemmArgs, b) == 32, "unexpected offset for b");
 static_assert(offsetof(GemmArgs, c) == 40, "unexpected offset for c");
-
-// --- Grid launch constants ---
-// These match the hardcoded tile configuration in gemm_fp32.hip so the host
-// can compute grid dimensions without including CK Tile headers.
-//
-// Tile shape: 128x128x32 (M_Tile x N_Tile x K_Tile)
-// Block warps: 2x2x1 = 4 warps = 256 threads (64 threads/warp on CDNA)
-constexpr int M_TILE     = 128;
-constexpr int N_TILE     = 128;
-constexpr int BLOCK_SIZE = 256; // = 2 * 2 * 1 * 64
 
 } // namespace rocm_ck

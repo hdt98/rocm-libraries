@@ -11,8 +11,8 @@
 // CkLayoutMap: Layout enum   → CK Tile layout tag (RowMajor, ColumnMajor)
 // runGemm<K>:  wires the full CK Tile GEMM pipeline from K's types/layouts
 //
-// Tile config is hardcoded to 128×128×32 with 16×16×16 warp tile — valid for
-// fp32, fp16, and bf16 per WarpGemmDispatcher.
+// Tile geometry is parameterized through GemmKernel fields, validated by
+// make_kernel() against CK Tile's WarpGemmDispatcher table.
 
 #pragma once
 
@@ -77,7 +77,7 @@ struct CkLayoutMap<Layout::Col>
 ///
 /// Wires the 7-type CK Tile GEMM stack (shape, traits, problem, pipeline,
 /// partitioner, epilogue, kernel) with types and layouts from the GemmKernel
-/// NTTP. Tile geometry is hardcoded (128×128×32, 2×2×1, 16×16×16).
+/// NTTP. Tile geometry comes from GemmKernel fields (validated at compile time).
 template <GemmKernel K>
 __device__ void runGemm(GemmArgs args)
 {
@@ -91,11 +91,11 @@ __device__ void runGemm(GemmArgs args)
     using BLayout = typename CkLayoutMap<K.b_layout>::type;
     using CLayout = typename CkLayoutMap<K.c_layout>::type;
 
-    // --- Step 1: Tile geometry (hardcoded; future: parameterize via GemmKernel) ---
+    // --- Step 1: Tile geometry (from GemmKernel, validated by make_kernel) ---
     using GemmShape =
-        ck_tile::TileGemmShape<ck_tile::sequence<128, 128, 32>, // BlockTile (M, N, K)
-                               ck_tile::sequence<2, 2, 1>, // BlockWarps → 4 warps = 256 threads
-                               ck_tile::sequence<16, 16, 16>>; // WarpTile
+        ck_tile::TileGemmShape<ck_tile::sequence<K.block_tile.m, K.block_tile.n, K.block_tile.k>,
+                               ck_tile::sequence<K.block_warps.m, K.block_warps.n, K.block_warps.k>,
+                               ck_tile::sequence<K.warp_tile.m, K.warp_tile.n, K.warp_tile.k>>;
 
     // --- Step 2: Traits (no padding, layouts from kernel descriptor) ---
     using GemmTraits = ck_tile::TileGemmTraits<false, false, false, ALayout, BLayout, CLayout>;
@@ -122,11 +122,11 @@ __device__ void runGemm(GemmArgs args)
                                          ck_tile::element_wise::PassThrough,
                                          TilePartitioner::MPerBlock,
                                          TilePartitioner::NPerBlock,
-                                         2,
-                                         2, // M_Warp, N_Warp
-                                         16,
-                                         16,
-                                         16, // warp tile dims
+                                         K.block_warps.m,
+                                         K.block_warps.n,
+                                         K.warp_tile.m,
+                                         K.warp_tile.n,
+                                         K.warp_tile.k,
                                          PipelineProblem::TransposeC>>;
 
     // --- Step 7: Kernel (ties everything together) ---
