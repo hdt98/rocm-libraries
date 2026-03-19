@@ -120,7 +120,7 @@ struct StreamKKernel
 
     struct StreamKKernelArgs : ck_tile::UniversalGemmKernelArgs<>
     {
-        StreamKKernelArgs(const StreamKHostArgs& host_args, index_t grid, int num_xccs_ = 1)
+        StreamKKernelArgs(const StreamKHostArgs& host_args, index_t max_active_wgs, int num_xccs_ = 1)
             : UniversalGemmKernelArgs{host_args.as_ptr,
                                       host_args.bs_ptr,
                                       host_args.ds_ptr,
@@ -136,7 +136,7 @@ struct StreamKKernel
               // The workspace pointer is set to nullptr because we must first
               // instantiate the TilePartitioner to get the necessary size
               workspace_ptr{nullptr},
-              tile_partitioner{TilePartitioner{host_args.M, host_args.N, host_args.K, grid}},
+              tile_partitioner{TilePartitioner{host_args.M, host_args.N, host_args.K, max_active_wgs}},
               num_xccs{num_xccs_}
 
         {
@@ -213,9 +213,9 @@ struct StreamKKernel
                                                          int num_cu    = NumCU(),
                                                          int occupancy = Occupancy())
     {
-        const index_t grid = num_cu * occupancy;
+        const index_t max_active_wgs = num_cu * occupancy;
         const int num_xccs = get_num_xccs();
-        return StreamKKernelArgs{host_args, grid, num_xccs};
+        return StreamKKernelArgs{host_args, max_active_wgs, num_xccs};
     }
 
     template <bool UseDefaultScheduler = true>
@@ -801,7 +801,7 @@ struct StreamKKernel
         block_idx = kargs.tile_partitioner.remap_xcd(block_idx, grid_size, kargs.num_xccs);
         // Data-parallel section
         for(index_t tile_idx = block_idx; tile_idx < kargs.tile_partitioner.get_dp_tiles();
-            tile_idx += kargs.tile_partitioner.get_grid())
+            tile_idx += kargs.tile_partitioner.get_max_active_wgs())
         {
             BaseGemm(kargs, tile_idx, dp_num_loop, 0, 0, kargs.K, smem_ptr_0);
             block_sync_lds();

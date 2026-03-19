@@ -9,10 +9,10 @@ TEST(StreamKTilePartitionerBaseConstructor, SKOnly)
     using Config = StreamKTilePartitionerBaseConfigSKOnly;
 
     ck_tile::StreamKTilePartitionerBase<Config::GemmShape> tile_partitioner{
-        Config::M, Config::N, Config::K, Config::GRID};
+        Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     StreamKTilePartitionerBaseExpected expected_values{
-        2, 0, 3, 4, 1, 2, 1, 0, 2, Config::GRID, Config::N};
+        2, 0, 3, 4, 1, 2, 1, 0, 2, Config::MAX_ACTIVE_WGS, Config::N};
     validate_streamk_base_constructor<Config::GemmShape>(expected_values, tile_partitioner);
 }
 
@@ -21,10 +21,10 @@ TEST(StreamKTilePartitionerBaseConstructor, DPOnly)
     using Config = StreamKTilePartitionerBaseConfigDPOnly;
 
     ck_tile::StreamKTilePartitionerBase<Config::GemmShape> tile_partitioner{
-        Config::M, Config::N, Config::K, Config::GRID};
+        Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     StreamKTilePartitionerBaseExpected expected_values{
-        0, 6, 0, 0, 0, 2, 0, 12, 6, Config::GRID, Config::N};
+        0, 6, 0, 0, 0, 2, 0, 12, 6, Config::MAX_ACTIVE_WGS, Config::N};
     validate_streamk_base_constructor<Config::GemmShape>(expected_values, tile_partitioner);
 }
 
@@ -33,10 +33,10 @@ TEST(StreamKTilePartitionerBaseConstructor, DP2TileSK)
     using Config = StreamKTilePartitionerBaseConfigDP2TileSK;
 
     ck_tile::StreamKTilePartitionerBase<Config::GemmShape> tile_partitioner{
-        Config::M, Config::N, Config::K, Config::GRID};
+        Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     StreamKTilePartitionerBaseExpected expected_values{
-        4, 3, 3, 8, 2, 2, 2, 6, 7, Config::GRID, Config::N};
+        4, 3, 3, 8, 2, 2, 2, 6, 7, Config::MAX_ACTIVE_WGS, Config::N};
     validate_streamk_base_constructor<Config::GemmShape>(expected_values, tile_partitioner);
 }
 
@@ -45,10 +45,10 @@ TEST(StreamKTilePartitionerBaseConstructor, EdgeCase)
     using Config = StreamKTilePartitionerBaseConfigEdgeCase;
 
     ck_tile::StreamKTilePartitionerBase<Config::GemmShape> tile_partitioner{
-        Config::M, Config::N, Config::K, Config::GRID};
+        Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     StreamKTilePartitionerBaseExpected expected_values{
-        0, 1, 0, 0, 0, 2, 0, 2, 1, Config::GRID, Config::N};
+        0, 1, 0, 0, 0, 2, 0, 2, 1, Config::MAX_ACTIVE_WGS, Config::N};
     validate_streamk_base_constructor<Config::GemmShape>(expected_values, tile_partitioner);
 }
 
@@ -58,7 +58,7 @@ TEST(StreamKTilePartitionerBaseGetFlagsBufferSize, FlagsLessThan128Bytes)
 
     ck_tile::StreamKTilePartitionerBase<Config::GemmShape,
                                         ck_tile::StreamKReductionStrategy::Linear>
-        tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+        tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     EXPECT_EQ(tile_partitioner.get_flags_buffer_size(), 128);
 }
@@ -69,7 +69,7 @@ TEST(StreamKTilePartitionerBaseGetFlagsBufferSize, FlagsEqual128Bytes)
 
     ck_tile::StreamKTilePartitionerBase<Config::GemmShape,
                                         ck_tile::StreamKReductionStrategy::Linear>
-        tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+        tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     EXPECT_EQ(tile_partitioner.get_flags_buffer_size(), 128);
 }
@@ -80,7 +80,7 @@ TEST(StreamKTilePartitionerBaseGetFlagsBufferSize, FlagsGreaterThan128Bytes)
 
     ck_tile::StreamKTilePartitionerBase<Config::GemmShape,
                                         ck_tile::StreamKReductionStrategy::Linear>
-        tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+        tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     EXPECT_EQ(tile_partitioner.get_flags_buffer_size(), 256);
 }
@@ -90,7 +90,7 @@ TEST(StreamKTilePartitionerBaseGetWorkSpaceSize, AtomicStrategy)
     using Config = StreamKTilePartitionerBaseConfigDP2TileSK;
 
     ck_tile::StreamKTilePartitionerBase<Config::GemmShape> tile_partitioner{
-        Config::M, Config::N, Config::K, Config::GRID};
+        Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     EXPECT_EQ(tile_partitioner.get_workspace_size(sizeof(float)), 0);
 }
@@ -101,12 +101,12 @@ TEST(StreamKTilePartitionerBaseGetWorkSpaceSize, ReductionStrategy)
 
     ck_tile::StreamKTilePartitionerBase<Config::GemmShape,
                                         ck_tile::StreamKReductionStrategy::Linear>
-        tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+        tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     ck_tile::index_t expected_partials_size =
-        sizeof(float) * Config::M_TILE * Config::N_TILE * Config::GRID;
-    // Since GRID is 3, the final padded flags array must be 128B to ensure the total byte size of
-    // the flags array is 128B-aligned.
+        sizeof(float) * Config::M_TILE * Config::N_TILE * Config::MAX_ACTIVE_WGS;
+    // Since MAX_ACTIVE_WGS is 3, the final padded flags array must be 128B to ensure the total byte
+    // size of the flags array is 128B-aligned.
     ck_tile::index_t expected_flags_size = 128;
 
     EXPECT_EQ(tile_partitioner.get_workspace_size(sizeof(float)),
@@ -118,7 +118,7 @@ TEST(StreamKTilePartitionerBaseEstimateNumWgsPerTile, EstimateNumWgsPerTileLower
     using Config = StreamKTilePartitionerBaseConfigDP2TileSK;
 
     ck_tile::StreamKTilePartitionerBase<Config::GemmShape> tile_partitioner{
-        Config::M, Config::N, Config::K, Config::GRID};
+        Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     EXPECT_EQ(tile_partitioner.estimate_num_wgs_per_tile(), 2);
 }
@@ -128,7 +128,7 @@ TEST(StreamKTilePartitionerBaseEstimateNumWgsPerTile, EstimateNumWgsPerTileEqual
     using Config = StreamKTilePartitionerBaseConfigSKOnlyWith2WgsPerSKTile;
 
     ck_tile::StreamKTilePartitionerBase<Config::GemmShape> tile_partitioner{
-        Config::M, Config::N, Config::K, Config::GRID};
+        Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     EXPECT_EQ(tile_partitioner.estimate_num_wgs_per_tile(), 2);
 }
@@ -233,7 +233,7 @@ TEST(StreamKTilePartitionerBaseGetTileBoundaries, GetTileBoundaries)
 
     // Test parameters
     ck_tile::StreamKTilePartitionerBase<Config::GemmShape> tile_partitioner{
-        Config::M, Config::N, Config::K, Config::GRID};
+        Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
     ck_tile::DeviceMem tile_iter_start_dev(sizeof(ck_tile::index_t));
     ck_tile::DeviceMem tile_iter_end_dev(sizeof(ck_tile::index_t));
     ck_tile::index_t tile_idx = 1;
@@ -268,7 +268,7 @@ TEST(StreamKTilePartitionerBaseGetTileIndex, GetTileIndex)
 
     // Test parameters
     ck_tile::StreamKTilePartitionerBase<Config::GemmShape> tile_partitioner{
-        Config::M, Config::N, Config::K, Config::GRID};
+        Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
     ck_tile::DeviceMem tile_idx_dev(sizeof(ck_tile::index_t));
     ck_tile::index_t iter_start = 8;
 
@@ -300,7 +300,7 @@ TEST(StreamKTilePartitionerBaseGetIterBoundaries, ZeroExtraItersBeforeMe)
 
     // Test parameters
     ck_tile::StreamKTilePartitionerBase<Config::GemmShape> tile_partitioner{
-        Config::M, Config::N, Config::K, Config::GRID};
+        Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
     ck_tile::DeviceMem iter_start_dev(sizeof(ck_tile::index_t));
     ck_tile::DeviceMem iter_end_dev(sizeof(ck_tile::index_t));
     ck_tile::index_t cta_idx = 0;
@@ -334,7 +334,7 @@ TEST(StreamKTilePartitionerBaseGetIterBoundaries, NonZeroExtraItersBeforeMe)
 
     // Test parameters
     ck_tile::StreamKTilePartitionerBase<Config::GemmShape> tile_partitioner{
-        Config::M, Config::N, Config::K, Config::GRID};
+        Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
     ck_tile::DeviceMem iter_start_dev(sizeof(ck_tile::index_t));
     ck_tile::DeviceMem iter_end_dev(sizeof(ck_tile::index_t));
     ck_tile::index_t cta_idx = 1;
@@ -368,7 +368,7 @@ TEST(StreamKTilePartitionerBaseGetIterBoundaries, MinIsExtraIters)
 
     // Test parameters
     ck_tile::StreamKTilePartitionerBase<Config::GemmShape> tile_partitioner{
-        Config::M, Config::N, Config::K, Config::GRID};
+        Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
     ck_tile::DeviceMem iter_start_dev(sizeof(ck_tile::index_t));
     ck_tile::DeviceMem iter_end_dev(sizeof(ck_tile::index_t));
     ck_tile::index_t cta_idx = 2;
@@ -574,7 +574,7 @@ TEST(StreamKTilePartitioner_PersistentConstructor, SKOnly)
 
     ck_tile::
         StreamKTilePartitioner<Config::GemmShape, ck_tile::StreamKReductionStrategy::Atomic, true>
-            tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+            tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     StreamKTilePartitionerV2PersistentExpected expected_values{0, 0, 3};
     validate_streamk_persistent<Config::GemmShape>(expected_values, tile_partitioner);
@@ -587,7 +587,7 @@ TEST(StreamKTilePartitioner_PersistentConstructor, DPOnly)
     ck_tile::StreamKTilePartitioner<typename Config::GemmShape,
                                     ck_tile::StreamKReductionStrategy::Atomic,
                                     true>
-        tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+        tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     StreamKTilePartitionerV2PersistentExpected expected_values{2, 0, 3};
     validate_streamk_persistent<Config::GemmShape>(expected_values, tile_partitioner);
@@ -600,7 +600,7 @@ TEST(StreamKTilePartitioner_PersistentConstructor, DP2TileSK)
     ck_tile::StreamKTilePartitioner<typename Config::GemmShape,
                                     ck_tile::StreamKReductionStrategy::Atomic,
                                     true>
-        tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+        tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     StreamKTilePartitionerV2PersistentExpected expected_values{1, 0, 3};
     validate_streamk_persistent<Config::GemmShape>(expected_values, tile_partitioner);
@@ -613,7 +613,7 @@ TEST(StreamKTilePartitioner_PersistentConstructor, EdgeCase)
     ck_tile::StreamKTilePartitioner<typename Config::GemmShape,
                                     ck_tile::StreamKReductionStrategy::Atomic,
                                     true>
-        tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+        tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     StreamKTilePartitionerV2PersistentExpected expected_values{0, 1, 4};
     validate_streamk_persistent<Config::GemmShape>(expected_values, tile_partitioner);
@@ -626,10 +626,10 @@ TEST(StreamKTilePartitioner_GridSize_Persistent, SKOnly)
     ck_tile::StreamKTilePartitioner<typename Config::GemmShape,
                                     ck_tile::StreamKReductionStrategy::Atomic,
                                     true>
-        tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+        tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     const auto g = tile_partitioner.grid_size();
-    EXPECT_EQ(g.x, Config::GRID);
+    EXPECT_EQ(g.x, Config::MAX_ACTIVE_WGS);
 }
 
 TEST(StreamKTilePartitioner_GridSize_Persistent, EdgeCase)
@@ -639,7 +639,7 @@ TEST(StreamKTilePartitioner_GridSize_Persistent, EdgeCase)
     ck_tile::StreamKTilePartitioner<typename Config::GemmShape,
                                     ck_tile::StreamKReductionStrategy::Atomic,
                                     true>
-        tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+        tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     const auto g = tile_partitioner.grid_size();
     EXPECT_EQ(g.x, 1);
@@ -652,7 +652,7 @@ TEST(StreamKTilePartitioner_NonPersistentConstructor, SKOnly)
 
     ck_tile::
         StreamKTilePartitioner<Config::GemmShape, ck_tile::StreamKReductionStrategy::Atomic, false>
-            tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+            tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     StreamKTilePartitionerV2NonPersistentExpected expected_values{0, 0, 0, 3};
     validate_streamk_nonpersistent<Config::GemmShape>(expected_values, tile_partitioner);
@@ -665,7 +665,7 @@ TEST(StreamKTilePartitioner_NonPersistentConstructor, DPOnly)
     ck_tile::StreamKTilePartitioner<typename Config::GemmShape,
                                     ck_tile::StreamKReductionStrategy::Atomic,
                                     false>
-        tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+        tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     StreamKTilePartitionerV2NonPersistentExpected expected_values{6, 0, 6, 3};
     validate_streamk_nonpersistent<Config::GemmShape>(expected_values, tile_partitioner);
@@ -678,7 +678,7 @@ TEST(StreamKTilePartitioner_NonPersistentConstructor, DP2TileSK)
     ck_tile::StreamKTilePartitioner<typename Config::GemmShape,
                                     ck_tile::StreamKReductionStrategy::Atomic,
                                     false>
-        tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+        tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     StreamKTilePartitionerV2NonPersistentExpected expected_values{3, 0, 3, 3};
     validate_streamk_nonpersistent<Config::GemmShape>(expected_values, tile_partitioner);
@@ -691,7 +691,7 @@ TEST(StreamKTilePartitioner_NonPersistentConstructor, EdgeCase)
     ck_tile::StreamKTilePartitioner<typename Config::GemmShape,
                                     ck_tile::StreamKReductionStrategy::Atomic,
                                     false>
-        tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+        tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     StreamKTilePartitionerV2NonPersistentExpected expected_values{1, 0, 1, 4};
     validate_streamk_nonpersistent<Config::GemmShape>(expected_values, tile_partitioner);
@@ -704,7 +704,7 @@ TEST(StreamKTilePartitioner_GridSize_NonPersistent, DP2TileSK)
     ck_tile::StreamKTilePartitioner<typename Config::GemmShape,
                                     ck_tile::StreamKReductionStrategy::Atomic,
                                     false>
-        tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+        tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     const auto g = tile_partitioner.grid_size();
     EXPECT_EQ(g.x, 6);
