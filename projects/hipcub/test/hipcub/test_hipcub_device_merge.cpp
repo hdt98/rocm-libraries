@@ -493,6 +493,11 @@ TEST(HipcubDeviceMerge, MergeLargeSizeIterators)
         const size_t size2       = std::get<1>(sizes);
         const size_t output_size = size1 + size2;
 
+        // check if we have enough global memory size
+        if(sizeof(key_type) * output_size >= test_common_utils::system.devProp.totalGlobalMem){
+            continue;
+        }
+
         // compare function
         compare_function compare_op;
 
@@ -513,11 +518,6 @@ TEST(HipcubDeviceMerge, MergeLargeSizeIterators)
                    vec_input2.end(),
                    expected.begin(),
                    compare_op);
-
-        // check if we have enough memory size
-        if(sizeof(key_type) * output_size >= test_common_utils::system.devProp.totalGlobalMem){
-            continue;
-        }
 
 
 
