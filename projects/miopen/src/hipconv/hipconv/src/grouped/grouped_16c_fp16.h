@@ -7,6 +7,7 @@
 #include "mathutil.h"
 #include "launch_params.h"
 #include "kernel_variant.h"
+#include "transpose_16x16.h"
 #include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
 
@@ -30,6 +31,8 @@ struct Config
 
     int n_fold = 8;
 
+    hipconv::Direction direction = hipconv::Direction::Fprop;
+
     constexpr int block_c() const { return group_size * waves_per_wg; }
 
     constexpr int block_size() const { return waves_per_wg * WAVE_SIZE; }
@@ -37,6 +40,15 @@ struct Config
 
 // All instantiated configurations.
 constexpr Config configs[] = {
+    {.waves_per_wg = 16, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 8, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 7, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 6, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 5, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 4, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 3, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 2, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 1, .direction = hipconv::Direction::Dgrad},
     {.waves_per_wg = 16},
     {.waves_per_wg = 8},
     {.waves_per_wg = 7},
@@ -52,6 +64,11 @@ constexpr int NUM_CONFIGS = sizeof(configs) / sizeof(configs[0]);
 
 inline bool is_valid_config(const hipconv::Conv2dParams& par, const Config& cfg)
 {
+    if(par.direction != cfg.direction)
+    {
+        return false;
+    }
+
     // Require that the number of groups per work-group evenly divides the total number of
     // workgroups.
     if((par.groups % cfg.waves_per_wg) != 0)
@@ -67,7 +84,9 @@ inline LaunchParams get_launch_params(int config_idx, const hipconv::Conv2dParam
     const auto& cfg = configs[config_idx];
 
     // Compute the grid size.
-    auto blocks_w      = divup(par.q, BLOCK_Q);
+    // For Dgrad the output is the input gradient (width = par.w, not par.q).
+    const int out_q    = (cfg.direction == hipconv::Direction::Dgrad) ? par.w : par.q;
+    auto blocks_w      = divup(out_q, BLOCK_Q);
     auto blocks_w_n    = blocks_w * cfg.n_fold;
     auto blocks_c      = divup(par.c, cfg.block_c());
     auto blocks_n_fold = divup(par.n, cfg.n_fold);
@@ -134,11 +153,18 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     // Size of LDS buffer for outputs (swizzled, no padding needed)
     constexpr int OUTPUT_LDS_BUFFER_SIZE = BLOCK_C8 * BLOCK_Q;
 
-    // LDS buffer for staging loads from global memory.
-    __shared__ uint4 input_lds[NUM_INPUT_LDS_BUFFERS * INPUT_LDS_BUFFER_SIZE_C8];
+    // Weight LDS: all K-rows for this block, in uint4 units.
+    // Each K-row is kh * kw * GROUP_SIZE_8 uint4 elements; total K-rows = BLOCK_GROUPS *
+    // group_size.
+    constexpr int WEIGHT_LDS_SIZE_UINT4 =
+        BLOCK_GROUPS * cfg.group_size * cfg.kh * cfg.kw * GROUP_SIZE_8;
 
-    // LDS buffer for staging stores to global memory.
-    __shared__ uint4 output_lds[OUTPUT_LDS_BUFFER_SIZE];
+    // Unified LDS: large enough for either (input double-buffer + output) or (weight prologue).
+    constexpr int IO_LDS_SIZE =
+        NUM_INPUT_LDS_BUFFERS * INPUT_LDS_BUFFER_SIZE_C8 + OUTPUT_LDS_BUFFER_SIZE;
+    __shared__ uint4 lds_buf[maximum(WEIGHT_LDS_SIZE_UINT4, IO_LDS_SIZE)];
+    uint4* input_lds  = lds_buf;
+    uint4* output_lds = lds_buf + NUM_INPUT_LDS_BUFFERS * INPUT_LDS_BUFFER_SIZE_C8;
 
     const int tid  = threadIdx.x;
     const int wave = tid / WAVE_SIZE;
@@ -197,6 +223,56 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
         input_voffset = input_bytes;
     }
 
+    // Each wave computes one group of channels.
+    auto wave_group = wave;
+
+    // Load weights from global memory through LDS into registers.
+    fp16x4_t weights_reg[cfg.kh * cfg.kw];
+    {
+        auto weight_bytes = static_cast<size_t>(groups * cfg.group_size) * cfg.kh * cfg.kw *
+                            cfg.group_size * sizeof(half);
+        auto weight_rsrc  = __builtin_amdgcn_make_buffer_rsrc(
+            const_cast<_Float16*>(wei), 0, weight_bytes, rsrc_data_format);
+        uint32_t voffset_base = block_k * cfg.kh * cfg.kw * cfg.group_size * sizeof(half);
+
+        for(int j = tid; j < WEIGHT_LDS_SIZE_UINT4; j += cfg.block_size())
+        {
+            __builtin_amdgcn_raw_ptr_buffer_load_lds(
+                weight_rsrc, &lds_buf[j], 16, voffset_base + j * sizeof(uint4), 0, 0, 0);
+        }
+
+        asm volatile("s_waitcnt vmcnt(0)\n");
+        __syncthreads();
+
+        if constexpr(cfg.direction == hipconv::Direction::Dgrad)
+        {
+            const int row_stride = cfg.kh * cfg.kw * cfg.group_size;
+            const __half* wei_lds =
+                reinterpret_cast<const __half*>(lds_buf) + wave_group * cfg.group_size * row_stride;
+            for(int khw = 0; khw < cfg.kh * cfg.kw; khw++)
+            {
+                auto& w = reinterpret_cast<uint2&>(weights_reg[khw]);
+                load_16x16_transposed(wei_lds + khw * cfg.group_size, row_stride, w.x, w.y);
+            }
+        }
+        else
+        {
+            auto lane_k       = OperandLayout::outer(lane);
+            auto lane_c4_w    = OperandLayout::inner(lane) / 4;
+            auto k_local      = wave_group * cfg.group_size + lane_k;
+            auto* weights_lds = reinterpret_cast<const uint2*>(lds_buf) +
+                                k_local * (cfg.kh * cfg.kw * GROUP_SIZE_4) + lane_c4_w;
+            for(int khw = 0; khw < cfg.kh * cfg.kw; khw++)
+            {
+                weights_reg[khw] = *(const fp16x4_t*)(weights_lds + khw * GROUP_SIZE_4);
+            }
+        }
+    }
+
+    // Ensure all threads have finished reading weights from LDS before
+    // the input buffer_load_lds overwrites the same lds_buf region.
+    __syncthreads();
+
     // Load first chunk of inputs asynchronously.
     if(load_active)
     {
@@ -207,9 +283,6 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     // Map lanes to MFMA matrix coordinates.
     const int lane_q  = ResultLayout::outer(lane);
     const int lane_c4 = ResultLayout::inner(lane) / 4;
-
-    // Each wave computes one group of channels.
-    auto wave_group = wave;
 
     // Map threads to output addresses for transferring through LDS to global memory.
     const bool store_active      = (tid < STORE_VECS);
@@ -225,20 +298,6 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
             const int K8        = C / 8;
             store_output_global = reinterpret_cast<uint4*>(out) + (size_t)block_n * ho * wo * K8 +
                                   (size_t)q * K8 + block_c8 + c8;
-        }
-    }
-
-    // Load weights from global memory to mfma matrices in registers.
-    fp16x4_t weights_reg[cfg.kh * cfg.kw];
-    {
-        auto lane_k  = OperandLayout::outer(lane);
-        auto lane_c4 = OperandLayout::inner(lane) / 4;
-        auto k       = block_k + wave_group * cfg.group_size + lane_k;
-        auto weights_global =
-            reinterpret_cast<const uint2*>(wei) + k * (cfg.kh * cfg.kw * GROUP_SIZE_4) + lane_c4;
-        for(int khw = 0; khw < cfg.kh * cfg.kw; khw++)
-        {
-            weights_reg[khw] = *(const fp16x4_t*)(weights_global + khw * GROUP_SIZE_4);
         }
     }
 
@@ -307,8 +366,22 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
                                 // are compile-time constants. Therefore acc[p_idx] compiles to a
                                 // register address.
                                 constexpr int p_idx = (Y_LOCAL - R + cfg.kh) % cfg.kh;
-                                acc[p_idx]          = __builtin_amdgcn_mfma_f32_16x16x16f16(
-                                    weights_reg[R * cfg.kw + S], input_reg, acc[p_idx], 0, 0, 0);
+                                if constexpr(cfg.direction == hipconv::Direction::Dgrad)
+                                    acc[p_idx] = __builtin_amdgcn_mfma_f32_16x16x16f16(
+                                        weights_reg[(cfg.kh - 1 - R) * cfg.kw + (cfg.kw - 1 - S)],
+                                        input_reg,
+                                        acc[p_idx],
+                                        0,
+                                        0,
+                                        0);
+                                else
+                                    acc[p_idx] = __builtin_amdgcn_mfma_f32_16x16x16f16(
+                                        weights_reg[R * cfg.kw + S],
+                                        input_reg,
+                                        acc[p_idx],
+                                        0,
+                                        0,
+                                        0);
                             });
                     });
 
@@ -374,8 +447,22 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
                             [&]<int R>()
                             {
                                 constexpr int p_idx = (Y_LOCAL - R + cfg.kh) % cfg.kh;
-                                acc[p_idx]          = __builtin_amdgcn_mfma_f32_16x16x16f16(
-                                    weights_reg[R * cfg.kw + S], input_reg, acc[p_idx], 0, 0, 0);
+                                if constexpr(cfg.direction == hipconv::Direction::Dgrad)
+                                    acc[p_idx] = __builtin_amdgcn_mfma_f32_16x16x16f16(
+                                        weights_reg[(cfg.kh - 1 - R) * cfg.kw + (cfg.kw - 1 - S)],
+                                        input_reg,
+                                        acc[p_idx],
+                                        0,
+                                        0,
+                                        0);
+                                else
+                                    acc[p_idx] = __builtin_amdgcn_mfma_f32_16x16x16f16(
+                                        weights_reg[R * cfg.kw + S],
+                                        input_reg,
+                                        acc[p_idx],
+                                        0,
+                                        0,
+                                        0);
                             });
                     });
 
@@ -504,6 +591,7 @@ void launch_dispatch(int config_idx,
 {
     auto kernel_launch = [&]<size_t I>()
     {
+        auto view = hipconv::SizeView<configs[I].direction>(par);
         conv2d_grouped_16c_fp16_nhwc_cdna4<configs[I]>
             <<<lp.grid, lp.block_size, lp.dynamic_shared_bytes, stream>>>(
                 static_cast<const _Float16*>(in),
@@ -515,18 +603,18 @@ void launch_dispatch(int config_idx,
                 par.groups,
                 par.channels_per_group(),
                 par.filters_per_group(),
-                par.h,
-                par.w,
-                par.p,
-                par.q,
+                view.h(),
+                view.w(),
+                view.p(),
+                view.q(),
                 par.kh,
                 par.kw,
                 par.stride_h,
                 par.stride_w,
                 par.dilation_h,
                 par.dilation_w,
-                par.pad_h,
-                par.pad_w);
+                view.pad_h(),
+                view.pad_w());
     };
     (void)((config_idx == static_cast<int>(Is) ? (kernel_launch.template operator()<Is>(), true)
                                                : false) ||
@@ -559,7 +647,8 @@ constexpr KernelVariant make_variant()
                 return false;
             if(par.order != hipconv::TensorOrder::NHWC)
                 return false;
-            if(par.direction != hipconv::Direction::Fprop)
+            if(par.direction != hipconv::Direction::Fprop &&
+               par.direction != hipconv::Direction::Dgrad)
                 return false;
             if(par.kh != 3 || par.kw != 3)
                 return false;
@@ -570,6 +659,10 @@ constexpr KernelVariant make_variant()
             if(par.c % 16 != 0)
                 return false;
             if(par.stride_h != 1 || par.stride_w != 1)
+                return false;
+            if(par.dilation_h != 1 || par.dilation_w != 1)
+                return false;
+            if(par.pad_h > par.kh - 1 || par.pad_w > par.kw - 1)
                 return false;
             return true;
         },
