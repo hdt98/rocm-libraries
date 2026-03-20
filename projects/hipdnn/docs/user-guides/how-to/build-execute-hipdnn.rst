@@ -110,4 +110,7 @@ For complete working examples, see the official `samples on GitHub <https://gith
 Variant pack
 ------------
 
-The variant pack specifies which GPU memory address correspond to which tensors. The tensors are added to the variant pack using the tensor UID as the key and the GPU memory address as the value. It is the responsibility of the application to ensure sufficient GPU memory is allocated for each tensor and to ensure data is propoerly to/from GPU and host memory. The Data SDK ``utilities::Tensor`` class is provided to assist with tensor host and GPU memory management thought it may not be suitable for all applications.
+The variant pack specifies which GPU memory address correspond to which tensors. 
+The tensors are added to the variant pack using the tensor UID as the key and the GPU memory address as the value. 
+It's the responsibility of the application to ensure sufficient GPU memory is allocated for each tensor, and to ensure data is properly to/from the GPU and host memory. 
+The Data SDK ``utilities::Tensor`` class assists with tensor host and GPU memory management, though it may not be suitable for all applications.

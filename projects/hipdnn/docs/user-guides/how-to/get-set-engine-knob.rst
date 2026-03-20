@@ -21,8 +21,8 @@ Query available knobs
 
 The supported knobs for a specific engine can be retrieved as a list or a lookup table.
 
-Retrieving knobs as a list
---------------------------
+Retrieve knobs as a list
+------------------------
 
 Use the hipDNN frontend method ``get_knobs_for_engine()`` to retrieve a list of knobs an engine supports and their constraints.
 
@@ -68,8 +68,8 @@ Use the hipDNN frontend method ``get_knobs_for_engine()`` to retrieve a list of 
       std::cerr << "Error getting knobs: " << error.get_message() << "\n";
   }
 
-Retrieving knobs as a lookup table
-----------------------------------
+Retrieve knobs as a lookup table
+--------------------------------
 
 Use the hipDNN frontend method ``get_knob_lookup_for_engine()`` to retrieve a set of knobs an engine supports and their constraints. This is useful for checking if a specific knob exists without iterating through a list.
 
