@@ -53,6 +53,12 @@ option(BUILD_MHA_LIB "Build the static library for flash attention" OFF)
 option(FORCE_DISABLE_XDL "Skip compiling XDL specific instances (even if supported GPUs are included in GPU_TARGETS)" OFF)
 option(FORCE_DISABLE_WMMA "Skip compiling WMMA specific instances (even if supported GPUs are included in GPU_TARGETS)" OFF)
 
+if(MIOPEN_REQ_LIBS_ONLY)
+    set(DTYPES "fp32;tf32;fp16;bf16" CACHE STRING
+      "Datatypes to build for MIOpen-only builds")
+    message(STATUS "CK Build Optimization: MIOPEN_REQ_LIBS_ONLY=ON, restricting to datatypes: ${DTYPES}")
+endif()
+
 if(CK_EXPERIMENTAL_BUILDER)
     add_definitions(-DCK_EXPERIMENTAL_BUILDER)
     include_directories(${PROJECT_SOURCE_DIR}/experimental/builder/include)

@@ -131,6 +131,24 @@ function(add_instance_library INSTANCE_NAME)
             endif()
         endif()
 
+        # Fusion variant filtering
+        if(MIOPEN_REQ_LIBS_ONLY)
+            # Exclude rarely-used fusion variants for MIOpen builds
+            # Keep essential: PassThrough, Bilinear, Scale, Bias+Activation, ScaleAdd_ScaleAdd_ReLU
+            # Exclude: bias_clamp, convscale (non-scaleadd), clamp, convinvscale, scaleadd_ab, dynamic_op
+            if(source_name MATCHES "bias_bn(orm)?_clamp" OR
+               source_name MATCHES "bias_clamp" OR
+               source_name MATCHES "[^_]clamp[^_]" OR
+               source_name MATCHES "_clamp_" OR
+               source_name MATCHES "convinvscale" OR
+               (source_name MATCHES "convscale" AND NOT source_name MATCHES "scaleadd") OR
+               source_name MATCHES "scaleadd_ab" OR
+               source_name MATCHES "dynamic_op")
+                message(DEBUG "removing minimal fusion variant instance ${source} ")
+                list(REMOVE_ITEM ARGN "${source}")
+            endif()
+        endif()
+
     endforeach()
 
     message(DEBUG "remaining instances: ${ARGN}")
