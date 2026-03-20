@@ -3946,6 +3946,7 @@ hipsolverStatus_t hipsolverSgetrfBatched_bufferSize(hipsolverHandle_t handle,
                                                     int               strideP,
                                                     int*              lwork,
                                                     int               batch_count)
+// note: a try-catch block is not required for routines that are implemented in cuBLAS, we keep it to follow the library pattern
 try
 {
     if(!handle)
@@ -3971,6 +3972,7 @@ hipsolverStatus_t hipsolverDgetrfBatched_bufferSize(hipsolverHandle_t handle,
                                                     int               strideP,
                                                     int*              lwork,
                                                     int               batch_count)
+// note: a try-catch block is not required for routines that are implemented in cuBLAS, we keep it to follow the library pattern
 try
 {
     if(!handle)
@@ -3996,6 +3998,7 @@ hipsolverStatus_t hipsolverCgetrfBatched_bufferSize(hipsolverHandle_t handle,
                                                     int               strideP,
                                                     int*              lwork,
                                                     int               batch_count)
+// note: a try-catch block is not required for routines that are implemented in cuBLAS, we keep it to follow the library pattern
 try
 {
     if(!handle)
@@ -4021,6 +4024,7 @@ hipsolverStatus_t hipsolverZgetrfBatched_bufferSize(hipsolverHandle_t handle,
                                                     int               strideP,
                                                     int*              lwork,
                                                     int               batch_count)
+// note: a try-catch block is not required for routines that are implemented in cuBLAS, we keep it to follow the library pattern
 try
 {
     if(!handle)
