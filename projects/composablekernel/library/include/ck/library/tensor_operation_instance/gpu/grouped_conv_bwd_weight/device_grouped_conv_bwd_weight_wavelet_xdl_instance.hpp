@@ -54,9 +54,7 @@ using device_grouped_conv_bwd_weight_wavelet_xdl_c_shuffle_f16_instances = std::
     // M=128 N=64: 2x2 waves, 32 AccVGPRs/wave — asymmetric M>N
     DeviceGroupedConvBwdWeight_Xdl_WaveletModel_CShuffleV3<NDimSpatial, ALayout, BLayout, ELayout, F16, F16, F16, F32, PassThrough, PassThrough, PassThrough, ConvSpec,    1,      256,     256,   128,  64,  32, 8,  32,  32,   2,   1, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    4,    4, false, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    2,    4, false,   1,   1, S<1, 32, 1, 8>,    2>,
     // M=64 N=128: 2x2 waves, 32 AccVGPRs/wave — asymmetric N>M
-    DeviceGroupedConvBwdWeight_Xdl_WaveletModel_CShuffleV3<NDimSpatial, ALayout, BLayout, ELayout, F16, F16, F16, F32, PassThrough, PassThrough, PassThrough, ConvSpec,    1,      256,     256,    64, 128,  32, 8,  32,  32,   1,   2, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    2,    4, false, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    4,    4, false,   1,   1, S<1, 32, 1, 8>,    2>,
-    // M=128 N=32: 4x1 waves, 16 AccVGPRs/wave — tall M for large-K shapes
-    DeviceGroupedConvBwdWeight_Xdl_WaveletModel_CShuffleV3<NDimSpatial, ALayout, BLayout, ELayout, F16, F16, F16, F32, PassThrough, PassThrough, PassThrough, ConvSpec,    1,      256,     256,   128,  32,  32, 8,  32,  32,   1,   1, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    4,    4, false, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    1,    4, false,   1,   1, S<1, 32, 1, 8>,    2>
+    DeviceGroupedConvBwdWeight_Xdl_WaveletModel_CShuffleV3<NDimSpatial, ALayout, BLayout, ELayout, F16, F16, F16, F32, PassThrough, PassThrough, PassThrough, ConvSpec,    1,      256,     256,    64, 128,  32, 8,  32,  32,   1,   2, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    2,    4, false, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    4,    4, false,   1,   1, S<1, 32, 1, 8>,    2>
     // clang-format on
     >;
 
@@ -73,10 +71,6 @@ using device_grouped_conv_bwd_weight_wavelet_4w2_xdl_c_shuffle_f16_instances = s
     // clang-format off
     //                                                                                                                                                                 |Prefetch|TileLoad|TileMath| M  |  N | K0|K1| MXdl|NXdl|MXdl|NXdl|
     //                                                                                                                                                                 | Stage  | Thrds  | Thrds  |    |    |   |  | XDL | XDL| /Wv| /Wv| A cluster     |A ArrangeOrd|A SrcAccOrd | AVDim|ASSca|ADSca|AExM| B cluster     |B ArrangeOrd|B SrcAccOrd | BVDim|BSSca|BDSca|BExN|CShM|CShN|  C cluster       |CSca|
-    // M=64 N=32: 2x1 waves, 16 AccVGPRs/wave
-    DeviceGroupedConvBwdWeight_Xdl_WaveletModel_CShuffleV3<NDimSpatial, ALayout, BLayout, ELayout, F16, F16, F16, F32, PassThrough, PassThrough, PassThrough, ConvSpec,    1,      256,     128,    64,  32,  32, 8,  32,  32,   1,   1, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    2,    4, false, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    1,    4, false,   1,   1, S<1, 16, 1, 8>,    2>,
-    // M=128 N=32: 2x1 waves, 32 AccVGPRs/wave
-    DeviceGroupedConvBwdWeight_Xdl_WaveletModel_CShuffleV3<NDimSpatial, ALayout, BLayout, ELayout, F16, F16, F16, F32, PassThrough, PassThrough, PassThrough, ConvSpec,    1,      256,     128,   128,  32,  32, 8,  32,  32,   2,   1, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    4,    4, false, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    1,    4, false,   1,   1, S<1, 16, 1, 8>,    2>,
     // M=64 N=64: 1x2 waves, 32 AccVGPRs/wave
     DeviceGroupedConvBwdWeight_Xdl_WaveletModel_CShuffleV3<NDimSpatial, ALayout, BLayout, ELayout, F16, F16, F16, F32, PassThrough, PassThrough, PassThrough, ConvSpec,    1,      256,     128,    64,  64,  32, 8,  32,  32,   2,   1, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    2,    4, false, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    2,    4, false,   1,   1, S<1, 16, 1, 8>,    2>,
     // M=128 N=64: 2x1 waves, 64 AccVGPRs/wave
@@ -103,9 +97,26 @@ using device_grouped_conv_bwd_weight_wavelet_xdl_c_shuffle_bf16_instances = std:
     // M=128 N=64: 2x2 waves, 32 AccVGPRs/wave
     DeviceGroupedConvBwdWeight_Xdl_WaveletModel_CShuffleV3<NDimSpatial, ALayout, BLayout, ELayout, BF16, BF16, BF16, F32, PassThrough, PassThrough, PassThrough, ConvSpec,    1,      256,     256,   128,  64,  32, 8,  32,  32,   2,   1, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    4,    4, false, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    2,    4, false,   1,   1, S<1, 32, 1, 8>,    2>,
     // M=64 N=128: 2x2 waves, 32 AccVGPRs/wave
-    DeviceGroupedConvBwdWeight_Xdl_WaveletModel_CShuffleV3<NDimSpatial, ALayout, BLayout, ELayout, BF16, BF16, BF16, F32, PassThrough, PassThrough, PassThrough, ConvSpec,    1,      256,     256,    64, 128,  32, 8,  32,  32,   1,   2, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    2,    4, false, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    4,    4, false,   1,   1, S<1, 32, 1, 8>,    2>,
-    // M=128 N=32: 4x1 waves, 16 AccVGPRs/wave
-    DeviceGroupedConvBwdWeight_Xdl_WaveletModel_CShuffleV3<NDimSpatial, ALayout, BLayout, ELayout, BF16, BF16, BF16, F32, PassThrough, PassThrough, PassThrough, ConvSpec,    1,      256,     256,   128,  32,  32, 8,  32,  32,   1,   1, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    4,    4, false, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    1,    4, false,   1,   1, S<1, 32, 1, 8>,    2>
+    DeviceGroupedConvBwdWeight_Xdl_WaveletModel_CShuffleV3<NDimSpatial, ALayout, BLayout, ELayout, BF16, BF16, BF16, F32, PassThrough, PassThrough, PassThrough, ConvSpec,    1,      256,     256,    64, 128,  32, 8,  32,  32,   1,   2, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    2,    4, false, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    4,    4, false,   1,   1, S<1, 32, 1, 8>,    2>
+    // clang-format on
+    >;
+
+// BF16 (4,2) wavelet instances — same tile configs as F16 (4,2).
+template <ck::index_t NDimSpatial,
+          typename ALayout,
+          typename BLayout,
+          typename ELayout,
+          ConvolutionBackwardWeightSpecialization ConvSpec>
+using device_grouped_conv_bwd_weight_wavelet_4w2_xdl_c_shuffle_bf16_instances = std::tuple<
+    // clang-format off
+    //                                                                                                                                                                   |Prefetch|TileLoad|TileMath|  M |  N | K0|K1| MXdl|NXdl|MXdl|NXdl|
+    //                                                                                                                                                                   | Stage  | Thrds  | Thrds  |    |    |   |  |  XDL| XDL| /Wv| /Wv| A cluster     |A ArrangeOrd|A SrcAccOrd | AVDim|ASSca|ADSca|AExM| B cluster     |B ArrangeOrd|B SrcAccOrd | BVDim|BSSca|BDSca|BExN|CShM|CShN|  C cluster       |CSca|
+    // M=64 N=64: 1x2 waves, 32 AccVGPRs/wave
+    DeviceGroupedConvBwdWeight_Xdl_WaveletModel_CShuffleV3<NDimSpatial, ALayout, BLayout, ELayout, BF16, BF16, BF16, F32, PassThrough, PassThrough, PassThrough, ConvSpec,    1,      256,     128,    64,  64,  32, 8,  32,  32,   2,   1, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    2,    4, false, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    2,    4, false,   1,   1, S<1, 16, 1, 8>,    2>,
+    // M=128 N=64: 2x1 waves, 64 AccVGPRs/wave
+    DeviceGroupedConvBwdWeight_Xdl_WaveletModel_CShuffleV3<NDimSpatial, ALayout, BLayout, ELayout, BF16, BF16, BF16, F32, PassThrough, PassThrough, PassThrough, ConvSpec,    1,      256,     128,   128,  64,  32, 8,  32,  32,   2,   2, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    4,    4, false, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    2,    4, false,   1,   1, S<1, 16, 1, 8>,    2>,
+    // M=64 N=128: 1x2 waves, 64 AccVGPRs/wave
+    DeviceGroupedConvBwdWeight_Xdl_WaveletModel_CShuffleV3<NDimSpatial, ALayout, BLayout, ELayout, BF16, BF16, BF16, F32, PassThrough, PassThrough, PassThrough, ConvSpec,    1,      256,     128,    64, 128,  32, 8,  32,  32,   2,   2, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    2,    4, false, S<4, 32, 2>, S<2, 0, 1>, S<1, 0, 2>,     1,    4,    4, false,   1,   1, S<1, 16, 1, 8>,    2>
     // clang-format on
     >;
 
