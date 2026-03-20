@@ -150,4 +150,16 @@ hipError_t hipMallocHelper(T** devPtr, size_t size)
     return hipSuccess;
 }
 
+struct sys_info
+{
+  hipDeviceProp_t devProp;
+  sys_info()
+  {
+    int device_id = 0;
+    HIP_CHECK(hipGetDevice(&device_id));
+    HIP_CHECK(hipGetDeviceProperties(&devProp, device_id));
+  }
+};
+
+inline sys_info system;
 }

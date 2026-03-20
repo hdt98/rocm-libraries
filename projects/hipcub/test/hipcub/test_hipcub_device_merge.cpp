@@ -485,6 +485,7 @@ TEST(HipcubDeviceMerge, MergeLargeSizeIterators)
             // hipMallocManaged() currently doesnt support zero byte allocation
             continue;
         }
+
         SCOPED_TRACE(testing::Message() << "with sizes = {" << std::get<0>(sizes) << ", "
                                         << std::get<1>(sizes) << "}");
 
@@ -512,6 +513,13 @@ TEST(HipcubDeviceMerge, MergeLargeSizeIterators)
                    vec_input2.end(),
                    expected.begin(),
                    compare_op);
+
+        // check if we have enough memory size
+        if(sizeof(key_type) * output_size >= test_common_utils::system.devProp.totalGlobalMem){
+            continue;
+        }
+
+
 
         key_type* d_keys_output;
         HIP_CHECK(
