@@ -289,13 +289,10 @@ the tile config.
 
 ### TODO
 
-Step 1: Match no-swizzle-no-rotate GR pattern
+Step 1: Enable half-wave GR pattern
+- Add `LDSBankSwizzleMode` kernel option (None, Swizzle) -- model on `ScaleSkipPermlaneMode.hpp`
 - New coordinate transform: remap GR voffset to use half-wave split (sequential cols, no rotation or XOR); LDS dest unchanged
-- Update LR address to match: with the half-wave split, each wave's LDS region now holds 2 rows per wave (not 8), so LR must read 2 rows from each of the 4 waves' regions rather than 8 contiguous rows from 2 waves' regions
+- Update LR address to match: with the half-wave split, each wave's LDS region now holds 2 rows per wave (not 4), so LR must read 2 rows from each of the 4 waves' regions rather than 4 contiguous rows from 4 waves' regions
 
 Step 2: Enable swizzle
 - Extend transform: add per-wave col rotation + conditional XOR pair-swap on GR; add inverse col rotation (closed-form per-lane arithmetic) on LR
-- Add `LDSBankSwizzleMode` kernel option (None, Swizzle) -- model on `ScaleSkipPermlaneMode.hpp` -- to gate steps 1 and 2
-
-Step 3: Enable direct-to-LDS
-- Enable the `buffer_load...lds` path in rocRoller for this kernel; steps 1 and 2 are prerequisites because the swizzled GR layout is what makes the conflict-free LR pattern possible
