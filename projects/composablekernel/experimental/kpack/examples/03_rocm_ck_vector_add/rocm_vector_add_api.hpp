@@ -10,7 +10,9 @@
 #pragma once
 
 #include <rocm_ck/datatype_utils.hpp>
+#include <rocm_ck/tensor_desc.hpp>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -62,8 +64,8 @@ static_assert(offsetof(VectorAddArgs, c) == 32, "unexpected offset for c");
 ///
 /// Specify only what differs — use {.dtype = FP32} for homogeneous kernels,
 /// {.in_dtype = FP16, .out_dtype = FP32} for mixed types, or override
-/// individual fields for asymmetric inputs. Call resolve_types() to flatten
-/// the hierarchy into concrete types.
+/// individual fields for asymmetric inputs. Call resolve_tensors() to flatten
+/// the hierarchy into concrete TensorDesc entries.
 struct ElementwiseSignature
 {
     std::optional<DataType> dtype;     // kernel-level default
@@ -108,17 +110,7 @@ struct VectorAddKernel
 /// AMD GCN/CDNA wavefront size.
 constexpr int warp_size = 64;
 
-/// Resolved types from an ElementwiseSignature.
-/// Contains the concrete DataType for each kernel operand after applying the
-/// optional dtype hierarchy.
-struct ResolvedElementwiseTypes
-{
-    DataType a_dtype;
-    DataType b_dtype;
-    DataType out_dtype;
-};
-
-/// Resolve the optional dtype hierarchy into concrete types.
+/// Resolve the optional dtype hierarchy into concrete TensorDesc entries.
 ///
 /// Resolution chains:
 ///   a_dtype   = a_dtype   ?? in_dtype ?? dtype ?? error
@@ -126,7 +118,7 @@ struct ResolvedElementwiseTypes
 ///   out_dtype = out_dtype ?? dtype    ?? error
 ///
 /// Note: in_dtype does NOT cascade to out_dtype — they are separate branches.
-consteval ResolvedElementwiseTypes resolve_types(ElementwiseSignature sig)
+consteval std::array<TensorDesc, 3> resolve_tensors(ElementwiseSignature sig)
 {
     DataType a = sig.a_dtype    ? *sig.a_dtype
                  : sig.in_dtype ? *sig.in_dtype
@@ -142,35 +134,48 @@ consteval ResolvedElementwiseTypes resolve_types(ElementwiseSignature sig)
                    : sig.dtype   ? *sig.dtype
                                  : throw "out_dtype unresolvable: set out_dtype or dtype";
 
-    return {a, b, out};
+    return {TensorDesc{"A", a, 1, TensorDir::In, false},
+            TensorDesc{"B", b, 1, TensorDir::In, false},
+            TensorDesc{"out", out, 1, TensorDir::Out, false}};
 }
 
-// --- resolve_types compile-time tests ---
+// --- resolve_tensors compile-time tests ---
 // clang-format off
 
 // Homogeneous: dtype sets everything
-static_assert(resolve_types({.dtype = DataType::FP32}).a_dtype == DataType::FP32);
-static_assert(resolve_types({.dtype = DataType::FP32}).b_dtype == DataType::FP32);
-static_assert(resolve_types({.dtype = DataType::FP32}).out_dtype == DataType::FP32);
+static_assert(resolve_tensors({.dtype = DataType::FP32})[0].dtype == DataType::FP32);
+static_assert(resolve_tensors({.dtype = DataType::FP32})[1].dtype == DataType::FP32);
+static_assert(resolve_tensors({.dtype = DataType::FP32})[2].dtype == DataType::FP32);
 
 // Mixed-type: dtype or in_dtype for inputs, out_dtype for output
-static_assert(resolve_types({.dtype = DataType::FP16, .out_dtype = DataType::FP32}).a_dtype == DataType::FP16);
-static_assert(resolve_types({.dtype = DataType::FP16, .out_dtype = DataType::FP32}).out_dtype == DataType::FP32);
-static_assert(resolve_types({.in_dtype = DataType::FP16, .out_dtype = DataType::FP32}).a_dtype == DataType::FP16);
+static_assert(resolve_tensors({.dtype = DataType::FP16, .out_dtype = DataType::FP32})[0].dtype == DataType::FP16);
+static_assert(resolve_tensors({.dtype = DataType::FP16, .out_dtype = DataType::FP32})[2].dtype == DataType::FP32);
+static_assert(resolve_tensors({.in_dtype = DataType::FP16, .out_dtype = DataType::FP32})[0].dtype == DataType::FP16);
 
 // Override chain: in_dtype overrides dtype for inputs, NOT for output
-static_assert(resolve_types({.dtype = DataType::FP32, .in_dtype = DataType::FP16}).a_dtype == DataType::FP16);
-static_assert(resolve_types({.dtype = DataType::FP32, .in_dtype = DataType::FP16}).out_dtype == DataType::FP32);
+static_assert(resolve_tensors({.dtype = DataType::FP32, .in_dtype = DataType::FP16})[0].dtype == DataType::FP16);
+static_assert(resolve_tensors({.dtype = DataType::FP32, .in_dtype = DataType::FP16})[2].dtype == DataType::FP32);
 
 // Per-operand overrides: a_dtype/b_dtype override in_dtype
-static_assert(resolve_types({.a_dtype = DataType::FP16, .b_dtype = DataType::FP16, .out_dtype = DataType::FP32}).a_dtype == DataType::FP16);
-static_assert(resolve_types({.dtype = DataType::FP32, .a_dtype = DataType::FP16, .b_dtype = DataType::FP16}).out_dtype == DataType::FP32);
+static_assert(resolve_tensors({.a_dtype = DataType::FP16, .b_dtype = DataType::FP16, .out_dtype = DataType::FP32})[0].dtype == DataType::FP16);
+static_assert(resolve_tensors({.dtype = DataType::FP32, .a_dtype = DataType::FP16, .b_dtype = DataType::FP16})[2].dtype == DataType::FP32);
+
+// TensorDesc metadata: name, rank, direction
+static_assert(resolve_tensors({.dtype = DataType::FP32})[0].name == "A");
+static_assert(resolve_tensors({.dtype = DataType::FP32})[1].name == "B");
+static_assert(resolve_tensors({.dtype = DataType::FP32})[2].name == "out");
+static_assert(resolve_tensors({.dtype = DataType::FP32})[0].rank == 1);
+static_assert(resolve_tensors({.dtype = DataType::FP32})[2].rank == 1);
+static_assert(resolve_tensors({.dtype = DataType::FP32})[0].direction == TensorDir::In);
+static_assert(resolve_tensors({.dtype = DataType::FP32})[1].direction == TensorDir::In);
+static_assert(resolve_tensors({.dtype = DataType::FP32})[2].direction == TensorDir::Out);
+static_assert(!resolve_tensors({.dtype = DataType::FP32})[0].optional);
 
 // Error cases (uncommenting would produce consteval compile errors):
-// resolve_types({})                                     — nothing resolvable
-// resolve_types({.a_dtype = DataType::FP16})            — b_dtype, out_dtype unknown
-// resolve_types({.in_dtype = DataType::FP16})           — out_dtype unknown
-// resolve_types({.out_dtype = DataType::FP32})          — inputs unknown
+// resolve_tensors({})                                     — nothing resolvable
+// resolve_tensors({.a_dtype = DataType::FP16})            — b_dtype, out_dtype unknown
+// resolve_tensors({.in_dtype = DataType::FP16})           — out_dtype unknown
+// resolve_tensors({.out_dtype = DataType::FP32})          — inputs unknown
 // clang-format on
 
 /// Validate an elementwise config and produce a structural kernel descriptor.
@@ -189,10 +194,10 @@ static_assert(resolve_types({.dtype = DataType::FP32, .a_dtype = DataType::FP16,
 /// Invalid configs produce a compile-time error (consteval).
 consteval VectorAddKernel make_kernel(ElementwiseConfig cfg)
 {
-    ResolvedElementwiseTypes resolved = resolve_types(cfg.signature);
+    std::array<TensorDesc, 3> tensors = resolve_tensors(cfg.signature);
     ElementwiseAlgorithm algo         = cfg.algorithm;
 
-    if(resolved.a_dtype != resolved.b_dtype)
+    if(tensors[0].dtype != tensors[1].dtype)
         throw "vector add requires a_dtype == b_dtype";
 
     if(algo.block_tile <= 0)
@@ -206,8 +211,8 @@ consteval VectorAddKernel make_kernel(ElementwiseConfig cfg)
     if(algo.warp_tile < warp_size)
         throw "warp_tile must be >= warp_size (64)";
 
-    int in_bits    = data_type_bits(resolved.a_dtype);
-    int out_bits   = data_type_bits(resolved.out_dtype);
+    int in_bits    = data_type_bits(tensors[0].dtype);
+    int out_bits   = data_type_bits(tensors[2].dtype);
     int max_bits   = in_bits > out_bits ? in_bits : out_bits;
     int kVectorM_a = 128 / max_bits;             // max vector from wider type
     int kVectorM_b = algo.warp_tile / warp_size; // max vector from warp tile
@@ -226,8 +231,8 @@ consteval VectorAddKernel make_kernel(ElementwiseConfig cfg)
 
     return {algo.block_tile,
             warp_size * algo.block_warps,
-            resolved.a_dtype,
-            resolved.out_dtype,
+            tensors[0].dtype,
+            tensors[2].dtype,
             algo.block_warps,
             algo.warp_tile,
             algo.pad};
