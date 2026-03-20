@@ -17,23 +17,11 @@
 #pragma once
 
 #include <rocm_ck/datatype_utils.hpp>
+#include <rocm_ck/layout.hpp>
 
 #include <optional>
 
 namespace rocm_ck {
-
-// ============================================================================
-// Layout
-// ============================================================================
-
-/// Memory layout for GEMM matrices.
-/// Row = row-major (stride is number of columns).
-/// Col = column-major (stride is number of rows).
-enum class Layout
-{
-    Row,
-    Col
-};
 
 // ============================================================================
 // EpilogueOp

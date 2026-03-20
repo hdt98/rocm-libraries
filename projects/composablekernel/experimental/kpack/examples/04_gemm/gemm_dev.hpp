@@ -7,7 +7,6 @@
 // Each .hip variant file includes this header and instantiates runGemm<K>
 // with a specific constexpr GemmKernel.
 //
-// CkTypeMap:   DataType enum → CK Tile C++ type (float, half_t, bf16_t)
 // CkLayoutMap: Layout enum   → CK Tile layout tag (RowMajor, ColumnMajor)
 // runGemm<K>:  wires the full CK Tile GEMM pipeline from K's types/layouts
 //
@@ -19,36 +18,13 @@
 #include "gemm_api.hpp"
 #include "gemm_args.hpp"
 
+#include <rocm_ck/ck_type_map.hpp>
+
 #include "ck_tile/core.hpp"
 #include "ck_tile/ops/gemm.hpp"
 #include "ck_tile/ops/epilogue.hpp"
 
 namespace rocm_ck {
-
-// ============================================================================
-// CkTypeMap: DataType → CK Tile C++ type
-// ============================================================================
-
-template <DataType>
-struct CkTypeMap;
-
-template <>
-struct CkTypeMap<DataType::FP32>
-{
-    using type = float;
-};
-
-template <>
-struct CkTypeMap<DataType::FP16>
-{
-    using type = ck_tile::half_t;
-};
-
-template <>
-struct CkTypeMap<DataType::BF16>
-{
-    using type = ck_tile::bf16_t;
-};
 
 // ============================================================================
 // CkLayoutMap: Layout → CK Tile layout tag
