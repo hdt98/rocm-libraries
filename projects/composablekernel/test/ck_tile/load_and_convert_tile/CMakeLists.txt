@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 
 set(LOAD_TILE_TRANSPOSE_COMPILE_OPTIONS)
-if(GPU_TARGETS MATCHES "gfx9")
+if(GPU_TARGETS MATCHES "gfx950")
     add_gtest_executable(test_load_and_convert_tile test_load_and_convert_tile.cpp)
     list(APPEND LOAD_TILE_TRANSPOSE_COMPILE_OPTIONS -DCK_TILE_USE_OCP_FP8 -fverbose-asm --save-temps -Wno-gnu-line-marker)
     target_compile_options(test_load_and_convert_tile PRIVATE ${LOAD_TILE_TRANSPOSE_COMPILE_OPTIONS})
