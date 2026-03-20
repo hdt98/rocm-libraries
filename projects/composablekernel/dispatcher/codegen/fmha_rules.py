@@ -76,16 +76,16 @@ def _validate_tile_against_specs(
             f"{pipeline} with hdim ({hdim_q},{hdim_v}) requires bn0={hdim_constraint['required_bn0']}, "
             f"got bn0={tile[1]}"
         )
-    # batch_prefill uses BlockFmhaBatchPrefillPipelineQRKSVSAsync which supports
-    # smaller bm0 values than the standard fwd pipeline
+    # CK supports bm0 < required_bm0 with adapted warp configs (e.g. w16x16x32).
+    # Downgrade to warning -- the kernel compiles and runs correctly.
     if (
         "required_bm0" in hdim_constraint
         and tile[0] != hdim_constraint["required_bm0"]
         and family != "batch_prefill"
     ):
-        result.add_error(
-            f"{pipeline} with hdim ({hdim_q},{hdim_v}) requires bm0={hdim_constraint['required_bm0']}, "
-            f"got bm0={tile[0]}"
+        result.add_warning(
+            f"{pipeline} with hdim ({hdim_q},{hdim_v}): bm0={tile[0]} differs from recommended "
+            f"bm0={hdim_constraint['required_bm0']}"
         )
     if (
         "forbidden_bk0" in hdim_constraint

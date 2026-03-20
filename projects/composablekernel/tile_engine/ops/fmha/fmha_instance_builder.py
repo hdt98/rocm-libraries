@@ -309,64 +309,70 @@ def expand_sweep(
             )
             if not sk_tiles:
                 continue
-            for (hq, hv), tile in sorted(sk_tiles.items()):
+            for (hq, hv), tiles_or_tile in sorted(sk_tiles.items()):
+                tile_list = (
+                    tiles_or_tile
+                    if isinstance(tiles_or_tile, list)
+                    else [tiles_or_tile]
+                )
                 sk_specs = get_splitkv_pipelines(dtype, hq, receipt)
-                for mode in MODES:
-                    if allowed_modes is not None and mode not in allowed_modes:
-                        continue
-                    for spec in sk_specs:
-                        if mode == "group" and not (
-                            spec.spad == "t" and spec.skpad == "t"
-                        ):
+                for tile in tile_list:
+                    for mode in MODES:
+                        if allowed_modes is not None and mode not in allowed_modes:
                             continue
-                        mm = _MASK_MAP.get(spec.mask, spec.mask)
-                        mb = _BIAS_MAP.get(spec.bias, spec.bias)
-                        if allowed_masks is not None and mm not in allowed_masks:
-                            continue
-                        if allowed_biases is not None and mb not in allowed_biases:
-                            continue
-                        m0, n0, k0, n1, k1, k0max, wave_m, warp_m, warp_k = (
-                            _tile_params(tile, hv, dtype, var="splitkv")
-                        )
-                        configs.append(
-                            FmhaKernelConfig(
-                                family="fwd_splitkv",
-                                data_type=dtype,
-                                mode=mode,
-                                hdim_q=hq,
-                                hdim_v=hv,
-                                pipeline=spec.tag,
-                                tile_m0=m0,
-                                tile_n0=n0,
-                                tile_k0=k0,
-                                tile_n1=n1,
-                                tile_k1=k1,
-                                tile_k0max=k0max,
-                                wave_m0=wave_m,
-                                wave_n0=1,
-                                wave_k0=1,
-                                wave_m1=wave_m,
-                                wave_n1=1,
-                                wave_k1=1,
-                                warp_m0=warp_m,
-                                warp_n0=warp_m,
-                                warp_k0=warp_k,
-                                warp_m1=warp_m,
-                                warp_n1=warp_m,
-                                warp_k1=warp_k,
-                                pad_s=_pad_val(spec.spad),
-                                pad_sk=_pad_val(spec.skpad),
-                                pad_d=_pad_val(spec.dpad),
-                                pad_dv=_pad_val(spec.dvpad),
-                                mask=mm,
-                                bias=mb,
-                                lse=True,
-                                logits=(spec.logits == "t"),
-                                sink=(spec.sink == "t"),
-                                paged_kv=(spec.pagedkv == "t"),
-                                gfx_arch=arch,
+                        for spec in sk_specs:
+                            if mode == "group" and not (
+                                spec.spad == "t" and spec.skpad == "t"
+                            ):
+                                continue
+                            mm = _MASK_MAP.get(spec.mask, spec.mask)
+                            mb = _BIAS_MAP.get(spec.bias, spec.bias)
+                            if allowed_masks is not None and mm not in allowed_masks:
+                                continue
+                            if allowed_biases is not None and mb not in allowed_biases:
+                                continue
+                            m0, n0, k0, n1, k1, k0max, wave_m, warp_m, warp_k = (
+                                _tile_params(tile, hv, dtype, var="splitkv")
                             )
-                        )
+                            configs.append(
+                                FmhaKernelConfig(
+                                    family="fwd_splitkv",
+                                    data_type=dtype,
+                                    mode=mode,
+                                    hdim_q=hq,
+                                    hdim_v=hv,
+                                    pipeline=spec.tag,
+                                    tile_m0=m0,
+                                    tile_n0=n0,
+                                    tile_k0=k0,
+                                    tile_n1=n1,
+                                    tile_k1=k1,
+                                    tile_k0max=k0max,
+                                    wave_m0=wave_m,
+                                    wave_n0=1,
+                                    wave_k0=1,
+                                    wave_m1=wave_m,
+                                    wave_n1=1,
+                                    wave_k1=1,
+                                    warp_m0=warp_m,
+                                    warp_n0=warp_m,
+                                    warp_k0=warp_k,
+                                    warp_m1=warp_m,
+                                    warp_n1=warp_m,
+                                    warp_k1=warp_k,
+                                    pad_s=_pad_val(spec.spad),
+                                    pad_sk=_pad_val(spec.skpad),
+                                    pad_d=_pad_val(spec.dpad),
+                                    pad_dv=_pad_val(spec.dvpad),
+                                    mask=mm,
+                                    bias=mb,
+                                    lse=True,
+                                    logits=(spec.logits == "t"),
+                                    sink=(spec.sink == "t"),
+                                    paged_kv=(spec.pagedkv == "t"),
+                                    gfx_arch=arch,
+                                )
+                            )
         # Also generate combine kernels
         for dtype in dtypes:
             comb_specs = get_splitkv_combine_pipelines(dtype, receipt)
@@ -416,64 +422,70 @@ def expand_sweep(
             )
             if not pk_tiles:
                 continue
-            for (hq, hv), tile in sorted(pk_tiles.items()):
+            for (hq, hv), tiles_or_tile in sorted(pk_tiles.items()):
+                tile_list = (
+                    tiles_or_tile
+                    if isinstance(tiles_or_tile, list)
+                    else [tiles_or_tile]
+                )
                 pk_specs = get_pagedkv_pipelines(dtype, hq, receipt)
-                for mode in MODES:
-                    if allowed_modes is not None and mode not in allowed_modes:
-                        continue
-                    for spec in pk_specs:
-                        if mode == "group" and not (
-                            spec.spad == "t" and spec.skpad == "t"
-                        ):
+                for tile in tile_list:
+                    for mode in MODES:
+                        if allowed_modes is not None and mode not in allowed_modes:
                             continue
-                        mm = _MASK_MAP.get(spec.mask, spec.mask)
-                        mb = _BIAS_MAP.get(spec.bias, spec.bias)
-                        if allowed_masks is not None and mm not in allowed_masks:
-                            continue
-                        if allowed_biases is not None and mb not in allowed_biases:
-                            continue
-                        m0, n0, k0, n1, k1, k0max, wave_m, warp_m, warp_k = (
-                            _tile_params(tile, hv, dtype, var="pagedkv")
-                        )
-                        configs.append(
-                            FmhaKernelConfig(
-                                family="fwd_pagedkv",
-                                data_type=dtype,
-                                mode=mode,
-                                hdim_q=hq,
-                                hdim_v=hv,
-                                pipeline=spec.tag,
-                                tile_m0=m0,
-                                tile_n0=n0,
-                                tile_k0=k0,
-                                tile_n1=n1,
-                                tile_k1=k1,
-                                tile_k0max=k0max,
-                                wave_m0=wave_m,
-                                wave_n0=1,
-                                wave_k0=1,
-                                wave_m1=wave_m,
-                                wave_n1=1,
-                                wave_k1=1,
-                                warp_m0=warp_m,
-                                warp_n0=warp_m,
-                                warp_k0=warp_k,
-                                warp_m1=warp_m,
-                                warp_n1=warp_m,
-                                warp_k1=warp_k,
-                                pad_s=_pad_val(spec.spad),
-                                pad_sk=_pad_val(spec.skpad),
-                                pad_d=_pad_val(spec.dpad),
-                                pad_dv=_pad_val(spec.dvpad),
-                                mask=mm,
-                                bias=mb,
-                                logits=(spec.logits == "t"),
-                                skip_min_seqlen_q=(spec.skip == "t"),
-                                sink=(spec.sink == "t"),
-                                paged_kv=True,
-                                gfx_arch=arch,
+                        for spec in pk_specs:
+                            if mode == "group" and not (
+                                spec.spad == "t" and spec.skpad == "t"
+                            ):
+                                continue
+                            mm = _MASK_MAP.get(spec.mask, spec.mask)
+                            mb = _BIAS_MAP.get(spec.bias, spec.bias)
+                            if allowed_masks is not None and mm not in allowed_masks:
+                                continue
+                            if allowed_biases is not None and mb not in allowed_biases:
+                                continue
+                            m0, n0, k0, n1, k1, k0max, wave_m, warp_m, warp_k = (
+                                _tile_params(tile, hv, dtype, var="pagedkv")
                             )
-                        )
+                            configs.append(
+                                FmhaKernelConfig(
+                                    family="fwd_pagedkv",
+                                    data_type=dtype,
+                                    mode=mode,
+                                    hdim_q=hq,
+                                    hdim_v=hv,
+                                    pipeline=spec.tag,
+                                    tile_m0=m0,
+                                    tile_n0=n0,
+                                    tile_k0=k0,
+                                    tile_n1=n1,
+                                    tile_k1=k1,
+                                    tile_k0max=k0max,
+                                    wave_m0=wave_m,
+                                    wave_n0=1,
+                                    wave_k0=1,
+                                    wave_m1=wave_m,
+                                    wave_n1=1,
+                                    wave_k1=1,
+                                    warp_m0=warp_m,
+                                    warp_n0=warp_m,
+                                    warp_k0=warp_k,
+                                    warp_m1=warp_m,
+                                    warp_n1=warp_m,
+                                    warp_k1=warp_k,
+                                    pad_s=_pad_val(spec.spad),
+                                    pad_sk=_pad_val(spec.skpad),
+                                    pad_d=_pad_val(spec.dpad),
+                                    pad_dv=_pad_val(spec.dvpad),
+                                    mask=mm,
+                                    bias=mb,
+                                    logits=(spec.logits == "t"),
+                                    skip_min_seqlen_q=(spec.skip == "t"),
+                                    sink=(spec.sink == "t"),
+                                    paged_kv=True,
+                                    gfx_arch=arch,
+                                )
+                            )
 
     elif variant == "appendkv":
         for dtype in dtypes:

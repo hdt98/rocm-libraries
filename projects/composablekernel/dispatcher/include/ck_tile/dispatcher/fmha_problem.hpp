@@ -342,6 +342,13 @@ struct FmhaProblem
                     p.has_sink            = traits.has_sink;
                     p.hdim_q              = traits.hdim_q;
                     p.hdim_v              = traits.hdim_v;
+                    // Explicit defaults for fields not in splitkv traits
+                    p.has_dropout       = false;
+                    p.skip_min_seqlen_q = false;
+                    p.use_paged_kv      = false;
+                    p.has_dbias         = false;
+                    p.is_store_randval  = false;
+                    p.is_deterministic  = false;
                 }
                 else if constexpr(std::is_same_v<T, fmha_fwd_appendkv_traits>)
                 {
@@ -352,6 +359,18 @@ struct FmhaProblem
                     p.rope_type        = static_cast<int>(traits.rope_type);
                     p.hdim_q           = traits.hdim_q;
                     p.hdim_v           = traits.hdim_v;
+                    // Explicit defaults for fields not in appendkv traits
+                    p.has_logits_soft_cap = false;
+                    p.mask_type           = 0;
+                    p.bias_type           = 0;
+                    p.has_lse             = false;
+                    p.has_dropout         = false;
+                    p.has_sink            = false;
+                    p.skip_min_seqlen_q   = false;
+                    p.use_paged_kv        = false;
+                    p.has_dbias           = false;
+                    p.is_store_randval    = false;
+                    p.is_deterministic    = false;
                 }
                 else if constexpr(std::is_same_v<T, fmha_batch_prefill_traits>)
                 {
@@ -387,6 +406,13 @@ struct FmhaProblem
                     p.is_deterministic = traits.is_deterministic;
                     p.hdim_q           = traits.hdim_q;
                     p.hdim_v           = traits.hdim_v;
+                    // Explicit defaults for fields not in bwd traits
+                    p.is_v_rowmajor       = true;
+                    p.has_logits_soft_cap = false;
+                    p.has_lse             = false;
+                    p.has_sink            = false;
+                    p.skip_min_seqlen_q   = false;
+                    p.use_paged_kv        = false;
                 }
             },
             invocation.traits);
