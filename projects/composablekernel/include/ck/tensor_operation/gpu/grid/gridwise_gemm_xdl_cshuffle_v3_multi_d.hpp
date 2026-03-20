@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ck/utility/common_header.hpp"
+#include "ck/utility/logging.hpp"
 #include "ck/tensor_description/multi_index_transform_helper.hpp"
 #include "ck/tensor_description/tensor_descriptor.hpp"
 #include "ck/tensor_description/tensor_descriptor_helper.hpp"
@@ -15,8 +16,6 @@
 #include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_direct_load.hpp"
 
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_xdl_cshuffle_common.hpp"
-
-#define DEBUG_LOG 0
 
 namespace ck {
 
@@ -1018,6 +1017,11 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
 
         if constexpr(NXdlPerWave % CShuffleNXdlPerWavePerShuffle != 0)
         {
+            ck::LogInfo("CheckValidity failed: NXdlPerWave (",
+                              NXdlPerWave,
+                              ") is not a multiple of CShuffleNXdlPerWavePerShuffle (",
+                              CShuffleNXdlPerWavePerShuffle,
+                              "). ");
             return false;
         }
 
@@ -1029,12 +1033,11 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
         {
             if(!(karg.M % MPerBlock == 0))
             {
-#if DEBUG_LOG
-                std::cout << "Arg M value is not a multiple of MPerBlock! M: " << karg.M << " "
-                          << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
-                          << std::endl;
-
-#endif // DEBUG_LOG
+                ck::LogInfo("CheckValidity failed: M (",
+                                  karg.M,
+                                  ") is not a multiple of MPerBlock (",
+                                  MPerBlock,
+                                  "). ");
                 return false;
             }
         }
@@ -1047,12 +1050,11 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
         {
             if(!(karg.N % NPerBlock == 0))
             {
-#if DEBUG_LOG
-                std::cout << "Arg N value is not a multiple of NPerBlock! N: " << karg.N << " "
-                          << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
-                          << std::endl;
-
-#endif // DEBUG_LOG
+                ck::LogInfo("CheckValidity failed: N (",
+                                  karg.N,
+                                  ") is not a multiple of NPerBlock (",
+                                  NPerBlock,
+                                  "). ");
                 return false;
             }
         }
@@ -1066,12 +1068,15 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
             auto K_t = karg.KBatch * KPerBlock;
             if(!(karg.K % K_t == 0))
             {
-#if DEBUG_LOG
-                std::cout << "Arg K value is not a multiple of K_Batch * K0PerBlock * K1! K: "
-                          << karg.K << " " << __FILE__ << ":" << __LINE__
-                          << ", in function: " << __func__ << std::endl;
-
-#endif // DEBUG_LOG
+                ck::LogInfo("CheckValidity failed: K (",
+                                  karg.K,
+                                  ") is not a multiple of KBatch * KPerBlock (",
+                                  karg.KBatch,
+                                  " * ",
+                                  KPerBlock,
+                                  " = ",
+                                  K_t,
+                                  "). ");
                 return false;
             }
         }
@@ -1082,6 +1087,13 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
             auto KReadPadSplited    = math::integer_divide_ceil(karg.K, K_t) * KReadVec;
             if((KReadPadSplited * (karg.KBatch - 1)) >= karg.K)
             {
+                ck::LogInfo("CheckValidity failed: K-padding split-K validity.",
+                                  " KReadPadSplited=",
+                                  KReadPadSplited,
+                                  " KBatch=",
+                                  karg.KBatch,
+                                  " K=",
+                                  karg.K);
                 return false;
             }
         }
@@ -1090,13 +1102,11 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
         {
             if(karg.K % ABlockTransferSrcScalarPerVector != 0)
             {
-#if DEBUG_LOG
-                std::cout << "Arg K (" << karg.K
-                          << ") value is not a multiple of ABlockTransferSrcScalarPerVector ("
-                          << ABlockTransferSrcScalarPerVector << " )! " << __FILE__ << ":"
-                          << __LINE__ << ", in function: " << __func__ << std::endl;
-
-#endif // DEBUG_LOG
+                ck::LogInfo("CheckValidity failed: K (",
+                                  karg.K,
+                                  ") is not a multiple of ABlockTransferSrcScalarPerVector (",
+                                  ABlockTransferSrcScalarPerVector,
+                                  "). ");
                 return false;
             }
         }
@@ -1104,13 +1114,11 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
         {
             if(karg.M % ABlockTransferSrcScalarPerVector != 0)
             {
-#if DEBUG_LOG
-                std::cout << "Arg M (" << karg.M
-                          << ") value is not a multiple of ABlockTransferSrcScalarPerVector ("
-                          << ABlockTransferSrcScalarPerVector << " )! " << __FILE__ << ":"
-                          << __LINE__ << ", in function: " << __func__ << std::endl;
-
-#endif // DEBUG_LOG
+                ck::LogInfo("CheckValidity failed: M (",
+                                  karg.M,
+                                  ") is not a multiple of ABlockTransferSrcScalarPerVector (",
+                                  ABlockTransferSrcScalarPerVector,
+                                  "). ");
                 return false;
             }
         }
@@ -1119,13 +1127,11 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
         {
             if(karg.N % BBlockTransferSrcScalarPerVector != 0)
             {
-#if DEBUG_LOG
-                std::cout << "Arg N (" << karg.N
-                          << ") value is not a multiple of BBlockTransferSrcScalarPerVector ("
-                          << BBlockTransferSrcScalarPerVector << " )! " << __FILE__ << ":"
-                          << __LINE__ << ", in function: " << __func__ << std::endl;
-
-#endif // DEBUG_LOG
+                ck::LogInfo("CheckValidity failed: N (",
+                                  karg.N,
+                                  ") is not a multiple of BBlockTransferSrcScalarPerVector (",
+                                  BBlockTransferSrcScalarPerVector,
+                                  "). ");
                 return false;
             }
         }
@@ -1133,13 +1139,11 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
         {
             if(karg.K % BBlockTransferSrcScalarPerVector != 0)
             {
-#if DEBUG_LOG
-                std::cout << "Arg K (" << karg.K
-                          << ") value is not a multiple of BBlockTransferSrcScalarPerVector ("
-                          << BBlockTransferSrcScalarPerVector << " )! " << __FILE__ << ":"
-                          << __LINE__ << ", in function: " << __func__ << std::endl;
-
-#endif // DEBUG_LOG
+                ck::LogInfo("CheckValidity failed: K (",
+                                  karg.K,
+                                  ") is not a multiple of BBlockTransferSrcScalarPerVector (",
+                                  BBlockTransferSrcScalarPerVector,
+                                  "). ");
                 return false;
             }
         }
@@ -1148,14 +1152,11 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
         {
             if(karg.N % CShuffleBlockTransferScalarPerVector_NPerBlock != 0)
             {
-#if DEBUG_LOG
-                std::cout << "Arg N (" << karg.N
-                          << ") value is not a multiple of "
-                             "CShuffleBlockTransferScalarPerVector_NPerBlock ("
-                          << CShuffleBlockTransferScalarPerVector_NPerBlock << " )! " << __FILE__
-                          << ":" << __LINE__ << ", in function: " << __func__ << std::endl;
-
-#endif // DEBUG_LOG
+                ck::LogInfo("CheckValidity failed: N (",
+                                  karg.N,
+                                  ") is not a multiple of CShuffleBlockTransferScalarPerVector_NPerBlock (",
+                                  CShuffleBlockTransferScalarPerVector_NPerBlock,
+                                  "). ");
                 return false;
             }
         }
@@ -1163,14 +1164,11 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
         {
             if(karg.M % CShuffleBlockTransferScalarPerVector_NPerBlock != 0)
             {
-#if DEBUG_LOG
-                std::cout << "Arg M (" << karg.M
-                          << ") value is not a multiple of "
-                             "CShuffleBlockTransferScalarPerVector_NPerBlock ("
-                          << CShuffleBlockTransferScalarPerVector_NPerBlock << " )! " << __FILE__
-                          << ":" << __LINE__ << ", in function: " << __func__ << std::endl;
-
-#endif // DEBUG_LOG
+                ck::LogInfo("CheckValidity failed: M (",
+                                  karg.M,
+                                  ") is not a multiple of CShuffleBlockTransferScalarPerVector_NPerBlock (",
+                                  CShuffleBlockTransferScalarPerVector_NPerBlock,
+                                  "). ");
                 return false;
             }
         }
@@ -1182,6 +1180,17 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
         {
             if(num_k_loop <= BlockwiseGemmPipe::PrefetchStages)
             {
+                ck::LogInfo("CheckValidity failed: pipeline prefetch stages not satisfied.",
+                                  " num_k_loop=",
+                                  num_k_loop,
+                                  " PrefetchStages=",
+                                  BlockwiseGemmPipe::PrefetchStages,
+                                  " AK0=",
+                                  karg.AK0,
+                                  " KPerBlock=",
+                                  KPerBlock,
+                                  " AK1Value=",
+                                  AK1Value);
                 return false;
             }
         }
@@ -1191,6 +1200,13 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
              karg.N * karg.K * sizeof(BDataType) <= TwoGB &&
              karg.M * karg.N * sizeof(CDataType) <= TwoGB))
         {
+            ck::LogInfo("CheckValidity failed: tensor size exceeds 2GB limit.",
+                              " A_bytes=",
+                              karg.M * karg.K * sizeof(ADataType),
+                              " B_bytes=",
+                              karg.N * karg.K * sizeof(BDataType),
+                              " C_bytes=",
+                              karg.M * karg.N * sizeof(CDataType));
             return false;
         }
 

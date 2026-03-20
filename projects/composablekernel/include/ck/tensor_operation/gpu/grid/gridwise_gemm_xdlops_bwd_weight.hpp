@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ck/utility/common_header.hpp"
+#include "ck/utility/logging.hpp"
 #include "ck/tensor_description/multi_index_transform_helper.hpp"
 #include "ck/tensor_description/tensor_descriptor.hpp"
 #include "ck/tensor_description/tensor_descriptor_helper.hpp"
@@ -646,6 +647,13 @@ struct GridwiseGemm_bk0mk1_bk0nk1_mn_xdlops_bwd_weight
 
         if(!GridwiseGemmPipe::IsSupported(num_k_loop))
         {
+            ck::LogInfo("CheckValidity failed: pipeline not supported.",
+                              " num_k_loop=",
+                              num_k_loop,
+                              " K0=",
+                              K0,
+                              " K0PerBlock=",
+                              K0PerBlock);
             return false;
         }
 
@@ -654,13 +662,54 @@ struct GridwiseGemm_bk0mk1_bk0nk1_mn_xdlops_bwd_weight
              K1 == a_b_k0_m_k1_grid_desc.GetLength(I3) &&
              K1 == b_b_k0_n_k1_grid_desc.GetLength(I3) &&
              KBatch == b_b_k0_n_k1_grid_desc.GetLength(I0)))
+        {
+            ck::LogInfo("CheckValidity failed: descriptor inconsistency.",
+                              " M=",
+                              M,
+                              " C_M=",
+                              c_m_n_grid_desc.GetLength(I0),
+                              " N=",
+                              N,
+                              " C_N=",
+                              c_m_n_grid_desc.GetLength(I1),
+                              " K0=",
+                              K0,
+                              " BK0=",
+                              b_b_k0_n_k1_grid_desc.GetLength(I1),
+                              " K1=",
+                              K1,
+                              " AK1=",
+                              a_b_k0_m_k1_grid_desc.GetLength(I3),
+                              " BK1=",
+                              b_b_k0_n_k1_grid_desc.GetLength(I3),
+                              " KBatch=",
+                              KBatch,
+                              " BKBatch=",
+                              b_b_k0_n_k1_grid_desc.GetLength(I0));
             return false;
+        }
 
         if(!(M % MPerBlock == 0 && N % NPerBlock == 0 && K0 % K0PerBlock == 0))
+        {
+            ck::LogInfo("CheckValidity failed: tile size divisibility.",
+                              " M=",
+                              M,
+                              " MPerBlock=",
+                              MPerBlock,
+                              " N=",
+                              N,
+                              " NPerBlock=",
+                              NPerBlock,
+                              " K0=",
+                              K0,
+                              " K0PerBlock=",
+                              K0PerBlock);
             return false;
+        }
 
         if(!block_2_ctile_map.CheckValidity(c_m_n_grid_desc))
         {
+            ck::LogInfo("CheckValidity failed: block_2_ctile_map is invalid.");
             return false;
         }
 
@@ -670,6 +719,13 @@ struct GridwiseGemm_bk0mk1_bk0nk1_mn_xdlops_bwd_weight
              b_b_k0_n_k1_grid_desc.GetElementSpaceSize() * sizeof(FloatB) <= TwoGB &&
              c_m_n_grid_desc.GetElementSpaceSize() * sizeof(FloatC) <= TwoGB))
         {
+            ck::LogInfo("CheckValidity failed: tensor size exceeds 2GB limit.",
+                              " A_bytes=",
+                              a_b_k0_m_k1_grid_desc.GetElementSpaceSize() * sizeof(FloatA),
+                              " B_bytes=",
+                              b_b_k0_n_k1_grid_desc.GetElementSpaceSize() * sizeof(FloatB),
+                              " C_bytes=",
+                              c_m_n_grid_desc.GetElementSpaceSize() * sizeof(FloatC));
             return false;
         }
 

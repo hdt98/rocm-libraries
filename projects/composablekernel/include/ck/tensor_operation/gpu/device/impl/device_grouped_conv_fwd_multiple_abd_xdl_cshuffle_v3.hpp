@@ -27,6 +27,8 @@
 #include "ck/host_utility/device_prop.hpp"
 #include "ck/host_utility/kernel_launch.hpp"
 #include "ck/host_utility/io.hpp"
+#include "ck/utility/logging.hpp"
+
 #ifdef CK_EXPERIMENTAL_BUILDER
 #include "ck_tile/builder/reflect/conv_describe.hpp"
 #include "ck_tile/builder/reflect/instance_traits_device_grouped_conv_fwd_multiple_abd_xdl_cshuffle_v3.hpp"
@@ -1473,11 +1475,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
         if constexpr(isMultiABD)
         {
             return false;
-            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-            {
-                std::cout << "The MultiABD is not supported!" << " In " << __FILE__ << ":"
-                          << __LINE__ << ", in function: " << __func__ << std::endl;
-            }
+            ck::LogInfo("The MultiABD is not supported!");
         }
 
         // check device
@@ -1493,11 +1491,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
         {
             if(G % NumGroupsToMerge != 0)
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "Unsupported! G % NumGroupsToMerge != 0: G=" << G
-                              << ", NumGroupsToMerge=" << NumGroupsToMerge << std::endl;
-                }
+                ck::LogInfo("Unsupported! G % NumGroupsToMerge != 0: G=", G, ", NumGroupsToMerge=", NumGroupsToMerge);
                 return false;
             }
         }
@@ -1507,13 +1501,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
             // FIXME: re-enable fp64 when SWDEV-335738 is fixed
             if constexpr(!(is_same_v<AccDataType, float> || is_same_v<AccDataType, int32_t>))
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout
-                        << "On gfx908 the accumulation data type must be one of fp32 or int32!"
-                        << " In " << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
-                        << std::endl;
-                }
+                ck::LogInfo("On gfx908 the accumulation data type must be one of fp32 or int32!");
                 return false;
             }
         }
@@ -1523,12 +1511,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
                                       Wave32MaxMNPerXDL,
                                       Wave32MaxMNPerXDL>())
         {
-            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-            {
-                std::cout << "Current device does not support xdl instructions!" << " In "
-                          << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
-                          << std::endl;
-            }
+            ck::LogInfo("Current device does not support xdl instructions!");
             return false;
         }
 
@@ -1541,11 +1524,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
             }
             if constexpr(!is_same_v<AComputeDataType, BComputeDataType>)
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "ComputeDataType for A and B should be same while using TF32"
-                              << std::endl;
-                }
+                ck::LogInfo("ComputeDataType for A and B should be same while using TF32");
                 return false;
             }
         }
@@ -1564,13 +1543,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
 
                 if(!(SpatialDim == 1 && ConvStride == 1 && LeftPad == 0 && RightPad == 0))
                 {
-                    if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                    {
-                        std::cout << "The input paramters do not align with specialization "
-                                     "Filter1x1Stride1Pad0!"
-                                  << " In " << __FILE__ << ":" << __LINE__
-                                  << ", in function: " << __func__ << std::endl;
-                    }
+                    ck::LogInfo("The input paramters do not align with specialization " "Filter1x1Stride1Pad0!");
                     return false;
                 }
             }
@@ -1587,13 +1560,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
 
                 if(!(SpatialDim == 1 && LeftPad == 0 && RightPad == 0))
                 {
-                    if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                    {
-                        std::cout
-                            << "The input paramters do not align with specialization Filter1x1Pad0!"
-                            << " In " << __FILE__ << ":" << __LINE__
-                            << ", in function: " << __func__ << std::endl;
-                    }
+                    ck::LogInfo("The input paramters do not align with specialization Filter1x1Pad0!");
                     return false;
                 }
             }
@@ -1626,23 +1593,13 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
         {
             if(!(ABlockTransferSrcVectorDim == 2 && C % ABlockTransferSrcScalarPerVector == 0))
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "[A Layout] The number of input channels is not a multiple of "
-                                 "ABlockTransferSrcScalarPerVector!"
-                              << " In " << __FILE__ << ":" << __LINE__
-                              << ", in function: " << __func__ << std::endl;
-                }
+                ck::LogInfo("[A Layout] The number of input channels is not a multiple of " "ABlockTransferSrcScalarPerVector!");
                 return false;
             }
         }
         else
         {
-            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-            {
-                std::cout << "Unsupported A Layout!" << " In " << __FILE__ << ":" << __LINE__
-                          << ", in function: " << __func__ << std::endl;
-            }
+            ck::LogInfo("Unsupported A Layout!");
             return false;
         }
 
@@ -1658,23 +1615,13 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
         {
             if(!(BBlockTransferSrcVectorDim == 2 && C % BBlockTransferSrcScalarPerVector == 0))
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "[B Layout] The number of input channels is not a multiple of "
-                                 "BBlockTransferSrcScalarPerVector!"
-                              << " In " << __FILE__ << ":" << __LINE__
-                              << ", in function: " << __func__ << std::endl;
-                }
+                ck::LogInfo("[B Layout] The number of input channels is not a multiple of " "BBlockTransferSrcScalarPerVector!");
                 return false;
             }
         }
         else
         {
-            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-            {
-                std::cout << "Unsupported A Layout!" << " In " << __FILE__ << ":" << __LINE__
-                          << ", in function: " << __func__ << std::endl;
-            }
+            ck::LogInfo("Unsupported A Layout!");
             return false;
         }
 
@@ -1683,25 +1630,13 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
         {
             if((G * C) % CDEBlockTransferScalarPerVector_NPerBlock != 0)
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "[NGCHW Layout] The G * C is not a multiple of "
-                                 "CDEBlockTransferScalarPerVector_NPerBlock"
-                              << " In " << __FILE__ << ":" << __LINE__
-                              << ", in function: " << __func__ << std::endl;
-                }
+                ck::LogInfo("[NGCHW Layout] The G * C is not a multiple of " "CDEBlockTransferScalarPerVector_NPerBlock");
                 return false;
             }
 
             if((G * K) % CDEBlockTransferScalarPerVector_NPerBlock != 0)
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "[NGCHW Layout] The G * K is not a multiple of "
-                                 "CDEBlockTransferScalarPerVector_NPerBlock"
-                              << " In " << __FILE__ << ":" << __LINE__
-                              << ", in function: " << __func__ << std::endl;
-                }
+                ck::LogInfo("[NGCHW Layout] The G * K is not a multiple of " "CDEBlockTransferScalarPerVector_NPerBlock");
                 return false;
             }
 
@@ -1712,37 +1647,19 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
 
             if(input_spatial_acum % CDEBlockTransferScalarPerVector_NPerBlock != 0)
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "[NGCHW Layout] The input_spatial_acum is not a multiple of "
-                                 "CDEBlockTransferScalarPerVector_NPerBlock"
-                              << " In " << __FILE__ << ":" << __LINE__
-                              << ", in function: " << __func__ << std::endl;
-                }
+                ck::LogInfo("[NGCHW Layout] The input_spatial_acum is not a multiple of " "CDEBlockTransferScalarPerVector_NPerBlock");
                 return false;
             }
 
             if(output_spatial_acum % CDEBlockTransferScalarPerVector_NPerBlock != 0)
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "[NGCHW Layout] The output_spatial_acum is not a multiple of "
-                                 "CDEBlockTransferScalarPerVector_NPerBlock"
-                              << " In " << __FILE__ << ":" << __LINE__
-                              << ", in function: " << __func__ << std::endl;
-                }
+                ck::LogInfo("[NGCHW Layout] The output_spatial_acum is not a multiple of " "CDEBlockTransferScalarPerVector_NPerBlock");
                 return false;
             }
 
             if(!arg.p_workspace_)
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "Warning: Workspace for "
-                                 "DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3::Argument is not "
-                                 "allocated, use SetWorkSpacePointer."
-                              << std::endl;
-                }
+                ck::LogInfo("Warning: Workspace for " "DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3::Argument is not " "allocated, use SetWorkSpacePointer.");
                 return false;
             }
 
@@ -1750,13 +1667,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
             if(!(arg.a_out_transpose_desc_.GetElementSpaceSize() * sizeof(ADataType) <= TwoGB &&
                  arg.e_in_transpose_desc_.GetElementSpaceSize() * sizeof(EDataType) <= TwoGB))
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "[NGCHW Layout] One of the transposed vectors is exceeding 2GB "
-                                 "memory size!"
-                              << " In " << __FILE__ << ":" << __LINE__
-                              << ", in function: " << __func__ << std::endl;
-                }
+                ck::LogInfo("[NGCHW Layout] One of the transposed vectors is exceeding 2GB " "memory size!");
                 return false;
             }
         }
@@ -1771,36 +1682,20 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
         {
             if(!(K % CDEBlockTransferScalarPerVector_NPerBlock == 0))
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "[E Layout] The K is not a multiple of "
-                                 "CDEBlockTransferScalarPerVector_NPerBlock"
-                              << " In " << __FILE__ << ":" << __LINE__
-                              << ", in function: " << __func__ << std::endl;
-                }
+                ck::LogInfo("[E Layout] The K is not a multiple of " "CDEBlockTransferScalarPerVector_NPerBlock");
                 return false;
             }
         }
         else
         {
-            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-            {
-                std::cout << "Unsupported E Layout!" << " In " << __FILE__ << ":" << __LINE__
-                          << ", in function: " << __func__ << std::endl;
-            }
+            ck::LogInfo("Unsupported E Layout!");
             return false;
         }
 
         // Gridwise gemm v3 doesn't verify descriptors size
         if(!arg.conv_to_gemm_transformer_.AreDescriptorsSmallerThan2GB())
         {
-            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-            {
-                std::cout
-                    << "[conv_to_gemm_transformer_] One of the descriptors is bigger than 2GB!"
-                    << " In " << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
-                    << std::endl;
-            }
+            ck::LogInfo("[conv_to_gemm_transformer_] One of the descriptors is bigger than 2GB!");
             return false;
         }
 
@@ -2156,6 +2051,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
 
         return str.str();
     }
+
 
 #ifdef CK_EXPERIMENTAL_BUILDER
     std::string GetInstanceString() const override

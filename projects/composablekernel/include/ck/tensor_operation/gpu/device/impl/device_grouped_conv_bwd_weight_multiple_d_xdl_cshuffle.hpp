@@ -26,6 +26,8 @@
 #include "ck/host_utility/device_prop.hpp"
 #include "ck/host_utility/kernel_launch.hpp"
 
+#include "ck/utility/logging.hpp"
+
 #ifdef CK_EXPERIMENTAL_BUILDER
 #include "ck_tile/builder/reflect/description.hpp"
 #include "ck_tile/builder/reflect/instance_traits_device_grouped_conv_bwd_weight_multiple_d_xdl_cshuffle.hpp"
@@ -950,32 +952,19 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
     {
         if(!ck::is_xdl_wmma_supported<ComputeTypeA, ComputeTypeB, MPerXDL, NPerXDL>())
         {
-            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-            {
-                std::cout << "Current device does not support xdl/wmma instructions!" << " In "
-                          << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
-                          << std::endl;
-            }
+            ck::LogInfo("Current device does not support xdl/wmma instructions!");
             return false;
         }
         if constexpr(is_same_v<ComputeTypeA, ck::tf32_t> || is_same_v<ComputeTypeB, ck::tf32_t>)
         {
             if(!is_tf32_supported())
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "TF32 is not supported on this device." << " In " << __FILE__
-                              << ":" << __LINE__ << ", in function: " << __func__ << std::endl;
-                }
+                ck::LogInfo("TF32 is not supported on this device.");
                 return false;
             }
             if constexpr(!is_same_v<ComputeTypeA, ComputeTypeB>)
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "ComputeDataType for A and B should be same while using TF32"
-                              << std::endl;
-                }
+                ck::LogInfo("ComputeDataType for A and B should be same while using TF32");
                 return false;
             }
         }
@@ -983,12 +972,7 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
         {
             if constexpr(!is_GNWC_GKXC_GNWK<InLayout, WeiLayout, OutLayout>())
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "Unsupported layout combination for NDimSpatial=1." << " In "
-                              << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
-                              << std::endl;
-                }
+                ck::LogInfo("Unsupported layout combination for NDimSpatial=1.");
                 return false;
             }
         }
@@ -997,12 +981,7 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
             if constexpr(!(is_NHWGC_GKYXC_NHWGK<InLayout, WeiLayout, OutLayout>() ||
                            is_GNHWC_GKYXC_GNHWK<InLayout, WeiLayout, OutLayout>()))
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "Unsupported layout combination for NDimSpatial=2." << " In "
-                              << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
-                              << std::endl;
-                }
+                ck::LogInfo("Unsupported layout combination for NDimSpatial=2.");
                 return false;
             }
         }
@@ -1011,23 +990,13 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
             if constexpr(!(is_NDHWGC_GKZYXC_NDHWGK<InLayout, WeiLayout, OutLayout>() ||
                            is_GNDHWC_GKZYXC_GNDHWK<InLayout, WeiLayout, OutLayout>()))
             {
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "Unsupported layout combination for NDimSpatial=3." << " In "
-                              << __FILE__ << ":" << __LINE__ << ", in function: " << __func__
-                              << std::endl;
-                }
+                ck::LogInfo("Unsupported layout combination for NDimSpatial=3.");
                 return false;
             }
         }
         else
         {
-            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-            {
-                std::cout << "Unsupported layout combination for NDimSpatial=" << NDimSpatial
-                          << "." << " In " << __FILE__ << ":" << __LINE__
-                          << ", in function: " << __func__ << std::endl;
-            }
+            ck::LogInfo("Unsupported layout combination for NDimSpatial=", NDimSpatial, ".");
             return false;
         }
 
@@ -1040,16 +1009,7 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
                 if(!(arg.filter_spatial_lengths_[i] == 1 && arg.conv_filter_strides_[i] == 1 &&
                      arg.input_left_pads_[i] == 0 && arg.input_right_pads_[i] == 0))
                 {
-                    if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                    {
-                        std::cout << "Filter1x1Stride1Pad0: dim " << i
-                                  << " does not match (filter="
-                                  << arg.filter_spatial_lengths_[i]
-                                  << ", stride=" << arg.conv_filter_strides_[i]
-                                  << ", pad=" << arg.input_left_pads_[i] << ")." << " In "
-                                  << __FILE__ << ":" << __LINE__
-                                  << ", in function: " << __func__ << std::endl;
-                    }
+                    ck::LogInfo("Filter1x1Stride1Pad0: dim ", i, " does not match (filter=", arg.filter_spatial_lengths_[i], ", stride=", arg.conv_filter_strides_[i], ", pad=", arg.input_left_pads_[i], ").");
                     return false;
                 }
             }
@@ -1060,16 +1020,7 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
              arg.Conv_K_ % ABlockTransferSrcScalarPerVector == 0 &&
              arg.Conv_C_ % BBlockTransferSrcScalarPerVector == 0))
         {
-            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-            {
-                std::cout << "Conv_K_=" << arg.Conv_K_
-                          << " or Conv_C_=" << arg.Conv_C_
-                          << " not multiple of ABlockTransferSrcScalarPerVector="
-                          << ABlockTransferSrcScalarPerVector
-                          << "/BBlockTransferSrcScalarPerVector="
-                          << BBlockTransferSrcScalarPerVector << "." << " In " << __FILE__ << ":"
-                          << __LINE__ << ", in function: " << __func__ << std::endl;
-            }
+            ck::LogInfo("Conv_K_=", arg.Conv_K_, " or Conv_C_=", arg.Conv_C_, " not multiple of ABlockTransferSrcScalarPerVector=", ABlockTransferSrcScalarPerVector, "/BBlockTransferSrcScalarPerVector=", BBlockTransferSrcScalarPerVector, ".");
             return false;
         }
 
@@ -1077,15 +1028,7 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
         if(!(arg.Conv_C_ % CBlockTransferScalarPerVector_NWaveNPerXdl == 0 &&
              arg.Conv_C_ % WorkspaceInOutScalarPerVector == 0))
         {
-            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-            {
-                std::cout << "Conv_C_=" << arg.Conv_C_
-                          << " not multiple of CBlockTransferScalarPerVector_NWaveNPerXdl="
-                          << CBlockTransferScalarPerVector_NWaveNPerXdl
-                          << " or WorkspaceInOutScalarPerVector=" << WorkspaceInOutScalarPerVector
-                          << "." << " In " << __FILE__ << ":" << __LINE__
-                          << ", in function: " << __func__ << std::endl;
-            }
+            ck::LogInfo("Conv_C_=", arg.Conv_C_, " not multiple of CBlockTransferScalarPerVector_NWaveNPerXdl=", CBlockTransferScalarPerVector_NWaveNPerXdl, " or WorkspaceInOutScalarPerVector=", WorkspaceInOutScalarPerVector, ".");
             return false;
         }
 
@@ -1110,13 +1053,7 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
                                                      arg.block_2_ctile_map_);
             }
         }
-        if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-        {
-            std::cout << "No valid Gridwise GEMM path (NXdlPerWave64=" << NXdlPerWave64
-                      << ", NXdlPerWave32=" << NXdlPerWave32
-                      << ", warp_size=" << get_warp_size() << ")." << " In " << __FILE__ << ":"
-                      << __LINE__ << ", in function: " << __func__ << std::endl;
-        }
+        ck::LogInfo("No valid Gridwise GEMM path (NXdlPerWave64=", NXdlPerWave64, ", NXdlPerWave32=", NXdlPerWave32, ", warp_size=", get_warp_size(), ").");
         return false;
     }
 
@@ -1279,6 +1216,7 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
                 "The argument pointer is not an object of "
                 "DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle::Argument structure!");
     }
+
 
 #ifdef CK_EXPERIMENTAL_BUILDER
     std::string GetInstanceString() const override

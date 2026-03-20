@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ck/utility/common_header.hpp"
+#include "ck/utility/logging.hpp"
 #include "ck/tensor_description/multi_index_transform_helper.hpp"
 #include "ck/tensor_description/tensor_descriptor.hpp"
 #include "ck/tensor_description/tensor_descriptor_helper.hpp"
@@ -361,6 +362,19 @@ struct GridwiseGemmMultipleABD_xdl_cshuffle
         // check consistency of desc
         if(!(M == e_grid_desc_m_n.GetLength(I0) && N == e_grid_desc_m_n.GetLength(I1) && AK == BK))
         {
+            ck::LogInfo("CheckValidity failed: descriptor inconsistency.",
+                              " M=",
+                              M,
+                              " E_M=",
+                              e_grid_desc_m_n.GetLength(I0),
+                              " N=",
+                              N,
+                              " E_N=",
+                              e_grid_desc_m_n.GetLength(I1),
+                              " AK=",
+                              AK,
+                              " BK=",
+                              BK);
             return false;
         }
 
@@ -390,12 +404,32 @@ struct GridwiseGemmMultipleABD_xdl_cshuffle
 
         if(!valid)
         {
+            ck::LogInfo("CheckValidity failed: A/B/D tensor size or dimension mismatch.",
+                              " M=",
+                              M,
+                              " N=",
+                              N,
+                              " AK=",
+                              AK);
             return false;
         }
 
         // check tile size
         if(!(M % MPerBlock == 0 && N % NPerBlock == 0 && AK % KPerBlock == 0))
         {
+            ck::LogInfo("CheckValidity failed: tile size divisibility.",
+                              " M=",
+                              M,
+                              " MPerBlock=",
+                              MPerBlock,
+                              " N=",
+                              N,
+                              " NPerBlock=",
+                              NPerBlock,
+                              " AK=",
+                              AK,
+                              " KPerBlock=",
+                              KPerBlock);
             return false;
         }
 
@@ -404,12 +438,20 @@ struct GridwiseGemmMultipleABD_xdl_cshuffle
 
         if(!GridwiseGemmPipe::IsSupported(num_k_loop))
         {
+            ck::LogInfo("CheckValidity failed: pipeline not supported.",
+                              " num_k_loop=",
+                              num_k_loop,
+                              " AK=",
+                              AK,
+                              " KPerBlock=",
+                              KPerBlock);
             return false;
         }
 
         // check block-to-E-tile
         if(!block_2_etile_map.CheckValidity(e_grid_desc_m_n))
         {
+            ck::LogInfo("CheckValidity failed: block_2_etile_map is invalid.");
             return false;
         }
 
@@ -418,6 +460,9 @@ struct GridwiseGemmMultipleABD_xdl_cshuffle
 
         if(!(e_grid_desc_m_n.GetElementSpaceSize() * sizeof(EDataType) <= TwoGB))
         {
+            ck::LogInfo("CheckValidity failed: E tensor size exceeds 2GB limit.",
+                              " E_bytes=",
+                              e_grid_desc_m_n.GetElementSpaceSize() * sizeof(EDataType));
             return false;
         }
 
