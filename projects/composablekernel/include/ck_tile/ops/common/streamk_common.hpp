@@ -268,7 +268,7 @@ StreamKDispatch(const TilePartitioner_& tile_partitioner, DPTileFunc dp_tile_fun
     {
         // Persistent: each workgroup loops over multiple DP tiles, then does SK work
         for(index_t tile_idx = block_idx; tile_idx < tile_partitioner.get_dp_tiles();
-            tile_idx += tile_partitioner.get_grid())
+            tile_idx += tile_partitioner.get_max_active_wgs())
         {
             dp_tile_func(tile_idx);
             block_sync_lds();

@@ -208,7 +208,7 @@ TEST(StreamKConvBwdWeight, KernelArgsConstruction_LinearPartitioner)
     EXPECT_GT(kargs.GemmM, 0);
     EXPECT_GT(kargs.GemmN, 0);
     EXPECT_GT(kargs.GemmK, 0);
-    EXPECT_GT(kargs.tile_partitioner.get_grid(), 0);
+    EXPECT_GT(kargs.tile_partitioner.get_max_active_wgs(), 0);
 }
 
 TEST(StreamKConvBwdWeight, KernelArgsConstruction_TreePartitioner)
@@ -223,7 +223,7 @@ TEST(StreamKConvBwdWeight, KernelArgsConstruction_TreePartitioner)
     EXPECT_GT(kargs.GemmM, 0);
     EXPECT_GT(kargs.GemmN, 0);
     EXPECT_GT(kargs.GemmK, 0);
-    EXPECT_GT(kargs.tile_partitioner.get_grid(), 0);
+    EXPECT_GT(kargs.tile_partitioner.get_max_active_wgs(), 0);
 }
 
 TEST(StreamKConvBwdWeight, GridSize)
