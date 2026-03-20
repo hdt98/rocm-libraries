@@ -36,6 +36,7 @@
 #include <rocRoller/KernelGraph/Transforms/OrderMemory.hpp>
 #include <rocRoller/KernelGraph/Transforms/OrderMultiplyNodes.hpp>
 #include <rocRoller/KernelGraph/Transforms/PrefetchScale.hpp>
+#include <rocRoller/KernelGraph/Transforms/RegisterUsageAnalysis.hpp>
 #include <rocRoller/KernelGraph/Transforms/RemapOutputTiles.hpp>
 #include <rocRoller/KernelGraph/Transforms/RemoveDuplicates.hpp>
 #include <rocRoller/KernelGraph/Transforms/RemoveImplicitScheduling.hpp>

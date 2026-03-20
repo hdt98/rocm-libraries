@@ -434,6 +434,7 @@ namespace rocRoller
         transforms.push_back(std::make_shared<KernelGraph::Simplify>());
         transforms.push_back(std::make_shared<KernelGraph::SortArguments>(m_context));
         transforms.push_back(std::make_shared<KernelGraph::SetWorkitemCount>(m_context));
+        transforms.push_back(std::make_shared<KernelGraph::RegisterUsageAnalysis>());
 
         for(auto const& t : transforms)
         {
