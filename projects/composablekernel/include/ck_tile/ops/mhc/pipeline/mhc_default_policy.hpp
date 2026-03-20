@@ -37,44 +37,6 @@ struct MHCDefaultPolicy
         return is_supported_type;
     }
 
-    // Helper to compute warp tile dimensions based on data type and block shape
-    template <typename ADataType, index_t kM, index_t kN, index_t kK>
-    CK_TILE_HOST_DEVICE static constexpr auto GetWarpTileDimensions()
-    {
-        // Standard warp tile size for MFMA operations
-        constexpr index_t kWarpM = 16;
-        constexpr index_t kWarpN = 16;
-
-        // K dimension varies by data type to match MFMA instruction capabilities
-        constexpr index_t kWarpK =
-            std::is_same_v<ADataType, float> ? 16 : // f32: 16x16x16
-                std::is_same_v<ADataType, bf16_t> ? (kK == 32 ? 32 : 16)
-                                                  : // bf16: 16x16x16 or 16x16x32
-                std::is_same_v<ADataType, half_t> ? (kK == 32 ? 32 : 16)
-                                                  : // fp16: 16x16x16 or 16x16x32
-                std::is_same_v<ADataType, fp8_t> ? (kK == 32 ? 32 : 16)
-                                                 : // fp8: 16x16x16 or 16x16x32
-                16;                                // default
-
-        return make_tuple(number<kWarpM>{}, number<kWarpN>{}, number<kWarpK>{});
-    }
-
-    // Helper to compute number of warps in M and N dimensions
-    template <index_t kM, index_t kN, index_t kWarpM, index_t kWarpN>
-    CK_TILE_HOST_DEVICE static constexpr auto GetNumWarps()
-    {
-        // Special case: asymmetric 16x32 block uses 2 warps in N dimension
-        if constexpr(kM == 16 && kN == 32)
-        {
-            return make_tuple(number<1>{}, number<2>{}); // 1 warp in M, 2 warps in N
-        }
-        else
-        {
-            // Standard case: 1 warp in both dimensions
-            return make_tuple(number<1>{}, number<1>{}); // 1 warp in M, 1 warp in N
-        }
-    }
-
     // Provide warp gemm configuration for various data types and block shapes
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto GetWarpGemmMWarpNWarp()
@@ -83,28 +45,22 @@ struct MHCDefaultPolicy
         using BDataType = typename Problem::BDataType;
         using CDataType = typename Problem::CDataType;
 
-        constexpr index_t kM = Problem::BlockGemmShape::kM;
-        constexpr index_t kN = Problem::BlockGemmShape::kN;
-        constexpr index_t kK = Problem::BlockGemmShape::kK;
-
         // Validate argument types:
         // Check if we support this configuration with MFMA
         static_assert(IsSupportedArguments<ADataType, BDataType, CDataType>(),
                       "MHC kernel requires: A and B must be the same type"
                       ", and C must be float");
 
-        // Get warp tile dimensions based on data type and block shape
-        constexpr auto warp_dims = GetWarpTileDimensions<ADataType, kM, kN, kK>();
-        constexpr index_t kWarpM = warp_dims.template at<0>().value;
-        constexpr index_t kWarpN = warp_dims.template at<1>().value;
-        constexpr index_t kWarpK = warp_dims.template at<2>().value;
+        // Read warp configuration directly from Problem's BlockGemmShape
+        // This allows the Problem definition to control the warp layout
+        constexpr index_t kWarpM = Problem::BlockGemmShape::WarpTile::at(number<0>{});
+        constexpr index_t kWarpN = Problem::BlockGemmShape::WarpTile::at(number<1>{});
+        constexpr index_t kWarpK = Problem::BlockGemmShape::WarpTile::at(number<2>{});
 
-        // Get number of warps in M and N dimensions
-        constexpr auto num_warps = GetNumWarps<kM, kN, kWarpM, kWarpN>();
-        constexpr index_t kMWarp = num_warps.template at<0>().value;
-        constexpr index_t kNWarp = num_warps.template at<1>().value;
+        constexpr index_t kMWarp = Problem::BlockGemmShape::BlockWarps::at(number<0>{});
+        constexpr index_t kNWarp = Problem::BlockGemmShape::BlockWarps::at(number<1>{});
 
-        // Create WarpGemm dispatcher with computed dimensions
+        // Create WarpGemm dispatcher with dimensions from BlockGemmShape
         using WG = WarpGemmDispatcher<ADataType,
                                       BDataType,
                                       CDataType,

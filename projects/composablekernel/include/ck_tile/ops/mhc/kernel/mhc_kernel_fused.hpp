@@ -16,6 +16,23 @@
 // This kernel uses the MhcGemmPipelineAgBgCrCompV3Fused pipeline which
 // supports optional fusion functions. This enables single-pass fusion of
 // operations like norm computation with the GEMM operation.
+//
+// The core design uses a 3-stage kernel:
+// 1. GEMM and normalization computation fused, using split-k as a way to increase compute
+// occupancy. This kernel is compute bound and represents the majority of the execution time
+// 2. Reduction of the partial results produced in step (1). This part is memory bound.
+// 3. Sinkhorn-Knopp kernel
+//
+// The motivation for these first 2 stages is given by the split-k constraints when executing on
+// multi-block requiring either atomic operations (potentially serializing execution) or splitting
+// the compute and reduction into separate kernels. While the split-k improves overall performance,
+// hence interesting to keep, this setup involves a round-trip between DRAM and registers and
+// constitutes a trade-off between no-split-k, split-k single kernel with atomics, or split-k with
+// extra reduction kernel.
+//
+// Avenues of improvements are:
+// * Better tuning tile size to input size, enabling better resource utilization and scalability.
+// * Experimenting with V4 Gemm async pipeline
 
 namespace ck_tile {
 

@@ -30,6 +30,10 @@ struct MHCProblemGemmDist
 
     static constexpr index_t kMTile = MTile_;
 
+    // Validate MTile value at compile time
+    static_assert(MTile_ == 16 || MTile_ == 32 || MTile_ == 64 || MTile_ == 128,
+                  "MHC kernel only supports MTile values of 16, 32, 64, or 128. ");
+
     // BlockGemmShape defines the warp grid and tile sizes
     // Use ONLY WarpTile configs supported by WarpGemmDispatcher for bf16!
     // M=16: 1 warp, WarpTile 16×16×32

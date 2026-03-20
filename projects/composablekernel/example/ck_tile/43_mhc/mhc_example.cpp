@@ -299,7 +299,7 @@ int main(int argc, char* argv[])
     std::cout << "║  MHC  - Test & Validation                                  ║" << std::endl;
     std::cout << "╚════════════════════════════════════════════════════════════╝" << std::endl;
 
-    // Run with BF16 inputs, float output and compute, M=32 tile
+    // Run with BF16 inputs, float output and compute, M=64 tile
     bool pass = run_mhc<ck_tile::bf16_t, // XDataType
                         ck_tile::bf16_t, // PhiDataType
                         float,           // YDataType
