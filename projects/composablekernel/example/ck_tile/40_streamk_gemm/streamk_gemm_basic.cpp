@@ -83,7 +83,7 @@ std::tuple<float, ck_tile::index_t> gemm(const ck_tile::StreamKHostArgs& args,
 
     using Kernel = ck_tile::StreamKKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
 
-    auto kernel_args          = Kernel::MakeKernelArgs(args);
+    auto kernel_args          = Kernel::MakeKernelArgs(args, stream_config);
     const auto workspace_size = Kernel::GetWorkSpaceSize(kernel_args);
     ck_tile::DeviceMem workspace_data(workspace_size);
     workspace_data.SetZero();

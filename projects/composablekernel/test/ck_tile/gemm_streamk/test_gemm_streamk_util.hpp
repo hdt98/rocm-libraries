@@ -141,7 +141,7 @@ class TestCkTileStreamK : public ::testing::Test
 
         using Kernel = ck_tile::StreamKKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
 
-        auto kargs                = Kernel::MakeKernelArgs(args);
+        auto kargs                = Kernel::MakeKernelArgs(args, s);
         const auto workspace_size = Kernel::GetWorkSpaceSize(kargs);
         ck_tile::DeviceMem workspace_data(workspace_size);
         workspace_data.SetZero();
