@@ -11,6 +11,7 @@
 //   - Fused epilogue: E = A*B + D0 with GemmArgs1D
 //   - Per-type tolerance for correctness verification
 
+#include "cpu_ref.hpp"
 #include "gemm_api.hpp"
 #include "gemm_args.hpp"
 
@@ -75,36 +76,6 @@ static constexpr GemmVariant ALL_GEMM_VARIANTS[] = {
 };
 
 // ============================================================================
-// CPU reference GEMM (always fp32)
-// ============================================================================
-
-/// Naive triple-loop CPU reference GEMM: C = A * B
-/// A [M x K] RowMajor, B [K x N] ColumnMajor, C [M x N] RowMajor.
-static void cpu_gemm(const float* a,
-                     const float* b,
-                     float* c,
-                     int M,
-                     int N,
-                     int K,
-                     int stride_A,
-                     int stride_B,
-                     int stride_C)
-{
-    for(int i = 0; i < M; ++i)
-    {
-        for(int j = 0; j < N; ++j)
-        {
-            float sum = 0.0f;
-            for(int k = 0; k < K; ++k)
-            {
-                sum += a[i * stride_A + k] * b[j * stride_B + k];
-            }
-            c[i * stride_C + j] = sum;
-        }
-    }
-}
-
-// ============================================================================
 // Main
 // ============================================================================
 
@@ -150,8 +121,7 @@ int main(int argc, char** argv)
 
     // Fused reference: E = A*B + D0
     std::vector<float> ref_add(M * N);
-    for(int i = 0; i < M * N; ++i)
-        ref_add[i] = ref_c[i] + ref_d0[i];
+    cpu_gemm_add(ref_add.data(), ref_c.data(), ref_d0.data(), M * N);
 
     // --- Run each variant ---
     bool all_passed  = true;

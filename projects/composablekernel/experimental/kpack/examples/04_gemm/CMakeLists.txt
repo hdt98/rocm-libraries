@@ -79,7 +79,7 @@ add_custom_target(gemm_kpack_archive ALL DEPENDS ${CMAKE_BINARY_DIR}/gemm.kpack)
 # --- Build the host-side loader executable ---
 # Links against hip::host (host-only HIP runtime) and rocm_kpack (archive reader).
 # Device code is loaded at runtime via hipModuleLoadData, not compiled into this binary.
-add_executable(kpack_gemm main.cpp)
+add_executable(kpack_gemm main.cpp cpu_ref.cpp)
 target_compile_features(kpack_gemm PRIVATE cxx_std_20)
 target_include_directories(kpack_gemm PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(kpack_gemm PRIVATE rocm_ck rocm_kpack hip::host)
