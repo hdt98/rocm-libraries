@@ -18,7 +18,9 @@
 
 #include <rocm_ck/datatype_utils.hpp>
 #include <rocm_ck/layout.hpp>
+#include <rocm_ck/tensor_desc.hpp>
 
+#include <array>
 #include <optional>
 
 namespace rocm_ck {
@@ -107,26 +109,25 @@ struct GemmConfig
 };
 
 // ============================================================================
-// Type resolution
+// Tensor resolution
 // ============================================================================
 
-/// Resolved types from a GemmSignature. All concrete, no optionals.
-struct ResolvedGemmTypes
+/// Resolved tensor descriptors and accumulator type from a GemmSignature.
+/// acc_dtype is not a tensor — it has no rank, no pointer, no direction.
+struct ResolvedGemmTensors
 {
-    DataType a_dtype;
-    DataType b_dtype;
-    DataType c_dtype;
+    std::array<TensorDesc, 3> tensors; // A, B, C
     DataType acc_dtype;
 };
 
-/// Resolve the optional dtype hierarchy into concrete types.
+/// Resolve the optional dtype hierarchy into concrete TensorDesc entries.
 ///
 /// Resolution chains:
 ///   a_dtype   = a_dtype   ?? dtype ?? error
 ///   b_dtype   = b_dtype   ?? dtype ?? error
 ///   c_dtype   = c_dtype   ?? dtype ?? error
 ///   acc_dtype = acc_dtype  ?? FP32
-consteval ResolvedGemmTypes resolve_types(GemmSignature sig)
+consteval ResolvedGemmTensors resolve_tensors(GemmSignature sig)
 {
     DataType a = sig.a_dtype ? *sig.a_dtype
                  : sig.dtype ? *sig.dtype
@@ -142,7 +143,10 @@ consteval ResolvedGemmTypes resolve_types(GemmSignature sig)
 
     DataType acc = sig.acc_dtype ? *sig.acc_dtype : DataType::FP32;
 
-    return {a, b, c, acc};
+    return {{TensorDesc{"A", a, 2, TensorDir::In, false},
+             TensorDesc{"B", b, 2, TensorDir::In, false},
+             TensorDesc{"C", c, 2, TensorDir::Out, false}},
+            acc};
 }
 
 // ============================================================================
@@ -269,9 +273,9 @@ struct GemmKernel
 /// Derives thread_block_size = block_warps.m × block_warps.n × block_warps.k × 64.
 consteval GemmKernel make_kernel(GemmConfig cfg)
 {
-    ResolvedGemmTypes types   = resolve_types(cfg.signature);
-    ResolvedEpilogue epilogue = resolve_epilogue(cfg.signature);
-    GemmAlgorithm algo        = cfg.algorithm;
+    ResolvedGemmTensors resolved = resolve_tensors(cfg.signature);
+    ResolvedEpilogue epilogue    = resolve_epilogue(cfg.signature);
+    GemmAlgorithm algo           = cfg.algorithm;
 
     if(algo.block_tile.m <= 0 || algo.block_tile.n <= 0 || algo.block_tile.k <= 0)
         throw "block_tile dimensions must be positive";
@@ -283,7 +287,8 @@ consteval GemmKernel make_kernel(GemmConfig cfg)
     if(algo.block_warps.k != 1)
         throw "block_warps.k must be 1 (CShuffleEpilogue constraint)";
 
-    if(!is_valid_warp_gemm(types.a_dtype, algo.warp_tile.m, algo.warp_tile.n, algo.warp_tile.k))
+    if(!is_valid_warp_gemm(
+           resolved.tensors[0].dtype, algo.warp_tile.m, algo.warp_tile.n, algo.warp_tile.k))
         throw "warp_tile is not a valid MFMA configuration for this dtype";
 
     if(algo.block_tile.m % (algo.block_warps.m * algo.warp_tile.m) != 0)
@@ -296,10 +301,10 @@ consteval GemmKernel make_kernel(GemmConfig cfg)
     int thread_block_size =
         algo.block_warps.m * algo.block_warps.n * algo.block_warps.k * warp_size;
 
-    return {types.a_dtype,
-            types.b_dtype,
-            types.c_dtype,
-            types.acc_dtype,
+    return {resolved.tensors[0].dtype,
+            resolved.tensors[1].dtype,
+            resolved.tensors[2].dtype,
+            resolved.acc_dtype,
             cfg.signature.a_layout,
             cfg.signature.b_layout,
             cfg.signature.c_layout,
@@ -316,42 +321,53 @@ consteval GemmKernel make_kernel(GemmConfig cfg)
 }
 
 // ============================================================================
-// resolve_types compile-time tests
+// resolve_tensors compile-time tests
 // ============================================================================
 // clang-format off
 
 // --- Homogeneous: dtype sets everything ---
-static_assert(resolve_types({.dtype = DataType::FP32}).a_dtype == DataType::FP32);
-static_assert(resolve_types({.dtype = DataType::FP32}).b_dtype == DataType::FP32);
-static_assert(resolve_types({.dtype = DataType::FP32}).c_dtype == DataType::FP32);
+static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[0].dtype == DataType::FP32);
+static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[1].dtype == DataType::FP32);
+static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[2].dtype == DataType::FP32);
 
-static_assert(resolve_types({.dtype = DataType::FP16}).a_dtype == DataType::FP16);
-static_assert(resolve_types({.dtype = DataType::FP16}).c_dtype == DataType::FP16);
+static_assert(resolve_tensors({.dtype = DataType::FP16}).tensors[0].dtype == DataType::FP16);
+static_assert(resolve_tensors({.dtype = DataType::FP16}).tensors[2].dtype == DataType::FP16);
 
-static_assert(resolve_types({.dtype = DataType::BF16}).a_dtype == DataType::BF16);
-static_assert(resolve_types({.dtype = DataType::BF16}).c_dtype == DataType::BF16);
+static_assert(resolve_tensors({.dtype = DataType::BF16}).tensors[0].dtype == DataType::BF16);
+static_assert(resolve_tensors({.dtype = DataType::BF16}).tensors[2].dtype == DataType::BF16);
 
 // --- acc_dtype defaults to FP32, regardless of dtype ---
-static_assert(resolve_types({.dtype = DataType::FP16}).acc_dtype == DataType::FP32);
-static_assert(resolve_types({.dtype = DataType::BF16}).acc_dtype == DataType::FP32);
-static_assert(resolve_types({.dtype = DataType::FP32}).acc_dtype == DataType::FP32);
+static_assert(resolve_tensors({.dtype = DataType::FP16}).acc_dtype == DataType::FP32);
+static_assert(resolve_tensors({.dtype = DataType::BF16}).acc_dtype == DataType::FP32);
+static_assert(resolve_tensors({.dtype = DataType::FP32}).acc_dtype == DataType::FP32);
 
 // --- acc_dtype override ---
-static_assert(resolve_types({.dtype = DataType::FP16, .acc_dtype = DataType::FP16}).acc_dtype == DataType::FP16);
+static_assert(resolve_tensors({.dtype = DataType::FP16, .acc_dtype = DataType::FP16}).acc_dtype == DataType::FP16);
 
 // --- Per-operand overrides ---
-static_assert(resolve_types({.dtype = DataType::FP32, .a_dtype = DataType::FP16}).a_dtype == DataType::FP16);
-static_assert(resolve_types({.dtype = DataType::FP32, .a_dtype = DataType::FP16}).b_dtype == DataType::FP32);
+static_assert(resolve_tensors({.dtype = DataType::FP32, .a_dtype = DataType::FP16}).tensors[0].dtype == DataType::FP16);
+static_assert(resolve_tensors({.dtype = DataType::FP32, .a_dtype = DataType::FP16}).tensors[1].dtype == DataType::FP32);
 
 // --- Mixed-type widening: fp16 inputs, fp32 output ---
-static_assert(resolve_types({.dtype = DataType::FP16, .c_dtype = DataType::FP32}).a_dtype == DataType::FP16);
-static_assert(resolve_types({.dtype = DataType::FP16, .c_dtype = DataType::FP32}).c_dtype == DataType::FP32);
-static_assert(resolve_types({.dtype = DataType::FP16, .c_dtype = DataType::FP32}).acc_dtype == DataType::FP32);
+static_assert(resolve_tensors({.dtype = DataType::FP16, .c_dtype = DataType::FP32}).tensors[0].dtype == DataType::FP16);
+static_assert(resolve_tensors({.dtype = DataType::FP16, .c_dtype = DataType::FP32}).tensors[2].dtype == DataType::FP32);
+static_assert(resolve_tensors({.dtype = DataType::FP16, .c_dtype = DataType::FP32}).acc_dtype == DataType::FP32);
+
+// --- TensorDesc metadata: name, rank, direction ---
+static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[0].name == "A");
+static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[1].name == "B");
+static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[2].name == "C");
+static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[0].rank == 2);
+static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[2].rank == 2);
+static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[0].direction == TensorDir::In);
+static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[1].direction == TensorDir::In);
+static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[2].direction == TensorDir::Out);
+static_assert(!resolve_tensors({.dtype = DataType::FP32}).tensors[0].optional);
 
 // Error cases (uncommenting any would produce consteval compile errors):
-// resolve_types({})                                    — nothing resolvable
-// resolve_types({.a_dtype = DataType::FP16})           — b, c unknown
-// resolve_types({.c_dtype = DataType::FP32})           — a, b unknown
+// resolve_tensors({})                                    — nothing resolvable
+// resolve_tensors({.a_dtype = DataType::FP16})           — b, c unknown
+// resolve_tensors({.c_dtype = DataType::FP32})           — a, b unknown
 
 // ============================================================================
 // is_valid_warp_gemm compile-time tests
