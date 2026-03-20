@@ -69,6 +69,26 @@ static int dtype_output_bytes(const char* dtype)
     return 2; // fp16, bf16, fp8bf16 (output is bf16)
 }
 
+// Run the single registered kernel directly, bypassing the multi-stage plan()
+// that requires split+combine for splitkv or dot+dq+convert for bwd.
+// Used for single-kernel .so benchmarking.
+static float run_single_kernel(const FmhaInvocation& invocation)
+{
+    auto kernels = g_registry->get_all();
+    if(kernels.empty())
+    {
+        throw std::runtime_error("No FMHA kernels registered");
+    }
+    ck_tile::stream_config sc;
+    sc.log_level_ = 0;
+    if(g_dispatcher)
+    {
+        sc.time_kernel_ = true;
+        sc.nrepeat_     = 3;
+    }
+    return kernels.front()->run(invocation, sc);
+}
+
 extern "C" {
 
 int fmha_dispatcher_initialize(const char* arch)
@@ -138,7 +158,7 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     float elapsed           = 0.0f;
 
     void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
-    void *bias_dev = nullptr, *lse_dev_buf = nullptr;
+    void *bias_dev = nullptr, *lse_dev_buf = nullptr, *sink_dev_fwd = nullptr;
     void *seqstart_q_dev = nullptr, *seqstart_k_dev = nullptr, *seqlen_k_dev = nullptr;
 
     fmha_fwd_traits traits{};
@@ -200,6 +220,11 @@ int fmha_dispatcher_run_fwd(const void* q_host,
         HIP_CHECK(hipMalloc(&lse_dev_buf, lse_bytes));
         HIP_CHECK(hipMemset(lse_dev_buf, 0, lse_bytes));
     }
+    if(has_sink)
+    {
+        HIP_CHECK(hipMalloc(&sink_dev_fwd, nhead_q * sizeof(float)));
+        HIP_CHECK(hipMemset(sink_dev_fwd, 0, nhead_q * sizeof(float)));
+    }
 
     args.q_ptr                      = q_dev;
     args.k_ptr                      = k_dev;
@@ -215,7 +240,7 @@ int fmha_dispatcher_run_fwd(const void* q_host,
     args.seqstart_k_ptr             = seqstart_k_dev;
     args.seqlen_q_ptr               = nullptr;
     args.seqlen_k_ptr               = seqlen_k_dev;
-    args.sink_ptr                   = nullptr;
+    args.sink_ptr                   = sink_dev_fwd;
     args.block_scale_seqstart_q_ptr = nullptr;
     args.block_scale_seqstart_k_ptr = nullptr;
 
@@ -307,11 +332,17 @@ int fmha_dispatcher_run_fwd(const void* q_host,
 
     try
     {
-        elapsed = g_dispatcher->run_fwd(traits, args, nullptr);
+        auto invocation = FmhaInvocation::make(std::move(traits), std::move(args));
+        if(g_registry->size() == 1)
+            elapsed = run_single_kernel(invocation);
+        else
+            elapsed = g_dispatcher->run_fwd(std::get<fmha_fwd_traits>(invocation.traits),
+                                            std::get<fmha_fwd_args>(invocation.args),
+                                            nullptr);
     }
     catch(const std::exception& e)
     {
-        fprintf(stderr, "FMHA_ERR: %s\n", e.what());
+        fprintf(stderr, "FMHA_FWD_ERR: %s\n", e.what());
         rc = -2;
         goto cleanup;
     }
@@ -338,6 +369,7 @@ cleanup:
     safe_hip_free(o_dev);
     safe_hip_free(bias_dev);
     safe_hip_free(lse_dev_buf);
+    safe_hip_free(sink_dev_fwd);
     safe_hip_free(seqstart_q_dev);
     safe_hip_free(seqstart_k_dev);
     safe_hip_free(seqlen_k_dev);
@@ -363,6 +395,12 @@ int fmha_dispatcher_run_bwd(const void* q_host,
                             int hdim_v,
                             float scale,
                             const char* data_type_str,
+                            int mask_type_int,
+                            int bias_type_int,
+                            int has_dropout,
+                            int has_dbias,
+                            int is_deterministic,
+                            int is_group_mode,
                             float* time_ms_out)
 {
     if(!g_initialized)
@@ -386,21 +424,34 @@ int fmha_dispatcher_run_bwd(const void* q_host,
         static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * sizeof(float);
     float elapsed = 0.0f;
 
+    const bool bwd_grp = (is_group_mode != 0);
+
     void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
     void *lse_dev = nullptr, *do_dev = nullptr, *d_dev = nullptr;
     void *dq_dev = nullptr, *dk_dev = nullptr, *dv_dev = nullptr, *dq_acc_dev = nullptr;
+    void *bwd_seqstart_q_dev = nullptr, *bwd_seqstart_k_dev = nullptr, *bwd_seqlen_k_dev = nullptr;
+
+    std::vector<int> bwd_sq(batch + 1), bwd_sk(batch + 1), bwd_skl(batch, seqlen_k);
+    if(bwd_grp)
+    {
+        for(int b = 0; b <= batch; ++b)
+        {
+            bwd_sq[b] = b * seqlen_q;
+            bwd_sk[b] = b * seqlen_k;
+        }
+    }
 
     fmha_bwd_traits traits{};
     traits.hdim_q           = hdim_q;
     traits.hdim_v           = hdim_v;
     traits.data_type        = data_type_str ? data_type_str : "fp16";
-    traits.is_group_mode    = false;
-    traits.mask_type        = mask_enum::no_mask;
-    traits.bias_type        = bias_enum::no_bias;
-    traits.has_dbias        = false;
-    traits.has_dropout      = false;
+    traits.is_group_mode    = (is_group_mode != 0);
+    traits.mask_type        = static_cast<mask_enum>(mask_type_int);
+    traits.bias_type        = static_cast<bias_enum>(bias_type_int);
+    traits.has_dbias        = (has_dbias != 0);
+    traits.has_dropout      = (has_dropout != 0);
     traits.is_store_randval = false;
-    traits.is_deterministic = false;
+    traits.is_deterministic = (is_deterministic != 0);
 
     fmha_bwd_args args{};
 
@@ -415,6 +466,19 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     HIP_CHECK(hipMalloc(&dk_dev, dk_bytes));
     HIP_CHECK(hipMalloc(&dv_dev, dv_bytes));
     HIP_CHECK(hipMalloc(&dq_acc_dev, dq_acc_bytes));
+
+    if(bwd_grp)
+    {
+        HIP_CHECK(hipMalloc(&bwd_seqstart_q_dev, (batch + 1) * sizeof(int)));
+        HIP_CHECK(hipMalloc(&bwd_seqstart_k_dev, (batch + 1) * sizeof(int)));
+        HIP_CHECK(hipMalloc(&bwd_seqlen_k_dev, batch * sizeof(int)));
+        HIP_CHECK(hipMemcpy(
+            bwd_seqstart_q_dev, bwd_sq.data(), (batch + 1) * sizeof(int), hipMemcpyHostToDevice));
+        HIP_CHECK(hipMemcpy(
+            bwd_seqstart_k_dev, bwd_sk.data(), (batch + 1) * sizeof(int), hipMemcpyHostToDevice));
+        HIP_CHECK(hipMemcpy(
+            bwd_seqlen_k_dev, bwd_skl.data(), batch * sizeof(int), hipMemcpyHostToDevice));
+    }
 
     HIP_CHECK(hipMemcpy(q_dev, q_host, q_bytes, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(k_dev, k_host, k_bytes, hipMemcpyHostToDevice));
@@ -454,62 +518,124 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     args.nhead_k      = nhead_k;
     args.scale        = scale;
 
-    // bhsd strides (cast first operand to int64_t to prevent int32 overflow)
-    args.stride_q       = hdim_q;
-    args.stride_k       = hdim_q;
-    args.stride_v       = hdim_v;
-    args.stride_bias    = 0;
-    args.stride_o       = hdim_v;
-    args.stride_randval = 0;
-    args.stride_do      = hdim_v;
-    args.stride_dq_acc  = hdim_q;
-    args.stride_dq      = hdim_q;
-    args.stride_dk      = hdim_q;
-    args.stride_dv      = hdim_v;
-    args.stride_dbias   = 0;
+    if(bwd_grp)
+    {
+        // Group-mode: [total_tokens, nhead, hdim]
+        args.stride_q             = nhead_q * hdim_q;
+        args.stride_k             = nhead_k * hdim_q;
+        args.stride_v             = nhead_k * hdim_v;
+        args.stride_bias          = 0;
+        args.stride_o             = nhead_q * hdim_v;
+        args.stride_randval       = 0;
+        args.stride_do            = nhead_q * hdim_v;
+        args.stride_dq_acc        = hdim_q;
+        args.stride_dq            = nhead_q * hdim_q;
+        args.stride_dk            = nhead_k * hdim_q;
+        args.stride_dv            = nhead_k * hdim_v;
+        args.stride_dbias         = 0;
+        args.nhead_stride_q       = hdim_q;
+        args.nhead_stride_k       = hdim_q;
+        args.nhead_stride_v       = hdim_v;
+        args.nhead_stride_bias    = 0;
+        args.nhead_stride_o       = hdim_v;
+        args.nhead_stride_randval = 0;
+        args.nhead_stride_do      = hdim_v;
+        args.nhead_stride_lsed    = seqlen_q;
+        args.nhead_stride_dq_acc  = static_cast<ck_tile::long_index_t>(seqlen_q) * hdim_q;
+        args.nhead_stride_dq      = hdim_q;
+        args.nhead_stride_dk      = hdim_q;
+        args.nhead_stride_dv      = hdim_v;
+        args.nhead_stride_dbias   = 0;
+        args.batch_stride_q       = 0;
+        args.batch_stride_k       = 0;
+        args.batch_stride_v       = 0;
+        args.batch_stride_bias    = 0;
+        args.batch_stride_o       = 0;
+        args.batch_stride_randval = 0;
+        args.batch_stride_do      = 0;
+        args.batch_stride_lsed    = static_cast<int64_t>(nhead_q) * seqlen_q;
+        args.batch_stride_dq_acc  = static_cast<ck_tile::long_index_t>(nhead_q) * seqlen_q * hdim_q;
+        args.batch_stride_dq      = 0;
+        args.batch_stride_dk      = 0;
+        args.batch_stride_dv      = 0;
+        args.batch_stride_dbias   = 0;
+        args.split_stride_dq_acc  = 0;
+    }
+    else
+    {
+        // BHSD strides
+        args.stride_q             = hdim_q;
+        args.stride_k             = hdim_q;
+        args.stride_v             = hdim_v;
+        args.stride_bias          = 0;
+        args.stride_o             = hdim_v;
+        args.stride_randval       = 0;
+        args.stride_do            = hdim_v;
+        args.stride_dq_acc        = hdim_q;
+        args.stride_dq            = hdim_q;
+        args.stride_dk            = hdim_q;
+        args.stride_dv            = hdim_v;
+        args.stride_dbias         = 0;
+        args.nhead_stride_q       = static_cast<int64_t>(seqlen_q) * hdim_q;
+        args.nhead_stride_k       = static_cast<int64_t>(seqlen_k) * hdim_q;
+        args.nhead_stride_v       = static_cast<int64_t>(seqlen_k) * hdim_v;
+        args.nhead_stride_bias    = 0;
+        args.nhead_stride_o       = static_cast<int64_t>(seqlen_q) * hdim_v;
+        args.nhead_stride_randval = 0;
+        args.nhead_stride_do      = static_cast<int64_t>(seqlen_q) * hdim_v;
+        args.nhead_stride_lsed    = seqlen_q;
+        args.nhead_stride_dq_acc  = static_cast<ck_tile::long_index_t>(seqlen_q) * hdim_q;
+        args.nhead_stride_dq      = static_cast<int64_t>(seqlen_q) * hdim_q;
+        args.nhead_stride_dk      = static_cast<int64_t>(seqlen_k) * hdim_q;
+        args.nhead_stride_dv      = static_cast<int64_t>(seqlen_k) * hdim_v;
+        args.nhead_stride_dbias   = 0;
+        args.batch_stride_q       = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
+        args.batch_stride_k       = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_q;
+        args.batch_stride_v       = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_v;
+        args.batch_stride_bias    = 0;
+        args.batch_stride_o       = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
+        args.batch_stride_randval = 0;
+        args.batch_stride_do      = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
+        args.batch_stride_lsed    = static_cast<int64_t>(nhead_q) * seqlen_q;
+        args.batch_stride_dq_acc  = static_cast<ck_tile::long_index_t>(nhead_q) * seqlen_q * hdim_q;
+        args.batch_stride_dq      = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
+        args.batch_stride_dk      = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_q;
+        args.batch_stride_dv      = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_v;
+        args.batch_stride_dbias   = 0;
+        args.split_stride_dq_acc  = 0;
+    }
 
-    args.nhead_stride_q       = static_cast<int64_t>(seqlen_q) * hdim_q;
-    args.nhead_stride_k       = static_cast<int64_t>(seqlen_k) * hdim_q;
-    args.nhead_stride_v       = static_cast<int64_t>(seqlen_k) * hdim_v;
-    args.nhead_stride_bias    = 0;
-    args.nhead_stride_o       = static_cast<int64_t>(seqlen_q) * hdim_v;
-    args.nhead_stride_randval = 0;
-    args.nhead_stride_do      = static_cast<int64_t>(seqlen_q) * hdim_v;
-    args.nhead_stride_lsed    = seqlen_q;
-    args.nhead_stride_dq_acc  = static_cast<ck_tile::long_index_t>(seqlen_q) * hdim_q;
-    args.nhead_stride_dq      = static_cast<int64_t>(seqlen_q) * hdim_q;
-    args.nhead_stride_dk      = static_cast<int64_t>(seqlen_k) * hdim_q;
-    args.nhead_stride_dv      = static_cast<int64_t>(seqlen_k) * hdim_v;
-    args.nhead_stride_dbias   = 0;
-
-    args.batch_stride_q       = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
-    args.batch_stride_k       = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_q;
-    args.batch_stride_v       = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_v;
-    args.batch_stride_bias    = 0;
-    args.batch_stride_o       = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
-    args.batch_stride_randval = 0;
-    args.batch_stride_do      = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
-    args.batch_stride_lsed    = static_cast<int64_t>(nhead_q) * seqlen_q;
-    args.batch_stride_dq_acc  = static_cast<ck_tile::long_index_t>(nhead_q) * seqlen_q * hdim_q;
-    args.batch_stride_dq      = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
-    args.batch_stride_dk      = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_q;
-    args.batch_stride_dv      = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_v;
-    args.batch_stride_dbias   = 0;
-    args.split_stride_dq_acc  = 0;
+    args.seqstart_q_ptr = bwd_seqstart_q_dev;
+    args.seqstart_k_ptr = bwd_seqstart_k_dev;
+    args.seqlen_k_ptr   = bwd_seqlen_k_dev;
 
     args.window_size_left  = -1;
     args.window_size_right = -1;
-    args.mask_type         = 0;
-    args.p_drop            = 0.0f;
-    args.p_undrop          = 1.0f;
-    args.drop_seed_offset  = std::make_pair(uint64_t(0), uint64_t(0));
+    args.mask_type         = mask_type_int;
+    args.p_drop            = has_dropout ? 0.2f : 0.0f;
+    args.p_undrop          = has_dropout ? (1.0f / (1.0f - 0.2f)) : 1.0f;
+    args.drop_seed_offset  = has_dropout ? std::make_pair(uint64_t(1), uint64_t(0))
+                                         : std::make_pair(uint64_t(0), uint64_t(0));
 
     try
     {
-        elapsed = g_dispatcher->run_bwd(traits, args, nullptr);
+        auto invocation = FmhaInvocation::make(std::move(traits), std::move(args));
+        if(g_registry->size() == 1)
+            elapsed = run_single_kernel(invocation);
+        else
+            elapsed = g_dispatcher->run_bwd(std::get<fmha_bwd_traits>(invocation.traits),
+                                            std::get<fmha_bwd_args>(invocation.args),
+                                            nullptr);
+    }
+    catch(const std::exception& e)
+    {
+        fprintf(stderr, "FMHA_BWD_ERR: %s\n", e.what());
+        rc = -2;
+        goto cleanup;
     }
     catch(...)
     {
+        fprintf(stderr, "FMHA_BWD_ERR: unknown\n");
         rc = -2;
         goto cleanup;
     }
@@ -537,6 +663,9 @@ cleanup:
     safe_hip_free(dk_dev);
     safe_hip_free(dv_dev);
     safe_hip_free(dq_acc_dev);
+    safe_hip_free(bwd_seqstart_q_dev);
+    safe_hip_free(bwd_seqstart_k_dev);
+    safe_hip_free(bwd_seqlen_k_dev);
 
     return rc;
 }
@@ -562,6 +691,12 @@ int fmha_dispatcher_run_splitkv(const void* q_host,
                                 int is_v_rowmajor,
                                 const char* data_type_str,
                                 int has_lse,
+                                int is_group_mode,
+                                int has_logits,
+                                int bias_type_int,
+                                int has_sink,
+                                int paged_kv,
+                                int page_block_size,
                                 float* time_ms_out)
 {
     if(!g_initialized)
@@ -582,19 +717,44 @@ int fmha_dispatcher_run_splitkv(const void* q_host,
         static_cast<int64_t>(num_splits) * batch * nhead_q * seqlen_q * sizeof(float);
     float elapsed = 0.0f;
 
+    const bool grp = (is_group_mode != 0);
+
+    const bool is_paged = (paged_kv != 0);
+    if(is_paged && page_block_size <= 0)
+        page_block_size = 64;
+    const int pages_per_seq = is_paged ? (seqlen_k + page_block_size - 1) / page_block_size : 0;
+    const int total_pages   = is_paged ? batch * pages_per_seq : 0;
+
     void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
     void *o_acc_dev = nullptr, *lse_dev = nullptr, *lse_acc_dev = nullptr;
+    void *seqstart_q_dev = nullptr, *seqstart_k_dev = nullptr, *seqlen_k_dev = nullptr;
+    void *block_table_dev = nullptr, *bias_dev = nullptr, *sink_dev = nullptr;
+
+    // Declare vectors before any HIP_CHECK to avoid goto-over-init
+    std::vector<int> sq_starts(batch + 1), sk_starts(batch + 1), sk_lens(batch, seqlen_k);
+    std::vector<int> block_table(total_pages);
+    for(int i = 0; i < total_pages; ++i)
+        block_table[i] = i;
+    if(grp)
+    {
+        for(int b = 0; b <= batch; ++b)
+        {
+            sq_starts[b] = b * seqlen_q;
+            sk_starts[b] = b * seqlen_k;
+        }
+    }
 
     fmha_fwd_splitkv_traits traits{};
     traits.hdim_q              = hdim_q;
     traits.hdim_v              = hdim_v;
     traits.data_type           = data_type_str ? data_type_str : "fp16";
-    traits.is_group_mode       = false;
+    traits.is_group_mode       = grp;
     traits.is_v_rowmajor       = (is_v_rowmajor != 0);
-    traits.has_logits_soft_cap = false;
+    traits.has_logits_soft_cap = (has_logits != 0);
     traits.mask_type           = static_cast<mask_enum>(mask_type_int);
-    traits.bias_type           = bias_enum::no_bias;
+    traits.bias_type           = static_cast<bias_enum>(bias_type_int);
     traits.has_lse             = (has_lse != 0);
+    traits.has_sink            = (has_sink != 0);
 
     fmha_fwd_splitkv_args args{};
 
@@ -606,6 +766,26 @@ int fmha_dispatcher_run_splitkv(const void* q_host,
     HIP_CHECK(hipMalloc(&lse_dev, lse_bytes));
     HIP_CHECK(hipMalloc(&lse_acc_dev, lse_acc_bytes));
 
+    if(is_paged)
+    {
+        HIP_CHECK(hipMalloc(&block_table_dev, total_pages * sizeof(int)));
+        HIP_CHECK(hipMemcpy(
+            block_table_dev, block_table.data(), total_pages * sizeof(int), hipMemcpyHostToDevice));
+    }
+
+    if(grp || is_paged)
+    {
+        HIP_CHECK(hipMalloc(&seqstart_q_dev, (batch + 1) * sizeof(int)));
+        HIP_CHECK(hipMalloc(&seqstart_k_dev, (batch + 1) * sizeof(int)));
+        HIP_CHECK(hipMalloc(&seqlen_k_dev, batch * sizeof(int)));
+        HIP_CHECK(hipMemcpy(
+            seqstart_q_dev, sq_starts.data(), (batch + 1) * sizeof(int), hipMemcpyHostToDevice));
+        HIP_CHECK(hipMemcpy(
+            seqstart_k_dev, sk_starts.data(), (batch + 1) * sizeof(int), hipMemcpyHostToDevice));
+        HIP_CHECK(
+            hipMemcpy(seqlen_k_dev, sk_lens.data(), batch * sizeof(int), hipMemcpyHostToDevice));
+    }
+
     HIP_CHECK(hipMemcpy(q_dev, q_host, q_bytes, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(k_dev, k_host, k_bytes, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(v_dev, v_host, v_bytes, hipMemcpyHostToDevice));
@@ -614,23 +794,38 @@ int fmha_dispatcher_run_splitkv(const void* q_host,
     HIP_CHECK(hipMemset(lse_dev, 0, lse_bytes));
     HIP_CHECK(hipMemset(lse_acc_dev, 0, lse_acc_bytes));
 
+    if(bias_type_int > 0)
+    {
+        const int64_t bias_bytes =
+            (bias_type_int == 2) // alibi: [batch, nhead] slope values
+                ? static_cast<int64_t>(batch) * nhead_q * sizeof(float)
+                : static_cast<int64_t>(batch) * nhead_q * seqlen_q * seqlen_k * out_bytes;
+        HIP_CHECK(hipMalloc(&bias_dev, bias_bytes));
+        HIP_CHECK(hipMemset(bias_dev, 0, bias_bytes));
+    }
+    if(has_sink)
+    {
+        HIP_CHECK(hipMalloc(&sink_dev, nhead_q * sizeof(float)));
+        HIP_CHECK(hipMemset(sink_dev, 0, nhead_q * sizeof(float)));
+    }
+
     args.q_ptr                    = q_dev;
     args.k_ptr                    = k_dev;
     args.v_ptr                    = v_dev;
-    args.bias_ptr                 = nullptr;
+    args.bias_ptr                 = bias_dev;
     args.lse_acc_ptr              = lse_acc_dev;
     args.o_acc_ptr                = o_acc_dev;
     args.lse_ptr                  = lse_dev;
     args.o_ptr                    = o_dev;
-    args.block_table_ptr          = nullptr;
-    args.batch_stride_block_table = 0;
-    args.page_block_size          = 0;
+    args.block_table_ptr          = block_table_dev;
+    args.batch_stride_block_table = is_paged ? pages_per_seq : 0;
+    args.page_block_size          = is_paged ? page_block_size : 0;
     args.is_gappy                 = false;
     args.cache_batch_idx          = nullptr;
-    args.seqstart_q_ptr           = nullptr;
-    args.seqstart_k_ptr           = nullptr;
-    args.seqlen_k_ptr             = nullptr;
-    args.sink_ptr                 = nullptr;
+    args.seqstart_q_ptr           = seqstart_q_dev;
+    args.seqstart_k_ptr           = seqstart_k_dev;
+    args.seqlen_k_ptr             = seqlen_k_dev;
+    args.sink_ptr                 = sink_dev;
     args.seqlen_q                 = seqlen_q;
     args.seqlen_k                 = seqlen_k;
     args.batch                    = batch;
@@ -645,29 +840,59 @@ int fmha_dispatcher_run_splitkv(const void* q_host,
     args.scale_o                  = 1.0f;
     args.logits_soft_cap          = 0.0f;
 
-    // BHSD strides
-    args.stride_q             = hdim_q;
-    args.stride_k             = hdim_q;
-    args.stride_v             = hdim_v;
-    args.stride_bias          = 0;
-    args.stride_o_acc         = hdim_v;
-    args.stride_o             = hdim_v;
-    args.nhead_stride_q       = static_cast<int64_t>(seqlen_q) * hdim_q;
-    args.nhead_stride_k       = static_cast<int64_t>(seqlen_k) * hdim_q;
-    args.nhead_stride_v       = static_cast<int64_t>(seqlen_k) * hdim_v;
-    args.nhead_stride_bias    = 0;
-    args.nhead_stride_lse     = seqlen_q;
-    args.nhead_stride_lse_acc = seqlen_q;
-    args.nhead_stride_o_acc   = static_cast<int64_t>(seqlen_q) * hdim_v;
-    args.nhead_stride_o       = static_cast<int64_t>(seqlen_q) * hdim_v;
-    args.batch_stride_q       = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
-    args.batch_stride_k       = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_q;
-    args.batch_stride_v       = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_v;
-    args.batch_stride_bias    = 0;
-    args.batch_stride_lse     = static_cast<int64_t>(nhead_q) * seqlen_q;
-    args.batch_stride_lse_acc = static_cast<int64_t>(nhead_q) * seqlen_q;
-    args.batch_stride_o_acc   = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
-    args.batch_stride_o       = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
+    if(grp)
+    {
+        // Group-mode: [total_tokens, nhead, hdim]
+        args.stride_q             = nhead_q * hdim_q;
+        args.stride_k             = nhead_k * hdim_q;
+        args.stride_v             = nhead_k * hdim_v;
+        args.stride_bias          = 0;
+        args.stride_o_acc         = hdim_v;
+        args.stride_o             = nhead_q * hdim_v;
+        args.nhead_stride_q       = hdim_q;
+        args.nhead_stride_k       = hdim_q;
+        args.nhead_stride_v       = hdim_v;
+        args.nhead_stride_bias    = 0;
+        args.nhead_stride_lse     = seqlen_q;
+        args.nhead_stride_lse_acc = seqlen_q;
+        args.nhead_stride_o_acc   = static_cast<int64_t>(seqlen_q) * hdim_v;
+        args.nhead_stride_o       = hdim_v;
+        args.batch_stride_q       = 0;
+        args.batch_stride_k       = 0;
+        args.batch_stride_v       = 0;
+        args.batch_stride_bias    = 0;
+        args.batch_stride_lse     = static_cast<int64_t>(nhead_q) * seqlen_q;
+        args.batch_stride_lse_acc = static_cast<int64_t>(nhead_q) * seqlen_q;
+        args.batch_stride_o_acc   = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
+        args.batch_stride_o       = 0;
+    }
+    else
+    {
+        // BHSD strides (with paged K/V if applicable)
+        const int kv_seq          = is_paged ? page_block_size : seqlen_k;
+        args.stride_q             = hdim_q;
+        args.stride_k             = hdim_q;
+        args.stride_v             = hdim_v;
+        args.stride_bias          = 0;
+        args.stride_o_acc         = hdim_v;
+        args.stride_o             = hdim_v;
+        args.nhead_stride_q       = static_cast<int64_t>(seqlen_q) * hdim_q;
+        args.nhead_stride_k       = static_cast<int64_t>(kv_seq) * hdim_q;
+        args.nhead_stride_v       = static_cast<int64_t>(kv_seq) * hdim_v;
+        args.nhead_stride_bias    = 0;
+        args.nhead_stride_lse     = seqlen_q;
+        args.nhead_stride_lse_acc = seqlen_q;
+        args.nhead_stride_o_acc   = static_cast<int64_t>(seqlen_q) * hdim_v;
+        args.nhead_stride_o       = static_cast<int64_t>(seqlen_q) * hdim_v;
+        args.batch_stride_q       = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
+        args.batch_stride_k       = static_cast<int64_t>(nhead_k) * kv_seq * hdim_q;
+        args.batch_stride_v       = static_cast<int64_t>(nhead_k) * kv_seq * hdim_v;
+        args.batch_stride_bias    = 0;
+        args.batch_stride_lse     = static_cast<int64_t>(nhead_q) * seqlen_q;
+        args.batch_stride_lse_acc = static_cast<int64_t>(nhead_q) * seqlen_q;
+        args.batch_stride_o_acc   = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
+        args.batch_stride_o       = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
+    }
     args.split_stride_lse_acc = static_cast<int64_t>(batch) * nhead_q * seqlen_q;
     args.split_stride_o_acc   = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_v;
     args.window_size_left     = -1;
@@ -677,16 +902,24 @@ int fmha_dispatcher_run_splitkv(const void* q_host,
 
     try
     {
-        elapsed = g_dispatcher->run_fwd_splitkv(traits, args, nullptr);
+        auto invocation = FmhaInvocation::make(std::move(traits), std::move(args));
+        if(g_registry->size() == 1)
+            elapsed = run_single_kernel(invocation);
+        else
+            elapsed =
+                g_dispatcher->run_fwd_splitkv(std::get<fmha_fwd_splitkv_traits>(invocation.traits),
+                                              std::get<fmha_fwd_splitkv_args>(invocation.args),
+                                              nullptr);
     }
     catch(const std::exception& e)
     {
-        fprintf(stderr, "FMHA_ERR: %s\n", e.what());
+        fprintf(stderr, "FMHA_SPLITKV_ERR: %s\n", e.what());
         rc = -2;
         goto cleanup;
     }
     catch(...)
     {
+        fprintf(stderr, "FMHA_SPLITKV_ERR: unknown\n");
         rc = -2;
         goto cleanup;
     }
@@ -707,6 +940,12 @@ cleanup:
     safe_hip_free(o_acc_dev);
     safe_hip_free(lse_dev);
     safe_hip_free(lse_acc_dev);
+    safe_hip_free(seqstart_q_dev);
+    safe_hip_free(seqstart_k_dev);
+    safe_hip_free(seqlen_k_dev);
+    safe_hip_free(block_table_dev);
+    safe_hip_free(bias_dev);
+    safe_hip_free(sink_dev);
     return rc;
 }
 
@@ -731,6 +970,10 @@ int fmha_dispatcher_run_pagedkv(const void* q_host,
                                 int is_v_rowmajor,
                                 const char* data_type_str,
                                 int has_lse,
+                                int has_logits,
+                                int has_sink,
+                                int skip_min_seqlen_q,
+                                int bias_type_int,
                                 float* time_ms_out)
 {
     if(!g_initialized)
@@ -754,13 +997,20 @@ int fmha_dispatcher_run_pagedkv(const void* q_host,
 
     void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
     void *lse_dev = nullptr, *block_table_dev = nullptr;
-    void* seqlen_k_dev = nullptr;
+    void *seqlen_k_dev = nullptr, *seqstart_q_dev = nullptr, *seqstart_k_dev = nullptr;
+    void* sink_dev = nullptr;
 
     // Declare vectors before any HIP_CHECK to avoid goto-over-init
     std::vector<int> block_table(total_pages);
     for(int i = 0; i < total_pages; ++i)
         block_table[i] = i;
     std::vector<int> seqlen_k_vec(batch, seqlen_k);
+    std::vector<int> sq_starts(batch + 1), sk_starts(batch + 1);
+    for(int b = 0; b <= batch; ++b)
+    {
+        sq_starts[b] = b * seqlen_q;
+        sk_starts[b] = b * seqlen_k;
+    }
 
     fmha_fwd_pagedkv_traits traits{};
     traits.hdim_q              = hdim_q;
@@ -768,11 +1018,13 @@ int fmha_dispatcher_run_pagedkv(const void* q_host,
     traits.data_type           = data_type_str ? data_type_str : "fp16";
     traits.is_group_mode       = true;
     traits.is_v_rowmajor       = (is_v_rowmajor != 0);
-    traits.has_logits_soft_cap = false;
+    traits.has_logits_soft_cap = (has_logits != 0);
     traits.mask_type           = static_cast<mask_enum>(mask_type_int);
-    traits.bias_type           = bias_enum::no_bias;
+    traits.bias_type           = static_cast<bias_enum>(bias_type_int);
     traits.has_lse             = (has_lse != 0);
     traits.use_pagedkv         = true;
+    traits.has_sink            = (has_sink != 0);
+    traits.skip_min_seqlen_q   = (skip_min_seqlen_q != 0);
 
     fmha_fwd_pagedkv_args args{};
 
@@ -789,10 +1041,34 @@ int fmha_dispatcher_run_pagedkv(const void* q_host,
     HIP_CHECK(
         hipMemcpy(seqlen_k_dev, seqlen_k_vec.data(), batch * sizeof(int), hipMemcpyHostToDevice));
 
+    // Group mode needs seqstart pointers
+    HIP_CHECK(hipMalloc(&seqstart_q_dev, (batch + 1) * sizeof(int)));
+    HIP_CHECK(hipMalloc(&seqstart_k_dev, (batch + 1) * sizeof(int)));
+    HIP_CHECK(hipMemcpy(
+        seqstart_q_dev, sq_starts.data(), (batch + 1) * sizeof(int), hipMemcpyHostToDevice));
+    HIP_CHECK(hipMemcpy(
+        seqstart_k_dev, sk_starts.data(), (batch + 1) * sizeof(int), hipMemcpyHostToDevice));
+
     if(has_lse)
     {
         HIP_CHECK(hipMalloc(&lse_dev, lse_bytes));
         HIP_CHECK(hipMemset(lse_dev, 0, lse_bytes));
+    }
+    if(has_sink)
+    {
+        HIP_CHECK(hipMalloc(&sink_dev, nhead_q * sizeof(float)));
+        HIP_CHECK(hipMemset(sink_dev, 0, nhead_q * sizeof(float)));
+    }
+
+    void* bias_dev_pkv = nullptr;
+    if(bias_type_int > 0)
+    {
+        const int64_t bias_bytes =
+            (bias_type_int == 2)
+                ? static_cast<int64_t>(batch) * nhead_q * sizeof(float)
+                : static_cast<int64_t>(batch) * nhead_q * seqlen_q * seqlen_k * out_bytes;
+        HIP_CHECK(hipMalloc(&bias_dev_pkv, bias_bytes));
+        HIP_CHECK(hipMemset(bias_dev_pkv, 0, bias_bytes));
     }
 
     HIP_CHECK(hipMemcpy(q_dev, q_host, q_bytes, hipMemcpyHostToDevice));
@@ -803,7 +1079,7 @@ int fmha_dispatcher_run_pagedkv(const void* q_host,
     args.q_ptr                    = q_dev;
     args.k_ptr                    = k_dev;
     args.v_ptr                    = v_dev;
-    args.bias_ptr                 = nullptr;
+    args.bias_ptr                 = bias_dev_pkv;
     args.lse_ptr                  = lse_dev;
     args.o_ptr                    = o_dev;
     args.block_table_ptr          = block_table_dev;
@@ -811,10 +1087,10 @@ int fmha_dispatcher_run_pagedkv(const void* q_host,
     args.page_block_size          = page_block_size;
     args.is_gappy                 = false;
     args.cache_batch_idx          = nullptr;
-    args.seqstart_q_ptr           = nullptr;
-    args.seqstart_k_ptr           = nullptr;
+    args.seqstart_q_ptr           = seqstart_q_dev;
+    args.seqstart_k_ptr           = seqstart_k_dev;
     args.seqlen_k_ptr             = seqlen_k_dev;
-    args.sink_ptr                 = nullptr;
+    args.sink_ptr                 = sink_dev;
     args.seqlen_q                 = seqlen_q;
     args.seqlen_k                 = seqlen_k;
     args.batch                    = batch;
@@ -828,24 +1104,24 @@ int fmha_dispatcher_run_pagedkv(const void* q_host,
     args.scale_o                  = 1.0f;
     args.logits_soft_cap          = 0.0f;
 
-    // K/V stored in page table: [total_pages, nhead_k, page_block_size, hdim]
-    args.stride_q          = hdim_q;
+    // Pagedkv is always group mode: Q=[total_tokens, nhead, hdim], K/V=[pages, nhead, pbs, hdim]
+    args.stride_q          = nhead_q * hdim_q;
     args.stride_k          = hdim_q;
     args.stride_v          = hdim_v;
     args.stride_bias       = 0;
-    args.stride_o          = hdim_v;
-    args.nhead_stride_q    = static_cast<int64_t>(seqlen_q) * hdim_q;
+    args.stride_o          = nhead_q * hdim_v;
+    args.nhead_stride_q    = hdim_q;
     args.nhead_stride_k    = static_cast<int64_t>(page_block_size) * hdim_q;
     args.nhead_stride_v    = static_cast<int64_t>(page_block_size) * hdim_v;
     args.nhead_stride_bias = 0;
     args.nhead_stride_lse  = seqlen_q;
-    args.nhead_stride_o    = static_cast<int64_t>(seqlen_q) * hdim_v;
-    args.batch_stride_q    = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
+    args.nhead_stride_o    = hdim_v;
+    args.batch_stride_q    = 0;
     args.batch_stride_k    = static_cast<int64_t>(nhead_k) * page_block_size * hdim_q;
     args.batch_stride_v    = static_cast<int64_t>(nhead_k) * page_block_size * hdim_v;
     args.batch_stride_bias = 0;
     args.batch_stride_lse  = static_cast<int64_t>(nhead_q) * seqlen_q;
-    args.batch_stride_o    = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
+    args.batch_stride_o    = 0;
     args.window_size_left  = -1;
     args.window_size_right = -1;
     args.sink_size         = 0;
@@ -854,16 +1130,24 @@ int fmha_dispatcher_run_pagedkv(const void* q_host,
 
     try
     {
-        elapsed = g_dispatcher->run_fwd_pagedkv(traits, args, nullptr);
+        auto invocation = FmhaInvocation::make(std::move(traits), std::move(args));
+        if(g_registry->size() == 1)
+            elapsed = run_single_kernel(invocation);
+        else
+            elapsed =
+                g_dispatcher->run_fwd_pagedkv(std::get<fmha_fwd_pagedkv_traits>(invocation.traits),
+                                              std::get<fmha_fwd_pagedkv_args>(invocation.args),
+                                              nullptr);
     }
     catch(const std::exception& e)
     {
-        fprintf(stderr, "FMHA_ERR: %s\n", e.what());
+        fprintf(stderr, "FMHA_PAGEDKV_ERR: %s\n", e.what());
         rc = -2;
         goto cleanup;
     }
     catch(...)
     {
+        fprintf(stderr, "FMHA_PAGEDKV_ERR: unknown\n");
         rc = -2;
         goto cleanup;
     }
@@ -884,6 +1168,10 @@ cleanup:
     safe_hip_free(lse_dev);
     safe_hip_free(block_table_dev);
     safe_hip_free(seqlen_k_dev);
+    safe_hip_free(seqstart_q_dev);
+    safe_hip_free(seqstart_k_dev);
+    safe_hip_free(sink_dev);
+    safe_hip_free(bias_dev_pkv);
     return rc;
 }
 
@@ -992,16 +1280,24 @@ int fmha_dispatcher_run_appendkv(const void* q_host,
 
     try
     {
-        elapsed = g_dispatcher->run_fwd_appendkv(traits, args, nullptr);
+        auto invocation = FmhaInvocation::make(std::move(traits), std::move(args));
+        if(g_registry->size() == 1)
+            elapsed = run_single_kernel(invocation);
+        else
+            elapsed = g_dispatcher->run_fwd_appendkv(
+                std::get<fmha_fwd_appendkv_traits>(invocation.traits),
+                std::get<fmha_fwd_appendkv_args>(invocation.args),
+                nullptr);
     }
     catch(const std::exception& e)
     {
-        fprintf(stderr, "FMHA_ERR: %s\n", e.what());
+        fprintf(stderr, "FMHA_APPENDKV_ERR: %s\n", e.what());
         rc = -2;
         goto cleanup;
     }
     catch(...)
     {
+        fprintf(stderr, "FMHA_APPENDKV_ERR: unknown\n");
         rc = -2;
         goto cleanup;
     }
@@ -1035,6 +1331,7 @@ int fmha_dispatcher_run_batch_prefill(const void* q_host,
                                       int hdim_v,
                                       float scale,
                                       int mask_type_int,
+                                      int bias_type_int,
                                       int page_block_size,
                                       int kv_layout_int,
                                       int kv_lookup_int,
@@ -1044,6 +1341,7 @@ int fmha_dispatcher_run_batch_prefill(const void* q_host,
                                       int has_dropout,
                                       int has_logits,
                                       int has_sink,
+                                      int skip_min_seqlen_q,
                                       float* time_ms_out)
 {
     if(!g_initialized)
@@ -1068,7 +1366,7 @@ int fmha_dispatcher_run_batch_prefill(const void* q_host,
     void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
     void *lse_dev = nullptr, *seqstart_q_dev = nullptr;
     void *kv_indptr_dev = nullptr, *kv_page_indices_dev = nullptr, *kv_last_page_dev = nullptr;
-    void* seqlen_k_dev = nullptr;
+    void *seqlen_k_dev = nullptr, *bias_dev = nullptr, *sink_dev = nullptr;
 
     fmha_batch_prefill_traits traits{};
     traits.hdim_q              = hdim_q;
@@ -1077,11 +1375,11 @@ int fmha_dispatcher_run_batch_prefill(const void* q_host,
     traits.is_group_mode       = true;
     traits.is_v_rowmajor       = (is_v_rowmajor != 0);
     traits.mask_type           = static_cast<mask_enum>(mask_type_int);
-    traits.bias_type           = bias_enum::no_bias;
+    traits.bias_type           = static_cast<bias_enum>(bias_type_int);
     traits.has_lse             = (has_lse != 0);
     traits.has_dropout         = (has_dropout != 0);
     traits.has_logits_soft_cap = (has_logits != 0);
-    traits.skip_min_seqlen_q   = false;
+    traits.skip_min_seqlen_q   = (skip_min_seqlen_q != 0);
     traits.has_sink            = (has_sink != 0);
     traits.qscale_type         = quant_scale_enum::no_scale;
     traits.kv_memory_layout =
@@ -1138,40 +1436,56 @@ int fmha_dispatcher_run_batch_prefill(const void* q_host,
         HIP_CHECK(hipMalloc(&lse_dev, lse_bytes));
         HIP_CHECK(hipMemset(lse_dev, 0, lse_bytes));
     }
+    if(bias_type_int > 0)
+    {
+        const int64_t bias_bytes =
+            (bias_type_int == 2)
+                ? static_cast<int64_t>(batch) * nhead_q * sizeof(float)
+                : static_cast<int64_t>(batch) * nhead_q * seqlen_q * seqlen_k * out_bytes;
+        HIP_CHECK(hipMalloc(&bias_dev, bias_bytes));
+        HIP_CHECK(hipMemset(bias_dev, 0, bias_bytes));
+    }
+    if(has_sink)
+    {
+        HIP_CHECK(hipMalloc(&sink_dev, nhead_q * sizeof(float)));
+        HIP_CHECK(hipMemset(sink_dev, 0, nhead_q * sizeof(float)));
+    }
 
     HIP_CHECK(hipMemcpy(q_dev, q_host, q_bytes, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemset(k_dev, 0, kv_page_bytes));
     HIP_CHECK(hipMemset(v_dev, 0, kv_page_bytes));
     HIP_CHECK(hipMemset(o_dev, 0, o_bytes));
 
-    args.q_ptr             = q_dev;
-    args.k_ptr             = k_dev;
-    args.v_ptr             = v_dev;
-    args.bias_ptr          = nullptr;
-    args.q_descale_ptr     = nullptr;
-    args.k_descale_ptr     = nullptr;
-    args.v_descale_ptr     = nullptr;
-    args.rand_val_ptr      = nullptr;
-    args.lse_ptr           = lse_dev;
-    args.o_ptr             = o_dev;
-    args.seqstart_q_ptr    = seqstart_q_dev;
-    args.sink_ptr          = nullptr;
-    args.seqlen_q          = seqlen_q;
-    args.seqlen_k          = seqlen_k;
-    args.batch             = batch;
-    args.max_seqlen_q      = seqlen_q;
-    args.hdim_q            = hdim_q;
-    args.hdim_v            = hdim_v;
-    args.nhead_q           = nhead_q;
-    args.nhead_k           = nhead_k;
-    args.num_total_pages   = total_pages;
-    args.page_block_size   = page_block_size;
-    args.kv_memory_layout  = ck_tile::BlockAttentionKVCacheMemoryLayoutEnum::VECTORIZED_LAYOUT;
-    args.kv_lookup_table   = ck_tile::BlockAttentionKVCacheLookupTableEnum::SGLANG_PAGE_TABLE_1D;
-    args.kv_indptr         = kv_indptr_dev;
-    args.kv_page_indices   = kv_page_indices_dev;
-    args.kv_last_page_lens = kv_last_page_dev;
-    args.seqlen_k_ptr      = seqlen_k_dev;
+    args.q_ptr           = q_dev;
+    args.k_ptr           = k_dev;
+    args.v_ptr           = v_dev;
+    args.bias_ptr        = bias_dev;
+    args.q_descale_ptr   = nullptr;
+    args.k_descale_ptr   = nullptr;
+    args.v_descale_ptr   = nullptr;
+    args.rand_val_ptr    = nullptr;
+    args.lse_ptr         = lse_dev;
+    args.o_ptr           = o_dev;
+    args.seqstart_q_ptr  = seqstart_q_dev;
+    args.sink_ptr        = sink_dev;
+    args.seqlen_q        = seqlen_q;
+    args.seqlen_k        = seqlen_k;
+    args.batch           = batch;
+    args.max_seqlen_q    = seqlen_q;
+    args.hdim_q          = hdim_q;
+    args.hdim_v          = hdim_v;
+    args.nhead_q         = nhead_q;
+    args.nhead_k         = nhead_k;
+    args.num_total_pages = total_pages;
+    args.page_block_size = page_block_size;
+    args.kv_memory_layout =
+        static_cast<ck_tile::BlockAttentionKVCacheMemoryLayoutEnum>(kv_layout_int);
+    args.kv_lookup_table =
+        static_cast<ck_tile::BlockAttentionKVCacheLookupTableEnum>(kv_lookup_int);
+    args.kv_indptr                = kv_indptr_dev;
+    args.kv_page_indices          = kv_page_indices_dev;
+    args.kv_last_page_lens        = kv_last_page_dev;
+    args.seqlen_k_ptr             = seqlen_k_dev;
     args.batch_stride_block_table = pages_per_seq;
     args.scale_s                  = scale;
     args.scale_p                  = 1.0f;
@@ -1203,19 +1517,31 @@ int fmha_dispatcher_run_batch_prefill(const void* q_host,
     args.window_size_right    = -1;
     args.sink_size            = 0;
     args.mask_type            = mask_type_int;
+    args.p_drop               = has_dropout ? 0.2f : 0.0f;
+    args.s_randval            = false;
+    args.drop_seed_offset     = has_dropout ? std::make_pair(uint64_t(1), uint64_t(0))
+                                            : std::make_pair(uint64_t(0), uint64_t(0));
 
     try
     {
-        elapsed = g_dispatcher->run_batch_prefill(traits, args, nullptr);
+        auto invocation = FmhaInvocation::make(std::move(traits), std::move(args));
+        if(g_registry->size() == 1)
+            elapsed = run_single_kernel(invocation);
+        else
+            elapsed = g_dispatcher->run_batch_prefill(
+                std::get<fmha_batch_prefill_traits>(invocation.traits),
+                std::get<fmha_batch_prefill_args>(invocation.args),
+                nullptr);
     }
     catch(const std::exception& e)
     {
-        fprintf(stderr, "FMHA_ERR: %s\n", e.what());
+        fprintf(stderr, "FMHA_PREFILL_ERR: %s\n", e.what());
         rc = -2;
         goto cleanup;
     }
     catch(...)
     {
+        fprintf(stderr, "FMHA_PREFILL_ERR: unknown\n");
         rc = -2;
         goto cleanup;
     }
@@ -1239,6 +1565,8 @@ cleanup:
     safe_hip_free(kv_page_indices_dev);
     safe_hip_free(kv_last_page_dev);
     safe_hip_free(seqlen_k_dev);
+    safe_hip_free(bias_dev);
+    safe_hip_free(sink_dev);
     return rc;
 }
 

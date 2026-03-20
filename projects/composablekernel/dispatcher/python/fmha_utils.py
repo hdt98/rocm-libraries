@@ -479,6 +479,12 @@ class FmhaDispatcherLib:
             ctypes.c_int,  # hdim_v
             ctypes.c_float,  # scale
             ctypes.c_char_p,  # data_type_str
+            ctypes.c_int,  # mask_type_int
+            ctypes.c_int,  # bias_type_int
+            ctypes.c_int,  # has_dropout
+            ctypes.c_int,  # has_dbias
+            ctypes.c_int,  # is_deterministic
+            ctypes.c_int,  # is_group_mode
             ctypes.POINTER(ctypes.c_float),  # time_ms_out
         ]
         lib.fmha_dispatcher_run_bwd.restype = ctypes.c_int
@@ -501,7 +507,13 @@ class FmhaDispatcherLib:
             ctypes.c_int,  # num_splits
             ctypes.c_int,  # is_v_rowmajor
             ctypes.c_char_p,
-            ctypes.c_int,  # data_type, has_lse
+            ctypes.c_int,  # has_lse
+            ctypes.c_int,  # is_group_mode
+            ctypes.c_int,  # has_logits
+            ctypes.c_int,  # bias_type
+            ctypes.c_int,  # has_sink
+            ctypes.c_int,  # paged_kv
+            ctypes.c_int,  # page_block_size
             ctypes.POINTER(ctypes.c_float),
         ]
         lib.fmha_dispatcher_run_splitkv.restype = ctypes.c_int
@@ -524,7 +536,11 @@ class FmhaDispatcherLib:
             ctypes.c_int,  # page_block_size
             ctypes.c_int,  # is_v_rowmajor
             ctypes.c_char_p,
-            ctypes.c_int,  # data_type, has_lse
+            ctypes.c_int,  # has_lse
+            ctypes.c_int,  # has_logits
+            ctypes.c_int,  # has_sink
+            ctypes.c_int,  # skip_min_seqlen_q
+            ctypes.c_int,  # bias_type
             ctypes.POINTER(ctypes.c_float),
         ]
         lib.fmha_dispatcher_run_pagedkv.restype = ctypes.c_int
@@ -562,6 +578,7 @@ class FmhaDispatcherLib:
             ctypes.c_int,
             ctypes.c_float,
             ctypes.c_int,  # mask_type
+            ctypes.c_int,  # bias_type
             ctypes.c_int,  # page_block_size
             ctypes.c_int,  # kv_layout_int
             ctypes.c_int,  # kv_lookup_int
@@ -571,6 +588,7 @@ class FmhaDispatcherLib:
             ctypes.c_int,  # has_dropout
             ctypes.c_int,  # has_logits
             ctypes.c_int,  # has_sink
+            ctypes.c_int,  # skip_min_seqlen_q
             ctypes.POINTER(ctypes.c_float),
         ]
         lib.fmha_dispatcher_run_batch_prefill.restype = ctypes.c_int
@@ -614,6 +632,12 @@ class FmhaDispatcherLib:
         dv: ctypes.c_void_p,
         prob: FmhaProblem,
         data_type: str = "fp16",
+        mask_type: int = 0,
+        bias_type: int = 0,
+        has_dropout: bool = False,
+        has_dbias: bool = False,
+        is_deterministic: bool = False,
+        is_group_mode: bool = False,
     ) -> Tuple[int, float]:
         time_ms = ctypes.c_float(0.0)
         rc = self._lib.fmha_dispatcher_run_bwd(
@@ -635,6 +659,12 @@ class FmhaDispatcherLib:
             prob.hdim_v,
             prob.scale,
             data_type.encode(),
+            ctypes.c_int(mask_type),
+            ctypes.c_int(bias_type),
+            ctypes.c_int(int(has_dropout)),
+            ctypes.c_int(int(has_dbias)),
+            ctypes.c_int(int(is_deterministic)),
+            ctypes.c_int(int(is_group_mode)),
             ctypes.byref(time_ms),
         )
         return rc, time_ms.value
@@ -724,6 +754,7 @@ class FmhaRunner:
         has_sink: int = 0,
         has_skip: int = 0,
         api_family: str = "fwd",
+        data_type: str = "fp16",
         **kwargs,
     ) -> "FmhaResult":
         """Run FMHA forward on GPU with automatic HIP memory management.
@@ -736,10 +767,31 @@ class FmhaRunner:
         Returns:
             FmhaResult with output array, timing, TFLOPS
         """
-        Q_c = np.ascontiguousarray(Q.astype(np.float16))
-        K_c = np.ascontiguousarray(K.astype(np.float16))
-        V_c = np.ascontiguousarray(V.astype(np.float16))
-        O_c = np.zeros(prob.o_shape(), dtype=np.float16)
+        # Map CK dtype to numpy dtype for buffer allocation.
+        # bf16 uses fp16 as proxy (same size, different encoding handled by GPU).
+        # fp8 uses uint8 (1 byte per element).
+        _NP_DTYPE = {
+            "fp16": np.float16,
+            "bf16": np.float16,
+            "fp32": np.float32,
+            "fp8bf16": np.uint8,
+            "fp8fp32": np.uint8,
+            "bf8": np.uint8,
+        }
+        _NP_OUT_DTYPE = {
+            "fp16": np.float16,
+            "bf16": np.float16,
+            "fp32": np.float32,
+            "fp8bf16": np.float16,
+            "fp8fp32": np.float32,
+            "bf8": np.uint8,
+        }
+        in_dt = _NP_DTYPE.get(data_type, np.float16)
+        out_dt = _NP_OUT_DTYPE.get(data_type, np.float16)
+        Q_c = np.ascontiguousarray(Q.astype(in_dt))
+        K_c = np.ascontiguousarray(K.astype(in_dt))
+        V_c = np.ascontiguousarray(V.astype(in_dt))
+        O_c = np.zeros(prob.o_shape(), dtype=out_dt)
 
         d_q, d_k, d_v, d_o = (ctypes.c_void_p() for _ in range(4))
 
@@ -757,7 +809,20 @@ class FmhaRunner:
             time_ms = ctypes.c_float(0.0)
             lib = self._lib._lib
 
+            is_v_rowmajor = kwargs.get("is_v_rowmajor", 1)
+            is_group_mode = kwargs.get("is_group_mode", 0)
+            perm = kwargs.get("perm", 1)
+            window_left = kwargs.get("window_left", -1)
+            window_right = kwargs.get("window_right", -1)
+            num_splits = kwargs.get("num_splits", 4)
+            page_size = kwargs.get("page_size", 64)
+            kv_layout = kwargs.get("kv_layout", 0)
+            kv_lookup = kwargs.get("kv_lookup", 0)
+            traits_hdim_q = kwargs.get("traits_hdim_q", 0)
+            traits_hdim_v = kwargs.get("traits_hdim_v", 0)
+
             if api_family == "splitkv":
+                paged_kv = kwargs.get("paged_kv", 0)
                 rc = lib.fmha_dispatcher_run_splitkv(
                     d_q,
                     d_k,
@@ -772,10 +837,16 @@ class FmhaRunner:
                     prob.hdim_v,
                     prob.scale,
                     mask_type,
-                    4,
-                    1,
-                    b"fp16",
+                    num_splits,
+                    is_v_rowmajor,
+                    data_type.encode(),
                     has_lse,
+                    is_group_mode,
+                    has_logits,
+                    bias_type,
+                    has_sink,
+                    paged_kv,
+                    page_size,
                     ctypes.byref(time_ms),
                 )
             elif api_family == "pagedkv":
@@ -793,29 +864,35 @@ class FmhaRunner:
                     prob.hdim_v,
                     prob.scale,
                     mask_type,
-                    64,
-                    1,
-                    b"fp16",
+                    page_size,
+                    is_v_rowmajor,
+                    data_type.encode(),
                     has_lse,
+                    has_logits,
+                    has_sink,
+                    has_skip,
+                    bias_type,
                     ctypes.byref(time_ms),
                 )
             elif api_family == "appendkv":
+                seqlen_knew = kwargs.get("seqlen_knew", prob.seqlen_k)
                 rc = lib.fmha_dispatcher_run_appendkv(
-                    d_q,
-                    d_k,
-                    d_v,
+                    Q_c.ctypes.data,
+                    K_c.ctypes.data,
+                    V_c.ctypes.data,
                     prob.batch,
                     prob.nhead_q,
                     prob.nhead_k,
                     prob.seqlen_q,
-                    prob.seqlen_k,
+                    seqlen_knew,
                     prob.hdim_q,
                     prob.hdim_v,
-                    1,
-                    b"fp16",
+                    is_v_rowmajor,
+                    data_type.encode(),
                     ctypes.byref(time_ms),
                 )
             elif api_family == "batch_prefill":
+                skip_min_sq = kwargs.get("skip_min_seqlen_q", 0)
                 rc = lib.fmha_dispatcher_run_batch_prefill(
                     d_q,
                     d_k,
@@ -830,15 +907,17 @@ class FmhaRunner:
                     prob.hdim_v,
                     prob.scale,
                     mask_type,
-                    kwargs.get("page_size", 16),
-                    kwargs.get("kv_layout", 0),
-                    kwargs.get("kv_lookup", 0),
-                    1,
-                    b"fp16",
+                    bias_type,
+                    page_size,
+                    kv_layout,
+                    kv_lookup,
+                    is_v_rowmajor,
+                    data_type.encode(),
                     has_lse,
                     has_dropout,
                     has_logits,
                     has_sink,
+                    skip_min_sq,
                     ctypes.byref(time_ms),
                 )
             else:
@@ -859,14 +938,14 @@ class FmhaRunner:
                     bias_type,
                     has_lse,
                     has_dropout,
-                    0,
-                    0,
-                    1,
-                    1,
-                    b"fp16",
-                    0,
-                    -1,
-                    -1,
+                    traits_hdim_q,
+                    traits_hdim_v,
+                    is_v_rowmajor,
+                    perm,
+                    data_type.encode(),
+                    is_group_mode,
+                    window_left,
+                    window_right,
                     has_logits,
                     has_sink,
                     has_skip,
@@ -904,17 +983,32 @@ class FmhaRunner:
         dO: np.ndarray,
         prob: FmhaProblem,
         data_type: str = "fp16",
+        mask_type: int = 0,
+        bias_type: int = 0,
+        has_dropout: bool = False,
+        has_dbias: bool = False,
+        is_deterministic: bool = False,
+        is_group_mode: bool = False,
     ) -> "FmhaResult":
         """Run FMHA backward on GPU with automatic HIP memory management.
 
         Returns FmhaResult with dQ, dK, dV packed in output as a tuple.
         """
-        Q_c = np.ascontiguousarray(Q.astype(np.float16))
-        K_c = np.ascontiguousarray(K.astype(np.float16))
-        V_c = np.ascontiguousarray(V.astype(np.float16))
-        O_c = np.ascontiguousarray(out.astype(np.float16))
+        _NP_DTYPE = {
+            "fp16": np.float16,
+            "bf16": np.float16,
+            "fp32": np.float32,
+            "fp8bf16": np.uint8,
+            "fp8fp32": np.uint8,
+            "bf8": np.uint8,
+        }
+        in_dt = _NP_DTYPE.get(data_type, np.float16)
+        Q_c = np.ascontiguousarray(Q.astype(in_dt))
+        K_c = np.ascontiguousarray(K.astype(in_dt))
+        V_c = np.ascontiguousarray(V.astype(in_dt))
+        O_c = np.ascontiguousarray(out.astype(in_dt))
         LSE_c = np.ascontiguousarray(LSE.astype(np.float32))
-        dO_c = np.ascontiguousarray(dO.astype(np.float16))
+        dO_c = np.ascontiguousarray(dO.astype(in_dt))
         dQ_c = np.zeros_like(Q_c)
         dK_c = np.zeros_like(K_c)
         dV_c = np.zeros_like(V_c)
@@ -942,6 +1036,12 @@ class FmhaRunner:
                 d_dv,
                 prob,
                 data_type,
+                mask_type=mask_type,
+                bias_type=bias_type,
+                has_dropout=has_dropout,
+                has_dbias=has_dbias,
+                is_deterministic=is_deterministic,
+                is_group_mode=is_group_mode,
             )
 
             if rc != 0:

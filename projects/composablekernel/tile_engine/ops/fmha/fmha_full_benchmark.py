@@ -238,10 +238,12 @@ for so_path, cfg in kernels:
             has_logits=cfg["has_logits"], has_sink=cfg["has_sink"],
             has_skip=cfg["has_skip"],
             api_family=cfg.get("api_family", "fwd"),
+            data_type=cfg.get("data_type", "fp16"),
             page_size=cfg.get("page_size", 16),
             kv_layout=cfg.get("kv_layout", 0),
             kv_lookup=cfg.get("kv_lookup", 1))
-    except Exception:
+    except Exception as exc:
+        print(f"  WARN: kernel {cfg.get('name','?')} exception: {exc}", file=sys.stderr)
         continue
     if not result.success:
         continue
@@ -285,6 +287,7 @@ def _config_to_serializable(config, so_path: str) -> dict:
     return {
         "so_path": so_path,
         "api_family": FAMILY_TO_API.get(config.family, "fwd"),
+        "data_type": config.data_type,
         "kernel": config.name,
         "family": config.family,
         "mode": config.mode,

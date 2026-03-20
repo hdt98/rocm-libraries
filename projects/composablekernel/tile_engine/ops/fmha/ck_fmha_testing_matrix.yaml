@@ -130,31 +130,19 @@ forward_tests:
       dropout: [0.0]
       lse: [false]
 
+    # Hdim sweep covering all supported (hdim_q, hdim_v) pairs.
+    # YAML cartesian product creates some orphan combos (hdim_q != hdim_v pairs
+    # without kernels). The benchmark silently skips these. Use --validate to list them.
+    # Supported pairs: h32, h64, h80x96, h96, h96x128, h128, h160, h192x128, h192, h256
     - name: "CK_All_Hdim_Sweep"
-      description: "Cover ALL hdim/dtype combos that CK kernels produce."
+      description: "Sweep all supported hdim combos. Orphan pairs are skipped at runtime."
       batch: [2]
       seqlen_q: [1024]
       seqlen_k: [1024]
       nhead_q: [8]
       nhead_k: [4]
-      hdim_q: [32, 64, 80, 96, 128, 192, 256]
-      hdim_v: [32, 64, 96, 128, 128, 128, 256]
-      dtype: ["fp16", "bf16"]
-      layout: ["BHSD"]
-      mask: ["no_mask"]
-      bias: ["none"]
-      dropout: [0.0]
-      lse: [false]
-
-    - name: "CK_Symmetric_H192"
-      description: "h192x192 symmetric; wide head dimension."
-      batch: [2]
-      seqlen_q: [1024]
-      seqlen_k: [1024]
-      nhead_q: [8]
-      nhead_k: [4]
-      hdim_q: [192]
-      hdim_v: [192]
+      hdim_q: [32, 64, 80, 96, 128, 160, 192, 256]
+      hdim_v: [32, 64, 96, 128, 160, 192, 256]
       dtype: ["fp16", "bf16"]
       layout: ["BHSD"]
       mask: ["no_mask"]

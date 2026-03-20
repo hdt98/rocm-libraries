@@ -573,12 +573,27 @@ def get_pipelines_for_config(
 # These are separate from the fwd hdim_tile_combos in fmha_arch_specs.json.
 # Each variant has its own (typically smaller) tile set per hdim.
 
+# Multiple tiles per hdim for splitkv, matching PR #5482 benchmarking additions.
+# The instance builder iterates all tiles per hdim, letting the benchmark find the best.
 SPLITKV_TILES_FP16 = {
-    (32, 32): (32, 64, 16, 32, 32, 32),
-    (64, 64): (64, 64, 32, 64, 32, 64),
-    (96, 128): (64, 128, 32, 128, 32, 96),
-    (128, 128): (64, 128, 32, 128, 32, 128),
-    (256, 256): (64, 128, 32, 256, 32, 256),
+    (32, 32): [
+        (32, 64, 16, 32, 32, 32),
+    ],
+    (64, 64): [
+        (64, 64, 32, 64, 32, 64),
+        (128, 64, 32, 64, 32, 64),  # PR #5482: larger bm0 for CU occupancy
+    ],
+    (96, 128): [
+        (64, 128, 32, 128, 32, 96),
+    ],
+    (128, 128): [
+        (32, 128, 32, 128, 32, 128),  # PR #5482: fastest for many shapes
+        (64, 128, 32, 128, 32, 128),  # original
+        (16, 128, 32, 128, 32, 128),  # PR #5482: smaller block
+    ],
+    (256, 256): [
+        (64, 128, 32, 256, 32, 256),
+    ],
 }
 
 SPLITKV_TILES_FP8 = {
@@ -589,14 +604,24 @@ SPLITKV_TILES_FP8 = {
 SPLITKV_COMBINE_HDIMS_FP16 = [32, 64, 96, 128, 256]
 SPLITKV_COMBINE_HDIMS_FP8 = [64, 128, 256]
 
+# PagedKV uses the same tile families as splitkv.
+# Expanded to cover all hdims that CK supports for paged attention.
 PAGEDKV_TILES_FP16 = {
-    (128, 128): (64, 128, 32, 128, 32, 128),
+    (32, 32): [(32, 64, 16, 32, 32, 32)],
+    (64, 64): [(64, 64, 32, 64, 32, 64)],
+    (96, 128): [(64, 128, 32, 128, 32, 96)],
+    (128, 128): [
+        (32, 128, 32, 128, 32, 128),
+        (64, 128, 32, 128, 32, 128),
+        (16, 128, 32, 128, 32, 128),
+    ],
+    (256, 256): [(64, 128, 32, 256, 32, 256)],
 }
 
 PAGEDKV_TILES_FP8 = {
-    (64, 64): (128, 64, 32, 64, 32, 64),
-    (128, 128): (128, 128, 32, 128, 32, 128),
-    (256, 256): (64, 128, 32, 256, 32, 256),
+    (64, 64): [(128, 64, 32, 64, 32, 64)],
+    (128, 128): [(128, 128, 32, 128, 32, 128)],
+    (256, 256): [(64, 128, 32, 256, 32, 256)],
 }
 
 # Append-KV tiles: (bs, bsk, bd, bdv)
