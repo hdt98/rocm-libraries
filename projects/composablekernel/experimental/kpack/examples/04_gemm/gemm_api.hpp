@@ -143,9 +143,9 @@ consteval ResolvedGemmTensors resolve_tensors(GemmSignature sig)
 
     DataType acc = sig.acc_dtype ? *sig.acc_dtype : DataType::FP32;
 
-    return {{TensorDesc{"A", a, 2, TensorDir::In, false},
-             TensorDesc{"B", b, 2, TensorDir::In, false},
-             TensorDesc{"C", c, 2, TensorDir::Out, false}},
+    return {{TensorDesc{"A", a, 2, TensorDir::In, sig.a_layout},
+             TensorDesc{"B", b, 2, TensorDir::In, sig.b_layout},
+             TensorDesc{"C", c, 2, TensorDir::Out, sig.c_layout}},
             acc};
 }
 
@@ -305,9 +305,9 @@ consteval GemmKernel make_kernel(GemmConfig cfg)
             resolved.tensors[1].dtype,
             resolved.tensors[2].dtype,
             resolved.acc_dtype,
-            cfg.signature.a_layout,
-            cfg.signature.b_layout,
-            cfg.signature.c_layout,
+            resolved.tensors[0].layout,
+            resolved.tensors[1].layout,
+            resolved.tensors[2].layout,
             algo.block_tile,
             algo.block_warps,
             algo.warp_tile,
@@ -362,7 +362,13 @@ static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[2].rank == 2);
 static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[0].direction == TensorDir::In);
 static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[1].direction == TensorDir::In);
 static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[2].direction == TensorDir::Out);
-static_assert(!resolve_tensors({.dtype = DataType::FP32}).tensors[0].optional);
+// --- Layout propagation through resolve_tensors ---
+static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[0].layout == Layout::Row);
+static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[1].layout == Layout::Col);
+static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[2].layout == Layout::Row);
+
+// --- Layout override flows through resolve_tensors ---
+static_assert(resolve_tensors({.dtype = DataType::FP32, .a_layout = Layout::Col}).tensors[0].layout == Layout::Col);
 
 // Error cases (uncommenting any would produce consteval compile errors):
 // resolve_tensors({})                                    — nothing resolvable
