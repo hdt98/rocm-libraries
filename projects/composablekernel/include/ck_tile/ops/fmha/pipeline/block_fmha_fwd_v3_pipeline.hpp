@@ -665,7 +665,7 @@ struct BlockFmhaFwdV3Pipeline
                 }
                 else if constexpr(std::is_same_v<PDataType, bf16_t>)
                 {
-                    auto casted                           = detail::cvt_pk_bf16_f32(x, y);
+                    auto casted                           = ck_tile::cvt_pk_bf16_f32(x, y);
                     sp(sp_reg_idx).p.thread_buf_[idx]     = casted.x;
                     sp(sp_reg_idx).p.thread_buf_[idx + 1] = casted.y;
                 }
