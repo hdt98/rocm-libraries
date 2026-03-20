@@ -17,6 +17,30 @@
 
 namespace ck_tile {
 
+template <typename T>
+CK_TILE_HOST_DEVICE static constexpr index_t GetPackedSize()
+{
+    return numeric_traits<remove_cvref_t<T>>::PackedSize;
+}
+
+template <typename T>
+CK_TILE_HOST_DEVICE static constexpr index_t GetLogicalVectorSize(index_t bytes)
+{
+    return (bytes / sizeof(remove_cvref_t<T>)) * GetPackedSize<T>();
+}
+
+template <typename Problem>
+using SageAttnQKGemmQDataType =
+    std::conditional_t<is_packed_type_v<remove_cvref_t<typename Problem::QDataType>>,
+                       fp8_t,
+                       remove_cvref_t<typename Problem::QDataType>>;
+
+template <typename Problem>
+using SageAttnQKGemmKDataType =
+    std::conditional_t<is_packed_type_v<remove_cvref_t<typename Problem::KDataType>>,
+                       fp8_t,
+                       remove_cvref_t<typename Problem::KDataType>>;
+
 template <bool QLoadOnce_>
 struct BlockSageAttnPipelineQRCustomPolicy;
 
@@ -36,7 +60,7 @@ struct BlockSageAttnPipelineQRCustomPolicy</* QLoadOnce = */ true>
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto GetAlignmentQ()
     {
-        constexpr index_t MaxVectorSize = 16 / sizeof(typename Problem::QDataType);
+        constexpr index_t MaxVectorSize = GetLogicalVectorSize<typename Problem::QDataType>(16);
 
         using BlockGemm       = remove_cvref_t<decltype(GetQKBlockGemm<Problem>())>;
         constexpr auto config = BlockGemm::Policy::template GetWarpGemmMWarpNWarp<Problem>();
@@ -58,16 +82,20 @@ struct BlockSageAttnPipelineQRCustomPolicy</* QLoadOnce = */ true>
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto GetQKBlockGemm()
     {
+        using QKGemmQDataType = SageAttnQKGemmQDataType<Problem>;
+        using QKGemmKDataType = SageAttnQKGemmKDataType<Problem>;
         // int8 MFMA accumulates to int32, but SaccDataType is float for softmax
         using GemmAccDataType =
-            std::conditional_t<std::is_same_v<typename Problem::QDataType, int8_t> ||
-                                   std::is_same_v<typename Problem::QDataType, signed char>,
+            std::conditional_t<(std::is_same_v<QKGemmQDataType, int8_t> ||
+                                std::is_same_v<QKGemmQDataType, signed char>) &&
+                                   (std::is_same_v<QKGemmKDataType, int8_t> ||
+                                    std::is_same_v<QKGemmKDataType, signed char>),
                                int32_t,
                                typename Problem::SaccDataType>;
 
         using GemmProblem =
-            BlockGemmProblem<typename Problem::QDataType,
-                             typename Problem::KDataType,
+            BlockGemmProblem<QKGemmQDataType,
+                             QKGemmKDataType,
                              GemmAccDataType,
                              Problem::kNumGemm0Warps * get_warp_size(),
                              TileGemmShape<sequence<Problem::BlockSageAttnShape::kM0,
@@ -77,9 +105,8 @@ struct BlockSageAttnPipelineQRCustomPolicy</* QLoadOnce = */ true>
                                            typename Problem::BlockSageAttnShape::Gemm0WarpTile>>;
 
         constexpr auto warp_gemm = []() {
-            if constexpr(get_warp_size() == 64 &&
-                         std::is_same_v<typename Problem::QDataType, fp8_t> &&
-                         std::is_same_v<typename Problem::KDataType, fp8_t> &&
+            if constexpr(get_warp_size() == 64 && std::is_same_v<QKGemmQDataType, fp8_t> &&
+                         std::is_same_v<QKGemmKDataType, fp8_t> &&
                          std::is_same_v<typename Problem::SaccDataType, float>)
             {
                 static_assert(Problem::BlockSageAttnShape::Gemm0WarpTile::at(number<0>{}) == 32);
@@ -92,10 +119,10 @@ struct BlockSageAttnPipelineQRCustomPolicy</* QLoadOnce = */ true>
                     swizzle_factor>{};
             }
             else if constexpr(get_warp_size() == 64 &&
-                              (std::is_same_v<typename Problem::QDataType, int8_t> ||
-                               std::is_same_v<typename Problem::QDataType, signed char>) &&
-                              (std::is_same_v<typename Problem::KDataType, int8_t> ||
-                               std::is_same_v<typename Problem::KDataType, signed char>))
+                              (std::is_same_v<QKGemmQDataType, int8_t> ||
+                               std::is_same_v<QKGemmQDataType, signed char>) &&
+                              (std::is_same_v<QKGemmKDataType, int8_t> ||
+                               std::is_same_v<QKGemmKDataType, signed char>))
             {
                 static_assert(Problem::BlockSageAttnShape::Gemm0WarpTile::at(number<0>{}) == 32);
                 static_assert(Problem::BlockSageAttnShape::Gemm0WarpTile::at(number<1>{}) == 32);
@@ -111,8 +138,8 @@ struct BlockSageAttnPipelineQRCustomPolicy</* QLoadOnce = */ true>
                 constexpr bool SwizzleA =
                     Problem::BlockSageAttnShape::Gemm0WarpTile::at(number<0>{}) == 32;
                 return WarpGemmDispatcher<
-                    typename Problem::QDataType,
-                    typename Problem::KDataType,
+                    QKGemmQDataType,
+                    QKGemmKDataType,
                     GemmAccDataType,
                     Problem::BlockSageAttnShape::Gemm0WarpTile::at(number<0>{}),
                     Problem::BlockSageAttnShape::Gemm0WarpTile::at(number<1>{}),
@@ -123,8 +150,8 @@ struct BlockSageAttnPipelineQRCustomPolicy</* QLoadOnce = */ true>
         }();
 
         using BlockGemmPolicy = BlockGemmARegBSmemCRegV2CustomPolicy<
-            typename Problem::QDataType,
-            typename Problem::KDataType,
+            QKGemmQDataType,
+            QKGemmKDataType,
             GemmAccDataType,
             typename Problem::BlockSageAttnShape::Gemm0BlockWarps,
             decltype(warp_gemm)>;
@@ -214,8 +241,8 @@ struct BlockSageAttnPipelineQRKSVSCustomPolicy : BlockSageAttnPipelineQRCustomPo
     CK_TILE_HOST_DEVICE static constexpr auto GetSmemKPackK()
     {
         // TODO: this is for 3d layout
-        using KDataType = remove_cvref_t<typename Problem::KDataType>;
-        return 16 / sizeof(KDataType);
+        using KDataType = SageAttnQKGemmKDataType<Problem>;
+        return GetLogicalVectorSize<KDataType>(16);
     }
 
     template <typename Problem>
@@ -230,7 +257,7 @@ struct BlockSageAttnPipelineQRKSVSCustomPolicy : BlockSageAttnPipelineQRCustomPo
             constexpr index_t MaxLoadSizeInBytes = 4; // dword
 #endif
 
-            return MaxLoadSizeInBytes / sizeof(KDataType);
+            return GetLogicalVectorSize<KDataType>(MaxLoadSizeInBytes);
         }
         else
         {
@@ -238,7 +265,7 @@ struct BlockSageAttnPipelineQRKSVSCustomPolicy : BlockSageAttnPipelineQRCustomPo
             constexpr index_t kNPerBlock = Problem::BlockSageAttnShape::kN0;
             constexpr index_t kKPerBlock = Problem::BlockSageAttnShape::kK0;
 
-            constexpr index_t MaxVectorSize = 16 / sizeof(KDataType);
+            constexpr index_t MaxVectorSize = GetLogicalVectorSize<KDataType>(16);
             constexpr index_t ElemPerThread = (kNPerBlock * kKPerBlock) / kBlockSize;
 
             return min(MaxVectorSize, ElemPerThread);
@@ -526,9 +553,10 @@ struct BlockSageAttnPipelineQRKSVSCustomPolicy : BlockSageAttnPipelineQRCustomPo
     CK_TILE_HOST_DEVICE static constexpr ck_tile::index_t GetSmemSizeKV()
     {
         // TODO: assume Q is in register
-        // TODO: assume K/V has same data type
+        // TODO: assume K and V share smem buffers
+        using KLdsDataType = SageAttnQKGemmKDataType<Problem>;
         constexpr index_t single_smem_size =
-            GetSingleSmemElementSpaceSize<Problem>() * sizeof(typename Problem::KDataType);
+            GetSingleSmemElementSpaceSize<Problem>() * sizeof(KLdsDataType);
 
         return QXPolicy::template GetSmemSizeQ<Problem>() + single_smem_size * NumKVLdsBuffers;
     }
@@ -550,7 +578,7 @@ struct BlockSageAttnPipelineQRKSVSCustomPolicy : BlockSageAttnPipelineQRCustomPo
             constexpr index_t kNPerBlock = Problem::BlockSageAttnShape::kN0;
             constexpr index_t kKPerBlock = Problem::BlockSageAttnShape::kK0;
 
-            constexpr index_t MaxVectorSize = 16 / sizeof(KDataType);
+            constexpr index_t MaxVectorSize = GetLogicalVectorSize<KDataType>(16);
             constexpr index_t ElemPerThread = (kNPerBlock * kKPerBlock) / kBlockSize;
 
             constexpr index_t K1 = min(MaxVectorSize, ElemPerThread);

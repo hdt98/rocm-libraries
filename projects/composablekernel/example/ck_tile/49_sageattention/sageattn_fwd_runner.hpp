@@ -80,6 +80,14 @@ auto get_elimit<SageAttentionFwdI8Fp8Bf16>(std::string /*init_method*/)
     return ck_tile::make_tuple(rtol, atol);
 }
 
+template <>
+auto get_elimit<SageAttentionFwdI4Fp8Bf16>(std::string /*init_method*/)
+{
+    double rtol = 1e-2;
+    double atol = 1.9e-1;
+    return ck_tile::make_tuple(rtol, atol);
+}
+
 template <typename DataTypeConfig>
 fwd_result sageattn_fwd_run(mode_enum mode,
                             ck_tile::index_t batch,
@@ -120,6 +128,8 @@ fwd_result sageattn_fwd_run(mode_enum mode,
             return "fp8bf16";
         else if constexpr(std::is_same_v<DataTypeConfig, SageAttentionFwdI8Fp8Bf16>)
             return "i8fp8bf16";
+        else if constexpr(std::is_same_v<DataTypeConfig, SageAttentionFwdI4Fp8Bf16>)
+            return "i4fp8bf16";
         else
             static_assert(false);
     }();
@@ -244,6 +254,53 @@ fwd_result sageattn_fwd_run(mode_enum mode,
     using OaccDataType        = typename TypeConfig::OaccDataType;
     using ODataType           = typename TypeConfig::ODataType;
 
+    constexpr ck_tile::index_t q_packed_size =
+        ck_tile::is_packed_type_v<QDataType> ? ck_tile::numeric_traits<QDataType>::PackedSize : 1;
+    constexpr ck_tile::index_t k_packed_size =
+        ck_tile::is_packed_type_v<KDataType> ? ck_tile::numeric_traits<KDataType>::PackedSize : 1;
+    constexpr bool is_q_i4                  = std::is_same_v<QDataType, ck_tile::pk_int4_t>;
+    constexpr bool is_k_i4                  = std::is_same_v<KDataType, ck_tile::pk_int4_t>;
+    constexpr bool need_q_i4_permute        = is_q_i4 && !is_k_i4;
+    constexpr bool need_k_i4_permute        = is_k_i4 && !is_q_i4;
+    const ck_tile::index_t hdim_q_storage_q = hdim_q / q_packed_size;
+    const ck_tile::index_t hdim_q_storage_k = hdim_q / k_packed_size;
+    if constexpr(ck_tile::is_packed_type_v<QDataType>)
+    {
+        if(hdim_q % q_packed_size != 0)
+        {
+            std::cerr << "hdim_q must be divisible by packed size for QDataType, got hdim_q="
+                      << hdim_q << ", packed_size=" << q_packed_size << std::endl;
+            return fwd_result::invalid_args;
+        }
+        if constexpr(need_q_i4_permute)
+        {
+            if(hdim_q % 8 != 0)
+            {
+                std::cerr << "hdim_q must be divisible by 8 for pk_int4_t QDataType, got hdim_q="
+                          << hdim_q << std::endl;
+                return fwd_result::invalid_args;
+            }
+        }
+    }
+    if constexpr(ck_tile::is_packed_type_v<KDataType>)
+    {
+        if(hdim_q % k_packed_size != 0)
+        {
+            std::cerr << "hdim_q must be divisible by packed size for KDataType, got hdim_q="
+                      << hdim_q << ", packed_size=" << k_packed_size << std::endl;
+            return fwd_result::invalid_args;
+        }
+        if constexpr(need_k_i4_permute)
+        {
+            if(hdim_q % 8 != 0)
+            {
+                std::cerr << "hdim_q must be divisible by 8 for pk_int4_t KDataType, got hdim_q="
+                          << hdim_q << std::endl;
+                return fwd_result::invalid_args;
+            }
+        }
+    }
+
     // accumulation numbers for performance evaluation
     std::size_t flop = 0, num_byte = 0;
     auto max_seqlen_q =
@@ -268,9 +325,9 @@ fwd_result sageattn_fwd_run(mode_enum mode,
             flop += nhead * (static_cast<std::size_t>(2) * mask.get_unmaskarea() * hdim_q +
                              static_cast<std::size_t>(2) * mask.get_unmaskarea() * hdim_v);
 
-            num_byte += nhead * (sizeof(QDataType) * real_seqlen_q * hdim_q +
+            num_byte += nhead * (sizeof(QDataType) * real_seqlen_q * hdim_q_storage_q +
                                  sizeof(ODataType) * real_seqlen_q * hdim_v);
-            num_byte += nhead_k * (sizeof(KDataType) * real_seqlen_k * hdim_q +
+            num_byte += nhead_k * (sizeof(KDataType) * real_seqlen_k * hdim_q_storage_k +
                                    sizeof(VDataType) * hdim_v * real_seqlen_k);
         }
     }
@@ -356,6 +413,13 @@ fwd_result sageattn_fwd_run(mode_enum mode,
     ck_tile::HostTensor<ODataType> o_host(
         get_lengths(o_perm, shape_batch, nhead, shape_seqlen_q, hdim_v));
 
+    const auto get_dtype_max = []<typename T>() {
+        if constexpr(ck_tile::is_packed_type_v<T>)
+            return 7.0f;
+        else
+            return ck_tile::type_convert<float>(ck_tile::numeric<T>::max());
+    };
+
     if(init_method == "ui" || init_method == "0")
     {
         ck_tile::FillUniformDistributionIntegerValue<QDataType>{-3.f, 3.f, next_seed()}(q_host);
@@ -389,9 +453,9 @@ fwd_result sageattn_fwd_run(mode_enum mode,
     }
     else if(init_method == "3")
     {
-        float q_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<QDataType>::max());
-        float k_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<KDataType>::max());
-        float v_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<VDataType>::max());
+        float q_dtype_max = get_dtype_max.template operator()<QDataType>();
+        float k_dtype_max = get_dtype_max.template operator()<KDataType>();
+        float v_dtype_max = get_dtype_max.template operator()<VDataType>();
 
         ck_tile::FillUniformDistribution<QDataType>{-q_dtype_max, q_dtype_max, next_seed()}(q_host);
         ck_tile::FillUniformDistribution<KDataType>{-k_dtype_max, k_dtype_max, next_seed()}(k_host);
@@ -399,9 +463,9 @@ fwd_result sageattn_fwd_run(mode_enum mode,
     }
     if(qscale.type == quant_scale_enum::pertensor)
     {
-        float q_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<QDataType>::max());
-        float k_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<KDataType>::max());
-        float v_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<VDataType>::max());
+        float q_dtype_max = get_dtype_max.template operator()<QDataType>();
+        float k_dtype_max = get_dtype_max.template operator()<KDataType>();
+        float v_dtype_max = get_dtype_max.template operator()<VDataType>();
 
         float qkv_max     = 3.f;
         q_descale_host(0) = qkv_max / q_dtype_max;
@@ -411,9 +475,9 @@ fwd_result sageattn_fwd_run(mode_enum mode,
     else if(qscale.type == quant_scale_enum::blockscale ||
             qscale.type == quant_scale_enum::perwarp || qscale.type == quant_scale_enum::perthread)
     {
-        float q_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<QDataType>::max());
-        float k_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<KDataType>::max());
-        float v_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<VDataType>::max());
+        float q_dtype_max = get_dtype_max.template operator()<QDataType>();
+        float k_dtype_max = get_dtype_max.template operator()<KDataType>();
+        float v_dtype_max = get_dtype_max.template operator()<VDataType>();
 
         float qkv_max       = 3.f;
         float max_descale_q = qkv_max / q_dtype_max;
@@ -467,8 +531,26 @@ fwd_result sageattn_fwd_run(mode_enum mode,
             ? block_scale_seqstart_k_host.size() * sizeof(int32_t)
             : 0);
 
-    q_buf.ToDevice(q_host.data());
-    k_buf.ToDevice(k_host.data());
+    if constexpr(need_q_i4_permute)
+    {
+        auto q_host_dev = q_host;
+        ck_tile::permute_vectors_i4x4_b(q_host_dev);
+        q_buf.ToDevice(q_host_dev.data());
+    }
+    else
+    {
+        q_buf.ToDevice(q_host.data());
+    }
+    if constexpr(need_k_i4_permute)
+    {
+        auto k_host_dev = k_host;
+        ck_tile::permute_vectors_i4x4_b(k_host_dev);
+        k_buf.ToDevice(k_host_dev.data());
+    }
+    else
+    {
+        k_buf.ToDevice(k_host.data());
+    }
     v_buf.ToDevice(v_host.data());
     q_descale_buf.ToDevice(q_descale_host.data());
     k_descale_buf.ToDevice(k_descale_host.data());
@@ -761,9 +843,11 @@ fwd_result sageattn_fwd_run(mode_enum mode,
     {
         o_buf.FromDevice(o_host.data());
 
-        constexpr bool supports_qscale = std::is_same_v<DataTypeConfig, SageAttentionFwdFp8> ||
-                                         std::is_same_v<DataTypeConfig, SageAttentionFwdFp8Bf16> ||
-                                         std::is_same_v<DataTypeConfig, SageAttentionFwdI8Fp8Bf16>;
+        constexpr bool supports_qscale =
+            std::is_same_v<DataTypeConfig, SageAttentionFwdFp8> ||
+            std::is_same_v<DataTypeConfig, SageAttentionFwdFp8Bf16> ||
+            std::is_same_v<DataTypeConfig, SageAttentionFwdI8Fp8Bf16> ||
+            std::is_same_v<DataTypeConfig, SageAttentionFwdI4Fp8Bf16>;
 
         float scale_s_host = scale_s;
         float scale_p_host = 1.0f;
@@ -870,6 +954,20 @@ fwd_result sageattn_fwd_run(mode_enum mode,
             }
 
             // reference
+            // For packed types (pk_int4_t), unpack to float for host reference GEMM
+            auto unpack_to_float = [](const auto& packed_tensor) {
+                auto dims = packed_tensor.mDesc.get_lengths();
+                ck_tile::HostTensor<float> unpacked({static_cast<ck_tile::index_t>(dims[0]),
+                                                     static_cast<ck_tile::index_t>(dims[1]),
+                                                     static_cast<ck_tile::index_t>(dims[2])});
+                unpacked.ForEach([&](auto& self, auto idx) {
+                    auto packed = packed_tensor(idx[0], idx[1], idx[2]);
+                    auto fp32x2 = ck_tile::pk_int4_t_to_fp32x2_t(packed);
+                    self(idx)   = (idx[2] % 2 == 0) ? fp32x2[0] : fp32x2[1];
+                });
+                return unpacked;
+            };
+
             if(qscale.type == quant_scale_enum::blockscale ||
                qscale.type == quant_scale_enum::perwarp ||
                qscale.type == quant_scale_enum::perthread)
@@ -878,35 +976,83 @@ fwd_result sageattn_fwd_run(mode_enum mode,
                     (mode == mode_enum::batch) ? 0 : block_scale_seqstart_q_host[wb];
                 const ck_tile::index_t k_offset =
                     (mode == mode_enum::batch) ? 0 : block_scale_seqstart_k_host[wb];
-                ck_tile::reference_batched_quant_gemm<QDataType,
-                                                      KDataType,
-                                                      SaccDataType,
-                                                      SMPLComputeDataType>(
-                    q_host_ref,
-                    k_host_ref,
-                    s_host_ref,
-                    ck_tile::idx_identity{},
-                    ck_tile::idx_identity{},
-                    [&](auto idx, auto value) {
-                        return value * scale_s *
-                               q_descale_host(b_idx,
-                                              std::get<0>(idx),
-                                              q_offset + std::get<1>(idx) / block_scale_size_q_) *
-                               k_descale_host(b_idx,
-                                              std::get<0>(idx) / nr,
-                                              k_offset + std::get<2>(idx) / block_scale_size_k_);
-                    });
+                if constexpr(ck_tile::is_packed_type_v<QDataType>)
+                {
+                    auto q_f32 = unpack_to_float(q_host_ref);
+                    auto k_f32 = unpack_to_float(k_host_ref);
+                    ck_tile::reference_batched_quant_gemm<float,
+                                                          float,
+                                                          SaccDataType,
+                                                          SMPLComputeDataType>(
+                        q_f32,
+                        k_f32,
+                        s_host_ref,
+                        ck_tile::idx_identity{},
+                        ck_tile::idx_identity{},
+                        [&](auto idx, auto value) {
+                            return value * scale_s *
+                                   q_descale_host(b_idx,
+                                                  std::get<0>(idx),
+                                                  q_offset +
+                                                      std::get<1>(idx) / block_scale_size_q_) *
+                                   k_descale_host(b_idx,
+                                                  std::get<0>(idx) / nr,
+                                                  k_offset +
+                                                      std::get<2>(idx) / block_scale_size_k_);
+                        });
+                }
+                else
+                {
+                    ck_tile::reference_batched_quant_gemm<QDataType,
+                                                          KDataType,
+                                                          SaccDataType,
+                                                          SMPLComputeDataType>(
+                        q_host_ref,
+                        k_host_ref,
+                        s_host_ref,
+                        ck_tile::idx_identity{},
+                        ck_tile::idx_identity{},
+                        [&](auto idx, auto value) {
+                            return value * scale_s *
+                                   q_descale_host(b_idx,
+                                                  std::get<0>(idx),
+                                                  q_offset +
+                                                      std::get<1>(idx) / block_scale_size_q_) *
+                                   k_descale_host(b_idx,
+                                                  std::get<0>(idx) / nr,
+                                                  k_offset +
+                                                      std::get<2>(idx) / block_scale_size_k_);
+                        });
+                }
             }
             else
             {
-                ck_tile::
-                    reference_batched_gemm<QDataType, KDataType, SaccDataType, SMPLComputeDataType>(
+                if constexpr(ck_tile::is_packed_type_v<QDataType>)
+                {
+                    auto q_f32 = unpack_to_float(q_host_ref);
+                    auto k_f32 = unpack_to_float(k_host_ref);
+                    ck_tile::
+                        reference_batched_gemm<float, float, SaccDataType, SMPLComputeDataType>(
+                            q_f32,
+                            k_f32,
+                            s_host_ref,
+                            ck_tile::identity{},
+                            ck_tile::identity{},
+                            ck_tile::scales(scale_s_host));
+                }
+                else
+                {
+                    ck_tile::reference_batched_gemm<QDataType,
+                                                    KDataType,
+                                                    SaccDataType,
+                                                    SMPLComputeDataType>(
                         q_host_ref,
                         k_host_ref,
                         s_host_ref,
                         ck_tile::identity{},
                         ck_tile::identity{},
                         ck_tile::scales(scale_s_host));
+                }
             }
 
             if(mask.type == mask_enum::no_mask)

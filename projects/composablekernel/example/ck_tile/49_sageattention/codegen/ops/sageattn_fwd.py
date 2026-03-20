@@ -34,6 +34,7 @@ DTYPE_BITS = {
     "fp8": 8,
     "fp8bf16": 8,
     "i8fp8bf16": 8,
+    "i4fp8bf16": 4,
     "bf8": 8,
 }
 
@@ -764,10 +765,17 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
     _DT_FP8 = ("fp8",)
     _DT_FP8BF16 = ("fp8bf16",)
     _DT_I8FP8BF16 = ("i8fp8bf16",)
+    _DT_I4FP8BF16 = ("i4fp8bf16",)
 
     @classmethod
     def supported_dtypes(cls) -> Tuple[str]:
-        return cls._DT_FP16_BF16 + cls._DT_FP8 + cls._DT_FP8BF16 + cls._DT_I8FP8BF16
+        return (
+            cls._DT_FP16_BF16
+            + cls._DT_FP8
+            + cls._DT_FP8BF16
+            + cls._DT_I8FP8BF16
+            + cls._DT_I4FP8BF16
+        )
 
     # TODO: design a more practical way to do it
     # this is current supported tile size per hdim
@@ -784,6 +792,10 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
         ):
             return {
                 (128, 128) : [SageAttnFwdTileSize(128,  128, 32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1)],
+            }  # fmt: skip
+        elif dtype in cls._DT_I4FP8BF16:
+            return {
+                (128, 128) : [SageAttnFwdTileSize(128,   64, 32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1)],
             }  # fmt: skip
         else:
             raise ValueError(f"unsupported dtype={dtype}")
@@ -814,7 +826,11 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                 else:
                     pipelines.append(SageAttnFwdPipeline("qr_async", vlayout, "t", "f", "t", "t", qscale, mask, skip))  # fmt: skip
                     pipelines.append(SageAttnFwdPipeline("qr_async", vlayout, "t", "t", "t", "t", qscale, mask, skip))  # fmt: skip
-        elif dtype in cls._DT_FP8BF16 or dtype in cls._DT_I8FP8BF16:
+        elif (
+            dtype in cls._DT_FP8BF16
+            or dtype in cls._DT_I8FP8BF16
+            or dtype in cls._DT_I4FP8BF16
+        ):
             # no need lse kernels
             skip = "f"  # skip: only false
             for mask, qscale, vlayout in itertools.product(
@@ -822,7 +838,13 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                 ["no", "pertensor", "blockscale", "perwarp", "perthread"],
                 ["row", "col"],  # Support both row and col major layouts
             ):
-                if hdim == 64:
+                if dtype in cls._DT_I4FP8BF16:
+                    # int4 only uses sync pipeline (qr), pad_d="f" because packed types
+                    # require alignment >= PackedSize which conflicts with kPadHeadDimQ=true
+                    # forcing alignment to 1. Safe since hdim always matches tile size.
+                    pipelines.append(SageAttnFwdPipeline("qr", vlayout, "t", "f", "f", "f", qscale, mask, skip))  # fmt: skip
+                    pipelines.append(SageAttnFwdPipeline("qr", vlayout, "t", "t", "f", "f", qscale, mask, skip))  # fmt: skip
+                elif hdim == 64:
                     pipelines.append(SageAttnFwdPipeline("qr", vlayout, "t", "f", "f", "f", qscale, mask, skip))  # fmt: skip
                     pipelines.append(SageAttnFwdPipeline("qr", vlayout, "t", "t", "f", "f", qscale, mask, skip))  # fmt: skip
                 else:
@@ -831,6 +853,18 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
         elif dtype in ["fp8", "fp8fp16", "bf8"]:
             # TODO
             pass
+
+        # Packed types (int4) cannot use head-dim padding: the tile_window infrastructure
+        # forces alignment=1 when padding is enabled, but packed types need alignment >= PackedSize.
+        if dtype in cls._DT_I4FP8BF16:
+            for p in pipelines:
+                assert p.F_dpad == "f", (
+                    f"int4 dtype '{dtype}' requires pad_d=false, got '{p.F_dpad}'"
+                )
+                assert p.F_dvpad == "f", (
+                    f"int4 dtype '{dtype}' requires pad_dv=false, got '{p.F_dvpad}'"
+                )
+
         return pipelines
 
 
