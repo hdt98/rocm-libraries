@@ -60,11 +60,32 @@ template <typename TensorDesc, typename TopIndex>
 CK_TILE_HOST_DEVICE constexpr auto make_tensor_coordinate(const TensorDesc& tensor_desc,
                                                           const TopIndex& idx_top)
 {
-    const auto adaptor_coord = make_tensor_adaptor_coordinate(tensor_desc, idx_top);
+    if constexpr (TensorDesc::is_tiled())
+    {
+        // For now, return the same coordinate as the non-tiled case.
+        const auto adaptor_coord = make_tensor_adaptor_coordinate(tensor_desc, idx_top);
 
-    return tensor_coordinate<TensorDesc::get_num_of_hidden_dimension(),
-                             remove_cvref_t<decltype(TensorDesc::get_top_dimension_hidden_ids())>>{
-        adaptor_coord};
+        // Debug print
+        if (threadIdx.x == 0)
+        {
+            printf("Block (%u,%u,%u): idx_top[0]=%d idx_top[1]=%d\n",
+                blockIdx.x, blockIdx.y, blockIdx.z,
+                static_cast<int>(idx_top[number<0>{}]),
+                static_cast<int>(idx_top[number<1>{}]));
+        }
+
+        return tensor_coordinate<TensorDesc::get_num_of_hidden_dimension(),
+                                remove_cvref_t<decltype(TensorDesc::get_top_dimension_hidden_ids())>>{
+            adaptor_coord};
+    }
+    else 
+    {
+        const auto adaptor_coord = make_tensor_adaptor_coordinate(tensor_desc, idx_top);
+
+        return tensor_coordinate<TensorDesc::get_num_of_hidden_dimension(),
+                                remove_cvref_t<decltype(TensorDesc::get_top_dimension_hidden_ids())>>{
+            adaptor_coord};
+    }
 }
 
 template <bool JudgeDoTransforms = true, typename TensorDesc, typename TensorCoord, typename Index>

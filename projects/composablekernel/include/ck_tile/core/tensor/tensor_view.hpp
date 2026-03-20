@@ -11,6 +11,7 @@
 #include "ck_tile/core/container/container_helper.hpp"
 #include "ck_tile/core/numeric/math.hpp"
 #include "ck_tile/core/tensor/tensor_descriptor.hpp"
+#include "ck_tile/core/tensor/tensor_descriptor_tiled.hpp"
 #include "ck_tile/core/utility/functional.hpp"
 #include "ck_tile/core/utility/type_traits.hpp"
 
@@ -503,6 +504,20 @@ template <address_space_enum BufferAddressSpace = address_space_enum::generic,
           memory_operation_enum DstInMemOp      = memory_operation_enum::set,
           amd_buffer_coherence_enum Coherence   = amd_buffer_coherence_enum::coherence_default,
           typename DataType,
+          typename... Ts>
+CK_TILE_HOST_DEVICE constexpr auto make_tensor_view(DataType* __restrict__ p,
+                                                    const tensor_descriptor_tiled<Ts...>& desc)
+{
+    auto buffer_view =
+        make_buffer_view<BufferAddressSpace, Coherence>(p, desc.get_element_space_size());
+
+    return tensor_view<decltype(buffer_view), decltype(desc), DstInMemOp>{buffer_view, desc};
+}
+
+template <address_space_enum BufferAddressSpace = address_space_enum::generic,
+          memory_operation_enum DstInMemOp      = memory_operation_enum::set,
+          amd_buffer_coherence_enum Coherence   = amd_buffer_coherence_enum::coherence_default,
+          typename DataType,
           typename... Lengths,
           typename... Strides,
           index_t GuaranteedLastDimensionVectorLength                                   = -1,
@@ -554,10 +569,22 @@ CK_TILE_HOST_DEVICE constexpr auto transform_tensor_view(const OldTensorView& ol
                                                          NewLowerDimensionOldVisibleIdss,
                                                          NewUpperDimensionNewVisibleIdss)
 {
-    auto new_desc = transform_tensor_descriptor(old_tensor_view.desc_,
-                                                new_transforms,
-                                                NewLowerDimensionOldVisibleIdss{},
-                                                NewUpperDimensionNewVisibleIdss{});
+    auto new_desc = [&]() {
+        if constexpr(OldTensorView::TensorDesc::is_tiled())
+        {
+            return transform_tensor_descriptor_tiled(old_tensor_view.desc_,
+                                                     new_transforms,
+                                                     NewLowerDimensionOldVisibleIdss{},
+                                                     NewUpperDimensionNewVisibleIdss{});
+        }
+        else
+        {
+            return transform_tensor_descriptor(old_tensor_view.desc_,
+                                              new_transforms,
+                                              NewLowerDimensionOldVisibleIdss{},
+                                              NewUpperDimensionNewVisibleIdss{});
+        }
+    }();
 
     return tensor_view<typename OldTensorView::buffer_view,
                        remove_cvref_t<decltype(new_desc)>,

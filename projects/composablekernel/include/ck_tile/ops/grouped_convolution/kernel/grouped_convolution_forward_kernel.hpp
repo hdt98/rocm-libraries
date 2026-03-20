@@ -15,7 +15,7 @@
 #include "ck_tile/core/utility/env.hpp"
 #include "ck_tile/host/convolution_parameter.hpp"
 #include "ck_tile/ops/elementwise/unary_element_wise_operation.hpp"
-#include "ck_tile/ops/grouped_convolution/utils/transform_conv_fwd_to_gemm.hpp"
+#include "ck_tile/ops/grouped_convolution/utils/transform_conv_fwd_to_gemm_v2.hpp"
 #include "ck_tile/ops/grouped_convolution/utils/grouped_convolution_utils.hpp"
 
 #ifdef CK_EXPERIMENTAL_BUILDER
@@ -29,7 +29,7 @@ template <typename GroupedConvTraitsType_, typename CDElementwise_>
 struct GroupedConvFwdKernelArgs
 {
     using ConvToGemmFwdTransformer =
-        TransformConvFwdToGemm<GroupedConvTraitsType_::NDimSpatial,
+        TransformConvFwdToGemm_V2<GroupedConvTraitsType_::NDimSpatial,
                                GroupedConvTraitsType_::ConvSpecialization,
                                GroupedConvTraitsType_::VectorSizeA,
                                GroupedConvTraitsType_::VectorSizeB,
@@ -197,6 +197,11 @@ struct GroupedConvFwdKernelArgs
             transformer_.template MakeBDescriptor_N_K<typename GroupedConvTraitsType_::WeiLayout>();
         c_grid_desc_m_n =
             transformer_.template MakeCDescriptor_M_N<typename GroupedConvTraitsType_::OutLayout>();
+
+        // std::cout << "***** Tensor descriptors *******" << std::endl;
+        // print(a_grid_desc_m_k);
+        // print(b_grid_desc_n_k);
+        // print(c_grid_desc_m_n);
 
         NumGroupsToMerge = GroupedConvTraitsType_::NumGroupsToMerge;
         group_stride_a   = args.C_ * NumGroupsToMerge;
