@@ -10,36 +10,12 @@
 
 #include "rocm_vector_add_api.hpp"
 
+#include <rocm_ck/ck_type_map.hpp>
+
 #include "ck_tile/core.hpp"
 #include "ck_tile/ops/elementwise.hpp"
 
 namespace rocm_ck {
-
-/// Maps a DataType enum value to the corresponding CK Tile numeric type.
-/// Primary template is intentionally undefined — only valid specializations compile.
-template <DataType>
-struct CkTypeMap;
-
-template <>
-struct CkTypeMap<DataType::FP32>
-{
-    using type = float;
-};
-template <>
-struct CkTypeMap<DataType::FP16>
-{
-    using type = ck_tile::half_t;
-};
-template <>
-struct CkTypeMap<DataType::BF16>
-{
-    using type = ck_tile::bf16_t;
-};
-template <>
-struct CkTypeMap<DataType::FP8>
-{
-    using type = ck_tile::fp8_t;
-};
 
 /// Device function that computes c = alpha * a + beta * b.
 ///
