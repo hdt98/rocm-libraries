@@ -15,12 +15,11 @@
 #include "gemm_args.hpp"
 
 #include <rocm_ck/datatype_utils.hpp>
-#include <rocm_ck/gpu_arch.hpp>
 #include <rocm_ck/hip_check.hpp>
+#include <rocm_ck/kpack_module.hpp>
+#include <rocm_ck/typed_buffer.hpp>
 
 #include <hip/hip_runtime.h>
-
-#include <rocm_kpack/kpack.h>
 
 #include <cmath>
 #include <cstdio>
@@ -118,34 +117,9 @@ int main(int argc, char** argv)
     }
 
     // --- Open the kpack archive ---
-    kpack_archive_t archive = nullptr;
-    kpack_error_t kerr      = kpack_open(argv[1], &archive);
-    if(kerr != KPACK_SUCCESS)
-    {
-        std::fprintf(stderr, "Failed to open archive '%s' (error %d)\n", argv[1], kerr);
+    rocm_ck::KpackArchive archive;
+    if(!archive.open(argv[1]))
         return 1;
-    }
-
-    size_t arch_count = 0;
-    kpack_get_architecture_count(archive, &arch_count);
-    std::printf("Opened %s — architectures:", argv[1]);
-    for(size_t i = 0; i < arch_count; ++i)
-    {
-        const char* arch_name = nullptr;
-        kpack_get_architecture(archive, i, &arch_name);
-        std::printf("%s %s", (i > 0 ? "," : ""), arch_name);
-    }
-    std::printf("\n");
-
-    // --- Detect current GPU architecture ---
-    std::string gpu_arch = rocm_ck::get_gpu_arch();
-    if(gpu_arch.empty())
-    {
-        std::fprintf(stderr, "Failed to detect GPU architecture\n");
-        kpack_close(archive);
-        return 1;
-    }
-    std::printf("Detected GPU: %s\n", gpu_arch.c_str());
 
     // --- Problem dimensions (all divisible by tile dims for no-pad kernel) ---
     constexpr int M = 512;
@@ -192,68 +166,24 @@ int main(int argc, char** argv)
         int grid_n    = (N + k.block_tile.n - 1) / k.block_tile.n;
         int grid_size = grid_m * grid_n;
 
-        // Load kernel code object
-        void* kernel_code_object = nullptr;
-        size_t code_object_size  = 0;
-        kerr                     = kpack_get_kernel(
-            archive, variant.name, gpu_arch.c_str(), &kernel_code_object, &code_object_size);
-        if(kerr != KPACK_SUCCESS)
-        {
-            std::fprintf(stderr,
-                         "%s: no kernel for '%s' (error %d), skipping\n",
-                         variant.name,
-                         gpu_arch.c_str(),
-                         kerr);
+        // Load kernel
+        rocm_ck::KpackKernel kernel;
+        if(!kernel.load(archive, variant.name))
             continue;
-        }
 
-        // Create HIP module and get function
-        hipModule_t module            = nullptr;
-        hipFunction_t kernel_function = nullptr;
-        HIP_CHECK(hipModuleLoadData(&module, kernel_code_object));
-        HIP_CHECK(hipModuleGetFunction(&kernel_function, module, variant.name));
+        // Allocate typed device buffers
+        rocm_ck::TypedBuffer buf_a(k.a_dtype, M * K);
+        rocm_ck::TypedBuffer buf_b(k.b_dtype, K * N);
+        rocm_ck::TypedBuffer buf_c(k.c_dtype, M * N);
 
-        // Element sizes in bytes
-        int a_elem_bytes = rocm_ck::data_type_bits(k.a_dtype) / 8;
-        int b_elem_bytes = rocm_ck::data_type_bits(k.b_dtype) / 8;
-        int c_elem_bytes = rocm_ck::data_type_bits(k.c_dtype) / 8;
+        buf_a.upload(ref_a.data());
+        buf_b.upload(ref_b.data());
+        buf_c.zero();
 
-        // Fill typed host buffers from float values
-        std::vector<char> host_a(M * K * a_elem_bytes);
-        std::vector<char> host_b(K * N * b_elem_bytes);
-        std::vector<char> host_c(M * N * c_elem_bytes, 0);
-
-        for(int i = 0; i < M * K; ++i)
-            rocm_ck::float_to_typed(k.a_dtype, ref_a[i], &host_a[i * a_elem_bytes]);
-        for(int i = 0; i < K * N; ++i)
-            rocm_ck::float_to_typed(k.b_dtype, ref_b[i], &host_b[i * b_elem_bytes]);
-
-        // Allocate device buffers
-        void* device_a = nullptr;
-        void* device_b = nullptr;
-        void* device_c = nullptr;
-        HIP_CHECK(hipMalloc(&device_a, M * K * a_elem_bytes));
-        HIP_CHECK(hipMalloc(&device_b, K * N * b_elem_bytes));
-        HIP_CHECK(hipMalloc(&device_c, M * N * c_elem_bytes));
-
-        HIP_CHECK(hipMemcpy(device_a, host_a.data(), M * K * a_elem_bytes, hipMemcpyHostToDevice));
-        HIP_CHECK(hipMemcpy(device_b, host_b.data(), K * N * b_elem_bytes, hipMemcpyHostToDevice));
-        HIP_CHECK(hipMemset(device_c, 0, M * N * c_elem_bytes));
-
-        // Allocate D0 tensor for fused epilogue variants
-        void* device_d0   = nullptr;
-        int d0_elem_bytes = 0;
-        std::vector<char> host_d0_buf;
+        // Allocate D0 tensor (used by fused epilogue variants)
+        rocm_ck::TypedBuffer buf_d0(k.d0_dtype, M * N);
         if(k.num_d_tensors >= 1)
-        {
-            d0_elem_bytes = rocm_ck::data_type_bits(k.d0_dtype) / 8;
-            host_d0_buf.resize(M * N * d0_elem_bytes);
-            for(int i = 0; i < M * N; ++i)
-                rocm_ck::float_to_typed(k.d0_dtype, ref_d0[i], &host_d0_buf[i * d0_elem_bytes]);
-            HIP_CHECK(hipMalloc(&device_d0, M * N * d0_elem_bytes));
-            HIP_CHECK(hipMemcpy(
-                device_d0, host_d0_buf.data(), M * N * d0_elem_bytes, hipMemcpyHostToDevice));
-        }
+            buf_d0.upload(ref_d0.data());
 
         std::printf("%s: M=%d, N=%d, K=%d, grid=%d, block=%d\n",
                     variant.name,
@@ -271,9 +201,9 @@ int main(int argc, char** argv)
             .stride_A = stride_A,
             .stride_B = stride_B,
             .stride_C = stride_C,
-            .a        = device_a,
-            .b        = device_b,
-            .c        = device_c,
+            .a        = buf_a.ptr(),
+            .b        = buf_b.ptr(),
+            .c        = buf_c.ptr(),
         };
         constexpr int stride_D0 = N; // D0 [M x N] RowMajor
         GemmArgs1D fused_args   = {
@@ -283,12 +213,12 @@ int main(int argc, char** argv)
               .stride_A  = stride_A,
               .stride_B  = stride_B,
               .stride_E  = stride_C, // output stride matches C layout
-              .a         = device_a,
-              .b         = device_b,
-              .e         = device_c,
+              .a         = buf_a.ptr(),
+              .b         = buf_b.ptr(),
+              .e         = buf_c.ptr(),
               .stride_D0 = stride_D0,
               ._pad0     = 0,
-              .d0        = device_d0,
+              .d0        = (k.num_d_tensors >= 1) ? buf_d0.ptr() : nullptr,
         };
 
         // Launch — select args struct by D tensor count
@@ -301,7 +231,7 @@ int main(int argc, char** argv)
                                    &kernel_args_size,
                                    HIP_LAUNCH_PARAM_END};
 
-        HIP_CHECK(hipModuleLaunchKernel(kernel_function,
+        HIP_CHECK(hipModuleLaunchKernel(kernel.function(),
                                         grid_size,
                                         1,
                                         1,
@@ -315,7 +245,8 @@ int main(int argc, char** argv)
         HIP_CHECK(hipDeviceSynchronize());
 
         // Download and verify
-        HIP_CHECK(hipMemcpy(host_c.data(), device_c, M * N * c_elem_bytes, hipMemcpyDeviceToHost));
+        std::vector<float> result(M * N);
+        buf_c.download(result.data());
 
         // Select correct reference: plain GEMM or fused
         const float* ref = (k.num_d_tensors == 0) ? ref_c.data() : ref_add.data();
@@ -324,9 +255,7 @@ int main(int argc, char** argv)
         bool passed = true;
         for(int i = 0; i < M * N; ++i)
         {
-            float got      = rocm_ck::typed_to_float(k.c_dtype, &host_c[i * c_elem_bytes]);
-            float expected = ref[i];
-            if(std::fabs(got - expected) > tol * std::fabs(expected) + tol)
+            if(std::fabs(result[i] - ref[i]) > tol * std::fabs(ref[i]) + tol)
             {
                 int row = i / N;
                 int col = i % N;
@@ -334,9 +263,9 @@ int main(int argc, char** argv)
                              "  MISMATCH at (%d,%d): got %f, expected %f (diff=%e)\n",
                              row,
                              col,
-                             got,
-                             expected,
-                             got - expected);
+                             result[i],
+                             ref[i],
+                             result[i] - ref[i]);
                 passed = false;
                 break;
             }
@@ -346,18 +275,7 @@ int main(int argc, char** argv)
         if(!passed)
             all_passed = false;
         ++variants_run;
-
-        // Cleanup this variant
-        HIP_CHECK(hipFree(device_a));
-        HIP_CHECK(hipFree(device_b));
-        HIP_CHECK(hipFree(device_c));
-        if(device_d0 != nullptr)
-            HIP_CHECK(hipFree(device_d0));
-        HIP_CHECK(hipModuleUnload(module));
-        kpack_free_kernel(kernel_code_object);
     }
-
-    kpack_close(archive);
 
     if(variants_run == 0)
     {

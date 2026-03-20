@@ -11,17 +11,15 @@
 #include "rocm_vector_add_registry.hpp"
 
 #include <rocm_ck/datatype_utils.hpp>
-#include <rocm_ck/gpu_arch.hpp>
 #include <rocm_ck/hip_check.hpp>
+#include <rocm_ck/kpack_module.hpp>
+#include <rocm_ck/typed_buffer.hpp>
 
 #include <hip/hip_runtime.h>
-
-#include <rocm_kpack/kpack.h>
 
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
 #include <vector>
 
 using rocm_ck::ALL_VARIANTS;
@@ -30,58 +28,29 @@ using rocm_ck::ALL_VARIANTS_COUNT;
 /// Run a single variant: load from archive, launch kernel, verify results.
 /// Returns true if the variant passed verification.
 static bool runVariant(const rocm_ck::VariantDescriptor& variant,
-                       kpack_archive_t archive,
-                       const char* gpu_arch,
+                       const rocm_ck::KpackArchive& archive,
                        const std::vector<float>& host_a,
                        const std::vector<float>& host_b,
                        float alpha,
                        float beta)
 {
-    const int num_elements    = static_cast<int>(host_a.size());
-    const auto in_dtype       = variant.kernel.in_dtype;
-    const auto out_dtype      = variant.kernel.out_dtype;
-    const int in_dtype_bytes  = rocm_ck::data_type_bits(in_dtype) / 8;
-    const int out_dtype_bytes = rocm_ck::data_type_bits(out_dtype) / 8;
-    const size_t in_buf_size  = static_cast<size_t>(num_elements) * in_dtype_bytes;
-    const size_t out_buf_size = static_cast<size_t>(num_elements) * out_dtype_bytes;
+    const int num_elements = static_cast<int>(host_a.size());
+    const auto in_dtype    = variant.kernel.in_dtype;
+    const auto out_dtype   = variant.kernel.out_dtype;
 
-    // Load kernel code object
-    void* kernel_code_object       = nullptr;
-    size_t kernel_code_object_size = 0;
-    kpack_error_t kerr             = kpack_get_kernel(
-        archive, variant.name, gpu_arch, &kernel_code_object, &kernel_code_object_size);
-    if(kerr != KPACK_SUCCESS)
-    {
-        std::fprintf(stderr, "  %s: no kernel for '%s' (error %d)\n", variant.name, gpu_arch, kerr);
+    // Load kernel
+    rocm_ck::KpackKernel kernel;
+    if(!kernel.load(archive, variant.name))
         return false;
-    }
 
-    // Create HIP module and get function
-    hipModule_t module            = nullptr;
-    hipFunction_t kernel_function = nullptr;
-    HIP_CHECK(hipModuleLoadData(&module, kernel_code_object));
-    HIP_CHECK(hipModuleGetFunction(&kernel_function, module, variant.name));
+    // Allocate typed device buffers
+    rocm_ck::TypedBuffer buf_a(in_dtype, num_elements);
+    rocm_ck::TypedBuffer buf_b(in_dtype, num_elements);
+    rocm_ck::TypedBuffer buf_result(out_dtype, num_elements);
 
-    // Allocate device buffers (inputs use in_type size, output uses out_type size)
-    void* device_a      = nullptr;
-    void* device_b      = nullptr;
-    void* device_result = nullptr;
-    HIP_CHECK(hipMalloc(&device_a, in_buf_size));
-    HIP_CHECK(hipMalloc(&device_b, in_buf_size));
-    HIP_CHECK(hipMalloc(&device_result, out_buf_size));
-
-    // Convert float test data to typed host buffers and upload
-    std::vector<char> typed_a(in_buf_size);
-    std::vector<char> typed_b(in_buf_size);
-    for(int i = 0; i < num_elements; ++i)
-    {
-        rocm_ck::float_to_typed(in_dtype, host_a[i], typed_a.data() + i * in_dtype_bytes);
-        rocm_ck::float_to_typed(in_dtype, host_b[i], typed_b.data() + i * in_dtype_bytes);
-    }
-
-    HIP_CHECK(hipMemcpy(device_a, typed_a.data(), in_buf_size, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(device_b, typed_b.data(), in_buf_size, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemset(device_result, 0, out_buf_size));
+    buf_a.upload(host_a.data());
+    buf_b.upload(host_b.data());
+    buf_result.zero();
 
     // Launch
     const int grid_size =
@@ -99,9 +68,9 @@ static bool runVariant(const rocm_ck::VariantDescriptor& variant,
     rocm_ck::VectorAddArgs kernel_args = {.n     = num_elements,
                                           .alpha = alpha,
                                           .beta  = beta,
-                                          .a     = device_a,
-                                          .b     = device_b,
-                                          .c     = device_result};
+                                          .a     = buf_a.ptr(),
+                                          .b     = buf_b.ptr(),
+                                          .c     = buf_result.ptr()};
     size_t kernel_args_size            = sizeof(kernel_args);
     void* launch_config[]              = {HIP_LAUNCH_PARAM_BUFFER_POINTER,
                                           &kernel_args,
@@ -110,26 +79,25 @@ static bool runVariant(const rocm_ck::VariantDescriptor& variant,
                                           HIP_LAUNCH_PARAM_END};
 
     HIP_CHECK(hipModuleLaunchKernel(
-        kernel_function, grid_size, 1, 1, block_size, 1, 1, 0, nullptr, nullptr, launch_config));
+        kernel.function(), grid_size, 1, 1, block_size, 1, 1, 0, nullptr, nullptr, launch_config));
     HIP_CHECK(hipDeviceSynchronize());
 
-    // Download and verify (output uses out_type)
-    std::vector<char> typed_result(out_buf_size);
-    HIP_CHECK(hipMemcpy(typed_result.data(), device_result, out_buf_size, hipMemcpyDeviceToHost));
+    // Download and verify
+    std::vector<float> result(num_elements);
+    buf_result.download(result.data());
 
     const float tol = rocm_ck::tolerance_for(out_dtype);
     bool passed     = true;
     for(int i = 0; i < num_elements; ++i)
     {
-        float got = rocm_ck::typed_to_float(out_dtype, typed_result.data() + i * out_dtype_bytes);
         float expected = alpha * host_a[i] + beta * host_b[i];
-        if(std::fabs(got - expected) > tol)
+        if(std::fabs(result[i] - expected) > tol)
         {
             std::fprintf(stderr,
                          "  %s: MISMATCH at index %d: got %f, expected %f\n",
                          variant.name,
                          i,
-                         got,
+                         result[i],
                          expected);
             passed = false;
             break;
@@ -141,12 +109,6 @@ static bool runVariant(const rocm_ck::VariantDescriptor& variant,
                 grid_size,
                 block_size,
                 passed ? "PASSED" : "FAILED");
-
-    HIP_CHECK(hipFree(device_a));
-    HIP_CHECK(hipFree(device_b));
-    HIP_CHECK(hipFree(device_result));
-    HIP_CHECK(hipModuleUnload(module));
-    kpack_free_kernel(kernel_code_object);
 
     return passed;
 }
@@ -160,34 +122,9 @@ int main(int argc, char** argv)
     }
 
     // --- Open the kpack archive ---
-    kpack_archive_t archive = nullptr;
-    kpack_error_t kerr      = kpack_open(argv[1], &archive);
-    if(kerr != KPACK_SUCCESS)
-    {
-        std::fprintf(stderr, "Failed to open archive '%s' (error %d)\n", argv[1], kerr);
+    rocm_ck::KpackArchive archive;
+    if(!archive.open(argv[1]))
         return 1;
-    }
-
-    size_t arch_count = 0;
-    kpack_get_architecture_count(archive, &arch_count);
-    std::printf("Opened %s — architectures:", argv[1]);
-    for(size_t i = 0; i < arch_count; ++i)
-    {
-        const char* arch_name = nullptr;
-        kpack_get_architecture(archive, i, &arch_name);
-        std::printf("%s %s", (i > 0 ? "," : ""), arch_name);
-    }
-    std::printf("\n");
-
-    // --- Detect current GPU architecture ---
-    std::string gpu_arch = rocm_ck::get_gpu_arch();
-    if(gpu_arch.empty())
-    {
-        std::fprintf(stderr, "Failed to detect GPU architecture\n");
-        kpack_close(archive);
-        return 1;
-    }
-    std::printf("Detected GPU: %s\n", gpu_arch.c_str());
 
     // --- Test data (small integers exactly representable in fp16 and bf16) ---
     // bf16 has 7 mantissa bits, so only integers <= 128 are exact.
@@ -231,7 +168,7 @@ int main(int argc, char** argv)
 
     for(const auto& variant : ALL_VARIANTS)
     {
-        if(!runVariant(variant, archive, gpu_arch.c_str(), host_a, host_b, 1.0f, 1.0f))
+        if(!runVariant(variant, archive, host_a, host_b, 1.0f, 1.0f))
             all_passed = false;
     }
 
@@ -241,12 +178,9 @@ int main(int argc, char** argv)
         rocm_ck::findVariant(rocm_ck::DataType::FP32, rocm_ck::DataType::FP32, NUM_ELEMENTS);
     if(scaled_variant)
     {
-        if(!runVariant(*scaled_variant, archive, gpu_arch.c_str(), host_a, host_b, 2.0f, 0.5f))
+        if(!runVariant(*scaled_variant, archive, host_a, host_b, 2.0f, 0.5f))
             all_passed = false;
     }
-
-    // --- Cleanup ---
-    kpack_close(archive);
 
     return all_passed ? 0 : 1;
 }
