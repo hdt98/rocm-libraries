@@ -287,12 +287,58 @@ GR voffset and LR address. Both can be expressed as pure per-lane arithmetic in 
 coordinate graph -- no new instruction emission needed. All parameters are derived from
 the tile config.
 
+**Note:** The 256x256x256 tile requires Direct2LDS; without it the kernel runs out of VGPRs
+and must use a smaller tile. However, the implementation should work for any tile size that
+exhibits this bank conflict pattern. Development strategy: implement and verify on a smaller
+tile first (without Direct2LDS), then confirm it scales up to 256x256x256 with Direct2LDS.
+
 ### TODO
 
-Step 1: Enable half-wave GR pattern
-- Add `LDSBankSwizzleMode` kernel option (None, Swizzle) -- model on `ScaleSkipPermlaneMode.hpp`
-- New coordinate transform: remap GR voffset to use half-wave split (sequential cols, no rotation or XOR); LDS dest unchanged
-- Update LR address to match: with the half-wave split, each wave's LDS region now holds 2 rows per wave (not 4), so LR must read 2 rows from each of the 4 waves' regions rather than 4 contiguous rows from 4 waves' regions
+The current 8-row-per-wave GR pattern is determined by `createInternalTile` in
+`LowerTile.cpp:1409-1520`, which computes `thrTileM` based on `numElements / numWorkitems`.
+This is a generic load-balancing calculation that doesn't account for LDS bank conflicts.
 
-Step 2: Enable swizzle
-- Extend transform: add per-wave col rotation + conditional XOR pair-swap on GR; add inverse col rotation (closed-form per-lane arithmetic) on LR
+For the swizzled pattern, the GR tiling must be derived from the LR side's requirements:
+- LR constraint: one wave's MFMA reads from N wave LDS regions to get N rotations for bank
+  conflict elimination
+- GR consequence: the tiling must ensure each wave writes rows that align with what LR expects
+  from each region
+
+Why half-wave split for 16×16 MFMA: The LR needs 4 rotations to produce 16 unique bank
+groups (4 rotations × 4 SIMDIndex = 16). Each rotation comes from one wave's LDS region, so
+LR reads from all 4 wave regions. With 16 M-rows per MFMA and 4 regions, each region provides
+16/4 = 4 rows. On the GR side, 4 rows × 8 K-cols = 32 lanes = half-wave.
+
+For a 32×32 MFMA, the split would differ (32 M-rows / 4 regions = 8 rows per region = 64 lanes
+= full wave). The implementation should parameterize the split based on MFMA dimensions, not
+hardcode the half-wave assumption.
+
+1. Enable LR-driven GR pattern (start with 128×128×256 tile, no Direct2LDS)
+   1. Add kernel option
+      - Add `LDSBankSwizzleMode` kernel option (None, Swizzle) -- model on `ScaleSkipPermlaneMode.hpp`
+   2. Modify GR tiling
+      - Modify `addLoadThreadTileCT` to produce the LR-driven split pattern
+      - Change coordinate transforms so that rows per region = MFMA_M / num_regions (e.g., 16/4 = 4 rows for 16×16 MFMA), with regions offset by macM / num_regions
+      - Tile shape from `createInternalTile` can stay the same
+      - Verify: check assembly and traces for new GR pattern
+   3. Update LR address
+      - Modify `addLoadWaveTileCT` or equivalent
+      - Update LR to follow the new GR layout: each LR wave reads from all N GR wave LDS regions (`laneInSIMD // (16/N)` selects region for 16×16 MFMA with N=4)
+      - Verify: check assembly, traces, and norm should now pass
+
+2. Enable swizzle (still on 128×128×256)
+   1. Extend GR tiling: add per-wave col rotation + conditional XOR pair-swap
+      - Verify: check assembly and traces for rotation + XOR pattern
+   2. Extend LR address computation: add inverse col rotation (closed-form per-lane arithmetic)
+      - Verify: check assembly, traces, and norm should pass
+   3. Benchmark
+      - rocgdb tracing to confirm rotation pattern eliminates bank conflicts
+      - Benchmark LDS read cycles (expect 4x improvement)
+
+3. Scale up to 256×256×256 with Direct2LDS
+   1. Enable Direct2LDS path with `LDSBankSwizzleMode::Swizzle`
+   2. Verify the same tiling logic applies correctly at the larger tile size
+      - rocgdb tracing to confirm patterns match 128×128×256
+      - Ensure norm passes
+      - Check assembly
+   3. Benchmark to confirm bank conflict elimination
