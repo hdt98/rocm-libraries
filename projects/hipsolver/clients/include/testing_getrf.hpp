@@ -588,29 +588,22 @@ void testing_getrf(Arguments& argus)
     }
 
     // memory size query is necessary
-    {
-        SIZE size_dW, size_hW;
-        if constexpr(BATCHED)
-            CHECK_ROCBLAS_ERROR(hipsolver_getrf_bufferSize(
-                API, handle, params, m, n, (T**)nullptr, lda, &size_dW, &size_hW, bc));
-        else
-            CHECK_ROCBLAS_ERROR(hipsolver_getrf_bufferSize(
-                API, handle, params, m, n, (T*)nullptr, lda, &size_dW, &size_hW, bc));
+    SIZE size_dW, size_hW;
+    if constexpr(BATCHED)
+        CHECK_ROCBLAS_ERROR(hipsolver_getrf_bufferSize(
+            API, handle, params, m, n, (T**)nullptr, lda, &size_dW, &size_hW, bc));
+    else
+        CHECK_ROCBLAS_ERROR(hipsolver_getrf_bufferSize(
+            API, handle, params, m, n, (T*)nullptr, lda, &size_dW, &size_hW, bc));
 
-        if(argus.mem_query)
-        {
-            rocsolver_bench_inform(inform_mem_query, size_dW);
-            return;
-        }
+    if(argus.mem_query)
+    {
+        rocsolver_bench_inform(inform_mem_query, size_dW);
+        return;
     }
 
     if constexpr(BATCHED)
     {
-        int size_dW, size_hW;
-        CHECK_ROCBLAS_ERROR(hipsolver_getrf_bufferSize(
-            API, handle, params, m, n, (T**)nullptr, lda, &size_dW, &size_hW, bc));
-        int size_dW_elems = (size_dW + sizeof(T) - 1) / sizeof(T);
-
         // memory allocations
         host_batch_vector<T>             hA(size_A, 1, bc);
         host_batch_vector<T>             hARes(size_ARes, 1, bc);
@@ -622,7 +615,7 @@ void testing_getrf(Arguments& argus)
         device_batch_vector<T>           dA(size_A, 1, bc);
         device_strided_batch_vector<int> dIpiv(size_P, 1, stP, bc);
         device_strided_batch_vector<int> dInfo(1, 1, 1, bc);
-        device_strided_batch_vector<T>   dWork(size_dW_elems, 1, size_dW_elems, 1);
+        device_strided_batch_vector<T>   dWork(size_dW, 1, size_dW, 1);
         if(size_A)
             CHECK_HIP_ERROR(dA.memcheck());
         CHECK_HIP_ERROR(dInfo.memcheck());
@@ -684,10 +677,6 @@ void testing_getrf(Arguments& argus)
 
     else
     {
-        SIZE size_dW, size_hW;
-        CHECK_ROCBLAS_ERROR(hipsolver_getrf_bufferSize(
-            API, handle, params, m, n, (T*)nullptr, lda, &size_dW, &size_hW, bc));
-
         // memory allocations
         host_strided_batch_vector<T>     hA(size_A, 1, stA, bc);
         host_strided_batch_vector<T>     hARes(size_ARes, 1, stARes, bc);
