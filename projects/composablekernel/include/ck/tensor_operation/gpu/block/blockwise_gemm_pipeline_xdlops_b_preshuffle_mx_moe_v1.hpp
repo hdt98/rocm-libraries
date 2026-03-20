@@ -490,16 +490,16 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v1<BlockGemmPipelineSched
                                 vector_type<ComputeTypeA, KPack> a_thread_vec;
                                 vector_type<ComputeTypeB, KPack> b_thread_vec;
 
-                                auto loadA =
-                                    thread_buf_to_vec_loader<decltype(a_thread_vec),
-                                                             decltype(a_thread_buf),
-                                                             decltype(a_thread_desc_),
-                                                             ComputeTypeA,
-                                                             decltype(im_major),
-                                                             Number<0>,
-                                                             decltype(im_minor),
-                                                             decltype(k0),
-                                                             Ik>{a_thread_vec, a_thread_buf};
+                                auto loadA = thread_buf_to_vec_loader<decltype(a_thread_vec),
+                                                                      decltype(a_thread_buf),
+                                                                      decltype(a_thread_desc_),
+                                                                      ComputeTypeA,
+                                                                      decltype(im_major),
+                                                                      Number<0>,
+                                                                      decltype(im_minor),
+                                                                      decltype(k0),
+                                                                      index_expression::Ik>{
+                                    a_thread_vec, a_thread_buf};
                                 auto loadB = thread_buf_to_vec_loader<
                                     decltype(b_thread_vec),
                                     decltype(b_thread_bufs[scale_comp_buf]),
@@ -509,7 +509,8 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v1<BlockGemmPipelineSched
                                     Number<0>,
                                     decltype(in_minor),
                                     decltype(k0),
-                                    Ik>{b_thread_vec, b_thread_bufs[scale_comp_buf]};
+                                    index_expression::Ik>{b_thread_vec,
+                                                          b_thread_bufs[scale_comp_buf]};
 
                                 static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
@@ -669,7 +670,8 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v1<BlockGemmPipelineSched
                                                               Number<0>,
                                                               decltype(im_minor),
                                                               decltype(k0),
-                                                              Ik>{a_thread_vec, a_thread_buf};
+                                                              index_expression::Ik>{a_thread_vec,
+                                                                                    a_thread_buf};
                         auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                               decltype(b_thread_bufs[I0]),
                                                               decltype(b_thread_desc_),
@@ -678,7 +680,8 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v1<BlockGemmPipelineSched
                                                               Number<0>,
                                                               decltype(in_minor),
                                                               decltype(k0),
-                                                              Ik>{b_thread_vec, b_thread_bufs[I0]};
+                                                              index_expression::Ik>{
+                            b_thread_vec, b_thread_bufs[I0]};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
@@ -786,7 +789,8 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v1<BlockGemmPipelineSched
                                                               Number<0>,
                                                               decltype(im_minor),
                                                               decltype(k0),
-                                                              Ik>{a_thread_vec, a_thread_buf};
+                                                              index_expression::Ik>{a_thread_vec,
+                                                                                    a_thread_buf};
                         auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                               decltype(b_thread_bufs[I1]),
                                                               decltype(b_thread_desc_),
@@ -795,7 +799,8 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v1<BlockGemmPipelineSched
                                                               Number<0>,
                                                               decltype(in_minor),
                                                               decltype(k0),
-                                                              Ik>{b_thread_vec, b_thread_bufs[I1]};
+                                                              index_expression::Ik>{
+                            b_thread_vec, b_thread_bufs[I1]};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
@@ -873,7 +878,8 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v1<BlockGemmPipelineSched
                                                               Number<0>,
                                                               decltype(im_minor),
                                                               decltype(k0),
-                                                              Ik>{a_thread_vec, a_thread_buf};
+                                                              index_expression::Ik>{a_thread_vec,
+                                                                                    a_thread_buf};
                         auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                               decltype(b_thread_bufs[I0]),
                                                               decltype(b_thread_desc_),
@@ -882,7 +888,8 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v1<BlockGemmPipelineSched
                                                               Number<0>,
                                                               decltype(in_minor),
                                                               decltype(k0),
-                                                              Ik>{b_thread_vec, b_thread_bufs[I0]};
+                                                              index_expression::Ik>{
+                            b_thread_vec, b_thread_bufs[I0]};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 

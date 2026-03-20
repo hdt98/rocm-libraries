@@ -9,6 +9,12 @@
 
 namespace ck {
 
+/**
+ * @brief Invokes multiple functors based on an index parameter
+ * @tparam Funcs Parameter pack of functor types
+ * @details Stores a tuple of functors and provides an operator() that invokes all of them
+ * with the same index parameter. Uses static_for to iterate through the functors.
+ */
 template <typename... Funcs>
 struct FunctorInvoker
 {
@@ -16,12 +22,18 @@ struct FunctorInvoker
 
     __host__ __device__ constexpr FunctorInvoker(Funcs... fs) : funcs(ck::forward<Funcs>(fs)...) {}
 
+    /**
+     * @brief Invokes all functors with the given index
+     * @tparam I The index to pass to each functor
+     * @param i Number wrapper containing the index value
+     */
     template <index_t I>
     __host__ __device__ constexpr void operator()(ck::Number<I> i) const
     {
         invoke(i, std::index_sequence_for<Funcs...>{});
     }
 
+    private:
     template <index_t I, std::size_t... Is>
     __host__ __device__ constexpr void invoke(ck::Number<I> i, std::index_sequence<Is...>) const
     {
@@ -36,27 +48,85 @@ __host__ __device__ constexpr auto MakeFunctorInvoker(Fs&&... fs)
     return FunctorInvoker<Fs...>{ck::forward<Fs&&>(fs)...};
 }
 
-
-using Ik = index_expr::Ik;
-
-template <typename L, typename R>
-using Add = index_expr::Add<L, R>;
-
-template <typename L, typename R>
-using Mult = index_expr::Mult<L, R>;
-
-template <typename L, typename R>
-using Div = index_expr::Div<L, R>;
-
-template <typename L, typename R>
-using Mod = index_expr::Mod<L, R>;
-
+/**
+ * @brief Helper struct for evaluating compile-time index expressions
+ * @tparam T The expression type to evaluate
+ * @tparam ik The index variable value
+ * @details Provides a value member that evaluates the index expression T using
+ * the index_expression::eval_v facility
+ */
 template <typename T, index_t ik, typename Enable = void>
-struct IndexEval
+struct IndexEval;
+
+template <index_t v, index_t ik>
+struct IndexEval<Number<v>, ik, std::enable_if_t<true, void>>
 {
-    static constexpr index_t value = index_expr::eval_v<T, ik>;
+    static constexpr index_t value = v;
 };
 
+template <index_t ik>
+struct IndexEval<index_expression::Ik, ik, std::enable_if_t<true, void>>
+{
+    static constexpr index_t value = ik;
+};
+
+// TODO c++20: concepts for binary expressions to simplify SFINAE
+template <typename L, typename R, index_t ik>
+using BinaryIndexEvalEnable =
+    std::enable_if_t<!std::is_same_v<decltype(IndexEval<L, ik>::value), void> &&
+                         !std::is_same_v<decltype(IndexEval<R, ik>::value), void>,
+                     void>;
+
+template <typename L, typename R, index_t ik>
+struct IndexEval<index_expression::Add<L, R>, ik, BinaryIndexEvalEnable<L, R, ik>>
+{
+    static constexpr index_t value = IndexEval<L, ik>::value + IndexEval<R, ik>::value;
+};
+
+template <typename L, typename R, index_t ik>
+struct IndexEval<index_expression::Mult<L, R>, ik, BinaryIndexEvalEnable<L, R, ik>>
+{
+    static constexpr index_t value = IndexEval<L, ik>::value * IndexEval<R, ik>::value;
+};
+
+template <typename L, typename R, index_t ik>
+struct IndexEval<index_expression::Div<L, R>, ik, BinaryIndexEvalEnable<L, R, ik>>
+{
+    static constexpr index_t divisor = IndexEval<R, ik>::value;
+    static_assert(divisor != 0,
+                  "ck::index_expression::Div: division by zero in compile-time index expression");
+    static constexpr index_t value = IndexEval<L, ik>::value / divisor;
+};
+
+template <typename L, typename R, index_t ik>
+struct IndexEval<index_expression::Mod<L, R>, ik, BinaryIndexEvalEnable<L, R, ik>>
+{
+    static constexpr index_t divisor = IndexEval<R, ik>::value;
+    static_assert(divisor != 0,
+                  "ck::index_expression::Mod: modulo by zero in compile-time index expression");
+    static constexpr index_t value = IndexEval<L, ik>::value % divisor;
+};
+
+/**
+ * @brief Loads thread elements from buffer to vector using compile-time index expressions
+ * @tparam ThreadVec The vector type to load into
+ * @tparam ThreadBuf The buffer type to load from
+ * @tparam ThreadDesc The descriptor for thread memory layout
+ * @tparam ComputeType The computation type for the result
+ * @tparam IdxExpr Parameter pack of compile-time index expressions
+ * @details Uses index expressions to compute offsets in ThreadBuf and loads the values
+ * into the ThreadVec. The operator() accepts a compile-time index and evaluates all
+ * index expressions for that particular index value.
+ *
+ * Example:
+ * @code
+ *   // Load from buffer using index expressions Ik (the loop index) and Number<5>
+ *   using Loader = thread_buf_to_vec_loader<VecType, BufType, DescType, float,
+ *                                            index_expression::Ik, index_expression::Number<5>>;
+ *   Loader loader{thread_vec, thread_buf};
+ *   loader(Number<3>{});  // Loads at offset computed by evaluating expressions with ik=3
+ * @endcode
+ */
 template <typename ThreadVec,
           typename ThreadBuf,
           typename ThreadDesc,
@@ -72,16 +142,21 @@ struct thread_buf_to_vec_loader
     {
     }
 
+    /**
+     * @brief Loads a single element from buffer to vector for the given index
+     * @tparam ik The index value for which to evaluate the index expressions
+     */
     template <index_t ik>
     __host__ __device__ constexpr void operator()(Number<ik>) const
     {
+        // TODO c++20: ThreadDesc could be an auto parameter, but clang doesn't support auto
+        // non-type template parameters yet
         constexpr auto thread_desc = ThreadDesc{};
-        constexpr auto idx_tuple = ck::make_tuple(Number<index_expr::eval_v<IdxExpr, ik>>{}...);
-        constexpr auto offset    = thread_desc.CalculateOffset(idx_tuple);
+        constexpr auto idx_tuple   = ck::make_tuple(Number<IndexEval<IdxExpr, ik>::value>{}...);
+        constexpr auto offset      = thread_desc.CalculateOffset(idx_tuple);
 
         auto& target = thread_vec.template AsType<ComputeType>()(Number<ik>{});
         target       = thread_buf[Number<offset>{}];
     }
 };
 } // namespace ck
-

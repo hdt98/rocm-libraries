@@ -289,24 +289,26 @@ struct BlockwiseGemmDpp_ak0mak1_bk0nbk1_m0n0m1n1m2n2
                     vector_type<ABDataType, KPack> a_thread_vec;
                     vector_type<ABDataType, KPack> b_thread_vec;
 
-                    auto loadA =
-                        thread_buf_to_vec_loader<decltype(a_thread_vec),
-                                                 decltype(a_thread_buf),
-                                                 decltype(a_thread_desc_),
-                                                 ABDataType,
-                                                 Number<0>,
-                                                 Number<0>,
-                                                 Number<0>,
-                                                 Add<Ik, Number<k>>>{a_thread_vec, a_thread_buf};
-                    auto loadB =
-                        thread_buf_to_vec_loader<decltype(b_thread_vec),
-                                                 decltype(b_thread_buf),
-                                                 decltype(b_thread_desc_),
-                                                 ABDataType,
-                                                 Number<0>,
-                                                 Number<0>,
-                                                 Number<0>,
-                                                 Add<Ik, Number<k>>>{b_thread_vec, b_thread_buf};
+                    auto loadA = thread_buf_to_vec_loader<
+                        decltype(a_thread_vec),
+                        decltype(a_thread_buf),
+                        decltype(a_thread_desc_),
+                        ABDataType,
+                        Number<0>,
+                        Number<0>,
+                        Number<0>,
+                        index_expression::Add<index_expression::Ik, Number<k>>>{a_thread_vec,
+                                                                                a_thread_buf};
+                    auto loadB = thread_buf_to_vec_loader<
+                        decltype(b_thread_vec),
+                        decltype(b_thread_buf),
+                        decltype(b_thread_desc_),
+                        ABDataType,
+                        Number<0>,
+                        Number<0>,
+                        Number<0>,
+                        index_expression::Add<index_expression::Ik, Number<k>>>{b_thread_vec,
+                                                                                b_thread_buf};
 
                     static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 

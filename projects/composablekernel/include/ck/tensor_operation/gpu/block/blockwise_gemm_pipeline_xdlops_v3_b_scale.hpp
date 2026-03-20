@@ -441,7 +441,8 @@ struct BlockwiseGemmXdlops_pipeline_v3_b_scale<BlockGemmPipelineScheduler::Intra
                                                                   decltype(m0),
                                                                   Number<0>,
                                                                   decltype(k0),
-                                                                  Ik>{a_thread_vec, a_thread_buf};
+                                                                  index_expression::Ik>{
+                                a_thread_vec, a_thread_buf};
                             auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                                   decltype(b_thread_buf),
                                                                   decltype(b_thread_desc_),
@@ -449,7 +450,8 @@ struct BlockwiseGemmXdlops_pipeline_v3_b_scale<BlockGemmPipelineScheduler::Intra
                                                                   decltype(n0),
                                                                   Number<0>,
                                                                   decltype(k0),
-                                                                  Ik>{b_thread_vec, b_thread_buf};
+                                                                  index_expression::Ik>{
+                                b_thread_vec, b_thread_buf};
 
                             static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
@@ -513,7 +515,8 @@ struct BlockwiseGemmXdlops_pipeline_v3_b_scale<BlockGemmPipelineScheduler::Intra
                                                               decltype(m0),
                                                               Number<0>,
                                                               decltype(k0),
-                                                              Ik>{a_thread_vec, a_thread_buf};
+                                                              index_expression::Ik>{a_thread_vec,
+                                                                                    a_thread_buf};
                         auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                               decltype(b_thread_buf),
                                                               decltype(b_thread_desc_),
@@ -521,7 +524,8 @@ struct BlockwiseGemmXdlops_pipeline_v3_b_scale<BlockGemmPipelineScheduler::Intra
                                                               decltype(n0),
                                                               Number<0>,
                                                               decltype(k0),
-                                                              Ik>{b_thread_vec, b_thread_buf};
+                                                              index_expression::Ik>{b_thread_vec,
+                                                                                    b_thread_buf};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
