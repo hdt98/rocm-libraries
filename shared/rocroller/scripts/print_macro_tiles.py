@@ -68,14 +68,8 @@ def mfma_iter(a0, b0):
     b_half = b0 // 4  # 0 or 1
     a_local = a0 % 4
     b_local = b0 % 4
-    quadrant = a_half * 2 + b_half  # 0,1,2,3 but order is (0,0),(1,0),(0,1),(1,1)
-    # Quadrant order: Q0=(a<4,b<4), Q1=(a>=4,b<4), Q2=(a<4,b>=4), Q3=(a>=4,b>=4)
-    q_base = [0, 32, 64, 96][a_half + b_half * 2]  # note: b_half*2 because Q2 is (a<4,b>=4)
-    # Wait, let me re-derive from the code order:
-    # Q1: a0=[0..3], b0=[0..3]  -> base 0
-    # Q2: a0=[4..7], b0=[0..3]  -> base 32
-    # Q3: a0=[0..3], b0=[4..7]  -> base 64
-    # Q4: a0=[4..7], b0=[4..7]  -> base 96
+    # Quadrant order: Q0=(a<4,b<4) base 0, Q1=(a>=4,b<4) base 32,
+    #                 Q2=(a<4,b>=4) base 64, Q3=(a>=4,b>=4) base 96
     q_base = (a_half + b_half * 2) * 32  # a_half=0,b_half=0->0; a_half=1,b_half=0->32; etc.
     offset = b_local * 8 + a_local * 2
     return q_base + offset, q_base + offset + 1
