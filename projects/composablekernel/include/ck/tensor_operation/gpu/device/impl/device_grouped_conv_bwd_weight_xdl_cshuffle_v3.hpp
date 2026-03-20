@@ -615,8 +615,13 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
                 // Cap k_batch_ to 128 to avoid accuracy issues
                 k_batch_ = std::min(k_batch_, 128);
 
-                ck::LogInfo("[SPLIT-K AUTODEDUCE] k_batch max value: ", k_batch_max);
-                ck::LogInfo("[SPLIT-K AUTODEDUCE] Final k_batch value: ", k_batch_);
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "[SPLIT-K AUTODEDUCE] k_batch max value: " << k_batch_max
+                              << std::endl;
+                    std::cout << "[SPLIT-K AUTODEDUCE] Final k_batch value: " << k_batch_
+                              << std::endl;
+                }
             }
             else
             {

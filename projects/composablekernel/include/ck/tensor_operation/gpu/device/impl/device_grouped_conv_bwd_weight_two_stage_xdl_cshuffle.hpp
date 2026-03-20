@@ -707,8 +707,11 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                 const auto k_batch_max = static_cast<index_t>((gemmK - 1) / KPerBlock);
                 k_batch_               = std::max(std::min(k_batch_, k_batch_max), 1);
 
-                ck::LogInfo("[SPLIT-K AUTODEDUCE] k_batch max value: ", k_batch_max);
-                ck::LogInfo("[SPLIT-K AUTODEDUCE] Final k_batch value: ", k_batch_);
+                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+                {
+                    std::cout << "[SPLIT-K AUTODEDUCE] k_batch max value: " << k_batch_max << std::endl;
+                    std::cout << "[SPLIT-K AUTODEDUCE] Final k_batch value: " << k_batch_ << std::endl;
+                }
             }
             else
             {
