@@ -52,6 +52,9 @@ struct GridwiseGemmLoadWave<TileLoadThreadGroup, 1>
                                                const BBlockTransferStep& b_block_copy_step,
                                                index_t num_loop)
     {
+        // sched_group_barrier hints force VMEM reads (0x20) to issue before
+        // address-advance VALU (0x02), so loads are in-flight during computation.
+
         // global read 0: issue VMEM loads, then VALU for address advance
         a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
         __builtin_amdgcn_sched_group_barrier(0x20, 4, 0); // prioritize VMEM reads

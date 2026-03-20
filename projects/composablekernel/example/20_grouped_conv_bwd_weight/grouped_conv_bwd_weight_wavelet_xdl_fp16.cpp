@@ -19,17 +19,17 @@ using DeviceConvBwdWeightInstance =
     ck::tensor_operation::device::DeviceGroupedConvBwdWeight_Xdl_WaveletModel_CShuffleV3<
         NDimSpatial,
         ck::tuple_element_t<NDimSpatial - 1,
-                            ck::Tuple<ck::tensor_layout::convolution::GNWC,
-                                      ck::tensor_layout::convolution::GNHWC,
-                                      ck::tensor_layout::convolution::GNDHWC>>,
+                            ck::Tuple<ck::tensor_layout::convolution::NWGC,
+                                      ck::tensor_layout::convolution::NHWGC,
+                                      ck::tensor_layout::convolution::NDHWGC>>,
         ck::tuple_element_t<NDimSpatial - 1,
                             ck::Tuple<ck::tensor_layout::convolution::GKXC,
                                       ck::tensor_layout::convolution::GKYXC,
                                       ck::tensor_layout::convolution::GKZYXC>>,
         ck::tuple_element_t<NDimSpatial - 1,
-                            ck::Tuple<ck::tensor_layout::convolution::GNWK,
-                                      ck::tensor_layout::convolution::GNHWK,
-                                      ck::tensor_layout::convolution::GNDHWK>>,
+                            ck::Tuple<ck::tensor_layout::convolution::NWGK,
+                                      ck::tensor_layout::convolution::NHWGK,
+                                      ck::tensor_layout::convolution::NDHWGK>>,
         InDataType,           // InDataType
         WeiDataType,          // WeiDataType
         OutDataType,          // OutDataType
