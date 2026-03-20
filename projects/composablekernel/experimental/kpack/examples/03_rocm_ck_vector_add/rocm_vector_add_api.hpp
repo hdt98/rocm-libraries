@@ -134,9 +134,9 @@ consteval std::array<TensorDesc, 3> resolve_tensors(ElementwiseSignature sig)
                    : sig.dtype   ? *sig.dtype
                                  : throw "out_dtype unresolvable: set out_dtype or dtype";
 
-    return {TensorDesc{"A", a, 1, TensorDir::In, false},
-            TensorDesc{"B", b, 1, TensorDir::In, false},
-            TensorDesc{"out", out, 1, TensorDir::Out, false}};
+    return {TensorDesc{"A", a, 1, TensorDir::In, Layout::Contiguous},
+            TensorDesc{"B", b, 1, TensorDir::In, Layout::Contiguous},
+            TensorDesc{"out", out, 1, TensorDir::Out, Layout::Contiguous}};
 }
 
 // --- resolve_tensors compile-time tests ---
@@ -169,7 +169,9 @@ static_assert(resolve_tensors({.dtype = DataType::FP32})[2].rank == 1);
 static_assert(resolve_tensors({.dtype = DataType::FP32})[0].direction == TensorDir::In);
 static_assert(resolve_tensors({.dtype = DataType::FP32})[1].direction == TensorDir::In);
 static_assert(resolve_tensors({.dtype = DataType::FP32})[2].direction == TensorDir::Out);
-static_assert(!resolve_tensors({.dtype = DataType::FP32})[0].optional);
+static_assert(resolve_tensors({.dtype = DataType::FP32})[0].layout == Layout::Contiguous);
+static_assert(resolve_tensors({.dtype = DataType::FP32})[1].layout == Layout::Contiguous);
+static_assert(resolve_tensors({.dtype = DataType::FP32})[2].layout == Layout::Contiguous);
 
 // Error cases (uncommenting would produce consteval compile errors):
 // resolve_tensors({})                                     — nothing resolvable

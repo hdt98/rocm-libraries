@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: MIT
 //
 // Common vocabulary type for resolved tensor metadata.
-// Captures dtype, name, rank, direction, and optional flag — used as the
+// Captures dtype, name, rank, direction, and layout — used as the
 // internal intermediate between user-facing Signature structs and make_kernel().
 
 #pragma once
 
 #include <rocm_ck/datatype_utils.hpp>
+#include <rocm_ck/layout.hpp>
 
 #include <string_view>
 
@@ -31,7 +32,7 @@ struct TensorDesc
     DataType dtype;          // element type
     int rank            = 2; // dimensions
     TensorDir direction = TensorDir::In;
-    bool optional       = false;
+    Layout layout       = Layout::Row; // default: row-major rank-2
 };
 
 } // namespace rocm_ck
