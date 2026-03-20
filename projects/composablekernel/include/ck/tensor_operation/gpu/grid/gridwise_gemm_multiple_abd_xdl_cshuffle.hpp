@@ -363,18 +363,18 @@ struct GridwiseGemmMultipleABD_xdl_cshuffle
         if(!(M == e_grid_desc_m_n.GetLength(I0) && N == e_grid_desc_m_n.GetLength(I1) && AK == BK))
         {
             ck::LogInfo("CheckValidity failed: descriptor inconsistency.",
-                              " M=",
-                              M,
-                              " E_M=",
-                              e_grid_desc_m_n.GetLength(I0),
-                              " N=",
-                              N,
-                              " E_N=",
-                              e_grid_desc_m_n.GetLength(I1),
-                              " AK=",
-                              AK,
-                              " BK=",
-                              BK);
+                        " M=",
+                        M,
+                        " E_M=",
+                        e_grid_desc_m_n.GetLength(I0),
+                        " N=",
+                        N,
+                        " E_N=",
+                        e_grid_desc_m_n.GetLength(I1),
+                        " AK=",
+                        AK,
+                        " BK=",
+                        BK);
             return false;
         }
 
@@ -405,12 +405,12 @@ struct GridwiseGemmMultipleABD_xdl_cshuffle
         if(!valid)
         {
             ck::LogInfo("CheckValidity failed: A/B/D tensor size or dimension mismatch.",
-                              " M=",
-                              M,
-                              " N=",
-                              N,
-                              " AK=",
-                              AK);
+                        " M=",
+                        M,
+                        " N=",
+                        N,
+                        " AK=",
+                        AK);
             return false;
         }
 
@@ -418,18 +418,18 @@ struct GridwiseGemmMultipleABD_xdl_cshuffle
         if(!(M % MPerBlock == 0 && N % NPerBlock == 0 && AK % KPerBlock == 0))
         {
             ck::LogInfo("CheckValidity failed: tile size divisibility.",
-                              " M=",
-                              M,
-                              " MPerBlock=",
-                              MPerBlock,
-                              " N=",
-                              N,
-                              " NPerBlock=",
-                              NPerBlock,
-                              " AK=",
-                              AK,
-                              " KPerBlock=",
-                              KPerBlock);
+                        " M=",
+                        M,
+                        " MPerBlock=",
+                        MPerBlock,
+                        " N=",
+                        N,
+                        " NPerBlock=",
+                        NPerBlock,
+                        " AK=",
+                        AK,
+                        " KPerBlock=",
+                        KPerBlock);
             return false;
         }
 
@@ -439,12 +439,12 @@ struct GridwiseGemmMultipleABD_xdl_cshuffle
         if(!GridwiseGemmPipe::IsSupported(num_k_loop))
         {
             ck::LogInfo("CheckValidity failed: pipeline not supported.",
-                              " num_k_loop=",
-                              num_k_loop,
-                              " AK=",
-                              AK,
-                              " KPerBlock=",
-                              KPerBlock);
+                        " num_k_loop=",
+                        num_k_loop,
+                        " AK=",
+                        AK,
+                        " KPerBlock=",
+                        KPerBlock);
             return false;
         }
 
@@ -461,8 +461,8 @@ struct GridwiseGemmMultipleABD_xdl_cshuffle
         if(!(e_grid_desc_m_n.GetElementSpaceSize() * sizeof(EDataType) <= TwoGB))
         {
             ck::LogInfo("CheckValidity failed: E tensor size exceeds 2GB limit.",
-                              " E_bytes=",
-                              e_grid_desc_m_n.GetElementSpaceSize() * sizeof(EDataType));
+                        " E_bytes=",
+                        e_grid_desc_m_n.GetElementSpaceSize() * sizeof(EDataType));
             return false;
         }
 

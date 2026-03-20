@@ -863,7 +863,13 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
         // Check if all descs are valid
         if(!(arg.is_split_valid_ && arg.gemms_count_ == arg.valid_gemms_count_))
         {
-            ck::LogInfo("Invalid split descriptors: is_split_valid_=", arg.is_split_valid_, ", gemms_count_=", arg.gemms_count_, ", valid_gemms_count_=", arg.valid_gemms_count_, ".");
+            ck::LogInfo("Invalid split descriptors: is_split_valid_=",
+                        arg.is_split_valid_,
+                        ", gemms_count_=",
+                        arg.gemms_count_,
+                        ", valid_gemms_count_=",
+                        arg.valid_gemms_count_,
+                        ".");
             return false;
         }
         // check device
@@ -912,7 +918,17 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
 
                 if(!(X == 1 && ConvStride == 1 && LeftPad == 0 && RightPad == 0))
                 {
-                    ck::LogInfo("Filter1x1Stride1Pad0 specialization: dim ", i, " does not match (filter_size=", X, ", stride=", ConvStride, ", left_pad=", LeftPad, ", right_pad=", RightPad, ").");
+                    ck::LogInfo("Filter1x1Stride1Pad0 specialization: dim ",
+                                i,
+                                " does not match (filter_size=",
+                                X,
+                                ", stride=",
+                                ConvStride,
+                                ", left_pad=",
+                                LeftPad,
+                                ", right_pad=",
+                                RightPad,
+                                ").");
                     return false;
                 }
             }
@@ -929,7 +945,15 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
 
                 if(!(X == 1 && LeftPad == 0 && RightPad == 0))
                 {
-                    ck::LogInfo("Filter1x1Pad0 specialization: dim ", i, " does not match (filter_size=", X, ", left_pad=", LeftPad, ", right_pad=", RightPad, ").");
+                    ck::LogInfo("Filter1x1Pad0 specialization: dim ",
+                                i,
+                                " does not match (filter_size=",
+                                X,
+                                ", left_pad=",
+                                LeftPad,
+                                ", right_pad=",
+                                RightPad,
+                                ").");
                     return false;
                 }
             }
@@ -947,7 +971,11 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
 
                 if(filter_spatial_dim != I3)
                 {
-                    ck::LogInfo("Filter3x3 specialization: dim ", i, " filter_size=", filter_spatial_dim, " != 3.");
+                    ck::LogInfo("Filter3x3 specialization: dim ",
+                                i,
+                                " filter_size=",
+                                filter_spatial_dim,
+                                " != 3.");
                     return false;
                 }
             }
@@ -969,7 +997,13 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
             // Check access per C
             if(!(ABlockTransferSrcVectorDim == 2 && C % ABlockTransferSrcScalarPerVector == 0))
             {
-                ck::LogInfo("[A Layout] C=", C, " is not a multiple of ABlockTransferSrcScalarPerVector=", ABlockTransferSrcScalarPerVector, " (ABlockTransferSrcVectorDim=", ABlockTransferSrcVectorDim, ").");
+                ck::LogInfo("[A Layout] C=",
+                            C,
+                            " is not a multiple of ABlockTransferSrcScalarPerVector=",
+                            ABlockTransferSrcScalarPerVector,
+                            " (ABlockTransferSrcVectorDim=",
+                            ABlockTransferSrcVectorDim,
+                            ").");
                 return false;
             }
         }
@@ -990,7 +1024,13 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
         {
             if(!(BBlockTransferSrcVectorDim == 2 && C % BBlockTransferSrcScalarPerVector == 0))
             {
-                ck::LogInfo("[B Layout] C=", C, " is not a multiple of BBlockTransferSrcScalarPerVector=", BBlockTransferSrcScalarPerVector, " (BBlockTransferSrcVectorDim=", BBlockTransferSrcVectorDim, ").");
+                ck::LogInfo("[B Layout] C=",
+                            C,
+                            " is not a multiple of BBlockTransferSrcScalarPerVector=",
+                            BBlockTransferSrcScalarPerVector,
+                            " (BBlockTransferSrcVectorDim=",
+                            BBlockTransferSrcVectorDim,
+                            ").");
                 return false;
             }
         }
@@ -1009,7 +1049,11 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
         {
             if(!(K % CDEBlockTransferScalarPerVector_NPerBlock == 0))
             {
-                ck::LogInfo("[E Layout] K=", K, " is not a multiple of CDEBlockTransferScalarPerVector_NPerBlock=", CDEBlockTransferScalarPerVector_NPerBlock, ".");
+                ck::LogInfo("[E Layout] K=",
+                            K,
+                            " is not a multiple of CDEBlockTransferScalarPerVector_NPerBlock=",
+                            CDEBlockTransferScalarPerVector_NPerBlock,
+                            ".");
                 return false;
             }
         }
@@ -1296,7 +1340,6 @@ struct DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor
 
         return str.str();
     }
-
 
 #ifdef CK_EXPERIMENTAL_BUILDER
     std::string GetInstanceString() const override

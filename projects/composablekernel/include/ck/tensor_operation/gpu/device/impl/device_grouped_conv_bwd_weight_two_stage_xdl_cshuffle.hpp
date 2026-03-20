@@ -709,8 +709,10 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
 
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
                 {
-                    std::cout << "[SPLIT-K AUTODEDUCE] k_batch max value: " << k_batch_max << std::endl;
-                    std::cout << "[SPLIT-K AUTODEDUCE] Final k_batch value: " << k_batch_ << std::endl;
+                    std::cout << "[SPLIT-K AUTODEDUCE] k_batch max value: " << k_batch_max
+                              << std::endl;
+                    std::cout << "[SPLIT-K AUTODEDUCE] Final k_batch value: " << k_batch_
+                              << std::endl;
                 }
             }
             else
@@ -1820,7 +1822,11 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                 {
                     if(num_k_loop <= GridwiseGemm64::BlockwiseGemmPipe::PrefetchStages)
                     {
-                        ck::LogInfo("num_k_loop=", num_k_loop, " <= PrefetchStages=", GridwiseGemm64::BlockwiseGemmPipe::PrefetchStages, " for wave64.");
+                        ck::LogInfo("num_k_loop=",
+                                    num_k_loop,
+                                    " <= PrefetchStages=",
+                                    GridwiseGemm64::BlockwiseGemmPipe::PrefetchStages,
+                                    " for wave64.");
                         return false;
                     }
                 }
@@ -1843,7 +1849,11 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                 {
                     if(num_k_loop <= GridwiseGemm32::BlockwiseGemmPipe::PrefetchStages)
                     {
-                        ck::LogInfo("num_k_loop=", num_k_loop, " <= PrefetchStages=", GridwiseGemm32::BlockwiseGemmPipe::PrefetchStages, " for wave32.");
+                        ck::LogInfo("num_k_loop=",
+                                    num_k_loop,
+                                    " <= PrefetchStages=",
+                                    GridwiseGemm32::BlockwiseGemmPipe::PrefetchStages,
+                                    " for wave32.");
                         return false;
                     }
                 }
@@ -1856,7 +1866,9 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
             // TODO: this is needed because there is a bug
             if(arg.k_batch_ > 1)
             {
-                ck::LogInfo("wave32 with k_batch_>1 not supported (bug workaround), k_batch_=", arg.k_batch_, ".");
+                ck::LogInfo("wave32 with k_batch_>1 not supported (bug workaround), k_batch_=",
+                            arg.k_batch_,
+                            ".");
                 return false;
             }
         }
@@ -1865,7 +1877,9 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
         // if workspace is not allocated
         if(!arg.p_workspace_)
         {
-            ck::LogInfo("Warning: Workspace for " "DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle::Argument is not " "allocated, use SetWorkSpacePointer.");
+            ck::LogInfo("Warning: Workspace for "
+                        "DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle::Argument is not "
+                        "allocated, use SetWorkSpacePointer.");
             return false;
         }
         if(!ck::is_xdl_wmma_supported<ComputeTypeA, ComputeTypeB, MPerXDL, NPerXDL>())
@@ -1906,7 +1920,15 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
                 if(!(arg.filter_spatial_lengths_[i] == 1 && arg.conv_filter_strides_[i] == 1 &&
                      arg.input_left_pads_[i] == 0 && arg.input_right_pads_[i] == 0))
                 {
-                    ck::LogInfo("Filter1x1Stride1Pad0: dim ", i, " does not match (filter=", arg.filter_spatial_lengths_[i], ", stride=", arg.conv_filter_strides_[i], ", pad=", arg.input_left_pads_[i], ").");
+                    ck::LogInfo("Filter1x1Stride1Pad0: dim ",
+                                i,
+                                " does not match (filter=",
+                                arg.filter_spatial_lengths_[i],
+                                ", stride=",
+                                arg.conv_filter_strides_[i],
+                                ", pad=",
+                                arg.input_left_pads_[i],
+                                ").");
                     return false;
                 }
             }
@@ -1917,17 +1939,33 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
             // support only if whole M and N can be proccessed on one block
             if(!(GemmM <= MPerBlock && GemmN <= NPerBlock))
             {
-                ck::LogInfo("NumGroupsToMerge>1: GemmM=", GemmM, " or GemmN=", GemmN, " exceeds block size (MPerBlock=", MPerBlock, ", NPerBlock=", NPerBlock, ").");
+                ck::LogInfo("NumGroupsToMerge>1: GemmM=",
+                            GemmM,
+                            " or GemmN=",
+                            GemmN,
+                            " exceeds block size (MPerBlock=",
+                            MPerBlock,
+                            ", NPerBlock=",
+                            NPerBlock,
+                            ").");
                 return false;
             }
             if(!(arg.Conv_C_ == 1 && arg.Conv_K_ == 1))
             {
-                ck::LogInfo("NumGroupsToMerge>1: Conv_C_=", arg.Conv_C_, " and Conv_K_=", arg.Conv_K_, " must both be 1.");
+                ck::LogInfo("NumGroupsToMerge>1: Conv_C_=",
+                            arg.Conv_C_,
+                            " and Conv_K_=",
+                            arg.Conv_K_,
+                            " must both be 1.");
                 return false;
             }
             if(arg.Conv_G_ % NumGroupsToMerge != 0)
             {
-                ck::LogInfo("NumGroupsToMerge>1: Conv_G_=", arg.Conv_G_, " not divisible by NumGroupsToMerge=", NumGroupsToMerge, ".");
+                ck::LogInfo("NumGroupsToMerge>1: Conv_G_=",
+                            arg.Conv_G_,
+                            " not divisible by NumGroupsToMerge=",
+                            NumGroupsToMerge,
+                            ".");
                 return false;
             }
         }
@@ -1945,13 +1983,21 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
             if(!(arg.Conv_K_ == 1 && arg.compute_ptr_offset_of_batch_.BatchStrideA_ == 1 &&
                  NumGroupsToMerge > 1))
             {
-                ck::LogInfo("Conv_K_=", arg.Conv_K_, " not multiple of ABlockTransferSrcScalarPerVector=", ABlockTransferSrcScalarPerVector, " and fallback conditions not met.");
+                ck::LogInfo("Conv_K_=",
+                            arg.Conv_K_,
+                            " not multiple of ABlockTransferSrcScalarPerVector=",
+                            ABlockTransferSrcScalarPerVector,
+                            " and fallback conditions not met.");
                 return false;
             }
             if(!(arg.Conv_C_ == 1 && arg.compute_ptr_offset_of_batch_.BatchStrideB_ == 1 &&
                  NumGroupsToMerge > 1))
             {
-                ck::LogInfo("Conv_C_=", arg.Conv_C_, " not multiple of BBlockTransferSrcScalarPerVector=", BBlockTransferSrcScalarPerVector, " and fallback conditions not met.");
+                ck::LogInfo("Conv_C_=",
+                            arg.Conv_C_,
+                            " not multiple of BBlockTransferSrcScalarPerVector=",
+                            BBlockTransferSrcScalarPerVector,
+                            " and fallback conditions not met.");
                 return false;
             }
         }
@@ -1959,14 +2005,22 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
         // vector load A/B matrix from global memory
         if(!(ABlockTransferSrcVectorDim == 1 && BBlockTransferSrcVectorDim == 1))
         {
-            ck::LogInfo("ABlockTransferSrcVectorDim=", ABlockTransferSrcVectorDim, " or BBlockTransferSrcVectorDim=", BBlockTransferSrcVectorDim, " is not 1 (required for this solver).");
+            ck::LogInfo("ABlockTransferSrcVectorDim=",
+                        ABlockTransferSrcVectorDim,
+                        " or BBlockTransferSrcVectorDim=",
+                        BBlockTransferSrcVectorDim,
+                        " is not 1 (required for this solver).");
             return false;
         }
 
         // vector store C matrix into global memory
         if(!(arg.Conv_C_ % CBlockTransferScalarPerVector_NWaveNPerXdl == 0))
         {
-            ck::LogInfo("Conv_C_=", arg.Conv_C_, " not multiple of CBlockTransferScalarPerVector_NWaveNPerXdl=", CBlockTransferScalarPerVector_NWaveNPerXdl, ".");
+            ck::LogInfo("Conv_C_=",
+                        arg.Conv_C_,
+                        " not multiple of CBlockTransferScalarPerVector_NWaveNPerXdl=",
+                        CBlockTransferScalarPerVector_NWaveNPerXdl,
+                        ".");
             return false;
         }
 
@@ -1975,13 +2029,21 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
         {
             if((arg.Conv_G_ * arg.Conv_C_) % TransposeTransferDstScalarPerVector != 0)
             {
-                ck::LogInfo("Conv_G_ * Conv_C_=", (arg.Conv_G_ * arg.Conv_C_), " not multiple of TransposeTransferDstScalarPerVector=", TransposeTransferDstScalarPerVector, ".");
+                ck::LogInfo("Conv_G_ * Conv_C_=",
+                            (arg.Conv_G_ * arg.Conv_C_),
+                            " not multiple of TransposeTransferDstScalarPerVector=",
+                            TransposeTransferDstScalarPerVector,
+                            ".");
                 return false;
             }
 
             if((arg.Conv_G_ * arg.Conv_K_) % TransposeTransferDstScalarPerVector != 0)
             {
-                ck::LogInfo("Conv_G_ * Conv_K_=", (arg.Conv_G_ * arg.Conv_K_), " not multiple of TransposeTransferDstScalarPerVector=", TransposeTransferDstScalarPerVector, ".");
+                ck::LogInfo("Conv_G_ * Conv_K_=",
+                            (arg.Conv_G_ * arg.Conv_K_),
+                            " not multiple of TransposeTransferDstScalarPerVector=",
+                            TransposeTransferDstScalarPerVector,
+                            ".");
                 return false;
             }
 
@@ -1992,13 +2054,21 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
 
             if(input_spatial_acum % TransposeTransferSrcScalarPerVector != 0)
             {
-                ck::LogInfo("input_spatial_acum=", input_spatial_acum, " not multiple of TransposeTransferSrcScalarPerVector=", TransposeTransferSrcScalarPerVector, ".");
+                ck::LogInfo("input_spatial_acum=",
+                            input_spatial_acum,
+                            " not multiple of TransposeTransferSrcScalarPerVector=",
+                            TransposeTransferSrcScalarPerVector,
+                            ".");
                 return false;
             }
 
             if(output_spatial_acum % TransposeTransferSrcScalarPerVector != 0)
             {
-                ck::LogInfo("output_spatial_acum=", output_spatial_acum, " not multiple of TransposeTransferSrcScalarPerVector=", TransposeTransferSrcScalarPerVector, ".");
+                ck::LogInfo("output_spatial_acum=",
+                            output_spatial_acum,
+                            " not multiple of TransposeTransferSrcScalarPerVector=",
+                            TransposeTransferSrcScalarPerVector,
+                            ".");
                 return false;
             }
 
@@ -2006,7 +2076,13 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
             if(!(arg.a_out_transpose_desc_.GetElementSpaceSize() * sizeof(ADataType) <= TwoGB &&
                  arg.b_out_transpose_desc_.GetElementSpaceSize() * sizeof(BDataType) <= TwoGB))
             {
-                ck::LogInfo("Tensor(s) exceed 2GB limit (a_transpose=", arg.a_out_transpose_desc_.GetElementSpaceSize() * sizeof(ADataType), ", b_transpose=", arg.b_out_transpose_desc_.GetElementSpaceSize() * sizeof(BDataType), ", limit=", TwoGB, ").");
+                ck::LogInfo("Tensor(s) exceed 2GB limit (a_transpose=",
+                            arg.a_out_transpose_desc_.GetElementSpaceSize() * sizeof(ADataType),
+                            ", b_transpose=",
+                            arg.b_out_transpose_desc_.GetElementSpaceSize() * sizeof(BDataType),
+                            ", limit=",
+                            TwoGB,
+                            ").");
                 return false;
             }
         }

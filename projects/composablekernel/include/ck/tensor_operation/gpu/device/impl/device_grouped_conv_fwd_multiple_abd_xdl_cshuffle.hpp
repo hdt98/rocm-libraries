@@ -1557,7 +1557,17 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
                 if(!(SpatialDim == 1 && ConvStride == 1 && LeftPad == 0 && RightPad == 0))
                 {
-                    ck::LogInfo("Filter1x1Stride1Pad0 specialization: dim ", i, " does not match (filter_size=", SpatialDim, ", stride=", ConvStride, ", left_pad=", LeftPad, ", right_pad=", RightPad, ").");
+                    ck::LogInfo("Filter1x1Stride1Pad0 specialization: dim ",
+                                i,
+                                " does not match (filter_size=",
+                                SpatialDim,
+                                ", stride=",
+                                ConvStride,
+                                ", left_pad=",
+                                LeftPad,
+                                ", right_pad=",
+                                RightPad,
+                                ").");
                     return false;
                 }
             }
@@ -1574,7 +1584,15 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
                 if(!(SpatialDim == 1 && LeftPad == 0 && RightPad == 0))
                 {
-                    ck::LogInfo("Filter1x1Pad0 specialization: dim ", i, " does not match (filter_size=", SpatialDim, ", left_pad=", LeftPad, ", right_pad=", RightPad, ").");
+                    ck::LogInfo("Filter1x1Pad0 specialization: dim ",
+                                i,
+                                " does not match (filter_size=",
+                                SpatialDim,
+                                ", left_pad=",
+                                LeftPad,
+                                ", right_pad=",
+                                RightPad,
+                                ").");
                     return false;
                 }
             }
@@ -1592,7 +1610,11 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
                 if(filter_spatial_dim != I3)
                 {
-                    ck::LogInfo("Filter3x3 specialization: dim ", i, " filter_size=", filter_spatial_dim, " != 3.");
+                    ck::LogInfo("Filter3x3 specialization: dim ",
+                                i,
+                                " filter_size=",
+                                filter_spatial_dim,
+                                " != 3.");
                     return false;
                 }
             }
@@ -1602,12 +1624,20 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         {
             if(!(C == 1) && CDEBlockTransferScalarPerVector_NPerBlock > 1)
             {
-                ck::LogInfo("NumGroupsToMerge>1: C=", C, " must be 1 when CDEBlockTransferScalarPerVector_NPerBlock=", CDEBlockTransferScalarPerVector_NPerBlock, " > 1.");
+                ck::LogInfo("NumGroupsToMerge>1: C=",
+                            C,
+                            " must be 1 when CDEBlockTransferScalarPerVector_NPerBlock=",
+                            CDEBlockTransferScalarPerVector_NPerBlock,
+                            " > 1.");
                 return false;
             }
             if(G % NumGroupsToMerge != 0)
             {
-                ck::LogInfo("NumGroupsToMerge>1: G=", G, " is not a multiple of NumGroupsToMerge=", NumGroupsToMerge, ".");
+                ck::LogInfo("NumGroupsToMerge>1: G=",
+                            G,
+                            " is not a multiple of NumGroupsToMerge=",
+                            NumGroupsToMerge,
+                            ".");
                 return false;
             }
             if constexpr(!(is_NSpatialGC_GKSpatial_NSpatialGK<ALayout, BLayout, ELayout>() ||
@@ -1639,7 +1669,15 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                       is_NGCDHW_NGKDHW<ALayout, BLayout, ELayout>()) &&
                      G % ABlockTransferSrcScalarPerVector == 0))
                 {
-                    ck::LogInfo("[A Layout] C=", C, " is not a multiple of ABlockTransferSrcScalarPerVector=", ABlockTransferSrcScalarPerVector, " (ABlockTransferSrcVectorDim=", ABlockTransferSrcVectorDim, ", G=", G, ").");
+                    ck::LogInfo("[A Layout] C=",
+                                C,
+                                " is not a multiple of ABlockTransferSrcScalarPerVector=",
+                                ABlockTransferSrcScalarPerVector,
+                                " (ABlockTransferSrcVectorDim=",
+                                ABlockTransferSrcVectorDim,
+                                ", G=",
+                                G,
+                                ").");
                     return false;
                 }
             }
@@ -1653,12 +1691,18 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             {
                 if(ABlockTransferSrcVectorDim != 1)
                 {
-                    ck::LogInfo("[A Layout NGCHW] ABlockTransferSrcVectorDim=", ABlockTransferSrcVectorDim, " must be 1.");
+                    ck::LogInfo("[A Layout NGCHW] ABlockTransferSrcVectorDim=",
+                                ABlockTransferSrcVectorDim,
+                                " must be 1.");
                     return false;
                 }
                 if(input_spatial_acum % ABlockTransferSrcScalarPerVector != 0)
                 {
-                    ck::LogInfo("[A Layout NGCHW] input_spatial_acum=", input_spatial_acum, " is not a multiple of ABlockTransferSrcScalarPerVector=", ABlockTransferSrcScalarPerVector, ".");
+                    ck::LogInfo("[A Layout NGCHW] input_spatial_acum=",
+                                input_spatial_acum,
+                                " is not a multiple of ABlockTransferSrcScalarPerVector=",
+                                ABlockTransferSrcScalarPerVector,
+                                ".");
                     return false;
                 }
             }
@@ -1681,7 +1725,13 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         {
             if(!(BBlockTransferSrcVectorDim == 2 && C % BBlockTransferSrcScalarPerVector == 0))
             {
-                ck::LogInfo("[B Layout] C=", C, " is not a multiple of BBlockTransferSrcScalarPerVector=", BBlockTransferSrcScalarPerVector, " (BBlockTransferSrcVectorDim=", BBlockTransferSrcVectorDim, ").");
+                ck::LogInfo("[B Layout] C=",
+                            C,
+                            " is not a multiple of BBlockTransferSrcScalarPerVector=",
+                            BBlockTransferSrcScalarPerVector,
+                            " (BBlockTransferSrcVectorDim=",
+                            BBlockTransferSrcVectorDim,
+                            ").");
                 return false;
             }
         }
@@ -1739,13 +1789,21 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
         {
             if((G * C) % CDEBlockTransferScalarPerVector_NPerBlock != 0)
             {
-                ck::LogInfo("[NeedTransposeKernel] G*C=", (G * C), " is not a multiple of CDEBlockTransferScalarPerVector_NPerBlock=", CDEBlockTransferScalarPerVector_NPerBlock, ".");
+                ck::LogInfo("[NeedTransposeKernel] G*C=",
+                            (G * C),
+                            " is not a multiple of CDEBlockTransferScalarPerVector_NPerBlock=",
+                            CDEBlockTransferScalarPerVector_NPerBlock,
+                            ".");
                 return false;
             }
 
             if((G * K) % CDEBlockTransferScalarPerVector_NPerBlock != 0)
             {
-                ck::LogInfo("[NeedTransposeKernel] G*K=", (G * K), " is not a multiple of CDEBlockTransferScalarPerVector_NPerBlock=", CDEBlockTransferScalarPerVector_NPerBlock, ".");
+                ck::LogInfo("[NeedTransposeKernel] G*K=",
+                            (G * K),
+                            " is not a multiple of CDEBlockTransferScalarPerVector_NPerBlock=",
+                            CDEBlockTransferScalarPerVector_NPerBlock,
+                            ".");
                 return false;
             }
 
@@ -1754,19 +1812,29 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
             if(input_spatial_acum % CDEBlockTransferScalarPerVector_NPerBlock != 0)
             {
-                ck::LogInfo("[NeedTransposeKernel] input_spatial_acum=", input_spatial_acum, " is not a multiple of CDEBlockTransferScalarPerVector_NPerBlock=", CDEBlockTransferScalarPerVector_NPerBlock, ".");
+                ck::LogInfo("[NeedTransposeKernel] input_spatial_acum=",
+                            input_spatial_acum,
+                            " is not a multiple of CDEBlockTransferScalarPerVector_NPerBlock=",
+                            CDEBlockTransferScalarPerVector_NPerBlock,
+                            ".");
                 return false;
             }
 
             if(output_spatial_acum % CDEBlockTransferScalarPerVector_NPerBlock != 0)
             {
-                ck::LogInfo("[NeedTransposeKernel] output_spatial_acum=", output_spatial_acum, " is not a multiple of CDEBlockTransferScalarPerVector_NPerBlock=", CDEBlockTransferScalarPerVector_NPerBlock, ".");
+                ck::LogInfo("[NeedTransposeKernel] output_spatial_acum=",
+                            output_spatial_acum,
+                            " is not a multiple of CDEBlockTransferScalarPerVector_NPerBlock=",
+                            CDEBlockTransferScalarPerVector_NPerBlock,
+                            ".");
                 return false;
             }
 
             if(!arg.p_workspace_)
             {
-                ck::LogInfo("Warning: Workspace for DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle::Argument is not allocated, use SetWorkSpacePointer.");
+                ck::LogInfo(
+                    "Warning: Workspace for DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle::Argument "
+                    "is not allocated, use SetWorkSpacePointer.");
                 return false;
             }
 
@@ -1797,7 +1865,11 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             {
                 if(!(K % CDEBlockTransferScalarPerVector_NPerBlock == 0))
                 {
-                    ck::LogInfo("[E Layout] K=", K, " is not a multiple of CDEBlockTransferScalarPerVector_NPerBlock=", CDEBlockTransferScalarPerVector_NPerBlock, ".");
+                    ck::LogInfo("[E Layout] K=",
+                                K,
+                                " is not a multiple of CDEBlockTransferScalarPerVector_NPerBlock=",
+                                CDEBlockTransferScalarPerVector_NPerBlock,
+                                ".");
                     return false;
                 }
             }
@@ -1808,7 +1880,11 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
                 if(output_spatial_acum % CDEBlockTransferScalarPerVector_NPerBlock != 0)
                 {
-                    ck::LogInfo("[E Layout CTranspose] output_spatial_acum=", output_spatial_acum, " is not a multiple of CDEBlockTransferScalarPerVector_NPerBlock=", CDEBlockTransferScalarPerVector_NPerBlock, ".");
+                    ck::LogInfo("[E Layout CTranspose] output_spatial_acum=",
+                                output_spatial_acum,
+                                " is not a multiple of CDEBlockTransferScalarPerVector_NPerBlock=",
+                                CDEBlockTransferScalarPerVector_NPerBlock,
+                                ".");
                     return false;
                 }
             }
@@ -1911,7 +1987,13 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
             }
         }
 
-        ck::LogInfo("No valid Gridwise GEMM path (MXdlPerWave64=", MXdlPerWave64, ", MXdlPerWave32=", MXdlPerWave32, ", warp_size=", get_warp_size(), ").");
+        ck::LogInfo("No valid Gridwise GEMM path (MXdlPerWave64=",
+                    MXdlPerWave64,
+                    ", MXdlPerWave32=",
+                    MXdlPerWave32,
+                    ", warp_size=",
+                    get_warp_size(),
+                    ").");
         return false;
     }
 
@@ -2190,7 +2272,6 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
         return str.str();
     }
-
 
 #ifdef CK_EXPERIMENTAL_BUILDER
     std::string GetInstanceString() const override

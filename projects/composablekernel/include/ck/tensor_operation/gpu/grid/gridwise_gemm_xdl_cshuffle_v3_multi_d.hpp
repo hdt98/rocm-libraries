@@ -1018,10 +1018,10 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
         if constexpr(NXdlPerWave % CShuffleNXdlPerWavePerShuffle != 0)
         {
             ck::LogInfo("CheckValidity failed: NXdlPerWave (",
-                              NXdlPerWave,
-                              ") is not a multiple of CShuffleNXdlPerWavePerShuffle (",
-                              CShuffleNXdlPerWavePerShuffle,
-                              "). ");
+                        NXdlPerWave,
+                        ") is not a multiple of CShuffleNXdlPerWavePerShuffle (",
+                        CShuffleNXdlPerWavePerShuffle,
+                        "). ");
             return false;
         }
 
@@ -1034,10 +1034,10 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
             if(!(karg.M % MPerBlock == 0))
             {
                 ck::LogInfo("CheckValidity failed: M (",
-                                  karg.M,
-                                  ") is not a multiple of MPerBlock (",
-                                  MPerBlock,
-                                  "). ");
+                            karg.M,
+                            ") is not a multiple of MPerBlock (",
+                            MPerBlock,
+                            "). ");
                 return false;
             }
         }
@@ -1051,10 +1051,10 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
             if(!(karg.N % NPerBlock == 0))
             {
                 ck::LogInfo("CheckValidity failed: N (",
-                                  karg.N,
-                                  ") is not a multiple of NPerBlock (",
-                                  NPerBlock,
-                                  "). ");
+                            karg.N,
+                            ") is not a multiple of NPerBlock (",
+                            NPerBlock,
+                            "). ");
                 return false;
             }
         }
@@ -1069,14 +1069,14 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
             if(!(karg.K % K_t == 0))
             {
                 ck::LogInfo("CheckValidity failed: K (",
-                                  karg.K,
-                                  ") is not a multiple of KBatch * KPerBlock (",
-                                  karg.KBatch,
-                                  " * ",
-                                  KPerBlock,
-                                  " = ",
-                                  K_t,
-                                  "). ");
+                            karg.K,
+                            ") is not a multiple of KBatch * KPerBlock (",
+                            karg.KBatch,
+                            " * ",
+                            KPerBlock,
+                            " = ",
+                            K_t,
+                            "). ");
                 return false;
             }
         }
@@ -1088,12 +1088,12 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
             if((KReadPadSplited * (karg.KBatch - 1)) >= karg.K)
             {
                 ck::LogInfo("CheckValidity failed: K-padding split-K validity.",
-                                  " KReadPadSplited=",
-                                  KReadPadSplited,
-                                  " KBatch=",
-                                  karg.KBatch,
-                                  " K=",
-                                  karg.K);
+                            " KReadPadSplited=",
+                            KReadPadSplited,
+                            " KBatch=",
+                            karg.KBatch,
+                            " K=",
+                            karg.K);
                 return false;
             }
         }
@@ -1103,10 +1103,10 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
             if(karg.K % ABlockTransferSrcScalarPerVector != 0)
             {
                 ck::LogInfo("CheckValidity failed: K (",
-                                  karg.K,
-                                  ") is not a multiple of ABlockTransferSrcScalarPerVector (",
-                                  ABlockTransferSrcScalarPerVector,
-                                  "). ");
+                            karg.K,
+                            ") is not a multiple of ABlockTransferSrcScalarPerVector (",
+                            ABlockTransferSrcScalarPerVector,
+                            "). ");
                 return false;
             }
         }
@@ -1115,10 +1115,10 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
             if(karg.M % ABlockTransferSrcScalarPerVector != 0)
             {
                 ck::LogInfo("CheckValidity failed: M (",
-                                  karg.M,
-                                  ") is not a multiple of ABlockTransferSrcScalarPerVector (",
-                                  ABlockTransferSrcScalarPerVector,
-                                  "). ");
+                            karg.M,
+                            ") is not a multiple of ABlockTransferSrcScalarPerVector (",
+                            ABlockTransferSrcScalarPerVector,
+                            "). ");
                 return false;
             }
         }
@@ -1128,10 +1128,10 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
             if(karg.N % BBlockTransferSrcScalarPerVector != 0)
             {
                 ck::LogInfo("CheckValidity failed: N (",
-                                  karg.N,
-                                  ") is not a multiple of BBlockTransferSrcScalarPerVector (",
-                                  BBlockTransferSrcScalarPerVector,
-                                  "). ");
+                            karg.N,
+                            ") is not a multiple of BBlockTransferSrcScalarPerVector (",
+                            BBlockTransferSrcScalarPerVector,
+                            "). ");
                 return false;
             }
         }
@@ -1140,10 +1140,10 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
             if(karg.K % BBlockTransferSrcScalarPerVector != 0)
             {
                 ck::LogInfo("CheckValidity failed: K (",
-                                  karg.K,
-                                  ") is not a multiple of BBlockTransferSrcScalarPerVector (",
-                                  BBlockTransferSrcScalarPerVector,
-                                  "). ");
+                            karg.K,
+                            ") is not a multiple of BBlockTransferSrcScalarPerVector (",
+                            BBlockTransferSrcScalarPerVector,
+                            "). ");
                 return false;
             }
         }
@@ -1152,11 +1152,12 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
         {
             if(karg.N % CShuffleBlockTransferScalarPerVector_NPerBlock != 0)
             {
-                ck::LogInfo("CheckValidity failed: N (",
-                                  karg.N,
-                                  ") is not a multiple of CShuffleBlockTransferScalarPerVector_NPerBlock (",
-                                  CShuffleBlockTransferScalarPerVector_NPerBlock,
-                                  "). ");
+                ck::LogInfo(
+                    "CheckValidity failed: N (",
+                    karg.N,
+                    ") is not a multiple of CShuffleBlockTransferScalarPerVector_NPerBlock (",
+                    CShuffleBlockTransferScalarPerVector_NPerBlock,
+                    "). ");
                 return false;
             }
         }
@@ -1164,11 +1165,12 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
         {
             if(karg.M % CShuffleBlockTransferScalarPerVector_NPerBlock != 0)
             {
-                ck::LogInfo("CheckValidity failed: M (",
-                                  karg.M,
-                                  ") is not a multiple of CShuffleBlockTransferScalarPerVector_NPerBlock (",
-                                  CShuffleBlockTransferScalarPerVector_NPerBlock,
-                                  "). ");
+                ck::LogInfo(
+                    "CheckValidity failed: M (",
+                    karg.M,
+                    ") is not a multiple of CShuffleBlockTransferScalarPerVector_NPerBlock (",
+                    CShuffleBlockTransferScalarPerVector_NPerBlock,
+                    "). ");
                 return false;
             }
         }
@@ -1181,16 +1183,16 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
             if(num_k_loop <= BlockwiseGemmPipe::PrefetchStages)
             {
                 ck::LogInfo("CheckValidity failed: pipeline prefetch stages not satisfied.",
-                                  " num_k_loop=",
-                                  num_k_loop,
-                                  " PrefetchStages=",
-                                  BlockwiseGemmPipe::PrefetchStages,
-                                  " AK0=",
-                                  karg.AK0,
-                                  " KPerBlock=",
-                                  KPerBlock,
-                                  " AK1Value=",
-                                  AK1Value);
+                            " num_k_loop=",
+                            num_k_loop,
+                            " PrefetchStages=",
+                            BlockwiseGemmPipe::PrefetchStages,
+                            " AK0=",
+                            karg.AK0,
+                            " KPerBlock=",
+                            KPerBlock,
+                            " AK1Value=",
+                            AK1Value);
                 return false;
             }
         }
@@ -1201,12 +1203,12 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
              karg.M * karg.N * sizeof(CDataType) <= TwoGB))
         {
             ck::LogInfo("CheckValidity failed: tensor size exceeds 2GB limit.",
-                              " A_bytes=",
-                              karg.M * karg.K * sizeof(ADataType),
-                              " B_bytes=",
-                              karg.N * karg.K * sizeof(BDataType),
-                              " C_bytes=",
-                              karg.M * karg.N * sizeof(CDataType));
+                        " A_bytes=",
+                        karg.M * karg.K * sizeof(ADataType),
+                        " B_bytes=",
+                        karg.N * karg.K * sizeof(BDataType),
+                        " C_bytes=",
+                        karg.M * karg.N * sizeof(CDataType));
             return false;
         }
 

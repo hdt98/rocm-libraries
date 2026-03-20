@@ -1009,7 +1009,15 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
                 if(!(arg.filter_spatial_lengths_[i] == 1 && arg.conv_filter_strides_[i] == 1 &&
                      arg.input_left_pads_[i] == 0 && arg.input_right_pads_[i] == 0))
                 {
-                    ck::LogInfo("Filter1x1Stride1Pad0: dim ", i, " does not match (filter=", arg.filter_spatial_lengths_[i], ", stride=", arg.conv_filter_strides_[i], ", pad=", arg.input_left_pads_[i], ").");
+                    ck::LogInfo("Filter1x1Stride1Pad0: dim ",
+                                i,
+                                " does not match (filter=",
+                                arg.filter_spatial_lengths_[i],
+                                ", stride=",
+                                arg.conv_filter_strides_[i],
+                                ", pad=",
+                                arg.input_left_pads_[i],
+                                ").");
                     return false;
                 }
             }
@@ -1020,7 +1028,15 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
              arg.Conv_K_ % ABlockTransferSrcScalarPerVector == 0 &&
              arg.Conv_C_ % BBlockTransferSrcScalarPerVector == 0))
         {
-            ck::LogInfo("Conv_K_=", arg.Conv_K_, " or Conv_C_=", arg.Conv_C_, " not multiple of ABlockTransferSrcScalarPerVector=", ABlockTransferSrcScalarPerVector, "/BBlockTransferSrcScalarPerVector=", BBlockTransferSrcScalarPerVector, ".");
+            ck::LogInfo("Conv_K_=",
+                        arg.Conv_K_,
+                        " or Conv_C_=",
+                        arg.Conv_C_,
+                        " not multiple of ABlockTransferSrcScalarPerVector=",
+                        ABlockTransferSrcScalarPerVector,
+                        "/BBlockTransferSrcScalarPerVector=",
+                        BBlockTransferSrcScalarPerVector,
+                        ".");
             return false;
         }
 
@@ -1028,7 +1044,13 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
         if(!(arg.Conv_C_ % CBlockTransferScalarPerVector_NWaveNPerXdl == 0 &&
              arg.Conv_C_ % WorkspaceInOutScalarPerVector == 0))
         {
-            ck::LogInfo("Conv_C_=", arg.Conv_C_, " not multiple of CBlockTransferScalarPerVector_NWaveNPerXdl=", CBlockTransferScalarPerVector_NWaveNPerXdl, " or WorkspaceInOutScalarPerVector=", WorkspaceInOutScalarPerVector, ".");
+            ck::LogInfo("Conv_C_=",
+                        arg.Conv_C_,
+                        " not multiple of CBlockTransferScalarPerVector_NWaveNPerXdl=",
+                        CBlockTransferScalarPerVector_NWaveNPerXdl,
+                        " or WorkspaceInOutScalarPerVector=",
+                        WorkspaceInOutScalarPerVector,
+                        ".");
             return false;
         }
 
@@ -1053,7 +1075,13 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
                                                      arg.block_2_ctile_map_);
             }
         }
-        ck::LogInfo("No valid Gridwise GEMM path (NXdlPerWave64=", NXdlPerWave64, ", NXdlPerWave32=", NXdlPerWave32, ", warp_size=", get_warp_size(), ").");
+        ck::LogInfo("No valid Gridwise GEMM path (NXdlPerWave64=",
+                    NXdlPerWave64,
+                    ", NXdlPerWave32=",
+                    NXdlPerWave32,
+                    ", warp_size=",
+                    get_warp_size(),
+                    ").");
         return false;
     }
 
@@ -1216,7 +1244,6 @@ struct DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle
                 "The argument pointer is not an object of "
                 "DeviceGroupedConvBwdWeightMultipleD_Xdl_CShuffle::Argument structure!");
     }
-
 
 #ifdef CK_EXPERIMENTAL_BUILDER
     std::string GetInstanceString() const override

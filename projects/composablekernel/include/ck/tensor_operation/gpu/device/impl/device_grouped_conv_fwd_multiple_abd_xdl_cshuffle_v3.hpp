@@ -1491,7 +1491,10 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
         {
             if(G % NumGroupsToMerge != 0)
             {
-                ck::LogInfo("Unsupported! G % NumGroupsToMerge != 0: G=", G, ", NumGroupsToMerge=", NumGroupsToMerge);
+                ck::LogInfo("Unsupported! G % NumGroupsToMerge != 0: G=",
+                            G,
+                            ", NumGroupsToMerge=",
+                            NumGroupsToMerge);
                 return false;
             }
         }
@@ -1543,7 +1546,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
 
                 if(!(SpatialDim == 1 && ConvStride == 1 && LeftPad == 0 && RightPad == 0))
                 {
-                    ck::LogInfo("The input paramters do not align with specialization " "Filter1x1Stride1Pad0!");
+                    ck::LogInfo("The input paramters do not align with specialization "
+                                "Filter1x1Stride1Pad0!");
                     return false;
                 }
             }
@@ -1560,7 +1564,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
 
                 if(!(SpatialDim == 1 && LeftPad == 0 && RightPad == 0))
                 {
-                    ck::LogInfo("The input paramters do not align with specialization Filter1x1Pad0!");
+                    ck::LogInfo(
+                        "The input paramters do not align with specialization Filter1x1Pad0!");
                     return false;
                 }
             }
@@ -1593,7 +1598,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
         {
             if(!(ABlockTransferSrcVectorDim == 2 && C % ABlockTransferSrcScalarPerVector == 0))
             {
-                ck::LogInfo("[A Layout] The number of input channels is not a multiple of " "ABlockTransferSrcScalarPerVector!");
+                ck::LogInfo("[A Layout] The number of input channels is not a multiple of "
+                            "ABlockTransferSrcScalarPerVector!");
                 return false;
             }
         }
@@ -1615,7 +1621,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
         {
             if(!(BBlockTransferSrcVectorDim == 2 && C % BBlockTransferSrcScalarPerVector == 0))
             {
-                ck::LogInfo("[B Layout] The number of input channels is not a multiple of " "BBlockTransferSrcScalarPerVector!");
+                ck::LogInfo("[B Layout] The number of input channels is not a multiple of "
+                            "BBlockTransferSrcScalarPerVector!");
                 return false;
             }
         }
@@ -1630,13 +1637,15 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
         {
             if((G * C) % CDEBlockTransferScalarPerVector_NPerBlock != 0)
             {
-                ck::LogInfo("[NGCHW Layout] The G * C is not a multiple of " "CDEBlockTransferScalarPerVector_NPerBlock");
+                ck::LogInfo("[NGCHW Layout] The G * C is not a multiple of "
+                            "CDEBlockTransferScalarPerVector_NPerBlock");
                 return false;
             }
 
             if((G * K) % CDEBlockTransferScalarPerVector_NPerBlock != 0)
             {
-                ck::LogInfo("[NGCHW Layout] The G * K is not a multiple of " "CDEBlockTransferScalarPerVector_NPerBlock");
+                ck::LogInfo("[NGCHW Layout] The G * K is not a multiple of "
+                            "CDEBlockTransferScalarPerVector_NPerBlock");
                 return false;
             }
 
@@ -1647,19 +1656,23 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
 
             if(input_spatial_acum % CDEBlockTransferScalarPerVector_NPerBlock != 0)
             {
-                ck::LogInfo("[NGCHW Layout] The input_spatial_acum is not a multiple of " "CDEBlockTransferScalarPerVector_NPerBlock");
+                ck::LogInfo("[NGCHW Layout] The input_spatial_acum is not a multiple of "
+                            "CDEBlockTransferScalarPerVector_NPerBlock");
                 return false;
             }
 
             if(output_spatial_acum % CDEBlockTransferScalarPerVector_NPerBlock != 0)
             {
-                ck::LogInfo("[NGCHW Layout] The output_spatial_acum is not a multiple of " "CDEBlockTransferScalarPerVector_NPerBlock");
+                ck::LogInfo("[NGCHW Layout] The output_spatial_acum is not a multiple of "
+                            "CDEBlockTransferScalarPerVector_NPerBlock");
                 return false;
             }
 
             if(!arg.p_workspace_)
             {
-                ck::LogInfo("Warning: Workspace for " "DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3::Argument is not " "allocated, use SetWorkSpacePointer.");
+                ck::LogInfo("Warning: Workspace for "
+                            "DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3::Argument is not "
+                            "allocated, use SetWorkSpacePointer.");
                 return false;
             }
 
@@ -1667,7 +1680,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
             if(!(arg.a_out_transpose_desc_.GetElementSpaceSize() * sizeof(ADataType) <= TwoGB &&
                  arg.e_in_transpose_desc_.GetElementSpaceSize() * sizeof(EDataType) <= TwoGB))
             {
-                ck::LogInfo("[NGCHW Layout] One of the transposed vectors is exceeding 2GB " "memory size!");
+                ck::LogInfo("[NGCHW Layout] One of the transposed vectors is exceeding 2GB "
+                            "memory size!");
                 return false;
             }
         }
@@ -1682,7 +1696,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
         {
             if(!(K % CDEBlockTransferScalarPerVector_NPerBlock == 0))
             {
-                ck::LogInfo("[E Layout] The K is not a multiple of " "CDEBlockTransferScalarPerVector_NPerBlock");
+                ck::LogInfo("[E Layout] The K is not a multiple of "
+                            "CDEBlockTransferScalarPerVector_NPerBlock");
                 return false;
             }
         }
@@ -2051,7 +2066,6 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
 
         return str.str();
     }
-
 
 #ifdef CK_EXPERIMENTAL_BUILDER
     std::string GetInstanceString() const override

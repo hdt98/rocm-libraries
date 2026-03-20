@@ -20,11 +20,10 @@ namespace ck {
 template <typename... Ts>
 struct LogInfo
 {
-    __host__ __device__
-    LogInfo([[maybe_unused]] Ts... args,
-          [[maybe_unused]] const char* file = __builtin_FILE(),
-          [[maybe_unused]] int line         = __builtin_LINE(),
-          [[maybe_unused]] const char* func = __builtin_FUNCTION())
+    __host__ __device__ LogInfo([[maybe_unused]] Ts... args,
+                                [[maybe_unused]] const char* file = __builtin_FILE(),
+                                [[maybe_unused]] int line         = __builtin_LINE(),
+                                [[maybe_unused]] const char* func = __builtin_FUNCTION())
     {
 #ifndef __HIP_DEVICE_COMPILE__
         if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
