@@ -39,7 +39,6 @@ using DeviceConvBwdWeightInstance =
         OutElementOp,         // OutElementwiseOperation
         ConvBwdWeightDefault, // ConvolutionBackwardWeightSpecialization
         1,                    // NumGemmKPrefetchStage
-        0,                    // TileIndexThreadGroupSize (0 = 2-way mode)
         256,                  // TileLoadThreadGroupSize
         256,                  // TileMathThreadGroupSize
         64,                   // MPerBlock

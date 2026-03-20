@@ -11,8 +11,6 @@
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_waveletmodel.hpp"
 #include "ck/tensor_operation/gpu/block/blockwise_gemm_xdlops.hpp"
 #include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_v4r1.hpp"
-#include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_offset_compute.hpp"
-#include "ck/tensor_operation/gpu/block/thread_group_tensor_slice_transfer_offset_load.hpp"
 #include "ck/tensor_operation/gpu/thread/threadwise_tensor_slice_transfer.hpp"
 #include "ck/tensor_operation/gpu/element/element_wise_operation.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_xdl_cshuffle_common.hpp"
@@ -42,7 +40,6 @@ template <typename ALayout,
           typename BElementwiseOperation,
           typename CElementwiseOperation,
           index_t NumGemmKPrefetchStage,
-          index_t TileIndexThreadGroupSize,
           index_t TileLoadThreadGroupSize,
           index_t TileMathThreadGroupSize,
           index_t MPerBlock,
@@ -177,11 +174,8 @@ struct GridwiseGemm_xdl_waveletmodel_cshuffle_conv_v3
     using Base::I1;
     using Base::I2;
 
-    static constexpr auto BlockSize = TileMathThreadGroupSize;
-    static constexpr auto LaunchBlockSize =
-        TileIndexThreadGroupSize > 0
-            ? TileMathThreadGroupSize + TileIndexThreadGroupSize + TileLoadThreadGroupSize
-            : TileLoadThreadGroupSize + TileMathThreadGroupSize;
+    static constexpr auto BlockSize       = TileMathThreadGroupSize;
+    static constexpr auto LaunchBlockSize = TileLoadThreadGroupSize + TileMathThreadGroupSize;
 
     // DirectLoad is not supported — wavelet model requires LDS as the sync boundary
     static constexpr bool DirectLoadEnabled = false;
@@ -204,46 +198,19 @@ struct GridwiseGemm_xdl_waveletmodel_cshuffle_conv_v3
         __device__ static index_t GetThreadId() { return get_thread_local_1d_id(); }
     };
 
-    // Index threads are TileMath..TileMath+TileIndex-1 (only in 3-way mode)
-    struct TileIndexThreadGroup
-    {
-        __device__ static constexpr index_t GetNumOfThread() { return TileIndexThreadGroupSize; }
-
-        __device__ static constexpr bool IsBelong()
-        {
-            return get_thread_local_1d_id() >= TileMathThreadGroupSize &&
-                   get_thread_local_1d_id() < TileMathThreadGroupSize + TileIndexThreadGroupSize;
-        }
-
-        __device__ static index_t GetThreadId()
-        {
-            return get_thread_local_1d_id() - TileMathThreadGroupSize;
-        }
-    };
-
-    // Load threads:
-    //   2-way: TileMath..TileMath+TileLoad-1
-    //   3-way: TileMath+TileIndex..TileMath+TileIndex+TileLoad-1
+    // Load threads: TileMath..TileMath+TileLoad-1
     struct TileLoadThreadGroup
     {
         __device__ static constexpr index_t GetNumOfThread() { return TileLoadThreadGroupSize; }
 
         __device__ static constexpr bool IsBelong()
         {
-            if constexpr(TileIndexThreadGroupSize > 0)
-                return get_thread_local_1d_id() >=
-                       TileMathThreadGroupSize + TileIndexThreadGroupSize;
-            else
-                return get_thread_local_1d_id() >= TileMathThreadGroupSize;
+            return get_thread_local_1d_id() >= TileMathThreadGroupSize;
         }
 
         __device__ static index_t GetThreadId()
         {
-            if constexpr(TileIndexThreadGroupSize > 0)
-                return get_thread_local_1d_id() - TileMathThreadGroupSize -
-                       TileIndexThreadGroupSize;
-            else
-                return get_thread_local_1d_id() - TileMathThreadGroupSize;
+            return get_thread_local_1d_id() - TileMathThreadGroupSize;
         }
     };
 
@@ -253,17 +220,8 @@ struct GridwiseGemm_xdl_waveletmodel_cshuffle_conv_v3
     // Wave pipelines (from gridwise_gemm_waveletmodel.hpp)
     // =========================================================================
 
-    // 2-way pipelines
     using GridwiseGemmLoad = GridwiseGemmLoadWave<TileLoadThreadGroup, NumGemmKPrefetchStage>;
     using GridwiseGemmMath = GridwiseGemmMathWave<TileMathThreadGroup, NumGemmKPrefetchStage>;
-
-    // 3-way pipelines
-    using GridwiseGemmIndex3Way =
-        GridwiseGemmIndexWave<TileIndexThreadGroup, NumGemmKPrefetchStage>;
-    using GridwiseGemmLoad3Way_ =
-        GridwiseGemmLoadWave3Way<TileLoadThreadGroup, NumGemmKPrefetchStage>;
-    using GridwiseGemmMath3Way_ =
-        GridwiseGemmMathWave3Way<TileMathThreadGroup, NumGemmKPrefetchStage>;
 
     // =========================================================================
     // MFMA instruction selection
@@ -467,48 +425,6 @@ struct GridwiseGemm_xdl_waveletmodel_cshuffle_conv_v3
     IS_VALID_COMPILATION_PARAMETER_IMPL(CDataType)
 
     // =========================================================================
-    // Offset buffer LDS sizing (for offset-compute → offset-load round-trip)
-    // =========================================================================
-
-    // Compute number of packed int32_t offset entries for one tensor's offset buffer.
-    // This equals ClusterSize * NumAccessPointsPerThread.
-    // All inputs are compile-time template parameters — no descriptor type needed.
-    template <typename BlockSliceLengths_,
-              typename ThreadClusterLengths_,
-              index_t SrcVectorDim_,
-              index_t SrcScalarPerVector_>
-    __device__ static constexpr index_t ComputeOffsetBufferNumElements()
-    {
-        constexpr auto thread_slice      = BlockSliceLengths_{} / ThreadClusterLengths_{};
-        constexpr auto scalar_per_access = generate_sequence(
-            detail::lambda_scalar_per_access<SrcVectorDim_, SrcScalarPerVector_>{},
-            Number<BlockSliceLengths_::Size()>{});
-        constexpr auto access_lengths = thread_slice / scalar_per_access;
-
-        // Product of access_lengths (3D)
-        constexpr index_t num_access =
-            access_lengths[Number<0>{}] * access_lengths[Number<1>{}] * access_lengths[Number<2>{}];
-
-        // Product of cluster lengths
-        constexpr index_t cluster_size = ThreadClusterLengths_{}[Number<0>{}] *
-                                         ThreadClusterLengths_{}[Number<1>{}] *
-                                         ThreadClusterLengths_{}[Number<2>{}];
-
-        return cluster_size * num_access;
-    }
-
-    static constexpr index_t AOffsetBufferNumElements =
-        ComputeOffsetBufferNumElements<Sequence<AK0Number, MPerBlock, AK1Number>,
-                                       ABlockTransferThreadClusterLengths_AK0_M_AK1,
-                                       ABlockTransferSrcVectorDim,
-                                       ABlockTransferSrcScalarPerVector>();
-
-    static constexpr index_t BOffsetBufferNumElements =
-        ComputeOffsetBufferNumElements<Sequence<BK0Number, NPerBlock, BK1Number>,
-                                       BBlockTransferThreadClusterLengths_BK0_N_BK1,
-                                       BBlockTransferSrcVectorDim,
-                                       BBlockTransferSrcScalarPerVector>();
-
     // =========================================================================
     // Shared memory sizing
     // =========================================================================
@@ -532,13 +448,6 @@ struct GridwiseGemm_xdl_waveletmodel_cshuffle_conv_v3
         constexpr auto data_lds_bytes = a_block_space_size_aligned * sizeof(ADataType) +
                                         b_block_space_size_aligned * sizeof(BDataType);
 
-        // Offset buffer LDS: only needed for 3-way mode (2x for ping-pong).
-        // 2-way mode uses v4r1 transfers directly — no offset buffer.
-        constexpr auto offset_lds_bytes =
-            TileIndexThreadGroupSize > 0
-                ? 2 * (AOffsetBufferNumElements + BOffsetBufferNumElements) * sizeof(int32_t)
-                : 0;
-
         // C shuffle LDS (reuses same memory after GEMM loop — mutually exclusive)
         constexpr auto c_shuffle_block_desc_mblock_mperblock_nblock_nperblock =
             Base::GetCShuffleBlockDescriptor_MBlock_MPerBlock_NBlock_NPerBlock(DeviceArch{});
@@ -546,8 +455,7 @@ struct GridwiseGemm_xdl_waveletmodel_cshuffle_conv_v3
         constexpr auto c_block_size =
             c_shuffle_block_desc_mblock_mperblock_nblock_nperblock.GetElementSpaceSize();
 
-        return math::max(data_lds_bytes + offset_lds_bytes,
-                         c_block_size * sizeof(CShuffleDataType));
+        return math::max(data_lds_bytes, c_block_size * sizeof(CShuffleDataType));
     }
 
     // =========================================================================
@@ -556,10 +464,7 @@ struct GridwiseGemm_xdl_waveletmodel_cshuffle_conv_v3
     __host__ __device__ static constexpr bool CalculateHasMainKBlockLoop(index_t K)
     {
         const index_t num_loop = K / KPerBlock;
-        if constexpr(TileIndexThreadGroupSize > 0)
-            return GridwiseGemmMath3Way_::CalculateHasMainLoop(num_loop);
-        else
-            return GridwiseGemmMath::CalculateHasMainLoop(num_loop);
+        return GridwiseGemmMath::CalculateHasMainLoop(num_loop);
     }
 
     // =========================================================================
@@ -670,218 +575,31 @@ struct GridwiseGemm_xdl_waveletmodel_cshuffle_conv_v3
         // Wave specialization
         // =====================================================================
 
-        // Offset buffer LDS pointers (shared by index and load branches)
-        constexpr auto b_block_space_size_aligned = math::integer_least_multiple(
-            b_block_desc_bk0_n_bk1.GetElementSpaceSize(), max_lds_align);
-
-        constexpr auto data_lds_bytes = a_block_space_size_aligned * sizeof(ADataType) +
-                                        b_block_space_size_aligned * sizeof(BDataType);
-
-        constexpr auto offset_lds_byte_start =
-            math::integer_least_multiple(data_lds_bytes, sizeof(int32_t));
-
-        int32_t* p_a_offset_lds_0 =
-            reinterpret_cast<int32_t*>(static_cast<char*>(p_shared) + offset_lds_byte_start);
-        int32_t* p_b_offset_lds_0 = p_a_offset_lds_0 + AOffsetBufferNumElements;
-
-        // Ping-pong: second half for 3-way mode (offset by total single-buffer size)
-        constexpr index_t single_offset_buf_size =
-            AOffsetBufferNumElements + BOffsetBufferNumElements;
-        int32_t* p_a_offset_lds_1 = p_a_offset_lds_0 + single_offset_buf_size;
-        int32_t* p_b_offset_lds_1 = p_b_offset_lds_0 + single_offset_buf_size;
-
-        // Epilogue barrier count (used by non-math branches to match RunEpilogue)
-        static_assert(MXdlPerWave % CShuffleMXdlPerWavePerShuffle == 0 &&
-                          NXdlPerWave % CShuffleNXdlPerWavePerShuffle == 0,
-                      "CShuffle XdlPerWave must divide MXdlPerWave/NXdlPerWave");
-        constexpr index_t num_epilogue_access = (MXdlPerWave / CShuffleMXdlPerWavePerShuffle) *
-                                                (NXdlPerWave / CShuffleNXdlPerWavePerShuffle);
-
-        if constexpr(TileIndexThreadGroupSize > 0)
+        if(TileLoadThreadGroup::IsBelong())
         {
-            // =================================================================
-            // 3-way mode: index + load + math
-            // =================================================================
-            if(TileIndexThreadGroup::IsBelong())
-            {
-                // Index wave: compute offsets → write to offset LDS
-                auto a_offset_compute = ThreadGroupTensorSliceTransfer_OffsetCompute<
-                    TileIndexThreadGroup,
-                    Sequence<AK0Number, MPerBlock, AK1Number>,
-                    ABlockTransferThreadClusterLengths_AK0_M_AK1,
-                    ABlockTransferThreadClusterArrangeOrder,
-                    decltype(a_grid_desc_ak0_m_ak1),
-                    ABlockTransferSrcAccessOrder,
-                    ABlockTransferSrcVectorDim,
-                    ABlockTransferSrcScalarPerVector,
-                    AThreadTransferSrcResetCoordinateAfterRun>(
-                    a_grid_desc_ak0_m_ak1,
-                    make_multi_index(SplitKOffsetHack ? 0 : k_id, m_block_data_idx_on_grid, 0));
-
-                auto b_offset_compute = ThreadGroupTensorSliceTransfer_OffsetCompute<
-                    TileIndexThreadGroup,
-                    Sequence<BK0Number, NPerBlock, BK1Number>,
-                    BBlockTransferThreadClusterLengths_BK0_N_BK1,
-                    BBlockTransferThreadClusterArrangeOrder,
-                    decltype(b_grid_desc_bk0_n_bk1),
-                    BBlockTransferSrcAccessOrder,
-                    BBlockTransferSrcVectorDim,
-                    BBlockTransferSrcScalarPerVector,
-                    BThreadTransferSrcResetCoordinateAfterRun>(
-                    b_grid_desc_bk0_n_bk1,
-                    make_multi_index(SplitKOffsetHack ? 0 : k_id, n_block_data_idx_on_grid, 0));
-
-                GridwiseGemmIndex3Way::template RunIndexWavePipeline<HasMainKBlockLoop>(
-                    a_grid_desc_ak0_m_ak1,
-                    a_offset_compute,
-                    a_block_slice_copy_step,
-                    p_a_offset_lds_0,
-                    p_a_offset_lds_1,
-                    b_grid_desc_bk0_n_bk1,
-                    b_offset_compute,
-                    b_block_slice_copy_step,
-                    p_b_offset_lds_0,
-                    p_b_offset_lds_1,
-                    num_k_block_main_loop);
-
-                // Match epilogue barriers
-                static_for<0, 2 * num_epilogue_access, 1>{}([&](auto) { block_sync_lds(); });
-            }
-            else if(TileLoadThreadGroup::IsBelong())
-            {
-                // Load wave: read offsets from LDS → buffer_load → write to data LDS
-                auto a_offset_load = ThreadGroupTensorSliceTransfer_OffsetLoad<
-                    TileLoadThreadGroup,
-                    AElementwiseOperation,
-                    ck::tensor_operation::element_wise::PassThrough,
-                    InMemoryDataOperationEnum::Set,
-                    Sequence<AK0Number, MPerBlock, AK1Number>,
-                    ABlockTransferThreadClusterLengths_AK0_M_AK1,
-                    ABlockTransferThreadClusterArrangeOrder,
-                    ADataType,
-                    ADataType,
-                    decltype(a_block_desc_ak0_m_ak1),
-                    ABlockTransferSrcAccessOrder,
-                    Sequence<0, 1, 2>,
-                    ABlockTransferSrcVectorDim,
-                    2,
-                    ABlockTransferSrcScalarPerVector,
-                    ABlockTransferDstScalarPerVector_AK1,
-                    1,
-                    1,
-                    true,
-                    NumGemmKPrefetchStage>(a_element_op,
-                                           a_block_desc_ak0_m_ak1,
-                                           make_multi_index(0, 0, 0),
-                                           ck::tensor_operation::element_wise::PassThrough{});
-
-                auto b_offset_load = ThreadGroupTensorSliceTransfer_OffsetLoad<
-                    TileLoadThreadGroup,
-                    BElementwiseOperation,
-                    ck::tensor_operation::element_wise::PassThrough,
-                    InMemoryDataOperationEnum::Set,
-                    Sequence<BK0Number, NPerBlock, BK1Number>,
-                    BBlockTransferThreadClusterLengths_BK0_N_BK1,
-                    BBlockTransferThreadClusterArrangeOrder,
-                    BDataType,
-                    BDataType,
-                    decltype(b_block_desc_bk0_n_bk1),
-                    BBlockTransferSrcAccessOrder,
-                    Sequence<0, 1, 2>,
-                    BBlockTransferSrcVectorDim,
-                    2,
-                    BBlockTransferSrcScalarPerVector,
-                    BBlockTransferDstScalarPerVector_BK1,
-                    1,
-                    1,
-                    true,
-                    NumGemmKPrefetchStage>(b_element_op,
-                                           b_block_desc_bk0_n_bk1,
-                                           make_multi_index(0, 0, 0),
-                                           ck::tensor_operation::element_wise::PassThrough{});
-
-                GridwiseGemmLoad3Way_::template RunLoadWavePipeline3Way<HasMainKBlockLoop>(
-                    a_block_desc_ak0_m_ak1,
-                    a_offset_load,
-                    a_grid_buf,
-                    a_block_buf,
-                    p_a_offset_lds_0,
-                    p_a_offset_lds_1,
-                    b_block_desc_bk0_n_bk1,
-                    b_offset_load,
-                    b_grid_buf,
-                    b_block_buf,
-                    p_b_offset_lds_0,
-                    p_b_offset_lds_1,
-                    num_k_block_main_loop);
-
-                // Match epilogue barriers
-                static_for<0, 2 * num_epilogue_access, 1>{}([&](auto) { block_sync_lds(); });
-            }
-            else if(TileMathThreadGroup::IsBelong())
-            {
-                auto blockwise_gemm = BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1<
-                    TileMathThreadGroupSize,
-                    ADataType,
-                    BDataType,
-                    AccDataType,
-                    decltype(a_block_desc_ak0_m_ak1),
-                    decltype(b_block_desc_bk0_n_bk1),
-                    MPerXdl,
-                    NPerXdl,
-                    MXdlPerWave,
-                    NXdlPerWave,
-                    KPack,
-                    ComputeTypeA,
-                    ComputeTypeB>{};
-
-                auto c_thread_buf = blockwise_gemm.GetCThreadBuffer();
-
-                GridwiseGemmMath3Way_::template RunMathWavePipeline3Way<HasMainKBlockLoop>(
-                    a_block_buf, b_block_buf, blockwise_gemm, c_thread_buf, num_k_block_main_loop);
-
-                Base::template RunEpilogue<CGlobalMemoryDataOperation, false, false>(
-                    blockwise_gemm,
-                    c_grid_desc_mblock_mperblock_nblock_nperblock,
-                    c_thread_buf,
-                    block_m_id,
-                    block_n_id,
-                    p_shared,
-                    p_c_grid,
-                    c_element_op);
-            }
-        }
-        else
-        {
-            // =================================================================
-            // 2-way mode: load + math (v4r1 transfers)
-            // =================================================================
-
-            if(TileLoadThreadGroup::IsBelong())
-            {
-                auto a_blockwise_copy = ThreadGroupTensorSliceTransfer_v4r1<
-                    TileLoadThreadGroup,
-                    AElementwiseOperation,
-                    ck::tensor_operation::element_wise::PassThrough,
-                    InMemoryDataOperationEnum::Set,
-                    Sequence<AK0Number, MPerBlock, AK1Number>,
-                    ABlockTransferThreadClusterLengths_AK0_M_AK1,
-                    ABlockTransferThreadClusterArrangeOrder,
-                    ADataType,
-                    ADataType,
-                    decltype(a_grid_desc_ak0_m_ak1),
-                    decltype(a_block_desc_ak0_m_ak1),
-                    ABlockTransferSrcAccessOrder,
-                    Sequence<0, 1, 2>,
-                    ABlockTransferSrcVectorDim,
-                    2,
-                    ABlockTransferSrcScalarPerVector,
-                    ABlockTransferDstScalarPerVector_AK1,
-                    1,
-                    1,
-                    AThreadTransferSrcResetCoordinateAfterRun,
-                    true,
-                    NumGemmKPrefetchStage>(
+            auto a_blockwise_copy =
+                ThreadGroupTensorSliceTransfer_v4r1<TileLoadThreadGroup,
+                                                    AElementwiseOperation,
+                                                    ck::tensor_operation::element_wise::PassThrough,
+                                                    InMemoryDataOperationEnum::Set,
+                                                    Sequence<AK0Number, MPerBlock, AK1Number>,
+                                                    ABlockTransferThreadClusterLengths_AK0_M_AK1,
+                                                    ABlockTransferThreadClusterArrangeOrder,
+                                                    ADataType,
+                                                    ADataType,
+                                                    decltype(a_grid_desc_ak0_m_ak1),
+                                                    decltype(a_block_desc_ak0_m_ak1),
+                                                    ABlockTransferSrcAccessOrder,
+                                                    Sequence<0, 1, 2>,
+                                                    ABlockTransferSrcVectorDim,
+                                                    2,
+                                                    ABlockTransferSrcScalarPerVector,
+                                                    ABlockTransferDstScalarPerVector_AK1,
+                                                    1,
+                                                    1,
+                                                    AThreadTransferSrcResetCoordinateAfterRun,
+                                                    true,
+                                                    NumGemmKPrefetchStage>(
                     a_grid_desc_ak0_m_ak1,
                     make_multi_index(SplitKOffsetHack ? 0 : k_id, m_block_data_idx_on_grid, 0),
                     a_element_op,
@@ -889,29 +607,29 @@ struct GridwiseGemm_xdl_waveletmodel_cshuffle_conv_v3
                     make_multi_index(0, 0, 0),
                     ck::tensor_operation::element_wise::PassThrough{});
 
-                auto b_blockwise_copy = ThreadGroupTensorSliceTransfer_v4r1<
-                    TileLoadThreadGroup,
-                    BElementwiseOperation,
-                    ck::tensor_operation::element_wise::PassThrough,
-                    InMemoryDataOperationEnum::Set,
-                    Sequence<BK0Number, NPerBlock, BK1Number>,
-                    BBlockTransferThreadClusterLengths_BK0_N_BK1,
-                    BBlockTransferThreadClusterArrangeOrder,
-                    BDataType,
-                    BDataType,
-                    decltype(b_grid_desc_bk0_n_bk1),
-                    decltype(b_block_desc_bk0_n_bk1),
-                    BBlockTransferSrcAccessOrder,
-                    Sequence<0, 1, 2>,
-                    BBlockTransferSrcVectorDim,
-                    2,
-                    BBlockTransferSrcScalarPerVector,
-                    BBlockTransferDstScalarPerVector_BK1,
-                    1,
-                    1,
-                    BThreadTransferSrcResetCoordinateAfterRun,
-                    true,
-                    NumGemmKPrefetchStage>(
+            auto b_blockwise_copy =
+                ThreadGroupTensorSliceTransfer_v4r1<TileLoadThreadGroup,
+                                                    BElementwiseOperation,
+                                                    ck::tensor_operation::element_wise::PassThrough,
+                                                    InMemoryDataOperationEnum::Set,
+                                                    Sequence<BK0Number, NPerBlock, BK1Number>,
+                                                    BBlockTransferThreadClusterLengths_BK0_N_BK1,
+                                                    BBlockTransferThreadClusterArrangeOrder,
+                                                    BDataType,
+                                                    BDataType,
+                                                    decltype(b_grid_desc_bk0_n_bk1),
+                                                    decltype(b_block_desc_bk0_n_bk1),
+                                                    BBlockTransferSrcAccessOrder,
+                                                    Sequence<0, 1, 2>,
+                                                    BBlockTransferSrcVectorDim,
+                                                    2,
+                                                    BBlockTransferSrcScalarPerVector,
+                                                    BBlockTransferDstScalarPerVector_BK1,
+                                                    1,
+                                                    1,
+                                                    BThreadTransferSrcResetCoordinateAfterRun,
+                                                    true,
+                                                    NumGemmKPrefetchStage>(
                     b_grid_desc_bk0_n_bk1,
                     make_multi_index(SplitKOffsetHack ? 0 : k_id, n_block_data_idx_on_grid, 0),
                     b_element_op,
@@ -919,68 +637,67 @@ struct GridwiseGemm_xdl_waveletmodel_cshuffle_conv_v3
                     make_multi_index(0, 0, 0),
                     ck::tensor_operation::element_wise::PassThrough{});
 
-                GridwiseGemmLoad::template RunLoadWavePipeline<HasMainKBlockLoop>(
-                    a_grid_desc_ak0_m_ak1,
-                    a_block_desc_ak0_m_ak1,
-                    a_blockwise_copy,
-                    a_grid_buf,
-                    a_block_buf,
-                    a_block_slice_copy_step,
-                    b_grid_desc_bk0_n_bk1,
-                    b_block_desc_bk0_n_bk1,
-                    b_blockwise_copy,
-                    b_grid_buf,
-                    b_block_buf,
-                    b_block_slice_copy_step,
-                    num_k_block_main_loop);
+            GridwiseGemmLoad::template RunLoadWavePipeline<HasMainKBlockLoop>(
+                a_grid_desc_ak0_m_ak1,
+                a_block_desc_ak0_m_ak1,
+                a_blockwise_copy,
+                a_grid_buf,
+                a_block_buf,
+                a_block_slice_copy_step,
+                b_grid_desc_bk0_n_bk1,
+                b_block_desc_bk0_n_bk1,
+                b_blockwise_copy,
+                b_grid_buf,
+                b_block_buf,
+                b_block_slice_copy_step,
+                num_k_block_main_loop);
 
-                // Match epilogue LDS syncs: RunEpilogue calls block_sync_lds() twice per
-                // SFC access iteration (once before VGPR→LDS, once before LDS→global).
-                // For !TransposeC && !IsMxGemm, the SFC access count equals
-                // (MXdlPerWave / CShuffleMXdlPerWavePerShuffle) * (NXdlPerWave /
-                // CShuffleNXdlPerWavePerShuffle) because the M2/M4/N2 SFC dimensions have equal
-                // total and per-access lengths. See Base::GetCThreadWiseSpaceFillingCurve and
-                // RunEpilogue in gridwise_gemm_xdl_cshuffle_common.hpp.
-                static_assert(MXdlPerWave % CShuffleMXdlPerWavePerShuffle == 0 &&
-                                  NXdlPerWave % CShuffleNXdlPerWavePerShuffle == 0,
-                              "CShuffle XdlPerWave must divide MXdlPerWave/NXdlPerWave");
-                constexpr index_t num_access = (MXdlPerWave / CShuffleMXdlPerWavePerShuffle) *
-                                               (NXdlPerWave / CShuffleNXdlPerWavePerShuffle);
-                static_for<0, 2 * num_access, 1>{}([&](auto) { block_sync_lds(); });
-            }
-            else if(TileMathThreadGroup::IsBelong())
-            {
-                auto blockwise_gemm = BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1<
-                    TileMathThreadGroupSize,
-                    ADataType,
-                    BDataType,
-                    AccDataType,
-                    decltype(a_block_desc_ak0_m_ak1),
-                    decltype(b_block_desc_bk0_n_bk1),
-                    MPerXdl,
-                    NPerXdl,
-                    MXdlPerWave,
-                    NXdlPerWave,
-                    KPack,
-                    ComputeTypeA,
-                    ComputeTypeB>{};
+            // Match epilogue LDS syncs: RunEpilogue calls block_sync_lds() twice per
+            // SFC access iteration (once before VGPR→LDS, once before LDS→global).
+            // For !TransposeC && !IsMxGemm, the SFC access count equals
+            // (MXdlPerWave / CShuffleMXdlPerWavePerShuffle) * (NXdlPerWave /
+            // CShuffleNXdlPerWavePerShuffle) because the M2/M4/N2 SFC dimensions have equal
+            // total and per-access lengths. See Base::GetCThreadWiseSpaceFillingCurve and
+            // RunEpilogue in gridwise_gemm_xdl_cshuffle_common.hpp.
+            static_assert(MXdlPerWave % CShuffleMXdlPerWavePerShuffle == 0 &&
+                              NXdlPerWave % CShuffleNXdlPerWavePerShuffle == 0,
+                          "CShuffle XdlPerWave must divide MXdlPerWave/NXdlPerWave");
+            constexpr index_t num_access = (MXdlPerWave / CShuffleMXdlPerWavePerShuffle) *
+                                           (NXdlPerWave / CShuffleNXdlPerWavePerShuffle);
+            static_for<0, 2 * num_access, 1>{}([&](auto) { block_sync_lds(); });
+        }
+        else if(TileMathThreadGroup::IsBelong())
+        {
+            auto blockwise_gemm = BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1<
+                TileMathThreadGroupSize,
+                ADataType,
+                BDataType,
+                AccDataType,
+                decltype(a_block_desc_ak0_m_ak1),
+                decltype(b_block_desc_bk0_n_bk1),
+                MPerXdl,
+                NPerXdl,
+                MXdlPerWave,
+                NXdlPerWave,
+                KPack,
+                ComputeTypeA,
+                ComputeTypeB>{};
 
-                auto c_thread_buf = blockwise_gemm.GetCThreadBuffer();
+            auto c_thread_buf = blockwise_gemm.GetCThreadBuffer();
 
-                GridwiseGemmMath::template RunMathWavePipeline<HasMainKBlockLoop>(
-                    a_block_buf, b_block_buf, blockwise_gemm, c_thread_buf, num_k_block_main_loop);
+            GridwiseGemmMath::template RunMathWavePipeline<HasMainKBlockLoop>(
+                a_block_buf, b_block_buf, blockwise_gemm, c_thread_buf, num_k_block_main_loop);
 
-                Base::template RunEpilogue<CGlobalMemoryDataOperation, false, false>(
-                    blockwise_gemm,
-                    c_grid_desc_mblock_mperblock_nblock_nperblock,
-                    c_thread_buf,
-                    block_m_id,
-                    block_n_id,
-                    p_shared,
-                    p_c_grid,
-                    c_element_op);
-            }
-        } // end 2-way else
+            Base::template RunEpilogue<CGlobalMemoryDataOperation, false, false>(
+                blockwise_gemm,
+                c_grid_desc_mblock_mperblock_nblock_nperblock,
+                c_thread_buf,
+                block_m_id,
+                block_n_id,
+                p_shared,
+                p_c_grid,
+                c_element_op);
+        }
     }
 };
 
