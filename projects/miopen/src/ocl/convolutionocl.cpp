@@ -71,8 +71,11 @@ void LogConvolutionExecution(const Handle& handle,
                              const std::string& network_config,
                              const AlgorithmName& algorithm_name)
 {
-    // Only log at Info level (level 5) or higher
-    if(!IsLogging(LoggingLevel::Info))
+    const bool should_log    = IsLogging(LoggingLevel::Info);
+    const bool should_buffer = IsLogBufferOn();
+
+    // Return early only if neither logging nor buffering is active
+    if(!should_log && !should_buffer)
         return;
 
     try
