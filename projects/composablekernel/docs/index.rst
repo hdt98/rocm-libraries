@@ -34,6 +34,7 @@ The Composable Kernel project is located in https://github.com/ROCm/rocm-librari
 
   .. grid-item-card:: Reference
 
+    * :doc:`CK Tile coverage map <./reference/CK-Tile-coverage-map>`
     * :doc:`Composable Kernel supported scalar types <./reference/Composable_Kernel_supported_scalar_types>`
     * :doc:`Composable Kernel custom types <./reference/Composable_Kernel_custom_types>`
     * :doc:`Composable Kernel vector utilities <./reference/Composable_Kernel_vector_utilities>`
