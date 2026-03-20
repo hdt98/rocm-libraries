@@ -6,6 +6,7 @@
 #include "mathutil.h"
 #include "launch_params.h"
 #include "kernel_variant.h"
+#include "transpose_4x4.h"
 #include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
 
@@ -33,6 +34,8 @@ struct Config
 
     int n_fold = 8;
 
+    hipconv::Direction direction = hipconv::Direction::Fprop;
+
     constexpr int num_waves() const { return waves_c64 * waves_q4; }
 
     constexpr int block_c() const { return waves_c64 * 64; }
@@ -44,9 +47,15 @@ struct Config
     constexpr int block_size() const { return num_waves() * WAVE_SIZE; }
 };
 
-// All instantiated configurations.
+// All instantiated configurations. The first valid config is expected to be the fastest.
 constexpr Config configs[] = {
+    {.waves_c64 = 2, .waves_q4 = 8, .direction = hipconv::Direction::Dgrad},
+    {.waves_c64 = 2, .waves_q4 = 4, .direction = hipconv::Direction::Dgrad},
+    {.waves_c64 = 2, .waves_q4 = 2, .direction = hipconv::Direction::Dgrad},
+    {.waves_c64 = 2, .waves_q4 = 1, .direction = hipconv::Direction::Dgrad},
+    {.waves_c64 = 1, .waves_q4 = 1, .direction = hipconv::Direction::Dgrad},
     {.waves_c64 = 2, .waves_q4 = 8},
+    {.waves_c64 = 2, .waves_q4 = 4},
     {.waves_c64 = 2, .waves_q4 = 2},
     {.waves_c64 = 2, .waves_q4 = 1},
     {.waves_c64 = 1, .waves_q4 = 1},
@@ -56,7 +65,16 @@ constexpr int NUM_CONFIGS = sizeof(configs) / sizeof(configs[0]);
 
 inline bool is_valid_config(const hipconv::Conv2dParams& par, const Config& cfg)
 {
+    if(par.direction != cfg.direction)
+    {
+        return false;
+    }
     if((par.groups % cfg.block_groups()) != 0)
+    {
+        return false;
+    }
+    const int out_q = (par.direction == hipconv::Direction::Dgrad) ? par.w : par.q;
+    if(out_q < cfg.block_q() && cfg.waves_q4 > 1)
     {
         return false;
     }
@@ -67,8 +85,10 @@ inline LaunchParams get_launch_params(int config_idx, const hipconv::Conv2dParam
 {
     const auto& cfg = configs[config_idx];
 
-    // Compute the grid size
-    auto blocks_w      = divup(par.q, cfg.block_q());
+    // Compute the grid size.
+    // For Dgrad the output is the input gradient (width = par.w, not par.q).
+    const int out_q    = (cfg.direction == hipconv::Direction::Dgrad) ? par.w : par.q;
+    auto blocks_w      = divup(out_q, cfg.block_q());
     auto blocks_w_n    = blocks_w * cfg.n_fold;
     auto blocks_c      = divup(par.c, cfg.block_c());
     auto blocks_n_fold = divup(par.n, cfg.n_fold);
@@ -136,11 +156,15 @@ __device__ void conv2d_grouped_4c_fp16_cdna4_nhwc_impl(const _Float16* __restric
     // Size of LDS buffer for outputs.
     constexpr int OUTPUT_LDS_BUFFER_SIZE = BLOCK_C8 * cfg.block_q();
 
+    // Size of LDS buffer for weight staging: [kh*kw][block_groups][GROUP_SIZE] in uint2 units.
+    constexpr int WEIGHT_LDS_SIZE_UINT2 = cfg.kh * cfg.kw * cfg.block_groups() * GROUP_SIZE;
+    constexpr int WEIGHT_LDS_SIZE_UINT4 = WEIGHT_LDS_SIZE_UINT2 / 2;
+
     // LDS buffer for staging loads from global memory.
     __shared__ uint4 input_lds[NUM_INPUT_LDS_BUFFERS * INPUT_LDS_BUFFER_SIZE_C8];
 
-    // LDS buffer for staging stores to global memory.
-    __shared__ uint4 output_lds[OUTPUT_LDS_BUFFER_SIZE];
+    // LDS buffer for weight staging (prologue) and output staging (main loop).
+    __shared__ uint4 output_lds[maximum(WEIGHT_LDS_SIZE_UINT4, OUTPUT_LDS_BUFFER_SIZE)];
 
     const int tid  = threadIdx.x;
     const int wave = tid / WAVE_SIZE;
@@ -199,6 +223,23 @@ __device__ void conv2d_grouped_4c_fp16_cdna4_nhwc_impl(const _Float16* __restric
         input_voffset = input_bytes;
     }
 
+    // Load weights from global memory through LDS into registers.
+    // Global layout: wei[k][kh*kw] in uint2 units (GROUP_SIZE_4 = 1).
+    // LDS mirrors the global layout: contiguous block of block_c * kh*kw uint2 elements.
+    fp16x4_t weights_reg[cfg.kh * cfg.kw];
+    {
+        auto weight_bytes = static_cast<size_t>(C) * cfg.kh * cfg.kw * GROUP_SIZE * sizeof(half);
+        auto weight_rsrc  = __builtin_amdgcn_make_buffer_rsrc(
+            const_cast<_Float16*>(wei), 0, weight_bytes, rsrc_data_format);
+        uint32_t voffset_base = block_k * cfg.kh * cfg.kw * sizeof(uint2);
+
+        for(int j = tid; j < WEIGHT_LDS_SIZE_UINT4; j += cfg.block_size())
+        {
+            __builtin_amdgcn_raw_ptr_buffer_load_lds(
+                weight_rsrc, &output_lds[j], 16, voffset_base + j * sizeof(uint4), 0, 0, 0);
+        }
+    }
+
     // Load first chunk of inputs asynchronously.
     if(load_active)
     {
@@ -232,18 +273,25 @@ __device__ void conv2d_grouped_4c_fp16_cdna4_nhwc_impl(const _Float16* __restric
         }
     }
 
-    // Load weights from global memory to mfma matrices in registers.
-    fp16x4_t weights_reg[cfg.kh * cfg.kw];
     {
-        auto lane_k     = OperandLayout::outer(lane);
-        auto lane_c4    = OperandLayout::inner(lane) / 4;
-        auto lane_batch = OperandLayout::batch(lane);
-        auto k          = block_k + wave_c64 * 64 + lane_batch * GROUP_SIZE + lane_k;
-        auto weights_global =
-            reinterpret_cast<const uint2*>(wei) + k * (cfg.kh * cfg.kw * GROUP_SIZE_4) + lane_c4;
+        // Wait for the filters to load from global to LDS ..
+        // but allow the first chunk of inputs to still be flight.
+        asm volatile("s_waitcnt vmcnt(1)\n");
+        __syncthreads();
+
+        auto lane_k      = OperandLayout::outer(lane);
+        auto lane_batch  = OperandLayout::batch(lane);
+        int filter_local = wave_c64 * 64 + lane_batch * GROUP_SIZE + lane_k;
+        auto* weight_lds = reinterpret_cast<const uint2*>(output_lds);
         for(int khw = 0; khw < cfg.kh * cfg.kw; khw++)
         {
-            weights_reg[khw] = *(const fp16x4_t*)(weights_global + khw * GROUP_SIZE_4);
+            auto* lds_ptr    = &weight_lds[filter_local * cfg.kh * cfg.kw + khw];
+            weights_reg[khw] = *(const fp16x4_t*)lds_ptr;
+            if constexpr(cfg.direction == hipconv::Direction::Dgrad)
+            {
+                auto& w = reinterpret_cast<uint2&>(weights_reg[khw]);
+                transpose_4x4_batch16(w.x, w.y);
+            }
         }
     }
 
@@ -314,8 +362,22 @@ __device__ void conv2d_grouped_4c_fp16_cdna4_nhwc_impl(const _Float16* __restric
                                 // are compile-time constants. Therefore acc[p_idx] compiles to a
                                 // register address.
                                 constexpr int p_idx = (Y_LOCAL - R + cfg.kh) % cfg.kh;
-                                acc[p_idx]          = __builtin_amdgcn_mfma_f32_4x4x4f16(
-                                    weights_reg[R * cfg.kw + S], input_reg, acc[p_idx], 0, 0, 0);
+                                if constexpr(cfg.direction == hipconv::Direction::Dgrad)
+                                    acc[p_idx] = __builtin_amdgcn_mfma_f32_4x4x4f16(
+                                        weights_reg[(cfg.kh - 1 - R) * cfg.kw + (cfg.kw - 1 - S)],
+                                        input_reg,
+                                        acc[p_idx],
+                                        0,
+                                        0,
+                                        0);
+                                else
+                                    acc[p_idx] = __builtin_amdgcn_mfma_f32_4x4x4f16(
+                                        weights_reg[R * cfg.kw + S],
+                                        input_reg,
+                                        acc[p_idx],
+                                        0,
+                                        0,
+                                        0);
                             });
                     });
 
@@ -381,8 +443,22 @@ __device__ void conv2d_grouped_4c_fp16_cdna4_nhwc_impl(const _Float16* __restric
                             [&]<int R>()
                             {
                                 constexpr int p_idx = (Y_LOCAL - R + cfg.kh) % cfg.kh;
-                                acc[p_idx]          = __builtin_amdgcn_mfma_f32_4x4x4f16(
-                                    weights_reg[R * cfg.kw + S], input_reg, acc[p_idx], 0, 0, 0);
+                                if constexpr(cfg.direction == hipconv::Direction::Dgrad)
+                                    acc[p_idx] = __builtin_amdgcn_mfma_f32_4x4x4f16(
+                                        weights_reg[(cfg.kh - 1 - R) * cfg.kw + (cfg.kw - 1 - S)],
+                                        input_reg,
+                                        acc[p_idx],
+                                        0,
+                                        0,
+                                        0);
+                                else
+                                    acc[p_idx] = __builtin_amdgcn_mfma_f32_4x4x4f16(
+                                        weights_reg[R * cfg.kw + S],
+                                        input_reg,
+                                        acc[p_idx],
+                                        0,
+                                        0,
+                                        0);
                             });
                     });
 
@@ -503,6 +579,7 @@ void launch_dispatch(int config_idx,
 {
     auto kernel_launch = [&]<size_t I>()
     {
+        auto view = hipconv::SizeView<configs[I].direction>(par);
         conv2d_grouped_4c_fp16_nhwc_cdna4<configs[I]>
             <<<lp.grid, lp.block_size, lp.dynamic_shared_bytes, stream>>>(
                 static_cast<const _Float16*>(in),
@@ -514,18 +591,18 @@ void launch_dispatch(int config_idx,
                 par.groups,
                 par.channels_per_group(),
                 par.filters_per_group(),
-                par.h,
-                par.w,
-                par.p,
-                par.q,
+                view.h(),
+                view.w(),
+                view.p(),
+                view.q(),
                 par.kh,
                 par.kw,
                 par.stride_h,
                 par.stride_w,
                 par.dilation_h,
                 par.dilation_w,
-                par.pad_h,
-                par.pad_w);
+                view.pad_h(),
+                view.pad_w());
     };
     (void)((config_idx == static_cast<int>(Is) ? (kernel_launch.template operator()<Is>(), true)
                                                : false) ||
@@ -558,7 +635,8 @@ constexpr KernelVariant make_variant()
                 return false;
             if(par.order != hipconv::TensorOrder::NHWC)
                 return false;
-            if(par.direction != hipconv::Direction::Fprop)
+            if(par.direction != hipconv::Direction::Fprop &&
+               par.direction != hipconv::Direction::Dgrad)
                 return false;
             if(par.kh != 3 || par.kw != 3)
                 return false;
@@ -569,6 +647,10 @@ constexpr KernelVariant make_variant()
             if(par.c % 4 != 0)
                 return false;
             if(par.stride_h != 1 || par.stride_w != 1)
+                return false;
+            if(par.dilation_h != 1 || par.dilation_w != 1)
+                return false;
+            if(par.pad_h > par.kh - 1 || par.pad_w > par.kw - 1)
                 return false;
             return true;
         },
