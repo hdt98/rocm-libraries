@@ -1441,6 +1441,12 @@ namespace TensileLite
         std::vector<size_t> maxElements;
         size_t              workspaceSize;
         bool                gpu = false;
+
+        /// When true, append 8-byte device pointer after StrideBias (hand-patched kernels with
+        /// EpilogueDump @ user offset 128 / kernarg size 136). Must match kernel metadata;
+        /// do not enable with stock code objects.
+        bool   appendEpilogueDumpKernarg = false;
+        void*  epilogueDump              = nullptr;
     };
 
     struct TENSILE_API ContractionGroupedInputs : public ProblemInputs

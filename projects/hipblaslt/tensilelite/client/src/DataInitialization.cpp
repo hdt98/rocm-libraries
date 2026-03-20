@@ -34,9 +34,12 @@
 #include <hip/hip_runtime.h>
 
 #include <algorithm>
+#include <fstream>
 #include <list>
 #include <map>
+#include <stdexcept>
 #include <tuple>
+#include <vector>
 
 namespace TensileLite
 {
@@ -889,6 +892,9 @@ namespace TensileLite
             m_rotatingMode   = args["rotating-buffer-mode"].as<int32_t>();
             m_boundsCheck    = args["bounds-check"].as<BoundsCheckMode>();
             m_curBoundsCheck = m_boundsCheck;
+
+            m_epilogueDumpPath    = args["epilogue-dump"].as<std::string>();
+            m_epilogueDumpEnabled = !m_epilogueDumpPath.empty();
 
             if(m_boundsCheck == BoundsCheckMode::GuardPageAll)
             {
@@ -2285,6 +2291,44 @@ namespace TensileLite
             }
         }
 
+        void DataInitialization::ensureEpilogueDumpBuffer(ContractionProblemGemm const& problem)
+        {
+            size_t const bytes = problem.d().totalAllocatedElements() * 16;
+            if(bytes == 0)
+                throw std::runtime_error("epilogue-dump: D tensor has zero elements.");
+            if(bytes == m_epilogueDumpBytes && m_epilogueDumpGpu)
+                return;
+            void* p = nullptr;
+            HIP_CHECK_EXC(hipMalloc(&p, bytes));
+            m_epilogueDumpGpu = std::shared_ptr<void>(p, [](void* x) {
+                if(x)
+                    hipFree(x);
+            });
+            m_epilogueDumpBytes = bytes;
+        }
+
+        void DataInitialization::validateEnqueues(std::shared_ptr<ProblemInputs> inputs,
+                                                  TimingEvents const&           startEvents,
+                                                  TimingEvents const&           stopEvents)
+        {
+            (void)inputs;
+            (void)startEvents;
+            (void)stopEvents;
+            if(!m_epilogueDumpEnabled || m_epilogueDumpPath.empty() || !m_epilogueDumpGpu
+               || m_epilogueDumpBytes == 0)
+                return;
+            std::vector<uint8_t> host(m_epilogueDumpBytes);
+            HIP_CHECK_EXC(hipMemcpy(host.data(),
+                                    m_epilogueDumpGpu.get(),
+                                    m_epilogueDumpBytes,
+                                    hipMemcpyDeviceToHost));
+            std::ofstream out(m_epilogueDumpPath, std::ios::binary);
+            if(!out)
+                throw std::runtime_error("epilogue-dump: cannot open for write: " + m_epilogueDumpPath);
+            out.write(reinterpret_cast<char const*>(host.data()),
+                      static_cast<std::streamsize>(m_epilogueDumpBytes));
+        }
+
         // For GEMM only
         std::shared_ptr<ProblemInputs>
             DataInitialization::ConvertToProblemInputs(ContractionProblemGemm const& problem,
@@ -2314,6 +2358,17 @@ namespace TensileLite
                                          m_maxElements,
                                          isGPU,
                                          inputs);
+                }
+                if(m_epilogueDumpEnabled && isGPU)
+                {
+                    ensureEpilogueDumpBuffer(problem);
+                    inputs->appendEpilogueDumpKernarg = true;
+                    inputs->epilogueDump               = m_epilogueDumpGpu.get();
+                }
+                else
+                {
+                    inputs->appendEpilogueDumpKernarg = false;
+                    inputs->epilogueDump              = nullptr;
                 }
                 result = static_pointer_cast<ProblemInputs>(
                     std::shared_ptr<ContractionInputs>(inputs));

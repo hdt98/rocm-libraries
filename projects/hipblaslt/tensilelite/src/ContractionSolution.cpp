@@ -847,6 +847,13 @@ namespace TensileLite
             }
         }
 
+        // EpilogueDump: optional extra global pointer (see scripts/EPILOGUE_DUMP_KERNARG.md).
+        // Must appear after StrideBias and before factorDim in the argument order expected by the kernel.
+        if(inputs.appendEpilogueDumpKernarg)
+        {
+            args.template append<void*>("EpilogueDump", inputs.epilogueDump);
+        }
+
         if(problemType.useScaleAlphaVec == 3 || problemType.useBias == 3)
         {
             args.template append<uint32_t>("factorDim",

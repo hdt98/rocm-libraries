@@ -849,9 +849,7 @@ namespace TensileLite
             }
             virtual void validateEnqueues(std::shared_ptr<ProblemInputs> inputs,
                                           TimingEvents const&            startEvents,
-                                          TimingEvents const&            stopEvents) override
-            {
-            }
+                                          TimingEvents const&            stopEvents) override;
 
             virtual void finalizeReport() override {}
 
@@ -955,6 +953,9 @@ namespace TensileLite
             std::shared_ptr<ProblemInputs>
                 ConvertToProblemInputs(ContractionProblemGemm const& problem, bool isGPU);
 
+            /// Resize GPU buffer for epilogue dump (one 16-byte record per D element).
+            void ensureEpilogueDumpBuffer(ContractionProblemGemm const& problem);
+
             std::vector<VectorDataInitProperties> m_vdata;
             std::vector<void*>                    m_cpuPtrs;
             std::vector<void*>                    m_gpuPtrs;
@@ -963,6 +964,12 @@ namespace TensileLite
             std::vector<void**>                   m_gpuBatchPtrs;
             std::shared_ptr<void>                 m_workspacePristine;
             std::vector<ConstDataInitProperties>  m_cdata;
+
+            /// Optional epilogue debug dump (see --epilogue-dump, EPILOGUE_DUMP_KERNARG.md).
+            bool                  m_epilogueDumpEnabled = false;
+            std::string           m_epilogueDumpPath;
+            std::shared_ptr<void> m_epilogueDumpGpu;
+            size_t                m_epilogueDumpBytes = 0;
 
             bool m_cpuInit = false;
             bool m_gpuInit = false;

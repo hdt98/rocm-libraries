@@ -257,6 +257,9 @@ namespace TensileLite
                 ("print-tensor-amaxd",              po::value<bool>()->default_value(false), "Print tensor AmaxD value from both CPU and GPU.")
 
                 ("dump-tensors",             po::value<bool>()->default_value(false), "Binary dump tensors instead of printing.")
+                ("epilogue-dump",            po::value<std::string>()->default_value(""),
+                 "Write epilogue debug buffer (M*N*16 bytes) to this file after each validated enqueue. "
+                 "Requires a hand-patched code object with EpilogueDump kernarg (see tensilelite/scripts/EPILOGUE_DUMP_KERNARG.md).")
 
                 ("device-idx",               po::value<int>()->default_value(0), "Device index")
                 ("use-default-stream",       po::value<bool>()->default_value(false), "Use default Hip stream to run kernels.")
