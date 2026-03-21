@@ -76,6 +76,7 @@ try:
     import msgpack
     _msgpack_available = True
 except ImportError:
+    msgpack = None
     _msgpack_available = False
     print("Message pack python library not detected. Must use YAML backend instead.")
 
@@ -83,14 +84,26 @@ except ImportError:
 ###################
 # Writing functions
 ###################
+def formatFilename(filename_noExt, format="yaml"):
+    """Returns the output filename for a given serialization format."""
+    if format == "yaml":
+        return filename_noExt + ".yaml"
+    if format == "json":
+        return filename_noExt + ".json"
+    if format == "msgpack":
+        return filename_noExt + ".dat"
+
+    printExit("Unrecognized write format {}".format(format))
+
+
 def write(filename_noExt, data, format="yaml"):
     """Writes data to file with specified format; extension is appended based on format."""
     if format == "yaml":
-        writeYAML(filename_noExt + ".yaml", data)
+        writeYAML(formatFilename(filename_noExt, format), data)
     elif format == "json":
-        writeJson(filename_noExt + ".json", data)
+        writeJson(formatFilename(filename_noExt, format), data)
     elif format == "msgpack":
-        writeMsgPack(filename_noExt + ".dat", data)
+        writeMsgPack(formatFilename(filename_noExt, format), data)
     else:
         printExit("Unrecognized write format {}".format(format))
 
@@ -104,9 +117,11 @@ def writeYAML(filename, data, **kwargs):
         kwargs["explicit_end"] = True
     if "default_flow_style" not in kwargs:
         kwargs["default_flow_style"] = None
+    if "Dumper" not in kwargs:
+        kwargs["Dumper"] = yamlDumper
 
     with open(filename, "w") as f:
-        yaml.dump(data, f, Dumper=yamlDumper, **kwargs)
+        yaml.dump(data, f, **kwargs)
 
 def writeJson(filename, data):
     """Writes data to file in json format."""
@@ -116,44 +131,121 @@ def writeJson(filename, data):
 
 def writeMsgPack(filename, data):
     """Writes data to file in Message Pack format."""
+    if msgpack is None:
+        printExit("Message pack python library not detected. Install msgpack to use msgpack format.")
     with open(filename, "wb") as f:
-        msgpack.pack(data, f)
+        msgpack.pack(data, f, use_bin_type=True)
 
-def _solutionsCacheFilename(yamlFilename):
-    """Return path to the msgpack cache file for a solutions YAML."""
-    base, _ = os.path.splitext(yamlFilename)
+def _solutionsCacheFilename(filename):
+    """Return path to the msgpack cache file for a solutions artifact."""
+    base, _ = os.path.splitext(str(filename))
     return base + ".solcache.dat"
 
-def writeSolutions(filename, problemSizes, biasTypeArgs, activationArgs, solutions, cache=False):
-    """Writes solution YAML file."""
-    def load_solution_states_from_cache(filename) -> list[dict]:
-        """Try loading from msgpack cache, falling back to YAML."""
+
+def _serialize_problem_sizes(problemSizes):
+    if not problemSizes:
+        return []
+
+    serialized = []
+
+    for sizeRange in problemSizes.ranges:
+        rangeConfig = []
+        sizedIdx = 0
+        mappedIdx = 0
+        for isSized in sizeRange.indexIsSized:
+            if isSized:
+                rangeConfig.append(list(sizeRange.indicesSized[sizedIdx]))
+                sizedIdx += 1
+            else:
+                rangeConfig.append(sizeRange.indicesMapped[mappedIdx])
+                mappedIdx += 1
+        serialized.append({"Range": rangeConfig})
+
+    for problemExact in problemSizes.exacts:
+        hasExplicitShape = any(
+            getattr(problemExact, attr, None)
+            for attr in ("stridesA", "stridesB", "stridesC", "stridesD")
+        ) or getattr(problemExact, "count", None) is not None
+        if hasExplicitShape:
+            exactData = {"sizes": list(problemExact.sizes)}
+            if problemExact.stridesA:
+                exactData["stridesA"] = list(problemExact.stridesA)
+            if problemExact.stridesB:
+                exactData["stridesB"] = list(problemExact.stridesB)
+            if problemExact.stridesC:
+                exactData["stridesC"] = list(problemExact.stridesC)
+            if problemExact.stridesD:
+                exactData["stridesD"] = list(problemExact.stridesD)
+            if getattr(problemExact, "count", None) is not None:
+                exactData["count"] = problemExact.count
+            serialized.append({"Exact": exactData})
+        else:
+            serialized.append({"Exact": list(problemExact.sizes)})
+
+    return serialized
+
+
+def _serialize_bias_type_args(biasTypeArgs):
+    if biasTypeArgs is None or biasTypeArgs == "":
+        return None
+
+    return [btype.toChar().lower() for btype in biasTypeArgs.biasTypes]
+
+
+def _serialize_activation_args(activationArgs):
+    if activationArgs is None or activationArgs == "":
+        return None
+
+    return [{"Enum": str(setting.activationEnum)} for setting in activationArgs.settingList]
+
+
+def writeSolutions(
+    filename,
+    problemSizes,
+    biasTypeArgs,
+    activationArgs,
+    solutions,
+    cache=False,
+    format="yaml",
+):
+    """Writes solution benchmark data using the requested serialization format."""
+
+    filename = formatFilename(os.path.splitext(str(filename))[0], format)
+    biasTypes = _serialize_bias_type_args(biasTypeArgs)
+    activationSettings = _serialize_activation_args(activationArgs)
+
+    def solutionDataOffset() -> int:
+        if biasTypes is not None and activationSettings is not None:
+            return 4
+        elif biasTypes is not None or activationSettings is not None:
+            return 3
+        else:
+            return 2
+
+    def load_solution_states_from_cache() -> list[dict]:
         cachePath = _solutionsCacheFilename(filename)
-        # Try msgpack cache if available and the cache file exists
-        if _msgpack_available and os.path.exists(cachePath):
-            # If the YAML is newer than the cache, don't use the cache; assume it's stale
+        if format == "yaml" and _msgpack_available and os.path.exists(cachePath) and os.path.exists(filename):
             if os.path.getmtime(cachePath) >= os.path.getmtime(filename):
                 try:
                     with open(cachePath, "rb") as cf:
                         return msgpack.unpack(cf, raw=False)
                 except Exception as e:
                     printWarning("Failed to load solution cache: {}".format(e))
-        # Fall back to YAML
-        solYaml = read(filename)
-        if biasTypeArgs and activationArgs:
-            return solYaml[4:]
-        elif biasTypeArgs or activationArgs:
-            return solYaml[3:]
-        else:
-            return solYaml[2:]
+
+        solutionData = read(filename)
+        if solutionData is None:
+            return []
+        return solutionData[solutionDataOffset():]
+
+    # convert objects to nested dictionaries
+    solutionStates = []
 
     with timing_context("python_wsol_prepare"):
-        if cache:
+        if cache and os.path.exists(filename):
             with timing_context("python_wsol_prepare_cache"):
-                solutionStates = load_solution_states_from_cache(filename)
-        else:
+                solutionStates = load_solution_states_from_cache()
+        elif solutions is not None:
             with timing_context("python_wsol_prepare_nocache"):
-                solutionStates: list[dict] = []
                 for solution in solutions:
                     solutionState = solution.getAttributes()
                     solutionState["ProblemType"] = solutionState["ProblemType"].state
@@ -161,28 +253,58 @@ def writeSolutions(filename, problemSizes, biasTypeArgs, activationArgs, solutio
                     isa = solutionState["ISA"]
                     solutionState["ISA"] = [isa[0], isa[1], isa[2]]
                     solutionStates.append(solutionState)
-                if _msgpack_available:
+
+                if format == "yaml" and _msgpack_available:
                     try:
                         writeMsgPack(_solutionsCacheFilename(filename), solutionStates)
                     except Exception as e:
                         printWarning("Failed to write solution cache: {}".format(e))
-    # write dictionaries
-    with open(filename, "w") as f:
-        f.write("- MinimumRequiredVersion: {}\n".format(__version__))
-        f.write("- ProblemSizes:\n")
-        if problemSizes:
-            for sizeRange in problemSizes.ranges:
-                f.write("  - Range: {}\n".format(sizeRange))
-            for problemExact in problemSizes.exacts:
-                #FIXME-problem, this ignores strides:
-                f.write("  - Exact: {}\n".format(problemExact))
-        if biasTypeArgs:
-            f.write("- BiasTypeArgs: [{}]\n".format([btype.value for btype in biasTypeArgs.biasTypes]))
-        if activationArgs:
-            f.write("- ActivationArgs:\n")
-            for setting in activationArgs.settingList:
-                f.write("  - [Enum: %s]\n"%(setting.activationEnum))
-        yaml.dump(solutionStates, f, Dumper=yamlDumper, default_flow_style=None)
+
+    if format == "yaml":
+        with open(filename, "w") as f:
+            f.write("- MinimumRequiredVersion: {}\n".format(__version__))
+            f.write("- ProblemSizes:\n")
+            if problemSizes:
+                for sizeRange in problemSizes.ranges:
+                    f.write("  - Range: {}\n".format(sizeRange))
+                for problemExact in problemSizes.exacts:
+                    #FIXME-problem, this ignores strides:
+                    f.write("  - Exact: {}\n".format(problemExact))
+            if biasTypes is not None:
+                if biasTypes:
+                    f.write("- BiasTypeArgs: [{}]\n".format(", ".join(biasTypes)))
+                else:
+                    f.write("- BiasTypeArgs: []\n")
+            if activationSettings is not None:
+                if activationSettings:
+                    f.write("- ActivationArgs:\n")
+                    for setting in activationSettings:
+                        f.write("  - [Enum: %s]\n" % (setting["Enum"]))
+                else:
+                    f.write("- ActivationArgs: []\n")
+            if solutionStates:  # Only dump if we have solution states
+                yaml.dump(solutionStates, f, default_flow_style=None, Dumper=yamlDumper)
+        return
+
+    data = [
+        {"MinimumRequiredVersion": __version__},
+        {"ProblemSizes": _serialize_problem_sizes(problemSizes)},
+    ]
+    if biasTypes is not None:
+        data.append({"BiasTypeArgs": biasTypes})
+    if activationSettings is not None:
+        data.append({"ActivationArgs": activationSettings})
+    data.extend(solutionStates)
+
+    if format == "msgpack":
+        writeMsgPack(filename, data)
+        return
+
+    if format == "json":
+        writeJson(filename, data)
+        return
+
+    printExit("Unrecognized write format {}".format(format))
 
 
 ###############################
@@ -194,6 +316,8 @@ def read(filename, customizedLoader=False):
         return load_yaml_stream(filename, yamlLoader) if customizedLoader else readYAML(filename)
     if extension == ".json":
         return readJson(filename)
+    if extension == ".dat":
+        return readMsgPack(filename)
     else:
         printExit("Unrecognized read format {}".format(extension))
 
@@ -209,6 +333,15 @@ def readJson(filename):
     """Reads and returns JSON data from file."""
     with open(filename, "r") as f:
         data = json.loads(f.read())
+    return data
+
+
+def readMsgPack(filename):
+    """Reads and returns Message Pack data from file."""
+    if msgpack is None:
+        printExit("Message pack python library not detected. Install msgpack to read msgpack format.")
+    with open(filename, "rb") as f:
+        data = msgpack.unpack(f, raw=False)
     return data
 
 
