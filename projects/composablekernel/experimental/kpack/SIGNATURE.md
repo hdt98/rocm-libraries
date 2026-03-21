@@ -101,8 +101,8 @@ constraints hold between them.
 C[B, M, N] = sum_k( A[B, M, K] * B[B, K, N] )
 ```
 
-| Tensor | Rank | Direction | Required |
-|--------|------|-----------|----------|
+| Tensor | Rank | Role | Required |
+|--------|------|------|----------|
 | A | 2-3 | In | yes |
 | B | 2-3 | In | yes |
 | C | 2-3 | Out | yes |
@@ -117,8 +117,8 @@ Constraints: `A.size[-2] == C.size[-2]`, `A.size[-1] == B.size[-2]`, `B.size[-1]
 Y[N, K, oH, oW] = sum( X[N, C, iH, iW] * W[K, C/g, kH, kW] )
 ```
 
-| Tensor | Rank | Direction | Required |
-|--------|------|-----------|----------|
+| Tensor | Rank | Role | Required |
+|--------|------|------|----------|
 | X | 4+ | In | yes |
 | W | 4+ | In | yes |
 | Y | 4+ | Out | yes |
@@ -131,8 +131,8 @@ Parameters: `pad`, `stride`, `dilation`, `groups`
 O = softmax( Q @ K^T / scale ) @ V
 ```
 
-| Tensor | Rank | Direction | Required |
-|--------|------|-----------|----------|
+| Tensor | Rank | Role | Required |
+|--------|------|------|----------|
 | Q | 4 | In | yes |
 | K | 4 | In | yes |
 | V | 4 | In | yes |
@@ -147,8 +147,8 @@ Parameters: `scale`, `causal`
 C[i] = alpha * A[i] + beta * B[i]
 ```
 
-| Tensor | Rank | Direction | Required |
-|--------|------|-----------|----------|
+| Tensor | Rank | Role | Required |
+|--------|------|------|----------|
 | A | 1+ | In | yes |
 | B | 1+ | In | yes |
 | C | 1+ | Out | yes |
