@@ -66,6 +66,12 @@ except ImportError:
     printWarning("CSafeLoader not installed. Fallback to SafeLoader.")
 
 try:
+    from yaml import CSafeDumper as yamlDumper
+except ImportError:
+    from yaml import SafeDumper as yamlDumper
+    printWarning("CSafeDumper not installed. Fallback to SafeDumper.")
+
+try:
     import msgpack
 except ImportError:
     msgpack = None
@@ -108,6 +114,8 @@ def writeYAML(filename, data, **kwargs):
         kwargs["explicit_end"] = True
     if "default_flow_style" not in kwargs:
         kwargs["default_flow_style"] = None
+    if "Dumper" not in kwargs:
+        kwargs["Dumper"] = yamlDumper
 
     with open(filename, "w") as f:
         yaml.dump(data, f, **kwargs)
@@ -242,7 +250,7 @@ def writeSolutions(
                 else:
                     f.write("- ActivationArgs: []\n")
             if solutionStates:  # Only dump if we have solution states
-                yaml.dump(solutionStates, f, default_flow_style=None)
+                yaml.dump(solutionStates, f, default_flow_style=None, Dumper=yamlDumper)
         return
 
     data = [
