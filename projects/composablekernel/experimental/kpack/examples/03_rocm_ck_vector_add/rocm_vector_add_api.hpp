@@ -73,6 +73,15 @@ struct ElementwiseSignature
     std::optional<DataType> a_dtype;   // input A (overrides in_dtype)
     std::optional<DataType> b_dtype;   // input B (overrides in_dtype)
     std::optional<DataType> out_dtype; // output (overrides dtype; NOT from in_dtype)
+
+    // Operation: binary add with named tensor slots
+    struct Add
+    {
+        std::string_view lhs = "A";
+        std::string_view rhs = "B";
+        std::string_view out = "out";
+    };
+    Add op{};
 };
 
 /// Algorithm: describes HOW the kernel executes (tile geometry, pipeline).
@@ -134,9 +143,9 @@ consteval std::array<TensorDesc, 3> resolve_tensors(ElementwiseSignature sig)
                    : sig.dtype   ? *sig.dtype
                                  : throw "out_dtype unresolvable: set out_dtype or dtype";
 
-    return {TensorDesc{"A", a, 1, TensorDir::In, Layout::Contiguous},
-            TensorDesc{"B", b, 1, TensorDir::In, Layout::Contiguous},
-            TensorDesc{"out", out, 1, TensorDir::Out, Layout::Contiguous}};
+    return {TensorDesc{"A", a, 1, Layout::Contiguous},
+            TensorDesc{"B", b, 1, Layout::Contiguous},
+            TensorDesc{"out", out, 1, Layout::Contiguous}};
 }
 
 // --- resolve_tensors compile-time tests ---
@@ -160,18 +169,20 @@ static_assert(resolve_tensors({.dtype = DataType::FP32, .in_dtype = DataType::FP
 static_assert(resolve_tensors({.a_dtype = DataType::FP16, .b_dtype = DataType::FP16, .out_dtype = DataType::FP32})[0].dtype == DataType::FP16);
 static_assert(resolve_tensors({.dtype = DataType::FP32, .a_dtype = DataType::FP16, .b_dtype = DataType::FP16})[2].dtype == DataType::FP32);
 
-// TensorDesc metadata: name, rank, direction
+// TensorDesc metadata: name, rank, layout
 static_assert(resolve_tensors({.dtype = DataType::FP32})[0].name == "A");
 static_assert(resolve_tensors({.dtype = DataType::FP32})[1].name == "B");
 static_assert(resolve_tensors({.dtype = DataType::FP32})[2].name == "out");
 static_assert(resolve_tensors({.dtype = DataType::FP32})[0].rank == 1);
 static_assert(resolve_tensors({.dtype = DataType::FP32})[2].rank == 1);
-static_assert(resolve_tensors({.dtype = DataType::FP32})[0].direction == TensorDir::In);
-static_assert(resolve_tensors({.dtype = DataType::FP32})[1].direction == TensorDir::In);
-static_assert(resolve_tensors({.dtype = DataType::FP32})[2].direction == TensorDir::Out);
 static_assert(resolve_tensors({.dtype = DataType::FP32})[0].layout == Layout::Contiguous);
 static_assert(resolve_tensors({.dtype = DataType::FP32})[1].layout == Layout::Contiguous);
 static_assert(resolve_tensors({.dtype = DataType::FP32})[2].layout == Layout::Contiguous);
+
+// Operation slots match tensor names
+static_assert(ElementwiseSignature{}.op.lhs == "A");
+static_assert(ElementwiseSignature{}.op.rhs == "B");
+static_assert(ElementwiseSignature{}.op.out == "out");
 
 // Error cases (uncommenting would produce consteval compile errors):
 // resolve_tensors({})                                     — nothing resolvable

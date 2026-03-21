@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 //
 // Common vocabulary type for resolved tensor metadata.
-// Captures dtype, name, rank, direction, and layout — used as the
-// internal intermediate between user-facing Signature structs and make_kernel().
+// Captures dtype, name, rank, and layout — used as the internal intermediate
+// between user-facing Signature structs and make_kernel().
 
 #pragma once
 
@@ -14,25 +14,16 @@
 
 namespace rocm_ck {
 
-/// Direction of data flow for a tensor operand.
-enum class TensorDir
-{
-    In,
-    Out,
-    InOut
-};
-
 /// Resolved metadata for a single tensor operand.
 /// Plain aggregate — no constructors, no methods.
 /// std::string_view makes it non-structural (can't be NTTP), but that's fine:
 /// TensorDesc is an internal intermediate, never used as a template parameter.
 struct TensorDesc
 {
-    std::string_view name;   // "A", "bias", "query"
-    DataType dtype;          // element type
-    int rank            = 2; // dimensions
-    TensorDir direction = TensorDir::In;
-    Layout layout       = Layout::Row; // default: row-major rank-2
+    std::string_view name;       // "A", "bias", "query"
+    DataType dtype;              // element type
+    int rank      = 2;           // dimensions
+    Layout layout = Layout::Row; // default: row-major rank-2
 };
 
 } // namespace rocm_ck

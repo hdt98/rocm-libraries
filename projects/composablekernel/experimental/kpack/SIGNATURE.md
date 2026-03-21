@@ -19,8 +19,7 @@ properties (provided at each launch).
 | **name** | Semantic role: `"A"`, `"bias"`, `"query"`, `"output"` |
 | **dtype** | Element type: FP32, FP16, BF16, FP8, INT8, ... |
 | **rank** | Number of dimensions |
-| **direction** | `In`, `Out`, or `InOut` |
-| **optional** | Whether the tensor may be absent (`nullptr`) |
+| **layout** | Memory layout: `Row`, `Col`, `Contiguous`, or strides |
 
 **Runtime:**
 
@@ -184,7 +183,7 @@ Every kernel has two distinct phases:
 
 **Compile time** — the signature and algorithm are validated, and a kernel binary is
 produced. This determines:
-- Tensor dtypes, ranks, directions
+- Tensor dtypes, ranks, layouts
 - Layout patterns
 - Operation type and epilogue structure
 - Accumulator type

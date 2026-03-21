@@ -79,6 +79,15 @@ struct GemmSignature
     std::optional<Layout> d0_layout;  // defaults to Row if d0_dtype set
     std::optional<DataType> d1_dtype; // second D tensor type
     std::optional<Layout> d1_layout;  // defaults to Row if d1_dtype set
+
+    // Operation: matrix multiply with named tensor slots
+    struct Gemm
+    {
+        std::string_view lhs = "A";
+        std::string_view rhs = "B";
+        std::string_view out = "C";
+    };
+    Gemm op{};
 };
 
 // ============================================================================
@@ -113,7 +122,7 @@ struct GemmConfig
 // ============================================================================
 
 /// Resolved tensor descriptors and accumulator type from a GemmSignature.
-/// acc_dtype is not a tensor — it has no rank, no pointer, no direction.
+/// acc_dtype is not a tensor — it has no rank, no pointer, no layout.
 struct ResolvedGemmTensors
 {
     std::array<TensorDesc, 3> tensors; // A, B, C
@@ -143,9 +152,9 @@ consteval ResolvedGemmTensors resolve_tensors(GemmSignature sig)
 
     DataType acc = sig.acc_dtype ? *sig.acc_dtype : DataType::FP32;
 
-    return {{TensorDesc{"A", a, 2, TensorDir::In, sig.a_layout},
-             TensorDesc{"B", b, 2, TensorDir::In, sig.b_layout},
-             TensorDesc{"C", c, 2, TensorDir::Out, sig.c_layout}},
+    return {{TensorDesc{"A", a, 2, sig.a_layout},
+             TensorDesc{"B", b, 2, sig.b_layout},
+             TensorDesc{"C", c, 2, sig.c_layout}},
             acc};
 }
 
@@ -353,15 +362,17 @@ static_assert(resolve_tensors({.dtype = DataType::FP16, .c_dtype = DataType::FP3
 static_assert(resolve_tensors({.dtype = DataType::FP16, .c_dtype = DataType::FP32}).tensors[2].dtype == DataType::FP32);
 static_assert(resolve_tensors({.dtype = DataType::FP16, .c_dtype = DataType::FP32}).acc_dtype == DataType::FP32);
 
-// --- TensorDesc metadata: name, rank, direction ---
+// --- TensorDesc metadata: name, rank, layout ---
 static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[0].name == "A");
 static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[1].name == "B");
 static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[2].name == "C");
 static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[0].rank == 2);
 static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[2].rank == 2);
-static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[0].direction == TensorDir::In);
-static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[1].direction == TensorDir::In);
-static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[2].direction == TensorDir::Out);
+
+// --- Operation slots match tensor names ---
+static_assert(GemmSignature{}.op.lhs == "A");
+static_assert(GemmSignature{}.op.rhs == "B");
+static_assert(GemmSignature{}.op.out == "C");
 // --- Layout propagation through resolve_tensors ---
 static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[0].layout == Layout::Row);
 static_assert(resolve_tensors({.dtype = DataType::FP32}).tensors[1].layout == Layout::Col);
