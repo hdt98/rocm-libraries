@@ -193,19 +193,23 @@ def ParallelMap(function, objects, message="", enable=True, method=None, maxTask
     return rv
 
 
-def ParallelMapReturnAsGenerator(function, objects, message="", enable=True, multiArg=True):
+def ParallelMapReturnAsGenerator(function, objects, message="", enable=True, multiArg=True, procs=None):
     from .GlobalParameters import globalParameters
 
-    threadCount = CPUThreadCount(enable)
+    threadCount = procs if procs is not None else CPUThreadCount(enable)
     print("{0}Launching {1} threads...".format(message, threadCount))
 
-    if threadCount <= 1 and globalParameters["ShowProgressBar"]:
-        # Provide a progress bar for single-threaded operation.
-        callFunc = lambda args: function(*args) if multiArg else lambda args: function(args)
-        return [callFunc(args) for args in tqdm(objects, message)]
+    if threadCount <= 1:
+        iterable = tqdm(objects, message) if globalParameters["ShowProgressBar"] else objects
+        for args in iterable:
+            yield function(*args) if multiArg else function(args)
+        return
 
     with concurrent.futures.ProcessPoolExecutor(max_workers=threadCount) as executor:
-        resultFutures = (executor.submit(function, *arg if multiArg else arg) for arg in objects)
+        resultFutures = (
+            executor.submit(function, *arg) if multiArg else executor.submit(function, arg)
+            for arg in objects
+        )
         for result in concurrent.futures.as_completed(resultFutures):
             yield result.result()
 
@@ -220,19 +224,19 @@ def ParallelMap2(
       enable: May be set to false to disable parallelism.
       multiArg: True if objects represent multiple arguments
                   (differentiates multi args vs single collection arg)
+      procs: Optional explicit worker cap. When provided, this overrides
+                  CPUThreadCount(enable) for this call.
     """
     if return_as in ("generator", "generator_unordered") and not joblibParallelSupportsGenerator():
-        return ParallelMapReturnAsGenerator(function, objects, message, enable, multiArg)
+        return ParallelMapReturnAsGenerator(function, objects, message, enable, multiArg, procs=procs)
 
     from .GlobalParameters import globalParameters
 
-    threadCount = procs if procs else CPUThreadCount(enable)
+    threadCount = procs if procs is not None else CPUThreadCount(enable)
 
-    threadCount = CPUThreadCount(enable)
-
-    if threadCount <= 1 and globalParameters["ShowProgressBar"]:
-        # Provide a progress bar for single-threaded operation.
-        return [function(*args) if multiArg else function(args) for args in tqdm(objects, message)]
+    if threadCount <= 1:
+        iterable = tqdm(objects, message) if globalParameters["ShowProgressBar"] else objects
+        return [function(*args) if multiArg else function(args) for args in iterable]
 
     countMessage = ""
     try:
