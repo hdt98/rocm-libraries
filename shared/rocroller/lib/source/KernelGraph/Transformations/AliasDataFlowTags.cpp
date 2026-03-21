@@ -408,12 +408,117 @@ namespace rocRoller
                 return false;
             }
 
+            std::optional<VariableType> resolveCoordTypeFromOperations(
+                KernelGraph const& kgraph, int coordTag, std::vector<Record> const& records)
+            {
+                namespace CG = ControlGraph;
+                // Priority 1: Assign.variableType
+                for(auto const& rec : records)
+                {
+                    auto  op     = kgraph.control.getNode(rec.control);
+                    auto* assign = std::get_if<CG::Assign>(&op);
+                    if(!assign)
+                        continue;
+                    if(assign->variableType.has_value()
+                       && assign->variableType->dataType != DataType::None)
+                    {
+                        return assign->variableType.value();
+                    }
+                }
+                // Priority 2: resultVariableType(assign.expression)
+                for(auto const& rec : records)
+                {
+                    auto  op     = kgraph.control.getNode(rec.control);
+                    auto* assign = std::get_if<CG::Assign>(&op);
+                    if(!assign)
+                        continue;
+                    auto vt = Expression::resultVariableType(assign->expression);
+                    if(vt.dataType != DataType::None && vt.dataType != DataType::Count)
+                    {
+                        return vt;
+                    }
+                }
+                // Priority 3: getDataType from non-Assign operations
+                for(auto const& rec : records)
+                {
+                    auto op = kgraph.control.getNode(rec.control);
+                    auto dt = CG::getDataType(op);
+                    if(dt != DataType::None && dt != DataType::Count)
+                    {
+                        return VariableType(dt);
+                    }
+                }
+                return std::nullopt;
+            }
+
+            std::map<int, std::optional<VariableType>>
+                resolveAllCoordTypes(KernelGraph const&                        kgraph,
+                                     std::map<int, std::vector<Record>> const& recordsByCoord)
+            {
+                namespace CT = CoordinateGraph;
+                std::map<int, std::optional<VariableType>> result;
+                // Pass 1: operation-based resolution (P1-P3).
+                for(auto const& [coordTag, records] : recordsByCoord)
+                    result[coordTag] = resolveCoordTypeFromOperations(kgraph, coordTag, records);
+                // Pass 2: DataFlow neighbor propagation (P4).
+                auto isDataFlowEdge
+                    = [](auto const& edge) { return CT::isEdge<CT::DataFlowEdge>(edge); };
+                bool changed = true;
+                while(changed)
+                {
+                    changed = false;
+                    for(auto& [coordTag, vt] : result)
+                    {
+                        if(vt.has_value())
+                            continue;
+                        if(kgraph.coordinates.getElementType(coordTag) != Graph::ElementType::Node)
+                            continue;
+                        // Try upstream neighbors.
+                        for(auto neighbor :
+                            kgraph.coordinates.getConnectedNodeIndices<Graph::Direction::Upstream>(
+                                coordTag, isDataFlowEdge))
+                        {
+                            auto it = result.find(neighbor);
+                            if(it != result.end() && it->second.has_value())
+                            {
+                                vt      = it->second.value();
+                                changed = true;
+                                break;
+                            }
+                        }
+                        if(vt.has_value())
+                            continue;
+                        // Try downstream neighbors.
+                        for(auto neighbor :
+                            kgraph.coordinates
+                                .getConnectedNodeIndices<Graph::Direction::Downstream>(
+                                    coordTag, isDataFlowEdge))
+                        {
+                            auto it = result.find(neighbor);
+                            if(it != result.end() && it->second.has_value())
+                            {
+                                vt      = it->second.value();
+                                changed = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                return result;
+            }
+
             std::map<TagExtent::CategoryKey, std::list<TagExtent>>
                 getGroupedTagExtents(KernelGraph const& kgraph)
             {
                 std::map<TagExtent::CategoryKey, std::list<TagExtent>> groupedExtents;
 
                 ControlFlowRWTracer tracer(kgraph);
+
+                auto                               allRecords = tracer.coordinatesReadWrite();
+                std::map<int, std::vector<Record>> recordsByCoord;
+                for(auto const& rec : allRecords)
+                    recordsByCoord[rec.coordinate].push_back(rec);
+                auto allTypes = resolveAllCoordTypes(kgraph, recordsByCoord);
 
                 for(auto mt : kgraph.coordinates.getNodes<CoordinateGraph::MacroTile>())
                 {
@@ -447,6 +552,20 @@ namespace rocRoller
                     }
 
                     auto extent = getExtent(kgraph, records);
+                    if(extent.dataType == DataType::None)
+                    {
+                        //Log::info("None DT = {}", extent.baseTag);
+                        if(allTypes.contains(extent.baseTag)
+                           && allTypes.at(extent.baseTag).has_value() && !extent.empty()
+                           && extent.layoutType != LayoutType::MATRIX_ACCUMULATOR)
+                        {
+                            extent.dataType = allTypes.at(extent.baseTag).value().dataType;
+                            //Log::info("Assign type {} => {}, layout = {}, empty ={}",
+                            //        extent.baseTag, toString(extent.dataType),
+                            //        toString(extent.layoutType), extent.empty());
+                            //exit(0);
+                        }
+                    }
 
                     if(!extent.empty() && extent.dataType != DataType::None
                        && extent.layoutType != LayoutType::MATRIX_ACCUMULATOR)
