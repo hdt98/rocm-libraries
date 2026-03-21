@@ -402,7 +402,9 @@ def _benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSize
         if benchmarkStep.isFinal():
             resultsFileBaseFinal = resultsFileBase
         resultsFileName = resultsFileBase + ".csv"
-        solutionsFileName = resultsFileBase + ".yaml"
+        solutionsFileName = LibraryIO.formatFilename(
+            resultsFileBase, globalParameters["LibraryFormat"]
+        )
 
         # check if a solution cache exists and if it matches our solution parameters
         cachePath = os.path.join(stepBaseDir, "cache.yaml")
@@ -513,8 +515,15 @@ def _benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSize
         # I think the size portion of this yaml could be removed,
         # but for now it's needed, so we update it even in the cache case
         with timing_context("python_write_solutions"):
-            LibraryIO.writeSolutions(solutionsFileName, benchmarkStep.problemSizes, benchmarkStep.biasTypeArgs,
-                benchmarkStep.activationArgs, solutions, cacheValid)
+            LibraryIO.writeSolutions(
+                solutionsFileName,
+                benchmarkStep.problemSizes,
+                benchmarkStep.biasTypeArgs,
+                benchmarkStep.activationArgs,
+                solutions,
+                cacheValid,
+                format=globalParameters["LibraryFormat"],
+            )
 
         # run benchmarking client
         if buildOnly:
@@ -585,8 +594,10 @@ def main(
             # results files will be named
             newResultsFileName = os.path.join(benchmarkDataPath, "{}_{:02d}{}.csv" \
                     .format(str(problemTypeObj), idx, csvSuffix) )
-            newSolutionsFileName = os.path.join(benchmarkDataPath, "{}_{:02d}{}.yaml" \
-                    .format(str(problemTypeObj), idx, csvSuffix) )
+            newSolutionsFileBase = os.path.join(
+                    benchmarkDataPath, "{}_{:02d}{}".format(str(problemTypeObj), idx, csvSuffix))
+            newSolutionsFileName = LibraryIO.formatFilename(
+                    newSolutionsFileBase, globalParameters["LibraryFormat"])
             newGranularityFileName = os.path.join(benchmarkDataPath, "{}_{:02d}{}.gsp" \
                     .format(str(problemTypeObj), idx, csvSuffix) )
 
@@ -626,7 +637,9 @@ def main(
                     # copy data
                     resultsFileBase = resultsFileBaseFinal
                     resultsFileName = resultsFileBase + ".csv"
-                    solutionsFileName = resultsFileBase + ".yaml"
+                    solutionsFileName = LibraryIO.formatFilename(
+                        resultsFileBase, globalParameters["LibraryFormat"]
+                    )
                     granularityFileName = resultsFileBase + "_Granularity.csv"
                     shutil.copy(resultsFileName, newResultsFileName)
                     shutil.copy(solutionsFileName, newSolutionsFileName)

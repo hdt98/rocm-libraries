@@ -1471,7 +1471,7 @@ def generateLogic(
             os.path.join(benchmarkDataPath, \
             fileName))[0]
         dataFileName = fileBase + ".csv"
-        solutionsFileName = fileBase + ".yaml"
+        solutionsFileName = LibraryIO.formatFilename(fileBase, globalParameters["LibraryFormat"])
         selectionFileName = fileBase + ".gsp"
         if not os.path.exists(dataFileName):
           printExit("%s doesn't exist for %s" % (dataFileName, fileBase) )
