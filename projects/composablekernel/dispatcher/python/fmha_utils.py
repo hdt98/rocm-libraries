@@ -557,7 +557,10 @@ class FmhaDispatcherLib:
             ctypes.c_int,
             ctypes.c_int,
             ctypes.c_int,
-            ctypes.c_int,
+            ctypes.c_int,  # is_v_rowmajor
+            ctypes.c_int,  # rope_type
+            ctypes.c_int,  # paged_kv
+            ctypes.c_int,  # page_block_size
             ctypes.c_char_p,
             ctypes.POINTER(ctypes.c_float),
         ]
@@ -888,6 +891,9 @@ class FmhaRunner:
                     prob.hdim_q,
                     prob.hdim_v,
                     is_v_rowmajor,
+                    kwargs.get("rope_type", 0),
+                    kwargs.get("paged_kv", 0),
+                    page_size,
                     data_type.encode(),
                     ctypes.byref(time_ms),
                 )
@@ -1199,6 +1205,49 @@ def setup_fmha_dispatcher(
         )
 
     # Step 1: Codegen
+    # BWD dq_dk_dv needs a matching dot_do_o kernel in the same .so
+    # BWD dq_dk_dv needs matching dot_do_o kernel for the 2-stage pipeline
+    if config.family == "bwd_dq_dk_dv":
+        import copy
+
+        dot_cfg = copy.copy(config)
+        dot_cfg.family = "bwd_dot_do_o"
+        dot_cfg.pipeline = "qr"
+        dot_cfg.tile_m0 = 64
+        dot_cfg.tile_n0 = 128
+        dot_cfg.tile_k0 = 32
+        dot_cfg.tile_n1 = 128
+        dot_cfg.tile_k1 = 32
+        dot_cfg.tile_k0max = 128
+        dot_cfg.wave_m0 = 4
+        dot_cfg.wave_n0 = 1
+        dot_cfg.wave_k0 = 1
+        dot_cfg.wave_m1 = 4
+        dot_cfg.wave_n1 = 1
+        dot_cfg.wave_k1 = 1
+        dot_cfg.warp_m0 = 32
+        dot_cfg.warp_n0 = 32
+        dot_cfg.warp_k0 = 16
+        dot_cfg.warp_m1 = 32
+        dot_cfg.warp_n1 = 32
+        dot_cfg.warp_k1 = 16
+        dot_cfg.use_trload = False
+        dot_cfg.pad_s = 1
+        dot_cfg.pad_sk = 1
+        dot_cfg.pad_d = 1
+        dot_cfg.pad_dv = 1
+        dot_cfg.pad_s = 1
+        dot_cfg.pad_sk = 1
+        dot_cfg.pad_d = 1
+        dot_cfg.pad_dv = 1
+        config_json_str = json.dumps(
+            [
+                json.loads(dot_cfg.to_codegen_json()),
+                json.loads(config.to_codegen_json()),
+            ]
+        )
+    else:
+        config_json_str = config.to_codegen_json()
     gen_cmd = [
         sys.executable,
         str(codegen_dir / "generate_fmha_fallback.py"),
@@ -1207,7 +1256,7 @@ def setup_fmha_dispatcher(
         "--gpu-target",
         config.gfx_arch,
         "--config-json",
-        config.to_codegen_json(),
+        config_json_str,
     ]
     r = subprocess.run(gen_cmd, capture_output=True, text=True, cwd=str(codegen_dir))
     if r.returncode != 0:

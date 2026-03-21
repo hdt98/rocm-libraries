@@ -396,6 +396,15 @@ struct FmhaProblem
                 else if constexpr(std::is_same_v<T, fmha_bwd_traits>)
                 {
                     p.requested_family = FmhaKernelFamily::BwdDqDkDv;
+                    p.seqlen_q         = traits.seqlen_q;
+                    p.seqlen_k         = traits.seqlen_k;
+                    p.batch            = traits.batch;
+                    p.max_seqlen_q     = traits.max_seqlen_q;
+                    p.max_seqlen_k     = traits.max_seqlen_k;
+                    p.hdim_q           = traits.hdim_q;
+                    p.hdim_v           = traits.hdim_v;
+                    p.nhead_q          = traits.nhead_q;
+                    p.nhead_k          = traits.nhead_k;
                     p.data_type        = traits.data_type;
                     p.is_group_mode    = traits.is_group_mode;
                     p.mask_type        = static_cast<int>(traits.mask_type);
@@ -404,8 +413,6 @@ struct FmhaProblem
                     p.has_dropout      = traits.has_dropout;
                     p.is_store_randval = traits.is_store_randval;
                     p.is_deterministic = traits.is_deterministic;
-                    p.hdim_q           = traits.hdim_q;
-                    p.hdim_v           = traits.hdim_v;
                     // Explicit defaults for fields not in bwd traits
                     p.is_v_rowmajor       = true;
                     p.has_logits_soft_cap = false;

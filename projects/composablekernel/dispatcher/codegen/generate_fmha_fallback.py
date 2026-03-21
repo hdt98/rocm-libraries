@@ -194,17 +194,29 @@ def main():
     output_dir = args.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    config = dict(DEFAULT_CONFIG)
-    config["arch"] = args.gpu_target
-    config["signature"] = dict(DEFAULT_CONFIG["signature"])
-    config["algorithm"] = dict(DEFAULT_CONFIG["algorithm"])
-
-    if args.config_json:
-        override = json.loads(args.config_json)
-        config.update(override)
-
     codegen_dir = Path(__file__).parent
     codegen_script = codegen_dir / "unified_fmha_codegen.py"
+
+    # Accept either a single config dict or a list of configs
+    if args.config_json:
+        parsed = json.loads(args.config_json)
+        if isinstance(parsed, list):
+            # Multi-config: pass list directly to unified_fmha_codegen
+            codegen_input = parsed
+        else:
+            # Single config: merge with defaults
+            config = dict(DEFAULT_CONFIG)
+            config["arch"] = args.gpu_target
+            config["signature"] = dict(DEFAULT_CONFIG["signature"])
+            config["algorithm"] = dict(DEFAULT_CONFIG["algorithm"])
+            config.update(parsed)
+            codegen_input = config
+    else:
+        config = dict(DEFAULT_CONFIG)
+        config["arch"] = args.gpu_target
+        config["signature"] = dict(DEFAULT_CONFIG["signature"])
+        config["algorithm"] = dict(DEFAULT_CONFIG["algorithm"])
+        codegen_input = config
 
     print(f"Generating FMHA fallback kernel for {args.gpu_target}...")
     print(f"  Output: {output_dir}")
@@ -217,7 +229,7 @@ def main():
         "--gpu-target",
         args.gpu_target,
         "--config-json",
-        json.dumps(config),
+        json.dumps(codegen_input),
     ]
 
     result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(codegen_dir))

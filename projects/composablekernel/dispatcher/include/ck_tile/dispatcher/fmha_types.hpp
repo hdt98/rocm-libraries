@@ -570,8 +570,15 @@ struct fmha_bwd_args
 
 struct fmha_bwd_traits
 {
+    int seqlen_q;
+    int seqlen_k;
+    int batch;
+    int max_seqlen_q;
+    int max_seqlen_k;
     int hdim_q;
     int hdim_v;
+    int nhead_q;
+    int nhead_k;
     std::string data_type;
     bool is_group_mode;
     mask_enum mask_type;
