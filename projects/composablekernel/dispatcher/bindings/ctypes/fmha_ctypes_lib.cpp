@@ -420,9 +420,11 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     const int64_t dv_bytes  = v_bytes;
     const int64_t lse_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
     const int64_t d_bytes   = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
+    const int bwd_nsplits   = 8; // safe upper bound for dq_acc splits
     const int64_t dq_acc_bytes =
-        static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * sizeof(float);
-    float elapsed = 0.0f;
+        static_cast<int64_t>(batch) * nhead_q * bwd_nsplits * seqlen_q * hdim_q * sizeof(float);
+    const int64_t split_stride_dq_acc_val = static_cast<int64_t>(seqlen_q) * hdim_q;
+    float elapsed                         = 0.0f;
 
     const bool bwd_grp = (is_group_mode != 0);
 
@@ -442,8 +444,15 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     }
 
     fmha_bwd_traits traits{};
+    traits.seqlen_q         = seqlen_q;
+    traits.seqlen_k         = seqlen_k;
+    traits.batch            = batch;
+    traits.max_seqlen_q     = seqlen_q;
+    traits.max_seqlen_k     = seqlen_k;
     traits.hdim_q           = hdim_q;
     traits.hdim_v           = hdim_v;
+    traits.nhead_q          = nhead_q;
+    traits.nhead_k          = nhead_k;
     traits.data_type        = data_type_str ? data_type_str : "fp16";
     traits.is_group_mode    = (is_group_mode != 0);
     traits.mask_type        = static_cast<mask_enum>(mask_type_int);
@@ -486,6 +495,8 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     HIP_CHECK(hipMemcpy(o_dev, o_host, o_bytes, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(lse_dev, lse_host, lse_bytes, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(do_dev, do_host, do_bytes, hipMemcpyHostToDevice));
+    // d_ptr is computed by dot_do_o GPU kernel (stage 1 of BWD pipeline).
+    // Zero-initialize; dot_do_o will fill it before dq_dk_dv reads it.
     HIP_CHECK(hipMemset(d_dev, 0, d_bytes));
     HIP_CHECK(hipMemset(dq_dev, 0, dq_bytes));
     HIP_CHECK(hipMemset(dk_dev, 0, dk_bytes));
@@ -541,7 +552,8 @@ int fmha_dispatcher_run_bwd(const void* q_host,
         args.nhead_stride_randval = 0;
         args.nhead_stride_do      = hdim_v;
         args.nhead_stride_lsed    = seqlen_q;
-        args.nhead_stride_dq_acc  = static_cast<ck_tile::long_index_t>(seqlen_q) * hdim_q;
+        args.nhead_stride_dq_acc =
+            static_cast<ck_tile::long_index_t>(split_stride_dq_acc_val) * bwd_nsplits;
         args.nhead_stride_dq      = hdim_q;
         args.nhead_stride_dk      = hdim_q;
         args.nhead_stride_dv      = hdim_v;
@@ -554,12 +566,13 @@ int fmha_dispatcher_run_bwd(const void* q_host,
         args.batch_stride_randval = 0;
         args.batch_stride_do      = 0;
         args.batch_stride_lsed    = static_cast<int64_t>(nhead_q) * seqlen_q;
-        args.batch_stride_dq_acc  = static_cast<ck_tile::long_index_t>(nhead_q) * seqlen_q * hdim_q;
-        args.batch_stride_dq      = 0;
-        args.batch_stride_dk      = 0;
-        args.batch_stride_dv      = 0;
-        args.batch_stride_dbias   = 0;
-        args.split_stride_dq_acc  = 0;
+        args.batch_stride_dq_acc =
+            static_cast<ck_tile::long_index_t>(nhead_q) * split_stride_dq_acc_val * bwd_nsplits;
+        args.batch_stride_dq     = 0;
+        args.batch_stride_dk     = 0;
+        args.batch_stride_dv     = 0;
+        args.batch_stride_dbias  = 0;
+        args.split_stride_dq_acc = split_stride_dq_acc_val;
     }
     else
     {
@@ -584,7 +597,8 @@ int fmha_dispatcher_run_bwd(const void* q_host,
         args.nhead_stride_randval = 0;
         args.nhead_stride_do      = static_cast<int64_t>(seqlen_q) * hdim_v;
         args.nhead_stride_lsed    = seqlen_q;
-        args.nhead_stride_dq_acc  = static_cast<ck_tile::long_index_t>(seqlen_q) * hdim_q;
+        args.nhead_stride_dq_acc =
+            static_cast<ck_tile::long_index_t>(split_stride_dq_acc_val) * bwd_nsplits;
         args.nhead_stride_dq      = static_cast<int64_t>(seqlen_q) * hdim_q;
         args.nhead_stride_dk      = static_cast<int64_t>(seqlen_k) * hdim_q;
         args.nhead_stride_dv      = static_cast<int64_t>(seqlen_k) * hdim_v;
@@ -597,12 +611,13 @@ int fmha_dispatcher_run_bwd(const void* q_host,
         args.batch_stride_randval = 0;
         args.batch_stride_do      = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
         args.batch_stride_lsed    = static_cast<int64_t>(nhead_q) * seqlen_q;
-        args.batch_stride_dq_acc  = static_cast<ck_tile::long_index_t>(nhead_q) * seqlen_q * hdim_q;
-        args.batch_stride_dq      = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
-        args.batch_stride_dk      = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_q;
-        args.batch_stride_dv      = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_v;
-        args.batch_stride_dbias   = 0;
-        args.split_stride_dq_acc  = 0;
+        args.batch_stride_dq_acc =
+            static_cast<ck_tile::long_index_t>(nhead_q) * split_stride_dq_acc_val * bwd_nsplits;
+        args.batch_stride_dq     = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
+        args.batch_stride_dk     = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_q;
+        args.batch_stride_dv     = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_v;
+        args.batch_stride_dbias  = 0;
+        args.split_stride_dq_acc = split_stride_dq_acc_val;
     }
 
     args.seqstart_q_ptr = bwd_seqstart_q_dev;
@@ -998,7 +1013,7 @@ int fmha_dispatcher_run_pagedkv(const void* q_host,
     void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
     void *lse_dev = nullptr, *block_table_dev = nullptr;
     void *seqlen_k_dev = nullptr, *seqstart_q_dev = nullptr, *seqstart_k_dev = nullptr;
-    void* sink_dev = nullptr;
+    void *sink_dev = nullptr, *bias_dev_pkv = nullptr;
 
     // Declare vectors before any HIP_CHECK to avoid goto-over-init
     std::vector<int> block_table(total_pages);
@@ -1060,7 +1075,6 @@ int fmha_dispatcher_run_pagedkv(const void* q_host,
         HIP_CHECK(hipMemset(sink_dev, 0, nhead_q * sizeof(float)));
     }
 
-    void* bias_dev_pkv = nullptr;
     if(bias_type_int > 0)
     {
         const int64_t bias_bytes =
@@ -1189,6 +1203,9 @@ int fmha_dispatcher_run_appendkv(const void* q_host,
                                  int hdim_q,
                                  int hdim_v,
                                  int is_v_rowmajor,
+                                 int rope_type_int,
+                                 int paged_kv,
+                                 int page_block_size,
                                  const char* data_type_str,
                                  float* time_ms_out)
 {
@@ -1198,28 +1215,45 @@ int fmha_dispatcher_run_appendkv(const void* q_host,
     const int in_bytes = dtype_input_bytes(data_type_str);
     int rc             = 0;
 
-    const int seqlen_k    = seqlen_q + seqlen_knew;
+    const int seqlen_k   = seqlen_q + seqlen_knew;
+    const bool has_rope  = (rope_type_int != 0);
+    const int rotary_dim = has_rope ? hdim_q : 0;
+    const bool akv_paged = (paged_kv != 0);
+    if(akv_paged && page_block_size <= 0)
+        page_block_size = 64;
+    const int akv_pps = akv_paged ? (seqlen_k + page_block_size - 1) / page_block_size : 0;
+    const int akv_tp  = akv_paged ? batch * akv_pps : 0;
+    const int kv_s    = akv_paged ? page_block_size : seqlen_k;
+
     const int64_t q_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * hdim_q * in_bytes;
     const int64_t knew_bytes =
         static_cast<int64_t>(batch) * nhead_k * seqlen_knew * hdim_q * in_bytes;
     const int64_t vnew_bytes =
         static_cast<int64_t>(batch) * nhead_k * seqlen_knew * hdim_v * in_bytes;
-    const int64_t k_bytes = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * in_bytes;
-    const int64_t v_bytes = static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * in_bytes;
-    float elapsed         = 0.0f;
+    const int64_t k_bytes =
+        akv_paged ? static_cast<int64_t>(akv_tp) * nhead_k * page_block_size * hdim_q * in_bytes
+                  : static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_q * in_bytes;
+    const int64_t v_bytes =
+        akv_paged ? static_cast<int64_t>(akv_tp) * nhead_k * page_block_size * hdim_v * in_bytes
+                  : static_cast<int64_t>(batch) * nhead_k * seqlen_k * hdim_v * in_bytes;
+    float elapsed = 0.0f;
 
     void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr;
     void *knew_dev = nullptr, *vnew_dev = nullptr;
-    void* seqlen_k_dev = nullptr;
+    void *seqlen_k_dev = nullptr, *rotary_cos_dev = nullptr, *rotary_sin_dev = nullptr;
+    void* akv_block_table_dev = nullptr;
 
     fmha_fwd_appendkv_traits traits{};
     traits.hdim_q        = hdim_q;
     traits.hdim_v        = hdim_v;
     traits.data_type     = data_type_str ? data_type_str : "fp16";
     traits.is_v_rowmajor = (is_v_rowmajor != 0);
-    traits.rope_type     = rope_enum::none;
+    traits.rope_type     = static_cast<rope_enum>(rope_type_int);
 
     std::vector<int> sk_vec(batch, seqlen_k - seqlen_knew);
+    std::vector<int> akv_bt(akv_tp);
+    for(int i = 0; i < akv_tp; ++i)
+        akv_bt[i] = i;
 
     fmha_fwd_appendkv_args args{};
 
@@ -1231,6 +1265,22 @@ int fmha_dispatcher_run_appendkv(const void* q_host,
 
     HIP_CHECK(hipMalloc(&seqlen_k_dev, batch * sizeof(int)));
     HIP_CHECK(hipMemcpy(seqlen_k_dev, sk_vec.data(), batch * sizeof(int), hipMemcpyHostToDevice));
+
+    if(akv_paged)
+    {
+        HIP_CHECK(hipMalloc(&akv_block_table_dev, akv_tp * sizeof(int)));
+        HIP_CHECK(hipMemcpy(
+            akv_block_table_dev, akv_bt.data(), akv_tp * sizeof(int), hipMemcpyHostToDevice));
+    }
+
+    if(has_rope)
+    {
+        const int64_t rot_bytes = static_cast<int64_t>(seqlen_k) * (rotary_dim / 2) * sizeof(float);
+        HIP_CHECK(hipMalloc(&rotary_cos_dev, rot_bytes));
+        HIP_CHECK(hipMalloc(&rotary_sin_dev, rot_bytes));
+        HIP_CHECK(hipMemset(rotary_cos_dev, 0, rot_bytes));
+        HIP_CHECK(hipMemset(rotary_sin_dev, 0, rot_bytes));
+    }
 
     HIP_CHECK(hipMemcpy(q_dev, q_host, q_bytes, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(knew_dev, knew_host, knew_bytes, hipMemcpyHostToDevice));
@@ -1251,31 +1301,31 @@ int fmha_dispatcher_run_appendkv(const void* q_host,
     args.hdim_v                   = hdim_v;
     args.nhead_q                  = nhead_q;
     args.nhead_k                  = nhead_k;
-    args.rotary_cos_ptr           = nullptr;
-    args.rotary_sin_ptr           = nullptr;
-    args.rotary_dim               = 0;
+    args.rotary_cos_ptr           = rotary_cos_dev;
+    args.rotary_sin_ptr           = rotary_sin_dev;
+    args.rotary_dim               = rotary_dim;
     args.has_mask                 = false;
-    args.block_table_ptr          = nullptr;
-    args.batch_stride_block_table = 0;
-    args.page_block_size          = 0;
+    args.block_table_ptr          = akv_block_table_dev;
+    args.batch_stride_block_table = akv_paged ? akv_pps : 0;
+    args.page_block_size          = akv_paged ? page_block_size : 0;
     args.cache_batch_idx          = nullptr;
     args.sink_ptr                 = nullptr;
 
-    // BHSD strides
+    // BHSD strides (paged K/V uses page_block_size instead of seqlen_k)
     args.stride_q          = hdim_q;
     args.stride_k          = hdim_q;
     args.stride_knew       = hdim_q;
     args.stride_v          = hdim_v;
     args.stride_vnew       = hdim_v;
     args.nhead_stride_q    = static_cast<int64_t>(seqlen_q) * hdim_q;
-    args.nhead_stride_k    = static_cast<int64_t>(seqlen_k) * hdim_q;
+    args.nhead_stride_k    = static_cast<int64_t>(kv_s) * hdim_q;
     args.nhead_stride_knew = static_cast<int64_t>(seqlen_knew) * hdim_q;
-    args.nhead_stride_v    = static_cast<int64_t>(seqlen_k) * hdim_v;
+    args.nhead_stride_v    = static_cast<int64_t>(kv_s) * hdim_v;
     args.nhead_stride_vnew = static_cast<int64_t>(seqlen_knew) * hdim_v;
     args.batch_stride_q    = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
-    args.batch_stride_k    = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_q;
+    args.batch_stride_k    = static_cast<int64_t>(nhead_k) * kv_s * hdim_q;
     args.batch_stride_knew = static_cast<int64_t>(nhead_k) * seqlen_knew * hdim_q;
-    args.batch_stride_v    = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_v;
+    args.batch_stride_v    = static_cast<int64_t>(nhead_k) * kv_s * hdim_v;
     args.batch_stride_vnew = static_cast<int64_t>(nhead_k) * seqlen_knew * hdim_v;
 
     try
@@ -1312,6 +1362,9 @@ cleanup:
     safe_hip_free(knew_dev);
     safe_hip_free(vnew_dev);
     safe_hip_free(seqlen_k_dev);
+    safe_hip_free(rotary_cos_dev);
+    safe_hip_free(rotary_sin_dev);
+    safe_hip_free(akv_block_table_dev);
     return rc;
 }
 
