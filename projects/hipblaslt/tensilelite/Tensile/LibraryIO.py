@@ -68,20 +68,33 @@ except ImportError:
 try:
     import msgpack
 except ImportError:
+    msgpack = None
     print("Message pack python library not detected. Must use YAML backend instead.")
 
 
 ###################
 # Writing functions
 ###################
+def formatFilename(filename_noExt, format="yaml"):
+    """Returns the output filename for a given serialization format."""
+    if format == "yaml":
+        return filename_noExt + ".yaml"
+    if format == "json":
+        return filename_noExt + ".json"
+    if format == "msgpack":
+        return filename_noExt + ".dat"
+
+    printExit("Unrecognized write format {}".format(format))
+
+
 def write(filename_noExt, data, format="yaml"):
     """Writes data to file with specified format; extension is appended based on format."""
     if format == "yaml":
-        writeYAML(filename_noExt + ".yaml", data)
+        writeYAML(formatFilename(filename_noExt, format), data)
     elif format == "json":
-        writeJson(filename_noExt + ".json", data)
+        writeJson(formatFilename(filename_noExt, format), data)
     elif format == "msgpack":
-        writeMsgPack(filename_noExt + ".dat", data)
+        writeMsgPack(formatFilename(filename_noExt, format), data)
     else:
         printExit("Unrecognized write format {}".format(format))
 
@@ -107,24 +120,97 @@ def writeJson(filename, data):
 
 def writeMsgPack(filename, data):
     """Writes data to file in Message Pack format."""
+    if msgpack is None:
+        printExit("Message pack python library not detected. Install msgpack to use msgpack format.")
     with open(filename, "wb") as f:
-        msgpack.pack(data, f)
+        msgpack.pack(data, f, use_bin_type=True)
 
-def writeSolutions(filename, problemSizes, biasTypeArgs, activationArgs, solutions, cache=False):
-    """Writes solution YAML file."""
+
+def _serialize_problem_sizes(problemSizes):
+    if not problemSizes:
+        return []
+
+    serialized = []
+
+    for sizeRange in problemSizes.ranges:
+        rangeConfig = []
+        sizedIdx = 0
+        mappedIdx = 0
+        for isSized in sizeRange.indexIsSized:
+            if isSized:
+                rangeConfig.append(list(sizeRange.indicesSized[sizedIdx]))
+                sizedIdx += 1
+            else:
+                rangeConfig.append(sizeRange.indicesMapped[mappedIdx])
+                mappedIdx += 1
+        serialized.append({"Range": rangeConfig})
+
+    for problemExact in problemSizes.exacts:
+        hasExplicitShape = any(
+            getattr(problemExact, attr, None)
+            for attr in ("stridesA", "stridesB", "stridesC", "stridesD")
+        ) or getattr(problemExact, "count", None) is not None
+        if hasExplicitShape:
+            exactData = {"sizes": list(problemExact.sizes)}
+            if problemExact.stridesA:
+                exactData["stridesA"] = list(problemExact.stridesA)
+            if problemExact.stridesB:
+                exactData["stridesB"] = list(problemExact.stridesB)
+            if problemExact.stridesC:
+                exactData["stridesC"] = list(problemExact.stridesC)
+            if problemExact.stridesD:
+                exactData["stridesD"] = list(problemExact.stridesD)
+            if getattr(problemExact, "count", None) is not None:
+                exactData["count"] = problemExact.count
+            serialized.append({"Exact": exactData})
+        else:
+            serialized.append({"Exact": list(problemExact.sizes)})
+
+    return serialized
+
+
+def _serialize_bias_type_args(biasTypeArgs):
+    if biasTypeArgs is None:
+        return None
+
+    return [btype.toChar().lower() for btype in biasTypeArgs.biasTypes]
+
+
+def _serialize_activation_args(activationArgs):
+    if activationArgs is None:
+        return None
+
+    return [{"Enum": str(setting.activationEnum)} for setting in activationArgs.settingList]
+
+
+def writeSolutions(
+    filename,
+    problemSizes,
+    biasTypeArgs,
+    activationArgs,
+    solutions,
+    cache=False,
+    format="yaml",
+):
+    """Writes solution benchmark data using the requested serialization format."""
+
+    filename = formatFilename(os.path.splitext(str(filename))[0], format)
+    biasTypes = _serialize_bias_type_args(biasTypeArgs)
+    activationSettings = _serialize_activation_args(activationArgs)
 
     # convert objects to nested dictionaries
     solutionStates = []
 
-    if cache:
-        solYaml = read(filename)
-        if biasTypeArgs and activationArgs:
-            solutionStates = solYaml[4:]
-        elif biasTypeArgs or activationArgs:
-            solutionStates = solYaml[3:]
-        else:
-            solutionStates = solYaml[2:]
-    else:
+    if cache and os.path.exists(filename):
+        solutionData = read(filename)
+        if solutionData is not None:
+            if biasTypes is not None and activationSettings is not None:
+                solutionStates = solutionData[4:]
+            elif biasTypes is not None or activationSettings is not None:
+                solutionStates = solutionData[3:]
+            else:
+                solutionStates = solutionData[2:]
+    elif solutions is not None:
         for solution in solutions:
             solutionState = solution.getAttributes()
             solutionState["ProblemType"] = solutionState["ProblemType"].state
@@ -132,23 +218,52 @@ def writeSolutions(filename, problemSizes, biasTypeArgs, activationArgs, solutio
             isa = solutionState["ISA"]
             solutionState["ISA"] = [isa[0], isa[1], isa[2]]
             solutionStates.append(solutionState)
-    # write dictionaries
-    with open(filename, "w") as f:
-        f.write("- MinimumRequiredVersion: {}\n".format(__version__))
-        f.write("- ProblemSizes:\n")
-        if problemSizes:
-            for sizeRange in problemSizes.ranges:
-                f.write("  - Range: {}\n".format(sizeRange))
-            for problemExact in problemSizes.exacts:
-                #FIXME-problem, this ignores strides:
-                f.write("  - Exact: {}\n".format(problemExact))
-        if biasTypeArgs:
-            f.write("- BiasTypeArgs: [{}]\n".format([btype.value for btype in biasTypeArgs.biasTypes]))
-        if activationArgs:
-            f.write("- ActivationArgs:\n")
-            for setting in activationArgs.settingList:
-                f.write("  - [Enum: %s]\n"%(setting.activationEnum))
-        yaml.dump(solutionStates, f, default_flow_style=None)
+
+    if format == "yaml":
+        with open(filename, "w") as f:
+            f.write("- MinimumRequiredVersion: {}\n".format(__version__))
+            f.write("- ProblemSizes:\n")
+            if problemSizes:
+                for sizeRange in problemSizes.ranges:
+                    f.write("  - Range: {}\n".format(sizeRange))
+                for problemExact in problemSizes.exacts:
+                    #FIXME-problem, this ignores strides:
+                    f.write("  - Exact: {}\n".format(problemExact))
+            if biasTypes is not None:
+                if biasTypes:
+                    f.write("- BiasTypeArgs: [{}]\n".format(", ".join(biasTypes)))
+                else:
+                    f.write("- BiasTypeArgs: []\n")
+            if activationSettings is not None:
+                if activationSettings:
+                    f.write("- ActivationArgs:\n")
+                    for setting in activationSettings:
+                        f.write("  - [Enum: %s]\n" % (setting["Enum"]))
+                else:
+                    f.write("- ActivationArgs: []\n")
+            if solutionStates:  # Only dump if we have solution states
+                yaml.dump(solutionStates, f, default_flow_style=None)
+        return
+
+    data = [
+        {"MinimumRequiredVersion": __version__},
+        {"ProblemSizes": _serialize_problem_sizes(problemSizes)},
+    ]
+    if biasTypes is not None:
+        data.append({"BiasTypeArgs": biasTypes})
+    if activationSettings is not None:
+        data.append({"ActivationArgs": activationSettings})
+    data.extend(solutionStates)
+
+    if format == "msgpack":
+        writeMsgPack(filename, data)
+        return
+
+    if format == "json":
+        writeJson(filename, data)
+        return
+
+    printExit("Unrecognized write format {}".format(format))
 
 
 ###############################
@@ -160,6 +275,8 @@ def read(filename, customizedLoader=False):
         return load_yaml_stream(filename, yamlLoader) if customizedLoader else readYAML(filename)
     if extension == ".json":
         return readJson(filename)
+    if extension == ".dat":
+        return readMsgPack(filename)
     else:
         printExit("Unrecognized read format {}".format(extension))
 
@@ -175,6 +292,15 @@ def readJson(filename):
     """Reads and returns JSON data from file."""
     with open(filename, "r") as f:
         data = json.loads(f.read())
+    return data
+
+
+def readMsgPack(filename):
+    """Reads and returns Message Pack data from file."""
+    if msgpack is None:
+        printExit("Message pack python library not detected. Install msgpack to read msgpack format.")
+    with open(filename, "rb") as f:
+        data = msgpack.unpack(f, raw=False)
     return data
 
 
