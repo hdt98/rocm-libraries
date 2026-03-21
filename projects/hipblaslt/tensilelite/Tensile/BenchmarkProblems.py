@@ -278,9 +278,12 @@ def writeBenchmarkFiles(
     # ^ this is where solutions is mutated
     with timing_context("python_kernel_bench_postprocess"):
         with timing_context("python_benchpost_naming"):
-            for s in solutions:
-                s["SolutionNameMin"] = getSolutionNameMin(solution, debugConfig.splitGSU)
-                s["KernelNameMin"]   = getKernelNameMin(solution, debugConfig.splitGSU)
+            for i, s in enumerate(solutions):
+                existingIndex = s.getAttributes().get("SolutionIndex") if hasattr(s, "getAttributes") else s.get("SolutionIndex")
+                if existingIndex is None:
+                    s["SolutionIndex"] = i
+                s["SolutionNameMin"] = getSolutionNameMin(s, debugConfig.splitGSU)
+                s["KernelNameMin"]   = getKernelNameMin(s, debugConfig.splitGSU)
 
             newLibraryDir = ensurePath(sourcePath / 'library')
             newLibraryFile = os.path.join(newLibraryDir, "TensileLibrary")
@@ -488,14 +491,6 @@ def _benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSize
 
             print1("# Actual Solutions: {} / {} after KernelWriter\n" \
                     .format(len(solutions), prevCount ))
-
-            # add SolutionIndex and SolutionNameMin into benchmark yaml
-            with timing_context("python_solution_indexing"):
-                for i in range(0, len(solutions)):
-                    solution = solutions[i]
-                    solution["SolutionIndex"] = i
-                    solution["SolutionNameMin"] = getSolutionNameMin(solution, debugConfig.splitGSU)
-                    solution["KernelNameMin"]   = getKernelNameMin(solution, debugConfig.splitGSU)
         else:
             solutions = None
             print1("# Using cached solution data")
