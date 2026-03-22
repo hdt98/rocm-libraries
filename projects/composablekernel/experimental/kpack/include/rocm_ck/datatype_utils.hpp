@@ -8,6 +8,8 @@
 #pragma once
 
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 namespace rocm_ck {
@@ -83,7 +85,8 @@ inline void float_to_typed(DataType dt, float value, void* dst)
     case DataType::FP32: *static_cast<float*>(dst) = value; break;
     case DataType::FP16: *static_cast<_Float16*>(dst) = static_cast<_Float16>(value); break;
     case DataType::BF16: *static_cast<std::uint16_t*>(dst) = float_to_bf16_bits(value); break;
-    case DataType::FP8: break; // not used
+    // FP8 host conversion not yet implemented
+    case DataType::FP8: std::fprintf(stderr, "FP8 host conversion not implemented\n"); std::abort();
     }
 }
 
@@ -95,7 +98,8 @@ inline float typed_to_float(DataType dt, const void* src)
     case DataType::FP32: return *static_cast<const float*>(src);
     case DataType::FP16: return static_cast<float>(*static_cast<const _Float16*>(src));
     case DataType::BF16: return bf16_bits_to_float(*static_cast<const std::uint16_t*>(src));
-    case DataType::FP8: return 0.0f;
+    // FP8 host conversion not yet implemented
+    case DataType::FP8: std::fprintf(stderr, "FP8 host conversion not implemented\n"); std::abort();
     }
     return 0.0f;
 }
