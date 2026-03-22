@@ -19,6 +19,7 @@
 #include <rocm_ck/datatype_utils.hpp>
 #include <rocm_ck/layout.hpp>
 #include <rocm_ck/tensor_desc.hpp>
+#include <rocm_ck/types.hpp>
 
 #include <array>
 #include <optional>
