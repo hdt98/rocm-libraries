@@ -32,7 +32,7 @@ Proves that CK Tile kernels can be compiled into standalone `.hsaco` code object
 Production-ready pattern with:
 
 - **Signature/Algorithm separation** — *what* (data types) vs *how* (tile geometry, warp count, vector width, padding)
-- **9 compiled variants** across FP32, FP16, BF16 with different block sizes and multi-warp configurations
+- **12 compiled variants** across FP32, FP16, BF16 with different block sizes, multi-warp configurations, and mixed-precision
 - **Constexpr validation** via `make_kernel` that catches invalid configurations at compile time
 - **Variant registry** with `find_variant(DataType, problem_size)` for automatic kernel selection
 - **Archive metadata** — tuning parameters stored in the kpack TOC for tooling
@@ -46,6 +46,7 @@ Extends the Signature pattern from elementwise to GEMM:
 - **GemmSignature** — two-level optional dtype hierarchy (no `in_dtype`; GEMM's A/B are asymmetric)
 - **Multi-type variants** — fp32, fp16, bf16 compiled from ~15-line `.hip` files via `runGemm<K>` template
 - **Mixed-precision epilogue** — all variants accumulate in fp32; CShuffleEpilogue handles output type conversion
+- **Fused epilogue support** — demonstrates C += A×B via `CShuffleEpilogue` with prior output activation
 - **Typed host buffers** — `float_to_typed` / `typed_to_float` for type-agnostic verification
 
 See the [example 04 README](examples/04_gemm/README.md) for full details.
@@ -76,7 +77,13 @@ experimental/kpack/
 │   └── rocm_ck/
 │       ├── hip_check.hpp           # HIP_CHECK error-checking macro
 │       ├── gpu_arch.hpp            # get_gpu_arch() — GPU architecture detection
-│       └── datatype_utils.hpp      # DataType enum, type conversions, tolerances
+│       ├── datatype_utils.hpp      # DataType enum, type conversions, tolerances
+│       ├── types.hpp               # Common types: index_t, warp_size
+│       ├── typed_buffer.hpp        # TypedBuffer wrapper for host memory
+│       ├── kpack_module.hpp        # RAII wrappers for kpack and HIP module handles
+│       ├── ck_type_map.hpp         # DataType enum to CK Tile type mapping
+│       ├── layout.hpp              # Layout enum (RowMajor, ColumnMajor)
+│       └── tensor_desc.hpp         # TensorDesc: shape + strides + leading dimension
 ├── rocm_kpack/                     # Vendored kpack C runtime library (from TheRock)
 │   ├── CMakeLists.txt
 │   ├── include/rocm_kpack/
@@ -109,7 +116,7 @@ experimental/kpack/
     │   ├── rocm_vector_add_api.hpp     # Signature/Algorithm types, make_kernel validation
     │   ├── rocm_vector_add_dev.hpp     # Device interface — maps config to CK Tile types
     │   ├── rocm_vector_add_registry.hpp # Variant table + find_variant selection
-    │   ├── vector_add_*.hip            # 9 variant instantiations
+    │   ├── vector_add_*.hip            # 12 variant instantiations
     │   ├── pack.py                     # Variant-aware packer with metadata
     │   └── main.cpp                    # Variant selection demo + verify-all mode
     └── 04_gemm/                     # GEMM: multi-type via GemmSignature schema
@@ -119,7 +126,11 @@ experimental/kpack/
         ├── gemm_args.hpp               # GemmArgs ABI struct, tile constants
         ├── gemm_fp32.hip               # fp32 variant instantiation
         ├── gemm_fp16.hip               # fp16 variant instantiation
+        ├── gemm_fp16_w32.hip           # fp16 variant with WarpTile=32 (K=16 for fp16)
+        ├── gemm_fp16_add.hip           # fp16 variant with fused C += A×B epilogue
         ├── gemm_bf16.hip               # bf16 variant instantiation
+        ├── cpu_ref.hpp                 # CPU reference GEMM implementation
+        ├── cpu_ref.cpp                 # CPU reference implementation
         ├── pack.py                     # Variant-aware packer with dtype metadata
         └── main.cpp                    # Multi-variant loop with typed buffers
 ```
