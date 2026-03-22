@@ -401,6 +401,8 @@ int fmha_dispatcher_run_bwd(const void* q_host,
                             int has_dbias,
                             int is_deterministic,
                             int is_group_mode,
+                            int is_store_randval,
+                            int tile_n0,
                             float* time_ms_out)
 {
     if(!g_initialized)
@@ -420,20 +422,28 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     const int64_t dv_bytes  = v_bytes;
     const int64_t lse_bytes = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
     const int64_t d_bytes   = static_cast<int64_t>(batch) * nhead_q * seqlen_q * sizeof(float);
-    const int bwd_nsplits   = 8; // safe upper bound for dq_acc splits
+    const bool bwd_grp      = (is_group_mode != 0);
+    const int kN0           = (tile_n0 > 0) ? tile_n0 : 128;
+    const int bwd_nsplits   = is_deterministic
+                                  ? ((seqlen_k + kN0 - 1) / kN0) // ceil(max_seqlen_k / kN0)
+                                  : 1;
+    const int64_t bwd_shape_sq    = bwd_grp ? static_cast<int64_t>(batch) * seqlen_q : seqlen_q;
+    const int64_t bwd_shape_sk    = bwd_grp ? static_cast<int64_t>(batch) * seqlen_k : seqlen_k;
+    const int64_t bwd_shape_batch = bwd_grp ? 1 : batch;
     const int64_t dq_acc_bytes =
-        static_cast<int64_t>(batch) * nhead_q * bwd_nsplits * seqlen_q * hdim_q * sizeof(float);
-    const int64_t split_stride_dq_acc_val = static_cast<int64_t>(seqlen_q) * hdim_q;
+        bwd_shape_batch * nhead_q * bwd_nsplits * bwd_shape_sq * hdim_q * sizeof(float);
+    const int64_t split_stride_dq_acc_val = bwd_shape_sq * hdim_q;
     float elapsed                         = 0.0f;
-
-    const bool bwd_grp = (is_group_mode != 0);
 
     void *q_dev = nullptr, *k_dev = nullptr, *v_dev = nullptr, *o_dev = nullptr;
     void *lse_dev = nullptr, *do_dev = nullptr, *d_dev = nullptr;
     void *dq_dev = nullptr, *dk_dev = nullptr, *dv_dev = nullptr, *dq_acc_dev = nullptr;
-    void *bwd_seqstart_q_dev = nullptr, *bwd_seqstart_k_dev = nullptr, *bwd_seqlen_k_dev = nullptr;
+    void *bwd_seqstart_q_dev = nullptr, *bwd_seqstart_k_dev = nullptr;
+    void *bwd_seqlen_k_dev = nullptr, *bwd_seqlen_q_dev = nullptr;
+    void *bwd_bias_dev = nullptr, *bwd_randval_dev = nullptr, *bwd_dbias_dev = nullptr;
 
-    std::vector<int> bwd_sq(batch + 1), bwd_sk(batch + 1), bwd_skl(batch, seqlen_k);
+    std::vector<int> bwd_sq(batch + 1), bwd_sk(batch + 1), bwd_skl(batch, seqlen_k),
+        bwd_sql(batch, seqlen_q);
     if(bwd_grp)
     {
         for(int b = 0; b <= batch; ++b)
@@ -444,8 +454,8 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     }
 
     fmha_bwd_traits traits{};
-    traits.seqlen_q         = seqlen_q;
-    traits.seqlen_k         = seqlen_k;
+    traits.seqlen_q         = bwd_shape_sq;
+    traits.seqlen_k         = bwd_shape_sk;
     traits.batch            = batch;
     traits.max_seqlen_q     = seqlen_q;
     traits.max_seqlen_k     = seqlen_k;
@@ -459,7 +469,7 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     traits.bias_type        = static_cast<bias_enum>(bias_type_int);
     traits.has_dbias        = (has_dbias != 0);
     traits.has_dropout      = (has_dropout != 0);
-    traits.is_store_randval = false;
+    traits.is_store_randval = (is_store_randval != 0);
     traits.is_deterministic = (is_deterministic != 0);
 
     fmha_bwd_args args{};
@@ -476,25 +486,66 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     HIP_CHECK(hipMalloc(&dv_dev, dv_bytes));
     HIP_CHECK(hipMalloc(&dq_acc_dev, dq_acc_bytes));
 
+    if(bias_type_int > 0)
+    {
+        const int64_t bias_bytes =
+            (bias_type_int == 2)
+                ? static_cast<int64_t>(batch) * nhead_q * sizeof(float)
+                : static_cast<int64_t>(batch) * nhead_q * seqlen_q * seqlen_k * out_bytes;
+        HIP_CHECK(hipMalloc(&bwd_bias_dev, bias_bytes));
+        HIP_CHECK(hipMemset(bwd_bias_dev, 0, bias_bytes));
+    }
+    if(has_dropout)
+    {
+        const int64_t rv_bytes =
+            static_cast<int64_t>(batch) * nhead_q * seqlen_q * seqlen_k * sizeof(int8_t);
+        HIP_CHECK(hipMalloc(&bwd_randval_dev, rv_bytes));
+        HIP_CHECK(hipMemset(bwd_randval_dev, 0, rv_bytes));
+    }
+    if(has_dbias)
+    {
+        const int64_t dbias_bytes =
+            static_cast<int64_t>(batch) * nhead_q * seqlen_q * seqlen_k * out_bytes;
+        HIP_CHECK(hipMalloc(&bwd_dbias_dev, dbias_bytes));
+        HIP_CHECK(hipMemset(bwd_dbias_dev, 0, dbias_bytes));
+    }
+
     if(bwd_grp)
     {
         HIP_CHECK(hipMalloc(&bwd_seqstart_q_dev, (batch + 1) * sizeof(int)));
         HIP_CHECK(hipMalloc(&bwd_seqstart_k_dev, (batch + 1) * sizeof(int)));
         HIP_CHECK(hipMalloc(&bwd_seqlen_k_dev, batch * sizeof(int)));
+        HIP_CHECK(hipMalloc(&bwd_seqlen_q_dev, batch * sizeof(int)));
         HIP_CHECK(hipMemcpy(
             bwd_seqstart_q_dev, bwd_sq.data(), (batch + 1) * sizeof(int), hipMemcpyHostToDevice));
         HIP_CHECK(hipMemcpy(
             bwd_seqstart_k_dev, bwd_sk.data(), (batch + 1) * sizeof(int), hipMemcpyHostToDevice));
         HIP_CHECK(hipMemcpy(
             bwd_seqlen_k_dev, bwd_skl.data(), batch * sizeof(int), hipMemcpyHostToDevice));
+        HIP_CHECK(hipMemcpy(
+            bwd_seqlen_q_dev, bwd_sql.data(), batch * sizeof(int), hipMemcpyHostToDevice));
     }
 
-    HIP_CHECK(hipMemcpy(q_dev, q_host, q_bytes, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(k_dev, k_host, k_bytes, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(v_dev, v_host, v_bytes, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(o_dev, o_host, o_bytes, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(lse_dev, lse_host, lse_bytes, hipMemcpyHostToDevice));
-    HIP_CHECK(hipMemcpy(do_dev, do_host, do_bytes, hipMemcpyHostToDevice));
+    if(bwd_grp)
+    {
+        // Group mode: kernel uses [1, nhead, total_tokens, hdim] layout.
+        // Zero all buffers (data content doesn't affect benchmarking timing).
+        HIP_CHECK(hipMemset(q_dev, 0, q_bytes));
+        HIP_CHECK(hipMemset(k_dev, 0, k_bytes));
+        HIP_CHECK(hipMemset(v_dev, 0, v_bytes));
+        HIP_CHECK(hipMemset(o_dev, 0, o_bytes));
+        HIP_CHECK(hipMemset(lse_dev, 0, lse_bytes));
+        HIP_CHECK(hipMemset(do_dev, 0, do_bytes));
+    }
+    else
+    {
+        HIP_CHECK(hipMemcpy(q_dev, q_host, q_bytes, hipMemcpyHostToDevice));
+        HIP_CHECK(hipMemcpy(k_dev, k_host, k_bytes, hipMemcpyHostToDevice));
+        HIP_CHECK(hipMemcpy(v_dev, v_host, v_bytes, hipMemcpyHostToDevice));
+        HIP_CHECK(hipMemcpy(o_dev, o_host, o_bytes, hipMemcpyHostToDevice));
+        HIP_CHECK(hipMemcpy(lse_dev, lse_host, lse_bytes, hipMemcpyHostToDevice));
+        HIP_CHECK(hipMemcpy(do_dev, do_host, do_bytes, hipMemcpyHostToDevice));
+    }
     // d_ptr is computed by dot_do_o GPU kernel (stage 1 of BWD pipeline).
     // Zero-initialize; dot_do_o will fill it before dq_dk_dv reads it.
     HIP_CHECK(hipMemset(d_dev, 0, d_bytes));
@@ -506,20 +557,20 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     args.q_ptr        = q_dev;
     args.k_ptr        = k_dev;
     args.v_ptr        = v_dev;
-    args.bias_ptr     = nullptr;
+    args.bias_ptr     = bwd_bias_dev;
     args.o_ptr        = o_dev;
     args.lse_ptr      = lse_dev;
     args.do_ptr       = do_dev;
     args.d_ptr        = d_dev;
-    args.rand_val_ptr = nullptr;
+    args.rand_val_ptr = bwd_randval_dev;
     args.dq_ptr       = dq_dev;
     args.dk_ptr       = dk_dev;
     args.dv_ptr       = dv_dev;
-    args.dbias_ptr    = nullptr;
+    args.dbias_ptr    = bwd_dbias_dev;
     args.dq_acc_ptr   = dq_acc_dev;
 
-    args.seqlen_q     = seqlen_q;
-    args.seqlen_k     = seqlen_k;
+    args.seqlen_q     = bwd_shape_sq;
+    args.seqlen_k     = bwd_shape_sk;
     args.batch        = batch;
     args.max_seqlen_q = seqlen_q;
     args.max_seqlen_k = seqlen_k;
@@ -529,100 +580,57 @@ int fmha_dispatcher_run_bwd(const void* q_host,
     args.nhead_k      = nhead_k;
     args.scale        = scale;
 
-    if(bwd_grp)
-    {
-        // Group-mode: [total_tokens, nhead, hdim]
-        args.stride_q             = nhead_q * hdim_q;
-        args.stride_k             = nhead_k * hdim_q;
-        args.stride_v             = nhead_k * hdim_v;
-        args.stride_bias          = 0;
-        args.stride_o             = nhead_q * hdim_v;
-        args.stride_randval       = 0;
-        args.stride_do            = nhead_q * hdim_v;
-        args.stride_dq_acc        = hdim_q;
-        args.stride_dq            = nhead_q * hdim_q;
-        args.stride_dk            = nhead_k * hdim_q;
-        args.stride_dv            = nhead_k * hdim_v;
-        args.stride_dbias         = 0;
-        args.nhead_stride_q       = hdim_q;
-        args.nhead_stride_k       = hdim_q;
-        args.nhead_stride_v       = hdim_v;
-        args.nhead_stride_bias    = 0;
-        args.nhead_stride_o       = hdim_v;
-        args.nhead_stride_randval = 0;
-        args.nhead_stride_do      = hdim_v;
-        args.nhead_stride_lsed    = seqlen_q;
-        args.nhead_stride_dq_acc =
-            static_cast<ck_tile::long_index_t>(split_stride_dq_acc_val) * bwd_nsplits;
-        args.nhead_stride_dq      = hdim_q;
-        args.nhead_stride_dk      = hdim_q;
-        args.nhead_stride_dv      = hdim_v;
-        args.nhead_stride_dbias   = 0;
-        args.batch_stride_q       = 0;
-        args.batch_stride_k       = 0;
-        args.batch_stride_v       = 0;
-        args.batch_stride_bias    = 0;
-        args.batch_stride_o       = 0;
-        args.batch_stride_randval = 0;
-        args.batch_stride_do      = 0;
-        args.batch_stride_lsed    = static_cast<int64_t>(nhead_q) * seqlen_q;
-        args.batch_stride_dq_acc =
-            static_cast<ck_tile::long_index_t>(nhead_q) * split_stride_dq_acc_val * bwd_nsplits;
-        args.batch_stride_dq     = 0;
-        args.batch_stride_dk     = 0;
-        args.batch_stride_dv     = 0;
-        args.batch_stride_dbias  = 0;
-        args.split_stride_dq_acc = split_stride_dq_acc_val;
-    }
-    else
-    {
-        // BHSD strides
-        args.stride_q             = hdim_q;
-        args.stride_k             = hdim_q;
-        args.stride_v             = hdim_v;
-        args.stride_bias          = 0;
-        args.stride_o             = hdim_v;
-        args.stride_randval       = 0;
-        args.stride_do            = hdim_v;
-        args.stride_dq_acc        = hdim_q;
-        args.stride_dq            = hdim_q;
-        args.stride_dk            = hdim_q;
-        args.stride_dv            = hdim_v;
-        args.stride_dbias         = 0;
-        args.nhead_stride_q       = static_cast<int64_t>(seqlen_q) * hdim_q;
-        args.nhead_stride_k       = static_cast<int64_t>(seqlen_k) * hdim_q;
-        args.nhead_stride_v       = static_cast<int64_t>(seqlen_k) * hdim_v;
-        args.nhead_stride_bias    = 0;
-        args.nhead_stride_o       = static_cast<int64_t>(seqlen_q) * hdim_v;
-        args.nhead_stride_randval = 0;
-        args.nhead_stride_do      = static_cast<int64_t>(seqlen_q) * hdim_v;
-        args.nhead_stride_lsed    = seqlen_q;
-        args.nhead_stride_dq_acc =
-            static_cast<ck_tile::long_index_t>(split_stride_dq_acc_val) * bwd_nsplits;
-        args.nhead_stride_dq      = static_cast<int64_t>(seqlen_q) * hdim_q;
-        args.nhead_stride_dk      = static_cast<int64_t>(seqlen_k) * hdim_q;
-        args.nhead_stride_dv      = static_cast<int64_t>(seqlen_k) * hdim_v;
-        args.nhead_stride_dbias   = 0;
-        args.batch_stride_q       = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
-        args.batch_stride_k       = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_q;
-        args.batch_stride_v       = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_v;
-        args.batch_stride_bias    = 0;
-        args.batch_stride_o       = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
-        args.batch_stride_randval = 0;
-        args.batch_stride_do      = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
-        args.batch_stride_lsed    = static_cast<int64_t>(nhead_q) * seqlen_q;
-        args.batch_stride_dq_acc =
-            static_cast<ck_tile::long_index_t>(nhead_q) * split_stride_dq_acc_val * bwd_nsplits;
-        args.batch_stride_dq     = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
-        args.batch_stride_dk     = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_q;
-        args.batch_stride_dv     = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_v;
-        args.batch_stride_dbias  = 0;
-        args.split_stride_dq_acc = split_stride_dq_acc_val;
-    }
+    // BHSD strides -- unified for both group and batch mode.
+    // CK uses shape_seqlen_q/k (= total_tokens for group, = per-seq for batch)
+    // for ALL stride computations, including batch_stride.
+    args.stride_q             = hdim_q;
+    args.stride_k             = hdim_q;
+    args.stride_v             = hdim_v;
+    args.stride_bias          = 0;
+    args.stride_o             = hdim_v;
+    args.stride_randval       = 0;
+    args.stride_do            = hdim_v;
+    args.stride_dq_acc        = hdim_q;
+    args.stride_dq            = hdim_q;
+    args.stride_dk            = hdim_q;
+    args.stride_dv            = hdim_v;
+    args.stride_dbias         = 0;
+    args.nhead_stride_q       = bwd_shape_sq * hdim_q;
+    args.nhead_stride_k       = bwd_shape_sk * hdim_q;
+    args.nhead_stride_v       = bwd_shape_sk * hdim_v;
+    args.nhead_stride_bias    = 0;
+    args.nhead_stride_o       = bwd_shape_sq * hdim_v;
+    args.nhead_stride_randval = 0;
+    args.nhead_stride_do      = bwd_shape_sq * hdim_v;
+    args.nhead_stride_lsed    = bwd_shape_sq;
+    args.nhead_stride_dq_acc =
+        static_cast<ck_tile::long_index_t>(split_stride_dq_acc_val) * bwd_nsplits;
+    args.nhead_stride_dq      = bwd_shape_sq * hdim_q;
+    args.nhead_stride_dk      = bwd_shape_sk * hdim_q;
+    args.nhead_stride_dv      = bwd_shape_sk * hdim_v;
+    args.nhead_stride_dbias   = 0;
+    args.batch_stride_q       = static_cast<int64_t>(nhead_q) * bwd_shape_sq * hdim_q;
+    args.batch_stride_k       = static_cast<int64_t>(nhead_k) * bwd_shape_sk * hdim_q;
+    args.batch_stride_v       = static_cast<int64_t>(nhead_k) * bwd_shape_sk * hdim_v;
+    args.batch_stride_bias    = 0;
+    args.batch_stride_o       = static_cast<int64_t>(nhead_q) * bwd_shape_sq * hdim_v;
+    args.batch_stride_randval = 0;
+    args.batch_stride_do      = static_cast<int64_t>(nhead_q) * bwd_shape_sq * hdim_v;
+    args.batch_stride_lsed    = static_cast<int64_t>(nhead_q) * bwd_shape_sq;
+    args.batch_stride_dq_acc =
+        static_cast<ck_tile::long_index_t>(nhead_q) * split_stride_dq_acc_val * bwd_nsplits;
+    args.batch_stride_dq     = static_cast<int64_t>(nhead_q) * bwd_shape_sq * hdim_q;
+    args.batch_stride_dk     = static_cast<int64_t>(nhead_k) * bwd_shape_sk * hdim_q;
+    args.batch_stride_dv     = static_cast<int64_t>(nhead_k) * bwd_shape_sk * hdim_v;
+    args.batch_stride_dbias  = 0;
+    args.split_stride_dq_acc = split_stride_dq_acc_val;
 
-    args.seqstart_q_ptr = bwd_seqstart_q_dev;
-    args.seqstart_k_ptr = bwd_seqstart_k_dev;
-    args.seqlen_k_ptr   = bwd_seqlen_k_dev;
+    args.seqstart_q_ptr  = bwd_seqstart_q_dev;
+    args.seqstart_k_ptr  = bwd_seqstart_k_dev;
+    args.seqlen_q_ptr    = bwd_seqlen_q_dev;
+    args.seqlen_k_ptr    = bwd_seqlen_k_dev;
+    args.cu_seqlen_q_ptr = nullptr;
+    args.cu_seqlen_k_ptr = nullptr;
 
     args.window_size_left  = -1;
     args.window_size_right = -1;
@@ -681,6 +689,10 @@ cleanup:
     safe_hip_free(bwd_seqstart_q_dev);
     safe_hip_free(bwd_seqstart_k_dev);
     safe_hip_free(bwd_seqlen_k_dev);
+    safe_hip_free(bwd_seqlen_q_dev);
+    safe_hip_free(bwd_bias_dev);
+    safe_hip_free(bwd_randval_dev);
+    safe_hip_free(bwd_dbias_dev);
 
     return rc;
 }

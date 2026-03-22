@@ -245,6 +245,29 @@ def validate_config(
                 family=family,
             )
 
+    # --- QR pipeline MFMA instruction count validation ---
+    # block_fmha_pipeline_qr_ks_vs.hpp:354 requires NumMfmaInsts % 8 == 0
+    # when warp_size == 64 (gfx9) and hdim_q == 256.
+    # NumMfmaInsts = (tile_m0/warp_m0) * (tile_n0/warp_n0) * (tile_k0/warp_k0) / (wave_m0*wave_n0)
+    if (
+        pipeline == "qr"
+        and sig["hdim_q"] == 256
+        and arch_info.get("family", "").startswith("cdna")
+        and len(tile) >= 3
+        and len(alg["wave"]) >= 2
+        and len(alg["warp"]) >= 3
+    ):
+        wm, wn, wk = alg["warp"][0], alg["warp"][1], alg["warp"][2]
+        gm, gn = alg["wave"][0], alg["wave"][1]
+        if wm > 0 and wn > 0 and wk > 0 and gm > 0 and gn > 0:
+            num_mfma = (tile[0] // wm) * (tile[1] // wn) * (tile[2] // wk) // (gm * gn)
+            if num_mfma % 8 != 0:
+                result.add_error(
+                    f"qr pipeline h256 on {arch}: NumMfmaInsts={num_mfma} "
+                    f"(must be divisible by 8). tile=({tile[0]},{tile[1]},{tile[2]}), "
+                    f"warp=({wm},{wn},{wk}), wave=({gm},{gn})"
+                )
+
     if alg["block_per_cu"] <= 0:
         result.add_error("block_per_cu must be positive")
     if alg["num_wave_groups"] <= 0:

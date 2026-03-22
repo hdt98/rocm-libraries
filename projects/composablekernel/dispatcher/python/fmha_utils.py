@@ -485,6 +485,8 @@ class FmhaDispatcherLib:
             ctypes.c_int,  # has_dbias
             ctypes.c_int,  # is_deterministic
             ctypes.c_int,  # is_group_mode
+            ctypes.c_int,  # is_store_randval
+            ctypes.c_int,  # tile_n0 (kN0 for nsplits computation)
             ctypes.POINTER(ctypes.c_float),  # time_ms_out
         ]
         lib.fmha_dispatcher_run_bwd.restype = ctypes.c_int
@@ -641,6 +643,8 @@ class FmhaDispatcherLib:
         has_dbias: bool = False,
         is_deterministic: bool = False,
         is_group_mode: bool = False,
+        is_store_randval: bool = False,
+        tile_n0: int = 128,
     ) -> Tuple[int, float]:
         time_ms = ctypes.c_float(0.0)
         rc = self._lib.fmha_dispatcher_run_bwd(
@@ -668,6 +672,8 @@ class FmhaDispatcherLib:
             ctypes.c_int(int(has_dbias)),
             ctypes.c_int(int(is_deterministic)),
             ctypes.c_int(int(is_group_mode)),
+            ctypes.c_int(int(is_store_randval)),
+            ctypes.c_int(tile_n0),
             ctypes.byref(time_ms),
         )
         return rc, time_ms.value
@@ -995,6 +1001,8 @@ class FmhaRunner:
         has_dbias: bool = False,
         is_deterministic: bool = False,
         is_group_mode: bool = False,
+        is_store_randval: bool = False,
+        tile_n0: int = 128,
     ) -> "FmhaResult":
         """Run FMHA backward on GPU with automatic HIP memory management.
 
@@ -1048,6 +1056,8 @@ class FmhaRunner:
                 has_dbias=has_dbias,
                 is_deterministic=is_deterministic,
                 is_group_mode=is_group_mode,
+                is_store_randval=is_store_randval,
+                tile_n0=tile_n0,
             )
 
             if rc != 0:
@@ -1154,6 +1164,58 @@ def fmha_compile_flags(arch: str, hipcc: str = "", family: str = "") -> List[str
     return flags
 
 
+def _make_bwd_dot_do_o_config(dq_cfg: FmhaKernelConfig) -> FmhaKernelConfig:
+    """Create a matching bwd_dot_do_o config for a bwd_dq_dk_dv config.
+
+    The dot_do_o kernel computes d = rowsum(O * dO) and must be in the same
+    .so as the dq_dk_dv kernel for the 2-stage BWD pipeline.
+    Tile/wave/warp are fixed; signature fields (hdim, dtype, mode, features,
+    padding) are inherited from the dq_dk_dv config.
+    """
+    import copy
+
+    dot = copy.copy(dq_cfg)
+    dot.family = "bwd_dot_do_o"
+    dot.pipeline = "qr"
+    hq, hv = dq_cfg.hdim_q, dq_cfg.hdim_v
+    dot.tile_m0 = 64
+    dot.tile_n0 = max(hv, 128)
+    dot.tile_k0 = 32
+    dot.tile_n1 = max(hv, 128)
+    dot.tile_k1 = 32
+    dot.tile_k0max = max(hq, 128)
+    dot.wave_m0 = 4
+    dot.wave_n0 = 1
+    dot.wave_k0 = 1
+    dot.wave_m1 = 4
+    dot.wave_n1 = 1
+    dot.wave_k1 = 1
+    dot.warp_m0 = 32
+    dot.warp_n0 = 32
+    dot.warp_k0 = 16
+    dot.warp_m1 = 32
+    dot.warp_n1 = 32
+    dot.warp_k1 = 16
+    dot.use_trload = False
+    # dot_do_o uses all-padded for maximum compatibility
+    dot.pad_s = 1
+    dot.pad_sk = 1
+    dot.pad_d = 1
+    dot.pad_dv = 1
+    # BWD traits don't have logits/sink/skip/lse/paged_kv -- from_invocation
+    # defaults them to false/0. The dot_do_o signature must match these defaults.
+    dot.logits = False
+    dot.sink = False
+    dot.skip_min_seqlen_q = False
+    dot.lse = False
+    dot.paged_kv = False
+    dot.qscale = "no"
+    dot.rope = "no"
+    # dot_do_o must match the problem's is_store_randval (from traits);
+    # keep dropout_variant as-is so store_randval matches
+    return dot
+
+
 def setup_fmha_dispatcher(
     config: FmhaKernelConfig,
     output_dir: Optional[Path] = None,
@@ -1208,38 +1270,7 @@ def setup_fmha_dispatcher(
     # BWD dq_dk_dv needs a matching dot_do_o kernel in the same .so
     # BWD dq_dk_dv needs matching dot_do_o kernel for the 2-stage pipeline
     if config.family == "bwd_dq_dk_dv":
-        import copy
-
-        dot_cfg = copy.copy(config)
-        dot_cfg.family = "bwd_dot_do_o"
-        dot_cfg.pipeline = "qr"
-        dot_cfg.tile_m0 = 64
-        dot_cfg.tile_n0 = 128
-        dot_cfg.tile_k0 = 32
-        dot_cfg.tile_n1 = 128
-        dot_cfg.tile_k1 = 32
-        dot_cfg.tile_k0max = 128
-        dot_cfg.wave_m0 = 4
-        dot_cfg.wave_n0 = 1
-        dot_cfg.wave_k0 = 1
-        dot_cfg.wave_m1 = 4
-        dot_cfg.wave_n1 = 1
-        dot_cfg.wave_k1 = 1
-        dot_cfg.warp_m0 = 32
-        dot_cfg.warp_n0 = 32
-        dot_cfg.warp_k0 = 16
-        dot_cfg.warp_m1 = 32
-        dot_cfg.warp_n1 = 32
-        dot_cfg.warp_k1 = 16
-        dot_cfg.use_trload = False
-        dot_cfg.pad_s = 1
-        dot_cfg.pad_sk = 1
-        dot_cfg.pad_d = 1
-        dot_cfg.pad_dv = 1
-        dot_cfg.pad_s = 1
-        dot_cfg.pad_sk = 1
-        dot_cfg.pad_d = 1
-        dot_cfg.pad_dv = 1
+        dot_cfg = _make_bwd_dot_do_o_config(config)
         config_json_str = json.dumps(
             [
                 json.loads(dot_cfg.to_codegen_json()),
@@ -1383,6 +1414,17 @@ def setup_multiple_fmha_dispatchers(
             except Exception:
                 pass
         out.mkdir(parents=True, exist_ok=True)
+        # BWD dq_dk_dv needs matching dot_do_o kernel
+        if cfg.family == "bwd_dq_dk_dv":
+            dot = _make_bwd_dot_do_o_config(cfg)
+            config_json_str = json.dumps(
+                [
+                    json.loads(dot.to_codegen_json()),
+                    json.loads(cfg.to_codegen_json()),
+                ]
+            )
+        else:
+            config_json_str = cfg.to_codegen_json()
         r = subprocess.run(
             [
                 sys.executable,
@@ -1392,7 +1434,7 @@ def setup_multiple_fmha_dispatchers(
                 "--gpu-target",
                 cfg.gfx_arch,
                 "--config-json",
-                cfg.to_codegen_json(),
+                config_json_str,
             ],
             capture_output=True,
             text=True,
