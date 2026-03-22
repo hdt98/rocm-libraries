@@ -27,23 +27,37 @@
 namespace rocm_ck {
 
 // ============================================================================
-// EpilogueOp
+// Epilogue: CombineOp × Activation
 // ============================================================================
 
-/// Fused epilogue operation applied after the GEMM matmul.
+/// How to combine D tensors with the matmul result.
 ///
 ///   None     — E = A * B                    (no D tensors)
 ///   Add      — E = A * B + D0 [+ D1]       (bias addition)
 ///   Multiply — E = A * B * D0 [* D1]       (scaling)
-///
-/// Maps to CK Tile elementwise functors: PassThrough, MultiDAdd, MultiDMultiply.
-/// Operations with runtime parameters (AddScale) or composed operations
-/// (Add+ReLU) are out of scope — see INSIGHTS.md for future directions.
-enum class EpilogueOp
+enum class CombineOp
 {
     None,
     Add,
     Multiply
+};
+
+/// Fused activation applied after the combine step.
+///
+///   None     — identity (no activation)
+///   Relu     — max(0, x)
+///   FastGelu — approximate GELU: x * sigmoid(1.702 * x)
+///   Gelu     — exact GELU: 0.5 * x * (1 + erf(x / sqrt(2)))
+///   Silu     — x * sigmoid(x)  (aka Swish with beta=1)
+///   Sigmoid  — 1 / (1 + exp(-x))
+enum class Activation
+{
+    None,
+    Relu,
+    FastGelu,
+    Gelu,
+    Silu,
+    Sigmoid
 };
 
 // ============================================================================
@@ -74,8 +88,9 @@ struct GemmSignature
     Layout b_layout = Layout::Col;
     Layout c_layout = Layout::Row;
 
-    // Fused epilogue: E = f(A*B, D0, D1, ...)
-    EpilogueOp epilogue_op = EpilogueOp::None;
+    // Fused epilogue: E = activation(combine(A*B, D0, D1, ...))
+    CombineOp combine     = CombineOp::None;
+    Activation activation = Activation::None;
     std::optional<DataType> d0_dtype; // first D tensor type
     std::optional<Layout> d0_layout;  // defaults to Row if d0_dtype set
     std::optional<DataType> d1_dtype; // second D tensor type
@@ -166,7 +181,8 @@ consteval ResolvedGemmTensors resolve_tensors(GemmSignature sig)
 /// Resolved epilogue from a GemmSignature. Concrete types for D tensors.
 struct ResolvedEpilogue
 {
-    EpilogueOp op;
+    CombineOp combine;
+    Activation activation;
     int num_d_tensors; // 0, 1, or 2
     DataType d0_dtype; // valid when num_d_tensors >= 1
     Layout d0_layout;
@@ -177,34 +193,40 @@ struct ResolvedEpilogue
 /// Resolve the epilogue fields into concrete D tensor types and count.
 ///
 /// Rules:
-///   - None requires no D tensors (d0_dtype/d1_dtype must not be set)
-///   - Add/Multiply require at least d0_dtype
+///   - CombineOp::None forbids D tensors (d0_dtype/d1_dtype must not be set)
+///   - CombineOp::Add/Multiply implies D0 exists; d0_dtype cascades from dtype
+///   - D1 exists only when d1_dtype is explicitly set
+///   - Activation is always valid (independent of D tensors)
 ///   - d0_layout defaults to Row, d1_layout defaults to Row
-///   - num_d_tensors is 0, 1, or 2 based on which d*_dtype fields are set
 consteval ResolvedEpilogue resolve_epilogue(GemmSignature sig)
 {
     bool has_d0 = sig.d0_dtype.has_value();
     bool has_d1 = sig.d1_dtype.has_value();
 
-    if(sig.epilogue_op == EpilogueOp::None)
+    if(sig.combine == CombineOp::None)
     {
         if(has_d0 || has_d1)
-            throw "EpilogueOp::None must not have D tensors";
-        // All fields below num_d_tensors are unused; zero-init is fine
-        return {EpilogueOp::None, 0, DataType::FP32, Layout::Row, DataType::FP32, Layout::Row};
+            throw "CombineOp::None must not have D tensors";
+        return {CombineOp::None,
+                sig.activation,
+                0,
+                DataType::FP32,
+                Layout::Row,
+                DataType::FP32,
+                Layout::Row};
     }
 
-    // Add or Multiply requires at least D0
-    if(!has_d0)
-        throw "EpilogueOp::Add/Multiply requires d0_dtype";
+    // Add or Multiply: D0 exists, dtype cascades from d0_dtype ?? dtype
+    DataType d0_dt = sig.d0_dtype ? *sig.d0_dtype
+                     : sig.dtype  ? *sig.dtype
+                                  : throw "d0_dtype unresolvable: set d0_dtype or dtype";
+    Layout d0_ly   = sig.d0_layout ? *sig.d0_layout : Layout::Row;
 
     int num_d      = has_d1 ? 2 : 1;
-    DataType d0_dt = *sig.d0_dtype;
-    Layout d0_ly   = sig.d0_layout ? *sig.d0_layout : Layout::Row;
     DataType d1_dt = has_d1 ? *sig.d1_dtype : DataType::FP32;
     Layout d1_ly   = sig.d1_layout ? *sig.d1_layout : Layout::Row;
 
-    return {sig.epilogue_op, num_d, d0_dt, d0_ly, d1_dt, d1_ly};
+    return {sig.combine, sig.activation, num_d, d0_dt, d0_ly, d1_dt, d1_ly};
 }
 
 // ============================================================================
@@ -261,7 +283,8 @@ struct GemmKernel
     int thread_block_size;
 
     // Epilogue fields
-    EpilogueOp epilogue_op;
+    CombineOp combine;
+    Activation activation;
     int num_d_tensors; // 0, 1, or 2
     DataType d0_dtype; // valid when num_d_tensors >= 1
     Layout d0_layout;
@@ -319,7 +342,8 @@ consteval GemmKernel make_kernel(GemmConfig cfg)
             algo.block_warps,
             algo.warp_tile,
             thread_block_size,
-            epilogue.op,
+            epilogue.combine,
+            epilogue.activation,
             epilogue.num_d_tensors,
             epilogue.d0_dtype,
             epilogue.d0_layout,
@@ -447,54 +471,90 @@ static_assert(make_kernel(
 // resolve_epilogue compile-time tests
 // ============================================================================
 
-// --- None with no D tensors: passes ---
+// --- Default: no combine, no activation ---
 static_assert(resolve_epilogue({.dtype = DataType::FP16}).num_d_tensors == 0);
-static_assert(resolve_epilogue({.dtype = DataType::FP16}).op == EpilogueOp::None);
+static_assert(resolve_epilogue({.dtype = DataType::FP16}).combine == CombineOp::None);
+static_assert(resolve_epilogue({.dtype = DataType::FP16}).activation == Activation::None);
 
-// --- Add with d0: passes ---
+// --- Add with d0 (dtype cascades to d0) ---
 static_assert(resolve_epilogue(
-    {.dtype = DataType::FP16, .epilogue_op = EpilogueOp::Add, .d0_dtype = DataType::FP16})
+    {.dtype = DataType::FP16, .combine = CombineOp::Add})
     .num_d_tensors == 1);
 static_assert(resolve_epilogue(
-    {.dtype = DataType::FP16, .epilogue_op = EpilogueOp::Add, .d0_dtype = DataType::FP16})
+    {.dtype = DataType::FP16, .combine = CombineOp::Add})
+    .d0_dtype == DataType::FP16);
+static_assert(resolve_epilogue(
+    {.dtype = DataType::FP16, .combine = CombineOp::Add})
     .d0_layout == Layout::Row);
 
-// --- Add with d0 + d1: passes ---
+// --- d0_dtype override (overrides cascade) ---
 static_assert(resolve_epilogue(
-    {.dtype = DataType::FP16, .epilogue_op = EpilogueOp::Add,
-     .d0_dtype = DataType::FP16, .d1_dtype = DataType::FP16})
+    {.dtype = DataType::FP16, .combine = CombineOp::Add, .d0_dtype = DataType::FP32})
+    .d0_dtype == DataType::FP32);
+
+// --- Add with d0 + d1 ---
+static_assert(resolve_epilogue(
+    {.dtype = DataType::FP16, .combine = CombineOp::Add, .d1_dtype = DataType::FP16})
     .num_d_tensors == 2);
 
 // --- Layout override for d0 ---
 static_assert(resolve_epilogue(
-    {.dtype = DataType::FP16, .epilogue_op = EpilogueOp::Add,
-     .d0_dtype = DataType::FP16, .d0_layout = Layout::Col})
+    {.dtype = DataType::FP16, .combine = CombineOp::Add, .d0_layout = Layout::Col})
     .d0_layout == Layout::Col);
 
-// --- make_kernel with epilogue: None (backward compat) ---
+// --- Activation only (no D tensors): valid ---
+static_assert(resolve_epilogue(
+    {.dtype = DataType::FP16, .activation = Activation::Relu})
+    .activation == Activation::Relu);
+static_assert(resolve_epilogue(
+    {.dtype = DataType::FP16, .activation = Activation::Relu})
+    .combine == CombineOp::None);
+static_assert(resolve_epilogue(
+    {.dtype = DataType::FP16, .activation = Activation::Relu})
+    .num_d_tensors == 0);
+
+// --- Composed: Add + Relu (d0 cascaded from dtype) ---
+static_assert(resolve_epilogue(
+    {.dtype = DataType::FP16, .combine = CombineOp::Add, .activation = Activation::Relu})
+    .combine == CombineOp::Add);
+static_assert(resolve_epilogue(
+    {.dtype = DataType::FP16, .combine = CombineOp::Add, .activation = Activation::Relu})
+    .activation == Activation::Relu);
+static_assert(resolve_epilogue(
+    {.dtype = DataType::FP16, .combine = CombineOp::Add, .activation = Activation::Relu})
+    .d0_dtype == DataType::FP16);
+
+// --- make_kernel with defaults (no combine, no activation) ---
 static_assert(make_kernel(
     {.signature = {.dtype = DataType::FP16},
-     .algorithm = {{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}}).epilogue_op == EpilogueOp::None);
+     .algorithm = {{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}}).combine == CombineOp::None);
+static_assert(make_kernel(
+    {.signature = {.dtype = DataType::FP16},
+     .algorithm = {{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}}).activation == Activation::None);
 static_assert(make_kernel(
     {.signature = {.dtype = DataType::FP16},
      .algorithm = {{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}}).num_d_tensors == 0);
 
-// --- make_kernel with Add + D0 ---
+// --- make_kernel with Add (d0 cascaded from dtype) ---
 static_assert(make_kernel(
-    {.signature = {.dtype = DataType::FP16, .epilogue_op = EpilogueOp::Add,
-                   .d0_dtype = DataType::FP16},
+    {.signature = {.dtype = DataType::FP16, .combine = CombineOp::Add},
      .algorithm = {{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}}).num_d_tensors == 1);
 static_assert(make_kernel(
-    {.signature = {.dtype = DataType::FP16, .epilogue_op = EpilogueOp::Add,
-                   .d0_dtype = DataType::FP16},
+    {.signature = {.dtype = DataType::FP16, .combine = CombineOp::Add},
      .algorithm = {{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}}).d0_dtype == DataType::FP16);
+
+// --- make_kernel with Add + Relu ---
+static_assert(make_kernel(
+    {.signature = {.dtype = DataType::FP16, .combine = CombineOp::Add,
+                   .activation = Activation::Relu},
+     .algorithm = {{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}}).activation == Activation::Relu);
 
 // Error cases (uncommenting any would produce consteval compile errors):
 // None with D tensor:
 // resolve_epilogue({.dtype = DataType::FP16, .d0_dtype = DataType::FP16})
 //
-// Add without D tensor:
-// resolve_epilogue({.dtype = DataType::FP16, .epilogue_op = EpilogueOp::Add})
+// Add without dtype or d0_dtype:
+// resolve_epilogue({.combine = CombineOp::Add})
 // clang-format on
 
 } // namespace rocm_ck

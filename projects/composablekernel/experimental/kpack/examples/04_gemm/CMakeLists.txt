@@ -33,8 +33,8 @@ if(NOT TARGET rocm_ck)
     add_subdirectory(../../include rocm_ck_build)
 endif()
 
-# --- Kernel variants: fp32, fp16, bf16, fp16 with 32×32 warp tile, fp16+add ---
-set(KERNEL_VARIANTS gemm_fp32 gemm_fp16 gemm_bf16 gemm_fp16_w32 gemm_fp16_add)
+# --- Kernel variants: fp32, fp16, bf16, fp16 with 32×32 warp tile, fp16+add, fp16+add+relu ---
+set(KERNEL_VARIANTS gemm_fp32 gemm_fp16 gemm_bf16 gemm_fp16_w32 gemm_fp16_add gemm_fp16_add_relu)
 
 # rocm_ck headers for device code (DataType, Layout enums used by gemm_api.hpp)
 set(ROCM_CK_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
