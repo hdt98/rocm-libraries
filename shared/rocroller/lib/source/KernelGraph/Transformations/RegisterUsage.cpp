@@ -167,7 +167,8 @@ namespace rocRoller
                     }
                     // Classify each coordinate.
                     std::vector<std::pair<int, CoordLiveness>> alive, maybeAlive;
-                    for(auto const& [coordTag, ext] : allExtents)
+                    //for(auto const& [coordTag, ext] : allExtents)
+                    for(auto const& [coordTag, ext] : usageIt->second.overlappedCoords)
                     {
                         auto lv = getCoordLiveness(kgraph, opTag, ext);
                         if(lv == CoordLiveness::Alive)
@@ -878,6 +879,86 @@ namespace rocRoller
                 }
                 return "Unknown";
             }
+
+            enum class CoordRegAllocation
+            {
+                NoRegisters, // guaranteed 0 physical registers
+                ExpressionOnly, // stored as expression; may become literal (0) or runtime (small)
+                PhysicalRegister // will need actual register allocation
+            };
+
+            CoordRegAllocation
+                classifyCoordinate(KernelGraph const& kgraph,
+                                   int                coordTag,
+                                   std::vector<ControlFlowRWTracer::ReadWriteRecord> const& records)
+            {
+                // 1. Check if it's a coordinate graph edge (Stride, Offset, Buffer, etc.)
+                auto elemType = kgraph.coordinates.getElementType(coordTag);
+                if(elemType == Graph::ElementType::Node)
+                {
+                    auto dim = kgraph.coordinates.getNode(coordTag);
+                    // Dimension types that never consume GPRs:
+                    bool noRegs = std::visit(
+                        overloaded{
+                            [](CoordinateGraph::User const&) { return true; },
+                            [](CoordinateGraph::LDS const&) { return true; },
+                            [](CoordinateGraph::Workgroup const&) { return true; },
+                            [](CoordinateGraph::Workitem const&) { return true; },
+                            [](CoordinateGraph::Wavefront const&) { return true; },
+                            [](CoordinateGraph::Lane const&) { return true; },
+                            [](CoordinateGraph::ForLoop const&) { return true; },
+                            [](CoordinateGraph::Unroll const&) { return true; },
+                            [](CoordinateGraph::SubDimension const&) { return true; },
+                            [](CoordinateGraph::MacroTileIndex const&) { return true; },
+                            [](CoordinateGraph::MacroTileNumber const&) { return true; },
+                            [](CoordinateGraph::WaveTileIndex const&) { return true; },
+                            [](CoordinateGraph::WaveTileNumber const&) { return true; },
+                            [](CoordinateGraph::ThreadTileIndex const&) { return true; },
+                            [](CoordinateGraph::ThreadTileNumber const&) { return true; },
+                            [](CoordinateGraph::JammedWaveTileNumber const&) { return true; },
+                            [](CoordinateGraph::ElementNumber const&) { return true; },
+                            [](auto const&) { return false; }},
+                        dim);
+                    if(noRegs)
+                        return CoordRegAllocation::NoRegisters;
+                    // Remaining: MacroTile, VGPR, Linear, ThreadTile, WaveTile,
+                    //            Adhoc, VGPRBlockNumber, VGPRBlockIndex
+                    // These are storage dimensions -> PhysicalRegister
+                    // (but the actual count depends on type resolution)
+                }
+                // 2. For edge coordinates (Stride, Offset, Buffer) or storage nodes,
+                //    find the Assign operation that writes to this coordinate.
+                for(auto const& rec : records)
+                {
+                    if(rec.coordinate != coordTag)
+                        continue;
+                    if(rec.rw != ControlFlowRWTracer::WRITE
+                       && rec.rw != ControlFlowRWTracer::READWRITE)
+                        continue;
+                    auto op     = kgraph.control.getNode(rec.control);
+                    auto assign = std::get_if<ControlGraph::Assign>(&op);
+                    if(!assign)
+                        continue; // non-Assign write (e.g., LoadTiled)
+                            // Signal 1: strideExpressionAttributes -> expression-only
+                    if(assign->strideExpressionAttributes.has_value())
+                    {
+                        auto evalTimes = Expression::evaluationTimes(assign->expression);
+                        if(evalTimes[Expression::EvaluationTime::Translate])
+                            return CoordRegAllocation::NoRegisters;
+                        else
+                            return CoordRegAllocation::ExpressionOnly;
+                    }
+                    // Signal 2: Expression fully evaluable at translate time -> literal
+                    auto evalTimes = Expression::evaluationTimes(assign->expression);
+                    if(evalTimes[Expression::EvaluationTime::Translate])
+                    {
+                        return CoordRegAllocation::NoRegisters;
+                    }
+                }
+                // 3. Default: needs physical registers
+                return CoordRegAllocation::PhysicalRegister;
+            }
+
             // ================================================================
             // Type resolution -- Priorities 1-3 (operation-based)
             // ================================================================
@@ -896,6 +977,18 @@ namespace rocRoller
                                                          std::vector<Record> const& records)
             {
                 CoordTypeInfo info;
+
+                bool isBuffer = false;
+                if(kgraph.coordinates.getElementType(coordTag) == Graph::ElementType::Edge)
+                {
+                    if(std::holds_alternative<CoordinateGraph::DataFlowEdge>(
+                           kgraph.coordinates.getEdge(coordTag)))
+                        if(std::holds_alternative<CoordinateGraph::Buffer>(
+                               std::get<CoordinateGraph::DataFlowEdge>(
+                                   kgraph.coordinates.getEdge(coordTag))))
+                            isBuffer = true;
+                }
+
                 // Priority 1: Assign.variableType
                 for(auto const& rec : records)
                 {
@@ -910,6 +1003,8 @@ namespace rocRoller
                         info.regType    = assign->regType;
                         info.valueCount = assign->valueCount;
                         info.resolved   = true;
+                        if(isBuffer)
+                            info.regType = Register::Type::Scalar;
                         return info;
                     }
                 }
@@ -927,6 +1022,8 @@ namespace rocRoller
                         info.regType    = assign->regType;
                         info.valueCount = assign->valueCount;
                         info.resolved   = true;
+                        if(isBuffer)
+                            info.regType = Register::Type::Scalar;
                         return info;
                     }
                 }
@@ -945,6 +1042,8 @@ namespace rocRoller
                             return Register::Type::Vector;
                         };
                         info.regType = std::visit(getRT, op);
+                        if(isBuffer)
+                            info.regType = Register::Type::Scalar;
                         return info;
                     }
                 }
@@ -1134,6 +1233,27 @@ namespace rocRoller
                     allExtents[coordTag] = getCoordExtent(kgraph, coordTag, records);
                 // Step 3: Resolve types for all coordinates.
                 auto allTypes = resolveAllCoordTypes(kgraph, recordsByCoord);
+
+                std::unordered_set<int> coordNoRegister;
+                for(auto& [coordTag, records] : recordsByCoord)
+                {
+                    auto const result = classifyCoordinate(kgraph, coordTag, allRecords);
+                    if(result == CoordRegAllocation::NoRegisters)
+                    {
+                        coordNoRegister.insert(coordTag);
+                    }
+                    if(coordTag == 314)
+                    {
+                        //if(result == CoordRegAllocation::NoRegisters)
+                        //    Log::info("no reg");
+                        //if(result == CoordRegAllocation::ExpressionOnly)
+                        //    Log::info("expr only");
+                        //if(result == CoordRegAllocation::PhysicalRegister)
+                        //    Log::info("phy");
+                        //exit(0);
+                    }
+                }
+
                 // Step 4: Per-work-item register estimates.
                 std::map<int, CoordRegisterEstimate> regEstimates;
                 for(auto const& [coordTag, typeInfo] : allTypes)
@@ -1172,17 +1292,25 @@ namespace rocRoller
                         // Skip aliased-inner coordinates.
                         if(aliasedInners.contains(coordTag))
                             continue;
+
+                        // Skip if no register for this coordinate
+                        if(coordNoRegister.contains(coordTag))
+                            continue;
+
                         auto liveness = getCoordLiveness(kgraph, opTag, ext);
                         // Dead coordinates don't use registers at this point.
                         if(liveness == CoordLiveness::Dead or liveness == CoordLiveness::MaybeAlive)
                             continue;
+
                         // Look up the pre-computed register estimate.
                         auto estIt = regEstimates.find(coordTag);
                         if(estIt == regEstimates.end() || !estIt->second.resolved)
                             continue;
+
                         int regs = estIt->second.registerCount;
                         if(regs <= 0)
                             continue;
+
                         // Determine which Register::Type bucket this belongs to.
                         // Default to Vector if regType is unknown.
                         Register::Type rType = Register::Type::Vector;
@@ -1192,12 +1320,16 @@ namespace rocRoller
                         {
                             rType = tIt->second.regType;
                         }
+
                         usage.regCountByType[rType] += regs;
                         usage.totalRegisters += regs;
                         controlExtents[opTag].push_back(ext);
+
+                        usage.overlappedCoords.insert({coordTag, ext});
                     }
                     result[opTag] = std::move(usage);
                 }
+                //exit(0);
 
                 // --- 1. ASCII text: control graph liveness ---
                 std::string controlText

@@ -47,6 +47,8 @@ namespace rocRoller
                 std::map<Register::Type, int> regCountByType;
                 // Sum of all register types.
                 int totalRegisters = 0;
+
+                std::map<int, CoordExtent> overlappedCoords;
             };
             std::vector<Record> deduplicateRecords(std::vector<Record> const& records);
             AliasDataFlowTagsDetail::TagRWGraph
