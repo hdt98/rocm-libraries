@@ -23,6 +23,7 @@
 #include "ck_tile/core.hpp"
 #include "ck_tile/ops/gemm.hpp"
 #include "ck_tile/ops/epilogue.hpp"
+#include "ck_tile/ops/elementwise/unary_element_wise_operation.hpp"
 
 namespace rocm_ck {
 
@@ -46,28 +47,56 @@ struct CkLayoutMap<Layout::Col>
 };
 
 // ============================================================================
-// CkEpilogueOpMap: EpilogueOp → CK Tile elementwise functor
+// ComposedCDEOp: CombineOp × Activation → single CK Tile elementwise functor
 // ============================================================================
 
-template <EpilogueOp>
-struct CkEpilogueOpMap;
-
-template <>
-struct CkEpilogueOpMap<EpilogueOp::None>
+/// Composed epilogue functor: combine D tensors in float, activate, cast to output.
+///
+/// Replaces the old CkEpilogueOpMap 1:1 enum mapping with a two-axis composition.
+/// All arithmetic is in float to avoid precision loss between combine and activation.
+/// Delegates activation math to CK Tile's existing functor implementations.
+template <CombineOp Combine, Activation Act>
+struct ComposedCDEOp
 {
-    using type = ck_tile::element_wise::PassThrough;
-};
+    template <typename E, typename C, typename... Ds>
+    CK_TILE_HOST_DEVICE void operator()(E& e, const C& c, const Ds&... ds) const
+    {
+        float result = ck_tile::type_convert<float>(c);
 
-template <>
-struct CkEpilogueOpMap<EpilogueOp::Add>
-{
-    using type = ck_tile::element_wise::MultiDAdd;
-};
+        // Combine D tensors with matmul result
+        if constexpr(Combine == CombineOp::Add)
+        {
+            ((result += ck_tile::type_convert<float>(ds)), ...);
+        }
+        else if constexpr(Combine == CombineOp::Multiply)
+        {
+            ((result *= ck_tile::type_convert<float>(ds)), ...);
+        }
 
-template <>
-struct CkEpilogueOpMap<EpilogueOp::Multiply>
-{
-    using type = ck_tile::element_wise::MultiDMultiply;
+        // Apply activation (delegating to CK Tile's optimized implementations)
+        if constexpr(Act == Activation::Relu)
+        {
+            ck_tile::element_wise::Relu{}(result, result);
+        }
+        else if constexpr(Act == Activation::FastGelu)
+        {
+            ck_tile::element_wise::FastGelu{}(result, result);
+        }
+        else if constexpr(Act == Activation::Gelu)
+        {
+            ck_tile::element_wise::Gelu{}(result, result);
+        }
+        else if constexpr(Act == Activation::Silu)
+        {
+            ck_tile::element_wise::Silu{}(result, result);
+        }
+        else if constexpr(Act == Activation::Sigmoid)
+        {
+            ck_tile::element_wise::Sigmoid{}(result, result);
+        }
+
+        e = ck_tile::type_convert<E>(result);
+    }
 };
 
 // ============================================================================
@@ -77,7 +106,7 @@ struct CkEpilogueOpMap<EpilogueOp::Multiply>
 template <GemmKernel K>
 struct EpilogueTypes
 {
-    using Op = typename CkEpilogueOpMap<K.epilogue_op>::type;
+    using Op = ComposedCDEOp<K.combine, K.activation>;
 
     // Always resolved (GemmKernel fields have valid defaults even when unused).
     // std::conditional_t below selects which ones go into the tuples.

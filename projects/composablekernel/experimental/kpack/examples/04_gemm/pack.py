@@ -106,7 +106,27 @@ VARIANTS = [
         "b_dtype": "fp16",
         "c_dtype": "fp16",
         "acc_dtype": "fp32",
-        "epilogue_op": "add",
+        "combine": "add",
+        "d0_dtype": "fp16",
+        "block_m": 128,
+        "block_n": 128,
+        "block_k": 32,
+        "warps_m": 2,
+        "warps_n": 2,
+        "warps_k": 1,
+        "warp_m": 16,
+        "warp_n": 16,
+        "warp_k": 16,
+        "block_size": 256,
+    },
+    {
+        "name": "gemm_fp16_add_relu",
+        "a_dtype": "fp16",
+        "b_dtype": "fp16",
+        "c_dtype": "fp16",
+        "acc_dtype": "fp32",
+        "combine": "add",
+        "activation": "relu",
         "d0_dtype": "fp16",
         "block_m": 128,
         "block_n": 128,
@@ -196,8 +216,10 @@ def main() -> None:
                     "block_size": v["block_size"],
                 }
                 # Include epilogue metadata when present
-                if "epilogue_op" in v:
-                    meta["epilogue_op"] = v["epilogue_op"]
+                if "combine" in v:
+                    meta["combine"] = v["combine"]
+                if "activation" in v:
+                    meta["activation"] = v["activation"]
                 if "d0_dtype" in v:
                     meta["d0_dtype"] = v["d0_dtype"]
                 if "d1_dtype" in v:

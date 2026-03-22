@@ -8,9 +8,8 @@
 
 static constexpr rocm_ck::GemmKernel kernel =
     rocm_ck::make_kernel(rocm_ck::GemmConfig{
-        .signature = {.dtype       = rocm_ck::DataType::FP16,
-                      .epilogue_op = rocm_ck::EpilogueOp::Add,
-                      .d0_dtype    = rocm_ck::DataType::FP16},
+        .signature = {.dtype   = rocm_ck::DataType::FP16,
+                      .combine = rocm_ck::CombineOp::Add},
         .algorithm = {.block_tile  = {128, 128, 32},
                       .block_warps = {2, 2, 1},
                       .warp_tile   = {16, 16, 16}}});

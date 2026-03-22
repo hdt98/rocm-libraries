@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: MIT
 //
 // Host-side loader for the kpack GEMM example. Loads fp32, fp16, bf16,
-// fp16_w32, and fp16_add GEMM kernels from a kpack archive, runs each on
-// the detected GPU, and verifies results against a naive CPU reference.
+// fp16_w32, fp16_add, and fp16_add_relu GEMM kernels from a kpack archive,
+// runs each on the detected GPU, and verifies against CPU reference.
 //
 // This example demonstrates:
 //   - GemmConfig schema: compile-time type + tile geometry via make_kernel()
 //   - Multi-variant iteration with per-variant grid launch parameters
-//   - Fused epilogue: E = A*B + D0 with GemmArgs1D
+//   - Composable epilogue: CombineOp × Activation (e.g., Add + Relu)
 //   - Per-type tolerance for correctness verification
 
 #include "cpu_ref.hpp"
@@ -28,8 +28,9 @@
 #include <memory>
 #include <vector>
 
+using rocm_ck::Activation;
+using rocm_ck::CombineOp;
 using rocm_ck::DataType;
-using rocm_ck::EpilogueOp;
 using rocm_ck::GemmArgs;
 using rocm_ck::GemmArgs1D;
 using rocm_ck::GemmConfig;
@@ -68,9 +69,14 @@ static constexpr GemmVariant ALL_GEMM_VARIANTS[] = {
                                           .block_warps = {2, 2, 1},
                                           .warp_tile   = {32, 32, 16}}})},
     {"gemm_fp16_add",
-     make_kernel(GemmConfig{.signature = {.dtype       = DataType::FP16,
-                                          .epilogue_op = EpilogueOp::Add,
-                                          .d0_dtype    = DataType::FP16},
+     make_kernel(GemmConfig{.signature = {.dtype = DataType::FP16, .combine = CombineOp::Add},
+                            .algorithm = {.block_tile  = {128, 128, 32},
+                                          .block_warps = {2, 2, 1},
+                                          .warp_tile   = {16, 16, 16}}})},
+    {"gemm_fp16_add_relu",
+     make_kernel(GemmConfig{.signature = {.dtype      = DataType::FP16,
+                                          .combine    = CombineOp::Add,
+                                          .activation = Activation::Relu},
                             .algorithm = {.block_tile  = {128, 128, 32},
                                           .block_warps = {2, 2, 1},
                                           .warp_tile   = {16, 16, 16}}})},
@@ -120,9 +126,12 @@ int main(int argc, char** argv)
 
     cpu_gemm(ref_a.data(), ref_b.data(), ref_c.data(), M, N, K, stride_A, stride_B, stride_C);
 
-    // Fused reference: E = A*B + D0
+    // Fused references
     std::vector<float> ref_add(M * N);
     cpu_gemm_add(ref_add.data(), ref_c.data(), ref_d0.data(), M * N);
+
+    std::vector<float> ref_add_relu(M * N);
+    cpu_gemm_add_relu(ref_add_relu.data(), ref_c.data(), ref_d0.data(), M * N);
 
     // --- Run each variant ---
     bool all_passed  = true;
@@ -222,8 +231,12 @@ int main(int argc, char** argv)
         std::vector<float> result(M * N);
         buf_c.download(result.data());
 
-        // Select correct reference: plain GEMM or fused
-        const float* ref = (k.num_d_tensors == 0) ? ref_c.data() : ref_add.data();
+        // Select correct reference based on epilogue composition
+        const float* ref = ref_c.data();
+        if(k.combine == CombineOp::Add && k.activation == Activation::Relu)
+            ref = ref_add_relu.data();
+        else if(k.combine == CombineOp::Add)
+            ref = ref_add.data();
 
         float tol   = rocm_ck::tolerance_for(k.c_dtype);
         bool passed = true;

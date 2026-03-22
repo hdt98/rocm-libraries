@@ -19,3 +19,6 @@ void cpu_gemm(const float* a,
 
 /// Fused epilogue reference: e[i] = c[i] + d0[i]
 void cpu_gemm_add(float* e, const float* c, const float* d0, int count);
+
+/// Fused epilogue reference: e[i] = max(0, c[i] + d0[i])
+void cpu_gemm_add_relu(float* e, const float* c, const float* d0, int count);
