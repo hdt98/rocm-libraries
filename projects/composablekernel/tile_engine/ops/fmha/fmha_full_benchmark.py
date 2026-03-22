@@ -228,20 +228,38 @@ Q = (np.random.randn(*prob.q_shape()) * 0.1).astype(np_dt)
 K = (np.random.randn(*prob.k_shape()) * 0.1).astype(np_dt)
 V = (np.random.randn(*prob.v_shape()) * 0.1).astype(np_dt)
 
+out_dt = np_dt
+O = (np.random.randn(*prob.q_shape()[:3] + (s["hdim_v"],)) * 0.1).astype(out_dt)
+LSE = np.random.randn(s["batch"], s["nhead_q"], s["seqlen_q"]).astype(np.float32)
+dO = (np.random.randn(*O.shape) * 0.1).astype(out_dt)
+
 rows = []
 for so_path, cfg in kernels:
     try:
         runner = FmhaRunner.from_library(so_path)
-        result = runner.run(Q, K, V, prob,
-            mask_type=cfg["mask_int"], bias_type=cfg["bias_int"],
-            has_lse=cfg["has_lse"], has_dropout=cfg["has_dropout"],
-            has_logits=cfg["has_logits"], has_sink=cfg["has_sink"],
-            has_skip=cfg["has_skip"],
-            api_family=cfg.get("api_family", "fwd"),
-            data_type=cfg.get("data_type", "fp16"),
-            page_size=cfg.get("page_size", 16),
-            kv_layout=cfg.get("kv_layout", 0),
-            kv_lookup=cfg.get("kv_lookup", 1))
+        api = cfg.get("api_family", "fwd")
+        if api == "bwd":
+            is_grp = cfg.get("mode", "batch") == "group"
+            result = runner.run_bwd(Q, K, V, O, LSE, dO, prob,
+                data_type=cfg.get("data_type", "fp16"),
+                mask_type=cfg["mask_int"], bias_type=cfg["bias_int"],
+                has_dropout=cfg["has_dropout"],
+                has_dbias=cfg.get("has_dbias", 0),
+                is_deterministic=cfg.get("deterministic", 0),
+                is_group_mode=is_grp,
+                is_store_randval=cfg.get("is_store_randval", 0),
+                tile_n0=cfg.get("tile_n0", 128))
+        else:
+            result = runner.run(Q, K, V, prob,
+                mask_type=cfg["mask_int"], bias_type=cfg["bias_int"],
+                has_lse=cfg["has_lse"], has_dropout=cfg["has_dropout"],
+                has_logits=cfg["has_logits"], has_sink=cfg["has_sink"],
+                has_skip=cfg["has_skip"],
+                api_family=api,
+                data_type=cfg.get("data_type", "fp16"),
+                page_size=cfg.get("page_size", 16),
+                kv_layout=cfg.get("kv_layout", 0),
+                kv_lookup=cfg.get("kv_lookup", 1))
     except Exception as exc:
         print(f"  WARN: kernel {cfg.get('name','?')} exception: {exc}", file=sys.stderr)
         continue
@@ -321,6 +339,8 @@ def _config_to_serializable(config, so_path: str) -> dict:
         "has_logits": int(config.logits),
         "has_sink": int(config.sink),
         "has_skip": int(config.skip_min_seqlen_q),
+        "has_dbias": int(getattr(config, "dbias", False)),
+        "is_store_randval": int(getattr(config, "store_randval", False)),
         "page_size": getattr(config, "page_size", 16),
         "kv_layout": KV_LAYOUT_INT.get(
             getattr(config, "kv_memory_layout", "vectorized"), 0
