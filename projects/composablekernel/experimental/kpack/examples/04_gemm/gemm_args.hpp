@@ -8,15 +8,12 @@
 
 #pragma once
 
+#include <rocm_ck/types.hpp>
+
 #include <cstddef>
-#include <cstdint>
 #include <type_traits>
 
 namespace rocm_ck {
-
-/// Fixed-width integer type for kernel index/size arguments.
-/// Matches ck_tile::index_t but avoids pulling in CK Tile headers.
-using index_t = std::int32_t;
 
 /// Kernel arguments passed by value through hipModuleLaunchKernel.
 /// Layout must match exactly between host and device.
