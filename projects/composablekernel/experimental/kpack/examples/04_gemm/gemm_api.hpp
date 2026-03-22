@@ -210,9 +210,6 @@ consteval ResolvedEpilogue resolve_epilogue(GemmSignature sig)
 // Warp tile validation
 // ============================================================================
 
-/// AMD CDNA wavefront size.
-constexpr int warp_size = 64;
-
 /// Check if (a_dtype, warp_m, warp_n, warp_k) is a valid MFMA warp gemm
 /// configuration. Based on CK Tile's WarpGemmDispatcher specializations
 /// for gfx9 (MFMA). Only covers standard symmetric tile shapes.

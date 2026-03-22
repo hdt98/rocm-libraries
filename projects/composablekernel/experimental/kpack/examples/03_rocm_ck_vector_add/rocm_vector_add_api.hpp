@@ -11,18 +11,14 @@
 
 #include <rocm_ck/datatype_utils.hpp>
 #include <rocm_ck/tensor_desc.hpp>
+#include <rocm_ck/types.hpp>
 
 #include <array>
 #include <cstddef>
-#include <cstdint>
 #include <optional>
 #include <type_traits>
 
 namespace rocm_ck {
-
-/// Fixed-width integer type for kernel index/size arguments.
-/// Matches ck_tile::index_t but avoids pulling in CK Tile headers.
-using index_t = std::int32_t;
 
 /// Kernel arguments passed by value through hipModuleLaunchKernel.
 /// Layout must match exactly between host and device.
@@ -115,9 +111,6 @@ struct VectorAddKernel
     int warp_tile;         // Warp tile size
     bool pad;              // Padding enabled
 };
-
-/// AMD GCN/CDNA wavefront size.
-constexpr int warp_size = 64;
 
 /// Resolve the optional dtype hierarchy into concrete TensorDesc entries.
 ///
