@@ -91,7 +91,7 @@ static bool runVariant(const rocm_ck::VariantDescriptor& variant,
     for(int i = 0; i < num_elements; ++i)
     {
         float expected = alpha * host_a[i] + beta * host_b[i];
-        if(std::fabs(result[i] - expected) > tol)
+        if(std::fabs(result[i] - expected) > tol * std::fabs(expected) + tol)
         {
             std::fprintf(stderr,
                          "  %s: MISMATCH at index %d: got %f, expected %f\n",

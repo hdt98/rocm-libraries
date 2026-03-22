@@ -38,6 +38,30 @@ class TypedBuffer
     TypedBuffer(const TypedBuffer&)            = delete;
     TypedBuffer& operator=(const TypedBuffer&) = delete;
 
+    TypedBuffer(TypedBuffer&& other) noexcept
+        : dtype_(other.dtype_),
+          count_(other.count_),
+          elem_bytes_(other.elem_bytes_),
+          device_ptr_(other.device_ptr_)
+    {
+        other.device_ptr_ = nullptr;
+    }
+
+    TypedBuffer& operator=(TypedBuffer&& other) noexcept
+    {
+        if(this != &other)
+        {
+            if(device_ptr_ != nullptr)
+                (void)hipFree(device_ptr_);
+            dtype_            = other.dtype_;
+            count_            = other.count_;
+            elem_bytes_       = other.elem_bytes_;
+            device_ptr_       = other.device_ptr_;
+            other.device_ptr_ = nullptr;
+        }
+        return *this;
+    }
+
     /// Convert float array to typed format and upload to device.
     void upload(const float* src)
     {

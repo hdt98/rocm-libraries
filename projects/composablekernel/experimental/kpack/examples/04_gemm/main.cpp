@@ -25,6 +25,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
 #include <vector>
 
 using rocm_ck::DataType;
@@ -151,9 +152,12 @@ int main(int argc, char** argv)
         buf_c.zero();
 
         // Allocate D0 tensor (used by fused epilogue variants)
-        rocm_ck::TypedBuffer buf_d0(k.d0_dtype, M * N);
+        std::unique_ptr<rocm_ck::TypedBuffer> buf_d0;
         if(k.num_d_tensors >= 1)
-            buf_d0.upload(ref_d0.data());
+        {
+            buf_d0 = std::make_unique<rocm_ck::TypedBuffer>(k.d0_dtype, M * N);
+            buf_d0->upload(ref_d0.data());
+        }
 
         std::printf("%s: M=%d, N=%d, K=%d, grid=%d, block=%d\n",
                     variant.name,
@@ -188,7 +192,7 @@ int main(int argc, char** argv)
               .e         = buf_c.ptr(),
               .stride_D0 = stride_D0,
               ._pad0     = 0,
-              .d0        = (k.num_d_tensors >= 1) ? buf_d0.ptr() : nullptr,
+              .d0        = (k.num_d_tensors >= 1) ? buf_d0->ptr() : nullptr,
         };
 
         // Launch — select args struct by D tensor count

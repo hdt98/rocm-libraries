@@ -33,6 +33,25 @@ class KpackArchive
     KpackArchive(const KpackArchive&)            = delete;
     KpackArchive& operator=(const KpackArchive&) = delete;
 
+    KpackArchive(KpackArchive&& other) noexcept
+        : archive_(other.archive_), gpu_arch_(std::move(other.gpu_arch_))
+    {
+        other.archive_ = nullptr;
+    }
+
+    KpackArchive& operator=(KpackArchive&& other) noexcept
+    {
+        if(this != &other)
+        {
+            if(archive_ != nullptr)
+                kpack_close(archive_);
+            archive_       = other.archive_;
+            gpu_arch_      = std::move(other.gpu_arch_);
+            other.archive_ = nullptr;
+        }
+        return *this;
+    }
+
     /// Open a kpack archive, print its architecture list, and detect the GPU.
     /// Returns false on failure (errors printed to stderr).
     bool open(const char* path)
@@ -94,6 +113,32 @@ class KpackKernel
 
     KpackKernel(const KpackKernel&)            = delete;
     KpackKernel& operator=(const KpackKernel&) = delete;
+
+    KpackKernel(KpackKernel&& other) noexcept
+        : code_object_(other.code_object_), module_(other.module_), function_(other.function_)
+    {
+        other.code_object_ = nullptr;
+        other.module_      = nullptr;
+        other.function_    = nullptr;
+    }
+
+    KpackKernel& operator=(KpackKernel&& other) noexcept
+    {
+        if(this != &other)
+        {
+            if(module_ != nullptr)
+                (void)hipModuleUnload(module_);
+            if(code_object_ != nullptr)
+                kpack_free_kernel(code_object_);
+            code_object_       = other.code_object_;
+            module_            = other.module_;
+            function_          = other.function_;
+            other.code_object_ = nullptr;
+            other.module_      = nullptr;
+            other.function_    = nullptr;
+        }
+        return *this;
+    }
 
     /// Load a kernel by name from the archive for the archive's detected GPU.
     /// Returns false if the kernel is not found for this architecture.
