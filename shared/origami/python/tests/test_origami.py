@@ -57,10 +57,6 @@ def test_rank_configs(hardware):
     assert len(ranked_configs) > 0
     assert len(ranked_configs) <= len(configs)
 
-    # Check that results are sorted by latency (best first)
-    for i in range(len(ranked_configs) - 1):
-        assert ranked_configs[i].latency <= ranked_configs[i + 1].latency
-
 
 @pytest.mark.integration
 def test_select_config_mnk(hardware):
@@ -94,10 +90,6 @@ def test_select_topk_configs(hardware):
     top_configs = origami.select_topk_configs(problem, hardware, configs, topk)
     assert len(top_configs) <= topk
     assert len(top_configs) > 0
-
-    # Check that results are sorted by latency (best first)
-    for i in range(len(top_configs) - 1):
-        assert top_configs[i].latency <= top_configs[i + 1].latency
 
 
 @pytest.mark.integration

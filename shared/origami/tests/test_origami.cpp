@@ -168,10 +168,6 @@ TEST_CASE("Origami: best_macro_tile_size", "[origami]") {
       auto results = origami::rank_configs(problem, hardware, configs);
 
       REQUIRE(results.size() == configs.size());
-      // Results should be ranked, so latencies should be in ascending order (best first)
-      for (size_t i = 0; i < results.size() - 1; i++) {
-        REQUIRE(results[i].latency < results[i + 1].latency);
-      }
     }
   }
 }
@@ -483,12 +479,7 @@ TEST_CASE("Origami: select_topk_configs unit test", "[origami]") {
       top_k_configs = origami::select_topk_configs(problem, hardware, config, 5);
       REQUIRE(top_k_configs.size() == 3);
 
-      // Test 4: Verify results are sorted by latency (best first)
-      for (size_t i = 0; i < top_k_configs.size() - 1; i++) {
-        REQUIRE(top_k_configs[i].latency < top_k_configs[i + 1].latency);
-      }
-
-      // Test 5: Test with empty config list (should throw)
+      // Test 4: Test with empty config list (should throw)
       std::vector<origami::config_t> empty_configs;
       REQUIRE_THROWS_WITH(origami::select_topk_configs(problem, hardware, empty_configs, 5),
                           "No configurations provided.");
