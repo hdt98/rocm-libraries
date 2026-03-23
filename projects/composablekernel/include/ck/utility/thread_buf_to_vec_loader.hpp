@@ -53,44 +53,37 @@ __host__ __device__ constexpr auto MakeFunctorInvoker(Fs&&... fs)
  * @tparam T The expression type to evaluate
  * @tparam ik The index variable value
  * @details Provides a value member that evaluates the index expression T using
- * the index_expression::eval_v facility
+ * the index_expression::eval_v
  */
-template <typename T, index_t ik, typename Enable = void>
+template <typename T, index_t ik>
 struct IndexEval;
 
 template <index_t v, index_t ik>
-struct IndexEval<Number<v>, ik, std::enable_if_t<true, void>>
+struct IndexEval<Number<v>, ik>
 {
     static constexpr index_t value = v;
 };
 
 template <index_t ik>
-struct IndexEval<index_expression::Ik, ik, std::enable_if_t<true, void>>
+struct IndexEval<index_expression::Ik, ik>
 {
     static constexpr index_t value = ik;
 };
 
-// TODO c++20: concepts for binary expressions to simplify SFINAE
 template <typename L, typename R, index_t ik>
-using BinaryIndexEvalEnable =
-    std::enable_if_t<!std::is_same_v<decltype(IndexEval<L, ik>::value), void> &&
-                         !std::is_same_v<decltype(IndexEval<R, ik>::value), void>,
-                     void>;
-
-template <typename L, typename R, index_t ik>
-struct IndexEval<index_expression::Add<L, R>, ik, BinaryIndexEvalEnable<L, R, ik>>
+struct IndexEval<index_expression::Add<L, R>, ik>
 {
     static constexpr index_t value = IndexEval<L, ik>::value + IndexEval<R, ik>::value;
 };
 
 template <typename L, typename R, index_t ik>
-struct IndexEval<index_expression::Mult<L, R>, ik, BinaryIndexEvalEnable<L, R, ik>>
+struct IndexEval<index_expression::Mult<L, R>, ik>
 {
     static constexpr index_t value = IndexEval<L, ik>::value * IndexEval<R, ik>::value;
 };
 
 template <typename L, typename R, index_t ik>
-struct IndexEval<index_expression::Div<L, R>, ik, BinaryIndexEvalEnable<L, R, ik>>
+struct IndexEval<index_expression::Div<L, R>, ik>
 {
     static constexpr index_t divisor = IndexEval<R, ik>::value;
     static_assert(divisor != 0,
@@ -99,7 +92,7 @@ struct IndexEval<index_expression::Div<L, R>, ik, BinaryIndexEvalEnable<L, R, ik
 };
 
 template <typename L, typename R, index_t ik>
-struct IndexEval<index_expression::Mod<L, R>, ik, BinaryIndexEvalEnable<L, R, ik>>
+struct IndexEval<index_expression::Mod<L, R>, ik>
 {
     static constexpr index_t divisor = IndexEval<R, ik>::value;
     static_assert(divisor != 0,
