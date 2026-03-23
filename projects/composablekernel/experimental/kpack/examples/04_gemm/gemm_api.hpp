@@ -18,6 +18,7 @@
 
 #include <rocm_ck/datatype_utils.hpp>
 #include <rocm_ck/layout.hpp>
+#include <rocm_ck/resolve.hpp>
 #include <rocm_ck/tensor_desc.hpp>
 #include <rocm_ck/types.hpp>
 
@@ -352,6 +353,147 @@ consteval GemmKernel make_kernel(GemmConfig cfg)
 }
 
 // ============================================================================
+// make_kernel overload for operator-centric Signature
+// ============================================================================
+
+/// Resolve and validate a GEMM using the operator-centric Signature.
+///
+/// Pattern-matches the ops array to determine epilogue:
+///   {GemmOp}                          -> no epilogue
+///   {GemmOp, AddOp}                   -> CombineOp::Add, 1 D tensor
+///   {GemmOp, AddOp, ReluOp/...}       -> CombineOp::Add + activation
+///   {GemmOp, MulOp}                   -> CombineOp::Multiply, 1 D tensor
+///   {GemmOp, ReluOp/...}              -> activation only, no D tensors
+///
+/// The D tensor is the rhs of the AddOp/MulOp (the "bias" or "scale" operand).
+/// c_dtype comes from the GemmOp output tensor.
+consteval GemmKernel make_kernel(Signature sig, GemmAlgorithm algo)
+{
+    ResolvedSignature resolved = resolve(sig);
+
+    // First op must be GemmOp
+    if(!std::holds_alternative<GemmOp>(sig.ops[0]))
+        throw "GEMM make_kernel requires GemmOp as first operator";
+    const GemmOp& gemm = std::get<GemmOp>(sig.ops[0]);
+
+    TensorDesc a_td = resolved.tensor(gemm.lhs);
+    TensorDesc b_td = resolved.tensor(gemm.rhs);
+    TensorDesc c_td = resolved.tensor(gemm.out);
+    DataType acc    = gemm.acc_dtype;
+
+    // Pattern-match epilogue from remaining ops
+    CombineOp combine     = CombineOp::None;
+    Activation activation = Activation::None;
+    int num_d_tensors     = 0;
+    DataType d0_dtype     = DataType::FP32;
+    Layout d0_layout      = Layout::Row;
+    DataType d1_dtype     = DataType::FP32;
+    Layout d1_layout      = Layout::Row;
+
+    int next_op = 1;
+
+    // Check for combine op (AddOp or MulOp after GemmOp)
+    if(next_op < kMaxOps && std::holds_alternative<AddOp>(sig.ops[next_op]))
+    {
+        const AddOp& add = std::get<AddOp>(sig.ops[next_op]);
+        combine          = CombineOp::Add;
+        num_d_tensors    = 1;
+        TensorDesc d0_td = resolved.tensor(add.rhs);
+        d0_dtype         = d0_td.dtype;
+        d0_layout        = d0_td.layout != Layout::Auto ? d0_td.layout : Layout::Row;
+        next_op++;
+    }
+    else if(next_op < kMaxOps && std::holds_alternative<MulOp>(sig.ops[next_op]))
+    {
+        const MulOp& mul = std::get<MulOp>(sig.ops[next_op]);
+        combine          = CombineOp::Multiply;
+        num_d_tensors    = 1;
+        TensorDesc d0_td = resolved.tensor(mul.rhs);
+        d0_dtype         = d0_td.dtype;
+        d0_layout        = d0_td.layout != Layout::Auto ? d0_td.layout : Layout::Row;
+        next_op++;
+    }
+
+    // Check for activation (unary op after combine or directly after GemmOp)
+    if(next_op < kMaxOps)
+    {
+        if(std::holds_alternative<ReluOp>(sig.ops[next_op]))
+        {
+            activation = Activation::Relu;
+            next_op++;
+        }
+        else if(std::holds_alternative<FastGeluOp>(sig.ops[next_op]))
+        {
+            activation = Activation::FastGelu;
+            next_op++;
+        }
+        else if(std::holds_alternative<GeluOp>(sig.ops[next_op]))
+        {
+            activation = Activation::Gelu;
+            next_op++;
+        }
+        else if(std::holds_alternative<SiluOp>(sig.ops[next_op]))
+        {
+            activation = Activation::Silu;
+            next_op++;
+        }
+        else if(std::holds_alternative<SigmoidOp>(sig.ops[next_op]))
+        {
+            activation = Activation::Sigmoid;
+            next_op++;
+        }
+    }
+
+    // Remaining ops must be empty
+    for(int i = next_op; i < kMaxOps; ++i)
+        if(!std::holds_alternative<std::monostate>(sig.ops[i]))
+            throw "unexpected operator after GEMM epilogue chain";
+
+    // Same tile validation as old make_kernel
+    if(algo.block_tile.m <= 0 || algo.block_tile.n <= 0 || algo.block_tile.k <= 0)
+        throw "block_tile dimensions must be positive";
+    if(algo.block_warps.m <= 0 || algo.block_warps.n <= 0 || algo.block_warps.k <= 0)
+        throw "block_warps dimensions must be positive";
+    if(algo.warp_tile.m <= 0 || algo.warp_tile.n <= 0 || algo.warp_tile.k <= 0)
+        throw "warp_tile dimensions must be positive";
+
+    if(algo.block_warps.k != 1)
+        throw "block_warps.k must be 1 (CShuffleEpilogue constraint)";
+
+    if(!is_valid_warp_gemm(a_td.dtype, algo.warp_tile.m, algo.warp_tile.n, algo.warp_tile.k))
+        throw "warp_tile is not a valid MFMA configuration for this dtype";
+
+    if(algo.block_tile.m % (algo.block_warps.m * algo.warp_tile.m) != 0)
+        throw "block_tile.m must be divisible by (block_warps.m * warp_tile.m)";
+    if(algo.block_tile.n % (algo.block_warps.n * algo.warp_tile.n) != 0)
+        throw "block_tile.n must be divisible by (block_warps.n * warp_tile.n)";
+    if(algo.block_tile.k % (algo.block_warps.k * algo.warp_tile.k) != 0)
+        throw "block_tile.k must be divisible by (block_warps.k * warp_tile.k)";
+
+    int thread_block_size =
+        algo.block_warps.m * algo.block_warps.n * algo.block_warps.k * warp_size;
+
+    return {a_td.dtype,
+            b_td.dtype,
+            c_td.dtype,
+            acc,
+            a_td.layout,
+            b_td.layout,
+            c_td.layout,
+            algo.block_tile,
+            algo.block_warps,
+            algo.warp_tile,
+            thread_block_size,
+            combine,
+            activation,
+            num_d_tensors,
+            d0_dtype,
+            d0_layout,
+            d1_dtype,
+            d1_layout};
+}
+
+// ============================================================================
 // resolve_tensors compile-time tests
 // ============================================================================
 // clang-format off
@@ -555,6 +697,71 @@ static_assert(make_kernel(
 //
 // Add without dtype or d0_dtype:
 // resolve_epilogue({.combine = CombineOp::Add})
+
+// ============================================================================
+// Signature-based make_kernel equivalence tests
+// ============================================================================
+
+// --- Plain GEMM: new Signature produces same kernel as old GemmConfig ---
+static_assert(make_kernel(
+    Signature{.dtype = DataType::FP16, .ops = {GemmOp{}}},
+    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).a_dtype == DataType::FP16);
+static_assert(make_kernel(
+    Signature{.dtype = DataType::FP16, .ops = {GemmOp{}}},
+    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).thread_block_size == 256);
+static_assert(make_kernel(
+    Signature{.dtype = DataType::FP16, .ops = {GemmOp{}}},
+    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).combine == CombineOp::None);
+
+// --- GEMM + Add: epilogue pattern match ---
+static_assert(make_kernel(
+    Signature{.dtype = DataType::FP16,
+              .ops = {GemmOp{.out = "C"},
+                      AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).combine == CombineOp::Add);
+static_assert(make_kernel(
+    Signature{.dtype = DataType::FP16,
+              .ops = {GemmOp{.out = "C"},
+                      AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).num_d_tensors == 1);
+static_assert(make_kernel(
+    Signature{.dtype = DataType::FP16,
+              .ops = {GemmOp{.out = "C"},
+                      AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).d0_dtype == DataType::FP16);
+
+// --- GEMM + Add + Relu: full epilogue chain ---
+static_assert(make_kernel(
+    Signature{.dtype = DataType::FP16,
+              .ops = {GemmOp{.out = "C"},
+                      AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                      ReluOp{.in = "D", .out = "E"}}},
+    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).activation == Activation::Relu);
+static_assert(make_kernel(
+    Signature{.dtype = DataType::FP16,
+              .ops = {GemmOp{.out = "C"},
+                      AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                      ReluOp{.in = "D", .out = "E"}}},
+    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).combine == CombineOp::Add);
+
+// --- Equivalence: new path matches old path for plain GEMM ---
+static_assert(make_kernel(
+    Signature{.dtype = DataType::FP16, .ops = {GemmOp{}}},
+    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).thread_block_size ==
+    make_kernel(GemmConfig{
+        .signature = {.dtype = DataType::FP16},
+        .algorithm = {{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}}).thread_block_size);
+
+// --- Equivalence: new path matches old path for GEMM + Add ---
+static_assert(make_kernel(
+    Signature{.dtype = DataType::FP16,
+              .ops = {GemmOp{.out = "C"},
+                      AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).d0_dtype ==
+    make_kernel(GemmConfig{
+        .signature = {.dtype = DataType::FP16, .combine = CombineOp::Add},
+        .algorithm = {{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}}).d0_dtype);
+
 // clang-format on
 
 } // namespace rocm_ck

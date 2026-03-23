@@ -55,23 +55,28 @@ and layouts we haven't named yet.
 
 ### Type resolution
 
-Signatures use an optional cascade for ergonomic type specification:
+Signatures use an optional dtype cascade for ergonomic type specification:
 
 ```cpp
-// Set everything to FP16 (accumulator defaults to FP32):
-{ .dtype = FP16 }
+// Set everything to FP16 (GemmOp accumulator defaults to FP32):
+Signature{.dtype = FP16, .ops = {GemmOp{}}}
 
-// Mixed precision — FP16 inputs, FP32 output:
-{ .dtype = FP16, .c_dtype = FP32 }
+// Mixed precision — FP16 compute, FP32 output tensor:
+Signature{.dtype = FP16,
+          .tensors = {Tensor{.name = "C", .dtype = FP32}},
+          .ops = {GemmOp{}}}
 
-// Fully explicit:
-{ .a_dtype = FP16, .b_dtype = BF16, .c_dtype = FP32, .acc_dtype = FP32 }
+// Fully explicit per-tensor:
+Signature{.tensors = {Tensor{.name = "A", .dtype = FP16},
+                      Tensor{.name = "B", .dtype = BF16},
+                      Tensor{.name = "C", .dtype = FP32}},
+          .ops = {GemmOp{}}}
 ```
 
-Each operation defines its own cascade rules. The common pattern:
-- `dtype` sets the default for all tensors
-- Per-tensor overrides (`a_dtype`, `b_dtype`, ...) take precedence
-- `acc_dtype` defaults to FP32 when not specified
+The cascade rules:
+- `Signature::dtype` sets the default for all tensors
+- Per-tensor `Tensor::dtype` overrides take precedence
+- `GemmOp::acc_dtype` defaults to FP32 independently
 
 Resolution is `consteval` — unresolvable types are compile errors, not runtime surprises.
 
@@ -92,90 +97,86 @@ dimensions. They are always runtime values but may have compile-time constraints
 
 ## Operations
 
-An operation defines which tensors participate, which are optional, and what shape
-constraints hold between them.
+Operations are **typed structs** held in a `std::variant` array. Each struct defines
+named tensor slots. A signature's `ops` array forms a directed compute graph — tensors
+are nodes, operators are edges. Adding a new operation = new struct + add to variant.
 
-### GEMM
+### Operator Structs
 
-```
-C[B, M, N] = sum_k( A[B, M, K] * B[B, K, N] )
-```
-
-| Tensor | Rank | Role | Required |
-|--------|------|------|----------|
-| A | 2-3 | In | yes |
-| B | 2-3 | In | yes |
-| C | 2-3 | Out | yes |
-
-Batch is a first-class dimension. An unbatched GEMM is simply batch size 1 (or rank 2).
-
-Constraints: `A.size[-2] == C.size[-2]`, `A.size[-1] == B.size[-2]`, `B.size[-1] == C.size[-1]`
-
-### Convolution
-
-```
-Y[N, K, oH, oW] = sum( X[N, C, iH, iW] * W[K, C/g, kH, kW] )
+```cpp
+struct GemmOp    { string_view lhs="A", rhs="B", out="C"; DataType acc_dtype=FP32; };
+struct AddOp     { string_view lhs, rhs, out; };
+struct MulOp     { string_view lhs, rhs, out; };
+struct ReluOp    { string_view in, out; };
+struct FastGeluOp { string_view in, out; };
+struct SoftmaxOp { string_view in, out; };  // reduces last dimension
+struct ScaleOp   { string_view in, out, scale; };  // scale names a Scalar
+// ... plus GeluOp, SiluOp, SigmoidOp
 ```
 
-| Tensor | Rank | Role | Required |
-|--------|------|------|----------|
-| X | 4+ | In | yes |
-| W | 4+ | In | yes |
-| Y | 4+ | Out | yes |
+### Compute Graph Examples
 
-Parameters: `pad`, `stride`, `dilation`, `groups`
-
-### FMHA (Flash Attention)
-
+**GEMM:**
 ```
-O = softmax( Q @ K^T / scale ) @ V
+A, B → [GemmOp] → C
 ```
 
-| Tensor | Rank | Role | Required |
-|--------|------|------|----------|
-| Q | 4 | In | yes |
-| K | 4 | In | yes |
-| V | 4 | In | yes |
-| O | 4 | Out | yes |
-| bias | 4 | In | no |
-
-Parameters: `scale`, `causal`
-
-### Elementwise
-
+**GEMM + bias + ReLU (fused epilogue):**
 ```
-C[i] = alpha * A[i] + beta * B[i]
+A, B → [GemmOp] → C → [AddOp] ← bias → D → [ReluOp] → E
 ```
 
-| Tensor | Rank | Role | Required |
-|--------|------|------|----------|
-| A | 1+ | In | yes |
-| B | 1+ | In | yes |
-| C | 1+ | Out | yes |
+**FMHA (decomposes into existing ops):**
+```
+Q, K → [GemmOp] → S → [SoftmaxOp] → P
+                                       P, V → [GemmOp] → O
+```
 
-Parameters: `alpha`, `beta`
+**Elementwise:**
+```
+A, B → [AddOp] → C
+```
+
+### SSA Naming
+
+Each operator output gets a unique name. Graph edges = shared names between
+operator outputs and inputs. SSA uniqueness is enforced by `resolve()` at
+compile time — duplicate output names produce a compile error.
+
+### Operator-Implied Defaults
+
+`GemmOp` implies rank-2 tensors: lhs=Row, rhs=Col, out=Row. Binary and unary
+ops propagate rank/layout from connected tensors. Explicit `Tensor` entries
+in the signature override any propagated values.
 
 ## Fusion
 
-Fusion adds tensors and pointwise operations to a base computation. Rather than
-enumerating every combination, we describe fusion as an **epilogue chain** applied
-to the base result:
+Fusion is expressed as **operator composition** in the signature's ops array.
+Rather than enumerating combinations with enums, each fusion step is a typed
+operator in the compute graph:
 
+```cpp
+// GEMM + bias + ReLU
+Signature{
+    .dtype = FP16,
+    .ops = {GemmOp{.out = "C"},
+            AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+            ReluOp{.in = "D", .out = "E"}}}
 ```
-Base:       acc[M, N] = A * B                  (GEMM in accumulator type)
-Epilogue:   acc       = acc + D0[M, N]         (bias addition)
-            acc       = relu(acc)              (activation)
-            C[M, N]   = cast(acc)              (output in storage type)
-```
 
-The fused signature is the base signature plus the epilogue tensors and operations.
-Each epilogue tensor (D0, D1, ...) has its own dtype and layout. The epilogue operation
-describes what to do with them.
+`make_kernel()` pattern-matches the ops sequence to select the CK Tile kernel
+and epilogue configuration. The mapping is:
 
-The epilogue model should be as general as possible — at least as flexible as the best
-parts of CK Tile's epilogue system. The current enum (`None`, `Add`, `Multiply`) is a
-starting point; the target is a composable graph of typed operations that can express
-arbitrary epilogue fusions.
+| Ops Pattern | Kernel |
+|-------------|--------|
+| `[GemmOp]` | Plain GEMM |
+| `[GemmOp, AddOp]` | GEMM + CShuffleEpilogue (bias) |
+| `[GemmOp, AddOp, ReluOp]` | GEMM + CShuffleEpilogue (bias + activation) |
+| `[GemmOp, SoftmaxOp, GemmOp]` | FMHA kernel |
+| `[AddOp]` | Elementwise kernel |
+
+This replaces the earlier enum model (`CombineOp`, `Activation`) with a
+composable graph that naturally extends to arbitrary epilogue chains.
 
 ## Compile-Time / Runtime Boundary
 
