@@ -16,8 +16,8 @@ Four progressive examples, each building on the last:
 |---------|---------------------|
 | [01_hello_world](examples/01_hello_world/) | Minimal kpack pipeline — hand-written HIP kernel, one binary per arch |
 | [02_ck_tile_vector_add](examples/02_ck_tile_vector_add/) | Bridge pattern — `extern "C"` wrapper around CK Tile's `ElementWiseKernel` |
-| [03_rocm_ck_vector_add](examples/03_rocm_ck_vector_add/) | Full tuning surface — Signature/Algorithm split, 9 compiled variants, registry-based selection |
-| [04_gemm](examples/04_gemm/) | GEMM with multi-type variants — GemmSignature schema, fp32/fp16/bf16, mixed-precision epilogue |
+| [03_rocm_ck_vector_add](examples/03_rocm_ck_vector_add/) | Full tuning surface — Signature/Algorithm split, 12 compiled variants, registry-based selection |
+| [04_gemm](examples/04_gemm/) | GEMM with multi-type variants — operator-centric Signature, fp32/fp16/bf16, composed epilogue |
 
 ### Example 01: Hello World
 
@@ -31,8 +31,8 @@ Proves that CK Tile kernels can be compiled into standalone `.hsaco` code object
 
 Production-ready pattern with:
 
-- **Signature/Algorithm separation** — *what* (data types) vs *how* (tile geometry, warp count, vector width, padding)
-- **12 compiled variants** across FP32, FP16, BF16 with different block sizes, multi-warp configurations, and mixed-precision
+- **Signature/Algorithm separation** — *what* (operator graph + data types) vs *how* (tile geometry, warp count, vector width, padding)
+- **12 compiled variants** across FP32, FP16, BF16 with different block sizes, multi-warp, and mixed-precision
 - **Constexpr validation** via `make_kernel` that catches invalid configurations at compile time
 - **Variant registry** with `find_variant(DataType, problem_size)` for automatic kernel selection
 - **Archive metadata** — tuning parameters stored in the kpack TOC for tooling
@@ -43,10 +43,10 @@ See the [example 03 README](examples/03_rocm_ck_vector_add/README.md) for full d
 
 Extends the Signature pattern from elementwise to GEMM:
 
-- **GemmSignature** — two-level optional dtype hierarchy (no `in_dtype`; GEMM's A/B are asymmetric)
-- **Multi-type variants** — fp32, fp16, bf16 compiled from ~15-line `.hip` files via `runGemm<K>` template
+- **Operator-centric Signature** — `GemmOp`, `AddOp`, `ReluOp` compose the compute graph
+- **Multi-type variants** — fp32, fp16, bf16 compiled from ~20-line `.hip` files via `runGemm<K>` template
 - **Mixed-precision epilogue** — all variants accumulate in fp32; CShuffleEpilogue handles output type conversion
-- **Fused epilogue support** — demonstrates C += A×B via `CShuffleEpilogue` with prior output activation
+- **Composed epilogue** — `GemmOp + AddOp + ReluOp` for fused bias + activation
 - **Typed host buffers** — `float_to_typed` / `typed_to_float` for type-agnostic verification
 
 See the [example 04 README](examples/04_gemm/README.md) for full details.
@@ -82,8 +82,11 @@ experimental/kpack/
 │       ├── typed_buffer.hpp        # TypedBuffer wrapper for host memory
 │       ├── kpack_module.hpp        # RAII wrappers for kpack and HIP module handles
 │       ├── ck_type_map.hpp         # DataType enum to CK Tile type mapping
-│       ├── layout.hpp              # Layout enum (RowMajor, ColumnMajor)
-│       └── tensor_desc.hpp         # TensorDesc: shape + strides + leading dimension
+│       ├── layout.hpp              # Layout enum (Row, Col, Contiguous, Auto)
+│       ├── tensor_desc.hpp         # TensorDesc: name, dtype, rank, layout
+│       ├── ops.hpp                 # Operator structs (GemmOp, AddOp, ReluOp, ...) + Op variant
+│       ├── signature.hpp           # Tensor, Scalar, Signature (compute graph)
+│       └── resolve.hpp             # consteval resolve(): dtype cascade, rank/layout propagation
 ├── rocm_kpack/                     # Vendored kpack C runtime library (from TheRock)
 │   ├── CMakeLists.txt
 │   ├── include/rocm_kpack/
@@ -121,13 +124,14 @@ experimental/kpack/
     │   └── main.cpp                    # Variant selection demo + verify-all mode
     └── 04_gemm/                     # GEMM: multi-type via GemmSignature schema
         ├── CMakeLists.txt
-        ├── gemm_api.hpp                # GemmSignature, Layout, GemmKernel, make_kernel
+        ├── gemm_api.hpp                # Signature-based make_kernel, GemmKernel, tile validation
         ├── gemm_dev.hpp                # CkTypeMap, CkLayoutMap, runGemm<K> template
         ├── gemm_args.hpp               # GemmArgs ABI struct, tile constants
         ├── gemm_fp32.hip               # fp32 variant instantiation
         ├── gemm_fp16.hip               # fp16 variant instantiation
         ├── gemm_fp16_w32.hip           # fp16 variant with WarpTile=32 (K=16 for fp16)
-        ├── gemm_fp16_add.hip           # fp16 variant with fused C += A×B epilogue
+        ├── gemm_fp16_add.hip           # fp16 + bias addition (fused epilogue)
+        ├── gemm_fp16_add_relu.hip      # fp16 + bias + ReLU (composed epilogue)
         ├── gemm_bf16.hip               # bf16 variant instantiation
         ├── cpu_ref.hpp                 # CPU reference GEMM implementation
         ├── cpu_ref.cpp                 # CPU reference implementation

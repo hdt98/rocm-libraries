@@ -4,10 +4,12 @@
 #include "rocm_vector_add_dev.hpp"
 
 // FP16 large tile. kVectorM=8, kRepeatM=2.
-static constexpr auto kernel = rocm_ck::make_kernel(
-    rocm_ck::ElementwiseConfig{
-        .signature = {.dtype = rocm_ck::DataType::FP16},
-        .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}});
+static constexpr rocm_ck::VectorAddKernel kernel = rocm_ck::make_kernel(
+    rocm_ck::Signature{
+        .dtype = rocm_ck::DataType::FP16,
+        .ops = {rocm_ck::AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+    rocm_ck::ElementwiseAlgorithm{.block_tile = 1024, .block_warps = 1,
+                                   .warp_tile = 1024, .pad = true});
 
 extern "C" __global__ void vector_add_fp16_b1024(rocm_ck::VectorAddArgs args)
 {

@@ -8,55 +8,42 @@ Supports mixed input/output types and scaled addition (`c = alpha * a + beta * b
 
 ### Signature / Algorithm Separation
 
-Following CK Tile's builder pattern, kernel configuration is split into two
-orthogonal concerns:
+Kernel configuration is split into two orthogonal concerns:
 
-- **Signature** (`ElementwiseSignature`): *What* the kernel computes — data types,
-  specified via an optional dtype hierarchy. Users set only what differs:
-  `{.dtype = FP32}` for homogeneous, `{.in_dtype = FP16, .out_dtype = FP32}` for
-  mixed. `resolve_tensors()` flattens the hierarchy into concrete types at compile time.
+- **Signature** (`Signature`): *What* the kernel computes — a directed compute
+  graph of typed operators referencing named tensors. For vector add, the graph
+  is a single `AddOp`. `resolve()` flattens the signature into concrete tensor
+  descriptors at compile time.
 - **Algorithm** (`ElementwiseAlgorithm`): *How* the kernel executes — tile geometry,
   warp count, vector width, padding.
-- **Config** (`ElementwiseConfig`): User-facing API combining Signature + Algorithm.
 
 This separation lets the same operation (vector add) be compiled with many
 different tuning configurations, each producing a distinct `.hsaco` binary.
 
-### Optional dtype Hierarchy
+### Operator-Centric Signature
 
-The signature uses an optional hierarchy so users specify the minimum:
-
-```
-dtype                    (kernel-level default)
-├── in_dtype             (input default, overrides dtype for inputs)
-│   ├── a_dtype          (overrides in_dtype)
-│   └── b_dtype          (overrides in_dtype)
-└── out_dtype            (overrides dtype for output)
-```
-
-Resolution chains:
-- `a_dtype   = a_dtype   ?? in_dtype ?? dtype ?? error`
-- `b_dtype   = b_dtype   ?? in_dtype ?? dtype ?? error`
-- `out_dtype = out_dtype ?? dtype    ?? error`
-
-Note: `in_dtype` does NOT cascade to `out_dtype` — they are separate branches.
+The signature describes the compute graph using typed operator structs:
 
 ```cpp
 // Same-type: all FP32
-.signature = {.dtype = DataType::FP32}
+Signature{.dtype = DataType::FP32,
+          .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}}
 
 // Widening: fp16 inputs, fp32 output
-.signature = {.in_dtype = DataType::FP16, .out_dtype = DataType::FP32}
+Signature{.dtype = DataType::FP16,
+          .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
+          .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}}
 
 // Narrowing: fp32 inputs, fp16 output
-.signature = {.in_dtype = DataType::FP32, .out_dtype = DataType::FP16}
-
-// Asymmetric inputs (future operations like GEMM — vector add requires a == b)
-.signature = {.a_dtype = DataType::FP16, .b_dtype = DataType::BF16, .out_dtype = DataType::FP32}
+Signature{.dtype = DataType::FP32,
+          .tensors = {Tensor{.name = "C", .dtype = DataType::FP16}},
+          .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}}
 ```
 
-For mixed types, `kVectorM` is constrained by the wider type (fewer elements
-per 128-bit register), validated at compile time by `make_kernel`.
+`Signature::dtype` sets the default for all tensors. Explicit `Tensor` entries
+override specific tensors by name. For mixed types, `kVectorM` is constrained
+by the wider type (fewer elements per 128-bit register), validated at compile
+time by `make_kernel`.
 
 ### Scaled Addition
 
@@ -119,7 +106,7 @@ The `_w8`/`_w2` suffixes indicate multi-warp variants.
 
 | File | Purpose |
 |------|---------|
-| `rocm_vector_add_api.hpp` | Shared ABI, Config/Signature/Algorithm types, `resolve_types`, `make_kernel` validation |
+| `rocm_vector_add_api.hpp` | Shared ABI, Signature/Algorithm types, `resolve`, `make_kernel` validation |
 | `rocm_vector_add_dev.hpp` | Device kernel — uses CK Tile tile primitives for `c = alpha*a + beta*b` |
 | `rocm_vector_add_registry.hpp` | `VariantDescriptor` table and `findVariant` selection (host-only) |
 | `vector_add_*.hip` | Variant instantiations (~15 lines each) |
@@ -180,7 +167,7 @@ kpack TOC containing each variant's tuning parameters (in_dtype, out_dtype,
 block_tile, block_warps, warp_tile, pad). This is ignored by the kpack reader
 but available for tooling that inspects archives.
 
-**Per-operation signatures.** Each operation defines its own signature struct
-with optional DataType fields organized in a hierarchy. This is intentionally
-not a universal struct — GEMM, convolution, and FMHA will each define their
-own signatures with different type hierarchies.
+**Unified Signature.** All operations share the same `Signature` struct. The
+operation type is determined by the operator structs in the `ops` array
+(`AddOp` for elementwise, `GemmOp` for GEMM, etc.). `make_kernel()` pattern-
+matches the ops to select the appropriate kernel path and validation.

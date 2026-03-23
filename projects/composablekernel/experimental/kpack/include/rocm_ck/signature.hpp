@@ -1,0 +1,75 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
+//
+// Signature: the complete description of WHAT a kernel computes.
+//
+// A directed compute graph where tensors are nodes and operators are edges.
+// Operators reference tensors by name (SSA-style). Shared names between
+// operator outputs and inputs form graph edges.
+//
+// This header has NO CK Tile dependency. It is included by both host code
+// and device code to share the signature definition.
+
+#pragma once
+
+#include <rocm_ck/datatype_utils.hpp>
+#include <rocm_ck/layout.hpp>
+#include <rocm_ck/ops.hpp>
+
+#include <array>
+#include <optional>
+#include <string_view>
+
+namespace rocm_ck {
+
+/// A tensor node in the signature's compute graph.
+///
+/// Default values mean "inherit from the operator slot":
+///   dtype  = nullopt  -> inherit from Signature::dtype cascade
+///   rank   = 0        -> inherit from operator (e.g., GemmOp implies rank 2)
+///   layout = Auto     -> inherit from operator (e.g., GemmOp::lhs implies Row)
+struct Tensor
+{
+    std::string_view name;
+    std::optional<DataType> dtype = std::nullopt;
+    int rank                      = 0;
+    Layout layout                 = Layout::Auto;
+};
+
+/// A named scalar parameter (e.g., alpha, beta, scale).
+struct Scalar
+{
+    std::string_view name;
+    DataType dtype = DataType::FP32;
+};
+
+/// The complete description of WHAT a kernel computes.
+///
+/// A directed compute graph where tensors are nodes and operators are edges.
+/// Each operator output gets a unique name; shared names form graph edges.
+///
+/// Example — simple fp16 GEMM:
+///   {.dtype = FP16, .ops = {GemmOp{}}}
+///
+/// Example — GEMM + bias + ReLU:
+///   {.dtype = FP16,
+///    .ops = {GemmOp{.out="C"},
+///            AddOp{.lhs="C", .rhs="bias", .out="D"},
+///            ReluOp{.in="D", .out="E"}}}
+/// Array size limits for Signature. Named constants for grep-ability.
+/// 16 tensors covers FMHA (Q, K, V, S, P, O + masks + intermediates).
+/// 8 ops covers GEMM + multi-stage epilogue or multi-GEMM fusion.
+/// 8 scalars covers alpha, beta, scale, plus operation-specific params.
+constexpr int kMaxTensors = 16;
+constexpr int kMaxOps     = 8;
+constexpr int kMaxScalars = 8;
+
+struct Signature
+{
+    std::optional<DataType> dtype;
+    std::array<Tensor, kMaxTensors> tensors = {};
+    std::array<Scalar, kMaxScalars> scalars = {};
+    std::array<Op, kMaxOps> ops             = {};
+};
+
+} // namespace rocm_ck

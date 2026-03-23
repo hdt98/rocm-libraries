@@ -6,26 +6,26 @@ variants, parameterized tile geometry, and fused epilogues. Extends example 03's
 
 ## Key Concepts
 
-### GemmSignature — the "WHAT" of a GEMM
+### Signature — the "WHAT" of a GEMM
 
-Describes data types and memory layouts for a GEMM. Uses a two-level optional
-dtype hierarchy (simpler than elementwise's three levels):
+The GEMM operation is described by an operator-centric `Signature` — a directed
+compute graph where `GemmOp` defines the matrix multiply and optional epilogue
+operators (`AddOp`, `ReluOp`, etc.) compose the post-GEMM fusion:
 
+```cpp
+// Plain GEMM (GemmOp defaults: A, B, C with acc_dtype=FP32)
+Signature{.dtype = DataType::FP16, .ops = {GemmOp{}}}
+
+// GEMM + bias + ReLU (operator composition)
+Signature{.dtype = DataType::FP16,
+          .ops = {GemmOp{.out = "C"},
+                  AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                  ReluOp{.in = "D", .out = "E"}}}
 ```
-dtype                    (kernel-level default)
-├── a_dtype              (A override)
-├── b_dtype              (B override)
-├── c_dtype              (C output override)
-└── acc_dtype            (accumulator, defaults to FP32)
-```
 
-**Why no `in_dtype`?** GEMM's A and B are asymmetric (M×K vs K×N) — a shared
-"input default" suggests false symmetry. Two levels (dtype → per-operand) is
-cleaner.
-
-**Why `acc_dtype` defaults to FP32?** Every practical GEMM accumulates in fp32,
-even with fp16/bf16 inputs (MFMA instructions). This is a sensible default,
-not inherited from `dtype`.
+`Signature::dtype` sets the default for all tensors. Explicit `Tensor` entries
+override specific tensors by name. `GemmOp::acc_dtype` defaults to FP32
+independently — every practical GEMM accumulates in fp32.
 
 ### GemmAlgorithm — the "HOW" of a GEMM
 
@@ -41,14 +41,14 @@ struct GemmAlgorithm {
 };
 ```
 
-Independent of data types — paired with `GemmSignature` in `GemmConfig`:
+Independent of data types — paired with `Signature` in the `make_kernel()` call:
 
 ```cpp
-make_kernel(GemmConfig{
-    .signature = {.dtype = DataType::FP16},
-    .algorithm = {.block_tile  = {128, 128, 32},
+make_kernel(
+    Signature{.dtype = DataType::FP16, .ops = {GemmOp{}}},
+    GemmAlgorithm{.block_tile  = {128, 128, 32},
                   .block_warps = {2, 2, 1},
-                  .warp_tile   = {32, 32, 16}}})
+                  .warp_tile   = {32, 32, 16}})
 ```
 
 ### Consteval Validation
@@ -81,12 +81,13 @@ Tile geometry flows from `K.block_tile`, `K.block_warps`, and `K.warp_tile`.
 Each `.hip` variant file is ~20 lines:
 
 ```cpp
-static constexpr rocm_ck::GemmKernel kernel =
-    rocm_ck::make_kernel(rocm_ck::GemmConfig{
-        .signature = {.dtype = rocm_ck::DataType::FP16},
-        .algorithm = {.block_tile  = {128, 128, 32},
-                      .block_warps = {2, 2, 1},
-                      .warp_tile   = {16, 16, 16}}});
+static constexpr rocm_ck::GemmKernel kernel = rocm_ck::make_kernel(
+    rocm_ck::Signature{
+        .dtype = rocm_ck::DataType::FP16,
+        .ops = {rocm_ck::GemmOp{}}},
+    rocm_ck::GemmAlgorithm{.block_tile  = {128, 128, 32},
+                            .block_warps = {2, 2, 1},
+                            .warp_tile   = {16, 16, 16}});
 
 extern "C" __global__ void gemm_fp16(rocm_ck::GemmArgs args) {
     rocm_ck::runGemm<kernel>(args);
@@ -99,60 +100,65 @@ All variants accumulate in fp32. For fp16 and bf16, the CShuffleEpilogue
 handles the fp32 → fp16/bf16 conversion when storing to global memory. This is
 CK Tile's standard mixed-precision path.
 
-### Fused Epilogue (EpilogueOp)
+### Fused Epilogue (Operator Composition)
 
-The signature includes an `epilogue_op` field that controls post-GEMM fusion:
-
-```cpp
-enum class EpilogueOp { None, Add, Multiply };
-```
-
-- **None** — plain GEMM: `E = A * B` (no D tensors, uses `GemmArgs`)
-- **Add** — fused addition: `E = A * B + D0 [+ D1]` (uses `GemmArgs1D`)
-- **Multiply** — fused scaling: `E = A * B * D0 [* D1]`
-
-D tensors are specified in the signature alongside the epilogue operation:
+Post-GEMM fusion is expressed as operators in the signature's compute graph.
+Each epilogue step is a typed operator that references tensors by name:
 
 ```cpp
-make_kernel(GemmConfig{
-    .signature = {.dtype       = DataType::FP16,
-                  .epilogue_op = EpilogueOp::Add,
-                  .d0_dtype    = DataType::FP16},
-    .algorithm = {.block_tile  = {128, 128, 32},
-                  .block_warps = {2, 2, 1},
-                  .warp_tile   = {16, 16, 16}}})
+// GEMM + bias addition
+make_kernel(
+    Signature{.dtype = DataType::FP16,
+              .ops = {GemmOp{.out = "C"},
+                      AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+    GemmAlgorithm{...})
+
+// GEMM + bias + ReLU
+make_kernel(
+    Signature{.dtype = DataType::FP16,
+              .ops = {GemmOp{.out = "C"},
+                      AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                      ReluOp{.in = "D", .out = "E"}}},
+    GemmAlgorithm{...})
 ```
 
-The schema validates consistency at compile time: `None` rejects D tensors,
-`Add`/`Multiply` require at least `d0_dtype`. D tensors are M x N (same shape
-as output). Broadcast via stride tricks (1xN bias) is a future extension.
+`make_kernel()` pattern-matches the ops sequence to select the CK Tile epilogue:
+- `[GemmOp]` — plain GEMM, uses `GemmArgs`
+- `[GemmOp, AddOp]` — fused bias addition, uses `GemmArgs1D`
+- `[GemmOp, AddOp, ReluOp]` — fused bias + activation, uses `GemmArgs1D`
+
+The "bias" tensor's dtype cascades from `Signature::dtype`. Explicit `Tensor`
+entries can override it for mixed-precision epilogues.
 
 ## Compiled Variants
 
-| Variant | A | B | E | Acc | Epilogue | D0 | BlockTile | WarpTile | Threads |
-|---------|---|---|---|-----|----------|----|-----------|----------|---------|
-| `gemm_fp32` | FP32 | FP32 | FP32 | FP32 | None | — | 128×128×32 | 16×16×16 | 256 |
-| `gemm_fp16` | FP16 | FP16 | FP16 | FP32 | None | — | 128×128×32 | 16×16×16 | 256 |
-| `gemm_bf16` | BF16 | BF16 | BF16 | FP32 | None | — | 128×128×32 | 16×16×16 | 256 |
-| `gemm_fp16_w32` | FP16 | FP16 | FP16 | FP32 | None | — | 128×128×32 | 32×32×16 | 256 |
-| `gemm_fp16_add` | FP16 | FP16 | FP16 | FP32 | Add | FP16 | 128×128×32 | 16×16×16 | 256 |
+| Variant | A | B | Out | Acc | Epilogue | BlockTile | WarpTile | Threads |
+|---------|---|---|-----|-----|----------|-----------|----------|---------|
+| `gemm_fp32` | FP32 | FP32 | FP32 | FP32 | — | 128×128×32 | 16×16×16 | 256 |
+| `gemm_fp16` | FP16 | FP16 | FP16 | FP32 | — | 128×128×32 | 16×16×16 | 256 |
+| `gemm_bf16` | BF16 | BF16 | BF16 | FP32 | — | 128×128×32 | 16×16×16 | 256 |
+| `gemm_fp16_w32` | FP16 | FP16 | FP16 | FP32 | — | 128×128×32 | 32×32×16 | 256 |
+| `gemm_fp16_add` | FP16 | FP16 | FP16 | FP32 | `+bias` | 128×128×32 | 16×16×16 | 256 |
+| `gemm_fp16_add_relu` | FP16 | FP16 | FP16 | FP32 | `+bias+relu` | 128×128×32 | 16×16×16 | 256 |
 
 All variants use 128×128×32 block tile with 2×2×1 warp layout (4 warps =
 256 threads). `gemm_fp16_w32` demonstrates a wider 32×32 warp tile.
-`gemm_fp16_add` demonstrates a fused epilogue with one D tensor.
+`gemm_fp16_add` demonstrates fused bias addition. `gemm_fp16_add_relu`
+demonstrates composed epilogue (bias + activation).
 
 ## File Roles
 
 | File | Purpose |
 |------|---------|
-| `gemm_api.hpp` | `GemmSignature`, `GemmAlgorithm`, `GemmConfig`, `GemmKernel`, `EpilogueOp`, `is_valid_warp_gemm`, `make_kernel`, static_asserts |
+| `gemm_api.hpp` | `Signature`, `GemmAlgorithm`, `GemmKernel`, `make_kernel`, `is_valid_warp_gemm`, static_asserts |
 | `gemm_dev.hpp` | `CkTypeMap`, `CkLayoutMap`, `CkEpilogueOpMap`, `EpilogueTypes`, `runGemm<K>` — maps schema to CK Tile types |
 | `gemm_args.hpp` | `GemmArgs` (plain GEMM) and `GemmArgs1D` (1 D tensor) ABI structs |
 | `gemm_fp32.hip` | fp32 variant (16×16×16 warp tile) |
 | `gemm_fp16.hip` | fp16 variant (16×16×16 warp tile) |
 | `gemm_bf16.hip` | bf16 variant (16×16×16 warp tile) |
 | `gemm_fp16_w32.hip` | fp16 variant (32×32×16 warp tile) |
-| `gemm_fp16_add.hip` | fp16 + D0 addition (fused epilogue) |
+| `gemm_fp16_add.hip` | fp16 + bias addition (fused epilogue) |
+| `gemm_fp16_add_relu.hip` | fp16 + bias + ReLU (composed epilogue) |
 | `pack.py` | Archive packer with per-variant dtype, epilogue, and tile metadata |
 | `main.cpp` | Host loader — multi-variant loop with D tensor support, CPU reference verification |
 | `CMakeLists.txt` | Build system (variant × arch nested loop) |
@@ -190,15 +196,16 @@ gemm_fp16_w32: M=512, N=512, K=256, grid=16, block=256
 gemm_fp16_w32: PASSED
 gemm_fp16_add: M=512, N=512, K=256, grid=16, block=256
 gemm_fp16_add: PASSED
+gemm_fp16_add_relu: M=512, N=512, K=256, grid=16, block=256
+gemm_fp16_add_relu: PASSED
 ```
 
 ## Design Notes
 
-**Two-level hierarchy, not three.** Elementwise operations have symmetric
-inputs, so `in_dtype` makes sense as a shared default. GEMM's A and B are
-fundamentally asymmetric (M×K vs K×N), so the three-level hierarchy would
-suggest false symmetry. Two levels (dtype → per-operand) is the right
-abstraction.
+**Unified Signature with operator composition.** Both GEMM and elementwise
+use the same `Signature` type. The operation is determined by the `ops`
+array — `GemmOp` for GEMM, `AddOp` for elementwise. Epilogues are expressed
+as additional operators in the graph rather than enum flags.
 
 **Layouts are non-optional.** Unlike data types (where defaults reduce
 boilerplate), layouts have universally sensible BLAS defaults: A=Row, B=Col,
