@@ -4071,9 +4071,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.skConstVgprs[name] = v
       module.add(VMovB32(dst=vgpr(v), src=sgpr(name), comment="Save %s to VGPR v%u" % (name, v)))
 
-    # Free the SGPR slots for temp reuse
+    # Fully free the SGPR slots so defineVariableSgprs can reuse them.
+    # undefineSgpr checks them back into sgprPool (Available) AND emits
+    # .set UNDEF so the assembler catches any stale references.
+    # addSgprVarToPool would only put them in freeSgprVarPool which
+    # defineSgpr intentionally blocks from reuse (see defineSgpr lines 514-518).
     for name in consts:
-      self.addSgprVarToPool(name)
+      module.add(self.undefineSgpr(name))
 
     # StreamKIdx is a var (not kernel arg) — value set later in preLoop
     v = baseVgpr + len(consts)
@@ -4105,9 +4109,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     module.add(self.defineAndResources(kernel, tensorParametersA, tensorParametersB, tPM))
     module.add(self.disableWmmaArbStall())
 
-    # Move StreamK constant SGPRs to VGPRs to reduce SGPR pressure
-    if kernel["StreamK"]:
-      module.add(self.moveStreamKConstantsToVgpr(kernel))
+    # SK constants are now moved to VGPRs inside defineAndResources,
+    # before defineVariableSgprs, so freed slots can be reused.
 
     # Initialize stream-k loop
     skComponent = Component.StreamK.find(self)

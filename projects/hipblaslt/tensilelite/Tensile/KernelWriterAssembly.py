@@ -2536,6 +2536,11 @@ class KernelWriterAssembly(KernelWriter):
       self.sgprPool.checkIn(sgprNumsOfGemm)
       sgprNumsOfGemm = None
 
+    # Move SK constants to VGPRs and fully free their SGPR slots BEFORE
+    # defineVariableSgprs so the freed slots can be reused, reducing peak SGPR count.
+    if kernel["StreamK"]:
+      module.add(self.moveStreamKConstantsToVgpr(kernel))
+
     # define the rest of sgprs
     module.addModuleAsFlatItems(self.defineVariableSgprs(kernel))
 
