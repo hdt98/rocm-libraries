@@ -157,6 +157,7 @@ template <typename ALayout,
           index_t ActivationOperation                 = 0,
           bool NSwizzle                               = false,
           bool IsInputGemm                            = true,
+          bool UseGUFusion                            = true,
           bool MulRoutedWeight                        = true,
           bool PerTokenQuant                          = false,
           typename IndexType                          = index_t,
@@ -685,7 +686,8 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
                                     index_t StrideB_,
                                     std::array<index_t, NumDTensor> StrideDs_,
                                     index_t StrideC_,
-                                    index_t KBatch_)
+                                    index_t KBatch_,
+                                    bool UseGateUpFusion_ = true)
             : NumTokens{NumTokens_},
               TopK{TopK_},
               M{M_},
@@ -696,6 +698,7 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
               StrideDs{StrideDs_},
               StrideC{StrideC_},
               KBatch{KBatch_},
+              UseGateUpFusion{UseGateUpFusion_},
               MPadded{CalculateMPadded(M_)},
               NPadded{CalculateNPadded(N_)},
               KRead{CalculateKRead(K_, KBatch_)},
@@ -715,7 +718,8 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
                       << ", " << "MP:" << MPadded << ", " << "NP:" << NPadded << ", "
                       << "KRead:" << KRead << ", " << "KP:" << KPadded << ", " << "AK0:" << AK0
                       << ", " << "BK0:" << BK0 << ", " << "MBlock: " << MBlock << ", "
-                      << "NBlock: " << NBlock << "}" << std::endl;
+                      << "NBlock: " << NBlock << ", " << "UseGateUpFusion: " << UseGateUpFusion
+                      << "}" << std::endl;
         }
 
         index_t NumTokens;
@@ -728,6 +732,7 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
         std::array<index_t, NumDTensor> StrideDs;
         index_t StrideC;
         index_t KBatch;
+        bool UseGateUpFusion;
         index_t MPadded;
         index_t NPadded;
         index_t KRead;
@@ -760,7 +765,8 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
                           index_t k_batch_,
                           AElementwiseOperation a_element_op_,
                           BElementwiseOperation b_element_op_,
-                          CElementwiseOperation c_element_op_)
+                          CElementwiseOperation c_element_op_,
+                          bool isGateUpFusion_ = true)
             : Problem{NumTokens_,
                       TopK_,
                       M_,
@@ -770,7 +776,8 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
                       StrideB_,
                       StrideDs_,
                       StrideC_,
-                      k_batch_},
+                      k_batch_,
+                      isGateUpFusion_},
               p_sorted_token_ids{p_sorted_token_ids_},
               p_sorted_expert_ids{p_sorted_expert_ids_},
               p_max_token_id{p_max_token_id_},
@@ -874,7 +881,7 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
                  MXdlPerWave,
                  NXdlPerWave,
                  KPack,
-                 IsInputGemm>())>;
+                 (IsInputGemm && UseGUFusion)>())>;
 
     IS_VALID_COMPILATION_PARAMETER_IMPL(CDataType)
 
@@ -1175,8 +1182,9 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
             }
             gather_offsets(m0) = static_cast<IndexType>(token_offset) * problem.K;
         });
-        const long_index_t expert_stride = __builtin_amdgcn_readfirstlane(
-            static_cast<long_index_t>(problem.N) * problem.K * (IsInputGemm ? 2 : 1));
+        const long_index_t expert_stride =
+            __builtin_amdgcn_readfirstlane(static_cast<long_index_t>(problem.N) * problem.K *
+                                           (IsInputGemm && UseGUFusion ? 2 : 1));
         const long_index_t expert_offset =
             static_cast<long_index_t>(expert_id) * expert_stride / BPackedSize;
         // N0, K0, Blocksize*KPack
@@ -1274,42 +1282,63 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
             KPerBlock);
         if constexpr(IsInputGemm)
         {
-            const BDataType* p_b_grid_up = p_b_grid + expert_stride / 2 / BPackedSize;
-            const auto b_grid_buf_up     = make_dynamic_buffer<AddressSpaceEnum::Global>(
-                p_b_grid_up + expert_offset, b_grid_desc_bpreshuffled.GetElementSpaceSize());
-            auto b_blockwise_copy_up = ThreadwiseTensorSliceTransfer_v2<
-                BDataType,
-                BDataType,
-                decltype(b_grid_desc_bpreshuffled),
-                decltype(b_block_desc_bk0_n_bk1),
-                Sequence<Number<NXdlPerWave>{}, I1, Number<KRepeat>{}, Number<BK1Value>{}>,
-                Sequence<1, 2, 0, 3>,
-                3,
-                BBlockTransferSrcScalarPerVector,
-                BThreadTransferSrcResetCoordinateAfterRun,
-                true>(b_grid_desc_bpreshuffled,
-                      make_multi_index(n_block_data_idx_on_grid,
-                                       get_warp_local_1d_id() % NWave,
-                                       0,
-                                       KPack / KGroup * (get_thread_local_1d_id() % WarpSize)));
+            if constexpr(UseGUFusion)
+            {
+                const BDataType* p_b_grid_up = p_b_grid + expert_stride / 2 / BPackedSize;
+                const auto b_grid_buf_up     = make_dynamic_buffer<AddressSpaceEnum::Global>(
+                    p_b_grid_up + expert_offset, b_grid_desc_bpreshuffled.GetElementSpaceSize());
+                auto b_blockwise_copy_up = ThreadwiseTensorSliceTransfer_v2<
+                    BDataType,
+                    BDataType,
+                    decltype(b_grid_desc_bpreshuffled),
+                    decltype(b_block_desc_bk0_n_bk1),
+                    Sequence<Number<NXdlPerWave>{}, I1, Number<KRepeat>{}, Number<BK1Value>{}>,
+                    Sequence<1, 2, 0, 3>,
+                    3,
+                    BBlockTransferSrcScalarPerVector,
+                    BThreadTransferSrcResetCoordinateAfterRun,
+                    true>(b_grid_desc_bpreshuffled,
+                          make_multi_index(n_block_data_idx_on_grid,
+                                           get_warp_local_1d_id() % NWave,
+                                           0,
+                                           KPack / KGroup * (get_thread_local_1d_id() % WarpSize)));
 
-            blockwise_gemm_pipeline.template Run<HasMainKBlockLoop, TailNum>(
-                a_grid_desc_ak0_m_ak1,
-                a_block_desc_ak0_m_ak1,
-                a_blockwise_copy,
-                a_grid_buf,
-                a_block_buf,
-                a_block_slice_copy_step,
-                b_grid_desc_bpreshuffled,
-                b_blockwise_copy,
-                b_blockwise_copy_up,
-                b_grid_buf,
-                b_grid_buf_up,
-                b_block_buf,
-                b_block_slice_copy_step,
-                c_thread_buf,
-                c_thread_buf_up,
-                num_k_block_main_loop);
+                blockwise_gemm_pipeline.template Run<HasMainKBlockLoop, TailNum>(
+                    a_grid_desc_ak0_m_ak1,
+                    a_block_desc_ak0_m_ak1,
+                    a_blockwise_copy,
+                    a_grid_buf,
+                    a_block_buf,
+                    a_block_slice_copy_step,
+                    b_grid_desc_bpreshuffled,
+                    b_blockwise_copy,
+                    b_blockwise_copy_up,
+                    b_grid_buf,
+                    b_grid_buf_up,
+                    b_block_buf,
+                    b_block_slice_copy_step,
+                    c_thread_buf,
+                    c_thread_buf_up,
+                    num_k_block_main_loop);
+            }
+            else
+            {
+                // g1u0: Process only gate projection (no up)
+                blockwise_gemm_pipeline.template Run<HasMainKBlockLoop, TailNum>(
+                    a_grid_desc_ak0_m_ak1,
+                    a_block_desc_ak0_m_ak1,
+                    a_blockwise_copy,
+                    a_grid_buf,
+                    a_block_buf,
+                    a_block_slice_copy_step,
+                    b_grid_desc_bpreshuffled,
+                    b_blockwise_copy,
+                    b_grid_buf,
+                    b_block_buf,
+                    b_block_slice_copy_step,
+                    c_thread_buf,
+                    num_k_block_main_loop);
+            }
         }
         else
         {
@@ -1356,7 +1385,7 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
         {
             if constexpr(PerTokenQuant)
             {
-                constexpr index_t scale_stride = (IsInputGemm ? 2 : 1);
+                constexpr index_t scale_stride = (IsInputGemm && UseGUFusion ? 2 : 1);
                 p_scale_b += expert_id * problem.N * scale_stride + block_n_id * NPerBlock +
                              get_warp_local_1d_id() % NWave * NPerXdl + threadIdx.x % NPerXdl;
             }
@@ -1410,45 +1439,72 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
                             constexpr auto cidx = Number<c_offset>{};
                             if constexpr(IsInputGemm) // gu fusion
                             {
-                                if constexpr(ActivationOperation == Activation::silu_and_mul)
+                                if constexpr(UseGUFusion)
                                 {
-                                    const float scale_up =
-                                        p_scale_b[(n0 * NWave * NPerXdl + problem.N) *
-                                                  PerTokenQuant];
-                                    float gate = scale_a * scale_b * c_thread_buf[cidx];
-                                    float up   = scale_a * scale_up * c_thread_buf_up[cidx];
-                                    if constexpr(MulRoutedWeight)
+                                    if constexpr(ActivationOperation == Activation::silu_and_mul)
                                     {
-                                        gate = gate * topk_weights.template AsType<float>()[m4];
-                                        up   = up * topk_weights.template AsType<float>()[m4];
+                                        const float scale_up =
+                                            p_scale_b[(n0 * NWave * NPerXdl + problem.N) *
+                                                      PerTokenQuant];
+                                        float gate = scale_a * scale_b * c_thread_buf[cidx];
+                                        float up   = scale_a * scale_up * c_thread_buf_up[cidx];
+                                        if constexpr(MulRoutedWeight)
+                                        {
+                                            gate = gate * topk_weights.template AsType<float>()[m4];
+                                            up   = up * topk_weights.template AsType<float>()[m4];
+                                        }
+                                        if constexpr(is_same_v<remove_cvref_t<BDataType>, pk_i4_t>)
+                                        {
+                                            gate *= 16;
+                                            up *= 16;
+                                        }
+                                        tensor_operation::element_wise::Silu{}(gate, gate);
+                                        c_thread_buf_fp32(cidx) = gate * up;
                                     }
-                                    if constexpr(is_same_v<remove_cvref_t<BDataType>, pk_i4_t>)
+                                    else if(ActivationOperation == Activation::gelu_and_mul)
                                     {
-                                        gate *= 16;
-                                        up *= 16;
+                                        const float scale_up =
+                                            p_scale_b[(n0 * NWave * NPerXdl + problem.N) *
+                                                      PerTokenQuant];
+                                        float gate = scale_a * scale_b * c_thread_buf[cidx];
+                                        float up   = scale_a * scale_up * c_thread_buf_up[cidx];
+                                        if constexpr(MulRoutedWeight)
+                                        {
+                                            gate = gate * topk_weights.template AsType<float>()[m4];
+                                            up   = up * topk_weights.template AsType<float>()[m4];
+                                        }
+                                        if constexpr(is_same_v<remove_cvref_t<BDataType>, pk_i4_t>)
+                                        {
+                                            gate *= 16;
+                                            up *= 16;
+                                        }
+                                        tensor_operation::element_wise::Gelu{}(gate, gate);
+                                        c_thread_buf_fp32(cidx) = gate * up;
                                     }
-                                    tensor_operation::element_wise::Silu{}(gate, gate);
-                                    c_thread_buf_fp32(cidx) = gate * up;
                                 }
-                                else if(ActivationOperation == Activation::gelu_and_mul)
+                                else
                                 {
-                                    const float scale_up =
-                                        p_scale_b[(n0 * NWave * NPerXdl + problem.N) *
-                                                  PerTokenQuant];
-                                    float gate = scale_a * scale_b * c_thread_buf[cidx];
-                                    float up   = scale_a * scale_up * c_thread_buf_up[cidx];
+                                    // g1u0: only gate projection with activation
+                                    float output = scale_a * scale_b * c_thread_buf[cidx];
                                     if constexpr(MulRoutedWeight)
                                     {
-                                        gate = gate * topk_weights.template AsType<float>()[m4];
-                                        up   = up * topk_weights.template AsType<float>()[m4];
+                                        output = output * topk_weights.template AsType<float>()[m4];
                                     }
                                     if constexpr(is_same_v<remove_cvref_t<BDataType>, pk_i4_t>)
                                     {
-                                        gate *= 16;
-                                        up *= 16;
+                                        output *= 16;
                                     }
-                                    tensor_operation::element_wise::Gelu{}(gate, gate);
-                                    c_thread_buf_fp32(cidx) = gate * up;
+                                    // Apply activation based on ActivationOperation
+                                    if constexpr(ActivationOperation == Activation::silu_and_mul)
+                                    {
+                                        tensor_operation::element_wise::Silu{}(
+                                            c_thread_buf_fp32(cidx), output);
+                                    }
+                                    else if(ActivationOperation == Activation::gelu_and_mul)
+                                    {
+                                        tensor_operation::element_wise::Gelu{}(
+                                            c_thread_buf_fp32(cidx), output);
+                                    }
                                 }
                             }
                             else
@@ -1487,29 +1543,57 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
 
                             if constexpr(IsInputGemm) // gu fusion
                             {
-                                if constexpr(ActivationOperation == Activation::silu_and_mul)
+                                if constexpr(UseGUFusion)
                                 {
-                                    float gate = c_thread_buf[cidx];
-                                    float up   = c_thread_buf_up[cidx];
-                                    if constexpr(MulRoutedWeight)
+                                    if constexpr(ActivationOperation == Activation::silu_and_mul)
                                     {
-                                        gate = gate * topk_weights.template AsType<float>()[m4];
-                                        up   = up * topk_weights.template AsType<float>()[m4];
+                                        float gate = c_thread_buf[cidx];
+                                        float up   = c_thread_buf_up[cidx];
+                                        if constexpr(MulRoutedWeight)
+                                        {
+                                            gate = gate * topk_weights.template AsType<float>()[m4];
+                                            up   = up * topk_weights.template AsType<float>()[m4];
+                                        }
+                                        tensor_operation::element_wise::Silu{}(gate, gate);
+                                        c_thread_buf_fp32(cidx) = gate * up;
                                     }
-                                    tensor_operation::element_wise::Silu{}(gate, gate);
-                                    c_thread_buf_fp32(cidx) = gate * up;
+                                    else if(ActivationOperation == Activation::gelu_and_mul)
+                                    {
+                                        float gate = c_thread_buf[cidx];
+                                        float up   = c_thread_buf_up[cidx];
+                                        if constexpr(MulRoutedWeight)
+                                        {
+                                            gate = gate * topk_weights.template AsType<float>()[m4];
+                                            up   = up * topk_weights.template AsType<float>()[m4];
+                                        }
+                                        tensor_operation::element_wise::Gelu{}(gate, gate);
+                                        c_thread_buf_fp32(cidx) = gate * up;
+                                    }
                                 }
-                                else if(ActivationOperation == Activation::gelu_and_mul)
+                                else
                                 {
-                                    float gate = c_thread_buf[cidx];
-                                    float up   = c_thread_buf_up[cidx];
-                                    if constexpr(MulRoutedWeight)
+                                    if constexpr(ActivationOperation == Activation::silu_and_mul)
                                     {
-                                        gate = gate * topk_weights.template AsType<float>()[m4];
-                                        up   = up * topk_weights.template AsType<float>()[m4];
+                                        float output = c_thread_buf[cidx];
+                                        if constexpr(MulRoutedWeight)
+                                        {
+                                            output =
+                                                output * topk_weights.template AsType<float>()[m4];
+                                        }
+                                        tensor_operation::element_wise::Silu{}(
+                                            c_thread_buf_fp32(cidx), output);
                                     }
-                                    tensor_operation::element_wise::Gelu{}(gate, gate);
-                                    c_thread_buf_fp32(cidx) = gate * up;
+                                    else if(ActivationOperation == Activation::gelu_and_mul)
+                                    {
+                                        float output = c_thread_buf[cidx];
+                                        if constexpr(MulRoutedWeight)
+                                        {
+                                            output =
+                                                output * topk_weights.template AsType<float>()[m4];
+                                        }
+                                        tensor_operation::element_wise::Gelu{}(
+                                            c_thread_buf_fp32(cidx), output);
+                                    }
                                 }
                             }
                             else
@@ -1641,8 +1725,9 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
             }
             gather_offsets(m0) = static_cast<IndexType>(token_offset) * problem.K;
         });
-        const long_index_t expert_stride = __builtin_amdgcn_readfirstlane(
-            static_cast<long_index_t>(problem.N) * problem.K * (IsInputGemm ? 2 : 1));
+        const long_index_t expert_stride =
+            __builtin_amdgcn_readfirstlane(static_cast<long_index_t>(problem.N) * problem.K *
+                                           (IsInputGemm && UseGUFusion ? 2 : 1));
         const long_index_t expert_offset =
             static_cast<long_index_t>(expert_id) * expert_stride / BPackedSize;
         // N0, K0, Blocksize*KPack
@@ -1748,45 +1833,64 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
 
         if constexpr(IsInputGemm)
         {
-            const BDataType* p_b_grid_up = p_b_grid + expert_stride / 2 / BPackedSize;
-            const auto b_grid_buf_up     = make_dynamic_buffer<AddressSpaceEnum::Global>(
-                p_b_grid_up + expert_offset, b_grid_desc_bpreshuffled.GetElementSpaceSize());
-            auto b_blockwise_copy_up = ThreadwiseTensorSliceTransfer_v2<
-                BDataType,
-                BDataType,
-                decltype(b_grid_desc_bpreshuffled),
-                decltype(b_block_desc_bk0_n_bk1),
-                Sequence<Number<NXdlPerWave>{}, I1, Number<KRepeat>{}, Number<BK1Value>{}>,
-                Sequence<1, 2, 0, 3>,
-                3,
-                BBlockTransferSrcScalarPerVector,
-                BThreadTransferSrcResetCoordinateAfterRun,
-                true>(b_grid_desc_bpreshuffled,
-                      make_multi_index(n_block_data_idx_on_grid,
-                                       get_warp_local_1d_id() % NWave,
-                                       0,
-                                       KPack / KGroup * (get_thread_local_1d_id() % WarpSize)));
-            blockwise_gemm_pipeline.template Run<HasMainKBlockLoop, TailNum>(
-                a_grid_desc_ak0_m_ak1,
-                a_block_desc_ak0_m_ak1,
-                a_blockwise_copy,
-                a_grid_buf,
-                a_block_bufs,
-                a_block_slice_copy_step,
-                b_grid_desc_bpreshuffled,
-                b_blockwise_copy,
-                b_blockwise_copy_up,
-                b_grid_buf,
-                b_grid_buf_up,
-                b_block_bufs,
-                b_block_slice_copy_step,
-                c_thread_buf,
-                c_thread_buf_up,
-                num_k_block_main_loop);
+            if constexpr(UseGUFusion)
+            {
+                const BDataType* p_b_grid_up = p_b_grid + expert_stride / 2 / BPackedSize;
+                const auto b_grid_buf_up     = make_dynamic_buffer<AddressSpaceEnum::Global>(
+                    p_b_grid_up + expert_offset, b_grid_desc_bpreshuffled.GetElementSpaceSize());
+                auto b_blockwise_copy_up = ThreadwiseTensorSliceTransfer_v2<
+                    BDataType,
+                    BDataType,
+                    decltype(b_grid_desc_bpreshuffled),
+                    decltype(b_block_desc_bk0_n_bk1),
+                    Sequence<Number<NXdlPerWave>{}, I1, Number<KRepeat>{}, Number<BK1Value>{}>,
+                    Sequence<1, 2, 0, 3>,
+                    3,
+                    BBlockTransferSrcScalarPerVector,
+                    BThreadTransferSrcResetCoordinateAfterRun,
+                    true>(b_grid_desc_bpreshuffled,
+                          make_multi_index(n_block_data_idx_on_grid,
+                                           get_warp_local_1d_id() % NWave,
+                                           0,
+                                           KPack / KGroup * (get_thread_local_1d_id() % WarpSize)));
+                blockwise_gemm_pipeline.template Run<HasMainKBlockLoop, TailNum>(
+                    a_grid_desc_ak0_m_ak1,
+                    a_block_desc_ak0_m_ak1,
+                    a_blockwise_copy,
+                    a_grid_buf,
+                    a_block_bufs,
+                    a_block_slice_copy_step,
+                    b_grid_desc_bpreshuffled,
+                    b_blockwise_copy,
+                    b_blockwise_copy_up,
+                    b_grid_buf,
+                    b_grid_buf_up,
+                    b_block_bufs,
+                    b_block_slice_copy_step,
+                    c_thread_buf,
+                    c_thread_buf_up,
+                    num_k_block_main_loop);
+            }
+            else
+            {
+                blockwise_gemm_pipeline.template Run<HasMainKBlockLoop, TailNum>(
+                    a_grid_desc_ak0_m_ak1,
+                    a_block_desc_ak0_m_ak1,
+                    a_blockwise_copy,
+                    a_grid_buf,
+                    a_block_bufs,
+                    a_block_slice_copy_step,
+                    b_grid_desc_bpreshuffled,
+                    b_blockwise_copy,
+                    b_grid_buf,
+                    b_block_bufs,
+                    b_block_slice_copy_step,
+                    c_thread_buf,
+                    num_k_block_main_loop);
+            }
         }
         else
         {
-
             blockwise_gemm_pipeline.template Run<HasMainKBlockLoop, TailNum>(
                 a_grid_desc_ak0_m_ak1,
                 a_block_desc_ak0_m_ak1,
@@ -1829,7 +1933,7 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
         {
             if constexpr(PerTokenQuant)
             {
-                constexpr index_t scale_stride = (IsInputGemm ? 2 : 1);
+                constexpr index_t scale_stride = (IsInputGemm && UseGUFusion ? 2 : 1);
                 p_scale_b += expert_id * problem.N * scale_stride + block_n_id * NPerBlock +
                              get_warp_local_1d_id() % NWave * NPerXdl + threadIdx.x % NPerXdl;
             }
@@ -1883,45 +1987,72 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
                             constexpr auto cidx = Number<c_offset>{};
                             if constexpr(IsInputGemm) // gu fusion
                             {
-                                if constexpr(ActivationOperation == Activation::silu_and_mul)
+                                if constexpr(UseGUFusion)
                                 {
-                                    const float scale_up =
-                                        p_scale_b[(n0 * NWave * NPerXdl + problem.N) *
-                                                  PerTokenQuant];
-                                    float gate = scale_a * scale_b * c_thread_buf[cidx];
-                                    float up   = scale_a * scale_up * c_thread_buf_up[cidx];
-                                    if constexpr(MulRoutedWeight)
+                                    if constexpr(ActivationOperation == Activation::silu_and_mul)
                                     {
-                                        gate = gate * topk_weights.template AsType<float>()[m4];
-                                        up   = up * topk_weights.template AsType<float>()[m4];
+                                        const float scale_up =
+                                            p_scale_b[(n0 * NWave * NPerXdl + problem.N) *
+                                                      PerTokenQuant];
+                                        float gate = scale_a * scale_b * c_thread_buf[cidx];
+                                        float up   = scale_a * scale_up * c_thread_buf_up[cidx];
+                                        if constexpr(MulRoutedWeight)
+                                        {
+                                            gate = gate * topk_weights.template AsType<float>()[m4];
+                                            up   = up * topk_weights.template AsType<float>()[m4];
+                                        }
+                                        if constexpr(is_same_v<remove_cvref_t<BDataType>, pk_i4_t>)
+                                        {
+                                            gate *= 16;
+                                            up *= 16;
+                                        }
+                                        tensor_operation::element_wise::Silu{}(gate, gate);
+                                        c_thread_buf_fp32(cidx) = gate * up;
                                     }
-                                    if constexpr(is_same_v<remove_cvref_t<BDataType>, pk_i4_t>)
+                                    else if(ActivationOperation == Activation::gelu_and_mul)
                                     {
-                                        gate *= 16;
-                                        up *= 16;
+                                        const float scale_up =
+                                            p_scale_b[(n0 * NWave * NPerXdl + problem.N) *
+                                                      PerTokenQuant];
+                                        float gate = scale_a * scale_b * c_thread_buf[cidx];
+                                        float up   = scale_a * scale_up * c_thread_buf_up[cidx];
+                                        if constexpr(MulRoutedWeight)
+                                        {
+                                            gate = gate * topk_weights.template AsType<float>()[m4];
+                                            up   = up * topk_weights.template AsType<float>()[m4];
+                                        }
+                                        if constexpr(is_same_v<remove_cvref_t<BDataType>, pk_i4_t>)
+                                        {
+                                            gate *= 16;
+                                            up *= 16;
+                                        }
+                                        tensor_operation::element_wise::Gelu{}(gate, gate);
+                                        c_thread_buf_fp32(cidx) = gate * up;
                                     }
-                                    tensor_operation::element_wise::Silu{}(gate, gate);
-                                    c_thread_buf_fp32(cidx) = gate * up;
                                 }
-                                else if(ActivationOperation == Activation::gelu_and_mul)
+                                else
                                 {
-                                    const float scale_up =
-                                        p_scale_b[(n0 * NWave * NPerXdl + problem.N) *
-                                                  PerTokenQuant];
-                                    float gate = scale_a * scale_b * c_thread_buf[cidx];
-                                    float up   = scale_a * scale_up * c_thread_buf_up[cidx];
+                                    // g1u0: only gate projection with activation
+                                    float output = scale_a * scale_b * c_thread_buf[cidx];
                                     if constexpr(MulRoutedWeight)
                                     {
-                                        gate = gate * topk_weights.template AsType<float>()[m4];
-                                        up   = up * topk_weights.template AsType<float>()[m4];
+                                        output = output * topk_weights.template AsType<float>()[m4];
                                     }
                                     if constexpr(is_same_v<remove_cvref_t<BDataType>, pk_i4_t>)
                                     {
-                                        gate *= 16;
-                                        up *= 16;
+                                        output *= 16;
                                     }
-                                    tensor_operation::element_wise::Gelu{}(gate, gate);
-                                    c_thread_buf_fp32(cidx) = gate * up;
+                                    // Apply activation based on ActivationOperation
+                                    if constexpr(ActivationOperation == Activation::silu_and_mul)
+                                    {
+                                        tensor_operation::element_wise::Silu{}(
+                                            c_thread_buf_fp32(cidx), output);
+                                    }
+                                    else if(ActivationOperation == Activation::gelu_and_mul)
+                                    {
+                                        tensor_operation::element_wise::Gelu{}(
+                                            c_thread_buf_fp32(cidx), output);
+                                    }
                                 }
                             }
                             else
@@ -1960,29 +2091,50 @@ struct GridwiseMoeGemm : public GridwiseGemm_xdl_cshuffle_base<
 
                             if constexpr(IsInputGemm) // gu fusion
                             {
-                                if constexpr(ActivationOperation == Activation::silu_and_mul)
+                                if constexpr(UseGUFusion)
                                 {
-                                    float gate = c_thread_buf[cidx];
-                                    float up   = c_thread_buf_up[cidx];
-                                    if constexpr(MulRoutedWeight)
+                                    if constexpr(ActivationOperation == Activation::silu_and_mul)
                                     {
-                                        gate = gate * topk_weights.template AsType<float>()[m4];
-                                        up   = up * topk_weights.template AsType<float>()[m4];
+                                        float gate = c_thread_buf[cidx];
+                                        float up   = c_thread_buf_up[cidx];
+                                        if constexpr(MulRoutedWeight)
+                                        {
+                                            gate = gate * topk_weights.template AsType<float>()[m4];
+                                            up   = up * topk_weights.template AsType<float>()[m4];
+                                        }
+                                        tensor_operation::element_wise::Silu{}(gate, gate);
+                                        c_thread_buf_fp32(cidx) = gate * up;
                                     }
-                                    tensor_operation::element_wise::Silu{}(gate, gate);
-                                    c_thread_buf_fp32(cidx) = gate * up;
+                                    else if(ActivationOperation == Activation::gelu_and_mul)
+                                    {
+                                        float gate = c_thread_buf[cidx];
+                                        float up   = c_thread_buf_up[cidx];
+                                        if constexpr(MulRoutedWeight)
+                                        {
+                                            gate = gate * topk_weights.template AsType<float>()[m4];
+                                            up   = up * topk_weights.template AsType<float>()[m4];
+                                        }
+                                        tensor_operation::element_wise::Gelu{}(gate, gate);
+                                        c_thread_buf_fp32(cidx) = gate * up;
+                                    }
                                 }
-                                else if(ActivationOperation == Activation::gelu_and_mul)
+                                else
                                 {
-                                    float gate = c_thread_buf[cidx];
-                                    float up   = c_thread_buf_up[cidx];
+                                    float output = c_thread_buf[cidx];
                                     if constexpr(MulRoutedWeight)
                                     {
-                                        gate = gate * topk_weights.template AsType<float>()[m4];
-                                        up   = up * topk_weights.template AsType<float>()[m4];
+                                        output = output * topk_weights.template AsType<float>()[m4];
                                     }
-                                    tensor_operation::element_wise::Gelu{}(gate, gate);
-                                    c_thread_buf_fp32(cidx) = gate * up;
+                                    if constexpr(ActivationOperation == Activation::silu_and_mul)
+                                    {
+                                        tensor_operation::element_wise::Silu{}(
+                                            c_thread_buf_fp32(cidx), output);
+                                    }
+                                    else if(ActivationOperation == Activation::gelu_and_mul)
+                                    {
+                                        tensor_operation::element_wise::Gelu{}(
+                                            c_thread_buf_fp32(cidx), output);
+                                    }
                                 }
                             }
                             else

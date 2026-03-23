@@ -91,7 +91,7 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
     static constexpr auto NXdlPerWave64 = GetNXdlPerWave<true>();
     static constexpr auto NXdlPerWave32 = GetNXdlPerWave<false>();
     static constexpr index_t NumDTensor = DsDataType::Size();
-    template <index_t NXdlPerWave_>
+    template <index_t NXdlPerWave_, bool UseGUFusion_>
     using GridwiseGemmBase =
         GridwiseMoeGemm<ALayout,
                         BLayout,
@@ -142,6 +142,7 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
                         ActivationOP,
                         NSwizzle,
                         IsInputGemm,
+                        UseGUFusion_,
                         MulRoutedWeight,
                         PerTokenQuant,
                         IndexType,
@@ -149,10 +150,12 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
                         ComputeTypeB,
                         LDSTypeA,
                         LDSTypeB>;
-    using GridwiseGemm64 = GridwiseGemmBase<math::max(NXdlPerWave64, 1)>;
-    using GridwiseGemm32 = GridwiseGemmBase<NXdlPerWave32>;
+    using GridwiseGemm64_G1U1 = GridwiseGemmBase<math::max(NXdlPerWave64, 1), true>;
+    using GridwiseGemm64_G1U0 = GridwiseGemmBase<math::max(NXdlPerWave64, 1), false>;
+    using GridwiseGemm32_G1U1 = GridwiseGemmBase<NXdlPerWave32, true>;
+    using GridwiseGemm32_G1U0 = GridwiseGemmBase<NXdlPerWave32, false>;
 
-    using Argument = typename GridwiseGemm64::Argument;
+    using Argument = typename GridwiseGemm64_G1U1::Argument;
 
     static constexpr index_t APackedSize = []() {
         if constexpr(is_same_v<remove_cvref_t<ADataType>, pk_i4_t>)
@@ -388,9 +391,43 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
 
             return ave_time;
         }
-
-        INVOKER_RUN3_IMPL
-
+        float Run(const Argument& arg, const StreamConfig& stream_config = StreamConfig{})
+        {
+            if(get_warp_size() == 64)
+            {
+                if constexpr(NXdlPerWave64 > 0)
+                {
+                    if(arg.UseGateUpFusion)
+                    {
+                        return RunImp<GridwiseGemm64_G1U1>(arg, stream_config);
+                    }
+                    else
+                    {
+                        return RunImp<GridwiseGemm64_G1U0>(
+                            reinterpret_cast<const typename GridwiseGemm64_G1U0::Argument&>(arg),
+                            stream_config);
+                    }
+                }
+            }
+            else
+            {
+                if constexpr(NXdlPerWave32 > 0)
+                {
+                    if(arg.UseGateUpFusion)
+                    {
+                        return RunImp<GridwiseGemm32_G1U1>(
+                            reinterpret_cast<const typename GridwiseGemm32_G1U1::Argument&>(arg),
+                            stream_config);
+                    }
+                    else
+                    {
+                        return RunImp<GridwiseGemm32_G1U0>(
+                            reinterpret_cast<const typename GridwiseGemm32_G1U0::Argument&>(arg),
+                            stream_config);
+                    }
+                }
+            }
+        }
         // polymorphic
         float Run(const BaseArgument* p_arg,
                   const StreamConfig& stream_config = StreamConfig{}) override
@@ -436,15 +473,31 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
         {
             if constexpr(NXdlPerWave64 > 0)
             {
-                return GridwiseGemm64::CheckValidity(arg);
+                if(arg.UseGateUpFusion)
+                {
+                    return GridwiseGemm64_G1U1::CheckValidity(arg);
+                }
+                else
+                {
+                    return GridwiseGemm64_G1U0::CheckValidity(
+                        reinterpret_cast<const typename GridwiseGemm64_G1U0::Argument&>(arg));
+                }
             }
         }
         else
         {
             if constexpr(NXdlPerWave32 > 0)
             {
-                return GridwiseGemm32::CheckValidity(
-                    reinterpret_cast<const typename GridwiseGemm32::Argument&>(arg));
+                if(arg.UseGateUpFusion)
+                {
+                    return GridwiseGemm32_G1U1::CheckValidity(
+                        reinterpret_cast<const typename GridwiseGemm32_G1U1::Argument&>(arg));
+                }
+                else
+                {
+                    return GridwiseGemm32_G1U0::CheckValidity(
+                        reinterpret_cast<const typename GridwiseGemm32_G1U0::Argument&>(arg));
+                }
             }
         }
         return false;
@@ -475,7 +528,8 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
                              index_t KBatch,
                              AElementwiseOperation a_element_op,
                              BElementwiseOperation b_element_op,
-                             CElementwiseOperation c_element_op)
+                             CElementwiseOperation c_element_op,
+                             bool UseGateUpFusion = true)
     {
         return Argument{static_cast<const index_t*>(p_sorted_token_ids),
                         static_cast<const index_t*>(p_sorted_expert_ids),
@@ -496,7 +550,8 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
                         KBatch,
                         a_element_op,
                         b_element_op,
-                        c_element_op};
+                        c_element_op,
+                        UseGateUpFusion};
     }
 
     static auto MakeInvoker() { return Invoker{}; }
@@ -581,7 +636,7 @@ struct DeviceMoeGemm : public DeviceGemmMultipleDSplitKBPreShuffle<ALayout,
             << "BlkGemmPipelineVersion: "
             << BlkGemmPipelineVersionToString[BlkGemmPipelineVer] << ", "
             << "BlkGemmPipelinePrefetchStages: "
-            << GridwiseGemm64::BlockwiseGemmPipe::PrefetchStages;
+            << GridwiseGemm64_G1U1::BlockwiseGemmPipe::PrefetchStages;
         // clang-format on
 
         return str.str();
