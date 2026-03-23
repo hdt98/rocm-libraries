@@ -89,7 +89,7 @@ static constexpr rocm_ck::GemmKernel kernel = rocm_ck::make_kernel(
                             .block_warps = {2, 2, 1},
                             .warp_tile   = {16, 16, 16}});
 
-extern "C" __global__ void gemm_fp16(rocm_ck::GemmArgs args) {
+extern "C" __global__ void gemm_fp16(rocm_ck::Args args) {
     rocm_ck::runGemm<kernel>(args);
 }
 ```
@@ -123,9 +123,12 @@ make_kernel(
 ```
 
 `make_kernel()` pattern-matches the ops sequence to select the CK Tile epilogue:
-- `[GemmOp]` — plain GEMM, uses `GemmArgs`
-- `[GemmOp, AddOp]` — fused bias addition, uses `GemmArgs1D`
-- `[GemmOp, AddOp, ReluOp]` — fused bias + activation, uses `GemmArgs1D`
+- `[GemmOp]` — plain GEMM (tensors 0-2: A, B, C)
+- `[GemmOp, AddOp]` — fused bias addition (tensors 0-3: A, B, E, D0)
+- `[GemmOp, AddOp, ReluOp]` — fused bias + activation (tensors 0-3: A, B, E, D0)
+
+All variants use the generic `Args` struct. Tensor slot count varies by
+epilogue — `runGemm` branches on `K.num_d_tensors` at compile time.
 
 The "bias" tensor's dtype cascades from `Signature::dtype`. Explicit `Tensor`
 entries can override it for mixed-precision epilogues.
@@ -151,8 +154,7 @@ demonstrates composed epilogue (bias + activation).
 | File | Purpose |
 |------|---------|
 | `gemm_api.hpp` | `Signature`, `GemmAlgorithm`, `GemmKernel`, `make_kernel`, `is_valid_warp_gemm`, static_asserts |
-| `gemm_dev.hpp` | `CkTypeMap`, `CkLayoutMap`, `CkEpilogueOpMap`, `EpilogueTypes`, `runGemm<K>` — maps schema to CK Tile types |
-| `gemm_args.hpp` | `GemmArgs` (plain GEMM) and `GemmArgs1D` (1 D tensor) ABI structs |
+| `gemm_dev.hpp` | `CkTypeMap`, `CkLayoutMap`, `EpilogueTypes`, `runGemm<K>` — maps schema to CK Tile types |
 | `gemm_fp32.hip` | fp32 variant (16×16×16 warp tile) |
 | `gemm_fp16.hip` | fp16 variant (16×16×16 warp tile) |
 | `gemm_bf16.hip` | bf16 variant (16×16×16 warp tile) |

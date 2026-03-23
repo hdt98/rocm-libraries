@@ -13,7 +13,8 @@
 
 #include "cpu_ref.hpp"
 #include "gemm_api.hpp"
-#include "gemm_args.hpp"
+
+#include <rocm_ck/args.hpp>
 
 #include <rocm_ck/datatype_utils.hpp>
 #include <rocm_ck/hip_check.hpp>
@@ -179,38 +180,24 @@ int main(int argc, char** argv)
                     grid_size,
                     k.thread_block_size);
 
-        // Build args struct — type depends on D tensor count
-        rocm_ck::GemmArgs base_args = {
-            .M        = M,
-            .N        = N,
-            .K        = K,
-            .stride_A = stride_A,
-            .stride_B = stride_B,
-            .stride_C = stride_C,
-            .a        = buf_a.ptr(),
-            .b        = buf_b.ptr(),
-            .c        = buf_c.ptr(),
-        };
-        constexpr int stride_D0        = N; // D0 [M x N] RowMajor
-        rocm_ck::GemmArgs1D fused_args = {
-            .M         = M,
-            .N         = N,
-            .K         = K,
-            .stride_A  = stride_A,
-            .stride_B  = stride_B,
-            .stride_E  = stride_C, // output stride matches C layout
-            .a         = buf_a.ptr(),
-            .b         = buf_b.ptr(),
-            .e         = buf_c.ptr(),
-            .stride_D0 = stride_D0,
-            ._pad0     = 0,
-            .d0        = (k.num_d_tensors >= 1) ? buf_d0->ptr() : nullptr,
-        };
+        // Build generic Args — same struct for all variants
+        rocm_ck::Args kernel_args{};
+        // A [M x K] RowMajor
+        kernel_args.tensors[0] = {buf_a.ptr(), {M, K, 0, 0, 0, 0}, {stride_A, 1, 0, 0, 0, 0}};
+        // B [K x N] ColumnMajor
+        kernel_args.tensors[1] = {buf_b.ptr(), {K, N, 0, 0, 0, 0}, {1, stride_B, 0, 0, 0, 0}};
+        // C/E [M x N] RowMajor (output)
+        kernel_args.tensors[2] = {buf_c.ptr(), {M, N, 0, 0, 0, 0}, {stride_C, 1, 0, 0, 0, 0}};
+        // D0 [M x N] RowMajor (optional, for fused epilogue)
+        if(k.num_d_tensors >= 1)
+        {
+            constexpr int stride_D0 = N;
+            kernel_args.tensors[3]  = {
+                buf_d0->ptr(), {M, N, 0, 0, 0, 0}, {stride_D0, 1, 0, 0, 0, 0}};
+        }
 
-        // Launch — select args struct by D tensor count
-        void* args_ptr          = (k.num_d_tensors == 0) ? static_cast<void*>(&base_args)
-                                                         : static_cast<void*>(&fused_args);
-        size_t kernel_args_size = (k.num_d_tensors == 0) ? sizeof(base_args) : sizeof(fused_args);
+        void* args_ptr          = &kernel_args;
+        size_t kernel_args_size = sizeof(kernel_args);
         void* launch_config[]   = {HIP_LAUNCH_PARAM_BUFFER_POINTER,
                                    args_ptr,
                                    HIP_LAUNCH_PARAM_BUFFER_SIZE,

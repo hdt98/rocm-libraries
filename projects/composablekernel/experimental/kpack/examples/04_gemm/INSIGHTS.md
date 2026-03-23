@@ -11,7 +11,7 @@ static constexpr rocm_ck::GemmKernel K = rocm_ck::make_kernel(
     rocm_ck::Signature{.dtype = rocm_ck::DataType::FP16, .ops = {rocm_ck::GemmOp{}}},
     rocm_ck::GemmAlgorithm{...});
 
-extern "C" __global__ void gemm_fp16(rocm_ck::GemmArgs args) {
+extern "C" __global__ void gemm_fp16(rocm_ck::Args args) {
     rocm_ck::runGemm<K>(args);
 }
 ```
@@ -85,20 +85,20 @@ The valid set of (dtype, warp_tile) combinations is hardware-specific and non-ob
 
 > **Hard-won lesson**: The initial attempt used 256×256×64 block tile with 32×32×16 warp tile (copied from CK's `gemm_basic_invoker.hpp`). Failed on ALL architectures. Root causes: (1) no WarpGemmDispatcher for fp32 32×32×16, (2) 256×256 block tile requires 128KB LDS, exceeding 64KB limit. The fix — 128×128×32 with 16×16×16 — came from cross-referencing the dispatcher table with CK's own validated configs.
 
-## 7. ABI Structs Per D-Tensor Count
+## 7. Generic Args Replaces Per-Epilogue Structs
 
-Two fixed-size args structs, one per epilogue category:
+All variants now use the generic `Args` struct (1408 bytes) from `include/rocm_ck/args.hpp`. Tensor slots carry their own shape — M, N, K are derivable from tensor lengths rather than redundant scalar fields.
 
-| Struct | Size | D tensors | Fields |
-|--------|------|-----------|--------|
-| `GemmArgs` | 48 bytes | 0 | M, N, K, stride_A/B/C, a, b, c |
-| `GemmArgs1D` | 64 bytes | 1 | M, N, K, stride_A/B/E, a, b, e, stride_D0, d0 |
+| Slot | Tensor | Shape |
+|------|--------|-------|
+| `tensors[0]` | A | `[M, K]` with layout-dependent strides |
+| `tensors[1]` | B | `[K, N]` with layout-dependent strides |
+| `tensors[2]` | C/E (output) | `[M, N]` with layout-dependent strides |
+| `tensors[3]` | D0 (optional) | `[M, N]` — present for fused epilogue |
 
-Both have `static_assert` checks for size, alignment, and field offsets. `hipModuleLaunchKernel` passes args by value — variable-length structs would break.
+`runGemm<K>` unpacks tensors and extracts leading dimension strides based on layout (RowMajor → `strides[0]`, ColMajor → `strides[1]`). The device code branches on `K.num_d_tensors` with `if constexpr` — each branch is compiled away.
 
-`runGemm<K>` deduces `ArgsType` from the `extern "C"` function parameter. The `.hip` file picks the right args struct in its signature; the device code dispatches with `if constexpr(K.num_d_tensors == ...)`. Each branch is compiled away — no runtime overhead.
-
-> **Design**: One struct per D-tensor count, not one struct with optional fields. This keeps the ABI contract explicit and verifiable with `offsetof`.
+> **Design evolution**: The original per-epilogue structs (`GemmArgs`, `GemmArgs1D`) kept the ABI minimal but required new structs for each D-tensor count. The generic Args eliminates this — adding D tensors is just populating more slots. The GPU only loads fields it reads, so the larger struct costs nothing at runtime.
 
 ## 8. Epilogue Is Signature, Not Algorithm
 
@@ -143,7 +143,7 @@ CK Tile's `CShuffleEpilogue` is the universal epilogue for GEMM:
 | Optional dtype hierarchy | 3 levels (dtype→in_dtype→per-operand) | 2 levels (dtype→per-operand) | Shape varies by op |
 | `_api` / `_dev` header split | Yes | Yes | Generalizes |
 | `CkTypeMap` enum→type dispatch | Yes | Yes + `CkLayoutMap` | Generalizes (adds layout) |
-| ABI struct with `void*` + offsets | 40 bytes, 6 asserts | 48/64 bytes, same pattern | Generalizes |
+| Generic Args struct | 40 bytes (old) | 1408 bytes (shared) | Generalizes — one struct for all ops |
 | consteval validation in `make_kernel` | 6 checks | 5 checks | Generalizes (different checks) |
 | One `.hip` file per variant | ~15 lines each | ~15 lines each | Generalizes |
 | `Signature` with operator composition | `AddOp{}` only | `GemmOp` + epilogue ops | Generalizes |
@@ -152,7 +152,7 @@ CK Tile's `CShuffleEpilogue` is the universal epilogue for GEMM:
 
 - **Dtype hierarchy depth**: Elementwise has a shared input default (`in_dtype`); GEMM does not. Each operation must define its own hierarchy shape.
 - **Tile validation**: Elementwise validates 1D `kVectorM`; GEMM validates 3D tile divisibility + MFMA warp dispatch. The validation logic is operation-specific.
-- **Scalar parameters**: Elementwise bakes `alpha`/`beta` into the args struct and kernel. GEMM's D-tensor fusion is data-driven (D tensor passed as a pointer, not a scalar). These are different mechanisms for different use cases.
+- **Scalar parameters**: Elementwise uses `scalars[0]`/`scalars[1]` for `alpha`/`beta`. GEMM's D-tensor fusion is data-driven (D tensor passed as a pointer in `tensors[3]`). Both fit in the generic Args — different slot types for different use cases.
 - **Grid calculation**: Elementwise uses `ceil(N / block_tile)`; GEMM uses `ceil(M/M_tile) × ceil(N/N_tile)` flattened to 1D via `GemmTile1DPartitioner`. More complex but CK Tile handles it.
 
 ## 12. Open Design Questions

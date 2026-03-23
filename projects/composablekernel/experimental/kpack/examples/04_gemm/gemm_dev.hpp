@@ -16,7 +16,8 @@
 #pragma once
 
 #include "gemm_api.hpp"
-#include "gemm_args.hpp"
+
+#include <rocm_ck/args.hpp>
 
 #include <rocm_ck/ck_type_map.hpp>
 
@@ -132,16 +133,19 @@ struct EpilogueTypes
 // runGemm<K>: assemble CK Tile GEMM pipeline from GemmKernel descriptor
 // ============================================================================
 
-/// Device-side GEMM bridge: args → CK Tile template stack → ck_tile::GemmKernel.
+/// Device-side GEMM bridge: Args → CK Tile template stack → ck_tile::GemmKernel.
+///
+/// Tensor layout:
+///   tensors[0] = A,  tensors[1] = B,  tensors[2] = C/E (output)
+///   tensors[3] = D0 (optional, for fused epilogue)
+///   lengths[0] = first dim, lengths[1] = second dim
+///   strides follow dimension order (RowMajor: strides[0]=ld, ColMajor: strides[1]=ld)
 ///
 /// Wires the 7-type CK Tile GEMM stack (shape, traits, problem, pipeline,
 /// partitioner, epilogue, kernel) with types and layouts from the GemmKernel
 /// NTTP. Tile geometry comes from GemmKernel fields (validated at compile time).
-///
-/// ArgsType is deduced from the extern "C" function parameter — GemmArgs for
-/// plain GEMM, GemmArgs1D for fused epilogues with one D tensor.
-template <GemmKernel K, typename ArgsType>
-__device__ void runGemm(ArgsType args)
+template <GemmKernel K>
+__device__ void runGemm(Args args)
 {
     // --- Map schema types to CK Tile types ---
     using AType   = typename CkTypeMap<K.a_dtype>::type;
@@ -152,6 +156,24 @@ __device__ void runGemm(ArgsType args)
     using ALayout = typename CkLayoutMap<K.a_layout>::type;
     using BLayout = typename CkLayoutMap<K.b_layout>::type;
     using CLayout = typename CkLayoutMap<K.c_layout>::type;
+
+    // --- Unpack generic Args — compiler generates s_load at fixed offsets ---
+    const TensorArg& t_a = args.tensors[0];
+    const TensorArg& t_b = args.tensors[1];
+    const TensorArg& t_c = args.tensors[2];
+
+    index_t M     = t_a.lengths[0];
+    index_t N     = t_b.lengths[1];
+    index_t K_dim = t_a.lengths[1];
+
+    // Leading dimension stride depends on layout:
+    //   RowMajor → strides[0],  ColMajor → strides[1]
+    index_t stride_A =
+        static_cast<index_t>(K.a_layout == Layout::Row ? t_a.strides[0] : t_a.strides[1]);
+    index_t stride_B =
+        static_cast<index_t>(K.b_layout == Layout::Row ? t_b.strides[0] : t_b.strides[1]);
+    index_t stride_C =
+        static_cast<index_t>(K.c_layout == Layout::Row ? t_c.strides[0] : t_c.strides[1]);
 
     // --- Step 1: Tile geometry (from GemmKernel, validated by make_kernel) ---
     using GemmShape =
@@ -200,38 +222,42 @@ __device__ void runGemm(ArgsType args)
     using CkKernel   = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
     using KernelArgs = typename CkKernel::UniversalGemmKernel::KernelArgs;
 
-    // Convert clean ABI struct to CK Tile's internal args.
+    // Convert generic Args to CK Tile's internal args.
     // Branch on D tensor count to construct the right KernelArgs initializer.
     if constexpr(K.num_d_tensors == 0)
     {
-        const KernelArgs kargs{{args.a},        // as_ptr
-                               {args.b},        // bs_ptr
-                               {},              // ds_ptr  (empty — no D tensors)
-                               args.c,          // e_ptr
-                               args.M,          // M
-                               args.N,          // N
-                               args.K,          // K
-                               {args.stride_A}, // stride_As
-                               {args.stride_B}, // stride_Bs
-                               {},              // stride_Ds (empty)
-                               args.stride_C,   // stride_E
-                               1};              // k_batch (no split-K)
+        const KernelArgs kargs{{t_a.ptr},                  // as_ptr
+                               {t_b.ptr},                  // bs_ptr
+                               {},                         // ds_ptr  (empty — no D tensors)
+                               const_cast<void*>(t_c.ptr), // e_ptr
+                               M,                          // M
+                               N,                          // N
+                               K_dim,                      // K
+                               {stride_A},                 // stride_As
+                               {stride_B},                 // stride_Bs
+                               {},                         // stride_Ds (empty)
+                               stride_C,                   // stride_E
+                               1};                         // k_batch (no split-K)
         CkKernel{}(kargs);
     }
     else if constexpr(K.num_d_tensors == 1)
     {
-        const KernelArgs kargs{{args.a},         // as_ptr
-                               {args.b},         // bs_ptr
-                               {args.d0},        // ds_ptr (1 D tensor)
-                               args.e,           // e_ptr
-                               args.M,           // M
-                               args.N,           // N
-                               args.K,           // K
-                               {args.stride_A},  // stride_As
-                               {args.stride_B},  // stride_Bs
-                               {args.stride_D0}, // stride_Ds (1 stride)
-                               args.stride_E,    // stride_E
-                               1};               // k_batch (no split-K)
+        const TensorArg& t_d0 = args.tensors[3];
+        index_t stride_D0 =
+            static_cast<index_t>(K.d0_layout == Layout::Row ? t_d0.strides[0] : t_d0.strides[1]);
+
+        const KernelArgs kargs{{t_a.ptr},                  // as_ptr
+                               {t_b.ptr},                  // bs_ptr
+                               {t_d0.ptr},                 // ds_ptr (1 D tensor)
+                               const_cast<void*>(t_c.ptr), // e_ptr
+                               M,                          // M
+                               N,                          // N
+                               K_dim,                      // K
+                               {stride_A},                 // stride_As
+                               {stride_B},                 // stride_Bs
+                               {stride_D0},                // stride_Ds (1 stride)
+                               stride_C,                   // stride_E
+                               1};                         // k_batch (no split-K)
         CkKernel{}(kargs);
     }
 }

@@ -11,7 +11,7 @@ static constexpr rocm_ck::VectorAddKernel kernel = rocm_ck::make_kernel(
     rocm_ck::ElementwiseAlgorithm{.block_tile = 1024, .block_warps = 1,
                                    .warp_tile = 1024, .pad = true});
 
-extern "C" __global__ void vector_add_fp32_b1024(rocm_ck::VectorAddArgs args)
+extern "C" __global__ void vector_add_fp32_b1024(rocm_ck::Args args)
 {
     rocm_ck::runVectorAdd<kernel>(args);
 }
