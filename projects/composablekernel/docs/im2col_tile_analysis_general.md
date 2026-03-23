@@ -439,3 +439,10 @@ since M_base changes more slowly per output element.
 If K_tile is not a multiple of C, the K-tile may start mid-cycle in c_conv.
 Account for by initialising `c_start = k_start % C` and adjusting K_base
 and the x-transition point accordingly.
+
+
+## Testing
+
+Unit tests for the im2col index calculations
+
+- projects/composablekernel/test/ck_tile/image_to_column/test_im2col_index_mapping.cpp
