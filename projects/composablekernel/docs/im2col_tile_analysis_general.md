@@ -127,7 +127,7 @@ K_offset(k_gemm) = y × DH × HiStride
 const_g          = g × GStride             ← constant per kernel launch
 ```
 
-**The M and K address contributions are fully independent and additive.**
+**The M and K address contributions are independent and additive.**
 This holds for any stride, dilation, or padding. Padding affects only the
 validity check (see below), not the address structure.
 
@@ -160,8 +160,7 @@ valid_w(wo, x) = (0 ≤ wo × SW + x × DW − PW < Wi)
 With non-zero padding these cannot be fully separated, but:
 - The `y` and `x` ranges that are invalid for a given (ho, wo) tile can be
   **precomputed once per M-tile** and stored as a small validity mask over k_gemm.
-- For zero padding (common in optimized kernels), the check is unconditionally
-  true and can be eliminated entirely.
+- For zero padding, the check is trivially true and can be eliminated entirely.
 
 > Tests: [ValidityMatchesReference](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L722) · [CornerElementsInvalid](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L730) · [CenterFilterValid](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L738) · [ValidElementsDecomposeCorrectly](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L746)
 
@@ -174,11 +173,15 @@ A block covers rows `m_gemm ∈ [m_start, m_start + M_tile − 1]` where:
 m_start = block_M_idx × M_tile
 ```
 
-Decoding the tile origin:
+The tile origin (i=0):
 ```
-n_conv_0 = m_start / (Ho × Wo)
-ho_0     = (m_start % (Ho × Wo)) / Wo
-wo_0     = m_start % Wo
+n_conv(i=0) = m_start / (Ho × Wo)
+ho(i=0)     = (m_start % (Ho × Wo)) / Wo
+wo(i=0)     = m_start % Wo
+```
+
+```
+m_gemm(i) = m_start + i, where i ∈ [0, M_tile)
 ```
 
 ### n_conv across the tile
@@ -189,10 +192,12 @@ wo_0     = m_start % Wo
 P(n_conv changes within tile) ≈ M_tile / (Ho × Wo)
 ```
 
-For typical values this is negligible (e.g., 16 / 3721 < 0.5%). In practice,
-**n_conv is constant within every tile**.
+For typical values this is negligible (e.g., 16 / (100 x 100) = 0.16%). In practice,
+`n_conv` is constant within every tile.
 
 > Test: [NConvConstantWithinTile](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L526)
+
+However, it remains to be seen if this is a good approximation. 
 
 ### ho across the tile — general formula
 
@@ -230,7 +235,8 @@ wrap_delta    = SH × HiStride − Wo × SW × WiStride
               = SH × HiStride − Wo × step_w   (M_base change at each ho-boundary)
 ```
 
-For unit stride (SH=SW=1): `step_w = WiStride`, `wrap_delta = HiStride − Wo × WiStride`.
+For unit stride (SH=SW=1) which is comon for the RetinaNet shapes we have: 
+`step_w = WiStride`, `wrap_delta = HiStride − Wo × WiStride`.
 
 Then for row i within the tile:
 ```
@@ -274,9 +280,9 @@ For general K_tile and alignment:
 y-boundaries within K-tile = ⌊(k_start/C + K_tile/C − 1) / X⌋ − ⌊k_start/C / X⌋
 ```
 
-When `K_tile = X × C` (one full filter row per K-tile): exactly 1 y value, all X x-values.
-When `K_tile = C` (one filter column per K-tile): exactly 1 y, 1 x value. Simplest case.
-When `K_tile = 2C` (as in the analyzed case, K_tile=64, C=32): 1 y, 2 x values.
+When `K_tile = X × C` (one full filter row per K-tile): exactly one `y` value, all X `x`-values.
+When `K_tile = C` (one filter column per K-tile): exactly one `y`, one `x` value. Simplest case.
+When `K_tile = 2C`: one `y`, two `x` values.
 
 > Tests: [YConstantForKTileEqualC](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L577) · [YConstantForKTileEqual2C](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L593)
 
