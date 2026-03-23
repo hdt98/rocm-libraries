@@ -21,43 +21,49 @@ struct VariantDescriptor
 /// Each entry corresponds to a .hip file and its make_kernel configuration.
 // clang-format off
 static constexpr VariantDescriptor ALL_VARIANTS[] = {
-    {"vector_add_fp32_b256", make_kernel(ElementwiseConfig{
-         .signature = {.dtype = DataType::FP32},
-         .algorithm = {.block_tile = 256, .block_warps = 1, .warp_tile = 256, .pad = true}})},
-    {"vector_add_fp32_b512", make_kernel(ElementwiseConfig{
-         .signature = {.dtype = DataType::FP32},
-         .algorithm = {.block_tile = 512, .block_warps = 1, .warp_tile = 512, .pad = true}})},
-    {"vector_add_fp32_b1024", make_kernel(ElementwiseConfig{
-         .signature = {.dtype = DataType::FP32},
-         .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}})},
-    {"vector_add_fp16_b512", make_kernel(ElementwiseConfig{
-         .signature = {.dtype = DataType::FP16},
-         .algorithm = {.block_tile = 512, .block_warps = 1, .warp_tile = 512, .pad = true}})},
-    {"vector_add_fp16_b1024", make_kernel(ElementwiseConfig{
-         .signature = {.dtype = DataType::FP16},
-         .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}})},
-    {"vector_add_bf16_b512", make_kernel(ElementwiseConfig{
-         .signature = {.dtype = DataType::BF16},
-         .algorithm = {.block_tile = 512, .block_warps = 1, .warp_tile = 512, .pad = true}})},
-    {"vector_add_bf16_b1024", make_kernel(ElementwiseConfig{
-         .signature = {.dtype = DataType::BF16},
-         .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}})},
-    {"vector_add_fp32_b2048_w8", make_kernel(ElementwiseConfig{
-         .signature = {.dtype = DataType::FP32},
-         .algorithm = {.block_tile = 2048, .block_warps = 8, .warp_tile = 64, .pad = true}})},
-    {"vector_add_fp16_b1024_w2", make_kernel(ElementwiseConfig{
-         .signature = {.dtype = DataType::FP16},
-         .algorithm = {.block_tile = 1024, .block_warps = 2, .warp_tile = 512, .pad = true}})},
+    {"vector_add_fp32_b256", make_kernel(
+         Signature{.dtype = DataType::FP32, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+         ElementwiseAlgorithm{256, 1, 256, true})},
+    {"vector_add_fp32_b512", make_kernel(
+         Signature{.dtype = DataType::FP32, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+         ElementwiseAlgorithm{512, 1, 512, true})},
+    {"vector_add_fp32_b1024", make_kernel(
+         Signature{.dtype = DataType::FP32, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+         ElementwiseAlgorithm{1024, 1, 1024, true})},
+    {"vector_add_fp16_b512", make_kernel(
+         Signature{.dtype = DataType::FP16, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+         ElementwiseAlgorithm{512, 1, 512, true})},
+    {"vector_add_fp16_b1024", make_kernel(
+         Signature{.dtype = DataType::FP16, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+         ElementwiseAlgorithm{1024, 1, 1024, true})},
+    {"vector_add_bf16_b512", make_kernel(
+         Signature{.dtype = DataType::BF16, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+         ElementwiseAlgorithm{512, 1, 512, true})},
+    {"vector_add_bf16_b1024", make_kernel(
+         Signature{.dtype = DataType::BF16, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+         ElementwiseAlgorithm{1024, 1, 1024, true})},
+    {"vector_add_fp32_b2048_w8", make_kernel(
+         Signature{.dtype = DataType::FP32, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+         ElementwiseAlgorithm{2048, 8, 64, true})},
+    {"vector_add_fp16_b1024_w2", make_kernel(
+         Signature{.dtype = DataType::FP16, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+         ElementwiseAlgorithm{1024, 2, 512, true})},
     // Mixed-type variants
-    {"vector_add_fp16_fp32_b1024", make_kernel(ElementwiseConfig{
-         .signature = {.in_dtype = DataType::FP16, .out_dtype = DataType::FP32},
-         .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}})},
-    {"vector_add_fp32_fp16_b1024", make_kernel(ElementwiseConfig{
-         .signature = {.in_dtype = DataType::FP32, .out_dtype = DataType::FP16},
-         .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}})},
-    {"vector_add_bf16_fp32_b1024", make_kernel(ElementwiseConfig{
-         .signature = {.in_dtype = DataType::BF16, .out_dtype = DataType::FP32},
-         .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}})},
+    {"vector_add_fp16_fp32_b1024", make_kernel(
+         Signature{.dtype = DataType::FP16,
+                   .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
+                   .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+         ElementwiseAlgorithm{1024, 1, 1024, true})},
+    {"vector_add_fp32_fp16_b1024", make_kernel(
+         Signature{.dtype = DataType::FP32,
+                   .tensors = {Tensor{.name = "C", .dtype = DataType::FP16}},
+                   .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+         ElementwiseAlgorithm{1024, 1, 1024, true})},
+    {"vector_add_bf16_fp32_b1024", make_kernel(
+         Signature{.dtype = DataType::BF16,
+                   .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
+                   .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+         ElementwiseAlgorithm{1024, 1, 1024, true})},
 };
 // clang-format on
 

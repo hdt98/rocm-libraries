@@ -6,9 +6,9 @@
 // runs each on the detected GPU, and verifies against CPU reference.
 //
 // This example demonstrates:
-//   - GemmConfig schema: compile-time type + tile geometry via make_kernel()
+//   - Operator-centric Signature schema with GemmOp, AddOp, ReluOp
 //   - Multi-variant iteration with per-variant grid launch parameters
-//   - Composable epilogue: CombineOp × Activation (e.g., Add + Relu)
+//   - Epilogue composition via operator chaining (e.g., GemmOp + AddOp + ReluOp)
 //   - Per-type tolerance for correctness verification
 
 #include "cpu_ref.hpp"
@@ -28,17 +28,15 @@
 #include <memory>
 #include <vector>
 
-using rocm_ck::Activation;
-using rocm_ck::CombineOp;
 using rocm_ck::DataType;
-using rocm_ck::GemmArgs;
-using rocm_ck::GemmArgs1D;
-using rocm_ck::GemmConfig;
+using rocm_ck::GemmAlgorithm;
 using rocm_ck::GemmKernel;
+using rocm_ck::GemmOp;
 using rocm_ck::make_kernel;
+using rocm_ck::Signature;
 
 // ============================================================================
-// Variant table — compile-time resolved via GemmConfig schema
+// Variant table — compile-time resolved via Signature + GemmAlgorithm
 // ============================================================================
 
 struct GemmVariant
@@ -47,40 +45,45 @@ struct GemmVariant
     GemmKernel kernel;
 };
 
+// clang-format off
 static constexpr GemmVariant ALL_GEMM_VARIANTS[] = {
     {"gemm_fp32",
-     make_kernel(GemmConfig{.signature = {.dtype = DataType::FP32},
-                            .algorithm = {.block_tile  = {128, 128, 32},
-                                          .block_warps = {2, 2, 1},
-                                          .warp_tile   = {16, 16, 16}}})},
+     make_kernel(Signature{.dtype = DataType::FP32, .ops = {GemmOp{}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {16, 16, 16}})},
     {"gemm_fp16",
-     make_kernel(GemmConfig{.signature = {.dtype = DataType::FP16},
-                            .algorithm = {.block_tile  = {128, 128, 32},
-                                          .block_warps = {2, 2, 1},
-                                          .warp_tile   = {16, 16, 16}}})},
+     make_kernel(Signature{.dtype = DataType::FP16, .ops = {GemmOp{}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {16, 16, 16}})},
     {"gemm_bf16",
-     make_kernel(GemmConfig{.signature = {.dtype = DataType::BF16},
-                            .algorithm = {.block_tile  = {128, 128, 32},
-                                          .block_warps = {2, 2, 1},
-                                          .warp_tile   = {16, 16, 16}}})},
+     make_kernel(Signature{.dtype = DataType::BF16, .ops = {GemmOp{}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {16, 16, 16}})},
     {"gemm_fp16_w32",
-     make_kernel(GemmConfig{.signature = {.dtype = DataType::FP16},
-                            .algorithm = {.block_tile  = {128, 128, 32},
-                                          .block_warps = {2, 2, 1},
-                                          .warp_tile   = {32, 32, 16}}})},
+     make_kernel(Signature{.dtype = DataType::FP16, .ops = {GemmOp{}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {32, 32, 16}})},
     {"gemm_fp16_add",
-     make_kernel(GemmConfig{.signature = {.dtype = DataType::FP16, .combine = CombineOp::Add},
-                            .algorithm = {.block_tile  = {128, 128, 32},
-                                          .block_warps = {2, 2, 1},
-                                          .warp_tile   = {16, 16, 16}}})},
+     make_kernel(Signature{.dtype = DataType::FP16,
+                           .ops = {GemmOp{.out = "C"},
+                                   rocm_ck::AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {16, 16, 16}})},
     {"gemm_fp16_add_relu",
-     make_kernel(GemmConfig{.signature = {.dtype      = DataType::FP16,
-                                          .combine    = CombineOp::Add,
-                                          .activation = Activation::Relu},
-                            .algorithm = {.block_tile  = {128, 128, 32},
-                                          .block_warps = {2, 2, 1},
-                                          .warp_tile   = {16, 16, 16}}})},
+     make_kernel(Signature{.dtype = DataType::FP16,
+                           .ops = {GemmOp{.out = "C"},
+                                   rocm_ck::AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                                   rocm_ck::ReluOp{.in = "D", .out = "E"}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {16, 16, 16}})},
 };
+// clang-format on
 
 // ============================================================================
 // Main
@@ -177,7 +180,7 @@ int main(int argc, char** argv)
                     k.thread_block_size);
 
         // Build args struct — type depends on D tensor count
-        GemmArgs base_args = {
+        rocm_ck::GemmArgs base_args = {
             .M        = M,
             .N        = N,
             .K        = K,
@@ -188,20 +191,20 @@ int main(int argc, char** argv)
             .b        = buf_b.ptr(),
             .c        = buf_c.ptr(),
         };
-        constexpr int stride_D0 = N; // D0 [M x N] RowMajor
-        GemmArgs1D fused_args   = {
-              .M         = M,
-              .N         = N,
-              .K         = K,
-              .stride_A  = stride_A,
-              .stride_B  = stride_B,
-              .stride_E  = stride_C, // output stride matches C layout
-              .a         = buf_a.ptr(),
-              .b         = buf_b.ptr(),
-              .e         = buf_c.ptr(),
-              .stride_D0 = stride_D0,
-              ._pad0     = 0,
-              .d0        = (k.num_d_tensors >= 1) ? buf_d0->ptr() : nullptr,
+        constexpr int stride_D0        = N; // D0 [M x N] RowMajor
+        rocm_ck::GemmArgs1D fused_args = {
+            .M         = M,
+            .N         = N,
+            .K         = K,
+            .stride_A  = stride_A,
+            .stride_B  = stride_B,
+            .stride_E  = stride_C, // output stride matches C layout
+            .a         = buf_a.ptr(),
+            .b         = buf_b.ptr(),
+            .e         = buf_c.ptr(),
+            .stride_D0 = stride_D0,
+            ._pad0     = 0,
+            .d0        = (k.num_d_tensors >= 1) ? buf_d0->ptr() : nullptr,
         };
 
         // Launch — select args struct by D tensor count
@@ -233,9 +236,9 @@ int main(int argc, char** argv)
 
         // Select correct reference based on epilogue composition
         const float* ref = ref_c.data();
-        if(k.combine == CombineOp::Add && k.activation == Activation::Relu)
+        if(k.combine == rocm_ck::CombineOp::Add && k.activation == rocm_ck::Activation::Relu)
             ref = ref_add_relu.data();
-        else if(k.combine == CombineOp::Add)
+        else if(k.combine == rocm_ck::CombineOp::Add)
             ref = ref_add.data();
 
         float tol   = rocm_ck::tolerance_for(k.c_dtype);
