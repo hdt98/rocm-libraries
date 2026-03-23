@@ -56,7 +56,6 @@ Verify hipDNN installation
 ==========================
 
 The hipDNN library ships with executables that can be used to test the hipDNN library and plugins when the GPU hardware is available.
-
 These executables can be run individually or as a suite using the ``ctest`` driver program. (``ctest`` is isntalled as part of the CMake package.)
 
 Run hipDNN unit tests
@@ -94,7 +93,6 @@ Run hipDNN samples
 ------------------
 
 The sample programs shipped with hipDNN require AMD GPU hardware to execute.
-
 The samples execute supported tensor operations on GPU hardware using the plugins installed with hipDNN.
 
 This example demonstrates running the entire set of samples using ``ctest``:
