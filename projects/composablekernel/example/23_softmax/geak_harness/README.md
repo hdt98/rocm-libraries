@@ -180,20 +180,6 @@ limitations:
   better coverage. An LLM modifying kernel internals should run the relevant
   CK/CK Tile unit tests, not just the end-to-end PyTorch comparison.
 
-### Recommendations for kernel development (beyond tuning)
-
-- **Use this harness for fast iteration.** The PyTorch comparison catches gross
-  correctness issues and gives immediate performance feedback. This is the
-  primary loop.
-- **Fall back to CK tests when stuck.** If the LLM produces faulty kernels and
-  cannot diagnose the issue from the PyTorch error alone, CK's test
-  infrastructure provides unit-level granularity to isolate the problem. For
-  CK Tile kernels, the relevant unit tests from the CK Tile test suite can help
-  narrow down which component is broken.
-- **Use CK tests for final correctness.** Before accepting a kernel modification
-  as done, run the full CK test suite for that kernel family. The tests cover
-  edge cases, multiple dtypes, alignment boundaries, and specific parameter
-  combinations that a single PyTorch comparison won't catch.
 
 ## Possible Improvements
 
