@@ -92,11 +92,6 @@ struct ProblemData : SQLiteSerializable<ProblemData>
 {
     conv::ProblemDescription prob;
 
-    struct NoInit
-    {
-    };
-
-    ProblemData(NoInit) {}
     ProblemData() : ProblemData(Rnd()) {}
     ProblemData(Random& rnd)
     {
@@ -255,11 +250,6 @@ protected:
         }};
 
         return data;
-    }
-
-    void ClearDb(SQLitePerfDb& db) const
-    {
-        db.sql.Exec("delete from config; delete from perf_db;");
     }
 
     void ResetDb() const { db_inst.sql.Exec("delete from config; delete from perf_db;"); }
