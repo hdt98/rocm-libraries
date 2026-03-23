@@ -43,7 +43,8 @@ Dependencies
 Install ROCm and hipDNN
 =======================
 
-Follow the instructions at `Install AMD ROCm <https://advanced-micro-devices-rocm-internal--692.com.readthedocs.build/en/692/install/rocm.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_ to install ROCm, including hipDNN.
+Follow the instructions at `Install AMD ROCm <https://advanced-micro-devices-rocm-internal--692.com.readthedocs.build/en/692/install/rocm.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_ to install a ROCm development package that includes hipDNN. 
+ROCm development packages contain the ``.dev`` prefix.
 
 .. important::
 
