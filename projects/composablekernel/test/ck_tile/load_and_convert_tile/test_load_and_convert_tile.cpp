@@ -70,7 +70,7 @@ class TestLoadAndConvert : public ::testing::Test
 #elif MATRIX_TYPE == IDENTITY
         ck_tile::FillIdentity<XDataType>{M, K}(h_a);
 #else
-        ck_tile::FillUniformDistributionIntegerValue<XDataType>{-5.0, 5.0, 11939}(h_a);
+        ck_tile::FillUniformDistributionIntegerValue<XDataType>{-5.0, 5.0}(h_a);
 #endif
 
         ck_tile::DeviceMem d_a(h_a.get_element_space_size_in_bytes());
