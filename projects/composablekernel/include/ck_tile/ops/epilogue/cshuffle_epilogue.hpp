@@ -341,34 +341,14 @@ struct CShuffleEpilogue
 #endif
 
             constexpr auto lds_block_desc_0 = make_naive_tensor_descriptor(
-                make_tuple(number<MPerIterationShuffle / MLdsLayer>{},
-                           number<NPerIterationShuffle / VectorLen * MLdsLayer>{},
-                           number<VectorLen>{}),
-                make_tuple(number<NPerIterationShuffle * MLdsLayer + PaddingAmount>{},
-                           number<VectorLen>{},
+                make_tuple(number<MPerIterationShuffle>{},
+                           number<NPerIterationShuffle>{}),
+                make_tuple(number<NPerIterationShuffle + PaddingAmount>{},
                            number<1>{}),
                 number<VectorLen>{},
                 number<1>{});
 
-            constexpr auto lds_block_desc_1 = transform_tensor_descriptor(
-                lds_block_desc_0,
-                make_tuple(make_pass_through_transform(number<MPerIterationShuffle / MLdsLayer>{}),
-                           make_unmerge_transform(make_tuple(
-                               number<MLdsLayer>{}, number<NPerIterationShuffle / VectorLen>{})),
-                           make_pass_through_transform(number<VectorLen>{})),
-                make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
-                make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
-
-            constexpr auto lds_block_desc = transform_tensor_descriptor(
-                lds_block_desc_1,
-                make_tuple(make_merge_transform_v3_division_mod(make_tuple(
-                               number<MPerIterationShuffle / MLdsLayer>{}, number<MLdsLayer>{})),
-                           make_merge_transform_v3_division_mod(make_tuple(
-                               number<NPerIterationShuffle / VectorLen>{}, number<VectorLen>{}))),
-                make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
-                make_tuple(sequence<0>{}, sequence<1>{}));
-
-            return lds_block_desc;
+            return lds_block_desc_0;
         }
         // M is contiguous dimension
         else if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::ColumnMajor>)
