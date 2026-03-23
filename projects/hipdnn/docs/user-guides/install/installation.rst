@@ -55,16 +55,16 @@ Follow the instructions at `Install AMD ROCm <https://advanced-micro-devices-roc
 Verify hipDNN installation
 ==========================
 
-The hipDNN library ships with executables that can be used to test the hipDNN library and plugins when GPU hardware is available.
+The hipDNN library ships with executables that can be used to test the hipDNN library and plugins when the GPU hardware is available.
 
-These executables can be run either individually or as a suite using the ``ctest`` driver program. (``ctest`` is isntalled as part of the CMake package.)
+These executables can be run individually or as a suite using the ``ctest`` driver program. (``ctest`` is isntalled as part of the CMake package.)
 
 Run hipDNN unit tests
-=====================
+---------------------
 
-A suite of unit test executables are included with hipDNN. These test executables do not require GPU hardware to run.
+A suite of unit test executables are included with hipDNN. These test executables don't require the GPU hardware to run.
 
-The following example demonstrates running these tests using ``ctest``.
+Here's an example that demonstrates running these tests using ``ctest``:
 
 .. code-block:: console
 
@@ -88,17 +88,16 @@ The following example demonstrates running these tests using ``ctest``.
 
   100% tests passed, 0 tests failed out of 7
 
-On Windows, replace ``/opt/rocm`` with your ROCm install folder when running the above ``ctest`` command.
-
+On Windows, replace ``/opt/rocm`` with your ROCm install folder when running the ``ctest`` command.
 
 Run hipDNN samples
-==================
+------------------
 
 The sample programs shipped with hipDNN require AMD GPU hardware to execute.
 
-The samples will execute supported tensor operations on GPU hardware using the plugins installed with hipDNN.
+The samples execute supported tensor operations on GPU hardware using the plugins installed with hipDNN.
 
-The following example demonstrates running the entire set of samples using ``ctest``.
+This example demonstrates running the entire set of samples using ``ctest``:
 
 .. code-block:: console
 
