@@ -10,6 +10,7 @@
 #include <optional>
 #include <memory>
 
+#include "ck/utility/scheduler_enum.hpp"
 #include "ck/stream_config.hpp"
 
 #ifdef CK_EXPERIMENTAL_BUILDER
@@ -300,6 +301,7 @@ struct BaseOperator
 #if !defined(__HIPCC_RTC__) || !defined(CK_CODE_GEN_RTC)
     virtual bool IsSupportedArgument(const BaseArgument*) { return false; }
     virtual std::string GetTypeString() const { return ""; }
+    virtual ck::BlockGemmPipelineVersion GetBlkGemmPipelineVersion() const { return ck::BlockGemmPipelineVersion::v1; }
 
 #ifdef CK_EXPERIMENTAL_BUILDER
     // Return a description object for this operator, or nullptr if not supported.

@@ -429,7 +429,7 @@ bool profile_grouped_conv_bwd_weight_impl(int do_verification,
 
                 std::cout << "Perf: " << std::setw(10) << avg_time << " ms, " << tflops
                           << " TFlops, " << gb_per_sec << " GB/s, " << op_name << ", SplitK "
-                          << split_k_param_str << std::endl;
+                          << split_k_param_str << " instance#" << (num_kernel - 1) << " " << int(op_ptr->GetBlkGemmPipelineVersion()) << std::endl;
 
                 if(tflops > best_tflops)
                 {

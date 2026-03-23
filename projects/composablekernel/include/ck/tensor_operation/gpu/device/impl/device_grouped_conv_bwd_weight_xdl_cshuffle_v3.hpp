@@ -1654,6 +1654,11 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
         return std::make_unique<Invoker>(Invoker{});
     }
 
+    BlockGemmPipelineVersion GetBlkGemmPipelineVersion() const override
+    {
+        return BlkGemmPipelineVer;
+    }
+
     std::string GetTypeString() const override
     {
         auto str = std::stringstream();
@@ -1684,7 +1689,8 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
             << BBlockTransferDstScalarPerVector_K1 << ", "
             << CShuffleMXdlPerWavePerShuffle << ", "
             << CShuffleNXdlPerWavePerShuffle << ", "
-            << CBlockTransferScalarPerVector_NWaveNPerXdl;
+            << CBlockTransferScalarPerVector_NWaveNPerXdl << ", "
+            << "PipelineVer: " << int(BlkGemmPipelineVer);
             if constexpr(NumGroupsToMerge > 1) 
                 str << ", " << NumGroupsToMerge;
             str << ">";
