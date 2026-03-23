@@ -57,6 +57,8 @@ wo     =  m_gemm % Wo
 
 Range: `m_gemm ∈ [0, M_gemm)`, `n_conv ∈ [0,N)`, `ho ∈ [0,Ho)`, `wo ∈ [0,Wo)`.
 
+> Tests: [MappingBounds](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L251) · [MappingBijection](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L269) · [MDecodeSpecificValues](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L292)
+
 ### k_gemm → conv filter indices
 
 ```
@@ -66,6 +68,8 @@ c_conv =  k_gemm % C
 ```
 
 Range: `k_gemm ∈ [0, K_gemm)`, `y ∈ [0,Y)`, `x ∈ [0,X)`, `c_conv ∈ [0,C)`.
+
+> Tests: [MappingBounds](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L251) · [MappingBijection](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L269) · [KDecodeSpecificValues](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L307)
 
 ### n_gemm → output filter index
 
@@ -127,6 +131,15 @@ const_g          = g × GStride             ← constant per kernel launch
 This holds for any stride, dilation, or padding. Padding affects only the
 validity check (see below), not the address structure.
 
+> Tests (exhaustive decomposition vs. `TransformConvFwdToGemm` reference):
+> [UnitStrideZeroPad](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L331) · [Stride2ZeroPad](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L336) · [Dilation2ZeroPad](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L341) · [WithPadding](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L346)
+>
+> Tests (independence of M and K contributions):
+> [MBaseIndependentOfK](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L376) · [KOffsetIndependentOfM](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L388)
+>
+> Tests (individual contributions vs. reference):
+> [MBaseMatchesDescriptorForK0](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L351) · [KOffsetMatchesDescriptorForM0](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L363)
+
 ---
 
 ## Validity Check (Padding)
@@ -149,6 +162,8 @@ With non-zero padding these cannot be fully separated, but:
   **precomputed once per M-tile** and stored as a small validity mask over k_gemm.
 - For zero padding (common in optimized kernels), the check is unconditionally
   true and can be eliminated entirely.
+
+> Tests: [ValidityMatchesReference](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L722) · [CornerElementsInvalid](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L730) · [CenterFilterValid](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L738) · [ValidElementsDecomposeCorrectly](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L746)
 
 ---
 
@@ -177,6 +192,8 @@ P(n_conv changes within tile) ≈ M_tile / (Ho × Wo)
 For typical values this is negligible (e.g., 16 / 3721 < 0.5%). In practice,
 **n_conv is constant within every tile**.
 
+> Test: [NConvConstantWithinTile](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L526)
+
 ### ho across the tile — general formula
 
 For row `i ∈ [0, M_tile)`, the number of ho-boundaries (wo-row wraps) crossed is:
@@ -202,11 +219,7 @@ B_total = ⌊(wo_0 + M_tile − 1) / Wo⌋
 | M_tile ≤ Wo, wo_0 > Wo − M_tile | 1 | (M_tile − 1) / Wo |
 | M_tile > Wo | ⌊M_tile/Wo⌋ or ⌊M_tile/Wo⌋+1 | — |
 
-For the analyzed case (M_tile=16, Wo=61):
-- P(B_total=0) = 46/61 ≈ **75.4%** (theoretical)
-- P(B_total=1) = 15/61 ≈ **24.6%**
-- Empirical from data: 83.6% / 16.4% (sampling bias toward single-ho tiles
-  likely due to non-uniform printf buffer dropout)
+> Tests: [BoundaryCountFormula](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L478) · [BoundaryProbability](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L549)
 
 ### M_base across the tile
 
@@ -226,13 +239,15 @@ M_base[i] = M_base[0]  +  i × step_w  +  B(i) × wrap_delta
 
 where `B(i) = ⌊(wo_0 + i) / Wo⌋`.
 
-- **When B_total=0** (83.6% of tiles): `B(i) = 0` for all i → `M_base[i] = M_base[0] + i × step_w`.
+- **When B_total=0**: `B(i) = 0` for all i → `M_base[i] = M_base[0] + i × step_w`.
   Pure linear: no division required after tile setup.
 
-- **When B_total=1** (16.4% of tiles): `B(i) = 0` for `i < Wo − wo_0`, then 1.
+- **When B_total=1**: `B(i) = 0` for `i < Wo − wo_0`, then 1.
   One conditional add of `wrap_delta`.
 
 - **When B_total≥2** (M_tile > Wo only): general formula applies, computed incrementally.
+
+> Tests: [StepWAndWrapDeltaValues](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L415) · [SingleHoTileIsLinear](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L427) · [DualHoTileHasWrapDelta](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L450) · [GeneralFormulaWithNWraps](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L499)
 
 ---
 
@@ -263,8 +278,7 @@ When `K_tile = X × C` (one full filter row per K-tile): exactly 1 y value, all 
 When `K_tile = C` (one filter column per K-tile): exactly 1 y, 1 x value. Simplest case.
 When `K_tile = 2C` (as in the analyzed case, K_tile=64, C=32): 1 y, 2 x values.
 
-For the analyzed case (K_tile=64, X=4, C=32, X×C=128):
-`K_tile < X×C` → **y is constant** within every K-tile. ✓
+> Tests: [YConstantForKTileEqualC](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L577) · [YConstantForKTileEqual2C](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L593)
 
 ### x across the K-tile
 
@@ -274,8 +288,6 @@ The general count of x-values:
 ```
 x_count = ⌈K_tile / C⌉    (may be non-integer if K_tile not multiple of C)
 ```
-
-For the analyzed case: 64/32 = **2 x-values per K-tile** (x changes once at the midpoint).
 
 ### c_conv across the K-tile
 
@@ -294,6 +306,8 @@ For unit dilation (DH=DW=1): `ΔK_x = WiStride − C`, `ΔK_y = HiStride − X �
 
 The K_offset can be computed incrementally by tracking only these deltas — no
 division or modulo required in the inner loop.
+
+> Tests: [KOffsetIncrementsByOnePerC](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L622) · [KOffsetXTransitionStep](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L635) · [KOffsetYTransitionStep](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L650) · [Dilation2KOffsetYStep](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L701)
 
 ---
 
@@ -319,7 +333,8 @@ Step 5.  M_base[i] for i = 1..M_tile-1:
 ```
 
 Amortization cost: 3 divisions amortized over `M_tile × K_tiles_per_block` element loads.
-For the analyzed case: 3 / (16 × 8) = **0.023 divisions per element load**.
+
+> Test: [PrecomputedArrayMatchesMBase](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L782)
 
 ### At each K-tile start — once per K-tile
 
@@ -346,6 +361,8 @@ where `local_x = local_k / C` (0 or 1 for K_tile = 2C) and `local_c = local_k % 
 advance by 1 each step with periodic x-increment.
 
 **Hot path cost: 2 register loads + 2 additions.** No division or modulo.
+
+> Test (full round-trip precomputed M_base + K_offset vs. reference): [PrecomputedPlusKOffsetMatchesReference](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L794)
 
 ---
 
@@ -421,6 +438,8 @@ Probability ≈ M_tile / (Ho × Wo). When it occurs (e.g., last few M-tiles):
 - Add `NStride` to M_base for subsequent rows, similar to `wrap_delta`
 - Negligible frequency; can be handled with a branch
 
+> Test: [NConvConstantWithinTile](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L526)
+
 ### When K_tile > X×C (y changes within K-tile)
 
 y-boundaries within K-tile: `⌊(x_0 + K_tile/C − 1) / X⌋`
@@ -434,6 +453,8 @@ Large SH or SW reduce Ho/Wo, which increases P(n_conv spans tile) and
 P(ho is constant per tile). Large strides favour the precomputed approach
 since M_base changes more slowly per output element.
 
+> Tests: [Stride2DecompositionVsReference](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L670) · [Stride2StepW](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L680)
+
 ### Alignment of K_tile to C
 
 If K_tile is not a multiple of C, the K-tile may start mid-cycle in c_conv.
@@ -443,6 +464,5 @@ and the x-transition point accordingly.
 
 ## Testing
 
-Unit tests for the im2col index calculations
-
-- projects/composablekernel/test/ck_tile/image_to_column/test_im2col_index_mapping.cpp
+Unit tests for the im2col index calculations:
+[test_im2col_index_mapping.cpp](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp)
