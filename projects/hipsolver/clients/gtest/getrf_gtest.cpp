@@ -124,250 +124,250 @@ protected:
     }
 };
 
-class Getrf : public GETRF_BASE<API_NORMAL, false, int, int>
+class GETRF : public GETRF_BASE<API_NORMAL, false, int, int>
 {
 };
 
-class GetrfNpvt : public GETRF_BASE<API_NORMAL, true, int, int>
+class GETRF_NPVT : public GETRF_BASE<API_NORMAL, true, int, int>
 {
 };
 
-class GetrfFortran : public GETRF_BASE<API_FORTRAN, false, int, int>
+class GETRF_FORTRAN : public GETRF_BASE<API_FORTRAN, false, int, int>
 {
 };
 
-class GetrfCompat : public GETRF_BASE<API_COMPAT, false, int, int>
+class GETRF_COMPAT : public GETRF_BASE<API_COMPAT, false, int, int>
 {
 };
 
-class GetrfCompat64 : public GETRF_BASE<API_COMPAT, false, int64_t, size_t>
+class GETRF_COMPAT_64 : public GETRF_BASE<API_COMPAT, false, int64_t, size_t>
 {
 };
 
-class GetrfCompatNpvt64 : public GETRF_BASE<API_COMPAT, true, int64_t, size_t>
+class GETRF_COMPAT_NPVT_64 : public GETRF_BASE<API_COMPAT, true, int64_t, size_t>
 {
 };
 
-class GetrfBatched : public GETRF_BASE<API_NORMAL, false, int, int>
+class GETRF_BATCHED : public GETRF_BASE<API_NORMAL, false, int, int>
 {
 };
 
-class GetrfNpvtBatched : public GETRF_BASE<API_NORMAL, true, int, int>
+class GETRF_NPVT_BATCHED : public GETRF_BASE<API_NORMAL, true, int, int>
 {
 };
 
 // non-batch tests
 
-TEST_P(Getrf, Float)
+TEST_P(GETRF, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(Getrf, Double)
+TEST_P(GETRF, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(Getrf, FloatComplex)
+TEST_P(GETRF, __float_complex)
 {
     run_tests<false, false, hipsolverComplex>();
 }
 
-TEST_P(Getrf, DoubleComplex)
+TEST_P(GETRF, __double_complex)
 {
     run_tests<false, false, hipsolverDoubleComplex>();
 }
 
-TEST_P(GetrfNpvt, Float)
+TEST_P(GETRF_NPVT, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GetrfNpvt, Double)
+TEST_P(GETRF_NPVT, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GetrfNpvt, FloatComplex)
+TEST_P(GETRF_NPVT, __float_complex)
 {
     run_tests<false, false, hipsolverComplex>();
 }
 
-TEST_P(GetrfNpvt, DoubleComplex)
+TEST_P(GETRF_NPVT, __double_complex)
 {
     run_tests<false, false, hipsolverDoubleComplex>();
 }
 
-TEST_P(GetrfFortran, Float)
+TEST_P(GETRF_FORTRAN, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GetrfFortran, Double)
+TEST_P(GETRF_FORTRAN, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GetrfFortran, FloatComplex)
+TEST_P(GETRF_FORTRAN, __float_complex)
 {
     run_tests<false, false, hipsolverComplex>();
 }
 
-TEST_P(GetrfFortran, DoubleComplex)
+TEST_P(GETRF_FORTRAN, __double_complex)
 {
     run_tests<false, false, hipsolverDoubleComplex>();
 }
 
-TEST_P(GetrfCompat, Float)
+TEST_P(GETRF_COMPAT, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GetrfCompat, Double)
+TEST_P(GETRF_COMPAT, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GetrfCompat, FloatComplex)
+TEST_P(GETRF_COMPAT, __float_complex)
 {
     run_tests<false, false, hipsolverComplex>();
 }
 
-TEST_P(GetrfCompat, DoubleComplex)
+TEST_P(GETRF_COMPAT, __double_complex)
 {
     run_tests<false, false, hipsolverDoubleComplex>();
 }
 
-TEST_P(GetrfCompat64, Float)
+TEST_P(GETRF_COMPAT_64, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GetrfCompat64, Double)
+TEST_P(GETRF_COMPAT_64, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GetrfCompat64, FloatComplex)
+TEST_P(GETRF_COMPAT_64, __float_complex)
 {
     run_tests<false, false, hipsolverComplex>();
 }
 
-TEST_P(GetrfCompat64, DoubleComplex)
+TEST_P(GETRF_COMPAT_64, __double_complex)
 {
     run_tests<false, false, hipsolverDoubleComplex>();
 }
 
-TEST_P(GetrfCompatNpvt64, Float)
+TEST_P(GETRF_COMPAT_NPVT_64, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GetrfCompatNpvt64, Double)
+TEST_P(GETRF_COMPAT_NPVT_64, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GetrfCompatNpvt64, FloatComplex)
+TEST_P(GETRF_COMPAT_NPVT_64, __float_complex)
 {
     run_tests<false, false, hipsolverComplex>();
 }
 
-TEST_P(GetrfCompatNpvt64, DoubleComplex)
+TEST_P(GETRF_COMPAT_NPVT_64, __double_complex)
 {
     run_tests<false, false, hipsolverDoubleComplex>();
 }
 
 // batched tests
 
-TEST_P(GetrfBatched, BatchedFloat)
+TEST_P(GETRF_BATCHED, batched__float)
 {
     run_tests<true, false, float>();
 }
 
-TEST_P(GetrfBatched, BatchedDouble)
+TEST_P(GETRF_BATCHED, batched__double)
 {
     run_tests<true, false, double>();
 }
 
-TEST_P(GetrfBatched, BatchedFloatComplex)
+TEST_P(GETRF_BATCHED, batched__float_complex)
 {
     run_tests<true, false, hipsolverComplex>();
 }
 
-TEST_P(GetrfBatched, BatchedDoubleComplex)
+TEST_P(GETRF_BATCHED, batched__double_complex)
 {
     run_tests<true, false, hipsolverDoubleComplex>();
 }
 
-TEST_P(GetrfNpvtBatched, BatchedFloat)
+TEST_P(GETRF_NPVT_BATCHED, batched__float)
 {
     run_tests<true, false, float>();
 }
 
-TEST_P(GetrfNpvtBatched, BatchedDouble)
+TEST_P(GETRF_NPVT_BATCHED, batched__double)
 {
     run_tests<true, false, double>();
 }
 
-TEST_P(GetrfNpvtBatched, BatchedFloatComplex)
+TEST_P(GETRF_NPVT_BATCHED, batched__float_complex)
 {
     run_tests<true, false, hipsolverComplex>();
 }
 
-TEST_P(GetrfNpvtBatched, BatchedDoubleComplex)
+TEST_P(GETRF_NPVT_BATCHED, batched__double_complex)
 {
     run_tests<true, false, hipsolverDoubleComplex>();
 }
 
 // INSTANTIATE_TEST_SUITE_P(daily_lapack,
-//                          Getrf,
+//                          GETRF,
 //                          Combine(ValuesIn(large_matrix_size_range), ValuesIn(large_n_size_range)));
 
 INSTANTIATE_TEST_SUITE_P(checkin_lapack,
-                         Getrf,
+                         GETRF,
                          Combine(ValuesIn(matrix_size_range), ValuesIn(n_size_range)));
 
 // INSTANTIATE_TEST_SUITE_P(daily_lapack,
-//                          GetrfNpvt,
+//                          GETRF_NPVT,
 //                          Combine(ValuesIn(large_matrix_size_range), ValuesIn(large_n_size_range)));
 
 INSTANTIATE_TEST_SUITE_P(checkin_lapack,
-                         GetrfNpvt,
+                         GETRF_NPVT,
                          Combine(ValuesIn(matrix_size_range), ValuesIn(n_size_range)));
 
 // INSTANTIATE_TEST_SUITE_P(daily_lapack,
-//                          GetrfFortran,
+//                          GETRF_FORTRAN,
 //                          Combine(ValuesIn(large_matrix_size_range), ValuesIn(large_n_size_range)));
 
 INSTANTIATE_TEST_SUITE_P(checkin_lapack,
-                         GetrfFortran,
+                         GETRF_FORTRAN,
                          Combine(ValuesIn(matrix_size_range), ValuesIn(n_size_range)));
 
 // INSTANTIATE_TEST_SUITE_P(daily_lapack,
-//                          GetrfCompat,
+//                          GETRF_COMPAT,
 //                          Combine(ValuesIn(large_matrix_size_range), ValuesIn(large_n_size_range)));
 
 INSTANTIATE_TEST_SUITE_P(checkin_lapack,
-                         GetrfCompat,
+                         GETRF_COMPAT,
                          Combine(ValuesIn(matrix_size_range), ValuesIn(n_size_range)));
 
 // INSTANTIATE_TEST_SUITE_P(daily_lapack,
-//                          GetrfCompat64,
+//                          GETRF_COMPAT_64,
 //                          Combine(ValuesIn(large_matrix_size_range), ValuesIn(large_n_size_range)));
 
 INSTANTIATE_TEST_SUITE_P(checkin_lapack,
-                         GetrfCompat64,
+                         GETRF_COMPAT_64,
                          Combine(ValuesIn(matrix_size_range), ValuesIn(n_size_range)));
 
 // INSTANTIATE_TEST_SUITE_P(daily_lapack,
-//                          GetrfCompatNpvt64,
+//                          GETRF_COMPAT_NPVT_64,
 //                          Combine(ValuesIn(large_matrix_size_range), ValuesIn(large_n_size_range)));
 
 INSTANTIATE_TEST_SUITE_P(checkin_lapack,
-                         GetrfCompatNpvt64,
+                         GETRF_COMPAT_NPVT_64,
                          Combine(ValuesIn(matrix_size_range), ValuesIn(n_size_range)));
 
-INSTANTIATE_TEST_SUITE_P(checkin_lapack, GetrfBatched, ValuesIn(batched_square_range));
+INSTANTIATE_TEST_SUITE_P(checkin_lapack, GETRF_BATCHED, ValuesIn(batched_square_range));
 
-INSTANTIATE_TEST_SUITE_P(checkin_lapack, GetrfNpvtBatched, ValuesIn(batched_square_range));
+INSTANTIATE_TEST_SUITE_P(checkin_lapack, GETRF_NPVT_BATCHED, ValuesIn(batched_square_range));
