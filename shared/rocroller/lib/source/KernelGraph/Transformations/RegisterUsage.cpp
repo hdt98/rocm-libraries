@@ -1293,7 +1293,7 @@ namespace rocRoller
                         if(aliasedInners.contains(coordTag))
                             continue;
 
-                        // Skip if no register for this coordinate
+                        // Skip if no register for this coordinate (e.g., constant)
                         if(coordNoRegister.contains(coordTag))
                             continue;
 
@@ -1339,21 +1339,21 @@ namespace rocRoller
                 std::string coordText = dumpCoordinateAccessMap(
                     kgraph, allExtents, allTypes, regEstimates, recordsByCoord);
                 Log::info("Coordinate Access Map:\n{}", coordText);
-                // --- 3. DOT: control graph liveness ---
-                {
-                    std::ofstream dot("control_liveness.dot");
-                    exportControlGraphLivenessDot(
-                        dot, kgraph, allExtents, allTypes, regEstimates, result);
-                }
-                // Render: python3 scripts/render_register_usage.py control_liveness.dot
-                // --- 4. DOT: coordinate access map ---
-                {
-                    std::ofstream dot("coord_access.dot");
-                    exportCoordinateAccessDot(
-                        dot, kgraph, allExtents, allTypes, regEstimates, recordsByCoord);
-                }
+                // // --- 3. DOT: control graph liveness ---
+                // {
+                //     std::ofstream dot("control_liveness.dot");
+                //     exportControlGraphLivenessDot(
+                //         dot, kgraph, allExtents, allTypes, regEstimates, result);
+                // }
+                // // Render: python3 scripts/render_register_usage.py control_liveness.dot
+                // // --- 4. DOT: coordinate access map ---
+                // {
+                //     std::ofstream dot("coord_access.dot");
+                //     exportCoordinateAccessDot(
+                //         dot, kgraph, allExtents, allTypes, regEstimates, recordsByCoord);
+                // }
 
-                exit(0);
+                //exit(0);
                 return result;
             }
 

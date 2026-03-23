@@ -82,6 +82,7 @@ namespace rocRoller
                 // Other Observers
                 FileWritingObserver,
                 RegisterLivenessObserver,
+                RegisterCountObserver,
                 SupportedInstructionObserver>
                 potentialObservers;
 
