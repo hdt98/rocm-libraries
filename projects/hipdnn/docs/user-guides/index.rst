@@ -12,7 +12,9 @@ hipDNN uses operation graphs as an intermediate representation for describing co
 
 hipDNN provides an interface that follows established deep learning conventions and a plugin-based architecture, which allows advanced users to extend hipDNN without modifying the core library.
 
-New users can :ref:`migrate-cudnn`.
+.. note::
+
+  New users can :ref:`migrate-cudnn`.
 
 The public repository for hipDNN is located at `https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn>`_.
 
