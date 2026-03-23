@@ -789,13 +789,11 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
             dtype in cls._DT_FP8
             or dtype in cls._DT_FP8BF16
             or dtype in cls._DT_I8FP8BF16
+            or dtype in cls._DT_I4FP8BF16
         ):
             return {
-                (128, 128) : [SageAttnFwdTileSize(128,  128, 32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1)],
-            }  # fmt: skip
-        elif dtype in cls._DT_I4FP8BF16:
-            return {
-                (128, 128) : [SageAttnFwdTileSize(128,   64, 32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1)],
+                (128, 128) : [SageAttnFwdTileSize(128,  128, 32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1),
+                              SageAttnFwdTileSize(128,   64, 32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1)],
             }  # fmt: skip
         else:
             raise ValueError(f"unsupported dtype={dtype}")
@@ -908,15 +906,40 @@ class Product:
 
 
 def get_product(receipt: int) -> Product:
-    # Build all supported dtypes and configurations
-    def fit(problem_ctx: ProblemContext, kernel_ctx: KernelContext) -> bool:
-        # fp16/bf16 only support qscale="no"
-        if problem_ctx.dtype in ["fp16", "bf16"]:
-            if kernel_ctx.pipeline.F_qscale != "no":
-                return False
-        return True
+    if receipt == 0:
+        def fit(problem_ctx: ProblemContext, kernel_ctx: KernelContext) -> bool:
+            if problem_ctx.dtype in ["fp16", "bf16"]:
+                if kernel_ctx.pipeline.F_qscale != "no":
+                    return False
+            # receipt=0: only NPerBlock=128
+            if problem_ctx.dtype not in ["fp16", "bf16"]:
+                if kernel_ctx.tile.F_bn0 != 128:
+                    return False
+            return True
 
-    return Product(name="Default", rule=fit)
+        return Product(name="Default (NPerBlock=128)", rule=fit)
+
+    elif receipt == 100:
+        def fit(problem_ctx: ProblemContext, kernel_ctx: KernelContext) -> bool:
+            if problem_ctx.dtype in ["fp16", "bf16"]:
+                if kernel_ctx.pipeline.F_qscale != "no":
+                    return False
+            # receipt=100: only NPerBlock=64
+            if problem_ctx.dtype not in ["fp16", "bf16"]:
+                if kernel_ctx.tile.F_bn0 != 64:
+                    return False
+            return True
+
+        return Product(name="NPerBlock=64", rule=fit)
+
+    else:
+        def fit(problem_ctx: ProblemContext, kernel_ctx: KernelContext) -> bool:
+            if problem_ctx.dtype in ["fp16", "bf16"]:
+                if kernel_ctx.pipeline.F_qscale != "no":
+                    return False
+            return True
+
+        return Product(name="All tiles", rule=fit)
 
 
 def get_fwd_blobs(
