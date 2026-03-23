@@ -6,7 +6,6 @@
 #include "ck_tile/core.hpp"
 #include "ck_tile/core/arch/arch.hpp"
 #include "ck_tile/core/arch/mma/amdgcn_mma.hpp"
-#include "ck_tile/core/arch/mma/mma_traits.hpp"
 #include "ck_tile/core/arch/mma/mma_selector.hpp"
 #include "ck_tile/core/numeric/half.hpp"
 #include "ck_tile/core/numeric/vector_type.hpp"
@@ -68,7 +67,9 @@ struct RegisterMap
 /**
  * @brief RegisterMapTraits for GFX12 WMMA 16x16x16_F16_F16_F32_GFX12
  */
-template <typename CtrlFlags, typename CompilerTarget>
+template <typename CtrlFlags,
+          typename CompilerTarget,
+          ck_tile::core::arch::mma::MmaOpFamily OpFamily_>
 struct RegisterMapTraits<ck_tile::core::arch::mma::amdgcn_mma<
     ck_tile::fp16_t,
     ck_tile::fp16_t,
@@ -78,6 +79,7 @@ struct RegisterMapTraits<ck_tile::core::arch::mma::amdgcn_mma<
     16u,
     CtrlFlags,
     CompilerTarget,
+    OpFamily_,
     ck_tile::core::arch::enable_if_target_family_gfx12_t<CompilerTarget>>>
 {
     using MmaOp = ck_tile::core::arch::mma::amdgcn_mma<ck_tile::fp16_t,
@@ -87,14 +89,12 @@ struct RegisterMapTraits<ck_tile::core::arch::mma::amdgcn_mma<
                                                        16u,
                                                        16u,
                                                        CtrlFlags,
-                                                       CompilerTarget>;
+                                                       CompilerTarget,
+                                                       OpFamily_>;
 
-    using MmaTraits = ck_tile::core::arch::mma::MmaOpTraits<MmaOp>;
-    static constexpr index_t WaveSize =
-        static_cast<index_t>(MmaTraits::CompilerTarget::WAVE_SIZE_ID);
-    static constexpr index_t AVecSize = vector_traits<typename MmaTraits::AVecType>::vector_size;
-    static constexpr index_t BVecSize = vector_traits<typename MmaTraits::BVecType>::vector_size;
-    static constexpr index_t CVecSize = vector_traits<typename MmaTraits::CVecType>::vector_size;
+    static constexpr index_t AVecSize = vector_traits<typename MmaOp::AVecType>::vector_size;
+    static constexpr index_t BVecSize = vector_traits<typename MmaOp::BVecType>::vector_size;
+    static constexpr index_t CVecSize = vector_traits<typename MmaOp::CVecType>::vector_size;
 
     using kABPs2RHssMajor = sequence<2, 1>;
     using kABPs2RHssMinor = sequence<1, 0>;
@@ -147,7 +147,9 @@ struct RegisterMapTraits<ck_tile::core::arch::mma::amdgcn_mma<
 /**
  * @brief RegisterMapTraits for GFX9 MFMA 16x16x16_F16_F16_F32_GFX9
  */
-template <typename CtrlFlags, typename CompilerTarget>
+template <typename CtrlFlags,
+          typename CompilerTarget,
+          ck_tile::core::arch::mma::MmaOpFamily OpFamily_>
 struct RegisterMapTraits<ck_tile::core::arch::mma::amdgcn_mma<
     ck_tile::fp16_t,
     ck_tile::fp16_t,
@@ -157,6 +159,7 @@ struct RegisterMapTraits<ck_tile::core::arch::mma::amdgcn_mma<
     16u,
     CtrlFlags,
     CompilerTarget,
+    OpFamily_,
     ck_tile::core::arch::enable_if_target_family_gfx9_t<CompilerTarget>>>
 {
     using MmaOp = ck_tile::core::arch::mma::amdgcn_mma<ck_tile::fp16_t,
@@ -166,14 +169,12 @@ struct RegisterMapTraits<ck_tile::core::arch::mma::amdgcn_mma<
                                                        16u,
                                                        16u,
                                                        CtrlFlags,
-                                                       CompilerTarget>;
+                                                       CompilerTarget,
+                                                       OpFamily_>;
 
-    using MmaTraits = ck_tile::core::arch::mma::MmaOpTraits<MmaOp>;
-    static constexpr index_t WaveSize =
-        static_cast<index_t>(MmaTraits::CompilerTarget::WAVE_SIZE_ID);
-    static constexpr index_t AVecSize = vector_traits<typename MmaTraits::AVecType>::vector_size;
-    static constexpr index_t BVecSize = vector_traits<typename MmaTraits::BVecType>::vector_size;
-    static constexpr index_t CVecSize = vector_traits<typename MmaTraits::CVecType>::vector_size;
+    static constexpr index_t AVecSize = vector_traits<typename MmaOp::AVecType>::vector_size;
+    static constexpr index_t BVecSize = vector_traits<typename MmaOp::BVecType>::vector_size;
+    static constexpr index_t CVecSize = vector_traits<typename MmaOp::CVecType>::vector_size;
 
     using kABPs2RHssMajor = sequence<2, 1>;
     using kABPs2RHssMinor = sequence<0, 0>;
@@ -184,35 +185,49 @@ struct RegisterMapTraits<ck_tile::core::arch::mma::amdgcn_mma<
     using kCYs2RHsMajor   = sequence<1>;
     using kCYs2RHsMinor   = sequence<1>;
 
-    using AWarpDstrEncoding = tile_distribution_encoding<
-        sequence<1>,
-        tuple<sequence<MmaOp::kAMLane>, sequence<MmaOp::kABKLane, MmaOp::kABKPerLane>>,
-        tuple<kABPs2RHssMajor>,
-        tuple<kABPs2RHssMinor>,
-        kABYs2RHsMajor,
-        kABYs2RHsMinor>;
+    // TODO:  remove these and fix constants in amdgcn_mma
+    static constexpr index_t kAMBlock    = 1;
+    static constexpr index_t kBNBlock    = 1;
+    static constexpr index_t kAMLane     = 16;
+    static constexpr index_t kBNLane     = 16;
+    static constexpr index_t kABKLane    = 4;
+    static constexpr index_t kABKPerLane = 4;
+    static constexpr index_t kCMLane     = 4;
+    static constexpr index_t kCNLane     = 16;
+    static constexpr index_t kCM0PerLane = 1;
+    static constexpr index_t kCM1PerLane = 4;
 
-    using BWarpDstrEncoding = tile_distribution_encoding<
-        sequence<1>,
-        tuple<sequence<MmaOp::kBNLane>, sequence<MmaOp::kABKLane, MmaOp::kABKPerLane>>,
-        tuple<kABPs2RHssMajor>,
-        tuple<kABPs2RHssMinor>,
-        kABYs2RHsMajor,
-        kABYs2RHsMinor>;
+    using AWarpDstrEncoding =
+        tile_distribution_encoding<sequence<1>,
+                                   tuple<sequence<kAMLane>, sequence<kABKLane, kABKPerLane>>,
+                                   tuple<kABPs2RHssMajor>,
+                                   tuple<kABPs2RHssMinor>,
+                                   kABYs2RHsMajor,
+                                   kABYs2RHsMinor>;
 
-    using CWarpDstrEncoding = tile_distribution_encoding<
-        sequence<1>,
-        tuple<sequence<MmaOp::kCMLane, MmaOp::kCM1PerLane>, sequence<MmaOp::kCNLane>>,
-        tuple<kCPs2RHssMajor>,
-        tuple<kCPs2RHssMinor>,
-        kCYs2RHsMajor,
-        kCYs2RHsMinor>;
+    using BWarpDstrEncoding =
+        tile_distribution_encoding<sequence<1>,
+                                   tuple<sequence<kBNLane>, sequence<kABKLane, kABKPerLane>>,
+                                   tuple<kABPs2RHssMajor>,
+                                   tuple<kABPs2RHssMinor>,
+                                   kABYs2RHsMajor,
+                                   kABYs2RHsMinor>;
+
+    using CWarpDstrEncoding =
+        tile_distribution_encoding<sequence<1>,
+                                   tuple<sequence<kCMLane, kCM1PerLane>, sequence<kCNLane>>,
+                                   tuple<kCPs2RHssMajor>,
+                                   tuple<kCPs2RHssMinor>,
+                                   kCYs2RHsMajor,
+                                   kCYs2RHsMinor>;
 };
 
 /**
  * @brief RegisterMapTraits for GFX11 WMMA 16x16x16_F16_F16_F32_GFX11
  */
-template <typename CtrlFlags, typename CompilerTarget>
+template <typename CtrlFlags,
+          typename CompilerTarget,
+          ck_tile::core::arch::mma::MmaOpFamily OpFamily_>
 struct RegisterMapTraits<ck_tile::core::arch::mma::amdgcn_mma<
     ck_tile::fp16_t,
     ck_tile::fp16_t,
@@ -222,6 +237,7 @@ struct RegisterMapTraits<ck_tile::core::arch::mma::amdgcn_mma<
     16u,
     CtrlFlags,
     CompilerTarget,
+    OpFamily_,
     ck_tile::core::arch::enable_if_target_family_gfx11_t<CompilerTarget>>>
 {
     using MmaOp = ck_tile::core::arch::mma::amdgcn_mma<ck_tile::fp16_t,
@@ -231,14 +247,12 @@ struct RegisterMapTraits<ck_tile::core::arch::mma::amdgcn_mma<
                                                        16u,
                                                        16u,
                                                        CtrlFlags,
-                                                       CompilerTarget>;
+                                                       CompilerTarget,
+                                                       OpFamily_>;
 
-    using MmaTraits = ck_tile::core::arch::mma::MmaOpTraits<MmaOp>;
-    static constexpr index_t WaveSize =
-        static_cast<index_t>(MmaTraits::CompilerTarget::WAVE_SIZE_ID);
-    static constexpr index_t AVecSize = vector_traits<typename MmaTraits::AVecType>::vector_size;
-    static constexpr index_t BVecSize = vector_traits<typename MmaTraits::BVecType>::vector_size;
-    static constexpr index_t CVecSize = vector_traits<typename MmaTraits::CVecType>::vector_size;
+    static constexpr index_t AVecSize = vector_traits<typename MmaOp::AVecType>::vector_size;
+    static constexpr index_t BVecSize = vector_traits<typename MmaOp::BVecType>::vector_size;
+    static constexpr index_t CVecSize = vector_traits<typename MmaOp::CVecType>::vector_size;
 
     using kABPs2RHssMajor = sequence<0, 1>;
     using kABPs2RHssMinor = sequence<0, 0>;

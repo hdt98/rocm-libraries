@@ -420,7 +420,7 @@ auto GenericSearch(const Solver s,
     const auto invoke_ctx = [invoke_ctx_]() {
         auto copy = invoke_ctx_;
         copy.SetInvokeType(InvokeType::AutoTune);
-        return copy;
+        return std::move(copy);
     }();
 
     // list of sampled solutions
@@ -505,6 +505,8 @@ auto GenericSearch(const Solver s,
         std::vector<float> samples;
         // Set tuning mode flag for kernel logging - extends to all runs in this scope
         miopen::ScopedKernelPhase phase_scope(miopen::KernelPhase::SolverTuning);
+        float tuning_tolerance =
+            1.0f + static_cast<float>(env::value(MIOPEN_TUNING_FOLLOWUP_TOLERANCE_PCT)) / 100.0f;
         while(true)
         {
             if(n_current >= n_runs_total)
@@ -631,19 +633,18 @@ auto GenericSearch(const Solver s,
                 }
 
                 // Smooth the jitter of measurements:
-                // If the 1st probe is NOT too bad (measured time <= 1.10 * worst sample of the best
-                // config), then gather 9 more samples, and remove positive z-score outliers. Use
-                // the mean value with outliers removed for calculating best config.
-                constexpr int N_RUNS = 10;
+                // If the 1st probe is NOT too bad (measured time <= tuning_tolerance * worst sample
+                // of the best config), then gather more samples, and remove positive z-score
+                // outliers. Use the mean value with outliers removed for calculating best config.
                 last_imprv++;
-                if(elapsed_time < worst_time * 1.10f && elapsed_time < skip_time)
+                if(elapsed_time < worst_time * tuning_tolerance && elapsed_time < skip_time)
                 {
                     MIOPEN_LOG_I2("Finding average for: " << elapsed_time << " / " << best_time
                                                           << " = " << (elapsed_time / best_time));
 
                     try
                     {
-                        for(int i = 1; i < N_RUNS; ++i)
+                        for(int i = 1; i < env::value(MIOPEN_TUNING_ITERATIONS); ++i)
                         {
                             IncrementKernelExecutionCounter();
                             invoker(profile_h, invoke_ctx);
@@ -741,7 +742,8 @@ auto GenericSearch(const Solver s,
     {
         MIOPEN_LOG_I(
             "Search cutoff or skipped for all kernels.  Last config returned: " << last_config);
-        return last_config;
+        best_config = std::move(last_config);
+        return best_config;
     }
 
     if(!is_passed)
