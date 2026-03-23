@@ -368,27 +368,27 @@ consteval ResolvedSignature resolve(Signature sig)
 // --- Simple GemmOp: resolves to 3 tensors with operator defaults ---
 static_assert(resolve(Signature{
     .dtype = DataType::FP16,
-    .ops = {GemmOp{}}}).num_tensors == 3);
+    .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}).num_tensors == 3);
 
 static_assert(resolve(Signature{
     .dtype = DataType::FP16,
-    .ops = {GemmOp{}}}).tensor("A").dtype == DataType::FP16);
+    .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}).tensor("A").dtype == DataType::FP16);
 
 static_assert(resolve(Signature{
     .dtype = DataType::FP16,
-    .ops = {GemmOp{}}}).tensor("A").rank == 2);
+    .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}).tensor("A").rank == 2);
 
 static_assert(resolve(Signature{
     .dtype = DataType::FP16,
-    .ops = {GemmOp{}}}).tensor("A").layout == Layout::Row);
+    .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}).tensor("A").layout == Layout::Row);
 
 static_assert(resolve(Signature{
     .dtype = DataType::FP16,
-    .ops = {GemmOp{}}}).tensor("B").layout == Layout::Col);
+    .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}).tensor("B").layout == Layout::Col);
 
 static_assert(resolve(Signature{
     .dtype = DataType::FP16,
-    .ops = {GemmOp{}}}).tensor("C").layout == Layout::Row);
+    .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}).tensor("C").layout == Layout::Row);
 
 // --- GemmOp with custom tensor names ---
 static_assert(resolve(Signature{
@@ -398,33 +398,33 @@ static_assert(resolve(Signature{
 // --- dtype cascade: sig.dtype applies to all tensors ---
 static_assert(resolve(Signature{
     .dtype = DataType::BF16,
-    .ops = {GemmOp{}}}).tensor("A").dtype == DataType::BF16);
+    .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}).tensor("A").dtype == DataType::BF16);
 
 static_assert(resolve(Signature{
     .dtype = DataType::BF16,
-    .ops = {GemmOp{}}}).tensor("C").dtype == DataType::BF16);
+    .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}).tensor("C").dtype == DataType::BF16);
 
 // --- Explicit tensor dtype overrides sig.dtype ---
 static_assert(resolve(Signature{
     .dtype = DataType::FP16,
     .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
-    .ops = {GemmOp{}}}).tensor("C").dtype == DataType::FP32);
+    .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}).tensor("C").dtype == DataType::FP32);
 
 static_assert(resolve(Signature{
     .dtype = DataType::FP16,
     .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
-    .ops = {GemmOp{}}}).tensor("A").dtype == DataType::FP16);
+    .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}).tensor("A").dtype == DataType::FP16);
 
 // --- Explicit tensor rank/layout overrides operator defaults ---
 static_assert(resolve(Signature{
     .dtype = DataType::FP16,
     .tensors = {Tensor{.name = "A", .rank = 3}},
-    .ops = {GemmOp{}}}).tensor("A").rank == 3);
+    .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}).tensor("A").rank == 3);
 
 // --- GEMM + Add + Relu: propagation test ---
 constexpr ResolvedSignature gemm_add_relu_resolved = resolve(Signature{
     .dtype = DataType::FP16,
-    .ops = {GemmOp{.out = "C"},
+    .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
             AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
             ReluOp{.in = "D", .out = "E"}}});
 
@@ -466,11 +466,11 @@ static_assert(fmha_resolved.tensor("O").rank == 2);
 // Error cases (uncommenting any would produce consteval compile errors):
 //
 // No dtype:
-// resolve(Signature{.ops = {GemmOp{}}})
+// resolve(Signature{.ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}})
 //
 // SSA violation (two ops output "C"):
 // resolve(Signature{.dtype = DataType::FP16,
-//         .ops = {GemmOp{.out = "C"},
+//         .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
 //                 AddOp{.lhs = "X", .rhs = "Y", .out = "C"}}})
 
 // clang-format on

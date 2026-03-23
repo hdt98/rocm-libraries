@@ -17,13 +17,14 @@
 namespace rocm_ck {
 
 /// Matrix multiplication: out = lhs x rhs.
-/// Default tensor names follow BLAS convention (A, B, C).
+/// All tensor labels must be explicit — no implicit defaults.
+/// acc_dtype defaults to FP32 (universal accumulation convention).
 struct GemmOp
 {
-    std::string_view lhs = "A";
-    std::string_view rhs = "B";
-    std::string_view out = "C";
-    DataType acc_dtype   = DataType::FP32;
+    std::string_view lhs;
+    std::string_view rhs;
+    std::string_view out;
+    DataType acc_dtype = DataType::FP32;
 };
 
 /// Element-wise addition: out = lhs + rhs.

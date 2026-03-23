@@ -155,7 +155,7 @@ static_assert(make_kernel(
 // make_kernel(Signature{.ops = {AddOp{}}}, ElementwiseAlgorithm{1024, 1, 1024, true})
 //
 // No AddOp:
-// make_kernel(Signature{.dtype = DataType::FP32, .ops = {GemmOp{}}},
+// make_kernel(Signature{.dtype = DataType::FP32, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
 //             ElementwiseAlgorithm{1024, 1, 1024, true})
 
 // clang-format on

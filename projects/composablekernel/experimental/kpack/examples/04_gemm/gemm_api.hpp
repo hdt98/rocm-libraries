@@ -310,30 +310,30 @@ static_assert( is_valid_warp_gemm(DataType::BF16, 32, 32, 16));
 // --- make_kernel: plain GEMM ---
 
 static_assert(make_kernel(
-    Signature{.dtype = DataType::FP16, .ops = {GemmOp{}}},
+    Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).a_dtype == DataType::FP16);
 static_assert(make_kernel(
-    Signature{.dtype = DataType::FP16, .ops = {GemmOp{}}},
+    Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).thread_block_size == 256);
 static_assert(make_kernel(
-    Signature{.dtype = DataType::FP16, .ops = {GemmOp{}}},
+    Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).combine == CombineOp::None);
 
 // --- make_kernel: GEMM + Add (epilogue pattern match) ---
 
 static_assert(make_kernel(
     Signature{.dtype = DataType::FP16,
-              .ops = {GemmOp{.out = "C"},
+              .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
     GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).combine == CombineOp::Add);
 static_assert(make_kernel(
     Signature{.dtype = DataType::FP16,
-              .ops = {GemmOp{.out = "C"},
+              .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
     GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).num_d_tensors == 1);
 static_assert(make_kernel(
     Signature{.dtype = DataType::FP16,
-              .ops = {GemmOp{.out = "C"},
+              .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
     GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).d0_dtype == DataType::FP16);
 
@@ -341,13 +341,13 @@ static_assert(make_kernel(
 
 static_assert(make_kernel(
     Signature{.dtype = DataType::FP16,
-              .ops = {GemmOp{.out = "C"},
+              .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
                       ReluOp{.in = "D", .out = "E"}}},
     GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).activation == Activation::Relu);
 static_assert(make_kernel(
     Signature{.dtype = DataType::FP16,
-              .ops = {GemmOp{.out = "C"},
+              .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
                       ReluOp{.in = "D", .out = "E"}}},
     GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).combine == CombineOp::Add);
@@ -355,29 +355,29 @@ static_assert(make_kernel(
 // --- make_kernel: fp16 32×32×16 warp tile ---
 
 static_assert(make_kernel(
-    Signature{.dtype = DataType::FP16, .ops = {GemmOp{}}},
+    Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {32, 32, 16}}).thread_block_size == 256);
 
 // --- Layout defaults (A=Row, B=Col, C=Row) ---
 
 static_assert(make_kernel(
-    Signature{.dtype = DataType::FP32, .ops = {GemmOp{}}},
+    Signature{.dtype = DataType::FP32, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).a_layout == Layout::Row);
 static_assert(make_kernel(
-    Signature{.dtype = DataType::FP32, .ops = {GemmOp{}}},
+    Signature{.dtype = DataType::FP32, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).b_layout == Layout::Col);
 
 // Error cases (uncommenting any would produce consteval compile errors):
 // fp32 32×32×16 — not in MFMA dispatcher table:
-// make_kernel(Signature{.dtype = DataType::FP32, .ops = {GemmOp{}}},
+// make_kernel(Signature{.dtype = DataType::FP32, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
 //             GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {32, 32, 16}})
 //
 // Bad divisibility — 128 % (3 × 16) = 32 ≠ 0:
-// make_kernel(Signature{.dtype = DataType::FP32, .ops = {GemmOp{}}},
+// make_kernel(Signature{.dtype = DataType::FP32, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
 //             GemmAlgorithm{{128, 128, 32}, {3, 2, 1}, {16, 16, 16}})
 //
 // block_warps.k != 1 — violates CShuffleEpilogue constraint:
-// make_kernel(Signature{.dtype = DataType::FP32, .ops = {GemmOp{}}},
+// make_kernel(Signature{.dtype = DataType::FP32, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
 //             GemmAlgorithm{{128, 128, 32}, {2, 2, 2}, {16, 16, 16}})
 
 // clang-format on

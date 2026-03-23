@@ -13,12 +13,12 @@ compute graph where `GemmOp` defines the matrix multiply and optional epilogue
 operators (`AddOp`, `ReluOp`, etc.) compose the post-GEMM fusion:
 
 ```cpp
-// Plain GEMM (GemmOp defaults: A, B, C with acc_dtype=FP32)
-Signature{.dtype = DataType::FP16, .ops = {GemmOp{}}}
+// Plain GEMM (acc_dtype defaults to FP32)
+Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}
 
 // GEMM + bias + ReLU (operator composition)
 Signature{.dtype = DataType::FP16,
-          .ops = {GemmOp{.out = "C"},
+          .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                   AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
                   ReluOp{.in = "D", .out = "E"}}}
 ```
@@ -45,7 +45,7 @@ Independent of data types — paired with `Signature` in the `make_kernel()` cal
 
 ```cpp
 make_kernel(
-    Signature{.dtype = DataType::FP16, .ops = {GemmOp{}}},
+    Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     GemmAlgorithm{.block_tile  = {128, 128, 32},
                   .block_warps = {2, 2, 1},
                   .warp_tile   = {32, 32, 16}})
@@ -84,7 +84,7 @@ Each `.hip` variant file is ~20 lines:
 static constexpr rocm_ck::GemmKernel kernel = rocm_ck::make_kernel(
     rocm_ck::Signature{
         .dtype = rocm_ck::DataType::FP16,
-        .ops = {rocm_ck::GemmOp{}}},
+        .ops = {rocm_ck::GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     rocm_ck::GemmAlgorithm{.block_tile  = {128, 128, 32},
                             .block_warps = {2, 2, 1},
                             .warp_tile   = {16, 16, 16}});
@@ -109,14 +109,14 @@ Each epilogue step is a typed operator that references tensors by name:
 // GEMM + bias addition
 make_kernel(
     Signature{.dtype = DataType::FP16,
-              .ops = {GemmOp{.out = "C"},
+              .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
     GemmAlgorithm{...})
 
 // GEMM + bias + ReLU
 make_kernel(
     Signature{.dtype = DataType::FP16,
-              .ops = {GemmOp{.out = "C"},
+              .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
                       ReluOp{.in = "D", .out = "E"}}},
     GemmAlgorithm{...})

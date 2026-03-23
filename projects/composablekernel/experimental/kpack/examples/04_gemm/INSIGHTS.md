@@ -8,7 +8,7 @@ The same bridge pattern from example 03 works for GEMM. A `.hip` variant file as
 
 ```cpp
 static constexpr rocm_ck::GemmKernel K = rocm_ck::make_kernel(
-    rocm_ck::Signature{.dtype = rocm_ck::DataType::FP16, .ops = {rocm_ck::GemmOp{}}},
+    rocm_ck::Signature{.dtype = rocm_ck::DataType::FP16, .ops = {rocm_ck::GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     rocm_ck::GemmAlgorithm{...});
 
 extern "C" __global__ void gemm_fp16(rocm_ck::Args args) {
@@ -108,16 +108,16 @@ The operator-centric model expresses this naturally: operators in the signature'
 
 ```cpp
 // Plain GEMM
-Signature{.dtype = FP16, .ops = {GemmOp{}}}
+Signature{.dtype = FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}
 
 // GEMM + bias
 Signature{.dtype = FP16,
-          .ops = {GemmOp{.out = "C"},
+          .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                   AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}}
 
 // GEMM + bias + ReLU
 Signature{.dtype = FP16,
-          .ops = {GemmOp{.out = "C"},
+          .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                   AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
                   ReluOp{.in = "D", .out = "E"}}}
 ```

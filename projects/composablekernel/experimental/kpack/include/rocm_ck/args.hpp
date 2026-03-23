@@ -44,6 +44,9 @@ struct TensorArg
 ///
 /// No runtime type tag — the Signature declares each scalar's type at compile time.
 /// The entry kernel knows which union member to read.
+///
+/// FP16/BF16/FP8 scalars use the f32 member with host-side conversion. Scalar
+/// precision is always >= tensor precision, so float covers all sub-32-bit types.
 union ScalarValue
 {
     float f32;
