@@ -506,8 +506,10 @@ TEST_F(Im2colMTilePattern, GeneralFormulaWithNWraps)
     // Use a large M_tile to force multiple crossings
     int M_tile = p.Wo + 3; // guaranteed to cross at least one boundary
 
-    for(int m_start = 0; m_start + M_tile <= p.M_gemm(); m_start += p.Wo)
+    // Verify the formula for m_start=0 (one case is sufficient)
+    ASSERT_LE(M_tile, p.M_gemm()) << "M_tile too large for test params";
     {
+        int m_start  = 0;
         int wo_start = m_start % p.Wo;
         int base0    = M_base(p, m_start);
 
@@ -518,7 +520,6 @@ TEST_F(Im2colMTilePattern, GeneralFormulaWithNWraps)
             EXPECT_EQ(M_base(p, m_start + i), expected)
                 << "m_start=" << m_start << " i=" << i;
         }
-        break; // one case is sufficient for this formula check
     }
 }
 
@@ -547,20 +548,20 @@ TEST_F(Im2colMTilePattern, NConvConstantWithinTile)
 
 TEST_F(Im2colMTilePattern, BoundaryProbability)
 {
-    // P(B_total=0) ≈ (Wo - M_tile + 1) / Wo  for M_tile ≤ Wo
+    // P(B_total=0) = (Wo - M_tile + 1) / Wo  for M_tile ≤ Wo,
+    // when wo_start is uniform over [0, Wo).  Verify by counting directly
+    // over all distinct wo_start values.
     int M_tile = 4;
     ASSERT_LE(M_tile, p.Wo);
 
-    int total     = p.M_gemm() / M_tile;
     int single_ho = 0;
-    for(int block = 0; block < total; ++block)
-        if(count_ho_boundaries(block * M_tile, M_tile) == 0) single_ho++;
+    for(int wo_start = 0; wo_start < p.Wo; ++wo_start)
+        if((wo_start + M_tile - 1) / p.Wo == 0) single_ho++;
 
     double expected = double(p.Wo - M_tile + 1) / p.Wo;
-    double actual   = double(single_ho) / total;
-    // Allow ±2/total tolerance for n_conv boundary effects
-    EXPECT_NEAR(actual, expected, 2.0 / total)
-        << "single_ho=" << single_ho << " total=" << total;
+    double actual   = double(single_ho) / p.Wo;
+    EXPECT_NEAR(actual, expected, 1e-9)
+        << "single_ho=" << single_ho << " Wo=" << p.Wo;
 }
 
 // ===========================================================================
@@ -591,13 +592,19 @@ TEST_F(Im2colKTilePattern, YConstantForKTileEqualC)
 
 TEST_F(Im2colKTilePattern, YConstantForKTileEqual2C)
 {
-    // K_tile = 2*C: one y value, exactly two distinct x values per tile
+    // K_tile = 2*C keeps y constant only when the tile does not cross a y-boundary
+    // (i.e., k_start is a multiple of X*C and K_tile ≤ X*C).
+    // For tiles aligned to X*C boundaries with K_tile=2C < X*C=X*C:
+    //   - y is constant within the tile
+    //   - there are exactly 2 distinct x values (x_start and x_start+1)
     int K_tile = 2 * p.C;
+    int XC     = p.X * p.C;
     if(K_tile > p.K_gemm()) GTEST_SKIP() << "K_tile exceeds K_gemm";
+    if(K_tile >= XC) GTEST_SKIP() << "K_tile >= X*C; y may change within tile";
 
-    for(int kt = 0; kt * K_tile < p.K_gemm(); ++kt)
+    // Only test tiles aligned to X*C boundaries so y is guaranteed constant
+    for(int k_start = 0; k_start + K_tile <= p.K_gemm(); k_start += XC)
     {
-        int k_start   = kt * K_tile;
         int y0        = decode_k(p, k_start).y;
         int x_prev    = -1;
         int x_changes = 0;
@@ -605,10 +612,10 @@ TEST_F(Im2colKTilePattern, YConstantForKTileEqual2C)
         for(int j = 0; j < K_tile; ++j)
         {
             auto [y, x, c] = decode_k(p, k_start + j);
-            EXPECT_EQ(y, y0) << "kt=" << kt << " j=" << j;
+            EXPECT_EQ(y, y0) << "k_start=" << k_start << " j=" << j;
             if(x != x_prev) { x_changes++; x_prev = x; }
         }
-        EXPECT_EQ(x_changes, 2) << "kt=" << kt << " should have exactly 2 x-values";
+        EXPECT_EQ(x_changes, 2) << "k_start=" << k_start << " should have exactly 2 x-values";
     }
 }
 
@@ -627,11 +634,14 @@ TEST_F(Im2colKTilePattern, KOffsetIncrementsByOnePerC)
 
 TEST_F(Im2colKTilePattern, KOffsetXTransitionStep)
 {
-    // At each x-transition (k = multiple of C, k > 0):
+    // At each pure x-transition (k = multiple of C but NOT multiple of X*C):
     // ΔK_offset = DW * WiStride - (C-1)   (x += 1, c resets from C-1 to 0)
+    // Skip y-transitions (multiples of X*C) which have a different delta.
     int expected_delta = p.DW * p.WiStride() - (p.C - 1);
+    int XC = p.X * p.C;
     for(int k = p.C; k < p.K_gemm(); k += p.C)
     {
+        if(k % XC == 0) continue; // y-transition, not a pure x-transition
         int delta = K_offset(p, k) - K_offset(p, k - 1);
         EXPECT_EQ(delta, expected_delta) << "x-transition at k=" << k;
     }

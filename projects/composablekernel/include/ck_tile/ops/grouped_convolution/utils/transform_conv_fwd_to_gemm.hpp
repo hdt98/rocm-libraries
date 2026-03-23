@@ -3,6 +3,7 @@
 
 #pragma once
 #include "ck_tile/core.hpp"
+#include "ck_tile/ops/common/tensor_layout.hpp"
 #include "ck_tile/ops/grouped_convolution/utils/convolution_specialization.hpp"
 namespace ck_tile {
 
