@@ -122,7 +122,7 @@ experimental/kpack/
     │   ├── vector_add_*.hip            # 12 variant instantiations
     │   ├── pack.py                     # Variant-aware packer with metadata
     │   └── main.cpp                    # Variant selection demo + verify-all mode
-    └── 04_gemm/                     # GEMM: multi-type via GemmSignature schema
+    └── 04_gemm/                     # GEMM: multi-type via operator-centric Signature
         ├── CMakeLists.txt
         ├── gemm_api.hpp                # Signature-based make_kernel, GemmKernel, tile validation
         ├── gemm_dev.hpp                # CkTypeMap, CkLayoutMap, runGemm<K> template

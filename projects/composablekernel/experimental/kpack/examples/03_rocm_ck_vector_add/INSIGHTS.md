@@ -4,27 +4,27 @@ This example is the design prototype for the production rocm_ck API. It validate
 
 ## 1. Config -> consteval -> Kernel: The Three-Layer Pattern
 
-User-facing `ElementwiseConfig` (uses `std::optional`, not valid as an NTTP) is transformed by `consteval make_kernel()` into `VectorAddKernel` (a structural type, valid as an NTTP). This separation is fundamental:
+The user-facing `Signature` + `ElementwiseAlgorithm` (using `std::optional`, `std::variant`, not valid as NTTPs) are transformed by `consteval make_kernel()` into `VectorAddKernel` (a structural type, valid as an NTTP). This separation is fundamental:
 
-- **Config** — flexible, user-facing. Uses `std::optional` fields so users specify only what differs from defaults.
+- **Signature + Algorithm** — flexible, user-facing. Uses `std::optional` fields and operator composition so users specify only what differs from defaults.
 - **consteval** — validates and transforms. Throws at compile time if the config is invalid. Invalid configs never produce binaries.
 - **Kernel** — structural, concrete. Every field has a definite value. Used as a C++20 NTTP to instantiate device templates.
 
 ```cpp
 // User writes:
-constexpr auto kernel = make_kernel(ElementwiseConfig{
-    .signature = {.dtype = DataType::FP32},
-    .algorithm = {.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true}});
+constexpr auto kernel = make_kernel(
+    Signature{.dtype = DataType::FP32, .ops = {AddOp{}}},
+    ElementwiseAlgorithm{.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true});
 
 // make_kernel returns a VectorAddKernel with all fields resolved and validated.
 // This value is used directly as a template parameter: runVectorAdd<kernel>(args)
 ```
 
-> **Production implication**: Every rocm_ck operation will follow this pattern. The Config struct is the public API; the Kernel struct is the internal interface. `consteval` is the bridge that enforces invariants.
+> **Production implication**: Every rocm_ck operation will follow this pattern. The Signature defines WHAT; the Algorithm defines HOW. `consteval` is the bridge that enforces invariants.
 
 ## 2. Optional Dtype Hierarchy
 
-`ElementwiseSignature` uses 5 optional fields with clear resolution chains:
+The `Signature` uses optional dtype fields with clear resolution chains. For elementwise, the dtype hierarchy has three levels:
 
 ```
 dtype                    (kernel-level default)
@@ -36,9 +36,9 @@ dtype                    (kernel-level default)
 
 `in_dtype` does NOT cascade to `out_dtype`. They are separate branches rooted at `dtype`. This prevents ambiguity: setting `in_dtype = FP16` with `dtype = FP32` gives FP16 inputs and FP32 output, not FP16 everywhere.
 
-The `resolve_types` consteval function flattens the hierarchy. 10 `static_assert` tests verify all resolution paths — homogeneous, widening, narrowing, and per-operand overrides.
+The `resolve()` consteval function flattens the hierarchy. `static_assert` tests verify all resolution paths — homogeneous, widening, narrowing, and per-operand overrides.
 
-> **Production implication**: Each operation defines its own signature struct with the `DataType` fields it needs. GEMM will have `{a_dtype, b_dtype, c_dtype, compute_dtype}`; FMHA will have its own set. One-size-fits-all signatures would be either too restrictive or too confusing.
+> **Production implication**: The dtype hierarchy depth is operation-dependent. Elementwise has a shared input default (`in_dtype`); GEMM uses a two-level hierarchy (dtype → per-operand) because its operands are asymmetric. The unified `Signature` type handles both through its operator structs and tensor overrides.
 
 ## 3. consteval for Immediate Feedback
 
@@ -111,13 +111,13 @@ Each variant file is ~15 lines:
 
 ```cpp
 #include "rocm_vector_add_dev.hpp"
-static constexpr auto kernel = rocm_ck::make_kernel(
-    rocm_ck::ElementwiseConfig{
-        .signature = {.dtype = rocm_ck::DataType::FP32},
-        .algorithm = {.block_tile = 1024, ...}});
+static constexpr rocm_ck::VectorAddKernel K = rocm_ck::make_kernel(
+    rocm_ck::Signature{.dtype = rocm_ck::DataType::FP32,
+                       .ops = {rocm_ck::AddOp{}}},
+    rocm_ck::ElementwiseAlgorithm{1024, 1, 1024, true});
 
 extern "C" __global__ void vector_add_fp32_b1024(rocm_ck::VectorAddArgs args) {
-    rocm_ck::runVectorAdd<kernel>(args);
+    rocm_ck::runVectorAdd<K>(args);
 }
 ```
 
