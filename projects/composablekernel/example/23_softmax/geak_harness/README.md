@@ -1,9 +1,10 @@
 # GEAK Test Harness - Softmax PoC
 
-A standalone test harness for LLM-driven CK kernel optimization. The kernel is
-compiled as a shared library (`.so`) and loaded into a Python/PyTorch test
-script via ctypes. No CK build system dependency — only CK headers + HIP
-runtime.
+A standalone test harness for LLM-driven CK kernel optimization. The baseline
+and optimized kernels are compiled as shared libraries (`.so`) and loaded into a
+Python test script via ctypes. The baseline kernel output is used as ground
+truth — the optimized kernel is verified against it. No CK build system
+dependency — only CK headers + HIP runtime.
 
 ## Quick Start
 
@@ -56,23 +57,20 @@ recompilation.
 ### test_harness.py
 
 ```bash
-# Verify and benchmark a single kernel
-python test_harness.py liboptimized.so
-
-# Compare two kernels (first kernel is the baseline for speedup)
+# Verify optimized against baseline and benchmark both
 python test_harness.py libbaseline.so liboptimized.so
 
 # Custom shapes (semicolon-separated)
-python test_harness.py liboptimized.so --shapes "8,128,2048;32,64,4096"
+python test_harness.py libbaseline.so liboptimized.so --shapes "8,128,2048;32,64,4096"
 
 # Control timing: 10 warmup iterations, 200 timed iterations
-python test_harness.py liboptimized.so --warmup 10 --nrepeat 200
+python test_harness.py libbaseline.so liboptimized.so --warmup 10 --nrepeat 200
 
 # Change reduction dimension (default: last dim)
-python test_harness.py liboptimized.so --reduce-dim 1
+python test_harness.py libbaseline.so liboptimized.so --reduce-dim 1
 
 # Skip verification (timing only)
-python test_harness.py liboptimized.so --no-verify
+python test_harness.py libbaseline.so liboptimized.so --no-verify
 ```
 
 ### Example output
@@ -80,10 +78,10 @@ python test_harness.py liboptimized.so --no-verify
 ```
 Shape: [8, 128, 2048], reduce_dim=2
 ------------------------------------------------------------
-  libbaseline.so                     0.016 ms     517.1 GB/s  [PASS, max_err=1.91e-06]
+  libbaseline.so                     0.016 ms     517.1 GB/s
   liboptimized.so                    0.014 ms     590.2 GB/s  [PASS, max_err=3.81e-06]
 
-  liboptimized.so vs libbaseline.so: 1.14x
+  Speedup: 1.14x
 ```
 
 ## Tuning Parameters (optimized.cpp)
@@ -144,41 +142,44 @@ extern "C" float run_kernel(
 
 ### 2. Python test harness (`test_harness.py`)
 
-Update three things:
+Update two things:
 - **`load_kernel()`**: change `argtypes` to match new C ABI
 - **`call_kernel()`**: change arguments passed to `run_kernel`
-- **Reference implementation**: replace `torch.softmax()` with the appropriate
-  PyTorch operation (e.g., `torch.matmul()`, `torch.nn.functional.conv2d()`)
+
+The verification model stays the same: the baseline kernel output is the ground
+truth, and the optimized kernel is compared against it.
 
 ### 3. What stays the same
 
 - `compile.py` and `Makefile` work unchanged (same hipcc flags)
 - The overall pattern: `.cpp` with tuning params + `extern "C"` wrapper +
-  Python test script with PyTorch reference
+  Python test script with baseline-as-ground-truth verification
 - ctypes loading, GPU synchronization, error reporting
 
 ## Testing Limitations
 
-### PyTorch reference is sufficient for tuning, not for kernel development
+### Baseline-as-ground-truth is sufficient for tuning, not for kernel development
 
-This harness validates results against PyTorch's reference implementation
-(`torch.softmax`). This works well when the LLM is only modifying **tuning
+This harness validates the optimized kernel's output against the baseline
+kernel's output. This works well when the LLM is only modifying **tuning
 parameters** (tile sizes, vector widths, cluster dimensions) — the kernel logic
-is unchanged, so a single end-to-end correctness check is enough.
+is unchanged, so comparing outputs between configurations is sufficient.
 
 However, when the LLM modifies **kernel source code** (e.g., CK grid/block
-kernels, pipeline logic, memory access patterns), PyTorch-only validation has
+kernels, pipeline logic, memory access patterns), baseline-only validation has
 limitations:
 
-- **No isolation**: if the output is wrong, the PyTorch comparison only tells
-  you *that* it's wrong, not *where*. The LLM cannot easily test individual
+- **Assumes baseline correctness**: the baseline is treated as ground truth. If
+  the baseline itself has a bug, the harness won't catch it.
+- **No isolation**: if the output diverges, the comparison only tells you
+  *that* it's wrong, not *where*. The LLM cannot easily test individual
   components (e.g., just the reduction, just the memory layout transform).
-- **No edge case coverage**: PyTorch reference tests one random input per shape.
+- **No edge case coverage**: the harness tests one random input per shape.
   CK's test infrastructure covers boundary conditions, alignment edge cases,
   and specific parameter combinations that trigger different code paths.
 - **No unit test granularity**: old CK has limited unit tests, but CK Tile has
   better coverage. An LLM modifying kernel internals should run the relevant
-  CK/CK Tile unit tests, not just the end-to-end PyTorch comparison.
+  CK/CK Tile unit tests, not just the end-to-end comparison.
 
 
 ## Possible Improvements
