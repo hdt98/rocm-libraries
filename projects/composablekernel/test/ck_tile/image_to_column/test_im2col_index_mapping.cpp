@@ -20,8 +20,10 @@
 #include <vector>
 
 #include "ck_tile/core.hpp"
+#include "ck_tile/core/tensor/tiled_im2col_coordinate.hpp"
 #include "ck_tile/ops/grouped_convolution/utils/convolution_specialization.hpp"
 #include "ck_tile/ops/grouped_convolution/utils/transform_conv_fwd_to_gemm.hpp"
+#include "ck_tile/ops/grouped_convolution/utils/transform_conv_fwd_to_gemm_v2.hpp"
 
 using namespace ck_tile;
 
@@ -810,6 +812,220 @@ TEST_F(Im2colPrecomputation, PrecomputedPlusKOffsetMatchesReference)
                 EXPECT_EQ(arr[i] + K_offset(p, k), ref)
                     << "block=" << block << " i=" << i << " k=" << k;
             }
+        }
+    }
+}
+
+// ===========================================================================
+// TEST SUITE 8: TiledIm2ColMetadata and TiledIm2ColCoordinate
+// ===========================================================================
+//
+// Tests for the new tile-aware coordinate types.  MakeATileMetadata() on the
+// V2 transformer produces a TiledIm2ColMetadata struct.  TiledIm2ColCoordinate
+// uses that metadata to compute offset(m, k) = M_base(m) + K_offset(k).
+//
+// These tests verify that:
+//   1. MakeATileMetadata() produces correct constants.
+//   2. TiledIm2ColCoordinate::init() gives the same offset as TransformConvFwdToGemm.
+//   3. TiledIm2ColCoordinate::move_k() updates K_offset correctly.
+//   4. Validity agrees with reference.
+
+using V2Transformer = TransformConvFwdToGemm_V2<
+    2,
+    ConvolutionSpecialization::Default,
+    /*VectorSizeA=*/1,
+    /*VectorSizeB=*/1,
+    /*VectorSizeC=*/1,
+    /*NumGroupsToMerge=*/1,
+    /*SplitN=*/false,
+    float,
+    float,
+    int>;
+
+V2Transformer make_v2_transformer(const Conv2dParams& p)
+{
+    std::array<int, 5> a_lens = {p.G, p.N, p.C, p.Hi, p.Wi};
+    std::array<int, 5> b_lens = {p.G, p.K, p.C, p.Y,  p.X};
+    std::array<int, 5> c_lens = {p.G, p.N, p.K, p.Ho, p.Wo};
+    std::array<int, 2> strides    = {p.SH, p.SW};
+    std::array<int, 2> dilations  = {p.DH, p.DW};
+    std::array<int, 2> left_pads  = {p.PH, p.PW};
+    std::array<int, 2> right_pads = {p.PH, p.PW};
+    return V2Transformer{a_lens, b_lens, c_lens, strides, dilations, left_pads, right_pads};
+}
+
+class Im2colTiledCoordinate : public ::testing::Test
+{
+    protected:
+    Conv2dParams p = make_unit_params(); // unit stride, no padding
+};
+
+// ---- 8a. MakeATileMetadata constants ---
+
+TEST_F(Im2colTiledCoordinate, MetadataConstants)
+{
+    auto v2   = make_v2_transformer(p);
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+
+    // Verify derived constants match the analysis formulas
+    EXPECT_EQ(meta.WiStride,    p.WiStride());
+    EXPECT_EQ(meta.HiStride,    p.HiStride());
+    EXPECT_EQ(meta.NStride,     p.NStride());
+    EXPECT_EQ(meta.step_w,      p.SW * p.WiStride());
+    EXPECT_EQ(meta.SH_HiStride, p.SH * p.HiStride());
+    EXPECT_EQ(meta.wrap_delta,  p.SH * p.HiStride() - p.Wo * p.SW * p.WiStride());
+    EXPECT_EQ(meta.pad_offset,  p.PH * p.HiStride() + p.PW * p.WiStride());
+    EXPECT_EQ(meta.DH_HiStride, p.DH * p.HiStride());
+    EXPECT_EQ(meta.DW_WiStride, p.DW * p.WiStride());
+    EXPECT_EQ(meta.C,   p.C);
+    EXPECT_EQ(meta.XC,  p.X * p.C);
+    EXPECT_EQ(meta.Wo,  p.Wo);
+    EXPECT_EQ(meta.HoWo, p.Ho * p.Wo);
+    EXPECT_EQ(meta.Hi,  p.Hi);
+    EXPECT_EQ(meta.Wi,  p.Wi);
+    EXPECT_EQ(meta.SH,  p.SH);
+    EXPECT_EQ(meta.SW,  p.SW);
+    EXPECT_EQ(meta.DH,  p.DH);
+    EXPECT_EQ(meta.DW,  p.DW);
+    EXPECT_EQ(meta.PH,  p.PH);
+    EXPECT_EQ(meta.PW,  p.PW);
+}
+
+TEST_F(Im2colTiledCoordinate, MetadataConstantsWithPadding)
+{
+    auto pp   = make_padded_params();
+    auto v2   = make_v2_transformer(pp);
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+
+    EXPECT_EQ(meta.pad_offset, pp.PH * pp.HiStride() + pp.PW * pp.WiStride());
+    EXPECT_EQ(meta.PH, pp.PH);
+    EXPECT_EQ(meta.PW, pp.PW);
+}
+
+// ---- 8b. TiledIm2ColCoordinate::init() vs. reference ---
+
+TEST_F(Im2colTiledCoordinate, InitOffsetMatchesReference)
+{
+    auto v2   = make_v2_transformer(p);
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+
+    for(int m = 0; m < p.M_gemm(); ++m)
+    {
+        for(int k = 0; k < p.K_gemm(); ++k)
+        {
+            int ref = reference_offset(p, m, k);
+            if(ref == -1) continue; // padded
+
+            TiledIm2ColCoordinate coord;
+            coord.init(m, k, meta);
+
+            EXPECT_EQ(coord.get_offset(), ref) << "m=" << m << " k=" << k;
+            EXPECT_TRUE(coord.is_valid())      << "m=" << m << " k=" << k;
+        }
+    }
+}
+
+TEST_F(Im2colTiledCoordinate, InitValidityMatchesReference)
+{
+    auto pp   = make_padded_params();
+    auto v2   = make_v2_transformer(pp);
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+
+    for(int m = 0; m < pp.M_gemm(); ++m)
+    {
+        for(int k = 0; k < pp.K_gemm(); ++k)
+        {
+            int ref = reference_offset(pp, m, k);
+
+            TiledIm2ColCoordinate coord;
+            coord.init(m, k, meta);
+
+            EXPECT_EQ(coord.is_valid(), ref != -1) << "m=" << m << " k=" << k;
+            if(ref != -1)
+                EXPECT_EQ(coord.get_offset(), ref) << "m=" << m << " k=" << k;
+        }
+    }
+}
+
+TEST_F(Im2colTiledCoordinate, InitWithStride2)
+{
+    auto ps   = make_stride2_params();
+    auto v2   = make_v2_transformer(ps);
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+
+    for(int m = 0; m < ps.M_gemm(); ++m)
+        for(int k = 0; k < ps.K_gemm(); ++k)
+        {
+            int ref = reference_offset(ps, m, k);
+            if(ref == -1) continue;
+            TiledIm2ColCoordinate coord;
+            coord.init(m, k, meta);
+            EXPECT_EQ(coord.get_offset(), ref) << "m=" << m << " k=" << k;
+        }
+}
+
+TEST_F(Im2colTiledCoordinate, InitWithDilation2)
+{
+    auto pd   = make_dilation2_params();
+    auto v2   = make_v2_transformer(pd);
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+
+    for(int m = 0; m < pd.M_gemm(); ++m)
+        for(int k = 0; k < pd.K_gemm(); ++k)
+        {
+            int ref = reference_offset(pd, m, k);
+            if(ref == -1) continue;
+            TiledIm2ColCoordinate coord;
+            coord.init(m, k, meta);
+            EXPECT_EQ(coord.get_offset(), ref) << "m=" << m << " k=" << k;
+        }
+}
+
+// ---- 8c. TiledIm2ColCoordinate::move_k() ---
+
+TEST_F(Im2colTiledCoordinate, MoveKUpdatesKOffset)
+{
+    // init at k=0, then move_k to successive k values and compare to reference
+    auto v2   = make_v2_transformer(p);
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+
+    for(int m = 0; m < p.M_gemm(); m += p.Wo) // spot-check at ho-boundaries
+    {
+        TiledIm2ColCoordinate coord;
+        coord.init(m, 0, meta);
+        const int m_base = coord.M_base;
+
+        for(int k = 0; k < p.K_gemm(); ++k)
+        {
+            coord.move_k(k, m, meta);
+            int ref = reference_offset(p, m, k);
+            if(ref == -1) continue;
+
+            EXPECT_EQ(coord.M_base, m_base) // M_base must be unchanged
+                << "M_base changed at m=" << m << " k=" << k;
+            EXPECT_EQ(coord.get_offset(), ref)
+                << "m=" << m << " k=" << k;
+        }
+    }
+}
+
+// ---- 8d. M_base is constant across all k (move_k must not touch M_base) ---
+
+TEST_F(Im2colTiledCoordinate, MBaseConstantAcrossKMoves)
+{
+    auto v2   = make_v2_transformer(p);
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+
+    for(int m = 0; m < p.M_gemm(); ++m)
+    {
+        TiledIm2ColCoordinate coord;
+        coord.init(m, 0, meta);
+        const int m_base_ref = coord.M_base;
+
+        for(int k = p.C; k < p.K_gemm(); k += p.C)
+        {
+            coord.move_k(k, m, meta);
+            EXPECT_EQ(coord.M_base, m_base_ref) << "m=" << m << " k=" << k;
         }
     }
 }

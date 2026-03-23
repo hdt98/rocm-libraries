@@ -4,6 +4,7 @@
 #pragma once
 #include "ck_tile/core.hpp"
 #include "ck_tile/core/tensor/tensor_descriptor_tiled.hpp"
+#include "ck_tile/core/tensor/tiled_im2col_coordinate.hpp"
 #include "ck_tile/ops/grouped_convolution/utils/convolution_specialization.hpp"
 namespace ck_tile {
 
@@ -940,6 +941,55 @@ struct TransformConvFwdToGemm_V2
                     make_tuple(sequence<0>{}, sequence<1>{}));
             }
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // MakeATileMetadata — 2D NHWGC, Default specialization only.
+    //
+    // Returns a TiledIm2ColMetadata struct with all constants needed for the
+    // tile-aware precomputed im2col index calculation. Available for any
+    // ConvSpecialization, but the incremental formulas are most beneficial for
+    // the Default case (general stride/dilation/padding).
+    // -------------------------------------------------------------------------
+    template <typename ALayout,
+              typename std::enable_if<
+                  NDimSpatial == 2 && std::is_same_v<ALayout, tensor_layout::convolution::NHWGC>,
+                  bool>::type = false>
+    CK_TILE_HOST TiledIm2ColMetadata MakeATileMetadata() const
+    {
+        const IndexType HiStride    = Wi_ * G_ * C_;
+        const IndexType WiStride    = G_ * C_;
+        const IndexType NStride     = Hi_ * HiStride;
+        const IndexType SH_HiStride = ConvStrideH_ * HiStride;
+        const IndexType step_w      = ConvStrideW_ * WiStride;
+        const IndexType wrap_delta  = SH_HiStride - Wo_ * step_w;
+        const IndexType pad_offset  = InLeftPadH_ * HiStride + InLeftPadW_ * WiStride;
+        const IndexType DH_HiStride = ConvDilationH_ * HiStride;
+        const IndexType DW_WiStride = ConvDilationW_ * WiStride;
+
+        TiledIm2ColMetadata meta;
+        meta.NStride     = static_cast<index_t>(NStride);
+        meta.HiStride    = static_cast<index_t>(HiStride);
+        meta.WiStride    = static_cast<index_t>(WiStride);
+        meta.SH_HiStride = static_cast<index_t>(SH_HiStride);
+        meta.step_w      = static_cast<index_t>(step_w);
+        meta.wrap_delta  = static_cast<index_t>(wrap_delta);
+        meta.pad_offset  = static_cast<index_t>(pad_offset);
+        meta.DH_HiStride = static_cast<index_t>(DH_HiStride);
+        meta.DW_WiStride = static_cast<index_t>(DW_WiStride);
+        meta.C           = static_cast<index_t>(C_);
+        meta.XC          = static_cast<index_t>(X_ * C_);
+        meta.Wo          = static_cast<index_t>(Wo_);
+        meta.HoWo        = static_cast<index_t>(Ho_ * Wo_);
+        meta.Hi          = static_cast<index_t>(Hi_);
+        meta.Wi          = static_cast<index_t>(Wi_);
+        meta.SH          = static_cast<index_t>(ConvStrideH_);
+        meta.SW          = static_cast<index_t>(ConvStrideW_);
+        meta.DH          = static_cast<index_t>(ConvDilationH_);
+        meta.DW          = static_cast<index_t>(ConvDilationW_);
+        meta.PH          = static_cast<index_t>(InLeftPadH_);
+        meta.PW          = static_cast<index_t>(InLeftPadW_);
+        return meta;
     }
 
     template <typename ALayout,
