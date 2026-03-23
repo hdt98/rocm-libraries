@@ -117,7 +117,7 @@ class ArgParser
             else
             {
                 std::string text(cur_arg + 1);
-                if(text == "?" || text == "help" || text == "-help" || text == "h" || text == "-h")
+                if(text == "?")
                 {
                     print();
                     return false;
