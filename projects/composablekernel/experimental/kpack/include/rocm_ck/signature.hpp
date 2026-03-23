@@ -50,11 +50,11 @@ struct Scalar
 /// Each operator output gets a unique name; shared names form graph edges.
 ///
 /// Example — simple fp16 GEMM:
-///   {.dtype = FP16, .ops = {GemmOp{}}}
+///   {.dtype = FP16, .ops = {GemmOp{.lhs="A", .rhs="B", .out="C"}}}
 ///
 /// Example — GEMM + bias + ReLU:
 ///   {.dtype = FP16,
-///    .ops = {GemmOp{.out="C"},
+///    .ops = {GemmOp{.lhs="A", .rhs="B", .out="C"},
 ///            AddOp{.lhs="C", .rhs="bias", .out="D"},
 ///            ReluOp{.in="D", .out="E"}}}
 // kMaxTensors and kMaxScalars are defined in args.hpp (canonical source).

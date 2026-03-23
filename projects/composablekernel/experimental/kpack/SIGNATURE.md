@@ -59,18 +59,18 @@ Signatures use an optional dtype cascade for ergonomic type specification:
 
 ```cpp
 // Set everything to FP16 (GemmOp accumulator defaults to FP32):
-Signature{.dtype = FP16, .ops = {GemmOp{}}}
+Signature{.dtype = FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}
 
 // Mixed precision — FP16 compute, FP32 output tensor:
 Signature{.dtype = FP16,
           .tensors = {Tensor{.name = "C", .dtype = FP32}},
-          .ops = {GemmOp{}}}
+          .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}
 
 // Fully explicit per-tensor:
 Signature{.tensors = {Tensor{.name = "A", .dtype = FP16},
                       Tensor{.name = "B", .dtype = BF16},
                       Tensor{.name = "C", .dtype = FP32}},
-          .ops = {GemmOp{}}}
+          .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}
 ```
 
 The cascade rules:
@@ -159,7 +159,7 @@ operator in the compute graph:
 // GEMM + bias + ReLU
 Signature{
     .dtype = FP16,
-    .ops = {GemmOp{.out = "C"},
+    .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
             AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
             ReluOp{.in = "D", .out = "E"}}}
 ```

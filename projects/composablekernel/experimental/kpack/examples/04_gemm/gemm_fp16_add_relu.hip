@@ -10,7 +10,7 @@
 static constexpr rocm_ck::GemmKernel kernel = rocm_ck::make_kernel(
     rocm_ck::Signature{
         .dtype = rocm_ck::DataType::FP16,
-        .ops = {rocm_ck::GemmOp{.out = "C"},
+        .ops = {rocm_ck::GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                 rocm_ck::AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
                 rocm_ck::ReluOp{.in = "D", .out = "E"}}},
     rocm_ck::GemmAlgorithm{.block_tile  = {128, 128, 32},

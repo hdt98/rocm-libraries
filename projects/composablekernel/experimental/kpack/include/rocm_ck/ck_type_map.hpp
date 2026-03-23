@@ -14,9 +14,15 @@ namespace rocm_ck {
 
 /// Maps a DataType enum value to the corresponding CK Tile numeric type.
 /// Primary template is intentionally undefined — only valid specializations compile.
+/// Add specializations as new DataType values are used in device kernels.
 template <DataType>
 struct CkTypeMap;
 
+template <>
+struct CkTypeMap<DataType::FP64>
+{
+    using type = double;
+};
 template <>
 struct CkTypeMap<DataType::FP32>
 {
@@ -33,9 +39,26 @@ struct CkTypeMap<DataType::BF16>
     using type = ck_tile::bf16_t;
 };
 template <>
-struct CkTypeMap<DataType::FP8>
+struct CkTypeMap<DataType::FP8_FNUZ>
 {
     using type = ck_tile::fp8_t;
+};
+template <>
+struct CkTypeMap<DataType::BF8_FNUZ>
+{
+    using type = ck_tile::bf8_t;
+};
+// FP8_OCP/BF8_OCP: add when CK Tile exposes distinct OCP types.
+// Currently ck_tile::fp8_t/bf8_t are selected at compile time via CK_TILE_USE_OCP_FP8.
+template <>
+struct CkTypeMap<DataType::I8>
+{
+    using type = int8_t;
+};
+template <>
+struct CkTypeMap<DataType::I32>
+{
+    using type = int32_t;
 };
 
 } // namespace rocm_ck
