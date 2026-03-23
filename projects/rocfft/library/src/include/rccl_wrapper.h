@@ -32,12 +32,12 @@
 
 namespace rocfft_rccl
 {
-    // RCCL communicator wrapper for single-process multi-GPU
+    // RCCL communicator wrapper for single-node and multi-node multi-GPU
     class Communicator
     {
     public:
         // default ctor does not actually initialize rccl - call
-        // create to init and check success
+        // create or create_multinode to init and check success
         Communicator();
         ~Communicator();
 
@@ -45,8 +45,21 @@ namespace rocfft_rccl
         Communicator(Communicator&&);
         Communicator& operator=(Communicator&&);
 
-        // return a communicator for the specified devices
+        // single-node: return a communicator for the specified
+        // local devices (one process manages all GPUs)
         static std::shared_ptr<Communicator> create(const std::set<int>& devices);
+
+        // multi-node: return a communicator spanning multiple MPI
+        // ranks.  Each rank manages its local devices.
+        // mpi_rank and mpi_size come from MPI_Comm_rank/size.
+        // local_devices are the HIP device IDs owned by this rank.
+        // mpi_comm_ptr is a pointer to the MPI_Comm to broadcast
+        // the ncclUniqueId (passed as void* to avoid MPI header dependency).
+        static std::shared_ptr<Communicator> create_multinode(int                  mpi_rank,
+                                                              int                  mpi_size,
+                                                              const std::set<int>& local_devices,
+                                                              void*                mpi_comm_ptr);
+
         // process-wide communicator for all visible devices, created
         // on demand and destroyed at cleanup
         static std::shared_ptr<Communicator> comm_world;
@@ -59,6 +72,21 @@ namespace rocfft_rccl
 
         // NCCL rank assigned to the given device, or -1 if not found
         int get_rank(int device_id) const;
+
+        // MPI rank that owns this communicator, or 0 for single-node
+        int mpi_rank() const;
+
+        // number of MPI ranks in this communicator, or 1 for single-node
+        int mpi_size() const;
+
+        // number of local devices per MPI rank
+        int devices_per_rank() const;
+
+        // compute the global RCCL rank for a brick identified by
+        // its (comm_rank, device_id).  For single-node, comm_rank
+        // is ignored and device_id is the rank.  For multi-node,
+        // global_rank = comm_rank * devices_per_rank + device_local_index.
+        int global_rank_for(int comm_rank, int device_id) const;
 
         // all-to-all with uniform counts.
         // base_type_size is the size of one real component (2/4/8).

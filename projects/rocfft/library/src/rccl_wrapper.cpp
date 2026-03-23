@@ -20,6 +20,7 @@
 
 #include "rccl_wrapper.h"
 #include "logging.h"
+#include "rocfft_mpi.h"
 #include <algorithm>
 #include <iostream>
 #include <iterator>
@@ -67,17 +68,20 @@ namespace rocfft_rccl
     // implementation details
     struct Communicator::Impl
     {
-        // each comm is for one rank, and each rank has exactly one
-        // device.  comms is indexed by device_id.
+        // one ncclComm_t per local device
         std::vector<ncclComm_t> comms;
 
-        // unique id used to bootstrap this communicator group.
-        // stored so it can be broadcast via MPI for multi-node in the future.
+        // unique id used to bootstrap this communicator group
         ncclUniqueId uniqueId{};
 
-        // device_id -> NCCL rank mapping
+        // local device_id -> global NCCL rank mapping
         std::map<int, int> device_to_rank;
         int                nranks = 0;
+
+        // MPI topology (0/1 for single-node)
+        int mpi_rank_val = 0;
+        int mpi_size_val = 1;
+        int nlocal       = 0; // number of local devices per rank
 
         ~Impl()
         {
@@ -152,6 +156,7 @@ namespace rocfft_rccl
             }
             new_comm->pimpl->uniqueId = id;
             new_comm->pimpl->nranks   = ndevices;
+            new_comm->pimpl->nlocal   = ndevices;
 
             // save and restore the caller's active device
             int original_device = 0;
@@ -197,13 +202,112 @@ namespace rocfft_rccl
 #endif
     }
 
+    std::shared_ptr<Communicator> Communicator::create_multinode(int                  mpi_rank,
+                                                                 int                  mpi_size,
+                                                                 const std::set<int>& local_devices,
+                                                                 void*                mpi_comm_ptr)
+    {
+#if defined(ROCFFT_RCCL_ENABLE) && defined(ROCFFT_MPI_ENABLE)
+        const char* disable_rccl = std::getenv("ROCFFT_DISABLE_RCCL");
+        if(disable_rccl && std::string(disable_rccl) == "1")
+            return {};
+
+        if(local_devices.empty() || mpi_size < 2 || !mpi_comm_ptr)
+            return {};
+
+        MPI_Comm mpi_comm = *static_cast<MPI_Comm*>(mpi_comm_ptr);
+
+        int nlocal = static_cast<int>(local_devices.size());
+        int ntotal = nlocal * mpi_size;
+
+        auto new_comm                 = std::make_shared<Communicator>();
+        new_comm->pimpl               = std::make_unique<Impl>();
+        new_comm->pimpl->nranks       = ntotal;
+        new_comm->pimpl->nlocal       = nlocal;
+        new_comm->pimpl->mpi_rank_val = mpi_rank;
+        new_comm->pimpl->mpi_size_val = mpi_size;
+
+        // root rank generates the unique id, then broadcasts to all
+        ncclUniqueId id{};
+        if(mpi_rank == 0)
+        {
+            ncclResult_t result = ncclGetUniqueId(&id);
+            if(result != ncclSuccess)
+                return {};
+        }
+        MPI_Bcast(&id, sizeof(id), MPI_BYTE, 0, mpi_comm);
+        new_comm->pimpl->uniqueId = id;
+
+        int original_device = 0;
+        if(hipGetDevice(&original_device) != hipSuccess)
+            throw std::runtime_error("hipGetDevice failed during multi-node RCCL init");
+
+        new_comm->pimpl->comms.resize(nlocal, nullptr);
+
+        // each rank initializes its local devices with global ranks:
+        // global_rank = mpi_rank * nlocal + local_index
+        ncclGroupStart();
+        int local_idx = 0;
+        for(int dev : local_devices)
+        {
+            int global_rank = mpi_rank * nlocal + local_idx;
+
+            if(hipSetDevice(dev) != hipSuccess)
+                throw std::runtime_error("hipSetDevice failed for device " + std::to_string(dev));
+
+            new_comm->pimpl->device_to_rank[dev] = global_rank;
+
+            ncclResult_t result
+                = ncclCommInitRank(&new_comm->pimpl->comms[local_idx], ntotal, id, global_rank);
+            if(result != ncclSuccess)
+            {
+                ncclGroupEnd();
+                if(hipSetDevice(original_device) != hipSuccess)
+                    throw std::runtime_error("hipSetDevice failed restoring device "
+                                             + std::to_string(original_device));
+                return {};
+            }
+            ++local_idx;
+        }
+        ncclResult_t result = ncclGroupEnd();
+
+        if(hipSetDevice(original_device) != hipSuccess)
+            throw std::runtime_error("hipSetDevice failed restoring device "
+                                     + std::to_string(original_device));
+
+        if(result != ncclSuccess)
+            return {};
+
+        if(LOG_PLAN_ENABLED())
+        {
+            log_plan("RCCL multi-node init: mpi_rank=" + std::to_string(mpi_rank) + "/"
+                     + std::to_string(mpi_size) + ", local_devices=" + std::to_string(nlocal)
+                     + ", total_ranks=" + std::to_string(ntotal) + "\n");
+        }
+
+        return new_comm;
+#else
+        return {};
+#endif
+    }
+
     void* Communicator::get_comm(int device_id) const
     {
 #ifdef ROCFFT_RCCL_ENABLE
         auto it = pimpl->device_to_rank.find(device_id);
         if(it == pimpl->device_to_rank.end())
             return nullptr;
-        return &pimpl->comms[device_id];
+
+        // comms is indexed by local position within device_to_rank.
+        // find the local index for this device_id.
+        int local_idx = 0;
+        for(auto& kv : pimpl->device_to_rank)
+        {
+            if(kv.first == device_id)
+                return &pimpl->comms[local_idx];
+            ++local_idx;
+        }
+        return nullptr;
 #else
         return nullptr;
 #endif
@@ -225,6 +329,67 @@ namespace rocfft_rccl
         if(it == pimpl->device_to_rank.end())
             return -1;
         return it->second;
+#else
+        return -1;
+#endif
+    }
+
+    int Communicator::mpi_rank() const
+    {
+#ifdef ROCFFT_RCCL_ENABLE
+        return pimpl->mpi_rank_val;
+#else
+        return 0;
+#endif
+    }
+
+    int Communicator::mpi_size() const
+    {
+#ifdef ROCFFT_RCCL_ENABLE
+        return pimpl->mpi_size_val;
+#else
+        return 1;
+#endif
+    }
+
+    int Communicator::devices_per_rank() const
+    {
+#ifdef ROCFFT_RCCL_ENABLE
+        return pimpl->nlocal;
+#else
+        return 0;
+#endif
+    }
+
+    int Communicator::global_rank_for(int comm_rank, int device_id) const
+    {
+#ifdef ROCFFT_RCCL_ENABLE
+        if(pimpl->mpi_size_val <= 1)
+        {
+            // single-node: comm_rank is irrelevant, rank == device_id
+            auto it = pimpl->device_to_rank.find(device_id);
+            return (it != pimpl->device_to_rank.end()) ? it->second : -1;
+        }
+        // multi-node: assume uniform layout across ranks.
+        // global_rank = comm_rank * devices_per_rank + device_local_index.
+        // For the common 1-GPU-per-rank case this is just comm_rank.
+        //
+        // device_local_index is the position of device_id within the
+        // ordered set of devices on that rank.  Since we only know
+        // the local mapping, assume remote ranks use the same device
+        // index ordering.
+        if(comm_rank == pimpl->mpi_rank_val)
+        {
+            // local rank: use the actual mapping
+            auto it = pimpl->device_to_rank.find(device_id);
+            return (it != pimpl->device_to_rank.end()) ? it->second : -1;
+        }
+        else
+        {
+            // remote rank: compute based on uniform layout assumption
+            // device_local_index = 0 for the 1-GPU-per-rank case
+            return comm_rank * pimpl->nlocal;
+        }
 #else
         return -1;
 #endif

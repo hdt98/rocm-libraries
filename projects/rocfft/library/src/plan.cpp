@@ -2125,13 +2125,13 @@ void rocfft_plan_t::GlobalTranspose(size_t                     elem_size,
 #ifdef ROCFFT_RCCL_ENABLE
     if(rccl)
     {
-        // use RCCL for single-process multi-GPU
+        // use RCCL for all multi-GPU communication (single-node and multi-node)
         GlobalTransposeRCCL(
             elem_size, inField, outField, input, output, inputAntecedents, outputItems, itemGroup);
+        return;
     }
-    else
 #endif
-        if(use_p2p)
+    if(use_p2p)
     {
         GlobalTransposeP2P(
             elem_size, inField, outField, input, output, inputAntecedents, outputItems, itemGroup);
@@ -2169,7 +2169,13 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
     };
     std::vector<IntersectionInfo> intersections;
 
-    bool   alltoall_eligible  = (ndevices == outField.bricks.size()) && (ndevices >= 2);
+    // AllToAll requires all bricks on the same process (single-node).
+    // Multi-node AllToAll needs a brick-index mapping that accounts
+    // for (comm_rank, device_id) pairs -- not yet implemented.
+    bool is_multinode = rccl && rccl->mpi_size() > 1;
+
+    bool alltoall_eligible
+        = !is_multinode && (ndevices == outField.bricks.size()) && (ndevices >= 2);
     size_t uniform_count      = 0;
     size_t cross_device_count = 0;
 
@@ -2405,11 +2411,12 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
             multiPlan[packIdx]->group = itemGroup;
             packItems.push_back(packIdx);
 
-            const int dst_rank = outBrick.location.device;
-            if(dst_rank >= 0)
+            const int dst_rccl_rank
+                = rccl->global_rank_for(outBrick.location.comm_rank, outBrick.location.device);
+            if(dst_rccl_rank >= 0)
             {
                 rcclGrouped->AddTransfer(true,
-                                         dst_rank,
+                                         dst_rccl_rank,
                                          inBrick.location,
                                          BufferPtr::temp(pack.data()),
                                          0,
@@ -2417,11 +2424,12 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
                                          local_comm_rank);
             }
 
-            const int src_rank = inBrick.location.device;
-            if(src_rank >= 0)
+            const int src_rccl_rank
+                = rccl->global_rank_for(inBrick.location.comm_rank, inBrick.location.device);
+            if(src_rccl_rank >= 0)
             {
                 rcclGrouped->AddTransfer(false,
-                                         src_rank,
+                                         src_rccl_rank,
                                          outBrick.location,
                                          BufferPtr::temp(recv.data()),
                                          0,
@@ -3071,11 +3079,8 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
         return false;
 
 #ifdef ROCFFT_RCCL_ENABLE
-    // initialize RCCL for single-process multi-GPU if not already initialized
-    if(rocfft_plan_description_t::multiple_devices_in_rank(desc.inFields.front())
-       || rocfft_plan_description_t::multiple_devices_in_rank(desc.outFields.front()))
+    // collect all unique local device IDs from bricks
     {
-        // collect all unique device IDs from bricks
         std::set<int> device_set;
         for(const auto& brick : desc.inFields.front().bricks)
         {
@@ -3088,10 +3093,27 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
                 device_set.insert(brick.location.device);
         }
 
-        // initialize RCCL with these devices
         if(!device_set.empty())
         {
-            rccl = rocfft_rccl::Communicator::create(device_set);
+#ifdef ROCFFT_MPI_ENABLE
+            // multi-node: use MPI to bootstrap RCCL across all ranks
+            int mpi_size = desc.get_local_comm_size();
+            if(mpi_size > 1)
+            {
+                MPI_Comm mpi_comm_val = desc.mpi_comm;
+                rccl                  = rocfft_rccl::Communicator::create_multinode(
+                    local_comm_rank, mpi_size, device_set, &mpi_comm_val);
+            }
+            else
+#endif
+            {
+                // single-node: initialize RCCL for local multi-GPU
+                if(rocfft_plan_description_t::multiple_devices_in_rank(desc.inFields.front())
+                   || rocfft_plan_description_t::multiple_devices_in_rank(desc.outFields.front()))
+                {
+                    rccl = rocfft_rccl::Communicator::create(device_set);
+                }
+            }
         }
     }
 #endif
