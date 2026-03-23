@@ -595,7 +595,6 @@ struct GroupedConvolutionBackwardWeightKernel
             const index_t grid = num_cu * occupancy;
             kernel_args.tile_partitioner =
                 TilePartitioner(kernel_args.GemmM, kernel_args.GemmN, kernel_args.GemmK, grid);
-            kernel_args.k_batch = 1; // StreamK does its own K distribution
         }
         else
         {
@@ -645,6 +644,11 @@ struct GroupedConvolutionBackwardWeightKernel
                 LogInfo("StreamK requires cross-CU buffer coherence. "
                         "Supported: gfx90a, gfx942, gfx950. Got: ",
                         name);
+                return false;
+            }
+            if(kargs.k_batch != 1)
+            {
+                LogInfo("StreamK handles work distribution internally; k_batch must be 1.");
                 return false;
             }
         }
