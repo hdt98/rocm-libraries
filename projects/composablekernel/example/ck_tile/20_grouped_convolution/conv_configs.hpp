@@ -24,6 +24,11 @@ struct ConvConfigBase
     static constexpr ck_tile::index_t NumWaveGroups = 1;
 
     static constexpr ck_tile::index_t NumGroupsToMerge = 1;
+
+    // Enable tile-aware im2col fast coordinate computation (2D Default only).
+    // When true, MakeADescriptor_M_K() returns a TiledIm2ColDescriptor whose
+    // coordinate functions use M_base + K_offset instead of the full transform chain.
+    static constexpr bool UseTiledIm2Col = true;
 };
 
 template <typename PrecType>

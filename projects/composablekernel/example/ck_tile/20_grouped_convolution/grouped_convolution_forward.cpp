@@ -14,6 +14,26 @@
 #include "grouped_convolution_forward_invoker.hpp"
 #include "run_grouped_convolution_fwd_example.inc"
 
+// ---------------------------------------------------------------------------
+// Config variants differing only in UseTiledIm2Col.
+// ConvConfigComputeV3 inherits UseTiledIm2Col from ConvConfigBase (currently
+// true).  The two wrappers below let us select the path at runtime.
+// ---------------------------------------------------------------------------
+
+template <typename PrecType>
+struct ConvConfigComputeV3_TiledIm2Col : public ConvConfigComputeV3<PrecType>
+{
+    static constexpr bool UseTiledIm2Col = true;
+};
+
+template <typename PrecType>
+struct ConvConfigComputeV3_GenericIm2Col : public ConvConfigComputeV3<PrecType>
+{
+    static constexpr bool UseTiledIm2Col = false;
+};
+
+// ---------------------------------------------------------------------------
+
 template <template <typename PrecType> typename ConvConfig>
 int run_grouped_conv_fwd_example(int argc, char* argv[])
 {
@@ -52,10 +72,26 @@ int main(int argc, char* argv[])
 {
     try
     {
+        // Parse args early to read --tiled_im2col before selecting the config.
+        auto [result, arg_parser] = create_args(argc, argv);
+        if(!result)
+            return EXIT_FAILURE;
+
+        const bool use_tiled_im2col = arg_parser.get_int("tiled_im2col") != 0;
+
+        std::cout << "[grouped_conv_fwd] im2col mode: "
+                  << (use_tiled_im2col ? "tiled (fast coordinate)" : "generic (transform chain)")
+                  << '\n';
+
 #if CK_TILE_USE_WMMA
+        // WMMA path: tiled im2col not yet wired for WMMA configs — use generic only.
+        (void)use_tiled_im2col;
         return !run_grouped_conv_fwd_example<ConvConfigComputeV3_WMMA>(argc, argv);
 #else
-        return !run_grouped_conv_fwd_example<ConvConfigComputeV3>(argc, argv);
+        if(use_tiled_im2col)
+            return !run_grouped_conv_fwd_example<ConvConfigComputeV3_TiledIm2Col>(argc, argv);
+        else
+            return !run_grouped_conv_fwd_example<ConvConfigComputeV3_GenericIm2Col>(argc, argv);
 #endif
     }
     catch(const std::runtime_error& e)

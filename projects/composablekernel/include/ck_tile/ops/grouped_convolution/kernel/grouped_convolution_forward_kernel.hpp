@@ -92,7 +92,8 @@ struct GroupedConvFwdKernelArgs
                                                 input_right_pads};
 
         a_grid_desc_m_k =
-            transformer_.template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout>();
+            transformer_.template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout,
+                                                         UseTiledIm2Col>();
         b_grid_desc_n_k =
             transformer_.template MakeBDescriptor_N_K<typename GroupedConvTraitsType_::WeiLayout>();
         c_grid_desc_m_n =
@@ -192,7 +193,8 @@ struct GroupedConvFwdKernelArgs
                                                 input_right_pads};
 
         a_grid_desc_m_k =
-            transformer_.template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout>();
+            transformer_.template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout,
+                                                         UseTiledIm2Col>();
         b_grid_desc_n_k =
             transformer_.template MakeBDescriptor_N_K<typename GroupedConvTraitsType_::WeiLayout>();
         c_grid_desc_m_n =
@@ -304,7 +306,8 @@ struct GroupedConvFwdKernelArgs
                                                 input_right_pads};
 
         a_grid_desc_m_k =
-            transformer_.template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout>();
+            transformer_.template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout,
+                                                         UseTiledIm2Col>();
         b_grid_desc_n_k =
             transformer_.template MakeBDescriptor_N_K<typename GroupedConvTraitsType_::WeiLayout>();
         c_grid_desc_m_n =
@@ -347,9 +350,11 @@ struct GroupedConvFwdKernelArgs
                       << ", NumGroupsToMerge: " << NumGroupsToMerge << std::endl;
         }
     }
+    static constexpr bool UseTiledIm2Col = GroupedConvTraitsType_::UseTiledIm2Col;
     using AGridDescMK = remove_cvref_t<
         decltype(ConvToGemmFwdTransformer{}
-                     .template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout>())>;
+                     .template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout,
+                                                   UseTiledIm2Col>())>;
     using BGridDescNK = remove_cvref_t<
         decltype(ConvToGemmFwdTransformer{}
                      .template MakeBDescriptor_N_K<typename GroupedConvTraitsType_::WeiLayout>())>;

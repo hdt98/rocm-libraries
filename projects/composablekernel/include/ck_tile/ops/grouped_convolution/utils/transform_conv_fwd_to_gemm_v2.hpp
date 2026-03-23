@@ -696,6 +696,7 @@ struct TransformConvFwdToGemm_V2
     }
 
     template <typename ALayout,
+              bool EnableTiledIm2Col = false,
               typename std::enable_if<
                   NDimSpatial == 2 && std::is_same_v<ALayout, tensor_layout::convolution::NHWGC>,
                   bool>::type = false>
@@ -905,9 +906,16 @@ struct TransformConvFwdToGemm_V2
                     make_tuple(sequence<0, 2, 4>{}, sequence<1, 3, 5>{}),
                     make_tuple(sequence<0>{}, sequence<1>{}));
 
-                // Attach tile-aware im2col metadata for fast coordinate computation
-                return make_tiled_im2col_descriptor(
-                    base_desc, MakeATileMetadata<ALayout>());
+                if constexpr(EnableTiledIm2Col)
+                {
+                    // Attach tile-aware im2col metadata for fast coordinate computation
+                    return make_tiled_im2col_descriptor(
+                        base_desc, MakeATileMetadata<ALayout>());
+                }
+                else
+                {
+                    return base_desc;
+                }
             }
             else
             {
