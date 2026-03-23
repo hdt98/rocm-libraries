@@ -35,7 +35,7 @@ struct Add
     __host__ __device__ constexpr void
     operator()<float>(float& y, const float& x0, const half_t& x1) const
     {
-        y = x0 + type_convert<half_t>(x1);
+        y = x0 + type_convert<float>(x1);
     };
 
     template <>
@@ -49,7 +49,7 @@ struct Add
     __host__ __device__ constexpr void
     operator()<half_t>(half_t& y, const float& x0, const half_t& x1) const
     {
-        y = x0 + type_convert<float>(x1);
+        y = type_convert<half_t>(x0 + type_convert<float>(x1));
     };
 
     template <>
@@ -145,7 +145,7 @@ struct Multiply
     __host__ __device__ constexpr void
     operator()<float>(float& y, const float& x0, const half_t& x1) const
     {
-        y = x0 * type_convert<half_t>(x1);
+        y = x0 * type_convert<float>(x1);
     };
 
     template <>
@@ -159,7 +159,7 @@ struct Multiply
     __host__ __device__ constexpr void
     operator()<half_t>(half_t& y, const float& x0, const half_t& x1) const
     {
-        y = type_convert<half_t>(x0) * x1;
+        y = type_convert<half_t>(x0 * type_convert<float>(x1));
     };
 
     template <>
@@ -324,7 +324,10 @@ struct Bilinear
     __host__ __device__ constexpr void
     operator()<half_t, half_t, half_t>(half_t& y, const half_t& x0, const half_t& x1) const
     {
-        y = type_convert<half_t>(alpha_) * x0 + type_convert<half_t>(beta_) * x1;
+        const float x0_tmp = type_convert<float>(x0);
+        const float x1_tmp = type_convert<float>(x1);
+        const float y_tmp  = alpha_ * x0_tmp + beta_ * x1_tmp;
+        y                  = type_convert<half_t>(y_tmp);
     };
 
     template <>
@@ -550,7 +553,7 @@ struct AddHardswish
     {
         float a = x0 + x1;
         float b = a + float{3};
-        float c = (b > 0) * (b > 6.0f ? 6.0f : b) * a * 0.166667f;
+        float c = (b > 0) * (b > 6.0f ? 6.0f : b) * a * (1.0f / 6.0f);
         y       = c;
     };
 
@@ -560,7 +563,7 @@ struct AddHardswish
     {
         double a = x0 + x1;
         double b = a + 3.0;
-        double c = (b > 0) * (b > 6.0 ? 6.0 : b) * a * 0.166667;
+        double c = (b > 0) * (b > 6.0 ? 6.0 : b) * a * (1.0 / 6.0);
         y        = c;
     };
 
@@ -570,7 +573,7 @@ struct AddHardswish
     {
         float a = x0 + x1;
         float b = a + 3.0f;
-        float c = (b > 0) * (b > 6.0f ? 6.0f : b) * a * 0.166667f;
+        float c = (b > 0) * (b > 6.0f ? 6.0f : b) * a * (1.0f / 6.0f);
         y       = c;
     };
 };
@@ -592,6 +595,8 @@ struct AddFastGelu
         FastGelu{}.template operator()<float, float>(e, x);
     }
 
+    // TODO: Precision issue - addition and FastGelu (which uses transcendentals) are computed
+    // in half_t precision. Should promote to float like the bhalf_t version below.
     template <>
     __host__ __device__ constexpr void
     operator()<half_t, half_t, half_t>(half_t& e, const half_t& c, const half_t& d) const
@@ -659,6 +664,8 @@ struct MultiplyFastGelu
         FastGelu{}.template operator()<float, float>(e, x);
     }
 
+    // TODO: Precision issue - multiplication and FastGelu (which uses transcendentals) are
+    // computed in half_t precision. Should promote to float like the bhalf_t version below.
     template <>
     __host__ __device__ constexpr void
     operator()<half_t, half_t, half_t>(half_t& e, const half_t& c, const half_t& d) const
@@ -726,6 +733,8 @@ struct AddSilu
         Silu{}.template operator()<float>(e, x);
     }
 
+    // TODO: Precision issue - addition and Silu (which uses exp) are computed in half_t
+    // precision. Should promote to float like the bhalf_t version below.
     template <>
     __host__ __device__ constexpr void
     operator()<half_t, half_t, half_t>(half_t& e, const half_t& c, const half_t& d) const

@@ -127,7 +127,7 @@ struct AddHardswishAdd
     {
         float a = x0 + x1;
         float b = a + float{3};
-        float c = (b > 0) * (b > float{6} ? float{6} : b) * a * float{0.166667};
+        float c = (b > 0) * (b > float{6} ? float{6} : b) * a * (1.0f / 6.0f);
         float d = c + x2;
         y       = d;
     }
@@ -138,7 +138,7 @@ struct AddHardswishAdd
     {
         float a = x0 + x1;
         float b = a + float{3};
-        float c = (b > 0) * (b > float{6} ? float{6} : b) * a * float{0.166667};
+        float c = (b > 0) * (b > float{6} ? float{6} : b) * a * (1.0f / 6.0f);
         float d = c + x2;
         y       = d;
     }
