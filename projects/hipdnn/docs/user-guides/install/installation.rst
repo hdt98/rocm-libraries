@@ -11,12 +11,6 @@ hipDNN installation
 The hipDNN frontend API is distributed as a header-only library. It requires a development ROCm package installation.
 These development packages contain the ``dev`` prefix.
 
-.. important::
-
-  The base ROCm install package doesn't include the hipDNN frontend API header files. You must use the development ROCm packages.
-
-  For example, on Linux with an AMD Instinct MI350X Series GPU, install the ``amdrocm-core-dev7.12-gfx950`` package instead of the ``amdrocm7.12-gfx950`` package (``amdrocm-core-dev7.12-gfx950`` includes the ``amdrocm7.12-gfx950`` package, so only the ``amdrocm-core-dev7.12-gfx950`` package needs to be installed).
-
 System requirements
 ===================
 
@@ -51,6 +45,11 @@ Install ROCm and hipDNN
 
 Follow the instructions at `Install AMD ROCm <https://advanced-micro-devices-rocm-internal--692.com.readthedocs.build/en/692/install/rocm.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_ to install ROCm, including hipDNN.
 
+.. important::
+
+  The base ROCm install package doesn't include the hipDNN frontend API header files. You must use the development ROCm packages.
+
+  For example, on Linux with an AMD Instinct MI350X Series GPU, install the ``amdrocm-core-dev7.12-gfx950`` package instead of the ``amdrocm7.12-gfx950`` package (``amdrocm-core-dev7.12-gfx950`` includes the ``amdrocm7.12-gfx950`` package, so only the ``amdrocm-core-dev7.12-gfx950`` package needs to be installed).
 
 Verify hipDNN installation
 ==========================
