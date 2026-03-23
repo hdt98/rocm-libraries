@@ -13,6 +13,7 @@
 #include "ck_tile/core/container/multi_index.hpp"
 #include "ck_tile/core/numeric/math.hpp"
 #include "ck_tile/core/utility/type_traits.hpp"
+#include "ck_tile/core/tensor/tiled_im2col_coordinate.hpp"
 
 namespace ck_tile {
 
@@ -56,58 +57,99 @@ struct tensor_coordinate
     CK_TILE_HOST_DEVICE auto& get_hidden_index() { return Base::get_hidden_index(); }
 };
 
+// ---------------------------------------------------------------------------
+// make_tensor_coordinate
+//
+// Fast path: when the descriptor has im2col metadata (has_im2col_meta_v<>),
+// return a TiledIm2ColCoordinate initialized from (m_gemm, k_gemm) directly.
+//
+// Generic path: delegate to the full transform-chain adaptor.
+// ---------------------------------------------------------------------------
 template <typename TensorDesc, typename TopIndex>
 CK_TILE_HOST_DEVICE constexpr auto make_tensor_coordinate(const TensorDesc& tensor_desc,
                                                           const TopIndex& idx_top)
 {
-    if constexpr (TensorDesc::is_tiled())
+    if constexpr(has_im2col_meta_v<TensorDesc>)
     {
-        // For now, return the same coordinate as the non-tiled case.
-        const auto adaptor_coord = make_tensor_adaptor_coordinate(tensor_desc, idx_top);
-
-        // Debug print
-        if (threadIdx.x == 0)
-        {
-            printf("Block (%u,%u,%u): idx_top[0]=%d idx_top[1]=%d\n",
-                blockIdx.x, blockIdx.y, blockIdx.z,
-                static_cast<int>(idx_top[number<0>{}]),
-                static_cast<int>(idx_top[number<1>{}]));
-        }
-
-        return tensor_coordinate<TensorDesc::get_num_of_hidden_dimension(),
-                                remove_cvref_t<decltype(TensorDesc::get_top_dimension_hidden_ids())>>{
-            adaptor_coord};
+        // Fast tiled path: use precomputed metadata for direct offset calculation.
+        // idx_top contains the absolute (m_gemm, k_gemm) indices.
+        TiledIm2ColCoordinate coord;
+        coord.init(static_cast<index_t>(idx_top[number<0>{}]),
+                   static_cast<index_t>(idx_top[number<1>{}]),
+                   tensor_desc.get_im2col_meta());
+        return coord;
     }
-    else 
+    else
     {
         const auto adaptor_coord = make_tensor_adaptor_coordinate(tensor_desc, idx_top);
-
-        return tensor_coordinate<TensorDesc::get_num_of_hidden_dimension(),
-                                remove_cvref_t<decltype(TensorDesc::get_top_dimension_hidden_ids())>>{
-            adaptor_coord};
+        return tensor_coordinate<
+            TensorDesc::get_num_of_hidden_dimension(),
+            remove_cvref_t<decltype(TensorDesc::get_top_dimension_hidden_ids())>>{adaptor_coord};
     }
 }
 
+// ---------------------------------------------------------------------------
+// move_tensor_coordinate
+//
+// Fast path: when the coordinate is a TiledIm2ColCoordinate, use its
+// move_step() method which separates M and K movements.
+//   - K-only step (dm==0): 2 divmod, M_base unchanged.
+//   - General step:        5 divmod (full reinit).
+//
+// Generic path: delegate to move_tensor_adaptor_coordinate.
+// ---------------------------------------------------------------------------
 template <bool JudgeDoTransforms = true, typename TensorDesc, typename TensorCoord, typename Index>
 CK_TILE_HOST_DEVICE constexpr void
 move_tensor_coordinate(const TensorDesc& tensor_desc, TensorCoord& coord, const Index& coord_step)
 {
-    move_tensor_adaptor_coordinate(tensor_desc, coord, coord_step);
+    if constexpr(std::is_same_v<remove_cvref_t<TensorCoord>, TiledIm2ColCoordinate>)
+    {
+        // Fast tiled path: coord_step is the delta in (M, K) global space.
+        coord.move_step(static_cast<index_t>(coord_step[number<0>{}]),
+                        static_cast<index_t>(coord_step[number<1>{}]),
+                        tensor_desc.get_im2col_meta());
+    }
+    else
+    {
+        move_tensor_adaptor_coordinate(tensor_desc, coord, coord_step);
+    }
 }
 
+// ---------------------------------------------------------------------------
+// coordinate_has_valid_offset_assuming_top_index_is_valid
+//
+// Fast path: for TiledIm2ColCoordinate, the validity is precomputed in
+// coord.valid during init() and move_step().
+//
+// Generic path: delegate to adaptor validity check.
+// ---------------------------------------------------------------------------
 template <typename TensorDesc, typename TensorCoord>
 CK_TILE_HOST_DEVICE constexpr bool
 coordinate_has_valid_offset_assuming_top_index_is_valid(const TensorDesc& tensor_desc,
                                                         const TensorCoord& coord)
 {
-    return adaptor_coordinate_is_valid_assuming_top_index_is_valid(tensor_desc, coord);
+    if constexpr(std::is_same_v<remove_cvref_t<TensorCoord>, TiledIm2ColCoordinate>)
+    {
+        return coord.is_valid();
+    }
+    else
+    {
+        return adaptor_coordinate_is_valid_assuming_top_index_is_valid(tensor_desc, coord);
+    }
 }
 
 template <typename TensorDesc, typename TensorCoord>
 CK_TILE_HOST_DEVICE constexpr bool coordinate_has_valid_offset(const TensorDesc& tensor_desc,
                                                                const TensorCoord& coord)
 {
-    return adaptor_coordinate_is_valid(tensor_desc, coord);
+    if constexpr(std::is_same_v<remove_cvref_t<TensorCoord>, TiledIm2ColCoordinate>)
+    {
+        return coord.is_valid();
+    }
+    else
+    {
+        return adaptor_coordinate_is_valid(tensor_desc, coord);
+    }
 }
 
 template <index_t N, typename T>
@@ -115,4 +157,5 @@ CK_TILE_HOST_DEVICE void print(const tensor_coordinate<N, T>& coord)
 {
     print(static_cast<typename tensor_coordinate<N, T>::Base>(coord));
 }
+
 } // namespace ck_tile

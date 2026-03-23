@@ -981,11 +981,11 @@ TEST_F(Im2colTiledCoordinate, InitWithDilation2)
         }
 }
 
-// ---- 8c. TiledIm2ColCoordinate::move_k() ---
+// ---- 8c. TiledIm2ColCoordinate::move_step() for K-only moves ---
 
 TEST_F(Im2colTiledCoordinate, MoveKUpdatesKOffset)
 {
-    // init at k=0, then move_k to successive k values and compare to reference
+    // init at k=0, then advance by +1 steps using move_step(0, 1, meta)
     auto v2   = make_v2_transformer(p);
     auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
 
@@ -995,13 +995,13 @@ TEST_F(Im2colTiledCoordinate, MoveKUpdatesKOffset)
         coord.init(m, 0, meta);
         const int m_base = coord.M_base;
 
-        for(int k = 0; k < p.K_gemm(); ++k)
+        for(int k = 1; k < p.K_gemm(); ++k)
         {
-            coord.move_k(k, m, meta);
+            coord.move_step(0, 1, meta); // K-only step of +1
             int ref = reference_offset(p, m, k);
             if(ref == -1) continue;
 
-            EXPECT_EQ(coord.M_base, m_base) // M_base must be unchanged
+            EXPECT_EQ(coord.M_base, m_base) // M_base must be unchanged by K moves
                 << "M_base changed at m=" << m << " k=" << k;
             EXPECT_EQ(coord.get_offset(), ref)
                 << "m=" << m << " k=" << k;
@@ -1009,7 +1009,7 @@ TEST_F(Im2colTiledCoordinate, MoveKUpdatesKOffset)
     }
 }
 
-// ---- 8d. M_base is constant across all k (move_k must not touch M_base) ---
+// ---- 8d. M_base is constant across all k (move_step(0,dk) must not touch M_base) ---
 
 TEST_F(Im2colTiledCoordinate, MBaseConstantAcrossKMoves)
 {
@@ -1022,9 +1022,10 @@ TEST_F(Im2colTiledCoordinate, MBaseConstantAcrossKMoves)
         coord.init(m, 0, meta);
         const int m_base_ref = coord.M_base;
 
+        // Advance in steps of C (one x-column at a time)
         for(int k = p.C; k < p.K_gemm(); k += p.C)
         {
-            coord.move_k(k, m, meta);
+            coord.move_step(0, p.C, meta);
             EXPECT_EQ(coord.M_base, m_base_ref) << "m=" << m << " k=" << k;
         }
     }

@@ -5,6 +5,7 @@
 #include "ck_tile/core.hpp"
 #include "ck_tile/core/tensor/tensor_descriptor_tiled.hpp"
 #include "ck_tile/core/tensor/tiled_im2col_coordinate.hpp"
+#include "ck_tile/core/tensor/tiled_im2col_descriptor.hpp"
 #include "ck_tile/ops/grouped_convolution/utils/convolution_specialization.hpp"
 namespace ck_tile {
 
@@ -897,12 +898,16 @@ struct TransformConvFwdToGemm_V2
                     make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
                     make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3, 4>{}, sequence<5>{}));
 
-                return transform_tensor_descriptor_tiled(
+                const auto base_desc = transform_tensor_descriptor_tiled(
                     in_n_y_ho_x_wo_c_desc,
                     make_tuple(make_merge_transform(make_tuple(N_, Ho_, Wo_)),
                                make_merge_transform(make_tuple(Y_, X_, C_))),
                     make_tuple(sequence<0, 2, 4>{}, sequence<1, 3, 5>{}),
                     make_tuple(sequence<0>{}, sequence<1>{}));
+
+                // Attach tile-aware im2col metadata for fast coordinate computation
+                return make_tiled_im2col_descriptor(
+                    base_desc, MakeATileMetadata<ALayout>());
             }
             else
             {

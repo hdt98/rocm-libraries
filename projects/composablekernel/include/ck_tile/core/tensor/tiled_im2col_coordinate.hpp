@@ -36,7 +36,7 @@ struct TiledIm2ColMetadata
     index_t HiStride;     // Wi * G * C
     index_t WiStride;     // G * C
     index_t SH_HiStride;  // SH * HiStride  (ho contribution to M_base)
-    index_t step_w;       // SW * WiStride  (wo contribution to M_base / M_base step per row)
+    index_t step_w;       // SW * WiStride  (wo contribution to M_base / step per wo)
     index_t wrap_delta;   // SH_HiStride - Wo * step_w  (M_base correction at ho-boundary)
     index_t pad_offset;   // PH * HiStride + PW * WiStride  (subtracted from M_base)
 
@@ -68,29 +68,37 @@ struct TiledIm2ColMetadata
 // Replaces the generic BottomTensorCoord + transform-chain evaluation.
 //
 // Usage pattern:
-//   init(m_gemm, k_gemm, meta)  — once per thread coordinate (5 divmod)
-//   move_k(k_new, meta)         — once per K-step (2 divmod, no M cost)
-//   get_offset()                — every load (1 add)
-//   is_valid()                  — every load (1 bool read)
+//   init(m_gemm, k_gemm, meta)       — once per thread coordinate (5 divmod)
+//   move_step(dm, dk, meta)          — on coordinate move (0–5 divmod depending on dims)
+//   get_offset()                     — every load (1 add)
+//   is_valid()                       — every load (1 bool read)
+//
+// Key property: M_base is invariant across K-loop steps (when dm=0).
+// K-only moves cost 2 divmod (K decode only, M_base unchanged).
 
 struct TiledIm2ColCoordinate
 {
-    index_t M_base;   // offset contribution from m_gemm
-    index_t K_offset; // offset contribution from k_gemm
-    bool    valid;    // true iff (m_gemm, k_gemm) maps to non-padded input
+    index_t M_base;    // offset contribution from m_gemm  (constant across K-loop)
+    index_t K_offset;  // offset contribution from k_gemm  (updated per K-step)
+    index_t m_gemm;    // current absolute M index (for move_step)
+    index_t k_gemm;    // current absolute K index (for move_step)
+    bool    valid;     // true iff (m_gemm, k_gemm) maps to non-padded input
 
     // -------------------------------------------------------------------------
     // Full initialization from (m_gemm, k_gemm).
     // Cost: 5 integer divisions.
     // Called once per thread coordinate at block start.
     // -------------------------------------------------------------------------
-    CK_TILE_HOST_DEVICE void init(index_t m_gemm,
-                                   index_t k_gemm,
+    CK_TILE_HOST_DEVICE void init(index_t m,
+                                   index_t k,
                                    const TiledIm2ColMetadata& meta)
     {
-        // Decode m_gemm → (n_conv, ho, wo)  [3 divmod]
-        const index_t n_conv = m_gemm / meta.HoWo;
-        const index_t rem_m  = m_gemm % meta.HoWo;
+        m_gemm = m;
+        k_gemm = k;
+
+        // Decode m → (n_conv, ho, wo)  [3 divmod]
+        const index_t n_conv = m / meta.HoWo;
+        const index_t rem_m  = m % meta.HoWo;
         const index_t ho     = rem_m / meta.Wo;
         const index_t wo     = rem_m % meta.Wo;
 
@@ -100,9 +108,9 @@ struct TiledIm2ColCoordinate
                + wo     * meta.step_w
                - meta.pad_offset;
 
-        // Decode k_gemm → (y, x, c_conv)  [2 divmod]
-        const index_t y      = k_gemm / meta.XC;
-        const index_t rem_k  = k_gemm % meta.XC;
+        // Decode k → (y, x, c_conv)  [2 divmod]
+        const index_t y      = k / meta.XC;
+        const index_t rem_k  = k % meta.XC;
         const index_t x      = rem_k / meta.C;
         const index_t c_conv = rem_k % meta.C;
 
@@ -116,37 +124,61 @@ struct TiledIm2ColCoordinate
     }
 
     // -------------------------------------------------------------------------
-    // Incremental K update. Called once per K-step in the pipeline loop.
-    // Cost: 2 integer divisions (covers K_offset recomputation from k_new).
-    // M_base is unaffected — no divisions needed for it.
+    // Move by (dm, dk) in the global (M, K) space.
+    // Called by move_tensor_coordinate for both K-loop steps and within-tile moves.
     //
-    // Future optimisation: replace with fully-incremental update using deltas
-    //   ΔK(x unchanged): +1
-    //   ΔK(x wraps):     DW_WiStride - (C-1)
-    //   ΔK(y wraps):     DH_HiStride - X*DW_WiStride - (C-1)
-    // For now we recompute from k_new to keep the code simple and correct.
+    // When dm == 0 (pure K step): 2 divmod, M_base unchanged.
+    // When dm != 0: full reinit, 5 divmod.
     // -------------------------------------------------------------------------
-    CK_TILE_HOST_DEVICE void move_k(index_t k_new,
-                                     index_t m_gemm,
-                                     const TiledIm2ColMetadata& meta)
+    CK_TILE_HOST_DEVICE void move_step(index_t dm,
+                                        index_t dk,
+                                        const TiledIm2ColMetadata& meta)
     {
-        const index_t y      = k_new / meta.XC;
-        const index_t rem_k  = k_new % meta.XC;
-        const index_t x      = rem_k / meta.C;
-        const index_t c_conv = rem_k % meta.C;
-        K_offset = y * meta.DH_HiStride + x * meta.DW_WiStride + c_conv;
+        if(dm == 0)
+        {
+            // K-only step: update K_offset, M_base unchanged  [2 divmod]
+            k_gemm += dk;
+            const index_t y      = k_gemm / meta.XC;
+            const index_t rem_k  = k_gemm % meta.XC;
+            const index_t x      = rem_k / meta.C;
+            const index_t c_conv = rem_k % meta.C;
+            K_offset = y * meta.DH_HiStride + x * meta.DW_WiStride + c_conv;
 
-        // Update validity with new K values
-        const index_t rem_m  = m_gemm % meta.HoWo;
-        const index_t ho     = rem_m / meta.Wo;
-        const index_t wo     = rem_m % meta.Wo;
-        const index_t ih     = ho * meta.SH + y * meta.DH - meta.PH;
-        const index_t iw     = wo * meta.SW + x * meta.DW - meta.PW;
-        valid = (ih >= 0 && ih < meta.Hi) && (iw >= 0 && iw < meta.Wi);
+            // Validity: only K changes, M validity unchanged, recheck K part
+            const index_t rem_m = m_gemm % meta.HoWo;
+            const index_t ho    = rem_m / meta.Wo;
+            const index_t wo    = rem_m % meta.Wo;
+            const index_t ih    = ho * meta.SH + y * meta.DH - meta.PH;
+            const index_t iw    = wo * meta.SW + x * meta.DW - meta.PW;
+            valid = (ih >= 0 && ih < meta.Hi) && (iw >= 0 && iw < meta.Wi);
+        }
+        else
+        {
+            // General step: full reinit  [5 divmod]
+            init(m_gemm + dm, k_gemm + dk, meta);
+        }
     }
 
     CK_TILE_HOST_DEVICE index_t get_offset() const { return M_base + K_offset; }
     CK_TILE_HOST_DEVICE bool    is_valid()   const { return valid; }
 };
+
+// ============================================================================
+// Trait helper: detect if a descriptor has tiled im2col metadata
+// ============================================================================
+
+template <typename T, typename = void>
+struct has_im2col_meta : std::false_type
+{
+};
+
+template <typename T>
+struct has_im2col_meta<T, std::void_t<decltype(std::declval<T>().get_im2col_meta())>>
+    : std::true_type
+{
+};
+
+template <typename T>
+inline constexpr bool has_im2col_meta_v = has_im2col_meta<T>::value;
 
 } // namespace ck_tile
