@@ -15,8 +15,11 @@ uv venv .venv && .venv/bin/pip install torch --index-url https://download.pytorc
 # 2. Build kernel .so files (auto-detects GPU architecture)
 ./compile.py
 
-# 3. Run tests
-python test_harness.py libbaseline.so liboptimized.so
+# 3. Verify correctness
+python test_harness.py libbaseline.so liboptimized.so --correctness
+
+# 4. Benchmark
+python test_harness.py libbaseline.so liboptimized.so --benchmark
 ```
 
 ## Iteration Loop
@@ -25,9 +28,10 @@ The workflow for LLM-driven kernel optimization:
 
 1. **Edit** tuning parameters in `optimized.cpp` (the `TUNING PARAMETERS` section)
 2. **Build** the optimized kernel: `./compile.py optimized` (~2.5s with `--arch`, ~7.5s with auto-detect)
-3. **Test** against baseline: `python test_harness.py libbaseline.so liboptimized.so`
-4. **Read** the output: verification status, bandwidth, speedup vs baseline
-5. Repeat from step 1
+3. **Verify**: `python test_harness.py libbaseline.so liboptimized.so --correctness`
+4. **Benchmark**: `python test_harness.py libbaseline.so liboptimized.so --benchmark`
+5. **Read** the output: verification status, bandwidth, speedup vs baseline
+6. Repeat from step 1
 
 The baseline `.so` is built once and never changes. Only `optimized.cpp` is
 modified and recompiled during iteration. The Python test script never needs
@@ -56,32 +60,79 @@ recompilation.
 
 ### test_harness.py
 
+The harness has four mutually exclusive modes. Exactly one must be specified.
+
 ```bash
-# Verify optimized against baseline and benchmark both
-python test_harness.py libbaseline.so liboptimized.so
+# Verify optimized kernel against baseline (ground truth)
+python test_harness.py libbaseline.so liboptimized.so --correctness
 
-# Custom shapes (semicolon-separated)
-python test_harness.py libbaseline.so liboptimized.so --shapes "8,128,2048;32,64,4096"
+# Run optimized kernel for profiling (minimal launches, clean trace)
+python test_harness.py libbaseline.so liboptimized.so --profile
 
-# Control timing: 10 warmup iterations, 200 timed iterations
-python test_harness.py libbaseline.so liboptimized.so --warmup 10 --nrepeat 200
+# Benchmark on HARNESS_SHAPES (20-25 shapes)
+python test_harness.py libbaseline.so liboptimized.so --benchmark
+
+# Benchmark on ALL_SHAPES (full coverage)
+python test_harness.py libbaseline.so liboptimized.so --full-benchmark
+
+# Control iteration count (default: 20, or env GEAK_BENCHMARK_ITERATIONS)
+python test_harness.py libbaseline.so liboptimized.so --benchmark --iterations 50
 
 # Change reduction dimension (default: last dim)
-python test_harness.py libbaseline.so liboptimized.so --reduce-dim 1
-
-# Skip verification (timing only)
-python test_harness.py libbaseline.so liboptimized.so --no-verify
+python test_harness.py libbaseline.so liboptimized.so --benchmark --reduce-dim 1
 ```
+
+### Modes
+
+| Flag | Shapes | Description |
+|------|--------|-------------|
+| `--correctness` | HARNESS_SHAPES | Deterministic seed, run both kernels on same input, compare with `torch.testing.assert_close`, exit 1 on failure |
+| `--profile` | PROFILE_SHAPES (5) | Run optimized kernel once per shape for rocprofv3 capture. Tensors generated on CPU then moved to GPU for clean profiler trace. |
+| `--benchmark` | HARNESS_SHAPES | Benchmark both kernels, report per-shape latency/speedup and summary with median |
+| `--full-benchmark` | ALL_SHAPES | Same as `--benchmark` but over all shapes |
+
+### Shape lists
+
+Three shape tiers are defined at the top of `test_harness.py`:
+
+- **ALL_SHAPES** (25 shapes): 3D softmax tensors `(B, S, H)` sorted by element count, from `[1, 8, 256]` to `[128, 128, 4096]`.
+- **HARNESS_SHAPES**: same as ALL_SHAPES (since there are exactly 25).
+- **PROFILE_SHAPES** (5): evenly-spaced subset of ALL_SHAPES for fast profiling.
 
 ### Example output
 
-```
-Shape: [8, 128, 2048], reduce_dim=2
-------------------------------------------------------------
-  libbaseline.so                     0.016 ms     517.1 GB/s
-  liboptimized.so                    0.014 ms     590.2 GB/s  [PASS, max_err=3.81e-06]
+#### `--correctness`
 
-  Speedup: 1.14x
+```
+Correctness check: liboptimized.so vs libbaseline.so (ground truth)
+Shapes: 25
+
+  PASS  [1, 8, 256]  max_err=0.00e+00
+  PASS  [1, 8, 1024]  max_err=0.00e+00
+  ...
+  PASS  [128, 128, 4096]  max_err=0.00e+00
+
+RESULT: PASS
+```
+
+#### `--benchmark`
+
+```
+Benchmark: liboptimized.so vs libbaseline.so
+Shapes: 25, iterations: 20
+
+                         Shape  Baseline ms  Optimized ms   BW GB/s  Speedup
+--------------------------------------------------------------------------------
+                   [1, 8, 256]       0.0041        0.0041       2.0    1.00x
+                  [8, 128, 2048]     0.0173        0.0173     486.2    1.00x
+  ...
+              [128, 128, 4096]       0.1540        0.1540    1742.9    1.00x
+
+Shapes benchmarked: 25
+median_wall_time_us: 17.28
+median_baseline_us:  17.29
+median_speedup:      1.0009
+mean_speedup:        1.0000
 ```
 
 ## Tuning Parameters (optimized.cpp)
@@ -142,9 +193,11 @@ extern "C" float run_kernel(
 
 ### 2. Python test harness (`test_harness.py`)
 
-Update two things:
+Update three things:
 - **`load_kernel()`**: change `argtypes` to match new C ABI
 - **`call_kernel()`**: change arguments passed to `run_kernel`
+- **Shape lists**: replace `ALL_SHAPES` / `HARNESS_SHAPES` / `PROFILE_SHAPES`
+  with shapes appropriate for the new kernel family
 
 The verification model stays the same: the baseline kernel output is the ground
 truth, and the optimized kernel is compared against it.
@@ -154,6 +207,8 @@ truth, and the optimized kernel is compared against it.
 - `compile.py` and `Makefile` work unchanged (same hipcc flags)
 - The overall pattern: `.cpp` with tuning params + `extern "C"` wrapper +
   Python test script with baseline-as-ground-truth verification
+- The four GEAK modes (`--correctness`, `--profile`, `--benchmark`,
+  `--full-benchmark`) and `--iterations N`
 - ctypes loading, GPU synchronization, error reporting
 
 ## Testing Limitations
@@ -180,61 +235,6 @@ limitations:
 - **No unit test granularity**: old CK has limited unit tests, but CK Tile has
   better coverage. An LLM modifying kernel internals should run the relevant
   CK/CK Tile unit tests, not just the end-to-end comparison.
-
-
-## Possible Improvements
-
-### Use PyTorch extensions for both kernels (eliminate ctypes and Makefile)
-
-Both kernels could use PyTorch's C++ extension system with pybind11 bindings,
-accepting `torch::Tensor` directly instead of `void*`. This eliminates all
-ctypes boilerplate, Makefile, and compile.py. The two kernels use different
-compilation strategies to preserve the frozen baseline guarantee:
-
-- **Baseline**: `pip install ./baseline` — compiled once into site-packages,
-  never changes unless explicitly reinstalled. Immune to header changes.
-- **Optimized**: `torch.utils.cpp_extension.load()` — JIT-compiled on each
-  test run. Auto-detects GPU arch, auto-recompiles when source changes.
-
-```python
-from torch.utils.cpp_extension import load
-import geak_baseline  # pip-installed, frozen
-
-# Optimized: JIT-compiled, auto-rebuilds when optimized.cpp changes
-optimized = load(name="optimized", sources=["optimized.cpp"],
-                 extra_include_paths=["../../../include"])
-
-# Both use the same torch::Tensor interface — no ctypes
-ms_base = geak_baseline.run_kernel(x, y, [2], 1.0, 0.0, True, 5, 50)
-ms_opt = optimized.run_kernel(x, y, [2], 1.0, 0.0, True, 5, 50)
-```
-
-The baseline `setup.py` would look like:
-
-```python
-from setuptools import setup
-from torch.utils.cpp_extension import CppExtension, BuildExtension
-
-setup(
-    name="geak_baseline",
-    ext_modules=[CppExtension(
-        "geak_baseline",
-        ["baseline.cpp"],
-        include_dirs=["../../../include"],
-        extra_compile_args=["-O3"],
-    )],
-    cmdclass={"build_ext": BuildExtension},
-)
-```
-
-The `.cpp` files would use pybind11 instead of `extern "C"`. The tuning
-parameters section stays identical — only the wrapper at the bottom changes.
-
-`load()` tracks transitive includes and recompiles when CK headers change.
-This is desirable for the optimized kernel (pick up changes during development)
-but would be wrong for the baseline (must stay frozen). Using `pip install` for
-the baseline avoids this — the compiled extension in site-packages is decoupled
-from the source tree.
 
 ## Prerequisites
 
