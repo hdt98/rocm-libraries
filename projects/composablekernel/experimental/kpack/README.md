@@ -85,6 +85,7 @@ experimental/kpack/
 │       ├── layout.hpp              # Layout enum (Row, Col, Contiguous, Auto)
 │       ├── tensor_desc.hpp         # TensorDesc: name, dtype, rank, layout
 │       ├── ops.hpp                 # Operator structs (GemmOp, AddOp, ReluOp, ...) + Op variant
+│       ├── args.hpp                # Generic Args, TensorArg, ScalarValue (kernarg ABI)
 │       ├── signature.hpp           # Tensor, Scalar, Signature (compute graph)
 │       └── resolve.hpp             # consteval resolve(): dtype cascade, rank/layout propagation
 ├── rocm_kpack/                     # Vendored kpack C runtime library (from TheRock)
@@ -126,7 +127,6 @@ experimental/kpack/
         ├── CMakeLists.txt
         ├── gemm_api.hpp                # Signature-based make_kernel, GemmKernel, tile validation
         ├── gemm_dev.hpp                # CkTypeMap, CkLayoutMap, runGemm<K> template
-        ├── gemm_args.hpp               # GemmArgs ABI struct, tile constants
         ├── gemm_fp32.hip               # fp32 variant instantiation
         ├── gemm_fp16.hip               # fp16 variant instantiation
         ├── gemm_fp16_w32.hip           # fp16 variant with WarpTile=32 (K=16 for fp16)

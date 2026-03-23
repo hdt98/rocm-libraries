@@ -73,37 +73,36 @@ Two header files, strict dependency boundary:
 | `rocm_vector_add_api.hpp` | None | Host, device, tests |
 | `rocm_vector_add_dev.hpp` | Yes (CK Tile) | Device only |
 
-The API header contains the config types, `make_kernel`, `VectorAddArgs`, `VectorAddKernel`, and all compile-time validation. It is testable with `constexpr`/`consteval` without any GPU — the 10 `static_assert` tests in the source run on any C++20 compiler.
+The API header contains the config types, `make_kernel`, `VectorAddKernel`, and all compile-time validation. It is testable with `constexpr`/`consteval` without any GPU — the 10 `static_assert` tests in the source run on any C++20 compiler. The generic `Args` struct (from `args.hpp`) replaces per-operation args structs.
 
 The device header contains the CK Tile kernel implementation, `CkTypeMap`, and `runVectorAdd<K>`. It is compiled only with `--cuda-device-only` and never included in host code.
 
 > **Production implication**: This is the model for all rocm_ck operation headers. The `_api` header is the public interface; the `_dev` header is an implementation detail. Consumers include only `_api`.
 
-## 6. VectorAddArgs ABI Validation
+## 6. Generic Args ABI
 
-The args struct uses `void*` pointers (not typed), has explicit padding awareness, and 6 `static_assert` checks:
+All operations share a single `Args` struct (defined in `include/rocm_ck/args.hpp`):
 
 ```cpp
-struct VectorAddArgs {
-    index_t n;          // offset 0
-    float alpha;        // offset 4
-    float beta;         // offset 8
-    // 4 bytes implicit padding
-    const void* a;      // offset 16
-    const void* b;      // offset 24
-    void* c;            // offset 32
-};
+struct TensorArg {
+    const void* ptr;              //  8 bytes
+    index_t lengths[kMaxRank];    // 24 bytes (int32)
+    int64_t strides[kMaxRank];    // 48 bytes (int64)
+};  // 80 bytes total
 
-static_assert(std::is_trivially_copyable_v<VectorAddArgs>);
-static_assert(sizeof(VectorAddArgs) == 40);
-static_assert(alignof(VectorAddArgs) == 8);
-static_assert(offsetof(VectorAddArgs, a) == 16);
-// ... 3 more offset checks
+union ScalarValue { float f32; int32_t i32; uint32_t u32; double f64; };  // 8 bytes
+
+struct Args {
+    std::array<TensorArg, kMaxTensors> tensors;   // 1280 bytes
+    std::array<ScalarValue, kMaxScalars> scalars;  //  128 bytes
+};  // 1408 bytes total (34% of 4KB kernarg budget)
 ```
 
-This is the binary contract between host and device across separate compilation boundaries. Pointers are `void*` because the actual type depends on the variant (FP32, FP16, BF16) — type dispatch happens inside the device kernel via `CkTypeMap`.
+Tensor slots carry their own shape — problem dimensions (N, M, K) are derivable from tensor lengths rather than redundant scalar fields. Pointers are `const void*` because the actual type depends on the variant — type dispatch happens inside the device kernel via `CkTypeMap`. Output tensors use `const_cast` on the device side.
 
-> **Production implication**: Every kernel's args struct needs this level of ABI validation. A single-byte offset mismatch between host and device produces silent data corruption.
+ABI is locked with `static_assert` checks for size, alignment, standard layout, and trivial copyability. The GPU only loads fields it reads via `s_load` — unused slots cost nothing.
+
+> **Production implication**: One Args struct for all operations eliminates per-operation ABI structs. Adding a new operation requires no new args type — just new slot conventions documented in the device header.
 
 ## 7. One .hip File Per Variant
 
@@ -116,7 +115,7 @@ static constexpr rocm_ck::VectorAddKernel K = rocm_ck::make_kernel(
                        .ops = {rocm_ck::AddOp{}}},
     rocm_ck::ElementwiseAlgorithm{1024, 1, 1024, true});
 
-extern "C" __global__ void vector_add_fp32_b1024(rocm_ck::VectorAddArgs args) {
+extern "C" __global__ void vector_add_fp32_b1024(rocm_ck::Args args) {
     rocm_ck::runVectorAdd<K>(args);
 }
 ```

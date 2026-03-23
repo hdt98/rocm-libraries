@@ -1,7 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// Shared argument struct and compile-time configuration for rocm_ck vector add.
+// Compile-time configuration for rocm_ck vector add.
 //
 // Uses operator-centric Signature with AddOp, validated by make_kernel() into
 // a VectorAddKernel NTTP with consteval checks for CK Tile ElementWiseShape
@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include <rocm_ck/args.hpp>
 #include <rocm_ck/datatype_utils.hpp>
 #include <rocm_ck/resolve.hpp>
 #include <rocm_ck/tensor_desc.hpp>
@@ -21,34 +22,6 @@
 #include <type_traits>
 
 namespace rocm_ck {
-
-/// Kernel arguments passed by value through hipModuleLaunchKernel.
-/// Layout must match exactly between host and device.
-///
-/// Always computes c = alpha * a + beta * b. For plain addition, pass
-/// alpha = 1.0f and beta = 1.0f. This matches the BLAS convention where
-/// scalar parameters are always present.
-struct VectorAddArgs
-{
-    index_t n;
-    float alpha;
-    float beta;
-    // 4 bytes implicit padding (pointers need 8-byte alignment)
-    const void* a;
-    const void* b;
-    void* c;
-};
-
-static_assert(std::is_trivially_copyable_v<VectorAddArgs>,
-              "VectorAddArgs must be trivially copyable for kernarg passing");
-static_assert(sizeof(VectorAddArgs) == 40, "unexpected VectorAddArgs size");
-static_assert(alignof(VectorAddArgs) == 8, "unexpected VectorAddArgs alignment");
-static_assert(offsetof(VectorAddArgs, n) == 0, "unexpected offset for n");
-static_assert(offsetof(VectorAddArgs, alpha) == 4, "unexpected offset for alpha");
-static_assert(offsetof(VectorAddArgs, beta) == 8, "unexpected offset for beta");
-static_assert(offsetof(VectorAddArgs, a) == 16, "unexpected offset for a");
-static_assert(offsetof(VectorAddArgs, b) == 24, "unexpected offset for b");
-static_assert(offsetof(VectorAddArgs, c) == 32, "unexpected offset for c");
 
 /// Algorithm: describes HOW the kernel executes (tile geometry, pipeline).
 /// Independent of data types — paired with Signature in make_kernel().

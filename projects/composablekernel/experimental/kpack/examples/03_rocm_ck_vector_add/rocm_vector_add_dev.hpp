@@ -19,12 +19,16 @@ namespace rocm_ck {
 
 /// Device function that computes c = alpha * a + beta * b.
 ///
-/// Uses CK Tile tile primitives directly (not the stock ElementWiseKernel)
-/// to support scalar parameters and mixed input/output types.
+/// Tensor layout:
+///   tensors[0] = a (input),  tensors[1] = b (input),  tensors[2] = c (output)
+///   lengths[0] = n,  strides[0] = 1  (contiguous rank-1)
+///
+/// Scalar layout:
+///   scalars[0].f32 = alpha,  scalars[1].f32 = beta
 ///
 /// Call this from an extern "C" __global__ wrapper.
 template <VectorAddKernel K>
-__device__ void runVectorAdd(VectorAddArgs args)
+__device__ void runVectorAdd(Args args)
 {
     using X = typename CkTypeMap<K.in_dtype>::type;
     using Y = typename CkTypeMap<K.out_dtype>::type;
@@ -40,7 +44,12 @@ __device__ void runVectorAdd(VectorAddArgs args)
     static_assert(sizeof(rocm_ck::index_t) == sizeof(ck_tile::index_t),
                   "rocm_ck::index_t and ck_tile::index_t must match");
 
-    const auto n       = static_cast<ck_tile::index_t>(args.n);
+    // Unpack generic Args — compiler generates s_load at fixed offsets.
+    const TensorArg& t_a = args.tensors[0];
+    const TensorArg& t_b = args.tensors[1];
+    const TensorArg& t_c = args.tensors[2];
+
+    const auto n       = static_cast<ck_tile::index_t>(t_a.lengths[0]);
     const auto iM      = ck_tile::get_block_id() * Shape::kBlockM;
     const auto lens    = ck_tile::make_tuple(n);
     const auto strides = ck_tile::make_tuple(ck_tile::index_t{1});
@@ -78,14 +87,14 @@ __device__ void runVectorAdd(VectorAddArgs args)
     };
 
     // Load input tiles.
-    auto a_tile = ck_tile::load_tile(make_input_window(static_cast<const X*>(args.a)));
-    auto b_tile = ck_tile::load_tile(make_input_window(static_cast<const X*>(args.b)));
+    auto a_tile = ck_tile::load_tile(make_input_window(static_cast<const X*>(t_a.ptr)));
+    auto b_tile = ck_tile::load_tile(make_input_window(static_cast<const X*>(t_b.ptr)));
 
     // Compute: y = alpha * a + beta * b (in float, then cast to Y).
     auto y_tile = ck_tile::make_static_distributed_tensor<Y>(a_tile.get_tile_distribution());
 
-    const float alpha = args.alpha;
-    const float beta  = args.beta;
+    const float alpha = args.scalars[0].f32;
+    const float beta  = args.scalars[1].f32;
 
     const auto spans = a_tile.get_distributed_spans();
     ck_tile::sweep_tile_span(spans[ck_tile::number<0>{}], [&](auto idx) {
@@ -97,7 +106,10 @@ __device__ void runVectorAdd(VectorAddArgs args)
 
     // Store output tile.
     const auto y_view = ck_tile::make_naive_tensor_view<ck_tile::address_space_enum::global>(
-        static_cast<Y*>(args.c), lens, strides, ck_tile::number<Shape::kVectorM>{});
+        static_cast<Y*>(const_cast<void*>(t_c.ptr)),
+        lens,
+        strides,
+        ck_tile::number<Shape::kVectorM>{});
 
     const auto y_transformed = ck_tile::pad_tensor_view(
         ck_tile::transform_tensor_view(y_view,

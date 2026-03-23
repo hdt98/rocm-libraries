@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include <rocm_ck/args.hpp>
 #include <rocm_ck/datatype_utils.hpp>
 #include <rocm_ck/layout.hpp>
 #include <rocm_ck/ops.hpp>
@@ -56,13 +57,9 @@ struct Scalar
 ///    .ops = {GemmOp{.out="C"},
 ///            AddOp{.lhs="C", .rhs="bias", .out="D"},
 ///            ReluOp{.in="D", .out="E"}}}
-/// Array size limits for Signature. Named constants for grep-ability.
-/// 16 tensors covers FMHA (Q, K, V, S, P, O + masks + intermediates).
-/// 8 ops covers GEMM + multi-stage epilogue or multi-GEMM fusion.
-/// 8 scalars covers alpha, beta, scale, plus operation-specific params.
-constexpr int kMaxTensors = 16;
-constexpr int kMaxOps     = 8;
-constexpr int kMaxScalars = 8;
+// kMaxTensors and kMaxScalars are defined in args.hpp (canonical source).
+// kMaxOps is Signature-specific (operators, not kernel arguments).
+constexpr int kMaxOps = 8;
 
 struct Signature
 {

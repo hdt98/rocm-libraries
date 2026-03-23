@@ -48,9 +48,10 @@ time by `make_kernel`.
 ### Scaled Addition
 
 The kernel always computes `c = alpha * a + beta * b`. Scalar parameters
-`alpha` and `beta` are part of the `VectorAddArgs` struct, matching the BLAS
-convention where scalar parameters are always present. For plain addition,
-pass `alpha = 1.0f` and `beta = 1.0f`.
+`alpha` and `beta` are passed via the generic `Args` struct's scalar slots
+(`scalars[0].f32` and `scalars[1].f32`), matching the BLAS convention where
+scalar parameters are always present. For plain addition, pass
+`alpha = 1.0f` and `beta = 1.0f`.
 
 ### Custom CK Tile Kernel
 
@@ -106,7 +107,7 @@ The `_w8`/`_w2` suffixes indicate multi-warp variants.
 
 | File | Purpose |
 |------|---------|
-| `rocm_vector_add_api.hpp` | Shared ABI, Signature/Algorithm types, `resolve`, `make_kernel` validation |
+| `rocm_vector_add_api.hpp` | Signature/Algorithm types, `resolve`, `make_kernel` validation |
 | `rocm_vector_add_dev.hpp` | Device kernel — uses CK Tile tile primitives for `c = alpha*a + beta*b` |
 | `rocm_vector_add_registry.hpp` | `VariantDescriptor` table and `findVariant` selection (host-only) |
 | `vector_add_*.hip` | Variant instantiations (~15 lines each) |

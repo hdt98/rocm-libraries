@@ -15,7 +15,7 @@ static constexpr rocm_ck::GemmKernel kernel = rocm_ck::make_kernel(
                             .block_warps = {2, 2, 1},
                             .warp_tile   = {32, 32, 16}});
 
-extern "C" __global__ void gemm_fp16_w32(rocm_ck::GemmArgs args)
+extern "C" __global__ void gemm_fp16_w32(rocm_ck::Args args)
 {
     rocm_ck::runGemm<kernel>(args);
 }

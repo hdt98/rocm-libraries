@@ -65,18 +65,18 @@ static bool runVariant(const rocm_ck::VariantDescriptor& variant,
                 num_elements,
                 aligned ? "(aligned)" : "(padded)");
 
-    rocm_ck::VectorAddArgs kernel_args = {.n     = num_elements,
-                                          .alpha = alpha,
-                                          .beta  = beta,
-                                          .a     = buf_a.ptr(),
-                                          .b     = buf_b.ptr(),
-                                          .c     = buf_result.ptr()};
-    size_t kernel_args_size            = sizeof(kernel_args);
-    void* launch_config[]              = {HIP_LAUNCH_PARAM_BUFFER_POINTER,
-                                          &kernel_args,
-                                          HIP_LAUNCH_PARAM_BUFFER_SIZE,
-                                          &kernel_args_size,
-                                          HIP_LAUNCH_PARAM_END};
+    rocm_ck::Args kernel_args{};
+    kernel_args.tensors[0] = {buf_a.ptr(), {num_elements, 0, 0, 0, 0, 0}, {1, 0, 0, 0, 0, 0}};
+    kernel_args.tensors[1] = {buf_b.ptr(), {num_elements, 0, 0, 0, 0, 0}, {1, 0, 0, 0, 0, 0}};
+    kernel_args.tensors[2] = {buf_result.ptr(), {num_elements, 0, 0, 0, 0, 0}, {1, 0, 0, 0, 0, 0}};
+    kernel_args.scalars[0].f32 = alpha;
+    kernel_args.scalars[1].f32 = beta;
+    size_t kernel_args_size    = sizeof(kernel_args);
+    void* launch_config[]      = {HIP_LAUNCH_PARAM_BUFFER_POINTER,
+                                  &kernel_args,
+                                  HIP_LAUNCH_PARAM_BUFFER_SIZE,
+                                  &kernel_args_size,
+                                  HIP_LAUNCH_PARAM_END};
 
     HIP_CHECK(hipModuleLaunchKernel(
         kernel.function(), grid_size, 1, 1, block_size, 1, 1, 0, nullptr, nullptr, launch_config));
