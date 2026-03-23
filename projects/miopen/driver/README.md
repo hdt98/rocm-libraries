@@ -159,167 +159,77 @@ The `MIOPEN_PERFORMANCE_LOGS` environment variable enables lightweight logging o
 The variable supports five levels with varying detail and scope:
 
 - **Level 0** (default): No kernel logging
-- **Level 1**: Log only **main convolution kernel** per executed solution with **total solution time** - filters out transpose/transform kernels, excludes find/search
+- **Level 1**: Log only executed solution with **total solution time** - excludes find/search
 - **Level 2**: Log **all kernels** for executed solutions individually - includes transpose/transform kernels, excludes find/search
-- **Level 3**: Log only **main convolution kernel** per solution with **total solution time** - filters out transpose/transform kernels, includes find/search
+- **Level 3**: Log only **performance configs** per solution with **total solution time** - includes find/search
 - **Level 4**: Log **all kernels** individually - includes transpose/transform kernels and find/search kernels
 
 **Usage Examples:**
 
 ```bash
-# Level 1: Log only the chosen/executed kernels
-export MIOPEN_PERFORMANCE_LOGS=1
+# Level 4: Log all available kernel/performance config/solution information
+export MIOPEN_PERFORMANCE_LOGS=4
 ./bin/MIOpenDriver conv -W 32 -H 32 -c 3 -k 32 -x 5 -y 5 -p 2 -q 2
-
-# Level 2: Log all kernels including find/search
-export MIOPEN_PERFORMANCE_LOGS=2
-./bin/MIOpenDriver conv -W 32 -H 32 -c 3 -k 32 -x 5 -y 5 -p 2 -q 2
-```
-
-**Output Format:**
-
-The logging uses a hierarchical format where solution names are printed first, followed by the kernels for that solution:
-
-```
-[SOLUTION:solution_name]
-[KERNEL:exec_id] kernel_name : execution_time ms
-[KERNEL:exec_id] kernel_name : execution_time ms
-...
-```
-
-Where `exec_id` is an execution counter that groups related kernels together (e.g., transpose kernels and their main computation kernel).
-
-**Example Output (Level 1 - main kernels only with total time):**
-```
-[SOLUTION:ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC]
-[KERNEL:1] igemm_fwd_gtcx3_nhwc_bf16... : 1.520 ms (+4 transpose/transform kernels)
-[KERNEL:2] igemm_fwd_gtcx3_nhwc_bf16... : 1.489 ms (+4 transpose/transform kernels)
-[KERNEL:3] igemm_fwd_gtcx3_nhwc_bf16... : 1.407 ms (+4 transpose/transform kernels)
-```
-
-**Example Output (Level 2 - all kernels individually):**
-```
-[SOLUTION:ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC]
-[KERNEL:1] SubTensorOpWithScalar1d : 0.083 ms
-[KERNEL:1] batched_transpose_32x32_half : 0.330 ms
-[KERNEL:1] batched_transpose_16x32_half : 0.014 ms
-[KERNEL:1] igemm_fwd_gtcx3_nhwc_bf16... : 0.893 ms
-[KERNEL:1] batched_transpose_32x32_half : 0.269 ms
-[KERNEL:2] SubTensorOpWithScalar1d : 0.104 ms
-[KERNEL:2] batched_transpose_32x32_half : 0.342 ms
-[KERNEL:2] batched_transpose_16x32_half : 0.017 ms
-[KERNEL:2] igemm_fwd_gtcx3_nhwc_bf16... : 0.763 ms
-[KERNEL:2] batched_transpose_32x32_half : 0.272 ms
-```
-
-**Example Output (Level 3 - main kernels only, including find/search):**
-```
-[SOLUTION:SearchCandidate1]
-[KERNEL:1] miopenConv1x1u_search_candidate1 : 1.523 ms
-[SOLUTION:SearchCandidate2]
-[KERNEL:2] miopenConv1x1u_search_candidate2 : 1.612 ms
-[SOLUTION:ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC]
-[KERNEL:3] igemm_fwd_gtcx3_nhwc_bf16... : 1.520 ms (+4 transpose/transform kernels)
-```
-
-**Example Output (Level 4 - all kernels including find/search):**
-```
-[SOLUTION:SearchCandidate1]
-[KERNEL:1] miopenConv1x1u_search_candidate1 : 1.523 ms
-[SOLUTION:SearchCandidate2]
-[KERNEL:2] miopenConv1x1u_search_candidate2 : 1.612 ms
-[SOLUTION:ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC]
-[KERNEL:3] SubTensorOpWithScalar1d : 0.083 ms
-[KERNEL:3] batched_transpose_32x32_half : 0.012 ms
-[KERNEL:3] igemm_fwd_gtcx3_nhwc_bf16... : 0.234 ms
-[KERNEL:3] batched_transpose_32x32_half : 0.013 ms
-```
-
-**Key Features:**
-- **Multi-level control**: Five levels from no logging to comprehensive kernel-by-kernel logging
-- **Noise reduction**: Levels 1 and 3 filter out transpose/transform kernels to focus on core computation
-- **Solution-level timing**: Levels 1 and 3 aggregate timing across all kernels in a solution
-- **Execution tracking**: `exec_id` groups related kernels that execute together
-- **Accurate timing**: Uses GPU events for precise measurement (HIP events for HIP backend, OpenCL profiling for OpenCL backend)
-- **Independent of log levels**: Works without changing `MIOPEN_ENABLE_LOGGING`
-- **Easy filtering**: Simple `[KERNEL]` prefix for grep/parsing
-- **Both backends**: Full support for HIP and OpenCL
-
-**Performance Impact:**
-- **Level 0**: No overhead
-- **Level 1**: Minimal overhead - only times executed kernels, aggregates at solution level
-- **Level 2**: Moderate overhead - times all executed kernels individually
-- **Level 3**: Higher overhead - times all solutions including find/search, aggregates at solution level
-- **Level 4**: Highest overhead - times every kernel individually including benchmarking runs; synchronizes after each kernel
-
-**JSON Output Mode:**
-
-To enable JSON formatted output, add 256 to the desired log level. JSON mode outputs kernel execution data as structured JSON objects grouped by solution.
-
-```bash
-# Level 2 with JSON (2 + 256 = 258)
-export MIOPEN_PERFORMANCE_LOGS=258
-./bin/MIOpenDriver convbfp16 -W 1024 -H 1024 -c 128 -k 128 -x 3 -y 3
 ```
 
 **JSON Output Format:**
 
-Each solution outputs a single JSON object containing all its kernels:
+Each solution outputs a JSON object with performance configs. Each config contains aggregated timing statistics and optionally individual kernel execution data:
 
 ```json
 {
-  "solution": "miopenConvolutionFwdAlgoImplicitGEMM",
+  "solution": "ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC",
+  "solver_id": 1234567890,
   "phase": "execution",
-  "kernels": [
+  "performance_configs": [
     {
-      "exec_id": 1,
-      "kernel_name": "igemm_fwd_gtcx3_nhwc_bf16_bx0_ex1_bt128x128x32...",
-      "time_ms": 1.60839,
-      "timestamp": "2026-02-04T09:32:39.123456",
-      "is_transform": false
-    },
-    {
-      "exec_id": 1,
-      "kernel_name": "batched_transpose_32x32_half",
-      "time_ms": 0.234,
-      "timestamp": "2026-02-04T09:32:39.125012",
-      "is_transform": true
+      "config_name": "igemm_fwd_gtcx3_nhwc_bf16_bx0_ex1_bt128x128x32...",
+      "config_descriptor": "gemm_m_per_block=128 gemm_n_per_block=128...",
+      "exec_number": 1,
+      "time_executions_ms": [1.52, 1.49, 1.41, 1.38],
+      "time_ms": 1.42,
+      "time_std_ms": 0.056,
+      "time_min_ms": 1.38,
+      "time_max_ms": 1.52,
+      "number_of_transformations": 4,
+      "kernels": [
+        {
+          "kernel_name": "SubTensorOpWithScalar1d",
+          "time_executions_ms": [0.083, 0.104, 0.089],
+          "is_transformation": true
+        },
+        {
+          "kernel_name": "igemm_fwd_gtcx3_nhwc_bf16_bx0_ex1_bt128x128x32...",
+          "time_executions_ms": [0.893, 0.763, 0.724],
+          "is_transformation": false
+        }
+      ]
     }
   ]
 }
 ```
 
 **JSON Fields:**
+
+**Solution Level:**
 - `solution`: Name of the solver/algorithm
-- `phase`: Either "execution" (actual computation) or "tuning" (find/search phase)
-- `kernels`: Array of kernel execution records with:
-  - `exec_id`: Execution counter grouping related kernels
-  - `kernel_name`: Full kernel name
-  - `time_ms`: Execution time in milliseconds
-  - `timestamp`: ISO 8601 timestamp with microsecond precision
-  - `is_transform`: Boolean indicating if kernel is transpose/transform operation
+- `solver_id`: Numeric identifier for the solver
+- `phase`: Either "execution" (actual computation) or "tuning" (find/search phase), "validation", "solver_tuning", or "unknown"
+- `performance_configs`: Array of performance configuration results
 
-**Parsing JSON Output:**
-```bash
-# Extract kernel times with jq
-export MIOPEN_PERFORMANCE_LOGS=258
-./bin/MIOpenDriver conv ... 2>&1 | grep "^{" | jq '.kernels[].time_ms'
+**Performance Config Level:**
+- `config_name`: Name of the main kernel or solution
+- `config_descriptor`: Performance config parameters (optional)
+- `exec_number`: Execution counter (starts at 1)
+- `time_executions_ms`: Array of all execution times for this config
+- `time_ms`: Mean execution time (computed using outlier removal)
+- `time_std_ms`: Standard deviation of execution times
+- `time_min_ms`: Minimum execution time
+- `time_max_ms`: Maximum execution time
+- `number_of_transformations`: Count of transformation/transpose kernels
+- `kernels`: Array of individual kernel data (only present in levels 2 & 4, null in levels 1 & 3)
 
-# Get solution names
-./bin/MIOpenDriver conv ... 2>&1 | grep "^{" | jq -r '.solution'
-
-# Filter by phase
-./bin/MIOpenDriver conv ... 2>&1 | grep "^{" | jq 'select(.phase == "execution")'
-```
-
-**Filtering Output (Traditional Format):**
-```bash
-# Show only kernel logs
-./bin/MIOpenDriver conv ... 2>&1 | grep "\[KERNEL\]"
-
-# Extract just kernel names
-./bin/MIOpenDriver conv ... 2>&1 | grep "\[KERNEL\]" | awk '{print $2}'
-
-# Extract kernel names and times
-./bin/MIOpenDriver conv ... 2>&1 | grep "\[KERNEL\]" | awk '{print $2, $4, $5}'
-```
+**Kernel Level (when included):**
+- `kernel_name`: Full kernel name
+- `time_executions_ms`: Array of execution times across multiple runs
+- `is_transformation`: Boolean indicating if kernel is a transpose/transform operation
