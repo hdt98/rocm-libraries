@@ -685,8 +685,9 @@ struct GroupedConvolutionBackwardWeightKernel
 
         if constexpr(!IsStreamK)
         {
-            if(kargs.GemmK <
-               TilePartitioner::BlockGemmShape::WarpTile::at(number<2>{}) * kargs.k_batch)
+            if(integer_divide_ceil(kargs.GemmK,
+                                   TilePartitioner::BlockGemmShape::WarpTile::at(number<2>{})) <
+               kargs.k_batch)
             {
                 LogInfo("KBatch is too large, part of GPU wouldn't be utilized! GemmK: ",
                         kargs.GemmK,
