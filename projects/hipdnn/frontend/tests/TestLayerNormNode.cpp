@@ -14,6 +14,17 @@ using namespace hipdnn_frontend::graph;
 
 namespace
 {
+// Helper: verify normalized_dim_count via FlatBuffer round-trip (field is private)
+int64_t getPackedNormalizedDimCount(const LayernormAttributes& attrs)
+{
+    flatbuffers::FlatBufferBuilder builder;
+    auto packed = attrs.pack_attributes(builder);
+    builder.Finish(packed);
+    auto fb = flatbuffers::GetRoot<hipdnn_data_sdk::data_objects::LayernormAttributes>(
+        builder.GetBufferPointer());
+    return fb->normalized_dim_count();
+}
+
 // Helper: create a tensor with given dims and optional strides
 std::shared_ptr<TensorAttributes> makeTensor(const std::vector<int64_t>& dims,
                                              const std::vector<int64_t>& strides = {})
@@ -419,7 +430,7 @@ TEST(TestLayerNormNode, InferPropertiesSetsNormalizedDimCount)
     auto err = node.infer_properties_node();
     EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
 
-    EXPECT_EQ(node.attributes.get_normalized_dim_count(), 3);
+    EXPECT_EQ(getPackedNormalizedDimCount(node.attributes), 3);
 }
 
 TEST(TestLayerNormNode, InferPropertiesSetsAmbiguousNormalizedDimCount)
@@ -439,7 +450,7 @@ TEST(TestLayerNormNode, InferPropertiesSetsAmbiguousNormalizedDimCount)
     auto err = node.infer_properties_node();
     EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
 
-    EXPECT_EQ(node.attributes.get_normalized_dim_count(), 2);
+    EXPECT_EQ(getPackedNormalizedDimCount(node.attributes), 2);
 }
 
 TEST(TestLayerNormNode, InferPropertiesSetsNormalizedDimCountWithAlternativeLayoutConvention)
@@ -459,7 +470,7 @@ TEST(TestLayerNormNode, InferPropertiesSetsNormalizedDimCountWithAlternativeLayo
     auto err = node.infer_properties_node();
     EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
 
-    EXPECT_EQ(node.attributes.get_normalized_dim_count(), 3);
+    EXPECT_EQ(getPackedNormalizedDimCount(node.attributes), 3);
 }
 
 TEST(TestLayerNormNode, InferPropertiesStatsSkippedInInferenceMode)

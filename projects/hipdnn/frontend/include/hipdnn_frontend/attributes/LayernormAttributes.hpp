@@ -206,21 +206,6 @@ public:
         return _forwardPhase;
     }
 
-    /// @cond INTERNAL
-    // NOLINTNEXTLINE(readability-identifier-naming)
-    LayernormAttributes& set_normalized_dim_count(int64_t value)
-    {
-        _normalizedDimCount = value;
-        return *this;
-    }
-
-    // NOLINTNEXTLINE(readability-identifier-naming)
-    int64_t get_normalized_dim_count() const
-    {
-        return _normalizedDimCount;
-    }
-    /// @endcond
-
     flatbuffers::Offset<hipdnn_data_sdk::data_objects::LayernormAttributes>
         pack_attributes(flatbuffers::FlatBufferBuilder& builder) const // NOLINT
     {
@@ -253,7 +238,7 @@ public:
         attr.set_bias(tensorMap.at(fb->bias_tensor_uid()));
         attr.set_epsilon(tensorMap.at(fb->epsilon_tensor_uid()));
         attr.set_y(tensorMap.at(fb->y_tensor_uid()));
-        attr.set_normalized_dim_count(fb->normalized_dim_count());
+        attr._normalizedDimCount = fb->normalized_dim_count();
         attr.set_forward_phase(fromSdkType(fb->forward_phase()));
 
         if(fb->mean_tensor_uid().has_value())
@@ -269,6 +254,21 @@ public:
     }
 
 private:
+    friend class LayerNormNode;
+
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    LayernormAttributes& set_normalized_dim_count(int64_t value)
+    {
+        _normalizedDimCount = value;
+        return *this;
+    }
+
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    int64_t get_normalized_dim_count() const
+    {
+        return _normalizedDimCount;
+    }
+
     int64_t _normalizedDimCount = 0;
     NormFwdPhase _forwardPhase = NormFwdPhase::NOT_SET;
 };
