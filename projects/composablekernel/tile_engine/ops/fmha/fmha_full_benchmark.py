@@ -420,6 +420,11 @@ def main():
     # kernel_index: (hdim_q, hdim_v, dtype, variant) -> list of (so_path, cfg_dict)
     kernel_index: Dict[tuple, List[tuple]] = {}
 
+    from concurrent.futures import ProcessPoolExecutor as _PPE
+
+    _compile_pool = _PPE(max_workers=args.workers)
+    BATCH_SIZE = 200
+
     for variant in variants:
         cfg_path = str(_THIS_DIR / VARIANT_CONFIGS[variant])
         if not Path(cfg_path).exists():
@@ -432,16 +437,36 @@ def main():
         if not configs:
             continue
 
-        print(f"\n  {variant}: {len(configs)} configs, {args.workers} workers...")
-        t0 = time.perf_counter()
-        setups = setup_multiple_fmha_dispatchers(
-            configs, output_dir=build_dir, max_workers=args.workers
+        n_batches = (len(configs) + BATCH_SIZE - 1) // BATCH_SIZE
+        print(
+            f"\n  {variant}: {len(configs)} configs, {args.workers} workers, {n_batches} batches..."
         )
-        ok = sum(1 for s in setups if s.success)
+        t0 = time.perf_counter()
+        setups = []
+        total_ok = 0
+        for bi in range(n_batches):
+            batch_cfgs = configs[bi * BATCH_SIZE : (bi + 1) * BATCH_SIZE]
+            batch_setups = setup_multiple_fmha_dispatchers(
+                batch_cfgs,
+                output_dir=build_dir,
+                max_workers=args.workers,
+                executor=_compile_pool,
+            )
+            batch_ok = sum(1 for s in batch_setups if s.success)
+            batch_n = len(batch_cfgs)
+            total_ok += batch_ok
+            setups.extend(zip(batch_cfgs, batch_setups))
+            del batch_setups, batch_cfgs
+            print(
+                f"    Batch {bi + 1}/{n_batches}: {batch_ok}/{batch_n} "
+                f"(total {total_ok}, {time.perf_counter() - t0:.0f}s)",
+                flush=True,
+            )
+        ok = total_ok
         print(f"    Built {ok}/{len(configs)} in {time.perf_counter() - t0:.0f}s")
 
-        for config, setup in zip(configs, setups):
-            if not setup.success or setup.runner is None:
+        for config, setup in setups:
+            if not setup.success:
                 continue
             so_path = getattr(setup, "library_path", "") or ""
             if not so_path:
@@ -453,6 +478,9 @@ def main():
             key = (config.hdim_q, config.hdim_v, config.data_type, variant)
             cfg_dict = _config_to_serializable(config, so_path)
             kernel_index.setdefault(key, []).append((so_path, cfg_dict))
+
+    _compile_pool.shutdown(wait=True)
+    del _compile_pool
 
     total_built = sum(len(v) for v in kernel_index.values())
     print(f"\n  Total compiled: {total_built}")

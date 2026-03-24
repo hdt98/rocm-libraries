@@ -1376,11 +1376,33 @@ def setup_fmha_dispatcher(
     )
 
 
+def _run_compile_job(job):
+    """Module-level compile worker -- no threads, uses file-based stderr."""
+    cmd, obj_str, name, label = job
+    if os.path.exists(obj_str):
+        return (name, True, "")
+    err_path = obj_str + ".err"
+    with open(err_path, "w") as ef:
+        rc = subprocess.call(cmd, stdout=subprocess.DEVNULL, stderr=ef)
+    if rc != 0:
+        try:
+            err = open(err_path).read()[:200]
+        except Exception:
+            err = f"rc={rc}"
+        return (name, False, err)
+    try:
+        os.unlink(err_path)
+    except OSError:
+        pass
+    return (name, True, "")
+
+
 def setup_multiple_fmha_dispatchers(
     configs: List[FmhaKernelConfig],
     output_dir: Optional[Path] = None,
     verbose: bool = False,
     max_workers: Optional[int] = None,
+    executor=None,
 ) -> List[FmhaSetupResult]:
     """3-stage pipelined JIT: codegen(parallel) -> compile(parallel) -> link+load(parallel).
 
@@ -1390,7 +1412,6 @@ def setup_multiple_fmha_dispatchers(
     if not configs:
         return []
 
-    workers = max_workers or min(len(configs), os.cpu_count() or 4)
     root = get_dispatcher_root()
     codegen_dir = root / "codegen"
     ctypes_src = root / "bindings" / "ctypes" / "fmha_ctypes_lib.cpp"
@@ -1403,18 +1424,28 @@ def setup_multiple_fmha_dispatchers(
 
     results: dict[str, FmhaSetupResult] = {}
 
-    # --- Stage 1: Parallel codegen ---
+    # --- Stage 1: Codegen (sequential, skip cached) ---
     def _codegen(cfg):
         out = output_dir / f"fmha_jit_{cfg.name}"
         lib_path = out / f"libdispatcher_fmha_{cfg.name}.so"
+        # Fast path: .so exists, register result and skip
         if lib_path.exists():
-            try:
-                FmhaRunner.from_library(str(lib_path), arch)
-                return (cfg.name, cfg, out, True)
-            except Exception:
-                pass
+            results[cfg.name] = FmhaSetupResult(
+                success=True, config=cfg, library_path=str(lib_path)
+            )
+            return (cfg.name, cfg, out, True)
+        # Fast path: previous codegen already failed (no .hpp generated)
+        if out.exists() and not (out / "fmha_python_dispatch.hpp").exists():
+            err_file = out / "_codegen_err.txt"
+            if err_file.exists():
+                results[cfg.name] = FmhaSetupResult(
+                    success=False, config=cfg, error="Codegen failed (cached)"
+                )
+                return (cfg.name, cfg, out, False)
         out.mkdir(parents=True, exist_ok=True)
-        # BWD dq_dk_dv needs matching dot_do_o kernel
+        # Check if codegen was already done (has .hpp but no .so yet)
+        if (out / "fmha_python_dispatch.hpp").exists():
+            return (cfg.name, cfg, out, True)
         if cfg.family == "bwd_dq_dk_dv":
             dot = _make_bwd_dot_do_o_config(cfg)
             config_json_str = json.dumps(
@@ -1425,30 +1456,32 @@ def setup_multiple_fmha_dispatchers(
             )
         else:
             config_json_str = cfg.to_codegen_json()
-        r = subprocess.run(
-            [
-                sys.executable,
-                str(codegen_dir / "generate_fmha_fallback.py"),
-                "--output-dir",
-                str(out),
-                "--gpu-target",
-                cfg.gfx_arch,
-                "--config-json",
-                config_json_str,
-            ],
-            capture_output=True,
-            text=True,
-            cwd=str(codegen_dir),
-        )
-        ok = r.returncode == 0 and (out / "fmha_python_dispatch.hpp").exists()
+        err_file = out / "_codegen_err.txt"
+        with open(err_file, "w") as ef:
+            rc = subprocess.call(
+                [
+                    sys.executable,
+                    str(codegen_dir / "generate_fmha_fallback.py"),
+                    "--output-dir",
+                    str(out),
+                    "--gpu-target",
+                    cfg.gfx_arch,
+                    "--config-json",
+                    config_json_str,
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=ef,
+                cwd=str(codegen_dir),
+            )
+        ok = rc == 0 and (out / "fmha_python_dispatch.hpp").exists()
         if not ok:
+            err_msg = err_file.read_text()[:200] if err_file.exists() else "unknown"
             results[cfg.name] = FmhaSetupResult(
-                success=False, config=cfg, error=f"Codegen failed: {r.stderr[:200]}"
+                success=False, config=cfg, error=f"Codegen failed: {err_msg}"
             )
         return (cfg.name, cfg, out, ok)
 
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        codegen_results = list(pool.map(_codegen, configs))
+    codegen_results = [_codegen(cfg) for cfg in configs]
 
     # --- Stage 2: Collect ALL compile jobs, run in one pool ---
     # Use bwd family flag to get the superset of all flags (includes BWD-specific defines)
@@ -1464,7 +1497,7 @@ def setup_multiple_fmha_dispatchers(
             obj = cpp.with_suffix(".o")
             if not obj.exists():
                 compile_jobs.append(
-                    (base_flags + [str(cpp), "-o", str(obj)], obj, name, "kernel")
+                    (base_flags + [str(cpp), "-o", str(obj)], str(obj), name, "kernel")
                 )
         ctypes_obj = out / "fmha_ctypes_lib.o"
         if not ctypes_obj.exists():
@@ -1481,7 +1514,7 @@ def setup_multiple_fmha_dispatchers(
                         "-o",
                         str(ctypes_obj),
                     ],
-                    ctypes_obj,
+                    str(ctypes_obj),
                     name,
                     "ctypes",
                 )
@@ -1489,18 +1522,19 @@ def setup_multiple_fmha_dispatchers(
 
     failed_names: set = set()
 
-    def _compile(job):
-        cmd, obj, name, label = job
-        if obj.exists():
-            return (name, True, "")
-        r = subprocess.run(cmd, capture_output=True, text=True)
-        if r.returncode != 0:
-            return (name, False, r.stderr[:200])
-        return (name, True, "")
-
     if compile_jobs:
-        with ThreadPoolExecutor(max_workers=workers) as pool:
-            for name, ok, err in pool.map(_compile, compile_jobs):
+        if executor is not None:
+            for name, ok, err in executor.map(_run_compile_job, compile_jobs):
+                if not ok:
+                    failed_names.add(name)
+                    if name not in results:
+                        cfg, _ = config_dirs[name]
+                        results[name] = FmhaSetupResult(
+                            success=False, config=cfg, error=f"Compile: {err}"
+                        )
+        else:
+            for job in compile_jobs:
+                name, ok, err = _run_compile_job(job)
                 if not ok:
                     failed_names.add(name)
                     if name not in results:
@@ -1545,8 +1579,8 @@ def setup_multiple_fmha_dispatchers(
                 success=False, config=cfg, error=f"Load: {e}"
             )
 
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        list(pool.map(_link_load, config_dirs.items()))
+    for item in config_dirs.items():
+        _link_load(item)
 
     # Return in original order
     return [
