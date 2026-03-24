@@ -25,6 +25,7 @@
  *******************************************************************************/
 
 #include "contraction_solution.hpp"
+#include "hash.hpp"
 #include "hiptensor_options.hpp"
 
 namespace hiptensor
@@ -284,11 +285,17 @@ namespace hiptensor
 
     size_t ContractionSolution::uid() const
     {
-        // Convert CK uid string into binary.
-        std::istringstream converter(mDeviceOp->GetTypeIdHashCode());
-        size_t             value;
-        converter >> std::hex >> value;
-        return value;
+        // GetTypeString() encodes geometric parameters but not data types, so mix in
+        // the type and op parameters from mParams to avoid uid collisions between
+        // instances with identical geometry but different data types. All inputs are
+        // plain enums or a deterministic string, making this stable across platforms.
+        return Hash{}(mDeviceOp->GetTypeString(),
+                      mParams->typeA(),
+                      mParams->typeB(),
+                      mParams->typeC(),
+                      mParams->typeD(),
+                      mParams->typeCompute(),
+                      mParams->opCDE());
     }
 
     std::tuple<ck::index_t, ck::index_t, ck::index_t> ContractionSolution::problemDims() const

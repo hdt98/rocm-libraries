@@ -264,32 +264,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 16046312426561516674ull;
+                    unique_id = 1440761397456090142ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 5651259715737336589ull;
+                    unique_id = 2137990535294127184ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 5651259715737336589ull;
+                    unique_id = 2137990535294127184ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 16046312426561516674ull;
+                    unique_id = 1440761397456090142ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 17447143014665713887ull;
+                    unique_id = 7799114060056978341ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 16046312426561516674ull;
+                    unique_id = 1440761397456090142ull;
                 }
             }
             else
@@ -297,32 +297,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 9021620837589482599ull;
+                    unique_id = 2855318965775908903ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 6053663486226699267ull;
+                    unique_id = 10322445194860155826ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 6053663486226699267ull;
+                    unique_id = 10322445194860155826ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 6053663486226699267ull;
+                    unique_id = 10322445194860155826ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 10097482900535040320ull;
+                    unique_id = 10464053660216715737ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 6053663486226699267ull;
+                    unique_id = 10322445194860155826ull;
                 }
             }
 
@@ -376,32 +376,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 16046312426561516674ull;
+                    unique_id = 1440761397456090142ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 16046312426561516674ull;
+                    unique_id = 1440761397456090142ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 5651259715737336589ull;
+                    unique_id = 2137990535294127184ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 16046312426561516674ull;
+                    unique_id = 1440761397456090142ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 17447143014665713887ull;
+                    unique_id = 7799114060056978341ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 16046312426561516674ull;
+                    unique_id = 1440761397456090142ull;
                 }
             }
             else
@@ -409,32 +409,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 6053663486226699267ull;
+                    unique_id = 10322445194860155826ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 6053663486226699267ull;
+                    unique_id = 10322445194860155826ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 6053663486226699267ull;
+                    unique_id = 10322445194860155826ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 6053663486226699267ull;
+                    unique_id = 10322445194860155826ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 10097482900535040320ull;
+                    unique_id = 10464053660216715737ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 6053663486226699267ull;
+                    unique_id = 10322445194860155826ull;
                 }
             }
 
@@ -488,32 +488,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 12241437837959333440ull;
+                    unique_id = 2137990534574907378ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 12241437837959333440ull;
+                    unique_id = 2137990534574907378ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 12241437837959333440ull;
+                    unique_id = 2137990534574907378ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 12241437837959333440ull;
+                    unique_id = 2137990534574907378ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 12241437837959333440ull;
+                    unique_id = 2137990534574907378ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 12241437837959333440ull;
+                    unique_id = 2137990534574907378ull;
                 }
             }
             else
@@ -521,32 +521,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 2317674114976786230ull;
+                    unique_id = 14843745479191061099ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 2317674114976786230ull;
+                    unique_id = 14843745479191061099ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 2317674114976786230ull;
+                    unique_id = 14843745479191061099ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 12241437837959333440ull;
+                    unique_id = 2137990534574907378ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 12241437837959333440ull;
+                    unique_id = 2137990534574907378ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 11152060091307708334ull;
+                    unique_id = 7802847154886620598ull;
                 }
             }
 
@@ -600,32 +600,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 872672380373754190ull;
+                    unique_id = 1440761397456090842ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 872672380373754190ull;
+                    unique_id = 1440761397456090842ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 16476891743625221381ull;
+                    unique_id = 14843745479095717335ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 16476891743625221381ull;
+                    unique_id = 14843745479095717335ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 16476891743625221381ull;
+                    unique_id = 14843745479095717335ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 16476891743625221381ull;
+                    unique_id = 14843745479095717335ull;
                 }
             }
             else
@@ -636,38 +636,38 @@ namespace hiptensor
                 // rank2 dim1 case
                 if(rank == 2 && dim1)
                 {
-                    unique_id = 58303249112943560ull;
+                    unique_id = 7418684639400149524ull;
                 }
                 // m1n1k1
                 else if(rank == 1)
                 // if (rank == 1 || (rank == 1 && (a_ms_ks_lengths[3] == 1 || b_ns_ks_lengths[3] == 1)))
                 {
-                    unique_id = 58303249112943560ull;
+                    unique_id = 7418684639400149524ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 2303552229010777601ull;
+                    unique_id = 7802847154844028020ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 58303249112943560ull;
+                    unique_id = 7418684639400149524ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 58303249112943560ull;
+                    unique_id = 7418684639400149524ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 58303249112943560ull;
+                    unique_id = 7418684639400149524ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 2303552229010777601ull;
+                    unique_id = 7802847154844028020ull;
                 }
             }
 
@@ -721,32 +721,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 8024078432480148721ull;
+                    unique_id = 1440748527608857548ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 12894894255582471185ull;
+                    unique_id = 14843745530650938202ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 12894894255582471185ull;
+                    unique_id = 14843745530650938202ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 12894894255582471185ull;
+                    unique_id = 14843745530650938202ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 12894894255582471185ull;
+                    unique_id = 14843745530650938202ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 12894894255582471185ull;
+                    unique_id = 14843745530650938202ull;
                 }
             }
             else
@@ -754,32 +754,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 9333825291905548205ull;
+                    unique_id = 10464049561898994947ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 17760782256758115565ull;
+                    unique_id = 7802847185945830819ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 9333825291905548205ull;
+                    unique_id = 10464049561898994947ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 13058678487168027ull;
+                    unique_id = 8631818818903560452ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 9333825291905548205ull;
+                    unique_id = 10464049561898994947ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 9333825291905548205ull;
+                    unique_id = 10464049561898994947ull;
                 }
             }
 
@@ -833,32 +833,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 8024078432480148721ull;
+                    unique_id = 1440748527608857548ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 12894894255582471185ull;
+                    unique_id = 14843745530650938202ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 12894894255582471185ull;
+                    unique_id = 14843745530650938202ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 12894894255582471185ull;
+                    unique_id = 14843745530650938202ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 12894894255582471185ull;
+                    unique_id = 14843745530650938202ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 12894894255582471185ull;
+                    unique_id = 14843745530650938202ull;
                 }
             }
             else
@@ -866,32 +866,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 9333825291905548205ull;
+                    unique_id = 10464049561898994947ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 17760782256758115565ull;
+                    unique_id = 7802847185945830819ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 9333825291905548205ull;
+                    unique_id = 10464049561898994947ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 13058678487168027ull;
+                    unique_id = 8631818818903560452ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 9333825291905548205ull;
+                    unique_id = 10464049561898994947ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 9333825291905548205ull;
+                    unique_id = 10464049561898994947ull;
                 }
             }
 
@@ -945,32 +945,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 15452087623356707112ull;
+                    unique_id = 2137990547371739022ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 15452087623356707112ull;
+                    unique_id = 2137990547371739022ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 15452087623356707112ull;
+                    unique_id = 2137990547371739022ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 15452087623356707112ull;
+                    unique_id = 2137990547371739022ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 15452087623356707112ull;
+                    unique_id = 2137990547371739022ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 15452087623356707112ull;
+                    unique_id = 2137990547371739022ull;
                 }
             }
             else
@@ -978,32 +978,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 9967477699864925937ull;
+                    unique_id = 1440748527571594356ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 14071475272156866885ull;
+                    unique_id = 7418684562619456330ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 14071475272156866885ull;
+                    unique_id = 7418684562619456330ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 15452087623356707112ull;
+                    unique_id = 2137990547371739022ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 15452087623356707112ull;
+                    unique_id = 2137990547371739022ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 8307633941691601884ull;
+                    unique_id = 2855318850119830510ull;
                 }
             }
 
@@ -1057,32 +1057,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 9344798352708026060ull;
+                    unique_id = 14843745530651266429ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 9344798352708026060ull;
+                    unique_id = 14843745530651266429ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 9344798352708026060ull;
+                    unique_id = 14843745530651266429ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 9344798352708026060ull;
+                    unique_id = 14843745530651266429ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 9344798352708026060ull;
+                    unique_id = 14843745530651266429ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 9344798352708026060ull;
+                    unique_id = 14843745530651266429ull;
                 }
             }
             else
@@ -1093,37 +1093,37 @@ namespace hiptensor
                 // rank2 dim1 case
                 if(rank == 2 && dim1)
                 {
-                    unique_id = 16299024124514902126ull;
+                    unique_id = 13816607374468162736ull;
                 }
                 // m1n1k1
                 else if(rank == 1)
                 {
-                    unique_id = 378062791888302715ull;
+                    unique_id = 7418684562505742304ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 76527422265261696ull;
+                    unique_id = 7802847185945766836ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 378062791888302715ull;
+                    unique_id = 7418684562505742304ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 378062791888302715ull;
+                    unique_id = 7418684562505742304ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 378062791888302715ull;
+                    unique_id = 7418684562505742304ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 378062791888302715ull;
+                    unique_id = 7418684562505742304ull;
                 }
             }
 
@@ -1172,32 +1172,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 13825918879176996502ull;
+                    unique_id = 1440761399884165504ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 13825918879176996502ull;
+                    unique_id = 1440761399884165504ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 17141562253969597117ull;
+                    unique_id = 14843745480098865124ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 17141562253969597117ull;
+                    unique_id = 14843745480098865124ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 17141562253969597117ull;
+                    unique_id = 14843745480098865124ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 17141562253969597117ull;
+                    unique_id = 14843745480098865124ull;
                 }
             }
             else
@@ -1205,32 +1205,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 17141562253969597117ull;
+                    unique_id = 14843745480098865124ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 17141562253969597117ull;
+                    unique_id = 14843745480098865124ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 17141562253969597117ull;
+                    unique_id = 14843745480098865124ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 17141562253969597117ull;
+                    unique_id = 14843745480098865124ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 17141562253969597117ull;
+                    unique_id = 14843745480098865124ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 6384780398804323250ull;
+                    unique_id = 7802847063887535332ull;
                 }
             }
 
@@ -1279,32 +1279,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 11208787066124811014ull;
+                    unique_id = 1440761399899554757ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 11208787066124811014ull;
+                    unique_id = 1440761399899554757ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 14522095938220523368ull;
+                    unique_id = 14843745485562042314ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 14522095938220523368ull;
+                    unique_id = 14843745485562042314ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 14522095938220523368ull;
+                    unique_id = 14843745485562042314ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 14522095938220523368ull;
+                    unique_id = 14843745485562042314ull;
                 }
             }
             else
@@ -1315,37 +1315,37 @@ namespace hiptensor
                 // rank2 dim1 case
                 if(rank == 2 && dim1)
                 {
-                    unique_id = 8251132190088736039ull;
+                    unique_id = 2137990568415498270ull;
                 }
                 // m1n1k1
                 else if(rank == 1)
                 {
-                    unique_id = 2897979232477761524ull;
+                    unique_id = 7418684605442327629ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 2897979232477761524ull;
+                    unique_id = 7418684605442327629ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 2897979232477761524ull;
+                    unique_id = 7418684605442327629ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 2897979232477761524ull;
+                    unique_id = 7418684605442327629ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 2897979232477761524ull;
+                    unique_id = 7418684605442327629ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 2897979232477761524ull;
+                    unique_id = 7418684605442327629ull;
                 }
             }
 
@@ -1394,32 +1394,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 13613206280884761703ull;
+                    unique_id = 1440761399884232257ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 13613206280884761703ull;
+                    unique_id = 1440761399884232257ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 13613206280884761703ull;
+                    unique_id = 1440761399884232257ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 4373449368168185126ull;
+                    unique_id = 14843745480098915493ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 4373449368168185126ull;
+                    unique_id = 14843745480098915493ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 4373449368168185126ull;
+                    unique_id = 14843745480098915493ull;
                 }
             }
             else
@@ -1427,32 +1427,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 4373449368168185126ull;
+                    unique_id = 14843745480098915493ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 4373449368168185126ull;
+                    unique_id = 14843745480098915493ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 2008216990064456310ull;
+                    unique_id = 7418684605148177952ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 4373449368168185126ull;
+                    unique_id = 14843745480098915493ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 13613206280884761703ull;
+                    unique_id = 1440761399884232257ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 15116758930810193332ull;
+                    unique_id = 7802847063887519958ull;
                 }
             }
 
@@ -1506,32 +1506,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 15864809842584901464ull;
+                    unique_id = 7799114058105151833ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 8067958629699904967ull;
+                    unique_id = 1440761399899620868ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 15864809842584901464ull;
+                    unique_id = 7799114058105151833ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 6775599605174985174ull;
+                    unique_id = 14843745485562238603ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 6775599605174985174ull;
+                    unique_id = 14843745485562238603ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 5326563676026437938ull;
+                    unique_id = 2137990568422245213ull;
                 }
             }
             else
@@ -1542,37 +1542,37 @@ namespace hiptensor
                 // rank2 dim1 case
                 if(rank == 2 && dim1)
                 {
-                    unique_id = 8067958629699904967ull;
+                    unique_id = 1440761399899620868ull;
                 }
                 // m1n1k1
                 else if(rank == 1)
                 {
-                    unique_id = 8116863550692548667ull;
+                    unique_id = 7418684605442261131ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 8116863550692548667ull;
+                    unique_id = 7418684605442261131ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 8116863550692548667ull;
+                    unique_id = 7418684605442261131ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 8116863550692548667ull;
+                    unique_id = 7418684605442261131ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 8116863550692548667ull;
+                    unique_id = 7418684605442261131ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 8116863550692548667ull;
+                    unique_id = 7418684605442261131ull;
                 }
             }
 
@@ -1621,32 +1621,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 5794367356792942822ull;
+                    unique_id = 2137990568363823167ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 5794367356792942822ull;
+                    unique_id = 2137990568363823167ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 5794367356792942822ull;
+                    unique_id = 2137990568363823167ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 5794367356792942822ull;
+                    unique_id = 2137990568363823167ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 5794367356792942822ull;
+                    unique_id = 2137990568363823167ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 5794367356792942822ull;
+                    unique_id = 2137990568363823167ull;
                 }
             }
             else
@@ -1654,32 +1654,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 5794367356792942822ull;
+                    unique_id = 2137990568363823167ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 17939389824758640014ull;
+                    unique_id = 7418684605154406951ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 10640128726648594287ull;
+                    unique_id = 14843745480098848942ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 5794367356792942822ull;
+                    unique_id = 2137990568363823167ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 5794367356792942822ull;
+                    unique_id = 2137990568363823167ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 13933081369664111675ull;
+                    unique_id = 7802847063887535143ull;
                 }
             }
 
@@ -1728,32 +1728,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 14915761978535949477ull;
+                    unique_id = 7418684605442327694ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 2224053047801499357ull;
+                    unique_id = 1440761399899559459ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 3431382583157381293ull;
+                    unique_id = 14843745485562041486ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 5422513160360085353ull;
+                    unique_id = 2137990568415498584ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 3431382583157381293ull;
+                    unique_id = 14843745485562041486ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 3431382583157381293ull;
+                    unique_id = 14843745485562041486ull;
                 }
             }
             else
@@ -1764,37 +1764,37 @@ namespace hiptensor
                 // rank2 dim1 case
                 if(rank == 2 && dim1)
                 {
-                    unique_id = 14915761978535949477ull;
+                    unique_id = 7418684605442327694ull;
                 }
                 // m1n1k1
                 else if(rank == 1)
                 {
-                    unique_id = 14915761978535949477ull;
+                    unique_id = 7418684605442327694ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 14915761978535949477ull;
+                    unique_id = 7418684605442327694ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 14915761978535949477ull;
+                    unique_id = 7418684605442327694ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 14915761978535949477ull;
+                    unique_id = 7418684605442327694ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 14915761978535949477ull;
+                    unique_id = 7418684605442327694ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 14915761978535949477ull;
+                    unique_id = 7418684605442327694ull;
                 }
             }
 
@@ -1843,32 +1843,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 16870758234615651290ull;
+                    unique_id = 1702163653994140800ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 14901158961446820896ull;
+                    unique_id = 5324987995348915333ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 16870758234615651290ull;
+                    unique_id = 1702163653994140800ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 8188562791036959263ull;
+                    unique_id = 18357727884545307985ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 16870758234615651290ull;
+                    unique_id = 1702163653994140800ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 16870758234615651290ull;
+                    unique_id = 1702163653994140800ull;
                 }
             }
             else
@@ -1876,32 +1876,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 18207091374964962208ull;
+                    unique_id = 5864638737111407708ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 16948282955506101335ull;
+                    unique_id = 13477196687221110573ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 16870758234615651290ull;
+                    unique_id = 1702163653994140800ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 15355329505248522280ull;
+                    unique_id = 17963153062924488271ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 14642257549075851915ull;
+                    unique_id = 5543115929776525336ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 14642257549075851915ull;
+                    unique_id = 5543115929776525336ull;
                 }
             }
 
@@ -1950,32 +1950,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 12057130050439892271ull;
+                    unique_id = 1702163653986076371ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 13038089902448627981ull;
+                    unique_id = 5324987995339838616ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 12057130050439892271ull;
+                    unique_id = 1702163653986076371ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 11269655469469274301ull;
+                    unique_id = 18357727884539305700ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 11269655469469274301ull;
+                    unique_id = 18357727884539305700ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 12057130050439892271ull;
+                    unique_id = 1702163653986076371ull;
                 }
             }
             else
@@ -1986,37 +1986,37 @@ namespace hiptensor
                 // rank2 dim1 case
                 if(rank == 2 && dim1)
                 {
-                    unique_id = 11269655469469274301ull;
+                    unique_id = 18357727884539305700ull;
                 }
                 // m1n1k1
                 else if(rank == 1)
                 {
-                    unique_id = 2143493311543532856ull;
+                    unique_id = 5543115929791243003ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 2143493311543532856ull;
+                    unique_id = 5543115929791243003ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 2143493311543532856ull;
+                    unique_id = 5543115929791243003ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 2143493311543532856ull;
+                    unique_id = 5543115929791243003ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 2143493311543532856ull;
+                    unique_id = 5543115929791243003ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 2143493311543532856ull;
+                    unique_id = 5543115929791243003ull;
                 }
             }
 
@@ -2065,32 +2065,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 3879892272436099392ull;
+                    unique_id = 18357727884545307206ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 3879892272436099392ull;
+                    unique_id = 18357727884545307206ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 3879892272436099392ull;
+                    unique_id = 18357727884545307206ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 3879892272436099392ull;
+                    unique_id = 18357727884545307206ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 3879892272436099392ull;
+                    unique_id = 18357727884545307206ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 6406117030749216765ull;
+                    unique_id = 5478519037123088736ull;
                 }
             }
             else
@@ -2098,32 +2098,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 3879892272436099392ull;
+                    unique_id = 18357727884545307206ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 8021137963958390646ull;
+                    unique_id = 1702163653994139125ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 3248584345341330494ull;
+                    unique_id = 5864638737111407439ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 3879892272436099392ull;
+                    unique_id = 18357727884545307206ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 3879892272436099392ull;
+                    unique_id = 18357727884545307206ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 7950787545240972863ull;
+                    unique_id = 16199389493181343293ull;
                 }
             }
 
@@ -2172,32 +2172,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 4041813994497895944ull;
+                    unique_id = 18357727884539299315ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 4041813994497895944ull;
+                    unique_id = 18357727884539299315ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 4041813994497895944ull;
+                    unique_id = 18357727884539299315ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 4041813994497895944ull;
+                    unique_id = 18357727884539299315ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 4041813994497895944ull;
+                    unique_id = 18357727884539299315ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 7591632339673577634ull;
+                    unique_id = 5478519037096761531ull;
                 }
             }
             else
@@ -2208,37 +2208,37 @@ namespace hiptensor
                 // rank2 dim1 case
                 if(rank == 2 && dim1)
                 {
-                    unique_id = 2054609181761357786ull;
+                    unique_id = 16199389493187916904ull;
                 }
                 // m1n1k1
                 else if(rank == 1)
                 {
-                    unique_id = 14145390177844245465ull;
+                    unique_id = 5543115929791244242ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 14145390177844245465ull;
+                    unique_id = 5543115929791244242ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 14145390177844245465ull;
+                    unique_id = 5543115929791244242ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 14145390177844245465ull;
+                    unique_id = 5543115929791244242ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 14145390177844245465ull;
+                    unique_id = 5543115929791244242ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 14145390177844245465ull;
+                    unique_id = 5543115929791244242ull;
                 }
             }
 
@@ -2292,32 +2292,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 1688099565795560288ull;
+                    unique_id = 11370543435050271066ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 1688099565795560288ull;
+                    unique_id = 11370543435050271066ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 1688099565795560288ull;
+                    unique_id = 11370543435050271066ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 1688099565795560288ull;
+                    unique_id = 11370543435050271066ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 1688099565795560288ull;
+                    unique_id = 11370543435050271066ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 1688099565795560288ull;
+                    unique_id = 11370543435050271066ull;
                 }
             }
             else
@@ -2325,32 +2325,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 1688099565795560288ull;
+                    unique_id = 11370543435050271066ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 4348837698146370003ull;
+                    unique_id = 10717070564994925940ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 1688099565795560288ull;
+                    unique_id = 11370543435050271066ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 1688099565795560288ull;
+                    unique_id = 11370543435050271066ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 1688099565795560288ull;
+                    unique_id = 11370543435050271066ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 4363356859752806590ull;
+                    unique_id = 693497703183633080ull;
                 }
             }
 
@@ -2404,32 +2404,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 15330878641001915472ull;
+                    unique_id = 11370543435030959225ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 15330878641001915472ull;
+                    unique_id = 11370543435030959225ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 15330878641001915472ull;
+                    unique_id = 11370543435030959225ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 15330878641001915472ull;
+                    unique_id = 11370543435030959225ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 15330878641001915472ull;
+                    unique_id = 11370543435030959225ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 15330878641001915472ull;
+                    unique_id = 11370543435030959225ull;
                 }
             }
             else
@@ -2440,37 +2440,37 @@ namespace hiptensor
                 // rank2 dim1 case
                 if(rank == 2 && dim1)
                 {
-                    unique_id = 15330878641001915472ull;
+                    unique_id = 11370543435030959225ull;
                 }
                 // m1n1k1
                 else if(rank == 1)
                 {
-                    unique_id = 11537900932066889768ull;
+                    unique_id = 11795761762493949769ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 8338926107119209426ull;
+                    unique_id = 693497703792998170ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 11537900932066889768ull;
+                    unique_id = 11795761762493949769ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 11537900932066889768ull;
+                    unique_id = 11795761762493949769ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 11537900932066889768ull;
+                    unique_id = 11795761762493949769ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 11537900932066889768ull;
+                    unique_id = 11795761762493949769ull;
                 }
             }
 
@@ -2524,32 +2524,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 12959721676360111684ull;
+                    unique_id = 10893407295027284090ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 12959721676360111684ull;
+                    unique_id = 10893407295027284090ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 12959721676360111684ull;
+                    unique_id = 10893407295027284090ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 12959721676360111684ull;
+                    unique_id = 10893407295027284090ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 12959721676360111684ull;
+                    unique_id = 10893407295027284090ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 12959721676360111684ull;
+                    unique_id = 10893407295027284090ull;
                 }
             }
             else
@@ -2557,32 +2557,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 10254320286859648634ull;
+                    unique_id = 5985644680422688852ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 15705829219230515535ull;
+                    unique_id = 9552735252268041381ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 12959721676360111684ull;
+                    unique_id = 10893407295027284090ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 10254320286859648634ull;
+                    unique_id = 5985644680422688852ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 10254320286859648634ull;
+                    unique_id = 5985644680422688852ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 10254320286859648634ull;
+                    unique_id = 5985644680422688852ull;
                 }
             }
 
@@ -2636,32 +2636,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 1322366267556764247ull;
+                    unique_id = 10893407295038740933ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 1322366267556764247ull;
+                    unique_id = 10893407295038740933ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 1322366267556764247ull;
+                    unique_id = 10893407295038740933ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 1322366267556764247ull;
+                    unique_id = 10893407295038740933ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 1322366267556764247ull;
+                    unique_id = 10893407295038740933ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 1322366267556764247ull;
+                    unique_id = 10893407295038740933ull;
                 }
             }
             else
@@ -2672,37 +2672,37 @@ namespace hiptensor
                 // rank2 dim1 case
                 if(rank == 2 && dim1)
                 {
-                    unique_id = 14051358583041094215ull;
+                    unique_id = 5985644680464894601ull;
                 }
                 // m1n1k1
                 else if(rank == 1)
                 {
-                    unique_id = 8503926755447648324ull;
+                    unique_id = 5070367300278634316ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 8503926755447648324ull;
+                    unique_id = 5070367300278634316ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 8503926755447648324ull;
+                    unique_id = 5070367300278634316ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 8503926755447648324ull;
+                    unique_id = 5070367300278634316ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 8503926755447648324ull;
+                    unique_id = 5070367300278634316ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 8503926755447648324ull;
+                    unique_id = 5070367300278634316ull;
                 }
             }
 
@@ -3397,32 +3397,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 14408154905494010489ull;
+                    unique_id = 7799114060056978336ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 14408154905494010489ull;
+                    unique_id = 7799114060056978336ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 14408154905494010489ull;
+                    unique_id = 7799114060056978336ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 14408154905494010489ull;
+                    unique_id = 7799114060056978336ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 14408154905494010489ull;
+                    unique_id = 7799114060056978336ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 14408154905494010489ull;
+                    unique_id = 7799114060056978336ull;
                 }
             }
             else
@@ -3430,32 +3430,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 6974095321173130927ull;
+                    unique_id = 8631818818370467038ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 16253689926652332996ull;
+                    unique_id = 13816606913356302831ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 16253689926652332996ull;
+                    unique_id = 13816606913356302831ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 6974095321173130927ull;
+                    unique_id = 8631818818370467038ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 16253689926652332996ull;
+                    unique_id = 13816606913356302831ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 16253689926652332996ull;
+                    unique_id = 13816606913356302831ull;
                 }
             }
 
@@ -3509,32 +3509,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 14408154905494010489ull;
+                    unique_id = 7799114060056978336ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 14408154905494010489ull;
+                    unique_id = 7799114060056978336ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 14408154905494010489ull;
+                    unique_id = 7799114060056978336ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 14408154905494010489ull;
+                    unique_id = 7799114060056978336ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 14408154905494010489ull;
+                    unique_id = 7799114060056978336ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 14408154905494010489ull;
+                    unique_id = 7799114060056978336ull;
                 }
             }
             else
@@ -3542,32 +3542,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 6974095321173130927ull;
+                    unique_id = 8631818818370467038ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 16253689926652332996ull;
+                    unique_id = 13816606913356302831ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 16253689926652332996ull;
+                    unique_id = 13816606913356302831ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 6974095321173130927ull;
+                    unique_id = 8631818818370467038ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 16253689926652332996ull;
+                    unique_id = 13816606913356302831ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 16253689926652332996ull;
+                    unique_id = 13816606913356302831ull;
                 }
             }
 
@@ -3622,32 +3622,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 7538467540961049787ull;
+                    unique_id = 17935524427612935211ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 7538467540961049787ull;
+                    unique_id = 17935524427612935211ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 7538467540961049787ull;
+                    unique_id = 17935524427612935211ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 7538467540961049787ull;
+                    unique_id = 17935524427612935211ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 7538467540961049787ull;
+                    unique_id = 17935524427612935211ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 7538467540961049787ull;
+                    unique_id = 17935524427612935211ull;
                 }
             }
             else
@@ -3655,32 +3655,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 5838574146849536063ull;
+                    unique_id = 12026634380613989518ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 9929579717278416296ull;
+                    unique_id = 13816606913347014500ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 9929579717278416296ull;
+                    unique_id = 13816606913347014500ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 9929579717278416296ull;
+                    unique_id = 13816606913347014500ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 9929579717278416296ull;
+                    unique_id = 13816606913347014500ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 15431985258997757854ull;
+                    unique_id = 8631818814716308406ull;
                 }
             }
 
@@ -3734,32 +3734,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 3415378554316130654ull;
+                    unique_id = 15752964499459229608ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 3415378554316130654ull;
+                    unique_id = 15752964499459229608ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 3415378554316130654ull;
+                    unique_id = 15752964499459229608ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 3415378554316130654ull;
+                    unique_id = 15752964499459229608ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 3415378554316130654ull;
+                    unique_id = 15752964499459229608ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 3415378554316130654ull;
+                    unique_id = 15752964499459229608ull;
                 }
             }
             else
@@ -3767,32 +3767,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 17177484621493380088ull;
+                    unique_id = 8631818818370466973ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 17177484621493380088ull;
+                    unique_id = 8631818818370466973ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 17177484621493380088ull;
+                    unique_id = 8631818818370466973ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 8974719589220802400ull;
+                    unique_id = 13816606913356301639ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 8974719589220802400ull;
+                    unique_id = 13816606913356301639ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 17177484621493380088ull;
+                    unique_id = 8631818818370466973ull;
                 }
             }
 
@@ -3846,32 +3846,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 12765469494343230674ull;
+                    unique_id = 7799620307985751398ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 3753568868518805000ull;
+                    unique_id = 15752963963305608309ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 12765469494343230674ull;
+                    unique_id = 7799620307985751398ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 12765469494343230674ull;
+                    unique_id = 7799620307985751398ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 3753568868518805000ull;
+                    unique_id = 15752963963305608309ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 12765469494343230674ull;
+                    unique_id = 7799620307985751398ull;
                 }
             }
             else
@@ -3879,32 +3879,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 16194744748728374153ull;
+                    unique_id = 8631818818903560455ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 14950476381367017410ull;
+                    unique_id = 13816607374467706038ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 14950476381367017410ull;
+                    unique_id = 13816607374467706038ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 14950476381367017410ull;
+                    unique_id = 13816607374467706038ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 14950476381367017410ull;
+                    unique_id = 13816607374467706038ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 14950476381367017410ull;
+                    unique_id = 13816607374467706038ull;
                 }
             }
 
@@ -3958,32 +3958,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 12765469494343230674ull;
+                    unique_id = 7799620307985751398ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 12765469494343230674ull;
+                    unique_id = 7799620307985751398ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 12765469494343230674ull;
+                    unique_id = 7799620307985751398ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 12765469494343230674ull;
+                    unique_id = 7799620307985751398ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 3753568868518805000ull;
+                    unique_id = 15752963963305608309ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 12765469494343230674ull;
+                    unique_id = 7799620307985751398ull;
                 }
             }
             else
@@ -3991,32 +3991,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 16194744748728374153ull;
+                    unique_id = 8631818818903560455ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 14950476381367017410ull;
+                    unique_id = 13816607374467706038ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 14950476381367017410ull;
+                    unique_id = 13816607374467706038ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 16194744748728374153ull;
+                    unique_id = 8631818818903560455ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 14950476381367017410ull;
+                    unique_id = 13816607374467706038ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 14950476381367017410ull;
+                    unique_id = 13816607374467706038ull;
                 }
             }
 
@@ -4070,32 +4070,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 10572640329933031377ull;
+                    unique_id = 15752963964616289564ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 15510068347583301452ull;
+                    unique_id = 7799620308515659795ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 10572640329933031377ull;
+                    unique_id = 15752963964616289564ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 15510068347583301452ull;
+                    unique_id = 7799620308515659795ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 10572640329933031377ull;
+                    unique_id = 15752963964616289564ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 10572640329933031377ull;
+                    unique_id = 15752963964616289564ull;
                 }
             }
             else
@@ -4103,32 +4103,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 6276769470110182113ull;
+                    unique_id = 8631818818916211369ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 5827523263153508957ull;
+                    unique_id = 13816607374243476251ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 5827523263153508957ull;
+                    unique_id = 13816607374243476251ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 5827523263153508957ull;
+                    unique_id = 13816607374243476251ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 5827523263153508957ull;
+                    unique_id = 13816607374243476251ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 6276769470110182113ull;
+                    unique_id = 8631818818916211369ull;
                 }
             }
 
@@ -4182,32 +4182,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 12481385650722299445ull;
+                    unique_id = 15752963963303840864ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 4574287328754767068ull;
+                    unique_id = 7799620307985946959ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 12481385650722299445ull;
+                    unique_id = 15752963963303840864ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 12481385650722299445ull;
+                    unique_id = 15752963963303840864ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 12481385650722299445ull;
+                    unique_id = 15752963963303840864ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 4574287328754767068ull;
+                    unique_id = 7799620307985946959ull;
                 }
             }
             else
@@ -4215,32 +4215,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 2817642069473326068ull;
+                    unique_id = 8631818818927221532ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 1139053823940322184ull;
+                    unique_id = 13816607374468162743ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 2817642069473326068ull;
+                    unique_id = 8631818818927221532ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 1139053823940322184ull;
+                    unique_id = 13816607374468162743ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 1139053823940322184ull;
+                    unique_id = 13816607374468162743ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 2817642069473326068ull;
+                    unique_id = 8631818818927221532ull;
                 }
             }
 
@@ -4294,32 +4294,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 10482334011498030239ull;
+                    unique_id = 7799114058106622813ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 8472864432528069731ull;
+                    unique_id = 17935524478513395624ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 8472864432528069731ull;
+                    unique_id = 17935524478513395624ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 8472864432528069731ull;
+                    unique_id = 17935524478513395624ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 8472864432528069731ull;
+                    unique_id = 17935524478513395624ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 8472864432528069731ull;
+                    unique_id = 17935524478513395624ull;
                 }
             }
             else
@@ -4327,32 +4327,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 4617465351495394743ull;
+                    unique_id = 8631818820589571050ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 1663480608868680521ull;
+                    unique_id = 13816606924198920687ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 1663480608868680521ull;
+                    unique_id = 13816606924198920687ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 1663480608868680521ull;
+                    unique_id = 13816606924198920687ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 1663480608868680521ull;
+                    unique_id = 13816606924198920687ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 1663480608868680521ull;
+                    unique_id = 13816606924198920687ull;
                 }
             }
 
@@ -4406,32 +4406,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 14762504979677123854ull;
+                    unique_id = 17935524478459836898ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 14762504979677123854ull;
+                    unique_id = 17935524478459836898ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 14762504979677123854ull;
+                    unique_id = 17935524478459836898ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 14762504979677123854ull;
+                    unique_id = 17935524478459836898ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 14762504979677123854ull;
+                    unique_id = 17935524478459836898ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 14762504979677123854ull;
+                    unique_id = 17935524478459836898ull;
                 }
             }
             else
@@ -4439,32 +4439,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 1158968124405133622ull;
+                    unique_id = 12026634250626031350ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 6681600076438905506ull;
+                    unique_id = 13816606924240052004ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 1685602420862754469ull;
+                    unique_id = 8631818820570004292ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 6681600076438905506ull;
+                    unique_id = 13816606924240052004ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 6681600076438905506ull;
+                    unique_id = 13816606924240052004ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 6681600076438905506ull;
+                    unique_id = 13816606924240052004ull;
                 }
             }
 
@@ -4518,32 +4518,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 4677594781166299396ull;
+                    unique_id = 17935524478513328745ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 4677594781166299396ull;
+                    unique_id = 17935524478513328745ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 4677594781166299396ull;
+                    unique_id = 17935524478513328745ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 4677594781166299396ull;
+                    unique_id = 17935524478513328745ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 4677594781166299396ull;
+                    unique_id = 17935524478513328745ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 4677594781166299396ull;
+                    unique_id = 17935524478513328745ull;
                 }
             }
             else
@@ -4551,32 +4551,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 5675370401297283233ull;
+                    unique_id = 8631818820589504811ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 9469902973241888595ull;
+                    unique_id = 13816606924198855982ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 9469902973241888595ull;
+                    unique_id = 13816606924198855982ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 9469902973241888595ull;
+                    unique_id = 13816606924198855982ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 9469902973241888595ull;
+                    unique_id = 13816606924198855982ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 9469902973241888595ull;
+                    unique_id = 13816606924198855982ull;
                 }
             }
 
@@ -4630,32 +4630,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 5704881916563684892ull;
+                    unique_id = 17935524478459900707ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 2062110410148341538ull;
+                    unique_id = 15752964492878320049ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 2062110410148341538ull;
+                    unique_id = 15752964492878320049ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 2062110410148341538ull;
+                    unique_id = 15752964492878320049ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 2062110410148341538ull;
+                    unique_id = 15752964492878320049ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 2062110410148341538ull;
+                    unique_id = 15752964492878320049ull;
                 }
             }
             else
@@ -4663,32 +4663,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 1580714540240191281ull;
+                    unique_id = 8631818820571505029ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 1580714540240191281ull;
+                    unique_id = 8631818820571505029ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 1580714540240191281ull;
+                    unique_id = 8631818820571505029ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 1580714540240191281ull;
+                    unique_id = 8631818820571505029ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 1580714540240191281ull;
+                    unique_id = 8631818820571505029ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 1580714540240191281ull;
+                    unique_id = 8631818820571505029ull;
                 }
             }
 
@@ -4737,32 +4737,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 12160779730984340837ull;
+                    unique_id = 17935524478513392152ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 12160779730984340837ull;
+                    unique_id = 17935524478513392152ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 12160779730984340837ull;
+                    unique_id = 17935524478513392152ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 12160779730984340837ull;
+                    unique_id = 17935524478513392152ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 12160779730984340837ull;
+                    unique_id = 17935524478513392152ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 12160779730984340837ull;
+                    unique_id = 17935524478513392152ull;
                 }
             }
             else
@@ -4770,32 +4770,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 6103881444342374783ull;
+                    unique_id = 8631818820589570860ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 3492198639380540417ull;
+                    unique_id = 13816606924198924073ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 6103881444342374783ull;
+                    unique_id = 8631818820589570860ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 3492198639380540417ull;
+                    unique_id = 13816606924198924073ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 3492198639380540417ull;
+                    unique_id = 13816606924198924073ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 6103881444342374783ull;
+                    unique_id = 8631818820589570860ull;
                 }
             }
 
@@ -4849,32 +4849,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 5447850794718128443ull;
+                    unique_id = 17935524478459838250ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 7828346908127446539ull;
+                    unique_id = 7799114058105218391ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 5447850794718128443ull;
+                    unique_id = 17935524478459838250ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 7828346908127446539ull;
+                    unique_id = 7799114058105218391ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 5447850794718128443ull;
+                    unique_id = 17935524478459838250ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 5447850794718128443ull;
+                    unique_id = 17935524478459838250ull;
                 }
             }
             else
@@ -4882,32 +4882,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 15770210374284736011ull;
+                    unique_id = 8631818820570004366ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 15770210374284736011ull;
+                    unique_id = 8631818820570004366ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 15770210374284736011ull;
+                    unique_id = 8631818820570004366ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 6463641982677566422ull;
+                    unique_id = 13816606924240051306ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 6463641982677566422ull;
+                    unique_id = 13816606924240051306ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 15770210374284736011ull;
+                    unique_id = 8631818820570004366ull;
                 }
             }
 
@@ -4961,32 +4961,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 2158644421080291960ull;
+                    unique_id = 1702163653994140800ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 2158644421080291960ull;
+                    unique_id = 1702163653994140800ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 2158644421080291960ull;
+                    unique_id = 1702163653994140800ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 1106420844725934876ull;
+                    unique_id = 7421365356354019374ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 2158644421080291960ull;
+                    unique_id = 1702163653994140800ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 2158644421080291960ull;
+                    unique_id = 1702163653994140800ull;
                 }
             }
             else
@@ -4994,32 +4994,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 770569218298543735ull;
+                    unique_id = 16199389493181341988ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 5213105944240361468ull;
+                    unique_id = 2789232765572696187ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 5213105944240361468ull;
+                    unique_id = 2789232765572696187ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 5213105944240361468ull;
+                    unique_id = 2789232765572696187ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 5213105944240361468ull;
+                    unique_id = 2789232765572696187ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 5213105944240361468ull;
+                    unique_id = 2789232765572696187ull;
                 }
             }
 
@@ -5073,32 +5073,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 15689293195218612641ull;
+                    unique_id = 1702163653986076398ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 15689293195218612641ull;
+                    unique_id = 1702163653986076398ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 15689293195218612641ull;
+                    unique_id = 1702163653986076398ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 15689293195218612641ull;
+                    unique_id = 1702163653986076398ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 15689293195218612641ull;
+                    unique_id = 1702163653986076398ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 15689293195218612641ull;
+                    unique_id = 1702163653986076398ull;
                 }
             }
             else
@@ -5106,32 +5106,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 12362723444598556025ull;
+                    unique_id = 17963153064137026984ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 2980379434373265690ull;
+                    unique_id = 1058341445605340736ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 2980379434373265690ull;
+                    unique_id = 1058341445605340736ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 2980379434373265690ull;
+                    unique_id = 1058341445605340736ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 2980379434373265690ull;
+                    unique_id = 1058341445605340736ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 2980379434373265690ull;
+                    unique_id = 1058341445605340736ull;
                 }
             }
 
@@ -5185,32 +5185,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 1818797200832435030ull;
+                    unique_id = 16199389493181343293ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 6509874686188425969ull;
+                    unique_id = 1702163653994139125ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 6509874686188425969ull;
+                    unique_id = 1702163653994139125ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 6509874686188425969ull;
+                    unique_id = 1702163653994139125ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 6509874686188425969ull;
+                    unique_id = 1702163653994139125ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 6509874686188425969ull;
+                    unique_id = 1702163653994139125ull;
                 }
             }
             else
@@ -5218,32 +5218,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 10063938818899116719ull;
+                    unique_id = 1645499542390481235ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 16235788987998995137ull;
+                    unique_id = 5543115929776526095ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 16235788987998995137ull;
+                    unique_id = 5543115929776526095ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 10063938818899116719ull;
+                    unique_id = 1645499542390481235ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 16235788987998995137ull;
+                    unique_id = 5543115929776526095ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 16235788987998995137ull;
+                    unique_id = 5543115929776526095ull;
                 }
             }
 
@@ -5297,32 +5297,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 12567580538174379913ull;
+                    unique_id = 16199389493187916911ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 15173184787179566326ull;
+                    unique_id = 1702163653986075129ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 15173184787179566326ull;
+                    unique_id = 1702163653986075129ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 15173184787179566326ull;
+                    unique_id = 1702163653986075129ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 15173184787179566326ull;
+                    unique_id = 1702163653986075129ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 15173184787179566326ull;
+                    unique_id = 1702163653986075129ull;
                 }
             }
             else
@@ -5330,32 +5330,32 @@ namespace hiptensor
                 // m1n1k1
                 if(rank == 1)
                 {
-                    unique_id = 12567580538174379913ull;
+                    unique_id = 16199389493187916911ull;
                 }
                 // m2n2k2
                 else if(rank == 2)
                 {
-                    unique_id = 14694634098178137439ull;
+                    unique_id = 13477196687211894914ull;
                 }
                 // m3n3k3
                 else if(rank == 3)
                 {
-                    unique_id = 14694634098178137439ull;
+                    unique_id = 13477196687211894914ull;
                 }
                 // m4n4k4
                 else if(rank == 4)
                 {
-                    unique_id = 12567580538174379913ull;
+                    unique_id = 16199389493187916911ull;
                 }
                 // m5n5k5
                 else if(rank == 5)
                 {
-                    unique_id = 14694634098178137439ull;
+                    unique_id = 13477196687211894914ull;
                 }
                 // m6n6k6
                 else if(rank == 6)
                 {
-                    unique_id = 12567580538174379913ull;
+                    unique_id = 16199389493187916911ull;
                 }
             }
 
