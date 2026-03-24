@@ -357,7 +357,7 @@ For development workflows requiring multi-arch support, nightly-built dev images
 If you want to use a locally built version of [Composable Kernel (CK)](../../projects/composablekernel)
 instead of the system-installed one, follow these two steps.
 
-### Step 1: Build and install CK
+### Build and install CK separately
 
 ```shell
 cd projects/composablekernel
@@ -382,7 +382,23 @@ This installs CK under the default `/opt/rocm` location.
 `MIOPEN_REQ_LIBS_ONLY=ON` restricts the build to only the `device_conv_operations` library required
 by MIOpen, skipping tests, the profiler, GEMM, and reduction targets.
 
-### Step 2: Build MIOpen pointing at the local CK install
+### Install MIOpen dependencies including CK
+
+Use the provided `install_deps.cmake` script to install all required dependencies (bzip2, SQLite3,
+nlohmann\_json, Eigen, frugally-deep, rocMLIR, googletest, etc.) in one step:
+
+```shell
+cd projects/miopen
+cmake -P install_deps.cmake --prefix /usr/local --generator Ninja
+```
+
+This uses [cget](https://github.com/pfultz2/cget) to build and install every dependency listed in
+[requirements.txt](requirements.txt). Adjust `--prefix` if you want to install to a different
+location, and add that path to `CMAKE_PREFIX_PATH` in the MIOpen configure step below. 
+The CK installation location is defined in the [requirements.txt](requirements.txt) 
+and it is `/opt/rocm`, i.e., the standard location.
+
+### Build MIOpen pointing at the local CK install
 
 MIOpen locates CK via CMake's `find_package`, so pass your CK install path through
 `CMAKE_PREFIX_PATH`:
@@ -401,6 +417,8 @@ cmake .. \
   -DCMAKE_BUILD_TYPE=Release
 ```
 
+Then run `cmake --build . --config Release --target install` to execute the install target.
+
 `CMAKE_PREFIX_PATH` tells CMake where to find the `composable_kernelConfig.cmake` file installed
 under `<ck-install-path>/lib/cmake/composable_kernel/`.
 
@@ -417,7 +435,7 @@ under `<ck-install-path>/lib/cmake/composable_kernel/`.
 ### Building MIOpenDriver against a locally built CK
 
 MIOpenDriver links to CK transitively through MIOpen, so no additional CK configuration is needed
-for the driver. Follow Steps 1 and 2 above, then build the `MIOpenDriver` target:
+for the driver. Build the `MIOpenDriver` target via
 
 ```shell
 cmake --build . --target MIOpenDriver
