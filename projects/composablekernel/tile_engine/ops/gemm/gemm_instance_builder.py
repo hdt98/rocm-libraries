@@ -170,8 +170,6 @@ class GemmKernelBuilder:
             default_pipeline = "preshufflev2"
         elif self.kernel_name_prefix == "grouped_gemm":
             default_pipeline = "compv4"
-        elif self.kernel_name_prefix == "gemm_persistent":
-            default_pipeline = "compv3"
 
         configs = []
         for tile_m in tile_m_values:
@@ -366,6 +364,16 @@ class GemmKernelBuilder:
             base_pipeline_map = {
                 "preshufflev2": "ck_tile::BaseWeightPreshufflePipelineAGmemBGmemCRegV2",
             }
+        # [DELETE]
+        # elif self.kernel_name_prefix == "gemm_aquant":
+        #     pipeline_impl_map = {
+        #         "mem": "ck_tile::AQuantGemmPipelineAgBgCrMem",
+        #         "compv3": "ck_tile::AQuantGemmPipelineAgBgCrCompV3",
+        #     }
+        #     base_pipeline_map = {
+        #         "mem": "ck_tile::BaseGemmPipelineAgBgCrMem",
+        #         "compv3": "ck_tile::BaseGemmPipelineAgBgCrCompV3",
+        #     }
 
         scheduler_type_map = {
             "intrawave": "ck_tile::GemmPipelineScheduler::Intrawave",
@@ -425,6 +433,22 @@ class GemmKernelBuilder:
 #include <hip/hip_runtime.h>
 #include "ck_tile/ops/gemm/kernel/grouped_gemm_kernel.hpp"
 """
+        # [DELETE]
+        #         elif self.kernel_name_prefix == "gemm_aquant":
+        #             instance_code = f"""// Generated AQuant kernel instance for {kernel_name}
+        # #pragma once
+
+        # #include <cstdint>
+        # #include <utility>
+        # #include <tuple>
+        # #include "ck_tile/core.hpp"
+        # #include "ck_tile/host/kernel_launch.hpp"
+        # #include "ck_tile/ops/gemm.hpp"
+        # #include "ck_tile/ops/gemm_quant.hpp"
+        # #include "ck_tile/ops/gemm_quant/kernel/gemm_quant_kernel.hpp"
+        # #include "ck_tile/ops/common/tensor_layout.hpp"
+        # #include "ck_tile/ops/epilogue/default_2d_epilogue.hpp"
+        # """
         return instance_code
 
     def populate_kernel_dtype_layout(self):
@@ -443,6 +467,7 @@ class GemmKernelBuilder:
             "gemm_universal",
             "gemm_preshuffle",
             "grouped_gemm",
+            # "gemm_aquant", [DELETE]
         ]:
             a_layout, b_layout, c_layout = get_abc_layouts(self.layout)
 
@@ -451,6 +476,11 @@ using ADataType = {get_dtype_string(self.datatype)};
 using BDataType = {get_dtype_string(self.datatype)};
 using AccDataType = {acc_type};
 using CDataType = {get_dtype_string(c_type)};"""
+
+        # [DELETE]
+        #         if self.kernel_name_prefix == "gemm_aquant":
+        #             instance_code += """
+        # using AQDataType = float;"""
 
         if self.kernel_name_prefix == "gemm_multi_d":
             instance_code += f"""
@@ -463,6 +493,17 @@ using ALayout = {a_layout};
 using BLayout = {b_layout};
 using CLayout = {c_layout};
 """
+        # [DELETE]
+        #         if self.kernel_name_prefix == "gemm_aquant":
+        #             # AQ layout: follows ALayout except for CRR where AQ is RowMajor
+        #             layout_code = str(self.layout).strip().lower()
+        #             if layout_code == "crr":
+        #                 aq_layout = "ck_tile::tensor_layout::gemm::RowMajor"
+        #             else:
+        #                 aq_layout = a_layout
+        #             instance_code += f"""using AQLayout = {aq_layout};
+        # """
+
         if self.kernel_name_prefix == "gemm_multi_d":
             instance_code += f"""
 using D0Layout = {ds_layout[0]};
@@ -508,8 +549,33 @@ struct SelectedKernel {{
             persistent,
         ) = trait_combo
 
+        # [DELETE]
+        #     is_pad_m = "true" if pad_m in [True, "true"] else "false"
+        #     is_pad_n = "true" if pad_n in [True, "true"] else "false"
+        #     is_pad_k = "true" if pad_k in [True, "true"] else "false"
+
+        #     if self.kernel_name_prefix == "gemm_aquant":
+        #         a_preshuffle_quant = extra[0] if extra else False
+        #         is_a_preshuffle = "true" if a_preshuffle_quant in [True, "true"] else "false"
+
+        #         instance_code = f"""
+
+        # // AQuant traits
+        # static constexpr bool kPadM = {is_pad_m};
+        # static constexpr bool kPadN = {is_pad_n};
+        # static constexpr bool kPadK = {is_pad_k};
+        # static constexpr bool TransposeC = false;
+        # static constexpr bool APreshuffleQuant = {is_a_preshuffle};
+        # static constexpr bool BPreshuffleQuant = false;
+        # static constexpr bool PreshuffleB = false;
+        # static constexpr bool DoubleSmemBuffer = false;
+        # static constexpr ck_tile::index_t GroupSizeK = {self.group_size_k};"""
+        #         return instance_code
+
+        #     persistent = extra[0] if extra else False
+
         instance_code = f"""
-    
+
     // Traits configurations
     static constexpr bool kPadM = {"true" if pad_m in [True, "true"] else "false"};
     static constexpr bool kPadN = {"true" if pad_n in [True, "true"] else "false"};
@@ -538,8 +604,8 @@ struct SelectedKernel {{
 
     def populate_initialization(self, base_pipeline_map, pipeline):
         # Tile Shape
-        if self.kernel_name_prefix == "gemm_multi_d":
-            instance_code = """  
+        if self.kernel_name_prefix in ["gemm_multi_d"]:
+            instance_code = """
 
     // Tile shape
     using TileShape = ck_tile::TileGemmShape<
@@ -566,6 +632,26 @@ struct SelectedKernel {{
 
     // Tile partitioner
     using TilePartitioner = ck_tile::GemmSpatiallyLocalTilePartitioner<TileShape, 8, 4>;"""
+
+        # [DELETE]
+        #     # AQuant-specific: QuantGroupSize and Traits
+        #     if self.kernel_name_prefix == "gemm_aquant":
+        #         instance_code += """
+
+        # // Quantization group size
+        # using QuantGroupSize = ck_tile::QuantGroupShape<ck_tile::sequence<1, 1, GroupSizeK>>;
+
+        # // Traits
+        # using Traits = ck_tile::TileGemmQuantTraits<
+        #     kPadM, kPadN, kPadK,
+        #     APreshuffleQuant,
+        #     BPreshuffleQuant,
+        #     PreshuffleB,
+        #     ALayout, BLayout, CLayout,
+        #     ck_tile::QuantType::AQuantGrouped,
+        #     AQLayout>;"""
+
+        #         return instance_code
 
         # Traits
         if self.kernel_name_prefix == "gemm_multi_d":
@@ -616,6 +702,18 @@ struct SelectedKernel {{
         k_block_per_cu,
         persistent,
     ):
+        # [DELETE]
+        # # AQuant has a self-contained launch that includes pipeline problem,
+        # # base pipeline, pipeline, epilogue, kernel type, and launch.
+        # if self.kernel_name_prefix == "gemm_aquant":
+        #     return self._populate_launch_aquant(
+        #         scheduler_type_map,
+        #         scheduler,
+        #         pipeline_impl_map,
+        #         pipeline,
+        #         k_block_per_cu,
+        #     )
+
         # Function Signature
         if self.kernel_name_prefix == "gemm_multi_d":
             instance_code = """
@@ -983,6 +1081,107 @@ struct SelectedKernel {{
         
         using GemmEpilogue = ck_tile::DefaultGemm2DEpilogue<EpilogueProblem>;"""
         return instance_code
+
+    # [DELETE]
+    #     def _populate_launch_aquant(
+    #         self,
+    #         scheduler_type_map,
+    #         scheduler,
+    #         pipeline_impl_map,
+    #         pipeline,
+    #         k_block_per_cu,
+    #     ):
+    #         """Generate the complete launch function for AQuant kernels.
+
+    #         AQuant embeds pipeline problem, base pipeline, pipeline instantiation,
+    #         epilogue, kernel type, and launch all inside the launch() static method.
+    #         """
+    #         base_pipeline_map = {
+    #             "mem": "ck_tile::BaseGemmPipelineAgBgCrMem",
+    #             "compv3": "ck_tile::BaseGemmPipelineAgBgCrCompV3",
+    #         }
+
+    #         instance_code = f"""
+
+    #     // Pipeline problem (CDataType_ param is the accumulator type for the pipeline,
+    #     // not the output type — the output conversion is handled by the epilogue)
+    #     using GemmPipelineProblem = ck_tile::GemmAQuantPipelineProblem<
+    #         ADataType,
+    #         AQDataType,
+    #         BDataType,
+    #         AccDataType,
+    #         TileShape,
+    #         Traits,
+    #         QuantGroupSize,
+    #         TransposeC,
+    #         BDataType,
+    #         {scheduler_type_map.get(scheduler)}>;
+
+    #     // Base pipeline for hot loop detection
+    #     using BaseGemmPipeline = {base_pipeline_map.get(pipeline)}<GemmPipelineProblem>;
+
+    #     // Launch function
+    #     static float launch(const ck_tile::QuantGemmHostArgs& args,
+    #                         const ck_tile::stream_config& stream) {{
+
+    #         using _GemmPipelineProblem = SelectedKernel::GemmPipelineProblem;
+    #         using GemmPipeline = {pipeline_impl_map.get(pipeline)}<_GemmPipelineProblem>;
+
+    #         // Epilogue
+    #         using EpilogueProblem = ck_tile::DefaultGemm2DEpilogueProblem<
+    #             ADataType,
+    #             BDataType,
+    #             ck_tile::tuple<>,
+    #             AccDataType,
+    #             CDataType,
+    #             ck_tile::tuple<>,
+    #             CLayout,
+    #             ck_tile::element_wise::PassThrough,
+    #             SelectedKernel::TileM,
+    #             SelectedKernel::TileN,
+    #             SelectedKernel::kPadM,
+    #             SelectedKernel::kPadN,
+    #             SelectedKernel::WarpTileM,
+    #             SelectedKernel::WarpTileN,
+    #             SelectedKernel::WarpTileK,
+    #             SelectedKernel::TransposeC>;
+
+    #         using GemmEpilogue = ck_tile::DefaultGemm2DEpilogue<EpilogueProblem>;
+
+    #         // Kernel type
+    #         using Kernel = ck_tile::QuantGemmKernel<
+    #             SelectedKernel::TilePartitioner, GemmPipeline, GemmEpilogue,
+    #             ck_tile::QuantType::AQuantGrouped>;
+
+    #         // Kernel arguments
+    #         auto kargs = Kernel::MakeKernelArgs(args);
+
+    #         if (!Kernel::IsSupportedArgument(kargs)) {{
+    #             throw std::runtime_error("Unsupported kernel arguments; skipping GEMM launch.");
+    #         }}
+
+    #         // Get grid and block sizes
+    #         const dim3 grids = Kernel::GridSize(args.M, args.N, args.k_batch);
+    #         const dim3 blocks = Kernel::BlockSize();
+
+    #         if(stream.log_level_ > 0) {{
+    #             std::cout << "Launching kernel: " << Kernel::GetName() << '\\n'
+    #                       << "grid: {{" << grids.x << ", " << grids.y << ", " << grids.z << "}}"
+    #                       << ", blocks: {{" << blocks.x << ", " << blocks.y << ", " << blocks.z << "}}"
+    #                       << std::endl;
+    #         }}
+
+    #         // Launch kernel
+    #         constexpr int kBlockPerCu = {k_block_per_cu};
+    #         float ave_time = ck_tile::launch_kernel(
+    #             stream,
+    #             ck_tile::make_kernel<kBlockPerCu>(Kernel{{}}, grids, blocks, 0, kargs));
+
+    #         return ave_time;
+    #     }}
+    # }};
+    # """
+    #         return instance_code
 
     def _generate_cmake_individual_targets(self, kernel_list):
         """Generate CMake include file that creates individual targets"""
