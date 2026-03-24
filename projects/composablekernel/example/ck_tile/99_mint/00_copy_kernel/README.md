@@ -16,17 +16,18 @@ MINT provides a next-generation portable tile programming model that works acros
 mkdir build && cd build
 # You can replace <arch> with the appropriate architecture
 # (for example gfx90a or gfx942) or leave it blank
-../script/cmake-ck-dev.sh ../ <arch>
+../script/cmake-ck-dev.sh ../ gfx942 -G Ninja
 # Make the copy kernel executable
-make mint_tutorial_copy -j
+ninja example_mint_simple_copy
 ```
 
-This will result in an executable `build/bin/test_mint_copy`
+This will result in an executable `build/bin/example_mint_simple_copy`
 
 ## Example Usage
 
 ```bash
-./bin/test_mint_copy -m 64 -n 128 -v 1
+./bin/example_mint_simple_copy
+ -m 64 -n 128 -v 1
 ```
 
 ### Arguments:

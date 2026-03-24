@@ -33,4 +33,5 @@ add_subdirectory(41_batched_contraction)
 add_subdirectory(50_sparse_attn)
 add_subdirectory(51_tile_distr_enc_reg_map)
 add_subdirectory(99_mint)
+add_subdirectory(mint_example)
 

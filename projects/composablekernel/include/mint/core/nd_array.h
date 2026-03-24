@@ -9,7 +9,7 @@ namespace mint {
 template <class T, index_t kN, index_t... kNs>
 struct nd_array {
   using sub_nd_array_type = nd_array<T, kNs...>;
-
+ 
  public:
   using value_type = T;
 
@@ -17,8 +17,12 @@ struct nd_array {
 
   MINT_HOST_DEVICE constexpr nd_array(initializer_list<sub_nd_array_type> init)
       : data_{} {
-    if constexpr (kN > 0)
-      std::copy(init.begin(), init.end(), data_.begin());
+    if constexpr (kN > 0) {
+      index_t idx = 0;
+      for (auto it = init.begin(); it != init.end(); ++it, ++idx) {
+        data_[idx] = *it;
+      }
+    }
   }
 
   constexpr bool operator==(const nd_array&) const = default;
@@ -89,7 +93,10 @@ struct nd_array<T, kN> {
   constexpr nd_array() = default;
 
   MINT_HOST_DEVICE constexpr nd_array(initializer_list<T> init) : data_{} {
-    std::copy(init.begin(), init.end(), data_.begin());
+    index_t idx = 0;
+    for (auto it = init.begin(); it != init.end(); ++it, ++idx) {
+      data_[idx] = *it;
+    }
   }
 
   constexpr bool operator==(const nd_array&) const = default;
