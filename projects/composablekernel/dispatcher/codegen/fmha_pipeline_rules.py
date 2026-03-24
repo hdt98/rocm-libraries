@@ -593,6 +593,7 @@ SPLITKV_TILES_FP16 = {
     ],
     (256, 256): [
         (64, 128, 32, 256, 32, 256),
+        (128, 128, 128, 256, 32, 256),
     ],
 }
 
@@ -615,7 +616,10 @@ PAGEDKV_TILES_FP16 = {
         (64, 128, 32, 128, 32, 128),
         (16, 128, 32, 128, 32, 128),
     ],
-    (256, 256): [(64, 128, 32, 256, 32, 256)],
+    (256, 256): [
+        (64, 128, 32, 256, 32, 256),
+        (128, 128, 128, 256, 32, 256),
+    ],
 }
 
 PAGEDKV_TILES_FP8 = {
@@ -646,6 +650,7 @@ BATCH_PREFILL_TILES_FP16 = {
     ],
     (256, 256): [
         (128, 128, 32, 256, 32, 256),
+        (128, 128, 64, 256, 32, 256),
     ],
 }
 
@@ -737,10 +742,11 @@ def get_splitkv_pipelines(
     """Split-KV main kernel pipelines (matches KernelComponentFactoryBase.get_pipelines)."""
     specs: List[SplitKVPipelineSpec] = []
 
+    SPLITKV_MASKS = ["no", "causal"]
     if dtype in _DT_FP16_BF16:
         for logits, mask, bias, pagedkv, sink in itertools.product(
             BOOLS,
-            MASKS,
+            SPLITKV_MASKS,
             BIASES,
             BOOLS,
             BOOLS,
@@ -804,7 +810,7 @@ def get_splitkv_pipelines(
                 )
             )
     elif dtype in ("fp8", "bf8"):
-        for logits, mask, bias in itertools.product(BOOLS, MASKS, BIASES):
+        for logits, mask, bias in itertools.product(BOOLS, SPLITKV_MASKS, BIASES):
             if logits == "t" and bias != "no":
                 continue
             specs.append(
@@ -1112,10 +1118,11 @@ def get_batch_prefill_pipelines(
     """
     specs: List[BatchPrefillPipelineSpec] = []
 
+    PREFILL_MASKS = ["no", "causal"]
     if dtype in _DT_FP16_BF16:
         for logits, mask, bias, lse, dropout, kvl, kvt in itertools.product(
             BOOLS,
-            MASKS,
+            PREFILL_MASKS,
             BIASES,
             BOOLS,
             BOOLS,
@@ -1314,6 +1321,31 @@ def get_bwd_dq_dk_dv_extra_pipelines(
     return specs
 
 
+def _check_qr_mfma_insts(
+    arch: str,
+    hdim: int,
+    pipeline_tag: str,
+    tile_bm0: int,
+    tile_bn0: int,
+    tile_bk0: int,
+) -> bool:
+    """Reject qr pipeline configs where NumMfmaInsts % 8 != 0 on CDNA (warp_size=64).
+
+    Matches the static_assert in block_fmha_pipeline_qr_ks_vs.hpp:354.
+    """
+    if pipeline_tag != "qr" or hdim != 256:
+        return True
+    if not arch.startswith("gfx9"):
+        return True
+    wm, wn, wk = 32, 32, 16
+    gm, gn = 4, 1
+    if wm > 0 and wn > 0 and wk > 0 and gm > 0 and gn > 0:
+        num_mfma = (tile_bm0 // wm) * (tile_bn0 // wn) * (tile_bk0 // wk) // (gm * gn)
+        if num_mfma % 8 != 0:
+            return False
+    return True
+
+
 def tile_compatible(
     arch: str,
     dtype: str,
@@ -1334,5 +1366,8 @@ def tile_compatible(
     if arch in ("gfx950",):
         if not _check_tile_pipeline_gfx950(hdim, hdim_v, pipeline_tag, bm0, bn0):
             return False
+
+    if not _check_qr_mfma_insts(arch, hdim, pipeline_tag, bm0, bn0, bk0):
+        return False
 
     return True
