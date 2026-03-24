@@ -7,6 +7,13 @@
 // defaults, propagates rank/layout through connected tensors, merges explicit
 // Tensor entries, and applies the dtype cascade. All at compile time (consteval).
 //
+// Op dispatch uses C++20 concepts to classify ops by structural shape:
+//   BinaryOpLike  — has {lhs, rhs, out} string_view members
+//   UnaryOpLike   — has {in, out} string_view members
+// A single visit_op() function is the only place the Op variant type list
+// appears. Adding a new op requires one line in visit_op(); concepts handle
+// generic registration and propagation automatically.
+//
 // This header has NO CK Tile dependency.
 
 #pragma once
@@ -15,10 +22,74 @@
 #include <rocm_ck/tensor_desc.hpp>
 
 #include <array>
+#include <type_traits>
 
 namespace rocm_ck {
 
-/// Resolved signature: all tensors have concrete dtype.
+// ============================================================================
+// Op structural concepts — classify ops by their tensor slot shape
+// ============================================================================
+
+/// Ops with three tensor slots: lhs, rhs, out (e.g., AddOp, MulOp).
+/// Excludes ops that also have {in} to prevent overlap with UnaryOpLike.
+template <typename T>
+concept BinaryOpLike = requires(const T& t) {
+    t.lhs;
+    t.rhs;
+    t.out;
+} && !requires(const T& t) { t.in; };
+
+/// Ops with two tensor slots: in, out (e.g., ReluOp, SigmoidOp, ScaleOp).
+/// Excludes ops that also have {lhs, rhs} to prevent overlap with BinaryOpLike.
+template <typename T>
+concept UnaryOpLike = requires(const T& t) {
+    t.in;
+    t.out;
+} && !requires(const T& t) {
+    t.lhs;
+    t.rhs;
+};
+
+// ============================================================================
+// visit_op — single consteval dispatch point for all Op types
+//
+// This is the ONLY place the Op variant type list is enumerated for dispatch.
+// Adding a new Op alternative requires adding one line here; if the new op
+// satisfies BinaryOpLike or UnaryOpLike, all generic handlers work
+// automatically.
+// ============================================================================
+
+template <typename F>
+consteval auto visit_op(const Op& op, F&& f)
+{
+    if(std::holds_alternative<GemmOp>(op))
+        return f(std::get<GemmOp>(op));
+    if(std::holds_alternative<AddOp>(op))
+        return f(std::get<AddOp>(op));
+    if(std::holds_alternative<MulOp>(op))
+        return f(std::get<MulOp>(op));
+    if(std::holds_alternative<ReluOp>(op))
+        return f(std::get<ReluOp>(op));
+    if(std::holds_alternative<FastGeluOp>(op))
+        return f(std::get<FastGeluOp>(op));
+    if(std::holds_alternative<GeluOp>(op))
+        return f(std::get<GeluOp>(op));
+    if(std::holds_alternative<SiluOp>(op))
+        return f(std::get<SiluOp>(op));
+    if(std::holds_alternative<SigmoidOp>(op))
+        return f(std::get<SigmoidOp>(op));
+    if(std::holds_alternative<SoftmaxOp>(op))
+        return f(std::get<SoftmaxOp>(op));
+    if(std::holds_alternative<ScaleOp>(op))
+        return f(std::get<ScaleOp>(op));
+    return f(std::get<std::monostate>(op));
+}
+
+// ============================================================================
+// ResolvedSignature
+// ============================================================================
+
+/// Resolved signature: all tensors and scalars have concrete metadata.
 /// Rank and layout are concrete for tensors with operator-implied defaults
 /// or explicit Tensor entries; may remain 0/Auto for tensors where the
 /// operation type does not specify them (e.g., standalone AddOp).
@@ -26,6 +97,9 @@ struct ResolvedSignature
 {
     int num_tensors                             = 0;
     std::array<TensorDesc, kMaxTensors> tensors = {};
+
+    int num_scalars                         = 0;
+    std::array<Scalar, kMaxScalars> scalars = {};
 
     /// Find a resolved tensor by name. Compile-time error if not found.
     consteval TensorDesc tensor(std::string_view name) const
@@ -35,16 +109,148 @@ struct ResolvedSignature
                 return tensors[i];
         throw "tensor not found in resolved signature";
     }
+
+    /// Find a resolved tensor's slot index by name. Compile-time error if not found.
+    consteval int tensor_index(std::string_view name) const
+    {
+        for(int i = 0; i < num_tensors; ++i)
+            if(tensors[i].name == name)
+                return i;
+        throw "tensor not found in resolved signature";
+    }
+
+    /// Find a resolved scalar by name. Compile-time error if not found.
+    consteval Scalar scalar(std::string_view name) const
+    {
+        for(int i = 0; i < num_scalars; ++i)
+            if(scalars[i].name == name)
+                return scalars[i];
+        throw "scalar not found in resolved signature";
+    }
+
+    /// Find a resolved scalar's slot index by name. Compile-time error if not found.
+    consteval int scalar_index(std::string_view name) const
+    {
+        for(int i = 0; i < num_scalars; ++i)
+            if(scalars[i].name == name)
+                return i;
+        throw "scalar not found in resolved signature";
+    }
 };
 
-/// Resolve a Signature into concrete tensor descriptors.
+// ============================================================================
+// Op slot visitors — concept-driven, generic handling for binary/unary ops
+// ============================================================================
+
+/// Register all tensor slots of an op. Returns the output tensor name.
+///
+/// Uses concepts for generic dispatch:
+///   GemmOp  — special case: sets operator-implied rank/layout defaults
+///   ScaleOp — special case: validates scalar reference against sig.scalars[]
+///   BinaryOpLike — generic: registers lhs, rhs, out
+///   UnaryOpLike  — generic: registers in, out
+///
+/// Adding a new BinaryOpLike or UnaryOpLike op requires no changes here.
+consteval std::string_view
+register_slots(const Op& op, const Signature& sig, auto& find_or_add, auto& set_if_unknown)
+{
+    return visit_op(op, [&](const auto& typed_op) -> std::string_view {
+        using T = std::remove_cvref_t<decltype(typed_op)>;
+
+        if constexpr(std::is_same_v<T, std::monostate>)
+        {
+            return {};
+        }
+        else if constexpr(std::is_same_v<T, GemmOp>)
+        {
+            // GemmOp has operator-implied rank/layout defaults
+            set_if_unknown(find_or_add(typed_op.lhs), 2, Layout::Row);
+            set_if_unknown(find_or_add(typed_op.rhs), 2, Layout::Col);
+            set_if_unknown(find_or_add(typed_op.out), 2, Layout::Row);
+            return typed_op.out;
+        }
+        else if constexpr(std::is_same_v<T, ScaleOp>)
+        {
+            // ScaleOp is unary + scalar reference validation
+            find_or_add(typed_op.in);
+            find_or_add(typed_op.out);
+            if(typed_op.scale.empty())
+                throw "ScaleOp.scale must name a Scalar parameter";
+            bool found_scalar = false;
+            for(int si = 0; si < kMaxScalars; ++si)
+            {
+                if(sig.scalars[si].name == typed_op.scale)
+                {
+                    found_scalar = true;
+                    break;
+                }
+            }
+            if(!found_scalar)
+                throw "ScaleOp.scale references undeclared Scalar";
+            return typed_op.out;
+        }
+        else if constexpr(BinaryOpLike<T>)
+        {
+            find_or_add(typed_op.lhs);
+            find_or_add(typed_op.rhs);
+            find_or_add(typed_op.out);
+            return typed_op.out;
+        }
+        else if constexpr(UnaryOpLike<T>)
+        {
+            find_or_add(typed_op.in);
+            find_or_add(typed_op.out);
+            return typed_op.out;
+        }
+        else
+        {
+            // Unreachable for valid Op alternatives — all are either monostate,
+            // special-cased (GemmOp, ScaleOp), or match BinaryOpLike/UnaryOpLike.
+            return {};
+        }
+    });
+}
+
+/// Propagate rank/layout through an op's connected tensor slots.
+///
+/// Binary ops propagate from the first slot with known rank/layout to all others.
+/// Unary ops propagate between in and out.
+/// GemmOp is skipped (rank/layout already set by register_slots).
+///
+/// Adding a new BinaryOpLike or UnaryOpLike op requires no changes here.
+consteval void propagate_slots(const Op& op, auto& propagate_binary, auto& propagate_unary)
+{
+    visit_op(op, [&](const auto& typed_op) {
+        using T = std::remove_cvref_t<decltype(typed_op)>;
+
+        if constexpr(std::is_same_v<T, std::monostate> || std::is_same_v<T, GemmOp>)
+        {
+            // monostate: nothing to do
+            // GemmOp: rank/layout already set in register_slots
+        }
+        else if constexpr(BinaryOpLike<T>)
+        {
+            propagate_binary(typed_op.lhs, typed_op.rhs, typed_op.out);
+        }
+        else if constexpr(UnaryOpLike<T>)
+        {
+            propagate_unary(typed_op.in, typed_op.out);
+        }
+    });
+}
+
+// ============================================================================
+// resolve()
+// ============================================================================
+
+/// Resolve a Signature into concrete tensor and scalar descriptors.
 ///
 /// Phases:
 ///   1. Register tensor slots from operators (with op-implied rank/layout)
 ///   2. Propagate rank/layout through connected tensors (forward + backward)
 ///   3. Merge explicit Tensor entries from sig.tensors (overrides propagation)
 ///   4. Apply dtype cascade: explicit tensor -> sig.dtype -> error
-///   5. SSA check: each tensor name produced by at most one operator
+///   5. Collect declared scalars, build result
 ///
 /// GemmOp slots get operator-implied defaults:
 ///   lhs -> rank 2, Row;  rhs -> rank 2, Col;  out -> rank 2, Row
@@ -103,100 +309,7 @@ consteval ResolvedSignature resolve(Signature sig)
 
     for(int i = 0; i < kMaxOps; ++i)
     {
-        const Op& op = sig.ops[i];
-        if(std::holds_alternative<std::monostate>(op))
-            continue;
-
-        std::string_view out_name;
-
-        if(std::holds_alternative<GemmOp>(op))
-        {
-            const GemmOp& g = std::get<GemmOp>(op);
-            set_if_unknown(find_or_add(g.lhs), 2, Layout::Row);
-            set_if_unknown(find_or_add(g.rhs), 2, Layout::Col);
-            set_if_unknown(find_or_add(g.out), 2, Layout::Row);
-            out_name = g.out;
-        }
-        else if(std::holds_alternative<AddOp>(op))
-        {
-            const AddOp& a = std::get<AddOp>(op);
-            find_or_add(a.lhs);
-            find_or_add(a.rhs);
-            find_or_add(a.out);
-            out_name = a.out;
-        }
-        else if(std::holds_alternative<MulOp>(op))
-        {
-            const MulOp& m = std::get<MulOp>(op);
-            find_or_add(m.lhs);
-            find_or_add(m.rhs);
-            find_or_add(m.out);
-            out_name = m.out;
-        }
-        else if(std::holds_alternative<ReluOp>(op))
-        {
-            const ReluOp& r = std::get<ReluOp>(op);
-            find_or_add(r.in);
-            find_or_add(r.out);
-            out_name = r.out;
-        }
-        else if(std::holds_alternative<FastGeluOp>(op))
-        {
-            const FastGeluOp& f = std::get<FastGeluOp>(op);
-            find_or_add(f.in);
-            find_or_add(f.out);
-            out_name = f.out;
-        }
-        else if(std::holds_alternative<GeluOp>(op))
-        {
-            const GeluOp& g = std::get<GeluOp>(op);
-            find_or_add(g.in);
-            find_or_add(g.out);
-            out_name = g.out;
-        }
-        else if(std::holds_alternative<SiluOp>(op))
-        {
-            const SiluOp& s = std::get<SiluOp>(op);
-            find_or_add(s.in);
-            find_or_add(s.out);
-            out_name = s.out;
-        }
-        else if(std::holds_alternative<SigmoidOp>(op))
-        {
-            const SigmoidOp& s = std::get<SigmoidOp>(op);
-            find_or_add(s.in);
-            find_or_add(s.out);
-            out_name = s.out;
-        }
-        else if(std::holds_alternative<SoftmaxOp>(op))
-        {
-            const SoftmaxOp& s = std::get<SoftmaxOp>(op);
-            find_or_add(s.in);
-            find_or_add(s.out);
-            out_name = s.out;
-        }
-        else if(std::holds_alternative<ScaleOp>(op))
-        {
-            const ScaleOp& s = std::get<ScaleOp>(op);
-            find_or_add(s.in);
-            find_or_add(s.out);
-            out_name = s.out;
-
-            // Validate scalar reference
-            if(s.scale.empty())
-                throw "ScaleOp.scale must name a Scalar parameter";
-            bool found_scalar = false;
-            for(int si = 0; si < kMaxScalars; ++si)
-            {
-                if(sig.scalars[si].name == s.scale)
-                {
-                    found_scalar = true;
-                    break;
-                }
-            }
-            if(!found_scalar)
-                throw "ScaleOp.scale references undeclared Scalar";
-        }
+        std::string_view out_name = register_slots(sig.ops[i], sig, find_or_add, set_if_unknown);
 
         // SSA uniqueness: each output name may appear at most once
         if(!out_name.empty())
@@ -250,62 +363,13 @@ consteval ResolvedSignature resolve(Signature sig)
             set_if_unknown(ii, infos[oi].rank, infos[oi].layout);
     };
 
-    auto propagate_op = [&](const Op& op) {
-        if(std::holds_alternative<AddOp>(op))
-        {
-            const AddOp& a = std::get<AddOp>(op);
-            propagate_binary(a.lhs, a.rhs, a.out);
-        }
-        else if(std::holds_alternative<MulOp>(op))
-        {
-            const MulOp& m = std::get<MulOp>(op);
-            propagate_binary(m.lhs, m.rhs, m.out);
-        }
-        else if(std::holds_alternative<ReluOp>(op))
-        {
-            const ReluOp& r = std::get<ReluOp>(op);
-            propagate_unary(r.in, r.out);
-        }
-        else if(std::holds_alternative<FastGeluOp>(op))
-        {
-            const FastGeluOp& f = std::get<FastGeluOp>(op);
-            propagate_unary(f.in, f.out);
-        }
-        else if(std::holds_alternative<GeluOp>(op))
-        {
-            const GeluOp& g = std::get<GeluOp>(op);
-            propagate_unary(g.in, g.out);
-        }
-        else if(std::holds_alternative<SiluOp>(op))
-        {
-            const SiluOp& s = std::get<SiluOp>(op);
-            propagate_unary(s.in, s.out);
-        }
-        else if(std::holds_alternative<SigmoidOp>(op))
-        {
-            const SigmoidOp& s = std::get<SigmoidOp>(op);
-            propagate_unary(s.in, s.out);
-        }
-        else if(std::holds_alternative<SoftmaxOp>(op))
-        {
-            const SoftmaxOp& s = std::get<SoftmaxOp>(op);
-            propagate_unary(s.in, s.out);
-        }
-        else if(std::holds_alternative<ScaleOp>(op))
-        {
-            const ScaleOp& s = std::get<ScaleOp>(op);
-            propagate_unary(s.in, s.out);
-        }
-        // GemmOp: already set in phase 1, no propagation needed
-    };
-
     // Forward pass: propagate downstream effects
     for(int i = 0; i < kMaxOps; ++i)
-        propagate_op(sig.ops[i]);
+        propagate_slots(sig.ops[i], propagate_binary, propagate_unary);
 
     // Backward pass: propagate upstream effects
     for(int i = kMaxOps - 1; i >= 0; --i)
-        propagate_op(sig.ops[i]);
+        propagate_slots(sig.ops[i], propagate_binary, propagate_unary);
 
     // ================================================================
     // Phase 3: Merge explicit Tensor entries (override propagation)
@@ -355,6 +419,18 @@ consteval ResolvedSignature resolve(Signature sig)
     {
         result.tensors[i] =
             TensorDesc{infos[i].name, infos[i].dtype, infos[i].rank, infos[i].layout};
+    }
+
+    // Collect declared scalars (pass-through — no inference needed)
+    for(int i = 0; i < kMaxScalars; ++i)
+    {
+        if(sig.scalars[i].name.empty())
+            continue;
+        // Check for duplicate scalar names
+        for(int j = 0; j < result.num_scalars; ++j)
+            if(result.scalars[j].name == sig.scalars[i].name)
+                throw "duplicate scalar name in Signature";
+        result.scalars[result.num_scalars++] = sig.scalars[i];
     }
 
     return result;
@@ -462,6 +538,35 @@ static_assert(fmha_resolved.tensor("Q").rank == 2);
 static_assert(fmha_resolved.tensor("S").rank == 2);
 static_assert(fmha_resolved.tensor("P").rank == 2); // propagated via SoftmaxOp from S
 static_assert(fmha_resolved.tensor("O").rank == 2);
+
+// --- tensor_index: slot lookup by name ---
+// For GEMM + Add + Relu, the user provides data for A, B, C, bias.
+// Intermediates D and E are epilogue-internal (register-only); they have
+// valid indices but the user should not set Args slots for them.
+static_assert(gemm_add_relu_resolved.tensor_index("A") == 0);
+static_assert(gemm_add_relu_resolved.tensor_index("B") == 1);
+static_assert(gemm_add_relu_resolved.tensor_index("C") == 2);
+static_assert(gemm_add_relu_resolved.tensor_index("bias") == 3);
+static_assert(gemm_add_relu_resolved.tensor_index("D") == 4);  // intermediate
+static_assert(gemm_add_relu_resolved.tensor_index("E") == 5);  // intermediate
+
+// --- Scalar tracking: scalars passed through from Signature ---
+constexpr ResolvedSignature scaled_gemm_resolved = resolve(Signature{
+    .dtype = DataType::FP16,
+    .scalars = {Scalar{.name = "alpha", .dtype = DataType::FP32},
+                Scalar{.name = "beta", .dtype = DataType::FP32}},
+    .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+static_assert(scaled_gemm_resolved.num_scalars == 2);
+static_assert(scaled_gemm_resolved.scalar("alpha").dtype == DataType::FP32);
+static_assert(scaled_gemm_resolved.scalar("beta").dtype == DataType::FP32);
+static_assert(scaled_gemm_resolved.scalar_index("alpha") == 0);
+static_assert(scaled_gemm_resolved.scalar_index("beta") == 1);
+
+// --- No scalars: num_scalars == 0 ---
+static_assert(resolve(Signature{
+    .dtype = DataType::FP16,
+    .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}).num_scalars == 0);
 
 // Error cases (uncommenting any would produce consteval compile errors):
 //
