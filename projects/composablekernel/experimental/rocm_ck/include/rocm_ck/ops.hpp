@@ -1,7 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// Operator structs for the kpack signature compute graph.
+// Operator structs for the rocm_ck signature compute graph.
 //
 // Each operator is a typed struct with named tensor slots. Operators
 // form the edges of the directed compute graph; tensors are nodes.
