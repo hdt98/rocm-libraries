@@ -1,27 +1,100 @@
-# rocm_ck — CK Tile Kernel APIs with Multiarch Distribution
+# rocm_ck — Schema-Driven API for CK Tile Kernels
 
-## Motivation
+Describe GPU kernels as data (Signature + Algorithm), validate at compile time, dispatch with a universal argument struct.
 
-rocm_ck is a C++ metaprogramming API for GPU kernel dispatch built on CK Tile. It provides compile-time validated Signature/Algorithm types, operator composition, and multiarch distribution via [kpack](https://github.com/ROCm/TheRock/blob/develop/docs/rfcs/rfc0008_kpack.md) archives.
+## Architecture
 
-Kpack (kernel pack) is the binary archive format that separates GPU device code from host code for efficient multi-architecture distribution. Instead of shipping fat binaries that embed kernels for every supported GPU, kpack packages per-architecture `.hsaco` code objects into compressed archives that are loaded at runtime based on the detected GPU.
+rocm_ck replaces CK Tile's template-parameter API with a data-driven schema. Kernels are defined by two pure-data structs — no template parameters at the user level:
 
-The core challenge is that CK Tile kernels are C++ template instantiations — host and device code share the same translation unit, and there is no standalone device-only kernel file. The **bridge pattern** (introduced in example 02) solves this with a thin `extern "C" __global__` wrapper that delegates to CK Tile on-device, cleanly separating compilation: device code compiles with CK Tile headers, the host binary only needs HIP runtime and kpack.
+- **Signature** (what to compute) — a directed compute graph where tensors are nodes, operators are edges, and scalars are named parameters. Expressed with C++ designated initializers.
+- **Algorithm** (how to compute) — tile geometry, pipeline strategy, warp configuration, padding. Independent of data types.
+
+These flow through a compile-time pipeline:
+
+```text
+Signature (what) + Algorithm (how)
+    → consteval resolve() + make_kernel()    compile-time validation
+    → NTTP kernel descriptor                 structural type, zero runtime cost
+    → extern "C" __global__ fn(Args)         bridge: host C++ ↔ device CK Tile
+    → host fills Args, launches kernel       runtime
+```
+
+**resolve()** is `consteval` — it propagates dtypes, validates SSA uniqueness, resolves rank and layout defaults. Invalid configurations fail at compile time with actionable error messages, not linker errors or runtime crashes.
+
+**make_kernel()** pattern-matches the operator sequence (e.g., `[GemmOp, AddOp, ReluOp]`) and returns a structural NTTP kernel descriptor that triggers the correct CK Tile template instantiation.
+
+**Args** is a universal 1408-byte flat POD struct. It lives in the GPU's kernarg segment (device memory, not registers). Each wave issues `s_load` instructions for only the fields it reads — unused slots cost nothing. Any language or dispatcher that can fill a byte buffer can launch a kernel.
+
+The **bridge pattern** (`extern "C" __global__` wrapper) cleanly separates compilation: device code compiles with CK Tile headers; the host binary only needs HIP runtime and the kpack loader.
+
+### Complete Example
+
+This is a full kernel definition — GEMM with fused bias addition and ReLU activation, accumulating in fp32, storing fp16 output:
+
+```cpp
+// gemm_fp16_add_relu.hip
+#include "gemm_dev.hpp"
+
+static constexpr rocm_ck::GemmKernel kernel = rocm_ck::make_kernel(
+    rocm_ck::Signature{
+        .dtype = rocm_ck::DataType::FP16,
+        .ops = {rocm_ck::GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                rocm_ck::AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                rocm_ck::ReluOp{.in = "D", .out = "E"}}},
+    rocm_ck::GemmAlgorithm{.block_tile  = {128, 128, 32},
+                            .block_warps = {2, 2, 1},
+                            .warp_tile   = {16, 16, 16}});
+
+extern "C" __global__ void gemm_fp16_add_relu(rocm_ck::Args args)
+{
+    rocm_ck::runGemm<kernel>(args);
+}
+```
+
+Every architectural concept is visible: Signature declares the compute graph, Algorithm specifies the tile strategy, `make_kernel` validates and resolves at compile time, and the bridge function takes universal `Args`.
+
+## What This Changes
+
+CK Tile is a powerful template metaprogramming library. Using it directly means wiring ~7 internal type layers (`TileGemmShape`, `TileGemmTraits`, `GemmPipelineProblem`, pipeline type, partitioner, epilogue, kernel) with dozens of positional template parameters. See [`gemm_dev.hpp`](examples/04_gemm/gemm_dev.hpp) for what that looks like — it's the device-side bridge that rocm_ck hides behind 6 named fields.
+
+rocm_ck doesn't replace CK Tile — it provides a structured front-end. The same CK Tile kernels run underneath, but the user-facing API is pure data with compile-time validation.
+
+## Composable Operators
+
+Signatures describe computation as a graph of typed operators connected by named tensors. Each operator output gets a unique name (SSA form); graph edges are shared names between outputs and inputs.
+
+**GEMM + bias + ReLU:**
+```text
+A, B → [GemmOp] → C → [AddOp] ← bias → D → [ReluOp] → E
+```
+
+**Available operators:**
+
+| Category | Operators |
+|----------|-----------|
+| Compute | `GemmOp` |
+| Binary | `AddOp`, `MulOp` |
+| Unary | `ReluOp`, `FastGeluOp`, `GeluOp`, `SiluOp`, `SigmoidOp`, `SoftmaxOp` |
+| Scalar | `ScaleOp` |
+
+Adding a new operator: define a struct with named tensor slots, add it to the `Op` variant, add one line to `visit_op()` in `resolve.hpp`. If the struct satisfies `BinaryOpLike` or `UnaryOpLike` (C++20 concepts), generic rank/layout propagation works automatically.
+
+See [SIGNATURE.md](SIGNATURE.md) for the full specification: dtype cascading, layout resolution, SSA validation rules, and fusion pattern-matching.
 
 ## Examples
 
 Progressive examples, each building on the last:
 
-| Example | What it demonstrates |
+| Example | Architecture concept |
 |---------|---------------------|
-| [01_hello_world](examples/01_hello_world/) | Minimal multiarch pipeline — hand-written HIP kernel, one binary per arch |
+| [01_hello_world](examples/01_hello_world/) | Multiarch pipeline baseline — hand-written HIP kernel, one binary per arch |
 | [02_ck_tile_vector_add](examples/02_ck_tile_vector_add/) | Bridge pattern — `extern "C"` wrapper around CK Tile's `ElementWiseKernel` |
-| [03_rocm_ck_vector_add](examples/03_rocm_ck_vector_add/) | Full tuning surface — Signature/Algorithm split, 12 compiled variants, registry-based selection |
-| [04_gemm](examples/04_gemm/) | GEMM with multi-type variants — operator-centric Signature, fp32/fp16/bf16, composed epilogue |
+| [03_rocm_ck_vector_add](examples/03_rocm_ck_vector_add/) | Full schema — Signature/Algorithm split, `make_kernel` validation, 12 compiled variants, registry-based selection |
+| [04_gemm](examples/04_gemm/) | Composed operators — multi-type GEMM (fp32/fp16/bf16), fused epilogue, mixed-precision accumulation |
 
 ### Example 01: Hello World
 
-Validates the end-to-end pipeline with a trivial hand-written vector-add kernel. One kernel source, compiled per architecture, packed into a single archive, loaded at runtime.
+Validates the end-to-end multiarch pipeline with a trivial hand-written vector-add kernel. One kernel source, compiled per architecture, packed into a single archive, loaded at runtime.
 
 ### Example 02: CK Tile Bridge
 
@@ -41,7 +114,7 @@ See the [example 03 README](examples/03_rocm_ck_vector_add/README.md) for full d
 
 ### Example 04: GEMM (Multi-Type)
 
-Extends the Signature pattern from elementwise to GEMM:
+Extends the schema to GEMM:
 
 - **Operator-centric Signature** — `GemmOp`, `AddOp`, `ReluOp` compose the compute graph
 - **Multi-type variants** — fp32, fp16, bf16 compiled from ~20-line `.hip` files via `runGemm<K>` template
@@ -50,6 +123,16 @@ Extends the Signature pattern from elementwise to GEMM:
 - **Typed host buffers** — `float_to_typed` / `typed_to_float` for type-agnostic verification
 
 See the [example 04 README](examples/04_gemm/README.md) for full details.
+
+## Design for Integration
+
+The schema is designed to map cleanly into dispatcher and tooling systems:
+
+- **Signature** is a `constexpr` aggregate struct with no pointers or heap allocation. Its fields (dtypes, operators, tensor names) are a superset of a dispatcher's `KernelKey`. Serialization to JSON or Python dataclasses is mechanical.
+- **Algorithm** maps to a dispatcher's `KernelInstance` — tile geometry, pipeline strategy, padding. Each field has a concrete numeric value.
+- **Args** is trivially-copyable, standard-layout POD with `static_assert`-verified layout. Any language or runtime that can fill a 1408-byte buffer can launch a kernel.
+
+Integration is intentionally deferred until the schema stabilizes. See `dispatcher-integration-strategy.md` for the planned approach.
 
 ## Pipeline
 
@@ -182,7 +265,31 @@ On a machine with a supported GPU:
 
 If the current GPU's architecture is not in the archive, the demo prints a clear error and exits.
 
-## Inspect the Archive
+## Appendix: Kpack Archive Format
+
+Kpack (kernel pack) is the binary archive format for multiarch distribution. Instead of shipping fat binaries, kpack packages per-architecture `.hsaco` code objects into compressed archives loaded at runtime based on the detected GPU.
+
+### Archive Pipeline
+
+1. **Compile**: `clang++ --cuda-device-only` compiles `.hip` sources into per-architecture `.hsaco` code objects
+2. **Pack**: `pack.py` concatenates the `.hsaco` blobs after a 16-byte KPAK header, then appends a MessagePack table of contents (TOC) recording each blob's offset, size, and architecture
+3. **Load**: The host binary opens the archive via the kpack C API, queries the detected GPU's architecture, extracts the matching code object, and loads it via `hipModuleLoadData`
+
+### Binary Format
+
+```text
+[0x00]  "KPAK"              4 bytes   Magic
+[0x04]  version             4 bytes   Little-endian uint32 (currently 1)
+[0x08]  toc_offset          8 bytes   Little-endian uint64
+[0x10]  blob_0              variable  Raw .hsaco for first arch
+        blob_1              variable  Raw .hsaco for second arch
+        ...
+[toc_offset]  MessagePack TOC     variable  Compression scheme, arch list, blob metadata, nested TOC
+```
+
+The TOC can also carry optional `variant_metadata` sections (used by example 03) containing tuning parameters for each kernel variant.
+
+### Inspect the Archive
 
 ```bash
 python3 -c "
@@ -198,27 +305,7 @@ for binary, archs in toc['toc'].items():
 "
 ```
 
-## How It Works
-
-1. **Compile**: `clang++ --cuda-device-only` compiles `.hip` sources into per-architecture `.hsaco` code objects
-2. **Pack**: `pack.py` concatenates the `.hsaco` blobs after a 16-byte KPAK header, then appends a MessagePack table of contents (TOC) recording each blob's offset, size, and architecture
-3. **Load**: The host binary opens the archive via the kpack C API, queries the detected GPU's architecture, extracts the matching code object, and loads it via `hipModuleLoadData`
-
-## Kpack Archive Format
-
-```text
-[0x00]  "KPAK"              4 bytes   Magic
-[0x04]  version             4 bytes   Little-endian uint32 (currently 1)
-[0x08]  toc_offset          8 bytes   Little-endian uint64
-[0x10]  blob_0              variable  Raw .hsaco for first arch
-        blob_1              variable  Raw .hsaco for second arch
-        ...
-[toc_offset]  MessagePack TOC     variable  Compression scheme, arch list, blob metadata, nested TOC
-```
-
-The TOC can also carry optional `variant_metadata` sections (used by example 03) containing tuning parameters for each kernel variant.
-
-## Vendored Runtime
+### Vendored Runtime
 
 The `rocm_kpack/` directory contains a local copy of the kpack C runtime library, taken from [TheRock](https://github.com/ROCm/TheRock) (`base/rocm-kpack/runtime/`) for this experimental demo. This avoids requiring a full TheRock build as a dependency — the runtime is small and self-contained. Once kpack ships as part of a ROCm release, this vendored copy should be replaced with a proper `find_package(rocm_kpack)`.
 
