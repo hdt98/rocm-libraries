@@ -118,7 +118,7 @@ The `_w8`/`_w2` suffixes indicate multi-warp variants.
 ## Build
 
 ```bash
-cd experimental/kpack/examples/03_rocm_ck_vector_add
+cd experimental/rocm_ck/examples/03_rocm_ck_vector_add
 cmake -B build -S . -G Ninja \
     -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++ \
     -DCMAKE_PREFIX_PATH=/opt/rocm \
