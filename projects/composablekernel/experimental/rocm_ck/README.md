@@ -1,20 +1,20 @@
-# Kpack — CK Tile Kernel Distribution via Archive
+# rocm_ck — CK Tile Kernel APIs with Multiarch Distribution
 
 ## Motivation
 
-[Kpack](https://github.com/ROCm/TheRock/blob/develop/docs/rfcs/rfc0008_kpack.md) (kernel pack) is a binary archive format that separates GPU device code from host code for efficient multi-architecture distribution. Instead of shipping fat binaries that embed kernels for every supported GPU, kpack packages per-architecture `.hsaco` code objects into compressed archives that are loaded at runtime based on the detected GPU.
+rocm_ck is a C++ metaprogramming API for GPU kernel dispatch built on CK Tile. It provides compile-time validated Signature/Algorithm types, operator composition, and multiarch distribution via [kpack](https://github.com/ROCm/TheRock/blob/develop/docs/rfcs/rfc0008_kpack.md) archives.
 
-This project demonstrates how kpack works with CK Tile kernels, progressing from a minimal hello-world to a production-ready pattern with multi-variant tuning and runtime kernel selection.
+Kpack (kernel pack) is the binary archive format that separates GPU device code from host code for efficient multi-architecture distribution. Instead of shipping fat binaries that embed kernels for every supported GPU, kpack packages per-architecture `.hsaco` code objects into compressed archives that are loaded at runtime based on the detected GPU.
 
 The core challenge is that CK Tile kernels are C++ template instantiations — host and device code share the same translation unit, and there is no standalone device-only kernel file. The **bridge pattern** (introduced in example 02) solves this with a thin `extern "C" __global__` wrapper that delegates to CK Tile on-device, cleanly separating compilation: device code compiles with CK Tile headers, the host binary only needs HIP runtime and kpack.
 
 ## Examples
 
-Four progressive examples, each building on the last:
+Progressive examples, each building on the last:
 
 | Example | What it demonstrates |
 |---------|---------------------|
-| [01_hello_world](examples/01_hello_world/) | Minimal kpack pipeline — hand-written HIP kernel, one binary per arch |
+| [01_hello_world](examples/01_hello_world/) | Minimal multiarch pipeline — hand-written HIP kernel, one binary per arch |
 | [02_ck_tile_vector_add](examples/02_ck_tile_vector_add/) | Bridge pattern — `extern "C"` wrapper around CK Tile's `ElementWiseKernel` |
 | [03_rocm_ck_vector_add](examples/03_rocm_ck_vector_add/) | Full tuning surface — Signature/Algorithm split, 12 compiled variants, registry-based selection |
 | [04_gemm](examples/04_gemm/) | GEMM with multi-type variants — operator-centric Signature, fp32/fp16/bf16, composed epilogue |
@@ -69,7 +69,7 @@ host executable  (variant selection → hipModuleLoadData → hipModuleLaunchKer
 ## Directory Structure
 
 ```text
-experimental/kpack/
+experimental/rocm_ck/
 ├── CMakeLists.txt                  # Top-level (delegates to include/ and examples)
 ├── README.md
 ├── include/                        # Shared host-side headers (header-only)
@@ -150,7 +150,7 @@ experimental/kpack/
 Each example is standalone — build from its directory:
 
 ```bash
-cd experimental/kpack/examples/01_hello_world  # or 02_, 03_, 04_
+cd experimental/rocm_ck/examples/01_hello_world  # or 02_, 03_, 04_
 
 cmake -B build -S . -G Ninja \
     -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++ \

@@ -1,10 +1,9 @@
 # Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 #
-# Kpack experiment — see examples/01_hello_world/ for a standalone build.
+# rocm_ck — CK Tile kernel APIs with multiarch distribution.
 #
-# The 01_hello_world example has its own CMakeLists.txt and can be built
-# independently. Build it directly:
+# Each example has its own CMakeLists.txt and can be built independently:
 #
 #   cd examples/01_hello_world
 #   cmake -B build -S . -G Ninja \
@@ -14,7 +13,7 @@
 #   ninja -C build
 
 cmake_minimum_required(VERSION 3.21)
-project(kpack_experiment)
+project(rocm_ck)
 
 add_subdirectory(rocm_kpack)
 add_subdirectory(include)
@@ -22,3 +21,4 @@ add_subdirectory(examples/01_hello_world)
 add_subdirectory(examples/02_ck_tile_vector_add)
 add_subdirectory(examples/03_rocm_ck_vector_add)
 add_subdirectory(examples/04_gemm)
+add_subdirectory(examples/06_rocm_ck_fmha_bwd)

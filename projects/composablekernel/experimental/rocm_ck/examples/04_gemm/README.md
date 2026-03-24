@@ -168,7 +168,7 @@ demonstrates composed epilogue (bias + activation).
 ## Build
 
 ```bash
-cd experimental/kpack/examples/04_gemm
+cd experimental/rocm_ck/examples/04_gemm
 cmake -B build -S . -G Ninja \
     -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++ \
     -DCMAKE_PREFIX_PATH=/opt/rocm \
