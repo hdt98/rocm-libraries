@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2018-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,8 +31,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <initializer_list>
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #include <memory>
 #include <new>
 #include <type_traits>
@@ -785,8 +785,8 @@ public:
         /*         else */
         /*             std::cout << "\n" << std::flush; */
         /* } */
-        const auto precision{std::cout.precision()}; 
-        const std::size_t digits = 8;
+        const auto precision{std::cout.precision()};
+        const std::size_t digits = 3;
         std::cout << std::setw(digits) << std::scientific;
         for(I i = 0; i < nrows_; ++i)
         {
@@ -1239,8 +1239,7 @@ auto imag(const HostMatrix_<T, I>& A)
 }
 
 template <template <typename, typename> class HostMatrix_, typename T, typename I>
-auto qr(const HostMatrix_<T, I>& A)
-    -> std::tuple<HostMatrix_<T, I> /* Q */, HostMatrix_<T, I> /* R */>
+auto qr(const HostMatrix_<T, I>& A) -> std::tuple<HostMatrix_<T, I> /* Q */, HostMatrix_<T, I> /* R */>
 {
     I nrows = A.nrows();
     I ncols = A.ncols();
