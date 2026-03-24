@@ -5313,8 +5313,8 @@ class KernelWriterAssembly(KernelWriter):
       module.add(SLShiftLeftB32(dst=sgpr("StaggerUIter"), src=sgpr("StaggerUIter"), \
                 shiftHex=sgpr(staggerUStrideShift), comment="shift by StaggerUStride"))
 
-      skComponent = Component.StreamK.find(self)
-      module.add(skComponent.declareStaggerParms(self, kernel))
+    skComponent = Component.StreamK.find(self)
+    module.add(skComponent.declareStaggerParms(self, kernel))
 
     return module
 
