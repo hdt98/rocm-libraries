@@ -59,6 +59,10 @@ struct TiledIm2ColMetadata
     index_t DW;           // ConvDilationW
     index_t PH;           // InLeftPadH
     index_t PW;           // InLeftPadW
+
+    // ---- GEMM bounds (replaces pad_tensor_view OOB handling) ----
+    index_t M_gemm;       // N * Ho * Wo  — elements beyond this in M are OOB
+    index_t K_gemm;       // Y * X * C    — elements beyond this in K are OOB
 };
 
 // ============================================================================
@@ -117,10 +121,12 @@ struct TiledIm2ColCoordinate
         // K_offset: depends only on k_gemm
         K_offset = y * meta.DH_HiStride + x * meta.DW_WiStride + c_conv;
 
-        // Validity: ih = ho*SH + y*DH - PH, iw = wo*SW + x*DW - PW
+        // Validity: GEMM bounds + spatial padding check
+        // ih = ho*SH + y*DH - PH, iw = wo*SW + x*DW - PW
         const index_t ih = ho * meta.SH + y * meta.DH - meta.PH;
         const index_t iw = wo * meta.SW + x * meta.DW - meta.PW;
-        valid = (ih >= 0 && ih < meta.Hi) && (iw >= 0 && iw < meta.Wi);
+        valid = (m < meta.M_gemm) && (k < meta.K_gemm) &&
+                (ih >= 0 && ih < meta.Hi) && (iw >= 0 && iw < meta.Wi);
     }
 
     // -------------------------------------------------------------------------
@@ -144,13 +150,14 @@ struct TiledIm2ColCoordinate
             const index_t c_conv = rem_k % meta.C;
             K_offset = y * meta.DH_HiStride + x * meta.DW_WiStride + c_conv;
 
-            // Validity: only K changes, M validity unchanged, recheck K part
+            // Validity: K bounds + spatial padding (M_gemm bound unchanged from init)
             const index_t rem_m = m_gemm % meta.HoWo;
             const index_t ho    = rem_m / meta.Wo;
             const index_t wo    = rem_m % meta.Wo;
             const index_t ih    = ho * meta.SH + y * meta.DH - meta.PH;
             const index_t iw    = wo * meta.SW + x * meta.DW - meta.PW;
-            valid = (ih >= 0 && ih < meta.Hi) && (iw >= 0 && iw < meta.Wi);
+            valid = (k_gemm < meta.K_gemm) &&
+                    (ih >= 0 && ih < meta.Hi) && (iw >= 0 && iw < meta.Wi);
         }
         else
         {

@@ -887,8 +887,10 @@ TEST_F(Im2colTiledCoordinate, MetadataConstants)
     EXPECT_EQ(meta.SW,  p.SW);
     EXPECT_EQ(meta.DH,  p.DH);
     EXPECT_EQ(meta.DW,  p.DW);
-    EXPECT_EQ(meta.PH,  p.PH);
-    EXPECT_EQ(meta.PW,  p.PW);
+    EXPECT_EQ(meta.PH,     p.PH);
+    EXPECT_EQ(meta.PW,     p.PW);
+    EXPECT_EQ(meta.M_gemm, p.M_gemm());
+    EXPECT_EQ(meta.K_gemm, p.K_gemm());
 }
 
 TEST_F(Im2colTiledCoordinate, MetadataConstantsWithPadding)
@@ -979,6 +981,36 @@ TEST_F(Im2colTiledCoordinate, InitWithDilation2)
             coord.init(m, k, meta);
             EXPECT_EQ(coord.get_offset(), ref) << "m=" << m << " k=" << k;
         }
+}
+
+// ---- 8b-extra. GEMM bounds: indices at/beyond M_gemm or K_gemm must be invalid ---
+// This covers the case where pad_tensor_view is bypassed and OOB is handled
+// entirely by TiledIm2ColCoordinate::is_valid().
+
+TEST_F(Im2colTiledCoordinate, GemmBoundsInvalid)
+{
+    auto v2   = make_v2_transformer(p);
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+
+    // m == M_gemm (first padded M row) must be invalid
+    {
+        TiledIm2ColCoordinate coord;
+        coord.init(p.M_gemm(), 0, meta);
+        EXPECT_FALSE(coord.is_valid()) << "m=M_gemm should be invalid";
+    }
+    // k == K_gemm (first padded K column) must be invalid
+    {
+        TiledIm2ColCoordinate coord;
+        coord.init(0, p.K_gemm(), meta);
+        EXPECT_FALSE(coord.is_valid()) << "k=K_gemm should be invalid";
+    }
+    // After move_step(0, dk) that lands k >= K_gemm, must be invalid
+    {
+        TiledIm2ColCoordinate coord;
+        coord.init(0, 0, meta);
+        coord.move_step(0, p.K_gemm(), meta); // jump to k=K_gemm
+        EXPECT_FALSE(coord.is_valid()) << "k=K_gemm after move_step should be invalid";
+    }
 }
 
 // ---- 8c. TiledIm2ColCoordinate::move_step() for K-only moves ---

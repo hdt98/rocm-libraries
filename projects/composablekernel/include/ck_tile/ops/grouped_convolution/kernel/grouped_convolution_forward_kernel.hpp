@@ -895,20 +895,27 @@ struct GroupedConvolutionForwardKernel
     CK_TILE_DEVICE static auto
     MakeABlockWindow(const InDataType* a_ptr, const ADescType& a_desc, const index_t block_idx_m)
     {
-        // Step 1: Create tensor view
+        constexpr auto tile_shape =
+            make_tuple(number<TilePartitioner::MPerBlock>{}, number<TilePartitioner::KPerBlock>{});
+
         const auto& a_tensor_view = make_tensor_view<address_space_enum::global>(a_ptr, a_desc);
 
-        // Step 2: Create padded view
-        const auto& a_pad_view = pad_tensor_view(
-            a_tensor_view,
-            make_tuple(number<TilePartitioner::MPerBlock>{}, number<TilePartitioner::KPerBlock>{}),
-            sequence<true, true>{});
-
-        // Step 3: Create tile window
-        return make_tile_window(
-            a_pad_view,
-            make_tuple(number<TilePartitioner::MPerBlock>{}, number<TilePartitioner::KPerBlock>{}),
-            {block_idx_m, 0});
+        if constexpr(has_im2col_meta_v<ADescType>)
+        {
+            // Tiled im2col path: GEMM OOB is handled by TiledIm2ColCoordinate::is_valid()
+            // (which checks m < M_gemm && k < K_gemm in addition to padding validity).
+            // Skipping pad_tensor_view keeps the descriptor type as TiledIm2ColDescriptor so
+            // that make_tensor_coordinate returns a TiledIm2ColCoordinate and the fast path
+            // in move_tensor_coordinate / coordinate_has_valid_offset is actually reached.
+            return make_tile_window(a_tensor_view, tile_shape, {block_idx_m, 0});
+        }
+        else
+        {
+            // Generic path: use pad_tensor_view for GEMM boundary handling.
+            const auto& a_pad_view =
+                pad_tensor_view(a_tensor_view, tile_shape, sequence<true, true>{});
+            return make_tile_window(a_pad_view, tile_shape, {block_idx_m, 0});
+        }
     }
 
     template <typename BDescType>

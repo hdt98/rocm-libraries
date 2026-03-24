@@ -1002,6 +1002,8 @@ struct TransformConvFwdToGemm_V2
         meta.DW          = static_cast<index_t>(ConvDilationW_);
         meta.PH          = static_cast<index_t>(InLeftPadH_);
         meta.PW          = static_cast<index_t>(InLeftPadW_);
+        meta.M_gemm      = static_cast<index_t>(N_ * Ho_ * Wo_);
+        meta.K_gemm      = static_cast<index_t>(Y_ * X_ * C_);
         return meta;
     }
 
