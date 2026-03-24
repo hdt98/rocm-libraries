@@ -1,0 +1,103 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
+
+#include <gtest/gtest.h>
+
+#include "ck_tile/host.hpp"
+#include "ck_tile/ops/common.hpp"
+#include "kernel.hpp"
+
+// Enum struct specifying what kind of test matrix to use
+enum struct TestMatrixType
+{
+    MonotonicSequence   = 0,
+    Identity            = 1,
+    UniformDistribution = 2
+};
+
+static constexpr auto matrix_type = TestMatrixType::UniformDistribution;
+
+#define PRINT_MATRICES 0
+
+template <typename Tuple>
+class TestLoadAndConvert : public ::testing::Test
+{
+    public:
+    using XDataType     = std::tuple_element_t<0, Tuple>;
+    using YDataType     = std::tuple_element_t<1, Tuple>;
+    using LoadTranspose = std::tuple_element_t<2, Tuple>;
+
+    protected:
+    void RunTest()
+    {
+        constexpr ck_tile::index_t M = 32;
+        constexpr ck_tile::index_t N = 32;
+        constexpr ck_tile::index_t K = 32;
+
+        ck_tile::HostTensor<XDataType> h_a({M, K});
+        ck_tile::HostTensor<YDataType> h_c({M, K});
+
+        if constexpr(matrix_type == TestMatrixType::MonotonicSequence)
+        {
+            ck_tile::HostTensor<float> h_a_tmp({M, K});
+            ck_tile::FillMonotonicSeq<float>{0.0, 0.1}(h_a_tmp);
+            ck_tile::reference_unary_elementwise<float, XDataType, float>(
+                h_a_tmp, h_a, [](const auto& x) { return x; });
+        }
+        else if constexpr(matrix_type == TestMatrixType::Identity)
+        {
+            ck_tile::FillIdentity<XDataType>{M, K}(h_a);
+        }
+        else
+        {
+            ck_tile::FillUniformDistributionIntegerValue<XDataType>{-5.0, 5.0}(h_a);
+        }
+
+        ck_tile::DeviceMem d_a(h_a.get_element_space_size_in_bytes());
+        ck_tile::DeviceMem d_c(h_c.get_element_space_size_in_bytes());
+
+        d_a.ToDevice(h_a.data());
+        d_c.ToDevice(h_c.data());
+
+        using BlockWarps = ck_tile::sequence<1, 1, 1>;
+        using BlockTile  = ck_tile::sequence<32, 32, 16>;
+        using WarpTile   = ck_tile::sequence<32, 32, 16>;
+        using Vector     = ck_tile::sequence<1, 8>;
+
+        using Shape   = ck_tile::LoadAndConvertShape<BlockWarps, BlockTile, WarpTile, Vector>;
+        using Problem = ck_tile::LoadAndConvertProblem<XDataType, YDataType, Shape, LoadTranspose>;
+        using Kernel  = ck_tile::LoadAndConvertKernel<Problem>;
+
+        constexpr ck_tile::index_t block_size = Kernel::kBlockSize;
+        const ck_tile::index_t grid_size      = ck_tile::integer_divide_ceil(M, Shape::Block_M) *
+                                           ck_tile::integer_divide_ceil(N, Shape::Block_N);
+
+        launch_kernel(ck_tile::stream_config{nullptr, true},
+                      make_kernel<block_size>(Kernel{},
+                                              dim3(grid_size),
+                                              dim3(block_size),
+                                              0,
+                                              static_cast<const XDataType*>(d_a.GetDeviceBuffer()),
+                                              static_cast<YDataType*>(d_c.GetDeviceBuffer()),
+                                              M,
+                                              N,
+                                              K));
+
+        ck_tile::hip_check_error(hipDeviceSynchronize());
+        d_c.FromDevice(h_c.data());
+        ck_tile::HostTensor<YDataType> h_a_ref({M, K});
+        ck_tile::reference_unary_elementwise<XDataType, YDataType, float>(
+            h_a, h_a_ref, [](const auto& x) { return x; });
+        bool pass = ck_tile::check_err(h_c, h_a_ref);
+
+#if PRINT_MATRICES
+        auto [width, precision] = matrix_type == TestMatrixType::MonotonicSequence
+                                      ? std::make_pair(3, 3)
+                                      : std::make_pair(2, 6);
+        print_matrix(h_a, "Matrix A", width, precision);
+        print_matrix(h_c, "Matrix C", width, precision);
+#endif
+
+        EXPECT_TRUE(pass);
+    }
+};
