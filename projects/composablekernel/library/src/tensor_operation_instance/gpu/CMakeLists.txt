@@ -219,6 +219,16 @@ file(GLOB dir_list LIST_DIRECTORIES true *)
 set(CK_DEVICE_OTHER_INSTANCES)
 set(CK_DEVICE_GEMM_INSTANCES)
 set(CK_DEVICE_CONV_INSTANCES)
+# Split convolution libraries by layout
+set(CK_DEVICE_CONV_GNWC_INSTANCES)
+set(CK_DEVICE_CONV_NWGC_INSTANCES)
+set(CK_DEVICE_CONV_NHWGC_INSTANCES)
+set(CK_DEVICE_CONV_NGCHW_INSTANCES)
+set(CK_DEVICE_CONV_GNHWC_INSTANCES)
+set(CK_DEVICE_CONV_GNDHWC_INSTANCES)
+set(CK_DEVICE_CONV_NDHWGC_INSTANCES)
+set(CK_DEVICE_CONV_NGCDHW_INSTANCES)
+set(CK_DEVICE_CONV_OLD_INSTANCES)
 set(CK_DEVICE_MHA_INSTANCES)
 set(CK_DEVICE_CONTRACTION_INSTANCES)
 set(CK_DEVICE_REDUCTION_INSTANCES)
@@ -339,7 +349,7 @@ FOREACH(subdir_path ${dir_list})
         set(required_pattern "")
         set(pattern_parts "")
         if(MIOPEN_REQ_LIBS_ONLY)
-            message(STATUS "Removing all sources that are not required for MIOpen")
+            message(STATUS "Building only convolution layouts required for MIOpen: nhwgc, ndhwgc, and old convolutions")
             list(APPEND pattern_parts "conv")
         endif()
         if(HIPTENSOR_REQ_LIBS_ONLY)
@@ -361,7 +371,96 @@ FOREACH(subdir_path ${dir_list})
                 if("${cmake_instance}" MATCHES "gemm")
                     list(APPEND CK_DEVICE_GEMM_INSTANCES $<TARGET_OBJECTS:device_${target_dir}_instance>)
                 elseif("${cmake_instance}" MATCHES "conv")
-                    list(APPEND CK_DEVICE_CONV_INSTANCES $<TARGET_OBJECTS:device_${target_dir}_instance>)
+                    # Categorize convolutions by layout for split libraries
+                    # Check file contents to determine layout
+                    file(GLOB_RECURSE conv_files "${subdir_path}/*.cpp" "${subdir_path}/*.in")
+                    set(has_gnwc 0)
+                    set(has_nwgc 0)
+                    set(has_gnhwc 0)
+                    set(has_nhwgc 0)
+                    set(has_ngchw 0)
+                    set(has_gndhwc 0)
+                    set(has_ndhwgc 0)
+                    set(has_ngcdhw 0)
+                    set(is_old_conv 0)
+                    foreach(conv_file ${conv_files})
+                        get_filename_component(filename ${conv_file} NAME)
+                        if("${filename}" MATCHES "gnwc")
+                            set(has_gnwc 1)
+                        endif()
+                        if("${filename}" MATCHES "nwgc")
+                            set(has_nwgc 1)
+                        endif()
+                        if("${filename}" MATCHES "gnhwc")
+                            set(has_gnhwc 1)
+                        endif()
+                        if("${filename}" MATCHES "nhwgc")
+                            set(has_nhwgc 1)
+                        endif()
+                        if("${filename}" MATCHES "ngchw")
+                            set(has_ngchw 1)
+                        endif()
+                        if("${filename}" MATCHES "gndhwc")
+                            set(has_gndhwc 1)
+                        endif()
+                        if("${filename}" MATCHES "ndhwgc")
+                            set(has_ndhwgc 1)
+                        endif()
+                        if("${filename}" MATCHES "ngcdhw")
+                            set(has_ngcdhw 1)
+                        endif()
+                    endforeach()
+                    # Old-style convolutions (non-grouped or without specific layout patterns)
+                    if(NOT has_gnwc AND NOT has_nwgc AND NOT has_gnhwc AND NOT has_nhwgc AND
+                       NOT has_ngchw AND NOT has_gndhwc AND NOT has_ndhwgc AND NOT has_ngcdhw)
+                        set(is_old_conv 1)
+                    endif()
+
+                    # When building for MIOpen only, skip instances not needed by MIOpen
+                    # MIOpen needs: nhwgc (2D), ndhwgc (3D), and old convolutions
+                    set(needed_for_miopen 0)
+                    if(MIOPEN_REQ_LIBS_ONLY)
+                        if(has_nhwgc OR has_ndhwgc OR is_old_conv)
+                            set(needed_for_miopen 1)
+                        endif()
+                    else()
+                        # Build all convolutions when not restricting to MIOpen
+                        set(needed_for_miopen 1)
+                    endif()
+
+                    # Only add to lists if this instance is needed
+                    if(needed_for_miopen)
+                        list(APPEND CK_DEVICE_CONV_INSTANCES $<TARGET_OBJECTS:device_${target_dir}_instance>)
+
+                        # Append to appropriate split library lists
+                        if(has_gnwc)
+                            list(APPEND CK_DEVICE_CONV_GNWC_INSTANCES $<TARGET_OBJECTS:device_${target_dir}_instance>)
+                        endif()
+                        if(has_nwgc)
+                            list(APPEND CK_DEVICE_CONV_NWGC_INSTANCES $<TARGET_OBJECTS:device_${target_dir}_instance>)
+                        endif()
+                        if(has_gnhwc)
+                            list(APPEND CK_DEVICE_CONV_GNHWC_INSTANCES $<TARGET_OBJECTS:device_${target_dir}_instance>)
+                        endif()
+                        if(has_nhwgc)
+                            list(APPEND CK_DEVICE_CONV_NHWGC_INSTANCES $<TARGET_OBJECTS:device_${target_dir}_instance>)
+                        endif()
+                        if(has_ngchw)
+                            list(APPEND CK_DEVICE_CONV_NGCHW_INSTANCES $<TARGET_OBJECTS:device_${target_dir}_instance>)
+                        endif()
+                        if(has_gndhwc)
+                            list(APPEND CK_DEVICE_CONV_GNDHWC_INSTANCES $<TARGET_OBJECTS:device_${target_dir}_instance>)
+                        endif()
+                        if(has_ndhwgc)
+                            list(APPEND CK_DEVICE_CONV_NDHWGC_INSTANCES $<TARGET_OBJECTS:device_${target_dir}_instance>)
+                        endif()
+                        if(has_ngcdhw)
+                            list(APPEND CK_DEVICE_CONV_NGCDHW_INSTANCES $<TARGET_OBJECTS:device_${target_dir}_instance>)
+                        endif()
+                        if(is_old_conv)
+                            list(APPEND CK_DEVICE_CONV_OLD_INSTANCES $<TARGET_OBJECTS:device_${target_dir}_instance>)
+                        endif()
+                    endif()
                 elseif("${cmake_instance}" MATCHES "mha")
                     list(APPEND CK_DEVICE_MHA_INSTANCES $<TARGET_OBJECTS:device_${target_dir}_instance>)
                 elseif("${cmake_instance}" MATCHES "contr")
@@ -438,7 +537,7 @@ if(CK_DEVICE_GEMM_INSTANCES AND NOT MIOPEN_REQ_LIBS_ONLY AND NOT HIPTENSOR_REQ_L
             DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
         )
 endif()
-if(CK_DEVICE_CONV_INSTANCES AND (NOT HIPTENSOR_REQ_LIBS_ONLY OR MIOPEN_REQ_LIBS_ONLY))
+if(CK_DEVICE_CONV_INSTANCES AND NOT HIPTENSOR_REQ_LIBS_ONLY AND NOT MIOPEN_REQ_LIBS_ONLY)
         add_library(device_conv_operations ${CK_DEVICE_CONV_INSTANCES})
         add_library(composablekernels::device_conv_operations ALIAS device_conv_operations)
         target_compile_features(device_conv_operations PUBLIC)
@@ -463,6 +562,244 @@ if(CK_DEVICE_CONV_INSTANCES AND (NOT HIPTENSOR_REQ_LIBS_ONLY OR MIOPEN_REQ_LIBS_
             DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
         )
 endif()
+
+# Split convolution libraries by layout - 1D GNWC (not needed by MIOpen)
+if(CK_DEVICE_CONV_GNWC_INSTANCES AND NOT HIPTENSOR_REQ_LIBS_ONLY AND NOT MIOPEN_REQ_LIBS_ONLY)
+        add_library(device_conv_gnwc_operations ${CK_DEVICE_CONV_GNWC_INSTANCES})
+        add_library(composablekernels::device_conv_gnwc_operations ALIAS device_conv_gnwc_operations)
+        target_compile_features(device_conv_gnwc_operations PUBLIC)
+        set_target_properties(device_conv_gnwc_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        set_target_properties(device_conv_gnwc_operations
+            PROPERTIES
+            VERSION ${CMAKE_PROJECT_VERSION}
+            SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
+        )
+        target_include_directories(device_conv_gnwc_operations PUBLIC
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/conv_tensor_rearrange>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_weight>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_fwd>
+        )
+        rocm_install(TARGETS device_conv_gnwc_operations
+            EXPORT device_conv_gnwc_operationsTargets)
+        rocm_install(EXPORT device_conv_gnwc_operationsTargets
+            FILE composable_kerneldevice_conv_gnwc_operationsTargets.cmake
+            NAMESPACE composable_kernel::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
+        )
+endif()
+
+# Split convolution libraries by layout - 1D NWGC (not needed by MIOpen)
+if(CK_DEVICE_CONV_NWGC_INSTANCES AND NOT HIPTENSOR_REQ_LIBS_ONLY AND NOT MIOPEN_REQ_LIBS_ONLY)
+        add_library(device_conv_nwgc_operations ${CK_DEVICE_CONV_NWGC_INSTANCES})
+        add_library(composablekernels::device_conv_nwgc_operations ALIAS device_conv_nwgc_operations)
+        target_compile_features(device_conv_nwgc_operations PUBLIC)
+        set_target_properties(device_conv_nwgc_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        set_target_properties(device_conv_nwgc_operations
+            PROPERTIES
+            VERSION ${CMAKE_PROJECT_VERSION}
+            SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
+        )
+        target_include_directories(device_conv_nwgc_operations PUBLIC
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/conv_tensor_rearrange>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_weight>
+        )
+        rocm_install(TARGETS device_conv_nwgc_operations
+            EXPORT device_conv_nwgc_operationsTargets)
+        rocm_install(EXPORT device_conv_nwgc_operationsTargets
+            FILE composable_kerneldevice_conv_nwgc_operationsTargets.cmake
+            NAMESPACE composable_kernel::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
+        )
+endif()
+
+# Split convolution libraries by layout - 2D NHWGC (needed by MIOpen)
+if(CK_DEVICE_CONV_NHWGC_INSTANCES AND NOT HIPTENSOR_REQ_LIBS_ONLY)
+        add_library(device_conv_nhwgc_operations ${CK_DEVICE_CONV_NHWGC_INSTANCES})
+        add_library(composablekernels::device_conv_nhwgc_operations ALIAS device_conv_nhwgc_operations)
+        target_compile_features(device_conv_nhwgc_operations PUBLIC)
+        set_target_properties(device_conv_nhwgc_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        set_target_properties(device_conv_nhwgc_operations
+            PROPERTIES
+            VERSION ${CMAKE_PROJECT_VERSION}
+            SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
+        )
+        target_include_directories(device_conv_nhwgc_operations PUBLIC
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/conv_tensor_rearrange>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_data>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_weight>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_fwd>
+        )
+        rocm_install(TARGETS device_conv_nhwgc_operations
+            EXPORT device_conv_nhwgc_operationsTargets)
+        rocm_install(EXPORT device_conv_nhwgc_operationsTargets
+            FILE composable_kerneldevice_conv_nhwgc_operationsTargets.cmake
+            NAMESPACE composable_kernel::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
+        )
+endif()
+
+# Split convolution libraries by layout - 2D NGCHW (not needed by MIOpen)
+if(CK_DEVICE_CONV_NGCHW_INSTANCES AND NOT HIPTENSOR_REQ_LIBS_ONLY AND NOT MIOPEN_REQ_LIBS_ONLY)
+        add_library(device_conv_ngchw_operations ${CK_DEVICE_CONV_NGCHW_INSTANCES})
+        add_library(composablekernels::device_conv_ngchw_operations ALIAS device_conv_ngchw_operations)
+        target_compile_features(device_conv_ngchw_operations PUBLIC)
+        set_target_properties(device_conv_ngchw_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        set_target_properties(device_conv_ngchw_operations
+            PROPERTIES
+            VERSION ${CMAKE_PROJECT_VERSION}
+            SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
+        )
+        target_include_directories(device_conv_ngchw_operations PUBLIC
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/conv_tensor_rearrange>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_data>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_weight>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_fwd>
+        )
+        rocm_install(TARGETS device_conv_ngchw_operations
+            EXPORT device_conv_ngchw_operationsTargets)
+        rocm_install(EXPORT device_conv_ngchw_operationsTargets
+            FILE composable_kerneldevice_conv_ngchw_operationsTargets.cmake
+            NAMESPACE composable_kernel::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
+        )
+endif()
+
+# Split convolution libraries by layout - 2D GNHWC (not needed by MIOpen)
+if(CK_DEVICE_CONV_GNHWC_INSTANCES AND NOT HIPTENSOR_REQ_LIBS_ONLY AND NOT MIOPEN_REQ_LIBS_ONLY)
+        add_library(device_conv_gnhwc_operations ${CK_DEVICE_CONV_GNHWC_INSTANCES})
+        add_library(composablekernels::device_conv_gnhwc_operations ALIAS device_conv_gnhwc_operations)
+        target_compile_features(device_conv_gnhwc_operations PUBLIC)
+        set_target_properties(device_conv_gnhwc_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        set_target_properties(device_conv_gnhwc_operations
+            PROPERTIES
+            VERSION ${CMAKE_PROJECT_VERSION}
+            SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
+        )
+        target_include_directories(device_conv_gnhwc_operations PUBLIC
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/conv_tensor_rearrange>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_data>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_weight>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_fwd>
+        )
+        rocm_install(TARGETS device_conv_gnhwc_operations
+            EXPORT device_conv_gnhwc_operationsTargets)
+        rocm_install(EXPORT device_conv_gnhwc_operationsTargets
+            FILE composable_kerneldevice_conv_gnhwc_operationsTargets.cmake
+            NAMESPACE composable_kernel::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
+        )
+endif()
+
+# Split convolution libraries by layout - 3D GNDHWC (not needed by MIOpen)
+if(CK_DEVICE_CONV_GNDHWC_INSTANCES AND NOT HIPTENSOR_REQ_LIBS_ONLY AND NOT MIOPEN_REQ_LIBS_ONLY)
+        add_library(device_conv_gndhwc_operations ${CK_DEVICE_CONV_GNDHWC_INSTANCES})
+        add_library(composablekernels::device_conv_gndhwc_operations ALIAS device_conv_gndhwc_operations)
+        target_compile_features(device_conv_gndhwc_operations PUBLIC)
+        set_target_properties(device_conv_gndhwc_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        set_target_properties(device_conv_gndhwc_operations
+            PROPERTIES
+            VERSION ${CMAKE_PROJECT_VERSION}
+            SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
+        )
+        target_include_directories(device_conv_gndhwc_operations PUBLIC
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/conv_tensor_rearrange>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_data>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_weight>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_fwd>
+        )
+        rocm_install(TARGETS device_conv_gndhwc_operations
+            EXPORT device_conv_gndhwc_operationsTargets)
+        rocm_install(EXPORT device_conv_gndhwc_operationsTargets
+            FILE composable_kerneldevice_conv_gndhwc_operationsTargets.cmake
+            NAMESPACE composable_kernel::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
+        )
+endif()
+
+# Split convolution libraries by layout - 3D NDHWGC (needed by MIOpen)
+if(CK_DEVICE_CONV_NDHWGC_INSTANCES AND NOT HIPTENSOR_REQ_LIBS_ONLY)
+        add_library(device_conv_ndhwgc_operations ${CK_DEVICE_CONV_NDHWGC_INSTANCES})
+        add_library(composablekernels::device_conv_ndhwgc_operations ALIAS device_conv_ndhwgc_operations)
+        target_compile_features(device_conv_ndhwgc_operations PUBLIC)
+        set_target_properties(device_conv_ndhwgc_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        set_target_properties(device_conv_ndhwgc_operations
+            PROPERTIES
+            VERSION ${CMAKE_PROJECT_VERSION}
+            SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
+        )
+        target_include_directories(device_conv_ndhwgc_operations PUBLIC
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/conv_tensor_rearrange>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_data>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_weight>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_fwd>
+        )
+        rocm_install(TARGETS device_conv_ndhwgc_operations
+            EXPORT device_conv_ndhwgc_operationsTargets)
+        rocm_install(EXPORT device_conv_ndhwgc_operationsTargets
+            FILE composable_kerneldevice_conv_ndhwgc_operationsTargets.cmake
+            NAMESPACE composable_kernel::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
+        )
+endif()
+
+# Split convolution libraries by layout - 3D NGCDHW (not needed by MIOpen)
+if(CK_DEVICE_CONV_NGCDHW_INSTANCES AND NOT HIPTENSOR_REQ_LIBS_ONLY AND NOT MIOPEN_REQ_LIBS_ONLY)
+        add_library(device_conv_ngcdhw_operations ${CK_DEVICE_CONV_NGCDHW_INSTANCES})
+        add_library(composablekernels::device_conv_ngcdhw_operations ALIAS device_conv_ngcdhw_operations)
+        target_compile_features(device_conv_ngcdhw_operations PUBLIC)
+        set_target_properties(device_conv_ngcdhw_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        set_target_properties(device_conv_ngcdhw_operations
+            PROPERTIES
+            VERSION ${CMAKE_PROJECT_VERSION}
+            SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
+        )
+        target_include_directories(device_conv_ngcdhw_operations PUBLIC
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/conv_tensor_rearrange>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_data>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_weight>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_fwd>
+        )
+        rocm_install(TARGETS device_conv_ngcdhw_operations
+            EXPORT device_conv_ngcdhw_operationsTargets)
+        rocm_install(EXPORT device_conv_ngcdhw_operationsTargets
+            FILE composable_kerneldevice_conv_ngcdhw_operationsTargets.cmake
+            NAMESPACE composable_kernel::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
+        )
+endif()
+
+# Old-style convolution operations (needed by MIOpen)
+if(CK_DEVICE_CONV_OLD_INSTANCES AND NOT HIPTENSOR_REQ_LIBS_ONLY)
+        add_library(device_conv_old_operations ${CK_DEVICE_CONV_OLD_INSTANCES})
+        add_library(composablekernels::device_conv_old_operations ALIAS device_conv_old_operations)
+        target_compile_features(device_conv_old_operations PUBLIC)
+        set_target_properties(device_conv_old_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        set_target_properties(device_conv_old_operations
+            PROPERTIES
+            VERSION ${CMAKE_PROJECT_VERSION}
+            SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
+        )
+        target_include_directories(device_conv_old_operations PUBLIC
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/conv_tensor_rearrange>
+        )
+        rocm_install(TARGETS device_conv_old_operations
+            EXPORT device_conv_old_operationsTargets)
+        rocm_install(EXPORT device_conv_old_operationsTargets
+            FILE composable_kerneldevice_conv_old_operationsTargets.cmake
+            NAMESPACE composable_kernel::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
+        )
+endif()
+
 if(CK_DEVICE_MHA_INSTANCES AND NOT MIOPEN_REQ_LIBS_ONLY AND NOT HIPTENSOR_REQ_LIBS_ONLY AND BUILD_MHA_LIB)
         set(gpu_list ${INST_TARGETS})
         if(gpu_list MATCHES "gfx94" OR gpu_list MATCHES "gfx90a" OR gpu_list MATCHES "gfx95")
