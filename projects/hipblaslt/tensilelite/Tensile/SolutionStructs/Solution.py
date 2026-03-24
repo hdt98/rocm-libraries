@@ -441,6 +441,9 @@ class Solution(collections.abc.Mapping):
       # (3) cvt + sub  (set both (1) and (2) False)
       state["UseMFMAF32XEmulation"] = True # enable MFMA version by default
 
+      state["UseMFMAF32XEmulation"] = False # enable MFMA version by default
+      state["UseDirect32XEmulationInterleaveTreg"] = True # True: enable conventional T reg allocation
+
     state["MfmaInitCVgprs"] = False
 
     # done

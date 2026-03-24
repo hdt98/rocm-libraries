@@ -3436,11 +3436,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
     module.add(skComponent.preLoop(self, kernel))
 
     # MFMA F32XEmulation negative identity matrix
-    if kernel["UseMFMAF32XEmulation"]:
-      module.add(self.createNegIdentityMatrix(kernel))
+    if kernel["UseF32XEmulation"]:
       #module.add(VMovB32(vgpr(self.states.startVgprInfCheck), "0x207", comment="inf check for cmp_class"))
       module.add(VMovB32(vgpr(self.states.startVgprInfCheck), "0x204", comment="inf check for cmp_class"))
       module.add(VMovB32(vgpr(self.states.startVgprInf), "0x7F800000", comment="set to inf"))
+    if kernel["UseMFMAF32XEmulation"]:
+      module.add(self.createNegIdentityMatrix(kernel))
 
     # Open persistent loop
     loopComponent = Component.PersistentLoop.find(self)
@@ -5705,6 +5706,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       vgprIdx = ((vgprIdx+1)//2)*2 #align 64 bit
       self.states.startVgprIdentityMatrix = vgprIdx
       vgprIdx+=2
+    if kernel["UseF32XEmulation"]:
       self.states.startVgprInfCheck = vgprIdx
       vgprIdx+=1
       self.states.startVgprInf = vgprIdx

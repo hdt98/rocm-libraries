@@ -744,6 +744,9 @@ class KernelWriterAssembly(KernelWriter):
     # MFMA case
     if kernel["UseMFMAF32XEmulation"]:
       self.moduleVgprMacroValuB_T.add(RegSet("v", "IdentityMatrix", self.states.startVgprIdentityMatrix, 0))
+    if kernel["UseF32XEmulation"]:
+      self.moduleVgprMacroValuB_T.add(RegSet("v", "InfCheck", self.states.startVgprInfCheck, 0))
+      self.moduleVgprMacroValuB_T.add(RegSet("v", "Inf", self.states.startVgprInf, 0))
 
   def macroAndSet(self, kernel, tPA, tPB) -> Module:
     module = Module("MacroNSet")
