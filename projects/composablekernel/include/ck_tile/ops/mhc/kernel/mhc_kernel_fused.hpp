@@ -184,9 +184,6 @@ struct MHCKernelFused
                                                 make_tuple(number<kNTile>{}, number<kKTile>{}),
                                                 {out_start, k_start});
 
-        // Create the fused pipeline
-        Pipeline pipeline;
-
         // Use full kMTile array
         ComputeDataType norm_accum[kMTile];
         static_for<0, kMTile, 1>{}([&](auto m) { norm_accum[m.value] = 0.0f; });
@@ -245,13 +242,13 @@ struct MHCKernelFused
             current_k_tile++;
         };
 
-        auto c_block_tile = pipeline(x_dram_window,
-                                     PassThrough{},
-                                     phi_dram_window,
-                                     PassThrough{},
-                                     k_tiles_per_block,
-                                     smem_ptr,
-                                     fusion_func);
+        auto c_block_tile = Pipeline{}(x_dram_window,
+                                       PassThrough{},
+                                       phi_dram_window,
+                                       PassThrough{},
+                                       k_tiles_per_block,
+                                       smem_ptr,
+                                       fusion_func);
 
         // After all tiles, reduce norms and store
         __shared__ ComputeDataType norm_sums[kMTile];
@@ -281,7 +278,7 @@ struct MHCKernelFused
 
             // Level 2: Cross-warp reduction using atomics
             // Only lane 0 of each warp writes to shared memory
-            if((thread_id % get_warp_size()) == 0 && partial_sum != 0.0f)
+            if(get_lane_id() == 0 && partial_sum != 0.0f)
                 atomicAdd(&norm_sums[m], partial_sum);
         }
         block_sync_lds();

@@ -147,10 +147,16 @@ bool run_mhc(const ck_tile::ArgParser& arg_parser)
     const ck_tile::index_t sinkhorn_blocks  = (B + sinkhorn_threads - 1) / sinkhorn_threads;
 
     // 3-stage kernel launch: GEMM -> Reduction -> Sinkhorn
-    auto launch_combined = [&]() {
-        // Stage 1: Launch split-K GEMM kernel with Fused Pipeline
-        ck_tile::launch_kernel(
-            ck_tile::stream_config{nullptr, false},
+    ck_tile::stream_config stream_cfg{nullptr, true};
+    stream_cfg.cold_niters_ = warmup;
+    stream_cfg.nrepeat_     = repeat;
+
+    float ave_time = 0.0f;
+    if(sinkhorn_iters > 0)
+    {
+        // Launch all three stages together
+        ave_time = ck_tile::launch_kernel(
+            stream_cfg,
             ck_tile::make_kernel<kBlockPerCu>(
                 Kernel{},
                 kGridSize,
@@ -162,11 +168,52 @@ bool run_mhc(const ck_tile::ArgParser& arg_parser)
                 static_cast<ComputeDataType*>(d_partial_norms_mem.GetDeviceBuffer()),
                 B,
                 nC,
-                output_dim));
-
-        // Stage 2: Launch reduction kernel
-        ck_tile::launch_kernel(
-            ck_tile::stream_config{nullptr, false},
+                output_dim),
+            ck_tile::make_kernel<kBlockPerCu>(
+                ReductionKernel{},
+                reduction_blocks,
+                reduction_threads,
+                0,
+                static_cast<ComputeDataType*>(d_workspace_mem.GetDeviceBuffer()),
+                static_cast<ComputeDataType*>(d_partial_norms_mem.GetDeviceBuffer()),
+                static_cast<YDataType*>(d_output_mem.GetDeviceBuffer()),
+                B,
+                nC,
+                output_dim,
+                n,
+                grid_k,
+                alpha_pre,
+                alpha_post,
+                alpha_res,
+                bias),
+            ck_tile::make_kernel<kBlockPerCu>(
+                SinkhornKernel{},
+                sinkhorn_blocks,
+                sinkhorn_threads,
+                0,
+                static_cast<YDataType*>(d_output_mem.GetDeviceBuffer()),
+                B,
+                output_dim,
+                n,
+                sinkhorn_iters));
+    }
+    else
+    {
+        // Launch only GEMM and Reduction stages
+        ave_time = ck_tile::launch_kernel(
+            stream_cfg,
+            ck_tile::make_kernel<kBlockPerCu>(
+                Kernel{},
+                kGridSize,
+                kBlockSize,
+                kSmemSize,
+                static_cast<XDataType*>(d_x_mem.GetDeviceBuffer()),
+                static_cast<PhiDataType*>(d_phi_mem.GetDeviceBuffer()),
+                static_cast<ComputeDataType*>(d_workspace_mem.GetDeviceBuffer()),
+                static_cast<ComputeDataType*>(d_partial_norms_mem.GetDeviceBuffer()),
+                B,
+                nC,
+                output_dim),
             ck_tile::make_kernel<kBlockPerCu>(
                 ReductionKernel{},
                 reduction_blocks,
@@ -184,49 +231,7 @@ bool run_mhc(const ck_tile::ArgParser& arg_parser)
                 alpha_post,
                 alpha_res,
                 bias));
-
-        // Stage 3: Launch Sinkhorn kernel if enabled
-        if(sinkhorn_iters > 0)
-        {
-            ck_tile::launch_kernel(ck_tile::stream_config{nullptr, false},
-                                   ck_tile::make_kernel<kBlockPerCu>(
-                                       SinkhornKernel{},
-                                       sinkhorn_blocks,
-                                       sinkhorn_threads,
-                                       0,
-                                       static_cast<YDataType*>(d_output_mem.GetDeviceBuffer()),
-                                       B,
-                                       output_dim,
-                                       n,
-                                       sinkhorn_iters));
-        }
-    };
-
-    // Warmup
-    for(int i = 0; i < warmup; ++i)
-    {
-        launch_combined();
     }
-
-    // Benchmark with manual timing
-    hipEvent_t start, stop;
-    (void)hipEventCreate(&start);
-    (void)hipEventCreate(&stop);
-
-    (void)hipEventRecord(start);
-    for(int i = 0; i < repeat; ++i)
-    {
-        launch_combined();
-    }
-    (void)hipEventRecord(stop);
-    (void)hipEventSynchronize(stop);
-
-    float total_time = 0;
-    (void)hipEventElapsedTime(&total_time, start, stop);
-    float ave_time = total_time / repeat;
-
-    (void)hipEventDestroy(start);
-    (void)hipEventDestroy(stop);
 
     // Calculate performance metrics
     std::size_t num_bytes = sizeof(XDataType) * B * nC +            // Input x

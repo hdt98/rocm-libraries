@@ -97,58 +97,86 @@ class MHCTest
         constexpr ck_tile::index_t kBlockPerCu = 1;
         constexpr ck_tile::index_t kSmemSize   = Invoker::GetSmemSize();
 
-        // Launch GPU kernels
-        // Stage 1: GEMM & norm computation
-        ck_tile::launch_kernel(
-            ck_tile::stream_config{nullptr, false},
-            ck_tile::make_kernel<kBlockPerCu>(
-                GemmKernel{},
-                kGridSize,
-                kBlockSize,
-                kSmemSize,
-                static_cast<XDataType*>(d_x_mem.GetDeviceBuffer()),
-                static_cast<PhiDataType*>(d_phi_mem.GetDeviceBuffer()),
-                static_cast<ComputeDataType*>(d_workspace_mem.GetDeviceBuffer()),
-                static_cast<ComputeDataType*>(d_partial_norms_mem.GetDeviceBuffer()),
-                B,
-                nC,
-                output_dim));
-
-        // Stage 2: Reduction
-        ck_tile::launch_kernel(
-            ck_tile::stream_config{nullptr, false},
-            ck_tile::make_kernel<kBlockPerCu>(
-                ReductionKernel{},
-                reduction_blocks,
-                reduction_threads,
-                0,
-                static_cast<ComputeDataType*>(d_workspace_mem.GetDeviceBuffer()),
-                static_cast<ComputeDataType*>(d_partial_norms_mem.GetDeviceBuffer()),
-                static_cast<YDataType*>(d_output_mem.GetDeviceBuffer()),
-                B,
-                nC,
-                output_dim,
-                n,
-                grid_k,
-                alpha_pre,
-                alpha_post,
-                alpha_res,
-                bias));
-
-        // Stage 3: Sinkhorn (if enabled)
+        // Launch GPU kernels: 3-stage pipeline (GEMM -> Reduction -> Sinkhorn)
         if(sinkhorn_iters > 0)
         {
-            ck_tile::launch_kernel(ck_tile::stream_config{nullptr, false},
-                                   ck_tile::make_kernel<kBlockPerCu>(
-                                       SinkhornKernel{},
-                                       sinkhorn_blocks,
-                                       sinkhorn_threads,
-                                       0,
-                                       static_cast<YDataType*>(d_output_mem.GetDeviceBuffer()),
-                                       B,
-                                       output_dim,
-                                       n,
-                                       sinkhorn_iters));
+            // Launch all three stages together
+            ck_tile::launch_kernel(
+                ck_tile::stream_config{nullptr, false},
+                ck_tile::make_kernel<kBlockPerCu>(
+                    GemmKernel{},
+                    kGridSize,
+                    kBlockSize,
+                    kSmemSize,
+                    static_cast<XDataType*>(d_x_mem.GetDeviceBuffer()),
+                    static_cast<PhiDataType*>(d_phi_mem.GetDeviceBuffer()),
+                    static_cast<ComputeDataType*>(d_workspace_mem.GetDeviceBuffer()),
+                    static_cast<ComputeDataType*>(d_partial_norms_mem.GetDeviceBuffer()),
+                    B,
+                    nC,
+                    output_dim),
+                ck_tile::make_kernel<kBlockPerCu>(
+                    ReductionKernel{},
+                    reduction_blocks,
+                    reduction_threads,
+                    0,
+                    static_cast<ComputeDataType*>(d_workspace_mem.GetDeviceBuffer()),
+                    static_cast<ComputeDataType*>(d_partial_norms_mem.GetDeviceBuffer()),
+                    static_cast<YDataType*>(d_output_mem.GetDeviceBuffer()),
+                    B,
+                    nC,
+                    output_dim,
+                    n,
+                    grid_k,
+                    alpha_pre,
+                    alpha_post,
+                    alpha_res,
+                    bias),
+                ck_tile::make_kernel<kBlockPerCu>(
+                    SinkhornKernel{},
+                    sinkhorn_blocks,
+                    sinkhorn_threads,
+                    0,
+                    static_cast<YDataType*>(d_output_mem.GetDeviceBuffer()),
+                    B,
+                    output_dim,
+                    n,
+                    sinkhorn_iters));
+        }
+        else
+        {
+            // Launch only GEMM and Reduction stages
+            ck_tile::launch_kernel(
+                ck_tile::stream_config{nullptr, false},
+                ck_tile::make_kernel<kBlockPerCu>(
+                    GemmKernel{},
+                    kGridSize,
+                    kBlockSize,
+                    kSmemSize,
+                    static_cast<XDataType*>(d_x_mem.GetDeviceBuffer()),
+                    static_cast<PhiDataType*>(d_phi_mem.GetDeviceBuffer()),
+                    static_cast<ComputeDataType*>(d_workspace_mem.GetDeviceBuffer()),
+                    static_cast<ComputeDataType*>(d_partial_norms_mem.GetDeviceBuffer()),
+                    B,
+                    nC,
+                    output_dim),
+                ck_tile::make_kernel<kBlockPerCu>(
+                    ReductionKernel{},
+                    reduction_blocks,
+                    reduction_threads,
+                    0,
+                    static_cast<ComputeDataType*>(d_workspace_mem.GetDeviceBuffer()),
+                    static_cast<ComputeDataType*>(d_partial_norms_mem.GetDeviceBuffer()),
+                    static_cast<YDataType*>(d_output_mem.GetDeviceBuffer()),
+                    B,
+                    nC,
+                    output_dim,
+                    n,
+                    grid_k,
+                    alpha_pre,
+                    alpha_post,
+                    alpha_res,
+                    bias));
         }
 
         // Copy result back
