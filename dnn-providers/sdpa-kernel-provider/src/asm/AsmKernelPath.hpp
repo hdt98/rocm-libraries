@@ -26,7 +26,7 @@ inline auto getAsmKernelDir() -> std::string
 {
     const char* envDir = std::getenv("HIPDNN_AITER_ASM_DIR");
     if (envDir != nullptr && envDir[0] != '\0') {
-        return std::string(envDir);
+        return {envDir};
     }
     return AITER_ASM_DIR;
 }
