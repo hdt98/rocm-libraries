@@ -10,12 +10,12 @@ Convolution kernels written in HIP for AMD Instinct MI355X (CDNA 4, gfx950).
 
 - **Data type**: fp16
 - **Layout**: NHWC input, KRSC weights, NPQK output
-- **Direction**: forward (Fprop)
+- **Direction**: Fprop and Dgrad (Backward Data)
 - **Filter**: 3x3, stride 1, dilation 1
-- **Group size**: 4 and 16 channels per group
+- **Group size**: 4, 8, and 16 channels per group
 - **Constraint**: input channels == output channels (`c == k`)
 
-The kernel uses MFMA 16x16x16 instructions and buffer-load-to-LDS for input staging.
+The kernels use MFMA 16x16x16 (4c, 16c) and MFMA 16x16x32 (8c) instructions with buffer-load-to-LDS for input staging.
 
 ## MIOpen integration
 
@@ -60,7 +60,10 @@ hipconv/
     grouped/
       grouped_conv.hpp   — internal grouped conv interface (namespace grouped)
       grouped_conv.cpp   — variant table and dispatch
-      grouped_16c_fp16.h — kernel implementation
+      grouped_4c_fp16.h  — 4-channel kernel (MFMA 16x16x16)
+      grouped_8c_fp16.h  — 8-channel kernel (MFMA 16x16x32)
+      grouped_8c_transforms.h — GT matrix transform helpers for 8c kernel
+      grouped_16c_fp16.h — 16-channel kernel (MFMA 16x16x16)
 ```
 
 ## Adding a new algorithm
