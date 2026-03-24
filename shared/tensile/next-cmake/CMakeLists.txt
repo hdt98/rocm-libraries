@@ -24,6 +24,11 @@
 cmake_minimum_required(VERSION 3.21.2)
 project(tensile VERSION 4.44.0 LANGUAGES CXX)
 
+# ROCm libraries root (for shared/ctest and other shared resources)
+if(NOT DEFINED ROCM_LIBRARIES_ROOT)
+  set(ROCM_LIBRARIES_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../..")
+endif()
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 include(CMakeDependentOption)
@@ -183,6 +188,50 @@ if(TENSILE_BUILD_TESTING)
   # because tensile-tests search for data/ relative
   # to its location
   set(TENSILE_TEST_DATA_DIR "${CMAKE_CURRENT_BINARY_DIR}/../data")
-  file(MAKE_DIRECTORY "${TEST_DATA_DIR}")
+  file(MAKE_DIRECTORY "${TENSILE_TEST_DATA_DIR}")
   add_subdirectory(tests)
+
+  # CTest categories (shared/ctest; same pattern as rocBLAS #4659)
+  set(TENSILE_CTEST_INSTALL_FILE "")
+  if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_categories_gtest.yaml")
+    if(DEFINED ROCM_LIBRARIES_ROOT AND EXISTS "${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake")
+      find_package(Python3 3.9 COMPONENTS Interpreter REQUIRED)
+      include("${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake")
+      enable_testing()
+      message(STATUS "Tensile: YAML-based GTest categorization (shared/ctest)")
+      set(TENSILE_CTEST_INSTALL_FILE "${CMAKE_CURRENT_BINARY_DIR}/install_CTestTestfile.cmake")
+      file(WRITE "${TENSILE_CTEST_INSTALL_FILE}"
+[=[
+# Tensile: install-time CTest definitions (relative paths; run ctest from prefix/bin/tensile).
+]=]
+      )
+      # TestData resolves data/ next to the executable or one level up; CTest working dir is the
+      # build-tree parent so paths stay consistent with the populated ../data directory.
+      set(TENSILE_CTEST_WORKING_DIR "${CMAKE_CURRENT_BINARY_DIR}/..")
+      apply_test_category_labels(
+        tensile-tests
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_categories_gtest.yaml"
+        "${TENSILE_CTEST_WORKING_DIR}"
+        "${TENSILE_CTEST_INSTALL_FILE}"
+      )
+    else()
+      message(STATUS "Tensile: shared/ctest not found (e.g. standalone checkout), skipping CTest categories")
+    endif()
+  else()
+    message(STATUS "Tensile: test_categories_gtest.yaml not found (CTest categories not used)")
+  endif()
+
+  install(TARGETS tensile-tests RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+
+  if(EXISTS "${TENSILE_TEST_DATA_DIR}")
+    install(DIRECTORY "${TENSILE_TEST_DATA_DIR}/" DESTINATION "${CMAKE_INSTALL_BINDIR}/data")
+  endif()
+
+  if(TENSILE_CTEST_INSTALL_FILE)
+    install(
+      FILES "${TENSILE_CTEST_INSTALL_FILE}"
+      DESTINATION "${CMAKE_INSTALL_BINDIR}/tensile"
+      RENAME "CTestTestfile.cmake"
+    )
+  endif()
 endif()

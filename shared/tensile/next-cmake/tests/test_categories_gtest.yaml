@@ -1,0 +1,49 @@
+# Tensile HostLibraryTests (tensile-tests) — CTest categories (GTest)
+# Aligned with shared/ctest Test Filter Standardization (rocBLAS #4659).
+#
+# All standard tiers run the same full GTest suite (*:*) so ctest -L quick|standard|...
+# and TheRock TEST_TYPE stay consistent with other libraries; workload is identical until
+# a smaller smoke slice is needed.
+
+test_categories:
+  quick:
+    description: "Full tensile-tests GTest run (same filter as all tiers; label quick for CI)"
+    test_patterns:
+      - "*:*"
+    labels:
+      - quick
+
+  standard:
+    description: "Full tensile-tests GTest run (same filter as all tiers; label standard / PR)"
+    test_patterns:
+      - "*:*"
+    labels:
+      - standard
+      - pr
+
+  comprehensive:
+    description: "Full tensile-tests GTest run (same filter as all tiers; label comprehensive / nightly)"
+    test_patterns:
+      - "*:*"
+    labels:
+      - comprehensive
+      - nightly
+      - extended
+
+  full:
+    description: "Full tensile-tests GTest run (same filter as all tiers; label full / weekly)"
+    test_patterns:
+      - "*:*"
+    labels:
+      - full
+      - stress
+      - weekly
+
+execution_settings:
+  default_timeout: 600
+  timeout_multiplier: 1
+  category_timeouts:
+    quick: 600
+    standard: 600
+    comprehensive: 600
+    full: 600
