@@ -174,6 +174,10 @@ struct MHCReductionKernel
                 const index_t global_n = global_idx % output_dim;
 
                 // Compute norm from partial norms for this batch element
+                //
+                // Note: the GEMM/norm kernel, using the split-k setup, writes the partial norm
+                //  in a coalesced way [grid_k, batch]. However this kernel is setup to reduce
+                //. per batch, hence reads the partial norm in a strided way [batch, grid_k]
                 ComputeDataType sum_squares = 0.0f;
                 for(index_t k = 0; k < grid_k; ++k)
                 {
