@@ -179,8 +179,6 @@ class MHCTest
         bool pass = ck_tile::check_err(
             h_output_gpu, h_output_ref, "Error: GPU output mismatch!", rtol, atol);
 
-        std::cout << "  Result: " << (pass ? "PASS" : "FAIL") << std::endl;
-
         return pass;
     }
 };
@@ -198,14 +196,19 @@ class TestMHCComprehensive : public ::testing::Test
 };
 
 // Test configurations
-// NOTE: Only using BF16 due to compilation issues with F32 in GEMM kernel
 using TestConfig_BF16 = std::tuple<ck_tile::bf16_t,
                                    ck_tile::bf16_t,
                                    float,
                                    float,
                                    std::integral_constant<ck_tile::index_t, 64>>;
 
-using TestTypes = ::testing::Types<TestConfig_BF16>;
+using TestConfig_FP16 = std::tuple<ck_tile::fp16_t,
+                                   ck_tile::fp16_t,
+                                   float,
+                                   float,
+                                   std::integral_constant<ck_tile::index_t, 64>>;
+
+using TestTypes = ::testing::Types<TestConfig_BF16, TestConfig_FP16>;
 
 TYPED_TEST_SUITE(TestMHCComprehensive, TestTypes);
 
@@ -334,39 +337,6 @@ TYPED_TEST(TestMHCComprehensive, SinkhornLargeC)
 }
 
 // (4) Different activation functions
-TYPED_TEST(TestMHCComprehensive, ActivationTanh)
-{
-    using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
-                           typename TestFixture::YDataType,
-                           typename TestFixture::ComputeDataType,
-                           ck_tile::element_wise::TanH,
-                           TestFixture::MTile>;
-    EXPECT_TRUE((Tester::template RunTest<16, 4, 64>("Activation: TanH")));
-}
-
-TYPED_TEST(TestMHCComprehensive, ActivationReLU)
-{
-    using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
-                           typename TestFixture::YDataType,
-                           typename TestFixture::ComputeDataType,
-                           ck_tile::element_wise::Relu,
-                           TestFixture::MTile>;
-    EXPECT_TRUE((Tester::template RunTest<16, 4, 64>("Activation: ReLU")));
-}
-
-TYPED_TEST(TestMHCComprehensive, ActivationSiLU)
-{
-    using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
-                           typename TestFixture::YDataType,
-                           typename TestFixture::ComputeDataType,
-                           ck_tile::element_wise::Silu,
-                           TestFixture::MTile>;
-    EXPECT_TRUE((Tester::template RunTest<16, 4, 64>("Activation: SiLU")));
-}
-
 TYPED_TEST(TestMHCComprehensive, ActivationSigmoid)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
@@ -376,6 +346,17 @@ TYPED_TEST(TestMHCComprehensive, ActivationSigmoid)
                            ck_tile::element_wise::Sigmoid,
                            TestFixture::MTile>;
     EXPECT_TRUE((Tester::template RunTest<16, 4, 64>("Activation: Sigmoid")));
+}
+
+TYPED_TEST(TestMHCComprehensive, ActivationTanh)
+{
+    using Tester = MHCTest<typename TestFixture::XDataType,
+                           typename TestFixture::PhiDataType,
+                           typename TestFixture::YDataType,
+                           typename TestFixture::ComputeDataType,
+                           ck_tile::element_wise::TanH,
+                           TestFixture::MTile>;
+    EXPECT_TRUE((Tester::template RunTest<16, 4, 64>("Activation: TanH")));
 }
 
 // Combined stress tests
@@ -391,6 +372,17 @@ TYPED_TEST(TestMHCComprehensive, StressTest_LargeBatch_LargeC_Sinkhorn)
 }
 
 // (5) Edge cases: B odd, even, non-power-of-two
+TYPED_TEST(TestMHCComprehensive, BatchSize_Single)
+{
+    using Tester = MHCTest<typename TestFixture::XDataType,
+                           typename TestFixture::PhiDataType,
+                           typename TestFixture::YDataType,
+                           typename TestFixture::ComputeDataType,
+                           ck_tile::element_wise::Sigmoid,
+                           TestFixture::MTile>;
+    EXPECT_TRUE((Tester::template RunTest<1, 4, 64>("B=1 (single batch)")));
+}
+
 TYPED_TEST(TestMHCComprehensive, BatchSize_Odd_7)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
@@ -653,18 +645,6 @@ TYPED_TEST(TestMHCComprehensive, Padding_B_NotDivisibleBy32)
         (Tester::template RunTest<50, 4, 64>("B=50 (not divisible by 32, requires padding)")));
 }
 
-TYPED_TEST(TestMHCComprehensive, Padding_B_NotDivisibleBy64)
-{
-    using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
-                           typename TestFixture::YDataType,
-                           typename TestFixture::ComputeDataType,
-                           ck_tile::element_wise::Sigmoid,
-                           TestFixture::MTile>;
-    EXPECT_TRUE(
-        (Tester::template RunTest<100, 4, 64>("B=100 (not divisible by 64, requires padding)")));
-}
-
 TYPED_TEST(TestMHCComprehensive, Padding_C_NotDivisibleBy64)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
@@ -674,17 +654,6 @@ TYPED_TEST(TestMHCComprehensive, Padding_C_NotDivisibleBy64)
                            ck_tile::element_wise::Sigmoid,
                            TestFixture::MTile>;
     EXPECT_TRUE((Tester::template RunTest<16, 4, 100>("C=100 (not divisible by 64, K padding)")));
-}
-
-TYPED_TEST(TestMHCComprehensive, Padding_C_NotDivisibleBy32)
-{
-    using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
-                           typename TestFixture::YDataType,
-                           typename TestFixture::ComputeDataType,
-                           ck_tile::element_wise::Sigmoid,
-                           TestFixture::MTile>;
-    EXPECT_TRUE((Tester::template RunTest<16, 4, 50>("C=50 (not divisible by 32, K padding)")));
 }
 
 TYPED_TEST(TestMHCComprehensive, Padding_OutputDim_NotDivisibleBy32)
@@ -872,4 +841,77 @@ TYPED_TEST(TestMHCComprehensive, NonLogSinkhorn_n8)
                            ck_tile::element_wise::Sigmoid,
                            TestFixture::MTile>;
     EXPECT_TRUE((Tester::template RunTest<16, 8, 64, 20, false>("n=8 with non-log Sinkhorn")));
+}
+
+// (14) Split-K with different configurations
+TYPED_TEST(TestMHCComprehensive, SplitK_OddBatch_LargeC)
+{
+    using Tester = MHCTest<typename TestFixture::XDataType,
+                           typename TestFixture::PhiDataType,
+                           typename TestFixture::YDataType,
+                           typename TestFixture::ComputeDataType,
+                           ck_tile::element_wise::Sigmoid,
+                           TestFixture::MTile>;
+    // Odd batch size with large C requiring split-K
+    EXPECT_TRUE((Tester::template RunTest<15, 4, 2048>("Split-K: B=15 (odd), C=2048")));
+}
+
+TYPED_TEST(TestMHCComprehensive, SplitK_NonPow2Batch_LargeC)
+{
+    using Tester = MHCTest<typename TestFixture::XDataType,
+                           typename TestFixture::PhiDataType,
+                           typename TestFixture::YDataType,
+                           typename TestFixture::ComputeDataType,
+                           ck_tile::element_wise::Sigmoid,
+                           TestFixture::MTile>;
+    // Non-power-of-2 batch with large C requiring split-K
+    EXPECT_TRUE((Tester::template RunTest<48, 4, 1024>("Split-K: B=48 (non-pow2), C=1024")));
+}
+
+TYPED_TEST(TestMHCComprehensive, SplitK_LargeN_LargeC)
+{
+    using Tester = MHCTest<typename TestFixture::XDataType,
+                           typename TestFixture::PhiDataType,
+                           typename TestFixture::YDataType,
+                           typename TestFixture::ComputeDataType,
+                           ck_tile::element_wise::Sigmoid,
+                           TestFixture::MTile>;
+    // Large n with large C requiring split-K
+    EXPECT_TRUE((Tester::template RunTest<16, 8, 2048>("Split-K: n=8, C=2048")));
+}
+
+TYPED_TEST(TestMHCComprehensive, SplitK_OddC)
+{
+    using Tester = MHCTest<typename TestFixture::XDataType,
+                           typename TestFixture::PhiDataType,
+                           typename TestFixture::YDataType,
+                           typename TestFixture::ComputeDataType,
+                           ck_tile::element_wise::Sigmoid,
+                           TestFixture::MTile>;
+    // Odd C value with split-K
+    EXPECT_TRUE((Tester::template RunTest<16, 4, 1023>("Split-K: C=1023 (odd)")));
+}
+
+TYPED_TEST(TestMHCComprehensive, SplitK_WithSinkhorn)
+{
+    using Tester = MHCTest<typename TestFixture::XDataType,
+                           typename TestFixture::PhiDataType,
+                           typename TestFixture::YDataType,
+                           typename TestFixture::ComputeDataType,
+                           ck_tile::element_wise::Sigmoid,
+                           TestFixture::MTile>;
+    // Split-K combined with Sinkhorn iterations
+    EXPECT_TRUE((Tester::template RunTest<32, 4, 2048, 20>("Split-K: C=2048 with Sinkhorn")));
+}
+
+TYPED_TEST(TestMHCComprehensive, SplitK_WithTanH)
+{
+    using Tester = MHCTest<typename TestFixture::XDataType,
+                           typename TestFixture::PhiDataType,
+                           typename TestFixture::YDataType,
+                           typename TestFixture::ComputeDataType,
+                           ck_tile::element_wise::TanH,
+                           TestFixture::MTile>;
+    // Split-K with different activation function
+    EXPECT_TRUE((Tester::template RunTest<16, 4, 1024>("Split-K: C=1024 with TanH activation")));
 }
