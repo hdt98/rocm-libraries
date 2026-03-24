@@ -65,18 +65,19 @@ class GemmKernelBuilder:
         tile_configs = self._get_tile_configs()
         trait_combos = self._generate_trait_combinations()
 
+        print(
+            "HELLO: Total tile configs after validation:",
+            len(tile_configs),
+            "Total trait combinations after validation:",
+            len(trait_combos),
+        )
+
         kernel_list = []
         for tile_config in tile_configs:
             for trait_combo in trait_combos:
-                (
-                    pipeline,
-                    epilogue,
-                    scheduler,
-                    pad_m,
-                    pad_n,
-                    pad_k,
-                    persistent,
-                ) = trait_combo
+                (pipeline, epilogue, scheduler, pad_m, pad_n, pad_k, persistent) = (
+                    trait_combo
+                )
 
                 # Create kernel name with proper boolean capitalization
                 kernel_name = f"{self.kernel_name_prefix}_{self.datatype}_{self.layout}_{pipeline}_{epilogue}_{scheduler}_{str(pad_m).capitalize()}_{str(pad_n).capitalize()}_{str(pad_k).capitalize()}_{str(persistent).capitalize()}"
@@ -170,6 +171,8 @@ class GemmKernelBuilder:
             default_pipeline = "preshufflev2"
         elif self.kernel_name_prefix == "grouped_gemm":
             default_pipeline = "compv4"
+        elif self.kernel_name_prefix == "gemm_aquant":
+            default_pipeline = "compv3"
 
         configs = []
         for tile_m in tile_m_values:
@@ -283,7 +286,14 @@ class GemmKernelBuilder:
         pad_m_values = trait_config.get("pad_m").get("values")
         pad_n_values = trait_config.get("pad_n").get("values")
         pad_k_values = trait_config.get("pad_k").get("values")
-        persistent_values = trait_config.get("persistent").get("values")
+        if self.kernel_name_prefix == "gemm_aquant":
+            persistent_or_a_preshuffle_quant = trait_config.get(
+                "a_preshuffle_quant"
+            ).get("values")  # a_preshuffle_quant for aquant operator
+        else:
+            persistent_or_a_preshuffle_quant = trait_config.get("persistent").get(
+                "values"
+            )  # a_preshuffle_quant for aquant operator
 
         all_combinations = list(
             itertools.product(
@@ -293,7 +303,7 @@ class GemmKernelBuilder:
                 pad_m_values,
                 pad_n_values,
                 pad_k_values,
-                persistent_values,
+                persistent_or_a_preshuffle_quant,  # a_preshuffle_quant for aquant operator
             )
         )
 
@@ -301,7 +311,13 @@ class GemmKernelBuilder:
         combinations = []
         for combo in all_combinations:
             pipeline, epilogue, scheduler = combo[:3]
-            if is_trait_combination_valid(pipeline, epilogue, scheduler):
+            if is_trait_combination_valid(
+                pipeline,
+                epilogue,
+                scheduler,
+                persistent_or_a_preshuffle_quant,
+                self.kernel_name_prefix,
+            ):
                 combinations.append(combo)
             else:
                 logging.debug(

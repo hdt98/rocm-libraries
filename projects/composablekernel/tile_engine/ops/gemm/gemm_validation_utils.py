@@ -205,6 +205,11 @@ TRAIT_UNSUPPORTED_COMBINATIONS = {
     ("compv4", "default", "interwave"),
 }
 
+AQUANT_TRAIT_UNSUPPORTED_COMBINATIONS = {
+    ("mem", "default", "intrawave"),
+    ("compv3", "default", "interwave"),
+}
+
 
 def element_size(data_type: str) -> float:
     """Calculate the size (in bytes) of a single element for given data type."""
@@ -214,9 +219,24 @@ def element_size(data_type: str) -> float:
     return ELEMENT_SIZE_MAP[data_type]
 
 
-def is_trait_combination_valid(pipeline: str, epilogue: str, scheduler: str) -> bool:
+def is_trait_combination_valid(
+    pipeline: str,
+    epilogue: str,
+    scheduler: str,
+    persistent_or_a_preshuffle_quant: str,
+    kernel_name_prefix: str,
+) -> bool:
     """Check if a trait combination is valid."""
-    return (pipeline, epilogue, scheduler) not in TRAIT_UNSUPPORTED_COMBINATIONS
+    if kernel_name_prefix in ["gemm_aquant"]:
+        if (pipeline, epilogue, scheduler) in AQUANT_TRAIT_UNSUPPORTED_COMBINATIONS:
+            return False
+
+        if pipeline == "mem" and persistent_or_a_preshuffle_quant:
+            return False
+
+        return True
+    else:
+        return (pipeline, epilogue, scheduler) not in TRAIT_UNSUPPORTED_COMBINATIONS
 
 
 def validate_warp_configuration(
@@ -535,7 +555,26 @@ def is_tile_config_valid(
             return False
 
     elif kernel_name_prefix == "gemm_aquant":
-        pass
+        aquant_valid, aquant_valid_error = validate_gemm_aquant(
+            tile_m,
+            tile_n,
+            tile_k,
+            warp_m,
+            warp_n,
+            warp_k,
+            warp_tile_m,
+            warp_tile_n,
+            warp_tile_k,
+            a_datatype,
+            b_datatype,
+            c_datatype,
+            pipeline,
+            layout,
+            gpu_target,
+        )
+        if not aquant_valid:
+            logging.debug(f"GEMM AQuant validation failed: {aquant_valid_error}")
+            return False
 
     return True
 
@@ -789,6 +828,64 @@ def validate_gemm(
             f"Whole workgroup cover configuration validation failed: {whole_workgroup_cover_error}"
         )
         return False, whole_workgroup_cover_error
+
+    return True, ""
+
+
+def validate_gemm_aquant(
+    tile_m: int,
+    tile_n: int,
+    tile_k: int,
+    warp_m: int,
+    warp_n: int,
+    warp_k: int,
+    warp_tile_m: int,
+    warp_tile_n: int,
+    warp_tile_k: int,
+    a_datatype: str,
+    b_datatype: str,
+    c_datatype: str,
+    pipeline: str,
+    layout: str,
+    gpu_target: str,
+    group_size_k: int = 128,
+) -> Tuple[bool, str]:
+    """Validate AQuant GEMM-specific constraints."""
+
+    # AQuant-specific: tile_k must be a multiple of group_size_k
+    # (KPerBlockAQ = KPerBlock / QuantGroupSize::kK must be integer > 0)
+    if tile_k % group_size_k != 0 or tile_k < group_size_k:
+        return False, (
+            f"tile_k({tile_k}) must be a multiple of group_size_k({group_size_k}) "
+            f"and tile_k >= group_size_k"
+        )
+
+    # AQuant-specific: group_size_k must be divisible by warp_tile_k
+    # (from pipeline policy static_assert)
+    if group_size_k % warp_tile_k != 0:
+        return False, (
+            f"group_size_k({group_size_k}) must be divisible by warp_tile_k({warp_tile_k})"
+        )
+
+    # AQuant-specific: enforce warp_tile_m == warp_tile_n (MFMA requirement)
+    if warp_tile_m != warp_tile_n:
+        return False, (
+            f"warp_tile_m({warp_tile_m}) must equal warp_tile_n({warp_tile_n}) "
+            f"(MFMA requirement for AQuant)"
+        )
+
+    # AQuant-specific: enforce warp_tile_m <-> warp_tile_k coupling
+    # from get_k_warp_tile() in tile_gemm_shape.hpp
+    if a_datatype in ["fp8", "bf8"]:
+        if gpu_target == "gfx950":
+            expected_k = 64 if warp_tile_m == 32 else 128
+        else:
+            expected_k = 32 if warp_tile_m == 32 else 64
+        if warp_tile_k != expected_k:
+            return False, (
+                f"For {a_datatype} on {gpu_target}, warp_tile_m={warp_tile_m} "
+                f"requires warp_tile_k={expected_k}, got warp_tile_k={warp_tile_k}"
+            )
 
     return True, ""
 
