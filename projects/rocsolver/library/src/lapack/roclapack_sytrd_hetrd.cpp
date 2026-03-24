@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -60,40 +60,47 @@ rocblas_status rocsolver_sytrd_hetrd_impl(rocblas_handle handle,
     rocblas_stride strideP = 0;
     rocblas_int batch_count = 1;
 
-    // memory workspace sizes:
-    // size for constants in rocblas calls
-    size_t size_scalars;
-    // extra requirements for calling SYTD2/HETD2
-    size_t size_norms, size_work, size_tmptau_W;
-    // size of array of pointers to workspace (batched case)
-    size_t size_workArr;
-    rocsolver_sytrd_hetrd_getMemorySize<false, T>(n, batch_count, &size_scalars, &size_work,
-                                                  &size_norms, &size_tmptau_W, &size_workArr);
+    if(false)
+    {
+        // memory workspace sizes:
+        // size for constants in rocblas calls
+        size_t size_scalars;
+        // extra requirements for calling SYTD2/HETD2
+        size_t size_norms, size_work, size_tmptau_W;
+        // size of array of pointers to workspace (batched case)
+        size_t size_workArr;
+        rocsolver_sytrd_hetrd_getMemorySize<false, T>(n, batch_count, &size_scalars, &size_work,
+                                                      &size_norms, &size_tmptau_W, &size_workArr);
 
-    if(rocblas_is_device_memory_size_query(handle))
-        return rocblas_set_optimal_device_memory_size(handle, size_scalars, size_work, size_norms,
-                                                      size_tmptau_W, size_workArr);
+        if(rocblas_is_device_memory_size_query(handle))
+            return rocblas_set_optimal_device_memory_size(handle, size_scalars, size_work,
+                                                          size_norms, size_tmptau_W, size_workArr);
 
-    // memory workspace allocation
-    void *scalars, *work, *norms, *tmptau_W, *workArr;
-    rocblas_device_malloc mem(handle, size_scalars, size_work, size_norms, size_tmptau_W,
-                              size_workArr);
+        // memory workspace allocation
+        void *scalars, *work, *norms, *tmptau_W, *workArr;
+        rocblas_device_malloc mem(handle, size_scalars, size_work, size_norms, size_tmptau_W,
+                                  size_workArr);
 
-    if(!mem)
-        return rocblas_status_memory_error;
+        if(!mem)
+            return rocblas_status_memory_error;
 
-    scalars = mem[0];
-    work = mem[1];
-    norms = mem[2];
-    tmptau_W = mem[3];
-    workArr = mem[4];
-    if(size_scalars > 0)
-        init_scalars(handle, (T*)scalars);
+        scalars = mem[0];
+        work = mem[1];
+        norms = mem[2];
+        tmptau_W = mem[3];
+        workArr = mem[4];
+        if(size_scalars > 0)
+            init_scalars(handle, (T*)scalars);
 
-    // execution
-    return rocsolver_sytrd_hetrd_template<false, T>(
-        handle, uplo, n, A, shiftA, lda, strideA, D, strideD, E, strideE, tau, strideP, batch_count,
-        (T*)scalars, (T*)work, (T*)norms, (T*)tmptau_W, (T**)workArr);
+        // execution
+        return rocsolver_sytrd_hetrd_template<false, T>(
+            handle, uplo, n, A, shiftA, lda, strideA, D, strideD, E, strideE, tau, strideP,
+            batch_count, (T*)scalars, (T*)work, (T*)norms, (T*)tmptau_W, (T**)workArr);
+    }
+
+    return rocsolver_sytrd_hetrd_template<false, T>(handle, uplo, n, A, shiftA, lda, strideA, D,
+                                                    strideD, E, strideE, tau, strideP, batch_count,
+                                                    nullptr);
 }
 
 ROCSOLVER_END_NAMESPACE
