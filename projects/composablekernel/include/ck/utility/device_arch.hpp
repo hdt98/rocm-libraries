@@ -15,7 +15,7 @@ enum class DeviceArch
     Gfx950
 };
 
-inline std::ostream& operator<<(std::ostream& os, const DeviceArch& device_arch)
+inline std::ostream& operator<<([[clang::lifetimebound]] std::ostream& os, const DeviceArch& device_arch)
 {
   switch(device_arch)
   {    
