@@ -2,6 +2,8 @@
   :description: Learn how to include hipDNN in a CMake project.
   :keywords: hipDNN, ROCm, install, CMake
 
+.. _add-project:
+
 **************************
 Add hipDNN to your project
 **************************
@@ -42,6 +44,6 @@ Steps
 Next steps
 ==========
 
-- :ref:`build-execute`
 - :ref:`architecture`
+- :ref:`build-execute`
 - See `Samples <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/samples/README.md>`_ for complete working examples of building and executing operation graphs.

@@ -11,14 +11,10 @@ hipDNN high-level architecture
 hipDNN has a plugin-based architecture that allows contributors and users to extend it without modifying the core library.
 hipDNN supports engine plugins, which provide kernels to solve graphs.
 
-.. note::
-
-  See :ref:`backend-architecture` for a more granular breakdown of the system architecture and the backend API.
-
-The hipdnn library is structured as three primary components:
+The hipDNN library is structured as three primary components:
 
 - **Frontend**: The hipDNN frontend is a header-only C++ library that provides an industry standard API for interacting with hipDNN. The frontend wraps the backend C API to provide a more user-friendly C++ interface, encapsulating much of the detail required when creating graphs using the backend API.
-- **Backend**: The hipDNN backend is a shared library that provides a C API for hipDNN. The backend is the core component of hipDNN. It acts as a plugin loader and manager, connecting problems to engines optimized to solve them.
+- **Backend**: The hipDNN backend is a shared library that provides a C API for hipDNN. The backend is the core component of hipDNN. It acts as a plugin loader and manager, connecting problems to engines optimized to solve them. See :ref:`backend-architecture` for a more granular breakdown of the system architecture and the backend API.
 - **Engine plugins**: The hipDNN engine provider plugins are shared libraries responsible for matching the operations they provide to graphs and executing the operations on the supported hardware. Plugins will continue to be added over time to provide additional operational support or performance improvements. See :ref:`plugin-support` for more information.
 
 The frontend API defines tensors and attaches them to operational nodes on a graph. The graph is then lowered through the backend APIs, where each plugin's engine examines it to determine a match, at which point an execution plan is established with the preferred matched engine.

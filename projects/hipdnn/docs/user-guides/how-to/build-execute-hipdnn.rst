@@ -32,7 +32,7 @@ See :ref:`plugin-support` for a detailed list of the supported operations.
 Simplified workflow example
 ===========================
 
-Add ``hipdnn_frontend`` to your CMake project. See :ref:`add-hipdnn-steps`.
+Add ``hipdnn_frontend`` to your CMake project. See :ref:`add-hipdnn-steps` in :ref:`add-project` for more information.
 
 This simplified sample code creates a graph, creates tensors, and adds operations before building and executing them:
 

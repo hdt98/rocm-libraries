@@ -14,13 +14,15 @@ hipDNN provides an interface that follows established deep learning conventions 
 
 .. tip::
 
-  New users can :ref:`migrate-cudnn`.
+  hipDNN provides instructions to :ref:`migrate-cudnn`.
 
 The public repository for hipDNN is located at `https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn <https://github.com/ROCm/rocm-libraries/tree/develop/projects/hipdnn>`_.
 
 .. note::
 
-  hipDNN is in beta. Running production workloads is not recommended.
+  hipDNN is in beta. Running production workloads is not recommended. 
+  
+  hipDNN is only supported on ROCm 7.12 or later.
 
 .. grid:: 2
   :gutter: 3

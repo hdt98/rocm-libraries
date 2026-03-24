@@ -14,7 +14,7 @@ These development packages contain the ``dev`` prefix.
 System requirements
 ===================
 
-- An AMD GPU with ROCm support (see the `ROCm compatibility matrix <https://advanced-micro-devices-rocm-internal--692.com.readthedocs.build/en/692/compatibility/compatibility-matrix.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_)
+- `An AMD GPU with ROCm support <https://github.com/ROCm/TheRock/blob/main/SUPPORTED_GPUS.md>`_
 - Linux or Windows operating system (see `Install AMD ROCm <https://advanced-micro-devices-rocm-internal--692.com.readthedocs.build/en/692/install/rocm.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_)
 
 Dependencies
@@ -87,7 +87,7 @@ Here's an example that demonstrates running these tests using ``ctest``:
 
   100% tests passed, 0 tests failed out of 7
 
-On Windows, replace ``/opt/rocm`` with your ROCm install folder when running the ``ctest`` command.
+Replace ``/opt/rocm`` with your ROCm install folder when running this ``ctest`` command.
 
 Run hipDNN samples
 ------------------
@@ -135,6 +135,6 @@ This example demonstrates running the entire set of samples using ``ctest``:
 
   100% tests passed, 0 tests failed out of 15
 
-On Windows, replace ``/opt/rocm`` with your ROCm install folder when running the above ``ctest`` command.
+Replace ``/opt/rocm`` with your ROCm install folder when running this ``ctest`` command.
 
 See `hipDNN Samples <https://github.com/ROCm/rocm-libraries/blob/develop/projects/hipdnn/samples/README.md>`_ for further details on running these sample programs and their operation.
