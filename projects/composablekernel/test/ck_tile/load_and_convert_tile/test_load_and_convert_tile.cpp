@@ -21,7 +21,10 @@ static constexpr auto matrix_type = TestMatrixType::UniformDistribution;
 
 // Helper to print matrix (for debugging)
 template <typename T>
-void print_matrix(const ck_tile::HostTensor<T>& mat, const std::string& name = "Matrix")
+void print_matrix(const ck_tile::HostTensor<T>& mat,
+                  const std::string& name = "Matrix",
+                  const int width         = 3,
+                  const int precision     = 3)
 {
     const auto lens = mat.get_lengths();
     assert(len(lens) == 2);
@@ -34,11 +37,7 @@ void print_matrix(const ck_tile::HostTensor<T>& mat, const std::string& name = "
     {
         for(ck_tile::index_t j = 0; j < std::min(cols, ck_tile::index_t(limit)); ++j)
         {
-#if MATRIX_TYPE == MONOTONIC_SEQUENCE
-            std::cout << std::setw(3) << std::setprecision(3)
-#else
-            std::cout << std::fixed << std::setprecision(2) << std::setw(6)
-#endif
+            std::cout << std::setw(width) << std::setprecision(precision)
                       << ck_tile::type_convert<float>(mat(i, j)) << " ";
         }
         if(cols > limit)
@@ -122,8 +121,11 @@ class TestLoadAndConvert : public ::testing::Test
         bool pass = ck_tile::check_err(h_c, h_a_ref);
 
 #if PRINT_MATRICES
-        print_matrix(h_a, "Matrix A");
-        print_matrix(h_c, "Matrix C");
+        auto [width, precision] = matrix_type == TestMatrixType::MonotonicSequence
+                                      ? std::make_pair(3, 3)
+                                      : std::make_pair(2, 6);
+        print_matrix(h_a, "Matrix A", width, precision);
+        print_matrix(h_c, "Matrix C", width, precision);
 #endif
 
         EXPECT_TRUE(pass);
