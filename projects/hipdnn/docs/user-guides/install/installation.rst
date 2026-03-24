@@ -9,7 +9,7 @@ hipDNN installation
 *******************
 
 The hipDNN frontend API is distributed as a header-only library. It requires a development ROCm package installation.
-These development packages contain the ``dev`` prefix.
+These development packages contain the ``.dev`` prefix.
 
 System requirements
 ===================
