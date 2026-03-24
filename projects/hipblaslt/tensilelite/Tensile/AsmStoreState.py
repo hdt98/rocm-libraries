@@ -517,9 +517,9 @@ class StoreState:
             sumIdx = 0
             if kernel["LocalSplitU"] > 1:
                 if len(self.elementSumIdx) == 0:
-                    sumIdx = kw.states.c.startVgprValu // self.cfg.numVgprPerValuC
+                    sumIdx = kw.states.c.startVgprValu
                 else:
-                    sumIdx = self.elementSumIdx[-1] + self.cfg.gwvw
+                    sumIdx = self.elementSumIdx[-1] + self.cfg.numVgprPerValuC * self.cfg.gwvw
             else:
                 bestVw                  = kernel["VectorWidthA"]
                 elementsLoadedPerVw     = kernel["NumThreads"] * bestVw
