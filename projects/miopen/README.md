@@ -352,6 +352,79 @@ You can find prebuilt Docker images on [ROCm's public Docker Hub](https://hub.do
 
 For development workflows requiring multi-arch support, nightly-built dev images are available at [rocm/miopen-dev on Docker Hub](https://hub.docker.com/r/rocm/miopen-dev/tags).
 
+## Building MIOpen against a locally built Composable Kernel
+
+If you want to use a locally built version of [Composable Kernel (CK)](../../projects/composablekernel)
+instead of the system-installed one, follow these two steps.
+
+### Step 1: Build and install CK
+
+```shell
+cd projects/composablekernel
+mkdir build && cd build
+
+cmake                                                \
+  -D CMAKE_PREFIX_PATH=/opt/rocm                     \
+  -D CMAKE_CXX_COMPILER=/opt/rocm/bin/hipcc          \
+  -DCMAKE_INSTALL_PREFIX=/opt/rocm                   \
+  -DCMAKE_BUILD_TYPE=Release                         \
+  -DMIOPEN_REQ_LIBS_ONLY=ON                          \
+  -DBUILD_SHARED_LIBS=OFF                            \
+  -DGPU_TARGETS="gfx950"                             \
+  -G Ninja                                           \
+  ..
+
+ninja -j128 install
+```
+
+This installs CK under the default `/opt/rocm` location.
+
+`MIOPEN_REQ_LIBS_ONLY=ON` restricts the build to only the `device_conv_operations` library required
+by MIOpen, skipping tests, the profiler, GEMM, and reduction targets.
+
+### Step 2: Build MIOpen pointing at the local CK install
+
+MIOpen locates CK via CMake's `find_package`, so pass your CK install path through
+`CMAKE_PREFIX_PATH`:
+
+```shell
+cd projects/miopen
+mkdir build && cd build
+
+export CXX=/opt/rocm/llvm/bin/clang++
+
+cmake .. \
+  -DMIOPEN_BACKEND=HIP \
+  -DCMAKE_PREFIX_PATH="/opt/rocm" \
+  -DMIOPEN_USE_COMPOSABLEKERNEL=ON \
+  -DMIOPEN_BUILD_CK=OFF \
+  -DCMAKE_BUILD_TYPE=Release
+```
+
+`CMAKE_PREFIX_PATH` tells CMake where to find the `composable_kernelConfig.cmake` file installed
+under `<ck-install-path>/lib/cmake/composable_kernel/`.
+
+### Key CMake variables
+
+| Variable | Where set | Purpose |
+|---|---|---|
+| `MIOPEN_REQ_LIBS_ONLY=ON` | CK build | Builds only conv ops needed by MIOpen |
+| `CMAKE_INSTALL_PREFIX` | CK build | Where CK gets installed |
+| `CMAKE_PREFIX_PATH` | MIOpen build | Where MIOpen searches for the installed CK |
+| `MIOPEN_USE_COMPOSABLEKERNEL=ON` | MIOpen build | Enable CK backend (default ON for HIP) |
+| `MIOPEN_BUILD_CK=OFF` | MIOpen build | Use a pre-built CK rather than fetching it (default) |
+
+### Building MIOpenDriver against a locally built CK
+
+MIOpenDriver links to CK transitively through MIOpen, so no additional CK configuration is needed
+for the driver. Follow Steps 1 and 2 above, then build the `MIOpenDriver` target:
+
+```shell
+cmake --build . --target MIOpenDriver
+```
+
+The resulting binary is placed at `build/bin/MIOpenDriver`.
+
 ## Porting from cuDNN to MIOpen
 
 Our
