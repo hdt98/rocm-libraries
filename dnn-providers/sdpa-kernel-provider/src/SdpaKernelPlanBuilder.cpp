@@ -5,27 +5,128 @@
 #include "SdpaKernelPlan.hpp"
 #include "asm/AsmKernelPath.hpp"
 #include <cmath>
+#include <format>
 #include <hip/hip_runtime.h>
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
 
 namespace sdpa_kernel_provider
 {
+#define SDPA_PROVIDER_RETURN_FALSE_IF(condition, ...)         \
+    do                                                        \
+    {                                                         \
+        if(condition)                                         \
+        {                                                     \
+            HIPDNN_PLUGIN_LOG_INFO(std::format(__VA_ARGS__)); \
+            return false;                                     \
+        }                                                     \
+    } while(0)
+
+namespace
+{
+
+std::string getDeviceString(hipStream_t stream)
+{
+    int deviceId = -1;
+    auto status = hipStreamGetDevice(stream, &deviceId);
+    if(status != hipSuccess)
+    {
+        throw hipdnn_plugin_sdk::HipdnnPluginException(
+            hipdnnPluginStatus_t::HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+            "hipStreamGetDevice failed with error code: " + std::to_string(status));
+    }
+
+    hipDeviceProp_t props;
+    status = hipGetDeviceProperties(&props, deviceId);
+    if(status != hipSuccess)
+    {
+        throw hipdnn_plugin_sdk::HipdnnPluginException(
+            hipdnnPluginStatus_t::HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+            "hipGetDeviceProperties failed with error code: " + std::to_string(status));
+    }
+
+    return {props.gcnArchName};
+}
+}
 
 bool SdpaKernelPlanBuilder::isApplicable(
-    const SdpaKernelHandle& /*handle*/,
+    const SdpaKernelHandle& handle,
     const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph) const
 {
+    using namespace hipdnn_data_sdk::data_objects;
+
     auto& nodeWrappers = opGraph.nodeWrappers();
 
-    if(nodeWrappers.size() != 1
-       || nodeWrappers.front()->attributesType()
-              != hipdnn_data_sdk::data_objects::NodeAttributes::SdpaAttributes)
+    try
     {
+        auto deviceString = getDeviceString(handle.getStream());
+        SDPA_PROVIDER_RETURN_FALSE_IF(deviceString != "gfx942",
+                                      "Device string does not match gfx942 (Actual value: {})",
+                                      deviceString);
+    }
+    catch(const std::exception& e)
+    {
+        HIPDNN_PLUGIN_LOG_ERROR("Could not query device string: " << e.what());
         return false;
     }
 
-    // TODO: Add more expansive checks
-    HIPDNN_PLUGIN_LOG_WARN("SdpaKernelPlanBuilder::isApplicable not fully implemented");
+    SDPA_PROVIDER_RETURN_FALSE_IF(nodeWrappers.size() != 1, "Graph has more than one node");
+    SDPA_PROVIDER_RETURN_FALSE_IF(nodeWrappers.front()->attributesType()
+                                      != NodeAttributes::SdpaAttributes,
+                                  "Node attribute type is not SdpaAttributes");
+
+    const auto& attrs = nodeWrappers.front()->attributesAs<SdpaAttributes>();
+    SDPA_PROVIDER_RETURN_FALSE_IF(attrs.causal_mask(), "causal_mask must be false");
+    SDPA_PROVIDER_RETURN_FALSE_IF(attrs.causal_mask_bottom_right(),
+                                  "causal_mask_bottom_right must be false");
+    SDPA_PROVIDER_RETURN_FALSE_IF(attrs.left_bound().has_value(), "left_bound must be unset");
+    SDPA_PROVIDER_RETURN_FALSE_IF(attrs.right_bound().has_value(), "right_bound must be unset");
+    SDPA_PROVIDER_RETURN_FALSE_IF(attrs.dropout_probability().has_value()
+                                      && attrs.dropout_probability().value() != 0.f,
+                                  "Dropout probability must be unset or zero (Actual value: {})",
+                                  attrs.dropout_probability().value());
+    SDPA_PROVIDER_RETURN_FALSE_IF(attrs.alibi_mask(), "alibi_mask must be false");
+    SDPA_PROVIDER_RETURN_FALSE_IF(attrs.padding_mask(), "padding_mask must be false");
+    SDPA_PROVIDER_RETURN_FALSE_IF(attrs.seq_len_q_tensor_uid(), "seq_len_q tensor not supported");
+    SDPA_PROVIDER_RETURN_FALSE_IF(attrs.attn_mask_tensor_uid(), // Change to bias
+                                  "attn_mask tensor not supported");
+
+    SDPA_PROVIDER_RETURN_FALSE_IF(attrs.page_table_k_tensor_uid(),
+                                  "page_table_k tensor not supported");
+    SDPA_PROVIDER_RETURN_FALSE_IF(attrs.page_table_v_tensor_uid(),
+                                  "page_table_v tensor not supported");
+
+    const auto& tensorMap = opGraph.getTensorMap();
+
+    int64_t qUid = attrs.q_tensor_uid();
+    int64_t kUid = attrs.k_tensor_uid();
+    int64_t vUid = attrs.v_tensor_uid();
+    int64_t oUid = attrs.o_tensor_uid();
+
+    auto* qTensor = tensorMap.at(qUid);
+    SDPA_PROVIDER_RETURN_FALSE_IF(qTensor->data_type() != DataType::BFLOAT16,
+                                  "q tensor datatype must be BF16 (Actual type: {})",
+                                  EnumNameDataType(qTensor->data_type()));
+    SDPA_PROVIDER_RETURN_FALSE_IF(qTensor->dims()->size() != 4,
+                                  "q tensor must be rank 4 (Actual rank: {})",
+                                  qTensor->dims()->size());
+    SDPA_PROVIDER_RETURN_FALSE_IF(qTensor->dims()->Get(3) != 128,
+                                  "q tensor head dimension must be 128 (Actual value: {})",
+                                  qTensor->dims()->Get(3));
+
+    auto* kTensor = tensorMap.at(kUid);
+    SDPA_PROVIDER_RETURN_FALSE_IF(kTensor->data_type() != DataType::BFLOAT16,
+                                  "k tensor datatype must be BF16 (Actual type: {})",
+                                  EnumNameDataType(kTensor->data_type()));
+
+    auto* vTensor = tensorMap.at(vUid);
+    SDPA_PROVIDER_RETURN_FALSE_IF(vTensor->data_type() != DataType::BFLOAT16,
+                                  "v tensor datatype must be BF16 (Actual type: {})",
+                                  EnumNameDataType(vTensor->data_type()));
+
+    auto* oTensor = tensorMap.at(oUid);
+    SDPA_PROVIDER_RETURN_FALSE_IF(oTensor->data_type() != DataType::BFLOAT16,
+                                  "o tensor datatype must be BF16 (Actual type: {})",
+                                  EnumNameDataType(oTensor->data_type()));
 
     return true;
 }
@@ -46,7 +147,7 @@ void SdpaKernelPlanBuilder::initializeExecutionSettings(
     const hipdnn_data_sdk::flatbuffer_utilities::IEngineConfig& /* engineConfig */,
     SdpaKernelSettings& /* executionSettings */) const
 {
-    HIPDNN_PLUGIN_LOG_ERROR("SdpaKernelPlanBuilder::initializeExecutionContext not implemented");
+    HIPDNN_PLUGIN_LOG_ERROR("SdpaKernelPlanBuilder::initializeExecutionSettings not implemented");
 }
 
 void SdpaKernelPlanBuilder::buildPlan(
