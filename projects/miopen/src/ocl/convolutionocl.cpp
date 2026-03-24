@@ -283,14 +283,14 @@ std::vector<Solution> EvaluateConvSolutions(const ExecutionContext& ctx,
         const auto& solver = id.GetSolver();
         
         // Log the solver being benchmarked during tuning/Find phase
+        CompileSolution(id, ctx, problem);
+        
         if(IsLoggingKernel())
         {
             std::string solution_name = id.ToString();
-            LogSolutionName(solution_name, id.Value());
+            LogSolutionName(solution_name, id.Value(), conv_sol->workspace_sz);
             IncrementKernelExecutionCounter();
         }
-        
-        CompileSolution(id, ctx, problem);
 
         std::vector<solver::ConvSolution> conv_sols;
         conv_sols.emplace_back(*conv_sol);
@@ -1116,7 +1116,7 @@ void ConvolutionDescriptor::ConvolutionForwardImmediate(const Handle& handle,
             // Log the selected solver for execution phase kernel tracking
             std::string solution_name = (solver_id.Value() != 0) ? solver_id.ToString()
                                                                 : std::string("UNKNOWN");
-            LogSolutionName(solution_name, solver_id.Value());
+            LogSolutionName(solution_name, solver_id.Value(), workSpaceSize);
             IncrementKernelExecutionCounter();
         }
         invoker(handle, invoke_ctx);
@@ -1336,7 +1336,7 @@ void ConvolutionDescriptor::ConvolutionBackwardImmediate(const Handle& handle,
             // Log the selected solver for execution phase kernel tracking
             std::string solution_name = (solver_id.Value() != 0) ? solver_id.ToString()
                                                                 : std::string("UNKNOWN");
-            LogSolutionName(solution_name, solver_id.Value());
+            LogSolutionName(solution_name, solver_id.Value(), workSpaceSize);
             IncrementKernelExecutionCounter();
         }
         invoker(handle, invoke_ctx);
@@ -1548,7 +1548,7 @@ void ConvolutionDescriptor::ConvolutionWrwImmediate(const Handle& handle,
             tensors, workSpace, workSpaceSize, this->attribute.gfx90aFp16alt.GetWrW()};
         if(IsLoggingKernel())
         {
-            LogSolutionName(solver_id.ToString(), solver_id.Value());
+            LogSolutionName(solver_id.ToString(), solver_id.Value(), workSpaceSize);
             IncrementKernelExecutionCounter();
         }
         invoker(handle, invoke_ctx);

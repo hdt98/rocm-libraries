@@ -269,7 +269,7 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
 
             if(IsLoggingKernel())
             {
-                LogSolutionName(sol.solver_id, solver_id_obj.Value());
+                LogSolutionName(sol.solver_id, solver_id_obj.Value(), sol.workspace_sz);
                 
                 // Extract kernel name from first kernel in solution (if available)
                 std::string kernel_name;

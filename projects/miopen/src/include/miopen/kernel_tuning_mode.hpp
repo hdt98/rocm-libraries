@@ -176,6 +176,7 @@ struct SolutionExecutionData
     std::string solution_name;
     uint64_t solver_id;
     std::string phase;
+    size_t workspace_bytes = 0; // Workspace size for this solution
     std::vector<PerformanceConfigData> performance_configs; // Array of performance configs
     
     // Current config being accumulated (temporary)
@@ -186,6 +187,7 @@ struct SolutionExecutionData
         solution_name.clear();
         solver_id = 0;
         phase.clear();
+        workspace_bytes = 0;
         performance_configs.clear();
         current_config.Clear();
     }
@@ -329,6 +331,7 @@ inline void FlushJsonAccumulator()
     // Output JSON with solution-level metrics
     std::cerr << "{\"solution\":\"" << JsonEscape(data.solution_name) << "\","
               << "\"solver_id\":" << data.solver_id << ","
+              << "\"workspace_bytes\":" << data.workspace_bytes << ","
               << "\"phase\":\"" << data.phase << "\","
               << "\"performance_configs\":[";
 
@@ -536,7 +539,7 @@ inline void AddKernelToJsonAccumulator(const std::string& kernel_name,
 
 /// Log solution name if appropriate for the current log level
 /// Only prints if the solution name has changed since the last call
-inline void LogSolutionName(const std::string& solution_name, uint64_t solver_id)
+inline void LogSolutionName(const std::string& solution_name, uint64_t solver_id, size_t workspace_bytes = 0)
 {
     const bool logging_enabled = IsLoggingKernel();
     if(logging_enabled && !solution_name.empty())
@@ -555,6 +558,7 @@ inline void LogSolutionName(const std::string& solution_name, uint64_t solver_id
             auto& data         = GetJsonAccumulator();
             data.solution_name = solution_name;
             data.solver_id     = solver_id;
+            data.workspace_bytes = workspace_bytes;
             data.phase         = KernelPhaseToString(current_phase);
             last_solution      = solution_name;
             last_solver_id     = solver_id;

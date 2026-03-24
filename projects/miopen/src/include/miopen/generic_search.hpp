@@ -562,7 +562,7 @@ auto GenericSearch(const Solver s,
                     const auto solver_id = miopen::solver::Id(solver_name).Value();
                     
                     // LogSolutionName only sets up the solution context once
-                    LogSolutionName(solver_name, solver_id);
+                    LogSolutionName(solver_name, solver_id, current_solution.workspace_sz);
                     
                     // Add this specific performance config with kernel name extracted from solution
                     const auto config_string = current_config.ToString();
