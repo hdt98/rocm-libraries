@@ -64,6 +64,9 @@ add_executable(
     TestPointwiseNode.cpp
     TestRMSNormAttributes.cpp
     TestRMSNormNode.cpp
+    TestRMSNormBackwardAttributes.cpp
+    TestRMSNormBackwardNode.cpp
+    TestGraphRMSNormBackward.cpp
     TestScopedHipdnnBackendDescriptor.cpp
     TestSetEnginePluginPaths.cpp
     TestTensorAttributes.cpp

@@ -24,6 +24,7 @@
 // #include <hipdnn_frontend/node/MatmulNode.hpp>
 #include <hipdnn_frontend/node/Node.hpp>
 #include <hipdnn_frontend/node/PointwiseNode.hpp>
+#include <hipdnn_frontend/node/RMSNormBackwardNode.hpp>
 // #include <hipdnn_frontend/node/RMSNormNode.hpp>
 // #include <hipdnn_frontend/node/SdpaBpropNode.hpp>
 // #include <hipdnn_frontend/node/SdpaFpropNode.hpp>
@@ -119,6 +120,9 @@ namespace hipdnn_frontend::detail
     // case HIPDNN_OPERATION_TYPE_RMSNORM:
     //     return {std::make_shared<graph::RMSNormNode>(graph::RMSNormAttributes{}, graphAttrs),
     //             {}};
+    case HIPDNN_OPERATION_TYPE_RMSNORM_BACKWARD:
+        return {std::make_shared<graph::RMSNormBackwardNode>(graph::RMSNormBackwardAttributes{}, graphAttrs),
+                {}};
     // case HIPDNN_OPERATION_TYPE_SDPA_BACKWARD:
     //     return {std::make_shared<graph::SdpaBpropNode>(graph::SdpaBackwardAttributes{},
     //                                                    graphAttrs),

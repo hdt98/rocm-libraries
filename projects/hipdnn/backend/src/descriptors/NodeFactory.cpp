@@ -3,6 +3,7 @@
 
 #include "NodeFactory.hpp"
 #include "HipdnnException.hpp"
+#include "descriptors/RMSNormBackwardOperationDescriptor.hpp"
 
 namespace hipdnn_backend
 {
@@ -44,6 +45,8 @@ std::shared_ptr<IBackendDescriptor> NodeFactory::createOperationFromNode(
         return PointwiseOperationDescriptor::fromNode(nodeT, tensorMap);
     // case NodeAttributes::RMSNormAttributes:
     //     return RMSNormOperationDescriptor::fromNode(nodeT, tensorMap);
+    case NodeAttributes::RMSNormBackwardAttributes:
+        return RMSNormBackwardOperationDescriptor::fromNode(nodeT, tensorMap);
     // case NodeAttributes::SdpaAttributes:
     //     return SdpaFpropOperationDescriptor::fromNode(nodeT, tensorMap);
     // case NodeAttributes::SdpaBackwardAttributes:

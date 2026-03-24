@@ -20,6 +20,7 @@
 #include <hipdnn_frontend/attributes/MatmulAttributes.hpp>
 #include <hipdnn_frontend/attributes/PointwiseAttributes.hpp>
 #include <hipdnn_frontend/attributes/RMSNormAttributes.hpp>
+#include <hipdnn_frontend/attributes/RMSNormBackwardAttributes.hpp>
 #include <hipdnn_frontend/attributes/SdpaAttributes.hpp>
 #include <hipdnn_frontend/attributes/SdpaBackwardAttributes.hpp>
 #include <hipdnn_frontend/attributes/TensorAttributes.hpp>
@@ -42,6 +43,7 @@
 #include <hipdnn_frontend/node/Node.hpp>
 #include <hipdnn_frontend/node/PointwiseNode.hpp>
 #include <hipdnn_frontend/node/RMSNormNode.hpp>
+#include <hipdnn_frontend/node/RMSNormBackwardNode.hpp>
 #include <hipdnn_frontend/node/SdpaBpropNode.hpp>
 #include <hipdnn_frontend/node/SdpaFpropNode.hpp>
 #include <memory>
@@ -217,6 +219,14 @@ void unpackNodeFromFlatBuffer(
                 unpackNodeFromFlatBuffer<graph::RMSNormAttributes, graph::RMSNormNode>(
                     fbNode,
                     fbNode->attributes_as_RMSNormAttributes(),
+                    tensorMap,
+                    outGraphAttrs,
+                    outNodes);
+                break;
+            case hipdnn_data_sdk::data_objects::NodeAttributes::RMSNormBackwardAttributes:
+                unpackNodeFromFlatBuffer<graph::RMSNormBackwardAttributes, graph::RMSNormBackwardNode>(
+                    fbNode,
+                    fbNode->attributes_as_RMSNormBackwardAttributes(),
                     tensorMap,
                     outGraphAttrs,
                     outNodes);

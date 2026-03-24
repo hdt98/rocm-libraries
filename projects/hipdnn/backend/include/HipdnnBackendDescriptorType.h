@@ -260,4 +260,12 @@ typedef enum
      */
     HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_DEQUANTIZE_DESCRIPTOR_EXT = 28,
 
+    /**
+     * @brief RMS normalization backward operation descriptor
+     *
+     * Represents a backward RMS normalization operation with gradient of output (DY),
+     * input (X), scale, optional inverse RMS, and gradient outputs (DX, DSCALE, DBIAS).
+     */
+    HIPDNN_BACKEND_OPERATION_RMSNORM_BACKWARD_DESCRIPTOR_EXT = 29,
+
 } hipdnnBackendDescriptorType_t;

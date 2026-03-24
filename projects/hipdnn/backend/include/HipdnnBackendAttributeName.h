@@ -647,6 +647,38 @@ typedef enum
     /** @} */
 
     /**
+     * @name RMSNorm Backward Operation Attributes (2410-2499)
+     * Attributes for HIPDNN_BACKEND_OPERATION_RMSNORM_BACKWARD_DESCRIPTOR_EXT
+     * @{
+     */
+
+    /** @brief Gradient of output tensor (DY) for rmsnorm backward */
+    HIPDNN_ATTR_OPERATION_RMSNORM_BACKWARD_DY_EXT = 2410,
+
+    /** @brief Input tensor (X) for rmsnorm backward */
+    HIPDNN_ATTR_OPERATION_RMSNORM_BACKWARD_X_EXT = 2411,
+
+    /** @brief Scale tensor for rmsnorm backward */
+    HIPDNN_ATTR_OPERATION_RMSNORM_BACKWARD_SCALE_EXT = 2412,
+
+    /** @brief Inverse RMS tensor for rmsnorm backward (optional) */
+    HIPDNN_ATTR_OPERATION_RMSNORM_BACKWARD_INV_RMS_EXT = 2413,
+
+    /** @brief Gradient of input tensor (DX) for rmsnorm backward */
+    HIPDNN_ATTR_OPERATION_RMSNORM_BACKWARD_DX_EXT = 2414,
+
+    /** @brief Gradient of scale tensor (DSCALE) for rmsnorm backward */
+    HIPDNN_ATTR_OPERATION_RMSNORM_BACKWARD_DSCALE_EXT = 2415,
+
+    /** @brief Gradient of bias tensor (DBIAS) for rmsnorm backward (optional) */
+    HIPDNN_ATTR_OPERATION_RMSNORM_BACKWARD_DBIAS_EXT = 2416,
+
+    /** @brief Compute data type for rmsnorm backward */
+    HIPDNN_ATTR_RMSNORM_BACKWARD_COMP_TYPE_EXT = 2417,
+
+    /** @} */
+
+    /**
      * @name Matmul Operation Attributes (2500-2599)
      * Attributes for HIPDNN_BACKEND_OPERATION_MATMUL_DESCRIPTOR_EXT
      * @{
