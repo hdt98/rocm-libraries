@@ -14,8 +14,8 @@ int main(int argc, char** argv)
     ::testing::InitGoogleTest(&argc, argv);
 
     auto callback = hipdnn_test_sdk::utilities::initializeTestLogRecordingShared();
-    hipdnn_plugin_sdk::logging::initializeCallbackLogging(
-        "sdpa_kernel_plugin_integration_tests", callback);
+    hipdnn_plugin_sdk::logging::initializeCallbackLogging("sdpa_kernel_plugin_integration_tests",
+                                                          callback);
 
     // Register HipErrorHandler to check and clear HIP errors after each test
     testing::TestEventListeners& listeners = testing::UnitTest::GetInstance()->listeners();

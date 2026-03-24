@@ -61,86 +61,86 @@ struct SgprPad3
 struct __attribute__((packed)) fmha_fwd_v3_args
 {
     // ---- Output pointers ---------------------------------------------------
-    void* ptr_o;                  // co:R  Attention output  [B, H_q, S_q, D_v]
+    void* ptr_o; // co:R  Attention output  [B, H_q, S_q, D_v]
     SgprPad2 _p0;
     // ---- Input pointers ----------------------------------------------------
-    const void* ptr_q;            // co:Q  Query             [B, H_q, S_q, D_qk]
+    const void* ptr_q; // co:Q  Query             [B, H_q, S_q, D_qk]
     SgprPad2 _p1;
-    const void* ptr_k;            // co:K  Key               [B, H_kv, S_kv, D_qk]
+    const void* ptr_k; // co:K  Key               [B, H_kv, S_kv, D_qk]
     SgprPad2 _p2;
-    const void* ptr_v;            // co:V  Value             [B, H_kv, S_kv, D_v]
+    const void* ptr_v; // co:V  Value             [B, H_kv, S_kv, D_v]
     SgprPad2 _p3;
-    void* ptr_lse;                // co:LSE  Log-sum-exp stats [B, H_q, S_q, 1]
+    void* ptr_lse; // co:LSE  Log-sum-exp stats [B, H_q, S_q, 1]
     SgprPad2 _p4;
 
     // ---- Attention scale ---------------------------------------------------
-    float scalar;                 // co:scalar  Typically 1 / sqrt(D_qk)
+    float scalar; // co:scalar  Typically 1 / sqrt(D_qk)
     SgprPad3 _p5;
 
     // ---- Q tensor dimensions and strides -----------------------------------
-    unsigned int s_seq_len;       // co:seq_len  Query sequence length  (S_q)
+    unsigned int s_seq_len; // co:seq_len  Query sequence length  (S_q)
     SgprPad3 _p6;
-    unsigned int s_Seqs;          // co:Seqs  Q stride: sequence dim
+    unsigned int s_Seqs; // co:Seqs  Q stride: sequence dim
     SgprPad3 _p7;
-    unsigned int s_Ts;            // co:Ts  Q stride: row
+    unsigned int s_Ts; // co:Ts  Q stride: row
     SgprPad3 _p8;
-    unsigned int s_Hs;            // co:Hs  Q stride: head dim
+    unsigned int s_Hs; // co:Hs  Q stride: head dim
     SgprPad3 _p9;
-    unsigned int s_Bs;            // co:Bs  Q stride: batch dim
+    unsigned int s_Bs; // co:Bs  Q stride: batch dim
     SgprPad3 _p10;
 
     // ---- GQA ratio ---------------------------------------------------------
-    unsigned int s_gqa;           // co:gqa  Grouped-Query Attention ratio (H_q / H_kv)
+    unsigned int s_gqa; // co:gqa  Grouped-Query Attention ratio (H_q / H_kv)
     SgprPad3 _p11;
 
     // ---- K tensor strides --------------------------------------------------
-    unsigned int s_k_Seqs;        // co:k_Seqs  K stride: sequence dim
+    unsigned int s_k_Seqs; // co:k_Seqs  K stride: sequence dim
     SgprPad3 _p12;
-    unsigned int s_k_Hs;          // co:k_Hs  K stride: head dim
+    unsigned int s_k_Hs; // co:k_Hs  K stride: head dim
     SgprPad3 _p13;
-    unsigned int s_k_Bs;          // co:k_Bs  K stride: batch dim
+    unsigned int s_k_Bs; // co:k_Bs  K stride: batch dim
     SgprPad3 _p14;
 
     // ---- Options and flags -------------------------------------------------
-    unsigned int s_opt;           // co:msk_opt  Options bitmask (e.g., rounding mode)
+    unsigned int s_opt; // co:msk_opt  Options bitmask (e.g., rounding mode)
     SgprPad3 _p15;
-    unsigned int s_lse;           // co:lse  Whether to compute LSE output (0 or 1)
+    unsigned int s_lse; // co:lse  Whether to compute LSE output (0 or 1)
     SgprPad3 _p16;
 
     // ---- KV sequence and head dimensions -----------------------------------
-    unsigned int s_kv_seq_len;    // co:kv_seq_len  KV sequence length (S_kv)
+    unsigned int s_kv_seq_len; // co:kv_seq_len  KV sequence length (S_kv)
     SgprPad3 _p17;
-    unsigned int s_qk_head_dim;   // co:qk_head_dim  QK head dimension  (D_qk)
+    unsigned int s_qk_head_dim; // co:qk_head_dim  QK head dimension  (D_qk)
     SgprPad3 _p18;
-    unsigned int s_v_head_dim;    // co:v_head_dim  V head dimension   (D_v)
+    unsigned int s_v_head_dim; // co:v_head_dim  V head dimension   (D_v)
     SgprPad3 _p19;
-    unsigned int s_q_head_num;    // co:q_head_num  Number of Q heads  (H_q)
+    unsigned int s_q_head_num; // co:q_head_num  Number of Q heads  (H_q)
     SgprPad3 _p20;
 
     // ---- V tensor strides --------------------------------------------------
-    unsigned int s_v_Seqs;        // co:v_Seqs  V stride: sequence dim
+    unsigned int s_v_Seqs; // co:v_Seqs  V stride: sequence dim
     SgprPad3 _p21;
-    unsigned int s_v_Hs;          // co:v_Hs  V stride: head dim
+    unsigned int s_v_Hs; // co:v_Hs  V stride: head dim
     SgprPad3 _p22;
-    unsigned int s_v_Bs;          // co:v_Bs  V stride: batch dim
+    unsigned int s_v_Bs; // co:v_Bs  V stride: batch dim
     SgprPad3 _p23;
 
     // ---- O tensor strides --------------------------------------------------
-    unsigned int s_o_Seqs;        // co:r_Seqs  O stride: sequence dim
+    unsigned int s_o_Seqs; // co:r_Seqs  O stride: sequence dim
     SgprPad3 _p24;
-    unsigned int s_o_Hs;          // co:r_Hs  O stride: head dim
+    unsigned int s_o_Hs; // co:r_Hs  O stride: head dim
     SgprPad3 _p25;
-    unsigned int s_o_Bs;          // co:r_Bs  O stride: batch dim
+    unsigned int s_o_Bs; // co:r_Bs  O stride: batch dim
     SgprPad3 _p26;
 
     // ---- Variable-length sequence pointers (nullptr for batch mode) --------
-    const void* ptr_qseq;        // co:ptr_qseq  Cumulative Q sequence starts (group mode)
+    const void* ptr_qseq; // co:ptr_qseq  Cumulative Q sequence starts (group mode)
     SgprPad2 _p27;
-    const void* ptr_kseq;        // co:ptr_kseq  Cumulative K sequence starts (group mode)
+    const void* ptr_kseq; // co:ptr_kseq  Cumulative K sequence starts (group mode)
     SgprPad2 _p28;
 
     // ---- LSE stride --------------------------------------------------------
-    unsigned int s_lse_Hs;        // co:lse_Hs  LSE stride: head dim
+    unsigned int s_lse_Hs; // co:lse_Hs  LSE stride: head dim
     SgprPad3 _p29;
 
     // ---- Padding sequence pointers (nullptr for batch mode) ----------------
@@ -150,25 +150,25 @@ struct __attribute__((packed)) fmha_fwd_v3_args
     SgprPad2 _p31;
 
     // ---- FP8 descale pointers (nullptr for BF16/FP16) ----------------------
-    const void* ptr_q_descale;    // co:ptr_q_descale  Q descale tensor
+    const void* ptr_q_descale; // co:ptr_q_descale  Q descale tensor
     SgprPad2 _p32;
-    const void* ptr_k_descale;    // co:ptr_k_descale  K descale tensor
+    const void* ptr_k_descale; // co:ptr_k_descale  K descale tensor
     SgprPad2 _p33;
-    const void* ptr_v_descale;    // co:ptr_v_descale  V descale tensor
+    const void* ptr_v_descale; // co:ptr_v_descale  V descale tensor
     SgprPad2 _p34;
 
     // ---- FP8 descale strides -----------------------------------------------
-    unsigned int s_descale_q_Bs;  // co:descale_q_Bs  Q descale batch stride
+    unsigned int s_descale_q_Bs; // co:descale_q_Bs  Q descale batch stride
     SgprPad3 _p35;
-    unsigned int s_descale_q_Hs;  // co:descale_q_Hs  Q descale head stride
+    unsigned int s_descale_q_Hs; // co:descale_q_Hs  Q descale head stride
     SgprPad3 _p36;
-    unsigned int s_descale_k_Bs;  // co:descale_k_Bs  K descale batch stride
+    unsigned int s_descale_k_Bs; // co:descale_k_Bs  K descale batch stride
     SgprPad3 _p37;
-    unsigned int s_descale_k_Hs;  // co:descale_k_Hs  K descale head stride
+    unsigned int s_descale_k_Hs; // co:descale_k_Hs  K descale head stride
     SgprPad3 _p38;
-    unsigned int s_descale_v_Bs;  // co:descale_v_Bs  V descale batch stride
+    unsigned int s_descale_v_Bs; // co:descale_v_Bs  V descale batch stride
     SgprPad3 _p39;
-    unsigned int s_descale_v_Hs;  // co:descale_v_Hs  V descale head stride
+    unsigned int s_descale_v_Hs; // co:descale_v_Hs  V descale head stride
     SgprPad3 _p40;
 };
 

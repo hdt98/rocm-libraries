@@ -20,12 +20,14 @@
 #include <cstdlib>
 #include <string>
 
-namespace sdpa_kernel_provider::asm_kernels {
+namespace sdpa_kernel_provider::asm_kernels
+{
 
 inline auto getAsmKernelDir() -> std::string
 {
     const char* envDir = std::getenv("HIPDNN_AITER_ASM_DIR");
-    if (envDir != nullptr && envDir[0] != '\0') {
+    if(envDir != nullptr && envDir[0] != '\0')
+    {
         return {envDir};
     }
     return AITER_ASM_DIR;
