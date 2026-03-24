@@ -21,7 +21,7 @@ import json
 import os
 import subprocess
 import sys
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -1523,8 +1523,14 @@ def setup_multiple_fmha_dispatchers(
     failed_names: set = set()
 
     if compile_jobs:
-        if executor is not None:
-            for name, ok, err in executor.map(_run_compile_job, compile_jobs):
+        _own_pool = None
+        _pool = executor
+        if _pool is None:
+            workers = max_workers or min(len(compile_jobs), os.cpu_count() or 4)
+            _own_pool = ProcessPoolExecutor(max_workers=workers)
+            _pool = _own_pool
+        try:
+            for name, ok, err in _pool.map(_run_compile_job, compile_jobs):
                 if not ok:
                     failed_names.add(name)
                     if name not in results:
@@ -1532,16 +1538,9 @@ def setup_multiple_fmha_dispatchers(
                         results[name] = FmhaSetupResult(
                             success=False, config=cfg, error=f"Compile: {err}"
                         )
-        else:
-            for job in compile_jobs:
-                name, ok, err = _run_compile_job(job)
-                if not ok:
-                    failed_names.add(name)
-                    if name not in results:
-                        cfg, _ = config_dirs[name]
-                        results[name] = FmhaSetupResult(
-                            success=False, config=cfg, error=f"Compile: {err}"
-                        )
+        finally:
+            if _own_pool is not None:
+                _own_pool.shutdown(wait=True)
 
     # --- Stage 3: Link + load ---
     def _link_load(item):
