@@ -7,4 +7,4 @@ using TestTypes = ::testing::Types<std::tuple<ck_tile::half_t, ck_tile::fp8_t, s
 
 TYPED_TEST_SUITE(TestLoadAndConvert, TestTypes);
 
-TYPED_TEST(TestLoadAndConvert, Test) { this->RunTest(); }
+TYPED_TEST(TestLoadAndConvert, TestTransposeMixed) { this->RunTest(); }
