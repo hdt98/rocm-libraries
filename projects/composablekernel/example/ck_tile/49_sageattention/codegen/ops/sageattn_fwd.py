@@ -911,26 +911,26 @@ def get_product(receipt: int) -> Product:
             if problem_ctx.dtype in ["fp16", "bf16"]:
                 if kernel_ctx.pipeline.F_qscale != "no":
                     return False
-            # receipt=0: only NPerBlock=128
+            # receipt=0: only NPerBlock=64 (default, better perf)
             if problem_ctx.dtype not in ["fp16", "bf16"]:
-                if kernel_ctx.tile.F_bn0 != 128:
+                if kernel_ctx.tile.F_bn0 != 64:
                     return False
             return True
 
-        return Product(name="Default (NPerBlock=128)", rule=fit)
+        return Product(name="Default (NPerBlock=64)", rule=fit)
 
     elif receipt == 100:
         def fit(problem_ctx: ProblemContext, kernel_ctx: KernelContext) -> bool:
             if problem_ctx.dtype in ["fp16", "bf16"]:
                 if kernel_ctx.pipeline.F_qscale != "no":
                     return False
-            # receipt=100: only NPerBlock=64
+            # receipt=100: only NPerBlock=128
             if problem_ctx.dtype not in ["fp16", "bf16"]:
-                if kernel_ctx.tile.F_bn0 != 64:
+                if kernel_ctx.tile.F_bn0 != 128:
                     return False
             return True
 
-        return Product(name="NPerBlock=64", rule=fit)
+        return Product(name="NPerBlock=128", rule=fit)
 
     else:
         def fit(problem_ctx: ProblemContext, kernel_ctx: KernelContext) -> bool:
