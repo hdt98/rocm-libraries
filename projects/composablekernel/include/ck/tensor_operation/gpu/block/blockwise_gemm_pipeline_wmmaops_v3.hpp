@@ -4,7 +4,6 @@
 #pragma once
 
 #include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_wmmaops_base.hpp"
-#include "ck/utility/number.hpp"
 
 namespace ck {
 
@@ -435,64 +434,58 @@ struct BlockwiseGemmWmmaops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
 
                 b_scale_struct.template GlobalLoad<0>((i + 2) % num_loop_per_scale == 0);
 
-                static_for<0, KRepeat, 1>{}([&](auto k0) {
-                    static_for<0, MRepeat, 1>{}([&](auto m0) {
-                        static_for<0, NRepeat, 1>{}([&](auto n0) {
-                            static_for<0, KInner, 1>{}([&](auto k_inner) {
-                                vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
-                                vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
+                static_ford<Sequence<KRepeat, MRepeat, NRepeat, KInner>>{}([&](auto kmnk) {
+                    constexpr auto k0      = Number<kmnk[Number<0>{}]>{};
+                    constexpr auto m0      = Number<kmnk[Number<1>{}]>{};
+                    constexpr auto n0      = Number<kmnk[Number<2>{}]>{};
+                    constexpr auto k_inner = Number<kmnk[Number<3>{}]>{};
+                    vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
+                    vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
 
-                                using KK = index_expression::Add<
-                                    index_expression::Ik,
-                                    index_expression::Mult<ck::Number<k_inner>,
-                                                           ck::Number<KPerWaveBlock>>>;
+                    using KK = index_expression::Add<
+                        index_expression::Ik,
+                        index_expression::Mult<Number<k_inner>, Number<KPerWaveBlock>>>;
 
-                                auto loadA = thread_buf_to_vec_loader<
-                                    decltype(a_thread_vec),
-                                    decltype(a_thread_buf),
-                                    decltype(a_thread_desc_),
-                                    ComputeTypeA,
-                                    index_expression::Div<KK, ck::Number<A_K1>>,
-                                    decltype(m0),
-                                    decltype(k0),
-                                    Number<0>,
-                                    Number<0>,
-                                    Number<0>,
-                                    index_expression::Mod<KK, ck::Number<A_K1>>>(a_thread_vec,
-                                                                                 a_thread_buf);
+                    auto loadA = thread_buf_to_vec_loader<
+                        decltype(a_thread_vec),
+                        decltype(a_thread_buf),
+                        decltype(a_thread_desc_),
+                        ComputeTypeA,
+                        index_expression::Div<KK, Number<A_K1>>,
+                        decltype(m0),
+                        decltype(k0),
+                        Number<0>,
+                        Number<0>,
+                        Number<0>,
+                        index_expression::Mod<KK, Number<A_K1>>>(a_thread_vec, a_thread_buf);
 
-                                auto loadB = thread_buf_to_vec_loader<
-                                    decltype(b_thread_vec),
-                                    decltype(b_thread_buf),
-                                    decltype(b_thread_desc_),
-                                    ComputeTypeB,
-                                    index_expression::Div<KK, ck::Number<B_K1>>,
-                                    decltype(n0),
-                                    decltype(k0),
-                                    Number<0>,
-                                    Number<0>,
-                                    Number<0>,
-                                    index_expression::Mod<KK, ck::Number<B_K1>>>(b_thread_vec,
-                                                                                 b_thread_buf);
+                    auto loadB = thread_buf_to_vec_loader<
+                        decltype(b_thread_vec),
+                        decltype(b_thread_buf),
+                        decltype(b_thread_desc_),
+                        ComputeTypeB,
+                        index_expression::Div<KK, Number<B_K1>>,
+                        decltype(n0),
+                        decltype(k0),
+                        Number<0>,
+                        Number<0>,
+                        Number<0>,
+                        index_expression::Mod<KK, Number<B_K1>>>(b_thread_vec, b_thread_buf);
 
-                                static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
-                                static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
+                    static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
+                    static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
 
-                                using wmma_input_type_a =
-                                    typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
-                                using wmma_input_type_b =
-                                    typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
+                    using wmma_input_type_a =
+                        typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
+                    using wmma_input_type_b =
+                        typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
 
-                                constexpr index_t c_offset =
-                                    c_thread_desc_.CalculateOffset(make_tuple(m0, n0, I0));
+                    constexpr index_t c_offset =
+                        c_thread_desc_.CalculateOffset(make_tuple(m0, n0, I0));
 
-                                wmma_gemm.Run(
-                                    a_thread_vec.template AsType<wmma_input_type_a>(),
-                                    b_thread_vec.template AsType<wmma_input_type_b>(),
-                                    c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
-                            });
-                        });
-                    });
+                    wmma_gemm.Run(a_thread_vec.template AsType<wmma_input_type_a>(),
+                                  b_thread_vec.template AsType<wmma_input_type_b>(),
+                                  c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
                 });
 
                 block_sync_lds();
@@ -518,62 +511,55 @@ struct BlockwiseGemmWmmaops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
 
             b_scale_struct.template GlobalLoad<0>(num_loop % num_loop_per_scale == 0);
 
-            static_for<0, KRepeat, 1>{}([&](auto k0) {
-                static_for<0, MRepeat, 1>{}([&](auto m0) {
-                    static_for<0, NRepeat, 1>{}([&](auto n0) {
-                        vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
-                        vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
-                        static_for<0, KInner, 1>{}([&](auto k_inner) {
-                            using KK = index_expression::Add<
-                                index_expression::Ik,
-                                index_expression::Mult<ck::Number<k_inner>,
-                                                       ck::Number<KPerWaveBlock>>>;
+            static_ford<Sequence<KRepeat, MRepeat, NRepeat, KInner>>{}([&](auto kmnk) {
+                constexpr auto k0      = Number<kmnk[Number<0>{}]>{};
+                constexpr auto m0      = Number<kmnk[Number<1>{}]>{};
+                constexpr auto n0      = Number<kmnk[Number<2>{}]>{};
+                constexpr auto k_inner = Number<kmnk[Number<3>{}]>{};
+                vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
+                vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
 
-                            auto loadA = thread_buf_to_vec_loader<
-                                decltype(a_thread_vec),
-                                decltype(a_thread_buf),
-                                decltype(a_thread_desc_),
-                                ComputeTypeA,
-                                index_expression::Div<KK, ck::Number<A_K1>>,
-                                decltype(m0),
-                                decltype(k0),
-                                Number<0>,
-                                Number<0>,
-                                Number<0>,
-                                index_expression::Mod<KK, ck::Number<A_K1>>>(a_thread_vec,
-                                                                             a_thread_buf);
+                using KK = index_expression::Add<
+                    index_expression::Ik,
+                    index_expression::Mult<Number<k_inner>, Number<KPerWaveBlock>>>;
 
-                            auto loadB = thread_buf_to_vec_loader<
-                                decltype(b_thread_vec),
-                                decltype(b_thread_buf),
-                                decltype(b_thread_desc_),
-                                ComputeTypeB,
-                                index_expression::Div<KK, ck::Number<B_K1>>,
-                                decltype(n0),
-                                decltype(k0),
-                                Number<0>,
-                                Number<0>,
-                                Number<0>,
-                                index_expression::Mod<KK, ck::Number<B_K1>>>(b_thread_vec,
-                                                                             b_thread_buf);
+                auto loadA = thread_buf_to_vec_loader<
+                    decltype(a_thread_vec),
+                    decltype(a_thread_buf),
+                    decltype(a_thread_desc_),
+                    ComputeTypeA,
+                    index_expression::Div<KK, Number<A_K1>>,
+                    decltype(m0),
+                    decltype(k0),
+                    Number<0>,
+                    Number<0>,
+                    Number<0>,
+                    index_expression::Mod<KK, Number<A_K1>>>(a_thread_vec, a_thread_buf);
 
-                            static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
-                            static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
+                auto loadB = thread_buf_to_vec_loader<
+                    decltype(b_thread_vec),
+                    decltype(b_thread_buf),
+                    decltype(b_thread_desc_),
+                    ComputeTypeB,
+                    index_expression::Div<KK, Number<B_K1>>,
+                    decltype(n0),
+                    decltype(k0),
+                    Number<0>,
+                    Number<0>,
+                    Number<0>,
+                    index_expression::Mod<KK, Number<B_K1>>>(b_thread_vec, b_thread_buf);
 
-                            using wmma_input_type_a =
-                                typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
-                            using wmma_input_type_b =
-                                typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
+                static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
+                static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
 
-                            constexpr index_t c_offset =
-                                c_thread_desc_.CalculateOffset(make_tuple(m0, n0, I0));
+                using wmma_input_type_a = typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
+                using wmma_input_type_b = typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
 
-                            wmma_gemm.Run(a_thread_vec.template AsType<wmma_input_type_a>(),
-                                          b_thread_vec.template AsType<wmma_input_type_b>(),
-                                          c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
-                        });
-                    });
-                });
+                constexpr index_t c_offset = c_thread_desc_.CalculateOffset(make_tuple(m0, n0, I0));
+
+                wmma_gemm.Run(a_thread_vec.template AsType<wmma_input_type_a>(),
+                              b_thread_vec.template AsType<wmma_input_type_b>(),
+                              c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
             });
 
             block_sync_lds();
@@ -586,63 +572,55 @@ struct BlockwiseGemmWmmaops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
 
         // Tail, always perform.
         {
-            static_for<0, KRepeat, 1>{}([&](auto k0) {
-                static_for<0, MRepeat, 1>{}([&](auto m0) {
-                    static_for<0, NRepeat, 1>{}([&](auto n0) {
-                        static_for<0, KInner, 1>{}([&](auto k_inner) {
-                            vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
-                            vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
+            static_ford<Sequence<KRepeat, MRepeat, NRepeat, KInner>>{}([&](auto kmnk) {
+                constexpr auto k0      = Number<kmnk[Number<0>{}]>{};
+                constexpr auto m0      = Number<kmnk[Number<1>{}]>{};
+                constexpr auto n0      = Number<kmnk[Number<2>{}]>{};
+                constexpr auto k_inner = Number<kmnk[Number<3>{}]>{};
+                vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
+                vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
 
-                            using KK = index_expression::Add<
-                                index_expression::Ik,
-                                index_expression::Mult<ck::Number<k_inner>,
-                                                       ck::Number<KPerWaveBlock>>>;
+                using KK = index_expression::Add<
+                    index_expression::Ik,
+                    index_expression::Mult<Number<k_inner>, Number<KPerWaveBlock>>>;
 
-                            auto loadA = thread_buf_to_vec_loader<
-                                decltype(a_thread_vec),
-                                decltype(a_thread_buf),
-                                decltype(a_thread_desc_),
-                                ComputeTypeA,
-                                index_expression::Div<KK, ck::Number<A_K1>>,
-                                decltype(m0),
-                                decltype(k0),
-                                Number<0>,
-                                Number<0>,
-                                Number<0>,
-                                index_expression::Mod<KK, ck::Number<A_K1>>>(a_thread_vec,
-                                                                             a_thread_buf);
+                auto loadA = thread_buf_to_vec_loader<
+                    decltype(a_thread_vec),
+                    decltype(a_thread_buf),
+                    decltype(a_thread_desc_),
+                    ComputeTypeA,
+                    index_expression::Div<KK, Number<A_K1>>,
+                    decltype(m0),
+                    decltype(k0),
+                    Number<0>,
+                    Number<0>,
+                    Number<0>,
+                    index_expression::Mod<KK, Number<A_K1>>>(a_thread_vec, a_thread_buf);
 
-                            auto loadB = thread_buf_to_vec_loader<
-                                decltype(b_thread_vec),
-                                decltype(b_thread_buf),
-                                decltype(b_thread_desc_),
-                                ComputeTypeB,
-                                index_expression::Div<KK, ck::Number<B_K1>>,
-                                decltype(n0),
-                                decltype(k0),
-                                Number<0>,
-                                Number<0>,
-                                Number<0>,
-                                index_expression::Mod<KK, ck::Number<B_K1>>>(b_thread_vec,
-                                                                             b_thread_buf);
+                auto loadB = thread_buf_to_vec_loader<
+                    decltype(b_thread_vec),
+                    decltype(b_thread_buf),
+                    decltype(b_thread_desc_),
+                    ComputeTypeB,
+                    index_expression::Div<KK, Number<B_K1>>,
+                    decltype(n0),
+                    decltype(k0),
+                    Number<0>,
+                    Number<0>,
+                    Number<0>,
+                    index_expression::Mod<KK, Number<B_K1>>>(b_thread_vec, b_thread_buf);
 
-                            static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
-                            static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
+                static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
+                static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
 
-                            using wmma_input_type_a =
-                                typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
-                            using wmma_input_type_b =
-                                typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
+                using wmma_input_type_a = typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
+                using wmma_input_type_b = typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
 
-                            constexpr index_t c_offset =
-                                c_thread_desc_.CalculateOffset(make_tuple(m0, n0, I0));
+                constexpr index_t c_offset = c_thread_desc_.CalculateOffset(make_tuple(m0, n0, I0));
 
-                            wmma_gemm.Run(a_thread_vec.template AsType<wmma_input_type_a>(),
-                                          b_thread_vec.template AsType<wmma_input_type_b>(),
-                                          c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
-                        });
-                    });
-                });
+                wmma_gemm.Run(a_thread_vec.template AsType<wmma_input_type_a>(),
+                              b_thread_vec.template AsType<wmma_input_type_b>(),
+                              c_thread_buf.GetVectorTypeReference(Number<c_offset>{}));
             });
             // Let's leak last WMMA block to epilogue region, cover the potential lds-shuffle
             // latency
@@ -780,65 +758,62 @@ struct BlockwiseGemmWmmaops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
                 a_scale_struct.template GlobalLoad<0>((i + 2) % num_loop_per_scale == 0);
                 b_scale_struct.template GlobalLoad<0>((i + 2) % num_loop_per_scale == 0);
 
-                static_for<0, MRepeat, 1>{}([&](auto m0) {
-                    static_for<0, NRepeat, 1>{}([&](auto n0) {
-                        static_for<0, NumScaleKBlock, 1>{}([&](auto kscale0) {
-                            c_scale_struct.Clear();
-                            static_for<0, KRepeat / NumScaleKBlock, 1>{}([&](auto k0) {
-                                static_for<0, KInner, 1>{}([&](auto k_inner) {
-                                    vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
-                                    vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
-                                    constexpr index_t k_index =
-                                        kscale0 * (KRepeat / NumScaleKBlock) + k0;
-                                    using KK = index_expression::Add<
-                                        index_expression::Ik,
-                                        index_expression::Mult<ck::Number<k_inner>,
-                                                               ck::Number<KPerWaveBlock>>>;
+                static_ford<Sequence<MRepeat, NRepeat, NumScaleKBlock>>{}([&](auto mnk) {
+                    constexpr auto m0      = Number<mnk[Number<0>{}]>{};
+                    constexpr auto n0      = Number<mnk[Number<1>{}]>{};
+                    constexpr auto kscale0 = Number<mnk[Number<2>{}]>{};
+                    c_scale_struct.Clear();
+                    static_ford<Sequence<KRepeat / NumScaleKBlock, KInner>>{}([&](auto kk_id) {
+                        constexpr auto k0      = Number<kk_id[Number<0>{}]>{};
+                        constexpr auto k_inner = Number<kk_id[Number<1>{}]>{};
+                        vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
+                        vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
+                        constexpr index_t k_index = kscale0 * (KRepeat / NumScaleKBlock) + k0;
 
-                                    auto loadA = thread_buf_to_vec_loader<
-                                        decltype(a_thread_vec),
-                                        decltype(a_thread_buf),
-                                        decltype(a_thread_desc_),
-                                        ComputeTypeA,
-                                        index_expression::Div<KK, ck::Number<A_K1>>,
-                                        decltype(m0),
-                                        decltype(k_index),
-                                        Number<0>,
-                                        Number<0>,
-                                        Number<0>,
-                                        index_expression::Mod<KK, ck::Number<A_K1>>>(a_thread_vec,
-                                                                                     a_thread_buf);
+                        using KK = index_expression::Add<
+                            index_expression::Ik,
+                            index_expression::Mult<Number<k_inner>, Number<KPerWaveBlock>>>;
 
-                                    auto loadB = thread_buf_to_vec_loader<
-                                        decltype(b_thread_vec),
-                                        decltype(b_thread_buf),
-                                        decltype(b_thread_desc_),
-                                        ComputeTypeB,
-                                        index_expression::Div<KK, ck::Number<B_K1>>,
-                                        decltype(n0),
-                                        decltype(k_index),
-                                        Number<0>,
-                                        Number<0>,
-                                        Number<0>,
-                                        index_expression::Mod<KK, ck::Number<B_K1>>>(b_thread_vec,
-                                                                                     b_thread_buf);
+                        auto loadA = thread_buf_to_vec_loader<
+                            decltype(a_thread_vec),
+                            decltype(a_thread_buf),
+                            decltype(a_thread_desc_),
+                            ComputeTypeA,
+                            index_expression::Div<KK, Number<A_K1>>,
+                            decltype(m0),
+                            decltype(k_index),
+                            Number<0>,
+                            Number<0>,
+                            Number<0>,
+                            index_expression::Mod<KK, Number<A_K1>>>(a_thread_vec, a_thread_buf);
 
-                                    static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
-                                    static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
-                                    using wmma_input_type_a =
-                                        typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
-                                    using wmma_input_type_b =
-                                        typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
+                        auto loadB = thread_buf_to_vec_loader<
+                            decltype(b_thread_vec),
+                            decltype(b_thread_buf),
+                            decltype(b_thread_desc_),
+                            ComputeTypeB,
+                            index_expression::Div<KK, Number<B_K1>>,
+                            decltype(n0),
+                            decltype(k_index),
+                            Number<0>,
+                            Number<0>,
+                            Number<0>,
+                            index_expression::Mod<KK, Number<B_K1>>>(b_thread_vec, b_thread_buf);
 
-                                    wmma_gemm.Run(a_thread_vec.template AsType<wmma_input_type_a>(),
-                                                  b_thread_vec.template AsType<wmma_input_type_b>(),
-                                                  c_scale_struct.c_thread_buf_per_scale
-                                                      .GetVectorTypeReference(Number<0>{}));
-                                });
-                            });
-                            c_scale_struct.template UpdateCThreadBuf<kscale0, m0, n0>(c_thread_buf);
-                        });
+                        static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
+                        static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
+
+                        using wmma_input_type_a =
+                            typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
+                        using wmma_input_type_b =
+                            typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
+
+                        wmma_gemm.Run(a_thread_vec.template AsType<wmma_input_type_a>(),
+                                      b_thread_vec.template AsType<wmma_input_type_b>(),
+                                      c_scale_struct.c_thread_buf_per_scale.GetVectorTypeReference(
+                                          Number<0>{}));
                     });
+                    c_scale_struct.template UpdateCThreadBuf<kscale0, m0, n0>(c_thread_buf);
                 });
 
                 c_scale_struct.Load(a_scale_struct, b_scale_struct);
@@ -865,68 +840,62 @@ struct BlockwiseGemmWmmaops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
             a_scale_struct.template GlobalLoad<0>(num_loop % num_loop_per_scale == 0);
             b_scale_struct.template GlobalLoad<0>(num_loop % num_loop_per_scale == 0);
 
-            static_for<0, MRepeat, 1>{}([&](auto m0) {
-                static_for<0, NRepeat, 1>{}([&](auto n0) {
-                    static_for<0, NumScaleKBlock, 1>{}([&](auto kscale0) {
-                        c_scale_struct.Clear();
-                        static_for<0, KRepeat / NumScaleKBlock, 1>{}([&](auto k0) {
-                            static_for<0, KInner, 1>{}([&](auto k_inner) {
-                                vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
-                                vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
+            static_ford<Sequence<MRepeat, NRepeat, NumScaleKBlock>>{}([&](auto mnk) {
+                constexpr auto m0      = Number<mnk[Number<0>{}]>{};
+                constexpr auto n0      = Number<mnk[Number<1>{}]>{};
+                constexpr auto kscale0 = Number<mnk[Number<2>{}]>{};
+                c_scale_struct.Clear();
+                static_ford<Sequence<KRepeat / NumScaleKBlock, KInner>>{}([&](auto kk_id) {
+                    constexpr auto k0      = Number<kk_id[Number<0>{}]>{};
+                    constexpr auto k_inner = Number<kk_id[Number<1>{}]>{};
+                    vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
+                    vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
+                    constexpr index_t k_index = kscale0 * (KRepeat / NumScaleKBlock) + k0;
 
-                                constexpr index_t k_index =
-                                    kscale0 * (KRepeat / NumScaleKBlock) + k0;
-                                using KK = index_expression::Add<
-                                    index_expression::Ik,
-                                    index_expression::Mult<ck::Number<k_inner>,
-                                                           ck::Number<KPerWaveBlock>>>;
+                    using KK = index_expression::Add<
+                        index_expression::Ik,
+                        index_expression::Mult<Number<k_inner>, Number<KPerWaveBlock>>>;
 
-                                auto loadA = thread_buf_to_vec_loader<
-                                    decltype(a_thread_vec),
-                                    decltype(a_thread_buf),
-                                    decltype(a_thread_desc_),
-                                    ComputeTypeA,
-                                    index_expression::Div<KK, ck::Number<A_K1>>,
-                                    decltype(m0),
-                                    decltype(k_index),
-                                    Number<0>,
-                                    Number<0>,
-                                    Number<0>,
-                                    index_expression::Mod<KK, ck::Number<A_K1>>>(a_thread_vec,
-                                                                                 a_thread_buf);
+                    auto loadA = thread_buf_to_vec_loader<
+                        decltype(a_thread_vec),
+                        decltype(a_thread_buf),
+                        decltype(a_thread_desc_),
+                        ComputeTypeA,
+                        index_expression::Div<KK, Number<A_K1>>,
+                        decltype(m0),
+                        decltype(k_index),
+                        Number<0>,
+                        Number<0>,
+                        Number<0>,
+                        index_expression::Mod<KK, Number<A_K1>>>(a_thread_vec, a_thread_buf);
 
-                                auto loadB = thread_buf_to_vec_loader<
-                                    decltype(b_thread_vec),
-                                    decltype(b_thread_buf),
-                                    decltype(b_thread_desc_),
-                                    ComputeTypeB,
-                                    index_expression::Div<KK, ck::Number<B_K1>>,
-                                    decltype(n0),
-                                    decltype(k_index),
-                                    Number<0>,
-                                    Number<0>,
-                                    Number<0>,
-                                    index_expression::Mod<KK, ck::Number<B_K1>>>(b_thread_vec,
-                                                                                 b_thread_buf);
+                    auto loadB = thread_buf_to_vec_loader<
+                        decltype(b_thread_vec),
+                        decltype(b_thread_buf),
+                        decltype(b_thread_desc_),
+                        ComputeTypeB,
+                        index_expression::Div<KK, Number<B_K1>>,
+                        decltype(n0),
+                        decltype(k_index),
+                        Number<0>,
+                        Number<0>,
+                        Number<0>,
+                        index_expression::Mod<KK, Number<B_K1>>>(b_thread_vec, b_thread_buf);
 
-                                static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
-                                static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
+                    static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
+                    static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
 
-                                using wmma_input_type_a =
-                                    typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
-                                using wmma_input_type_b =
-                                    typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
+                    using wmma_input_type_a =
+                        typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
+                    using wmma_input_type_b =
+                        typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
 
-                                wmma_gemm.Run(
-                                    a_thread_vec.template AsType<wmma_input_type_a>(),
-                                    b_thread_vec.template AsType<wmma_input_type_b>(),
-                                    c_scale_struct.c_thread_buf_per_scale.GetVectorTypeReference(
-                                        Number<0>{}));
-                            });
-                        });
-                        c_scale_struct.template UpdateCThreadBuf<kscale0, m0, n0>(c_thread_buf);
-                    });
+                    wmma_gemm.Run(
+                        a_thread_vec.template AsType<wmma_input_type_a>(),
+                        b_thread_vec.template AsType<wmma_input_type_b>(),
+                        c_scale_struct.c_thread_buf_per_scale.GetVectorTypeReference(Number<0>{}));
                 });
+                c_scale_struct.template UpdateCThreadBuf<kscale0, m0, n0>(c_thread_buf);
             });
 
             c_scale_struct.Load(a_scale_struct, b_scale_struct);
@@ -940,67 +909,62 @@ struct BlockwiseGemmWmmaops_pipeline_v3<BlockGemmPipelineScheduler::Intrawave,
 
         // Tail, always perform.
         {
-            static_for<0, MRepeat, 1>{}([&](auto m0) {
-                static_for<0, NRepeat, 1>{}([&](auto n0) {
-                    static_for<0, NumScaleKBlock, 1>{}([&](auto kscale0) {
-                        c_scale_struct.Clear();
-                        static_for<0, KRepeat / NumScaleKBlock, 1>{}([&](auto k0) {
-                            vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
-                            vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
-                            static_for<0, KInner, 1>{}([&](auto k_inner) {
-                                constexpr index_t k_index =
-                                    kscale0 * (KRepeat / NumScaleKBlock) + k0;
-                                using KK = index_expression::Add<
-                                    index_expression::Ik,
-                                    index_expression::Mult<ck::Number<k_inner>,
-                                                           ck::Number<KPerWaveBlock>>>;
+            static_ford<Sequence<MRepeat, NRepeat, NumScaleKBlock>>{}([&](auto mnk) {
+                constexpr auto m0      = Number<mnk[Number<0>{}]>{};
+                constexpr auto n0      = Number<mnk[Number<1>{}]>{};
+                constexpr auto kscale0 = Number<mnk[Number<2>{}]>{};
+                c_scale_struct.Clear();
+                static_ford<Sequence<KRepeat / NumScaleKBlock, KInner>>{}([&](auto kk_id) {
+                    constexpr auto k0      = Number<kk_id[Number<0>{}]>{};
+                    constexpr auto k_inner = Number<kk_id[Number<1>{}]>{};
+                    vector_type<ComputeTypeA, KPack / A_KRow / KInner> a_thread_vec;
+                    vector_type<ComputeTypeB, KPack / B_KRow / KInner> b_thread_vec;
+                    constexpr index_t k_index = kscale0 * (KRepeat / NumScaleKBlock) + k0;
 
-                                auto loadA = thread_buf_to_vec_loader<
-                                    decltype(a_thread_vec),
-                                    decltype(a_thread_buf),
-                                    decltype(a_thread_desc_),
-                                    ComputeTypeA,
-                                    index_expression::Div<KK, ck::Number<A_K1>>,
-                                    decltype(m0),
-                                    decltype(k_index),
-                                    Number<0>,
-                                    Number<0>,
-                                    Number<0>,
-                                    index_expression::Mod<KK, ck::Number<A_K1>>>(a_thread_vec,
-                                                                                 a_thread_buf);
+                    using KK = index_expression::Add<
+                        index_expression::Ik,
+                        index_expression::Mult<Number<k_inner>, Number<KPerWaveBlock>>>;
 
-                                auto loadB = thread_buf_to_vec_loader<
-                                    decltype(b_thread_vec),
-                                    decltype(b_thread_buf),
-                                    decltype(b_thread_desc_),
-                                    ComputeTypeB,
-                                    index_expression::Div<KK, ck::Number<B_K1>>,
-                                    decltype(n0),
-                                    decltype(k_index),
-                                    Number<0>,
-                                    Number<0>,
-                                    Number<0>,
-                                    index_expression::Mod<KK, ck::Number<B_K1>>>(b_thread_vec,
-                                                                                 b_thread_buf);
+                    auto loadA = thread_buf_to_vec_loader<
+                        decltype(a_thread_vec),
+                        decltype(a_thread_buf),
+                        decltype(a_thread_desc_),
+                        ComputeTypeA,
+                        index_expression::Div<KK, Number<A_K1>>,
+                        decltype(m0),
+                        decltype(k_index),
+                        Number<0>,
+                        Number<0>,
+                        Number<0>,
+                        index_expression::Mod<KK, Number<A_K1>>>(a_thread_vec, a_thread_buf);
 
-                                static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
-                                static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
+                    auto loadB = thread_buf_to_vec_loader<
+                        decltype(b_thread_vec),
+                        decltype(b_thread_buf),
+                        decltype(b_thread_desc_),
+                        ComputeTypeB,
+                        index_expression::Div<KK, Number<B_K1>>,
+                        decltype(n0),
+                        decltype(k_index),
+                        Number<0>,
+                        Number<0>,
+                        Number<0>,
+                        index_expression::Mod<KK, Number<B_K1>>>(b_thread_vec, b_thread_buf);
 
-                                using wmma_input_type_a =
-                                    typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
-                                using wmma_input_type_b =
-                                    typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
+                    static_for<0, KPack / A_KRow / KInner, 1>{}(loadA);
+                    static_for<0, KPack / B_KRow / KInner, 1>{}(loadB);
 
-                                wmma_gemm.Run(
-                                    a_thread_vec.template AsType<wmma_input_type_a>(),
-                                    b_thread_vec.template AsType<wmma_input_type_b>(),
-                                    c_scale_struct.c_thread_buf_per_scale.GetVectorTypeReference(
-                                        Number<0>{}));
-                            });
-                        });
-                        c_scale_struct.template UpdateCThreadBuf<kscale0, m0, n0>(c_thread_buf);
-                    });
+                    using wmma_input_type_a =
+                        typename vector_type<ComputeTypeA, WmmaK / A_KRow>::type;
+                    using wmma_input_type_b =
+                        typename vector_type<ComputeTypeB, WmmaK / B_KRow>::type;
+
+                    wmma_gemm.Run(
+                        a_thread_vec.template AsType<wmma_input_type_a>(),
+                        b_thread_vec.template AsType<wmma_input_type_b>(),
+                        c_scale_struct.c_thread_buf_per_scale.GetVectorTypeReference(Number<0>{}));
                 });
+                c_scale_struct.template UpdateCThreadBuf<kscale0, m0, n0>(c_thread_buf);
             });
             // Let's leak last WMMA block to epilogue region, cover the potential lds-shuffle
             // latency
