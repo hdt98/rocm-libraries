@@ -96,7 +96,7 @@ All variants now use the generic `Args` struct (1408 bytes) from `include/rocm_c
 | `tensors[2]` | C/E (output) | `[M, N]` with layout-dependent strides |
 | `tensors[3]` | D0 (optional) | `[M, N]` — present for fused epilogue |
 
-`runGemm<K>` unpacks tensors and extracts leading dimension strides based on layout (RowMajor → `strides[0]`, ColMajor → `strides[1]`). The device code branches on `K.num_d_tensors` with `if constexpr` — each branch is compiled away.
+`runGemm<K>` unpacks tensors and extracts leading dimension strides based on layout (RowMajor → `strides[0]`, ColMajor → `strides[1]`). The device code branches on `K.num_d_tensors` with `if constexpr` — each branch is compiled away. On the host side, the resolved signature determines which optional tensor slots to populate: `variant.resolved.find_tensor("bias")` returns the D0 slot index (or -1 if the variant has no bias tensor).
 
 > **Design evolution**: The original per-epilogue structs (`GemmArgs`, `GemmArgs1D`) kept the ABI minimal but required new structs for each D-tensor count. The generic Args eliminates this — adding D tensors is just populating more slots. The GPU only loads fields it reads, so the larger struct costs nothing at runtime.
 

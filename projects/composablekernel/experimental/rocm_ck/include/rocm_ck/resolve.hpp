@@ -136,6 +136,26 @@ struct ResolvedSignature
                 return i;
         throw "scalar not found in resolved signature";
     }
+
+    /// Find a tensor slot index by name. Returns -1 if not found.
+    /// Unlike tensor_index() (consteval), callable at both compile time and runtime.
+    constexpr int find_tensor(std::string_view name) const
+    {
+        for(int i = 0; i < num_tensors; ++i)
+            if(tensors[i].name == name)
+                return i;
+        return -1;
+    }
+
+    /// Find a scalar slot index by name. Returns -1 if not found.
+    /// Unlike scalar_index() (consteval), callable at both compile time and runtime.
+    constexpr int find_scalar(std::string_view name) const
+    {
+        for(int i = 0; i < num_scalars; ++i)
+            if(scalars[i].name == name)
+                return i;
+        return -1;
+    }
 };
 
 // ============================================================================
