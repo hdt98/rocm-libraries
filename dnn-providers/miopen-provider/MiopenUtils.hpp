@@ -20,7 +20,7 @@
 #define LOG_ON_MIOPEN_FAILURE(status)                                                           \
     do                                                                                          \
     {                                                                                           \
-        if(status != miopenStatusSuccess)                                                       \
+        if((status) != miopenStatusSuccess)                                                     \
         {                                                                                       \
             HIPDNN_PLUGIN_LOG_ERROR("MIOpen error occurred: " << miopenGetErrorString(status)); \
         }                                                                                       \
@@ -29,7 +29,7 @@
 #define THROW_ON_MIOPEN_FAILURE(status)                                                 \
     do                                                                                  \
     {                                                                                   \
-        if(status != miopenStatusSuccess)                                               \
+        if((status) != miopenStatusSuccess)                                             \
         {                                                                               \
             throw hipdnn_plugin_sdk::HipdnnPluginException(                             \
                 HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,                                    \
@@ -79,6 +79,12 @@ public:
             HIPDNN_PLUGIN_LOG_ERROR(
                 "Failed to set tuning policy: " << miopenGetErrorString(status));
         }
+        else
+        {
+            HIPDNN_PLUGIN_LOG_INFO("Tuning policy set to "
+                                   << static_cast<int>(policy)
+                                   << " (benchmarking=" << benchmarkingEnabled << ")");
+        }
     }
 
     /// @brief Destructor restores tuning policy to original value.
@@ -89,6 +95,11 @@ public:
         {
             HIPDNN_PLUGIN_LOG_ERROR(
                 "Failed to restore tuning policy: " << miopenGetErrorString(status));
+        }
+        else
+        {
+            HIPDNN_PLUGIN_LOG_INFO("Tuning policy restored to "
+                                   << static_cast<int>(_originalPolicy));
         }
     }
 
@@ -105,18 +116,18 @@ private:
     miopenTuningPolicy_t _originalPolicy{miopenTuningPolicyNone};
 };
 
-#define HIPDNN_PREPEND_MESSAGE_ON_THROW(statement, message)                               \
-    do                                                                                    \
-    {                                                                                     \
-        try                                                                               \
-        {                                                                                 \
-            statement;                                                                    \
-        }                                                                                 \
-        catch(hipdnn_plugin_sdk::HipdnnPluginException error)                             \
-        {                                                                                 \
-            throw hipdnn_plugin_sdk::HipdnnPluginException(error.getStatus(),             \
-                                                           message + error.getMessage()); \
-        }                                                                                 \
+#define HIPDNN_PREPEND_MESSAGE_ON_THROW(statement, message)                                 \
+    do                                                                                      \
+    {                                                                                       \
+        try                                                                                 \
+        {                                                                                   \
+            statement;                                                                      \
+        }                                                                                   \
+        catch(hipdnn_plugin_sdk::HipdnnPluginException error)                               \
+        {                                                                                   \
+            throw hipdnn_plugin_sdk::HipdnnPluginException(error.getStatus(),               \
+                                                           (message) + error.getMessage()); \
+        }                                                                                   \
     } while(0)
 
 namespace miopen_plugin::miopen_utils
