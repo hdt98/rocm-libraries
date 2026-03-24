@@ -7,10 +7,15 @@
 #include "ck_tile/ops/common.hpp"
 #include "kernel.hpp"
 
-#define MONOTONIC_SEQUENCE 0
-#define IDENTITY 1
-#define UNIFORM_DISTRIBUTION 2
-#define MATRIX_TYPE UNIFORM_DISTRIBUTION
+// Enum struct specifying what kind of test matrix to use
+enum struct TestMatrixType
+{
+    MonotonicSequence   = 0,
+    Identity            = 1,
+    UniformDistribution = 2
+};
+
+static constexpr auto matrix_type = TestMatrixType::UniformDistribution;
 
 #define PRINT_MATRICES 0
 
@@ -62,16 +67,22 @@ class TestLoadAndConvert : public ::testing::Test
 
         ck_tile::HostTensor<XDataType> h_a({M, K});
         ck_tile::HostTensor<YDataType> h_c({M, K});
-#if MATRIX_TYPE == MONOTONIC_SEQUENCE
-        ck_tile::HostTensor<float> h_a_tmp({M, K});
-        ck_tile::FillMonotonicSeq<float>{0.0, 0.1}(h_a_tmp);
-        ck_tile::reference_unary_elementwise<float, XDataType, float>(
-            h_a_tmp, h_a, [](const auto& x) { return x; });
-#elif MATRIX_TYPE == IDENTITY
-        ck_tile::FillIdentity<XDataType>{M, K}(h_a);
-#else
-        ck_tile::FillUniformDistributionIntegerValue<XDataType>{-5.0, 5.0}(h_a);
-#endif
+
+        if constexpr(matrix_type == TestMatrixType::MonotonicSequence)
+        {
+            ck_tile::HostTensor<float> h_a_tmp({M, K});
+            ck_tile::FillMonotonicSeq<float>{0.0, 0.1}(h_a_tmp);
+            ck_tile::reference_unary_elementwise<float, XDataType, float>(
+                h_a_tmp, h_a, [](const auto& x) { return x; });
+        }
+        else if constexpr(matrix_type == TestMatrixType::Identity)
+        {
+            ck_tile::FillIdentity<XDataType>{M, K}(h_a);
+        }
+        else
+        {
+            ck_tile::FillUniformDistributionIntegerValue<XDataType>{-5.0, 5.0}(h_a);
+        }
 
         ck_tile::DeviceMem d_a(h_a.get_element_space_size_in_bytes());
         ck_tile::DeviceMem d_c(h_c.get_element_space_size_in_bytes());
