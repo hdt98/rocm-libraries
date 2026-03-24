@@ -418,7 +418,8 @@ struct UniversalGemmKernel
             }
         }
 
-        if(kargs.K < GemmPipeline::BlockGemmShape::WarpTile::at(number<2>{}) * kargs.k_batch)
+        if(integer_divide_ceil(kargs.K, GemmPipeline::BlockGemmShape::WarpTile::at(number<2>{})) <
+           kargs.k_batch)
         {
             if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
             {
@@ -1156,9 +1157,13 @@ struct UniversalGemmKernel
         }
         else
         {
-            auto c_block_window = MakeCBlockWindows<memory_operation_enum::atomic_add>(
-                e_ptr, kargs, block_idx_m, block_idx_n);
-            EpiloguePipeline{}(c_block_window, c_block_tile, ds_block_window, smem_ptr);
+            if constexpr(EpiloguePipeline::GetVectorSizeC() % 2 == 0 ||
+                         !is_any_of<EDataType, fp16_t, bf16_t>::value)
+            {
+                auto c_block_window = MakeCBlockWindows<memory_operation_enum::atomic_add>(
+                    e_ptr, kargs, block_idx_m, block_idx_n);
+                EpiloguePipeline{}(c_block_window, c_block_tile, ds_block_window, smem_ptr);
+            }
         }
     }
 
