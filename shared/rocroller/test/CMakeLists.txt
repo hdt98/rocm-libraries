@@ -29,19 +29,17 @@ endif()
 add_executable(rocroller-tests)
 
 if(ROCROLLER_ENABLE_CATCH)
-    if(ROCROLLER_ENABLE_CATCH)
-        find_package(Catch2 QUIET)
-        if(NOT Catch2_FOUND)
-            if(ROCROLLER_ENABLE_FETCH)
-                FetchContent_Declare(
-                    Catch2
-                    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-                    GIT_TAG devel
-                )
-                FetchContent_MakeAvailable(Catch2)
-            else()
-                message(FATAL_ERROR "Failed to find Catch2")
-            endif()
+    find_package(Catch2 QUIET)
+    if(NOT Catch2_FOUND)
+        if(ROCROLLER_ENABLE_FETCH)
+            FetchContent_Declare(
+                Catch2
+                GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+                GIT_TAG devel
+            )
+            FetchContent_MakeAvailable(Catch2)
+        else()
+            message(FATAL_ERROR "Failed to find Catch2")
         endif()
     endif()
 
@@ -80,13 +78,11 @@ endif()
 if(ROCROLLER_ENABLE_ROCPROF_ANALYZER)
     add_executable(rocroller-tests-rocprofiler)
 
-    if(ROCROLLER_ENABLE_ROCPROF_ANALYZER)
-        rocroller_target_configure_sanitizers(rocroller-tests-rocprofiler PRIVATE)
-        set_target_properties(rocroller-tests-rocprofiler
-            PROPERTIES
-                CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
-        )
-    endif()
+    rocroller_target_configure_sanitizers(rocroller-tests-rocprofiler PRIVATE)
+    set_target_properties(rocroller-tests-rocprofiler
+        PROPERTIES
+            CROSSCOMPILING_EMULATOR "${CMAKE_COMMAND};-E;env;${asan_opts}"
+    )
 
     add_subdirectory(rocprofiler)
 endif()
