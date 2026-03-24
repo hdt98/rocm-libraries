@@ -35,8 +35,8 @@ option(ROCROLLER_ENABLE_ASAN "Enable addresss sanitizers." OFF)
 option(ROCROLLER_ENABLE_PREGENERATED_ARCH_DEF "Use the pregenerates GPU architecture definition YAML file(s) in the repository." ON)
 set(ROCROLLER_MRISAS_DIR "${CMAKE_CURRENT_BINARY_DIR}/GPUArchitectureGenerator/amd-mrisa" CACHE STRING "Path to directory containing MRISA XML files.")
 
-if(NOT ROCROLLER_ENABLE_CATCH)
-    set(ROCROLLER_ENABLE_ROCPROF_ANALYZER OFF CACHE BOOL "Dependent feature (forced OFF by ROCROLLER_ENABLE_CATCH)" FORCE)
+if(ROCROLLER_ENABLE_ROCPROF_ANALYZER AND NOT ROCROLLER_ENABLE_CATCH)
+    message(FATAL_ERROR "ROCROLLER_ENABLE_ROCPROF_ANALYZER requires Catch enabled")
 endif()
 
 if(ROCROLLER_ENABLE_TEST_DISCOVERY)
