@@ -699,7 +699,6 @@ class KernelWriterAssembly(KernelWriter):
       module.add(self.defineSgpr("LDSBufferReadInc", 1))
       module.add(self.defineSgpr("LDSBufferWriteInc", 1))
 
-
     needPackK16  = False
     needPackK8Lw = False
     needPackK8Hi = False
@@ -5293,8 +5292,8 @@ class KernelWriterAssembly(KernelWriter):
     module = Module("declareStaggerParms")
     #Calculate StaggerUIter
     with self.allocTmpSgpr(4) as tmpSgprInfo:
-      beginStaggerUIterLabel = Label("beginStaggerUIter",comment="")
-      endStaggerUIterLabel = Label("endStaggerUIter", comment="")
+      beginStaggerUIterLabel = Label(self.labels.getNameInc("beginStaggerUIter"),comment="")
+      endStaggerUIterLabel = Label(self.labels.getNameInc("endStaggerUIter"), comment="")
       tmpSgpr = tmpSgprInfo.idx
       currentStaggerU = tmpSgpr
       shiftedStaggerU = tmpSgpr + 1
@@ -5326,9 +5325,10 @@ class KernelWriterAssembly(KernelWriter):
       module.add(SCSelectB32(dst=sgpr("StaggerUIter"), src0=sgpr(staggerUMask), src1=0, comment="set Mask"))
 
       staggerInput = tmpSgpr
-      staggerLabel = Label("staggerInputEnd", comment="")
+      staggerLabel = Label(self.labels.getNameInc("staggerInputEnd"), comment="")
+      staggerMapLabelNames = [self.labels.getNameInc("StaggerUMapping") for _ in range(5)]
       for i in range(0, 5):
-        label = Label("StaggerUMapping_%d"%(i + 1), comment="")
+        label = Label(staggerMapLabelNames[i], comment="")
         module.add(SCmpEQU32(src0=sgpr(staggerUMapping), src1=hex(i << 13)))
         if i != 4:
           module.add(SCBranchSCC0(labelName=label.getLabelName()))
@@ -16141,6 +16141,155 @@ class KernelWriterAssembly(KernelWriter):
       module.add(activation.assignGpr(actModule, tmpVgpr, tmpSgpr))
     activation.setSaturationForInt8(False)
     activation.setVgprPrefixFormat("")
+    return module
+
+  ##############################################################################
+  # Re-define variable SGPRs that endSummation freed so setupNewTile can
+  # run in the prefetch-across-persistent tail.
+  #
+  # Strategy:
+  #   1. Free all store-phase SGPRs (SrdC/D, SrdScale*, etc.) that
+  #      endSummation allocated inside the freed variable SGPR slots.
+  #      This restores the exact pool state that defineVariableSgprs saw.
+  #   2. Re-allocate each variable SGPR with defineSgpr (which calls
+  #      checkOutAligned).  Because the store-phase slots were freed in
+  #      step 1, checkOutAligned finds the SAME indices as the original
+  #      allocation — the generated .set directives point to the same
+  #      physical registers used by the normal setupNewTile path.
+  #   3. Add each to freeSgprVarPool so that removeGRSrd/Offsets inside
+  #      setupNewTile can reclaim them normally (identical to the flow
+  #      after defineVariableSgprs).
+  ##############################################################################
+  def redefineVariableSgprsForPrefetch(self, kernel):
+    module = Module("RedefineVariableSgprsForPrefetch")
+
+    # --- Step 1: free all store-phase SGPRs (same logic as endSummation) ---
+    spool = self.sgprPool.getPool()
+    lastRegTag = ""
+    for i in range(0, self.sgprPool.size()):
+      regTag = spool[i].tag
+      if regTag != lastRegTag:
+        lastRegTag = regTag
+        if (lastRegTag not in self.states.nonPostLoopSgpr) and \
+           (spool[i].status == RegisterPool.Status.InUse):
+          module.add(self.undefineSgpr(regTag))
+
+    # --- Step 2 & 3: mirror defineVariableSgprs allocation + pool setup ---
+    if kernel["BufferLoad"]:
+      if not kernel["enableTDMA"]:
+        module.add(self.defineSgpr("SrdA", 4, 4))
+        self.addSgprVarToPool("SrdA")
+      if not kernel["enableTDMB"]:
+        module.add(self.defineSgpr("SrdB", 4, 4))
+        self.addSgprVarToPool("SrdB")
+      if kernel["ProblemType"]["MXBlockA"] and not kernel["enableTDMA"]:
+        module.add(self.defineSgpr("SrdMXSA", 4, 4))
+        self.addSgprVarToPool("SrdMXSA")
+      if kernel["ProblemType"]["MXBlockB"] and not kernel["enableTDMB"]:
+        module.add(self.defineSgpr("SrdMXSB", 4, 4))
+        self.addSgprVarToPool("SrdMXSB")
+
+    if self.states.use64bShadowLimit:
+      if not kernel["enableTDMA"]:
+        module.add(self.defineSgpr("ShadowLimitA", 2, 2))
+        self.addSgprVarToPool("ShadowLimitA")
+      if not kernel["enableTDMB"]:
+        module.add(self.defineSgpr("ShadowLimitB", 2, 2))
+        self.addSgprVarToPool("ShadowLimitB")
+      if kernel["ProblemType"]["MXBlockA"] and not kernel["enableTDMA"]:
+        module.add(self.defineSgpr("ShadowLimitMXSA", 2, 2))
+        self.addSgprVarToPool("ShadowLimitMXSA")
+      if kernel["ProblemType"]["MXBlockB"] and not kernel["enableTDMB"]:
+        module.add(self.defineSgpr("ShadowLimitMXSB", 2, 2))
+        self.addSgprVarToPool("ShadowLimitMXSB")
+
+    if self.states.staggerUCode:
+      module.add(self.defineSgpr("StaggerUIter", 1))
+      wrapAlignment = 2 if self.states.asmCaps["s_sub_u64"] and self.states.asmCaps["HasWMMA_V3"] else 1
+      module.add(self.defineSgpr("WrapUA", 2, wrapAlignment))
+      module.add(self.defineSgpr("WrapUB", 2, wrapAlignment))
+      if kernel["ProblemType"]["MXBlockA"]:
+        module.add(self.defineSgpr("WrapUMXSA", 2, wrapAlignment))
+        self.addSgprVarToPool("WrapUMXSA")
+      if kernel["ProblemType"]["MXBlockB"]:
+        module.add(self.defineSgpr("WrapUMXSB", 2, wrapAlignment))
+        self.addSgprVarToPool("WrapUMXSB")
+      self.addSgprVarToPool("WrapUA")
+      self.addSgprVarToPool("WrapUB")
+
+    module.add(self.defineSgpr("GlobalReadIncsA", self.states.a.numSgprGlobalReadIncs))
+    module.add(self.defineSgpr("GlobalReadIncsB", self.states.b.numSgprGlobalReadIncs))
+    if kernel["ProblemType"]["MXBlockA"]:
+      module.add(self.defineSgpr("GlobalReadIncsMXSA", self.states.mxsa.numSgprGlobalReadIncs))
+    if kernel["ProblemType"]["MXBlockB"]:
+      module.add(self.defineSgpr("GlobalReadIncsMXSB", self.states.mxsb.numSgprGlobalReadIncs))
+    self.addSgprVarToPool("GlobalReadIncsA")
+    self.addSgprVarToPool("GlobalReadIncsB")
+
+    # --- Re-define VGPR macros (G2LA/B/MXSA/MXSB) that tailLoopFreeVgpr
+    # UNDEF'd.  No pool operations needed — original VGPR ranges are fixed
+    # allocations that were never checked back in by the main path. ---
+    if self.states.a.startVgprG2L is not None:
+      module.add(RegSet("v", "vgprG2LA_BASE", self.states.a.startVgprG2L))
+      module.add(self.moduleVgprMacroG2LA)
+    if self.states.b.startVgprG2L is not None:
+      module.add(RegSet("v", "vgprG2LB_BASE", self.states.b.startVgprG2L))
+      module.add(self.moduleVgprMacroG2LB)
+    if hasattr(self.states, 'mxsa') and self.states.mxsa.startVgprG2L is not None:
+      module.add(RegSet("v", "vgprG2LMXSA_BASE", self.states.mxsa.startVgprG2L))
+      module.add(self.moduleVgprMacroG2LMXSA)
+    if hasattr(self.states, 'mxsb') and self.states.mxsb.startVgprG2L is not None:
+      module.add(RegSet("v", "vgprG2LMXSB_BASE", self.states.mxsb.startVgprG2L))
+      module.add(self.moduleVgprMacroG2LMXSB)
+
+    # Protect GlobalReadOffset VGPRs from being handed out as temporaries.
+    # These are flat allocations sitting inside the pool's managed range
+    # (added at init via vgprPool.add but never checked out).  Without this,
+    # graTileOffsets/graFinalOffsets in setupNewTile can allocate overlapping
+    # temps that clobber the computed offsets before they are consumed by
+    # the prefetch global reads.
+    if kernel["BufferLoad"]:
+      self.vgprPool.remove(self.startVgprGlobalReadOffsetA,
+                           self.states.a.numVgprGlobalReadOffsets,
+                           "protect GlobalReadOffsetA")
+      self.vgprPool.remove(self.startVgprGlobalReadOffsetB,
+                           self.states.b.numVgprGlobalReadOffsets,
+                           "protect GlobalReadOffsetB")
+      if kernel["ProblemType"]["MXBlockA"]:
+        self.vgprPool.remove(self.startVgprGlobalReadOffsetMXSA,
+                             self.states.mxsa.numVgprGlobalReadOffsets,
+                             "protect GlobalReadOffsetMXSA")
+      if kernel["ProblemType"]["MXBlockB"]:
+        self.vgprPool.remove(self.startVgprGlobalReadOffsetMXSB,
+                             self.states.mxsb.numVgprGlobalReadOffsets,
+                             "protect GlobalReadOffsetMXSB")
+
+    return module
+
+  ##############################################################################
+  # Prefetch across persistent loop (StreamK)
+  ##############################################################################
+  def prefetchAcrossPersistentAfterGlobalWrite(self, kernel, tensorParametersA, tensorParametersB):
+    module = Module("prefetchAcrossPersistentAfterGlobalWrite")
+    if not kernel.get("PrefetchAcrossPersistent", 0):
+      return module
+    if kernel["StreamK"] == 0:
+      return module
+    skipLabel = Label(self.labels.getNameInc("SK_SkipPrefetchAcrossPersistent"), "")
+    # Parallel reduction (no synchronizer): WGs do not advance across tiles like tree fixup
+    module.add(SCmpEQU64(src0=sgpr("AddressFlags", 2), src1=hex(0), comment="Parallel reduction: skip PrefetchAcrossPersistent"))
+    module.add(SCBranchSCC1(labelName=skipLabel.getLabelName(), comment=""))
+    module.add(SCmpGeU32(src0=sgpr("StreamKIter"), src1=sgpr("StreamKIterEnd"), comment="No next persistent iteration"))
+    module.add(SCBranchSCC1(labelName=skipLabel.getLabelName(), comment=""))
+    module.add(SBarrier(comment="PrefetchAcrossPersistent: sync before next-tile prefetch"))
+
+    # Re-establish variable SGPRs that endSummation freed
+    module.addModuleAsFlatItems(self.redefineVariableSgprsForPrefetch(kernel))
+
+    skComponent = Component.StreamK.find(self)
+    module.add(skComponent.prefetchPersistentTileProlog(self, kernel, tensorParametersA, tensorParametersB))
+    module.add(self.setupNewTile(kernel, tensorParametersA, tensorParametersB, isOptNLL=False, persistentPrefetchTail=True))
+    module.add(skipLabel)
     return module
 
   ##############################################################################

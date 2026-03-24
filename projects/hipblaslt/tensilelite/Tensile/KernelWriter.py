@@ -2459,7 +2459,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
   ##############################################################################
   # returns list of modules or text
   ##############################################################################
-  def setupNewTile(self, kernel, tensorParametersA, tensorParametersB, isOptNLL=False, forceNoTileCode=False, forceNoGRCode=False):
+  def setupNewTile(self, kernel, tensorParametersA, tensorParametersB, isOptNLL=False, forceNoTileCode=False, forceNoGRCode=False, persistentPrefetchTail=False):
     module = Module("setupNewTile")
 
     ####################################
@@ -2469,7 +2469,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     # work-group assignments
     module.addComment1("global read addresses: work-group")
-    if not forceNoTileCode:
+    if not forceNoTileCode and not persistentPrefetchTail:
       module.add(self.graWorkGroup(kernel, tensorParametersA, tensorParametersB))
 
 
@@ -2749,7 +2749,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # we can't init in shadow of this prefetch
     # since that would initC inside the other summation loops
 
-    if self.states.doShadowInit != 2:
+    if self.states.doShadowInit != 2 and not persistentPrefetchTail:
       module.add(self.initC(kernel))
       if kernel["ProblemType"]["Gradient"] and kernel["ProblemType"]["UseBias"] and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B"):
         module.add(self.initSumUnroll(kernel))
@@ -2801,7 +2801,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.addComment0("local write addresses: reset inc")
       module.add(self.localWriteResetOffsets(kernel,  False, tensorParametersA))
 
-    if self.do["executeToInitEnd"]:
+    if self.do["executeToInitEnd"] and not persistentPrefetchTail:
       module.add(self.functionEnd(kernel, addLabel=False))
 
     ####################################
@@ -2819,21 +2819,46 @@ class KernelWriter(metaclass=abc.ABCMeta):
       pfi = 1 if kernel["PrefetchGlobalRead"] < 3 else kernel["PrefetchGlobalRead"] - 1
       module.addComment1("prefetch: global -> local")
       module.add(self.openSumAtLeastUnroll(kernel, prefetch=True, isOptNLL=isOptNLL))
+      usePrimedSkip = (
+        kernel.get("PrefetchAcrossPersistent")
+        and kernel["StreamK"]
+        and not persistentPrefetchTail
+      )
+      lbl_prefetchPrimedMerge = Label(self.labels.getNameInc("SK_PrefetchPrimedMerge"), "")
+      if usePrimedSkip:
+        module.add(SCmpEQU32(src0=sgpr("SkPrefetchPrimed"), src1=1, comment="tail prefetch already issued first PGR?"))
+        module.add(SCBranchSCC1(labelName=lbl_prefetchPrimedMerge.getLabelName(), comment="skip first PGR if primed"))
       moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters1st)
       module.add(replaceHolder(moduleTmp, 0))
       module.add(self.globalReadDo(kernel, 0, tensorParameters1st))
-      if "MX" in tensorParameters1st:
-        moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters1st["MX"])
-        module.add(replaceHolder(moduleTmp, 0))
-        module.add(self.globalReadDo(kernel, 0, tensorParameters1st["MX"]))
-      if "MX" in tensorParameters2nd:
-        moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters2nd["MX"])
-        module.add(replaceHolder(moduleTmp, 0))
-        module.add(self.globalReadDo(kernel, 0, tensorParameters2nd["MX"]))
+      if not usePrimedSkip:
+        if "MX" in tensorParameters1st:
+          moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters1st["MX"])
+          module.add(replaceHolder(moduleTmp, 0))
+          module.add(self.globalReadDo(kernel, 0, tensorParameters1st["MX"]))
+        if "MX" in tensorParameters2nd:
+          moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters2nd["MX"])
+          module.add(replaceHolder(moduleTmp, 0))
+          module.add(self.globalReadDo(kernel, 0, tensorParameters2nd["MX"]))
       skip2ndWaitForDtl = kernel["DirectToLds%s"%tensorParameters1st["tensorChar"]]
       moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters2nd, skip2ndWaitForDtl)
       module.add(replaceHolder(moduleTmp, 0))
       module.add(self.globalReadDo(kernel, 0, tensorParameters2nd))
+      module.add(lbl_prefetchPrimedMerge)
+      if usePrimedSkip:
+        module.add(SMovB32(dst=sgpr("SkPrefetchPrimed"), src=0, comment="clear after first PGR merge"))
+        # MX scale G2L VGPRs occupy low-numbered registers (e.g. v6, v8)
+        # that setupNewTile uses as temporaries for local address computation.
+        # When primed the A/B data loads above are skipped, but those MX
+        # VGPRs have already been clobbered, so re-issue the MX scale loads.
+        if "MX" in tensorParameters1st:
+          moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters1st["MX"])
+          module.add(replaceHolder(moduleTmp, 0))
+          module.add(self.globalReadDo(kernel, 0, tensorParameters1st["MX"]))
+        if "MX" in tensorParameters2nd:
+          moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters2nd["MX"])
+          module.add(replaceHolder(moduleTmp, 0))
+          module.add(self.globalReadDo(kernel, 0, tensorParameters2nd["MX"]))
       tPA = tensorParametersA
       tPB = tensorParametersB
       if kernel["PrefetchGlobalRead"] == 2:
@@ -2846,6 +2871,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.setMemTokenInsts = {}
       self.states.ldsWriteTokenIdx = \
         self.states.memTokenLdsBuffer1 if self.states.ldsWriteTokenIdx == self.states.memTokenLdsBuffer0 else self.states.memTokenLdsBuffer0
+
+      if persistentPrefetchTail:
+        module.add(SMovB32(dst=sgpr("SkPrefetchPrimed"), src=1, comment="first PGR for next persistent iter prefetched"))
 
     module.addComment2("End setupNewTile")
 
@@ -4211,6 +4239,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # Initialize stream-k loop
     skComponent = Component.StreamK.find(self)
     module.add(skComponent.preLoop(self, kernel))
+    if kernel.get("PrefetchAcrossPersistent"):
+      module.add(SMovB32(dst=sgpr("SkPrefetchPrimed"), src=0, comment="PrefetchAcrossPersistent: not primed at kernel entry"))
 
     # MFMA F32XEmulation negative identity matrix
     if kernel["UseMFMAF32XEmulation"]:
@@ -5309,6 +5339,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.addComment1("not-LocalSplitU: global write")
       module.add(self.notLocalSplitUGlobalWrite(kernel, tensorParametersA, tensorParametersB))
 
+    module.add(self.prefetchAcrossPersistentAfterGlobalWrite(kernel, tensorParametersA, tensorParametersB))
     module.add(self.functionEnd(kernel, addLabel=True))
 
     # Add a label at the end of the asm for indexing.
@@ -7676,6 +7707,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.defineSgpr("StreamKTileID", 1)
       if kernel["StreamKAtomic"] == 0:
         self.defineSgpr("SrdWS", 4, 4)
+    if kernel["StreamK"] and kernel.get("PrefetchAcrossPersistent"):
+      self.defineSgpr("SkPrefetchPrimed", 1)
+      self.states.numSgprStreamK += 1
     # These SGPRs aren't used right away, add them to sgpr pool temporarily
     if self.states.doShadowInit and kernel["BufferStore"]:
       self.addSgprVarToPool("SrdC")
@@ -7692,10 +7726,15 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # for conditionals
     for key, _ in self.sgprs.items():
       self.states.nonPostLoopSgpr.append(key)
-    # Manually remove some additional unused sgpr
-    for i in range(kernel["ProblemType"]["NumIndicesSummation"]):
-      self.states.nonPostLoopSgpr.remove(self.loopCounterName(kernel,i))
-    self.states.nonPostLoopSgpr.remove("OrigLoopCounter")
+    # Manually remove some additional unused sgpr.
+    # With PrefetchAcrossPersistent, loop counters must survive the
+    # post-loop store phase so setupNewTile can use them in the
+    # prefetch tail.
+    keepLoopCounters = kernel["StreamK"] and kernel.get("PrefetchAcrossPersistent")
+    if not keepLoopCounters:
+      for i in range(kernel["ProblemType"]["NumIndicesSummation"]):
+        self.states.nonPostLoopSgpr.remove(self.loopCounterName(kernel,i))
+      self.states.nonPostLoopSgpr.remove("OrigLoopCounter")
 
     if not kernel["StreamK"]:
       # Persistent loop requires arguments to remain for next tile
@@ -8549,6 +8588,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
   @abc.abstractmethod
   def closePrefetchGlobalRead2orMore(self, kernel, tensorParametersA, tensorParametersB, idxPgr):
     return ""
+
+  ##############################################################################
+  # Prefetch across persistent loop (StreamK): optional SGPR warm-up before back-edge
+  ##############################################################################
+  def prefetchAcrossPersistentAfterGlobalWrite(self, kernel, tensorParametersA, tensorParametersB):
+    return Module("prefetchAcrossPersistentAfterGlobalWrite (default empty)")
 
   ##############################################################################
   # Function End

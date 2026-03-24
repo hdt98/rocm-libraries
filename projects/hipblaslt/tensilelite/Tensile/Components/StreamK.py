@@ -288,6 +288,24 @@ class StreamK(Component):
     def graWorkGroup(self, writer, kernel, tPA, tPB):
         pass
 
+    def prefetchPersistentTileProlog(self, writer, kernel, tPA, tPB):
+        """Recompute StreamK tile locals and map tile index to WorkGroup* for the *next* tile.
+
+        After each persistent iteration's main body, ``StreamKIter`` already holds the starting
+        global iteration index for the next chunk (set at the beginning of ``graWorkGroup``).
+        Running ``skTileIndex`` + ``skIndexToWG`` here matches the start of the next
+        ``setupNewTile`` / ``graWorkGroup`` (without advancing ``StreamKIter`` again), so SGPRs
+        are warm before the persistent back-edge. ``KernelWriterAssembly.prefetchAcrossPersistentAfterGlobalWrite``
+        then runs ``setupNewTile(..., persistentPrefetchTail=True)`` to issue the first PGR into the
+        alternate LDS buffer and set ``SkPrefetchPrimed`` so the next ``setupNewTile`` can skip the
+        redundant first ``globalReadDo`` while still performing ``globalReadIncrementAB``."""
+        module = Module("StreamK prefetchPersistentTileProlog")
+        sTmp = writer.sgprPool.checkOutAligned(4, 2, "SKPrefetchTemp")
+        module.add(self.skTileIndex(writer, kernel, sTmp, tPA, tPB))
+        module.add(self.skIndexToWG(writer, kernel, sTmp))
+        writer.sgprPool.checkIn(sTmp)
+        return module
+
     def computeTotalTiles(self, writer, kernel, dstSgpr):
         """Compute totalTiles = NumWorkGroups0 * NumWorkGroups1 * batchCount into dstSgpr."""
         module = Module("StreamK computeTotalTiles")
@@ -555,7 +573,7 @@ class StreamK(Component):
         # Use StreamK params for loop count
         module.add(SSubU32(dst=sgpr(loopCounterName), src0=sgpr("StreamKLocalEnd"), src1=sgpr("StreamKLocalStart"), comment="StreamK loop counter = localEnd - localStart"))
         # Short circuit if alpha==0 (set loopCounter to 0 to skip main loop)
-        alphaLabel2 = Label("SKAlphaCheck2", "")
+        alphaLabel2 = Label(writer.labels.getNameInc("SKAlphaCheck"), "")
         module.add(BranchIfNotZero("Alpha", kernel["ProblemType"]["ComputeDataType"].toEnum(), alphaLabel2))
         module.add(SMovB32(dst=sgpr(loopCounterName), src=0, comment="Skip iterations"))
         module.add(alphaLabel2)
@@ -2094,6 +2112,10 @@ class StreamKOff(StreamK):
         module = Module("StreamK Off graWorkGroup")
         return module
 
+    def prefetchPersistentTileProlog(self, writer, kernel, tPA, tPB):
+        module = Module("StreamK Off prefetchPersistentTileProlog")
+        return module
+
     def computeLoadSrd(self, writer, kernel, tP, sTmp):
         module = Module("StreamK Off computeLoadSrd")
         return module
@@ -2710,7 +2732,7 @@ class StreamKTwoTileDPFirst(StreamK):
         # To skip main loop in stream-k, we check if this WG is responsible for writing results (ie: WG starts tile)
         # If WG starts tile then set LocalEnd=ItersPerTile to skip fixup step, and set loopCounter to 0 to skip main loop
         # If WG does not start tile, skip to end of persistent loop to check for other SK tile
-        alphaLabel = Label("SKAlphaCheck", "")
+        alphaLabel = Label(writer.labels.getNameInc("SKAlphaCheck"), "")
         module.add(BranchIfNotZero("Alpha", kernel["ProblemType"]["ComputeDataType"].toEnum(), alphaLabel))
         # Skip to end if not doing the global write
         module.add(SCmpEQU32(src0=sgpr("StreamKLocalStart"), src1=0, comment="does wg start tile?"))

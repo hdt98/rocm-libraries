@@ -1263,6 +1263,17 @@ class Solution(collections.abc.Mapping):
           reject(state, printRejectionReason, "Atomic Stream-K requires BufferStore")
         if state["LocalSplitU"] > 1:
           reject(state, printRejectionReason, "Atomic Stream-K not working with LocalSplitU")
+      if state.get("PrefetchAcrossPersistent", 0):
+        if not state["BufferLoad"]:
+          reject(state, printRejectionReason, "PrefetchAcrossPersistent requires BufferLoad")
+        if state["PrefetchGlobalRead"] < 2:
+          reject(state, printRejectionReason, "PrefetchAcrossPersistent requires PrefetchGlobalRead >= 2")
+        if state["1LDSBuffer"] == 1:
+          reject(state, printRejectionReason, "PrefetchAcrossPersistent requires 1LDSBuffer != 1 (double LDS buffer)")
+        if state["DirectToVgprA"] or state["DirectToVgprB"]:
+          reject(state, printRejectionReason, "PrefetchAcrossPersistent not supported with DirectToVgpr")
+        if state["ProblemType"]["NumIndicesSummation"] > 1:
+          reject(state, printRejectionReason, "PrefetchAcrossPersistent not supported with multiple summation indices")
       if not state["Valid"]:
         print2("in assignDerivedParameters, state['Valid'] = False")
         return
@@ -1272,6 +1283,7 @@ class Solution(collections.abc.Mapping):
       state["StreamKXCCMapping"] = 0
       state["StreamKFixupTreeReduction"] = 0
       state["DebugStreamK"] = 0
+      state["PrefetchAcrossPersistent"] = 0
 
     computeBytes = int(state["ProblemType"]["ComputeDataType"].numBytes())
     state["_WorkspaceSizePerElemC"] = computeBytes
@@ -1897,6 +1909,10 @@ class Solution(collections.abc.Mapping):
 
     if tdmInst not in (0, 3):
       reject(state, printRejectionReason, "Currently TDMA and TDMB must be enabled simultaneously")
+      return
+
+    if state.get("PrefetchAcrossPersistent", 0) and (state["enableTDMA"] or state["enableTDMB"]):
+      reject(state, printRejectionReason, "PrefetchAcrossPersistent not supported with TDM (enableTDMA/enableTDMB)")
       return
 
     if tdmInst > 0:
