@@ -560,7 +560,7 @@ class LocalReadMFMA(LocalRead):
         elif tc == "MXSB":
             writer.states.localReadDoCntMXSB += 1
         else:
-            raise Exception(f"unsupport tc %s{tc}")
+            assert False, f"unsupport tc {tc}"
         tile01           = tP["tile01Idx"]
         instruction      = tP["localReadInstruction"]
         bpr              = 4 # bytes/register
@@ -608,7 +608,7 @@ class LocalReadMFMA(LocalRead):
         elif tc == "Metadata":
             lrvwTile = writer.states.lrvwTileMetadata
         else:
-            raise Exception(f"unsupport tc %s{tc}")
+            assert False, f"unsupport tc {tc}"
         numElementPerRead = 1 if kernel["ConvertAfterDS"] and not kernel["UseF32XEmulation"] else int(blockWidth * bpr // tP['bpe'] // lrvwTile)
         numElementPerGroup = (writer.states.kernel["WavefrontSize"] // kernel["MatrixInstM"]) * miInputPerGroup
         inputPerThread   = kernel["LocalReadVectorWidth"] if not writer.states.inTailLoop else kernel["MIInputPerThread%s"%tc]
@@ -618,7 +618,7 @@ class LocalReadMFMA(LocalRead):
         elif tc == 'B' or tc == 'MXSB' or (tc == 'Metadata' and tP["tensorIdx"] != 0):
             abmatrixinfo = writer.states.b
         else:
-            raise Exception(f"unsupport tc {tc}")
+            assert False, f"unsupport tc {tc}"
         perpStride   = abmatrixinfo.gNLCPerpStride
 
         # pack register
@@ -629,11 +629,11 @@ class LocalReadMFMA(LocalRead):
             needPack |= needPackMetadata
         else:
             needPack = blockWidth == 0.25
+        needPack |= (kernel["ConvertAfterDS"] and (tP["bpe"] != tP["bpeDS"]))
+        needPack |= kernel["UseF32XEmulation"]
         if tc in ("MXSA", "MXSB"):
             # TODO: fix hard code
             needPack = False
-        needPack |= (kernel["ConvertAfterDS"] and (tP["bpe"] != tP["bpeDS"]))
-        needPack |= kernel["UseF32XEmulation"]
 
         # Metadata pack SGPR prefix: "M" when both 16-bit (A/B) and 8-bit (metadata) packing coexist
         # Must match tPackM logic in KernelWriterAssembly.py
