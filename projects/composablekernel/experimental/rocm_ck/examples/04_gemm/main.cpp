@@ -15,6 +15,7 @@
 #include "gemm_api.hpp"
 
 #include <rocm_ck/args.hpp>
+#include <rocm_ck/resolve.hpp>
 
 #include <rocm_ck/datatype_utils.hpp>
 #include <rocm_ck/hip_check.hpp>
@@ -44,45 +45,52 @@ struct GemmVariant
 {
     const char* name;
     GemmKernel kernel;
+    rocm_ck::ResolvedSignature resolved;
 };
+
+/// Build a GemmVariant with resolved signature preserved for host-side use.
+consteval GemmVariant make_variant(const char* name, Signature sig, GemmAlgorithm algo)
+{
+    return {name, make_kernel(sig, algo), rocm_ck::resolve(sig)};
+}
 
 // clang-format off
 static constexpr GemmVariant ALL_GEMM_VARIANTS[] = {
-    {"gemm_fp32",
-     make_kernel(Signature{.dtype = DataType::FP32, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+    make_variant("gemm_fp32",
+                 Signature{.dtype = DataType::FP32, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
                  GemmAlgorithm{.block_tile  = {128, 128, 32},
                                .block_warps = {2, 2, 1},
-                               .warp_tile   = {16, 16, 16}})},
-    {"gemm_fp16",
-     make_kernel(Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                               .warp_tile   = {16, 16, 16}}),
+    make_variant("gemm_fp16",
+                 Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
                  GemmAlgorithm{.block_tile  = {128, 128, 32},
                                .block_warps = {2, 2, 1},
-                               .warp_tile   = {16, 16, 16}})},
-    {"gemm_bf16",
-     make_kernel(Signature{.dtype = DataType::BF16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                               .warp_tile   = {16, 16, 16}}),
+    make_variant("gemm_bf16",
+                 Signature{.dtype = DataType::BF16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
                  GemmAlgorithm{.block_tile  = {128, 128, 32},
                                .block_warps = {2, 2, 1},
-                               .warp_tile   = {16, 16, 16}})},
-    {"gemm_fp16_w32",
-     make_kernel(Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                               .warp_tile   = {16, 16, 16}}),
+    make_variant("gemm_fp16_w32",
+                 Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
                  GemmAlgorithm{.block_tile  = {128, 128, 32},
                                .block_warps = {2, 2, 1},
-                               .warp_tile   = {32, 32, 16}})},
-    {"gemm_fp16_add",
-     make_kernel(Signature{.dtype = DataType::FP16,
+                               .warp_tile   = {32, 32, 16}}),
+    make_variant("gemm_fp16_add",
+                 Signature{.dtype = DataType::FP16,
                            .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                                    rocm_ck::AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
                  GemmAlgorithm{.block_tile  = {128, 128, 32},
                                .block_warps = {2, 2, 1},
-                               .warp_tile   = {16, 16, 16}})},
-    {"gemm_fp16_add_relu",
-     make_kernel(Signature{.dtype = DataType::FP16,
+                               .warp_tile   = {16, 16, 16}}),
+    make_variant("gemm_fp16_add_relu",
+                 Signature{.dtype = DataType::FP16,
                            .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                                    rocm_ck::AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
                                    rocm_ck::ReluOp{.in = "D", .out = "E"}}},
                  GemmAlgorithm{.block_tile  = {128, 128, 32},
                                .block_warps = {2, 2, 1},
-                               .warp_tile   = {16, 16, 16}})},
+                               .warp_tile   = {16, 16, 16}}),
 };
 // clang-format on
 
@@ -164,11 +172,14 @@ int main(int argc, char** argv)
         buf_b.upload(ref_b.data());
         buf_c.zero();
 
-        // Allocate D0 tensor (used by fused epilogue variants)
+        // Look up optional D0 tensor (bias) from the resolved signature
+        int d0_slot = variant.resolved.find_tensor("bias");
+
         std::unique_ptr<rocm_ck::TypedBuffer> buf_d0;
-        if(k.num_d_tensors >= 1)
+        if(d0_slot >= 0)
         {
-            buf_d0 = std::make_unique<rocm_ck::TypedBuffer>(k.d0_dtype, M * N);
+            buf_d0 = std::make_unique<rocm_ck::TypedBuffer>(variant.resolved.tensors[d0_slot].dtype,
+                                                            M * N);
             buf_d0->upload(ref_d0.data());
         }
 
@@ -189,10 +200,10 @@ int main(int argc, char** argv)
         // C/E [M x N] RowMajor (output)
         kernel_args.tensors[2] = {buf_c.ptr(), {M, N, 0, 0, 0, 0}, {stride_C, 1, 0, 0, 0, 0}};
         // D0 [M x N] RowMajor (optional, for fused epilogue)
-        if(k.num_d_tensors >= 1)
+        if(d0_slot >= 0)
         {
-            constexpr int stride_D0 = N;
-            kernel_args.tensors[3]  = {
+            constexpr int stride_D0      = N;
+            kernel_args.tensors[d0_slot] = {
                 buf_d0->ptr(), {M, N, 0, 0, 0, 0}, {stride_D0, 1, 0, 0, 0, 0}};
         }
 
