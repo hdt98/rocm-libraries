@@ -1151,11 +1151,8 @@ struct GroupedConvolutionBackwardWeightKernel
             const auto& b_block_window = MakeBBlockWindow(b_ptr, kargs, i_n, i_k);
             const auto& d_block_window = MakeDBlockWindows(kargs.ds_ptr, kargs, i_m, i_n);
 
-            const bool has_hot_loop   = GemmPipeline::BlockHasHotloop(num_loop_sk);
-            const TailNumber tail_num = GemmPipeline::GetBlockLoopTailNum(num_loop_sk);
-
             const auto& c_block_tile = GemmPipeline{}.template operator()(
-                a_block_window, b_block_window, num_loop_sk, has_hot_loop, tail_num, smem_ptr);
+                a_block_window, b_block_window, num_loop_sk, smem_ptr);
 
             auto tile_started = iter_start == tile_iter_start;
             auto tile_ended   = iter_end >= tile_iter_end;

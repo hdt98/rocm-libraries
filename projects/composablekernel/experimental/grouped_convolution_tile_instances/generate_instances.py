@@ -711,11 +711,21 @@ def parse_bwd_data_instances(instances, problem_name):
     return convs
 
 
+def get_signature_base(config):
+    """Extract layout_dtype from config name, stripping variant suffixes.
+
+    Config names follow {layout}_{dtype}[_{variant}], e.g. nhwgc_fp16_streamk.
+    The signature is determined by layout and dtype only.
+    """
+    parts = config.split("_")
+    return f"{parts[0]}_{parts[1]}"
+
+
 def generate_instances_fwd(
     instances, problem_name, config, filter_pattern, instances_path
 ):
     direction = "forward"
-    signature_name = f"SIGNATURE_{config.upper()}_FWD"
+    signature_name = f"SIGNATURE_{get_signature_base(config).upper()}_FWD"
     instances = parse_fwd_instances(instances, problem_name)
     generate_calls_inc(instances, problem_name, direction, filter_pattern)
     generate_defs_inc(
@@ -736,7 +746,7 @@ def generate_instances_bwd_weight(
     instances, problem_name, config, filter_pattern, instances_path
 ):
     direction = "backward_weight"
-    signature_name = f"SIGNATURE_{config.upper()}_BWD_WEIGHT"
+    signature_name = f"SIGNATURE_{get_signature_base(config).upper()}_BWD_WEIGHT"
     instances = parse_bwd_weight_instances(instances, problem_name)
     generate_calls_inc(instances, problem_name, direction, filter_pattern)
     generate_defs_inc(
@@ -757,7 +767,7 @@ def generate_instances_bwd_data(
     instances, problem_name, config, filter_pattern, instances_path
 ):
     direction = "backward_data"
-    signature_name = f"SIGNATURE_{config.upper()}_BWD_DATA"
+    signature_name = f"SIGNATURE_{get_signature_base(config).upper()}_BWD_DATA"
     instances = parse_bwd_data_instances(instances, problem_name)
     generate_calls_inc(instances, problem_name, direction, filter_pattern)
     generate_defs_inc(
@@ -818,6 +828,8 @@ if __name__ == "__main__":
         "ndhwgc_fp32",
         "ndhwgc_fp16",
         "ndhwgc_bf16",
+        "nhwgc_fp16_streamk",
+        "nhwgc_bf16_streamk",
     ]
 
     bwd_data_configs = [
