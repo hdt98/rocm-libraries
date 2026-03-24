@@ -29,12 +29,15 @@ add_executable(
     TestBatchnormInferenceNode.cpp
     TestBatchnormInferenceNodeVarianceExt.cpp
     TestBatchnormNode.cpp
+    TestCustomOpAttributes.cpp
+    TestCustomOpNode.cpp
     TestConvolutionDgradAttributes.cpp
     TestConvolutionFwdAttributes.cpp
     TestConvolutionDgradNode.cpp
     TestConvolutionNode.cpp
     TestConvolutionWgradAttributes.cpp
     TestDescriptorHelpers.cpp
+    TestDescriptorUnpackHelpers.cpp
     TestConvolutionWgradNode.cpp
     TestEngineOverrideConfig.cpp
     TestError.cpp
@@ -52,6 +55,7 @@ add_executable(
     TestMatmulAttributes.cpp
     TestMatmulNode.cpp
     TestNode.cpp
+    TestOperationUnpacker.cpp
     TestSdpaAttributes.cpp
     TestSdpaBackwardAttributes.cpp
     TestSdpaBpropNode.cpp
@@ -61,6 +65,7 @@ add_executable(
     TestRMSNormAttributes.cpp
     TestRMSNormNode.cpp
     TestScopedHipdnnBackendDescriptor.cpp
+    TestSetEnginePluginPaths.cpp
     TestTensorAttributes.cpp
     TestTensorValueAttributes.cpp
     TestTypes.cpp
