@@ -19,14 +19,15 @@ namespace ck_tile {
 // is true, make_tensor_coordinate and move_tensor_coordinate use the fast
 // tiled path instead of the generic transform-chain path.
 //
-// Usage:
-//   auto base_desc = transform_tensor_descriptor_tiled(...);   // existing call
-//   auto meta      = transformer.MakeATileMetadata<NHWGC>();    // new call
-//   auto tiled_desc = make_tiled_im2col_descriptor(base_desc, meta);
-//
-// The resulting descriptor is drop-in compatible with tensor_descriptor_tiled:
-// it exposes the same interface (get_length, calculate_offset, etc.) via
-// inheritance, plus the additional get_im2col_meta() for fast-path dispatch.
+// Note (Issue 1 investigation): a fully standalone descriptor (without BaseDesc
+// inheritance) was explored but found to regress performance.  The root cause
+// is that BaseDesc carries GuaranteedVectorLengths propagated through the full
+// transform chain (NHWGC → embed → merge → M×K).  Reproducing those values
+// correctly in a lightweight stub (without running the same propagation logic)
+// resulted in different get_top_dimension_safe_vector_length_strides() output
+// which changed ScalarPerVector and degraded the kernel.  We retain the
+// BaseDesc inheritance for correctness; the metadata payload is the only
+// runtime addition to the kernel args struct.
 
 template <typename BaseDesc>
 struct TiledIm2ColDescriptor : public BaseDesc

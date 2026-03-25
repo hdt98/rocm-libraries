@@ -908,9 +908,13 @@ struct TransformConvFwdToGemm_V2
 
                 if constexpr(EnableTiledIm2Col)
                 {
-                    // Attach tile-aware im2col metadata for fast coordinate computation
-                    return make_tiled_im2col_descriptor(
-                        base_desc, MakeATileMetadata<ALayout>());
+                    // Attach tile-aware im2col metadata for fast coordinate computation.
+                    // BaseDesc is retained (not stripped) because its
+                    // get_top_dimension_safe_vector_length_strides() carries the correct
+                    // VectorSizeA propagation through the full transform chain — without it
+                    // the tile window computes the wrong ScalarPerVector.
+                    return make_tiled_im2col_descriptor(base_desc,
+                                                        MakeATileMetadata<ALayout>());
                 }
                 else
                 {
@@ -991,6 +995,7 @@ struct TransformConvFwdToGemm_V2
         meta.DH_HiStride = static_cast<index_t>(DH_HiStride);
         meta.DW_WiStride = static_cast<index_t>(DW_WiStride);
         meta.C           = static_cast<index_t>(C_);
+        meta.X           = static_cast<index_t>(X_);
         meta.XC          = static_cast<index_t>(X_ * C_);
         meta.Wo          = static_cast<index_t>(Wo_);
         meta.HoWo        = static_cast<index_t>(Ho_ * Wo_);

@@ -46,6 +46,7 @@ struct TiledIm2ColMetadata
 
     // ---- Dimension sizes (for decode and validity) ----
     index_t C;            // input channels per group
+    index_t X;            // filter width  (number of x steps per y row)
     index_t XC;           // X * C  (x-period in K dimension)
     index_t Wo;           // output width  (wo-period in M dimension)
     index_t HoWo;         // Ho * Wo  (n_conv-period in M dimension)
@@ -73,19 +74,34 @@ struct TiledIm2ColMetadata
 //
 // Usage pattern:
 //   init(m_gemm, k_gemm, meta)       — once per thread coordinate (5 divmod)
-//   move_step(dm, dk, meta)          — on coordinate move (0–5 divmod depending on dims)
+//   move_step(dm, dk, meta)          — on coordinate move (0 or 5 divmod)
 //   get_offset()                     — every load (1 add)
 //   is_valid()                       — every load (1 bool read)
 //
 // Key property: M_base is invariant across K-loop steps (when dm=0).
-// K-only moves cost 2 divmod (K decode only, M_base unchanged).
+//
+// Branching note (Issue 2): the `if(dm == 0)` check in move_step is a runtime
+// branch, but in the pipeline's K-loop the step is always {0, KPerBlock} where
+// 0 is a compile-time constant — so the compiler eliminates the dm!=0 branch
+// body entirely from the unrolled K-loop.  No performance impact observed.
+//
+// Precomputation (Issue 3): c_conv_, x_, y_ are stored in the coordinate and
+// updated INCREMENTALLY in move_step(dm=0) via additions and comparisons only
+// — 0 divmods for the K-only step (vs 2 before).  Trade-off: +2 VGPRs per
+// coordinate vs the gain from eliminated divmods.  For the COMPUTE_V3 pipeline
+// with NumCoord=2 the tiled kernel sits exactly at the 64-VGPR occupancy
+// boundary (2 concurrent workgroups per SIMD); adding 2 more VGPRs may move
+// it to 68 VGPRs (1 workgroup).  Benchmark carefully to confirm net benefit.
 
 struct TiledIm2ColCoordinate
 {
     index_t M_base;    // offset contribution from m_gemm  (constant across K-loop)
     index_t K_offset;  // offset contribution from k_gemm  (updated per K-step)
-    index_t m_gemm;    // current absolute M index (for move_step)
-    index_t k_gemm;    // current absolute K index (for move_step)
+    index_t m_gemm;    // current absolute M index (needed for dm!=0 reinit)
+    index_t k_gemm;    // current absolute K index (needed for K_gemm bound check)
+    index_t c_conv_;   // current c_conv = k_gemm % C  (incremental K tracking)
+    index_t x_;        // current x filter index       (incremental K tracking)
+    index_t y_;        // current y filter index       (incremental K tracking)
     bool    valid;     // true iff (m_gemm, k_gemm) maps to non-padded input
 
     // -------------------------------------------------------------------------
@@ -113,28 +129,33 @@ struct TiledIm2ColCoordinate
                - meta.pad_offset;
 
         // Decode k → (y, x, c_conv)  [2 divmod]
-        const index_t y      = k / meta.XC;
-        const index_t rem_k  = k % meta.XC;
-        const index_t x      = rem_k / meta.C;
-        const index_t c_conv = rem_k % meta.C;
+        y_      = k / meta.XC;
+        const index_t rem_k = k % meta.XC;
+        x_      = rem_k / meta.C;
+        c_conv_ = rem_k % meta.C;
 
         // K_offset: depends only on k_gemm
-        K_offset = y * meta.DH_HiStride + x * meta.DW_WiStride + c_conv;
+        K_offset = y_ * meta.DH_HiStride + x_ * meta.DW_WiStride + c_conv_;
 
         // Validity: GEMM bounds + spatial padding check
         // ih = ho*SH + y*DH - PH, iw = wo*SW + x*DW - PW
-        const index_t ih = ho * meta.SH + y * meta.DH - meta.PH;
-        const index_t iw = wo * meta.SW + x * meta.DW - meta.PW;
+        const index_t ih = ho * meta.SH + y_ * meta.DH - meta.PH;
+        const index_t iw = wo * meta.SW + x_ * meta.DW - meta.PW;
         valid = (m < meta.M_gemm) && (k < meta.K_gemm) &&
                 (ih >= 0 && ih < meta.Hi) && (iw >= 0 && iw < meta.Wi);
     }
 
     // -------------------------------------------------------------------------
     // Move by (dm, dk) in the global (M, K) space.
-    // Called by move_tensor_coordinate for both K-loop steps and within-tile moves.
     //
-    // When dm == 0 (pure K step): 2 divmod, M_base unchanged.
-    // When dm != 0: full reinit, 5 divmod.
+    // When dm == 0 (pure K step): 0 divmod.
+    //   c_conv_, x_, y_ are updated incrementally with additions and comparisons.
+    //   K_offset is recomputed from the updated (y_, x_, c_conv_) in O(1).
+    //   Validity is updated at x/y boundaries only.
+    //
+    // When dm != 0: full reinit, 5 divmod.  Rare — only during tile setup.
+    //
+    // The branch is well-predicted: in the K-loop dm is always compile-time 0.
     // -------------------------------------------------------------------------
     CK_TILE_HOST_DEVICE void move_step(index_t dm,
                                         index_t dk,
@@ -142,22 +163,47 @@ struct TiledIm2ColCoordinate
     {
         if(dm == 0)
         {
-            // K-only step: update K_offset, M_base unchanged  [2 divmod]
-            k_gemm += dk;
-            const index_t y      = k_gemm / meta.XC;
-            const index_t rem_k  = k_gemm % meta.XC;
-            const index_t x      = rem_k / meta.C;
-            const index_t c_conv = rem_k % meta.C;
-            K_offset = y * meta.DH_HiStride + x * meta.DW_WiStride + c_conv;
+            // K-only step: update (c_conv_, x_, y_) incrementally.  [0 divmod]
+            k_gemm  += dk;
+            c_conv_ += dk;
+            // c_conv has stride 1 in K_offset — always apply the base delta first.
+            K_offset += dk;
 
-            // Validity: K bounds + spatial padding (M_gemm bound unchanged from init)
-            const index_t rem_m = m_gemm % meta.HoWo;
-            const index_t ho    = rem_m / meta.Wo;
-            const index_t wo    = rem_m % meta.Wo;
-            const index_t ih    = ho * meta.SH + y * meta.DH - meta.PH;
-            const index_t iw    = wo * meta.SW + x * meta.DW - meta.PW;
-            valid = (k_gemm < meta.K_gemm) &&
-                    (ih >= 0 && ih < meta.Hi) && (iw >= 0 && iw < meta.Wi);
+            // Handle c_conv_ overflow → x_ increment
+            if(c_conv_ >= meta.C)
+            {
+                c_conv_ -= meta.C;
+                x_++;
+                // x moved by +1 (contributes +DW_WiStride) and c_conv wrapped by −C.
+                // The base delta (dk) was already applied above; the net correction is:
+                //   +DW_WiStride − C    (x step minus the c_conv rollback)
+                K_offset += meta.DW_WiStride - meta.C;
+
+                // Handle x_ overflow → y_ increment
+                if(x_ >= meta.X)
+                {
+                    x_ = 0;
+                    y_++;
+                    // y moved by +1 (contributes +DH_HiStride) and x wrapped (−X*DW_WiStride).
+                    K_offset += meta.DH_HiStride - meta.X * meta.DW_WiStride;
+                }
+
+                // Spatial validity changes when x_ or y_ changes.
+                // Recompute using the compiler-hoisted ho/wo from m_gemm.
+                const index_t rem_m = m_gemm % meta.HoWo;
+                const index_t ho    = rem_m / meta.Wo;
+                const index_t wo    = rem_m % meta.Wo;
+                const index_t ih    = ho * meta.SH + y_ * meta.DH - meta.PH;
+                const index_t iw    = wo * meta.SW + x_ * meta.DW - meta.PW;
+                valid = (k_gemm < meta.K_gemm) &&
+                        (ih >= 0 && ih < meta.Hi) && (iw >= 0 && iw < meta.Wi);
+            }
+            else
+            {
+                // c_conv moved within same x/y → base delta already applied.
+                // Spatial validity unchanged; only K_gemm bound may change.
+                valid = (k_gemm < meta.K_gemm) && valid;
+            }
         }
         else
         {
