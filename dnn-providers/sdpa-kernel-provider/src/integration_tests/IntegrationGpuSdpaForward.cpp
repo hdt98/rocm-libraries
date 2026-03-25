@@ -116,7 +116,7 @@ protected:
             attnMask->set_dim(testCase.attnMaskDims)
                 .set_stride(testCase.attnMaskStrides)
                 .set_data_type(getDataTypeEnumFromType<DataType>());
-            attributes.set_attn_mask(attnMask);
+            attributes.set_bias(attnMask);
         }
         attributes.set_causal_mask(testCase.causalMask);
 
