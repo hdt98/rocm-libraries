@@ -231,11 +231,12 @@ int main(int argc, char** argv)
         std::vector<float> result(M * N);
         buf_c.download(result.data());
 
-        // Select correct reference based on epilogue composition
+        // Select correct reference based on epilogue op chain
         const float* ref = ref_c.data();
-        if(k.combine == rocm_ck::CombineOp::Add && k.activation == rocm_ck::Activation::Relu)
+        if(k.has_epilogue_op(rocm_ck::EpilogueOp::Add) &&
+           k.has_epilogue_op(rocm_ck::EpilogueOp::Relu))
             ref = ref_add_relu.data();
-        else if(k.combine == rocm_ck::CombineOp::Add)
+        else if(k.has_epilogue_op(rocm_ck::EpilogueOp::Add))
             ref = ref_add.data();
 
         float tol   = rocm_ck::tolerance_for(k.physical_tensors[2].dtype);

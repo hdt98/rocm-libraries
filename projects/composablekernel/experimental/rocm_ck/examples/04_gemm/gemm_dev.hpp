@@ -48,55 +48,53 @@ struct CkLayoutMap<Layout::Col>
 };
 
 // ============================================================================
-// ComposedCDEOp: CombineOp × Activation → single CK Tile elementwise functor
+// ComposedCDEOp: epilogue op chain → single CK Tile elementwise functor
 // ============================================================================
 
-/// Composed epilogue functor: combine D tensors in float, activate, cast to output.
+/// Composed epilogue functor: applies K's epilogue_ops chain in sequence.
 ///
-/// Replaces the old CkEpilogueOpMap 1:1 enum mapping with a two-axis composition.
-/// All arithmetic is in float to avoid precision loss between combine and activation.
-/// Delegates activation math to CK Tile's existing functor implementations.
-template <CombineOp Combine, Activation Act>
+/// Binary ops (Add, Mul) fold D tensors into the accumulator via parameter pack.
+/// Unary ops (Relu, etc.) transform the accumulator in place, delegating to
+/// CK Tile's optimized implementations.
+///
+/// All arithmetic is in float. The 4 if-constexpr lines are bounded by
+/// kMaxEpilogueOps and fully resolved at compile time — zero runtime overhead.
+template <GemmKernel K>
 struct ComposedCDEOp
 {
     template <typename E, typename C, typename... Ds>
     CK_TILE_HOST_DEVICE void operator()(E& e, const C& c, const Ds&... ds) const
     {
         float result = ck_tile::type_convert<float>(c);
-
-        // Combine D tensors with matmul result
-        if constexpr(Combine == CombineOp::Add)
-        {
-            ((result += ck_tile::type_convert<float>(ds)), ...);
-        }
-        else if constexpr(Combine == CombineOp::Multiply)
-        {
-            ((result *= ck_tile::type_convert<float>(ds)), ...);
-        }
-
-        // Apply activation (delegating to CK Tile's optimized implementations)
-        if constexpr(Act == Activation::Relu)
-        {
-            ck_tile::element_wise::Relu{}(result, result);
-        }
-        else if constexpr(Act == Activation::FastGelu)
-        {
-            ck_tile::element_wise::FastGelu{}(result, result);
-        }
-        else if constexpr(Act == Activation::Gelu)
-        {
-            ck_tile::element_wise::Gelu{}(result, result);
-        }
-        else if constexpr(Act == Activation::Silu)
-        {
-            ck_tile::element_wise::Silu{}(result, result);
-        }
-        else if constexpr(Act == Activation::Sigmoid)
-        {
-            ck_tile::element_wise::Sigmoid{}(result, result);
-        }
-
+        if constexpr(K.num_epilogue_ops > 0)
+            apply_op<K.epilogue_ops[0]>(result, ds...);
+        if constexpr(K.num_epilogue_ops > 1)
+            apply_op<K.epilogue_ops[1]>(result, ds...);
+        if constexpr(K.num_epilogue_ops > 2)
+            apply_op<K.epilogue_ops[2]>(result, ds...);
+        if constexpr(K.num_epilogue_ops > 3)
+            apply_op<K.epilogue_ops[3]>(result, ds...);
         e = ck_tile::type_convert<E>(result);
+    }
+
+    private:
+    template <EpilogueOp Op, typename... Ds>
+    CK_TILE_HOST_DEVICE static void apply_op(float& result, const Ds&... ds)
+    {
+        if constexpr(Op == EpilogueOp::Add)
+            ((result += ck_tile::type_convert<float>(ds)), ...);
+        else if constexpr(Op == EpilogueOp::Mul)
+            ((result *= ck_tile::type_convert<float>(ds)), ...);
+        else if constexpr(Op == EpilogueOp::Relu)
+            ck_tile::element_wise::Relu{}(result, result);
+        else if constexpr(Op == EpilogueOp::FastGelu)
+            ck_tile::element_wise::FastGelu{}(result, result);
+        else if constexpr(Op == EpilogueOp::Gelu)
+            ck_tile::element_wise::Gelu{}(result, result);
+        else if constexpr(Op == EpilogueOp::Silu)
+            ck_tile::element_wise::Silu{}(result, result);
+        else if constexpr(Op == EpilogueOp::Sigmoid)
+            ck_tile::element_wise::Sigmoid{}(result, result);
     }
 };
 
@@ -107,7 +105,7 @@ struct ComposedCDEOp
 template <GemmKernel K>
 struct EpilogueTypes
 {
-    using Op = ComposedCDEOp<K.combine, K.activation>;
+    using Op = ComposedCDEOp<K>;
 
     // D tensor count: physical tensors beyond A(0), B(1), output(2)
     static constexpr int NumDTensors = K.num_physical_tensors - 3;
