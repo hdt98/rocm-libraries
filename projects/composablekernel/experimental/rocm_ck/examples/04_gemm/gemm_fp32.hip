@@ -4,6 +4,7 @@
 // fp32 GEMM kernel variant with 16×16×16 warp tile. All types are fp32
 // (input, output, and accumulator).
 
+#include "gemm_api.hpp"
 #include "gemm_dev.hpp"
 
 static constexpr rocm_ck::GemmKernel kernel = rocm_ck::make_kernel(

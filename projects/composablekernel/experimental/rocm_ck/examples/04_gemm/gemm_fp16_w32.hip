@@ -5,6 +5,7 @@
 // tile configuration: wider warp tiles process more elements per MFMA
 // instruction at the cost of fewer warp-level iterations per block tile.
 
+#include "gemm_api.hpp"
 #include "gemm_dev.hpp"
 
 static constexpr rocm_ck::GemmKernel kernel = rocm_ck::make_kernel(

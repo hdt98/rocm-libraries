@@ -160,10 +160,11 @@ int main(int argc, char** argv)
         if(!kernel.load(archive, variant.name))
             continue;
 
-        // Allocate typed device buffers (dtypes from physical tensor table)
+        // Allocate typed device buffers from physical tensor table
+        // A = [0], B = [1], output = output(), D0 = [3]
         rocm_ck::TypedBuffer buf_a(k.physical_tensors[0].dtype, M * K);
         rocm_ck::TypedBuffer buf_b(k.physical_tensors[1].dtype, K * N);
-        rocm_ck::TypedBuffer buf_c(k.physical_tensors[2].dtype, M * N);
+        rocm_ck::TypedBuffer buf_c(k.output().dtype, M * N);
 
         buf_a.upload(ref_a.data());
         buf_b.upload(ref_b.data());
@@ -196,7 +197,7 @@ int main(int argc, char** argv)
         kernel_args.tensors[k.physical_tensors[1].args_slot] = {
             buf_b.ptr(), {K, N, 0, 0, 0, 0}, {1, stride_B, 0, 0, 0, 0}};
         // Output [M x N] RowMajor
-        kernel_args.tensors[k.physical_tensors[2].args_slot] = {
+        kernel_args.tensors[k.output().args_slot] = {
             buf_c.ptr(), {M, N, 0, 0, 0, 0}, {stride_C, 1, 0, 0, 0, 0}};
         // D0 [M x N] RowMajor (optional, for fused epilogue)
         if(has_d0)
@@ -239,7 +240,7 @@ int main(int argc, char** argv)
         else if(k.has_epilogue_op(rocm_ck::EpilogueOp::Add))
             ref = ref_add.data();
 
-        float tol   = rocm_ck::tolerance_for(k.physical_tensors[2].dtype);
+        float tol   = rocm_ck::tolerance_for(k.output().dtype);
         bool passed = true;
         for(int i = 0; i < M * N; ++i)
         {
