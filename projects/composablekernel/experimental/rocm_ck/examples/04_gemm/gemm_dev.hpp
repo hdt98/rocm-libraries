@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include "gemm_api.hpp"
+#include "gemm_kernel.hpp"
 
 #include <rocm_ck/args.hpp>
 

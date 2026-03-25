@@ -4,6 +4,7 @@
 // bf16 GEMM kernel variant with 16×16×16 warp tile. Accumulates in fp32,
 // stores bf16 output via CShuffleEpilogue.
 
+#include "gemm_api.hpp"
 #include "gemm_dev.hpp"
 
 static constexpr rocm_ck::GemmKernel kernel = rocm_ck::make_kernel(
