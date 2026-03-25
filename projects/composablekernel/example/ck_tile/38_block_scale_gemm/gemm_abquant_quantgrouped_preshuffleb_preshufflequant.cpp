@@ -19,8 +19,8 @@ static auto _ = []() {
                                                                  ck_tile::half_t,
                                                                  float>{});
             return run_gemm_example_prec_type<
-                GemmConfigPreshuffleB_PreshuffleBQuant<ck_tile::fp8_t, false>, // make the TransposeC
-                                                                               // false
+                GemmConfigPreshuffleB_PreshuffleBQuant<ck_tile::fp8_t, false>, // make the
+                                                                               // TransposeC false
                 TypeConfig,
                 AQuantGroupSize,
                 BQuantGroupSize,
@@ -35,8 +35,8 @@ static auto _ = []() {
                                                                  ck_tile::half_t,
                                                                  float>{});
             return run_gemm_example_prec_type<
-                GemmConfigPreshuffleB_PreshuffleBQuant<ck_tile::fp8_t, false>, // make the TransposeC
-                                                                               // false
+                GemmConfigPreshuffleB_PreshuffleBQuant<ck_tile::fp8_t, false>, // make the
+                                                                               // TransposeC false
                 TypeConfig,
                 AQuantGroupSize,
                 BQuantGroupSize,
