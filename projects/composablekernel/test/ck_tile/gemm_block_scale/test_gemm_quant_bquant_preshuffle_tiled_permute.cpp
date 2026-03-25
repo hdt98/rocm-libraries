@@ -19,6 +19,9 @@ using PkInt4        = ck_tile::pk_int4_t;
 using BQuantGrouped = std::integral_constant<ck_tile::QuantType, ck_tile::QuantType::BQuantGrouped>;
 using GroupSize     = ck_tile::QuantGroupShape<ck_tile::sequence<1, 1, 128>>;
 
+// 2d block sizes for BQuant
+using GroupSize2D128N = ck_tile::QuantGroupShape<ck_tile::sequence<1, 128, 128>>;
+
 // Type combinations for BQuant Preshuffle tests - TiledPermuteN Config
 // Tuple format: <ALayout, BLayout, CLayout, BQLayout, ADataType, BDataType, QDataType, CDataType,
 // QuantType, GemmConfig, QuantGroupSize>
@@ -26,7 +29,8 @@ using GroupSize     = ck_tile::QuantGroupShape<ck_tile::sequence<1, 1, 128>>;
 using BPreshuffleTiledPermuteTypes = ::testing::Types<
     std::tuple<RowMajor, ColumnMajor, RowMajor, ColumnMajor, FP8, FP8, float, Half, BQuantGrouped, GemmConfigPreshuffleBPrefillTiledPermuteN, GroupSize>,
     std::tuple<RowMajor, ColumnMajor, RowMajor, ColumnMajor, FP8, PkInt4, FP8, Half, BQuantGrouped, GemmConfigPreshuffleBPrefillTiledPermuteN, GroupSize>,
-    std::tuple<RowMajor, ColumnMajor, RowMajor, ColumnMajor, BF8, PkInt4, BF8, Half, BQuantGrouped, GemmConfigPreshuffleBPrefillTiledPermuteN, GroupSize>
+    std::tuple<RowMajor, ColumnMajor, RowMajor, ColumnMajor, BF8, PkInt4, BF8, Half, BQuantGrouped, GemmConfigPreshuffleBPrefillTiledPermuteN, GroupSize>,
+    std::tuple<RowMajor, ColumnMajor, RowMajor, ColumnMajor, BF8, PkInt4, BF8, Half, BQuantGrouped, GemmConfigPreshuffleBPrefillTiledPermuteN, GroupSize2D128N>
 >;
 // clang-format on
 

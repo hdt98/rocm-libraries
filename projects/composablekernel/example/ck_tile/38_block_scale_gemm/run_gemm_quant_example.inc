@@ -41,7 +41,8 @@ float gemm_calc_quant(const ck_tile::QuantGemmHostArgs& args, const ck_tile::str
          std::is_same_v<typename TypeConfig::ADataType, ck_tile::bf8_t>) &&
         (std::is_same_v<typename TypeConfig::BDataType, ck_tile::fp8_t> ||
          std::is_same_v<typename TypeConfig::BDataType, ck_tile::bf8_t>);
-    constexpr bool transpose_c = ((QuantMode == ck_tile::QuantType::ABQuantGrouped || QuantMode == ck_tile::QuantType::BQuantGrouped) && GemmConfig::TiledMMAPermuteN) ? false : GemmConfig::TransposeC;
+    constexpr bool transpose_c = ((QuantMode == ck_tile::QuantType::ABQuantGrouped || QuantMode == ck_tile::QuantType::BQuantGrouped) && GemmConfig::TiledMMAPermuteN  &&
+         (BQuantGroupSize::kN == 1 || BQuantGroupSize::kN == 128)) ? false : GemmConfig::TransposeC;
     constexpr bool eight_waves =
 #ifdef CK_GFX950_SUPPORT
         IS_FP8BLOCKSCALE && (GemmConfig::M_Warp * GemmConfig::N_Warp * GemmConfig::K_Warp == 8) &&

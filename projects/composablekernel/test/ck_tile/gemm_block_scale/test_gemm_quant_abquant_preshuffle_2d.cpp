@@ -33,7 +33,9 @@ using ABQuantPreshuffleBTypes = ::testing::Types<
     /// 2D B-scales; PreshuffleQuant = false && TransposeC = true (RCR layout with RowMajor AQ)
     std::tuple<RowMajor, ColumnMajor, RowMajor, RowMajor, FP8, FP8, float, Half, ABQuantGrouped, GemmConfigPreshuffleBPrefillTransposeC, GroupSize, GroupSize2D128N, ColumnMajor>,
     std::tuple<RowMajor, ColumnMajor, RowMajor, RowMajor, FP8, FP8, float, Half, ABQuantGrouped, GemmConfigPreshuffleBPrefill, GroupSize, GroupSize2D128N, ColumnMajor>,
-    std::tuple<RowMajor, ColumnMajor, RowMajor, RowMajor, FP8, FP8, float, Half, ABQuantGrouped, GemmConfigPreshuffleB_ABQuant_Prefill, GroupSize, GroupSize2D128N, ColumnMajor>
+    std::tuple<RowMajor, ColumnMajor, RowMajor, RowMajor, FP8, FP8, float, Half, ABQuantGrouped, GemmConfigPreshuffleB_ABQuant_Prefill, GroupSize, GroupSize2D128N, ColumnMajor>,
+    std::tuple<RowMajor, ColumnMajor, RowMajor, RowMajor, FP8, FP8, float, Half, ABQuantGrouped, GemmConfigPreshuffleBPrefillTiledPermuteN, GroupSize, GroupSize, ColumnMajor>,
+    std::tuple<RowMajor, ColumnMajor, RowMajor, RowMajor, FP8, FP8, float, Half, ABQuantGrouped, GemmConfigPreshuffleBPrefillTiledPermuteN, GroupSize, GroupSize2D128N, ColumnMajor>
 >;
 // clang-format on
 
