@@ -138,10 +138,9 @@ CK_TILE_HOST void reference_gemm_abquant(const HostTensor<ADataType>& a_m_k,
                                          const BElementOp& b_element_op     = {},
                                          const ACCElementOp& acc_element_op = {})
 {
-    constexpr auto A_TENSOR_M_DIM                    = 0;
-    constexpr auto A_TENSOR_K_DIM                    = 1;
-    [[maybe_unused]] constexpr auto B_TENSOR_K_DIM   = 0;
-    constexpr auto B_TENSOR_N_DIM                    = 1;
+    constexpr auto A_TENSOR_M_DIM = 0;
+    constexpr auto A_TENSOR_K_DIM = 1;
+    constexpr auto B_TENSOR_N_DIM = 1;
 
     const std::size_t M = a_m_k.get_length(A_TENSOR_M_DIM);
     const std::size_t N = b_k_n.get_length(B_TENSOR_N_DIM);

@@ -210,31 +210,6 @@ struct TransposeTileDistributionTraits
     static constexpr auto input_hs_lengthss = InDstrEncode::hs_lengthss_;
     static constexpr index_t LaneGroupSize =
         Policy::template ValidationTraits<InDstrEncode, ReverseDirection>::LaneGroupSize;
-    // Individual diagnostic asserts per LaneGroupSize to identify which check fails
-    static_assert(
-        Policy::template ValidationTraits<InDstrEncode, ReverseDirection>::value ||
-            Policy::template ValidationTraitsImpl<InDstrEncode, ReverseDirection, 32>::dims_valid,
-        "dims_valid failed for LaneGroupSize=32");
-    static_assert(
-        Policy::template ValidationTraits<InDstrEncode, ReverseDirection>::value ||
-            Policy::template ValidationTraitsImpl<InDstrEncode, ReverseDirection, 32>::
-                suffix_valid_dim0,
-        "suffix_valid_dim0 failed for LaneGroupSize=32 (M dim suffix mismatch)");
-    static_assert(
-        Policy::template ValidationTraits<InDstrEncode, ReverseDirection>::value ||
-            Policy::template ValidationTraitsImpl<InDstrEncode, ReverseDirection, 32>::
-                suffix_valid_dim1,
-        "suffix_valid_dim1 failed for LaneGroupSize=32 (K dim suffix mismatch)");
-    static_assert(
-        Policy::template ValidationTraits<InDstrEncode, ReverseDirection>::value ||
-            Policy::template ValidationTraitsImpl<InDstrEncode, ReverseDirection, 32>::
-                ps_mapping_valid,
-        "ps_mapping_valid failed for LaneGroupSize=32");
-    static_assert(
-        Policy::template ValidationTraits<InDstrEncode, ReverseDirection>::value ||
-            Policy::template ValidationTraitsImpl<InDstrEncode, ReverseDirection, 32>::
-                ys_mapping_valid,
-        "ys_mapping_valid failed for LaneGroupSize=32");
     static_assert(Policy::template ValidationTraits<InDstrEncode, ReverseDirection>::value,
                   "The input tile distribution encoding is not valid for transpose!");
 

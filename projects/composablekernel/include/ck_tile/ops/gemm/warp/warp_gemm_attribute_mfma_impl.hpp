@@ -1796,11 +1796,6 @@ struct WarpGemmAttributeMfmaImpl_f32_32x32x64_f8f6f4
     }
 };
 
-// Backward-compatible type aliases for existing fp8/bf8 specializations
-template <typename AType_, typename BType_, WGAttrCtlEnum Ctrl_ = WGAttrCtlEnum::Default_>
-using WarpGemmAttributeMfmaImpl_f32_32x32x64_f8_bf8_base =
-    WarpGemmAttributeMfmaImpl_f32_32x32x64_f8f6f4<AType_, BType_, Ctrl_>;
-
 template <WGAttrCtlEnum Ctrl_ = WGAttrCtlEnum::Default_>
 using WarpGemmAttributeMfmaImpl_f32_32x32x64_fp8_fp8 =
     WarpGemmAttributeMfmaImpl_f32_32x32x64_f8f6f4<fp8_t, fp8_t, Ctrl_>;
