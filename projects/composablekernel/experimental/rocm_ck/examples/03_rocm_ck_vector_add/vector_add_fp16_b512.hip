@@ -1,7 +1,6 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-#include "rocm_vector_add_api.hpp"
 #include "rocm_vector_add_dev.hpp"
 
 // Narrower type doubles vectorization: FP16 gets kVectorM=8 (vs FP32's 4)

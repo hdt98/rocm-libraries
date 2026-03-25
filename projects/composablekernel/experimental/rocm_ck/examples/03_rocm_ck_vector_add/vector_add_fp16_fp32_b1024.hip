@@ -1,7 +1,6 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-#include "rocm_vector_add_api.hpp"
 #include "rocm_vector_add_dev.hpp"
 
 // Widening: FP16 inputs -> FP32 output. Tensor override sets output type.

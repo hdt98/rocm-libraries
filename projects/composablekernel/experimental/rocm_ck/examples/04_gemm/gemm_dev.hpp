@@ -3,17 +3,29 @@
 //
 // Device-side CK Tile GEMM type wiring for kpack.
 //
-// Maps GemmKernel (our schema) → CK Tile template stack (7 types).
+// DEVICE ONLY: compiled via --cuda-device-only in .hip files.
+// This header must NOT be included from host-only .cpp files.
+//
+// Maps GemmKernel (our schema) -> CK Tile template stack (7 types).
 // Each .hip variant file includes this header and instantiates runGemm<K>
 // with a specific constexpr GemmKernel.
 //
-// CkLayoutMap: Layout enum   → CK Tile layout tag (RowMajor, ColumnMajor)
+// CkLayoutMap: Layout enum   -> CK Tile layout tag (RowMajor, ColumnMajor)
 // runGemm<K>:  wires the full CK Tile GEMM pipeline from K's types/layouts
 //
 // Tile geometry is parameterized through GemmKernel fields, validated by
 // make_kernel() against CK Tile's WarpGemmDispatcher table.
+//
+// Compilation boundary:
+//   _kernel.hpp — schema types + consteval factory (both passes)
+//   _api.hpp    — host-only helpers (host pass only, #error on device)
+//   _dev.hpp (this) — CK Tile bridge + __device__ code (device pass only, #error on host)
 
 #pragma once
+
+#ifndef __HIP_DEVICE_COMPILE__
+#error "gemm_dev.hpp requires device compilation. Host code should include gemm_api.hpp."
+#endif
 
 #include "gemm_kernel.hpp"
 
@@ -147,6 +159,13 @@ struct EpilogueTypes
 template <GemmKernel K>
 __device__ void runGemm(Args args)
 {
+    // Device-side validation — catches invalid manual construction.
+    static_assert(K.num_physical_tensors >= 3,
+                  "kernel must have at least A, B, and output tensors");
+    static_assert(K.thread_block_size > 0, "thread_block_size must be positive");
+    static_assert(EpilogueTypes<K>::NumDTensors <= 1,
+                  "at most 1 D tensor supported in this example");
+
     // Physical tensor table indices (compile-time constants)
     static constexpr auto PT_A   = K.physical_tensors[0]; // A
     static constexpr auto PT_B   = K.physical_tensors[1]; // B
