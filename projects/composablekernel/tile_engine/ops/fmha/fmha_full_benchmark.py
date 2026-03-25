@@ -369,8 +369,8 @@ def main():
                     so_path = str(candidate)
             if not so_path:
                 continue
-            key = (config.hdim_q, config.hdim_v, config.data_type, variant)
             cfg_dict = _config_to_serializable(config, so_path)
+            key = (config.hdim_q, config.hdim_v, config.data_type, variant, config.mode)
             kernel_index.setdefault(key, []).append((so_path, cfg_dict))
 
     _compile_pool.shutdown(wait=True)
@@ -453,74 +453,83 @@ def main():
         writer = csv.DictWriter(csv_file, fieldnames=csv_fields)
         writer.writeheader()
 
-    # Pre-filter: only shapes with matching kernels
+    # Pre-filter: match shapes to kernels by (hdim, dtype, variant, mode)
     runnable = []
     for shape in all_shapes:
         ck_dtype = DTYPE_CK.get(shape.dtype, shape.dtype)
-        key = (shape.hdim_q, shape.hdim_v, ck_dtype, shape.variant)
-        kernel_entries = kernel_index.get(key, [])
-        if kernel_entries:
-            runnable.append((shape, kernel_entries))
+        for mode in ["batch", "group"]:
+            key = (shape.hdim_q, shape.hdim_v, ck_dtype, shape.variant, mode)
+            kernel_entries = kernel_index.get(key, [])
+            if kernel_entries:
+                runnable.append((shape, kernel_entries))
 
-    # Flatten to (shape, so_path, cfg) work items
-    work_items = []
-    for shape, kernel_entries in runnable:
-        for so_path, cfg in kernel_entries:
-            work_items.append((shape, so_path, cfg))
-
-    total_work = len(work_items)
-    skipped = 0
-    total_measurements = len(completed)
-    total_gpu_faults = 0
-    bench_t0 = time.perf_counter()
-
-    worker_path = _THIS_DIR / "run_one_kernel.py"
-    worker_env = os.environ.copy()
-    worker_env["FMHA_PYPATH_1"] = str(_DISPATCHER_ROOT / "python")
-    worker_env["FMHA_PYPATH_2"] = str(_DISPATCHER_ROOT / "codegen")
-    worker_env["GPU_COREDUMP_ENABLE"] = "0"
-    worker_env["HSA_ENABLE_COREDUMP"] = "0"
-
-    print(f"  Runnable shapes: {len(runnable)}")
-    print(f"  Total kernel x shape pairs: {total_work}")
-    print(f"  Already completed: {len(completed)}")
-    print("  Kernel timeout: 30s")
-    print()
-
-    def _bandwidth_gb_s(s_dict, lat_ms):
-        if lat_ms <= 0:
-            return 0.0
-        eb = ELEM_BYTES.get(s_dict.get("dtype", "fp16"), 2)
-        total_bytes = (
-            s_dict["batch"]
-            * (
-                s_dict["nhead_q"] * s_dict["seqlen_q"] * s_dict["hdim_q"]
-                + s_dict["nhead_k"] * s_dict["seqlen_k"] * s_dict["hdim_q"]
-                + s_dict["nhead_k"] * s_dict["seqlen_k"] * s_dict["hdim_v"]
-                + s_dict["nhead_q"] * s_dict["seqlen_q"] * s_dict["hdim_v"]
-            )
-            * eb
-        )
-        return total_bytes / (lat_ms * 1e6)
-
-    for i, (shape, so_path, cfg) in enumerate(work_items):
-        resume_key = (
+    # Flatten to work items, skip already-completed
+    def _resume_key(cfg, shape):
+        return (
             cfg.get("kernel", ""),
             shape.name,
             str(shape.batch),
             str(shape.seqlen_q),
             shape.dtype,
         )
-        if resume_key in completed:
-            skipped += 1
-            continue
 
-        shape_dict = _shape_to_dict(shape)
-        cfg["so_path"] = so_path
-        payload = json.dumps(
-            {"so_path": so_path, "shape": shape_dict, "cfg": cfg}
-        ).encode()
+    work_items = []
+    skipped = 0
+    for shape, kernel_entries in runnable:
+        for so_path, cfg in kernel_entries:
+            if _resume_key(cfg, shape) in completed:
+                skipped += 1
+            else:
+                work_items.append((shape, so_path, cfg))
 
+    total_work = len(work_items) + skipped
+    total_measurements = len(completed)
+    total_gpu_faults = 0
+    bench_t0 = time.perf_counter()
+    BENCH_BATCH = 50
+
+    worker_path = _THIS_DIR / "run_one_kernel.py"
+    worker_env = os.environ.copy()
+    worker_env["FMHA_PYPATH_1"] = str(_DISPATCHER_ROOT / "python")
+    worker_env["FMHA_PYPATH_2"] = str(_DISPATCHER_ROOT / "codegen")
+
+    CFG_KEYS = [
+        "kernel",
+        "family",
+        "mode",
+        "pipeline",
+        "tile_m0",
+        "tile_n0",
+        "tile_k0",
+        "tile_n1",
+        "tile_k1",
+        "tile_k0max",
+        "pad_s",
+        "pad_sk",
+        "pad_d",
+        "pad_dv",
+        "mask",
+        "bias",
+        "lse",
+        "dropout",
+        "logits",
+        "sink",
+        "skip",
+        "qscale",
+        "paged_kv",
+        "rope",
+        "deterministic",
+        "dbias",
+    ]
+
+    print(f"  Runnable shapes: {len(runnable)}")
+    print(f"  Total kernel x shape pairs: {total_work}")
+    print(f"  Already completed: {skipped}")
+    print(f"  Pending: {len(work_items)}")
+    print(f"  Batch size: {BENCH_BATCH} (retry individually on fault)")
+    print()
+
+    def _run_subprocess(payload_bytes, timeout=10):
         proc = subprocess.Popen(
             [sys.executable, str(worker_path)],
             stdin=subprocess.PIPE,
@@ -531,51 +540,29 @@ def main():
         timed_out = False
         stdout_bytes = b""
         try:
-            stdout_bytes, _ = proc.communicate(input=payload, timeout=30)
+            stdout_bytes, _ = proc.communicate(input=payload_bytes, timeout=timeout)
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.communicate()
             timed_out = True
         finally:
+            pid = proc.pid
             if proc.poll() is None:
                 proc.kill()
             proc.wait()
             for pipe in [proc.stdin, proc.stdout, proc.stderr]:
                 if pipe and not pipe.closed:
                     pipe.close()
+            gpucore = _THIS_DIR / f"gpucore.{pid}"
+            if gpucore.exists():
+                gpucore.unlink(missing_ok=True)
+        rc = -1 if timed_out else proc.returncode
+        return stdout_bytes, rc
 
-        if timed_out:
-            total_gpu_faults += 1
-            if (i + 1) % 100 == 0 or i < 10:
-                print(
-                    f"  [{i + 1}/{total_work}] TIMEOUT  "
-                    f"{cfg.get('kernel', '?')[:45]} | {shape.name}",
-                    flush=True,
-                )
-            continue
-
-        if proc.returncode != 0:
-            total_gpu_faults += 1
-            if (i + 1) % 100 == 0 or i < 10:
-                print(
-                    f"  [{i + 1}/{total_work}] FAULT    "
-                    f"{cfg.get('kernel', '?')[:45]} | {shape.name}",
-                    flush=True,
-                )
-            continue
-
-        try:
-            result = json.loads(stdout_bytes.decode())
-        except (json.JSONDecodeError, ValueError):
-            continue
-
-        if not result.get("ok"):
-            continue
-
-        lat_ms = result["ms"]
-        tflops = result["tflops"]
-        bw = _bandwidth_gb_s(shape_dict, lat_ms)
-
+    def _record_result(r, shape, cfg, shape_dict):
+        nonlocal total_measurements
+        lat_ms, tflops = r["ms"], r["tflops"]
+        bw = bandwidth_gb_s(shape, lat_ms)
         row = {
             "problem_name": shape.name,
             "batch": shape.batch,
@@ -587,49 +574,99 @@ def main():
             "hdim_v": shape.hdim_v,
             "dtype": shape.dtype,
         }
-        for k in [
-            "kernel",
-            "family",
-            "mode",
-            "pipeline",
-            "tile_m0",
-            "tile_n0",
-            "tile_k0",
-            "tile_n1",
-            "tile_k1",
-            "tile_k0max",
-            "pad_s",
-            "pad_sk",
-            "pad_d",
-            "pad_dv",
-            "mask",
-            "bias",
-            "lse",
-            "dropout",
-            "logits",
-            "sink",
-            "skip",
-            "qscale",
-            "paged_kv",
-            "rope",
-            "deterministic",
-            "dbias",
-        ]:
+        for k in CFG_KEYS:
             row[k] = cfg.get(k, "")
         row["latency_ms"] = round(lat_ms, 4)
         row["tflops"] = round(tflops, 2)
         row["bandwidth_gb_s"] = round(bw, 2)
-
         writer.writerow(row)
         csv_file.flush()
         total_measurements += 1
+        return tflops, lat_ms
 
-        print(
-            f"  [{i + 1}/{total_work}] {tflops:>7.1f} TFLOPS  {lat_ms:.4f}ms  "
-            f"{cfg.get('kernel', '?')[:45]} | "
-            f"{shape.name} B={shape.batch} S={shape.seqlen_q} {shape.dtype}",
-            flush=True,
-        )
+    # Process in batches
+    n_batches = (len(work_items) + BENCH_BATCH - 1) // BENCH_BATCH
+    processed = 0
+    for bi in range(n_batches):
+        batch = work_items[bi * BENCH_BATCH : (bi + 1) * BENCH_BATCH]
+
+        items = []
+        for shape, so_path, cfg in batch:
+            cfg["so_path"] = so_path
+            items.append(
+                {"so_path": so_path, "shape": _shape_to_dict(shape), "cfg": cfg}
+            )
+
+        batch_timeout = len(batch) * 2 + 5
+        payload = json.dumps({"items": items}).encode()
+        stdout_bytes, rc = _run_subprocess(payload, timeout=batch_timeout)
+
+        if rc == 0:
+            batch_ok = 0
+            for line in stdout_bytes.decode().strip().split("\n"):
+                if not line:
+                    continue
+                try:
+                    r = json.loads(line)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                idx = r.get("idx", -1)
+                if not r.get("ok") or idx < 0 or idx >= len(batch):
+                    continue
+                shape, so_path, cfg = batch[idx]
+                _record_result(r, shape, cfg, items[idx]["shape"])
+                batch_ok += 1
+            processed += len(batch)
+            print(
+                f"  [batch {bi + 1}/{n_batches}] {batch_ok}/{len(batch)} ok  "
+                f"({processed}/{len(work_items)} done, {total_measurements} total)",
+                flush=True,
+            )
+        else:
+            # Collect partial results flushed before the fault
+            partial_done = set()
+            for line in stdout_bytes.decode().strip().split("\n"):
+                if not line:
+                    continue
+                try:
+                    r = json.loads(line)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                idx = r.get("idx", -1)
+                if r.get("ok") and 0 <= idx < len(batch):
+                    shape, so_path, cfg = batch[idx]
+                    _record_result(r, shape, cfg, items[idx]["shape"])
+                    partial_done.add(idx)
+
+            # Retry the rest one by one
+            retry = [(i, b) for i, b in enumerate(batch) if i not in partial_done]
+            print(
+                f"  [batch {bi + 1}/{n_batches}] FAULT after {len(partial_done)}/{len(batch)} ok, "
+                f"retrying {len(retry)} individually...",
+                flush=True,
+            )
+            for idx, (shape, so_path, cfg) in retry:
+                cfg["so_path"] = so_path
+                p = json.dumps(
+                    {"so_path": so_path, "shape": items[idx]["shape"], "cfg": cfg}
+                ).encode()
+                out, single_rc = _run_subprocess(p, timeout=10)
+                if single_rc != 0:
+                    total_gpu_faults += 1
+                    continue
+                try:
+                    r = json.loads(out.decode().strip().split("\n")[0])
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                if r.get("ok"):
+                    tflops, lat_ms = _record_result(r, shape, cfg, items[idx]["shape"])
+                    print(
+                        f"    {tflops:>7.1f} TFLOPS  {lat_ms:.4f}ms  "
+                        f"{cfg.get('kernel', '?')[:45]} | {shape.name}",
+                        flush=True,
+                    )
+            processed += len(batch)
+            print(f"    ({processed}/{len(work_items)} done)", flush=True)
 
     csv_file.close()
     bench_time = time.perf_counter() - bench_t0
