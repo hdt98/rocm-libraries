@@ -31,13 +31,18 @@ The same algorithm works across fp32, fp16, and bf16. The same type can use diff
 
 > **Implication**: Tuning is purely an algorithm-space search. Given a signature, sweep tile configs and let `make_kernel` reject invalid combinations at compile time. The search space is defined by `is_valid_warp_gemm` × divisibility constraints.
 
-## 3. Optional Dtype Hierarchy — Two Levels, Not Three
+## 3. Dtype Cascade — Uniform Across Operations
 
-GEMM uses a two-level hierarchy (unlike elementwise's three). The Signature's `dtype` field sets a kernel-level default. Per-tensor overrides go in `Signature::tensors[]`. After `make_kernel()` resolves types, each physical tensor's dtype is stored in the `physical_tensors[]` table. `acc_dtype` defaults to FP32 independently.
+All operations use the same two-level dtype cascade: `Signature::dtype` sets a kernel-level default for all tensors; explicit `Tensor` entries in `sig.tensors[]` override specific tensors by name. After `resolve()` flattens the cascade, `make_kernel()` stores each physical tensor's dtype in the `physical_tensors[]` table. `GemmOp::acc_dtype` defaults to FP32 independently.
 
-There is no `in_dtype` shared input default. GEMM's operands are asymmetric (A and B have different shapes and may have different types in mixed-precision training), so a shared input default would mislead rather than simplify.
+```cpp
+// Mixed precision: fp16 compute, fp32 output
+Signature{.dtype = DataType::FP16,
+          .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
+          .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}
+```
 
-> **Design principle**: Hierarchy depth is operation-dependent. Each operation defines the hierarchy shape that fits its semantics. Don't force a single hierarchy on all operations.
+> **Design principle**: One dtype cascade model for all operations. Per-tensor `Tensor::dtype` overrides handle any mixed-precision pattern — no operation-specific dtype fields needed.
 
 ## 4. Accumulator Defaults Independently
 
@@ -131,8 +136,8 @@ CK Tile's `CShuffleEpilogue` is the universal epilogue for GEMM:
 
 | Pattern | Elementwise | GEMM | Verdict |
 |---------|------------|------|---------|
-| Config → consteval → Kernel | `ElementwiseConfig` → `VectorAddKernel` | `Signature + GemmAlgorithm` → `GemmKernel` | Generalizes |
-| Optional dtype hierarchy | 3 levels (dtype→in_dtype→per-operand) | 2 levels (dtype→per-operand) | Shape varies by op |
+| Config → consteval → Kernel | `Signature + ElementwiseAlgorithm` → `VectorAddKernel` | `Signature + GemmAlgorithm` → `GemmKernel` | Generalizes |
+| Dtype cascade | 2 levels (Signature::dtype→Tensor::dtype) | 2 levels (Signature::dtype→Tensor::dtype) | Identical model |
 | `_api` / `_dev` header split | Yes | Yes | Generalizes |
 | `CkTypeMap` enum→type dispatch | Yes | Yes + `CkLayoutMap` | Generalizes (adds layout) |
 | Generic Args struct | 40 bytes (old) | 1408 bytes (shared) | Generalizes — one struct for all ops |
@@ -142,7 +147,6 @@ CK Tile's `CShuffleEpilogue` is the universal epilogue for GEMM:
 
 ## 11. What Didn't Generalize
 
-- **Dtype hierarchy depth**: Elementwise has a shared input default (`in_dtype`); GEMM does not. Each operation must define its own hierarchy shape.
 - **Tile validation**: Elementwise validates 1D `kVectorM`; GEMM validates 3D tile divisibility + MFMA warp dispatch. The validation logic is operation-specific.
 - **Scalar parameters**: Elementwise uses `scalars[0]`/`scalars[1]` for `alpha`/`beta`. GEMM's D-tensor fusion is data-driven (D tensor passed as a pointer in `tensors[3]`). Both fit in the generic Args — different slot types for different use cases.
 - **Grid calculation**: Elementwise uses `ceil(N / block_tile)`; GEMM uses `ceil(M/M_tile) × ceil(N/N_tile)` flattened to 1D via `GemmTile1DPartitioner`. More complex but CK Tile handles it.
