@@ -13,6 +13,7 @@
 #include "ck_tile/core/tensor/static_distributed_tensor.hpp"
 #include "ck_tile/core/tensor/tensor_adaptor.hpp"
 #include "ck_tile/core/tensor/tensor_view.hpp"
+#include "ck_tile/core/tensor/tiled_im2col_coordinate.hpp"
 #include "ck_tile/core/tensor/tile_distribution.hpp"
 #include "ck_tile/core/tensor/tile_window_base.hpp"
 #include "ck_tile/core/utility/functional.hpp"
@@ -120,8 +121,38 @@ struct tile_window_with_static_distribution
         typename Base::BottomTensorIndex bottom_tensor_thread_origin_idx_tmp =
             window_origin + window_adaptor_thread_coord_tmp.get_bottom_index();
 
-        const auto bottom_tensor_thread_coord_tmp = make_tensor_coordinate(
-            bottom_tensor_view.get_tensor_descriptor(), bottom_tensor_thread_origin_idx_tmp);
+        // Im2col fast path: split init into M part (potentially SALU) + K part (VALU).
+        // When the descriptor carries wave_uniform_m == true, all threads in a warp have
+        // identical m_gemm, so amd_wave_read_first_lane() promotes the 3 M divmods to the
+        // scalar unit.  The K part (2 divmods) remains lane-specific (VALU).
+        // For non-im2col descriptors we fall through to the existing generic path.
+        using DescType = remove_cvref_t<decltype(bottom_tensor_view.get_tensor_descriptor())>;
+        typename Base::BottomTensorCoord bottom_tensor_thread_coord_tmp;
+        if constexpr(has_im2col_meta_v<DescType>)
+        {
+            const auto& desc = bottom_tensor_view.get_tensor_descriptor();
+            const auto& meta = desc.get_im2col_meta();
+
+            const index_t m_raw = bottom_tensor_thread_origin_idx_tmp[number<0>{}];
+            const index_t k_raw = bottom_tensor_thread_origin_idx_tmp[number<1>{}];
+
+            // When wave_uniform_m, broadcast m_gemm from lane 0 so the compiler
+            // can schedule the 3 M divmods on the scalar unit (SALU).
+            const index_t m_for_init = [&]() {
+                if constexpr(DescType::wave_uniform_m)
+                    return amd_wave_read_first_lane(m_raw);
+                else
+                    return m_raw;
+            }();
+
+            bottom_tensor_thread_coord_tmp.init_m(m_for_init, meta);  // 3 divmods (SALU when wave_uniform_m)
+            bottom_tensor_thread_coord_tmp.init_k(k_raw, meta);        // 2 divmods (VALU, lane-specific k_gemm)
+        }
+        else
+        {
+            bottom_tensor_thread_coord_tmp = make_tensor_coordinate(
+                bottom_tensor_view.get_tensor_descriptor(), bottom_tensor_thread_origin_idx_tmp);
+        }
 
         // pre-compute NumCoord (WindowAdaptorCoord, BottomTensorCoord) bundles to speed up
         // future load/store() calls (might allocate more registers)

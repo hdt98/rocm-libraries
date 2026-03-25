@@ -29,10 +29,16 @@ namespace ck_tile {
 // BaseDesc inheritance for correctness; the metadata payload is the only
 // runtime addition to the kernel args struct.
 
-template <typename BaseDesc>
+// WaveUniformM = true signals that all 64 threads in a warp share the same
+// m_gemm value (guaranteed when KPerBlock >= warp_size * VecSizeA).
+// prepare_coords uses this flag to apply amd_wave_read_first_lane() on m_gemm
+// before calling init_m(), promoting the 3 M divmods to the scalar unit (SALU).
+template <typename BaseDesc, bool WaveUniformM = false>
 struct TiledIm2ColDescriptor : public BaseDesc
 {
     using Base = BaseDesc;
+
+    static constexpr bool wave_uniform_m = WaveUniformM;
 
     CK_TILE_HOST_DEVICE TiledIm2ColDescriptor() = default;
 
@@ -52,11 +58,13 @@ struct TiledIm2ColDescriptor : public BaseDesc
 };
 
 // Factory function: wrap a tensor_descriptor_tiled with im2col metadata.
-template <typename BaseDesc>
+// WaveUniformM should be true when KPerBlock >= warp_size * VecSizeA, i.e.
+// when all threads in a warp map exclusively to K (X0 == warp_size).
+template <bool WaveUniformM = false, typename BaseDesc>
 CK_TILE_HOST_DEVICE constexpr auto
 make_tiled_im2col_descriptor(const BaseDesc& base_desc, const TiledIm2ColMetadata& meta)
 {
-    return TiledIm2ColDescriptor<BaseDesc>{base_desc, meta};
+    return TiledIm2ColDescriptor<BaseDesc, WaveUniformM>{base_desc, meta};
 }
 
 } // namespace ck_tile

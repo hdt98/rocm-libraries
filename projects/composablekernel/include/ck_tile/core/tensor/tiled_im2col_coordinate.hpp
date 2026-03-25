@@ -73,25 +73,31 @@ struct TiledIm2ColMetadata
 // Replaces the generic BottomTensorCoord + transform-chain evaluation.
 //
 // Usage pattern:
-//   init(m_gemm, k_gemm, meta)       — once per thread coordinate (5 divmod)
-//   move_step(dm, dk, meta)          — on coordinate move (0 or 5 divmod)
+//   init_m(m_gemm, meta)             — M part: 3 divmods, stores ho_/wo_
+//   init_k(k_gemm, meta)             — K part: 2 divmods + validity
+//   init(m_gemm, k_gemm, meta)       — convenience wrapper: calls init_m + init_k
+//   move_step(dm, dk, meta)          — on coordinate move (0 divmod when dm==0)
 //   get_offset()                     — every load (1 add)
 //   is_valid()                       — every load (1 bool read)
 //
 // Key property: M_base is invariant across K-loop steps (when dm=0).
 //
-// Branching note (Issue 2): the `if(dm == 0)` check in move_step is a runtime
-// branch, but in the pipeline's K-loop the step is always {0, KPerBlock} where
-// 0 is a compile-time constant — so the compiler eliminates the dm!=0 branch
-// body entirely from the unrolled K-loop.  No performance impact observed.
+// init_m / init_k split (wave-uniform M optimisation):
+//   When KPerBlock >= warp_size * VecSizeA all 64 lanes in a warp share the
+//   same m_gemm.  prepare_coords applies amd_wave_read_first_lane() on m_gemm
+//   and calls init_m() with the resulting scalar value — the 3 M divmods then
+//   execute on the scalar unit (SALU) rather than the vector unit (VALU).
+//   init_k() is called per-lane with the lane-specific k_gemm.
 //
-// Precomputation (Issue 3): c_conv_, x_, y_ are stored in the coordinate and
-// updated INCREMENTALLY in move_step(dm=0) via additions and comparisons only
-// — 0 divmods for the K-only step (vs 2 before).  Trade-off: +2 VGPRs per
-// coordinate vs the gain from eliminated divmods.  For the COMPUTE_V3 pipeline
-// with NumCoord=2 the tiled kernel sits exactly at the 64-VGPR occupancy
-// boundary (2 concurrent workgroups per SIMD); adding 2 more VGPRs may move
-// it to 68 VGPRs (1 workgroup).  Benchmark carefully to confirm net benefit.
+// ho_ / wo_ caching:
+//   ho_ and wo_ are precomputed in init_m() and stored in the coordinate.
+//   move_step(dm=0) reads them directly, eliminating the 2 divmods that were
+//   previously needed to recompute ho/wo from m_gemm at every x_/y_ boundary.
+//
+// Branching note: the `if(dm == 0)` check in move_step is a runtime branch,
+// but in the pipeline's K-loop the step is always {0, KPerBlock} where 0 is a
+// compile-time constant — so the compiler eliminates the dm!=0 branch body
+// entirely from the unrolled K-loop.  No performance impact observed.
 
 struct TiledIm2ColCoordinate
 {
@@ -102,33 +108,45 @@ struct TiledIm2ColCoordinate
     index_t c_conv_;   // current c_conv = k_gemm % C  (incremental K tracking)
     index_t x_;        // current x filter index       (incremental K tracking)
     index_t y_;        // current y filter index       (incremental K tracking)
+    index_t ho_;       // output row   from m_gemm (cached to avoid divmod in move_step)
+    index_t wo_;       // output col   from m_gemm (cached to avoid divmod in move_step)
     bool    valid;     // true iff (m_gemm, k_gemm) maps to non-padded input
 
     // -------------------------------------------------------------------------
-    // Full initialization from (m_gemm, k_gemm).
-    // Cost: 5 integer divisions.
-    // Called once per thread coordinate at block start.
+    // M part: decode m_gemm → (n_conv, ho_, wo_) and compute M_base.
+    // Cost: 3 integer divisions.
+    //
+    // When m_gemm is wave-uniform, the caller should apply
+    // amd_wave_read_first_lane() before calling this method so that the 3
+    // divmods execute on the scalar unit (SALU) instead of the vector unit.
     // -------------------------------------------------------------------------
-    CK_TILE_HOST_DEVICE void init(index_t m,
-                                   index_t k,
-                                   const TiledIm2ColMetadata& meta)
+    CK_TILE_HOST_DEVICE void init_m(index_t m, const TiledIm2ColMetadata& meta)
     {
         m_gemm = m;
-        k_gemm = k;
 
-        // Decode m → (n_conv, ho, wo)  [3 divmod]
+        // Decode m → (n_conv, ho_, wo_)  [3 divmod]
         const index_t n_conv = m / meta.HoWo;
         const index_t rem_m  = m % meta.HoWo;
-        const index_t ho     = rem_m / meta.Wo;
-        const index_t wo     = rem_m % meta.Wo;
+        ho_ = rem_m / meta.Wo;
+        wo_ = rem_m % meta.Wo;
 
         // M_base: depends only on m_gemm
         M_base = n_conv * meta.NStride
-               + ho     * meta.SH_HiStride
-               + wo     * meta.step_w
+               + ho_    * meta.SH_HiStride
+               + wo_    * meta.step_w
                - meta.pad_offset;
+    }
 
-        // Decode k → (y, x, c_conv)  [2 divmod]
+    // -------------------------------------------------------------------------
+    // K part: decode k_gemm → (y_, x_, c_conv_), compute K_offset and validity.
+    // Cost: 2 integer divisions.
+    // Must be called after init_m() (uses ho_, wo_ for the validity check).
+    // -------------------------------------------------------------------------
+    CK_TILE_HOST_DEVICE void init_k(index_t k, const TiledIm2ColMetadata& meta)
+    {
+        k_gemm = k;
+
+        // Decode k → (y_, x_, c_conv_)  [2 divmod]
         y_      = k / meta.XC;
         const index_t rem_k = k % meta.XC;
         x_      = rem_k / meta.C;
@@ -137,12 +155,23 @@ struct TiledIm2ColCoordinate
         // K_offset: depends only on k_gemm
         K_offset = y_ * meta.DH_HiStride + x_ * meta.DW_WiStride + c_conv_;
 
-        // Validity: GEMM bounds + spatial padding check
-        // ih = ho*SH + y*DH - PH, iw = wo*SW + x*DW - PW
-        const index_t ih = ho * meta.SH + y_ * meta.DH - meta.PH;
-        const index_t iw = wo * meta.SW + x_ * meta.DW - meta.PW;
-        valid = (m < meta.M_gemm) && (k < meta.K_gemm) &&
+        // Validity: GEMM bounds + spatial padding check (uses cached ho_, wo_)
+        const index_t ih = ho_ * meta.SH + y_ * meta.DH - meta.PH;
+        const index_t iw = wo_ * meta.SW + x_ * meta.DW - meta.PW;
+        valid = (m_gemm < meta.M_gemm) && (k < meta.K_gemm) &&
                 (ih >= 0 && ih < meta.Hi) && (iw >= 0 && iw < meta.Wi);
+    }
+
+    // -------------------------------------------------------------------------
+    // Convenience wrapper: full init from (m_gemm, k_gemm).
+    // Cost: 5 integer divisions (3 M + 2 K).
+    // -------------------------------------------------------------------------
+    CK_TILE_HOST_DEVICE void init(index_t m,
+                                   index_t k,
+                                   const TiledIm2ColMetadata& meta)
+    {
+        init_m(m, meta);
+        init_k(k, meta);
     }
 
     // -------------------------------------------------------------------------
@@ -151,7 +180,7 @@ struct TiledIm2ColCoordinate
     // When dm == 0 (pure K step): 0 divmod.
     //   c_conv_, x_, y_ are updated incrementally with additions and comparisons.
     //   K_offset is recomputed from the updated (y_, x_, c_conv_) in O(1).
-    //   Validity is updated at x/y boundaries only.
+    //   Validity at x_/y_ boundaries uses cached ho_, wo_ — 0 divmods.
     //
     // When dm != 0: full reinit, 5 divmod.  Rare — only during tile setup.
     //
@@ -189,12 +218,9 @@ struct TiledIm2ColCoordinate
                 }
 
                 // Spatial validity changes when x_ or y_ changes.
-                // Recompute using the compiler-hoisted ho/wo from m_gemm.
-                const index_t rem_m = m_gemm % meta.HoWo;
-                const index_t ho    = rem_m / meta.Wo;
-                const index_t wo    = rem_m % meta.Wo;
-                const index_t ih    = ho * meta.SH + y_ * meta.DH - meta.PH;
-                const index_t iw    = wo * meta.SW + x_ * meta.DW - meta.PW;
+                // Use cached ho_, wo_ — no divmods needed.
+                const index_t ih = ho_ * meta.SH + y_ * meta.DH - meta.PH;
+                const index_t iw = wo_ * meta.SW + x_ * meta.DW - meta.PW;
                 valid = (k_gemm < meta.K_gemm) &&
                         (ih >= 0 && ih < meta.Hi) && (iw >= 0 && iw < meta.Wi);
             }

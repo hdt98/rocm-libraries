@@ -25,6 +25,9 @@ struct ConvConfigBase
 
     static constexpr ck_tile::index_t NumGroupsToMerge = 1;
 
+    // Wave-uniform M: false by default; set true in configs where KPerBlock/VecSizeA >= 64.
+    static constexpr bool WaveUniformM = false;
+
     // Enable tile-aware im2col fast coordinate computation (2D Default only).
     // When true, MakeADescriptor_M_K() returns a TiledIm2ColDescriptor whose
     // coordinate functions use M_base + K_offset instead of the full transform chain.
@@ -255,6 +258,39 @@ struct ConvConfigComputeV3_merged_groups : public ConvConfigBase
     static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_V3;
 
     static constexpr ck_tile::index_t NumGroupsToMerge = 2;
+};
+
+// Wave-uniform m_gemm config.
+//
+// KPerBlock = 256 ensures X0 = min(warp_size, KPerBlock/VecSize) = min(64, 64) = 64,
+// meaning all 64 lanes in a warp map exclusively to K.  Consequently m_gemm is identical
+// for every thread in a warp (wave-uniform), so TiledIm2ColCoordinate::init()'s 3 M
+// divmods are computed with a wavefront-uniform value — a necessary condition for the
+// scalar-unit M_base optimisation.
+//
+// LDS (fp16, single buffer): (64 + 64) × 256 × 2 = 65536 B = 64 KB (at limit).
+// K_gemm = Y×X×C = 9×256 = 2304, KPerBlock = 256 → 9 K-loop iterations.
+// N_gemm = K = 256, NPerBlock = 64 → 4 N-tiles.
+template <typename PrecType>
+struct ConvConfigWaveUniformM : public ConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 64;
+    static constexpr ck_tile::index_t N_Tile = 64;
+    static constexpr ck_tile::index_t K_Tile = 256;
+
+    static constexpr ck_tile::index_t M_Warp = 2;
+    static constexpr ck_tile::index_t N_Warp = 2;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    // M_Tile / M_Warp = 32, N_Tile / N_Warp = 32 → m32n32k16 MFMA.
+    static constexpr ck_tile::index_t M_Warp_Tile = 32;
+    static constexpr ck_tile::index_t N_Warp_Tile = 32;
+    static constexpr ck_tile::index_t K_Warp_Tile = 16;
+
+    static constexpr bool DoubleSmemBuffer = false;
+    static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_V3;
+    // KPerBlock / VectorSizeA = 256 / 4 = 64 == warp_size → all lanes map to K → wave-uniform M.
+    static constexpr bool WaveUniformM = true;
 };
 
 template <typename InDataType, typename WeiDataType = InDataType, typename OutDataType = InDataType>

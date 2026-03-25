@@ -468,6 +468,8 @@ struct TransformConvFwdToGemm_V2
     // TODO: implement ck_tile::tensor_layout::convolution that describe packed/strided dimemsion as
     // properties
     template <typename ALayout,
+              bool EnableTiledIm2Col = false,
+              bool WaveUniformM      = false,
               typename std::enable_if<NDimSpatial == 1 &&
                                           std::is_same_v<ALayout, tensor_layout::convolution::NWGC>,
                                       bool>::type = false>
@@ -697,6 +699,7 @@ struct TransformConvFwdToGemm_V2
 
     template <typename ALayout,
               bool EnableTiledIm2Col = false,
+              bool WaveUniformM      = false,
               typename std::enable_if<
                   NDimSpatial == 2 && std::is_same_v<ALayout, tensor_layout::convolution::NHWGC>,
                   bool>::type = false>
@@ -913,8 +916,12 @@ struct TransformConvFwdToGemm_V2
                     // get_top_dimension_safe_vector_length_strides() carries the correct
                     // VectorSizeA propagation through the full transform chain — without it
                     // the tile window computes the wrong ScalarPerVector.
-                    return make_tiled_im2col_descriptor(base_desc,
-                                                        MakeATileMetadata<ALayout>());
+                    //
+                    // WaveUniformM = true when KPerBlock >= warp_size * VecSizeA so that
+                    // prepare_coords can use amd_wave_read_first_lane() on m_gemm and run
+                    // the 3 M divmods on the scalar unit (SALU).
+                    return make_tiled_im2col_descriptor<WaveUniformM>(base_desc,
+                                                                      MakeATileMetadata<ALayout>());
                 }
                 else
                 {
@@ -1013,6 +1020,8 @@ struct TransformConvFwdToGemm_V2
     }
 
     template <typename ALayout,
+              bool EnableTiledIm2Col = false,
+              bool WaveUniformM      = false,
               typename std::enable_if<
                   NDimSpatial == 3 && std::is_same_v<ALayout, tensor_layout::convolution::NDHWGC>,
                   bool>::type = false>

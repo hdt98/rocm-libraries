@@ -93,7 +93,8 @@ struct GroupedConvFwdKernelArgs
 
         a_grid_desc_m_k =
             transformer_.template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout,
-                                                         UseTiledIm2Col>();
+                                                         GroupedConvTraitsType_::UseTiledIm2Col,
+                                                         GroupedConvTraitsType_::WaveUniformM>();
         b_grid_desc_n_k =
             transformer_.template MakeBDescriptor_N_K<typename GroupedConvTraitsType_::WeiLayout>();
         c_grid_desc_m_n =
@@ -194,7 +195,8 @@ struct GroupedConvFwdKernelArgs
 
         a_grid_desc_m_k =
             transformer_.template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout,
-                                                         UseTiledIm2Col>();
+                                                         GroupedConvTraitsType_::UseTiledIm2Col,
+                                                         GroupedConvTraitsType_::WaveUniformM>();
         b_grid_desc_n_k =
             transformer_.template MakeBDescriptor_N_K<typename GroupedConvTraitsType_::WeiLayout>();
         c_grid_desc_m_n =
@@ -307,7 +309,8 @@ struct GroupedConvFwdKernelArgs
 
         a_grid_desc_m_k =
             transformer_.template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout,
-                                                         UseTiledIm2Col>();
+                                                         GroupedConvTraitsType_::UseTiledIm2Col,
+                                                         GroupedConvTraitsType_::WaveUniformM>();
         b_grid_desc_n_k =
             transformer_.template MakeBDescriptor_N_K<typename GroupedConvTraitsType_::WeiLayout>();
         c_grid_desc_m_n =
@@ -351,10 +354,12 @@ struct GroupedConvFwdKernelArgs
         }
     }
     static constexpr bool UseTiledIm2Col = GroupedConvTraitsType_::UseTiledIm2Col;
+    static constexpr bool WaveUniformM   = GroupedConvTraitsType_::WaveUniformM;
     using AGridDescMK = remove_cvref_t<
         decltype(ConvToGemmFwdTransformer{}
                      .template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout,
-                                                   UseTiledIm2Col>())>;
+                                                   UseTiledIm2Col,
+                                                   WaveUniformM>())>;
     using BGridDescNK = remove_cvref_t<
         decltype(ConvToGemmFwdTransformer{}
                      .template MakeBDescriptor_N_K<typename GroupedConvTraitsType_::WeiLayout>())>;
