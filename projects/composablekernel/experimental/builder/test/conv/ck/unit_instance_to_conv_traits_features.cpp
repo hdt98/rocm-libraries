@@ -97,7 +97,6 @@ static constexpr int kCShuffleMXdlPerWavePerShuffle             = 1;
 static constexpr int kCShuffleNXdlPerWavePerShuffle             = 1;
 static constexpr int kCDEBlockTransferScalarPerVector_NPerBlock = 8;
 static constexpr bool kDirectLoad                               = false;
-static constexpr int kNumGroupsToMerge                          = 1;
 
 using DefaultABlockTransferThreadClusterLengths      = ck::Sequence<4, 64, 1>;
 using DefaultABlockTransferThreadClusterArrangeOrder = ck::Sequence<1, 0, 2>;
@@ -177,8 +176,7 @@ using DeviceInstanceForTests_V3 =
         BlkGemmPipelineVer,
         ADataType,
         BDataType,
-        defaults::kDirectLoad,
-        defaults::kNumGroupsToMerge>;
+        defaults::kDirectLoad>;
 
 // Test case helper for specialization testing
 template <ck::tensor_operation::device::ConvolutionForwardSpecialization Spec>

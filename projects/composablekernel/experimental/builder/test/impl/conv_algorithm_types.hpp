@@ -566,8 +566,7 @@ using ConvAlgorithm_DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3 =
                           FwdXdlGemm_,
                           Transfer_<>,
                           ConvSpecializationFwd_,
-                          BlockGemm_,
-                          GemmBatchOptions_>;
+                          BlockGemm_>;
 
 using ConvAlgorithm_DeviceGroupedConvFwdMultipleD_Wmma_CShuffle =
     ConvAlgorithmTemplate<ThreadBlock_,
@@ -683,5 +682,11 @@ using ConvAlgorithm_DeviceGroupedConvBwdWeightMultipleD_Wmma_CShuffle_V3 =
                           ConvSpecializationBwdWeight_,
                           BlockGemm_,
                           MultipleDSpecialization_>;
+
+using ConvAlgorithm_Tile_GroupedConvolutionKernel = ConvAlgorithmTemplate<TileThreadBlock_,
+                                                                          TileBlockGemm_,
+                                                                          TileTransfer_,
+                                                                          TileConvSpecialization_,
+                                                                          TileOptimizations_>;
 
 } // namespace ck_tile::builder::test

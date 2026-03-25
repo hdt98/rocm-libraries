@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "ck_tile/core/arch/arch.hpp"
 #include "ck_tile/core/config.hpp"
 #include "ck_tile/core/numeric/vector_type.hpp"
 #include "ck_tile/core/utility/ignore.hpp"
@@ -19,8 +18,7 @@ namespace ck_tile::core::arch::mma {
  */
 struct Unsupported;
 
-#if CK_TILE_CONCEPTS && CK_TILE_CONCEPTS_HEADER
-#include <concepts>
+#if defined(__cpp_concepts) && __cpp_concepts >= 201907L
 /**
  * @concept MmaOpI
  * @brief  Expresses the meta-data interface required for each MmaOp policy.
@@ -54,7 +52,7 @@ concept MmaOpI = requires(MmaOp op) {
     } -> std::convertible_to<typename MmaOp::CVecType>;
 };
 
-#endif // CK_TILE_CONCEPTS && CK_TILE_CONCEPTS_HEADER
+#endif // defined(__cpp_concepts) && __cpp_concepts >= 201907L
 
 /**
  *  @class  amdgcn_mma

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "amdgcn_mma.hpp"
-#include "ck_tile/core/arch/arch.hpp"
 #include "mfma/mfma_traits.hpp"
 #include "wmma/wmma_traits.hpp"
 
@@ -50,8 +49,7 @@ static constexpr bool is_mma_op_supported_v = is_mma_op_supported<MmaOp>::value;
 template <typename MmaOp>
 struct MmaOpParams;
 
-#if CK_TILE_CONCEPTS && CK_TILE_CONCEPTS_HEADER
-#include <concepts>
+#if defined(__cpp_concepts) && __cpp_concepts >= 201907L
 
 /**
  *  @concept MmaOpParamsI
@@ -71,7 +69,7 @@ concept MmaOpParamsI = requires(MmaOpParams op) {
     { MmaOpParams::GfxTargetId } -> std::convertible_to<amdgcn_target_arch_id>;
 };
 
-#endif // CK_TILE_CONCEPTS && CK_TILE_CONCEPTS_HEADER
+#endif // defined(__cpp_concepts) && __cpp_concepts >= 201907L
 
 /**
  * @struct MmaOpParams

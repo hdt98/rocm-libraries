@@ -1188,8 +1188,7 @@ TEST_F(ConvTraitsTest, ConvFwdTraitsExtraction)
             ck::BlockGemmPipelineVersion::v1,          // BlkGemmPipelineVer
             ck::half_t,                                // AComputeDataType
             ck::half_t,                                // BComputeDataType
-            false,                                     // DirectLoad
-            1>;                                        // NumGroupsToMerge
+            false>;                                    // DirectLoad
 
     // Use ConvTraitsTmpl to extract compile-time information
     const auto traits = ck_tile::reflect::conv::instance_to_conv_traits<DeviceInstance>();
