@@ -86,16 +86,11 @@ namespace rocRoller
 
             TagExtent::CategoryKey TagExtent::typeKey() const
             {
-                int totalElements = 1;
+                int size = 1;
                 for(int s : sizes)
-                    totalElements *= s;
+                    size *= s;
 
-                auto const& info = DataTypeInfo::Get(dataType);
-                int         physRegCount
-                    = static_cast<int>((totalElements / info.packing) * info.registerCount);
-
-                int bitsPerLogicalElement = static_cast<int>(info.elementBits / info.packing);
-                return std::make_tuple(memoryType, bitsPerLogicalElement, physRegCount);
+                return std::make_tuple(memoryType, dataType, size);
             }
 
             std::string TagExtent::toString() const
@@ -205,7 +200,6 @@ namespace rocRoller
                 AssertFatal(
                     typeKey() == inner.typeKey(), ShowValue(typeKey()), ShowValue(inner.typeKey()));
                 AssertFatal(dataType != DataType::None, ShowValue(dataType));
-                AssertFatal(inner.dataType != DataType::None, ShowValue(inner.dataType));
 
                 auto itFits
                     = [&](GraphExtent const& gap) { return inner.extent.isWithin(kgraph, gap); };

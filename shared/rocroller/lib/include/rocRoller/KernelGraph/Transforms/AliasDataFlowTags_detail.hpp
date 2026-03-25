@@ -63,7 +63,7 @@ namespace rocRoller
              */
             struct TagExtent
             {
-                using CategoryKey = std::tuple<MemoryType, int, int>;
+                using CategoryKey = std::tuple<MemoryType, DataType, int>;
 
                 int              baseTag = -1;
                 std::set<int>    tags;
