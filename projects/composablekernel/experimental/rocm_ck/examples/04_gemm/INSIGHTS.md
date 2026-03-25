@@ -33,15 +33,7 @@ The same algorithm works across fp32, fp16, and bf16. The same type can use diff
 
 ## 3. Optional Dtype Hierarchy — Two Levels, Not Three
 
-GEMM uses a two-level hierarchy (unlike elementwise's three):
-
-```
-dtype                 (kernel-level default)
-├── a_dtype           (A input override)
-├── b_dtype           (B input override)
-├── c_dtype           (C output override)
-└── acc_dtype         (accumulator, defaults to FP32 independently)
-```
+GEMM uses a two-level hierarchy (unlike elementwise's three). The Signature's `dtype` field sets a kernel-level default. Per-tensor overrides go in `Signature::tensors[]`. After `make_kernel()` resolves types, each physical tensor's dtype is stored in the `physical_tensors[]` table. `acc_dtype` defaults to FP32 independently.
 
 There is no `in_dtype` shared input default. GEMM's operands are asymmetric (A and B have different shapes and may have different types in mixed-precision training), so a shared input default would mislead rather than simplify.
 
@@ -89,14 +81,14 @@ The valid set of (dtype, warp_tile) combinations is hardware-specific and non-ob
 
 All variants now use the generic `Args` struct (1408 bytes) from `include/rocm_ck/args.hpp`. Tensor slots carry their own shape — M, N, K are derivable from tensor lengths rather than redundant scalar fields.
 
-| Slot | Tensor | Shape |
-|------|--------|-------|
-| `tensors[0]` | A | `[M, K]` with layout-dependent strides |
-| `tensors[1]` | B | `[K, N]` with layout-dependent strides |
-| `tensors[2]` | C/E (output) | `[M, N]` with layout-dependent strides |
-| `tensors[3]` | D0 (optional) | `[M, N]` — present for fused epilogue |
+| Physical tensor | Args slot | Shape |
+|-----------------|-----------|-------|
+| `physical_tensors[0]` (A) | 0 | `[M, K]` with layout-dependent strides |
+| `physical_tensors[1]` (B) | 1 | `[K, N]` with layout-dependent strides |
+| `physical_tensors[2]` (output) | 2 | `[M, N]` with layout-dependent strides |
+| `physical_tensors[3]` (D0, optional) | 3 | `[M, N]` — present for fused epilogue |
 
-`runGemm<K>` unpacks tensors and extracts leading dimension strides based on layout (RowMajor → `strides[0]`, ColMajor → `strides[1]`). The device code branches on `K.num_d_tensors` with `if constexpr` — each branch is compiled away. On the host side, the resolved signature determines which optional tensor slots to populate: `variant.resolved.find_tensor("bias")` returns the D0 slot index (or -1 if the variant has no bias tensor).
+`runGemm<K>` unpacks tensors and extracts leading dimension strides based on layout (RowMajor → `strides[0]`, ColMajor → `strides[1]`). The device code branches on `EpilogueTypes<K>::NumDTensors` (derived from `K.num_physical_tensors - 3`) with `if constexpr` — each branch is compiled away. On the host side, `k.num_physical_tensors > 3` determines whether D tensor slots need populating.
 
 > **Design evolution**: The original per-epilogue structs (`GemmArgs`, `GemmArgs1D`) kept the ABI minimal but required new structs for each D-tensor count. The generic Args eliminates this — adding D tensors is just populating more slots. The GPU only loads fields it reads, so the larger struct costs nothing at runtime.
 
@@ -122,9 +114,9 @@ Signature{.dtype = FP16,
                   ReluOp{.in = "D", .out = "E"}}}
 ```
 
-`make_kernel` pattern-matches the ops array to determine epilogue configuration. Internally, this maps to `CombineOp` and `Activation` enums in the `GemmKernel` NTTP, which the device code uses to parameterize `ComposedCDEOp`.
+`make_kernel` pattern-matches the ops array to build the `epilogue_ops[]` chain in GemmKernel — a composable sequence of `EpilogueOp` values (Add, Mul, Relu, etc.). `ComposedCDEOp<K>` applies the chain with `if constexpr` unrolling, delegating activation math to CK Tile's optimized implementations.
 
-> **Why operator composition over enums**: The old `CombineOp × Activation` enum model requires O(N×M) enum combinations for N combine ops and M activations. Operator composition is O(N+M) — add one operator struct, and it composes with everything. More importantly, users express what they want, not what the kernel builder anticipated.
+> **Why a composable chain**: A fixed `CombineOp × Activation` enum model requires O(N×M) enum combinations. The epilogue_ops array is O(N+M) — add one `EpilogueOp` value and one `apply_op` clause. The representation mirrors the Signature's operator chain, minus the string names (which aren't structural types for NTTP).
 
 ## 9. CShuffleEpilogue Handles Everything
 
