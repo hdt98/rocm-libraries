@@ -171,35 +171,74 @@ __global__ void prune_strip_kernel(const Ti* in,
         {
             int64_t offset = globalReadOffset + i * stride1 + j * stride2;
             Ti      values[4];
+            //cache pos values to avoid recomputing in write loop.
+            int64_t pos_arr[4];
 #pragma unroll 4
             for(int k = 0; k < 4; k++)
             {
-                int64_t pos    = offset + k * stride2;
-                bool    update = pos >= sizes;
-                values[k]      = update ? static_cast<Ti>(0.0f) : in[pos];
+                pos_arr[k] = offset + k * stride2;
             }
 
-            auto max_norm1 = static_cast<Tc>(-1.0);
-            int  pos_a = 0, pos_b = 0;
-
-#pragma unroll 4
-            for(int a = 0; a < 4; a++)
+            // checking the offset is in the bound.
+            const bool fully_inbounds = ((offset + 3 * stride2) < sizes);
+            if(fully_inbounds)
             {
-                for(int b = a + 1; b < 4; b++)
+                // Fast path: no per-element bounds checks, no zero-init dead stores.
+#pragma unroll 4
+                for(int k = 0; k < 4; k++)
+                    values[k] = in[pos_arr[k]];
+            }
+            else
+            {
+#pragma unroll 4
+                for(int k = 0; k < 4; k++)
                 {
-                    auto norm1_v = norm1<Ti, Tc>(values[a], values[b]);
-                    bool update  = norm1_v > max_norm1;
-                    pos_a        = update ? a : pos_a;
-                    pos_b        = update ? b : pos_b;
-                    max_norm1    = update ? norm1_v : max_norm1;
+                    values[k] = static_cast<Ti>(0.0f);
+                    if(pos_arr[k] < sizes)
+                        values[k] = in[pos_arr[k]];
                 }
             }
 
+            // precompute abs values once.
+            Tc abs_vals[4];
 #pragma unroll 4
             for(int k = 0; k < 4; k++)
+                abs_vals[k] = abs(static_cast<Tc>(values[k]));
+
+            // finding the largest 2 elements.
+            // when two elements have the same value then pick the element which index is smaller.
+            int pos_a = 0, pos_b = 0;
+
+            bool compare = abs_vals[0] >= abs_vals[1];
+            int  hi0     = compare ? 0 : 1;
+            int  lo0     = compare ? 1 : 0;
+            compare      = abs_vals[2] >= abs_vals[3];
+            int hi1      = compare ? 2 : 3;
+            int lo1      = compare ? 3 : 2;
+
+            compare = abs_vals[hi0] >= abs_vals[hi1];
+            pos_a   = compare ? hi0 : hi1;
+            hi0     = compare ? lo0 : hi0;
+            hi1     = compare ? hi1 : lo1;
+
+            compare = abs_vals[hi0] >= abs_vals[hi1];
+            pos_b   = compare ? hi0 : hi1;
+
+            if(fully_inbounds)
             {
-                int64_t pos = offset + k * stride2;
-                prune_if<Ti, InPlace>(k != pos_a && k != pos_b, &out[pos], values[k]);
+#pragma unroll 4
+                for(int k = 0; k < 4; k++)
+                    prune_if<Ti, InPlace>(k != pos_a && k != pos_b, &out[pos_arr[k]], values[k]);
+            }
+            else
+            {
+#pragma unroll 4
+                for(int k = 0; k < 4; k++)
+                {
+                    if(pos_arr[k] < sizes)
+                        prune_if<Ti, InPlace>(
+                            k != pos_a && k != pos_b, &out[pos_arr[k]], values[k]);
+                }
             }
         }
     }
