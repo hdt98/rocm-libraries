@@ -94,7 +94,8 @@ namespace rocRoller
                 int         physRegCount
                     = static_cast<int>((totalElements / info.packing) * info.registerCount);
 
-                return std::make_tuple(memoryType, physRegCount);
+                int bitsPerLogicalElement = static_cast<int>(info.elementBits / info.packing);
+                return std::make_tuple(memoryType, bitsPerLogicalElement, physRegCount);
             }
 
             std::string TagExtent::toString() const
