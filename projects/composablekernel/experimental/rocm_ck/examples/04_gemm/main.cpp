@@ -28,11 +28,13 @@
 #include <memory>
 #include <vector>
 
+using rocm_ck::AddOp;
 using rocm_ck::DataType;
 using rocm_ck::GemmAlgorithm;
 using rocm_ck::GemmKernel;
 using rocm_ck::GemmOp;
 using rocm_ck::make_kernel;
+using rocm_ck::ReluOp;
 using rocm_ck::Signature;
 
 // ============================================================================
@@ -76,15 +78,15 @@ static constexpr GemmVariant ALL_GEMM_VARIANTS[] = {
     make_variant("gemm_fp16_add",
                  Signature{.dtype = DataType::FP16,
                            .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                   rocm_ck::AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+                                   AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
                  GemmAlgorithm{.block_tile  = {128, 128, 32},
                                .block_warps = {2, 2, 1},
                                .warp_tile   = {16, 16, 16}}),
     make_variant("gemm_fp16_add_relu",
                  Signature{.dtype = DataType::FP16,
                            .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                   rocm_ck::AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
-                                   rocm_ck::ReluOp{.in = "D", .out = "E"}}},
+                                   AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                                   ReluOp{.in = "D", .out = "E"}}},
                  GemmAlgorithm{.block_tile  = {128, 128, 32},
                                .block_warps = {2, 2, 1},
                                .warp_tile   = {16, 16, 16}}),
