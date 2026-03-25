@@ -34,6 +34,7 @@
 #include <sstream>
 #include <fstream>
 #include <chrono>
+#include <thread>
 #ifndef _WIN32
 #include <sys/wait.h>
 #include <sys/stat.h>
@@ -530,6 +531,13 @@ static int run_tests_parallel_gpus(int argc, char** argv, int num_gpus)
 
     size_t tests_per_gpu = (all_tests.size() + num_gpus - 1) / num_gpus;
     hipblaslt_cout << "Tests per GPU: ~" << tests_per_gpu << std::endl;
+
+    // Calculate and display OpenMP thread distribution
+    const char* env_threads = getenv("OMP_NUM_THREADS");
+    int current_threads = env_threads ? std::atoi(env_threads) : std::thread::hardware_concurrency();
+    int threads_per_gpu = std::max(1, current_threads / num_gpus);
+    hipblaslt_cout << "OpenMP threads per GPU: " << threads_per_gpu
+                   << " (total available: " << current_threads << ")" << std::endl;
     hipblaslt_cout << std::endl;
 
     // Split tests across GPUs using Google Test's built-in sharding
@@ -553,6 +561,16 @@ static int run_tests_parallel_gpus(int argc, char** argv, int num_gpus)
             // Set which GPU to use
             std::string gpu_env = std::to_string(gpu);
             setenv("HIP_VISIBLE_DEVICES", gpu_env.c_str(), 1);
+
+            // Set optimal OpenMP threads per GPU process
+            // Get current OMP_NUM_THREADS setting, or use hardware concurrency
+            const char* env_threads = getenv("OMP_NUM_THREADS");
+            int current_threads = env_threads ? std::atoi(env_threads) : std::thread::hardware_concurrency();
+
+            // Divide CPU threads among GPU processes to avoid oversubscription
+            // Each GPU process should use (total_threads / num_gpus) threads
+            int threads_per_gpu = std::max(1, current_threads / num_gpus);
+            setenv("OMP_NUM_THREADS", std::to_string(threads_per_gpu).c_str(), 1);
 
             // Use Google Test's built-in sharding
             setenv("GTEST_TOTAL_SHARDS", std::to_string(num_gpus).c_str(), 1);

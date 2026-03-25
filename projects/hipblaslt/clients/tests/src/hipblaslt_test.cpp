@@ -145,6 +145,14 @@ static thread_local struct
     volatile sig_atomic_t signal;
 } t_handler;
 
+// Configuration: whether to continue tests on timeout or abort entire run
+static const bool timeout_continue_tests = [] {
+    // If set, timeout will fail the individual test and continue to next test
+    // instead of aborting the entire test run.
+    const char* env = getenv("HIPBLASLT_TEST_TIMEOUT_CONTINUE");
+    return env != nullptr;
+}();
+
 // Signal handler (must have external "C" linkage)
 extern "C" void hipblaslt_test_signal_handler(int sig)
 {
@@ -162,16 +170,22 @@ extern "C" void hipblaslt_test_signal_handler(int sig)
     }
 
 #ifndef _WIN32
-    // If this is an alarm timeout, we abort
+    // If this is an alarm timeout, check if we should abort or continue
     if(sig == SIGALRM)
     {
-        static constexpr char msg[]
-            = "\nAborting tests due to an alarm timeout.\n\n"
-              "This could be due to a deadlock caused by mutexes being left locked\n"
-              "after a previous test's signal was caught and partially recovered from.\n";
-        // We must use write() because it's async-signal-safe and other IO might be blocked
-        write(STDERR_FILENO, msg, sizeof(msg) - 1);
-        hipblaslt_abort();
+        if(!timeout_continue_tests)
+        {
+            // Original behavior: abort entire test run on timeout
+            static constexpr char msg[]
+                = "\nAborting tests due to an alarm timeout.\n\n"
+                  "This could be due to a deadlock caused by mutexes being left locked\n"
+                  "after a previous test's signal was caught and partially recovered from.\n"
+                  "Set HIPBLASLT_TEST_TIMEOUT_CONTINUE=1 to continue with remaining tests instead.\n";
+            // We must use write() because it's async-signal-safe and other IO might be blocked
+            write(STDERR_FILENO, msg, sizeof(msg) - 1);
+            hipblaslt_abort();
+        }
+        // If timeout_continue_tests is true, fall through to treat like other signals
     }
 #endif
 
@@ -223,11 +237,19 @@ void catch_signals_and_exceptions_as_failures(std::function<void()> test, bool s
     // Set up the return point, and handle siglongjmp returning back to here
     if(sigsetjmp(t_handler.sigjmp_buf_, true))
     {
+        // Provide clear message for timeout vs other signals
+        if(t_handler.signal == SIGALRM)
+        {
+            FAIL() << "Test exceeded timeout of " << test_timeout << " seconds";
+        }
+        else
+        {
 #if (__GLIBC__ < 2) || (__GLIBC__ == 2 && __GLIBC_MINOR__ < 32)
-        FAIL() << "Received " << sys_siglist[t_handler.signal] << " signal";
+            FAIL() << "Received " << sys_siglist[t_handler.signal] << " signal";
 #else
-        FAIL() << "Received " << sigdescr_np(t_handler.signal) << " signal";
+            FAIL() << "Received " << sigdescr_np(t_handler.signal) << " signal";
 #endif
+        }
     }
 #else
     if(setjmp(t_handler.sigjmp_buf_))
