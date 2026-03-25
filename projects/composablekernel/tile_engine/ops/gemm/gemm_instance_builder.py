@@ -337,11 +337,11 @@ class GemmKernelBuilder:
             pad_m,
             pad_n,
             pad_k,
-            persistent,
+            persistent_or_a_preshuffle_quant,
         ) = trait_combo
 
         # Create kernel name with proper boolean capitalization
-        kernel_name = f"{self.kernel_name_prefix}_{self.datatype}_{self.layout}_{pipeline}_{epilogue}_{scheduler}_{str(pad_m).capitalize()}_{str(pad_n).capitalize()}_{str(pad_k).capitalize()}_{str(persistent).capitalize()}"
+        kernel_name = f"{self.kernel_name_prefix}_{self.datatype}_{self.layout}_{pipeline}_{epilogue}_{scheduler}_{str(pad_m).capitalize()}_{str(pad_n).capitalize()}_{str(pad_k).capitalize()}_{str(persistent_or_a_preshuffle_quant).capitalize()}"
 
         # Create tile configuration string
         tile_str = (
@@ -380,16 +380,15 @@ class GemmKernelBuilder:
             base_pipeline_map = {
                 "preshufflev2": "ck_tile::BaseWeightPreshufflePipelineAGmemBGmemCRegV2",
             }
-        # [DELETE]
-        # elif self.kernel_name_prefix == "gemm_aquant":
-        #     pipeline_impl_map = {
-        #         "mem": "ck_tile::AQuantGemmPipelineAgBgCrMem",
-        #         "compv3": "ck_tile::AQuantGemmPipelineAgBgCrCompV3",
-        #     }
-        #     base_pipeline_map = {
-        #         "mem": "ck_tile::BaseGemmPipelineAgBgCrMem",
-        #         "compv3": "ck_tile::BaseGemmPipelineAgBgCrCompV3",
-        #     }
+        elif self.kernel_name_prefix == "gemm_aquant":
+            pipeline_impl_map = {
+                "mem": "ck_tile::AQuantGemmPipelineAgBgCrMem",
+                "compv3": "ck_tile::AQuantGemmPipelineAgBgCrCompV3",
+            }
+            base_pipeline_map = {
+                "mem": "ck_tile::BaseGemmPipelineAgBgCrMem",
+                "compv3": "ck_tile::BaseGemmPipelineAgBgCrCompV3",
+            }
 
         scheduler_type_map = {
             "intrawave": "ck_tile::GemmPipelineScheduler::Intrawave",
@@ -410,7 +409,7 @@ class GemmKernelBuilder:
             pipeline,
             epilogue,
             k_block_per_cu,
-            persistent,
+            persistent_or_a_preshuffle_quant,
         )
 
         # Write into a file
@@ -449,22 +448,6 @@ class GemmKernelBuilder:
 #include <hip/hip_runtime.h>
 #include "ck_tile/ops/gemm/kernel/grouped_gemm_kernel.hpp"
 """
-        # [DELETE]
-        #         elif self.kernel_name_prefix == "gemm_aquant":
-        #             instance_code = f"""// Generated AQuant kernel instance for {kernel_name}
-        # #pragma once
-
-        # #include <cstdint>
-        # #include <utility>
-        # #include <tuple>
-        # #include "ck_tile/core.hpp"
-        # #include "ck_tile/host/kernel_launch.hpp"
-        # #include "ck_tile/ops/gemm.hpp"
-        # #include "ck_tile/ops/gemm_quant.hpp"
-        # #include "ck_tile/ops/gemm_quant/kernel/gemm_quant_kernel.hpp"
-        # #include "ck_tile/ops/common/tensor_layout.hpp"
-        # #include "ck_tile/ops/epilogue/default_2d_epilogue.hpp"
-        # """
         return instance_code
 
     def populate_kernel_dtype_layout(self):
@@ -483,7 +466,7 @@ class GemmKernelBuilder:
             "gemm_universal",
             "gemm_preshuffle",
             "grouped_gemm",
-            # "gemm_aquant", [DELETE]
+            "gemm_aquant",
         ]:
             a_layout, b_layout, c_layout = get_abc_layouts(self.layout)
 
@@ -493,10 +476,9 @@ using BDataType = {get_dtype_string(self.datatype)};
 using AccDataType = {acc_type};
 using CDataType = {get_dtype_string(c_type)};"""
 
-        # [DELETE]
-        #         if self.kernel_name_prefix == "gemm_aquant":
-        #             instance_code += """
-        # using AQDataType = float;"""
+        if self.kernel_name_prefix == "gemm_aquant":
+            instance_code += """
+        using AQDataType = float;"""
 
         if self.kernel_name_prefix == "gemm_multi_d":
             instance_code += f"""
@@ -509,16 +491,15 @@ using ALayout = {a_layout};
 using BLayout = {b_layout};
 using CLayout = {c_layout};
 """
-        # [DELETE]
-        #         if self.kernel_name_prefix == "gemm_aquant":
-        #             # AQ layout: follows ALayout except for CRR where AQ is RowMajor
-        #             layout_code = str(self.layout).strip().lower()
-        #             if layout_code == "crr":
-        #                 aq_layout = "ck_tile::tensor_layout::gemm::RowMajor"
-        #             else:
-        #                 aq_layout = a_layout
-        #             instance_code += f"""using AQLayout = {aq_layout};
-        # """
+        if self.kernel_name_prefix == "gemm_aquant":
+            # AQ layout: follows ALayout except for CRR where AQ is RowMajor
+            layout_code = str(self.layout).strip().lower()
+            if layout_code == "crr":
+                aq_layout = "ck_tile::tensor_layout::gemm::RowMajor"
+            else:
+                aq_layout = a_layout
+            instance_code += f"""using AQLayout = {aq_layout};
+"""
 
         if self.kernel_name_prefix == "gemm_multi_d":
             instance_code += f"""
@@ -562,7 +543,7 @@ struct SelectedKernel {{
             pad_m,
             pad_n,
             pad_k,
-            persistent,
+            persistent_or_a_preshuffle_quant,
         ) = trait_combo
 
         # [DELETE]
@@ -605,7 +586,7 @@ struct SelectedKernel {{
             "grouped_gemm",
         ]:
             instance_code += f"""
-    static constexpr bool UsePersistentKernel = {"true" if persistent in [True, "true"] else "false"};
+    static constexpr bool UsePersistentKernel = {"true" if persistent_or_a_preshuffle_quant in [True, "true"] else "false"};
     static constexpr bool UseStructuredSparsity = false;
     static constexpr ck_tile::index_t NumWaveGroups = 1;"""
 
@@ -616,11 +597,17 @@ struct SelectedKernel {{
             else:
                 instance_code += """
     static constexpr bool Preshuffle = false;"""
+
+        if self.kernel_name_prefix == "gemm_aquant":
+            instance_code += f"""
+    static constexpr bool APreshuffleQuant = {"true" if persistent_or_a_preshuffle_quant in [True, "true"] else "false"};
+    static constexpr bool BPreshuffleQuant = false;
+    static constexpr ck_tile::index_t GroupSizeK = {self.group_size_k};"""
         return instance_code
 
     def populate_initialization(self, base_pipeline_map, pipeline):
         # Tile Shape
-        if self.kernel_name_prefix in ["gemm_multi_d"]:
+        if self.kernel_name_prefix in ["gemm_multi_d", "gemm_aquant"]:
             instance_code = """
 
     // Tile shape
@@ -649,28 +636,27 @@ struct SelectedKernel {{
     // Tile partitioner
     using TilePartitioner = ck_tile::GemmSpatiallyLocalTilePartitioner<TileShape, 8, 4>;"""
 
-        # [DELETE]
-        #     # AQuant-specific: QuantGroupSize and Traits
-        #     if self.kernel_name_prefix == "gemm_aquant":
-        #         instance_code += """
-
-        # // Quantization group size
-        # using QuantGroupSize = ck_tile::QuantGroupShape<ck_tile::sequence<1, 1, GroupSizeK>>;
-
-        # // Traits
-        # using Traits = ck_tile::TileGemmQuantTraits<
-        #     kPadM, kPadN, kPadK,
-        #     APreshuffleQuant,
-        #     BPreshuffleQuant,
-        #     PreshuffleB,
-        #     ALayout, BLayout, CLayout,
-        #     ck_tile::QuantType::AQuantGrouped,
-        #     AQLayout>;"""
-
-        #         return instance_code
-
         # Traits
-        if self.kernel_name_prefix == "gemm_multi_d":
+        # AQuant-specific: QuantGroupSize and Traits
+        if self.kernel_name_prefix == "gemm_aquant":
+            instance_code += """
+
+    // Quantization group size
+    using QuantGroupSize = ck_tile::QuantGroupShape<ck_tile::sequence<1, 1, GroupSizeK>>;
+
+    // Traits
+    using Traits = ck_tile::TileGemmQuantTraits<
+        kPadM, kPadN, kPadK,
+        APreshuffleQuant,
+        BPreshuffleQuant,
+        PreshuffleB,
+        ALayout, BLayout, CLayout,
+        ck_tile::QuantType::AQuantGrouped,
+        AQLayout>;"""
+
+            return instance_code
+
+        elif self.kernel_name_prefix == "gemm_multi_d":
             instance_code += """
 
     // Traits
@@ -681,6 +667,7 @@ struct SelectedKernel {{
     // Traits
     using Traits = ck_tile::TileGemmTraits<kPadM, kPadN, kPadK, ALayout, BLayout, CLayout, NumWaveGroups>;"""
 
+        # [DELETE][TODO] Complete this function from here
         # Pipeline problem
         if self.kernel_name_prefix in ["gemm_preshuffle", "gemm_multi_d"]:
             instance_code += """
