@@ -15,8 +15,6 @@
 #include "gemm_api.hpp"
 
 #include <rocm_ck/args.hpp>
-#include <rocm_ck/resolve.hpp>
-
 #include <rocm_ck/datatype_utils.hpp>
 #include <rocm_ck/hip_check.hpp>
 #include <rocm_ck/kpack_module.hpp>
@@ -45,13 +43,12 @@ struct GemmVariant
 {
     const char* name;
     GemmKernel kernel;
-    rocm_ck::ResolvedSignature resolved;
 };
 
-/// Build a GemmVariant with resolved signature preserved for host-side use.
+/// Build a GemmVariant from Signature + Algorithm.
 consteval GemmVariant make_variant(const char* name, Signature sig, GemmAlgorithm algo)
 {
-    return {name, make_kernel(sig, algo), rocm_ck::resolve(sig)};
+    return {name, make_kernel(sig, algo)};
 }
 
 // clang-format off
@@ -163,23 +160,22 @@ int main(int argc, char** argv)
         if(!kernel.load(archive, variant.name))
             continue;
 
-        // Allocate typed device buffers
-        rocm_ck::TypedBuffer buf_a(k.a_dtype, M * K);
-        rocm_ck::TypedBuffer buf_b(k.b_dtype, K * N);
-        rocm_ck::TypedBuffer buf_c(k.c_dtype, M * N);
+        // Allocate typed device buffers (dtypes from physical tensor table)
+        rocm_ck::TypedBuffer buf_a(k.physical_tensors[0].dtype, M * K);
+        rocm_ck::TypedBuffer buf_b(k.physical_tensors[1].dtype, K * N);
+        rocm_ck::TypedBuffer buf_c(k.physical_tensors[2].dtype, M * N);
 
         buf_a.upload(ref_a.data());
         buf_b.upload(ref_b.data());
         buf_c.zero();
 
-        // Look up optional D0 tensor (bias) from the resolved signature
-        int d0_slot = variant.resolved.find_tensor("bias");
+        // D0 tensor (e.g., bias) is present when num_physical_tensors > 3
+        bool has_d0 = k.num_physical_tensors > 3;
 
         std::unique_ptr<rocm_ck::TypedBuffer> buf_d0;
-        if(d0_slot >= 0)
+        if(has_d0)
         {
-            buf_d0 = std::make_unique<rocm_ck::TypedBuffer>(variant.resolved.tensors[d0_slot].dtype,
-                                                            M * N);
+            buf_d0 = std::make_unique<rocm_ck::TypedBuffer>(k.physical_tensors[3].dtype, M * N);
             buf_d0->upload(ref_d0.data());
         }
 
@@ -191,19 +187,22 @@ int main(int argc, char** argv)
                     grid_size,
                     k.thread_block_size);
 
-        // Build generic Args — same struct for all variants
+        // Build generic Args — slot indices from physical tensor table
         rocm_ck::Args kernel_args{};
         // A [M x K] RowMajor
-        kernel_args.tensors[0] = {buf_a.ptr(), {M, K, 0, 0, 0, 0}, {stride_A, 1, 0, 0, 0, 0}};
+        kernel_args.tensors[k.physical_tensors[0].args_slot] = {
+            buf_a.ptr(), {M, K, 0, 0, 0, 0}, {stride_A, 1, 0, 0, 0, 0}};
         // B [K x N] ColumnMajor
-        kernel_args.tensors[1] = {buf_b.ptr(), {K, N, 0, 0, 0, 0}, {1, stride_B, 0, 0, 0, 0}};
-        // C/E [M x N] RowMajor (output)
-        kernel_args.tensors[2] = {buf_c.ptr(), {M, N, 0, 0, 0, 0}, {stride_C, 1, 0, 0, 0, 0}};
+        kernel_args.tensors[k.physical_tensors[1].args_slot] = {
+            buf_b.ptr(), {K, N, 0, 0, 0, 0}, {1, stride_B, 0, 0, 0, 0}};
+        // Output [M x N] RowMajor
+        kernel_args.tensors[k.physical_tensors[2].args_slot] = {
+            buf_c.ptr(), {M, N, 0, 0, 0, 0}, {stride_C, 1, 0, 0, 0, 0}};
         // D0 [M x N] RowMajor (optional, for fused epilogue)
-        if(d0_slot >= 0)
+        if(has_d0)
         {
-            constexpr int stride_D0      = N;
-            kernel_args.tensors[d0_slot] = {
+            constexpr int stride_D0                              = N;
+            kernel_args.tensors[k.physical_tensors[3].args_slot] = {
                 buf_d0->ptr(), {M, N, 0, 0, 0, 0}, {stride_D0, 1, 0, 0, 0, 0}};
         }
 
@@ -239,7 +238,7 @@ int main(int argc, char** argv)
         else if(k.combine == rocm_ck::CombineOp::Add)
             ref = ref_add.data();
 
-        float tol   = rocm_ck::tolerance_for(k.c_dtype);
+        float tol   = rocm_ck::tolerance_for(k.physical_tensors[2].dtype);
         bool passed = true;
         for(int i = 0; i < M * N; ++i)
         {

@@ -109,22 +109,25 @@ struct EpilogueTypes
 {
     using Op = ComposedCDEOp<K.combine, K.activation>;
 
-    // Always resolved (GemmKernel fields have valid defaults even when unused).
-    // std::conditional_t below selects which ones go into the tuples.
-    using D0Type   = typename CkTypeMap<K.d0_dtype>::type;
-    using D1Type   = typename CkTypeMap<K.d1_dtype>::type;
-    using D0Layout = typename CkLayoutMap<K.d0_layout>::type;
-    using D1Layout = typename CkLayoutMap<K.d1_layout>::type;
+    // D tensor count: physical tensors beyond A(0), B(1), output(2)
+    static constexpr int NumDTensors = K.num_physical_tensors - 3;
 
-    using DsDataType = std::conditional_t<K.num_d_tensors == 0,
+    // D0/D1 types from physical tensor table (indices 3 and 4).
+    // Always resolved — std::conditional_t below selects which go into tuples.
+    using D0Type   = typename CkTypeMap<K.physical_tensors[3].dtype>::type;
+    using D1Type   = typename CkTypeMap<K.physical_tensors[4].dtype>::type;
+    using D0Layout = typename CkLayoutMap<K.physical_tensors[3].layout>::type;
+    using D1Layout = typename CkLayoutMap<K.physical_tensors[4].layout>::type;
+
+    using DsDataType = std::conditional_t<NumDTensors == 0,
                                           ck_tile::tuple<>,
-                                          std::conditional_t<K.num_d_tensors == 1,
+                                          std::conditional_t<NumDTensors == 1,
                                                              ck_tile::tuple<D0Type>,
                                                              ck_tile::tuple<D0Type, D1Type>>>;
 
-    using DsLayout = std::conditional_t<K.num_d_tensors == 0,
+    using DsLayout = std::conditional_t<NumDTensors == 0,
                                         ck_tile::tuple<>,
-                                        std::conditional_t<K.num_d_tensors == 1,
+                                        std::conditional_t<NumDTensors == 1,
                                                            ck_tile::tuple<D0Layout>,
                                                            ck_tile::tuple<D0Layout, D1Layout>>>;
 };
@@ -135,9 +138,8 @@ struct EpilogueTypes
 
 /// Device-side GEMM bridge: Args → CK Tile template stack → ck_tile::GemmKernel.
 ///
-/// Tensor layout:
-///   tensors[0] = A,  tensors[1] = B,  tensors[2] = C/E (output)
-///   tensors[3] = D0 (optional, for fused epilogue)
+/// Tensor slot mapping comes from K.physical_tensors[]:
+///   [0] = A,  [1] = B,  [2] = output (C/D/E),  [3] = D0 (optional)
 ///   lengths[0] = first dim, lengths[1] = second dim
 ///   strides follow dimension order (RowMajor: strides[0]=ld, ColMajor: strides[1]=ld)
 ///
@@ -147,20 +149,25 @@ struct EpilogueTypes
 template <GemmKernel K>
 __device__ void runGemm(Args args)
 {
-    // --- Map schema types to CK Tile types ---
-    using AType   = typename CkTypeMap<K.a_dtype>::type;
-    using BType   = typename CkTypeMap<K.b_dtype>::type;
-    using AccType = typename CkTypeMap<K.acc_dtype>::type;
-    using OType   = typename CkTypeMap<K.c_dtype>::type;
+    // Physical tensor table indices (compile-time constants)
+    static constexpr auto PT_A   = K.physical_tensors[0]; // A
+    static constexpr auto PT_B   = K.physical_tensors[1]; // B
+    static constexpr auto PT_OUT = K.physical_tensors[2]; // output
 
-    using ALayout = typename CkLayoutMap<K.a_layout>::type;
-    using BLayout = typename CkLayoutMap<K.b_layout>::type;
-    using CLayout = typename CkLayoutMap<K.c_layout>::type;
+    // --- Map schema types to CK Tile types ---
+    using AType   = typename CkTypeMap<PT_A.dtype>::type;
+    using BType   = typename CkTypeMap<PT_B.dtype>::type;
+    using AccType = typename CkTypeMap<K.acc_dtype>::type;
+    using OType   = typename CkTypeMap<PT_OUT.dtype>::type;
+
+    using ALayout = typename CkLayoutMap<PT_A.layout>::type;
+    using BLayout = typename CkLayoutMap<PT_B.layout>::type;
+    using CLayout = typename CkLayoutMap<PT_OUT.layout>::type;
 
     // --- Unpack generic Args — compiler generates s_load at fixed offsets ---
-    const TensorArg& t_a = args.tensors[0];
-    const TensorArg& t_b = args.tensors[1];
-    const TensorArg& t_c = args.tensors[2];
+    const TensorArg& t_a = args.tensors[PT_A.args_slot];
+    const TensorArg& t_b = args.tensors[PT_B.args_slot];
+    const TensorArg& t_c = args.tensors[PT_OUT.args_slot];
 
     index_t M     = t_a.lengths[0];
     index_t N     = t_b.lengths[1];
@@ -169,11 +176,11 @@ __device__ void runGemm(Args args)
     // Leading dimension stride depends on layout:
     //   RowMajor → strides[0],  ColMajor → strides[1]
     index_t stride_A =
-        static_cast<index_t>(K.a_layout == Layout::Row ? t_a.strides[0] : t_a.strides[1]);
+        static_cast<index_t>(PT_A.layout == Layout::Row ? t_a.strides[0] : t_a.strides[1]);
     index_t stride_B =
-        static_cast<index_t>(K.b_layout == Layout::Row ? t_b.strides[0] : t_b.strides[1]);
+        static_cast<index_t>(PT_B.layout == Layout::Row ? t_b.strides[0] : t_b.strides[1]);
     index_t stride_C =
-        static_cast<index_t>(K.c_layout == Layout::Row ? t_c.strides[0] : t_c.strides[1]);
+        static_cast<index_t>(PT_OUT.layout == Layout::Row ? t_c.strides[0] : t_c.strides[1]);
 
     // --- Step 1: Tile geometry (from GemmKernel, validated by make_kernel) ---
     using GemmShape =
@@ -224,7 +231,9 @@ __device__ void runGemm(Args args)
 
     // Convert generic Args to CK Tile's internal args.
     // Branch on D tensor count to construct the right KernelArgs initializer.
-    if constexpr(K.num_d_tensors == 0)
+    static constexpr int NumDTensors = EpilogueTypes<K>::NumDTensors;
+
+    if constexpr(NumDTensors == 0)
     {
         const KernelArgs kargs{{t_a.ptr},                  // as_ptr
                                {t_b.ptr},                  // bs_ptr
@@ -240,11 +249,12 @@ __device__ void runGemm(Args args)
                                1};                         // k_batch (no split-K)
         CkKernel{}(kargs);
     }
-    else if constexpr(K.num_d_tensors == 1)
+    else if constexpr(NumDTensors == 1)
     {
-        const TensorArg& t_d0 = args.tensors[3];
+        static constexpr auto PT_D0 = K.physical_tensors[3];
+        const TensorArg& t_d0       = args.tensors[PT_D0.args_slot];
         index_t stride_D0 =
-            static_cast<index_t>(K.d0_layout == Layout::Row ? t_d0.strides[0] : t_d0.strides[1]);
+            static_cast<index_t>(PT_D0.layout == Layout::Row ? t_d0.strides[0] : t_d0.strides[1]);
 
         const KernelArgs kargs{{t_a.ptr},                  // as_ptr
                                {t_b.ptr},                  // bs_ptr
