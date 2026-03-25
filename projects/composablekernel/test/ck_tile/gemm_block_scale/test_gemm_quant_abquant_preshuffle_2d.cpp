@@ -36,7 +36,6 @@ using ABQuantPreshuffleBTypes = ::testing::Types<
     std::tuple<RowMajor, ColumnMajor, RowMajor, RowMajor, FP8, FP8, float, Half, ABQuantGrouped, GemmConfigPreshuffleB_ABQuant_Prefill, GroupSize, GroupSize2D128N, ColumnMajor>,
     std::tuple<RowMajor, ColumnMajor, RowMajor, RowMajor, FP8, FP8, float, Half, ABQuantGrouped, GemmConfigPreshuffleBPrefillTiledPermuteN, GroupSize, GroupSize, ColumnMajor>,
     std::tuple<RowMajor, ColumnMajor, RowMajor, RowMajor, FP8, FP8, float, Half, ABQuantGrouped, GemmConfigPreshuffleBPrefillTiledPermuteN, GroupSize, GroupSize2D128N, ColumnMajor>
-    
 >;
 // clang-format on
 
