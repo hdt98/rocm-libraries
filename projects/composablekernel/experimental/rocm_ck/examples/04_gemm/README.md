@@ -128,9 +128,10 @@ make_kernel(
 - `[GemmOp, AddOp, ReluOp]` — fused bias + activation (tensors 0-3: A, B, E, D0)
 
 All variants use the generic `Args` struct. Tensor slot count varies by
-epilogue — `runGemm` branches on `K.num_d_tensors` at compile time on the
-device side. On the host side, the resolved signature drives which slots to
-populate: `variant.resolved.find_tensor("bias")` returns the D0 slot index.
+epilogue — `runGemm` branches on `EpilogueTypes<K>::NumDTensors` (derived
+from `K.num_physical_tensors - 3`) at compile time on the device side.
+On the host side, `k.num_physical_tensors > 3` determines whether D
+tensor slots need populating.
 
 The "bias" tensor's dtype cascades from `Signature::dtype`. Explicit `Tensor`
 entries can override it for mixed-precision epilogues.
