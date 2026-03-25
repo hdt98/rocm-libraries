@@ -48,11 +48,23 @@ TEST(TestSdpaKernelContainer, GetEngineManagerReturnsValidReference)
 
 TEST(TestSdpaKernelContainer, GetApplicableEngineIdsSupportedGraph)
 {
+    using namespace hipdnn_data_sdk::data_objects;
+    using namespace hipdnn_data_sdk::utilities;
+
     SdpaKernelHandle handle;
     SdpaKernelContainer container;
     auto& engineManager = container.getEngineManager();
 
-    auto graph = hipdnn_test_sdk::utilities::createValidSdpaFpropGraph();
+    std::vector<int64_t> dims = {4, 8, 256, 128};
+    auto graph = hipdnn_test_sdk::utilities::createValidSdpaFpropGraph(dims,
+                                                                       generateStrides(dims),
+                                                                       dims,
+                                                                       generateStrides(dims),
+                                                                       dims,
+                                                                       generateStrides(dims),
+                                                                       dims,
+                                                                       generateStrides(dims),
+                                                                       DataType::BFLOAT16);
     auto graphBuffer = graph.Release();
 
     auto graphWrapper = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(graphBuffer.data(),

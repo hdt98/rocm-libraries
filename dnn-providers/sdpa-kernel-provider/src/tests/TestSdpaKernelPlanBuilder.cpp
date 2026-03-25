@@ -23,8 +23,13 @@ protected:
 
 TEST_F(TestSdpaKernelPlanBuilder, IsApplicableReturnsFalseForNonSdpaGraph)
 {
+    using namespace hipdnn_data_sdk::data_objects;
+    using namespace hipdnn_data_sdk::utilities;
+
     // Create a batchnorm inference graph - this does not use SDPA attributes
-    auto builder = hipdnn_test_sdk::utilities::createValidBatchnormInferenceGraph();
+    std::vector<int64_t> dims = {4, 8, 256, 128};
+    auto builder = hipdnn_test_sdk::utilities::createValidBatchnormInferenceGraph(
+        hipdnn_data_sdk::utilities::generateStrides(dims), dims, DataType::BFLOAT16);
 
     hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(builder.GetBufferPointer(),
                                                                      builder.GetSize());
@@ -34,7 +39,19 @@ TEST_F(TestSdpaKernelPlanBuilder, IsApplicableReturnsFalseForNonSdpaGraph)
 
 TEST_F(TestSdpaKernelPlanBuilder, IsApplicableReturnsTrueForSdpaGraph)
 {
-    auto builder = hipdnn_test_sdk::utilities::createValidSdpaFpropGraph();
+    using namespace hipdnn_data_sdk::data_objects;
+    using namespace hipdnn_data_sdk::utilities;
+
+    std::vector<int64_t> dims = {4, 8, 256, 128};
+    auto builder = hipdnn_test_sdk::utilities::createValidSdpaFpropGraph(dims,
+                                                                         generateStrides(dims),
+                                                                         dims,
+                                                                         generateStrides(dims),
+                                                                         dims,
+                                                                         generateStrides(dims),
+                                                                         dims,
+                                                                         generateStrides(dims),
+                                                                         DataType::BFLOAT16);
 
     hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(builder.GetBufferPointer(),
                                                                      builder.GetSize());

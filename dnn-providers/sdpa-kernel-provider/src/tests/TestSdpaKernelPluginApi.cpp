@@ -53,6 +53,9 @@ TEST(TestSdpaKernelPluginApi, HipdnnEnginePluginGetAllEngineIds)
 
 TEST(TestSdpaKernelPluginApi, HipdnnEnginePluginGetApplicableEngineIds)
 {
+    using namespace hipdnn_data_sdk::data_objects;
+    using namespace hipdnn_data_sdk::utilities;
+
     hipdnnEnginePluginHandle_t handle = nullptr;
 
     ASSERT_EQ(hipdnnEnginePluginCreate(&handle),
@@ -63,7 +66,17 @@ TEST(TestSdpaKernelPluginApi, HipdnnEnginePluginGetApplicableEngineIds)
     std::array<int64_t, 2> engineIds = {-1, -1};
     uint32_t numEngineIdsReturned = 0;
 
-    auto graph = hipdnn_test_sdk::utilities::createValidSdpaFpropGraph();
+    std::vector<int64_t> dims = {4, 8, 256, 128};
+    auto graph = hipdnn_test_sdk::utilities::createValidSdpaFpropGraph(dims,
+                                                                       generateStrides(dims),
+                                                                       dims,
+                                                                       generateStrides(dims),
+                                                                       dims,
+                                                                       generateStrides(dims),
+                                                                       dims,
+                                                                       generateStrides(dims),
+                                                                       DataType::BFLOAT16);
+
     auto graphBuffer = graph.Release();
     hipdnnPluginConstData_t opGraph = {graphBuffer.data(), graphBuffer.size()};
 

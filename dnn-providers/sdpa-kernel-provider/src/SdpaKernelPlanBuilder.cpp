@@ -2,8 +2,10 @@
 // SPDX-License-Identifier:  MIT
 
 #include "SdpaKernelPlanBuilder.hpp"
+#include "SdpaKernelHelpers.hpp"
 #include "SdpaKernelPlan.hpp"
 #include "asm/AsmKernelPath.hpp"
+
 #include <cmath>
 #include <format>
 #include <hip/hip_runtime.h>
@@ -11,48 +13,14 @@
 
 namespace sdpa_kernel_provider
 {
-#define SDPA_PROVIDER_RETURN_FALSE_IF(condition, ...)         \
-    do                                                        \
-    {                                                         \
-        if(condition)                                         \
-        {                                                     \
-            HIPDNN_PLUGIN_LOG_INFO(std::format(__VA_ARGS__)); \
-            return false;                                     \
-        }                                                     \
-    } while(0)
-
-namespace
-{
-
-std::string getDeviceString(hipStream_t stream)
-{
-    int deviceId = -1;
-    auto status = hipStreamGetDevice(stream, &deviceId);
-    if(status != hipSuccess)
-    {
-        throw hipdnn_plugin_sdk::HipdnnPluginException(
-            hipdnnPluginStatus_t::HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
-            "hipStreamGetDevice failed with error code: " + std::to_string(status));
-    }
-
-    hipDeviceProp_t props;
-    status = hipGetDeviceProperties(&props, deviceId);
-    if(status != hipSuccess)
-    {
-        throw hipdnn_plugin_sdk::HipdnnPluginException(
-            hipdnnPluginStatus_t::HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
-            "hipGetDeviceProperties failed with error code: " + std::to_string(status));
-    }
-
-    return {props.gcnArchName};
-}
-}
 
 bool SdpaKernelPlanBuilder::isApplicable(
     const SdpaKernelHandle& handle,
     const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph) const
 {
     using namespace hipdnn_data_sdk::data_objects;
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    static const char* SDPA_PROVIDER_LOG_PREFIX = "[SdpaKernelPlanBuilder::isApplicable] ";
 
     auto& nodeWrappers = opGraph.nodeWrappers();
 

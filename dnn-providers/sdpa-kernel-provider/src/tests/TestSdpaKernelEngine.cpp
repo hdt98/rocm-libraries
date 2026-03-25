@@ -40,8 +40,19 @@ TEST_F(TestSdpaKernelEngine, IsApplicableReturnsFalseForNonSdpaGraph)
 
 TEST_F(TestSdpaKernelEngine, IsApplicableReturnsTrueForSdpaGraph)
 {
-    // Create a SDPA forward inference graph
-    auto builder = hipdnn_test_sdk::utilities::createValidSdpaFpropGraph();
+    using namespace hipdnn_data_sdk::data_objects;
+    using namespace hipdnn_data_sdk::utilities;
+
+    std::vector<int64_t> dims = {4, 8, 256, 128};
+    auto builder = hipdnn_test_sdk::utilities::createValidSdpaFpropGraph(dims,
+                                                                         generateStrides(dims),
+                                                                         dims,
+                                                                         generateStrides(dims),
+                                                                         dims,
+                                                                         generateStrides(dims),
+                                                                         dims,
+                                                                         generateStrides(dims),
+                                                                         DataType::BFLOAT16);
 
     hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(builder.GetBufferPointer(),
                                                                      builder.GetSize());

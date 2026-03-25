@@ -10,6 +10,7 @@ add_library(
     SdpaKernelPlan.cpp
     SdpaKernelPlanBuilder.cpp
     SdpaKernelPluginPublic.cpp
+    SdpaKernelHelpers.cpp
     )
 target_include_directories(sdpa_kernel_plugin_impl PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(sdpa_kernel_plugin_impl PUBLIC hipdnn_data_sdk hipdnn_plugin_sdk)
