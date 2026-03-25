@@ -34,14 +34,56 @@
 
 extern "C" {
 
-/******************** AUXILIARY ********************/
+/******************** HANDLE ********************/
+struct hipsolverDnHandle
+{
+    cusolverDnHandle_t handle;
+    cublasHandle_t     blas_handle;
+};
+
 hipsolverStatus_t hipsolverCreate(hipsolverHandle_t* handle)
 try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
 
-    return hipsolver::cuda2hip_status(cusolverDnCreate((cusolverDnHandle_t*)handle));
+    hipsolverDnHandle* dn = new hipsolverDnHandle;
+    cusolverStatus_t   status;
+    cublasStatus_t     blas_status;
+    cudaStream_t       stream;
+
+    if((status = cusolverDnCreate(&dn->handle)) != CUSOLVER_STATUS_SUCCESS)
+    {
+        delete dn;
+        return hipsolver::cuda2hip_status(status);
+    }
+
+    if((blas_status = cublasCreate(&dn->blas_handle)) != CUBLAS_STATUS_SUCCESS)
+    {
+        cusolverDnDestroy(dn->handle);
+        delete dn;
+        return hipsolver::cuda2hip_status(blas_status);
+    }
+
+    if((status = cusolverDnGetStream(dn->handle, &stream)) != CUSOLVER_STATUS_SUCCESS)
+    {
+        cusolverDnDestroy(dn->handle);
+        cublasDestroy(dn->blas_handle);
+        delete dn;
+        return hipsolver::cuda2hip_status(status);
+    }
+
+    if((blas_status = cublasSetStream(dn->blas_handle, stream)) != CUBLAS_STATUS_SUCCESS)
+    {
+        cusolverDnDestroy(dn->handle);
+        cublasDestroy(dn->blas_handle);
+        delete dn;
+        return hipsolver::cuda2hip_status(blas_status);
+    }
+
+    *handle = dn;
+
+    return HIPSOLVER_STATUS_SUCCESS;
 }
 catch(...)
 {
@@ -54,21 +96,36 @@ try
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
 
-    return hipsolver::cuda2hip_status(cusolverDnDestroy((cusolverDnHandle_t)handle));
+    hipsolverDnHandle* dn          = (hipsolverDnHandle*)handle;
+    auto               status      = cusolverDnDestroy(dn->handle);
+    auto               blas_status = cublasDestroy(dn->blas_handle);
+    delete dn;
+
+    if(status != CUSOLVER_STATUS_SUCCESS)
+        return hipsolver::cuda2hip_status(status);
+    else
+        return hipsolver::cuda2hip_status(blas_status);
 }
 catch(...)
 {
     return hipsolver::exception2hip_status();
 }
 
+/******************** AUXILIARY ********************/
 hipsolverStatus_t hipsolverSetStream(hipsolverHandle_t handle, hipStream_t streamId)
 try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
 
-    return hipsolver::cuda2hip_status(
-        cusolverDnSetStream((cusolverDnHandle_t)handle, (cudaStream_t)streamId));
+    hipsolverDnHandle* dn          = (hipsolverDnHandle*)handle;
+    auto               status      = cusolverDnSetStream(dn->handle, (cudaStream_t)streamId);
+    auto               blas_status = cublasSetStream(dn->blas_handle, (cudaStream_t)streamId);
+
+    if(status != CUSOLVER_STATUS_SUCCESS)
+        return hipsolver::cuda2hip_status(status);
+    else
+        return hipsolver::cuda2hip_status(blas_status);
 }
 catch(...)
 {
@@ -4057,25 +4114,14 @@ try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
-
     if(m != n)
         return HIPSOLVER_STATUS_INVALID_VALUE;
-
     if(strideP != n)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    cudaStream_t stream;
-    CHECK_CUSOLVER_ERROR(cusolverDnGetStream((cusolverDnHandle_t)handle, &stream));
-
-    cublasHandle_t cublas_handle;
-    CHECK_CUBLAS_ERROR(cublasCreate(&cublas_handle));
-    CHECK_CUBLAS_ERROR(cublasSetStream(cublas_handle, stream));
-
-    cublasStatus_t status
-        = cublasSgetrfBatched(cublas_handle, n, A, lda, devIpiv, devInfo, batch_count);
-
-    CHECK_CUBLAS_ERROR(cublasDestroy(cublas_handle));
-    return hipsolver::cuda2hip_status(status);
+    hipsolverDnHandle* dn = (hipsolverDnHandle*)handle;
+    return hipsolver::cuda2hip_status(
+        cublasSgetrfBatched(dn->blas_handle, n, A, lda, devIpiv, devInfo, batch_count));
 }
 catch(...)
 {
@@ -4097,25 +4143,14 @@ try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
-
     if(m != n)
         return HIPSOLVER_STATUS_INVALID_VALUE;
-
     if(strideP != n)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    cudaStream_t stream;
-    CHECK_CUSOLVER_ERROR(cusolverDnGetStream((cusolverDnHandle_t)handle, &stream));
-
-    cublasHandle_t cublas_handle;
-    CHECK_CUBLAS_ERROR(cublasCreate(&cublas_handle));
-    CHECK_CUBLAS_ERROR(cublasSetStream(cublas_handle, stream));
-
-    cublasStatus_t status
-        = cublasDgetrfBatched(cublas_handle, n, A, lda, devIpiv, devInfo, batch_count);
-
-    CHECK_CUBLAS_ERROR(cublasDestroy(cublas_handle));
-    return hipsolver::cuda2hip_status(status);
+    hipsolverDnHandle* dn = (hipsolverDnHandle*)handle;
+    return hipsolver::cuda2hip_status(
+        cublasDgetrfBatched(dn->blas_handle, n, A, lda, devIpiv, devInfo, batch_count));
 }
 catch(...)
 {
@@ -4137,25 +4172,14 @@ try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
-
     if(m != n)
         return HIPSOLVER_STATUS_INVALID_VALUE;
-
     if(strideP != n)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    cudaStream_t stream;
-    CHECK_CUSOLVER_ERROR(cusolverDnGetStream((cusolverDnHandle_t)handle, &stream));
-
-    cublasHandle_t cublas_handle;
-    CHECK_CUBLAS_ERROR(cublasCreate(&cublas_handle));
-    CHECK_CUBLAS_ERROR(cublasSetStream(cublas_handle, stream));
-
-    cublasStatus_t status
-        = cublasCgetrfBatched(cublas_handle, n, (cuComplex**)A, lda, devIpiv, devInfo, batch_count);
-
-    CHECK_CUBLAS_ERROR(cublasDestroy(cublas_handle));
-    return hipsolver::cuda2hip_status(status);
+    hipsolverDnHandle* dn = (hipsolverDnHandle*)handle;
+    return hipsolver::cuda2hip_status(cublasCgetrfBatched(
+        dn->blas_handle, n, (cuComplex**)A, lda, devIpiv, devInfo, batch_count));
 }
 catch(...)
 {
@@ -4177,25 +4201,14 @@ try
 {
     if(!handle)
         return HIPSOLVER_STATUS_NOT_INITIALIZED;
-
     if(m != n)
         return HIPSOLVER_STATUS_INVALID_VALUE;
-
     if(strideP != n)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    cudaStream_t stream;
-    CHECK_CUSOLVER_ERROR(cusolverDnGetStream((cusolverDnHandle_t)handle, &stream));
-
-    cublasHandle_t cublas_handle;
-    CHECK_CUBLAS_ERROR(cublasCreate(&cublas_handle));
-    CHECK_CUBLAS_ERROR(cublasSetStream(cublas_handle, stream));
-
-    cublasStatus_t status = cublasZgetrfBatched(
-        cublas_handle, n, (cuDoubleComplex**)A, lda, devIpiv, devInfo, batch_count);
-
-    CHECK_CUBLAS_ERROR(cublasDestroy(cublas_handle));
-    return hipsolver::cuda2hip_status(status);
+    hipsolverDnHandle* dn = (hipsolverDnHandle*)handle;
+    return hipsolver::cuda2hip_status(cublasZgetrfBatched(
+        dn->blas_handle, n, (cuDoubleComplex**)A, lda, devIpiv, devInfo, batch_count));
 }
 catch(...)
 {
