@@ -190,8 +190,8 @@ def summarize_jamming(a_lr_map: dict, b_lr_map: dict):
     """
     Print wave → subtileC assignment derived from LR mappings.
 
-    a_lr_map: (M-row, K-chunk) -> "w{wave}.L{lane}"
-    b_lr_map: (N-row, K-chunk) -> "w{wave}.L{lane}"
+    a_lr_map: (M-row, K-chunk) -> "w{wave}.L{lane}" or list thereof
+    b_lr_map: (N-row, K-chunk) -> "w{wave}.L{lane}" or list thereof
     """
     a_waves = _per_wave_rows(a_lr_map)
     b_waves = _per_wave_rows(b_lr_map)
@@ -202,32 +202,43 @@ def summarize_jamming(a_lr_map: dict, b_lr_map: dict):
         print("\n  [no LR data to derive jamming]")
         return
 
-    print()
-    print("=" * 80)
-    print("Jamming summary: wave → subtileC")
-    print()
-
+    # Build per-wave M and N range strings
+    wave_m: dict[int, str] = {}
+    wave_n: dict[int, str] = {}
     for w in all_waves:
         a_rows = a_waves.get(w, [])
         b_rows = b_waves.get(w, [])
-
-        a_range = f"M[{min(a_rows)}:{max(a_rows)+1}]" if a_rows else "M[?]"
-        b_range = f"N[{min(b_rows)}:{max(b_rows)+1}]" if b_rows else "N[?]"
-
-        print(f"  Wave {w} → {a_range}, {b_range}")
+        wave_m[w] = f"M[{min(a_rows)}:{max(a_rows)+1}]" if a_rows else "M[?]"
+        wave_n[w] = f"N[{min(b_rows)}:{max(b_rows)+1}]" if b_rows else "N[?]"
 
     # Derive jam factors
-    if a_waves:
-        unique_m = len(set((min(r), max(r)) for r in a_waves.values()))
-    else:
-        unique_m = 1
-    if b_waves:
-        unique_n = len(set((min(r), max(r)) for r in b_waves.values()))
-    else:
-        unique_n = 1
+    unique_m_ranges = sorted(set(wave_m.values()))
+    unique_n_ranges = sorted(set(wave_n.values()))
+    jam_m = len(unique_m_ranges)
+    jam_n = len(unique_n_ranges)
 
-    print(f"\n  Jam factors: {unique_m} along M x {unique_n} along N "
-          f"({len(all_waves)} waves total)")
+    print()
+    print("=" * 80)
+    print(f"Jamming: {jam_m} along M x {jam_n} along N "
+          f"({len(all_waves)} waves)")
+    print()
+
+    # Build a 2D grid: rows = M ranges, cols = N ranges
+    grid: dict[tuple[str, str], list[str]] = {}
+    for w in all_waves:
+        key = (wave_m[w], wave_n[w])
+        grid.setdefault(key, []).append(f"w{w}")
+
+    rows = []
+    for m_range in unique_m_ranges:
+        row = {"": m_range}
+        for n_range in unique_n_ranges:
+            waves = grid.get((m_range, n_range), [])
+            row[n_range] = ",".join(waves) if waves else ""
+        rows.append(row)
+
+    df = pl.DataFrame(rows)
+    print(df)
 
 
 # ---------------------------------------------------------------------------
@@ -294,12 +305,6 @@ def parse_args():
         default="both",
         help="Which matrix tile to show (default: both). "
              "A and B are separated by instruction program-order address.",
-    )
-    p.add_argument(
-        "--show-jamming",
-        action="store_true",
-        default=False,
-        help="Show wave → subtileC jamming summary derived from LR data.",
     )
     return p.parse_args()
 
@@ -385,6 +390,39 @@ def split_ab(records: list) -> tuple[list, list]:
     top_aregs = _most_common(areg_count)
     areg_a = top_aregs[0] if len(top_aregs) > 0 else None
     areg_b = top_aregs[1] if len(top_aregs) > 1 else None
+
+    # --- Cross-check LR assignment against GR LDS addresses ---
+    # The GR and LR A/B labels are assigned independently (by SRD frequency
+    # and address-register frequency).  Verify that the LR groups actually
+    # read from the same LDS regions that the GR groups write to.  If they
+    # are swapped, fix the assignment.
+    if srd_a is not None and srd_b is not None and areg_a is not None and areg_b is not None:
+        gr_a_lds = {
+            addr
+            for r in gr_recs if addr_to_srd.get(r["address"]) == srd_a
+            for addr in r["derived"].get("lds_effective_addr", [])
+        }
+        gr_b_lds = {
+            addr
+            for r in gr_recs if addr_to_srd.get(r["address"]) == srd_b
+            for addr in r["derived"].get("lds_effective_addr", [])
+        }
+        lr_0_lds = {
+            addr
+            for r in lr_recs if addr_to_areg.get(r["address"]) == areg_a
+            for addr in r["derived"]["effective_addr"]
+        }
+        lr_1_lds = {
+            addr
+            for r in lr_recs if addr_to_areg.get(r["address"]) == areg_b
+            for addr in r["derived"]["effective_addr"]
+        }
+        # Count how well each pairing matches
+        match_same = len(gr_a_lds & lr_0_lds) + len(gr_b_lds & lr_1_lds)
+        match_swap = len(gr_a_lds & lr_1_lds) + len(gr_b_lds & lr_0_lds)
+        if match_swap > match_same:
+            areg_a, areg_b = areg_b, areg_a
+
     print(f"LR split: addr-reg A={areg_a} ({areg_count.get(areg_a,0)} instrs), "
           f"B={areg_b} ({areg_count.get(areg_b,0)} instrs)")
 
@@ -462,8 +500,7 @@ def main():
     if args.tile in ("b", "both"):
         b_lr_map = show_tile(b_recs, args.mac_n, n_k_chunks_b, row_bytes_b, "B", "N-row")
 
-    if args.show_jamming:
-        summarize_jamming(a_lr_map, b_lr_map)
+    summarize_jamming(a_lr_map, b_lr_map)
 
 
 if __name__ == "__main__":
