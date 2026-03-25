@@ -248,10 +248,13 @@ def validate_config(
     # --- QR pipeline MFMA instruction count validation ---
     # block_fmha_pipeline_qr_ks_vs.hpp:354 requires NumMfmaInsts % 8 == 0
     # when warp_size == 64 (gfx9) and hdim_q == 256.
+    # Only applies to fwd/dq_dk_dv pipelines, NOT to dot_do_o/convert_dq (1D kernels).
     # NumMfmaInsts = (tile_m0/warp_m0) * (tile_n0/warp_n0) * (tile_k0/warp_k0) / (wave_m0*wave_n0)
+    _1d_families = {"bwd_dot_do_o", "bwd_convert_dq"}
     if (
         pipeline == "qr"
         and sig["hdim_q"] == 256
+        and sig.get("family", "") not in _1d_families
         and arch_info.get("family", "").startswith("cdna")
         and len(tile) >= 3
         and len(alg["wave"]) >= 2

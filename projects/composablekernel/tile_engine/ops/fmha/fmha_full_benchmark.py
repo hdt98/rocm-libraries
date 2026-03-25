@@ -181,112 +181,6 @@ def bandwidth_gb_s(shape: TestShape, latency_ms: float) -> float:
     return total / (latency_ms * 1e6)
 
 
-# ---------------------------------------------------------------------------
-# Subprocess worker code: runs all kernels for ONE shape in a separate process.
-# Reads JSON from stdin, writes JSON result rows to stdout.
-# If a GPU fault kills this process, the parent survives and moves on.
-# ---------------------------------------------------------------------------
-
-_WORKER_CODE = r"""
-import json, sys, os, numpy as np
-from pathlib import Path
-
-_THIS_DIR = Path(__file__).resolve().parent if "__file__" in dir() else Path(".")
-_DISPATCHER_ROOT = Path(os.environ.get("FMHA_DISPATCHER_ROOT",
-    str(Path(__file__).resolve().parents[2] / "dispatcher") if "__file__" in dir() else ""))
-
-# Paths are passed via env or inferred
-for p in [os.environ.get("FMHA_PYPATH_1", ""), os.environ.get("FMHA_PYPATH_2", "")]:
-    if p and p not in sys.path:
-        sys.path.insert(0, p)
-
-from fmha_utils import FmhaRunner, FmhaProblem
-
-DTYPE_NP = {"fp16": np.float16, "bf16": np.float16, "fp32": np.float32,
-            "fp8bf16": np.float16, "fp8fp32": np.float16}
-ELEM_BYTES = {"fp16": 2, "bf16": 2, "fp32": 4, "fp8bf16": 1, "fp8fp32": 1}
-
-def bandwidth_gb_s(s, lat):
-    if lat <= 0: return 0.0
-    eb = ELEM_BYTES.get(s["dtype"], 2)
-    total = s["batch"] * (
-        s["nhead_q"]*s["seqlen_q"]*s["hdim_q"] + s["nhead_k"]*s["seqlen_k"]*s["hdim_q"] +
-        s["nhead_k"]*s["seqlen_k"]*s["hdim_v"] + s["nhead_q"]*s["seqlen_q"]*s["hdim_v"]
-    ) * eb
-    return total / (lat * 1e6)
-
-data = json.loads(sys.stdin.read())
-s = data["shape"]
-kernels = data["kernels"]
-
-prob = FmhaProblem(batch=s["batch"], nhead_q=s["nhead_q"], nhead_k=s["nhead_k"],
-                   seqlen_q=s["seqlen_q"], seqlen_k=s["seqlen_k"],
-                   hdim_q=s["hdim_q"], hdim_v=s["hdim_v"])
-np_dt = DTYPE_NP.get(s["dtype"], np.float16)
-np.random.seed(42)
-Q = (np.random.randn(*prob.q_shape()) * 0.1).astype(np_dt)
-K = (np.random.randn(*prob.k_shape()) * 0.1).astype(np_dt)
-V = (np.random.randn(*prob.v_shape()) * 0.1).astype(np_dt)
-
-out_dt = np_dt
-O = (np.random.randn(*prob.q_shape()[:3] + (s["hdim_v"],)) * 0.1).astype(out_dt)
-LSE = np.random.randn(s["batch"], s["nhead_q"], s["seqlen_q"]).astype(np.float32)
-dO = (np.random.randn(*O.shape) * 0.1).astype(out_dt)
-
-rows = []
-for so_path, cfg in kernels:
-    try:
-        runner = FmhaRunner.from_library(so_path)
-        api = cfg.get("api_family", "fwd")
-        if api == "bwd":
-            is_grp = cfg.get("mode", "batch") == "group"
-            result = runner.run_bwd(Q, K, V, O, LSE, dO, prob,
-                data_type=cfg.get("data_type", "fp16"),
-                mask_type=cfg["mask_int"], bias_type=cfg["bias_int"],
-                has_dropout=cfg["has_dropout"],
-                has_dbias=cfg.get("has_dbias", 0),
-                is_deterministic=cfg.get("deterministic", 0),
-                is_group_mode=is_grp,
-                is_store_randval=cfg.get("is_store_randval", 0),
-                tile_n0=cfg.get("tile_n0", 128))
-        else:
-            result = runner.run(Q, K, V, prob,
-                mask_type=cfg["mask_int"], bias_type=cfg["bias_int"],
-                has_lse=cfg["has_lse"], has_dropout=cfg["has_dropout"],
-                has_logits=cfg["has_logits"], has_sink=cfg["has_sink"],
-                has_skip=cfg["has_skip"],
-                api_family=api,
-                data_type=cfg.get("data_type", "fp16"),
-                page_size=cfg.get("page_size", 16),
-                kv_layout=cfg.get("kv_layout", 0),
-                kv_lookup=cfg.get("kv_lookup", 1))
-    except Exception as exc:
-        print(f"  WARN: kernel {cfg.get('name','?')} exception: {exc}", file=sys.stderr)
-        continue
-    if not result.success:
-        continue
-    bw = bandwidth_gb_s(s, result.time_ms)
-    row = {
-        "problem_name": s["name"], "batch": s["batch"],
-        "seqlen_q": s["seqlen_q"], "seqlen_k": s["seqlen_k"],
-        "nhead_q": s["nhead_q"], "nhead_k": s["nhead_k"],
-        "hdim_q": s["hdim_q"], "hdim_v": s["hdim_v"], "dtype": s["dtype"],
-    }
-    for k in ["kernel","family","mode","pipeline",
-              "tile_m0","tile_n0","tile_k0","tile_n1","tile_k1","tile_k0max",
-              "pad_s","pad_sk","pad_d","pad_dv",
-              "mask","bias","lse","dropout","logits","sink","skip",
-              "qscale","paged_kv","rope","deterministic","dbias"]:
-        row[k] = cfg[k]
-    row["latency_ms"] = round(result.time_ms, 4)
-    row["tflops"] = round(result.tflops, 2)
-    row["bandwidth_gb_s"] = round(bw, 2)
-    rows.append(row)
-
-print(json.dumps(rows))
-"""
-
-
 FAMILY_TO_API = {
     "fwd": "fwd",
     "fwd_splitkv": "splitkv",
@@ -490,13 +384,12 @@ def main():
         print(f"\n  Compile-only. {total_built} kernels ready.")
         return
 
-    # ---- Phase 3: Shape-first benchmark sweep (subprocess-isolated) ----
+    # ---- Phase 3: Benchmark (serial, one subprocess per kernel) ----
     print(f"\n{'=' * 80}")
-    print("Phase 3: Benchmark sweep (subprocess-isolated, shape-first)")
+    print("Phase 3: Benchmark (one subprocess per kernel, serial GPU)")
     print(f"{'=' * 80}")
 
     csv_path = Path(args.csv) if os.path.isabs(args.csv) else _THIS_DIR / args.csv
-    csv_file = open(csv_path, "w", newline="")
     csv_fields = [
         "problem_name",
         "batch",
@@ -537,87 +430,206 @@ def main():
         "tflops",
         "bandwidth_gb_s",
     ]
-    writer = csv.DictWriter(csv_file, fieldnames=csv_fields)
-    writer.writeheader()
 
-    json_results = []
-    total_measurements = 0
-    total_shapes_run = 0
-    total_gpu_faults = 0
-    bench_t0 = time.perf_counter()
+    # Resume: load already-completed measurements
+    completed: set = set()
+    if csv_path.exists() and csv_path.stat().st_size > 0:
+        with open(csv_path, newline="") as f:
+            for row in csv.DictReader(f):
+                completed.add(
+                    (
+                        row.get("kernel", ""),
+                        row.get("problem_name", ""),
+                        str(row.get("batch", "")),
+                        str(row.get("seqlen_q", "")),
+                        row.get("dtype", ""),
+                    )
+                )
+        csv_file = open(csv_path, "a", newline="")
+        writer = csv.DictWriter(csv_file, fieldnames=csv_fields)
+        print(f"  Resuming: {len(completed)} measurements already in CSV")
+    else:
+        csv_file = open(csv_path, "w", newline="")
+        writer = csv.DictWriter(csv_file, fieldnames=csv_fields)
+        writer.writeheader()
 
-    print(f"  Shapes to run: {len(all_shapes)}")
-    print(f"  Shape timeout: {args.shape_timeout}s")
-    print()
-
-    for si, shape in enumerate(all_shapes):
+    # Pre-filter: only shapes with matching kernels
+    runnable = []
+    for shape in all_shapes:
         ck_dtype = DTYPE_CK.get(shape.dtype, shape.dtype)
         key = (shape.hdim_q, shape.hdim_v, ck_dtype, shape.variant)
         kernel_entries = kernel_index.get(key, [])
-        if not kernel_entries:
+        if kernel_entries:
+            runnable.append((shape, kernel_entries))
+
+    # Flatten to (shape, so_path, cfg) work items
+    work_items = []
+    for shape, kernel_entries in runnable:
+        for so_path, cfg in kernel_entries:
+            work_items.append((shape, so_path, cfg))
+
+    total_work = len(work_items)
+    skipped = 0
+    total_measurements = len(completed)
+    total_gpu_faults = 0
+    bench_t0 = time.perf_counter()
+
+    worker_path = _THIS_DIR / "run_one_kernel.py"
+    worker_env = os.environ.copy()
+    worker_env["FMHA_PYPATH_1"] = str(_DISPATCHER_ROOT / "python")
+    worker_env["FMHA_PYPATH_2"] = str(_DISPATCHER_ROOT / "codegen")
+    worker_env["GPU_COREDUMP_ENABLE"] = "0"
+    worker_env["HSA_ENABLE_COREDUMP"] = "0"
+
+    print(f"  Runnable shapes: {len(runnable)}")
+    print(f"  Total kernel x shape pairs: {total_work}")
+    print(f"  Already completed: {len(completed)}")
+    print("  Kernel timeout: 30s")
+    print()
+
+    def _bandwidth_gb_s(s_dict, lat_ms):
+        if lat_ms <= 0:
+            return 0.0
+        eb = ELEM_BYTES.get(s_dict.get("dtype", "fp16"), 2)
+        total_bytes = (
+            s_dict["batch"]
+            * (
+                s_dict["nhead_q"] * s_dict["seqlen_q"] * s_dict["hdim_q"]
+                + s_dict["nhead_k"] * s_dict["seqlen_k"] * s_dict["hdim_q"]
+                + s_dict["nhead_k"] * s_dict["seqlen_k"] * s_dict["hdim_v"]
+                + s_dict["nhead_q"] * s_dict["seqlen_q"] * s_dict["hdim_v"]
+            )
+            * eb
+        )
+        return total_bytes / (lat_ms * 1e6)
+
+    for i, (shape, so_path, cfg) in enumerate(work_items):
+        resume_key = (
+            cfg.get("kernel", ""),
+            shape.name,
+            str(shape.batch),
+            str(shape.seqlen_q),
+            shape.dtype,
+        )
+        if resume_key in completed:
+            skipped += 1
             continue
 
         shape_dict = _shape_to_dict(shape)
+        cfg["so_path"] = so_path
+        payload = json.dumps(
+            {"so_path": so_path, "shape": shape_dict, "cfg": cfg}
+        ).encode()
 
-        # Run in isolated subprocess via subprocess.run + json IPC.
-        # This gives full process isolation: GPU faults kill the child, not us.
-        worker_input = json.dumps(
-            {
-                "shape": shape_dict,
-                "kernels": kernel_entries,
-                "timeout": args.shape_timeout,
-            }
+        proc = subprocess.Popen(
+            [sys.executable, str(worker_path)],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            env=worker_env,
         )
-        worker_env = os.environ.copy()
-        worker_env["FMHA_PYPATH_1"] = str(_DISPATCHER_ROOT / "python")
-        worker_env["FMHA_PYPATH_2"] = str(_DISPATCHER_ROOT / "codegen")
+        timed_out = False
+        stdout_bytes = b""
         try:
-            proc_result = subprocess.run(
-                [sys.executable, "-c", _WORKER_CODE],
-                input=worker_input,
-                capture_output=True,
-                text=True,
-                env=worker_env,
-                timeout=args.shape_timeout + 30 if args.shape_timeout > 0 else None,
-            )
+            stdout_bytes, _ = proc.communicate(input=payload, timeout=30)
         except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.communicate()
+            timed_out = True
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+            proc.wait()
+            for pipe in [proc.stdin, proc.stdout, proc.stderr]:
+                if pipe and not pipe.closed:
+                    pipe.close()
+
+        if timed_out:
             total_gpu_faults += 1
-            print(
-                f"  [{si + 1}/{len(all_shapes)}] {shape.name} B={shape.batch} S={shape.seqlen_q} "
-                f"H={shape.hdim_q} {shape.dtype} {shape.variant} -> TIMEOUT",
-                flush=True,
-            )
+            if (i + 1) % 100 == 0 or i < 10:
+                print(
+                    f"  [{i + 1}/{total_work}] TIMEOUT  "
+                    f"{cfg.get('kernel', '?')[:45]} | {shape.name}",
+                    flush=True,
+                )
             continue
 
-        if proc_result.returncode != 0:
+        if proc.returncode != 0:
             total_gpu_faults += 1
-            print(
-                f"  [{si + 1}/{len(all_shapes)}] {shape.name} B={shape.batch} S={shape.seqlen_q} "
-                f"H={shape.hdim_q} {shape.dtype} {shape.variant} -> GPU FAULT (exit={proc_result.returncode})",
-                flush=True,
-            )
+            if (i + 1) % 100 == 0 or i < 10:
+                print(
+                    f"  [{i + 1}/{total_work}] FAULT    "
+                    f"{cfg.get('kernel', '?')[:45]} | {shape.name}",
+                    flush=True,
+                )
             continue
 
         try:
-            rows = json.loads(proc_result.stdout)
+            result = json.loads(stdout_bytes.decode())
         except (json.JSONDecodeError, ValueError):
-            rows = []
+            continue
 
-        if rows:
-            total_shapes_run += 1
-            for row in rows:
-                writer.writerow(row)
-                json_results.append(row)
-                total_measurements += 1
-            csv_file.flush()
-            best = max(rows, key=lambda r: r["tflops"])
-            print(
-                f"  [{si + 1}/{len(all_shapes)}] {shape.name} "
-                f"B={shape.batch} S={shape.seqlen_q} H={shape.hdim_q} {shape.dtype} "
-                f"{shape.variant} -> {len(rows)} kernels, best={best['tflops']:.3g} TFLOPS "
-                f"({best['latency_ms']:.4f} ms) ({best['kernel'][:40]})",
-                flush=True,
-            )
+        if not result.get("ok"):
+            continue
+
+        lat_ms = result["ms"]
+        tflops = result["tflops"]
+        bw = _bandwidth_gb_s(shape_dict, lat_ms)
+
+        row = {
+            "problem_name": shape.name,
+            "batch": shape.batch,
+            "seqlen_q": shape.seqlen_q,
+            "seqlen_k": shape.seqlen_k,
+            "nhead_q": shape.nhead_q,
+            "nhead_k": shape.nhead_k,
+            "hdim_q": shape.hdim_q,
+            "hdim_v": shape.hdim_v,
+            "dtype": shape.dtype,
+        }
+        for k in [
+            "kernel",
+            "family",
+            "mode",
+            "pipeline",
+            "tile_m0",
+            "tile_n0",
+            "tile_k0",
+            "tile_n1",
+            "tile_k1",
+            "tile_k0max",
+            "pad_s",
+            "pad_sk",
+            "pad_d",
+            "pad_dv",
+            "mask",
+            "bias",
+            "lse",
+            "dropout",
+            "logits",
+            "sink",
+            "skip",
+            "qscale",
+            "paged_kv",
+            "rope",
+            "deterministic",
+            "dbias",
+        ]:
+            row[k] = cfg.get(k, "")
+        row["latency_ms"] = round(lat_ms, 4)
+        row["tflops"] = round(tflops, 2)
+        row["bandwidth_gb_s"] = round(bw, 2)
+
+        writer.writerow(row)
+        csv_file.flush()
+        total_measurements += 1
+
+        print(
+            f"  [{i + 1}/{total_work}] {tflops:>7.1f} TFLOPS  {lat_ms:.4f}ms  "
+            f"{cfg.get('kernel', '?')[:45]} | "
+            f"{shape.name} B={shape.batch} S={shape.seqlen_q} {shape.dtype}",
+            flush=True,
+        )
 
     csv_file.close()
     bench_time = time.perf_counter() - bench_t0
@@ -626,46 +638,12 @@ def main():
     print(f"\n{'=' * 80}")
     print("Results")
     print(f"{'=' * 80}")
-    print(f"  Shapes benchmarked: {total_shapes_run}")
-    print(f"  Total measurements: {total_measurements}")
-    print(f"  GPU faults survived: {total_gpu_faults}")
+    print(f"  Total work items: {total_work}")
+    print(f"  Skipped (resumed): {skipped}")
+    print(f"  Measurements: {total_measurements}")
+    print(f"  GPU faults: {total_gpu_faults}")
     print(f"  Benchmark time: {bench_time:.1f}s")
     print(f"  CSV: {csv_path}")
-
-    if json_results:
-        json_path = (
-            Path(args.json) if os.path.isabs(args.json) else _THIS_DIR / args.json
-        )
-        report = {
-            "metadata": {
-                "arch": args.arch,
-                "category": args.category,
-                "variants": variants,
-                "total_kernels": total_built,
-                "total_shapes": len(all_shapes),
-                "shapes_benchmarked": total_shapes_run,
-                "total_measurements": total_measurements,
-                "gpu_faults": total_gpu_faults,
-                "bench_time_s": round(bench_time, 1),
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
-            },
-            "results": json_results,
-        }
-        with open(json_path, "w") as f:
-            json.dump(report, f, indent=2)
-        print(f"  JSON: {json_path}")
-
-        from collections import defaultdict
-
-        by_shape = defaultdict(lambda: {"best": 0, "n": 0})
-        for r in json_results:
-            k = f"{r['problem_name']} ({r['dtype']})"
-            by_shape[k]["n"] += 1
-            by_shape[k]["best"] = max(by_shape[k]["best"], r["tflops"])
-        print("\n  Top shapes by best TFLOPS:")
-        for name, info in sorted(by_shape.items(), key=lambda x: -x[1]["best"])[:15]:
-            print(f"    {name:50s} {info['best']:>10.3g} TFLOPS ({info['n']} kernels)")
-
     print(f"{'=' * 80}")
 
 

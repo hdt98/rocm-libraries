@@ -1542,8 +1542,8 @@ def setup_multiple_fmha_dispatchers(
             if _own_pool is not None:
                 _own_pool.shutdown(wait=True)
 
-    # --- Stage 3: Link + load ---
-    def _link_load(item):
+    # --- Stage 3: Link (no GPU access -- runner loading deferred to caller) ---
+    def _link(item):
         name, (cfg, out) = item
         if name in failed_names or name in results:
             return
@@ -1568,18 +1568,12 @@ def setup_multiple_fmha_dispatchers(
                     success=False, config=cfg, error=f"Link: {r.stderr[:200]}"
                 )
                 return
-        try:
-            runner = FmhaRunner.from_library(str(lib_path), arch)
-            results[name] = FmhaSetupResult(
-                success=True, config=cfg, runner=runner, library_path=str(lib_path)
-            )
-        except Exception as e:
-            results[name] = FmhaSetupResult(
-                success=False, config=cfg, error=f"Load: {e}"
-            )
+        results[name] = FmhaSetupResult(
+            success=True, config=cfg, library_path=str(lib_path)
+        )
 
     for item in config_dirs.items():
-        _link_load(item)
+        _link(item)
 
     # Return in original order
     return [
