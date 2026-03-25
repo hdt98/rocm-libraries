@@ -448,6 +448,10 @@ class GemmKernelBuilder:
 #include <hip/hip_runtime.h>
 #include "ck_tile/ops/gemm/kernel/grouped_gemm_kernel.hpp"
 """
+        elif self.kernel_name_prefix == "gemm_aquant":
+            instance_code += """#include "ck_tile/ops/gemm_quant.hpp"
+#include "ck_tile/ops/gemm_quant/kernel/gemm_quant_kernel.hpp"
+"""
         return instance_code
 
     def populate_kernel_dtype_layout(self):
@@ -478,7 +482,7 @@ using CDataType = {get_dtype_string(c_type)};"""
 
         if self.kernel_name_prefix == "gemm_aquant":
             instance_code += """
-        using AQDataType = float;"""
+using AQDataType = float;"""
 
         if self.kernel_name_prefix == "gemm_multi_d":
             instance_code += f"""
@@ -546,31 +550,6 @@ struct SelectedKernel {{
             persistent_or_a_preshuffle_quant,
         ) = trait_combo
 
-        # [DELETE]
-        #     is_pad_m = "true" if pad_m in [True, "true"] else "false"
-        #     is_pad_n = "true" if pad_n in [True, "true"] else "false"
-        #     is_pad_k = "true" if pad_k in [True, "true"] else "false"
-
-        #     if self.kernel_name_prefix == "gemm_aquant":
-        #         a_preshuffle_quant = extra[0] if extra else False
-        #         is_a_preshuffle = "true" if a_preshuffle_quant in [True, "true"] else "false"
-
-        #         instance_code = f"""
-
-        # // AQuant traits
-        # static constexpr bool kPadM = {is_pad_m};
-        # static constexpr bool kPadN = {is_pad_n};
-        # static constexpr bool kPadK = {is_pad_k};
-        # static constexpr bool TransposeC = false;
-        # static constexpr bool APreshuffleQuant = {is_a_preshuffle};
-        # static constexpr bool BPreshuffleQuant = false;
-        # static constexpr bool PreshuffleB = false;
-        # static constexpr bool DoubleSmemBuffer = false;
-        # static constexpr ck_tile::index_t GroupSizeK = {self.group_size_k};"""
-        #         return instance_code
-
-        #     persistent = extra[0] if extra else False
-
         instance_code = f"""
 
     // Traits configurations
@@ -602,6 +581,7 @@ struct SelectedKernel {{
             instance_code += f"""
     static constexpr bool APreshuffleQuant = {"true" if persistent_or_a_preshuffle_quant in [True, "true"] else "false"};
     static constexpr bool BPreshuffleQuant = false;
+    static constexpr bool PreshuffleB = false;
     static constexpr ck_tile::index_t GroupSizeK = {self.group_size_k};"""
         return instance_code
 
@@ -654,8 +634,6 @@ struct SelectedKernel {{
         ck_tile::QuantType::AQuantGrouped,
         AQLayout>;"""
 
-            return instance_code
-
         elif self.kernel_name_prefix == "gemm_multi_d":
             instance_code += """
 
@@ -667,7 +645,6 @@ struct SelectedKernel {{
     // Traits
     using Traits = ck_tile::TileGemmTraits<kPadM, kPadN, kPadK, ALayout, BLayout, CLayout, NumWaveGroups>;"""
 
-        # [DELETE][TODO] Complete this function from here
         # Pipeline problem
         if self.kernel_name_prefix in ["gemm_preshuffle", "gemm_multi_d"]:
             instance_code += """
@@ -680,6 +657,18 @@ struct SelectedKernel {{
         TileShape,
         Traits>;"""
 
+        elif self.kernel_name_prefix == "gemm_aquant":
+            instance_code += """
+
+    // Pipeline problem (base, for hot loop detection)
+    using GemmPipelineProblem = ck_tile::GemmPipelineProblemBase<
+        ADataType,
+        BDataType,
+        AccDataType,
+        TileShape,
+        Traits,
+        BDataType>;"""
+
         # Base pipeline for hot loop detection
         if self.kernel_name_prefix == "gemm_preshuffle":
             instance_code += f"""
@@ -687,7 +676,7 @@ struct SelectedKernel {{
     // Base pipeline for hot loop detection
     using BaseGemmPipeline = {base_pipeline_map.get(pipeline, "ck_tile::BaseWeightPreshufflePipelineAGmemBGmemCRegV2")}<GemmPipelineProblem>;"""
 
-        elif self.kernel_name_prefix == "gemm_multi_d":
+        elif self.kernel_name_prefix in ["gemm_multi_d", "gemm_aquant"]:
             instance_code += f"""
 
     // Base pipeline for hot loop detection
@@ -705,17 +694,16 @@ struct SelectedKernel {{
         k_block_per_cu,
         persistent,
     ):
-        # [DELETE]
-        # # AQuant has a self-contained launch that includes pipeline problem,
-        # # base pipeline, pipeline, epilogue, kernel type, and launch.
-        # if self.kernel_name_prefix == "gemm_aquant":
-        #     return self._populate_launch_aquant(
-        #         scheduler_type_map,
-        #         scheduler,
-        #         pipeline_impl_map,
-        #         pipeline,
-        #         k_block_per_cu,
-        #     )
+        # AQuant has a self-contained launch with TailHandler dispatch
+        if self.kernel_name_prefix == "gemm_aquant":
+            return self._populate_launch_aquant(
+                scheduler_type_map,
+                scheduler,
+                pipeline_impl_map,
+                pipeline,
+                epilogue,
+                k_block_per_cu,
+            )
 
         # Function Signature
         if self.kernel_name_prefix == "gemm_multi_d":
@@ -919,6 +907,99 @@ struct SelectedKernel {{
 """
         return instance_code
 
+    def _populate_launch_aquant(
+        self,
+        scheduler_type_map,
+        scheduler,
+        pipeline_impl_map,
+        pipeline,
+        epilogue,
+        k_block_per_cu,
+    ):
+        """Generate the complete launch function for AQuant kernels.
+
+        AQuant uses TailHandler runtime dispatch over has_hot_loop and tail_number,
+        following the pattern from example/ck_tile/38_block_scale_gemm/run_gemm_quant_example.inc.
+        """
+        instance_code = """
+
+    // Launch function
+    static float launch(const ck_tile::QuantGemmHostArgs& args, const ck_tile::stream_config& stream) {
+
+        // Hot loop detection
+        const ck_tile::index_t K_split = ck_tile::integer_least_multiple(args.K, TileShape::kK);
+        const ck_tile::index_t num_loop = TilePartitioner::GetLoopNum(K_split);
+        const bool has_hot_loop = BaseGemmPipeline::BlockHasHotloop(num_loop);
+        const ck_tile::TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);"""
+
+        instance_code += f"""
+
+        const auto Run = [&](const auto has_hot_loop_, const auto tail_number_) {{
+            constexpr bool has_hot_loop_v = has_hot_loop_.value;
+            constexpr auto tail_number_v = tail_number_.value;
+
+            // Full pipeline problem with hot loop and tail number
+            using PipelineProblem = ck_tile::GemmAQuantPipelineProblem<
+                ADataType,
+                AQDataType,
+                BDataType,
+                AccDataType,
+                TileShape,
+                Traits,
+                QuantGroupSize,
+                TransposeC,
+                BDataType,
+                {scheduler_type_map.get(scheduler)},
+                has_hot_loop_v,
+                tail_number_v>;
+
+            using GemmPipeline = {pipeline_impl_map.get(pipeline)}<PipelineProblem>;"""
+
+        # Epilogue (inline in the Run lambda)
+        instance_code += """
+
+            // Epilogue"""
+        instance_code += self.populate_default_gemm_aquant()
+
+        instance_code += f"""
+
+            // Kernel type
+            using Kernel = ck_tile::QuantGemmKernel<
+                TilePartitioner, GemmPipeline, GemmEpilogue,
+                ck_tile::QuantType::AQuantGrouped>;
+
+            // Kernel arguments
+            auto kargs = Kernel::MakeKernelArgs(args);
+
+            if (!Kernel::IsSupportedArgument(kargs)) {{
+                throw std::runtime_error("Unsupported kernel arguments; skipping GEMM launch.");
+            }}
+
+            // Get grid and block sizes
+            const dim3 grids = Kernel::GridSize(args.M, args.N, args.k_batch);
+            const dim3 blocks = Kernel::BlockSize();
+
+            if(stream.log_level_ > 0) {{
+                std::cout << "Launching kernel: " << Kernel::GetName() << '\\n'
+                          << "grid: {{" << grids.x << ", " << grids.y << ", " << grids.z << "}}"
+                          << ", blocks: {{" << blocks.x << ", " << blocks.y << ", " << blocks.z << "}}"
+                          << std::endl;
+            }}
+
+            // Launch kernel
+            constexpr int kBlockPerCu = {k_block_per_cu};
+            float ave_time = ck_tile::launch_kernel(
+                stream,
+                ck_tile::make_kernel<kBlockPerCu>(Kernel{{}}, grids, blocks, 0, kargs));
+
+            return ave_time;
+        }};
+        return BaseGemmPipeline::TailHandler(Run, has_hot_loop, tail_num);
+    }}
+}};
+"""
+        return instance_code
+
     def populate_epilogue(self, epilogue):
         instance_code = """
 
@@ -939,6 +1020,8 @@ struct SelectedKernel {{
                 instance_code += self.populate_default_gemm_multi_d()
             elif self.kernel_name_prefix == "gemm_preshuffle":
                 instance_code += self.populate_default_gemm_preshuffle()
+            elif self.kernel_name_prefix == "gemm_aquant":
+                instance_code += self.populate_default_gemm_aquant()
 
         return instance_code
 
@@ -1085,106 +1168,28 @@ struct SelectedKernel {{
         using GemmEpilogue = ck_tile::DefaultGemm2DEpilogue<EpilogueProblem>;"""
         return instance_code
 
-    # [DELETE]
-    #     def _populate_launch_aquant(
-    #         self,
-    #         scheduler_type_map,
-    #         scheduler,
-    #         pipeline_impl_map,
-    #         pipeline,
-    #         k_block_per_cu,
-    #     ):
-    #         """Generate the complete launch function for AQuant kernels.
+    def populate_default_gemm_aquant(self):
+        instance_code = """
+            using EpilogueProblem = ck_tile::DefaultGemm2DEpilogueProblem<
+                ADataType,
+                BDataType,
+                ck_tile::tuple<>,  // DsDataType
+                AccDataType,
+                CDataType,
+                ck_tile::tuple<>,  // DsLayout
+                CLayout,
+                ck_tile::element_wise::PassThrough,
+                TileM,  // kM_
+                TileN,  // kN_
+                kPadM,
+                kPadN,
+                WarpTileM,  // kMPerXdl_
+                WarpTileN,  // kNPerXdl_
+                WarpTileK,  // kKPerXdl_
+                TransposeC>;  // isCTransposed_
 
-    #         AQuant embeds pipeline problem, base pipeline, pipeline instantiation,
-    #         epilogue, kernel type, and launch all inside the launch() static method.
-    #         """
-    #         base_pipeline_map = {
-    #             "mem": "ck_tile::BaseGemmPipelineAgBgCrMem",
-    #             "compv3": "ck_tile::BaseGemmPipelineAgBgCrCompV3",
-    #         }
-
-    #         instance_code = f"""
-
-    #     // Pipeline problem (CDataType_ param is the accumulator type for the pipeline,
-    #     // not the output type — the output conversion is handled by the epilogue)
-    #     using GemmPipelineProblem = ck_tile::GemmAQuantPipelineProblem<
-    #         ADataType,
-    #         AQDataType,
-    #         BDataType,
-    #         AccDataType,
-    #         TileShape,
-    #         Traits,
-    #         QuantGroupSize,
-    #         TransposeC,
-    #         BDataType,
-    #         {scheduler_type_map.get(scheduler)}>;
-
-    #     // Base pipeline for hot loop detection
-    #     using BaseGemmPipeline = {base_pipeline_map.get(pipeline)}<GemmPipelineProblem>;
-
-    #     // Launch function
-    #     static float launch(const ck_tile::QuantGemmHostArgs& args,
-    #                         const ck_tile::stream_config& stream) {{
-
-    #         using _GemmPipelineProblem = SelectedKernel::GemmPipelineProblem;
-    #         using GemmPipeline = {pipeline_impl_map.get(pipeline)}<_GemmPipelineProblem>;
-
-    #         // Epilogue
-    #         using EpilogueProblem = ck_tile::DefaultGemm2DEpilogueProblem<
-    #             ADataType,
-    #             BDataType,
-    #             ck_tile::tuple<>,
-    #             AccDataType,
-    #             CDataType,
-    #             ck_tile::tuple<>,
-    #             CLayout,
-    #             ck_tile::element_wise::PassThrough,
-    #             SelectedKernel::TileM,
-    #             SelectedKernel::TileN,
-    #             SelectedKernel::kPadM,
-    #             SelectedKernel::kPadN,
-    #             SelectedKernel::WarpTileM,
-    #             SelectedKernel::WarpTileN,
-    #             SelectedKernel::WarpTileK,
-    #             SelectedKernel::TransposeC>;
-
-    #         using GemmEpilogue = ck_tile::DefaultGemm2DEpilogue<EpilogueProblem>;
-
-    #         // Kernel type
-    #         using Kernel = ck_tile::QuantGemmKernel<
-    #             SelectedKernel::TilePartitioner, GemmPipeline, GemmEpilogue,
-    #             ck_tile::QuantType::AQuantGrouped>;
-
-    #         // Kernel arguments
-    #         auto kargs = Kernel::MakeKernelArgs(args);
-
-    #         if (!Kernel::IsSupportedArgument(kargs)) {{
-    #             throw std::runtime_error("Unsupported kernel arguments; skipping GEMM launch.");
-    #         }}
-
-    #         // Get grid and block sizes
-    #         const dim3 grids = Kernel::GridSize(args.M, args.N, args.k_batch);
-    #         const dim3 blocks = Kernel::BlockSize();
-
-    #         if(stream.log_level_ > 0) {{
-    #             std::cout << "Launching kernel: " << Kernel::GetName() << '\\n'
-    #                       << "grid: {{" << grids.x << ", " << grids.y << ", " << grids.z << "}}"
-    #                       << ", blocks: {{" << blocks.x << ", " << blocks.y << ", " << blocks.z << "}}"
-    #                       << std::endl;
-    #         }}
-
-    #         // Launch kernel
-    #         constexpr int kBlockPerCu = {k_block_per_cu};
-    #         float ave_time = ck_tile::launch_kernel(
-    #             stream,
-    #             ck_tile::make_kernel<kBlockPerCu>(Kernel{{}}, grids, blocks, 0, kargs));
-
-    #         return ave_time;
-    #     }}
-    # }};
-    # """
-    #         return instance_code
+            using GemmEpilogue = ck_tile::DefaultGemm2DEpilogue<EpilogueProblem>;"""
+        return instance_code
 
     def _generate_cmake_individual_targets(self, kernel_list):
         """Generate CMake include file that creates individual targets"""
