@@ -472,3 +472,10 @@ and the x-transition point accordingly.
 
 Unit tests for the im2col index calculations:
 [test_im2col_index_mapping.cpp](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp)
+
+
+## Current status
+
+We have few issues to address in the current implementation
+
+- We are currently not fully utilizing the pre-computation opportunities as we construct the TiledIm2ColCoordinate objects on the fly in `move_tensor_coordinate` method (projects/composablekernel/include/ck_tile/core/tensor/tensor_coordinate.hpp). Since the `move_step` results to a full init for dm != 0, we are potentially computing reduntly M_base and K_offset. We should try to offload this to compile.time if possible and store the values in arrays in registers if possible. One option is to compute some values at compile-time and other at runtime.
