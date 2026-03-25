@@ -158,11 +158,12 @@ BenchmarkProblems:
         - DepthU: [128]
         - AssertSummationElementMultiple: [32]
         - LocalReadVectorWidth: [32]
-        - PrefetchGlobalRead: [2]
+        - PrefetchGlobalRead: [2, 3]
         - PrefetchLocalRead: [1]
         - ScheduleIterAlg: [3]
         - 1LDSBuffer: [0]
-        - DirectToLds: [1,2,3]
+        - UnrollLoopSwapGlobalReadOrder: [0,1]
+        - DirectToLds: [0,1,2,3]
         - Use64bShadowLimitMX: [0,1]
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:

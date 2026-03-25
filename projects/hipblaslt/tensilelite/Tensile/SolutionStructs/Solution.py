@@ -4118,6 +4118,10 @@ class Solution(collections.abc.Mapping):
         reject(state, printRejectionReason, "PrefetchGlobalRead need to be >=2 if UnrollLoopSwapGlobalReadOrder")
       if state["ProblemType"]["DataTypeA"].numBytes() != state["ProblemType"]["DataTypeB"].numBytes():
         reject(state, printRejectionReason, "UnrollLoopSwapGlobalReadOrder doesn't support mixed precision.")
+      if state["ProblemType"]["MXBlockA"] and (not state["DirectToLdsMXSA"]) and \
+         state["ProblemType"]["MXBlockB"] and (not state["DirectToLdsMXSB"]) and \
+         state["ULSGRODoubleG2L"] == 1:
+        reject(state, printRejectionReason, "MX + non DTL + UnrollLoopSwapGlobalReadOrder + ULSGRODoubleG2L not supported")
 
     if state["ExpandPointerSwap"] == 1 and state["LDSTrInst"]:
       reject(state, printRejectionReason, "LDSTrInst + ExpandPointerSwap not supported")

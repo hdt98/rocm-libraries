@@ -1123,18 +1123,18 @@ class KernelWriterAssembly(KernelWriter):
     if kernel["UnrollLoopSwapGlobalReadOrder"] and not kernel["DirectToLdsA"] and not kernel["DirectToLdsB"]:
       if kernel["ULSGRODoubleG2L"] == 0:
         moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LB2", "vgprG2LA_BASE", 0))
-        moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LA2", "vgprG2LA_BASE", self.states.b.numVgprG2LAllocated))
+        numMxsb = 0
         if kernel["ProblemType"]["MXBlockB"]:
-          moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LMXSB2", "vgprG2LMXSA_BASE", 0))
+          numMxsb = self.states.mxsb.numVgprG2LAllocated
+          moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LMXSB2", "vgprG2LA_BASE", self.states.b.numVgprG2LAllocated))
+        moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LA2", "vgprG2LA_BASE", self.states.b.numVgprG2LAllocated + numMxsb))
         if kernel["ProblemType"]["MXBlockA"]:
-          moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LMXSA2", "vgprG2LMXSA_BASE", self.states.mxsb.numVgprG2LAllocated))
+          moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LMXSA2", "vgprG2LA_BASE", self.states.b.numVgprG2LAllocated + numMxsb + self.states.a.numVgprG2LAllocated))
       else:
+        # MX + no DTL + ULSGRODoubleG2L does not work
+        assert((not kernel["ProblemType"]["MXBlockA"]) and (not kernel["ProblemType"]["MXBlockB"]))
         moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LA2", "vgprG2LA_BASE", self.states.a.numVgprG2LAllocated))
         moduleVgprMacroG2LB.add(RegSet("v", "vgprG2LB2", "vgprG2LB_BASE", self.states.b.numVgprG2LAllocated))
-        if kernel["ProblemType"]["MXBlockA"]:
-          moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LMXSA2", "vgprG2LMXSA_BASE", self.states.mxsa.numVgprG2LAllocated))
-        if kernel["ProblemType"]["MXBlockB"]:
-          moduleVgprMacroG2LB.add(RegSet("v", "vgprG2LMXSB2", "vgprG2LMXSB_BASE", self.states.mxsb.numVgprG2LAllocated))
 
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
       moduleVgprMacro.add(RegSet("v", "vgprG2LMetadata", "vgprBase", self.states.m.startVgprG2L - self.states.startVgpr))
