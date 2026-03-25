@@ -53,24 +53,38 @@ hardware_t::hardware_t(architecture_t arch,
           L2_capacity,
           compute_clock_ghz,
           constants.parallel_mi_cu,
-          constants.mem_bw_per_wg_coefficients) {}
+          constants.mem_bw_per_wg_coefficients) {
+  L1_capacity              = constants.L1_capacity;
+  L3_capacity              = constants.L3_capacity;
+  L1_cache_line_size       = constants.L1_cache_line_size;
+  wavefront_size           = constants.wavefront_size;
+  L1_bus_width_per_cu      = constants.L1_bus_width_per_cu;
+  L2_bus_width_per_cu      = constants.L2_bus_width_per_cu;
+  L1_write_bus_width_per_cu = constants.L1_write_bus_width_per_cu;
+  L2_write_bus_width_per_cu = constants.L2_write_bus_width_per_cu;
+  mem_frequency_mhz        = memory_clock_ghz * 1000.0;
+  hbm_bandwidth            = constants.hbm_bandwidth;
+  L3_bandwidth             = constants.L3_bandwidth;
+  boost_clock_ghz          = constants.boost_frequency_mhz / 1000.0;
+  initial_cost             = constants.initial_cost;
+  L2_read_arb_eff          = constants.L2_read_arb_eff;
+  L2_write_arb_eff         = constants.L2_write_arb_eff;
+  local_read_latency_b128  = constants.local_read_latency_b128;
+  local_read_latency_b64   = constants.local_read_latency_b64;
+  local_read_latency_b32   = constants.local_read_latency_b32;
+  local_read_conflict_b128 = constants.local_read_conflict_b128;
+  local_read_conflict_b64  = constants.local_read_conflict_b64;
+  local_read_conflict_b32  = constants.local_read_conflict_b32;
+  local_write_latency_b128  = constants.local_write_latency_b128;
+  local_write_latency_b64   = constants.local_write_latency_b64;
+  local_write_latency_b32   = constants.local_write_latency_b32;
+  local_write_conflict_b128 = constants.local_write_conflict_b128;
+  local_write_conflict_b64  = constants.local_write_conflict_b64;
+  local_write_conflict_b32  = constants.local_write_conflict_b32;
+}
 
 hardware_t::hardware_t(hipDeviceProp_t properties)
     : hardware_t(get_hardware_for_properties(properties)) {}
-
-hardware_t::hardware_t(const hardware_t& other)
-    : arch(other.arch)
-    , N_CU(other.N_CU)
-    , lds_capacity(other.lds_capacity)
-    , mem1_perf_ratio(other.mem1_perf_ratio)
-    , mem2_perf_ratio(other.mem2_perf_ratio)
-    , mem3_perf_ratio(other.mem3_perf_ratio)
-    , L2_capacity(other.L2_capacity)
-    , CU_per_L2(other.CU_per_L2)
-    , compute_clock_ghz(other.compute_clock_ghz)
-    , parallel_mi_cu(other.parallel_mi_cu)
-    , mem_bw_per_wg_coefficients(other.mem_bw_per_wg_coefficients)
-    , NUM_XCD(other.NUM_XCD) {}
 
 hardware_t hardware_t::get_hardware_for_properties(hipDeviceProp_t properties) {
   auto arch_name = get_before_first_colon(properties.gcnArchName);
@@ -81,13 +95,16 @@ hardware_t hardware_t::get_hardware_for_properties(hipDeviceProp_t properties) {
         std::string(arch_name));
   }
   auto constants = get_arch_constants(arch_enum);
-  return hardware_t(arch_enum,
-                    properties.multiProcessorCount,
-                    properties.sharedMemPerBlock,
-                    constants,
-                    properties.l2CacheSize,
-                    properties.clockRate / 1.e6,
-                    properties.memoryClockRate / 1.e6);
+  auto hw = hardware_t(arch_enum,
+                       properties.multiProcessorCount,
+                       properties.sharedMemPerBlock,
+                       constants,
+                       properties.l2CacheSize,
+                       properties.clockRate / 1.e6,
+                       properties.memoryClockRate / 1.e6);
+  hw.wavefront_size    = properties.warpSize;
+  hw.mem_frequency_mhz = properties.memoryClockRate / 1000.0;
+  return hw;
 }
 
 hardware_t hardware_t::get_hardware_for_device(int deviceId) {
@@ -137,7 +154,22 @@ void hardware_t::print() const {
   std::cout << "Number of XCDs (NUM_XCD)  : " << NUM_XCD << "\n";
   std::cout << "mem_bw_per_wg_coefficients: " << std::get<0>(mem_bw_per_wg_coefficients) << ", "
             << std::get<1>(mem_bw_per_wg_coefficients) << ", "
-            << std::get<2>(mem_bw_per_wg_coefficients) << "\n\n";
+            << std::get<2>(mem_bw_per_wg_coefficients) << "\n";
+  std::cout << "Wavefront size            : " << wavefront_size << "\n";
+  std::cout << "L1 cache capacity         : " << L1_capacity << " bytes\n";
+  std::cout << "L3 cache capacity         : " << L3_capacity << " bytes\n";
+  std::cout << "L1 cache line size        : " << L1_cache_line_size << " bytes\n";
+  std::cout << "L1 bus width/CU           : " << L1_bus_width_per_cu << " bytes\n";
+  std::cout << "L2 bus width/CU           : " << L2_bus_width_per_cu << " bytes\n";
+  std::cout << "L1 write bus width/CU     : " << L1_write_bus_width_per_cu << " bytes\n";
+  std::cout << "L2 write bus width/CU     : " << L2_write_bus_width_per_cu << " bytes\n";
+  std::cout << "Memory frequency (MHz)    : " << mem_frequency_mhz << "\n";
+  std::cout << "HBM bandwidth             : " << hbm_bandwidth << "\n";
+  std::cout << "L3 bandwidth              : " << L3_bandwidth << "\n";
+  std::cout << "Boost clock (GHz)         : " << boost_clock_ghz << "\n";
+  std::cout << "Initial cost              : " << initial_cost << "\n";
+  std::cout << "L2 read arb efficiency    : " << L2_read_arb_eff << "\n";
+  std::cout << "L2 write arb efficiency   : " << L2_write_arb_eff << "\n\n";
 
   std::cout << "------------------ Instruction Map -------------------------\n";
   // Loop over the instruction_map and print each entry

@@ -27,6 +27,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -113,20 +114,40 @@ class hardware_t {
         mem_bw_per_wg_coefficients;  ///< Memory bandwidth coefficients per workgroup
     double mem_clock_ratio;          ///< Memory clock ratio relative to compute clock
 
-    constexpr architecture_constants(size_t num_xcds,
-                                     double mem1_perf_ratio,
-                                     double mem2_perf_ratio,
-                                     double mem3_perf_ratio,
-                                     size_t parallel_mi_cu,
-                                     std::tuple<double, double, double> mem_bw_per_wg_coefficients,
-                                     double mem_clock_ratio)  // Obtained through microbenchmarking
-        : num_xcds(num_xcds)
-        , mem1_perf_ratio(mem1_perf_ratio)
-        , mem2_perf_ratio(mem2_perf_ratio)
-        , mem3_perf_ratio(mem3_perf_ratio)
-        , parallel_mi_cu(parallel_mi_cu)
-        , mem_bw_per_wg_coefficients(mem_bw_per_wg_coefficients)
-        , mem_clock_ratio(mem_clock_ratio) {}
+    size_t wavefront_size     = 0;  ///< Wavefront (warp) size: 64 CDNA, 32 RDNA
+
+    // --- Formocast simulation constants (per-architecture) ---
+
+    size_t L1_capacity        = 0;  ///< L1 cache capacity in bytes
+    size_t L3_capacity        = 0;  ///< L3 / MALL / Infinity Cache capacity in bytes
+    size_t L1_cache_line_size = 0;  ///< L1 cache line size in bytes
+
+    size_t L1_bus_width_per_cu       = 0;  ///< L1 read bus width per CU (bytes)
+    size_t L2_bus_width_per_cu       = 0;  ///< L2 read bus width per CU (bytes)
+    size_t L1_write_bus_width_per_cu = 0;  ///< L1 write bus width per CU (bytes)
+    size_t L2_write_bus_width_per_cu = 0;  ///< L2 write bus width per CU (bytes)
+
+    double hbm_bandwidth       = 0.0;  ///< HBM bandwidth parameter (model-tuned, per-CU)
+    double L3_bandwidth        = 0.0;  ///< L3 bandwidth parameter (model-tuned)
+    double boost_frequency_mhz = 0.0;  ///< Boost clock frequency in MHz
+
+    double initial_cost     = 0.0;  ///< Kernel launch overhead (model-tuned)
+    double L2_read_arb_eff  = 0.0;  ///< L2 read arbitration efficiency (0–1)
+    double L2_write_arb_eff = 0.0;  ///< L2 write arbitration efficiency (0–1)
+
+    uint32_t local_read_latency_b128  = 0;  ///< LDS read base latency, 128-byte
+    uint32_t local_read_latency_b64   = 0;  ///< LDS read base latency, 64-byte
+    uint32_t local_read_latency_b32   = 0;  ///< LDS read base latency, 32-byte
+    uint32_t local_read_conflict_b128 = 0;  ///< LDS read bank-conflict multiplier, 128-byte
+    uint32_t local_read_conflict_b64  = 0;  ///< LDS read bank-conflict multiplier, 64-byte
+    uint32_t local_read_conflict_b32  = 0;  ///< LDS read bank-conflict multiplier, 32-byte
+
+    uint32_t local_write_latency_b128  = 0;  ///< LDS write base latency, 128-byte
+    uint32_t local_write_latency_b64   = 0;  ///< LDS write base latency, 64-byte
+    uint32_t local_write_latency_b32   = 0;  ///< LDS write base latency, 32-byte
+    uint32_t local_write_conflict_b128 = 0;  ///< LDS write bank-conflict multiplier, 128-byte
+    uint32_t local_write_conflict_b64  = 0;  ///< LDS write bank-conflict multiplier, 64-byte
+    uint32_t local_write_conflict_b32  = 0;  ///< LDS write bank-conflict multiplier, 32-byte
   };
 
   /**
@@ -145,33 +166,164 @@ class hardware_t {
    * @param arch Architecture enum value
    * @return architecture_constants Constants for the specified architecture
    */
+  // clang-format off
   static constexpr architecture_constants get_arch_constants(architecture_t arch) {
     switch (arch) {
       case architecture_t::gfx90a:
-        return {1, 5.5, 1.21875121875121875122 * 1.2, 1.2, 4, std::make_tuple(0, 0.03, 0), 1.5};
+        return {
+            1,                                        // num_xcds
+            5.5,                                      // mem1_perf_ratio
+            1.21875121875121875122 * 1.2,             // mem2_perf_ratio
+            1.2,                                      // mem3_perf_ratio
+            4,                                        // parallel_mi_cu
+            std::make_tuple(0.0, 0.03, 0.0),          // mem_bw_per_wg_coefficients
+            1.5,                                      // mem_clock_ratio
+            64,                                       // wavefront_size
+        };
       case architecture_t::gfx942:
-        return {8, 17, 1.21875121875121875122 * 6, 4, 4, std::make_tuple(0, 0.015, 0), 1.5};
+        return {
+            8,                                        // num_xcds
+            17,                                       // mem1_perf_ratio
+            1.21875121875121875122 * 6,               // mem2_perf_ratio
+            4,                                        // mem3_perf_ratio
+            4,                                        // parallel_mi_cu
+            std::make_tuple(0.0, 0.015, 0.0),         // mem_bw_per_wg_coefficients
+            1.5,                                      // mem_clock_ratio
+            64,                                       // wavefront_size
+            32768,                                    // L1_capacity
+            268435456,                                // L3_capacity
+            128,                                      // L1_cache_line_size
+            64,                                       // L1_bus_width_per_cu
+            128,                                      // L2_bus_width_per_cu
+            64,                                       // L1_write_bus_width_per_cu
+            64,                                       // L2_write_bus_width_per_cu
+            30000.0 / 13.0,                           // hbm_bandwidth
+            60000.0 / 13.0,                           // L3_bandwidth
+            2200.0,                                   // boost_frequency_mhz
+            2.7,                                      // initial_cost
+            0.9,                                      // L2_read_arb_eff
+            0.58,                                     // L2_write_arb_eff
+            10, 5, 2,                                 // local_read_latency  b128, b64, b32
+            6, 3, 3,                                  // local_read_conflict b128, b64, b32
+            10, 10, 10,                               // local_write_latency  b128, b64, b32
+            4, 2, 1,                                  // local_write_conflict b128, b64, b32
+        };
       case architecture_t::gfx950:
-        return {8, 17, 1.21875121875121875122 * 7, 6, 4, std::make_tuple(0, 0.008, 0), 1.5};
+        return {
+            8,                                        // num_xcds
+            17,                                       // mem1_perf_ratio
+            1.21875121875121875122 * 7,               // mem2_perf_ratio
+            6,                                        // mem3_perf_ratio
+            4,                                        // parallel_mi_cu
+            std::make_tuple(0.0, 0.008, 0.0),         // mem_bw_per_wg_coefficients
+            1.5,                                      // mem_clock_ratio
+            64,                                       // wavefront_size
+            32768,                                    // L1_capacity
+            268435456,                                // L3_capacity
+            128,                                      // L1_cache_line_size
+            64,                                       // L1_bus_width_per_cu
+            128,                                      // L2_bus_width_per_cu
+            64,                                       // L1_write_bus_width_per_cu
+            64,                                       // L2_write_bus_width_per_cu
+            30000.0 / 19.0,                           // hbm_bandwidth
+            60000.0 / 19.0,                           // L3_bandwidth
+            2350.0,                                   // boost_frequency_mhz
+            2.6,                                      // initial_cost
+            0.9,                                      // L2_read_arb_eff
+            0.75,                                     // L2_write_arb_eff
+            14, 10, 10,                               // local_read_latency  b128, b64, b32
+            6, 3, 3,                                  // local_read_conflict b128, b64, b32
+            10, 10, 10,                               // local_write_latency  b128, b64, b32
+            4, 2, 1,                                  // local_write_conflict b128, b64, b32
+        };
       case architecture_t::gfx1201:
-        return {1, 5.74, 1.21875121875121875122 * 2.41, 0.464, 2, std::make_tuple(0, 0.17, 0), 1.5};
+        return {
+            1,                                        // num_xcds
+            5.74,                                     // mem1_perf_ratio
+            1.21875121875121875122 * 2.41,            // mem2_perf_ratio
+            0.464,                                    // mem3_perf_ratio
+            2,                                        // parallel_mi_cu
+            std::make_tuple(0.0, 0.17, 0.0),          // mem_bw_per_wg_coefficients
+            1.5,                                      // mem_clock_ratio
+            32,                                       // wavefront_size
+            32768,                                    // L1_capacity
+            67108864,                                 // L3_capacity
+            128,                                      // L1_cache_line_size
+            128,                                      // L1_bus_width_per_cu
+            128,                                      // L2_bus_width_per_cu
+            64,                                       // L1_write_bus_width_per_cu
+            128,                                      // L2_write_bus_width_per_cu
+            61.04,                                    // hbm_bandwidth
+            439.45,                                   // L3_bandwidth
+            2500.0,                                   // boost_frequency_mhz
+            14.6,                                     // initial_cost
+            0.9,                                      // L2_read_arb_eff
+            0.75,                                     // L2_write_arb_eff
+            14, 10, 10,                               // local_read_latency  b128, b64, b32
+            6, 3, 3,                                  // local_read_conflict b128, b64, b32
+            10, 10, 10,                               // local_write_latency  b128, b64, b32
+            4, 2, 1,                                  // local_write_conflict b128, b64, b32
+        };
       case architecture_t::gfx1100:
-        return {1, 7.12, 1.21875121875121875122 * 3.48, 0.732, 2, std::make_tuple(0, 0.11, 0), 1.5};
-      case architecture_t::gfx1150:
-        // AMD Strix Point iGPU
-        return {1, 1.497, NO_MALL_AVAILABLE, 0.077, 16, std::make_tuple(0, 0.18, 0), 1.5};
-      case architecture_t::gfx1151:
-        // AMD Strix Halo iGPU
-        return {1, 2.47, 1.21875121875121875122 * 0.93, 0.215, 2, std::make_tuple(0, 0.22, 0), 1.5};
-      case architecture_t::gfx1152:
-        // AMD Radeon 840M iGPU
-        return {1, 0.849, NO_MALL_AVAILABLE, 0.096, 4, std::make_tuple(0, 0.13, 0), 1.5};
-      case architecture_t::gfx1153:
-        // AMD Radeon 820M iGPU
-        return {1, 0.240, NO_MALL_AVAILABLE, 0.066, 2, std::make_tuple(0, 0.19, 0), 1.5};
-      default: return {0, 0, 0, 0, 0, std::make_tuple(0, 0, 0), 0};
+        return {
+            1,                                        // num_xcds
+            7.12,                                     // mem1_perf_ratio
+            1.21875121875121875122 * 3.48,            // mem2_perf_ratio
+            0.732,                                    // mem3_perf_ratio
+            2,                                        // parallel_mi_cu
+            std::make_tuple(0.0, 0.11, 0.0),          // mem_bw_per_wg_coefficients
+            1.5,                                      // mem_clock_ratio
+            32,                                       // wavefront_size
+        };
+      case architecture_t::gfx1150: // Strix Point iGPU
+        return {
+            1,                                        // num_xcds
+            1.497,                                    // mem1_perf_ratio
+            NO_MALL_AVAILABLE,                        // mem2_perf_ratio
+            0.077,                                    // mem3_perf_ratio
+            16,                                       // parallel_mi_cu
+            std::make_tuple(0.0, 0.18, 0.0),          // mem_bw_per_wg_coefficients
+            1.5,                                      // mem_clock_ratio
+            32,                                       // wavefront_size
+        };
+      case architecture_t::gfx1151: // Strix Halo iGPU
+        return {
+            1,                                        // num_xcds
+            2.47,                                     // mem1_perf_ratio
+            1.21875121875121875122 * 0.93,            // mem2_perf_ratio
+            0.215,                                    // mem3_perf_ratio
+            2,                                        // parallel_mi_cu
+            std::make_tuple(0.0, 0.22, 0.0),          // mem_bw_per_wg_coefficients
+            1.5,                                      // mem_clock_ratio
+            32,                                       // wavefront_size
+        };
+      case architecture_t::gfx1152: // Radeon 840M iGPU
+        return {
+            1,                                        // num_xcds
+            0.849,                                    // mem1_perf_ratio
+            NO_MALL_AVAILABLE,                        // mem2_perf_ratio
+            0.096,                                    // mem3_perf_ratio
+            4,                                        // parallel_mi_cu
+            std::make_tuple(0.0, 0.13, 0.0),          // mem_bw_per_wg_coefficients
+            1.5,                                      // mem_clock_ratio
+            32,                                       // wavefront_size
+        };
+      case architecture_t::gfx1153: // Radeon 820M iGPU
+        return {
+            1,                                        // num_xcds
+            0.240,                                    // mem1_perf_ratio
+            NO_MALL_AVAILABLE,                        // mem2_perf_ratio
+            0.066,                                    // mem3_perf_ratio
+            2,                                        // parallel_mi_cu
+            std::make_tuple(0.0, 0.19, 0.0),          // mem_bw_per_wg_coefficients
+            1.5,                                      // mem_clock_ratio
+            32,                                       // wavefront_size
+        };
+      default:
+        return {};
     }
   }
+  // clang-format on
 
   /**
    * @brief Map of matrix instruction latencies by architecture.
@@ -463,6 +615,42 @@ class hardware_t {
       mem_bw_per_wg_coefficients;  ///< Memory bandwidth coefficients per workgroup
   size_t NUM_XCD;                  ///< Number of XCDs (XGMI Complex Die)
 
+  size_t wavefront_size     = 0;  ///< Wavefront (warp) size
+
+  // --- Formocast simulation fields ---
+
+  size_t L1_capacity        = 0;  ///< L1 cache capacity in bytes
+  size_t L3_capacity        = 0;  ///< L3 / MALL / Infinity Cache capacity in bytes
+  size_t L1_cache_line_size = 0;  ///< L1 cache line size in bytes
+
+  size_t L1_bus_width_per_cu       = 0;  ///< L1 read bus width per CU (bytes)
+  size_t L2_bus_width_per_cu       = 0;  ///< L2 read bus width per CU (bytes)
+  size_t L1_write_bus_width_per_cu = 0;  ///< L1 write bus width per CU (bytes)
+  size_t L2_write_bus_width_per_cu = 0;  ///< L2 write bus width per CU (bytes)
+
+  double mem_frequency_mhz = 0.0;  ///< Memory clock frequency in MHz
+  double hbm_bandwidth     = 0.0;  ///< HBM bandwidth parameter (model-tuned)
+  double L3_bandwidth      = 0.0;  ///< L3 bandwidth parameter (model-tuned)
+  double boost_clock_ghz   = 0.0;  ///< Boost clock frequency in GHz
+
+  double initial_cost     = 0.0;  ///< Kernel launch overhead (model-tuned)
+  double L2_read_arb_eff  = 0.0;  ///< L2 read arbitration efficiency (0–1)
+  double L2_write_arb_eff = 0.0;  ///< L2 write arbitration efficiency (0–1)
+
+  uint32_t local_read_latency_b128  = 0;  ///< LDS read base latency, 128-byte
+  uint32_t local_read_latency_b64   = 0;  ///< LDS read base latency, 64-byte
+  uint32_t local_read_latency_b32   = 0;  ///< LDS read base latency, 32-byte
+  uint32_t local_read_conflict_b128 = 0;  ///< LDS read bank-conflict multiplier, 128-byte
+  uint32_t local_read_conflict_b64  = 0;  ///< LDS read bank-conflict multiplier, 64-byte
+  uint32_t local_read_conflict_b32  = 0;  ///< LDS read bank-conflict multiplier, 32-byte
+
+  uint32_t local_write_latency_b128  = 0;  ///< LDS write base latency, 128-byte
+  uint32_t local_write_latency_b64   = 0;  ///< LDS write base latency, 64-byte
+  uint32_t local_write_latency_b32   = 0;  ///< LDS write base latency, 32-byte
+  uint32_t local_write_conflict_b128 = 0;  ///< LDS write bank-conflict multiplier, 128-byte
+  uint32_t local_write_conflict_b64  = 0;  ///< LDS write bank-conflict multiplier, 64-byte
+  uint32_t local_write_conflict_b32  = 0;  ///< LDS write bank-conflict multiplier, 32-byte
+
   /**
    * @brief Construct hardware_t with explicit parameters.
    *
@@ -527,7 +715,7 @@ class hardware_t {
    *
    * @param other Another hardware_t instance to copy from
    */
-  hardware_t(const hardware_t& other);
+  hardware_t(const hardware_t& other) = default;
 
   /**
    * @brief Create hardware_t instance from HIP device properties.

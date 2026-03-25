@@ -107,6 +107,42 @@ def test_hardware_for_arch_gfx950():
     assert hardware.parallel_mi_cu == 4
     # mem1_perf_ratio is calculated based on clock speeds, not a direct constant
     assert hardware.mem1_perf_ratio > 0
+
+    # Formocast cache hierarchy fields
+    assert hardware.L1_capacity == 32768
+    assert hardware.L3_capacity == 268435456
+    assert hardware.L1_cache_line_size == 128
+    assert hardware.wavefront_size == 64
+
+    # Bus widths
+    assert hardware.L1_bus_width_per_cu == 64
+    assert hardware.L2_bus_width_per_cu == 128
+    assert hardware.L1_write_bus_width_per_cu == 64
+    assert hardware.L2_write_bus_width_per_cu == 64
+
+    # Bandwidth and frequency
+    assert hardware.hbm_bandwidth == pytest.approx(30000.0 / 19.0, rel=1e-6)
+    assert hardware.L3_bandwidth == pytest.approx(60000.0 / 19.0, rel=1e-6)
+    assert hardware.boost_clock_ghz == pytest.approx(2.35, rel=1e-3)
+
+    # Model parameters
+    assert hardware.initial_cost == pytest.approx(2.6, rel=1e-6)
+    assert hardware.L2_read_arb_eff == pytest.approx(0.9, rel=1e-6)
+    assert hardware.L2_write_arb_eff == pytest.approx(0.75, rel=1e-6)
+
+    # LDS latency model
+    assert hardware.local_read_latency_b128 == 14
+    assert hardware.local_read_latency_b64 == 10
+    assert hardware.local_read_latency_b32 == 10
+    assert hardware.local_read_conflict_b128 == 6
+    assert hardware.local_read_conflict_b64 == 3
+    assert hardware.local_read_conflict_b32 == 3
+    assert hardware.local_write_latency_b128 == 10
+    assert hardware.local_write_latency_b64 == 10
+    assert hardware.local_write_latency_b32 == 10
+    assert hardware.local_write_conflict_b128 == 4
+    assert hardware.local_write_conflict_b64 == 2
+    assert hardware.local_write_conflict_b32 == 1
     
 
 
@@ -131,6 +167,42 @@ def test_hardware_for_arch_gfx942():
     assert hardware.NUM_XCD == 8
     assert hardware.parallel_mi_cu == 4
 
+    # Formocast cache hierarchy fields
+    assert hardware.L1_capacity == 32768
+    assert hardware.L3_capacity == 268435456
+    assert hardware.L1_cache_line_size == 128
+    assert hardware.wavefront_size == 64
+
+    # Bus widths
+    assert hardware.L1_bus_width_per_cu == 64
+    assert hardware.L2_bus_width_per_cu == 128
+    assert hardware.L1_write_bus_width_per_cu == 64
+    assert hardware.L2_write_bus_width_per_cu == 64
+
+    # Bandwidth and frequency
+    assert hardware.hbm_bandwidth == pytest.approx(30000.0 / 13.0, rel=1e-6)
+    assert hardware.L3_bandwidth == pytest.approx(60000.0 / 13.0, rel=1e-6)
+    assert hardware.boost_clock_ghz == pytest.approx(2.2, rel=1e-3)
+
+    # Model parameters
+    assert hardware.initial_cost == pytest.approx(2.7, rel=1e-6)
+    assert hardware.L2_read_arb_eff == pytest.approx(0.9, rel=1e-6)
+    assert hardware.L2_write_arb_eff == pytest.approx(0.58, rel=1e-6)
+
+    # LDS latency model
+    assert hardware.local_read_latency_b128 == 10
+    assert hardware.local_read_latency_b64 == 5
+    assert hardware.local_read_latency_b32 == 2
+    assert hardware.local_read_conflict_b128 == 6
+    assert hardware.local_read_conflict_b64 == 3
+    assert hardware.local_read_conflict_b32 == 3
+    assert hardware.local_write_latency_b128 == 10
+    assert hardware.local_write_latency_b64 == 10
+    assert hardware.local_write_latency_b32 == 10
+    assert hardware.local_write_conflict_b128 == 4
+    assert hardware.local_write_conflict_b64 == 2
+    assert hardware.local_write_conflict_b32 == 1
+
 
 @pytest.mark.integration
 def test_hardware_for_arch_gfx90a():
@@ -151,6 +223,16 @@ def test_hardware_for_arch_gfx90a():
     assert hardware.NUM_XCD == 1
     assert hardware.parallel_mi_cu == 4
 
+    # gfx90a has no Formocast constants — fields should be at defaults (0)
+    assert hardware.L1_capacity == 0
+    assert hardware.L3_capacity == 0
+    assert hardware.L1_cache_line_size == 0
+    assert hardware.wavefront_size == 64
+    assert hardware.L1_bus_width_per_cu == 0
+    assert hardware.hbm_bandwidth == 0.0
+    assert hardware.initial_cost == 0.0
+    assert hardware.local_read_latency_b128 == 0
+
 
 @pytest.mark.integration
 def test_hardware_for_arch_gfx1201():
@@ -170,6 +252,42 @@ def test_hardware_for_arch_gfx1201():
     # Verify architecture-specific constants
     assert hardware.NUM_XCD == 1
     assert hardware.parallel_mi_cu == 2
+
+    # Formocast cache hierarchy fields
+    assert hardware.L1_capacity == 32768
+    assert hardware.L3_capacity == 67108864
+    assert hardware.L1_cache_line_size == 128
+    assert hardware.wavefront_size == 32
+
+    # Bus widths
+    assert hardware.L1_bus_width_per_cu == 128
+    assert hardware.L2_bus_width_per_cu == 128
+    assert hardware.L1_write_bus_width_per_cu == 64
+    assert hardware.L2_write_bus_width_per_cu == 128
+
+    # Bandwidth and frequency
+    assert hardware.hbm_bandwidth == pytest.approx(61.04, rel=1e-6)
+    assert hardware.L3_bandwidth == pytest.approx(439.45, rel=1e-6)
+    assert hardware.boost_clock_ghz == pytest.approx(2.5, rel=1e-3)
+
+    # Model parameters
+    assert hardware.initial_cost == pytest.approx(14.6, rel=1e-6)
+    assert hardware.L2_read_arb_eff == pytest.approx(0.9, rel=1e-6)
+    assert hardware.L2_write_arb_eff == pytest.approx(0.75, rel=1e-6)
+
+    # LDS latency model
+    assert hardware.local_read_latency_b128 == 14
+    assert hardware.local_read_latency_b64 == 10
+    assert hardware.local_read_latency_b32 == 10
+    assert hardware.local_read_conflict_b128 == 6
+    assert hardware.local_read_conflict_b64 == 3
+    assert hardware.local_read_conflict_b32 == 3
+    assert hardware.local_write_latency_b128 == 10
+    assert hardware.local_write_latency_b64 == 10
+    assert hardware.local_write_latency_b32 == 10
+    assert hardware.local_write_conflict_b128 == 4
+    assert hardware.local_write_conflict_b64 == 2
+    assert hardware.local_write_conflict_b32 == 1
 
 
 @pytest.mark.integration
