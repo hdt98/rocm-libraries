@@ -5,8 +5,6 @@ subtrees:
 
 - caption: Install
   entries:
-  - file: conceptual/Composable-Kernel-structure.rst
-    title: Structure
   - file: conceptual/Composable-Kernel-math.rst
     title: Mathematical basis
   - file: conceptual/CK-Tile-intra-inter-wave.rst
