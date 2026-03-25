@@ -1,6 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
+#include "rocm_vector_add_api.hpp"
 #include "rocm_vector_add_dev.hpp"
 
 // Baseline single-warp FP32 variant. Smallest tile in the set.
