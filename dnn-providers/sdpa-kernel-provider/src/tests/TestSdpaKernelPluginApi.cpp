@@ -67,7 +67,6 @@ TEST(TestSdpaKernelPluginApi, HipdnnEnginePluginGetApplicableEngineIds)
     std::array<int64_t, 2> engineIds = {-1, -1};
     uint32_t numEngineIdsReturned = 0;
 
-    std::vector<int64_t> dims = {4, 8, 256, 128};
     auto graph = createValidSdpaFpropGraph();
 
     auto graphBuffer = graph.Release();

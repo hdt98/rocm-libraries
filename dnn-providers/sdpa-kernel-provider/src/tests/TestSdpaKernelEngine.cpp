@@ -44,7 +44,6 @@ TEST_F(TestSdpaKernelEngine, IsApplicableReturnsTrueForSdpaGraph)
     using namespace hipdnn_data_sdk::data_objects;
     using namespace hipdnn_data_sdk::utilities;
 
-    std::vector<int64_t> dims = {4, 8, 256, 128};
     auto builder = createValidSdpaFpropGraph();
 
     hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(builder.GetBufferPointer(),

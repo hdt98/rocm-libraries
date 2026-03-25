@@ -55,7 +55,6 @@ TEST(TestSdpaKernelContainer, GetApplicableEngineIdsSupportedGraph)
     SdpaKernelContainer container;
     auto& engineManager = container.getEngineManager();
 
-    std::vector<int64_t> dims = {4, 8, 256, 128};
     auto graph = createValidSdpaFpropGraph();
     auto graphBuffer = graph.Release();
 
