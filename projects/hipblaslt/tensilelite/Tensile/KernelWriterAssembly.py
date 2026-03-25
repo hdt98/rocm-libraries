@@ -1124,9 +1124,17 @@ class KernelWriterAssembly(KernelWriter):
       if kernel["ULSGRODoubleG2L"] == 0:
         moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LB2", "vgprG2LA_BASE", 0))
         moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LA2", "vgprG2LA_BASE", self.states.b.numVgprG2LAllocated))
+        if kernel["ProblemType"]["MXBlockB"]:
+          moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LMXSB2", "vgprG2LMXSA_BASE", 0))
+        if kernel["ProblemType"]["MXBlockA"]:
+          moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LMXSA2", "vgprG2LMXSA_BASE", self.states.mxsb.numVgprG2LAllocated))
       else:
         moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LA2", "vgprG2LA_BASE", self.states.a.numVgprG2LAllocated))
         moduleVgprMacroG2LB.add(RegSet("v", "vgprG2LB2", "vgprG2LB_BASE", self.states.b.numVgprG2LAllocated))
+        if kernel["ProblemType"]["MXBlockA"]:
+          moduleVgprMacroG2LA.add(RegSet("v", "vgprG2LMXSA2", "vgprG2LMXSA_BASE", self.states.mxsa.numVgprG2LAllocated))
+        if kernel["ProblemType"]["MXBlockB"]:
+          moduleVgprMacroG2LB.add(RegSet("v", "vgprG2LMXSB2", "vgprG2LMXSB_BASE", self.states.mxsb.numVgprG2LAllocated))
 
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
       moduleVgprMacro.add(RegSet("v", "vgprG2LMetadata", "vgprBase", self.states.m.startVgprG2L - self.states.startVgpr))
