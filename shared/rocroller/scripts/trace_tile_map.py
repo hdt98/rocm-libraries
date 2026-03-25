@@ -65,12 +65,18 @@ def decode_global(addr: int, base: int, row_bytes: int, chunk_bytes: int):
 
 
 def build_df(mapping: dict, n_rows: int, n_chunks: int, row_label: str = "row") -> pl.DataFrame:
-    """Build a Polars DataFrame: rows = matrix rows, cols = K-chunks."""
+    """Build a Polars DataFrame: rows = matrix rows, cols = K-chunks.
+
+    Values may be strings (GR) or lists of strings (LR with jamming).
+    """
     rows = []
     for r in range(n_rows):
         row = {row_label: str(r)}
         for c in range(n_chunks):
-            row[f"K{c}"] = mapping.get((r, c), "")
+            val = mapping.get((r, c), "")
+            if isinstance(val, list):
+                val = ",".join(val)
+            row[f"K{c}"] = val
         rows.append(row)
     return pl.DataFrame(rows)
 
@@ -140,6 +146,8 @@ def analyse(
                     lds_to_tile[lds_addrs[lane]] = key
 
     # ---- LR pass: look up tile position via LDS address --------------------
+    # lr_mapping values are *lists* so that multiple waves sharing the same
+    # (row, chunk) via LDS (jamming) are all preserved.
     lr_mapping: dict = {}
 
     for rec in lr_recs:
@@ -151,9 +159,75 @@ def analyse(
             if key is not None:
                 row, chunk = key
                 if 0 <= row < mac_rows and 0 <= chunk < n_k_chunks:
-                    lr_mapping[(row, chunk)] = f"w{wave}.L{lane}"
+                    label = f"w{wave}.L{lane}"
+                    lr_mapping.setdefault((row, chunk), [])
+                    if label not in lr_mapping[(row, chunk)]:
+                        lr_mapping[(row, chunk)].append(label)
 
     return gr_mapping, lr_mapping, lds_to_tile
+
+
+def _per_wave_rows(lr_map: dict) -> dict[int, list[int]]:
+    """Return {wave_id: sorted list of rows} from an LR mapping.
+
+    lr_map values may be a single string or a list of strings (jamming).
+    """
+    import re
+
+    wave_rows: dict[int, set[int]] = {}
+    for (row, _chunk), labels in lr_map.items():
+        if isinstance(labels, str):
+            labels = [labels]
+        for label in labels:
+            m = re.match(r"w(\d+)", label)
+            if m:
+                w = int(m.group(1))
+                wave_rows.setdefault(w, set()).add(row)
+    return {w: sorted(rows) for w, rows in sorted(wave_rows.items())}
+
+
+def summarize_jamming(a_lr_map: dict, b_lr_map: dict):
+    """
+    Print wave → subtileC assignment derived from LR mappings.
+
+    a_lr_map: (M-row, K-chunk) -> "w{wave}.L{lane}"
+    b_lr_map: (N-row, K-chunk) -> "w{wave}.L{lane}"
+    """
+    a_waves = _per_wave_rows(a_lr_map)
+    b_waves = _per_wave_rows(b_lr_map)
+
+    all_waves = sorted(set(a_waves.keys()) | set(b_waves.keys()))
+
+    if not all_waves:
+        print("\n  [no LR data to derive jamming]")
+        return
+
+    print()
+    print("=" * 80)
+    print("Jamming summary: wave → subtileC")
+    print()
+
+    for w in all_waves:
+        a_rows = a_waves.get(w, [])
+        b_rows = b_waves.get(w, [])
+
+        a_range = f"M[{min(a_rows)}:{max(a_rows)+1}]" if a_rows else "M[?]"
+        b_range = f"N[{min(b_rows)}:{max(b_rows)+1}]" if b_rows else "N[?]"
+
+        print(f"  Wave {w} → {a_range}, {b_range}")
+
+    # Derive jam factors
+    if a_waves:
+        unique_m = len(set((min(r), max(r)) for r in a_waves.values()))
+    else:
+        unique_m = 1
+    if b_waves:
+        unique_n = len(set((min(r), max(r)) for r in b_waves.values()))
+    else:
+        unique_n = 1
+
+    print(f"\n  Jam factors: {unique_m} along M x {unique_n} along N "
+          f"({len(all_waves)} waves total)")
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +294,12 @@ def parse_args():
         default="both",
         help="Which matrix tile to show (default: both). "
              "A and B are separated by instruction program-order address.",
+    )
+    p.add_argument(
+        "--show-jamming",
+        action="store_true",
+        default=False,
+        help="Show wave → subtileC jamming summary derived from LR data.",
     )
     return p.parse_args()
 
@@ -371,11 +451,19 @@ def main():
         else:
             print("  [no data -- need GR records with lds_effective_addr]")
 
+        return lr_map
+
+    a_lr_map = {}
+    b_lr_map = {}
+
     if args.tile in ("a", "both"):
-        show_tile(a_recs, args.mac_m, n_k_chunks_a, row_bytes_a, "A", "M-row")
+        a_lr_map = show_tile(a_recs, args.mac_m, n_k_chunks_a, row_bytes_a, "A", "M-row")
 
     if args.tile in ("b", "both"):
-        show_tile(b_recs, args.mac_n, n_k_chunks_b, row_bytes_b, "B", "N-row")
+        b_lr_map = show_tile(b_recs, args.mac_n, n_k_chunks_b, row_bytes_b, "B", "N-row")
+
+    if args.show_jamming:
+        summarize_jamming(a_lr_map, b_lr_map)
 
 
 if __name__ == "__main__":
