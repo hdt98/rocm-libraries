@@ -478,4 +478,44 @@ Unit tests for the im2col index calculations:
 
 We have few issues to address in the current implementation
 
-- We are currently not fully utilizing the pre-computation opportunities as we construct the TiledIm2ColCoordinate objects on the fly in `move_tensor_coordinate` method (projects/composablekernel/include/ck_tile/core/tensor/tensor_coordinate.hpp). Since the `move_step` results to a full init for dm != 0, we are potentially computing reduntly M_base and K_offset. We should try to offload this to compile.time if possible and store the values in arrays in registers if possible. One option is to compute some values at compile-time and other at runtime.
+- The `init` and `move_step` methods from TiledIm2ColCoordinate are called when we traverse over the K-dimension, that is, each workgroup (thread block) handeles a fixed M-tile for which the `init` is 
+called. When we traverse over the K-tile in a loop, we call the `move_step` method. The number of 
+interation in the loop is determined by Kgemm (=Y x X x C) / KPerBlock
+
+- For a given tile, we use `tensor_view.get_vectorized_elements<VectorSizeA>(coord, linear_offset)` to run vectorized load from the global memory
+  - projects/composablekernel/include/ck_tile/core/tensor/tile_window.hpp#L377-L381
+  - the final address in the global memory is `(M_base + K_offset) + ys_offset` where `(M_base + K_offset)` is computed once per tiles and `ys_offset` is again computed via the `move_step` function in TiledIm2ColCoordinate. This again happens via dm=0 path because the theread positions are pre-computed unless the space-filling curve (SFC) cross M-rows (this should not happen). 
+  via `prepare_coords` method ([tile_window.hpp#L107-L149](../include/ck_tile/core/tensor/tile_window.hpp#L107-L149)).
+  - The thread position preparation uses the expensive `init(m_gemm, k_gemm)` method. Hence, we might be calling `init(m_gemm, k_gemm)` multiple times. However, each threads calls `init(m_gemm, k_gemm)` only once. How the `(m_gemm, k_gemm)` are distributed over threads depends on the tile_distribution.
+  - Assume: 
+    * lane_id → K dimension (adjacent threads load adjacent K positions for memory coalescing)
+    * warp_id → M dimension (different warps cover different M rows)
+    Then the 3 M divmods (n_conv, ho, wo) compute the same value for all 64 threads in a warp — wavefront-uniform computation on the VALU, which is redundant. The 2 K divmods (y_, x_, c_conv_) are lane-specific — legitimately divergent.
+  - Actual tile distribution: tile_distribution_encoding_pattern_2d<BlockSize, MPerBlock, KPerBlock, VecLoadSize, thread_raked>
+    * We need to change the tile distribution such that m_gemm is purely wave-uniform, but this would require ver large KPerBlock sizes that are impractical.
+
+## Wave-uniform m_gemm index
+
+The fundamental equation:
+
+For wave-uniform m_gemm, all 64 lanes must map only to K. In thread_raked:
+
+
+X0 = min(warp_size, KPerBlock / VecSize)
+Wave-uniform M requires X0 = warp_size = 64, which demands: 
+
+```
+KPerBlock ≥ 64 × VecSize
+```
+
+For VecSize=4:
+
+| KPerBlock | Required for wave-uniform M | X0 (achievable) | Lanes sharing M |
+|-----------|-----------------------------|-----------------|-----------------| 
+| 16        | ≥ 256                       | 4               | 4               |
+| 32        | ≥ 256                       | 8               | 8               |
+| 64        | ≥ 256                       | 16              | 16              |
+| 256       | = 256                       | 64              | 64 (wave-uniform) |
+
+This constraint is layout-agnostic (indpendent of the tile distribution). With 64 lanes each loading VecSize=4 elements, a warp covering one M row consumes 64×4=256 K elements per iteration. KPerBlock must be chosen to accommodate that.
+We can choose e.g. tile size (64, 64, 256) to achieve the wave-uniform m_gemm index.
