@@ -567,6 +567,28 @@ namespace rocRoller
                         }
                     }
 
+                    if(extent.dataType == DataType::None
+                       && extent.layoutType != LayoutType::MATRIX_ACCUMULATOR)
+                    {
+                        if(extent.baseTag != -1)
+                        {
+                            auto el = kgraph.coordinates.getElementType(extent.baseTag);
+                            if(el == Graph::ElementType::Node)
+                            {
+                                Log::info("Node is NOT -1 {} => {}",
+                                          extent.baseTag,
+                                          toString(kgraph.coordinates.getNode(extent.baseTag)));
+                            }
+                            else
+                            {
+                                Log::info("Edge is NOT -1 {} => {}",
+                                          extent.baseTag,
+                                          toString(kgraph.coordinates.getEdge(extent.baseTag)));
+                            }
+                            AssertFatal(false);
+                        }
+                    }
+
                     if(!extent.empty() && extent.dataType != DataType::None
                        && extent.layoutType != LayoutType::MATRIX_ACCUMULATOR)
                     {
