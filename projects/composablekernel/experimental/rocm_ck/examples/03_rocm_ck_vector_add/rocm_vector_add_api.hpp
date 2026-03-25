@@ -1,56 +1,24 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// Compile-time configuration for rocm_ck vector add.
+// Vector add host-side API for rocm_ck elementwise example.
 //
-// Uses operator-centric Signature with AddOp, validated by make_kernel() into
-// a VectorAddKernel NTTP with consteval checks for CK Tile ElementWiseShape
-// compatibility.
-//
-// This header has NO CK Tile dependency. It is included by both host code
-// (main.cpp) and device code (.hip files).
+// Host-only: make_kernel() validates a Signature + ElementwiseAlgorithm into
+// a VectorAddKernel descriptor. This header is NOT included by device code
+// (.hip files). Device code includes rocm_vector_add_kernel.hpp (the pure
+// structural types) via rocm_vector_add_dev.hpp.
 
 #pragma once
 
-#include <rocm_ck/args.hpp>
-#include <rocm_ck/datatype_utils.hpp>
+#include "rocm_vector_add_kernel.hpp"
+
 #include <rocm_ck/resolve.hpp>
 #include <rocm_ck/tensor_desc.hpp>
-#include <rocm_ck/types.hpp>
-
-#include <cstddef>
-#include <type_traits>
 
 namespace rocm_ck {
 
-/// Algorithm: describes HOW the kernel executes (tile geometry, pipeline).
-/// Independent of data types — paired with Signature in make_kernel().
-struct ElementwiseAlgorithm
-{
-    int block_tile;  // Elements processed per thread block (BlockTile)
-    int block_warps; // Number of warps per thread block (BlockWarps)
-    int warp_tile;   // Warp tile size for vector width calculation (WarpTile)
-    bool pad;        // Enable padding for unaligned problem sizes
-};
-
-/// Validated kernel descriptor used as NTTP and host launch info.
-/// All members are structural types (no std::optional, no pointers, etc.).
-struct VectorAddKernel
-{
-    int block_tile;        // Elements per thread block (for grid calculation)
-    int thread_block_size; // Threads per block (= warp_size * block_warps)
-    DataType in_dtype;     // Input storage type (a, b)
-    DataType out_dtype;    // Output storage type (c)
-    int block_warps;       // Warps per block
-    int warp_tile;         // Warp tile size
-    bool pad;              // Padding enabled
-};
-
-/// Check if problem size N is aligned to a variant's block_tile (no padding needed).
-constexpr bool isAligned(VectorAddKernel k, int n) { return n > 0 && n % k.block_tile == 0; }
-
 // ============================================================================
-// make_kernel: operator-centric Signature → VectorAddKernel
+// make_kernel: operator-centric Signature -> VectorAddKernel
 // ============================================================================
 
 /// Resolve and validate a vector add using the operator-centric Signature.

@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "rocm_vector_add_api.hpp"
+#include "rocm_vector_add_kernel.hpp"
 
 #include <rocm_ck/ck_type_map.hpp>
 
