@@ -191,22 +191,33 @@ host executable  (variant selection → hipModuleLoadData → hipModuleLaunchKer
 experimental/rocm_ck/
 ├── CMakeLists.txt                  # Top-level (delegates to include/ and examples)
 ├── README.md
-├── include/                        # Shared host-side headers (header-only)
+├── include/                        # Shared headers (header-only)
 │   ├── CMakeLists.txt              # INTERFACE library target "rocm_ck"
 │   └── rocm_ck/
-│       ├── hip_check.hpp           # HIP_CHECK error-checking macro
-│       ├── gpu_arch.hpp            # get_gpu_arch() — GPU architecture detection
-│       ├── datatype_utils.hpp      # DataType enum, type conversions, tolerances
-│       ├── types.hpp               # Common types: index_t, warp_size
-│       ├── typed_buffer.hpp        # TypedBuffer wrapper for host memory
-│       ├── kpack_module.hpp        # RAII wrappers for kpack and HIP module handles
-│       ├── ck_type_map.hpp         # DataType enum to CK Tile type mapping
+│       │ # Types — pure definitions, no runtime, no CK deps
+│       ├── types.hpp               # index_t, warp_size
+│       ├── datatype_utils.hpp      # DataType enum, data_type_bits(), data_type_name()
 │       ├── layout.hpp              # Layout enum (Row, Col, Contiguous, Auto)
 │       ├── tensor_desc.hpp         # TensorDesc: name, dtype, rank, layout
-│       ├── ops.hpp                 # Operator structs (GemmOp, AddOp, ReluOp, ...) + Op variant
-│       ├── args.hpp                # Generic Args, TensorArg, ScalarValue (kernarg ABI)
-│       ├── signature.hpp           # Tensor, Scalar, Signature (compute graph)
-│       └── resolve.hpp             # consteval resolve(): dtype cascade, rank/layout propagation
+│       ├── physical_tensor.hpp     # TensorName, PhysicalTensor (consteval, NTTP-safe)
+│       │
+│       │ # ABI — shared host/device interface
+│       ├── args.hpp                # Args, TensorArg, ScalarValue (kernarg ABI, 1408 bytes)
+│       │
+│       │ # Metaprogramming — compile-time logic, no runtime
+│       ├── ops.hpp                 # Operator structs (GemmOp, AddOp, ...) + Op variant
+│       ├── signature.hpp           # Tensor, Scalar, Signature (compute graph schema)
+│       ├── resolve.hpp             # consteval resolve(): dtype cascade, rank/layout propagation
+│       │
+│       │ # Host-only — requires HIP runtime or C++ runtime features
+│       ├── hip_check.hpp           # HIP_CHECK error-checking macro
+│       ├── gpu_arch.hpp            # get_gpu_arch() — GPU architecture detection
+│       ├── typed_buffer.hpp        # TypedBuffer: RAII device memory with type conversion
+│       ├── datatype_convert.hpp    # float ↔ typed conversions, verification tolerances
+│       ├── kpack_module.hpp        # KpackArchive, KpackKernel RAII wrappers
+│       │
+│       │ # Device-only — requires CK Tile headers (--cuda-device-only)
+│       └── ck_type_map.hpp         # DataType → CK Tile C++ type mapping
 ├── rocm_kpack/                     # Vendored kpack C runtime library (from TheRock)
 │   ├── CMakeLists.txt
 │   ├── include/rocm_kpack/

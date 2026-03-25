@@ -15,6 +15,7 @@
 #include "gemm_api.hpp"
 
 #include <rocm_ck/args.hpp>
+#include <rocm_ck/datatype_convert.hpp>
 #include <rocm_ck/datatype_utils.hpp>
 #include <rocm_ck/hip_check.hpp>
 #include <rocm_ck/kpack_module.hpp>
