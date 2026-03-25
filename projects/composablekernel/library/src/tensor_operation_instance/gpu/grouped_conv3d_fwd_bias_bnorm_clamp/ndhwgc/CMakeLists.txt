@@ -1,0 +1,10 @@
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+
+# NDHWGC layout instances for grouped_conv3d_fwd_bias_bnorm_clamp
+set(GROUPED_CONV3D_FWD_BIAS_BNORM_CLAMP_NDHWGC
+   wmma/large_tensor/device_grouped_conv3d_fwd_bias_bn_clamp_wmma_cshufflev3_large_tensor_ndhwgc_gkzyxc_ndhwgk_bf16_instance.cpp
+   wmma/large_tensor/device_grouped_conv3d_fwd_bias_bn_clamp_wmma_cshufflev3_large_tensor_ndhwgc_gkzyxc_ndhwgk_f16_instance.cpp
+)
+
+add_instance_library(device_grouped_conv3d_fwd_bias_bnorm_clamp_ndhwgc_instance ${GROUPED_CONV3D_FWD_BIAS_BNORM_CLAMP_NDHWGC})
