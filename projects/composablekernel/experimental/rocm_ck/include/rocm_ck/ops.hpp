@@ -28,8 +28,6 @@ struct GemmOp
 };
 
 /// Element-wise addition: out = lhs + rhs.
-/// No default names — slots must be explicitly named to prevent accidental
-/// graph connections when composing with GemmOp (which defaults to A, B, C).
 struct AddOp
 {
     std::string_view lhs;

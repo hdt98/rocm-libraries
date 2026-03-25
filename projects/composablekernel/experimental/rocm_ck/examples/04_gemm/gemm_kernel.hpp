@@ -87,9 +87,9 @@ struct GemmAlgorithm
 /// All members are structural types (enums, ints, aggregates) so this works as NTTP.
 ///
 /// Physical tensor table layout (ordered by args_slot):
-///   [0] = A (GEMM lhs input)
-///   [1] = B (GEMM rhs input)
-///   [2] = output (final output — name varies: "C", "D", or "E" depending on epilogue)
+///   [0] = lhs (GEMM left operand — name is user-chosen, e.g., "A", "Q")
+///   [1] = rhs (GEMM right operand — name is user-chosen, e.g., "B", "K")
+///   [2] = output (final output — name varies by epilogue chain)
 ///   [3] = D0 (optional — first auxiliary tensor, e.g., "bias")
 ///   [4] = D1 (optional — second auxiliary tensor)
 struct GemmKernel
@@ -120,7 +120,13 @@ struct GemmKernel
         return false;
     }
 
-    /// The GEMM output tensor (always at position 2 in the physical tensor table).
+    /// GEMM left operand (position 0 in the physical tensor table).
+    constexpr PhysicalTensor lhs() const { return physical_tensors[0]; }
+
+    /// GEMM right operand (position 1 in the physical tensor table).
+    constexpr PhysicalTensor rhs() const { return physical_tensors[1]; }
+
+    /// GEMM output tensor (position 2 in the physical tensor table).
     /// Name varies by epilogue chain: "C" (plain), "D" (with combine), "E" (with activation).
     constexpr PhysicalTensor output() const { return physical_tensors[2]; }
 };

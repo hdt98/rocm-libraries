@@ -163,9 +163,9 @@ int main(int argc, char** argv)
             continue;
 
         // Allocate typed device buffers from physical tensor table
-        // A = [0], B = [1], output = output(), D0 = [3]
-        rocm_ck::TypedBuffer buf_a(k.physical_tensors[0].dtype, M * K);
-        rocm_ck::TypedBuffer buf_b(k.physical_tensors[1].dtype, K * N);
+        // lhs = lhs(), rhs = rhs(), output = output(), D0 = [3]
+        rocm_ck::TypedBuffer buf_a(k.lhs().dtype, M * K);
+        rocm_ck::TypedBuffer buf_b(k.rhs().dtype, K * N);
         rocm_ck::TypedBuffer buf_c(k.output().dtype, M * N);
 
         buf_a.upload(ref_a.data());
@@ -190,13 +190,13 @@ int main(int argc, char** argv)
                     grid_size,
                     k.thread_block_size);
 
-        // Build generic Args — slot indices from physical tensor table
+        // Build generic Args — slot indices from role-based accessors
         rocm_ck::Args kernel_args{};
-        // A [M x K] RowMajor
-        kernel_args.tensors[k.physical_tensors[0].args_slot] = {
+        // lhs [M x K] RowMajor
+        kernel_args.tensors[k.lhs().args_slot] = {
             buf_a.ptr(), {M, K, 0, 0, 0, 0}, {stride_A, 1, 0, 0, 0, 0}};
-        // B [K x N] ColumnMajor
-        kernel_args.tensors[k.physical_tensors[1].args_slot] = {
+        // rhs [K x N] ColumnMajor
+        kernel_args.tensors[k.rhs().args_slot] = {
             buf_b.ptr(), {K, N, 0, 0, 0, 0}, {1, stride_B, 0, 0, 0, 0}};
         // Output [M x N] RowMajor
         kernel_args.tensors[k.output().args_slot] = {

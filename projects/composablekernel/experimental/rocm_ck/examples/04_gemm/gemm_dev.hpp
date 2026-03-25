@@ -119,7 +119,7 @@ struct EpilogueTypes
 {
     using Op = ComposedCDEOp<K>;
 
-    // D tensor count: physical tensors beyond A(0), B(1), output(2)
+    // D tensor count: physical tensors beyond lhs(0), rhs(1), output(2)
     static constexpr int NumDTensors = K.num_physical_tensors - 3;
 
     // D0/D1 types from physical tensor table (indices 3 and 4).
@@ -148,8 +148,8 @@ struct EpilogueTypes
 
 /// Device-side GEMM bridge: Args → CK Tile template stack → ck_tile::GemmKernel.
 ///
-/// Tensor slot mapping comes from K.physical_tensors[]:
-///   [0] = A,  [1] = B,  [2] = output (C/D/E),  [3] = D0 (optional)
+/// Tensor slot mapping comes from K's role-based accessors:
+///   lhs() = left operand,  rhs() = right operand,  output() = final output,  [3] = D0 (optional)
 ///   lengths[0] = first dim, lengths[1] = second dim
 ///   strides follow dimension order (RowMajor: strides[0]=ld, ColMajor: strides[1]=ld)
 ///
@@ -161,29 +161,29 @@ __device__ void runGemm(Args args)
 {
     // Device-side validation — catches invalid manual construction.
     static_assert(K.num_physical_tensors >= 3,
-                  "kernel must have at least A, B, and output tensors");
+                  "kernel must have at least lhs, rhs, and output tensors");
     static_assert(K.thread_block_size > 0, "thread_block_size must be positive");
     static_assert(EpilogueTypes<K>::NumDTensors <= 1,
                   "at most 1 D tensor supported in this example");
 
-    // Physical tensor table indices (compile-time constants)
-    static constexpr auto PT_A   = K.physical_tensors[0]; // A
-    static constexpr auto PT_B   = K.physical_tensors[1]; // B
-    static constexpr auto PT_OUT = K.physical_tensors[2]; // output
+    // Physical tensor table: role-based access (compile-time constants)
+    static constexpr auto PT_LHS = K.lhs();    // GEMM left operand
+    static constexpr auto PT_RHS = K.rhs();    // GEMM right operand
+    static constexpr auto PT_OUT = K.output(); // final output
 
     // --- Map schema types to CK Tile types ---
-    using AType   = typename CkTypeMap<PT_A.dtype>::type;
-    using BType   = typename CkTypeMap<PT_B.dtype>::type;
+    using AType   = typename CkTypeMap<PT_LHS.dtype>::type;
+    using BType   = typename CkTypeMap<PT_RHS.dtype>::type;
     using AccType = typename CkTypeMap<K.acc_dtype>::type;
     using OType   = typename CkTypeMap<PT_OUT.dtype>::type;
 
-    using ALayout = typename CkLayoutMap<PT_A.layout>::type;
-    using BLayout = typename CkLayoutMap<PT_B.layout>::type;
+    using ALayout = typename CkLayoutMap<PT_LHS.layout>::type;
+    using BLayout = typename CkLayoutMap<PT_RHS.layout>::type;
     using CLayout = typename CkLayoutMap<PT_OUT.layout>::type;
 
     // --- Unpack generic Args — compiler generates s_load at fixed offsets ---
-    const TensorArg& t_a = args.tensors[PT_A.args_slot];
-    const TensorArg& t_b = args.tensors[PT_B.args_slot];
+    const TensorArg& t_a = args.tensors[PT_LHS.args_slot];
+    const TensorArg& t_b = args.tensors[PT_RHS.args_slot];
     const TensorArg& t_c = args.tensors[PT_OUT.args_slot];
 
     index_t M     = t_a.lengths[0];
@@ -193,9 +193,9 @@ __device__ void runGemm(Args args)
     // Leading dimension stride depends on layout:
     //   RowMajor → strides[0],  ColMajor → strides[1]
     index_t stride_A =
-        static_cast<index_t>(PT_A.layout == Layout::Row ? t_a.strides[0] : t_a.strides[1]);
+        static_cast<index_t>(PT_LHS.layout == Layout::Row ? t_a.strides[0] : t_a.strides[1]);
     index_t stride_B =
-        static_cast<index_t>(PT_B.layout == Layout::Row ? t_b.strides[0] : t_b.strides[1]);
+        static_cast<index_t>(PT_RHS.layout == Layout::Row ? t_b.strides[0] : t_b.strides[1]);
     index_t stride_C =
         static_cast<index_t>(PT_OUT.layout == Layout::Row ? t_c.strides[0] : t_c.strides[1]);
 
