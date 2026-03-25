@@ -7,6 +7,7 @@
 #include <hipdnn_test_sdk/utilities/FlatbufferGraphTestUtils.hpp>
 
 #include "SdpaKernelEngine.hpp"
+#include "SdpaKernelGraphCreation.hpp"
 #include "SdpaKernelHandle.hpp"
 #include "SdpaKernelPlanBuilder.hpp"
 
@@ -44,15 +45,7 @@ TEST_F(TestSdpaKernelEngine, IsApplicableReturnsTrueForSdpaGraph)
     using namespace hipdnn_data_sdk::utilities;
 
     std::vector<int64_t> dims = {4, 8, 256, 128};
-    auto builder = hipdnn_test_sdk::utilities::createValidSdpaFpropGraph(dims,
-                                                                         generateStrides(dims),
-                                                                         dims,
-                                                                         generateStrides(dims),
-                                                                         dims,
-                                                                         generateStrides(dims),
-                                                                         dims,
-                                                                         generateStrides(dims),
-                                                                         DataType::BFLOAT16);
+    auto builder = createValidSdpaFpropGraph();
 
     hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(builder.GetBufferPointer(),
                                                                      builder.GetSize());

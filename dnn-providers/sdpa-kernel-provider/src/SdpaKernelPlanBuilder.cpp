@@ -50,7 +50,7 @@ bool SdpaKernelPlanBuilder::isApplicable(
     SDPA_PROVIDER_RETURN_FALSE_IF(attrs.right_bound().has_value(), "right_bound must be unset");
     SDPA_PROVIDER_RETURN_FALSE_IF(attrs.dropout_probability().has_value()
                                       && attrs.dropout_probability().value() != 0.f,
-                                  "Dropout probability must be unset or zero (Actual value: {})",
+                                  "dropout_probability must be unset or zero (Actual value: {})",
                                   attrs.dropout_probability().value());
     SDPA_PROVIDER_RETURN_FALSE_IF(attrs.alibi_mask(), "alibi_mask must be false");
     SDPA_PROVIDER_RETURN_FALSE_IF(attrs.padding_mask(), "padding_mask must be false");
