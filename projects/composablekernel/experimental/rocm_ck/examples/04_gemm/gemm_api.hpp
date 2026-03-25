@@ -22,38 +22,38 @@
 namespace rocm_ck {
 
 // ============================================================================
-// Epilogue: CombineOp × Activation (internal representation)
+// Epilogue operations (composable chain)
 // ============================================================================
 
-/// How to combine D tensors with the matmul result.
+/// Epilogue operations applied after the GEMM matmul result.
 ///
-///   None     — E = A * B                    (no D tensors)
-///   Add      — E = A * B + D0 [+ D1]       (bias addition)
-///   Multiply — E = A * B * D0 [* D1]       (scaling)
-enum class CombineOp
-{
-    None,
-    Add,
-    Multiply
-};
-
-/// Fused activation applied after the combine step.
+/// Binary ops (Add, Mul) fold over D tensors via parameter pack:
+///   Add — result += D0 [+ D1]     (bias addition)
+///   Mul — result *= D0 [* D1]     (scaling)
 ///
-///   None     — identity (no activation)
+/// Unary ops transform the accumulator in place:
 ///   Relu     — max(0, x)
 ///   FastGelu — approximate GELU: x * sigmoid(1.702 * x)
 ///   Gelu     — exact GELU: 0.5 * x * (1 + erf(x / sqrt(2)))
 ///   Silu     — x * sigmoid(x)  (aka Swish with beta=1)
 ///   Sigmoid  — 1 / (1 + exp(-x))
-enum class Activation
+///
+/// Operations compose as an ordered sequence in GemmKernel::epilogue_ops[].
+/// The Signature's operator chain (AddOp → ReluOp) maps directly to this
+/// array, minus the string names (which aren't structural types for NTTP).
+enum class EpilogueOp
 {
-    None,
+    Add,
+    Mul,
     Relu,
     FastGelu,
     Gelu,
     Silu,
     Sigmoid
 };
+
+/// Maximum epilogue ops in a chain. 4 covers combine + activation + future ops.
+inline constexpr int kMaxEpilogueOps = 4;
 
 // ============================================================================
 // Tile geometry types
@@ -135,9 +135,20 @@ struct GemmKernel
     Dim3 warp_tile;
     int thread_block_size;
 
-    // Epilogue composition
-    CombineOp combine;
-    Activation activation;
+    // Epilogue: composable op chain applied after matmul
+    int num_epilogue_ops;
+    std::array<EpilogueOp, kMaxEpilogueOps> epilogue_ops;
+
+    /// Check if the epilogue chain contains a specific op.
+    /// constexpr (not consteval) because this is called at both compile time
+    /// (static_asserts) and runtime (host-side variant iteration).
+    constexpr bool has_epilogue_op(EpilogueOp op) const
+    {
+        for(int i = 0; i < num_epilogue_ops; ++i)
+            if(epilogue_ops[i] == op)
+                return true;
+        return false;
+    }
 
     /// Compile-time slot lookup by name. Compile error if not a physical tensor.
     consteval int slot(std::string_view name) const
@@ -173,12 +184,12 @@ struct GemmKernel
 
 /// Resolve and validate a GEMM using the operator-centric Signature.
 ///
-/// Pattern-matches the ops array to determine epilogue:
-///   {GemmOp}                          -> no epilogue
-///   {GemmOp, AddOp}                   -> CombineOp::Add, 1 D tensor
-///   {GemmOp, AddOp, ReluOp/...}       -> CombineOp::Add + activation
-///   {GemmOp, MulOp}                   -> CombineOp::Multiply, 1 D tensor
-///   {GemmOp, ReluOp/...}              -> activation only, no D tensors
+/// Pattern-matches the ops array to build the epilogue_ops chain:
+///   {GemmOp}                          -> epilogue_ops = {}
+///   {GemmOp, AddOp}                   -> epilogue_ops = {Add}
+///   {GemmOp, AddOp, ReluOp}           -> epilogue_ops = {Add, Relu}
+///   {GemmOp, MulOp}                   -> epilogue_ops = {Mul}
+///   {GemmOp, ReluOp}                  -> epilogue_ops = {Relu}
 ///
 /// The D tensor is the rhs of the AddOp/MulOp (the "bias" or "scale" operand).
 /// c_dtype comes from the GemmOp output tensor.
@@ -204,10 +215,10 @@ consteval GemmKernel make_kernel(Signature sig, GemmAlgorithm algo)
     TensorDesc c_td = resolved.tensor(gemm.out);
     DataType acc    = gemm.acc_dtype;
 
-    // Pattern-match epilogue from remaining ops.
+    // Build epilogue op chain from remaining ops after GemmOp.
     // Track the final output name (varies by epilogue chain) and D tensor names.
-    CombineOp combine             = CombineOp::None;
-    Activation activation         = Activation::None;
+    int num_epi_ops = 0;
+    std::array<EpilogueOp, kMaxEpilogueOps> epi_ops{};
     std::string_view final_output = gemm.out; // "C" by default
     int num_d_tensors             = 0;
     std::string_view d0_name;
@@ -216,63 +227,63 @@ consteval GemmKernel make_kernel(Signature sig, GemmAlgorithm algo)
 
     int next_op = 1;
 
-    // Check for combine op (AddOp or MulOp after GemmOp)
+    // Binary ops: AddOp or MulOp — consumes a D tensor
     if(next_op < kMaxOps && std::holds_alternative<AddOp>(sig.ops[next_op]))
     {
-        const AddOp& add = std::get<AddOp>(sig.ops[next_op]);
-        combine          = CombineOp::Add;
-        num_d_tensors    = 1;
-        d0_name          = add.rhs;
-        TensorDesc d0_td = resolved.tensor(d0_name);
-        d0_dtype         = d0_td.dtype;
-        d0_layout        = d0_td.layout != Layout::Auto ? d0_td.layout : Layout::Row;
-        final_output     = add.out;
+        const AddOp& add       = std::get<AddOp>(sig.ops[next_op]);
+        epi_ops[num_epi_ops++] = EpilogueOp::Add;
+        num_d_tensors          = 1;
+        d0_name                = add.rhs;
+        TensorDesc d0_td       = resolved.tensor(d0_name);
+        d0_dtype               = d0_td.dtype;
+        d0_layout              = d0_td.layout != Layout::Auto ? d0_td.layout : Layout::Row;
+        final_output           = add.out;
         next_op++;
     }
     else if(next_op < kMaxOps && std::holds_alternative<MulOp>(sig.ops[next_op]))
     {
-        const MulOp& mul = std::get<MulOp>(sig.ops[next_op]);
-        combine          = CombineOp::Multiply;
-        num_d_tensors    = 1;
-        d0_name          = mul.rhs;
-        TensorDesc d0_td = resolved.tensor(d0_name);
-        d0_dtype         = d0_td.dtype;
-        d0_layout        = d0_td.layout != Layout::Auto ? d0_td.layout : Layout::Row;
-        final_output     = mul.out;
+        const MulOp& mul       = std::get<MulOp>(sig.ops[next_op]);
+        epi_ops[num_epi_ops++] = EpilogueOp::Mul;
+        num_d_tensors          = 1;
+        d0_name                = mul.rhs;
+        TensorDesc d0_td       = resolved.tensor(d0_name);
+        d0_dtype               = d0_td.dtype;
+        d0_layout              = d0_td.layout != Layout::Auto ? d0_td.layout : Layout::Row;
+        final_output           = mul.out;
         next_op++;
     }
 
-    // Check for activation (unary op after combine or directly after GemmOp)
+    // Unary ops: activations applied after binary combine
     if(next_op < kMaxOps)
     {
         if(std::holds_alternative<ReluOp>(sig.ops[next_op]))
         {
-            final_output = std::get<ReluOp>(sig.ops[next_op]).out;
-            activation   = Activation::Relu;
+            final_output           = std::get<ReluOp>(sig.ops[next_op]).out;
+            epi_ops[num_epi_ops++] = EpilogueOp::Relu;
             next_op++;
         }
         else if(std::holds_alternative<FastGeluOp>(sig.ops[next_op]))
         {
-            final_output = std::get<FastGeluOp>(sig.ops[next_op]).out;
-            activation   = Activation::FastGelu;
+            final_output           = std::get<FastGeluOp>(sig.ops[next_op]).out;
+            epi_ops[num_epi_ops++] = EpilogueOp::FastGelu;
             next_op++;
         }
         else if(std::holds_alternative<GeluOp>(sig.ops[next_op]))
         {
-            final_output = std::get<GeluOp>(sig.ops[next_op]).out;
-            activation   = Activation::Gelu;
+            final_output           = std::get<GeluOp>(sig.ops[next_op]).out;
+            epi_ops[num_epi_ops++] = EpilogueOp::Gelu;
             next_op++;
         }
         else if(std::holds_alternative<SiluOp>(sig.ops[next_op]))
         {
-            final_output = std::get<SiluOp>(sig.ops[next_op]).out;
-            activation   = Activation::Silu;
+            final_output           = std::get<SiluOp>(sig.ops[next_op]).out;
+            epi_ops[num_epi_ops++] = EpilogueOp::Silu;
             next_op++;
         }
         else if(std::holds_alternative<SigmoidOp>(sig.ops[next_op]))
         {
-            final_output = std::get<SigmoidOp>(sig.ops[next_op]).out;
-            activation   = Activation::Sigmoid;
+            final_output           = std::get<SigmoidOp>(sig.ops[next_op]).out;
+            epi_ops[num_epi_ops++] = EpilogueOp::Sigmoid;
             next_op++;
         }
     }
@@ -326,8 +337,8 @@ consteval GemmKernel make_kernel(Signature sig, GemmAlgorithm algo)
             algo.block_warps,
             algo.warp_tile,
             thread_block_size,
-            combine,
-            activation};
+            num_epi_ops,
+            epi_ops};
 }
 
 // ============================================================================
@@ -374,7 +385,7 @@ static_assert(make_kernel(
     GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).thread_block_size == 256);
 static_assert(make_kernel(
     Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).combine == CombineOp::None);
+    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).num_epilogue_ops == 0);
 
 // --- make_kernel: GEMM + Add — output is "D", D0 is "bias" ---
 
@@ -382,7 +393,7 @@ static_assert(make_kernel(
     Signature{.dtype = DataType::FP16,
               .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
-    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).combine == CombineOp::Add);
+    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).epilogue_ops[0] == EpilogueOp::Add);
 static_assert(make_kernel(
     Signature{.dtype = DataType::FP16,
               .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
@@ -411,7 +422,19 @@ static_assert(make_kernel(
               .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
                       ReluOp{.in = "D", .out = "E"}}},
-    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).activation == Activation::Relu);
+    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).num_epilogue_ops == 2);
+static_assert(make_kernel(
+    Signature{.dtype = DataType::FP16,
+              .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                      AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                      ReluOp{.in = "D", .out = "E"}}},
+    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).has_epilogue_op(EpilogueOp::Add));
+static_assert(make_kernel(
+    Signature{.dtype = DataType::FP16,
+              .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                      AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                      ReluOp{.in = "D", .out = "E"}}},
+    GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}}).has_epilogue_op(EpilogueOp::Relu));
 static_assert(make_kernel(
     Signature{.dtype = DataType::FP16,
               .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
