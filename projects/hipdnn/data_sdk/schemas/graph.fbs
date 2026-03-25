@@ -1,4 +1,4 @@
-// Copyright © Advanced Micro Devices, Inc., or its affiliates.
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
 include "data_types.fbs";
@@ -17,10 +17,11 @@ include "rmsnorm_attributes.fbs";
 include "block_scale_dequantize_attributes.fbs";
 include "block_scale_quantize_attributes.fbs";
 include "sdpa_attributes.fbs";
+include "sdpa_backward_attributes.fbs";
 
 namespace hipdnn_data_sdk.data_objects;
 
-union NodeAttributes {BatchnormInferenceAttributes, PointwiseAttributes, BatchnormBackwardAttributes, BatchnormAttributes, ConvolutionFwdAttributes, ConvolutionBwdAttributes, ConvolutionWrwAttributes, BatchnormInferenceAttributesVarianceExt, MatmulAttributes, RMSNormAttributes, LayernormAttributes, SdpaAttributes, BlockScaleDequantizeAttributes, BlockScaleQuantizeAttributes}
+union NodeAttributes {BatchnormInferenceAttributes, PointwiseAttributes, BatchnormBackwardAttributes, BatchnormAttributes, ConvolutionFwdAttributes, ConvolutionBwdAttributes, ConvolutionWrwAttributes, BatchnormInferenceAttributesVarianceExt, MatmulAttributes, RMSNormAttributes, LayernormAttributes, SdpaAttributes, BlockScaleDequantizeAttributes, BlockScaleQuantizeAttributes, SdpaBackwardAttributes}
 
 table Node {
 	name: string;

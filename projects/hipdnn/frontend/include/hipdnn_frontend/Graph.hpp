@@ -1,4 +1,4 @@
-// Copyright © Advanced Micro Devices, Inc., or its affiliates.
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
 /**
@@ -82,6 +82,7 @@
 #include <hipdnn_frontend/attributes/PointwiseAttributes.hpp>
 #include <hipdnn_frontend/attributes/RMSNormAttributes.hpp>
 #include <hipdnn_frontend/attributes/SdpaAttributes.hpp>
+#include <hipdnn_frontend/attributes/SdpaBackwardAttributes.hpp>
 #include <hipdnn_frontend/detail/BackendWrapper.hpp>
 #include <hipdnn_frontend/detail/CreateBackendDescriptor.hpp>
 #include <hipdnn_frontend/detail/EngineOverrideUtils.hpp>
@@ -104,6 +105,7 @@
 #include <hipdnn_frontend/node/Node.hpp>
 #include <hipdnn_frontend/node/PointwiseNode.hpp>
 #include <hipdnn_frontend/node/RMSNormNode.hpp>
+#include <hipdnn_frontend/node/SdpaBpropNode.hpp>
 #include <hipdnn_frontend/node/SdpaFpropNode.hpp>
 #include <hipdnn_frontend/node/detail/TopologicalSortingUtils.hpp>
 #ifndef HIPDNN_FRONTEND_SKIP_JSON_LIB
@@ -747,6 +749,18 @@ private:
                     }
                     _sub_nodes.emplace_back(std::make_shared<BlockScaleQuantizeNode>(
                         std::move(attr), graph_attributes));
+                    break;
+                }
+                case hipdnn_data_sdk::data_objects::NodeAttributes::SdpaBackwardAttributes:
+                {
+                    auto attr = SdpaBackwardAttributes::fromFlatBuffer(
+                        fbNode->attributes_as_SdpaBackwardAttributes(), tensorMap);
+                    if(fbNode->name() != nullptr)
+                    {
+                        attr.set_name(fbNode->name()->str());
+                    }
+                    _sub_nodes.emplace_back(
+                        std::make_shared<SdpaBpropNode>(std::move(attr), graph_attributes));
                     break;
                 }
                 default:
@@ -2041,6 +2055,103 @@ public:
         return ret;
     }
 
+    /** @brief Scaled dot-product attention backward pass
+     *
+     * Computes gradients dQ, dK, dV for the backward pass of SDPA:
+     * @code
+     * Attention(Q, K, V) = softmax(Q * K^T / sqrt(d_k)) * V
+     * @endcode
+     *
+     * Requires softmax statistics (logsumexp) from the forward pass, which
+     * are generated when the forward pass is configured with
+     * `set_generate_stats(true)`.
+     *
+     * @param q Query tensor from forward pass [B, H, S_q, D]
+     * @param k Key tensor from forward pass [B, H, S_kv, D]
+     * @param v Value tensor from forward pass [B, H, S_kv, D]
+     * @param o Output tensor from forward pass [B, H, S_q, D]
+     * @param dO Upstream gradient tensor [B, H, S_q, D]
+     * @param stats Softmax statistics (logsumexp) from forward pass [B, H, S_q, 1]
+     * @param attributes Configuration: masking, dropout, attention scale
+     * @return Array of 3 output tensors:
+     *         - [0] dQ: Gradient w.r.t. query [B, H, S_q, D]
+     *         - [1] dK: Gradient w.r.t. key [B, H, S_kv, D]
+     *         - [2] dV: Gradient w.r.t. value [B, H, S_kv, D]
+     *
+     * @see SdpaBackwardAttributes, SdpaAttributes
+     */
+    std::array<std::shared_ptr<TensorAttributes>, 3>
+        sdpa_backward(std::shared_ptr<TensorAttributes> q, // NOLINT
+                      std::shared_ptr<TensorAttributes> k,
+                      std::shared_ptr<TensorAttributes> v,
+                      std::shared_ptr<TensorAttributes> o,
+                      std::shared_ptr<TensorAttributes> dO,
+                      std::shared_ptr<TensorAttributes> stats,
+                      SdpaBackwardAttributes attributes)
+    {
+        if(attributes.get_name().empty())
+        {
+            attributes.set_name("SdpaBprop_" + std::to_string(_sub_nodes.size()));
+        }
+        if(q->get_name().empty())
+        {
+            q->set_name(attributes.get_name() + "::Q");
+        }
+        if(k->get_name().empty())
+        {
+            k->set_name(attributes.get_name() + "::K");
+        }
+        if(v->get_name().empty())
+        {
+            v->set_name(attributes.get_name() + "::V");
+        }
+        if(dO->get_name().empty())
+        {
+            dO->set_name(attributes.get_name() + "::dO");
+        }
+
+        auto dq = outputTensor(attributes.get_name() + "::dQ");
+        auto dk = outputTensor(attributes.get_name() + "::dK");
+        auto dv = outputTensor(attributes.get_name() + "::dV");
+
+        attributes.set_q(std::move(q));
+        attributes.set_k(std::move(k));
+        attributes.set_v(std::move(v));
+        attributes.set_o(std::move(o));
+        attributes.set_do(std::move(dO));
+        attributes.set_stats(std::move(stats));
+        attributes.set_dq(dq);
+        attributes.set_dk(dk);
+        attributes.set_dv(dv);
+
+        _sub_nodes.emplace_back(
+            std::make_shared<SdpaBpropNode>(std::move(attributes), graph_attributes));
+
+        return {dq, dk, dv};
+    }
+
+    /** @brief Convolution forward pass
+     *
+     * Computes a cross-correlation (or convolution) of the input with filters.
+     *
+     * Example for 2D (using NCHW notation for illustration):
+     * @code
+     * y[n,k,oh,ow] = sum_c,r,s  x[n, c, oh*stride_h + r*dilation_h - pad_h,
+     *                                     ow*stride_w + s*dilation_w - pad_w]
+     *                           * w[k, c, r, s]
+     *
+     * output_dim = floor((input + pad_before + pad_after
+     *              - dilation * (kernel - 1) - 1) / stride) + 1
+     * @endcode
+     *
+     * @param x Input activation tensor (batch, channels, spatial dimensions)
+     * @param w Filter/weight tensor (output channels, input channels, filter spatial dims)
+     * @param attributes Convolution parameters: padding, stride, dilation,
+     *        convolution mode
+     * @return y: Output activation tensor
+     *
+     * @see ConvFpropAttributes
+     */
     // NOLINTBEGIN(readability-identifier-naming)
     std::shared_ptr<TensorAttributes> conv_fprop(std::shared_ptr<TensorAttributes> x,
                                                  std::shared_ptr<TensorAttributes> w,
