@@ -4,17 +4,17 @@
     "tile_config": {
         "tile_m": {
             "max": 256,
-            "min": 64,
+            "min": 128,
             "step": 64
         },
         "tile_n": {
             "max": 256,
-            "min": 64,
+            "min": 128,
             "step": 64
         },
         "tile_k": {
             "max": 256,
-            "min": 64,
+            "min": 128,
             "step": 64
         },
         "warp_m": {
