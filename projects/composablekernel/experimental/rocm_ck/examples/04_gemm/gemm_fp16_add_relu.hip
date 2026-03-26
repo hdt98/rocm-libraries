@@ -19,5 +19,5 @@ static constexpr rocm_ck::GemmSpec spec = rocm_ck::make_kernel(
 
 extern "C" __global__ void gemm_fp16_add_relu(rocm_ck::Args args)
 {
-    rocm_ck::runGemm<spec>(args);
+    rocm_ck::run<spec>(args);
 }

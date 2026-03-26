@@ -14,5 +14,5 @@ static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_kernel(
 
 extern "C" __global__ void vector_add_fp16_b512(rocm_ck::Args args)
 {
-    rocm_ck::runVectorAdd<spec>(args);
+    rocm_ck::run<spec>(args);
 }

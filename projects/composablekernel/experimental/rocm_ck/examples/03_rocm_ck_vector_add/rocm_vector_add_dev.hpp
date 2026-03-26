@@ -39,7 +39,7 @@ namespace rocm_ck {
 ///
 /// Call this from an extern "C" __global__ wrapper.
 template <ElementwiseSpec S>
-__device__ void runVectorAdd(Args args)
+__device__ void run(Args args)
 {
     // Device-side validation — catches invalid manual construction.
     static_assert(S.block_tile > 0, "block_tile must be positive");

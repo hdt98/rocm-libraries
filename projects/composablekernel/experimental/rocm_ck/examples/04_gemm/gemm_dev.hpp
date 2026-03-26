@@ -7,11 +7,11 @@
 // This header must NOT be included from host-only .cpp files.
 //
 // Maps GemmSpec (our schema) -> CK Tile template stack (7 types).
-// Each .hip variant file includes this header and instantiates runGemm<S>
+// Each .hip variant file includes this header and instantiates run<S>
 // with a specific constexpr GemmSpec.
 //
 // CkLayoutMap: Layout enum   -> CK Tile layout tag (RowMajor, ColumnMajor)
-// runGemm<S>:  wires the full CK Tile GEMM pipeline from K's types/layouts
+// run<S>:  wires the full CK Tile GEMM pipeline from K's types/layouts
 //
 // Tile geometry is parameterized through GemmSpec fields, validated by
 // make_kernel() against CK Tile's WarpGemmDispatcher table.
@@ -143,7 +143,7 @@ struct EpilogueTypes
 };
 
 // ============================================================================
-// runGemm<S>: assemble CK Tile GEMM pipeline from GemmSpec descriptor
+// run<S>: assemble CK Tile GEMM pipeline from GemmSpec descriptor
 // ============================================================================
 
 /// Device-side GEMM bridge: Args → CK Tile template stack → ck_tile::GemmKernel.
@@ -157,7 +157,7 @@ struct EpilogueTypes
 /// partitioner, epilogue, kernel) with types and layouts from the GemmSpec
 /// NTTP. Tile geometry comes from GemmSpec fields (validated at compile time).
 template <GemmSpec S>
-__device__ void runGemm(Args args)
+__device__ void run(Args args)
 {
     // Device-side validation — catches invalid manual construction.
     static_assert(S.num_physical_tensors >= 3,
