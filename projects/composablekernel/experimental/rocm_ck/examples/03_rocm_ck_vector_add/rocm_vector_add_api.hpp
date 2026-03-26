@@ -19,7 +19,7 @@
 #error "rocm_vector_add_api.hpp is host-only. Device code should include rocm_vector_add_dev.hpp."
 #endif
 
-#include "elementwise_spec.hpp"
+#include <rocm_ck/elementwise_spec.hpp>
 
 namespace rocm_ck {
 

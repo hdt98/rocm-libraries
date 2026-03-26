@@ -1,7 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-#include "rocm_vector_add_dev.hpp"
+#include <rocm_ck/elementwise_dev.hpp>
 
 // Widening: FP16 inputs -> FP32 output. Tensor override sets output type.
 // The wider type (FP32) constrains kVectorM to 4 (vs 8 for homogeneous FP16).

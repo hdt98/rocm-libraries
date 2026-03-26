@@ -27,10 +27,9 @@
 #error "gemm_dev.hpp requires device compilation. Host code should include gemm_api.hpp."
 #endif
 
-#include "gemm_spec.hpp"
+#include <rocm_ck/gemm_spec.hpp>
 
 #include <rocm_ck/args.hpp>
-
 #include <rocm_ck/ck_type_map.hpp>
 
 #include "ck_tile/core.hpp"

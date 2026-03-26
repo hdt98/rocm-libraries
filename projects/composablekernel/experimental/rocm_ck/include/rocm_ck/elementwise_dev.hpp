@@ -16,11 +16,12 @@
 
 #ifndef __HIP_DEVICE_COMPILE__
 #error \
-    "rocm_vector_add_dev.hpp requires device compilation. Host code should include rocm_vector_add_api.hpp."
+    "elementwise_dev.hpp requires device compilation. Host code should include the example's api header."
 #endif
 
-#include "elementwise_spec.hpp"
+#include <rocm_ck/elementwise_spec.hpp>
 
+#include <rocm_ck/args.hpp>
 #include <rocm_ck/ck_type_map.hpp>
 
 #include "ck_tile/core.hpp"

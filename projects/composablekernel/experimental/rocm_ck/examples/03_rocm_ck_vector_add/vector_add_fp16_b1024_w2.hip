@@ -1,7 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-#include "rocm_vector_add_dev.hpp"
+#include <rocm_ck/elementwise_dev.hpp>
 
 // Multi-warp FP16: 2 warps x 64 = 128 threads, same block_tile as fp16_b1024.
 // Larger warp_tile (512) preserves kVectorM=8 (max for 16-bit). Compare with

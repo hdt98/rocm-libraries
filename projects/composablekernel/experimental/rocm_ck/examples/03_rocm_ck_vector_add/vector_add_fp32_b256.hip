@@ -1,7 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-#include "rocm_vector_add_dev.hpp"
+#include <rocm_ck/elementwise_dev.hpp>
 
 // Baseline single-warp FP32 variant. Smallest tile in the set.
 // Geometry: kVectorM=4 (128-bit / 32-bit), kRepeatM=1, 64 threads.

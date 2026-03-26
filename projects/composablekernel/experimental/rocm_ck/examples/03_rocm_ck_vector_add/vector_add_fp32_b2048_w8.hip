@@ -1,7 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-#include "rocm_vector_add_dev.hpp"
+#include <rocm_ck/elementwise_dev.hpp>
 
 // Multi-warp FP32: 8 warps x 64 = 512 threads, 2048 elements per block.
 // Small warp_tile (64) forces kVectorM=1 (minimum vectorization) — contrast
