@@ -743,6 +743,20 @@ struct GroupedConvolutionBackwardDataKernel
                 return false;
             }
         }
+
+        if(is_gfx11_supported() || is_gfx12_supported())
+        {
+            if(!check_wmma_supported<OutDataType,
+                                     WeiDataType,
+                                     float,
+                                     GemmPipeline::BlockGemmShape::WarpTile::at(I0),
+                                     GemmPipeline::BlockGemmShape::WarpTile::at(I1),
+                                     GemmPipeline::BlockGemmShape::WarpTile::at(I2)>())
+            {
+                return false;
+            }
+        }
+
         if constexpr(GroupedConvTraitsType_::VectorSizeC % 2 != 0 &&
                      is_any_of<InDataType, fp16_t, bf16_t>::value)
         {

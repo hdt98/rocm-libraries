@@ -124,7 +124,7 @@ run_grouped_conv_forward_tile_algs(const ckt::Args<SIGNATURE>& args,
         }
         else
         {
-            std::cout << " " << op_name << std::endl;
+            std::cout << "[Not supported] " << op_name << std::endl;
         }
     };
 

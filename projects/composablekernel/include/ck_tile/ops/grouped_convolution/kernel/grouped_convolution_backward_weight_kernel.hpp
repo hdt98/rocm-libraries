@@ -539,6 +539,20 @@ struct GroupedConvolutionBackwardWeightKernel
                 return false;
             }
         }
+
+        if(is_gfx11_supported() || is_gfx12_supported())
+        {
+            if(!check_wmma_supported<OutDataType,
+                                     InDataType,
+                                     float,
+                                     GemmPipeline::BlockGemmShape::WarpTile::at(I0),
+                                     GemmPipeline::BlockGemmShape::WarpTile::at(I1),
+                                     GemmPipeline::BlockGemmShape::WarpTile::at(I2)>())
+            {
+                return false;
+            }
+        }
+
         if(kargs.k_batch < 1)
         {
             LogInfo("k_batch must be at least one. Ensure argument is created via MakeKernelArgs.");

@@ -663,6 +663,19 @@ struct GroupedConvolutionForwardKernel
             }
         }
 
+        if(is_gfx11_supported() || is_gfx12_supported())
+        {
+            if(!check_wmma_supported<InDataType,
+                                     WeiDataType,
+                                     float,
+                                     GemmPipeline::BlockGemmShape::WarpTile::at(I0),
+                                     GemmPipeline::BlockGemmShape::WarpTile::at(I1),
+                                     GemmPipeline::BlockGemmShape::WarpTile::at(I2)>())
+            {
+                return false;
+            }
+        }
+
         if constexpr((GroupedConvTraitsType_::VectorSizeC % 2 != 0 &&
                       is_any_of<OutDataType, fp16_t, bf16_t>::value) ||
                      !IsSplitKSupported)
