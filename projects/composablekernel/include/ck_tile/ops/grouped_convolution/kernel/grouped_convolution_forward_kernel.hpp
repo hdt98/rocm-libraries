@@ -892,7 +892,7 @@ struct GroupedConvolutionForwardKernel
         const auto& a_pad_view = pad_tensor_view(
             a_tensor_view,
             make_tuple(number<TilePartitioner::MPerBlock>{}, number<TilePartitioner::KPerBlock>{}),
-            sequence<true, true>{});
+            sequence<false, true>{});
 
         // Step 3: Create tile window
         return make_tile_window(
@@ -912,7 +912,7 @@ struct GroupedConvolutionForwardKernel
         const auto& b_pad_view = pad_tensor_view(
             b_tensor_view,
             make_tuple(number<TilePartitioner::NPerBlock>{}, number<TilePartitioner::KPerBlock>{}),
-            sequence<true, true>{});
+            sequence<false, true>{});
 
         // Step 3: Create tile window
         return make_tile_window(
@@ -948,7 +948,7 @@ struct GroupedConvolutionForwardKernel
                 return pad_tensor_view(ds_tensor_view[i],
                                        make_tuple(number<TilePartitioner::MPerBlock>{},
                                                   number<TilePartitioner::NPerBlock>{}),
-                                       sequence<true, true>{});
+                                       sequence<false, true>{});
             },
             number<NumDTensor>{});
 
@@ -973,11 +973,16 @@ struct GroupedConvolutionForwardKernel
         const auto& c_tensor_view =
             make_tensor_view<address_space_enum::global, DstInMemOp>(c_ptr, c_desc);
 
+        // For bf16_t and atomic_add global_atomic_add is used instead of buffer_atomic_add
+        // Add padding for not continous dim due to the lack of OOB check
+        constexpr bool pad_not_continous_dim =
+            std::is_same_v<InDataType, bf16_t> && DstInMemOp == memory_operation_enum::atomic_add;
+
         // Step 2: Create padded view
         const auto& c_pad_view = pad_tensor_view(
             c_tensor_view,
             make_tuple(number<TilePartitioner::MPerBlock>{}, number<TilePartitioner::NPerBlock>{}),
-            sequence<true, true>{});
+            sequence<pad_not_continous_dim, true>{});
 
         // Step 3: Create tile window
         return make_tile_window(
