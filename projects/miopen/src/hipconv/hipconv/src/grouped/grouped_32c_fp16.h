@@ -1,0 +1,770 @@
+#pragma once
+
+#include "matrix_layout.h"
+#include "swizzle.h"
+#include "detail.h"
+#include "types.h"
+#include "mathutil.h"
+#include "launch_params.h"
+#include "kernel_variant.h"
+#include "transpose_16x16.h"
+#include <hip/hip_fp16.h>
+#include <hip/hip_runtime.h>
+
+namespace grouped_32c
+{
+// 64 threads per wave.
+constexpr int WAVE_SIZE = 64;
+
+// Block output is 16 columns wide.
+constexpr int BLOCK_Q = 16;
+
+// Kernel configuration parameters.
+struct Config
+{
+    int waves_per_wg;
+
+    int kh = 3;
+    int kw = 3;
+
+    int group_size = 32;
+
+    int n_fold = 8;
+
+    hipconv::Direction direction = hipconv::Direction::Fprop;
+
+    constexpr int block_c() const { return group_size * waves_per_wg; }
+
+    constexpr int block_size() const { return waves_per_wg * WAVE_SIZE; }
+};
+
+// All instantiated configurations.
+// Max waves_per_wg = 8; limited by register allocation and LDS
+constexpr Config configs[] = {
+    {.waves_per_wg = 8, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 4, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 3, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 2, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 1, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 8},
+    {.waves_per_wg = 4},
+    {.waves_per_wg = 3},
+    {.waves_per_wg = 2},
+    {.waves_per_wg = 1},
+};
+
+constexpr int NUM_CONFIGS = sizeof(configs) / sizeof(configs[0]);
+
+inline bool is_valid_config(const hipconv::Conv2dParams& par, const Config& cfg)
+{
+    if(par.direction != cfg.direction)
+    {
+        return false;
+    }
+
+    // Require that the number of groups per work-group evenly divides the total number of
+    // workgroups.
+    if((par.groups % cfg.waves_per_wg) != 0)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+inline LaunchParams get_launch_params(int config_idx, const hipconv::Conv2dParams& par)
+{
+    const auto& cfg = configs[config_idx];
+
+    // Compute the grid size.
+    // For Dgrad the output is the input gradient (width = par.w, not par.q).
+    const int out_q    = (cfg.direction == hipconv::Direction::Dgrad) ? par.w : par.q;
+    auto blocks_w      = divup(out_q, BLOCK_Q);
+    auto blocks_w_n    = blocks_w * cfg.n_fold;
+    auto blocks_c      = divup(par.c, cfg.block_c());
+    auto blocks_n_fold = divup(par.n, cfg.n_fold);
+
+    LaunchParams launch;
+    launch.grid       = dim3(blocks_w_n, blocks_c, blocks_n_fold);
+    launch.block_size = dim3(cfg.block_size(), 1, 1);
+    return launch;
+}
+
+} // namespace grouped_32c
+
+
+template <grouped_32c::Config cfg>
+__device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restrict__ in,
+                                                        const _Float16* __restrict__ wei,
+                                                        double alpha,
+                                                        double beta,
+                                                        _Float16* __restrict__ out,
+                                                        int N,
+                                                        int groups,
+                                                        int c_per_group,
+                                                        int k_per_group,
+                                                        int hi,
+                                                        int wi,
+                                                        int ho,
+                                                        int wo,
+                                                        int fy,
+                                                        int fx,
+                                                        int sy,
+                                                        int sx,
+                                                        int dy,
+                                                        int dx,
+                                                        int py,
+                                                        int px)
+{
+    using namespace grouped_32c;
+    // MFMA 16x16x32: operands are fp16x8, result is fp32x4.
+    using OperandLayout = MatrixLayout<16, 32, 1, __half>;
+    using ResultLayout  = MatrixLayout<16, 16, 1, float>;
+    using fp16x8_t      = __attribute__((ext_vector_type(8))) _Float16;
+
+    constexpr int GROUP_SIZE_8 = cfg.group_size / 8; // 4
+    constexpr int GROUP_SIZE_4 = cfg.group_size / 4; // 8
+
+    static_assert(sizeof(uint4) / sizeof(__half) == 8, "Expected 8 halves per uint4 vector");
+
+    // Number of input columns loaded by each workgroup (output columns plus halo)
+    constexpr int BLOCK_W = BLOCK_Q + (cfg.kw - 1);
+
+    // uint4 vectors per channels fiber
+    constexpr int BLOCK_C8 = cfg.block_c() / 8;
+
+    // Each wave processes one group of channels.
+    constexpr int BLOCK_GROUPS = cfg.waves_per_wg;
+
+    // Vectors to store (center only)
+    constexpr int STORE_VECS = BLOCK_Q * BLOCK_C8;
+
+    constexpr int NUM_INPUT_LDS_BUFFERS = 2;
+
+    // Size of LDS buffer for inputs (swizzled, no padding needed)
+    constexpr int INPUT_LDS_BUFFER_SIZE_C8 = BLOCK_C8 * BLOCK_W;
+
+    // Size of LDS buffer for outputs (swizzled, no padding needed)
+    constexpr int OUTPUT_LDS_BUFFER_SIZE = BLOCK_C8 * BLOCK_Q;
+
+    // Weight LDS: all K-rows for this block, in uint4 units.
+    // Each K-row is kh * kw * GROUP_SIZE_8 uint4 elements; total K-rows = BLOCK_GROUPS *
+    // group_size.
+    constexpr int WEIGHT_LDS_SIZE_UINT4 =
+        BLOCK_GROUPS * cfg.group_size * cfg.kh * cfg.kw * GROUP_SIZE_8;
+
+    // Unified LDS: large enough for either (input double-buffer + output) or (weight prologue).
+    constexpr int IO_LDS_SIZE =
+        NUM_INPUT_LDS_BUFFERS * INPUT_LDS_BUFFER_SIZE_C8 + OUTPUT_LDS_BUFFER_SIZE;
+    __shared__ uint4 lds_buf[maximum(WEIGHT_LDS_SIZE_UINT4, IO_LDS_SIZE)];
+    uint4* input_lds  = lds_buf;
+    uint4* output_lds = lds_buf + NUM_INPUT_LDS_BUFFERS * INPUT_LDS_BUFFER_SIZE_C8;
+
+    const int tid  = threadIdx.x;
+    const int wave = tid / WAVE_SIZE;
+    const int lane = tid % WAVE_SIZE;
+
+    // Workgroup coordinates.
+    const int block_q_n_idx   = blockIdx.x;
+    const int block_n_mod_idx = block_q_n_idx % cfg.n_fold;
+    const int block_q_idx     = block_q_n_idx / cfg.n_fold;
+    const int block_group_idx = blockIdx.y;
+    const int block_n_div_idx = blockIdx.z;
+    const int block_n_idx     = block_n_div_idx * cfg.n_fold + block_n_mod_idx;
+    if(block_n_idx >= N)
+        return;
+
+    const int block_n     = block_n_idx;
+    const int block_q     = block_q_idx * BLOCK_Q;
+    const int block_group = block_group_idx * BLOCK_GROUPS;
+    const int block_k     = block_group * cfg.group_size;
+    const int block_c8    = block_group * GROUP_SIZE_8; // in uint4 units
+
+    // Base pointer for this batch image in NHWC layout (all in uint4 units)
+    const int C  = groups * cfg.group_size;
+    const int C8 = C / 8;
+
+    const size_t offset_block = (size_t)block_n * hi * wi * C8;
+    const size_t wi_stride    = (size_t)wi * C8;
+    const size_t wo_stride    = (size_t)wo * C8;
+
+    // Two-pass input loading.
+    // Each row needs BLOCK_W * BLOCK_C8 = 18 * waves*4 = 72*waves uint4 loads.
+    // Block has 64*waves threads, so always need 2 passes.
+    // 8*waves threads do a second load.
+    auto store_input_lds_0 = &input_lds[tid];
+    auto store_input_lds_1 = &input_lds[tid + cfg.block_size()];
+
+    // Create the input buffer resource.
+    auto input_bytes               = static_cast<size_t>(N) * hi * wi * C * sizeof(half);
+    constexpr int rsrc_data_format = 1 << 15;
+    auto input_rsrc                = __builtin_amdgcn_make_buffer_rsrc(
+        const_cast<_Float16*>(in), 0, input_bytes, rsrc_data_format);
+    uint32_t input_voffset_0;
+    uint32_t input_voffset_1;
+
+    // Map threads to global memory input buffer using a swizzle.
+    using Sw = SwizzleT<cfg.block_c()>;
+
+    // First pass: all threads (tid < block_size)
+    const int col_0          = Sw::x(tid);
+    const int c8_0           = Sw::c8(tid);
+    const int global_col_0   = (block_q - px) + col_0;
+    const bool load_active_0 = (tid < BLOCK_W * BLOCK_C8);
+    if(load_active_0 && 0 <= global_col_0 && global_col_0 < wi)
+    {
+        input_voffset_0 =
+            sizeof(uint4) * (offset_block + (size_t)global_col_0 * C8 + block_c8 + c8_0);
+    }
+    else
+    {
+        input_voffset_0 = input_bytes;
+    }
+
+    // Second pass: overflow threads
+    const int tid_1          = tid + cfg.block_size();
+    const int col_1          = Sw::x(tid_1);
+    const int c8_1           = Sw::c8(tid_1);
+    const int global_col_1   = (block_q - px) + col_1;
+    const bool load_active_1 = (tid_1 < BLOCK_W * BLOCK_C8);
+    if(load_active_1 && 0 <= global_col_1 && global_col_1 < wi)
+    {
+        input_voffset_1 =
+            sizeof(uint4) * (offset_block + (size_t)global_col_1 * C8 + block_c8 + c8_1);
+    }
+    else
+    {
+        input_voffset_1 = input_bytes;
+    }
+
+    // Each wave computes one group of channels.
+    auto wave_group = wave;
+
+    // Load weights from global memory through LDS into registers.
+    // Two output halves per filter position: weights_reg[khw][0] for k 0-15,
+    // weights_reg[khw][1] for k 16-31.
+    fp16x8_t weights_reg[cfg.kh * cfg.kw][2];
+    {
+        auto weight_bytes = static_cast<size_t>(groups * cfg.group_size) * cfg.kh * cfg.kw *
+                            cfg.group_size * sizeof(half);
+        auto weight_rsrc  = __builtin_amdgcn_make_buffer_rsrc(
+            const_cast<_Float16*>(wei), 0, weight_bytes, rsrc_data_format);
+        uint32_t voffset_base = block_k * cfg.kh * cfg.kw * cfg.group_size * sizeof(half);
+
+        for(int j = tid; j < WEIGHT_LDS_SIZE_UINT4; j += cfg.block_size())
+        {
+            __builtin_amdgcn_raw_ptr_buffer_load_lds(
+                weight_rsrc, &lds_buf[j], 16, voffset_base + j * sizeof(uint4), 0, 0, 0);
+        }
+
+        asm volatile("s_waitcnt vmcnt(0)\n");
+        __syncthreads();
+
+        if constexpr(cfg.direction == hipconv::Direction::Dgrad)
+        {
+            // Dgrad: need W^T (32x32 transpose per filter position).
+            // Each lane reads 8 elements via scalar LDS reads.
+            const int c_lo   = lane % 16;       // input channel 0-15
+            const int c_hi   = lane % 16 + 16;  // input channel 16-31
+            const int k_base = (lane / 16) * 8; // 8 consecutive output channels
+
+            const int row_stride = cfg.kh * cfg.kw * cfg.group_size;
+            const __half* wei_lds =
+                reinterpret_cast<const __half*>(lds_buf) + wave_group * cfg.group_size * row_stride;
+
+            for(int khw = 0; khw < cfg.kh * cfg.kw; khw++)
+            {
+                for(int j = 0; j < 8; j++)
+                {
+                    weights_reg[khw][0][j] =
+                        wei_lds[(k_base + j) * row_stride + khw * cfg.group_size + c_lo];
+                    weights_reg[khw][1][j] =
+                        wei_lds[(k_base + j) * row_stride + khw * cfg.group_size + c_hi];
+                }
+            }
+        }
+        else
+        {
+            // Fprop: read weights in OperandLayout order.
+            // lane_k = lane % 16 (output channel within 16-wide half)
+            // lane_c8 = lane / 16 (which 8-channel slice within 32-channel group, 0..3)
+            auto lane_k    = OperandLayout::outer(lane);
+            auto lane_c8_w = OperandLayout::inner(lane) / 8;
+
+            auto k_lo = wave_group * cfg.group_size + lane_k;      // output channels 0-15
+            auto k_hi = wave_group * cfg.group_size + 16 + lane_k; // output channels 16-31
+
+            auto* weights_lds = reinterpret_cast<const uint4*>(lds_buf);
+            for(int khw = 0; khw < cfg.kh * cfg.kw; khw++)
+            {
+                weights_reg[khw][0] =
+                    *(const fp16x8_t*)(weights_lds + k_lo * (cfg.kh * cfg.kw * GROUP_SIZE_8) +
+                                       khw * GROUP_SIZE_8 + lane_c8_w);
+                weights_reg[khw][1] =
+                    *(const fp16x8_t*)(weights_lds + k_hi * (cfg.kh * cfg.kw * GROUP_SIZE_8) +
+                                       khw * GROUP_SIZE_8 + lane_c8_w);
+            }
+        }
+    }
+
+    // Ensure all threads have finished reading weights from LDS before
+    // the input buffer_load_lds overwrites the same lds_buf region.
+    __syncthreads();
+
+    // Load first chunk of inputs asynchronously (two passes).
+    if(load_active_0)
+    {
+        __builtin_amdgcn_raw_ptr_buffer_load_lds(
+            input_rsrc, store_input_lds_0, 16, input_voffset_0, 0, 0, 0);
+    }
+    if(load_active_1)
+    {
+        __builtin_amdgcn_raw_ptr_buffer_load_lds(
+            input_rsrc, store_input_lds_1, 16, input_voffset_1, 0, 0, 0);
+    }
+
+    // Map lanes to MFMA matrix coordinates.
+    const int lane_q  = lane % 16; // input position
+    const int lane_c8 = lane / 16; // which 8-channel slice within 32-channel group (0..3)
+    const int lane_c4 = ResultLayout::inner(lane) / 4;
+
+    // Map threads to output addresses for transferring through LDS to global memory.
+    const bool store_active      = (tid < STORE_VECS);
+    const uint4* load_output_lds = nullptr;
+    uint4* store_output_global   = nullptr;
+    if(store_active)
+    {
+        const int c8    = tid % BLOCK_C8;
+        const int q     = block_q + col_0;
+        load_output_lds = &output_lds[Sw::offset_uint4(col_0, c8)];
+        if(q < wo)
+        {
+            const int K8        = C / 8;
+            store_output_global = reinterpret_cast<uint4*>(out) + (size_t)block_n * ho * wo * K8 +
+                                  (size_t)q * K8 + block_c8 + c8;
+        }
+    }
+
+    // Pre-compute the kw input LDS offsets (uint4 units) for this thread.
+    // Each lane reads one uint4 = fp16x8 per filter column S.
+    int input_lds_offsets[cfg.kw];
+    static_for<cfg.kw>(
+        [&]<int S>()
+        {
+            input_lds_offsets[S] =
+                Sw::offset_uint4(lane_q + S, wave_group * GROUP_SIZE_8 + lane_c8);
+        });
+
+    // Pre-compute the output LDS swizzle offsets (thread-constant).
+    // Two writes per lane: one for output channels 0-15, one for 16-31.
+    const int output_lds_offset_lo = Sw::offset_uint2(lane_q, wave_group * GROUP_SIZE_4 + lane_c4);
+    const int output_lds_offset_hi =
+        Sw::offset_uint2(lane_q, wave_group * GROUP_SIZE_4 + lane_c4 + 4);
+
+    // Circular buffer of accumulators: two per filter row (lo and hi output halves).
+    constexpr auto Zero = fp32x4_t{0.f, 0.f, 0.f, 0.f};
+    fp32x4_t acc[cfg.kh][2];
+    for(int i = 0; i < cfg.kh; i++)
+    {
+        acc[i][0] = Zero;
+        acc[i][1] = Zero;
+    }
+
+    int tic = 1;
+    int toc = 0;
+
+    // Main loop iterates over input rows.
+    for(int y_base = 0; y_base + cfg.kh <= hi; y_base += cfg.kh)
+    {
+        static_for<cfg.kh>(
+            [&]<int Y_LOCAL>()
+            {
+                asm volatile("s_waitcnt vmcnt(0)\n");
+                __syncthreads();
+
+                int y = y_base + Y_LOCAL;
+
+                if((y + 1) < hi)
+                {
+                    auto row_offset = (y + 1) * wi_stride * sizeof(uint4);
+                    if(load_active_0)
+                    {
+                        __builtin_amdgcn_raw_ptr_buffer_load_lds(input_rsrc,
+                                                                 store_input_lds_0 +
+                                                                     tic * INPUT_LDS_BUFFER_SIZE_C8,
+                                                                 16,
+                                                                 input_voffset_0 + row_offset,
+                                                                 0,
+                                                                 0,
+                                                                 0);
+                    }
+                    if(load_active_1)
+                    {
+                        __builtin_amdgcn_raw_ptr_buffer_load_lds(input_rsrc,
+                                                                 store_input_lds_1 +
+                                                                     tic * INPUT_LDS_BUFFER_SIZE_C8,
+                                                                 16,
+                                                                 input_voffset_1 + row_offset,
+                                                                 0,
+                                                                 0,
+                                                                 0);
+                    }
+                }
+
+                static_for<cfg.kw>(
+                    [&]<int S>()
+                    {
+                        auto input_reg =
+                            *(const fp16x8_t*)(&input_lds[toc * INPUT_LDS_BUFFER_SIZE_C8 +
+                                                          input_lds_offsets[S]]);
+
+                        static_for<cfg.kh>(
+                            [&]<int R>()
+                            {
+                                constexpr int p_idx = (Y_LOCAL - R + cfg.kh) % cfg.kh;
+                                if constexpr(cfg.direction == hipconv::Direction::Dgrad)
+                                {
+                                    int w_idx     = (cfg.kh - 1 - R) * cfg.kw + (cfg.kw - 1 - S);
+                                    acc[p_idx][0] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
+                                        weights_reg[w_idx][0], input_reg, acc[p_idx][0], 0, 0, 0);
+                                    acc[p_idx][1] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
+                                        weights_reg[w_idx][1], input_reg, acc[p_idx][1], 0, 0, 0);
+                                }
+                                else
+                                {
+                                    int w_idx     = R * cfg.kw + S;
+                                    acc[p_idx][0] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
+                                        weights_reg[w_idx][0], input_reg, acc[p_idx][0], 0, 0, 0);
+                                    acc[p_idx][1] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
+                                        weights_reg[w_idx][1], input_reg, acc[p_idx][1], 0, 0, 0);
+                                }
+                            });
+                    });
+
+                tic ^= 1;
+                toc ^= 1;
+
+                constexpr int P_FLUSH = (Y_LOCAL + 1) % cfg.kh;
+                int p_out             = y + py - (cfg.kh - 1);
+                if(p_out >= 0 && p_out < ho)
+                {
+                    // Convert and store lo half (output channels 0-15)
+                    __half2 halves_lo[2];
+                    halves_lo[0]    = __float22half2_rn({acc[P_FLUSH][0][0], acc[P_FLUSH][0][1]});
+                    halves_lo[1]    = __float22half2_rn({acc[P_FLUSH][0][2], acc[P_FLUSH][0][3]});
+                    auto out_reg_lo = *reinterpret_cast<const fp16x4_t*>(halves_lo);
+
+                    // Convert and store hi half (output channels 16-31)
+                    __half2 halves_hi[2];
+                    halves_hi[0]    = __float22half2_rn({acc[P_FLUSH][1][0], acc[P_FLUSH][1][1]});
+                    halves_hi[1]    = __float22half2_rn({acc[P_FLUSH][1][2], acc[P_FLUSH][1][3]});
+                    auto out_reg_hi = *reinterpret_cast<const fp16x4_t*>(halves_hi);
+
+                    auto* store_output_lds = reinterpret_cast<uint2*>(output_lds);
+                    store_output_lds[output_lds_offset_lo] =
+                        *reinterpret_cast<const uint2*>(&out_reg_lo);
+                    store_output_lds[output_lds_offset_hi] =
+                        *reinterpret_cast<const uint2*>(&out_reg_hi);
+
+                    __syncthreads(); // output_lds fully written
+
+                    if(store_output_global)
+                        store_output_global[p_out * wo_stride] = *load_output_lds;
+                }
+                acc[P_FLUSH][0] = Zero;
+                acc[P_FLUSH][1] = Zero;
+            });
+    }
+
+    // Remainder: the hi % kh leftover rows.
+    {
+        int y_rem_base = (hi / cfg.kh) * cfg.kh;
+        static_for<cfg.kh>(
+            [&]<int Y_LOCAL>()
+            {
+                if(Y_LOCAL >= hi % cfg.kh)
+                    return;
+                int y = y_rem_base + Y_LOCAL;
+
+                asm volatile("s_waitcnt vmcnt(0)\n");
+                __syncthreads();
+
+                if((y + 1) < hi)
+                {
+                    auto row_offset = (y + 1) * wi_stride * sizeof(uint4);
+                    if(load_active_0)
+                    {
+                        __builtin_amdgcn_raw_ptr_buffer_load_lds(input_rsrc,
+                                                                 store_input_lds_0 +
+                                                                     tic * INPUT_LDS_BUFFER_SIZE_C8,
+                                                                 16,
+                                                                 input_voffset_0 + row_offset,
+                                                                 0,
+                                                                 0,
+                                                                 0);
+                    }
+                    if(load_active_1)
+                    {
+                        __builtin_amdgcn_raw_ptr_buffer_load_lds(input_rsrc,
+                                                                 store_input_lds_1 +
+                                                                     tic * INPUT_LDS_BUFFER_SIZE_C8,
+                                                                 16,
+                                                                 input_voffset_1 + row_offset,
+                                                                 0,
+                                                                 0,
+                                                                 0);
+                    }
+                }
+
+                static_for<cfg.kw>(
+                    [&]<int S>()
+                    {
+                        auto input_reg =
+                            *(const fp16x8_t*)(&input_lds[toc * INPUT_LDS_BUFFER_SIZE_C8 +
+                                                          input_lds_offsets[S]]);
+
+                        static_for<cfg.kh>(
+                            [&]<int R>()
+                            {
+                                constexpr int p_idx = (Y_LOCAL - R + cfg.kh) % cfg.kh;
+                                if constexpr(cfg.direction == hipconv::Direction::Dgrad)
+                                {
+                                    int w_idx     = (cfg.kh - 1 - R) * cfg.kw + (cfg.kw - 1 - S);
+                                    acc[p_idx][0] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
+                                        weights_reg[w_idx][0], input_reg, acc[p_idx][0], 0, 0, 0);
+                                    acc[p_idx][1] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
+                                        weights_reg[w_idx][1], input_reg, acc[p_idx][1], 0, 0, 0);
+                                }
+                                else
+                                {
+                                    int w_idx     = R * cfg.kw + S;
+                                    acc[p_idx][0] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
+                                        weights_reg[w_idx][0], input_reg, acc[p_idx][0], 0, 0, 0);
+                                    acc[p_idx][1] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
+                                        weights_reg[w_idx][1], input_reg, acc[p_idx][1], 0, 0, 0);
+                                }
+                            });
+                    });
+
+                tic ^= 1;
+                toc ^= 1;
+
+                constexpr int P_FLUSH = (Y_LOCAL + 1) % cfg.kh;
+                int p_out             = y + py - (cfg.kh - 1);
+                if(p_out >= 0 && p_out < ho)
+                {
+                    __half2 halves_lo[2];
+                    halves_lo[0]    = __float22half2_rn({acc[P_FLUSH][0][0], acc[P_FLUSH][0][1]});
+                    halves_lo[1]    = __float22half2_rn({acc[P_FLUSH][0][2], acc[P_FLUSH][0][3]});
+                    auto out_reg_lo = *reinterpret_cast<const fp16x4_t*>(halves_lo);
+
+                    __half2 halves_hi[2];
+                    halves_hi[0]    = __float22half2_rn({acc[P_FLUSH][1][0], acc[P_FLUSH][1][1]});
+                    halves_hi[1]    = __float22half2_rn({acc[P_FLUSH][1][2], acc[P_FLUSH][1][3]});
+                    auto out_reg_hi = *reinterpret_cast<const fp16x4_t*>(halves_hi);
+
+                    auto* store_output_lds = reinterpret_cast<uint2*>(output_lds);
+                    store_output_lds[output_lds_offset_lo] =
+                        *reinterpret_cast<const uint2*>(&out_reg_lo);
+                    store_output_lds[output_lds_offset_hi] =
+                        *reinterpret_cast<const uint2*>(&out_reg_hi);
+
+                    __syncthreads(); // output_lds fully written
+
+                    if(store_output_global)
+                        store_output_global[p_out * wo_stride] = *load_output_lds;
+                }
+                acc[P_FLUSH][0] = Zero;
+                acc[P_FLUSH][1] = Zero;
+            });
+    }
+
+    // Flush output rows whose last input contribution (at filter row kh-1) would land at
+    // y >= hi (out of bounds).
+    __syncthreads();
+    for(int p_out = hi - cfg.kh + 1 + py; p_out < ho; p_out++)
+    {
+        int p_idx = (p_out - py + cfg.kh) % cfg.kh;
+        fp32x4_t slot_lo, slot_hi;
+        dispatch<cfg.kh>(p_idx,
+                         [&]<int P>()
+                         {
+                             slot_lo   = acc[P][0];
+                             slot_hi   = acc[P][1];
+                             acc[P][0] = Zero;
+                             acc[P][1] = Zero;
+                         });
+
+        __half2 halves_lo[2];
+        halves_lo[0]    = __float22half2_rn({slot_lo[0], slot_lo[1]});
+        halves_lo[1]    = __float22half2_rn({slot_lo[2], slot_lo[3]});
+        auto out_reg_lo = *reinterpret_cast<const fp16x4_t*>(halves_lo);
+
+        __half2 halves_hi[2];
+        halves_hi[0]    = __float22half2_rn({slot_hi[0], slot_hi[1]});
+        halves_hi[1]    = __float22half2_rn({slot_hi[2], slot_hi[3]});
+        auto out_reg_hi = *reinterpret_cast<const fp16x4_t*>(halves_hi);
+
+        auto* store_output_lds                 = reinterpret_cast<uint2*>(output_lds);
+        store_output_lds[output_lds_offset_lo] = *reinterpret_cast<const uint2*>(&out_reg_lo);
+        store_output_lds[output_lds_offset_hi] = *reinterpret_cast<const uint2*>(&out_reg_hi);
+
+        __syncthreads(); // output_lds fully written
+
+        if(store_output_global)
+            store_output_global[p_out * wo_stride] = *load_output_lds;
+    }
+}
+
+// Compute grouped convolution with stride 1 and group size 32.
+//
+// This kernel assumes the number of input and output channels is the same.
+//
+// Input layout: N hi wi C8
+// Weights layout: K kh kw GROUP_SIZE_8
+// Output layout N ho wo K8
+template <grouped_32c::Config cfg>
+__global__ void conv2d_grouped_32c_fp16_nhwc_cdna4(const _Float16* __restrict__ in,
+                                                   const _Float16* __restrict__ wei,
+                                                   double alpha,
+                                                   double beta,
+                                                   _Float16* __restrict__ out,
+                                                   int N,
+                                                   int groups,
+                                                   int c_per_group,
+                                                   int k_per_group,
+                                                   int hi,
+                                                   int wi,
+                                                   int ho,
+                                                   int wo,
+                                                   int fy,
+                                                   int fx,
+                                                   int sy,
+                                                   int sx,
+                                                   int dy,
+                                                   int dx,
+                                                   int py,
+                                                   int px)
+{
+    conv2d_grouped_32c_fp16_cdna4_nhwc_impl<cfg>(in,
+                                                 wei,
+                                                 alpha,
+                                                 beta,
+                                                 out,
+                                                 N,
+                                                 groups,
+                                                 c_per_group,
+                                                 k_per_group,
+                                                 hi,
+                                                 wi,
+                                                 ho,
+                                                 wo,
+                                                 fy,
+                                                 fx,
+                                                 sy,
+                                                 sx,
+                                                 dy,
+                                                 dx,
+                                                 py,
+                                                 px);
+}
+
+namespace grouped_32c
+{
+
+template <size_t... Is>
+void launch_dispatch(int config_idx,
+                     std::index_sequence<Is...>,
+                     const LaunchParams& lp,
+                     const hipconv::Conv2dParams& par,
+                     const void* in,
+                     const void* wei,
+                     void* out,
+                     hipStream_t stream)
+{
+    auto kernel_launch = [&]<size_t I>()
+    {
+        auto view = hipconv::SizeView<configs[I].direction>(par);
+        conv2d_grouped_32c_fp16_nhwc_cdna4<configs[I]>
+            <<<lp.grid, lp.block_size, lp.dynamic_shared_bytes, stream>>>(
+                static_cast<const _Float16*>(in),
+                static_cast<const _Float16*>(wei),
+                1.0,
+                0.0,
+                static_cast<_Float16*>(out),
+                par.n,
+                par.groups,
+                par.channels_per_group(),
+                par.filters_per_group(),
+                view.h(),
+                view.w(),
+                view.p(),
+                view.q(),
+                par.kh,
+                par.kw,
+                par.stride_h,
+                par.stride_w,
+                par.dilation_h,
+                par.dilation_w,
+                view.pad_h(),
+                view.pad_w());
+    };
+    (void)((config_idx == static_cast<int>(Is) ? (kernel_launch.template operator()<Is>(), true)
+                                               : false) ||
+           ...);
+}
+
+inline void launch(int config_idx,
+                   const LaunchParams& lp,
+                   const hipconv::Conv2dParams& par,
+                   const void* in,
+                   const void* wei,
+                   void* out,
+                   hipStream_t stream)
+{
+    launch_dispatch(
+        config_idx, std::make_index_sequence<NUM_CONFIGS>{}, lp, par, in, wei, out, stream);
+}
+
+constexpr KernelVariant make_variant()
+{
+    return {
+        .is_applicable =
+            [](const hipconv::Conv2dParams& par)
+        {
+            if(par.in_type != hipconv::DataType::fp16)
+                return false;
+            if(par.wei_type != hipconv::DataType::fp16)
+                return false;
+            if(par.out_type != hipconv::DataType::fp16)
+                return false;
+            if(par.order != hipconv::TensorOrder::NHWC)
+                return false;
+            if(par.direction != hipconv::Direction::Fprop &&
+               par.direction != hipconv::Direction::Dgrad)
+                return false;
+            if(par.kh != 3 || par.kw != 3)
+                return false;
+            if(par.k != par.c)
+                return false;
+            if(par.channels_per_group() != 32)
+                return false;
+            if(par.c % 32 != 0)
+                return false;
+            if(par.stride_h != 1 || par.stride_w != 1)
+                return false;
+            if(par.dilation_h != 1 || par.dilation_w != 1)
+                return false;
+            if(par.pad_h > par.kh - 1 || par.pad_w > par.kw - 1)
+                return false;
+            return true;
+        },
+        .config_is_compatible = [](const hipconv::Conv2dParams& par, int idx)
+        { return is_valid_config(par, configs[idx]); },
+        .get_launch_params = &get_launch_params,
+        .launch            = &launch,
+        .num_configs       = NUM_CONFIGS,
+    };
+}
+
+} // namespace grouped_32c

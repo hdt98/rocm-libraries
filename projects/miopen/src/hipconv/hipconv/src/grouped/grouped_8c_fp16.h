@@ -95,8 +95,6 @@ inline LaunchParams get_launch_params(int config_idx, const hipconv::Conv2dParam
 
 } // namespace grouped_8c
 
-using fp16x8_t = __attribute__((ext_vector_type(8))) _Float16;
-
 template <grouped_8c::Config cfg>
 __device__ void conv2d_grouped_8c_fp16_cdna4_nhwc_impl(const _Float16* __restrict__ in,
                                                        const _Float16* __restrict__ wei,
@@ -126,6 +124,7 @@ __device__ void conv2d_grouped_8c_fp16_cdna4_nhwc_impl(const _Float16* __restric
     // MFMA 16x16x32: operands are fp16x8, result is fp32x4.
     using OperandLayout = MatrixLayout<16, 32, 1, __half>;
     using ResultLayout  = MatrixLayout<16, 16, 1, float>;
+    using fp16x8_t      = __attribute__((ext_vector_type(8))) _Float16;
 
     constexpr int GROUP_SIZE_8 = cfg.group_size / 8; // 1
     constexpr int GROUP_SIZE_4 = cfg.group_size / 4; // 2
