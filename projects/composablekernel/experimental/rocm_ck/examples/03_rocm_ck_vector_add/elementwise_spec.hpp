@@ -1,14 +1,14 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// VectorAddKernel — structural NTTP descriptor and consteval factory for
+// ElementwiseSpec — structural NTTP descriptor and consteval factory for
 // elementwise template instantiation.
 //
 // SHARED header: compiled in both host and device (--cuda-device-only) passes.
 // Contains structural types and consteval make_kernel() factory. No runtime code.
 //
 // Compilation boundary:
-//   _kernel.hpp (this) — schema types + consteval factory (both passes)
+//   _spec.hpp (this) — schema types + consteval factory (both passes)
 //   _api.hpp           — host-only helpers (host pass only, #error on device)
 //   _dev.hpp           — CK Tile bridge + __device__ code (device pass only, #error on host)
 
@@ -33,7 +33,7 @@ struct ElementwiseAlgorithm
 
 /// Validated kernel descriptor used as NTTP and host launch info.
 /// All members are structural types (no std::optional, no pointers, etc.).
-struct VectorAddKernel
+struct ElementwiseSpec
 {
     int block_tile;        // Elements per thread block (for grid calculation)
     int thread_block_size; // Threads per block (= warp_size * block_warps)
@@ -45,10 +45,10 @@ struct VectorAddKernel
 };
 
 /// Check if problem size N is aligned to a variant's block_tile (no padding needed).
-constexpr bool isAligned(VectorAddKernel k, int n) { return n > 0 && n % k.block_tile == 0; }
+constexpr bool isAligned(ElementwiseSpec k, int n) { return n > 0 && n % k.block_tile == 0; }
 
 // ============================================================================
-// make_kernel: operator-centric Signature -> VectorAddKernel
+// make_kernel: operator-centric Signature -> ElementwiseSpec
 // ============================================================================
 
 /// Resolve and validate a vector add using the operator-centric Signature.
@@ -62,7 +62,7 @@ constexpr bool isAligned(VectorAddKernel k, int n) { return n > 0 && n % k.block
 ///   - block_warps is power of 2 (CK Tile reduce_on_sequence requirement)
 ///   - warp_tile >= warp_size (64)
 ///   - kVectorM >= 1 and block_tile divisibility
-consteval VectorAddKernel make_kernel(Signature sig, ElementwiseAlgorithm algo)
+consteval ElementwiseSpec make_kernel(Signature sig, ElementwiseAlgorithm algo)
 {
     ResolvedSignature resolved = resolve(sig);
 

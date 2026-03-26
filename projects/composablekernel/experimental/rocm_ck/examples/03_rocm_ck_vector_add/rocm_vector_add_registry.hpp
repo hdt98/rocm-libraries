@@ -14,7 +14,7 @@ namespace rocm_ck {
 struct VariantDescriptor
 {
     const char* name;
-    VectorAddKernel kernel;
+    ElementwiseSpec kernel;
 };
 
 /// Complete table of all compiled variants, matching the kpack archive contents.
