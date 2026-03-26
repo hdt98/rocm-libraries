@@ -4,9 +4,8 @@
 import os
 import argparse
 import importlib.util
-# import logging
-# import multiprocessing
-# import concurrent.futures
+import multiprocessing
+import concurrent.futures
 
 
 def _import_gemm_kernel_builder():
@@ -64,6 +63,86 @@ class GemmAQuantKernelBuilder(GemmKernelBuilder):
             kernel_name_prefix, working_path, gpu_target, datatype, layout, config_json
         )
         self.group_size_k = self.config.get("group_size_k", 128)
+
+    def _generate_all_individual(self, num_workers=None):
+        """Generate individual kernel files for separate compilation with parallel processing"""
+        if num_workers is None:
+            num_workers = min(
+                multiprocessing.cpu_count(), 8
+            )  # Limit to avoid memory issues
+
+        tile_configs = self._get_tile_configs()
+        trait_combos = self._generate_trait_combinations()
+
+        # Prepare work items for parallel processing
+        work_items = []
+        for tile_config in tile_configs:
+            for trait_combo in trait_combos:
+                work_items.append(
+                    (
+                        tile_config,
+                        trait_combo,
+                        self.kernel_name_prefix,
+                        self.working_path,
+                        self.gpu_target,
+                        self.datatype,
+                        self.layout,
+                        self.config_json,
+                    )
+                )
+        print(
+            f"Generating {len(work_items)} individual kernel files using {num_workers} workers..."
+        )
+        print(f"  Tile configs: {len(tile_configs)}")
+        print(f"  Trait combinations: {len(trait_combos)}")
+        print(f"  Total kernels: {len(work_items)}")
+
+        # Show first few work items for debugging
+        if work_items:
+            print("  First work item example:")
+            tile_config, trait_combo = work_items[0][:2]
+            print(f"    Tile config: {tile_config}")
+            print(f"    Trait combo: {trait_combo[:3]}")  # Show first 3 traits
+
+        # Process work items in parallel
+        kernel_list = []
+        completed = 0
+
+        with concurrent.futures.ProcessPoolExecutor(
+            max_workers=num_workers
+        ) as executor:
+            # Submit all work items
+            print(f"  Submitting {len(work_items)} tasks to executor...")
+            future_to_item = {
+                executor.submit(_generate_single_kernel_individual, item): item
+                for item in work_items
+            }
+            print("  All tasks submitted, waiting for completion...")
+
+            # Collect results with progress reporting
+            for future in concurrent.futures.as_completed(future_to_item):
+                completed += 1
+                if completed % 100 == 0 or completed == len(work_items):
+                    print(
+                        f"  Progress: {completed}/{len(work_items)} kernels generated"
+                    )
+                try:
+                    result = future.result()
+                    if result:
+                        kernel_list.append(result)
+                except Exception as exc:
+                    item = future_to_item[future]
+                    print(f"Kernel generation failed for {item}: {exc}")
+
+        # Sort kernel list for consistent ordering
+        kernel_list.sort(key=lambda x: x[0])  # Sort by kernel name
+
+        # Generate CMake include file for individual targets
+        self._generate_cmake_individual_targets(kernel_list)
+
+        print(
+            f"Generated {len(kernel_list)} individual kernel files in {self.working_path}"
+        )
 
 
 #     # def _validate_tile_config(
@@ -424,32 +503,46 @@ class GemmAQuantKernelBuilder(GemmKernelBuilder):
 #         )
 
 
-# def _generate_single_kernel_individual(work_item):
-#     """Worker function to generate a single individual AQuant kernel file."""
-#     (
-#         tile_config,
-#         trait_combo,
-#         kernel_name_prefix,
-#         working_path,
-#         gpu_target,
-#         datatype,
-#         layout,
-#         config_json,
-#     ) = work_item
+def _generate_single_kernel_individual(work_item):
+    """Worker function to generate a single individual kernel file"""
+    (
+        tile_config,
+        trait_combo,
+        kernel_name_prefix,
+        working_path,
+        gpu_target,
+        datatype,
+        layout,
+        config_json,
+    ) = work_item
 
-#     builder = GemmAQuantKernelBuilder(
-#         kernel_name_prefix, working_path, gpu_target, datatype, layout, config_json
-#     )
+    # Create a temporary builder instance for this worker
+    builder = GemmAQuantKernelBuilder(
+        kernel_name_prefix, working_path, gpu_target, datatype, layout, config_json
+    )
 
-#     try:
-#         # _generate_kernel_instance() already writes the header file to disk,
-#         # so no need to write again here.
-#         kernel_name, _ = builder._generate_kernel_instance(tile_config, trait_combo)
+    try:
+        kernel_name, instance_code = builder._generate_kernel_instance(
+            tile_config, trait_combo
+        )
 
-#         return (kernel_name, trait_combo, tile_config)
-#     except Exception as e:
-#         print(f"Error generating individual kernel: {e}")
-#         return None
+        # Create simplified filename without the "gemm_aquant_" prefix
+        # Remove "gemm_aquant_" from the beginning of kernel_name for the filename
+        simplified_name = kernel_name
+        if simplified_name.startswith("gemm_aquant_"):
+            simplified_name = simplified_name[
+                len(kernel_name_prefix) + 1 :
+            ]  # Remove "gemm_aquant" prefix
+
+        # Write individual header file
+        header_file = working_path / f"gemm_aquant_single_{simplified_name}.hpp"
+        with open(header_file, "w") as f:
+            f.write(instance_code)
+
+        return (kernel_name, trait_combo, tile_config)
+    except Exception as e:
+        print(f"Error generating individual kernel: {e}")
+        return None
 
 
 def main():
