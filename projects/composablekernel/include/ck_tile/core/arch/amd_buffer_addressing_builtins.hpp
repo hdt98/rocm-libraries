@@ -2144,33 +2144,6 @@ CK_TILE_DEVICE void amd_buffer_store_raw_impl(const thread_buffer<T, N>& dst_thr
 }
 
 template <typename T, index_t N>
-CK_TILE_DEVICE void amd_global_atomic_add_impl(const thread_buffer<T, N>& src_thread_data, T* addr)
-{
-    static_assert((std::is_same<T, ck_tile::bf16_t>::value && (N == 2 || N == 4 || N == 8)) ||
-                      (std::is_same<T, ck_tile::fp16_t>::value && (N == 2 || N == 4 || N == 8)),
-                  "wrong! not implemented");
-
-    if constexpr(std::is_same<T, ck_tile::fp16_t>::value)
-    {
-        static_for<0, N / 2, 1>{}([&](auto i) {
-            __builtin_amdgcn_global_atomic_fadd_v2f16(
-                bit_cast<ck_tile::fp16x2_t*>(addr) + i,
-                src_thread_data.template get_as<ck_tile::fp16x2_t>()[i]);
-        });
-    }
-#if defined(__gfx942__) || defined(__gfx950__) || defined(__gfx12__)
-    else if constexpr(std::is_same<T, ck_tile::bf16_t>::value)
-    {
-        static_for<0, N / 2, 1>{}([&](auto i) {
-            __builtin_amdgcn_global_atomic_fadd_v2bf16(
-                bit_cast<ck_tile::bf16x2_t*>(addr) + i,
-                src_thread_data.template get_as<ck_tile::bf16x2_t>()[i]);
-        });
-    }
-#endif
-}
-
-template <typename T, index_t N>
 CK_TILE_DEVICE void amd_buffer_atomic_add_impl(const thread_buffer<T, N>& src_thread_data,
                                                int32x4_t dst_wave_buffer_resource,
                                                index_t dst_thread_addr_offset,
@@ -2178,6 +2151,7 @@ CK_TILE_DEVICE void amd_buffer_atomic_add_impl(const thread_buffer<T, N>& src_th
 {
     static_assert((std::is_same<T, float>::value && (N == 1 || N == 2 || N == 4)) ||
                       (std::is_same<T, fp16_t>::value && (N == 2 || N == 4 || N == 8)) ||
+                      (std::is_same<T, bf16_t>::value && (N == 2 || N == 4 || N == 8)) ||
                       (std::is_same<T, int32_t>::value && (N == 1 || N == 2 || N == 4)),
                   "wrong! not implemented");
 
@@ -2785,34 +2759,23 @@ CK_TILE_DEVICE void amd_buffer_atomic_add(const thread_buffer<T, N>& src_thread_
                                           const bool dst_thread_element_valid,
                                           const index_t dst_element_space_size)
 {
-    if constexpr(std::is_same<T, bf16_t>::value)
-    {
-        if(dst_thread_element_valid)
-        {
-            amd_global_atomic_add_impl<T, N>(src_thread_data,
-                                             p_dst_wave + dst_thread_element_offset);
-        }
-    }
-    else
-    {
-        const int32x4_t dst_wave_buffer_resource =
-            make_wave_buffer_resource(p_dst_wave, dst_element_space_size * sizeof(T));
+    const int32x4_t dst_wave_buffer_resource =
+        make_wave_buffer_resource(p_dst_wave, dst_element_space_size * sizeof(T));
 
-        index_t dst_thread_addr_offset = dst_thread_element_offset * sizeof(T);
+    index_t dst_thread_addr_offset = dst_thread_element_offset * sizeof(T);
 
 #if CK_TILE_EXPERIMENTAL_USE_BUFFER_ATOMIC_ADD_OOB_CHECK_OFFSET_TRICK
-        uint32_t dst_addr_shift = dst_thread_element_valid ? 0 : 0x80000000;
+    uint32_t dst_addr_shift = dst_thread_element_valid ? 0 : 0x80000000;
 
-        amd_buffer_atomic_add_impl<T, N>(
-            src_thread_data, dst_wave_buffer_resource, dst_addr_shift + dst_thread_addr_offset, 0);
+    amd_buffer_atomic_add_impl<T, N>(
+        src_thread_data, dst_wave_buffer_resource, dst_addr_shift + dst_thread_addr_offset, 0);
 #else
-        if(dst_thread_element_valid)
-        {
-            amd_buffer_atomic_add_impl<T, N>(
-                src_thread_data, dst_wave_buffer_resource, dst_thread_addr_offset, 0);
-        }
-#endif
+    if(dst_thread_element_valid)
+    {
+        amd_buffer_atomic_add_impl<T, N>(
+            src_thread_data, dst_wave_buffer_resource, dst_thread_addr_offset, 0);
     }
+#endif
 }
 
 template <typename T,
