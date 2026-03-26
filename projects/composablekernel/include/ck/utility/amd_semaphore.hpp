@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #ifndef CK_AMD_SEMAPHORE_HPP
 #define CK_AMD_SEMAPHORE_HPP
@@ -95,7 +95,12 @@ class WavegroupSemaphore
         constexpr unsigned imm = SemId | (WaveIdInWavegroup << 4);
         asm("s_sema_signal %0" : : "n"(imm) : "memory");
 #else
+#if defined(__clang_major__) && (__clang_major__ >= 23)
+        // The second argument is ignored for GFX13.
+        __builtin_amdgcn_s_sema_signal(&_sema, 0);
+#else
         __builtin_amdgcn_s_sema_signal(&_sema);
+#endif
 #endif
 #endif
     }
