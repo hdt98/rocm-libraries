@@ -133,6 +133,10 @@ bool run_test()
         in.GenerateTensorValue(GeneratorTensor_2<InDataType>{-5, 5});
         wei.GenerateTensorValue(GeneratorTensor_2<WeiDataType>{-5, 5});
         break;
+    case 2:
+        in.GenerateTensorValue(GeneratorTensor_1<InDataType>{1});
+        wei.GenerateTensorValue(GeneratorTensor_1<WeiDataType>{1});
+        break;
     default:
         in.GenerateTensorValue(GeneratorTensor_3<InDataType>{0.0, 1.0});
         wei.GenerateTensorValue(GeneratorTensor_3<WeiDataType>{-0.5, 0.5});
