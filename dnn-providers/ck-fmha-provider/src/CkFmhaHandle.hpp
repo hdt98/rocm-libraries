@@ -15,8 +15,9 @@
 #include <string>
 #include <unordered_map>
 
-#include "CkFmhaContext.hpp"
 #include "CkFmhaSettings.hpp"
+
+struct CkFmhaContext;
 
 namespace ck_fmha_plugin {
 

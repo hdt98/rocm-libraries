@@ -35,7 +35,7 @@ const fb::TensorAttributes* lookupTensor(const hipdnn_data_sdk::flatbuffer_utili
 
 // CK mask_enum values: 0=no_mask, 1=mask_top_left, 2=mask_bottom_right, 3=window_generic
 int mapMask(const fb::SdpaAttributes* attr) {
-    if (attr->left_bound() != nullptr || attr->right_bound() != nullptr)
+    if (attr->left_bound().has_value() || attr->right_bound().has_value())
         return 3;  // window_generic
     if (attr->causal_mask_bottom_right()) return 2;
     if (attr->causal_mask()) return 1;
@@ -43,7 +43,7 @@ int mapMask(const fb::SdpaAttributes* attr) {
 }
 
 int mapMaskBwd(const fb::SdpaBackwardAttributes* attr) {
-    if (attr->left_bound() != nullptr || attr->right_bound() != nullptr) return 3;
+    if (attr->left_bound().has_value() || attr->right_bound().has_value()) return 3;
     if (attr->causal_mask_bottom_right()) return 2;
     if (attr->causal_mask()) return 1;
     return 0;
@@ -52,13 +52,13 @@ int mapMaskBwd(const fb::SdpaBackwardAttributes* attr) {
 // CK bias_enum values: 0=no_bias, 1=elementwise_bias, 2=alibi
 int mapBias(const fb::SdpaAttributes* attr) {
     if (attr->alibi_mask()) return 2;
-    if (attr->attn_mask_tensor_uid() != 0) return 1;
+    if (attr->attn_mask_tensor_uid().value_or(0) != 0) return 1;
     return 0;
 }
 
 int mapBiasBwd(const fb::SdpaBackwardAttributes* attr) {
     if (attr->alibi_mask()) return 2;
-    if (attr->attn_mask_tensor_uid() != 0) return 1;
+    if (attr->attn_mask_tensor_uid().value_or(0) != 0) return 1;
     return 0;
 }
 
@@ -83,12 +83,12 @@ ParsedFwdParams parseFwdGraph(const hipdnn_data_sdk::flatbuffer_utilities::IGrap
     p.k_uid = attr->k_tensor_uid();
     p.v_uid = attr->v_tensor_uid();
     p.o_uid = attr->o_tensor_uid();
-    p.bias_uid = attr->attn_mask_tensor_uid();
-    p.seed_uid = attr->seed_tensor_uid();
-    p.offset_uid = attr->offset_tensor_uid();
+    p.bias_uid = attr->attn_mask_tensor_uid().value_or(0);
+    p.seed_uid = attr->seed_tensor_uid().value_or(0);
+    p.offset_uid = attr->offset_tensor_uid().value_or(0);
 
-    if (attr->stats_tensor_uid() != 0) {
-        p.lse_uid = attr->stats_tensor_uid();
+    if (attr->stats_tensor_uid().value_or(0) != 0) {
+        p.lse_uid = attr->stats_tensor_uid().value_or(0);
         p.has_lse = true;
     }
     if (attr->generate_stats()) p.has_lse = true;
@@ -103,13 +103,13 @@ ParsedFwdParams parseFwdGraph(const hipdnn_data_sdk::flatbuffer_utilities::IGrap
     p.data_type = mapDataType(q_tensor->data_type());
     if (p.data_type.empty()) throw std::runtime_error("CkFmhaParamParser: unsupported data type");
 
-    const auto* q_dims = q_tensor->dim();
-    const auto* k_dims = k_tensor->dim();
-    const auto* v_dims = v_tensor->dim();
+    const auto* q_dims = q_tensor->dims();
+    const auto* k_dims = k_tensor->dims();
+    const auto* v_dims = v_tensor->dims();
 
     // Rank-4 tensors: [B, H, S, D] (BHSD) or [B, S, H, D] (BSHD)
     // Detect layout from strides: BHSD if stride[1] > stride[2]
-    const auto* q_strides = q_tensor->stride();
+    const auto* q_strides = q_tensor->strides();
     if (q_strides != nullptr && q_strides->size() == 4)
         p.is_bhsd_layout = (q_strides->Get(1) > q_strides->Get(2));
 
@@ -134,13 +134,13 @@ ParsedFwdParams parseFwdGraph(const hipdnn_data_sdk::flatbuffer_utilities::IGrap
     p.mask_type = mapMask(attr);
     p.bias_type = mapBias(attr);
 
-    if (attr->left_bound() != nullptr) p.window_left = *attr->left_bound();
-    if (attr->right_bound() != nullptr) p.window_right = *attr->right_bound();
+    if (attr->left_bound().has_value()) p.window_left = attr->left_bound().value();
+    if (attr->right_bound().has_value()) p.window_right = attr->right_bound().value();
 
     p.has_dropout = (p.seed_uid != 0 && p.offset_uid != 0);
 
-    p.scale = attr->attn_scale_value()
-                  ? *attr->attn_scale_value()
+    p.scale = attr->attn_scale_value().has_value()
+                  ? attr->attn_scale_value().value()
                   : (p.hdim_q > 0 ? 1.0f / std::sqrt(static_cast<float>(p.hdim_q)) : 1.0f);
 
     return p;
@@ -160,10 +160,10 @@ ParsedBwdParams parseBwdGraph(const hipdnn_data_sdk::flatbuffer_utilities::IGrap
     p.dq_uid = attr->dq_tensor_uid();
     p.dk_uid = attr->dk_tensor_uid();
     p.dv_uid = attr->dv_tensor_uid();
-    p.bias_uid = attr->attn_mask_tensor_uid();
-    p.dbias_uid = attr->dbias_tensor_uid();
-    p.seed_uid = attr->seed_tensor_uid();
-    p.offset_uid = attr->offset_tensor_uid();
+    p.bias_uid = attr->attn_mask_tensor_uid().value_or(0);
+    p.dbias_uid = attr->dbias_tensor_uid().value_or(0);
+    p.seed_uid = attr->seed_tensor_uid().value_or(0);
+    p.offset_uid = attr->offset_tensor_uid().value_or(0);
 
     p.has_dbias = (p.dbias_uid != 0);
     p.has_dropout = (p.seed_uid != 0 && p.offset_uid != 0);
@@ -179,11 +179,11 @@ ParsedBwdParams parseBwdGraph(const hipdnn_data_sdk::flatbuffer_utilities::IGrap
     if (p.data_type.empty())
         throw std::runtime_error("CkFmhaParamParser(bwd): unsupported data type");
 
-    const auto* q_dims = q_tensor->dim();
-    const auto* k_dims = k_tensor->dim();
-    const auto* v_dims = v_tensor->dim();
+    const auto* q_dims = q_tensor->dims();
+    const auto* k_dims = k_tensor->dims();
+    const auto* v_dims = v_tensor->dims();
 
-    const auto* q_strides = q_tensor->stride();
+    const auto* q_strides = q_tensor->strides();
     if (q_strides != nullptr && q_strides->size() == 4)
         p.is_bhsd_layout = (q_strides->Get(1) > q_strides->Get(2));
 
@@ -208,11 +208,11 @@ ParsedBwdParams parseBwdGraph(const hipdnn_data_sdk::flatbuffer_utilities::IGrap
     p.mask_type = mapMaskBwd(attr);
     p.bias_type = mapBiasBwd(attr);
 
-    if (attr->left_bound() != nullptr) p.window_left = *attr->left_bound();
-    if (attr->right_bound() != nullptr) p.window_right = *attr->right_bound();
+    if (attr->left_bound().has_value()) p.window_left = attr->left_bound().value();
+    if (attr->right_bound().has_value()) p.window_right = attr->right_bound().value();
 
-    p.scale = attr->attn_scale_value()
-                  ? *attr->attn_scale_value()
+    p.scale = attr->attn_scale_value().has_value()
+                  ? attr->attn_scale_value().value()
                   : (p.hdim_q > 0 ? 1.0f / std::sqrt(static_cast<float>(p.hdim_q)) : 1.0f);
 
     return p;

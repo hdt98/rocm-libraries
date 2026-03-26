@@ -6,6 +6,7 @@
 #include <hipdnn_plugin_sdk/PluginException.hpp>
 
 #include "CkFmhaBwdPlan.hpp"
+#include "CkFmhaContext.hpp"
 #include "engines/CkFmhaParamParser.hpp"
 
 namespace ck_fmha_plugin {
@@ -51,7 +52,7 @@ void CkFmhaBwdPlanBuilder::buildPlan(const CkFmhaHandle& handle,
         auto plan = handle.dispatcher()->plan(problem);
         if (!plan.is_valid()) {
             throw hipdnn_plugin_sdk::HipdnnPluginException(
-                HIPDNN_PLUGIN_STATUS_NOT_SUPPORTED,
+                HIPDNN_PLUGIN_STATUS_BAD_PARAM,
                 "No CK FMHA backward kernel for: " + problem.to_string());
         }
         const_cast<CkFmhaHandle&>(handle).cachePlan(cache_key, std::move(plan));

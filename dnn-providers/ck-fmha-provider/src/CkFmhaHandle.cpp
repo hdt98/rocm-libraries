@@ -6,6 +6,8 @@
 #include <dlfcn.h>
 
 #include <cstdlib>
+
+// REGISTER_GENERATED_KERNELS is defined via -include of the generated dispatch header
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
 
 #include "CkFmhaContainer.hpp"
@@ -29,6 +31,8 @@ CkFmhaHandle::CkFmhaHandle() {
     if (colon != std::string::npos) gfx_arch_ = gfx_arch_.substr(0, colon);
 
     registry_ = ck_tile::dispatcher::make_fmha_registry("ck_fmha_" + gfx_arch_);
+
+    REGISTER_GENERATED_KERNELS(*registry_, gfx_arch_);
     registry_->filter_by_arch(gfx_arch_);
 
     dispatcher_ = std::make_shared<ck_tile::dispatcher::FmhaDispatcher>(registry_.get(), gfx_arch_);

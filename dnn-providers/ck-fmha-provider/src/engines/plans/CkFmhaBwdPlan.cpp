@@ -34,7 +34,7 @@ void CkFmhaBwdPlan::execute(const CkFmhaHandle& handle,
             HIPDNN_PLUGIN_STATUS_BAD_PARAM, "CkFmhaBwdPlan: null workspace for backward pass");
     }
 
-    ck_tile::dispatcher::fmha_bwd_traits traits{};
+    fmha_bwd_traits traits{};
     traits.hdim_q = static_cast<int>(params_.hdim_q);
     traits.hdim_v = static_cast<int>(params_.hdim_v);
     traits.data_type = params_.data_type;
@@ -55,7 +55,7 @@ void CkFmhaBwdPlan::execute(const CkFmhaHandle& handle,
     traits.nhead_q = static_cast<int>(params_.nhead_q);
     traits.nhead_k = static_cast<int>(params_.nhead_k);
 
-    ck_tile::dispatcher::fmha_bwd_args args{};
+    fmha_bwd_args args{};
     args.q_ptr = findBuffer(params_.q_uid, deviceBuffers, numDeviceBuffers);
     args.k_ptr = findBuffer(params_.k_uid, deviceBuffers, numDeviceBuffers);
     args.v_ptr = findBuffer(params_.v_uid, deviceBuffers, numDeviceBuffers);
@@ -84,7 +84,7 @@ void CkFmhaBwdPlan::execute(const CkFmhaHandle& handle,
     args.max_seqlen_k = static_cast<int>(params_.seqlen_k);
     args.nhead_q = static_cast<int>(params_.nhead_q);
     args.nhead_k = static_cast<int>(params_.nhead_k);
-    args.scale_s = params_.scale;
+    args.scale = params_.scale;
 
     const auto dq = params_.hdim_q;
     const auto dv = params_.hdim_v;
@@ -160,9 +160,9 @@ void CkFmhaBwdPlan::execute(const CkFmhaHandle& handle,
     }
 
     // LSE strides (always dense 1D per head per batch)
-    args.stride_lse = 1;
-    args.nhead_stride_lse = sq;
-    args.batch_stride_lse = hq * sq;
+
+    args.nhead_stride_lsed = sq;
+    args.batch_stride_lsed = hq * sq;
 
     if (params_.bias_uid > 0) {
         args.stride_bias = sk;

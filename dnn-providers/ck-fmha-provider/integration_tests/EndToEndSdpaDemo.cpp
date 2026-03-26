@@ -15,6 +15,7 @@
 // Run:
 //   ./ck_fmha_e2e_demo [--warmup 5] [--repeat 20] [--bwd]
 
+#include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
 #include <hipdnn_backend.h>
 
@@ -42,13 +43,14 @@
 #define HIPDNN_FE_CHECK(err)                                                                  \
     do {                                                                                      \
         auto _e = (err);                                                                      \
-        if (_e.get_code() != hipdnn_frontend::graph::ErrorCode::OK) {                         \
+        if (_e.get_code() != hipdnn_frontend::ErrorCode::OK) {                                \
             std::cerr << "hipDNN FE error: " << _e.get_message() << " at " << __FILE__ << ":" \
                       << __LINE__ << std::endl;                                               \
             std::exit(1);                                                                     \
         }                                                                                     \
     } while (0)
 
+using namespace hipdnn_frontend;
 using namespace hipdnn_frontend::graph;
 
 namespace {
@@ -377,15 +379,27 @@ int main(int argc, char** argv) {
               << "  Warmup: " << warmup << "  Repeat: " << repeat << "\n"
               << "============================================================\n\n";
 
+    const char* plugin_dir = std::getenv("HIPDNN_PLUGIN_PATH");
+    if (plugin_dir != nullptr) {
+        const char* paths[] = {plugin_dir};
+        hipdnnSetEnginePluginPaths_ext(1, paths, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+        std::cout << "  Plugin path: " << plugin_dir << "\n";
+    } else {
+        std::cout << "  WARNING: Set HIPDNN_PLUGIN_PATH to the directory containing\n"
+                  << "  ck_fmha_provider_plugin.so\n";
+    }
+
     hipdnnHandle_t handle;
     hipdnnCreate(&handle);
+    std::cout << std::endl;
 
     // Shapes from ck_fmha_testing_matrix.yaml (smoke tier)
-    // Verified against fmha_bench_all.csv benchmark data
     std::vector<Shape> shapes = {
+        // Basic MHA matching minimal kernel config
+        {2, 4, 4, 128, 128, 128, 128},
         // GQA_4to1_Prefill_Basic: Llama-3-8B baseline
-        {1, 32, 8, 2048, 2048, 128, 128},  // ~795 TFLOPS
-        {4, 32, 8, 2048, 2048, 128, 128},  // ~826 TFLOPS
+        {1, 32, 8, 2048, 2048, 128, 128},
+        {4, 32, 8, 2048, 2048, 128, 128},
         // GQA_16to1_Large: 70B-class models
         {1, 64, 4, 2048, 2048, 128, 128},  // ~811 TFLOPS
         {4, 64, 4, 2048, 2048, 128, 128},  // ~730 TFLOPS

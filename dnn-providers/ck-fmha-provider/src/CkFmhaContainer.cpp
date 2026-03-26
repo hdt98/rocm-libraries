@@ -10,6 +10,8 @@
 #include "engines/plans/CkFmhaBwdPlanBuilder.hpp"
 #include "engines/plans/CkFmhaFwdPlanBuilder.hpp"
 
+using namespace hipdnn_data_sdk::utilities;
+
 namespace ck_fmha_plugin {
 
 HIPDNN_REGISTER_ENGINE(CK_FMHA_ENGINE, "CK_FMHA_ENGINE")

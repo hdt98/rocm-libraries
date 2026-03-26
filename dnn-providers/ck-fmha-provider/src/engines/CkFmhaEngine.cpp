@@ -8,6 +8,8 @@
 #include <hipdnn_plugin_sdk/PluginException.hpp>
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
 
+#include "CkFmhaContext.hpp"
+
 namespace ck_fmha_plugin {
 
 CkFmhaEngine::CkFmhaEngine(int64_t id) : id_(id) {}

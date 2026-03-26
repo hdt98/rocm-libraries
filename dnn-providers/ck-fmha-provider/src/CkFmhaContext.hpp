@@ -8,12 +8,8 @@
 
 #include "CkFmhaSettings.hpp"
 
-namespace ck_fmha_plugin {
-
 struct CkFmhaHandle;
 
-}  // namespace ck_fmha_plugin
-
-struct CkFmhaContext : HipdnnEnginePluginExecutionContext,
-                       hipdnn_plugin_sdk::ExecutionContextBase<ck_fmha_plugin::CkFmhaHandle,
-                                                               ck_fmha_plugin::CkFmhaSettings> {};
+struct CkFmhaContext
+    : HipdnnEnginePluginExecutionContext,
+      hipdnn_plugin_sdk::ExecutionContextBase<CkFmhaHandle, ck_fmha_plugin::CkFmhaSettings> {};

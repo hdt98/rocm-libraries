@@ -4,6 +4,42 @@ A hipDNN engine plugin that executes Scaled Dot-Product Attention (SDPA)
 forward and backward operations through the Composable Kernel (CK) FMHA
 dispatcher.
 
+## Quickstart
+
+Build hipDNN, build the plugin, run the demo -- all on a machine with ROCm and an AMD GPU:
+
+```bash
+# 1. Build hipDNN backend
+cd projects/hipdnn
+cmake -B build -G Ninja -DCMAKE_CXX_COMPILER=hipcc \
+  -DHIPDNN_SKIP_TESTS=ON -DHIPDNN_GENERATE_SDK_HEADERS=OFF \
+  -DENABLE_CLANG_TIDY=OFF -DENABLE_CLANG_FORMAT=OFF -DCMAKE_BUILD_TYPE=Release
+ninja -C build hipdnn_backend
+
+# 2. Build CK dispatcher FMHA library (precompiled GPU kernels)
+cd ../composablekernel/dispatcher/build
+cmake --build . --target dispatcher_fmha_lib -j$(nproc)
+
+# 3. Build the CK FMHA plugin (see docs/EndToEndGuide.md for full commands)
+#    Short version: compile plugin sources with hipcc, link with
+#    libck_tile_dispatcher.a + generated kernel .o, install to plugin dir
+mkdir -p projects/hipdnn/build/lib/hipdnn_plugins/engines
+cp ck_fmha_provider_plugin.so projects/hipdnn/build/lib/hipdnn_plugins/engines/
+
+# 4. Compile the demo (links only against libhipdnn_backend.so)
+hipcc -std=c++17 -O2 -w <include flags> -lhipdnn_backend \
+  dnn-providers/ck-fmha-provider/integration_tests/EndToEndSdpaDemo.cpp \
+  -o ck_fmha_e2e_demo
+
+# 5. Run
+HIPDNN_PLUGIN_PATH=projects/hipdnn/build/lib/hipdnn_plugins/engines \
+  ./ck_fmha_e2e_demo --warmup 2 --repeat 10
+```
+
+For the complete step-by-step with every flag and include path, see
+**[docs/EndToEndGuide.md](docs/EndToEndGuide.md)** -- it documents exactly
+what was run on an MI355X (gfx950) to produce the verified TFLOPS output below.
+
 ## End-to-End Flow
 
 ### 1. Plugin Discovery
@@ -207,6 +243,26 @@ dV->set_output(true).set_uid(9);
 
 bwd_graph.build(handle);
 ```
+
+## Verified End-to-End (MI355X gfx950)
+
+The following shapes ran successfully through the full hipDNN Graph API path
+(`Graph::sdpa()` -> `graph.build()` -> `graph.execute()` -> CK kernel on GPU):
+
+```
+Shape                                             Time(ms)    TFLOPS
+--------------------------------------------------------------------------
+B=2 Hq=4 Hk=4 Sq=128 Sk=128 Dq=128 Dv=128         0.01        6.61
+B=1 Hq=32 Hk=8 Sq=2048 Sk=2048 Dq=128 Dv=128      0.18        375.58
+B=4 Hq=32 Hk=8 Sq=2048 Sk=2048 Dq=128 Dv=128      0.70        390.89
+B=4 Hq=64 Hk=4 Sq=2048 Sk=2048 Dq=128 Dv=128      1.36        404.38
+B=1 Hq=14 Hk=2 Sq=1024 Sk=1024 Dq=64 Dv=64        0.04        88.47
+B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 Dq=128 Dv=128       0.04        193.80
+```
+
+These numbers are with a single precompiled kernel (h128 fp16 qr_async).
+With the full receipt-curated kernel set (~50-100 kernels), seqtune-aware
+selection picks optimal kernels per shape for higher peak TFLOPS.
 
 ## Testing Matrix Shapes
 

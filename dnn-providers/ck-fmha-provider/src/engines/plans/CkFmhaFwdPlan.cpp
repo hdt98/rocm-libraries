@@ -27,19 +27,31 @@ void* CkFmhaFwdPlan::findBuffer(int64_t uid, const hipdnnPluginDeviceBuffer_t* b
 void CkFmhaFwdPlan::execute(const CkFmhaHandle& handle,
                             const hipdnnPluginDeviceBuffer_t* deviceBuffers,
                             uint32_t numDeviceBuffers, void*) const {
-    ck_tile::dispatcher::fmha_fwd_traits traits{};
-    traits.hdim_q = static_cast<int>(params_.hdim_q);
-    traits.hdim_v = static_cast<int>(params_.hdim_v);
+    const int batch = static_cast<int>(params_.batch);
+    const int nhead_q = static_cast<int>(params_.nhead_q);
+    const int nhead_k = static_cast<int>(params_.nhead_k);
+    const int seqlen_q = static_cast<int>(params_.seqlen_q);
+    const int seqlen_k = static_cast<int>(params_.seqlen_k);
+    const int hdim_q = static_cast<int>(params_.hdim_q);
+    const int hdim_v = static_cast<int>(params_.hdim_v);
+
+    fmha_fwd_traits traits{};
+    traits.hdim_q = hdim_q;
+    traits.hdim_v = hdim_v;
     traits.data_type = params_.data_type;
     traits.is_group_mode = false;
     traits.is_v_rowmajor = true;
     traits.has_logits_soft_cap = false;
-    traits.mask_type = static_cast<decltype(traits.mask_type)>(params_.mask_type);
-    traits.bias_type = static_cast<decltype(traits.bias_type)>(params_.bias_type);
+    traits.mask_type = static_cast<mask_enum>(params_.mask_type);
+    traits.bias_type = static_cast<bias_enum>(params_.bias_type);
     traits.has_lse = params_.has_lse;
     traits.has_dropout = params_.has_dropout;
+    traits.qscale_type = quant_scale_enum::no_scale;
+    traits.skip_min_seqlen_q = false;
+    traits.has_sink = false;
 
-    ck_tile::dispatcher::fmha_fwd_args args{};
+    fmha_fwd_args args{};
+
     args.q_ptr = findBuffer(params_.q_uid, deviceBuffers, numDeviceBuffers);
     args.k_ptr = findBuffer(params_.k_uid, deviceBuffers, numDeviceBuffers);
     args.v_ptr = findBuffer(params_.v_uid, deviceBuffers, numDeviceBuffers);
@@ -50,67 +62,56 @@ void CkFmhaFwdPlan::execute(const CkFmhaHandle& handle,
     if (params_.lse_uid > 0)
         args.lse_ptr = findBuffer(params_.lse_uid, deviceBuffers, numDeviceBuffers);
 
-    args.seqlen_q = static_cast<int>(params_.seqlen_q);
-    args.seqlen_k = static_cast<int>(params_.seqlen_k);
-    args.batch = static_cast<int>(params_.batch);
-    args.max_seqlen_q = static_cast<int>(params_.seqlen_q);
-    args.nhead_q = static_cast<int>(params_.nhead_q);
-    args.nhead_k = static_cast<int>(params_.nhead_k);
+    args.seqlen_q = seqlen_q;
+    args.seqlen_k = seqlen_k;
+    args.batch = batch;
+    args.max_seqlen_q = seqlen_q;
+    args.hdim_q = hdim_q;
+    args.hdim_v = hdim_v;
+    args.nhead_q = nhead_q;
+    args.nhead_k = nhead_k;
     args.scale_s = params_.scale;
 
-    // BHSD stride convention
-    const auto dq = params_.hdim_q;
-    const auto dv = params_.hdim_v;
-    const auto sq = params_.seqlen_q;
-    const auto sk = params_.seqlen_k;
-    const auto hq = params_.nhead_q;
-    const auto hk = params_.nhead_k;
-
+    // Strides: exactly matching fmha_ctypes_lib.cpp reference implementation
     if (params_.is_bhsd_layout) {
-        args.stride_q = dq;
-        args.nhead_stride_q = sq * dq;
-        args.batch_stride_q = hq * sq * dq;
-
-        args.stride_k = dq;
-        args.nhead_stride_k = sk * dq;
-        args.batch_stride_k = hk * sk * dq;
-
-        args.stride_v = dv;
-        args.nhead_stride_v = sk * dv;
-        args.batch_stride_v = hk * sk * dv;
-
-        args.stride_o = dv;
-        args.nhead_stride_o = sq * dv;
-        args.batch_stride_o = hq * sq * dv;
+        // BHSD: [batch, head, seq, dim]
+        args.stride_q = hdim_q;
+        args.stride_k = hdim_q;
+        args.stride_v = hdim_v;
+        args.stride_o = hdim_v;
+        args.nhead_stride_q = seqlen_q * hdim_q;
+        args.nhead_stride_k = seqlen_k * hdim_q;
+        args.nhead_stride_v = seqlen_k * hdim_v;
+        args.nhead_stride_o = seqlen_q * hdim_v;
+        args.batch_stride_q = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_q;
+        args.batch_stride_k = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_q;
+        args.batch_stride_v = static_cast<int64_t>(nhead_k) * seqlen_k * hdim_v;
+        args.batch_stride_o = static_cast<int64_t>(nhead_q) * seqlen_q * hdim_v;
     } else {
-        // BSHD layout
-        args.stride_q = dq;
-        args.nhead_stride_q = dq;
-        args.batch_stride_q = sq * hq * dq;
-
-        args.stride_k = dq;
-        args.nhead_stride_k = dq;
-        args.batch_stride_k = sk * hk * dq;
-
-        args.stride_v = dv;
-        args.nhead_stride_v = dv;
-        args.batch_stride_v = sk * hk * dv;
-
-        args.stride_o = dv;
-        args.nhead_stride_o = dv;
-        args.batch_stride_o = sq * hq * dv;
+        // BSHD: [batch, seq, head, dim]
+        args.stride_q = nhead_q * hdim_q;
+        args.stride_k = nhead_k * hdim_q;
+        args.stride_v = nhead_k * hdim_v;
+        args.stride_o = nhead_q * hdim_v;
+        args.nhead_stride_q = hdim_q;
+        args.nhead_stride_k = hdim_q;
+        args.nhead_stride_v = hdim_v;
+        args.nhead_stride_o = hdim_v;
+        args.batch_stride_q = static_cast<int64_t>(seqlen_q) * nhead_q * hdim_q;
+        args.batch_stride_k = static_cast<int64_t>(seqlen_k) * nhead_k * hdim_q;
+        args.batch_stride_v = static_cast<int64_t>(seqlen_k) * nhead_k * hdim_v;
+        args.batch_stride_o = static_cast<int64_t>(seqlen_q) * nhead_q * hdim_v;
     }
 
     if (params_.has_lse) {
-        args.stride_lse = 1;
-        args.nhead_stride_lse = sq;
-        args.batch_stride_lse = hq * sq;
+        args.nhead_stride_lse = seqlen_q;
+        args.batch_stride_lse = static_cast<int64_t>(nhead_q) * seqlen_q;
     }
 
     if (params_.bias_uid > 0) {
-        args.stride_bias = sk;
-        args.nhead_stride_bias = sq * sk;
-        args.batch_stride_bias = hq * sq * sk;
+        args.stride_bias = seqlen_k;
+        args.nhead_stride_bias = static_cast<int64_t>(seqlen_q) * seqlen_k;
+        args.batch_stride_bias = static_cast<int64_t>(nhead_q) * seqlen_q * seqlen_k;
     }
 
     args.window_size_left = static_cast<int>(params_.window_left);
