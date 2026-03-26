@@ -58,6 +58,11 @@ __host__ __device__ constexpr auto MakeFunctorInvoker(Fs&&... fs)
 template <typename T, index_t ik>
 struct IndexEval;
 
+template <typename T, index_t ik>
+struct IndexEval<const T, ik> : IndexEval<T, ik>
+{
+};
+
 template <index_t v, index_t ik>
 struct IndexEval<Number<v>, ik>
 {
