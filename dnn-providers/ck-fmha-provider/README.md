@@ -26,9 +26,9 @@ When `hipdnnEnginePluginCreate()` is called, a `CkFmhaHandle` is constructed:
 
 ```
 CkFmhaHandle()
-  detect_gfx_arch()           "gfx942"
+  detect_gfx_arch()           e.g. "gfx950"
   make_fmha_registry()        FmhaRegistry with all precompiled kernels
-  filter_by_arch("gfx942")    Remove kernels for other architectures
+  filter_by_arch(arch)        Remove kernels for other architectures
   FmhaDispatcher(registry)    Kernel selection engine
   set_benchmarking(false)     One-shot execution, no timing overhead
   loadSupplementalKernels()   Scan CK_FMHA_KERNEL_LIB_PATH for extra .so
@@ -208,85 +208,24 @@ dV->set_output(true).set_uid(9);
 bwd_graph.build(handle);
 ```
 
-## Performance (Measured on MI300X gfx942, fp16)
+## Testing Matrix Shapes
 
-Shapes aligned with `ck_fmha_testing_matrix.yaml`. TFLOPS from actual
-benchmarks (`fmha_bench_all.csv`), best kernel per shape.
+Benchmark shapes are aligned with `ck_fmha_testing_matrix.yaml` (smoke tier).
+Run `ck_fmha_e2e_demo` to collect TFLOPS on your target hardware.
 
-### Forward SDPA (No Mask)
-
-| Shape | Model Archetype | Latency (ms) | TFLOPS |
-|-------|-----------------|---------------|--------|
-| B=4 Hq=32 Hk=8 Sq=2048 Sk=2048 D=128 | Llama-3-8B GQA prefill | 0.333 | 825.7 |
-| B=1 Hq=64 Hk=4 Sq=2048 Sk=2048 D=128 | 70B-class GQA prefill | 0.169 | 811.3 |
-| B=1 Hq=32 Hk=8 Sq=2048 Sk=2048 D=128 | Llama-3-8B single-batch | 0.087 | 794.5 |
-| B=4 Hq=64 Hk=4 Sq=2048 Sk=2048 D=128 | 70B-class batched | 0.753 | 730.2 |
-| B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=192/128 | Asymmetric hdim (MLA) | 0.034 | 318.1 |
-| B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=256 | H256 high LDS pressure | 0.056 | 308.4 |
-| B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=128 | Standard GQA 2:1 | 0.031 | 277.5 |
-| B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=64 | Small hdim GQA | 0.024 | 178.6 |
-| B=1 Hq=14 Hk=2 Sq=1024 Sk=1024 D=64 | Small GQA 7:1 | 0.024 | 155.6 |
-| B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=32 | Minimal hdim | 0.019 | 116.1 |
-
-### Forward SDPA (Causal Mask, Top-Left)
-
-| Shape | Latency (ms) | TFLOPS |
-|-------|---------------|--------|
-| B=4 Hq=32 Hk=8 Sq=2048 Sk=2048 D=128 | 0.338 | 814.4 |
-| B=1 Hq=64 Hk=4 Sq=2048 Sk=2048 D=128 | 0.170 | 809.2 |
-| B=1 Hq=32 Hk=8 Sq=2048 Sk=2048 D=128 | 0.087 | 792.4 |
-| B=4 Hq=64 Hk=4 Sq=2048 Sk=2048 D=128 | 0.697 | 788.7 |
-| B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=128 | 0.031 | 281.1 |
-| B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=64 | 0.025 | 172.9 |
-
-### Forward SDPA (bf16)
-
-| Shape | Latency (ms) | TFLOPS |
-|-------|---------------|--------|
-| B=4 Hq=32 Hk=8 Sq=2048 Sk=2048 D=128 | 0.311 | 883.2 |
-| B=1 Hq=64 Hk=4 Sq=2048 Sk=2048 D=128 | 0.157 | 873.3 |
-| B=1 Hq=32 Hk=8 Sq=2048 Sk=2048 D=128 | 0.081 | 850.6 |
-| B=4 Hq=64 Hk=4 Sq=2048 Sk=2048 D=128 | 0.720 | 763.3 |
-
-### Decode Shapes (Single-Token Query)
-
-| Shape | Latency (ms) | TFLOPS |
-|-------|---------------|--------|
-| B=64 Hq=128 Hk=8 Sq=1 Sk=1024 D=128 | 0.310 | 13.8 |
-| B=64 Hq=128 Hk=8 Sq=1 Sk=4096 D=128 | 1.380 | 12.5 |
-| B=8 Hq=128 Hk=8 Sq=1 Sk=4096 D=128 | 0.247 | 8.7 |
-| B=8 Hq=128 Hk=8 Sq=1 Sk=1024 D=128 | 0.067 | 8.1 |
-| B=1 Hq=128 Hk=8 Sq=1 Sk=4096 D=128 | 0.115 | 2.3 |
-| B=1 Hq=128 Hk=8 Sq=1 Sk=1024 D=128 | 0.029 | 2.3 |
-
-### Testing Matrix Shape Coverage
-
-Shapes from `ck_fmha_testing_matrix.yaml` (smoke tier). Shapes marked
-with a check have verified benchmark data:
-
-| Test Name | Key Shape | TFLOPS | Status |
-|-----------|-----------|--------|--------|
-| GQA_4to1_Prefill_Basic | B=1 Hq=32 Hk=8 Sq=2048 Sk=2048 D=128 | 794.5 | Verified |
-| GQA_4to1_Prefill_Basic (batch=4) | B=4 Hq=32 Hk=8 Sq=2048 Sk=2048 D=128 | 825.7 | Verified |
-| Small_GQA_7to1_SubWarp | B=1 Hq=14 Hk=2 Sq=1024 Sk=1024 D=64 | 155.6 | Verified |
-| CK_All_Hdim_Sweep (h32) | B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=32 | 116.1 | Verified |
-| CK_All_Hdim_Sweep (h64) | B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=64 | 178.6 | Verified |
-| CK_All_Hdim_Sweep (h128) | B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=128 | 277.5 | Verified |
-| CK_All_Hdim_Sweep (h160) | B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=160 | 281.6 | Verified |
-| CK_All_Hdim_Sweep (h192) | B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=192 | 285.9 | Verified |
-| CK_All_Hdim_Sweep (h256) | B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=256 | 308.4 | Verified |
-| CK_All_Hdim_Sweep (h192x128) | B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=192/128 | 318.1 | Verified |
-| CK_All_Hdim_Sweep (h80x96) | B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=80/96 | 221.8 | Verified |
-| CK_All_Hdim_Sweep (h96x128) | B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=96/128 | 265.4 | Verified |
-| GQA_16to1_Large | B=1 Hq=64 Hk=4 Sq=2048 Sk=2048 D=128 | 811.3 | Verified |
-| GQA_16to1_Large (batch=4) | B=4 Hq=64 Hk=4 Sq=2048 Sk=2048 D=128 | 730.2 | Verified |
-| MQA_128to8_Decode (B=8) | B=8 Hq=128 Hk=8 Sq=1 Sk=1024 D=128 | 8.1 | Verified |
-| MQA_128to8_Decode (B=64) | B=64 Hq=128 Hk=8 Sq=1 Sk=1024 D=128 | 13.8 | Verified |
-| Extreme_GQA_Ratios | B=2 Hq=5..48 Hk=1..8 Sq=1024 Sk=1024 D=128 | -- | Not yet benchmarked |
-| Prefill_Odd_Lengths | B=2 Hq=32 Hk=8 Sq=113..3131 Sk=203..3131 D=128 | -- | Not yet benchmarked |
-| CK_Tiny_Sequences | B=1..2 Sq=1..33 Sk=10..99 | -- | Not yet benchmarked |
-| MLA_Sparse_Decode | B=1 Hq=128 Hk=128 Sq=1 Sk=1024 D=192/128 | -- | Not yet benchmarked |
-| Vision_Transformer_Shapes | B=1..4 Hq=16..40 D=88..128 | -- | Not yet benchmarked |
+| Test Name | Key Shape | Model Archetype |
+|-----------|-----------|-----------------|
+| GQA_4to1_Prefill_Basic | B=1 Hq=32 Hk=8 Sq=2048 Sk=2048 D=128 | Llama-3-8B |
+| GQA_4to1_Prefill_Basic | B=4 Hq=32 Hk=8 Sq=2048 Sk=2048 D=128 | Llama-3-8B batched |
+| GQA_16to1_Large | B=1 Hq=64 Hk=4 Sq=2048 Sk=2048 D=128 | 70B-class |
+| Small_GQA_7to1_SubWarp | B=1 Hq=14 Hk=2 Sq=1024 Sk=1024 D=64 | Sub-warp loads |
+| CK_All_Hdim_Sweep | B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 D=32..256 | hdim coverage |
+| MQA_128to8_Decode | B=8..64 Hq=128 Hk=8 Sq=1 Sk=1024..4096 D=128 | 405B decode |
+| MLA_Sparse_Decode | B=1..4 Hq=128 Hk=128 Sq=1 Sk=1024..4096 D=192/128 | R1-class MLA |
+| Extreme_GQA_Ratios | B=2 Hq=5..48 Hk=1..8 Sq=1024 Sk=1024 D=128 | Exotic GQA |
+| Prefill_Odd_Lengths | B=2 Hq=32 Hk=8 Sq=113..3131 D=128 | Padding stress |
+| CK_Tiny_Sequences | B=1..2 Sq=1..33 Sk=10..99 D=128 | Edge cases |
+| Vision_Transformer | B=1..4 Hq=16..40 D=88..128 | ViT hybrid |
 
 ## Supported Configurations
 
