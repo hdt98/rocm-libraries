@@ -944,7 +944,7 @@ __device__ void amd_async_copy_to_lds_impl_raw(__attribute__((address_space(1)))
 
     // ROCm 7.0.1 compiler flags unsupported builtins even though the function is never instantiated
     // for gfx9xx architectures
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
 #if CK_USE_AMD_LDS_DIRECT_LOAD_INLINE_ASM
     constexpr bool use_asm_path = is_uniform_src_ptr;
 #else
@@ -1134,7 +1134,7 @@ __device__ void amd_async_copy_to_lds_impl(__attribute__((address_space(1))) con
                                            index_t src_offfset,
                                            __attribute__((address_space(3))) T* dst_ptr)
 {
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
     // currently only support to b8, b32, b64, b128 when one async copy
     static_assert((is_same<T, double>::value && (N == 1 || N == 2)) ||
                       (is_same<T, float>::value && (N == 1 || N == 2 || N == 4)) ||

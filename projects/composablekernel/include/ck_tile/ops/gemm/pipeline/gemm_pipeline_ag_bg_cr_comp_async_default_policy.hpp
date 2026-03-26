@@ -28,7 +28,7 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto MakeALdsBlockDescriptor()
     {
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
         return Base::template MakeALdsBlockDescriptor<Problem>();
 #else
         constexpr index_t MPerBlock = Problem::BlockGemmShape::kM;
@@ -69,7 +69,7 @@ struct GemmPipelineAgBgCrCompAsyncDefaultPolicy
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto MakeBLdsBlockDescriptor()
     {
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
         return Base::template MakeBLdsBlockDescriptor<Problem>();
 #else
         constexpr index_t NPerBlock = Problem::BlockGemmShape::kN;

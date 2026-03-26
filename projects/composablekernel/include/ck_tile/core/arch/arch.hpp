@@ -1219,7 +1219,7 @@ template <index_t tensorcnt = 0>
 CK_TILE_DEVICE void s_wait_tensorcnt_barrier()
 {
     s_wait_tensorcnt<tensorcnt>();
-#if defined(__gfx12__)
+#if defined(__gfx12__) || defined(__gfx13__)
     __builtin_amdgcn_s_barrier_signal(-1);
     __builtin_amdgcn_s_barrier_wait(-1);
 #else
@@ -1244,7 +1244,7 @@ CK_TILE_DEVICE void block_async_lds(index_t cnt = 0)
 template <index_t vmcnt = 0>
 CK_TILE_DEVICE void block_sync_lds_direct_load()
 {
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
     __builtin_amdgcn_s_wait_asynccnt(vmcnt);
     __builtin_amdgcn_s_barrier_signal(-1);
     __builtin_amdgcn_s_barrier_wait(-1);

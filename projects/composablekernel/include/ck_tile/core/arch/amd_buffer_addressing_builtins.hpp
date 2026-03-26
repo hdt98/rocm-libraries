@@ -51,7 +51,7 @@ CK_TILE_DEVICE int32x4_t make_wave_buffer_resource(const void* ptr,
                                                    ForceSGPR     = {})
 {
     buffer_resource res;
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
     res.address[0] = const_cast<void*>(ptr);
     res.range[1] |= (size & 0x7f) << 25;
     res.range[2] = (size >> 7) & 0xffffffff;
@@ -2704,7 +2704,7 @@ __device__ void amd_async_global_load_to_lds(CK_TILE_LDS_ADDR T* smem_ptr,
                       (std::is_same_v<T, uint8_t> && (N == 1 || N == 4 || N == 8 || N == 16)),
                   "wrong! not implemented");
 
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
 #if CK_TILE_USE_AMD_LDS_DIRECT_LOAD_INLINE_ASM
     constexpr bool use_asm_path = is_uniform_global_ptr;
 #else
@@ -3089,7 +3089,7 @@ __device__ auto amd_transpose_load_to_vgpr(const T* __restrict__ in_ptr)
         typedef __attribute__((__vector_size__(4 * sizeof(__fp16)))) __fp16 llvm_fp16x4_t;
         auto lds_ptr = reinterpret_cast<__LDS_ADDR llvm_fp16x4_t*>(in_ptr_);
         return bit_cast<thread_buffer<T, N>>(__builtin_amdgcn_ds_read_tr16_b64_v4f16(lds_ptr));
-#elif defined(__gfx125__)
+#elif defined(__gfx125__) || defined(__gfx13__)
         typedef __attribute__((__vector_size__(8 * sizeof(__fp16)))) __fp16 llvm_fp16x8_t;
         auto lds_ptr = reinterpret_cast<__LDS_ADDR llvm_fp16x8_t*>(in_ptr_);
         return bit_cast<thread_buffer<T, N>>(__builtin_amdgcn_ds_load_tr16_b128_v8f16(lds_ptr));
@@ -3103,7 +3103,7 @@ __device__ auto amd_transpose_load_to_vgpr(const T* __restrict__ in_ptr)
         typedef __attribute__((__vector_size__(4 * sizeof(__bf16)))) __bf16 llvm_bf16x4_t;
         auto lds_ptr = reinterpret_cast<__LDS_ADDR llvm_bf16x4_t*>(in_ptr_);
         return bit_cast<thread_buffer<T, N>>(__builtin_amdgcn_ds_read_tr16_b64_v4bf16(lds_ptr));
-#elif defined(__gfx125__)
+#elif defined(__gfx125__) || defined(__gfx13__)
         typedef __attribute__((__vector_size__(8 * sizeof(__bf16)))) __bf16 llvm_bf16x8_t;
         auto lds_ptr = reinterpret_cast<__LDS_ADDR llvm_bf16x8_t*>(in_ptr_);
         return bit_cast<thread_buffer<T, N>>(__builtin_amdgcn_ds_load_tr16_b128_v8bf16(lds_ptr));
@@ -3120,7 +3120,7 @@ __device__ auto amd_transpose_load_to_vgpr(const T* __restrict__ in_ptr)
             reinterpret_cast<__LDS_ADDR llvm_i32x2_t*>(reinterpret_cast<uintptr_t>(in_ptr));
 #if defined(__gfx950__)
         return bit_cast<thread_buffer<T, N>>(__builtin_amdgcn_ds_read_tr8_b64_v2i32(lds_ptr));
-#elif defined(__gfx125__)
+#elif defined(__gfx125__) || defined(__gfx13__)
         return bit_cast<thread_buffer<T, N>>(__builtin_amdgcn_ds_load_tr8_b64_v2i32(lds_ptr));
 #else
         ignore = lds_ptr;

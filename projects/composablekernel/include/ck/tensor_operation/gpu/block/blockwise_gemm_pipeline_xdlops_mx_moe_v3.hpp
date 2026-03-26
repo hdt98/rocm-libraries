@@ -448,7 +448,7 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_nbs_v3<BlockGemmPipelineScheduler::In
             make_multi_index(-NWaves * NRepeat / NXdlPack, KRepeat / KXdlPack, 0));
 
         // Local prefetch 1, sync the async load
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
         block_sync_lds_async_load();
 #else
         __builtin_amdgcn_s_waitcnt(3952);
@@ -520,7 +520,7 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_nbs_v3<BlockGemmPipelineScheduler::In
             do
             {
                 auto LoopFunc = [&](auto scale_comp_buf, auto scale_mem_buf) {
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
                     block_sync_lds_async_load();
 #else
                     __builtin_amdgcn_s_waitcnt(3952);
@@ -843,7 +843,7 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_nbs_v3<BlockGemmPipelineScheduler::In
                     });
                 });
             });
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
             block_sync_lds_async_load();
 #else
             __builtin_amdgcn_s_waitcnt(3952);

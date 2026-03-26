@@ -432,6 +432,12 @@ struct UniversalGemmBasePolicy
         }
     }
 
+    template <typename Problem>
+    CK_TILE_DEVICE static constexpr auto MakeALdsBlockDescriptorImpl(gfx13_t)
+    {
+        return MakeALdsBlockDescriptorImpl<Problem>(gfx125_t{});
+    }
+
     // =====================================================
     // Main entry point: dispatches based on architecture
     // =====================================================
@@ -702,6 +708,11 @@ struct UniversalGemmBasePolicy
         }
     }
 
+    template <typename Problem>
+    CK_TILE_DEVICE static constexpr auto MakeBLdsBlockDescriptorImpl(gfx13_t)
+    {
+        return MakeBLdsBlockDescriptorImpl<Problem>(gfx125_t{});
+    }
     // =====================================================
     // Main entry point: dispatches based on architecture
     // =====================================================

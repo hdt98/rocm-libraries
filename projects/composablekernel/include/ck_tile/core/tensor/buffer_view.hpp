@@ -433,7 +433,8 @@ struct buffer_view<address_space_enum::global,
                       "wrong! X should contain multiple T");
 
         constexpr index_t t_per_x = scalar_per_x_vector / scalar_per_t_vector;
-#if defined(__gfx125__) // for gfx125; there uses another instruction to do async load
+#if defined(__gfx125__) || \
+    defined(__gfx13__) // for gfx125; there uses another instruction to do async load
         auto p_uniform_ptr = amd_wave_read_first_lane(p_data_);
         amd_async_global_load_to_lds<remove_cvref_t<T>, t_per_x, static_offset, true, Coherence>(
             smem, p_uniform_ptr, i + linear_offset, is_valid_element);
@@ -492,7 +493,7 @@ struct buffer_view<address_space_enum::global,
 #endif
         }
 
-#if defined(__gfx12__)
+#if defined(__gfx12__) || defined(__gfx13__)
         static constexpr bool is_cu_scope = []() {
             constexpr int coherence    = static_cast<int>(Coherence_);
             constexpr int se_scope     = static_cast<int>(amd_buffer_coherence_enum::SE);

@@ -593,6 +593,8 @@ struct DeviceGemm_Xdl_CkTileWrap : public
 #if CK_TILE_USE_WMMA
 #if defined(CK_USE_GFX1250)
     using DeviceArch = gfx125_t;
+#elif defined(CK_EXTENSION_MX_TYPE)
+    using DeviceArch = gfx13_t;
 #else
     using DeviceArch = gfx120_t;
 #endif
@@ -621,8 +623,8 @@ struct DeviceGemm_Xdl_CkTileWrap : public
         if constexpr(GemmConfig::Pipeline == ck_tile::GemmPipeline::COMPUTE_ASYNC ||
                      GemmConfig::Pipeline == ck_tile::GemmPipeline::COMPUTE_ASYNC_V2)
         {
-            if constexpr(!(is_same_v<DeviceArch_, gfx125_t> || is_same_v<DeviceArch_, gfx950_t> ||
-                           is_same_v<DeviceArch_, gfx9_t>))
+            if constexpr(!(is_same_v<DeviceArch_, gfx13_t> || is_same_v<DeviceArch_, gfx125_t> ||
+                           is_same_v<DeviceArch_, gfx950_t> || is_same_v<DeviceArch_, gfx9_t>))
             {
                 return false;
             }

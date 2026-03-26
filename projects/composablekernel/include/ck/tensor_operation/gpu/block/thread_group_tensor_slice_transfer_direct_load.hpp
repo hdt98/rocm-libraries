@@ -166,7 +166,7 @@ struct ThreadGroupTensorSliceTransfer_DirectLoad
             thread_cluster_desc_.CalculateBottomIndex(make_multi_index(ThreadGroup::GetThreadId()));
         const auto thread_data_idx_begin = thread_cluster_idx * thread_single_load_size;
         SetSrcSliceOrigin(src_desc, src_block_slice_origin + thread_data_idx_begin);
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
         SetDstSliceOrigin(dst_desc, dst_block_slice_origin + thread_data_idx_begin);
 #else
         constexpr auto wave_cluster_lengths = generate_sequence_v2(
@@ -232,7 +232,7 @@ struct ThreadGroupTensorSliceTransfer_DirectLoad
         static_assert(
             ck::is_same_v<remove_cvref_t<typename DstBuffer::type>, remove_cvref_t<DstData>>,
             "DstBuffer and DstData data types must be consistent.");
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
         ignore = dst_desc;
         constexpr auto scalar_per_access =
             generate_sequence(detail::lambda_scalar_per_access<DstVectorDim, 1>{}, Number<nDim>{});

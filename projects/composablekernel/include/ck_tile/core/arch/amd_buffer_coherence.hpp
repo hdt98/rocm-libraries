@@ -13,7 +13,7 @@ namespace ck_tile {
 enum struct amd_buffer_coherence_enum
 {
     coherence_default = 0, // default value
-#if defined(__gfx12__)
+#if defined(__gfx12__) || defined(__gfx13__)
     // Temporal hint
     RT = 0, // regular temporal
 #if defined(__gfx125__)

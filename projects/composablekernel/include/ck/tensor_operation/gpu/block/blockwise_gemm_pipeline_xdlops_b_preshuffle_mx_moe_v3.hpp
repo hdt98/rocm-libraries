@@ -528,7 +528,7 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v3<BlockGemmPipelineSched
             make_multi_index(-NWaves * NRepeat / NXdlPack, KRepeat / KXdlPack, 0));
 
         // Local prefetch 1, sync the async load
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
         block_sync_lds_async_load();
 #else
         __builtin_amdgcn_s_waitcnt(async_vmcnt_encoding);
@@ -703,7 +703,7 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v3<BlockGemmPipelineSched
 
                         if constexpr(m0.value == SwitchM)
                         {
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
                             block_sync_lds_async_load();
 #else
                             __builtin_amdgcn_s_waitcnt(async_vmcnt_encoding);
@@ -867,7 +867,7 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v3<BlockGemmPipelineSched
                 });
                 if constexpr(m0.value == SwitchM)
                 {
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
                     block_sync_lds_async_load();
 #else
                     __builtin_amdgcn_s_waitcnt(async_vmcnt_encoding);

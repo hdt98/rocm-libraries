@@ -1274,7 +1274,11 @@ struct GridwiseGemm_xdl_cshuffle_v3
         }
 
         const auto maxVgprCount = []() {
-            if(ck::is_gfx125_supported())
+            if(ck::is_gfx13_supported())
+            {
+                return get_max_vgpr_count(gfx13_t{});
+            }
+            else if(ck::is_gfx125_supported())
             {
                 return get_max_vgpr_count(gfx125_t{});
             }

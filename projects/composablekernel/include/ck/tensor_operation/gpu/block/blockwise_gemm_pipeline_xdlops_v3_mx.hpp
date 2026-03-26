@@ -448,7 +448,7 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx<BlockGemmPipelineScheduler::Intrawave,
             make_multi_index(-NWaves * NRepeat / NXdlPack, KRepeat / KXdlPack, 0));
 
 // Local prefetch 1, sync the async load
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
         block_sync_lds_async_load();
 #else
         __builtin_amdgcn_s_waitcnt(3952); // wait for EXP_CNT, LDS, GDS, Constant and Message
@@ -521,7 +521,7 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx<BlockGemmPipelineScheduler::Intrawave,
             do
             {
                 auto LoopFunc = [&](auto scale_comp_buf, auto scale_mem_buf) {
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
                     block_sync_lds_async_load();
 #else
                     // wait for EXP_CNT, LDS, GDS, Constant and Message
@@ -847,7 +847,7 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx<BlockGemmPipelineScheduler::Intrawave,
                 });
             });
 
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
             block_sync_lds_async_load();
 #else
             __builtin_amdgcn_s_waitcnt(3952); // wait for EXP_CNT, LDS, GDS, Constant and Message

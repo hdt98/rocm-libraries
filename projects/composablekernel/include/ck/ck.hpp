@@ -165,7 +165,7 @@
 
 // V_DOT inline instructions, less efficient since they require adding
 // `s_nop`s to avoid hazard
-#ifdef __gfx125__
+#if defined(__gfx125__) || defined(__gfx13__)
 #define CK_USE_AMD_V_DOT_INLINE_ASM 1
 #else
 #define CK_USE_AMD_V_DOT_INLINE_ASM 0
@@ -179,7 +179,7 @@
 #endif
 
 // LDS direct loads using inline assembly
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
 #define CK_USE_AMD_LDS_DIRECT_LOAD_INLINE_ASM 1
 #else
 #define CK_USE_AMD_LDS_DIRECT_LOAD_INLINE_ASM 0

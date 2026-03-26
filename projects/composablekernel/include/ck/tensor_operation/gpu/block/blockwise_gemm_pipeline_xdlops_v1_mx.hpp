@@ -292,7 +292,7 @@ struct BlockwiseGemmXdlops_pipeline_v1_mx<BlockGemmPipelineScheduler::Intrawave,
             make_multi_index(-NWaves * NRepeat / NXdlPack, KRepeat / KXdlPack, 0));
 
 // Local prefill 1
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
         block_sync_lds_async_load();
 #else
         // wait for EXP_CNT[6:4] and LGKM_CNT[11:8] 0b111101110000
@@ -377,7 +377,7 @@ struct BlockwiseGemmXdlops_pipeline_v1_mx<BlockGemmPipelineScheduler::Intrawave,
                 });
 
                 // load for next k loop
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
                 block_sync_lds_async_load();
 #else
                 block_sync_lds();
@@ -503,7 +503,7 @@ struct BlockwiseGemmXdlops_pipeline_v1_mx<BlockGemmPipelineScheduler::Intrawave,
                 b_scale_thread_copy.MoveSrcSliceWindow(
                     b_scale_grid_desc,
                     make_multi_index(-NWaves * NRepeat / NXdlPack, KRepeat / KXdlPack, 0));
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
                 block_sync_lds_async_load();
 #else
                 // wait for EXP_CNT[6:4] and LGKM_CNT[11:8] 0b111101110000

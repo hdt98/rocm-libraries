@@ -56,7 +56,7 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, MinimumOccupancy)
             e_grid_desc_mblock_mperblock_nblock_nperblock,
         const Block2ETileMap block_2_etile_map)
 {
-#if(defined(__gfx90a__) || defined(__gfx94__) || defined(__gfx125__))
+#if defined(__gfx90a__) || defined(__gfx94__) || defined(__gfx125__) || defined(__gfx13__)
     if constexpr(GridwiseGemm::template IsValidCompilationParameter<>())
     {
         __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte()];
@@ -190,8 +190,8 @@ struct GridwiseGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
           Sequence<CDEShuffleBlockTransferScalarPerVector_NPerBlock>,
           AComputeDataType_,
           BComputeDataType_,
-          false, // ForceNaiveLayout
-          true>  // DirectLoad
+          true, // ForceNaiveLayout
+          true> // DirectLoad
 {
     using Base = GridwiseGemm_xdl_cshuffle_base<
         ALayout,
@@ -237,7 +237,7 @@ struct GridwiseGemmMultipleD_Xdl_CShuffle_LdsDirectLoad
         Sequence<CDEShuffleBlockTransferScalarPerVector_NPerBlock>,
         AComputeDataType_,
         BComputeDataType_,
-        false, // ForceNaiveLayout
+        true,  // ForceNaiveLayout
         true>; // DirectLoad
 
     using Base::GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1;

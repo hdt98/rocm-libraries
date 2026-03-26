@@ -176,7 +176,7 @@ struct ThreadGroupTensorSliceTransfer_Gather_DirectLoad
             thread_cluster_desc_.CalculateBottomIndex(make_multi_index(ThreadGroup::GetThreadId()));
         const auto thread_data_idx_begin = thread_cluster_idx * thread_single_load_size;
         SetSrcSliceOrigin(src_desc, src_block_slice_origin + thread_data_idx_begin);
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
         SetDstSliceOrigin(dst_desc, dst_block_slice_origin + thread_data_idx_begin);
 #else
         constexpr auto wave_cluster_lengths = generate_sequence_v2(
@@ -278,7 +278,7 @@ struct ThreadGroupTensorSliceTransfer_Gather_DirectLoad
             // const bool is_src_valid =
             //     coordinate_has_valid_offset_assuming_visible_index_is_valid(src_desc,
             //     src_coord_);
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
             // Check if src data is not in the logic padding area.
             // Leave the HW for oob checking
             const bool is_src_valid =

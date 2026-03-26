@@ -221,13 +221,13 @@ inline bool is_lds_direct_load_supported()
 {
     // Check if direct loads from global memory to LDS are supported.
     return ck::get_device_name() == "gfx90a" || ck::get_device_name() == "gfx942" ||
-           ck::get_device_name() == "gfx950" || is_gfx125_supported();
+           ck::get_device_name() == "gfx950" || is_gfx125_supported() || is_gfx13_supported();
 }
 
 inline bool is_bf16_atomic_supported()
 {
     return ck::get_device_name() == "gfx942" || ck::get_device_name() == "gfx950" ||
-           is_gfx12_supported();
+           is_gfx12_supported() || is_gfx13_supported();
 }
 
 inline bool is_wmma_supported()

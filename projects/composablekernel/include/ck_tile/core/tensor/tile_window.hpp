@@ -630,7 +630,7 @@ struct tile_window_with_static_distribution
         const auto& bottom_tensor_view = lds_tile.get_bottom_tensor_view();
         const auto& tensor_descriptor  = bottom_tensor_view.get_tensor_descriptor();
         auto lds_base_ptr              = bottom_tensor_view.get_buffer_view().p_data_;
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
         // this is an optimization used in gfx125 where lds descriptor don't include xor swizzle
         if constexpr(!remove_cvref_t<decltype(tensor_descriptor)>::template has_transform<
                          coord_transform_enum::xor_t>() &&
@@ -709,7 +709,7 @@ struct tile_window_with_static_distribution
             static_for<0, NumCoord, 1>{}([&](auto iCoord) {
                 auto window_adaptor_thread_coord = pre_computed_coords_[iCoord][I0];
                 auto bottom_tensor_thread_coord  = pre_computed_coords_[iCoord][I1];
-#if !defined(__gfx125__)
+#if !defined(__gfx125__) && !defined(__gfx13__)
                 auto window_adaptor_warp_coord = pre_computed_warp_coords_[iCoord][I0];
                 auto bottom_tensor_warp_coord  = pre_computed_warp_coords_[iCoord][I1];
 #endif
@@ -736,7 +736,7 @@ struct tile_window_with_static_distribution
                     }();
 
                     // Use precomputed window origin & tensor descriptor
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
                     auto lds_bottom_tensor_thread_idx =
                         window_origin + window_adaptor_thread_coord.get_bottom_index();
 #else // else branch for gfx950
@@ -783,7 +783,7 @@ struct tile_window_with_static_distribution
                                 window_adaptor_thread_coord,
                                 bottom_tensor_thread_coord,
                                 idx_diff_ps_ys);
-#if !defined(__gfx125__)
+#if !defined(__gfx125__) && !defined(__gfx13__)
                         if constexpr(!static_move_ys)
                             Base::move_window_adaptor_and_bottom_tensor_thread_coordinate(
                                 window_adaptor_warp_coord,

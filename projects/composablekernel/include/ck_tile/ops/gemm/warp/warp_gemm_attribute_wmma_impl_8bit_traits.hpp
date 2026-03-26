@@ -866,4 +866,32 @@ struct WmmaTraits<gfx13_t, bf8_t, fp8_t, float, 16, 16, 16>
     }
 };
 
+// int8 specialization - GFX13
+template <>
+struct WmmaTraits<gfx13_t, int8_t, int8_t, int32_t, 16, 16, 16>
+    : WmmaTraitsBase<gfx13_t, int8_t, int8_t, int32_t, 16>
+{
+    using ArchType = gfx13_t;
+
+    template <typename... Params>
+    CK_TILE_DEVICE static CVecType
+    wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
+    {
+#ifdef __gfx13__
+        using P = WarpGemmParamsParser<Params...>;
+        return __builtin_amdgcn_wmma_i32_16x16x16_iu8_clamp(true,
+                                                            bit_cast<int32x2_t>(a_vec),
+                                                            true,
+                                                            bit_cast<int32x2_t>(b_vec),
+                                                            bit_cast<int32x8_t>(c_vec),
+                                                            P::clamp);
+#else
+        ck_tile::ignore = a_vec;
+        ck_tile::ignore = b_vec;
+        ck_tile::ignore = c_vec;
+        return CVecType{0};
+#endif
+    }
+};
+
 } // namespace ck_tile

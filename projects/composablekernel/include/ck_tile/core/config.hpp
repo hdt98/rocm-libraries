@@ -148,7 +148,7 @@
 #endif
 
 #ifndef CK_TILE_USE_AMD_LDS_DIRECT_LOAD_INLINE_ASM
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
 #define CK_TILE_USE_AMD_LDS_DIRECT_LOAD_INLINE_ASM 1
 #else
 #define CK_TILE_USE_AMD_LDS_DIRECT_LOAD_INLINE_ASM 1
@@ -213,7 +213,7 @@
 
 #ifndef CK_TILE_ENABLE_CLUSTER_LAUNCH
 #ifdef __HIP_DEVICE_COMPILE__ // for device code
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
 #define CK_TILE_ENABLE_CLUSTER_LAUNCH 1
 #else
 #define CK_TILE_ENABLE_CLUSTER_LAUNCH 0

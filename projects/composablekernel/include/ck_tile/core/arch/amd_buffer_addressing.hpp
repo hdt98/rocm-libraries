@@ -50,7 +50,7 @@ CK_TILE_DEVICE int32x4_t make_wave_buffer_resource(const void* ptr,
                                                    ForceSGPR     = {})
 {
     buffer_resource res;
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
     res.address[0] = const_cast<void*>(ptr);
     res.range[1] |= (size & 0x7f) << 25;
     res.range[2] = (size >> 7) & 0xffffffff;
