@@ -283,10 +283,14 @@ inline constexpr bool problem_fixed_vector_size_v = []() {
 
 template <typename Problem>
 inline constexpr bool problem_is_flatmm_v = []() {
+#if defined(__gfx13__)
+    return true;
+#else
     if constexpr(has_is_flatmm_v<Problem>)
         return Problem::isFlatMM;
     else
         return false;
+#endif
 }();
 
 // Helper struct to determine if a type is packed (more than 1 element per byte)

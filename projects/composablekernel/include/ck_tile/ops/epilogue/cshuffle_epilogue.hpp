@@ -280,6 +280,8 @@ struct CShuffleEpilogue
     static constexpr index_t NumNXdlPerWavePerShuffle =
         max(BlockedXDLN_PerWarp, std::get<1>(shuffle_tile_tuple));
 
+    static_assert(BlockedXDLN_PerWarp == 1 ||
+                  NPerXdl * NWave * NumNXdlPerWavePerShuffle <= kNPerBlock);
     static constexpr auto MNPerIterationShuffle = [] {
         constexpr index_t m_val = MPerXdl * MWave * NumMXdlPerWavePerShuffle;
         constexpr index_t n_val = NPerXdl * NWave * NumNXdlPerWavePerShuffle;

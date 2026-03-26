@@ -844,18 +844,7 @@ struct DeviceGemm_Xdl_CkTileWrap : public
         return IsSupportedArgument(*dynamic_cast<const Argument*>(p_arg));
     }
 #if !defined(CK_TILE_WARP_ENABLE_MX)
-    index_t GetKPerBlock() override
-    {
-        if constexpr(PipelineVer == ck_tile::GemmPipeline::PRESHUFFLE_V2 ||
-                     PipelineVer == ck_tile::GemmPipeline::PRESHUFFLE_TDM)
-        {
-            return KPerBlock | IsPreShuffleMM | DisableGfx9I4ToF32;
-        }
-        else
-        {
-            return KPerBlock | DisableGfx9I4ToF32;
-        }
-    }
+    index_t GetKPerBlock() override { return KPerBlock | DisableGfx9I4ToF32; }
 
     bool GetPermuteA() override { return false; }
     bool GetPermuteB() override { return false; }

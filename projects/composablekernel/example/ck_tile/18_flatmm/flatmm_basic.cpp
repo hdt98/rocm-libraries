@@ -103,6 +103,11 @@ float flatmm_calc(const ck_tile::ScaleFlatmmHostArgs<ScaleM, ScaleN>& args,
                                            ELayout,
                                            FlatmmConfig::NumWaveGroups>;
 
+    // clamp vector load size of gfx12 & gfx13
+    constexpr ck_tile::index_t VectorLoadSize = ck_tile::min(
+        static_cast<ck_tile::index_t>(FlatmmConfig::M_Warp_Tile * FlatmmConfig::K_Warp_Tile *
+                                      sizeof(ADataType) / 32),
+        16);
     using CodegenGemmTraits = ck_tile::TileGemmUniversalTraits<FlatmmConfig::kPadM,
                                                                FlatmmConfig::kPadN,
                                                                FlatmmConfig::kPadK,
@@ -114,7 +119,8 @@ float flatmm_calc(const ck_tile::ScaleFlatmmHostArgs<ScaleM, ScaleN>& args,
                                                                FlatmmConfig::UseStructuredSparsity,
                                                                persistent,
                                                                FlatmmConfig::NumWaveGroups,
-                                                               true>;
+                                                               true,
+                                                               VectorLoadSize>;
 
     using GemmPipelineProblem =
         ck_tile::GemmPipelineProblem<ADataType, BDataType, AccDataType, CodegenFlatmmShape, Traits>;
@@ -128,19 +134,15 @@ float flatmm_calc(const ck_tile::ScaleFlatmmHostArgs<ScaleM, ScaleN>& args,
     const ck_tile::TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);
     float ave_time{0};
 
-    const auto Run = [&](const auto has_hot_loop_, const auto tail_number_) {
-        constexpr bool has_hot_loop_v = has_hot_loop_.value;
-        constexpr auto tail_number_v  = tail_number_.value;
-        constexpr auto scheduler      = FlatmmConfig::Scheduler;
+    const auto Run = [&](const auto, const auto) {
+        constexpr auto scheduler = FlatmmConfig::Scheduler;
 
         using CodegenPipelineProblem = ck_tile::FlatmmPipelineProblem<ADataType,
                                                                       BDataType,
                                                                       AccDataType,
                                                                       CodegenFlatmmShape,
                                                                       CodegenGemmTraits,
-                                                                      scheduler,
-                                                                      has_hot_loop_v,
-                                                                      tail_number_v>;
+                                                                      scheduler>;
 
         using CodegenFlatmmPipeline =
             ck_tile::FlatmmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem>;

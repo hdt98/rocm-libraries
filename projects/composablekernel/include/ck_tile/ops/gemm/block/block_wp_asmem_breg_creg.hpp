@@ -85,8 +85,13 @@ struct BlockWeightPreshuffleASmemBRegCReg
             constexpr auto a_block_inner_dstr_encoding = tile_distribution_encoding<
                 sequence<>,
                 tuple<sequence<MWarpBlock, 16>, sequence<KFragment, KLane, KItemsPerLoad>>,
+#if defined(__gfx13__)
+                tuple<sequence<1, 2>>,
+                tuple<sequence<1, 1>>,
+#else
                 tuple<sequence<2, 1>>,
                 tuple<sequence<1, 1>>,
+#endif
                 sequence<1, 2, 2>,
                 sequence<0, 0, 2>>{};
 

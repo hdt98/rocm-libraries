@@ -199,9 +199,15 @@ auto shuffle_b_v0(const ck_tile::HostTensor<T>& t)
     int n_ = t.get_lengths()[1];
     int k_ = t.get_lengths()[0];
 
-    constexpr int MaxVecSize     = 16 / sizeof(T);
-    constexpr int KLane          = ck_tile::get_warp_size() / FlatmmConfig::N_Warp_Tile;
-    constexpr int ItemsPerAccess = std::min(MaxVecSize, FlatmmConfig::K_Warp_Tile / KLane);
+    constexpr int MaxVecSize = 16 / sizeof(T);
+    const int KLane =
+        ck_tile::is_wave32() ? 32 / FlatmmConfig::N_Warp_Tile : 64 / FlatmmConfig::N_Warp_Tile;
+    int ItemsPerAccess = std::min(MaxVecSize, FlatmmConfig::K_Warp_Tile / KLane);
+    // WMMA data is continuous in KLane
+    if(ck_tile::is_gfx13_supported())
+    {
+        ItemsPerAccess *= KLane;
+    }
 
     ck_tile::HostTensor<T> t_view({n_ / FlatmmConfig::N_Warp_Tile,
                                    FlatmmConfig::N_Warp_Tile,
@@ -218,9 +224,15 @@ auto shuffle_b_v1(const ck_tile::HostTensor<T>& t)
     int n_ = t.get_lengths()[1];
     int k_ = t.get_lengths()[0];
 
-    constexpr int MaxVecSize     = 16 / sizeof(T);
-    constexpr int KLane          = ck_tile::get_warp_size() / FlatmmConfig::N_Warp_Tile;
-    constexpr int ItemsPerAccess = std::min(MaxVecSize, FlatmmConfig::K_Warp_Tile / KLane);
+    constexpr int MaxVecSize = 16 / sizeof(T);
+    const int KLane =
+        ck_tile::is_wave32() ? 32 / FlatmmConfig::N_Warp_Tile : 64 / FlatmmConfig::N_Warp_Tile;
+    int ItemsPerAccess = std::min(MaxVecSize, FlatmmConfig::K_Warp_Tile / KLane);
+    // WMMA data is continuous in KLane
+    if(ck_tile::is_gfx13_supported())
+    {
+        ItemsPerAccess *= KLane;
+    }
     constexpr int NRepeat = FlatmmConfig::N_Tile / FlatmmConfig::N_Warp_Tile / FlatmmConfig::N_Warp;
 
     ck_tile::HostTensor<T> t_view({n_ / FlatmmConfig::N_Tile,

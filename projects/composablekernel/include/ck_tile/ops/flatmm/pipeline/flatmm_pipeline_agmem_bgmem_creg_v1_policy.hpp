@@ -283,8 +283,13 @@ struct UniversalFlatmmPipelineAgBgCrPolicy
             tile_distribution_encoding<
                 sequence<Repeat>,
                 tuple<sequence<MPerXdl>, sequence<KFragment, KLane, KItemsPerLoad>>,
+#if defined(__gfx13__)
+                tuple<sequence<0>, sequence<1, 2>>,
+                tuple<sequence<0>, sequence<0, 1>>,
+#else
                 tuple<sequence<0>, sequence<2, 1>>,
                 tuple<sequence<0>, sequence<1, 0>>,
+#endif
                 sequence<2, 2>,
                 sequence<0, 2>>{});
     }

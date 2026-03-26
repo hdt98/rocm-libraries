@@ -75,6 +75,14 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
         a_m_k.GenerateTensorValue(GeneratorTensor_2<ADataType>{-2, 2});
         b_k_n.GenerateTensorValue(GeneratorTensor_1<BDataType>{1});
         break;
+    case 4:
+        a_m_k.GenerateTensorValue(GeneratorTensor_Sequential<ADataType, 0>{});
+        b_k_n.GenerateTensorValue(GeneratorTensor_1<BDataType>{1});
+        break;
+    case 5:
+        a_m_k.GenerateTensorValue(GeneratorTensor_Sequential<ADataType, 1>{});
+        b_k_n.GenerateTensorValue(GeneratorTensor_1<BDataType>{1});
+        break;
     }
 
     Tensor<float> a_m_k_f32({M, K});
@@ -98,7 +106,19 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
     std::cout << "a_m_k: " << a_m_k.mDesc << std::endl;
     std::cout << "b_k_n: " << b_k_n.mDesc << std::endl;
     std::cout << "c_m_n: " << c_m_n_host_result.mDesc << std::endl;
+    auto gemm    = DeviceGemmV2Instance{};
+    auto invoker = gemm.MakeInvoker();
+    Tensor<BDataType> b_preshuffled(
+        f_host_tensor_descriptor(K, N, StrideB, BLayout{})); // use laout only for size
+    if constexpr(BPreShuffle)
+    {
+        static_assert(std::is_same_v<BLayout, ck::tensor_layout::gemm::RowMajor> == false);
 
+        static constexpr ck::index_t KPack = ck::math::max(
+            static_cast<ck::index_t>(16 / sizeof(BDataType)), static_cast<ck::index_t>(8));
+        constexpr int NPerXdl = 16;
+        preShuffleBuffer(b_k_n.mData.data(), b_preshuffled.mData.data(), N, K, NPerXdl, KPack);
+    }
     DeviceMem a_m_k_device_buf(sizeof(ADataType) * a_m_k.mDesc.GetElementSpaceSize());
     DeviceMem b_k_n_device_buf(sizeof(BDataType) * b_k_n.mDesc.GetElementSpaceSize());
     DeviceMem c_m_n_device_buf(sizeof(CDataType) * c_m_n_device_result.mDesc.GetElementSpaceSize());
