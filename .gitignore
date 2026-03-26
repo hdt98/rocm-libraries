@@ -12,3 +12,6 @@ CMakeUserPresets.json
 
 # Miscellanous tools
 .cline_storage/
+
+# Claude tmp files
+.claude/.nfs*
