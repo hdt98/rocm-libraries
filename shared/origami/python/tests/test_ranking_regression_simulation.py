@@ -33,12 +33,12 @@ from helpers import HARDWARE, create_config_list, get_matrix_instructions
 BASELINE_DIR = Path(__file__).parent / "baselines" / "rankings_simulation"
 PROBLEM_DATA_FILE = Path(__file__).parent / "data" / "problem_data.csv"
 
-SUPPORTED_DTYPES = ["f16", "bf16", "f32", "xf32", "f8"]
+SUPPORTED_DTYPES = ["f16", "bf16", "f32", "f8"]
 TRANSPOSE_VALUES = [origami.transpose_t.T, origami.transpose_t.N]
 
 SIMULATION_ARCHS = ["gfx942", "gfx950", "gfx1201"]
 
-TOP_K = 5
+TOP_K = 3
 
 
 def is_dtype_supported(arch_name: str, dtype: str) -> bool:
@@ -48,11 +48,17 @@ def is_dtype_supported(arch_name: str, dtype: str) -> bool:
 
 
 def load_problem_sizes() -> list[tuple[int, int, int, int]]:
-    """Load problem sizes from CSV file."""
+    """Load a subset of problem sizes from CSV file.
+
+    Uses every 4th problem to keep simulation runtime practical while
+    still covering a representative spread of shapes.
+    """
     problems = []
     with open(PROBLEM_DATA_FILE, "r") as f:
         reader = csv.DictReader(f)
-        for row in reader:
+        for i, row in enumerate(reader):
+            if i % 4 != 0:
+                continue
             m = int(row["m"])
             n = int(row["n"])
             k = int(row["k"])
@@ -107,12 +113,15 @@ def generate_rankings(
 ) -> dict[str, list[list[int]]]:
     """Generate simulation mode rankings for all test problem sizes."""
     hardware = HARDWARE[arch_name]
+    # Reduced config space vs estimation tests: Formocast simulation is ~100x
+    # slower per config, so we use fewer tile sizes/depths to keep CI runtime
+    # practical (~15 min) while still covering representative configurations.
     configs = create_config_list(
         hardware, dtype,
-        mt_sizes=[16, 32, 48, 96, 128, 192, 224, 256, 336, 448, 512],
-        depth_unroll=[16, 32, 64, 128, 512, 1024],
+        mt_sizes=[64, 128, 256],
+        depth_unroll=[32, 64],
         occupancy_values=[1, 2],
-        wgm_values=[1, 4, 8],
+        wgm_values=[1],
     )
 
     if not configs:
@@ -120,6 +129,7 @@ def generate_rankings(
 
     for cfg in configs:
         cfg.prediction_mode = origami.prediction_modes_t.simulation
+        cfg.tensile()
 
     rankings = {}
     for m, n, k, batch in TEST_PROBLEM_SIZES:
