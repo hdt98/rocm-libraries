@@ -76,8 +76,9 @@ namespace LDSTransformTest
         using LDSToIJMap = std::map<unsigned int, std::pair<unsigned int, unsigned int>>;
 
         /**
-         * Builds a minimal GEMM kernel graph and runs codegen using \p loadPath for the
-         * matrix selected by \p layout (A or B), with A transposed when \p transposeA is true.
+         * Builds a minimal GEMM kernel graph using \p loadPath for both
+         * A and B tiles. \p layout selects which matrix's coordinate transform is examined
+         * (A or B), and A is transposed when \p transposeA is true.
          */
         LDSCoordinateMappingFixture(rocRoller::ContextPtr                     context,
                                     bool                                      transposeA,
@@ -548,8 +549,14 @@ namespace LDSTransformTest
                 loadTransformer.setCoordinate(tag, literal(0));
         }
 
-        auto workitemTag = *KG::filterCoordinates<Workitem>(remainingRequired, kgraph).begin();
-        auto vgprTag     = *KG::filterCoordinates<VGPR>(remainingRequired, kgraph).begin();
+        auto workitemTags = KG::filterCoordinates<Workitem>(remainingRequired, kgraph);
+        auto vgprTags     = KG::filterCoordinates<VGPR>(remainingRequired, kgraph);
+
+        REQUIRE(workitemTags.size() == 1);
+        REQUIRE(vgprTags.size() == 1);
+
+        auto workitemTag = *workitemTags.begin();
+        auto vgprTag     = *vgprTags.begin();
         auto vgprSize
             = getUnsignedInt(evaluate(kgraph.coordinates.get<VGPR>(vgprTag).value().size));
 
@@ -624,9 +631,6 @@ namespace LDSTransformTest
         uint workgroup_size_x = wavefrontCountX * wavefrontCountY * wfs;
         uint workgroup_size_y = 1;
 
-        auto bpe = CeilDivide(DataTypeInfo::Get(dataTypeA).elementBits, 8u);
-        REQUIRE(mac_m * mac_k * bpe > wave_m * wave_k);
-
         TensorDescriptor descA(
             dataTypeA, {static_cast<size_t>(M), static_cast<size_t>(K)}, transA ? "T" : "N");
         TensorDescriptor descB(
@@ -639,15 +643,15 @@ namespace LDSTransformTest
         auto     A    = DGenVector<TA>(descA, -1.f, 1.f, seed + 1);
         auto     B    = DGenVector<TB>(descB, -1.f, 1.f, seed + 2);
 
-        std::shared_ptr<TA>  d_A;
-        std::shared_ptr<TB>  d_B;
-        std::shared_ptr<ACC> d_D;
+        std::shared_ptr<TA> d_A;
+        std::shared_ptr<TB> d_B;
+        std::shared_ptr<TD> d_D;
         if(runOnDevice)
         {
 #ifdef ROCROLLER_USE_HIP
             d_A = make_shared_device(A);
             d_B = make_shared_device(B);
-            d_D = make_shared_device<ACC>(M * N);
+            d_D = make_shared_device<TD>(M * N);
 #else
             SKIP("HIP not available");
 #endif
