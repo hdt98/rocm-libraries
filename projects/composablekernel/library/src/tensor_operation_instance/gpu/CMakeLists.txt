@@ -553,88 +553,71 @@ endif()
 #             DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
 #         )
 # endif()
-# if(CK_DEVICE_MHA_INSTANCES AND NOT MIOPEN_REQ_LIBS_ONLY AND NOT HIPTENSOR_REQ_LIBS_ONLY AND BUILD_MHA_LIB)
-#         set(gpu_list ${INST_TARGETS})
-#         if(gpu_list MATCHES "gfx94" OR gpu_list MATCHES "gfx90a" OR gpu_list MATCHES "gfx95")
-#             add_library(device_mha_operations ${CK_DEVICE_MHA_INSTANCES})
-#             set_target_properties(device_mha_operations
-#                 PROPERTIES
-#                 VERSION ${CMAKE_PROJECT_VERSION}
-#                 SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
-#             )
-#             add_library(composablekernels::device_mha_operations ALIAS device_mha_operations)
-#             target_compile_features(device_mha_operations PUBLIC)
-#             set_target_properties(device_mha_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(CK_DEVICE_MHA_INSTANCES AND NOT MIOPEN_REQ_LIBS_ONLY AND NOT HIPTENSOR_REQ_LIBS_ONLY AND BUILD_MHA_LIB)
+        set(gpu_list ${INST_TARGETS})
+        if(gpu_list MATCHES "gfx94" OR gpu_list MATCHES "gfx90a" OR gpu_list MATCHES "gfx95")
+            add_library(device_mha_operations ${CK_DEVICE_MHA_INSTANCES})
+            set_target_properties(device_mha_operations
+                PROPERTIES
+                VERSION ${CMAKE_PROJECT_VERSION}
+                SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
+            )
+            add_library(composablekernels::device_mha_operations ALIAS device_mha_operations)
+            target_compile_features(device_mha_operations PUBLIC)
+            set_target_properties(device_mha_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-#             rocm_install(TARGETS device_mha_operations
-#                 EXPORT device_mha_operationsTargets)
-#             rocm_install(EXPORT device_mha_operationsTargets
-#                 FILE composable_kerneldevice_mha_operationsTargets.cmake
-#                 NAMESPACE composable_kernel::
-#                 DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
-#             )
-#         endif()
-# endif()
-# if(CK_DEVICE_CONTRACTION_INSTANCES AND NOT MIOPEN_REQ_LIBS_ONLY)
-#         add_library(device_contraction_operations ${CK_DEVICE_CONTRACTION_INSTANCES})
-#         add_library(composablekernels::device_contraction_operations ALIAS device_contraction_operations)
-#         target_compile_features(device_contraction_operations PUBLIC)
-#         set_target_properties(device_contraction_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
-#         set_target_properties(device_contraction_operations
-#             PROPERTIES
-#             VERSION ${CMAKE_PROJECT_VERSION}
-#             SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
-#         )
-#         target_include_directories(device_contraction_operations PUBLIC
-#             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu>
-#             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/contraction>
-#         )
-#         rocm_install(TARGETS device_contraction_operations
-#             EXPORT device_contraction_operationsTargets)
-#         rocm_install(EXPORT device_contraction_operationsTargets
-#             FILE composable_kerneldevice_contraction_operationsTargets.cmake
-#             NAMESPACE composable_kernel::
-#             DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
-#         )
-# endif()
-# if(CK_DEVICE_REDUCTION_INSTANCES AND NOT MIOPEN_REQ_LIBS_ONLY)
-#         add_library(device_reduction_operations ${CK_DEVICE_REDUCTION_INSTANCES})
-#         add_library(composablekernels::device_reduction_operations ALIAS device_reduction_operations)
-#         target_compile_features(device_reduction_operations PUBLIC)
-#         set_target_properties(device_reduction_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
-#         set_target_properties(device_reduction_operations
-#             PROPERTIES
-#             VERSION ${CMAKE_PROJECT_VERSION}
-#             SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
-#         )
-#         target_include_directories(device_reduction_operations PUBLIC
-#             $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/reduce>
-#         )
-#         rocm_install(TARGETS device_reduction_operations
-#             EXPORT device_reduction_operationsTargets)
-#         rocm_install(EXPORT device_reduction_operationsTargets
-#             FILE composable_kerneldevice_reduction_operationsTargets.cmake
-#             NAMESPACE composable_kernel::
-#             DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
-#         )
-# endif()
-
-# if(NOT MIOPEN_REQ_LIBS_ONLY AND NOT HIPTENSOR_REQ_LIBS_ONLY)
-#     add_library(device_operations INTERFACE)
-#     target_link_libraries(device_operations INTERFACE
-#         device_contraction_operations
-#         device_conv_operations
-#         device_gemm_operations
-#         device_other_operations
-#         device_reduction_operations
-#         utility)
-# endif()
-
-# set(DEV_OPS_INC_DIRS
-#     ${PROJECT_SOURCE_DIR}/include/ck/
-#     ${PROJECT_SOURCE_DIR}/library/include/ck/
-# )
-# rocm_install(DIRECTORY ${DEV_OPS_INC_DIRS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ck)
+            rocm_install(TARGETS device_mha_operations
+                EXPORT device_mha_operationsTargets)
+            rocm_install(EXPORT device_mha_operationsTargets
+                FILE composable_kerneldevice_mha_operationsTargets.cmake
+                NAMESPACE composable_kernel::
+                DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
+            )
+        endif()
+endif()
+if(CK_DEVICE_CONTRACTION_INSTANCES AND NOT MIOPEN_REQ_LIBS_ONLY)
+        add_library(device_contraction_operations ${CK_DEVICE_CONTRACTION_INSTANCES})
+        add_library(composablekernels::device_contraction_operations ALIAS device_contraction_operations)
+        target_compile_features(device_contraction_operations PUBLIC)
+        set_target_properties(device_contraction_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        set_target_properties(device_contraction_operations
+            PROPERTIES
+            VERSION ${CMAKE_PROJECT_VERSION}
+            SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
+        )
+        target_include_directories(device_contraction_operations PUBLIC
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/contraction>
+        )
+        rocm_install(TARGETS device_contraction_operations
+            EXPORT device_contraction_operationsTargets)
+        rocm_install(EXPORT device_contraction_operationsTargets
+            FILE composable_kerneldevice_contraction_operationsTargets.cmake
+            NAMESPACE composable_kernel::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
+        )
+endif()
+if(CK_DEVICE_REDUCTION_INSTANCES AND NOT MIOPEN_REQ_LIBS_ONLY)
+        add_library(device_reduction_operations ${CK_DEVICE_REDUCTION_INSTANCES})
+        add_library(composablekernels::device_reduction_operations ALIAS device_reduction_operations)
+        target_compile_features(device_reduction_operations PUBLIC)
+        set_target_properties(device_reduction_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        set_target_properties(device_reduction_operations
+            PROPERTIES
+            VERSION ${CMAKE_PROJECT_VERSION}
+            SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
+        )
+        target_include_directories(device_reduction_operations PUBLIC
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/reduce>
+        )
+        rocm_install(TARGETS device_reduction_operations
+            EXPORT device_reduction_operationsTargets)
+        rocm_install(EXPORT device_reduction_operationsTargets
+            FILE composable_kerneldevice_reduction_operationsTargets.cmake
+            NAMESPACE composable_kernel::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
+        )
+endif()
 
 # =============================================================================
 # Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
@@ -654,180 +637,153 @@ macro(ADD_TARGET_OBJECTS_IF_EXISTS VAR_NAME TARGET_NAME)
     endif()
 endmacro()
 
+# Helper macro to create and install layout-specific convolution libraries
+# Usage: CREATE_CONV_LAYOUT_LIBRARY(library_name instance1 instance2 ...)
+macro(CREATE_CONV_LAYOUT_LIBRARY LIB_NAME)
+    message(DEBUG ">>> INSIDE CREATE_CONV_LAYOUT_LIBRARY for ${LIB_NAME}")
+    set(OBJECTS_VAR "${LIB_NAME}_OBJECTS")
+    set(${OBJECTS_VAR})
+    # Collect all instance objects
+    foreach(instance ${ARGN})
+        ADD_TARGET_OBJECTS_IF_EXISTS(${OBJECTS_VAR} ${instance})
+    endforeach()
+
+    # Create library if we have objects
+    # Note: Can't use if(${${OBJECTS_VAR}}) because it contains generator expressions
+    # Check if the variable is defined and not empty instead
+    if(DEFINED ${OBJECTS_VAR} AND ${OBJECTS_VAR})
+        add_library(${LIB_NAME} ${${OBJECTS_VAR}})
+        set_target_properties(${LIB_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+        set_target_properties(${LIB_NAME}
+            PROPERTIES
+            VERSION ${CMAKE_PROJECT_VERSION}
+            SOVERSION ${CMAKE_PROJECT_VERSION_MAJOR}
+        )
+        add_library(composablekernels::${LIB_NAME} ALIAS ${LIB_NAME})
+        rocm_install(TARGETS ${LIB_NAME}
+            EXPORT ${LIB_NAME}Targets)
+        rocm_install(EXPORT ${LIB_NAME}Targets
+            FILE composable_kernel${LIB_NAME}Targets.cmake
+            NAMESPACE composable_kernel::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
+        )
+        message(STATUS "Created ${LIB_NAME}")
+    endif()
+endmacro()
+
 # -----------------------------------------------------------------------------
 # 2D Convolution Layout Libraries
 # -----------------------------------------------------------------------------
 
 # NHWGC Layout (2D) - ⭐ Required by MIOpen
-set(CONV2D_NHWGC_OBJECTS)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV2D_NHWGC_OBJECTS device_grouped_conv2d_fwd_nhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV2D_NHWGC_OBJECTS device_grouped_conv2d_bwd_data_nhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV2D_NHWGC_OBJECTS device_grouped_conv2d_bwd_weight_nhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV2D_NHWGC_OBJECTS device_grouped_conv2d_fwd_clamp_nhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV2D_NHWGC_OBJECTS device_grouped_conv2d_fwd_bias_clamp_nhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV2D_NHWGC_OBJECTS device_grouped_conv2d_fwd_bias_bnorm_clamp_nhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV2D_NHWGC_OBJECTS device_grouped_conv2d_fwd_dynamic_op_nhwgc_instance)
-if(CONV2D_NHWGC_OBJECTS)
-    add_library(device_conv2d_nhwgc_operations ${CONV2D_NHWGC_OBJECTS})
-    set_target_properties(device_conv2d_nhwgc_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    add_library(composablekernels::device_conv2d_nhwgc_operations ALIAS device_conv2d_nhwgc_operations)
-    message(STATUS "Created device_conv2d_nhwgc_operations (MIOpen required) with ${CONV2D_NHWGC_OBJECTS}")
-endif()
+CREATE_CONV_LAYOUT_LIBRARY(device_conv2d_nhwgc_operations
+    device_grouped_conv2d_fwd_nhwgc_instance
+    device_grouped_conv2d_bwd_data_nhwgc_instance
+    device_grouped_conv2d_bwd_weight_nhwgc_instance
+    device_grouped_conv2d_fwd_clamp_nhwgc_instance
+    device_grouped_conv2d_fwd_bias_clamp_nhwgc_instance
+    device_grouped_conv2d_fwd_bias_bnorm_clamp_nhwgc_instance
+    device_grouped_conv2d_fwd_dynamic_op_nhwgc_instance
+)
 
 # GNHWC Layout (2D)
-set(CONV2D_GNHWC_OBJECTS)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV2D_GNHWC_OBJECTS device_grouped_conv2d_fwd_gnhwc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV2D_GNHWC_OBJECTS device_grouped_conv2d_bwd_data_gnhwc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV2D_GNHWC_OBJECTS device_grouped_conv2d_bwd_weight_gnhwc_instance)
-if(CONV2D_GNHWC_OBJECTS)
-    add_library(device_conv2d_gnhwc_operations ${CONV2D_GNHWC_OBJECTS})
-    set_target_properties(device_conv2d_gnhwc_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    add_library(composablekernels::device_conv2d_gnhwc_operations ALIAS device_conv2d_gnhwc_operations)
-    message(STATUS "Created device_conv2d_gnhwc_operations")
-endif()
+CREATE_CONV_LAYOUT_LIBRARY(device_conv2d_gnhwc_operations
+    device_grouped_conv2d_fwd_gnhwc_instance
+    device_grouped_conv2d_bwd_data_gnhwc_instance
+    device_grouped_conv2d_bwd_weight_gnhwc_instance
+)
 
 # NGCHW Layout (2D)
-set(CONV2D_NGCHW_OBJECTS)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV2D_NGCHW_OBJECTS device_grouped_conv2d_fwd_ngchw_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV2D_NGCHW_OBJECTS device_grouped_conv2d_bwd_data_ngchw_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV2D_NGCHW_OBJECTS device_grouped_conv2d_bwd_weight_ngchw_instance)
-if(CONV2D_NGCHW_OBJECTS)
-    add_library(device_conv2d_ngchw_operations ${CONV2D_NGCHW_OBJECTS})
-    set_target_properties(device_conv2d_ngchw_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    add_library(composablekernels::device_conv2d_ngchw_operations ALIAS device_conv2d_ngchw_operations)
-    message(STATUS "Created device_conv2d_ngchw_operations")
-endif()
+CREATE_CONV_LAYOUT_LIBRARY(device_conv2d_ngchw_operations
+    device_grouped_conv2d_fwd_ngchw_instance
+    device_grouped_conv2d_bwd_data_ngchw_instance
+    device_grouped_conv2d_bwd_weight_ngchw_instance
+)
 
 # -----------------------------------------------------------------------------
 # 3D Convolution Layout Libraries
 # -----------------------------------------------------------------------------
 
 # NDHWGC Layout (3D) - ⭐ Required by MIOpen
-set(CONV3D_NDHWGC_OBJECTS)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_fwd_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_bwd_data_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_bwd_weight_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_fwd_scale_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_fwd_clamp_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_fwd_bias_clamp_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_fwd_bias_bnorm_clamp_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_fwd_bilinear_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_fwd_convscale_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_fwd_convscale_add_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_fwd_convscale_relu_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_fwd_convinvscale_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_fwd_dynamic_op_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_fwd_scaleadd_ab_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_fwd_scaleadd_scaleadd_relu_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_bwd_data_bilinear_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_bwd_data_scale_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_bwd_weight_bilinear_ndhwgc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NDHWGC_OBJECTS device_grouped_conv3d_bwd_weight_scale_ndhwgc_instance)
-if(CONV3D_NDHWGC_OBJECTS)
-    add_library(device_conv3d_ndhwgc_operations ${CONV3D_NDHWGC_OBJECTS})
-    set_target_properties(device_conv3d_ndhwgc_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    add_library(composablekernels::device_conv3d_ndhwgc_operations ALIAS device_conv3d_ndhwgc_operations)
-    message(STATUS "Created device_conv3d_ndhwgc_operations (MIOpen required)")
-endif()
+CREATE_CONV_LAYOUT_LIBRARY(device_conv3d_ndhwgc_operations
+    device_grouped_conv3d_fwd_ndhwgc_instance
+    device_grouped_conv3d_bwd_data_ndhwgc_instance
+    device_grouped_conv3d_bwd_weight_ndhwgc_instance
+    device_grouped_conv3d_fwd_scale_ndhwgc_instance
+    device_grouped_conv3d_fwd_clamp_ndhwgc_instance
+    device_grouped_conv3d_fwd_bias_clamp_ndhwgc_instance
+    device_grouped_conv3d_fwd_bias_bnorm_clamp_ndhwgc_instance
+    device_grouped_conv3d_fwd_bilinear_ndhwgc_instance
+    device_grouped_conv3d_fwd_convscale_ndhwgc_instance
+    device_grouped_conv3d_fwd_convscale_add_ndhwgc_instance
+    device_grouped_conv3d_fwd_convscale_relu_ndhwgc_instance
+    device_grouped_conv3d_fwd_convinvscale_ndhwgc_instance
+    device_grouped_conv3d_fwd_dynamic_op_ndhwgc_instance
+    device_grouped_conv3d_fwd_scaleadd_ab_ndhwgc_instance
+    device_grouped_conv3d_fwd_scaleadd_scaleadd_relu_ndhwgc_instance
+    device_grouped_conv3d_bwd_data_bilinear_ndhwgc_instance
+    device_grouped_conv3d_bwd_data_scale_ndhwgc_instance
+    device_grouped_conv3d_bwd_weight_bilinear_ndhwgc_instance
+    device_grouped_conv3d_bwd_weight_scale_ndhwgc_instance
+)
 
 # GNDHWC Layout (3D)
-set(CONV3D_GNDHWC_OBJECTS)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_GNDHWC_OBJECTS device_grouped_conv3d_fwd_gndhwc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_GNDHWC_OBJECTS device_grouped_conv3d_bwd_data_gndhwc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_GNDHWC_OBJECTS device_grouped_conv3d_bwd_weight_gndhwc_instance)
-if(CONV3D_GNDHWC_OBJECTS)
-    add_library(device_conv3d_gndhwc_operations ${CONV3D_GNDHWC_OBJECTS})
-    set_target_properties(device_conv3d_gndhwc_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    add_library(composablekernels::device_conv3d_gndhwc_operations ALIAS device_conv3d_gndhwc_operations)
-    message(STATUS "Created device_conv3d_gndhwc_operations")
-endif()
+CREATE_CONV_LAYOUT_LIBRARY(device_conv3d_gndhwc_operations
+    device_grouped_conv3d_fwd_gndhwc_instance
+    device_grouped_conv3d_bwd_data_gndhwc_instance
+    device_grouped_conv3d_bwd_weight_gndhwc_instance
+)
 
 # NGCDHW Layout (3D)
-set(CONV3D_NGCDHW_OBJECTS)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NGCDHW_OBJECTS device_grouped_conv3d_fwd_ngcdhw_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NGCDHW_OBJECTS device_grouped_conv3d_bwd_data_ngcdhw_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NGCDHW_OBJECTS device_grouped_conv3d_bwd_weight_ngcdhw_instance)
-if(CONV3D_NGCDHW_OBJECTS)
-    add_library(device_conv3d_ngcdhw_operations ${CONV3D_NGCDHW_OBJECTS})
-    set_target_properties(device_conv3d_ngcdhw_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    add_library(composablekernels::device_conv3d_ngcdhw_operations ALIAS device_conv3d_ngcdhw_operations)
-    message(STATUS "Created device_conv3d_ngcdhw_operations")
-endif()
+CREATE_CONV_LAYOUT_LIBRARY(device_conv3d_ngcdhw_operations
+    device_grouped_conv3d_fwd_ngcdhw_instance
+    device_grouped_conv3d_bwd_data_ngcdhw_instance
+    device_grouped_conv3d_bwd_weight_ngcdhw_instance
+)
 
 # NHWGC Layout (3D)
-set(CONV3D_NHWGC_OBJECTS)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV3D_NHWGC_OBJECTS device_grouped_conv3d_fwd_bias_bnorm_clamp_nhwgc_instance)
-if(CONV3D_NHWGC_OBJECTS)
-    add_library(device_conv3d_nhwgc_operations ${CONV3D_NHWGC_OBJECTS})
-    set_target_properties(device_conv3d_nhwgc_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    add_library(composablekernels::device_conv3d_nhwgc_operations ALIAS device_conv3d_nhwgc_operations)
-    message(STATUS "Created device_conv3d_nhwgc_operations")
-endif()
+CREATE_CONV_LAYOUT_LIBRARY(device_conv3d_nhwgc_operations
+    device_grouped_conv3d_fwd_bias_bnorm_clamp_nhwgc_instance
+)
 
 # -----------------------------------------------------------------------------
 # 1D Convolution Layout Libraries
 # -----------------------------------------------------------------------------
 
 # GNWC Layout (1D)
-set(CONV1D_GNWC_OBJECTS)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV1D_GNWC_OBJECTS device_grouped_conv1d_fwd_gnwc_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV1D_GNWC_OBJECTS device_grouped_conv1d_bwd_weight_gnwc_instance)
-if(CONV1D_GNWC_OBJECTS)
-    add_library(device_conv1d_gnwc_operations ${CONV1D_GNWC_OBJECTS})
-    set_target_properties(device_conv1d_gnwc_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    add_library(composablekernels::device_conv1d_gnwc_operations ALIAS device_conv1d_gnwc_operations)
-    message(STATUS "Created device_conv1d_gnwc_operations")
-endif()
+CREATE_CONV_LAYOUT_LIBRARY(device_conv1d_gnwc_operations
+    device_grouped_conv1d_fwd_gnwc_instance
+    device_grouped_conv1d_bwd_weight_gnwc_instance
+)
 
 # NWGC Layout (1D)
-set(CONV1D_NWGC_OBJECTS)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV1D_NWGC_OBJECTS device_grouped_conv1d_bwd_weight_nwgc_instance)
-if(CONV1D_NWGC_OBJECTS)
-    add_library(device_conv1d_nwgc_operations ${CONV1D_NWGC_OBJECTS})
-    set_target_properties(device_conv1d_nwgc_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    add_library(composablekernels::device_conv1d_nwgc_operations ALIAS device_conv1d_nwgc_operations)
-    message(STATUS "Created device_conv1d_nwgc_operations")
-endif()
+CREATE_CONV_LAYOUT_LIBRARY(device_conv1d_nwgc_operations
+    device_grouped_conv1d_bwd_weight_nwgc_instance
+)
 
 # -----------------------------------------------------------------------------
 # Special Libraries (not split by layout)
 # -----------------------------------------------------------------------------
 
 # Non-grouped convolutions (old/legacy) - ⭐ Required by MIOpen
-# Combine all non-grouped conv instance libraries into one static library
-set(CONV_OLD_OBJECTS)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV_OLD_OBJECTS device_conv1d_bwd_data_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV_OLD_OBJECTS device_conv2d_bwd_data_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV_OLD_OBJECTS device_conv2d_fwd_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV_OLD_OBJECTS device_conv2d_fwd_bias_relu_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV_OLD_OBJECTS device_conv2d_fwd_bias_relu_add_instance)
-ADD_TARGET_OBJECTS_IF_EXISTS(CONV_OLD_OBJECTS device_conv3d_bwd_data_instance)
-if(CONV_OLD_OBJECTS)
-    add_library(device_conv_old_operations ${CONV_OLD_OBJECTS})
-    set_target_properties(device_conv_old_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    add_library(composablekernels::device_conv_old_operations ALIAS device_conv_old_operations)
-    message(STATUS "Created device_conv_old_operations (MIOpen required)")
-endif()
+CREATE_CONV_LAYOUT_LIBRARY(device_conv_old_operations
+    device_conv1d_bwd_data_instance
+    device_conv2d_bwd_data_instance
+    device_conv2d_fwd_instance
+    device_conv2d_fwd_bias_relu_instance
+    device_conv2d_fwd_bias_relu_add_instance
+    device_conv3d_bwd_data_instance
+)
 
 # N-dimensional generic convolutions (layout-agnostic)
-if(TARGET device_grouped_convnd_bwd_weight_instance)
-    add_library(device_convnd_generic_operations
-        $<TARGET_OBJECTS:device_grouped_convnd_bwd_weight_instance>
-    )
-    set_target_properties(device_convnd_generic_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    add_library(composablekernels::device_convnd_generic_operations ALIAS device_convnd_generic_operations)
-    message(STATUS "Created device_convnd_generic_operations")
-endif()
+CREATE_CONV_LAYOUT_LIBRARY(device_convnd_generic_operations
+    device_grouped_convnd_bwd_weight_instance
+)
 
 # Quantization operations
-if(TARGET device_quantization_instance)
-    add_library(device_quantization_operations
-        $<TARGET_OBJECTS:device_quantization_instance>
-    )
-    set_target_properties(device_quantization_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    add_library(composablekernels::device_quantization_operations ALIAS device_quantization_operations)
-    message(STATUS "Created device_quantization_operations")
-endif()
+CREATE_CONV_LAYOUT_LIBRARY(device_quantization_operations
+    device_quantization_instance
+)
 
 # -----------------------------------------------------------------------------
 # Umbrella Library (Backward Compatibility)
@@ -837,48 +793,86 @@ endif()
 add_library(device_conv_operations INTERFACE)
 
 # Link all layout libraries that exist
-if(TARGET device_conv1d_gnwc_operations)
-    target_link_libraries(device_conv_operations INTERFACE device_conv1d_gnwc_operations)
-endif()
-if(TARGET device_conv1d_nwgc_operations)
-    target_link_libraries(device_conv_operations INTERFACE device_conv1d_nwgc_operations)
-endif()
-if(TARGET device_conv2d_gnhwc_operations)
-    target_link_libraries(device_conv_operations INTERFACE device_conv2d_gnhwc_operations)
-endif()
-if(TARGET device_conv2d_nhwgc_operations)
-    target_link_libraries(device_conv_operations INTERFACE device_conv2d_nhwgc_operations)
-endif()
-if(TARGET device_conv2d_ngchw_operations)
-    target_link_libraries(device_conv_operations INTERFACE device_conv2d_ngchw_operations)
-endif()
-if(TARGET device_conv3d_gndhwc_operations)
-    target_link_libraries(device_conv_operations INTERFACE device_conv3d_gndhwc_operations)
-endif()
-if(TARGET device_conv3d_ndhwgc_operations)
-    target_link_libraries(device_conv_operations INTERFACE device_conv3d_ndhwgc_operations)
-endif()
-if(TARGET device_conv3d_ngcdhw_operations)
-    target_link_libraries(device_conv_operations INTERFACE device_conv3d_ngcdhw_operations)
-endif()
-if(TARGET device_conv3d_nhwgc_operations)
-    target_link_libraries(device_conv_operations INTERFACE device_conv3d_nhwgc_operations)
-endif()
-if(TARGET device_conv_old_operations)
-    target_link_libraries(device_conv_operations INTERFACE device_conv_old_operations)
-endif()
-if(TARGET device_convnd_generic_operations)
-    target_link_libraries(device_conv_operations INTERFACE device_convnd_generic_operations)
-endif()
-if(TARGET device_quantization_operations)
-    target_link_libraries(device_conv_operations INTERFACE device_quantization_operations)
-endif()
+set(CONV_LAYOUT_LIBS
+    device_conv1d_gnwc_operations
+    device_conv1d_nwgc_operations
+    device_conv2d_gnhwc_operations
+    device_conv2d_nhwgc_operations
+    device_conv2d_ngchw_operations
+    device_conv3d_gndhwc_operations
+    device_conv3d_ndhwgc_operations
+    device_conv3d_ngcdhw_operations
+    device_conv3d_nhwgc_operations
+    device_conv_old_operations
+    device_convnd_generic_operations
+    device_quantization_operations
+)
+foreach(lib IN LISTS CONV_LAYOUT_LIBS)
+    if(TARGET ${lib})
+        target_link_libraries(device_conv_operations INTERFACE ${lib})
+    endif()
+endforeach()
 
 add_library(composablekernels::device_conv_operations ALIAS device_conv_operations)
+
+# Add include directories for backward compatibility with old monolithic library
+target_include_directories(device_conv_operations INTERFACE
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/conv_tensor_rearrange>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_data>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_bwd_weight>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/ck/library/tensor_operation_instance/gpu/grouped_conv_fwd>
+)
+
+# Install the umbrella interface library (INTERFACE libraries don't have VERSION/SOVERSION)
+rocm_install(TARGETS device_conv_operations
+    EXPORT device_conv_operationsTargets)
+rocm_install(EXPORT device_conv_operationsTargets
+    FILE composable_kerneldevice_conv_operationsTargets.cmake
+    NAMESPACE composable_kernel::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/composable_kernel
+)
+
 message(STATUS "Created umbrella device_conv_operations (includes all layouts)")
 
 # =============================================================================
 # End of Layout-Specific Libraries
 # =============================================================================
+
+# =============================================================================
+# Top-Level device_operations Interface Library
+# =============================================================================
+# This umbrella library links all operation types for backward compatibility
+
+if(NOT MIOPEN_REQ_LIBS_ONLY AND NOT HIPTENSOR_REQ_LIBS_ONLY)
+    add_library(device_operations INTERFACE)
+    target_link_libraries(device_operations INTERFACE
+        device_conv_operations
+        device_gemm_operations
+        device_other_operations
+        utility)
+    # Conditionally add optional libraries if they exist
+    if(TARGET device_contraction_operations)
+        target_link_libraries(device_operations INTERFACE device_contraction_operations)
+    endif()
+    if(TARGET device_reduction_operations)
+        target_link_libraries(device_operations INTERFACE device_reduction_operations)
+    endif()
+    if(TARGET device_mha_operations)
+        target_link_libraries(device_operations INTERFACE device_mha_operations)
+    endif()
+    add_library(composablekernels::device_operations ALIAS device_operations)
+    message(STATUS "Created top-level device_operations interface library")
+endif()
+
+# =============================================================================
+# Header Installation
+# =============================================================================
+
+set(DEV_OPS_INC_DIRS
+    ${PROJECT_SOURCE_DIR}/include/ck/
+    ${PROJECT_SOURCE_DIR}/library/include/ck/
+)
+rocm_install(DIRECTORY ${DEV_OPS_INC_DIRS} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ck)
 
 # =============================================================================
