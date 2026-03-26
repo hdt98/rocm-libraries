@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2024-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -97,7 +97,8 @@ try
     if(!params)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    return hipsolver::cuda2hip_status(cusolverDnXgeqrf_bufferSize((cusolverDnHandle_t)handle,
+    hipsolverDnHandle* dn = (hipsolverDnHandle*)handle;
+    return hipsolver::cuda2hip_status(cusolverDnXgeqrf_bufferSize(dn->handle,
                                                                   (cusolverDnParams_t)params,
                                                                   m,
                                                                   n,
@@ -137,7 +138,8 @@ try
     if(!params)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    return hipsolver::cuda2hip_status(cusolverDnXgeqrf((cusolverDnHandle_t)handle,
+    hipsolverDnHandle* dn = (hipsolverDnHandle*)handle;
+    return hipsolver::cuda2hip_status(cusolverDnXgeqrf(dn->handle,
                                                        (cusolverDnParams_t)params,
                                                        m,
                                                        n,
@@ -176,7 +178,8 @@ try
     if(!params)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    return hipsolver::cuda2hip_status(cusolverDnXgetrf_bufferSize((cusolverDnHandle_t)handle,
+    hipsolverDnHandle* dn = (hipsolverDnHandle*)handle;
+    return hipsolver::cuda2hip_status(cusolverDnXgetrf_bufferSize(dn->handle,
                                                                   (cusolverDnParams_t)params,
                                                                   m,
                                                                   n,
@@ -213,7 +216,8 @@ try
     if(!params)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    return hipsolver::cuda2hip_status(cusolverDnXgetrf((cusolverDnHandle_t)handle,
+    hipsolverDnHandle* dn = (hipsolverDnHandle*)handle;
+    return hipsolver::cuda2hip_status(cusolverDnXgetrf(dn->handle,
                                                        (cusolverDnParams_t)params,
                                                        m,
                                                        n,
@@ -254,7 +258,8 @@ try
     if(!params)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    return hipsolver::cuda2hip_status(cusolverDnXgetrs((cusolverDnHandle_t)handle,
+    hipsolverDnHandle* dn = (hipsolverDnHandle*)handle;
+    return hipsolver::cuda2hip_status(cusolverDnXgetrs(dn->handle,
                                                        (cusolverDnParams_t)params,
                                                        hipsolver::hip2cuda_operation(trans),
                                                        n,
@@ -291,7 +296,8 @@ try
     if(!params)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    return hipsolver::cuda2hip_status(cusolverDnXpotrf_bufferSize((cusolverDnHandle_t)handle,
+    hipsolverDnHandle* dn = (hipsolverDnHandle*)handle;
+    return hipsolver::cuda2hip_status(cusolverDnXpotrf_bufferSize(dn->handle,
                                                                   (cusolverDnParams_t)params,
                                                                   hipsolver::hip2cuda_fill(uplo),
                                                                   n,
@@ -327,7 +333,8 @@ try
     if(!params)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    return hipsolver::cuda2hip_status(cusolverDnXpotrf((cusolverDnHandle_t)handle,
+    hipsolverDnHandle* dn = (hipsolverDnHandle*)handle;
+    return hipsolver::cuda2hip_status(cusolverDnXpotrf(dn->handle,
                                                        (cusolverDnParams_t)params,
                                                        hipsolver::hip2cuda_fill(uplo),
                                                        n,
@@ -366,7 +373,8 @@ try
     if(!params)
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
-    return hipsolver::cuda2hip_status(cusolverDnXpotrs((cusolverDnHandle_t)handle,
+    hipsolverDnHandle* dn = (hipsolverDnHandle*)handle;
+    return hipsolver::cuda2hip_status(cusolverDnXpotrs(dn->handle,
                                                        (cusolverDnParams_t)params,
                                                        hipsolver::hip2cuda_fill(uplo),
                                                        n,

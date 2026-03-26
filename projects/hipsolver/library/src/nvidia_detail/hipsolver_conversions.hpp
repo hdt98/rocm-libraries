@@ -30,6 +30,12 @@
 
 HIPSOLVER_BEGIN_NAMESPACE
 
+struct hipsolverDnHandle
+{
+    cusolverDnHandle_t handle;
+    cublasHandle_t     blas_handle;
+};
+
 cublasOperation_t hip2cuda_operation(hipsolverOperation_t op);
 
 hipsolverOperation_t cuda2hip_operation(cublasOperation_t op);
