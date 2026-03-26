@@ -2,6 +2,7 @@
 #include "kernel_variant.h"
 #include "grouped_conv.hpp"
 
+#include "grouped_32c_fp16.h"
 #include "grouped_16c_fp16.h"
 #include "grouped_8c_fp16.h"
 #include "grouped_4c_fp16.h"
@@ -27,6 +28,7 @@ bool is_applicable(const Conv2dParams& par)
 }
 
 constexpr KernelVariant variants[] = {
+    grouped_32c::make_variant(),
     grouped_16c::make_variant(),
     grouped_8c::make_variant(),
     grouped_4c::make_variant(),
