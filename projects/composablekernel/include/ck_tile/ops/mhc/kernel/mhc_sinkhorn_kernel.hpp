@@ -64,7 +64,7 @@ struct MHCSinkhornKernel
         const index_t iM          = get_block_id() * kBlockM;
 
         // Create 3D tensor view covering the batch data [batch, n, n]
-        auto matrix_tensor = make_naive_tensor_view<address_space_enum::global>(
+        auto matrix_tensor_naive = make_naive_tensor_view<address_space_enum::global>(
             p_output + 2 * n, // Start at first batch's H^res
             make_tuple(batch, n, n),
             make_tuple(output_dim,
@@ -73,8 +73,12 @@ struct MHCSinkhornKernel
             number<1>{},
             number<1>{});
 
+        auto matrix_tensor = pad_tensor_view(
+            matrix_tensor_naive,
+            make_tuple(number<kBlockM>{}, number<kN>{}, number<kN>{}),
+            sequence<true, false, false>{});
+
         // Create tile distribution for batch processing
-        // 64 threads total processing batches of nxn matrices
         // Each thread processes one complete nxn matrix
         constexpr auto tile_dist = make_static_tile_distribution(
             tile_distribution_encoding<
@@ -89,7 +93,7 @@ struct MHCSinkhornKernel
         auto input_window = make_tile_window(
             matrix_tensor, make_tuple(number<kN>{}, number<kN>{}), {iM, 0, 0}, tile_dist);
 
-        // Load matrix using ck-tile API
+        // Load matrix
         auto input_tile = make_static_distributed_tensor<YDataType>(tile_dist);
         load_tile(input_tile, input_window);
 
