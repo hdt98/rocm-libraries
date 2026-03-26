@@ -415,7 +415,7 @@ TEST(StreamKTilePartitionerBaseRemapXCD, SmallArray)
 
     ck_tile::
         StreamKTilePartitioner<Config::GemmShape, ck_tile::StreamKReductionStrategy::Atomic, true>
-            tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+            tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     const std::vector<ck_tile::index_t> initial_values = {
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
@@ -432,7 +432,7 @@ TEST(StreamKTilePartitionerBaseRemapXCD, MidArray)
 
     ck_tile::
         StreamKTilePartitioner<Config::GemmShape, ck_tile::StreamKReductionStrategy::Atomic, true>
-            tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+            tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     const std::vector<ck_tile::index_t> initial_values = {
         0,   1,   2,   3,   4,   5,   6,   7,   8,   9,   10,  11,  12,  13,  14,  15,
@@ -461,7 +461,7 @@ TEST(StreamKTilePartitionerBaseRemapXCD, UnevenXCD)
 
     ck_tile::
         StreamKTilePartitioner<Config::GemmShape, ck_tile::StreamKReductionStrategy::Atomic, true>
-            tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+            tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     const std::vector<ck_tile::index_t> initial_values = {
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
@@ -478,7 +478,7 @@ TEST(StreamKTilePartitionerBaseRemapXCD, SingleXCD)
 
     ck_tile::
         StreamKTilePartitioner<Config::GemmShape, ck_tile::StreamKReductionStrategy::Atomic, true>
-            tile_partitioner{Config::M, Config::N, Config::K, Config::GRID};
+            tile_partitioner{Config::M, Config::N, Config::K, Config::MAX_ACTIVE_WGS};
 
     const std::vector<ck_tile::index_t> initial_values = {
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
