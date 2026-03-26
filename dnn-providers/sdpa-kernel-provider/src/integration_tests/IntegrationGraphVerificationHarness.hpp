@@ -304,6 +304,7 @@ private:
         return true;
     }
 
+protected:
     hipdnnHandle_t _handle = nullptr;
     hipStream_t _stream = nullptr;
     int _deviceId = 0;

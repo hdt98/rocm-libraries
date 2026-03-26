@@ -9,6 +9,7 @@
 
 #include "SdpaKernelEngine.hpp"
 #include "SdpaKernelGraphCreation.hpp"
+#include "SdpaKernelHelpers.hpp"
 
 using namespace sdpa_kernel_provider;
 
@@ -63,6 +64,11 @@ TEST(TestSdpaKernelPluginApi, HipdnnEnginePluginGetApplicableEngineIds)
               hipdnnPluginStatus_t::HIPDNN_PLUGIN_STATUS_SUCCESS);
 
     EXPECT_NE(handle, nullptr);
+
+    if(getDeviceString(static_cast<SdpaKernelHandle*>(handle)->getStream()) != "gfx942")
+    {
+        GTEST_SKIP();
+    }
 
     std::array<int64_t, 2> engineIds = {-1, -1};
     uint32_t numEngineIdsReturned = 0;

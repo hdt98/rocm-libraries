@@ -9,6 +9,7 @@
 
 #include "SdpaKernelGraphCreation.hpp"
 #include "SdpaKernelHandle.hpp"
+#include "SdpaKernelHelpers.hpp"
 #include "SdpaKernelPlanBuilder.hpp"
 
 namespace sdpa_kernel_provider
@@ -59,6 +60,11 @@ struct GraphTest
 TEST_F(TestSdpaKernelPlanBuilder, IsApplicableSdpaVariations)
 {
     using namespace hipdnn_data_sdk::data_objects;
+
+    if(sdpa_kernel_provider::getDeviceString(_handle.getStream()) != "gfx942")
+    {
+        GTEST_SKIP();
+    }
 
     std::vector<std::pair<GraphTest, bool>> applicabilityTests = {
         {GraphTest{createValidSdpaFpropGraph(), "Valid test"}, true},

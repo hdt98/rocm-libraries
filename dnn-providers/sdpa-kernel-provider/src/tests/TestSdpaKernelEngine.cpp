@@ -9,6 +9,7 @@
 #include "SdpaKernelEngine.hpp"
 #include "SdpaKernelGraphCreation.hpp"
 #include "SdpaKernelHandle.hpp"
+#include "SdpaKernelHelpers.hpp"
 #include "SdpaKernelPlanBuilder.hpp"
 
 namespace sdpa_kernel_provider
@@ -42,7 +43,11 @@ TEST_F(TestSdpaKernelEngine, IsApplicableReturnsFalseForNonSdpaGraph)
 TEST_F(TestSdpaKernelEngine, IsApplicableReturnsTrueForSdpaGraph)
 {
     using namespace hipdnn_data_sdk::data_objects;
-    using namespace hipdnn_data_sdk::utilities;
+
+    if(sdpa_kernel_provider::getDeviceString(_handle.getStream()) != "gfx942")
+    {
+        GTEST_SKIP();
+    }
 
     auto builder = createValidSdpaFpropGraph();
 

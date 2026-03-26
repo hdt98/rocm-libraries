@@ -12,6 +12,7 @@
 #include <hipdnn_test_sdk/utilities/TestTolerances.hpp>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
 
+#include "Helpers.hpp"
 #include "IntegrationGraphVerificationHarness.hpp"
 
 using namespace hipdnn_frontend;
@@ -81,6 +82,11 @@ protected:
     void runGraphTest(float tolerance)
     {
         SKIP_IF_WINDOWS();
+
+        if(sdpa_integration_common::getDeviceString(this->_stream) != "gfx942")
+        {
+            GTEST_SKIP();
+        }
 
         const SdpaTestCase& testCase = this->GetParam();
 

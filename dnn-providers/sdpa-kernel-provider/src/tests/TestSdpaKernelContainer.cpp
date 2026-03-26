@@ -11,6 +11,7 @@
 
 #include "SdpaKernelContainer.hpp"
 #include "SdpaKernelEngine.hpp"
+#include "SdpaKernelHelpers.hpp"
 
 using namespace sdpa_kernel_provider;
 
@@ -52,6 +53,10 @@ TEST(TestSdpaKernelContainer, GetApplicableEngineIdsSupportedGraph)
     using namespace hipdnn_data_sdk::data_objects;
 
     SdpaKernelHandle handle;
+    if(getDeviceString(handle.getStream()) != "gfx942")
+    {
+        GTEST_SKIP();
+    }
     SdpaKernelContainer container;
     auto& engineManager = container.getEngineManager();
 
