@@ -274,7 +274,7 @@ struct MHCKernelFused
             // Level 1: Warp-level reduction using shuffle
 #pragma unroll
             for(index_t offset = get_warp_size() / 2; offset > 0; offset >>= 1)
-                partial_sum += __shfl_down(partial_sum, offset);
+                partial_sum += warp_shuffle_down(partial_sum, offset);
 
             // Level 2: Cross-warp reduction using atomics
             // Only lane 0 of each warp writes to shared memory

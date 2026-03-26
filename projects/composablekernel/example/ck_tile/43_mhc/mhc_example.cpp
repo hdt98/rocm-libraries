@@ -35,13 +35,14 @@ auto create_args(int argc, char* argv[])
 }
 
 template <typename XDataType,
-          typename PhiDataType,
           typename YDataType,
           typename ComputeDataType,
           typename ActivationFunc = ck_tile::element_wise::Sigmoid,
           ck_tile::index_t MTile  = 32>
 bool run_mhc(const ck_tile::ArgParser& arg_parser)
 {
+    using PhiDataType = XDataType;
+
     const int B = arg_parser.get_int("B");
     const int n = arg_parser.get_int("n");
     const int C = arg_parser.get_int("C");
@@ -96,30 +97,23 @@ bool run_mhc(const ck_tile::ArgParser& arg_parser)
     // Use invoker for kernel type definitions
     // Use log-domain Sinkhorn for better numerical stability
     constexpr bool use_log_sinkhorn = true;
-    using Invoker                   = ck_tile::MHCInvoker<XDataType,
-                                                          PhiDataType,
-                                                          YDataType,
-                                                          ComputeDataType,
-                                                          ActivationFunc,
-                                                          MTile,
-                                                          use_log_sinkhorn>;
-    using Kernel                    = typename Invoker::GemmKernel;
-    using ReductionKernel           = typename Invoker::ReductionKernel;
-    using SinkhornKernel            = typename Invoker::SinkhornKernel;
+    using Invoker                   = ck_tile::
+        MHCInvoker<XDataType, YDataType, ComputeDataType, ActivationFunc, MTile, use_log_sinkhorn>;
+    using Kernel          = typename Invoker::GemmKernel;
+    using ReductionKernel = typename Invoker::ReductionKernel;
+    using SinkhornKernel  = typename Invoker::SinkhornKernel;
 
-    const ck_tile::index_t kBlockSize    = Invoker::GetGemmBlockSize();
-    auto grid_size                       = Invoker::GetGridSize(B, output_dim, nC);
-    const ck_tile::index_t grid_m        = grid_size.at(ck_tile::number<0>{});
-    const ck_tile::index_t grid_n        = grid_size.at(ck_tile::number<1>{});
-    const ck_tile::index_t grid_k        = grid_size.at(ck_tile::number<2>{});
-    const ck_tile::index_t kGridSize     = grid_m * grid_n * grid_k;
-    constexpr ck_tile::index_t smem_size = Invoker::GetSmemSize();
+    const ck_tile::index_t kBlockSize = Invoker::GetGemmBlockSize();
+    auto grid_size                    = Invoker::GetGridSize(B, output_dim, nC);
+    const ck_tile::index_t grid_m     = grid_size.at(ck_tile::number<0>{});
+    const ck_tile::index_t grid_n     = grid_size.at(ck_tile::number<1>{});
+    const ck_tile::index_t grid_k     = grid_size.at(ck_tile::number<2>{});
+    const ck_tile::index_t kGridSize  = grid_m * grid_n * grid_k;
 
     std::cout << "\nKernel Configuration:" << std::endl;
     std::cout << "  Grid: " << grid_m << " × " << grid_n << " × " << grid_k << " = " << kGridSize
               << " blocks" << std::endl;
     std::cout << "  Block size: " << kBlockSize << " threads" << std::endl;
-    std::cout << "  Shared memory: " << smem_size << " bytes" << std::endl;
     std::cout << "  Split-K factor: " << grid_k << std::endl;
 
     // Allocate workspace for split-K partial results
@@ -135,7 +129,6 @@ bool run_mhc(const ck_tile::ArgParser& arg_parser)
     std::cout << "  Workspace size: " << workspace_size / (1024.0 * 1024.0) << " MB" << std::endl;
 
     constexpr ck_tile::index_t kBlockPerCu = 1;
-    constexpr ck_tile::index_t kSmemSize   = smem_size;
 
     // Reduction kernel configuration
     const ck_tile::index_t reduction_threads = ReductionKernel::BlockSize();
@@ -152,6 +145,13 @@ bool run_mhc(const ck_tile::ArgParser& arg_parser)
     stream_cfg.nrepeat_     = repeat;
 
     float ave_time = 0.0f;
+
+    if(!Invoker::IsSupportedArgument(n))
+    {
+        throw std::runtime_error(
+            "Arguments not supported! Skipping the executing of the mHC kernel!\n");
+    }
+
     if(sinkhorn_iters > 0)
     {
         // Launch all three stages together
@@ -161,7 +161,7 @@ bool run_mhc(const ck_tile::ArgParser& arg_parser)
                 Kernel{},
                 kGridSize,
                 kBlockSize,
-                kSmemSize,
+                0,
                 static_cast<XDataType*>(d_x_mem.GetDeviceBuffer()),
                 static_cast<PhiDataType*>(d_phi_mem.GetDeviceBuffer()),
                 static_cast<ComputeDataType*>(d_workspace_mem.GetDeviceBuffer()),
@@ -206,7 +206,7 @@ bool run_mhc(const ck_tile::ArgParser& arg_parser)
                 Kernel{},
                 kGridSize,
                 kBlockSize,
-                kSmemSize,
+                0,
                 static_cast<XDataType*>(d_x_mem.GetDeviceBuffer()),
                 static_cast<PhiDataType*>(d_phi_mem.GetDeviceBuffer()),
                 static_cast<ComputeDataType*>(d_workspace_mem.GetDeviceBuffer()),
@@ -305,8 +305,7 @@ int main(int argc, char* argv[])
     std::cout << "╚════════════════════════════════════════════════════════════╝" << std::endl;
 
     // Run with BF16 inputs, float output and compute, M=64 tile
-    bool pass = run_mhc<ck_tile::bf16_t, // XDataType
-                        ck_tile::bf16_t, // PhiDataType
+    bool pass = run_mhc<ck_tile::bf16_t, // XDataType = PhiDataType
                         float,           // YDataType
                         float,           // ComputeDataType
                         ck_tile::element_wise::Sigmoid,

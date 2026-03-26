@@ -179,7 +179,8 @@ void sinkhorn_knopp_log_domain_ref(const HostTensor<InDataType>& x_n_n,
     }
 
     // Helper function for log-sum-exp
-    auto log_sum_exp = [](const ComputeDataType* log_values, index_t n) -> ComputeDataType {
+    auto log_sum_exp = [](const std::vector<ComputeDataType>& log_values) -> ComputeDataType {
+        index_t n                   = log_values.size();
         ComputeDataType max_log_val = log_values[0];
         for(index_t i = 1; i < n; ++i)
         {
@@ -206,13 +207,13 @@ void sinkhorn_knopp_log_domain_ref(const HostTensor<InDataType>& x_n_n,
         // Normalize rows in log domain
         for(index_t i = 0; i < input_n; ++i)
         {
-            ComputeDataType row_values[16]; // Max size for typical use
+            std::vector<ComputeDataType> row_values(input_n);
             for(index_t j = 0; j < input_n; ++j)
             {
                 row_values[j] = log_c_n_n(i, j);
             }
 
-            ComputeDataType log_row_sum = log_sum_exp(row_values, input_n);
+            ComputeDataType log_row_sum = log_sum_exp(row_values);
 
             if(std::isinf(log_row_sum) && log_row_sum < 0)
             {
@@ -236,13 +237,13 @@ void sinkhorn_knopp_log_domain_ref(const HostTensor<InDataType>& x_n_n,
         // Normalize columns in log domain
         for(index_t j = 0; j < input_n; ++j)
         {
-            ComputeDataType col_values[16]; // Max size for typical use
+            std::vector<ComputeDataType> col_values(input_n);
             for(index_t i = 0; i < input_n; ++i)
             {
                 col_values[i] = log_c_n_n(i, j);
             }
 
-            ComputeDataType log_col_sum = log_sum_exp(col_values, input_n);
+            ComputeDataType log_col_sum = log_sum_exp(col_values);
 
             if(std::isinf(log_col_sum) && log_col_sum < 0)
             {

@@ -15,8 +15,7 @@ namespace ck_tile {
 
 // MHC Invoker
 // Provides type definitions and helper methods for the 3-stage MHC pipeline
-template <typename XDataType_,
-          typename PhiDataType_,
+template <typename XDataType_, // X and Phi input matrices type
           typename YDataType_,
           typename ComputeDataType_,
           typename ActivationFunc_ = ck_tile::element_wise::Sigmoid,
@@ -25,7 +24,6 @@ template <typename XDataType_,
 struct MHCInvoker
 {
     using XDataType       = ck_tile::remove_cvref_t<XDataType_>;
-    using PhiDataType     = ck_tile::remove_cvref_t<PhiDataType_>;
     using YDataType       = ck_tile::remove_cvref_t<YDataType_>;
     using ComputeDataType = ck_tile::remove_cvref_t<ComputeDataType_>;
     using ActivationFunc  = ck_tile::remove_cvref_t<ActivationFunc_>;
@@ -42,6 +40,13 @@ struct MHCInvoker
 
     using SinkhornKernel =
         ck_tile::MHCSinkhornKernelDispatcher<YDataType, ComputeDataType, UseLogSinkhorn>;
+
+    CK_TILE_HOST static constexpr bool IsSupportedArgument(index_t n)
+    {
+        bool supported = SinkhornKernel::IsSupportedArgument(n);
+
+        return supported;
+    }
 
     // Helper methods
     CK_TILE_HOST static constexpr auto GetGemmBlockSize() { return GemmKernel::BlockSize(); }
@@ -69,53 +74,6 @@ struct MHCInvoker
     CK_TILE_HOST static ck_tile::index_t GetSinkhornBlocks(ck_tile::index_t B)
     {
         return (B + GetSinkhornBlockSize() - 1) / GetSinkhornBlockSize();
-    }
-
-    // Host-callable GetSmemSize() - provides shared memory size for kernel launch
-    // NOTE: The actual LDS layout is complex with padding and permutation for bank conflict
-    // avoidance. Rather than trying to replicate the device-only GetSmemSize() calculation,
-    // we provide a simplified approximation based on the block dimensions and data types.
-    CK_TILE_HOST static constexpr ck_tile::index_t GetSmemSize()
-    {
-        using ADataType = remove_cvref_t<typename Problem::ADataType>;
-        using BDataType = remove_cvref_t<typename Problem::BDataType>;
-
-        constexpr ck_tile::index_t kM = BlockGemmShape::kM;
-        constexpr ck_tile::index_t kN = BlockGemmShape::kN;
-        constexpr ck_tile::index_t kK = BlockGemmShape::kK;
-
-        // Base calculation: A (MxK) + B (NxK) with type sizes
-        constexpr ck_tile::index_t base_a = kM * kK * sizeof(ADataType);
-        constexpr ck_tile::index_t base_b = kN * kK * sizeof(BDataType);
-
-        // The actual LDS layout adds padding for bank conflict avoidance
-        // Empirically, for bf16/fp16 (2 bytes), the padding results in:
-        // - MTile=16: 4096 bytes (base would be ~2048)
-        // - MTile=32,64,128: 8192 bytes (base would be 4096-8192)
-        // This suggests roughly 2x overhead for smaller tiles, less for larger
-
-        // Conservative estimate: use base calculation with alignment
-        // This should work across different data types
-        constexpr ck_tile::index_t aligned_a = ((base_a + 15) / 16) * 16;
-        constexpr ck_tile::index_t aligned_b = ((base_b + 15) / 16) * 16;
-        constexpr ck_tile::index_t total     = aligned_a + aligned_b;
-
-        // For bf16/fp16, verify against known good values
-        // If the calculation differs significantly, use empirical value
-        if constexpr(sizeof(ADataType) == 2 && sizeof(BDataType) == 2)
-        {
-            // For 2-byte types (bf16/fp16), use empirically validated values
-            if constexpr(MTile == 16)
-                return 4096;
-            else
-                return 8192; // MTile 32, 64, 128 all use 8192
-        }
-        else
-        {
-            // For other type sizes, use the calculated value
-            // This should scale appropriately with type size
-            return total;
-        }
     }
 };
 

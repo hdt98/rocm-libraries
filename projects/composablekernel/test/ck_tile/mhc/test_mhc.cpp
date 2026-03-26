@@ -15,14 +15,15 @@
 
 // Comprehensive MHC tests suite
 
-template <typename XDataType,
-          typename PhiDataType,
+template <typename XDataType, // XDatatype = PhiDataType
           typename YDataType,
           typename ComputeDataType,
           typename ActivationFunc = ck_tile::element_wise::Sigmoid,
           ck_tile::index_t MTile  = 64>
 class MHCTest
 {
+    using PhiDataType = XDataType;
+
     public:
     template <int B, int n, int C, int sinkhorn_iters = 0, bool UseLogSinkhorn = true>
     static bool RunTest(const std::string& test_name)
@@ -60,7 +61,6 @@ class MHCTest
         // Use invoker for kernel configuration
         constexpr bool use_log_sinkhorn = UseLogSinkhorn;
         using Invoker                   = ck_tile::MHCInvoker<XDataType,
-                                                              PhiDataType,
                                                               YDataType,
                                                               ComputeDataType,
                                                               ActivationFunc,
@@ -95,7 +95,6 @@ class MHCTest
         const ck_tile::index_t sinkhorn_blocks  = (B + sinkhorn_threads - 1) / sinkhorn_threads;
 
         constexpr ck_tile::index_t kBlockPerCu = 1;
-        constexpr ck_tile::index_t kSmemSize   = Invoker::GetSmemSize();
 
         // Launch GPU kernels: 3-stage pipeline (GEMM -> Reduction -> Sinkhorn)
         if(sinkhorn_iters > 0)
@@ -107,7 +106,7 @@ class MHCTest
                     GemmKernel{},
                     kGridSize,
                     kBlockSize,
-                    kSmemSize,
+                    0,
                     static_cast<XDataType*>(d_x_mem.GetDeviceBuffer()),
                     static_cast<PhiDataType*>(d_phi_mem.GetDeviceBuffer()),
                     static_cast<ComputeDataType*>(d_workspace_mem.GetDeviceBuffer()),
@@ -152,7 +151,7 @@ class MHCTest
                     GemmKernel{},
                     kGridSize,
                     kBlockSize,
-                    kSmemSize,
+                    0,
                     static_cast<XDataType*>(d_x_mem.GetDeviceBuffer()),
                     static_cast<PhiDataType*>(d_phi_mem.GetDeviceBuffer()),
                     static_cast<ComputeDataType*>(d_workspace_mem.GetDeviceBuffer()),
@@ -217,24 +216,17 @@ class TestMHCComprehensive : public ::testing::Test
 {
     public:
     using XDataType                         = std::tuple_element_t<0, TestConfig>;
-    using PhiDataType                       = std::tuple_element_t<1, TestConfig>;
-    using YDataType                         = std::tuple_element_t<2, TestConfig>;
-    using ComputeDataType                   = std::tuple_element_t<3, TestConfig>;
-    static constexpr ck_tile::index_t MTile = std::tuple_element_t<4, TestConfig>::value;
+    using YDataType                         = std::tuple_element_t<1, TestConfig>;
+    using ComputeDataType                   = std::tuple_element_t<2, TestConfig>;
+    static constexpr ck_tile::index_t MTile = std::tuple_element_t<3, TestConfig>::value;
 };
 
 // Test configurations
-using TestConfig_BF16 = std::tuple<ck_tile::bf16_t,
-                                   ck_tile::bf16_t,
-                                   float,
-                                   float,
-                                   std::integral_constant<ck_tile::index_t, 64>>;
+using TestConfig_BF16 =
+    std::tuple<ck_tile::bf16_t, float, float, std::integral_constant<ck_tile::index_t, 64>>;
 
-using TestConfig_FP16 = std::tuple<ck_tile::fp16_t,
-                                   ck_tile::fp16_t,
-                                   float,
-                                   float,
-                                   std::integral_constant<ck_tile::index_t, 64>>;
+using TestConfig_FP16 =
+    std::tuple<ck_tile::fp16_t, float, float, std::integral_constant<ck_tile::index_t, 64>>;
 
 using TestTypes = ::testing::Types<TestConfig_BF16, TestConfig_FP16>;
 
@@ -244,7 +236,6 @@ TYPED_TEST_SUITE(TestMHCComprehensive, TestTypes);
 TYPED_TEST(TestMHCComprehensive, BatchSize8)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -255,7 +246,6 @@ TYPED_TEST(TestMHCComprehensive, BatchSize8)
 TYPED_TEST(TestMHCComprehensive, BatchSize16)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -266,7 +256,6 @@ TYPED_TEST(TestMHCComprehensive, BatchSize16)
 TYPED_TEST(TestMHCComprehensive, BatchSize32)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -277,7 +266,6 @@ TYPED_TEST(TestMHCComprehensive, BatchSize32)
 TYPED_TEST(TestMHCComprehensive, BatchSize64)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -288,7 +276,6 @@ TYPED_TEST(TestMHCComprehensive, BatchSize64)
 TYPED_TEST(TestMHCComprehensive, BatchSize128)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -300,7 +287,6 @@ TYPED_TEST(TestMHCComprehensive, BatchSize128)
 TYPED_TEST(TestMHCComprehensive, LargeC_512)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -311,7 +297,6 @@ TYPED_TEST(TestMHCComprehensive, LargeC_512)
 TYPED_TEST(TestMHCComprehensive, LargeC_1024)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -322,7 +307,6 @@ TYPED_TEST(TestMHCComprehensive, LargeC_1024)
 TYPED_TEST(TestMHCComprehensive, LargeC_4096)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -334,7 +318,6 @@ TYPED_TEST(TestMHCComprehensive, LargeC_4096)
 TYPED_TEST(TestMHCComprehensive, SinkhornDisabled)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -345,7 +328,6 @@ TYPED_TEST(TestMHCComprehensive, SinkhornDisabled)
 TYPED_TEST(TestMHCComprehensive, Sinkhorn20Iterations)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -356,7 +338,6 @@ TYPED_TEST(TestMHCComprehensive, Sinkhorn20Iterations)
 TYPED_TEST(TestMHCComprehensive, SinkhornLargeC)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -368,7 +349,6 @@ TYPED_TEST(TestMHCComprehensive, SinkhornLargeC)
 TYPED_TEST(TestMHCComprehensive, ActivationSigmoid)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -379,7 +359,6 @@ TYPED_TEST(TestMHCComprehensive, ActivationSigmoid)
 TYPED_TEST(TestMHCComprehensive, ActivationTanh)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::TanH,
@@ -391,7 +370,6 @@ TYPED_TEST(TestMHCComprehensive, ActivationTanh)
 TYPED_TEST(TestMHCComprehensive, StressTest_LargeBatch_LargeC_Sinkhorn)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -403,7 +381,6 @@ TYPED_TEST(TestMHCComprehensive, StressTest_LargeBatch_LargeC_Sinkhorn)
 TYPED_TEST(TestMHCComprehensive, BatchSize_Single)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -414,7 +391,6 @@ TYPED_TEST(TestMHCComprehensive, BatchSize_Single)
 TYPED_TEST(TestMHCComprehensive, BatchSize_Odd_7)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -425,7 +401,6 @@ TYPED_TEST(TestMHCComprehensive, BatchSize_Odd_7)
 TYPED_TEST(TestMHCComprehensive, BatchSize_Odd_15)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -436,7 +411,6 @@ TYPED_TEST(TestMHCComprehensive, BatchSize_Odd_15)
 TYPED_TEST(TestMHCComprehensive, BatchSize_Odd_33)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -447,7 +421,6 @@ TYPED_TEST(TestMHCComprehensive, BatchSize_Odd_33)
 TYPED_TEST(TestMHCComprehensive, BatchSize_NonPowerOfTwo_12)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -458,7 +431,6 @@ TYPED_TEST(TestMHCComprehensive, BatchSize_NonPowerOfTwo_12)
 TYPED_TEST(TestMHCComprehensive, BatchSize_NonPowerOfTwo_48)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -469,7 +441,6 @@ TYPED_TEST(TestMHCComprehensive, BatchSize_NonPowerOfTwo_48)
 TYPED_TEST(TestMHCComprehensive, BatchSize_NonPowerOfTwo_100)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -481,7 +452,6 @@ TYPED_TEST(TestMHCComprehensive, BatchSize_NonPowerOfTwo_100)
 TYPED_TEST(TestMHCComprehensive, C_Odd_63)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -492,7 +462,6 @@ TYPED_TEST(TestMHCComprehensive, C_Odd_63)
 TYPED_TEST(TestMHCComprehensive, C_Odd_127)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -503,7 +472,6 @@ TYPED_TEST(TestMHCComprehensive, C_Odd_127)
 TYPED_TEST(TestMHCComprehensive, C_Odd_255)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -514,7 +482,6 @@ TYPED_TEST(TestMHCComprehensive, C_Odd_255)
 TYPED_TEST(TestMHCComprehensive, C_NonPowerOfTwo_48)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -525,7 +492,6 @@ TYPED_TEST(TestMHCComprehensive, C_NonPowerOfTwo_48)
 TYPED_TEST(TestMHCComprehensive, C_NonPowerOfTwo_96)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -536,7 +502,6 @@ TYPED_TEST(TestMHCComprehensive, C_NonPowerOfTwo_96)
 TYPED_TEST(TestMHCComprehensive, C_NonPowerOfTwo_192)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -548,7 +513,6 @@ TYPED_TEST(TestMHCComprehensive, C_NonPowerOfTwo_192)
 TYPED_TEST(TestMHCComprehensive, ExpansionFactor_n4)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -559,7 +523,6 @@ TYPED_TEST(TestMHCComprehensive, ExpansionFactor_n4)
 TYPED_TEST(TestMHCComprehensive, ExpansionFactor_n5_NoSinkhorn)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -570,7 +533,6 @@ TYPED_TEST(TestMHCComprehensive, ExpansionFactor_n5_NoSinkhorn)
 TYPED_TEST(TestMHCComprehensive, ExpansionFactor_n8_NoSinkhorn)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -581,7 +543,6 @@ TYPED_TEST(TestMHCComprehensive, ExpansionFactor_n8_NoSinkhorn)
 TYPED_TEST(TestMHCComprehensive, ExpansionFactor_n8_WithSinkhorn)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -592,7 +553,6 @@ TYPED_TEST(TestMHCComprehensive, ExpansionFactor_n8_WithSinkhorn)
 TYPED_TEST(TestMHCComprehensive, ExpansionFactor_n2)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -603,7 +563,6 @@ TYPED_TEST(TestMHCComprehensive, ExpansionFactor_n2)
 TYPED_TEST(TestMHCComprehensive, ExpansionFactor_n3)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -615,7 +574,6 @@ TYPED_TEST(TestMHCComprehensive, ExpansionFactor_n3)
 TYPED_TEST(TestMHCComprehensive, EdgeCase_OddB_OddC_OddN)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -626,7 +584,6 @@ TYPED_TEST(TestMHCComprehensive, EdgeCase_OddB_OddC_OddN)
 TYPED_TEST(TestMHCComprehensive, EdgeCase_NonPow2_All)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -637,7 +594,6 @@ TYPED_TEST(TestMHCComprehensive, EdgeCase_NonPow2_All)
 TYPED_TEST(TestMHCComprehensive, EdgeCase_LargeN_SmallC)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -652,7 +608,6 @@ TYPED_TEST(TestMHCComprehensive, EdgeCase_LargeN_SmallC)
 TYPED_TEST(TestMHCComprehensive, Padding_B_NotDivisibleBy16)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -664,7 +619,6 @@ TYPED_TEST(TestMHCComprehensive, Padding_B_NotDivisibleBy16)
 TYPED_TEST(TestMHCComprehensive, Padding_B_NotDivisibleBy32)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -676,7 +630,6 @@ TYPED_TEST(TestMHCComprehensive, Padding_B_NotDivisibleBy32)
 TYPED_TEST(TestMHCComprehensive, Padding_C_NotDivisibleBy64)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -687,7 +640,6 @@ TYPED_TEST(TestMHCComprehensive, Padding_C_NotDivisibleBy64)
 TYPED_TEST(TestMHCComprehensive, Padding_OutputDim_NotDivisibleBy32)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -699,7 +651,6 @@ TYPED_TEST(TestMHCComprehensive, Padding_OutputDim_NotDivisibleBy32)
 TYPED_TEST(TestMHCComprehensive, Padding_AllDimensions)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -714,7 +665,6 @@ TYPED_TEST(TestMHCComprehensive, Padding_AllDimensions)
 TYPED_TEST(TestMHCComprehensive, MultiWarp_2Warps_B64)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -726,7 +676,6 @@ TYPED_TEST(TestMHCComprehensive, MultiWarp_2Warps_B64)
 TYPED_TEST(TestMHCComprehensive, MultiWarp_2Warps_B128)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -738,7 +687,6 @@ TYPED_TEST(TestMHCComprehensive, MultiWarp_2Warps_B128)
 TYPED_TEST(TestMHCComprehensive, MultiWarp_4Warps_B128)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -750,7 +698,6 @@ TYPED_TEST(TestMHCComprehensive, MultiWarp_4Warps_B128)
 TYPED_TEST(TestMHCComprehensive, MultiWarp_4Warps_B256)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -765,7 +712,6 @@ TYPED_TEST(TestMHCComprehensive, MultiWarp_4Warps_B256)
 TYPED_TEST(TestMHCComprehensive, MultiBlock_LargeB_256)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -777,7 +723,6 @@ TYPED_TEST(TestMHCComprehensive, MultiBlock_LargeB_256)
 TYPED_TEST(TestMHCComprehensive, MultiBlock_LargeOutputDim)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -789,7 +734,6 @@ TYPED_TEST(TestMHCComprehensive, MultiBlock_LargeOutputDim)
 TYPED_TEST(TestMHCComprehensive, MultiBlock_LargeC_SplitK)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -801,7 +745,6 @@ TYPED_TEST(TestMHCComprehensive, MultiBlock_LargeC_SplitK)
 TYPED_TEST(TestMHCComprehensive, MultiBlock_AllDimensions)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -814,7 +757,6 @@ TYPED_TEST(TestMHCComprehensive, MultiBlock_AllDimensions)
 TYPED_TEST(TestMHCComprehensive, MultiWarp_WithPadding_B65)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -826,7 +768,6 @@ TYPED_TEST(TestMHCComprehensive, MultiWarp_WithPadding_B65)
 TYPED_TEST(TestMHCComprehensive, MultiWarp_WithPadding_B130)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -838,7 +779,6 @@ TYPED_TEST(TestMHCComprehensive, MultiWarp_WithPadding_B130)
 TYPED_TEST(TestMHCComprehensive, MultiWarp_WithPadding_AllDims)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -852,7 +792,6 @@ TYPED_TEST(TestMHCComprehensive, MultiWarp_WithPadding_AllDims)
 TYPED_TEST(TestMHCComprehensive, NonLogSinkhorn_n4)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -863,7 +802,6 @@ TYPED_TEST(TestMHCComprehensive, NonLogSinkhorn_n4)
 TYPED_TEST(TestMHCComprehensive, NonLogSinkhorn_n8)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -875,7 +813,6 @@ TYPED_TEST(TestMHCComprehensive, NonLogSinkhorn_n8)
 TYPED_TEST(TestMHCComprehensive, SplitK_OddBatch_LargeC)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -887,7 +824,6 @@ TYPED_TEST(TestMHCComprehensive, SplitK_OddBatch_LargeC)
 TYPED_TEST(TestMHCComprehensive, SplitK_NonPow2Batch_LargeC)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -899,7 +835,6 @@ TYPED_TEST(TestMHCComprehensive, SplitK_NonPow2Batch_LargeC)
 TYPED_TEST(TestMHCComprehensive, SplitK_LargeN_LargeC)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -911,7 +846,6 @@ TYPED_TEST(TestMHCComprehensive, SplitK_LargeN_LargeC)
 TYPED_TEST(TestMHCComprehensive, SplitK_OddC)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -923,7 +857,6 @@ TYPED_TEST(TestMHCComprehensive, SplitK_OddC)
 TYPED_TEST(TestMHCComprehensive, SplitK_WithSinkhorn)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::Sigmoid,
@@ -935,7 +868,6 @@ TYPED_TEST(TestMHCComprehensive, SplitK_WithSinkhorn)
 TYPED_TEST(TestMHCComprehensive, SplitK_WithTanH)
 {
     using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::PhiDataType,
                            typename TestFixture::YDataType,
                            typename TestFixture::ComputeDataType,
                            ck_tile::element_wise::TanH,
