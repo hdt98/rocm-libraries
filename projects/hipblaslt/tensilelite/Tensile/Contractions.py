@@ -30,7 +30,7 @@ from . import Properties
 from Tensile.Common import state, state_key_ordering, IsaInfo
 from Tensile.Common.Architectures import gfxToIsa
 from Tensile.Common.DataType import DataType
-from Tensile.Common.GlobalParameters import internalParameters
+from Tensile.Common.GlobalParameters import defaultInternalSupportParams, internalParameters
 from Tensile.SolutionStructs import Solution as OriginalSolution
 from Tensile.SolutionStructs.Problem import getBiasDataTypeListDefault
 from Tensile.Toolchain.Component import Assembler
@@ -870,15 +870,25 @@ class Solution:
 
     def __init__(self, **kwargs):
         self.name = None
+        self.kernelName = None
         self.problemType = None
         self.hardwarePredicate = Hardware.HardwarePredicate('TruePred')
         self.problemPredicate = ProblemPredicate('TruePred')
         self.taskPredicate = TaskPredicate('TruePred')
         self.sizeMapping = None
+        self.internalArgsSupport = InternalArgsSupport(
+            version=defaultInternalSupportParams["KernArgsVersion"],
+            gsu=defaultInternalSupportParams["SupportUserGSU"],
+            wgm=defaultInternalSupportParams["SupportCustomWGM"],
+            staggerU=defaultInternalSupportParams["SupportCustomStaggerU"],
+            useUniversalArgs=defaultInternalSupportParams["UseUniversalArgs"],
+            useSFC=defaultInternalSupportParams["UseSFC"],
+        )
         self.debugKernel = False
         self.libraryLogicIndex = {}
         self.index = None
         self.ideals = {}
+        self.linearModel = {}
         self.srcName = ""
 
         for key, value in kwargs:

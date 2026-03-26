@@ -595,9 +595,17 @@ class MasterSolutionLibrary:
         return rv
 
     def applyNaming(self, splitGSU: bool):
-        for s in list(self.solutions.values()):
-            s.name = getSolutionNameMin(s.originalSolution.getKernels()[0], splitGSU)
-            s.kernelName = getKernelNameMin(s.originalSolution.getKernels()[0], splitGSU)
+        for s in self.solutions.values():
+            name = getattr(s, "name", None)
+            kernelName = getattr(s, "kernelName", None)
+            if name is not None and kernelName is not None:
+                continue
+
+            kernel = s.originalSolution.getKernels()[0]
+            if name is None:
+                s.name = getSolutionNameMin(kernel, splitGSU)
+            if kernelName is None:
+                s.kernelName = getKernelNameMin(kernel, splitGSU)
 
     def remapSolutionIndicesStartingFrom(self, curIndex):
         reIndexMap = {}
