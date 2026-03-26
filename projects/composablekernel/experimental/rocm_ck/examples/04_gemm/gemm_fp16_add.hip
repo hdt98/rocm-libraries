@@ -6,7 +6,7 @@
 
 #include "gemm_dev.hpp"
 
-static constexpr rocm_ck::GemmKernel kernel = rocm_ck::make_kernel(
+static constexpr rocm_ck::GemmSpec spec = rocm_ck::make_kernel(
     rocm_ck::Signature{
         .dtype = rocm_ck::DataType::FP16,
         .ops = {rocm_ck::GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
@@ -17,5 +17,5 @@ static constexpr rocm_ck::GemmKernel kernel = rocm_ck::make_kernel(
 
 extern "C" __global__ void gemm_fp16_add(rocm_ck::Args args)
 {
-    rocm_ck::runGemm<kernel>(args);
+    rocm_ck::runGemm<spec>(args);
 }
