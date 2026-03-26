@@ -493,8 +493,14 @@ TEST(HipcubDeviceMerge, MergeLargeSizeIterators)
         const size_t size2       = std::get<1>(sizes);
         const size_t output_size = size1 + size2;
 
+
+        size_t required_mem = sizeof(key_type) * output_size;
+        size_t total_mem;
+        size_t free_mem;
+        HIP_CHECK(hipMemGetInfo(free_mem, total_mem));
+
         // check if we have enough global memory size
-        if(sizeof(key_type) * output_size >= test_common_utils::system.devProp.totalGlobalMem){
+        if(free_mem * 0.9 < required_mem){
             continue;
         }
 
