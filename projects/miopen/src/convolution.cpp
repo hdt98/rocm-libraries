@@ -57,8 +57,7 @@ std::size_t GetWorkSpaceSizeGEMM(const miopen::ExecutionContext& ctx,
                                  const conv::ProblemDescription& problem)
 {
 #if MIOPEN_USE_GEMM
-    if(env::disabled(MIOPEN_DEBUG_CONV_GEMM) ||
-       miopen::any_of(problem.GetConv().GetConvDilations(), [](auto v) { return v > 1; }))
+    if(env::disabled(MIOPEN_DEBUG_CONV_GEMM))
         return 0;
 
     return GetMaxWorkSpaceSize(AllGemmWorkspaceSize(ctx, problem));
@@ -392,35 +391,28 @@ std::size_t ConvolutionDescriptor::GetWorkSpaceSize(ExecutionContext ctx,
     ctx.do_search             = false;
     ctx.disable_perfdb_access = true;
 
-    while(findMode.IsFast(ctx) || (findMode.IsHybrid(ctx) && !findMode.IsTrustVerify(ctx)))
+    /// \section ffind_gwss_fast_mode
+    /// Fast mode only runs the heuristically-selected solver, so return its workspace only.
+    /// This is an optimization to avoid computing max workspace across all solvers.
+    if(findMode.IsFast(ctx))
     {
-        /// \section ffind_gwss_why_not_0
-        /// Basically we can return 0 here because
-        /// * (A) Find() emulated by Immediate mode does not execute kernels.
-        /// * (B) We expect that applications read output of Find() and
-        ///   allocate WS for Run phase as indicated there
-        ///   (in miopenConvAlgoPerf_t::memory).
-        ///
-        /// However there are some known apps that allocate WS once
-        /// (using size returned by *this* call) and then re-use
-        /// the same workspace for Run phase. That is why we shall return
-        /// actually required workspace here.
         auto fallback        = FallbackPath();
         const auto solutions = GetSolutions(ctx, problem, 1, &fallback);
-        if(solutions.empty() || ((findMode.IsHybrid(ctx) && fallback != FallbackPath::None) &&
-                                 !env::enabled(MIOPEN_DEBUG_FORCE_IMMED_MODE_FALLBACK)))
+        if(!solutions.empty())
         {
-            ctx.use_dynamic_solutions_only = findMode.IsDynamicHybrid(ctx);
-            break; // Fall down to Normal Find.
+            const auto id             = solver::Id{solutions.front().solution_id};
+            const auto& s             = id.GetSolver();
+            const auto workspace_size = s.GetWorkspaceSize(ctx, problem);
+            MIOPEN_LOG_I(workspace_size);
+            return workspace_size;
         }
-        const auto id             = solver::Id{solutions.front().solution_id};
-        const auto& s             = id.GetSolver();
-        const auto workspace_size = s.GetWorkspaceSize(ctx, problem);
-
-        MIOPEN_LOG_I(workspace_size);
-        return workspace_size;
+        // If no solution found in Fast mode, fall through to compute max workspace
     }
 
+    /// \section ffind_gwss_workspace_for_all_solvers
+    /// For Hybrid modes and Normal Find, compute max workspace across all applicable solvers.
+    /// Hybrid mode may fall back to full Find which evaluates all solvers, so workspace
+    /// must be sufficient for all of them.
     size_t workspace_size;
 
     if(problem.GetDirection() != conv::Direction::BackwardWeights)
