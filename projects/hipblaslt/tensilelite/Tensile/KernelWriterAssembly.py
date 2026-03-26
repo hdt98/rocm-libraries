@@ -11902,7 +11902,7 @@ class KernelWriterAssembly(KernelWriter):
           else:
             if tc == "A":
               sparseA = kernel["ProblemType"]["Sparse"] == 1
-              lrvw = kernel["LocalReadVectorWidth%s"%tc] // (2 if sparseA else 1)
+              lrvw = kernel["LocalReadVectorWidth%s"%tc]
               wlr = lrvw//kernel["MIInputPerThreadA"]
               wlr = max(wlr, 1)
               if kernel["ProblemType"]["Sparse"] and lrvw < kernel["MIInputPerThreadA"]:

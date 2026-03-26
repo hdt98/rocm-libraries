@@ -771,11 +771,9 @@ class LraTileAssignmentMFMA(LraTileAssignment):
         waveWidth        = writer.states.kernel["WavefrontSize"]
         lrvw             = kernel["LocalReadVectorWidthMXS"] if ("MXS" in tc) else kernel[f"LocalReadVectorWidth{tc}"]
         inputPerThread   = lrvw if not writer.states.inTailLoop else kernel["MIInputPerThread%s"%tc]
-        if kernel["ProblemType"]["Sparse"]:
-          if (kernel["ProblemType"]["Sparse"] == 2 and tP["isB"]) or (kernel["ProblemType"]["Sparse"] == 1 and tP["isA"]):
-            inputPerThread = inputPerThread // 2
-          elif tP["isM"]:
-            inputPerThread = inputPerThread // 8
+        if kernel["ProblemType"]["Sparse"] and tP["isM"]:
+            # each element is 2 bits = 1/4 byte
+            inputPerThread = inputPerThread // 4
         LdsPad           = kernel["LdsPad%s" % tc] if kernel["LdsBlockSizePerPad%s" % tc] == 0 else 0
 
         # parameter for get each type index
