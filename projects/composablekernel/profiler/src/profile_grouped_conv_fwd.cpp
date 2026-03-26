@@ -559,6 +559,11 @@ int profile_grouped_conv_fwd(int argc, char* argv[])
         }
     };
 
+
+    if (layout != ConvLayout::NHWGC_GKYXC_NHWGK) {
+        return 1;
+    }
+
     // GNHWC_GKYXC_GNHWK
     if(num_dim_spatial == 1 && layout == ConvLayout::GNHWC_GKYXC_GNHWK)
     {

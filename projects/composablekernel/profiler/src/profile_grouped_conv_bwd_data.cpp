@@ -396,6 +396,9 @@ int profile_grouped_conv_bwd_data(int argc, char* argv[])
         return pass ? 0 : 1;
     };
 
+    if (layout != ConvLayout::NHWGC_GKYXC_NHWGK) {
+        return 1;
+    }
     if(num_dim_spatial == 2)
     {
         if(layout == ConvLayout::GNHWC_GKYXC_GNHWK)

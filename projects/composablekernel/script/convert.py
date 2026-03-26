@@ -29,11 +29,11 @@ def run_ck_profiler_cmd(cmd):
 
 def parse_layouts(args):
     if args.in_layout == "NCW" or args.in_layout == "NCHW" or args.in_layout == "NCDHW":
-        if args.ck_profier_op == "grouped_conv_bwd_weight":
+        if args.ck_profier_op == "grouped_conv_bwd_weight_tile":
             args.layout = 4
         elif (
-            args.ck_profier_op == "grouped_conv_fwd"
-            or args.ck_profier_op == "grouped_conv_bwd_data"
+            args.ck_profier_op == "grouped_conv_fwd_tile"
+            or args.ck_profier_op == "grouped_conv_bwd_data_tile"
         ):
             args.layout = 3
         else:
@@ -42,11 +42,11 @@ def parse_layouts(args):
     elif (
         args.in_layout == "NWC" or args.in_layout == "NHWC" or args.in_layout == "NDHWC"
     ):
-        if args.ck_profier_op == "grouped_conv_bwd_weight":
+        if args.ck_profier_op == "grouped_conv_bwd_weight_tile":
             args.layout = 2
         elif (
-            args.ck_profier_op == "grouped_conv_bwd_data"
-            or args.ck_profier_op == "grouped_conv_fwd"
+            args.ck_profier_op == "grouped_conv_bwd_data_tile"
+            or args.ck_profier_op == "grouped_conv_fwd_tile"
         ):
             args.layout = 1
     else:
@@ -57,32 +57,32 @@ def parse_layouts(args):
 def parse_data_type(args):
     if args.data_type == "fp32":
         if (
-            args.ck_profier_op == "grouped_conv_bwd_weight"
-            or args.ck_profier_op == "grouped_conv_bwd_data"
-            or args.ck_profier_op == "grouped_conv_fwd"
+            args.ck_profier_op == "grouped_conv_bwd_weight_tile"
+            or args.ck_profier_op == "grouped_conv_bwd_data_tile"
+            or args.ck_profier_op == "grouped_conv_fwd_tile"
         ):
             args.data_type = 0
     if args.data_type == "fp16":
         if (
-            args.ck_profier_op == "grouped_conv_bwd_weight"
-            or args.ck_profier_op == "grouped_conv_bwd_data"
-            or args.ck_profier_op == "grouped_conv_fwd"
+            args.ck_profier_op == "grouped_conv_bwd_weight_tile"
+            or args.ck_profier_op == "grouped_conv_bwd_data_tile"
+            or args.ck_profier_op == "grouped_conv_fwd_tile"
         ):
             args.data_type = 1
     if args.data_type == "int8":
-        if args.ck_profier_op == "grouped_conv_bwd_weight":
+        if args.ck_profier_op == "grouped_conv_bwd_weight_tile":
             args.data_type = 4
-        if args.ck_profier_op == "grouped_conv_bwd_data":
-            print("Not supported data type for grouped_conv_bwd_data")
+        if args.ck_profier_op == "grouped_conv_bwd_data_tile":
+            print("Not supported data type for grouped_conv_bwd_data_tile")
             exit(1)
-        if args.ck_profier_op == "grouped_conv_fwd":
+        if args.ck_profier_op == "grouped_conv_fwd_tile":
             args.data_type = 3
     if args.data_type == "bfp16":
-        if args.ck_profier_op == "grouped_conv_bwd_weight":
+        if args.ck_profier_op == "grouped_conv_bwd_weight_tile":
             args.data_type = 5
         if (
-            args.ck_profier_op == "grouped_conv_bwd_data"
-            or args.ck_profier_op == "grouped_conv_fwd"
+            args.ck_profier_op == "grouped_conv_bwd_data_tile"
+            or args.ck_profier_op == "grouped_conv_fwd_tile"
         ):
             args.data_type = 2
 
@@ -113,7 +113,7 @@ def add_conv_params_to_cmd(args, cmd):
 
 
 def run_ck_grouped_conv_fwd(args):
-    args.ck_profier_op = "grouped_conv_fwd"
+    args.ck_profier_op = "grouped_conv_fwd_tile"
     parse_data_type(args)
     parse_layouts(args)
     # use int32 by default
@@ -121,7 +121,7 @@ def run_ck_grouped_conv_fwd(args):
 
     cmd = [str(args.ck_profiler_cmd), str(args.ck_profier_op)]
     cmd += [str(args.data_type), str(args.layout), str(args.index_type)]
-    cmd += [str(0), str(args.init_method)]
+    cmd += [str(args.verify), str(args.init_method)]
     cmd += [str(args.log_value), str(args.time)]
     cmd += [str(args.spatial_dim), str(args.group_count)]
     cmd += [str(args.batchsize), str(args.out_channels)]
@@ -138,7 +138,7 @@ def run_ck_grouped_conv_fwd(args):
 
 
 def run_ck_grouped_conv_bwd_data(args):
-    args.ck_profier_op = "grouped_conv_bwd_data"
+    args.ck_profier_op = "grouped_conv_bwd_data_tile"
     parse_data_type(args)
     parse_layouts(args)
     # Test all split K value from the list {1, 2, 4, 8, 32, 64, 128}
@@ -146,7 +146,7 @@ def run_ck_grouped_conv_bwd_data(args):
 
     cmd = [str(args.ck_profiler_cmd), str(args.ck_profier_op)]
     cmd += [str(args.data_type), str(args.layout)]
-    cmd += [str(0), str(args.init_method)]
+    cmd += [str(args.verify), str(args.init_method)]
     cmd += [str(args.log_value), str(args.time)]
     cmd += [str(args.spatial_dim), str(args.group_count)]
     cmd += [str(args.batchsize), str(args.out_channels)]
@@ -165,7 +165,7 @@ def run_ck_grouped_conv_bwd_data(args):
 
 
 def run_ck_grouped_conv_bwd_weight(args):
-    args.ck_profier_op = "grouped_conv_bwd_weight"
+    args.ck_profier_op = "grouped_conv_bwd_weight_tile"
     parse_data_type(args)
     parse_layouts(args)
     # Test all split K value from the list {1, 2, 4, 8, 32, 64, 128}
@@ -173,7 +173,7 @@ def run_ck_grouped_conv_bwd_weight(args):
 
     cmd = [str(args.ck_profiler_cmd), str(args.ck_profier_op)]
     cmd += [str(args.data_type), str(args.layout)]
-    cmd += [str(0), str(args.init_method)]
+    cmd += [str(args.verify), str(args.init_method)]
     cmd += [str(args.log_value), str(args.time)]
     cmd += [str(args.spatial_dim), str(args.group_count)]
     cmd += [str(args.batchsize), str(args.out_channels)]

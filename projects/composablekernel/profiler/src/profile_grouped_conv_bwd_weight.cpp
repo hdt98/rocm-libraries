@@ -451,6 +451,11 @@ int profile_grouped_conv_bwd_weight(int argc, char* argv[])
         return pass ? 0 : 1;
     };
 
+
+    if (layout != ConvLayout::NHWGC_GKYXC_NHWGK) {
+        return 1;
+    }
+
     if(num_dim_spatial == 1 && layout == ConvLayout::GNHWC_GKYXC_GNHWK)
     {
         if(data_type == ConvDataType::F32_F32_F32)
