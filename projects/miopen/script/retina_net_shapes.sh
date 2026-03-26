@@ -1,0 +1,8 @@
+#!/bin/bash
+
+../build/bin/MIOpenDriver convfp16 -n 32 -c 128 -H 200 -W 200 -k 128 -y 3 -x 3 -p 1 -q 1 -u 1 -v 1 -l 1 -j 1 --in_layout NHWC --fil_layout NHWC --out_layout NHWC -m conv -g 32 -F 1 -t 0 --verify 0
+../build/bin/MIOpenDriver convfp16 -n 32 -c 128 -H 200 -W 200 -k 128 -y 3 -x 3 -p 1 -q 1 -u 1 -v 1 -l 1 -j 1 --in_layout NHWC --fil_layout NHWC --out_layout NHWC -m conv -g 32 -F 2 -t 0 --verify 0
+../build/bin/MIOpenDriver convfp16 -n 32 -c 512 -H 50 -W 50 -k 512 -y 3 -x 3 -p 1 -q 1 -u 1 -v 1 -l 1 -j 1 --in_layout NHWC --fil_layout NHWC --out_layout NHWC -m conv -g 32 -F 1 -t 0 --verify 0
+../build/bin/MIOpenDriver convfp16 -n 32 -c 512 -H 50 -W 50 -k 512 -y 3 -x 3 -p 1 -q 1 -u 1 -v 1 -l 1 -j 1 --in_layout NHWC --fil_layout NHWC --out_layout NHWC -m conv -g 32 -F 2 -t 0 --verify 0
+../build/bin/MIOpenDriver convfp16 -n 32 -c 256 -H 100 -W 100 -k 256 -y 3 -x 3 -p 1 -q 1 -u 1 -v 1 -l 1 -j 1 --in_layout NHWC --fil_layout NHWC --out_layout NHWC -m conv -g 32 -F 1 -t 0 --verify 0
+../build/bin/MIOpenDriver convfp16 -n 32 -c 256 -H 100 -W 100 -k 256 -y 3 -x 3 -p 1 -q 1 -u 1 -v 1 -l 1 -j 1 --in_layout NHWC --fil_layout NHWC --out_layout NHWC -m conv -g 32 -F 2 -t 0 --verify 0

@@ -222,7 +222,7 @@ def run_ck_grouped_conv_bwd_data(args, capture_output=False):
     parse_data_type(args)
     parse_layouts(args)
     # Test all split K value from the list {1, 2, 4, 8, 32, 64, 128}
-    args.split_k_value = -1
+    args.split_k_value = 1
 
     cmd = [str(args.ck_profiler_cmd), str(args.ck_profier_op)]
     cmd += [str(args.data_type), str(args.layout)]
@@ -723,11 +723,13 @@ def process_batch_file(input_file, output_file, parser, profiler_path=None, verb
     total_lines = len(lines)
     
     # Open output file for incremental writing
-    try:
-        f_out = open(output_file, 'w')
-    except IOError as e:
-        print(f"Error opening output file '{output_file}': {e}")
-        sys.exit(1)
+    f_out = None
+    if output_file is not None:
+        try:
+            f_out = open(output_file, 'w')
+        except IOError as e:
+            print(f"Error opening output file '{output_file}': {e}")
+            sys.exit(1)
     
     try:
         for i, line in enumerate(lines, 1):
@@ -739,24 +741,29 @@ def process_batch_file(input_file, output_file, parser, profiler_path=None, verb
             
             print(f"Processing command {i}/{total_lines}: {line[:80]}...")
             
+            out = f_out if f_out is not None else sys.stdout
+                
+
             # Write separator for readability
-            f_out.write(f"{'='*80}\n")
-            f_out.write(f"Input command: {line}\n")
-            f_out.write(f"{'='*80}\n")
+            out.write(f"{'='*80}\n")
+            out.write(f"Input command: {line}\n")
+            out.write(f"{'='*80}\n")
             
             # Process the command and capture output
             output = process_single_command(line, parser, capture_output=True, profiler_path=profiler_path, verbose=verbose)
             if output:
-                f_out.write(output)
-                f_out.write("\n")
-            f_out.write("\n")  # Empty line between commands
+                out.write(output)
+                out.write("\n")
+            out.write("\n")  # Empty line between commands
             
-            # Flush to ensure results are written immediately
-            f_out.flush()
+            if f_out is not None:
+                # Flush to ensure results are written immediately
+                f_out.flush()
         
         print(f"\nResults written to '{output_file}'")
     finally:
-        f_out.close()
+        if f_out is not None:
+            f_out.close()
 
 
 if __name__ == "__main__":
@@ -768,10 +775,6 @@ if __name__ == "__main__":
     
     if preliminary_args.input_file is not None:
         # Batch mode
-        if preliminary_args.output_file is None:
-            print("Error: --output-file is required when using --input-file")
-            sys.exit(1)
-        
         print(f"Batch mode: Reading commands from '{preliminary_args.input_file}'")
         profiler_path = preliminary_args.profiler_path
         verbose = preliminary_args.verbose
