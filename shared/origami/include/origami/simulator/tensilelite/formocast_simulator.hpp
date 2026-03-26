@@ -34,6 +34,12 @@ namespace origami
     {
     public:
         /**
+         * @brief Construct a Formocast simulator for the given hardware.
+         * @param hw hardware_t instance describing the target GPU
+         */
+        explicit Formocast(const hardware_t& hw);
+
+        /**
          * @brief Configuration parameters for matrix tile sizes and memory access patterns
          *
          * Contains all the tuning parameters that define how a GEMM kernel will execute,
@@ -274,14 +280,6 @@ namespace origami
          * @param sm Size mapping containing tile sizes and optimization parameters
          */
         void setSolution(SizeMapping sm);
-
-        /**
-         * @brief Set the hardware for simulation
-         * @param hw hardware_t instance with architecture-specific parameters
-         *
-         * The caller must ensure the hardware_t object outlives this Formocast instance.
-         */
-        void setHardware(const hardware_t& hw);
 
         /**
          * @brief Calculate store (write-back) performance for matrix output
@@ -613,7 +611,7 @@ namespace origami
         ProblemInfo problem;               ///< Current problem specification
 
     private:
-        const hardware_t* hw_ = nullptr;  ///< Non-owning pointer to hardware; set via setHardware()
+        hardware_t hw_;  ///< Target hardware configuration
 
     public:
 

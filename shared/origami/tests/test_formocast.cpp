@@ -126,7 +126,8 @@ TEST_CASE("Formocast: Hardware setup via hardware_t", "[formocast]") {
 }
 
 TEST_CASE("Formocast: Basic problem and solution setup", "[formocast]") {
-    Formocast simulator;
+    auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
+    Formocast simulator(hw);
 
     SECTION("Set valid problem") {
         auto problem = make_problem_info(1024, 1024, 1024);
@@ -154,24 +155,18 @@ TEST_CASE("Formocast: Basic problem and solution setup", "[formocast]") {
         REQUIRE(simulator.sizeMapping.macroTile[1] == 128);
         REQUIRE(simulator.sizeMapping.depthU == 32);
     }
-
-    SECTION("Set hardware via hardware_t") {
-        auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
-        REQUIRE_NOTHROW(simulator.setHardware(hw));
-    }
 }
 
 TEST_CASE("Formocast: Performance prediction", "[formocast]") {
-    Formocast simulator;
 
     SECTION("Basic performance prediction for square problem") {
         auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
+        Formocast simulator(hw);
         auto problem = make_problem_info(1024, 1024, 1024);
         auto mapping = make_size_mapping(128, 128, 32);
 
         simulator.setProblem(problem);
         simulator.setSolution(mapping);
-        simulator.setHardware(hw);
 
         auto perf = simulator.predictedPerformance();
 
@@ -183,12 +178,12 @@ TEST_CASE("Formocast: Performance prediction", "[formocast]") {
 
     SECTION("Performance prediction for rectangular problem") {
         auto hw = make_test_hardware(hardware_t::architecture_t::gfx942);
+        Formocast simulator(hw);
         auto problem = make_problem_info(2048, 512, 1024);
         auto mapping = make_size_mapping(256, 64, 32);
 
         simulator.setProblem(problem);
         simulator.setSolution(mapping);
-        simulator.setHardware(hw);
 
         auto perf = simulator.predictedPerformance();
 
@@ -198,12 +193,12 @@ TEST_CASE("Formocast: Performance prediction", "[formocast]") {
 
     SECTION("Performance prediction with batched problem") {
         auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
+        Formocast simulator(hw);
         auto problem = make_problem_info(512, 512, 512, 2, 2, 2, 2, true, false, 4);
         auto mapping = make_size_mapping(128, 128, 32);
 
         simulator.setProblem(problem);
         simulator.setSolution(mapping);
-        simulator.setHardware(hw);
 
         auto perf = simulator.predictedPerformance();
 
@@ -213,12 +208,12 @@ TEST_CASE("Formocast: Performance prediction", "[formocast]") {
 
     SECTION("Performance prediction with GlobalSplitU") {
         auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
+        Formocast simulator(hw);
         auto problem = make_problem_info(1024, 1024, 2048);
         auto mapping = make_size_mapping(128, 128, 32, 32, 32, 8, 4, 2);
 
         simulator.setProblem(problem);
         simulator.setSolution(mapping);
-        simulator.setHardware(hw);
 
         auto perf = simulator.predictedPerformance();
 
@@ -228,8 +223,7 @@ TEST_CASE("Formocast: Performance prediction", "[formocast]") {
 
 TEST_CASE("Formocast: Cache hit rate computation", "[formocast]") {
     auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
-    Formocast simulator;
-    simulator.setHardware(hw);
+    Formocast simulator(hw);
 
     SECTION("L1 cache hit rate computation") {
         auto l1_hit = simulator.computeL1CacheHitRate(
@@ -273,8 +267,7 @@ TEST_CASE("Formocast: Cache hit rate computation", "[formocast]") {
 
 TEST_CASE("Formocast: Store performance calculation", "[formocast]") {
     auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
-    Formocast simulator;
-    simulator.setHardware(hw);
+    Formocast simulator(hw);
     double store, store_edge;
 
     SECTION("Calculate store performance with edge case") {
@@ -307,10 +300,9 @@ TEST_CASE("Formocast: Store performance calculation", "[formocast]") {
 
 TEST_CASE("Formocast: Tie-breaker comparison", "[formocast]") {
     auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
-    Formocast simulator;
+    Formocast simulator(hw);
     auto problem = make_problem_info(1024, 1024, 1024);
     simulator.setProblem(problem);
-    simulator.setHardware(hw);
 
     SECTION("Standalone tie-breaker function for skinny N") {
         bool result = compareConfigTieBreaker(
@@ -355,13 +347,12 @@ TEST_CASE("Formocast: Tie-breaker comparison", "[formocast]") {
 
 TEST_CASE("Formocast: GSU overhead calculation", "[formocast]") {
     auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
-    Formocast simulator;
+    Formocast simulator(hw);
     auto problem = make_problem_info(1024, 1024, 1024);
     auto mapping = make_size_mapping();
 
     simulator.setProblem(problem);
     simulator.setSolution(mapping);
-    simulator.setHardware(hw);
 
     SECTION("GSU overhead with MultipleBuffer method") {
         double gsu_overhead = simulator.calculateGlobalSplitUOverhead(
@@ -402,11 +393,10 @@ TEST_CASE("Formocast: GSU overhead calculation", "[formocast]") {
 
 TEST_CASE("Formocast: LSU overhead calculation", "[formocast]") {
     auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
-    Formocast simulator;
+    Formocast simulator(hw);
     auto problem = make_problem_info(1024, 1024, 1024);
 
     simulator.setProblem(problem);
-    simulator.setHardware(hw);
 
     SECTION("LSU overhead calculation") {
         double lsu_overhead = simulator.calculateLocalSplitUOverhead(
@@ -434,8 +424,7 @@ TEST_CASE("Formocast: LSU overhead calculation", "[formocast]") {
 
 TEST_CASE("Formocast: FIFO queue operations", "[formocast]") {
     auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
-    Formocast simulator;
-    simulator.setHardware(hw);
+    Formocast simulator(hw);
 
     SECTION("Check global read FIFO full - no stall") {
         std::deque<int> fifo;
@@ -616,8 +605,7 @@ TEST_CASE("Formocast: FIFO queue operations", "[formocast]") {
 
 TEST_CASE("Formocast: Bank conflict analysis", "[formocast]") {
     auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
-    Formocast simulator;
-    simulator.setHardware(hw);
+    Formocast simulator(hw);
 
     SECTION("Analyze bank conflicts from VGPR state") {
         std::vector<std::unordered_map<std::string, int64_t>> vgprState(64);
@@ -638,8 +626,7 @@ TEST_CASE("Formocast: Bank conflict analysis", "[formocast]") {
 
 TEST_CASE("Formocast: Memory access costs calculation", "[formocast]") {
     auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
-    Formocast simulator;
-    simulator.setHardware(hw);
+    Formocast simulator(hw);
 
     SECTION("Calculate memory access costs") {
         Formocast::CacheHitRates hr;
@@ -671,7 +658,8 @@ TEST_CASE("Formocast: Memory access costs calculation", "[formocast]") {
 }
 
 TEST_CASE("Formocast: Loop overall calculation", "[formocast]") {
-    Formocast simulator;
+    auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
+    Formocast simulator(hw);
 
     SECTION("Loop overall with prefetch") {
         Formocast::MemoryAccessCosts mem;
@@ -694,8 +682,7 @@ TEST_CASE("Formocast: Loop overall calculation", "[formocast]") {
 
 TEST_CASE("Formocast: Occupancy resolution", "[formocast]") {
     auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
-    Formocast simulator;
-    simulator.setHardware(hw);
+    Formocast simulator(hw);
 
     SECTION("Occupancy comparison: occupancy=2 perf should be <= occupancy=1 perf") {
         double perf_occ1 = simulator.resolveOccupancy(hw, 100.0, 10.0, 50.0, 20.0, 2, 1);
@@ -720,14 +707,13 @@ TEST_CASE("Formocast: Occupancy resolution", "[formocast]") {
 
 TEST_CASE("Formocast: Tie-breaker info", "[formocast]") {
     auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
-    Formocast simulator;
+    Formocast simulator(hw);
 
     auto problem = make_problem_info(1024, 1024, 1024);
     auto mapping = make_size_mapping();
 
     simulator.setProblem(problem);
     simulator.setSolution(mapping);
-    simulator.setHardware(hw);
 
     // Run prediction to populate perfInfo
     simulator.predictedPerformance();
@@ -767,16 +753,14 @@ TEST_CASE("Formocast: Tie-breaker info", "[formocast]") {
 }
 
 TEST_CASE("Formocast: Edge cases and error handling", "[formocast]") {
-    Formocast simulator;
-
     SECTION("Very small problem size") {
         auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
+        Formocast simulator(hw);
         auto problem = make_problem_info(32, 32, 32);
         auto mapping = make_size_mapping(128, 128, 32);
 
         simulator.setProblem(problem);
         simulator.setSolution(mapping);
-        simulator.setHardware(hw);
 
         auto perf = simulator.predictedPerformance();
 
@@ -785,12 +769,12 @@ TEST_CASE("Formocast: Edge cases and error handling", "[formocast]") {
 
     SECTION("Very large problem size") {
         auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
+        Formocast simulator(hw);
         auto problem = make_problem_info(8192, 8192, 8192);
         auto mapping = make_size_mapping(256, 256, 64);
 
         simulator.setProblem(problem);
         simulator.setSolution(mapping);
-        simulator.setHardware(hw);
 
         auto perf = simulator.predictedPerformance();
 
@@ -799,12 +783,12 @@ TEST_CASE("Formocast: Edge cases and error handling", "[formocast]") {
 
     SECTION("Problem with GlobalSplitU=2") {
         auto hw = make_test_hardware(hardware_t::architecture_t::gfx950);
+        Formocast simulator(hw);
         auto problem = make_problem_info(1024, 1024, 1024);
         auto mapping = make_size_mapping(128, 128, 32, 32, 32, 8, 4, 2);
 
         simulator.setProblem(problem);
         simulator.setSolution(mapping);
-        simulator.setHardware(hw);
 
         auto perf = simulator.predictedPerformance();
 

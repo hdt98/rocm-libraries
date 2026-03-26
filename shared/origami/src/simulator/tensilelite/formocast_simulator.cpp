@@ -351,7 +351,7 @@ namespace origami
         bool     isSwizzleB = problem.swizzleTensorB;
 
         // 2. Hardware Parameter Extraction
-        const hardware_t& hw = *hw_;
+        const hardware_t& hw = hw_;
         const double math_freq = hw.compute_clock_ghz * 1000.0;
         const double mem_freq  = hw.mem_frequency_mhz;
 
@@ -694,9 +694,9 @@ namespace origami
         sizeMapping = sm;
     }
 
-    void Formocast::setHardware(const hardware_t& hw)
+    Formocast::Formocast(const hardware_t& hw)
+        : hw_(hw)
     {
-        hw_ = &hw;
     }
 
     int Formocast::getGlobalReadQueueFullStallCycles(int currentCycle, std::deque<int>& fifo, int bpRead, int numWaves, bool isStall, bool isSgprOffset) const
@@ -711,17 +711,16 @@ namespace origami
 
     int Formocast::getLocalReadQueueFullStallCycles(int currentCycle, std::queue<int>& fifo, int bpRead, int numWaves, bool isStall, double bankConflict) const
     {
-        const hardware_t& hw = *hw_;
         int lrStallLatencyBuffer;
         if (!isStall){
             lrStallLatencyBuffer = 1;
         }
         else if (bpRead == 16) {
-            lrStallLatencyBuffer = simulator::getLocalReadLatency(hw.local_read_latency_b128, hw.local_read_conflict_b128, bankConflict);
+            lrStallLatencyBuffer = simulator::getLocalReadLatency(hw_.local_read_latency_b128, hw_.local_read_conflict_b128, bankConflict);
         } else if (bpRead == 8) {
-            lrStallLatencyBuffer = simulator::getLocalReadLatency(hw.local_read_latency_b64, hw.local_read_conflict_b64, bankConflict);
+            lrStallLatencyBuffer = simulator::getLocalReadLatency(hw_.local_read_latency_b64, hw_.local_read_conflict_b64, bankConflict);
         } else {
-            lrStallLatencyBuffer = simulator::getLocalReadLatency(hw.local_read_latency_b32, hw.local_read_conflict_b32, bankConflict);
+            lrStallLatencyBuffer = simulator::getLocalReadLatency(hw_.local_read_latency_b32, hw_.local_read_conflict_b32, bankConflict);
         }
         return simulator::getLocalReadQueueFullStallCycles(currentCycle, fifo, bpRead, numWaves, lrStallLatencyBuffer);
     }
@@ -744,11 +743,10 @@ namespace origami
 
     void Formocast::pushLocalReadWrite(int currentCycle, std::queue<int>& fifo, int bpr, double bankConflict, bool isLocalRead, int numPreviousLRs)
     {
-        const hardware_t& hw = *hw_;
         int lrMemLatency;
         if (isLocalRead) {
             if (bpr == 16) {
-                lrMemLatency = simulator::getLocalReadLatency(hw.local_read_latency_b128, hw.local_read_conflict_b128, bankConflict);
+                lrMemLatency = simulator::getLocalReadLatency(hw_.local_read_latency_b128, hw_.local_read_conflict_b128, bankConflict);
                 if (numPreviousLRs <= 4) {
                     lrMemLatency += 2 * numPreviousLRs;
                 }
@@ -756,18 +754,18 @@ namespace origami
                     lrMemLatency += 2 * 4;
                 }
             } else if (bpr == 8) {
-                lrMemLatency = simulator::getLocalReadLatency(hw.local_read_latency_b64, hw.local_read_conflict_b64, bankConflict);
+                lrMemLatency = simulator::getLocalReadLatency(hw_.local_read_latency_b64, hw_.local_read_conflict_b64, bankConflict);
             } else {
-                lrMemLatency = simulator::getLocalReadLatency(hw.local_read_latency_b32, hw.local_read_conflict_b32, bankConflict);
+                lrMemLatency = simulator::getLocalReadLatency(hw_.local_read_latency_b32, hw_.local_read_conflict_b32, bankConflict);
             }
         }
         else {
             if (bpr == 16) {
-                lrMemLatency = simulator::getLocalWriteLatency(hw.local_write_latency_b128, hw.local_write_conflict_b128, bankConflict);
+                lrMemLatency = simulator::getLocalWriteLatency(hw_.local_write_latency_b128, hw_.local_write_conflict_b128, bankConflict);
             } else if (bpr == 8) {
-                lrMemLatency = simulator::getLocalWriteLatency(hw.local_write_latency_b64, hw.local_write_conflict_b64, bankConflict);
+                lrMemLatency = simulator::getLocalWriteLatency(hw_.local_write_latency_b64, hw_.local_write_conflict_b64, bankConflict);
             } else {
-                lrMemLatency = simulator::getLocalWriteLatency(hw.local_write_latency_b32, hw.local_write_conflict_b32, bankConflict);
+                lrMemLatency = simulator::getLocalWriteLatency(hw_.local_write_latency_b32, hw_.local_write_conflict_b32, bankConflict);
             }
         }
         fifo.push(currentCycle + lrMemLatency);
@@ -821,7 +819,7 @@ namespace origami
         int LocalReadBytesB)
     {
         BankConflictResult result;
-        int NUM_THREADS_TO_SIMULATE = hw_->wavefront_size;
+        int NUM_THREADS_TO_SIMULATE = hw_.wavefront_size;
         int NUM_BANKS = 32;
         int BANK_WIDTH = 4;
         result.ratioA = simulator::analyzeBankConflictsFromVGPR(vgprState, vgprLocalReadAddrA, NUM_THREADS_TO_SIMULATE, NUM_BANKS, BANK_WIDTH, LocalReadBytesA);

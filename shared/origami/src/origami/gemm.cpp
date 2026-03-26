@@ -1013,7 +1013,7 @@ static double compute_formocast_latency(const problem_t& problem,
                                         const hardware_t& hardware,
                                         const config_t& config) {
   // Create Formocast simulator instance
-  Formocast formocast;
+  Formocast formocast(hardware);
 
   // Convert problem_t to Formocast::ProblemInfo
   Formocast::ProblemInfo prob_info;
@@ -1077,10 +1077,8 @@ static double compute_formocast_latency(const problem_t& problem,
   size_mapping.PrefetchGlobalRead = config.tensile().prefetch_global_read;
   size_mapping.MathClocksUnrolledLoop = config.tensile().math_clocks_unrolled_loop;
 
-  // Set problem, solution, and hardware in Formocast
   formocast.setProblem(prob_info);
   formocast.setSolution(size_mapping);
-  formocast.setHardware(hardware);
 
   // Get predicted performance
   Formocast::PredictedPerformance perf = formocast.predictedPerformance();
