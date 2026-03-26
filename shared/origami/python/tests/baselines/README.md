@@ -6,16 +6,23 @@ This directory contains golden baseline files for ranking regression tests.
 
 ```
 baselines/
-└── rankings/
-    ├── gfx90a.yaml
+├── rankings/                    # Estimation mode (default) baselines
+│   ├── gfx90a.yaml
+│   ├── gfx942.yaml
+│   ├── gfx950.yaml
+│   ├── gfx1100.yaml
+│   └── gfx1201.yaml
+└── rankings_simulation/         # Simulation (Formocast) mode baselines
     ├── gfx942.yaml
     ├── gfx950.yaml
-    ├── gfx1100.yaml
     └── gfx1201.yaml
 ```
 
 Each architecture has its own YAML file containing rankings for all dtype/transpose
 combinations.
+
+Simulation mode baselines only cover architectures with full Formocast simulation
+constants: gfx942, gfx950, and gfx1201.
 
 ## Generating Baselines
 
@@ -24,7 +31,12 @@ ranking behavior:
 
 ```bash
 # From the origami python directory
+
+# Estimation mode baselines
 pytest tests/test_ranking_regression.py -v --generate-baseline
+
+# Simulation (Formocast) mode baselines
+pytest tests/test_ranking_regression_simulation.py -v --generate-baseline
 ```
 
 This creates/updates YAML files containing the top-5 ranked configs for each
@@ -36,7 +48,7 @@ If a PR intentionally changes ranking behavior (e.g., fixing a bug or improving
 the heuristics), the baselines need to be updated:
 
 1. Ensure the changes are intentional and reviewed
-2. Run the baseline generation command above
+2. Run the baseline generation command above for the affected mode(s)
 3. Commit the updated baseline files with the PR
 
 ## Baseline File Format

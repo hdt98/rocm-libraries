@@ -164,6 +164,21 @@ if(ORIGAMI_BUILD_TESTING OR BUILD_TESTING)
             DEPENDS _pyorigami
     )
 
+    # Run simulation mode ranking regression tests
+    add_test(
+        NAME "Python: test_ranking_regression_simulation"
+        COMMAND ${Python_EXECUTABLE} -m pytest tests/test_ranking_regression_simulation.py -v
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+
+    set_tests_properties(
+        "Python: test_ranking_regression_simulation"
+        PROPERTIES
+            ENVIRONMENT
+            "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:$ENV{PYTHONPATH}"
+            DEPENDS _pyorigami
+    )
+
     # Install Python test files to bin/origami/tests for TheRock CI testing.
     install(
         DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/tests/"
