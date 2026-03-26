@@ -194,6 +194,8 @@ namespace rocRoller
             Log::debug("Argument: {} ({}) ({})", arg.getName(), arg.getSize(), arg.getPreloaded());
         }
 
+        // Assign offsets for validation. Note: when called from SortArguments::apply,
+        // these offsets are overridden with explicit contiguous packing.
         int  offset              = 0;
         bool startedNonPreloaded = false;
 

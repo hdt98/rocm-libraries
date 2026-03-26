@@ -10,6 +10,7 @@
 #include <rocRoller/AssemblyKernel.hpp>
 #include <rocRoller/CodeGen/ArgumentLoader.hpp>
 #include <rocRoller/KernelGraph/ControlGraph/ControlFlowArgumentTracer.hpp>
+#include <rocRoller/Utilities/Utils.hpp>
 
 namespace rocRoller::KernelGraph
 {
@@ -91,9 +92,29 @@ namespace rocRoller::KernelGraph
 
         kernel->resetArguments();
 
+        int manualOffset = -1;
         for(auto& arg : arguments)
         {
-            arg.setOffset(-1);
+            if(!arg.getPreloaded() && manualOffset < 0)
+            {
+                // Align the start of the manually-loaded block to enable
+                // the widest possible scalar load instructions (s_load_dwordx16).
+                constexpr int kMaxScalarLoadBytes = 64;
+                manualOffset = RoundUpToMultiple(
+                    static_cast<int>(kernel->argumentSize()), kMaxScalarLoadBytes);
+            }
+
+            if(!arg.getPreloaded())
+            {
+                // Pack manually-loaded args contiguously to maximize
+                // scalar load width (up to s_load_dwordx16).
+                arg.setOffset(manualOffset);
+                manualOffset += arg.getSize();
+            }
+            else
+            {
+                arg.setOffset(-1);
+            }
             m_context->kernel()->addArgument(arg);
         }
 

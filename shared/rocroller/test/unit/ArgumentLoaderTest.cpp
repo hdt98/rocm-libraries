@@ -141,6 +141,69 @@ namespace rocRollerTest
         EXPECT_EQ(NormalizedSource(""), NormalizedSource(output()));
     }
 
+    TEST_F(ArgumentLoaderTest, eagerLoadAlignedArgs)
+    {
+        auto kernel = m_context->kernel();
+        kernel->setKernelDimensions(1);
+
+        VariableType floatPtr{DataType::Float, PointerType::PointerGlobal};
+
+        // Simulate the layout after SortArguments aligns the manually-loaded
+        // block to 64 bytes: 8 pointer args (8 bytes each = 64 bytes total)
+        // starting at offset 64 should produce a single s_load_dwordx16.
+        kernel->addArgument({"a", floatPtr, DataDirection::ReadOnly, nullptr, 64});
+        kernel->addArgument({"b", floatPtr, DataDirection::ReadOnly});
+        kernel->addArgument({"c", floatPtr, DataDirection::ReadOnly});
+        kernel->addArgument({"d", floatPtr, DataDirection::ReadOnly});
+        kernel->addArgument({"e", floatPtr, DataDirection::ReadOnly});
+        kernel->addArgument({"f", floatPtr, DataDirection::ReadOnly});
+        kernel->addArgument({"g", floatPtr, DataDirection::ReadOnly});
+        kernel->addArgument({"h", floatPtr, DataDirection::ReadOnly});
+
+        auto loader = m_context->argLoader();
+        m_context->schedule(kernel->allocateInitialRegisters());
+        m_context->schedule(loader->eagerLoadArguments());
+
+        std::string expected = R"(
+            s_load_dwordx16 s[4:19], s[0:1], 64
+        )";
+
+        EXPECT_EQ(NormalizedSource(expected), NormalizedSource(output()));
+    }
+
+    TEST_F(ArgumentLoaderTest, eagerLoadMixedArgs)
+    {
+        auto kernel = m_context->kernel();
+        kernel->setKernelDimensions(1);
+
+        VariableType floatPtr{DataType::Float, PointerType::PointerGlobal};
+
+        // Simulate layout after SortArguments: 4 pointers (32B) + 8 scalars (32B)
+        // = 64 bytes total starting at offset 64 should produce a single s_load_dwordx16.
+        kernel->addArgument({"a", floatPtr, DataDirection::ReadOnly, nullptr, 64});
+        kernel->addArgument({"b", floatPtr, DataDirection::ReadOnly});
+        kernel->addArgument({"c", floatPtr, DataDirection::ReadOnly});
+        kernel->addArgument({"d", floatPtr, DataDirection::ReadOnly});
+        kernel->addArgument({"e", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"f", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"g", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"h", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"i", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"j", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"k", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"l", {DataType::Float}, DataDirection::ReadOnly});
+
+        auto loader = m_context->argLoader();
+        m_context->schedule(kernel->allocateInitialRegisters());
+        m_context->schedule(loader->eagerLoadArguments());
+
+        std::string expected = R"(
+            s_load_dwordx16 s[4:19], s[0:1], 64
+        )";
+
+        EXPECT_EQ(NormalizedSource(expected), NormalizedSource(output()));
+    }
+
     TEST_F(ArgumentLoaderTest, releaseArguments)
     {
         auto kernel = m_context->kernel();

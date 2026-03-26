@@ -11,6 +11,7 @@
 #include <common/Utilities.hpp>
 
 #include <functional>
+#include <limits>
 #include <random>
 #include <utility>
 #include <vector>
@@ -568,15 +569,15 @@ namespace ArgumentLoaderGPUTest
         auto lazyLoad = m_context->kernelOptions()->lazyLoadKernelArguments;
         Log::debug("LazyLoad: {}", lazyLoad);
 
-        int eagerBegin = 0, eagerEnd = 0;
+        int eagerBegin = std::numeric_limits<int>::max(), eagerEnd = 0;
 
         for(auto const& karg : m_context->kernel()->arguments())
         {
-            if(karg.getPreloaded())
-                eagerBegin = karg.getOffset() + karg.getSize();
-
             if(!karg.getPreloaded() && !lazyLoad)
-                eagerEnd = karg.getOffset() + karg.getSize();
+            {
+                eagerBegin = std::min<int>(eagerBegin, karg.getOffset());
+                eagerEnd   = std::max<int>(eagerEnd, karg.getOffset() + karg.getSize());
+            }
 
             if(lazyLoad && !karg.getPreloaded())
             {
@@ -602,6 +603,9 @@ namespace ArgumentLoaderGPUTest
         if(!lazyLoad)
         {
             ExpectedKernelStatistics eagerStats;
+
+            if(eagerBegin == std::numeric_limits<int>::max())
+                eagerBegin = eagerEnd;
 
             int numEagerBytes = eagerEnd - eagerBegin;
 

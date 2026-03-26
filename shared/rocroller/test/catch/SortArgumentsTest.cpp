@@ -144,5 +144,26 @@ TEST_CASE("SortArguments transform works as expected", "[kernel-graph][SortArgum
         auto args = context->kernel()->arguments();
 
         CHECK(argumentNames(args) == argNamesByUseAndSize);
+
+        // Verify first non-preloaded arg offset is 64-byte aligned
+        // and all manual args are packed contiguously.
+        bool   foundManual      = false;
+        int    expectedOffset   = 0;
+        for(auto const& arg : args)
+        {
+            if(!arg.getPreloaded() && !foundManual)
+            {
+                foundManual = true;
+                CHECK(arg.getOffset() % 64 == 0);
+                expectedOffset = arg.getOffset();
+            }
+
+            if(!arg.getPreloaded())
+            {
+                CAPTURE(arg.getName(), arg.getOffset(), expectedOffset);
+                CHECK(arg.getOffset() == expectedOffset);
+                expectedOffset += arg.getSize();
+            }
+        }
     }
 }

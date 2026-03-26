@@ -2266,3 +2266,18 @@ def priority_problems():
         "2. Halfs": {"type_A": "half"},
         "3. Floats": {"type_A": "float"},
     }
+
+def test_streamk_fp4():
+    kernel = fp4_target_d2lds_mi16x16x128_st32x8_pf2x1()
+    kernel = addStreamK(kernel)
+    for k in kernel:
+        k.M = 128
+        k.N = 128
+        k.K = 76800
+        k.mac_m = 64,
+        k.mac_n = 32,
+        k.mac_k = 256,
+        k.prefetchInFlight = 2
+
+        yield k
+        
