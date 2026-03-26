@@ -24,12 +24,14 @@ def cloneUpdateRefRepo() {
         echo "rocm-libraries repo does not exist at ${refRepoPath}, creating mirror clone..."
         echo "locking on label: ${lockLabel}"
         lock(lockLabel) {
+          withCredentials([usernamePassword(credentialsId: "${env.ck_githubemu_creds}", usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
             def cloneCommand = """
-                set -ex
-                rm -rf ${refRepoPath} && mkdir -p ${refRepoPath}
-                git clone --mirror git@github.com:AMD-ROCm-Internal/rocm-libraries.git ${refRepoPath}
+              set -ex
+              rm -rf ${refRepoPath} && mkdir -p ${refRepoPath}
+              git clone --mirror https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/AMD-ROCm-Internal/rocm-libraries.git /var/jenkins/ref-repo-internal/rocm-libraries
             """
             sh(script: cloneCommand, label: "clone ref repo")
+           }
         }
         echo "Completed git clone, lock released"
     }
@@ -95,18 +97,20 @@ def sendFailureNotifications() {
     
     // Get the build log.
     def buildLog = sh(script: 'wget -q --no-check-certificate -O - ' + BUILD_URL + 'consoleText', returnStdout: true)
+    echo "Checking for failure patterns..."
     // Check for patterns in the log.
-    def foundPatterns = []
-    for (patternMap in failurePatterns) {
-        def result = checkForPattern(patternMap.pattern, buildLog)
-        if (result.found) {
-            foundPatterns.add([
-                description: patternMap.description,
-                matchedLine: result.matchedLine,
-                context: result.context
-            ])
-        }
-    }
+    // def foundPatterns = []
+    // for (patternMap in failurePatterns) {
+    //     def result = checkForPattern(patternMap.pattern, buildLog)
+    //     if (result.found) {
+    //         foundPatterns.add([
+    //             description: patternMap.description,
+    //             matchedLine: result.matchedLine,
+    //             context: result.context
+    //         ])
+    //     }
+    // }
+    echo "Done checking for failure patterns..."
     // Send a notification for each matched failure pattern.
     for (patternMap in foundPatterns) {
         withCredentials([string(credentialsId: 'ck_ci_errors_webhook_url', variable: 'WEBHOOK_URL')]) {
@@ -117,6 +121,7 @@ def sendFailureNotifications() {
         '''
         }
     }
+    echo "Done failure pattern checking and notifications"
 }
 
 def generateAndArchiveBuildTraceVisualization(String buildTraceFileName) {
@@ -944,7 +949,7 @@ def Build_CK_and_Reboot(Map conf=[:]){
 
 def process_results(Map conf=[:]){
 
-    checkoutComposableKernel()
+    checkout scm
     //use older image that has user jenkins
     def image = "${env.CK_DOCKERHUB}:ck_ub22.04_rocm6.3"
 
