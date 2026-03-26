@@ -224,13 +224,22 @@ struct UniversalGemmKernel
     };
     static constexpr bool PersistentKernel = has_persistent_kernel::value;
 
-    struct is_stream_k
+    template <typename T, typename = void>
+    struct UseStreamK
     {
-        template <typename T>
-        using has_reduction_strategy = decltype(T::ReductionStrategy);
-        static constexpr bool value  = is_detected<has_reduction_strategy, TilePartitioner>{};
+        static constexpr bool value       = false;
+        static constexpr bool use_atomics = false;
     };
-    static constexpr bool IsStreamK = is_stream_k::value;
+
+    template <typename T>
+    struct UseStreamK<T, std::void_t<decltype(T::ReductionStrategy)>>
+    {
+        static constexpr bool value = true;
+        static constexpr bool use_atomics =
+            T::ReductionStrategy == StreamKReductionStrategy::Atomic;
+    };
+
+    static constexpr bool IsStreamK = UseStreamK<TilePartitioner>::value;
 
     // Detect custom output offset support for advanced partitioning schemes
     struct has_tile_partitioner_output_offset_impl
@@ -1145,15 +1154,51 @@ struct UniversalGemmKernel
                                        const index_t block_idx_m,
                                        const index_t block_idx_n)
     {
-        // Create block windows using specialized methods
-        const auto& as_block_window =
-            MakeABlockWindows(as_ptr, kargs, splitk_batch_offset.splitted_k, block_idx_m);
-        const auto& bs_block_window =
-            MakeBBlockWindows(bs_ptr, kargs, splitk_batch_offset.splitted_k, block_idx_n);
-        const auto& ds_block_window = MakeDBlockWindows(ds_ptr, kargs, block_idx_m, block_idx_n);
+        const index_t k_size   = amd_wave_read_first_lane(splitk_batch_offset.splitted_k);
+        const index_t num_loop = TilePartitioner::GetLoopNum(k_size);
+        RunGemm(as_ptr,
+                bs_ptr,
+                ds_ptr,
+                e_ptr,
+                smem_ptr,
+                kargs,
+                num_loop,
+                block_idx_m,
+                block_idx_n,
+                k_size);
+    }
 
-        const index_t num_loop =
-            amd_wave_read_first_lane(TilePartitioner::GetLoopNum(splitk_batch_offset.splitted_k));
+    /**
+     * @brief Runs single GEMM problem cooperatively by whole workgroup.
+     *
+     * @param as_ptr input As pointer
+     * @param bs_ptr input Bs pointer
+     * @param ds_ptr input Ds pointer
+     * @param e_ptr output E pointer
+     * @param smem_ptr The start memory pointer of the shared memory block.
+     * @param kargs GEMM kernel arguments
+     * @param num_loop The number of iterations (at the macro tile level) in the K dimension
+     * this workgroup will perform in the C tile
+     * @param block_idx_m The GEMM's output M dimension tile index processed by this workgroup.
+     * @param block_idx_n The GEMM's output N dimension tile index processed by this workgroup.
+     * @param k_size The size of K this workgroup is currently processing
+     *
+     */
+    CK_TILE_DEVICE static void RunGemm(const std::array<const ADataType*, NumATensor>& as_ptr,
+                                       const std::array<const BDataType*, NumBTensor>& bs_ptr,
+                                       const std::array<const void*, NumDTensor>& ds_ptr,
+                                       EDataType* e_ptr,
+                                       void* smem_ptr,
+                                       const KernelArgs& kargs,
+                                       const index_t num_loop,
+                                       const index_t block_idx_m,
+                                       const index_t block_idx_n,
+                                       const index_t k_size)
+    {
+        // Create block windows using specialized methods
+        const auto& as_block_window = MakeABlockWindows(as_ptr, kargs, k_size, block_idx_m);
+        const auto& bs_block_window = MakeBBlockWindows(bs_ptr, kargs, k_size, block_idx_n);
+        const auto& ds_block_window = MakeDBlockWindows(ds_ptr, kargs, block_idx_m, block_idx_n);
 
         // Run GEMM cooperatively by whole workgroup.
         const auto& c_block_tile = GemmPipeline{}.template operator()(
@@ -1161,21 +1206,28 @@ struct UniversalGemmKernel
 
         const index_t k_batch = amd_wave_read_first_lane(kargs.k_batch);
         // Run Epilogue Pipeline
-        if(k_batch == 1)
+        if(k_batch == 1) // k_batch is always 1 for Stream-K but we only use set for non-atomic
+                         // reduction strategy
         {
-            auto c_block_window = MakeCBlockWindows<memory_operation_enum::set>(
-                e_ptr, kargs, block_idx_m, block_idx_n);
-            EpiloguePipeline{}(c_block_window, c_block_tile, ds_block_window, smem_ptr);
-        }
-        else
-        {
-            if constexpr(EpiloguePipeline::GetVectorSizeC() % 2 == 0 ||
-                         !is_any_of<EDataType, fp16_t, bf16_t>::value)
+            if constexpr(!UseStreamK<TilePartitioner>::use_atomics)
             {
+                auto c_block_window = MakeCBlockWindows<memory_operation_enum::set>(
+                    e_ptr, kargs, block_idx_m, block_idx_n);
+                EpiloguePipeline{}(c_block_window, c_block_tile, ds_block_window, smem_ptr);
+            }
+            else
+            {
+
                 auto c_block_window = MakeCBlockWindows<memory_operation_enum::atomic_add>(
                     e_ptr, kargs, block_idx_m, block_idx_n);
                 EpiloguePipeline{}(c_block_window, c_block_tile, ds_block_window, smem_ptr);
             }
+        }
+        else
+        {
+            auto c_block_window = MakeCBlockWindows<memory_operation_enum::atomic_add>(
+                e_ptr, kargs, block_idx_m, block_idx_n);
+            EpiloguePipeline{}(c_block_window, c_block_tile, ds_block_window, smem_ptr);
         }
     }
 
