@@ -3,4 +3,5 @@
 
 # grouped_conv3d_bwd_weight_scale - layout-specific instances
 
+# NDHWGC - Required by MIOpen
 add_subdirectory(ndhwgc)

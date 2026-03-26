@@ -3,4 +3,5 @@
 
 # grouped_conv2d_fwd_dynamic_op - layout-specific instances
 
+# NHWGC - Required by MIOpen
 add_subdirectory(nhwgc)

@@ -3,6 +3,13 @@
 
 # grouped_conv3d_fwd - layout-specific instances
 
-add_subdirectory(gndhwc)
+# GNDHWC - Optional (not required by MIOpen)
+if(NOT MIOPEN_REQ_LIBS_ONLY)
+    add_subdirectory(gndhwc)
+endif()
+# NDHWGC - Required by MIOpen
 add_subdirectory(ndhwgc)
-add_subdirectory(ngcdhw)
+# NGCDHW - Optional (not required by MIOpen)
+if(NOT MIOPEN_REQ_LIBS_ONLY)
+    add_subdirectory(ngcdhw)
+endif()

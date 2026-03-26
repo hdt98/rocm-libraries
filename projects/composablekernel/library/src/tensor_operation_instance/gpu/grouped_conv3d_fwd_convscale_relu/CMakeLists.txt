@@ -3,4 +3,5 @@
 
 # grouped_conv3d_fwd_convscale_relu - layout-specific instances
 
+# NDHWGC - Required by MIOpen
 add_subdirectory(ndhwgc)

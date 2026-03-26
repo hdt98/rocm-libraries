@@ -3,4 +3,7 @@
 
 # grouped_conv1d_fwd - layout-specific instances
 
-add_subdirectory(gnwc)
+# GNWC - Optional (not required by MIOpen)
+if(NOT MIOPEN_REQ_LIBS_ONLY)
+    add_subdirectory(gnwc)
+endif()
