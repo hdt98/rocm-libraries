@@ -488,7 +488,6 @@ inline SolverRegistrar::SolverRegistrar(IdRegistryData& registry)
     RegisterWithSolver(
         registry, ++id, conv::ConvBinWinogradRxSf2x3g1{}, miopenConvolutionAlgoWinograd);
 
-    RegisterWithSolver(registry, ++id, conv::ConvHipConv{}, miopenConvolutionAlgoDirect);
     RegisterWithSolver(registry, ++id, conv::ConvDirectNaiveConvFwd{}, miopenConvolutionAlgoDirect);
     RegisterWithSolver(registry, ++id, conv::ConvDirectNaiveConvBwd{}, miopenConvolutionAlgoDirect);
     RegisterWithSolver(registry, ++id, conv::ConvDirectNaiveConvWrw{}, miopenConvolutionAlgoDirect);
@@ -813,6 +812,7 @@ inline SolverRegistrar::SolverRegistrar(IdRegistryData& registry)
                        ++id,
                        conv::TransposedConvMPBidirectWinograd_xdlops<6, 3>{},
                        miopenConvolutionAlgoWinograd);
+    RegisterWithSolver(registry, ++id, conv::ConvHipConv{}, miopenConvolutionAlgoDirect);
     //  IMPORTANT: New solvers should be added to the end of the function, and don't leave a white
     //  space between this comment and the newly registered solver(s)!
 }
