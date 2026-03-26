@@ -497,7 +497,7 @@ TEST(HipcubDeviceMerge, MergeLargeSizeIterators)
         size_t required_mem = sizeof(key_type) * output_size;
         size_t total_mem;
         size_t free_mem;
-        HIP_CHECK(hipMemGetInfo(free_mem, total_mem));
+        HIP_CHECK(hipMemGetInfo(&free_mem, &total_mem));
 
         // check if we have enough global memory size
         if(free_mem < required_mem * 0.9){
