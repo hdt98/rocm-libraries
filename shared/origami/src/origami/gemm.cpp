@@ -1080,7 +1080,7 @@ static double compute_formocast_latency(const problem_t& problem,
   // Set problem, solution, and hardware in Formocast
   formocast.setProblem(prob_info);
   formocast.setSolution(size_mapping);
-  formocast.setHardware(hardware.arch);
+  formocast.setHardware(hardware);
 
   // Get predicted performance
   Formocast::PredictedPerformance perf = formocast.predictedPerformance();

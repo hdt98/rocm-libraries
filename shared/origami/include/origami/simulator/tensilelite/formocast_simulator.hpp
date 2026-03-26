@@ -112,85 +112,6 @@ namespace origami
             double ratioB = 1.0;  ///< Bank conflict ratio for matrix B (1.0 = no conflicts)
         };
 
-        /**
-         * @brief Hardware-specific constants and capabilities
-         *
-         * Contains architecture-specific parameters for cache sizes, bandwidths,
-         * frequencies, and latencies used in performance modeling.
-         */
-        struct HardwareConstants
-        {
-            double L1CacheCapacity;
-            double L2CacheCapacity;
-            double L3CacheCapacity;
-            double L1CacheLineSize;
-            double L2CacheLineSize;
-            double L1BusWidthPerCU;
-            double L2BusWidthPerCU;
-            double L1WriteBusWidthPerCU;
-            double L2WriteBusWidthPerCU;
-            double maxBandWidthHBM;
-            double mem_frequency;
-            double hbmBandWidth;
-            double L3BandWidth;
-            double math_frequency;
-            double boost_frequency;
-            double initialCost;
-            double initialCostHit;
-            double flopsPerClk;
-            double NumCUs;
-            double wavefrontSize;
-            double L2ReadArbEff;
-            double L2WriteArbEff;
-            uint32_t NumXCDs;
-            uint32_t LocalReadBaseLatencyB128;
-            uint32_t LocalReadBaseLatencyB64;
-            uint32_t LocalReadBaseLatencyB32;
-            uint32_t LocalReadConflictMultiplierB128;
-            uint32_t LocalReadConflictMultiplierB64;
-            uint32_t LocalReadConflictMultiplierB32;
-            uint32_t LocalWriteBaseLatencyB128;
-            uint32_t LocalWriteBaseLatencyB64;
-            uint32_t LocalWriteBaseLatencyB32;
-            uint32_t LocalWriteConflictMultiplierB128;
-            uint32_t LocalWriteConflictMultiplierB64;
-            uint32_t LocalWriteConflictMultiplierB32;
-            hardware_t::architecture_t architecture;
-
-            void print() const {
-                std::cout << "HardwareConstants:" << std::endl;
-                std::cout << "  architecture:         " << (architecture == hardware_t::architecture_t::gfx950 ? "gfx950" : architecture == hardware_t::architecture_t::gfx942 ? "gfx942" : architecture == hardware_t::architecture_t::gfx1201 ? "gfx1201" : "Unknown") << std::endl;
-                std::cout << "  L1CacheCapacity:      " << L1CacheCapacity << std::endl;
-                std::cout << "  L2CacheCapacity:      " << L2CacheCapacity << std::endl;
-                std::cout << "  L3CacheCapacity:      " << L3CacheCapacity << std::endl;
-                std::cout << "  L1CacheLineSize:      " << L1CacheLineSize << std::endl;
-                std::cout << "  L2CacheLineSize:      " << L2CacheLineSize << std::endl;
-                std::cout << "  L1BusWidthPerCU:      " << L1BusWidthPerCU << std::endl;
-                std::cout << "  L2BusWidthPerCU:      " << L2BusWidthPerCU << std::endl;
-                std::cout << "  L1WriteBusWidthPerCU: " << L1WriteBusWidthPerCU << std::endl;
-                std::cout << "  L2WriteBusWidthPerCU: " << L2WriteBusWidthPerCU << std::endl;
-                std::cout << "  maxBandWidthHBM:      " << maxBandWidthHBM << std::endl;
-                std::cout << "  mem_frequency:        " << mem_frequency << std::endl;
-                std::cout << "  hbmBandWidth:         " << hbmBandWidth << std::endl;
-                std::cout << "  L3BandWidth:          " << L3BandWidth << std::endl;
-                std::cout << "  math_frequency:       " << math_frequency << std::endl;
-                std::cout << "  boost_frequency:      " << boost_frequency << std::endl;
-                std::cout << "  initialCost:          " << initialCost << std::endl;
-                std::cout << "  initialCostHit:       " << initialCostHit << std::endl;
-                std::cout << "  flopsPerClk:          " << flopsPerClk << std::endl;
-                std::cout << "  NumCUs:               " << NumCUs << std::endl;
-                std::cout << "  wavefrontSize:        " << wavefrontSize << std::endl;
-                std::cout << "  L2ReadArbEff:         " << L2ReadArbEff << std::endl;
-                std::cout << "  L2WriteArbEff:        " << L2WriteArbEff << std::endl;
-                std::cout << "  NumXCDs:              " << NumXCDs << std::endl;
-                std::cout << "  LocalReadBaseLatencyB128: " << LocalReadBaseLatencyB128 << std::endl;
-                std::cout << "  LocalReadBaseLatencyB64: " << LocalReadBaseLatencyB64 << std::endl;
-                std::cout << "  LocalReadBaseLatencyB32: " << LocalReadBaseLatencyB32 << std::endl;
-                std::cout << "  LocalReadConflictMultiplierB128: " << LocalReadConflictMultiplierB128 << std::endl;
-                std::cout << "  LocalReadConflictMultiplierB64: " << LocalReadConflictMultiplierB64 << std::endl;
-                std::cout << "  LocalReadConflictMultiplierB32: " << LocalReadConflictMultiplierB32 << std::endl;
-            };
-        };
 
         /**
          * @brief Cache hit rates for all cache levels and both matrix operands
@@ -355,17 +276,12 @@ namespace origami
         void setSolution(SizeMapping sm);
 
         /**
-         * @brief Set the hardware architecture for simulation
-         * @param arch GPU architecture identifier (e.g., gfx942, gfx950)
+         * @brief Set the hardware for simulation
+         * @param hw hardware_t instance with architecture-specific parameters
+         *
+         * The caller must ensure the hardware_t object outlives this Formocast instance.
          */
-        void setHardware(hardware_t::architecture_t arch);
-
-        /**
-         * @brief Get hardware constants for a specific architecture
-         * @param arch GPU architecture identifier
-         * @return HardwareConstants structure with architecture-specific parameters
-         */
-        HardwareConstants getHardwareConstants(const hardware_t::architecture_t arch) const;
+        void setHardware(const hardware_t& hw);
 
         /**
          * @brief Calculate store (write-back) performance for matrix output
@@ -376,7 +292,7 @@ namespace origami
          * @param MT1 Macro tile dimension 1 (N dimension)
          * @param GWVWD Global write vector width for matrix D
          * @param bpeD Bytes per element for output matrix D
-         * @param hw_consts Hardware constants
+         * @param hw Hardware configuration
          * @param WGs_per_tile Workgroups per tile
          * @param WGs_per_tile_XCD Workgroups per tile per XCD (chiplet)
          * @param store Output parameter for store cost
@@ -389,7 +305,7 @@ namespace origami
                                        double MT1,
                                        uint32_t GWVWD,
                                        uint32_t bpeD,
-                                       const HardwareConstants& hw_consts,
+                                       const hardware_t& hw,
                                        uint32_t WGs_per_tile,
                                        uint32_t WGs_per_tile_XCD,
                                        double &store,
@@ -404,7 +320,7 @@ namespace origami
          * @param GlobalSplitU Global split-K factor
          * @param gsuMethod Global Split U method (2=MultiBuffer, 3=MultiBufferSingleKernel)
          * @param problem Problem specification
-         * @param hw_consts Hardware constants
+         * @param hw Hardware configuration
          * @param WGs_per_tile Workgroups per tile
          * @param WGs_per_tile_XCD Workgroups per tile per XCD
          * @param MT0 Macro tile dimension 0
@@ -417,7 +333,7 @@ namespace origami
         double calculateGlobalSplitUOverhead(double M, double N, double K,
                                     double NumBatches, double GlobalSplitU,
                                     uint32_t gsuMethod, ProblemInfo problem,
-                                    const HardwareConstants& hw_consts,
+                                    const hardware_t& hw,
                                     uint32_t WGs_per_tile, uint32_t WGs_per_tile_XCD,
                                     double MT0, double MT1, uint32_t numWGs, double vgprCheck,
                                     double storeGSU) const;
@@ -430,13 +346,13 @@ namespace origami
          * @param svw Store vector width
          * @param numThreads Number of threads per workgroup
          * @param problem Problem specification
-         * @param hw_consts Hardware constants
+         * @param hw Hardware configuration
          * @return Calculated Local Split U overhead in cycles
          */
         double calculateLocalSplitUOverhead(double MT0, double MT1, double lsu,
                                     uint32_t svw, uint32_t numThreads,
                                     ProblemInfo problem,
-                                    const HardwareConstants& hw_consts) const;
+                                    const hardware_t& hw) const;
 
         /**
          * @brief Calculate memory access costs at all cache levels
@@ -461,7 +377,7 @@ namespace origami
          */
         MemoryAccessCosts
         calculateMemoryAccessCosts(double MT0, double MT1,
-                                   const HardwareConstants& hw,
+                                   const hardware_t& hw,
                                    const CacheHitRates& hr,
                                    double L2BandWidthPerCU, double L3BandWidthPerCU, double HBMBandWidthPerCU,
                                    bool isSwizzleA, bool isSwizzleB,
@@ -515,7 +431,7 @@ namespace origami
          * @return L1CacheHitRate structure with hit rates for both matrices
          */
         L1CacheHitRate
-        computeL1CacheHitRate(const HardwareConstants& hw,
+        computeL1CacheHitRate(const hardware_t& hw,
                             double MT0, double MT1, uint32_t bpeA, uint32_t bpeB,
                             int NTA, int NTB, uint32_t GRVWA, uint32_t GRVWB,
                             bool DTVA, bool DTVB, bool isSwizzleA, bool isSwizzleB,
@@ -542,7 +458,7 @@ namespace origami
         L2CacheHitRate computeL2CacheHitRate(uint32_t M,
                                              uint32_t N,
                                              uint32_t K,
-                                             const HardwareConstants& hw,
+                                             const hardware_t& hw,
                                              uint32_t gsu,
                                              int32_t  wgm,
                                              uint32_t batches,
@@ -569,7 +485,7 @@ namespace origami
          * @return L3CacheHitRate structure with hit rates
          */
         L3CacheHitRate
-        computeL3CacheHitRate(double M, double N, double K, const HardwareConstants& hw,
+        computeL3CacheHitRate(double M, double N, double K, const hardware_t& hw,
                                           uint32_t bpeA, uint32_t bpeB, int NTA, int NTB,
                                           int N_WGs_total, int M_WGs_total, int N_WGs_per_tile, int M_WGs_per_tile) const;
 
@@ -584,7 +500,7 @@ namespace origami
          * @param CUOccupancy Target CU occupancy
          * @return Resolved occupancy value
          */
-        double resolveOccupancy(const HardwareConstants& hw, double perf, double prefetch, double mathCost, double storeCost, uint32_t num_tiles, uint32_t CUOccupancy) const;
+        double resolveOccupancy(const hardware_t& hw, double perf, double prefetch, double mathCost, double storeCost, uint32_t num_tiles, uint32_t CUOccupancy) const;
 
         /**
          * @brief Compare if current configuration is better than previous solution
@@ -695,7 +611,11 @@ namespace origami
     public:
         SizeMapping sizeMapping;           ///< Current kernel configuration
         ProblemInfo problem;               ///< Current problem specification
-        HardwareConstants hw_consts;       ///< Hardware constants for current architecture
+
+    private:
+        const hardware_t* hw_ = nullptr;  ///< Non-owning pointer to hardware; set via setHardware()
+
+    public:
 
         /// Performance information for tie-breaking (mutable for caching)
         /// Note: Using MinTieBreakerInfo is preferred for std::sort to avoid segmentation faults

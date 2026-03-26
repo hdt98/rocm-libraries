@@ -10,7 +10,6 @@
 #include <cstdlib>
 #include <random>
 #include <cassert>
-#include <cstring>
 #include <iomanip>
 
 namespace origami
@@ -52,49 +51,12 @@ namespace origami
         return loop_overall;
     }
 
-    Formocast::HardwareConstants archConstantMap(const unsigned char* magic, size_t magicSize) {
-        Formocast::HardwareConstants hw;
-        if (magicSize != sizeof(Formocast::HardwareConstants)) {
-            std::cerr << "Error: magic number size does not match HardwareConstants size!" << std::endl;
-        }
-        std::memcpy(&hw, magic, std::min(magicSize, sizeof(Formocast::HardwareConstants)));
-        return hw;
-    }
 
-    Formocast::HardwareConstants
-    Formocast::getHardwareConstants(const hardware_t::architecture_t arch) const
+    void Formocast::calculateStorePerformance(double M, double N, double NumBatches, double MT0, double MT1, uint32_t GWVWD, uint32_t bpeD, const hardware_t& hw, uint32_t WGs_per_tile, uint32_t WGs_per_tile_XCD, double &store, double &store_edge) const
     {
-        HardwareConstants hw;
-        // TODO: migrate to use the original hardware_t
-        if(arch == hardware_t::architecture_t::gfx950)
-        {
-            unsigned char magic[232] = {0, 0, 0, 0, 0, 0, 224, 64, 0, 0, 0, 0, 0, 0, 80, 65, 0, 0, 0, 0, 0, 0, 176, 65, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 80, 64, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 80, 64, 0, 0, 0, 0, 0, 0, 80, 64, 0, 0, 0, 0, 0, 0, 8, 64, 0, 0, 0, 0, 0, 176, 157, 64, 189, 134, 242, 26, 202, 171, 152, 64, 189, 134, 242, 26, 202, 171, 168, 64, 0, 0, 0, 0, 0, 32, 156, 64, 0, 0, 0, 0, 0, 92, 162, 64, 205, 204, 204, 204, 204, 204, 4, 64, 205, 204, 204, 204, 204, 204, 0, 64, 0, 0, 0, 0, 0, 0, 176, 64, 0, 0, 0, 0, 0, 0, 112, 64, 0, 0, 0, 0, 0, 0, 80, 64, 205, 204, 204, 204, 204, 204, 236, 63, 0, 0, 0, 0, 0, 0, 232, 63, 8, 0, 0, 0, 14, 0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0, 6, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0};
-            hw = archConstantMap(magic, 232);
-            hw.architecture = hardware_t::architecture_t::gfx950;
-        }
-        else if(arch == hardware_t::architecture_t::gfx942)
-        {
-            unsigned char magic[232] = {0, 0, 0, 0, 0, 0, 224, 64, 0, 0, 0, 0, 0, 0, 80, 65, 0, 0, 0, 0, 0, 0, 176, 65, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 80, 64, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 80, 64, 0, 0, 0, 0, 0, 0, 80, 64, 0, 0, 0, 0, 0, 0, 8, 64, 0, 0, 0, 0, 0, 80, 148, 64, 118, 98, 39, 118, 98, 7, 162, 64, 118, 98, 39, 118, 98, 7, 178, 64, 0, 0, 0, 0, 0, 48, 145, 64, 0, 0, 0, 0, 0, 48, 161, 64, 154, 153, 153, 153, 153, 153, 5, 64, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 160, 64, 0, 0, 0, 0, 0, 0, 115, 64, 0, 0, 0, 0, 0, 0, 80, 64, 205, 204, 204, 204, 204, 204, 236, 63, 143, 194, 245, 40, 92, 143, 226, 63, 8, 0, 0, 0, 10, 0, 0, 0, 5, 0, 0, 0, 2, 0, 0, 0, 6, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0};
-            hw = archConstantMap(magic, 232);
-            hw.architecture = hardware_t::architecture_t::gfx942;
-        }
-        else if(arch == hardware_t::architecture_t::gfx1201)
-        {
-            unsigned char magic[232] = {0, 0, 0, 0, 0, 0, 224, 64, 0, 0, 0, 0, 0, 0, 96, 65, 0, 0, 0, 0, 0, 0, 144, 65, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 80, 64, 0, 0, 0, 0, 0, 0, 96, 64, 0, 0, 0, 0, 0, 0, 228, 63, 0, 0, 0, 0, 0, 168, 147, 64, 20, 174, 71, 225, 122, 132, 78, 64, 104, 145, 237, 124, 63, 119, 123, 64, 0, 0, 0, 0, 0, 92, 162, 64, 0, 0, 0, 0, 0, 136, 163, 64, 51, 51, 51, 51, 51, 51, 45, 64, 205, 204, 204, 204, 204, 204, 44, 64, 0, 0, 0, 0, 0, 0, 160, 64, 0, 0, 0, 0, 0, 0, 80, 64, 0, 0, 0, 0, 0, 0, 64, 64, 205, 204, 204, 204, 204, 204, 236, 63, 0, 0, 0, 0, 0, 0, 232, 63, 1, 0, 0, 0, 14, 0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0, 6, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0, 10, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0};
-            hw = archConstantMap(magic, 232);
-            hw.architecture = hardware_t::architecture_t::gfx1201;
-        }
-        else
-        {
-            throw std::runtime_error(
-                    "Attempting to retrieve hardware constants for unsupported architecture");
-        }
+        const double math_freq = hw.compute_clock_ghz * 1000.0;
+        const double mem_freq  = hw.mem_frequency_mhz;
 
-        return hw;
-    }
-
-    void Formocast::calculateStorePerformance(double M, double N, double NumBatches, double MT0, double MT1, uint32_t GWVWD, uint32_t bpeD, const HardwareConstants& hw_consts, uint32_t WGs_per_tile, uint32_t WGs_per_tile_XCD, double &store, double &store_edge) const
-    {
         double D_L1_req = 0.0;
         double D_L2_req = 0.0;
         double D_L3_req = 0.0;
@@ -105,31 +67,33 @@ namespace origami
             = simulator::calculateStoreL2Request(M, N, MT0, MT1, GWVWD, D_L2_req, D_L2_edge_req);
         double total_store_req3 = simulator::calculateStoreL3Request(M, N, MT0, MT1, D_L3_req, D_L3_edge_req);
 
-        double L2WriteBandWidthPerCU = hw_consts.L2WriteArbEff * 128 * 16 / WGs_per_tile_XCD; //58% eff
-        double L3BandWidthPerCU      = hw_consts.L3BandWidth / WGs_per_tile;
-        double HBMBandWidthPerCU     = hw_consts.hbmBandWidth / WGs_per_tile;
-        double D_L1_clk              = D_L1_req * 64 / hw_consts.L1WriteBusWidthPerCU;
-        double D_L2_clk = D_L2_req * 64 / std::min(hw_consts.L2WriteBusWidthPerCU, L2WriteBandWidthPerCU);
+        double L2WriteBandWidthPerCU = hw.L2_write_arb_eff * 128 * 16 / WGs_per_tile_XCD;
+        double L3BandWidthPerCU      = hw.L3_bandwidth / WGs_per_tile;
+        double HBMBandWidthPerCU     = hw.hbm_bandwidth / WGs_per_tile;
+        double L1WBus                = static_cast<double>(hw.L1_write_bus_width_per_cu);
+        double L2WBus                = static_cast<double>(hw.L2_write_bus_width_per_cu);
+        double D_L1_clk              = D_L1_req * 64 / L1WBus;
+        double D_L2_clk = D_L2_req * 64 / std::min(L2WBus, L2WriteBandWidthPerCU);
         double D_L3_clk = D_L3_req * 64 / L3BandWidthPerCU;
         // TODO: D_hbm_clk use D_L3_req.
         double D_hbm_clk     = 0 * 64 / HBMBandWidthPerCU;
-        double D_L1_clk_edge = D_L1_edge_req * 64 / hw_consts.L1WriteBusWidthPerCU;
+        double D_L1_clk_edge = D_L1_edge_req * 64 / L1WBus;
         double D_L2_clk_edge
-            = D_L2_edge_req * 64 / std::min(hw_consts.L2WriteBusWidthPerCU, L2WriteBandWidthPerCU);
+            = D_L2_edge_req * 64 / std::min(L2WBus, L2WriteBandWidthPerCU);
         double D_L3_clk_edge  = D_L3_edge_req * 64 / L3BandWidthPerCU;
         double D_hbm_clk_edge = 0 * 64 / HBMBandWidthPerCU;
-        double D_L1_clk_total = total_store_req1 * 64 / hw_consts.L1WriteBusWidthPerCU;
+        double D_L1_clk_total = total_store_req1 * 64 / L1WBus;
         double D_L2_clk_total
-            = total_store_req2 * 64 / std::min(hw_consts.L2WriteBusWidthPerCU, L2WriteBandWidthPerCU);
+            = total_store_req2 * 64 / std::min(L2WBus, L2WriteBandWidthPerCU);
         double D_L3_clk_total  = total_store_req3 * 64 / L3BandWidthPerCU;
         double D_hbm_clk_total = 0 * 64 / HBMBandWidthPerCU;
 
-        double store_edge_overall = ((D_L1_clk_edge + D_L2_clk_edge) / hw_consts.math_frequency)
-                                    + ((D_L3_clk_edge + D_hbm_clk_edge) / hw_consts.mem_frequency);
+        double store_edge_overall = ((D_L1_clk_edge + D_L2_clk_edge) / math_freq)
+                                    + ((D_L3_clk_edge + D_hbm_clk_edge) / mem_freq);
         double store_non_edge_overall
-            = ((D_L1_clk + D_L2_clk) / hw_consts.math_frequency) + ((D_L3_clk + D_hbm_clk) / hw_consts.mem_frequency);
-        double store_total = ((D_L1_clk_total + D_L2_clk_total) / hw_consts.math_frequency)
-                             + ((D_L3_clk_total + D_hbm_clk_total) / hw_consts.mem_frequency);
+            = ((D_L1_clk + D_L2_clk) / math_freq) + ((D_L3_clk + D_hbm_clk) / mem_freq);
+        double store_total = ((D_L1_clk_total + D_L2_clk_total) / math_freq)
+                             + ((D_L3_clk_total + D_hbm_clk_total) / mem_freq);
         // Use the max of edge/non-edge store
         store      = store_non_edge_overall;
         store_edge = store_edge_overall;
@@ -141,7 +105,7 @@ namespace origami
     }
 
     Formocast::L1CacheHitRate
-    Formocast::computeL1CacheHitRate(const HardwareConstants& hw,
+    Formocast::computeL1CacheHitRate(const hardware_t& hw,
                                           double MT0, double MT1, uint32_t bpeA, uint32_t bpeB,
                                           int NTA, int NTB, uint32_t GRVWA, uint32_t GRVWB,
                                           bool DTVA, bool DTVB, bool isSwizzleA, bool isSwizzleB,
@@ -150,10 +114,11 @@ namespace origami
                                           uint32_t threadnum, uint32_t NumWave0, uint32_t NumWave1) const
     {
         auto hr = simulator::computeL1CacheHitRate(
-            hw.L1CacheCapacity, hw.L1CacheLineSize, hw.L1BusWidthPerCU,
+            static_cast<double>(hw.L1_capacity), static_cast<double>(hw.L1_cache_line_size),
+            static_cast<double>(hw.L1_bus_width_per_cu),
             MT0, MT1, bpeA, bpeB, NTA, NTB, GRVWA, GRVWB, DTVA, DTVB,
             isSwizzleA, isSwizzleB, VWA, VWB, transA, transB, lda, ldb,
-            NLCA, NLCB, threadnum, NumWave0, NumWave1, hw.architecture == hardware_t::architecture_t::gfx942);
+            NLCA, NLCB, threadnum, NumWave0, NumWave1, hw.arch == hardware_t::architecture_t::gfx942);
 
         L1CacheHitRate result;
         result.tile0HitRate = hr.tile0HitRate;
@@ -162,12 +127,13 @@ namespace origami
     }
 
     Formocast::L3CacheHitRate
-    Formocast::computeL3CacheHitRate(double M, double N, double K, const HardwareConstants& hw,
+    Formocast::computeL3CacheHitRate(double M, double N, double K, const hardware_t& hw,
                                           uint32_t bpeA, uint32_t bpeB, int NTA, int NTB,
                                           int N_WGs_total, int M_WGs_total, int N_WGs_per_tile, int M_WGs_per_tile) const
     {
         auto hr = simulator::computeL3CacheHitRate(
-            M, N, K, hw.L3CacheCapacity, hw.NumCUs, bpeA, bpeB, NTA, NTB,
+            M, N, K, static_cast<double>(hw.L3_capacity), static_cast<double>(hw.N_CU),
+            bpeA, bpeB, NTA, NTB,
             N_WGs_total, M_WGs_total, N_WGs_per_tile, M_WGs_per_tile);
 
         L3CacheHitRate result;
@@ -180,30 +146,35 @@ namespace origami
     double Formocast::calculateGlobalSplitUOverhead(double M, double N, double K,
                                                         double NumBatches, double GlobalSplitU,
                                                         uint32_t gsuMethod, ProblemInfo problem,
-                                                        const HardwareConstants& hw_consts,
+                                                        const hardware_t& hw,
                                                         uint32_t WGs_per_tile, uint32_t WGs_per_tile_XCD,
                                                         double MT0, double MT1, uint32_t numWGs, double vgprCheck,
                                                         double storeGSU) const
     {
+        const double boost_freq = hw.boost_clock_ghz * 1000.0;
         double gsu_overall = 0.0;
 
         if(gsuMethod == 2 && GlobalSplitU > 1) //MB
         {
             gsu_overall = simulator::getMultipleBufferOverhead(
                 M, N, GlobalSplitU, NumBatches,
-                problem.bpeCompute, problem.bpeD, hw_consts.hbmBandWidth,
-                hw_consts.L1CacheLineSize, hw_consts.NumCUs, hw_consts.boost_frequency,
-                hw_consts.mem_frequency, hw_consts.L2WriteArbEff, hw_consts.L2ReadArbEff,
-                hw_consts.L3BandWidth, hw_consts.L1BusWidthPerCU, hw_consts.L2BusWidthPerCU,
-                hw_consts.L1WriteBusWidthPerCU, hw_consts.L2WriteBusWidthPerCU
+                problem.bpeCompute, problem.bpeD, hw.hbm_bandwidth,
+                static_cast<double>(hw.L1_cache_line_size), static_cast<double>(hw.N_CU),
+                boost_freq, hw.mem_frequency_mhz,
+                hw.L2_write_arb_eff, hw.L2_read_arb_eff,
+                hw.L3_bandwidth, static_cast<double>(hw.L1_bus_width_per_cu),
+                static_cast<double>(hw.L2_bus_width_per_cu),
+                static_cast<double>(hw.L1_write_bus_width_per_cu),
+                static_cast<double>(hw.L2_write_bus_width_per_cu)
             );
         }
         else if(gsuMethod == 3 && GlobalSplitU > 1) //MBSK
         {
             gsu_overall = simulator::getMultipleBufferSingleKernelOverhead(
                 GlobalSplitU, MT0, MT1, problem.bpeCompute,
-                hw_consts.NumCUs, numWGs, hw_consts.boost_frequency,
-                hw_consts.L2ReadArbEff, hw_consts.L1BusWidthPerCU, hw_consts.L2BusWidthPerCU,
+                static_cast<double>(hw.N_CU), numWGs, boost_freq,
+                hw.L2_read_arb_eff, static_cast<double>(hw.L1_bus_width_per_cu),
+                static_cast<double>(hw.L2_bus_width_per_cu),
                 storeGSU
             );
         }
@@ -214,15 +185,15 @@ namespace origami
     double Formocast::calculateLocalSplitUOverhead(double MT0, double MT1, double lsu,
                                                      uint32_t svw, uint32_t numThreads,
                                                      ProblemInfo problem,
-                                                     const HardwareConstants& hw_consts) const
+                                                     const hardware_t& hw) const
     {
         return simulator::getLocalSplitKOverhead(MT0, MT1, lsu, svw, numThreads,
-                                         problem.bpeCompute, hw_consts.math_frequency);
+                                         problem.bpeCompute, hw.compute_clock_ghz * 1000.0);
     }
 
     Formocast::MemoryAccessCosts
     Formocast::calculateMemoryAccessCosts(double MT0, double MT1,
-                                   const HardwareConstants& hw,
+                                   const hardware_t& hw,
                                    const CacheHitRates& hr,
                                    double L2BandWidthPerCU, double L3BandWidthPerCU, double HBMBandWidthPerCU,
                                    bool isSwizzleA, bool isSwizzleB,
@@ -230,37 +201,41 @@ namespace origami
                                    double A_L2_req, double A_L3_req, double A_hbm_req,
                                    double B_L2_req, double B_L3_req, double B_hbm_req) const
     {
+        const double math_freq = hw.compute_clock_ghz * 1000.0;
+        const double mem_freq  = hw.mem_frequency_mhz;
+        const double L1Bus     = static_cast<double>(hw.L1_bus_width_per_cu);
+        const double L2Bus     = static_cast<double>(hw.L2_bus_width_per_cu);
         MemoryAccessCosts mem;
 
-        double A_L1_clk = A_L1_req * 64 / hw.L1BusWidthPerCU;
+        double A_L1_clk = A_L1_req * 64 / L1Bus;
         double A_L2_clk;
         if(isSwizzleA)
-            A_L2_clk = A_L2_req * 128 / std::min(L2BandWidthPerCU, hw.L2BusWidthPerCU);
+            A_L2_clk = A_L2_req * 128 / std::min(L2BandWidthPerCU, L2Bus);
         else
-            A_L2_clk = A_L2_req * 128 / std::min(L2BandWidthPerCU, hw.L2BusWidthPerCU);
+            A_L2_clk = A_L2_req * 128 / std::min(L2BandWidthPerCU, L2Bus);
         double A_L3_clk = A_L3_req * 128 / L3BandWidthPerCU;
         double A_hbm_clk = A_hbm_req * 128 / HBMBandWidthPerCU;
 
-        double B_L1_clk = B_L1_req * 64 / hw.L1BusWidthPerCU;
+        double B_L1_clk = B_L1_req * 64 / L1Bus;
         double B_L2_clk;
         if(isSwizzleB)
-            B_L2_clk = B_L2_req * 128 / std::min(L2BandWidthPerCU, hw.L2BusWidthPerCU);
+            B_L2_clk = B_L2_req * 128 / std::min(L2BandWidthPerCU, L2Bus);
         else
-            B_L2_clk = B_L2_req * 128 / std::min(L2BandWidthPerCU, hw.L2BusWidthPerCU);
+            B_L2_clk = B_L2_req * 128 / std::min(L2BandWidthPerCU, L2Bus);
         double B_L3_clk = B_L3_req * 128 / L3BandWidthPerCU;
         double B_hbm_clk = B_hbm_req * 128 / HBMBandWidthPerCU;
 
-        A_L1_clk = A_L1_req * hr.A_L1_hit * 64 / hw.L1BusWidthPerCU;
+        A_L1_clk = A_L1_req * hr.A_L1_hit * 64 / L1Bus;
         A_L3_clk = A_L3_req * 64 / L3BandWidthPerCU;
         A_hbm_clk = A_hbm_req * 8 / HBMBandWidthPerCU;
-        B_L1_clk = B_L1_req * hr.B_L1_hit * 64 / hw.L1BusWidthPerCU;
+        B_L1_clk = B_L1_req * hr.B_L1_hit * 64 / L1Bus;
         B_L3_clk = B_L3_req * 64 / L3BandWidthPerCU;
         B_hbm_clk = B_hbm_req * 8 / HBMBandWidthPerCU;
 
-        double L1_overall   = (A_L1_clk + B_L1_clk) / hw.math_frequency;
-        double L2_overall   = (A_L2_clk + B_L2_clk) / hw.math_frequency;
-        double L3_overall   = (A_L3_clk + B_L3_clk) / hw.mem_frequency;
-        double hbm_overall  = (A_hbm_clk + B_hbm_clk) / hw.mem_frequency;
+        double L1_overall   = (A_L1_clk + B_L1_clk) / math_freq;
+        double L2_overall   = (A_L2_clk + B_L2_clk) / math_freq;
+        double L3_overall   = (A_L3_clk + B_L3_clk) / mem_freq;
+        double hbm_overall  = (A_hbm_clk + B_hbm_clk) / mem_freq;
         mem.mem_overall     = L1_overall + L2_overall + L3_overall + hbm_overall;
 
         mem.mem_l1 = L1_overall;
@@ -279,7 +254,7 @@ namespace origami
         return mem;
     }
 
-    double Formocast::resolveOccupancy(const HardwareConstants& hw, double perf, double prefetch, double mathCost, double storeCost, uint32_t num_tiles, uint32_t CUOccupancy) const
+    double Formocast::resolveOccupancy(const hardware_t& hw, double perf, double prefetch, double mathCost, double storeCost, uint32_t num_tiles, uint32_t CUOccupancy) const
     {
         if ((num_tiles > 1)  && CUOccupancy >= 2)
         {
@@ -376,8 +351,9 @@ namespace origami
         bool     isSwizzleB = problem.swizzleTensorB;
 
         // 2. Hardware Parameter Extraction
-        //HardwareConstants hw_consts = getHardwareConstants();
-        //hw_consts.print();
+        const hardware_t& hw = *hw_;
+        const double math_freq = hw.compute_clock_ghz * 1000.0;
+        const double mem_freq  = hw.mem_frequency_mhz;
 
         // 3. Variables directly from sizeMapping
 
@@ -404,7 +380,7 @@ namespace origami
         uint32_t waveNum  = sizeMapping.waveNum;
         uint32_t NumWave0 = sizeMapping.waveGroup[0];
         uint32_t NumWave1 = sizeMapping.waveGroup[1];
-        uint32_t NumThreads = hw_consts.wavefrontSize * waveNum;
+        uint32_t NumThreads = hw.wavefront_size * waveNum;
 
         // Matrix instruction and VGPR configuration
         int miSize = sizeMapping.matrixInstruction[0];
@@ -454,7 +430,7 @@ namespace origami
         if(problem.dataType == data_type_t::BFloat16 || problem.dataType == data_type_t::Half)
         {
             if(problem.bpeA == 2 && problem.bpeB == 2)
-                if (((K >= 64 && depthU <=32) || (K <= 32 && depthU > 32) || (K > 32 && depthU > K)) && NumBatches < hw_consts.NumCUs && sizeMapping.matrixInstruction[2] >= 32)
+                if (((K >= 64 && depthU <=32) || (K <= 32 && depthU > 32) || (K > 32 && depthU > K)) && NumBatches < hw.N_CU && sizeMapping.matrixInstruction[2] >= 32)
                 {
                     pp.microSeconds = 9999999.9;
                     pp.hitRate = 0;
@@ -480,14 +456,14 @@ namespace origami
         uint32_t N_WGs_total = safe_ceil_div(static_cast<uint32_t>(N), static_cast<uint32_t>(MT1));
         int N_WGs_per_tile_XCD = std::min((uint32_t)WGM, N_WGs_total);
         int M_WGs_per_tile_XCD
-            = std::min(M_WGs_total, static_cast<uint32_t>(safe_ceil_div(int(hw_consts.NumCUs / hw_consts.NumXCDs), N_WGs_per_tile_XCD)));
-        int M_WGs_per_tile = std::min(M_WGs_total, static_cast<uint32_t>(safe_ceil_div(int(hw_consts.NumCUs), N_WGs_per_tile_XCD)));
+            = std::min(M_WGs_total, static_cast<uint32_t>(safe_ceil_div(static_cast<int>(hw.N_CU / hw.NUM_XCD), N_WGs_per_tile_XCD)));
+        int M_WGs_per_tile = std::min(M_WGs_total, static_cast<uint32_t>(safe_ceil_div(static_cast<int>(hw.N_CU), N_WGs_per_tile_XCD)));
         int N_WGs_per_tile
             = std::min(N_WGs_total, static_cast<uint32_t>(N_WGs_per_tile_XCD * safe_ceil_div(M_WGs_per_tile, M_WGs_total)));
         uint32_t numberWGs = M_WGs_total * N_WGs_total * NumBatches * GlobalSplitU;
-        uint32_t WGs_per_tile = std::min(uint32_t(hw_consts.NumCUs), numberWGs);
-        uint32_t WGs_per_tile_XCD = safe_ceil_div(WGs_per_tile, hw_consts.NumXCDs);
-        uint32_t num_tiles = safe_ceil_div(numberWGs, uint32_t(hw_consts.NumCUs));
+        uint32_t WGs_per_tile = std::min(static_cast<uint32_t>(hw.N_CU), numberWGs);
+        uint32_t WGs_per_tile_XCD = safe_ceil_div(WGs_per_tile, static_cast<uint32_t>(hw.NUM_XCD));
+        uint32_t num_tiles = safe_ceil_div(numberWGs, static_cast<uint32_t>(hw.N_CU));
         uint32_t loopCnt = K_AfterGSU / depthU;
         uint32_t K_tail = K_AfterGSU - (loopCnt * depthU);
         PGR = (std::floor(K_AfterGSU/depthU > 1)) ? sizeMapping.PrefetchGlobalRead : int(K_AfterGSU/depthU);
@@ -501,7 +477,7 @@ namespace origami
         }
         // 5. Cache Hit Rates and Bandwidths
         CacheHitRates cache_hits;
-        L1CacheHitRate l1 = computeL1CacheHitRate(hw_consts,
+        L1CacheHitRate l1 = computeL1CacheHitRate(hw,
                                                 MT0, MT1, bpeA, bpeB,
                                                 0, 0, GRVWA, GRVWB,
                                                 DTVA, DTVB, isSwizzleA, isSwizzleB,
@@ -511,7 +487,7 @@ namespace origami
         L2CacheHitRate l2 = computeL2CacheHitRate(M,
                                                 N,
                                                 K_AfterGSU,
-                                                hw_consts,
+                                                hw,
                                                 GlobalSplitU,
                                                 WGM,
                                                 NumBatches,
@@ -520,7 +496,7 @@ namespace origami
                                                 0,
                                                 0,
                                                 isGSUWGMRR);
-        L3CacheHitRate l3 = computeL3CacheHitRate(M, N, K, hw_consts,
+        L3CacheHitRate l3 = computeL3CacheHitRate(M, N, K, hw,
                                                 bpeA, bpeB, 0, 0,
                                                 N_WGs_total, M_WGs_total, N_WGs_per_tile, M_WGs_per_tile);
 
@@ -535,46 +511,48 @@ namespace origami
 
         // 6. Calculate Store Performance (D matrix writes)
         double store, store_edge;
-        calculateStorePerformance(M, N, NumBatches, MT0, MT1, GWVWD, bpeD, hw_consts, WGs_per_tile, WGs_per_tile_XCD, store, store_edge);
+        calculateStorePerformance(M, N, NumBatches, MT0, MT1, GWVWD, bpeD, hw, WGs_per_tile, WGs_per_tile_XCD, store, store_edge);
 
         // 7. Calculate GSU Overhead
         double storeGSU = store * 2; //FIXME: incorrect
         auto vgprUsageCheck = MT0 * MT1 / miSize / miSize;
         double gsu_overall = calculateGlobalSplitUOverhead(M, N, K, NumBatches, GlobalSplitU, gsuMethod,
-                                                  problem, hw_consts, WGs_per_tile, WGs_per_tile_XCD,
+                                                  problem, hw, WGs_per_tile, WGs_per_tile_XCD,
                                                   MT0, MT1, numberWGs, vgprUsageCheck, storeGSU);
 
         // 8. Calcupate LSU Overhead
-        double lsu_overall = calculateLocalSplitUOverhead(MT0, MT1, LSU, GWVWD, NumThreads, problem, hw_consts);
+        double lsu_overall = calculateLocalSplitUOverhead(MT0, MT1, LSU, GWVWD, NumThreads, problem, hw);
 
         // 9. Calculate Memory Access and Math Costs
-        double L2BandWidthPerCU     = hw_consts.L2ReadArbEff * 128 * 16 / WGs_per_tile_XCD; //90% eff
-        if (L2BandWidthPerCU > hw_consts.L2ReadArbEff * 128 * 16 / (hw_consts.NumCUs/hw_consts.NumXCDs))
-            L2BandWidthPerCU = hw_consts.L2ReadArbEff * 128 * 16 / (hw_consts.NumCUs/hw_consts.NumXCDs);
-        double L3BandWidthPerCU     = hw_consts.L3BandWidth / WGs_per_tile;
-        double HBMBandWidthPerCU    = hw_consts.hbmBandWidth / WGs_per_tile;
+        double L2BandWidthPerCU     = hw.L2_read_arb_eff * 128 * 16 / WGs_per_tile_XCD;
+        if (L2BandWidthPerCU > hw.L2_read_arb_eff * 128 * 16 / (static_cast<double>(hw.N_CU)/hw.NUM_XCD))
+            L2BandWidthPerCU = hw.L2_read_arb_eff * 128 * 16 / (static_cast<double>(hw.N_CU)/hw.NUM_XCD);
+        double L3BandWidthPerCU     = hw.L3_bandwidth / WGs_per_tile;
+        double HBMBandWidthPerCU    = hw.hbm_bandwidth / WGs_per_tile;
 
         // Calculate load requests and memory access costs before calling calculateMemoryAccessCosts
         double tcc_ea0_coalscedA;
         double tcc_ea0_coalscedB;
-        double A_L1_req = simulator::getLoadRequest(std::min(MT0, M), depthU, hw_consts.L1CacheLineSize,
+        const double L1CacheLS = static_cast<double>(hw.L1_cache_line_size);
+        const double L1BusCU  = static_cast<double>(hw.L1_bus_width_per_cu);
+        double A_L1_req = simulator::getLoadRequest(std::min(MT0, M), depthU, L1CacheLS,
                                          GRVWA, bpeA, DTVA,
-                                         transA,           // isTransposed
-                                         isSwizzleA,    // isSwizzled (for transposed case)
-                                         VWA,           // VW (for transposed case)
-                                         hw_consts.L1BusWidthPerCU,  // L1BusWidthPerCU (for non-transposed case)
-                                         NLCA,          // NumLoadsCoalesced (for non-transposed case)
-                                         NumWave1,      // numWaveX (for non-transposed case)
+                                         transA,
+                                         isSwizzleA,
+                                         VWA,
+                                         L1BusCU,
+                                         NLCA,
+                                         NumWave1,
                                          tcc_ea0_coalscedA);
 
-        double B_L1_req = simulator::getLoadRequest(std::min(MT1, N), depthU, hw_consts.L1CacheLineSize,
+        double B_L1_req = simulator::getLoadRequest(std::min(MT1, N), depthU, L1CacheLS,
                                          GRVWB, bpeB, DTVB,
-                                         !transB,          // isTransposed (B is transposed when trB=false)
-                                         isSwizzleB,    // isSwizzled (for transposed case)
-                                         VWB,           // VW (for transposed case)
-                                         hw_consts.L1BusWidthPerCU,  // L1BusWidthPerCU (for non-transposed case)
-                                         NLCB,          // NumLoadsCoalesced (for non-transposed case)
-                                         NumWave0,      // numWaveX (for non-transposed case)
+                                         !transB,
+                                         isSwizzleB,
+                                         VWB,
+                                         L1BusCU,
+                                         NLCB,
+                                         NumWave0,
                                          tcc_ea0_coalscedB);
 
         double A_L2_req = A_L1_req * (1 - cache_hits.A_L1_hit) / 2 * tcc_ea0_coalscedA;
@@ -585,7 +563,7 @@ namespace origami
         double B_hbm_req = B_L3_req * (1 - cache_hits.B_L3_hit);
 
         MemoryAccessCosts mem_costs = calculateMemoryAccessCosts(std::min(MT0, M), std::min(MT1, N),
-                                                                hw_consts,
+                                                                hw,
                                                                 cache_hits,
                                                                 L2BandWidthPerCU, L3BandWidthPerCU, HBMBandWidthPerCU,
                                                                 isSwizzleA, isSwizzleB,
@@ -594,7 +572,7 @@ namespace origami
                                                                 B_L2_req, B_L3_req, B_hbm_req);
 
         // 10. Calculate Prefetch Performance
-        int numAccPerWave = MT0 * MT1 / waveNum / hw_consts.wavefrontSize;
+        int numAccPerWave = MT0 * MT1 / waveNum / hw.wavefront_size;
         double prefetch      = getPrefetchPerformance(GRVWA,
                                                  GRVWB,
                                                  bpeA,
@@ -603,12 +581,12 @@ namespace origami
                                                  waveNum,
                                                  MT0,
                                                  MT1,
-                                                 hw_consts.math_frequency,
+                                                 math_freq,
                                                  numAccPerWave);
-        double preLoopCost = hw_consts.initialCost + prefetch;
+        double preLoopCost = hw.initial_cost + prefetch;
 
         // 11. Calculate loop Performance
-        double math_overall = math_clk / hw_consts.math_frequency;
+        double math_overall = math_clk / math_freq;
         double loop_overall = getLoopOverall(mem_costs, math_overall, loopCnt, PGR);
 
         loop_overall += loopCnt*0.2;
@@ -640,7 +618,7 @@ namespace origami
         perf += lsu_overall;
 
         // 15. Apply CU Occupancy
-        perf = resolveOccupancy(hw_consts, perf, prefetch, loop_overall + tail_overall, store, num_tiles, CUOccupancy);
+        perf = resolveOccupancy(hw, perf, prefetch, loop_overall + tail_overall, store, num_tiles, CUOccupancy);
 
         // 16. Add GSU Reduction Part
         perf += gsu_overall;
@@ -671,7 +649,7 @@ namespace origami
         Formocast::computeL2CacheHitRate(uint32_t M,
                                                    uint32_t N,
                                                    uint32_t K,
-                                                   const HardwareConstants& hw,
+                                                   const hardware_t& hw,
                                                    uint32_t gsu,
                                                    int32_t  wgm,
                                                    uint32_t batches,
@@ -687,10 +665,12 @@ namespace origami
 
         // can't make these two unsigned, they could be -1 in special cases
         int XCC = sizeMapping.workGroupMappingXCC;
-        int XCCG = (sizeMapping.workGroupMappingXCCGroup < 0)? hw.NumCUs : sizeMapping.workGroupMappingXCCGroup;
+        int XCCG = (sizeMapping.workGroupMappingXCCGroup < 0)? static_cast<int>(hw.N_CU) : sizeMapping.workGroupMappingXCCGroup;
 
         auto hr = simulator::computeL2CacheHitRate(
-            M, N, K, MT0, MT1, depthU, hw.L2CacheCapacity, hw.NumCUs, hw.NumXCDs,
+            M, N, K, MT0, MT1, depthU,
+            static_cast<uint32_t>(hw.L2_capacity), static_cast<uint32_t>(hw.N_CU),
+            static_cast<uint32_t>(hw.NUM_XCD),
             XCC, XCCG, gsu, wgm, batches, bpeA, bpeB, NTA, NTB, isGSUWGMRR);
 
         L2CacheHitRate hitRate;
@@ -714,9 +694,9 @@ namespace origami
         sizeMapping = sm;
     }
 
-    void Formocast::setHardware(hardware_t::architecture_t hw)
+    void Formocast::setHardware(const hardware_t& hw)
     {
-        hw_consts = getHardwareConstants(hw);
+        hw_ = &hw;
     }
 
     int Formocast::getGlobalReadQueueFullStallCycles(int currentCycle, std::deque<int>& fifo, int bpRead, int numWaves, bool isStall, bool isSgprOffset) const
@@ -731,16 +711,17 @@ namespace origami
 
     int Formocast::getLocalReadQueueFullStallCycles(int currentCycle, std::queue<int>& fifo, int bpRead, int numWaves, bool isStall, double bankConflict) const
     {
+        const hardware_t& hw = *hw_;
         int lrStallLatencyBuffer;
         if (!isStall){
             lrStallLatencyBuffer = 1;
         }
         else if (bpRead == 16) {
-            lrStallLatencyBuffer = simulator::getLocalReadLatency(hw_consts.LocalReadBaseLatencyB128, hw_consts.LocalReadConflictMultiplierB128, bankConflict);
+            lrStallLatencyBuffer = simulator::getLocalReadLatency(hw.local_read_latency_b128, hw.local_read_conflict_b128, bankConflict);
         } else if (bpRead == 8) {
-            lrStallLatencyBuffer = simulator::getLocalReadLatency(hw_consts.LocalReadBaseLatencyB64, hw_consts.LocalReadConflictMultiplierB64, bankConflict);
+            lrStallLatencyBuffer = simulator::getLocalReadLatency(hw.local_read_latency_b64, hw.local_read_conflict_b64, bankConflict);
         } else {
-            lrStallLatencyBuffer = simulator::getLocalReadLatency(hw_consts.LocalReadBaseLatencyB32, hw_consts.LocalReadConflictMultiplierB32, bankConflict);
+            lrStallLatencyBuffer = simulator::getLocalReadLatency(hw.local_read_latency_b32, hw.local_read_conflict_b32, bankConflict);
         }
         return simulator::getLocalReadQueueFullStallCycles(currentCycle, fifo, bpRead, numWaves, lrStallLatencyBuffer);
     }
@@ -763,31 +744,30 @@ namespace origami
 
     void Formocast::pushLocalReadWrite(int currentCycle, std::queue<int>& fifo, int bpr, double bankConflict, bool isLocalRead, int numPreviousLRs)
     {
+        const hardware_t& hw = *hw_;
         int lrMemLatency;
         if (isLocalRead) {
             if (bpr == 16) {
-                lrMemLatency = simulator::getLocalReadLatency(hw_consts.LocalReadBaseLatencyB128, hw_consts.LocalReadConflictMultiplierB128, bankConflict);
+                lrMemLatency = simulator::getLocalReadLatency(hw.local_read_latency_b128, hw.local_read_conflict_b128, bankConflict);
                 if (numPreviousLRs <= 4) {
                     lrMemLatency += 2 * numPreviousLRs;
                 }
                 else {
-                    // Maximum 4 * 2 latency for previous local reads
                     lrMemLatency += 2 * 4;
                 }
             } else if (bpr == 8) {
-                lrMemLatency = simulator::getLocalReadLatency(hw_consts.LocalReadBaseLatencyB64, hw_consts.LocalReadConflictMultiplierB64, bankConflict);
+                lrMemLatency = simulator::getLocalReadLatency(hw.local_read_latency_b64, hw.local_read_conflict_b64, bankConflict);
             } else {
-                lrMemLatency = simulator::getLocalReadLatency(hw_consts.LocalReadBaseLatencyB32, hw_consts.LocalReadConflictMultiplierB32, bankConflict);
+                lrMemLatency = simulator::getLocalReadLatency(hw.local_read_latency_b32, hw.local_read_conflict_b32, bankConflict);
             }
         }
         else {
-            // Local write latency
             if (bpr == 16) {
-                lrMemLatency = simulator::getLocalWriteLatency(hw_consts.LocalWriteBaseLatencyB128, hw_consts.LocalWriteConflictMultiplierB128, bankConflict);
+                lrMemLatency = simulator::getLocalWriteLatency(hw.local_write_latency_b128, hw.local_write_conflict_b128, bankConflict);
             } else if (bpr == 8) {
-                lrMemLatency = simulator::getLocalWriteLatency(hw_consts.LocalWriteBaseLatencyB64, hw_consts.LocalWriteConflictMultiplierB64, bankConflict);
+                lrMemLatency = simulator::getLocalWriteLatency(hw.local_write_latency_b64, hw.local_write_conflict_b64, bankConflict);
             } else {
-                lrMemLatency = simulator::getLocalWriteLatency(hw_consts.LocalWriteBaseLatencyB32, hw_consts.LocalWriteConflictMultiplierB32, bankConflict);
+                lrMemLatency = simulator::getLocalWriteLatency(hw.local_write_latency_b32, hw.local_write_conflict_b32, bankConflict);
             }
         }
         fifo.push(currentCycle + lrMemLatency);
@@ -841,7 +821,7 @@ namespace origami
         int LocalReadBytesB)
     {
         BankConflictResult result;
-        int NUM_THREADS_TO_SIMULATE = hw_consts.wavefrontSize;
+        int NUM_THREADS_TO_SIMULATE = hw_->wavefront_size;
         int NUM_BANKS = 32;
         int BANK_WIDTH = 4;
         result.ratioA = simulator::analyzeBankConflictsFromVGPR(vgprState, vgprLocalReadAddrA, NUM_THREADS_TO_SIMULATE, NUM_BANKS, BANK_WIDTH, LocalReadBytesA);

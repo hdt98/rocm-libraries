@@ -172,7 +172,7 @@ namespace origami
             }
             double GSU_L1_clk      = GSU_L1_req * 64 / L1BusWidthPerCU;
 
-            double GSU_L2_req = MT0 * MT1 * bpeIn * GlobalSplitU / 128; //hw_consts.L1CacheLineSize;
+            double GSU_L2_req = MT0 * MT1 * bpeIn * GlobalSplitU / 128;
             double GSU_L2_clk = GSU_L2_req / 2 * 128 / std::min(L2BandWidthPerCU_local, L2BusWidthPerCU);
 
             double cost_overhead = 2*1024.0/1900/(GlobalSplitU-1);
@@ -917,8 +917,8 @@ namespace origami
 
         /**
          * @brief Calculate local read latency based on base latency, conflict multiplier, and bank conflicts
-         * @param baseLatency Base latency for local read operation (from HardwareConstants: LocalReadBaseLatencyB128/B64/B32)
-         * @param conflictMultiplier Multiplier applied to bank conflict penalty (from HardwareConstants: LocalReadConflictMultiplierB128/B64/B32)
+         * @param baseLatency Base latency for local read operation
+         * @param conflictMultiplier Multiplier applied to bank conflict penalty
          * @param bankConflict Bank conflict factor (typically 1.0 for no conflict, >1.0 for conflicts)
          * @return Calculated latency in cycles (baseLatency + conflict penalty based on bank conflicts)
          */
@@ -930,8 +930,8 @@ namespace origami
 
         /**
          * @brief Calculate local write latency based on base latency, conflict multiplier, and bank conflicts
-         * @param baseLatency Base latency for local write operation (from HardwareConstants: LocalWriteBaseLatencyB128/B64/B32)
-         * @param conflictMultiplier Multiplier applied to bank conflict penalty (from HardwareConstants: LocalWriteConflictMultiplierB128/B64/B32)
+         * @param baseLatency Base latency for local write operation
+         * @param conflictMultiplier Multiplier applied to bank conflict penalty
          * @param bankConflict Bank conflict factor (typically 1.0 for no conflict, >1.0 for conflicts)
          * @return Calculated latency in cycles (baseLatency + conflict penalty based on bank conflicts)
          */
