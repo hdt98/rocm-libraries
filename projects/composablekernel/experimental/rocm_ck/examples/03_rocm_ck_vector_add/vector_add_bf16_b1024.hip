@@ -1,7 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-#include "rocm_vector_add_dev.hpp"
+#include <rocm_ck/elementwise_dev.hpp>
 
 // BF16 large tile. Parallels fp16_b1024 (kVectorM=8, kRepeatM=2).
 // Gives findVariant a tile-size choice for BF16.

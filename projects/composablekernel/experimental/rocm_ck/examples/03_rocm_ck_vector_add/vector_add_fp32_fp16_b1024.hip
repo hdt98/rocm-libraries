@@ -1,7 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-#include "rocm_vector_add_dev.hpp"
+#include <rocm_ck/elementwise_dev.hpp>
 
 // Narrowing: FP32 inputs -> FP16 output. Same kVectorM=4 constraint as widening
 // (wider type always governs). Output stored in FP16 for reduced memory footprint.

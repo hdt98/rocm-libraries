@@ -1,7 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-#include "rocm_vector_add_dev.hpp"
+#include <rocm_ck/elementwise_dev.hpp>
 
 // BF16 widening: BF16 inputs -> FP32 output. The most common mixed-type pattern
 // in ML training (BF16 storage, FP32 accumulation). Same geometry as fp16_fp32_b1024.

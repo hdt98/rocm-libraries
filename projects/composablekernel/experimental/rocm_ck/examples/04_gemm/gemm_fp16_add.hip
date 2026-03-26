@@ -4,7 +4,7 @@
 // fp16 GEMM + D0 addition: E = A*B + D0. Demonstrates fused epilogue with
 // one D tensor. Accumulates in fp32, stores fp16 output via CShuffleEpilogue.
 
-#include "gemm_dev.hpp"
+#include <rocm_ck/gemm_dev.hpp>
 
 static constexpr rocm_ck::GemmSpec spec = rocm_ck::make_kernel(
     rocm_ck::Signature{

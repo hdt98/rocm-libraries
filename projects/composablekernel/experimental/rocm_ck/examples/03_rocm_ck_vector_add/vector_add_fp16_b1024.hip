@@ -1,7 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-#include "rocm_vector_add_dev.hpp"
+#include <rocm_ck/elementwise_dev.hpp>
 
 // FP16 large tile. kVectorM=8, kRepeatM=2.
 static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_kernel(

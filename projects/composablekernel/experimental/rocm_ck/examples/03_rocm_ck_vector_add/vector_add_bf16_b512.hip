@@ -1,7 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-#include "rocm_vector_add_dev.hpp"
+#include <rocm_ck/elementwise_dev.hpp>
 
 // BF16 baseline. Same geometry as fp16_b512 (both 16-bit -> kVectorM=8, kRepeatM=1).
 static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_kernel(

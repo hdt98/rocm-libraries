@@ -19,7 +19,7 @@
 #error "gemm_api.hpp is host-only. Device code should include gemm_dev.hpp."
 #endif
 
-#include "gemm_spec.hpp"
+#include <rocm_ck/gemm_spec.hpp>
 
 namespace rocm_ck {
 
