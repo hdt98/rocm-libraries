@@ -15,7 +15,7 @@ using namespace rocm_ck;
 // TensorName
 // ============================================================================
 
-TEST(TensorName, ShortName)
+TEST(TensorName, MatchesSingleCharacterName)
 {
     constexpr bool match    = TensorName("A") == "A";
     constexpr bool no_match = TensorName("A") == "B";
@@ -23,7 +23,7 @@ TEST(TensorName, ShortName)
     EXPECT_FALSE(no_match);
 }
 
-TEST(TensorName, LongerName)
+TEST(TensorName, MatchesExactStringOnly)
 {
     constexpr bool match  = TensorName("bias") == "bias";
     constexpr bool prefix = TensorName("bias") == "bia";
@@ -33,14 +33,14 @@ TEST(TensorName, LongerName)
     EXPECT_FALSE(longer);
 }
 
-TEST(TensorName, MaxLength)
+TEST(TensorName, Accepts15CharMaxLength)
 {
     // 15 chars is the max (16 - null)
     constexpr bool match = TensorName("123456789012345") == "123456789012345";
     EXPECT_TRUE(match);
 }
 
-TEST(TensorName, EmptyName)
+TEST(TensorName, SupportsEmptyString)
 {
     constexpr TensorName tn("");
     EXPECT_EQ(tn.len, 0);
@@ -48,7 +48,7 @@ TEST(TensorName, EmptyName)
     EXPECT_TRUE(match);
 }
 
-TEST(TensorName, SpaceshipComparison)
+TEST(TensorName, SupportsThreeWayComparison)
 {
     constexpr TensorName a("A");
     constexpr TensorName a2("A");
@@ -63,7 +63,7 @@ TEST(TensorName, SpaceshipComparison)
 // PhysicalTensor
 // ============================================================================
 
-TEST(PhysicalTensor, Defaults)
+TEST(PhysicalTensor, InitializesWithFP32RowAndSlotZero)
 {
     constexpr PhysicalTensor pt{};
     EXPECT_EQ(pt.dtype, DataType::FP32);
@@ -71,7 +71,7 @@ TEST(PhysicalTensor, Defaults)
     EXPECT_EQ(pt.args_slot, 0);
 }
 
-TEST(PhysicalTensor, Construction)
+TEST(PhysicalTensor, StoresAllFieldsFromConstruction)
 {
     constexpr PhysicalTensor pt{TensorName("bias"), DataType::FP16, Layout::Col, 3};
     constexpr bool name_match = pt.name == "bias";
@@ -85,4 +85,4 @@ TEST(PhysicalTensor, Construction)
 // Capacity constant
 // ============================================================================
 
-TEST(PhysicalTensor, MaxCount) { EXPECT_EQ(kMaxPhysicalTensors, 8); }
+TEST(PhysicalTensor, LimitsCapacityTo8) { EXPECT_EQ(kMaxPhysicalTensors, 8); }

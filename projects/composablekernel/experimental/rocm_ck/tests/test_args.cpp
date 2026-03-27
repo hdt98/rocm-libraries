@@ -14,19 +14,19 @@ using namespace rocm_ck;
 // TensorArg ABI
 // ============================================================================
 
-TEST(TensorArg, TriviallyCopyable) { EXPECT_TRUE(std::is_trivially_copyable_v<TensorArg>); }
+TEST(TensorArg, IsTriviallyCopyable) { EXPECT_TRUE(std::is_trivially_copyable_v<TensorArg>); }
 
-TEST(TensorArg, StandardLayout) { EXPECT_TRUE(std::is_standard_layout_v<TensorArg>); }
+TEST(TensorArg, HasStandardLayout) { EXPECT_TRUE(std::is_standard_layout_v<TensorArg>); }
 
-TEST(TensorArg, Size)
+TEST(TensorArg, Occupies80Bytes)
 {
     // ptr(8) + lengths(6*4=24) + strides(6*8=48) = 80
     EXPECT_EQ(sizeof(TensorArg), 80);
 }
 
-TEST(TensorArg, Alignment) { EXPECT_EQ(alignof(TensorArg), 8); }
+TEST(TensorArg, AlignsTo8Bytes) { EXPECT_EQ(alignof(TensorArg), 8); }
 
-TEST(TensorArg, FieldOffsets)
+TEST(TensorArg, PlacesFieldsAtExpectedOffsets)
 {
     EXPECT_EQ(offsetof(TensorArg, ptr), 0);
     EXPECT_EQ(offsetof(TensorArg, lengths), 8);
@@ -37,9 +37,9 @@ TEST(TensorArg, FieldOffsets)
 // ScalarValue ABI
 // ============================================================================
 
-TEST(ScalarValue, TriviallyCopyable) { EXPECT_TRUE(std::is_trivially_copyable_v<ScalarValue>); }
+TEST(ScalarValue, IsTriviallyCopyable) { EXPECT_TRUE(std::is_trivially_copyable_v<ScalarValue>); }
 
-TEST(ScalarValue, Size)
+TEST(ScalarValue, Occupies8Bytes)
 {
     // Union of float(4), int32(4), uint32(4), double(8) -> 8 bytes
     EXPECT_EQ(sizeof(ScalarValue), 8);
@@ -49,19 +49,19 @@ TEST(ScalarValue, Size)
 // Args ABI
 // ============================================================================
 
-TEST(Args, TriviallyCopyable) { EXPECT_TRUE(std::is_trivially_copyable_v<Args>); }
+TEST(Args, IsTriviallyCopyable) { EXPECT_TRUE(std::is_trivially_copyable_v<Args>); }
 
-TEST(Args, StandardLayout) { EXPECT_TRUE(std::is_standard_layout_v<Args>); }
+TEST(Args, HasStandardLayout) { EXPECT_TRUE(std::is_standard_layout_v<Args>); }
 
-TEST(Args, Size)
+TEST(Args, Occupies1408Bytes)
 {
     // 16 tensors * 80 + 16 scalars * 8 = 1280 + 128 = 1408
     EXPECT_EQ(sizeof(Args), 1408);
 }
 
-TEST(Args, Alignment) { EXPECT_EQ(alignof(Args), 8); }
+TEST(Args, AlignsTo8Bytes) { EXPECT_EQ(alignof(Args), 8); }
 
-TEST(Args, FitsInKernargBudget)
+TEST(Args, FitsWithin4KBKernargBudget)
 {
     // HSA minimum kernarg size is 4096 bytes
     EXPECT_LE(sizeof(Args), 4096);
@@ -71,7 +71,7 @@ TEST(Args, FitsInKernargBudget)
 // Capacity constants
 // ============================================================================
 
-TEST(Args, Constants)
+TEST(Args, DefinesExpectedCapacityLimits)
 {
     EXPECT_EQ(kMaxRank, 6);
     EXPECT_EQ(kMaxTensors, 16);
@@ -82,21 +82,21 @@ TEST(Args, Constants)
 // ScalarValue union access
 // ============================================================================
 
-TEST(ScalarValue, FloatAccess)
+TEST(ScalarValue, StoresAndRetrievesFloat)
 {
     ScalarValue sv{};
     sv.f32 = 3.14f;
     EXPECT_FLOAT_EQ(sv.f32, 3.14f);
 }
 
-TEST(ScalarValue, Int32Access)
+TEST(ScalarValue, StoresAndRetrievesInt32)
 {
     ScalarValue sv{};
     sv.i32 = -42;
     EXPECT_EQ(sv.i32, -42);
 }
 
-TEST(ScalarValue, DoubleAccess)
+TEST(ScalarValue, StoresAndRetrievesDouble)
 {
     ScalarValue sv{};
     sv.f64 = 2.718281828;

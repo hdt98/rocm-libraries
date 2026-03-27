@@ -11,7 +11,7 @@ using namespace rocm_ck;
 // layout_name
 // ============================================================================
 
-TEST(Layout, Names)
+TEST(Layout, MapsEnumValuesToExpectedStrings)
 {
     EXPECT_STREQ(layout_name(Layout::Contiguous), "Contiguous");
     EXPECT_STREQ(layout_name(Layout::Row), "Row");
@@ -23,7 +23,7 @@ TEST(Layout, Names)
 // is_valid_layout_for_rank
 // ============================================================================
 
-TEST(Layout, ContiguousValidForRank1Only)
+TEST(Layout, AllowsContiguousOnlyForRank1)
 {
     constexpr bool r1 = is_valid_layout_for_rank(Layout::Contiguous, 1);
     constexpr bool r2 = is_valid_layout_for_rank(Layout::Contiguous, 2);
@@ -33,7 +33,7 @@ TEST(Layout, ContiguousValidForRank1Only)
     EXPECT_FALSE(r0);
 }
 
-TEST(Layout, RowColValidForRank2Only)
+TEST(Layout, AllowsRowAndColOnlyForRank2)
 {
     constexpr bool row_r1 = is_valid_layout_for_rank(Layout::Row, 1);
     constexpr bool row_r2 = is_valid_layout_for_rank(Layout::Row, 2);
@@ -46,7 +46,7 @@ TEST(Layout, RowColValidForRank2Only)
     EXPECT_TRUE(col_r2);
 }
 
-TEST(Layout, AutoNeverValid)
+TEST(Layout, RejectsAutoForAllRanks)
 {
     constexpr bool auto_r0 = is_valid_layout_for_rank(Layout::Auto, 0);
     constexpr bool auto_r1 = is_valid_layout_for_rank(Layout::Auto, 1);
