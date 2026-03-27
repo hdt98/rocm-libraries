@@ -230,43 +230,64 @@ class options_description
             {
                 int32_t val{};
                 match = argc && sscanf(*argv, "%" SCNd32, &val) == 1;
-                ptr->actual_value(val);
+                if(match)
+                {
+                    ptr->actual_value(val);
+                }
             }
             else if(auto* ptr = dynamic_cast<value<uint32_t>*>(m_val.get()))
             {
                 uint32_t val{};
                 match = argc && sscanf(*argv, "%" SCNu32, &val) == 1;
-                ptr->actual_value(val);
+                if(match)
+                {
+                    ptr->actual_value(val);
+                }
             }
             else if(auto* ptr = dynamic_cast<value<int64_t>*>(m_val.get()))
             {
                 int64_t val{};
                 match = argc && sscanf(*argv, "%" SCNd64, &val) == 1;
-                ptr->actual_value(val);
+                if(match)
+                {
+                    ptr->actual_value(val);
+                }
             }
             else if(auto* ptr = dynamic_cast<value<uint64_t>*>(m_val.get()))
             {
                 uint64_t val{};
                 match = argc && sscanf(*argv, "%" SCNu64, &val) == 1;
-                ptr->actual_value(val);
+                if(match)
+                {
+                    ptr->actual_value(val);
+                }
             }
             else if(auto* ptr = dynamic_cast<value<float>*>(m_val.get()))
             {
                 float val{};
                 match = argc && sscanf(*argv, "%f", &val) == 1;
-                ptr->actual_value(val);
+                if(match)
+                {
+                    ptr->actual_value(val);
+                }
             }
             else if(auto* ptr = dynamic_cast<value<double>*>(m_val.get()))
             {
                 double val{};
                 match = argc && sscanf(*argv, "%lf", &val) == 1;
-                ptr->actual_value(val);
+                if(match)
+                {
+                    ptr->actual_value(val);
+                }
             }
             else if(auto* ptr = dynamic_cast<value<char>*>(m_val.get()))
             {
                 char val{};
                 match = argc && sscanf(*argv, " %c", &val) == 1;
-                ptr->actual_value(val);
+                if(match)
+                {
+                    ptr->actual_value(val);
+                }
             }
             else if(auto* ptr = dynamic_cast<value<bool>*>(m_val.get()))
             {
