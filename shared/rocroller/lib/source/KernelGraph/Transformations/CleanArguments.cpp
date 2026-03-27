@@ -7,10 +7,7 @@
 #include <rocRoller/CommandSolution.hpp>
 #include <rocRoller/Expression.hpp>
 #include <rocRoller/ExpressionTransformations.hpp>
-
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
-#include <rocRoller/KernelGraph/Visitors.hpp>
-
 #include <rocRoller/Operations/Command.hpp>
 
 namespace rocRoller
@@ -23,145 +20,124 @@ namespace rocRoller
         using namespace Expression;
 
         /**
-         * Visitor for cleaning all of the Dimensions within a graph.
-         */
-        struct CleanArgumentsVisitor
-        {
-            CleanArgumentsVisitor(KernelGraph const& graph, ContextPtr context, CommandPtr command)
-                : m_graph(graph)
-                , m_kernel(context->kernel())
-                , m_command(command)
-                , m_context(context)
-            {
-            }
-
-            ExpressionPtr cleanExpr(ExpressionPtr expr)
-            {
-                return FastArithmetic(m_context)(expr);
-            }
-
-            template <CCoordinateTransformEdge T>
-            rocRoller::KernelGraph::CoordinateGraph::Edge visitCoordinateEdge(int      tag,
-                                                                              T const& edge)
-            {
-                auto divideBySize = [&](int dimTag) {
-                    using ET  = Expression::EvaluationTime;
-                    auto dim  = m_graph.coordinates.getNode(dimTag);
-                    auto size = getSize(dim);
-                    if(size && !Expression::evaluationTimes(size)[ET::Translate])
-                    {
-                        auto resultType = resultVariableType(size);
-                        if(resultType == DataType::Int32 || resultType == DataType::Int64
-                           || resultType == DataType::UInt32 || resultType == DataType::UInt64)
-                            enableDivideBy(size, m_context);
-                    }
-                };
-                if constexpr(std::same_as<Tile, T>)
-                {
-                    auto loc = m_graph.coordinates.getLocation(tag);
-                    for(int i = 1; i < loc.outgoing.size(); i++)
-                        divideBySize(loc.outgoing[i]);
-                }
-
-                if constexpr(std::same_as<Flatten, T>)
-                {
-                    auto loc = m_graph.coordinates.getLocation(tag);
-                    for(int i = 1; i < loc.incoming.size(); i++)
-                        divideBySize(loc.incoming[i]);
-                }
-                return edge;
-            }
-
-            template <CDataFlowEdge T>
-            rocRoller::KernelGraph::CoordinateGraph::Edge visitCoordinateEdge(int      tag,
-                                                                              T const& edge)
-            {
-                return edge;
-            }
-
-            template <CCoordinateTransformEdge Dim, Graph::Direction Dir>
-            bool hasConnectedDimension(int tag)
-            {
-                auto pred
-                    = [this](int tag) { return m_graph.coordinates.get<Dim>(tag).has_value(); };
-
-                return !m_graph.coordinates.getNeighbours<Dir>(tag).filter(pred).empty();
-            }
-
-            template <CDimension T>
-            Dimension visitDimension(int tag, T const& dim)
-            {
-                auto d = dim;
-
-                d.size   = cleanExpr(dim.size);
-                d.stride = cleanExpr(dim.stride);
-                d.offset = cleanExpr(dim.offset);
-
-                if constexpr(std::same_as<User, T>)
-                {
-                    if(!m_kernel->hasArgument(dim.argumentName))
-                    {
-                        auto arg = findArgumentByName(m_command, dim.argumentName);
-                        AssertFatal(arg, ShowValue(dim.argumentName));
-
-                        m_kernel->addCommandArgument(arg);
-                    }
-                }
-
-                return d;
-            }
-
-            Operation visitOperation(int tag, Assign const& op)
-            {
-                auto cleanOp       = op;
-                cleanOp.expression = cleanExpr(op.expression);
-                return cleanOp;
-            }
-
-            Operation visitOperation(int tag, ConditionalOp const& op)
-            {
-                auto cleanOp      = op;
-                cleanOp.condition = cleanExpr(op.condition);
-                return cleanOp;
-            }
-
-            Operation visitOperation(int tag, AssertOp const& op)
-            {
-                auto cleanOp      = op;
-                cleanOp.condition = cleanExpr(op.condition);
-                return cleanOp;
-            }
-
-            Operation visitOperation(int tag, ForLoopOp const& op)
-            {
-                auto cleanOp      = op;
-                cleanOp.condition = cleanExpr(op.condition);
-                return cleanOp;
-            }
-
-            template <COperation T>
-            Operation visitOperation(int tag, T const& op)
-            {
-                return op;
-            }
-
-        private:
-            KernelGraph const& m_graph;
-            AssemblyKernelPtr  m_kernel;
-            CommandPtr         m_command;
-            ContextPtr         m_context;
-        };
-        static_assert(CCoordinateEdgeVisitor<CleanArgumentsVisitor>);
-
-        /**
          * Rewrite HyperGraph to make sure no more CommandArgument
          * values are present within the graph.
          */
         KernelGraph CleanArguments::apply(KernelGraph const& k)
         {
-            rocRoller::Log::getLogger()->debug("KernelGraph::cleanArguments()");
-            auto visitor = CleanArgumentsVisitor(k, m_context, m_command);
-            return rewriteDimensions(k, visitor);
+            auto kernel    = m_context->kernel();
+            auto cleanExpr = [&](ExpressionPtr expr) { return FastArithmetic(m_context)(expr); };
+
+            auto divideBySize = [&](KernelGraph const& graph, int dimTag) {
+                auto dim  = graph.coordinates.getNode(dimTag);
+                auto size = getSize(dim);
+                if(size && not Expression::evaluationTimes(size)[EvaluationTime::Translate])
+                {
+                    auto resultType = resultVariableType(size);
+                    if(resultType == DataType::Int32 || resultType == DataType::Int64
+                       || resultType == DataType::UInt32 || resultType == DataType::UInt64)
+                        enableDivideBy(size, m_context);
+                }
+            };
+
+            KernelGraph graph = k;
+
+            // Clean coordinate nodes.
+            for(auto tag : k.coordinates.getNodes())
+            {
+                auto node    = k.coordinates.getNode(tag);
+                bool changed = std::visit(
+                    [&](auto& dim) -> bool {
+                        auto update = [&](ExpressionPtr& field) -> bool {
+                            auto newVal = cleanExpr(field);
+                            if(not Expression::identical(newVal, field))
+                            {
+                                field = std::move(newVal);
+                                return true;
+                            }
+                            return false;
+                        };
+                        bool modified = update(dim.size) | update(dim.stride) | update(dim.offset);
+
+                        if constexpr(std::same_as<User, std::decay_t<decltype(dim)>>)
+                        {
+                            if(not kernel->hasArgument(dim.argumentName))
+                            {
+                                auto arg = findArgumentByName(m_command, dim.argumentName);
+                                AssertFatal(arg, ShowValue(dim.argumentName));
+                                kernel->addCommandArgument(arg);
+                            }
+                        }
+                        return modified;
+                    },
+                    node);
+                if(changed)
+                    graph.coordinates.setElement(tag, node);
+            }
+
+            // Process coordinate transform edges (Tile/Flatten) to enable fast division.
+            for(auto tag : k.coordinates.getEdges())
+            {
+                auto edge = k.coordinates.getEdge(tag);
+                // Edge is variant<CoordinateTransformEdge, DataFlowEdge>; only the
+                // CoordinateTransformEdge arm needs processing.
+                if(auto* cte = std::get_if<CoordinateTransformEdge>(&edge))
+                {
+                    auto loc = k.coordinates.getLocation(tag);
+                    std::visit(
+                        [&](auto& e) {
+                            using T = std::decay_t<decltype(e)>;
+                            if constexpr(std::same_as<Tile, T>)
+                            {
+                                for(int i = 1; i < (int)loc.outgoing.size(); i++)
+                                    divideBySize(k, loc.outgoing[i]);
+                            }
+                            else if constexpr(std::same_as<Flatten, T>)
+                            {
+                                for(int i = 1; i < (int)loc.incoming.size(); i++)
+                                    divideBySize(k, loc.incoming[i]);
+                            }
+                        },
+                        *cte);
+                }
+            }
+
+            // Clean control nodes.
+            for(auto tag : k.control.getNodes())
+            {
+                auto node    = k.control.getNode(tag);
+                bool changed = std::visit(
+                    [&](auto& op) -> bool {
+                        using T = std::decay_t<decltype(op)>;
+                        if constexpr(std::same_as<Assign, T>)
+                        {
+                            auto newExpr = cleanExpr(op.expression);
+                            if(not Expression::identical(newExpr, op.expression))
+                            {
+                                op.expression = std::move(newExpr);
+                                return true;
+                            }
+                        }
+                        else if constexpr(
+                            std::same_as<
+                                ConditionalOp,
+                                T> || std::same_as<AssertOp, T> || std::same_as<ForLoopOp, T>)
+                        {
+                            auto newCond = cleanExpr(op.condition);
+                            if(not Expression::identical(newCond, op.condition))
+                            {
+                                op.condition = std::move(newCond);
+                                return true;
+                            }
+                        }
+                        return false;
+                    },
+                    node);
+                if(changed)
+                    graph.control.setElement(tag, node);
+            }
+
+            return graph;
         }
 
     }
