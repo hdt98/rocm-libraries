@@ -57,7 +57,6 @@ class TestLoadAndConvert : public ::testing::Test
         ck_tile::DeviceMem d_c(h_c.get_element_space_size_in_bytes());
 
         d_a.ToDevice(h_a.data());
-        d_c.ToDevice(h_c.data());
 
         using BlockWarps = ck_tile::sequence<1, 1, 1>;
         using BlockTile  = ck_tile::sequence<32, 32, 16>;
