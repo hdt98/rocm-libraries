@@ -39,13 +39,33 @@ import polars as pl
 # ---------------------------------------------------------------------------
 
 
+def _to_int(v):
+    """Convert a value to int, handling hex strings like '0x1234'."""
+    if isinstance(v, str):
+        return int(v, 16) if v.startswith("0x") else int(v)
+    return v
+
+
+def _normalize_addrs(derived: dict) -> dict:
+    """Convert hex-string addresses in a derived dict to ints."""
+    for key in ("effective_addr", "relative_addr", "lds_effective_addr", "lds_relative_addr"):
+        if key in derived and derived[key]:
+            derived[key] = [_to_int(a) for a in derived[key]]
+    if "base_pointer" in derived:
+        derived["base_pointer"] = _to_int(derived["base_pointer"])
+    return derived
+
+
 def load_trace(path: str) -> list:
     records = []
     with open(path) as f:
         for line in f:
             line = line.strip()
             if line:
-                records.append(json.loads(line))
+                rec = json.loads(line)
+                if "derived" in rec:
+                    _normalize_addrs(rec["derived"])
+                records.append(rec)
     return records
 
 
@@ -62,6 +82,30 @@ def decode_global(addr: int, base: int, row_bytes: int, chunk_bytes: int):
     row = off // row_bytes
     chunk = (off % row_bytes) // chunk_bytes
     return int(row), int(chunk)
+
+
+def build_lds_grid(lds_map: dict, dwordx4_cols: int = 16) -> pl.DataFrame:
+    """Build a table in LDS address space.
+
+    Rows = LDS rows (each dwordx4_cols * 16 bytes wide).
+    Columns = dwordx4 slot index (0..dwordx4_cols-1).
+    ``lds_map`` maps LDS byte address -> display string.
+    """
+    row_bytes = dwordx4_cols * 16  # bytes per LDS row
+    if not lds_map:
+        return pl.DataFrame()
+
+    max_addr = max(lds_map.keys())
+    n_lds_rows = max_addr // row_bytes + 1
+
+    rows = []
+    for r in range(n_lds_rows):
+        row = {"LDS": str(r * row_bytes)}
+        for c in range(dwordx4_cols):
+            addr = r * row_bytes + c * 16
+            row[str(c)] = lds_map.get(addr, "")
+        rows.append(row)
+    return pl.DataFrame(rows)
 
 
 def build_df(mapping: dict, n_rows: int, n_chunks: int, row_label: str = "row") -> pl.DataFrame:
@@ -86,6 +130,53 @@ def build_df(mapping: dict, n_rows: int, n_chunks: int, row_label: str = "row") 
 # ---------------------------------------------------------------------------
 
 
+def _tag_iterations(records: list) -> list:
+    """Assign a ``_iter`` field to each GR (buffer_load...lds) record.
+
+    Iterations are detected by grouping records with the same base_pointer
+    per SRD register group.  Each unique base_pointer value represents one
+    loop iteration.  This works whether the loop is unrolled or not.
+
+    LR (ds_read) records are NOT tagged because software pipelining means
+    the LR in iteration N reads LDS data written by GR in iteration N-1.
+    Instead, analyse() keeps all LR records and matches them to the selected
+    GR iteration's lds_to_tile mapping.
+    """
+    import re as _re
+
+    srd_re = _re.compile(r"s\[(\d+):\d+\]")
+
+    # Collect unique base_pointers per SRD, ordered by first appearance.
+    srd_bp_order: dict[str, list] = {}  # SRD -> [bp0, bp1, ...]
+
+    for rec in records:
+        if not (rec.get("family") == "buffer" and rec.get("derived", {}).get("lds_direct")):
+            continue
+        m = srd_re.search(rec.get("instruction", ""))
+        srd = m.group(0) if m else "?"
+        bp = rec["derived"].get("base_pointer")
+        if srd not in srd_bp_order:
+            srd_bp_order[srd] = []
+        if bp not in srd_bp_order[srd]:
+            srd_bp_order[srd].append(bp)
+
+    # Build SRD -> {base_pointer: iteration_index}
+    srd_bp_to_iter: dict[str, dict] = {}
+    for srd, bps in srd_bp_order.items():
+        srd_bp_to_iter[srd] = {bp: i for i, bp in enumerate(bps)}
+
+    # Tag GR records
+    for rec in records:
+        if not (rec.get("family") == "buffer" and rec.get("derived", {}).get("lds_direct")):
+            continue
+        m = srd_re.search(rec.get("instruction", ""))
+        srd = m.group(0) if m else "?"
+        bp = rec["derived"].get("base_pointer")
+        rec["_iter"] = srd_bp_to_iter.get(srd, {}).get(bp, 0)
+
+    return records
+
+
 def analyse(
     records: list,
     mac_rows: int,
@@ -93,14 +184,21 @@ def analyse(
     row_bytes: int,
     chunk_bytes: int,
     row_label: str,
-) -> tuple[dict, dict, dict]:
+    iteration: int | None = None,
+) -> tuple[dict, dict, dict, dict, dict]:
     """
     Analyse GR and LR records for one tile (A or B).
 
+    If *iteration* is not None, only records tagged with ``_iter == iteration``
+    are used for GR, and the corresponding LR records (matched by LDS overlap)
+    are used for LR.
+
     Returns:
-      gr_mapping   (row, chunk) -> "w{wave}.L{lane}" from buffer_load...lds
-      lr_mapping   (row, chunk) -> "w{wave}.L{lane}" from ds_read via LDS composition
-      lds_to_tile  LDS byte address -> (row, chunk) side-product for inspection
+      gr_mapping     (row, chunk) -> "(wave,lane)" from buffer_load...lds
+      lr_mapping     (row, chunk) -> ["(wave,lane)", ...] from ds_read via LDS composition
+      lds_to_tile    LDS byte address -> (row, chunk)
+      lds_write_map  LDS byte address -> "(wave,lane)" (who wrote there)
+      lds_read_map   LDS byte address -> ["(iter,wave,lane)", ...] (who read from there)
     """
     # Separate record types
     gr_recs = [
@@ -114,11 +212,30 @@ def analyse(
         and r.get("instruction", "").split()[0].startswith("ds_read")
     ]
 
+    # Filter GR to selected iteration if requested.
+    # LR records are NOT filtered by iteration: we keep all ds_reads and match
+    # them to the GR iteration's LDS-to-tile mapping.  This handles software
+    # pipelining where GR iteration N fills LDS for LR iteration N+1.
+    if iteration is not None:
+        gr_recs = [r for r in gr_recs if r.get("_iter") == iteration]
+
+    # Drop GR records where all lanes have the same effective_addr (exec mask
+    # disabled or OOB -- VGPR = 0xFFFFFFFF).  These produce bogus mappings.
+    def _is_bogus_gr(rec):
+        addrs = rec["derived"]["effective_addr"]
+        return len(set(addrs)) == 1 and len(addrs) > 1
+
+    n_before = len(gr_recs)
+    gr_recs = [r for r in gr_recs if not _is_bogus_gr(r)]
+    n_dropped = n_before - len(gr_recs)
+    if n_dropped:
+        print(f"  Dropped {n_dropped} GR records with disabled exec mask (bogus addresses)")
+
     if not gr_recs and not lr_recs:
-        return {}, {}, {}
+        return {}, {}, {}, {}, {}
 
     # ---- GR pass: decode (row, chunk) from global address ------------------
-    # Find global base as minimum effective address across all GR records.
+    # Find global base as minimum effective address across GR records.
     all_global = [
         addr
         for rec in gr_recs
@@ -130,7 +247,8 @@ def analyse(
         global_base = min(all_global)
 
     gr_mapping: dict = {}
-    lds_to_tile: dict = {}  # LDS byte addr -> (row, chunk)
+    lds_to_tile: dict = {}   # LDS byte addr -> (row, chunk)
+    lds_write_map: dict = {} # LDS byte addr -> "(wave,lane)"
 
     for rec in gr_recs:
         wave = rec["wave"]
@@ -141,30 +259,47 @@ def analyse(
             row, chunk = decode_global(gaddr, global_base, row_bytes, chunk_bytes)
             if 0 <= row < mac_rows and 0 <= chunk < n_k_chunks:
                 key = (row, chunk)
-                gr_mapping[key] = f"w{wave}.L{lane}"
+                label = f"({wave},{lane})"
+                gr_mapping[key] = label
                 if lane < len(lds_addrs):
                     lds_to_tile[lds_addrs[lane]] = key
+                    lds_write_map[lds_addrs[lane]] = label
 
     # ---- LR pass: look up tile position via LDS address --------------------
     # lr_mapping values are *lists* so that multiple waves sharing the same
     # (row, chunk) via LDS (jamming) are all preserved.
     lr_mapping: dict = {}
+    lds_read_map: dict = {}  # LDS byte addr -> ["(iter,wave,lane)", ...]
+
+    # Track per-wave iteration (which ds_read instruction, in order)
+    wave_lr_count: dict = {}  # wave -> iteration counter
 
     for rec in lr_recs:
         wave = rec["wave"]
         lds_addrs = rec["derived"]["effective_addr"]
+        it = wave_lr_count.get(wave, 0)
+        wave_lr_count[wave] = it + 1
 
         for lane, laddr in enumerate(lds_addrs):
+            label = f"({wave},{lane})"
+            label_it = f"({it},{wave},{lane})"
+            lds_read_map.setdefault(laddr, [])
+            # Only record first occurrence per (wave,lane) to keep cells compact;
+            # later iterations repeat the same pattern.
+            existing_wl = [",".join(l.split(",")[1:]) for l in lds_read_map[laddr]]
+            wl = f"{wave},{lane})"
+            if wl not in existing_wl:
+                lds_read_map[laddr].append(label_it)
+
             key = lds_to_tile.get(laddr)
             if key is not None:
                 row, chunk = key
                 if 0 <= row < mac_rows and 0 <= chunk < n_k_chunks:
-                    label = f"w{wave}.L{lane}"
                     lr_mapping.setdefault((row, chunk), [])
                     if label not in lr_mapping[(row, chunk)]:
                         lr_mapping[(row, chunk)].append(label)
 
-    return gr_mapping, lr_mapping, lds_to_tile
+    return gr_mapping, lr_mapping, lds_to_tile, lds_write_map, lds_read_map
 
 
 def _per_wave_rows(lr_map: dict) -> dict[int, list[int]]:
@@ -214,7 +349,7 @@ def _format_segments(dim: str, segs: list[tuple[int, int]]) -> str:
 
 def summarize_jamming(a_lr_map: dict, b_lr_map: dict):
     """
-    Print wave → subtileC assignment derived from LR mappings.
+    Print wave -> subtileC assignment derived from LR mappings.
 
     a_lr_map: (M-row, K-chunk) -> "w{wave}.L{lane}" or list thereof
     b_lr_map: (N-row, K-chunk) -> "w{wave}.L{lane}" or list thereof
@@ -334,9 +469,16 @@ def parse_args():
     p.add_argument(
         "--tile",
         choices=["a", "b", "both"],
-        default="both",
-        help="Which matrix tile to show (default: both). "
+        default="a",
+        help="Which matrix tile to show (default: a). "
              "A and B are separated by instruction program-order address.",
+    )
+    p.add_argument(
+        "--iteration",
+        type=int,
+        default=None,
+        help="Which loop iteration to analyse (0-based). Default: auto-detect "
+             "(use iteration 0 when multiple iterations are present).",
     )
     return p.parse_args()
 
@@ -489,14 +631,29 @@ def main():
 
     pl.Config.set_tbl_cols(20)
     pl.Config.set_tbl_rows(-1)
-    pl.Config.set_tbl_width_chars(300)
+    pl.Config.set_tbl_width_chars(10000)
+    pl.Config.set_fmt_str_lengths(100)
+
+    # Tag loop iterations before splitting (needs full record list)
+    _tag_iterations(records)
 
     # Split records into A and B tile instructions
     a_recs, b_recs = split_ab(records)
     print(f"A records: {len(a_recs)}, B records: {len(b_recs)}")
 
+    # Determine which iteration to use
+    iter_ids = sorted({r.get("_iter", 0) for r in records if "_iter" in r})
+    n_iters = len(iter_ids) if iter_ids else 1
+    if n_iters > 1:
+        sel_iter = args.iteration if args.iteration is not None else 0
+        print(f"Trace has {n_iters} loop iterations (0-{n_iters-1}); showing iteration {sel_iter}")
+    else:
+        sel_iter = None  # single iteration, no filtering needed
+
     def show_tile(recs, mac_rows, n_chunks, row_bytes, name, row_label):
-        gr_map, lr_map, _ = analyse(recs, mac_rows, n_chunks, row_bytes, chunk_bytes, row_label)
+        gr_map, lr_map, lds_to_tile, lds_write_map, lds_read_map = analyse(
+            recs, mac_rows, n_chunks, row_bytes, chunk_bytes, row_label,
+            iteration=sel_iter)
         covered_gr = sum(1 for v in gr_map.values() if v)
         covered_lr = sum(1 for v in lr_map.values() if v)
         total = mac_rows * n_chunks
@@ -505,7 +662,7 @@ def main():
         print("=" * 80)
         print(f"GR -- {name} global tile -> LDS  (buffer_load_dwordx4 ... lds)")
         print(f"  {covered_gr}/{total} cells covered")
-        print(f"  Cell = wave.lane that loaded (row, K-chunk) from global memory")
+        print(f"  Cell = (wave_id, lane_id) that loaded this ({row_label}, K-chunk) from global memory")
         if gr_map:
             print(truncate(build_df(gr_map, mac_rows, n_chunks, row_label)))
         else:
@@ -515,11 +672,45 @@ def main():
         print("=" * 80)
         print(f"LR -- {name} LDS tile -> VGPRs  (ds_read_b128)")
         print(f"  {covered_lr}/{total} cells covered  [derived by composing GR LDS addr -> tile]")
-        print(f"  Cell = wave.lane that reads (row, K-chunk) from LDS")
+        print(f"  Cell = (wave_id, lane_id) that reads this ({row_label}, K-chunk) from LDS")
         if lr_map:
             print(truncate(build_df(lr_map, mac_rows, n_chunks, row_label)))
         else:
             print("  [no data -- need GR records with lds_effective_addr]")
+
+        # --- LDS-view diagrams ---
+        if lds_to_tile:
+            # Data layout: what global (row, K-chunk) lives at each LDS slot
+            tile_labels = {
+                addr: f"[{tile[0]},{tile[1]}]"
+                for addr, tile in lds_to_tile.items()
+            }
+            print()
+            print("=" * 80)
+            print(f"LDS data -- {name} tile data in LDS memory")
+            print(f"  Rows = LDS byte offset, Cols = dwordx4 slot (16 bytes)")
+            print(f"  Cell = [{row_label}, K-chunk] stored at that LDS location")
+            print(truncate(build_lds_grid(tile_labels), head=32, tail=3))
+
+        if lds_write_map:
+            # Write map: which wave.lane wrote to each LDS slot
+            print()
+            print("=" * 80)
+            print(f"LDS writes -- {name} tile: who wrote each LDS slot (buffer_load...lds)")
+            print(f"  Cell = (wave_id, lane_id) that wrote to that LDS location")
+            print(truncate(build_lds_grid(lds_write_map), head=32, tail=3))
+
+        if lds_read_map:
+            # Read map: which wave.lane(s) read from each LDS slot
+            read_labels = {
+                addr: ",".join(readers)
+                for addr, readers in lds_read_map.items()
+            }
+            print()
+            print("=" * 80)
+            print(f"LDS reads -- {name} tile: who read each LDS slot (ds_read_b128)")
+            print(f"  Cell = (lr_iteration, wave_id, lane_id) that read from that LDS location")
+            print(truncate(build_lds_grid(read_labels), head=32, tail=3))
 
         return lr_map
 
