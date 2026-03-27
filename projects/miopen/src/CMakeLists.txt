@@ -926,7 +926,8 @@ if(MIOPEN_USE_COMPOSABLEKERNEL)
     if(MIOPEN_BUILD_CK )
         # the aliased target doesnt exist when we build CK inline as part of MIOPEN.  The aliased target only is not
         # global when you build it so we dont have access to it.
-        set(MIOPEN_CK_LINK_FLAGS device_conv_operations hip::host)
+        # MIOpen only needs: NHWGC (2D), NDHWGC (3D), old non-grouped, N-d generic, and quantization
+        set(MIOPEN_CK_LINK_FLAGS device_conv2d_nhwgc_operations device_conv3d_ndhwgc_operations device_conv_old_operations device_convnd_generic_operations device_quantization_operations hip::host)
 
         # The include directories also dont propagate correctly when using the non aliased targets.
         # Manually including them fixes this problem for inline builds.
@@ -936,7 +937,8 @@ if(MIOPEN_USE_COMPOSABLEKERNEL)
             ${MIOPEN_CK_LIBRARY_INCLUDE_DIR})
     else()
         # Use the aliased targets when we pull CK from /opt/rocm or other place on disc.
-        set(MIOPEN_CK_LINK_FLAGS composable_kernel::device_conv_operations hip::host)
+        # MIOpen only needs: NHWGC (2D), NDHWGC (3D), old non-grouped, N-d generic, and quantization
+        set(MIOPEN_CK_LINK_FLAGS composable_kernel::device_conv2d_nhwgc_operations composable_kernel::device_conv3d_ndhwgc_operations composable_kernel::device_conv_old_operations composable_kernel::device_convnd_generic_operations composable_kernel::device_quantization_operations hip::host)
         
         if(MIOPEN_CK_BUILDER_EXPERIMENTAL)
             add_definitions(-DCK_EXPERIMENTAL_BUILDER)
