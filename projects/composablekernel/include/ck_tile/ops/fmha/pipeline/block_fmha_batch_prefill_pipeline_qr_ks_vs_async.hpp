@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
+#include "ck_tile/ops/fmha/pipeline/tile_fmha_traits.hpp"
 #include "ck_tile/ops/common/tensor_layout.hpp"
 #include "ck_tile/ops/fmha/block/block_attention_bias_enum.hpp"
 #include "ck_tile/ops/fmha/block/block_attention_kvcache_layout_enum.hpp"
@@ -291,6 +292,10 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
     static constexpr bool kHasDropout       = Problem::kHasDropout;
     static constexpr auto kKVMemoryLayout   = Problem::kKVMemoryLayout;
     static constexpr auto QScaleEnum        = Problem::QScaleEnum;
+    static constexpr FmhaSinkMode kSinkMode = Problem::kSinkMode;
+    static constexpr bool kHasSink          = Problem::kHasSink;
+    static constexpr bool kHasStreamSink    = Problem::kHasStreamSink;
+    static constexpr bool kHasGptOssSink    = Problem::kHasGptOssSink;
 
     // For KV_BLOCKSCALE: shift value for exp2(x + shift) to scale P to [0, 2^shift]
     // This avoids explicit P *= scale_p and v_descale /= scale_p operations
@@ -526,8 +531,9 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
         auto l     = MLBlockTileType{};
 
         clear_tile(o_acc);
-        if(__builtin_isinf_sign(sink_v) >= 0)
+        if constexpr(kHasGptOssSink)
         {
+            // sink_v is always valid when kHasGptOssSink=true; no isinf check needed.
 #if CK_TILE_FMHA_FWD_FAST_EXP2
             if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
                          BiasEnum == BlockAttentionBiasEnum::ALIBI)
@@ -561,7 +567,15 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
                 {
                     auto lse =
                         make_static_distributed_tensor<LSEDataType>(m.get_tile_distribution());
-                    set_tile(lse, SMPLComputeDataType{sink_v * scale_s});
+                    if constexpr(kHasGptOssSink)
+                    {
+                        const SMPLComputeDataType sink_lse = sink_v * scale_s;
+                        set_tile(lse, sink_lse);
+                    }
+                    else
+                    {
+                        set_tile(lse, -numeric<SMPLComputeDataType>::infinity());
+                    }
                     store_tile(lse_dram_window_tmp, tile_elementwise_in(lse_element_func, lse));
                 }
                 buffer_load_fence(0); // rocm-6.1, if whole tile is masked out, need to fence(0)

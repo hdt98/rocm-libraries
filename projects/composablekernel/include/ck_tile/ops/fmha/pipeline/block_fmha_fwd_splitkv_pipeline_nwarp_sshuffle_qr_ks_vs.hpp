@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
+#include "ck_tile/ops/fmha/pipeline/tile_fmha_traits.hpp"
 #include "ck_tile/ops/fmha/block/block_attention_bias_enum.hpp"
 #include "ck_tile/ops/fmha/pipeline/block_fmha_fwd_splitkv_pipeline_nwarp_sshuffle_qr_ks_vs_default_policy.hpp"
 #include "ck_tile/ops/reduce/block/block_reduce.hpp"
@@ -57,7 +58,10 @@ struct BlockFmhaFwdSplitKVPipelineNWarpSShuffleQRKSVS
     static constexpr bool kStoreLSE         = Problem::kStoreLSE;
     static constexpr bool kIsPagedKV        = Problem::kIsPagedKV;
     static constexpr bool kHasUnevenSplits  = Problem::kHasUnevenSplits;
+    static constexpr FmhaSinkMode kSinkMode = Problem::kSinkMode;
     static constexpr bool kHasSink          = Problem::kHasSink;
+    static constexpr bool kHasStreamSink    = Problem::kHasStreamSink;
+    static constexpr bool kHasGptOssSink    = Problem::kHasGptOssSink;
 
     static_assert((CK_TILE_FMHA_FWD_FAST_EXP2 &&
                    (kHasLogitsSoftCap && Problem::BiasEnum == BlockAttentionBiasEnum::NO_BIAS ||
@@ -255,10 +259,18 @@ struct BlockFmhaFwdSplitKVPipelineNWarpSShuffleQRKSVS
         auto l = MLBlockTileType{};
 
         clear_tile(o_acc);
-        if((__builtin_isinf_sign(sink_v) >= 0) && i_split == 0)
+        if constexpr(kHasGptOssSink)
         {
-            set_tile(m, SMPLComputeDataType{sink_v * C_LOG2E});
-            set_tile(l, SMPLComputeDataType{1.0f});
+            if(i_split == 0)
+            {
+                set_tile(m, SMPLComputeDataType{sink_v * C_LOG2E});
+                set_tile(l, SMPLComputeDataType{1.0f});
+            }
+            else
+            {
+                set_tile(m, -numeric<SMPLComputeDataType>::infinity());
+                clear_tile(l);
+            }
         }
         else
         {
@@ -268,7 +280,7 @@ struct BlockFmhaFwdSplitKVPipelineNWarpSShuffleQRKSVS
 
         const auto q_origin          = q_dram_window.get_window_origin();
         const auto tile_range_result = [&mask, &q_origin, num_splits, i_split]() {
-            if constexpr(kHasSink)
+            if constexpr(kHasStreamSink)
                 return mask.GetSinkTileRangeAlongX(
                     q_origin.at(number<0>{}), number<kM0>{}, number<kN0>{}, num_splits, i_split);
             else
@@ -293,7 +305,8 @@ struct BlockFmhaFwdSplitKVPipelineNWarpSShuffleQRKSVS
                 {
                     auto lse_acc =
                         make_static_distributed_tensor<LSEDataType>(m.get_tile_distribution());
-                    set_tile(lse_acc, SMPLComputeDataType{sink_v * scale_s});
+                    const SMPLComputeDataType sink_lse = sink_v * scale_s;
+                    set_tile(lse_acc, sink_lse);
                     if(get_thread_local_1d_id() < kM0)
                     {
                         store_tile(lse_acc_dram_window_tmp,
@@ -310,10 +323,13 @@ struct BlockFmhaFwdSplitKVPipelineNWarpSShuffleQRKSVS
         {
             auto [start, end] = mask.GetTileRangeAlongX(
                 q_origin.at(number<0>{}), number<kM0>{}, number<kN0>{}, num_splits, i_split - 1);
-            if((__builtin_isinf_sign(sink_v) >= 0) && start >= end)
+            if constexpr(kHasGptOssSink)
             {
-                set_tile(m, SMPLComputeDataType{sink_v});
-                set_tile(l, SMPLComputeDataType{1.0f});
+                if(start >= end)
+                {
+                    set_tile(m, SMPLComputeDataType{sink_v});
+                    set_tile(l, SMPLComputeDataType{1.0f});
+                }
             }
         }
         const index_t physical_seqlen_k_start = logical_seqlen_k_start + kv_l2p_offset;
@@ -345,7 +361,7 @@ struct BlockFmhaFwdSplitKVPipelineNWarpSShuffleQRKSVS
 
         const auto bias_origin      = bias_dram_block_window_tmp.get_window_origin();
         const index_t bias_n_offset = [&]() {
-            if constexpr(kHasSink)
+            if constexpr(kHasStreamSink)
                 return kv_load_start;
             else
                 return logical_seqlen_k_start -
@@ -409,7 +425,7 @@ struct BlockFmhaFwdSplitKVPipelineNWarpSShuffleQRKSVS
             clear_tile(s_acc); // initialize C
             const bool is_sink_tile  = ((num_sink_loop - 1) == i_total_loops);
             const auto k_move_offset = [&]() {
-                if constexpr(kHasSink)
+                if constexpr(kHasStreamSink)
                     return is_sink_tile ? logical_seqlen_k_start - sink_seq_end + kN0 : kN0;
                 else
                     return kN0;
@@ -585,7 +601,7 @@ struct BlockFmhaFwdSplitKVPipelineNWarpSShuffleQRKSVS
                             });
                     };
 
-                    if constexpr(kHasSink)
+                    if constexpr(kHasStreamSink)
                     {
                         apply_mask(
                             [&](auto row, auto col) { return mask.IsOutOfSinkBound(row, col); });

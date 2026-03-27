@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
+#include "ck_tile/ops/fmha/pipeline/tile_fmha_traits.hpp"
 #include "ck_tile/ops/fmha/block/block_attention_bias_enum.hpp"
 #include "ck_tile/ops/fmha/block/block_dropout.hpp"
 #include "ck_tile/ops/fmha/block/cast_tile_mx.hpp"
@@ -64,7 +65,10 @@ struct BlockFmhaPipelineQRKSVS
     static constexpr bool kStoreLSE         = Problem::kStoreLSE;
     static constexpr bool kHasDropout       = Problem::kHasDropout;
     static constexpr auto QScaleEnum        = Problem::QScaleEnum;
+    static constexpr FmhaSinkMode kSinkMode = Problem::kSinkMode;
     static constexpr bool kHasSink          = Problem::kHasSink;
+    static constexpr bool kHasStreamSink    = Problem::kHasStreamSink;
+    static constexpr bool kHasGptOssSink    = Problem::kHasGptOssSink;
 
     static constexpr ck_tile::index_t kQKScaleGranularity = Problem::kQKScaleGranularity;
     static constexpr ck_tile::index_t kVScaleGranularity  = Problem::kVScaleGranularity;
@@ -283,8 +287,9 @@ struct BlockFmhaPipelineQRKSVS
         auto l     = MLBlockTileType{};
 
         clear_tile(o_acc);
-        if(__builtin_isinf_sign(sink_v) >= 0)
+        if constexpr(kHasGptOssSink)
         {
+            // sink_v is always valid when kHasGptOssSink=true; no isinf check needed.
 #if CK_TILE_FMHA_FWD_FAST_EXP2
             if constexpr(BiasEnum == BlockAttentionBiasEnum::ALIBI ||
                          BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS)
@@ -304,7 +309,7 @@ struct BlockFmhaPipelineQRKSVS
         const auto q_origin = q_dram_window.get_window_origin();
 
         const auto tile_range_result = [&mask, &q_origin]() {
-            if constexpr(kHasSink)
+            if constexpr(kHasStreamSink)
                 return mask.GetSinkTileRangeAlongX(
                     q_origin.at(number<0>{}), number<kM0>{}, number<kN0>{});
             else
@@ -333,9 +338,12 @@ struct BlockFmhaPipelineQRKSVS
                     auto lse =
                         make_static_distributed_tensor<LSEDataType>(m.get_tile_distribution());
 
-                    if(__builtin_isinf_sign(sink_v) >= 0)
+                    if constexpr(kHasGptOssSink)
                     {
-                        set_tile(lse, SMPLComputeDataType{sink_v * scale_s});
+                        // Precompute sink_lse to avoid sink_v*scale_s in set_tile, which
+                        // triggers a compiler register-allocation bug for dropout kernels.
+                        const SMPLComputeDataType sink_lse = sink_v * scale_s;
+                        set_tile(lse, sink_lse);
                     }
                     else
                     {
@@ -634,7 +642,7 @@ struct BlockFmhaPipelineQRKSVS
 #endif
                 }
             }
-            if constexpr(kHasSink)
+            if constexpr(kHasStreamSink)
             {
                 if(i_total_loops == 0)
                     move_tile_window(bias_dram_window, {0, seqlen_k_start - sink_seq_end});
@@ -665,7 +673,7 @@ struct BlockFmhaPipelineQRKSVS
                             });
                     };
 
-                    if constexpr(kHasSink)
+                    if constexpr(kHasStreamSink)
                     {
                         apply_mask([&](auto&&... args) {
                             return variant.LogitsSinkMask(std::forward<decltype(args)>(args)...);
@@ -804,7 +812,7 @@ struct BlockFmhaPipelineQRKSVS
                 auto randval_ptr = reinterpret_cast<char*>(smem_ptr);
 
                 index_t seq_offset = [&]() {
-                    if constexpr(!kHasSink)
+                    if constexpr(!kHasStreamSink)
                         return seqlen_k_start + i_total_loops * kN0;
 
                     const bool in_sink_phase = (num_sink_loop > i_total_loops);
@@ -945,7 +953,7 @@ struct BlockFmhaPipelineQRKSVS
                 });
             }
             // move K tile windows
-            if constexpr(kHasSink)
+            if constexpr(kHasStreamSink)
             {
                 if(i_total_loops == 0)
                 {
@@ -971,7 +979,31 @@ struct BlockFmhaPipelineQRKSVS
             }
         } while(++i_total_loops < num_total_loop);
 
-        // store lse
+        // finally, O  -- normalize BEFORE storing LSE to avoid VGPR aliasing:
+        // the lse tile creation (below) may reuse o_acc VGPRs; normalizing first
+        // ensures o_acc is fully consumed before those registers can be reused.
+        constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
+
+        sweep_tile_span(o_spans[number<0>{}], [&](auto idx0) {
+            constexpr auto i_idx = make_tuple(idx0);
+            const auto tmp       = [&]() {
+                // When bias carries -inf masks the denominator can be zero; guard the normalization
+                // so we do not divide by zero after a fully masked row.
+                if constexpr(FmhaMask::IsMasking ||
+                             BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS)
+                {
+                    return l[i_idx] == 0.f ? 0.f : 1 / l[i_idx];
+                }
+                else
+                    return 1 / l[i_idx];
+            }();
+            sweep_tile_span(o_spans[number<1>{}], [&](auto idx1) {
+                constexpr auto i_j_idx = make_tuple(idx0, idx1);
+                o_acc(i_j_idx) *= tmp;
+            });
+        });
+
+        // store lse -- AFTER O normalization to prevent VGPR reuse corruption
         if constexpr(kStoreLSE)
         {
             auto lse = make_static_distributed_tensor<LSEDataType>(m.get_tile_distribution());
@@ -1012,28 +1044,6 @@ struct BlockFmhaPipelineQRKSVS
 
             store_tile(lse_dram_window_tmp, tile_elementwise_in(lse_element_func, lse));
         }
-
-        // finally, O
-        constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
-
-        sweep_tile_span(o_spans[number<0>{}], [&](auto idx0) {
-            constexpr auto i_idx = make_tuple(idx0);
-            const auto tmp       = [&]() {
-                // When bias carries -inf masks the denominator can be zero; guard the normalization
-                // so we do not divide by zero after a fully masked row.
-                if constexpr(FmhaMask::IsMasking ||
-                             BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS)
-                {
-                    return l[i_idx] == 0.f ? 0.f : 1 / l[i_idx];
-                }
-                else
-                    return 1 / l[i_idx];
-            }();
-            sweep_tile_span(o_spans[number<1>{}], [&](auto idx1) {
-                constexpr auto i_j_idx = make_tuple(idx0, idx1);
-                o_acc(i_j_idx) *= tmp;
-            });
-        });
 
         o_acc = tile_elementwise_in(o_acc_element_func, o_acc);
 

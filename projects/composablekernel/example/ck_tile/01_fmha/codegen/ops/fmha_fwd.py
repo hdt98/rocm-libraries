@@ -42,6 +42,30 @@ DTYPE_BITS = {
     "mxfp4": 4,
 }
 
+# Maps FmhaSinkMode string values to C++ FmhaSinkMode enum
+SINK_MODE_MAP = {
+    "none": "ck_tile::FmhaSinkMode::kNone",
+    "stream": "ck_tile::FmhaSinkMode::kStreamLLM",
+    "gptoss": "ck_tile::FmhaSinkMode::kGptOss",
+    "both": "ck_tile::FmhaSinkMode::kBoth",
+}
+
+# For backward compat dispatch check: map sink mode to (has_sink, has_gptoss_sink)
+SINK_MODE_DISPATCH_MAP = {
+    "none": ("false", "false"),
+    "stream": ("true", "false"),
+    "gptoss": ("false", "true"),
+    "both": ("true", "true"),
+}
+
+# Legacy sink name suffix for kernel files
+SINK_NAME_MAP = {
+    "none": "_nsink",
+    "stream": "_ssink",
+    "gptoss": "_gsink",
+    "both": "_bsink",
+}
+
 K0_MAX_SUBMAX_MAP = {
     32: 32,
     48: 48,
@@ -88,7 +112,7 @@ using fmha_traits = ck_tile::TileFmhaTraits<{F_spad},
                                             {F_qscale},
                                             {F_occupancy},
                                             {F_skip},
-                                            {F_sink}>;
+                                            {F_sink_mode}>;
 
 using fmha_variant = ck_tile::ComposedAttention<{F_logits} * ck_tile::LOGITS_SOFT_CAP, CK_TILE_FMHA_FWD_FAST_EXP2>;
 
@@ -125,7 +149,7 @@ using fmha_kernel = {F_kernel}<fmha_pipeline, fmha_epilogue>;
 
 
 using trait = fmha_fwd_traits_<{F_hdim}, {F_dtype}, {F_mode},{F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout},
-                        {F_pipeline_enum}, {F_logits}, fmha_mask, {F_bias}, {F_lse}, {F_dropout}, {F_qscale}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, {F_trload}, {F_skip}, {F_sink}>;
+                        {F_pipeline_enum}, {F_logits}, fmha_mask, {F_bias}, {F_lse}, {F_dropout}, {F_qscale}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, {F_trload}, {F_skip}, {F_sink_mode}>;
 
 template<>
 float fmha_fwd_<trait, {F_arch.tag}>(const ck_tile::stream_config& s, fmha_fwd_args a)
@@ -240,9 +264,9 @@ FMHA_FWD_API_PER_HDIM_CASE = """{F_if}(t.hdim_q <= {F_hdim} && t.hdim_v <= {F_hd
 }}
 """
 
-FMHA_FWD_API_INNER_DISPATCH = """{F_if}((t.is_group_mode == {F_mode}) && (t.is_v_rowmajor == {F_vlayout}) && (t.has_logits_soft_cap == {F_logits}) && ({F_mask_check}) && (t.bias_type == {F_bias_check}) && (t.has_lse == {F_lse})  && (t.has_dropout == {F_dropout}) && (t.qscale_type == {F_qscale_check}) && (t.skip_min_seqlen_q == {F_skip}) &&(t.has_sink == {F_sink}) &&
+FMHA_FWD_API_INNER_DISPATCH = """{F_if}((t.is_group_mode == {F_mode}) && (t.is_v_rowmajor == {F_vlayout}) && (t.has_logits_soft_cap == {F_logits}) && ({F_mask_check}) && (t.bias_type == {F_bias_check}) && (t.has_lse == {F_lse})  && (t.has_dropout == {F_dropout}) && (t.qscale_type == {F_qscale_check}) && (t.skip_min_seqlen_q == {F_skip}) && (t.has_sink == {F_stream_sink}) && (t.has_gptoss_sink == {F_gptoss_sink}) &&
         ({F_scheck}) && ({F_seqtune}) && ({F_skcheck}) && ({F_dcheck}) && ({F_dvcheck}) && ({F_constraint})) {{
-    using trait_ = fmha_fwd_traits_<{F_hdim}, {F_dtype}, {F_mode}, {F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout}, {F_pipeline_enum}, {F_logits}, {F_mask}, {F_bias}, {F_lse}, {F_dropout}, {F_qscale}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, {F_trload}, {F_skip}, {F_sink}>;
+    using trait_ = fmha_fwd_traits_<{F_hdim}, {F_dtype}, {F_mode}, {F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout}, {F_pipeline_enum}, {F_logits}, {F_mask}, {F_bias}, {F_lse}, {F_dropout}, {F_qscale}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, {F_trload}, {F_skip}, {F_sink_mode}>;
     return fmha_fwd_<trait_, {F_arch.tag}>(s, a);
 }}
 """
@@ -396,7 +420,7 @@ class FmhaFwdPipeline:
     F_mask: str  # value from MASK_MAP
     F_skip: str  # true/false
     F_trload: str  # true/false
-    F_sink: str  # true/false
+    F_sink: str  # "none" / "stream" / "gptoss" / "both"
     F_constraint: CppConstraint = field(default_factory=lambda: CppConstraint())
 
     @property
@@ -467,10 +491,7 @@ class FmhaFwdPipeline:
             n += "_trload"
         else:
             n += "_ntrload"
-        if self.F_sink == "t":
-            n += "_sink"
-        else:
-            n += "_nsink"
+        n += SINK_NAME_MAP[self.F_sink]
 
         return n
 
@@ -560,7 +581,9 @@ class FmhaFwdApiPool:
                             F_trload=BOOL_MAP[trait.tr_load],
                             F_qscale_check=QSCALE_CHECK_MAP[trait.qscale],
                             F_qscale=QSCALE_MAP[trait.qscale],
-                            F_sink=BOOL_MAP[trait.sink],
+                            F_sink_mode=SINK_MODE_MAP[trait.sink],
+                            F_stream_sink=SINK_MODE_DISPATCH_MAP[trait.sink][0],
+                            F_gptoss_sink=SINK_MODE_DISPATCH_MAP[trait.sink][1],
                             F_scheck=trait.scheck,
                             F_seqtune=trait.seqtune(max_bm0),
                             F_skcheck=trait.skcheck,
@@ -701,7 +724,7 @@ class FmhaFwdKernel:
             F_pipeline=PIPELINE_MAP[self.F_pipeline.tag],
             F_kernel=self._get_cpp_kernel_class_name(self.F_pipeline.tag),
             F_kargs_creator=self._get_cpp_kargs_creator_func_name(self.F_pipeline.tag),
-            F_sink=BOOL_MAP[self.F_pipeline.F_sink],
+            F_sink_mode=SINK_MODE_MAP[self.F_pipeline.F_sink],
         )
 
     @property
@@ -974,7 +997,7 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
     #       support this in future
     @classmethod
     def get_pipelines(
-        cls, dtype, hdim, hdim_v, receipt, mask_impl
+        cls, dtype, hdim, hdim_v, receipt, mask_impl, sink_modes=("none",)
     ) -> List[FmhaFwdPipeline]:
         # this function will populate a list possible pipelines
         # TODO: the order of List matters! the later in this list will be also be checked later
@@ -990,7 +1013,7 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                 ["t", "f"],
                 ["t", "f"],
                 ["t", "f"],
-                ["t", "f"],
+                sink_modes,
             ):
                 pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
                 pipelines.append(FmhaFwdPipeline("qr", "row", "f", "t", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
@@ -1004,7 +1027,7 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                 ["t", "f"],
                 ["t", "f"],
                 ["t", "f"],
-                ["t", "f"],
+                sink_modes,
             ):
                 if hdim == 256 and hdim_v == 256:
                     pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
@@ -1014,6 +1037,14 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                 else:
                     if bias == "bias":
                         # TODO: rocm 6.2 compiler problem if using qr_async for bias case
+                        pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
+                        pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
+                    elif mask not in ("s_no", "no") and (
+                        (bias == "no" and dropout == "t")
+                        or (bias == "alibi" and dropout == "f")
+                    ):
+                        # TODO: compiler problem with qr_async for IsMasking=true +
+                        # (no_bias+dropout) or (alibi+ndropout) combinations
                         pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
                         pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
                     else:
@@ -1028,7 +1059,7 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                 ["no", "pertensor", "blockscale"],
                 get_mask_map(mask_impl).keys(),
                 ["no"],
-                ["f", "t"],
+                sink_modes,
             ):
                 if hdim == 64:
                     pipelines.append(FmhaFwdPipeline("qr", "row", "t", "f", "t", "t", logits, bias, "f", "f", qscale, mask, "f", "f", sink))  # fmt: skip
@@ -1079,10 +1110,10 @@ class KernelComponentFactoryGfx950(
 
     @classmethod
     def get_pipelines(
-        cls, dtype, hdim, hdim_v, receipt, mask_impl
+        cls, dtype, hdim, hdim_v, receipt, mask_impl, sink_modes=("none",)
     ) -> List[FmhaFwdPipeline]:
         pipelines = KernelComponentFactoryGfx9.get_pipelines(
-            dtype, hdim, hdim_v, receipt, mask_impl
+            dtype, hdim, hdim_v, receipt, mask_impl, sink_modes
         )
         if dtype in cls._DT_FP16_BF16:
             qscale = "no"
@@ -1093,7 +1124,7 @@ class KernelComponentFactoryGfx950(
                 ["t", "f"],
                 ["t", "f"],
                 ["t", "f"],
-                ["t", "f"],
+                sink_modes,
             ):
                 if (
                     (hdim, hdim_v) in [(64, 64), (128, 128)]
@@ -1110,7 +1141,7 @@ class KernelComponentFactoryGfx950(
                 # qr_async_trload_v3 only supports (generic) causal mask
                 for logits, mask in itertools.product(["t", "f"], ["no", "causal"]):
                     pipelines.append(FmhaFwdPipeline("qr_async_trload_v3", "row", "t", "t", "f", "f",
-                        F_logits=logits, F_bias="no", F_lse="f", F_dropout="f", F_qscale=qscale, F_mask=mask, F_skip="f", F_trload="t", F_sink="f"))  # fmt: skip
+                        F_logits=logits, F_bias="no", F_lse="f", F_dropout="f", F_qscale=qscale, F_mask=mask, F_skip="f", F_trload="t", F_sink="none"))  # fmt: skip
 
         elif dtype in cls._DT_MXFP8 or dtype in cls._DT_MXFP4:
             # no need dropout kernels
@@ -1121,7 +1152,7 @@ class KernelComponentFactoryGfx950(
                 ["mx"],
                 get_mask_map(mask_impl).keys(),
                 ["no"],
-                ["f", "t"],
+                sink_modes,
             ):
                 pipelines.append(FmhaFwdPipeline("qr", "col", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, "f", "f", sink))  # fmt: skip
                 pipelines.append(FmhaFwdPipeline("qr", "col", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, "f", "f", sink))  # fmt: skip
@@ -1158,7 +1189,7 @@ class KernelComponentFactoryGfx11(CompatibilityRuleFactory):
 
     @classmethod
     def get_pipelines(
-        cls, dtype, hdim, hdim_v, receipt, mask_impl
+        cls, dtype, hdim, hdim_v, receipt, mask_impl, sink_modes=("none",)
     ) -> List[FmhaFwdPipeline]:
         pipelines = []
         if dtype in cls._DT_FP16_BF16:
@@ -1170,7 +1201,7 @@ class KernelComponentFactoryGfx11(CompatibilityRuleFactory):
                 ["t", "f"],
                 ["t", "f"],
                 ["t", "f"],
-                ["t", "f"],
+                sink_modes,
             ):
                 # Keep only ttff/tttt for gfx11: ffff path is often similar or worse
                 # pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
@@ -1230,7 +1261,7 @@ class KernelComponentFactoryGfx12(CompatibilityRuleFactory):
 
     @classmethod
     def get_pipelines(
-        cls, dtype, hdim, hdim_v, receipt, mask_impl
+        cls, dtype, hdim, hdim_v, receipt, mask_impl, sink_modes=("none",)
     ) -> List[FmhaFwdPipeline]:
         pipelines = []
         if dtype in cls._DT_FP16_BF16:
@@ -1242,22 +1273,23 @@ class KernelComponentFactoryGfx12(CompatibilityRuleFactory):
                 ["t", "f"],
                 ["t", "f"],
                 ["t", "f"],
-                ["t", "f"],
+                sink_modes,
             ):
                 pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
                 pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
                 pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
         elif dtype in cls._DT_FP8_FP8BF16 or dtype in cls._DT_FP8FP32:
             # no need lse/dropout kernels
-            for logits, qscale, mask, bias in itertools.product(
+            for logits, qscale, mask, bias, sink in itertools.product(
                 ["f"],
                 ["no", "pertensor", "blockscale"],
                 get_mask_map(mask_impl).keys(),
                 ["no"],
+                sink_modes,
             ):
-                pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, "f", "f", qscale, mask, "f", "f", "f"))  # fmt: skip
-                pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "f", "f", logits, bias, "f", "f", qscale, mask, "f", "f", "f"))  # fmt: skip
-                pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, "f", "f", qscale, mask, "f", "f", "f"))  # fmt: skip
+                pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, "f", "f", qscale, mask, "f", "f", sink))  # fmt: skip
+                pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "f", "f", logits, bias, "f", "f", qscale, mask, "f", "f", sink))  # fmt: skip
+                pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, "f", "f", qscale, mask, "f", "f", sink))  # fmt: skip
         return pipelines
 
 
@@ -1311,7 +1343,7 @@ def get_product(receipt: int) -> Product:
             cond &= kernel_ctx.pipeline.F_bias in ["no", "alibi"]
             cond &= kernel_ctx.pipeline.F_qscale == "no"
             cond &= kernel_ctx.pipeline.F_skip == "f"
-            cond &= kernel_ctx.pipeline.F_sink == "f"
+            cond &= kernel_ctx.pipeline.F_sink == "none"
             return cond
 
         return Product(name="Flash attention integration", rule=fit)
@@ -1408,7 +1440,12 @@ def get_product(receipt: int) -> Product:
 
 
 def get_fwd_blobs(
-    targets: List[str], kernel_filter: Optional[str], receipt, optdim_list, mask_impl
+    targets: List[str],
+    kernel_filter: Optional[str],
+    receipt,
+    optdim_list,
+    mask_impl,
+    sink_modes=("none",),
 ) -> Tuple[FmhaFwdApiPool, List[FmhaFwdKernel]]:
     gen = list()
     api_pool = FmhaFwdApiPool()
@@ -1430,7 +1467,10 @@ def get_fwd_blobs(
                 )
 
             for tile, pipeline in itertools.product(
-                tiles, factory.get_pipelines(dtype, hdim, hdim_v, receipt, mask_impl)
+                tiles,
+                factory.get_pipelines(
+                    dtype, hdim, hdim_v, receipt, mask_impl, sink_modes
+                ),
             ):
                 problem_ctx = ProblemContext(
                     dtype=dtype, mode=mode, hdim=hdim, hdim_v=hdim_v
@@ -1493,9 +1533,10 @@ def write_blobs(
     receipt,
     optdim_list,
     mask_impl,
+    sink_modes=("none",),
 ) -> None:
     api_pool, kernels = get_fwd_blobs(
-        targets, kernel_filter, receipt, optdim_list, mask_impl
+        targets, kernel_filter, receipt, optdim_list, mask_impl, sink_modes
     )
     for kernel in kernels:
         write_single_fwd_kernel(kernel, output_dir)
@@ -1509,10 +1550,11 @@ def list_blobs(
     receipt,
     optdim_list,
     mask_impl,
+    sink_modes=("none",),
 ) -> None:
     with file_path.open("a") as f:
         _, kernels = get_fwd_blobs(
-            targets, kernel_filter, receipt, optdim_list, mask_impl
+            targets, kernel_filter, receipt, optdim_list, mask_impl, sink_modes
         )
         for kernel in kernels:
             f.write((file_path.parent / GEN_DIR / kernel.filename).as_posix() + "\n")

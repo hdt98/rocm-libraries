@@ -43,13 +43,23 @@ set_directory_properties(PROPERTIES CMAKE_CONFIGURE_DEPENDS "${CODE_GEN_SCRIPTS}
 list(JOIN INST_TARGETS , FMHA_TARGETS_ARG)
 
 string(REPLACE ";" "," FMHA_FWD_APIS "${FMHA_FWD_ENABLE_APIS}")
+set(FMHA_FWD_OPTDIM "32,64,80,128,256" CACHE STRING
+  "comma-separated list of hdim values to optimize for")
+set(FMHA_FWD_FILTER "" CACHE STRING
+  "fnmatch filter pattern for fwd kernel instances. Empty = no filter.")
+set(FMHA_FWD_SINK_MODES "none" CACHE STRING
+  "comma-separated list of sink modes to generate (none,stream,gptoss,both). Default: none.")
+
 set(FMHA_FWD_CODE_GEN_COMMON_ARGS
   ${CMAKE_CURRENT_LIST_DIR}/generate.py
   --targets ${FMHA_TARGETS_ARG}
   --api ${FMHA_FWD_APIS}
-  --optdim 32,64,80,128,256
-  # --filter fmha_fwd...
+  --optdim ${FMHA_FWD_OPTDIM}
+  --sink ${FMHA_FWD_SINK_MODES}
 )
+if(FMHA_FWD_FILTER)
+  list(APPEND FMHA_FWD_CODE_GEN_COMMON_ARGS --filter ${FMHA_FWD_FILTER})
+endif()
 set(FMHA_BWD_CODE_GEN_COMMON_ARGS
   ${CMAKE_CURRENT_LIST_DIR}/generate.py
   --targets ${FMHA_TARGETS_ARG}
@@ -98,6 +108,7 @@ add_custom_command(
   --output_dir ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${CODE_GEN_SCRIPTS}
   COMMENT "Generate CK Tile FMHA FWD kernels"
+  VERBATIM
 )
 
 add_custom_command(

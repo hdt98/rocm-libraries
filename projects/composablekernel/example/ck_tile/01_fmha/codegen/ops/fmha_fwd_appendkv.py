@@ -493,6 +493,7 @@ def write_blobs(
     receipt,
     optdim_list,
     mask_impl,
+    sink_modes=("none",),
 ) -> None:
     api_pool, kernels = get_fwd_appendkv_blobs(
         targets, kernel_filter, receipt, mask_impl, optdim_list
@@ -509,6 +510,7 @@ def list_blobs(
     receipt,
     optdim_list,
     mask_impl,
+    sink_modes=("none",),
 ) -> None:
     with file_path.open("a") as f:
         _, kernels = get_fwd_appendkv_blobs(
@@ -516,4 +518,7 @@ def list_blobs(
         )
         for kernel in kernels:
             f.write((file_path.parent / GEN_DIR / kernel.filename).as_posix() + "\n")
-        f.write((file_path.parent / GEN_DIR / FMHA_FWD_APPENDKV_API_FILENAME).as_posix() + "\n")
+        f.write(
+            (file_path.parent / GEN_DIR / FMHA_FWD_APPENDKV_API_FILENAME).as_posix()
+            + "\n"
+        )

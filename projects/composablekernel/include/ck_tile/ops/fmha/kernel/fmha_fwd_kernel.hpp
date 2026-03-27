@@ -8,6 +8,7 @@
 #include "ck_tile/ops/fmha/block/block_attention_bias_enum.hpp"
 #include "ck_tile/ops/fmha/block/block_attention_quant_scale_enum.hpp"
 #include "ck_tile/ops/fmha/block/variants.hpp"
+#include "ck_tile/ops/fmha/pipeline/tile_fmha_traits.hpp"
 
 #include <string>
 #include <type_traits>
@@ -67,7 +68,10 @@ struct FmhaFwdKernel
     static constexpr bool kHasDropout       = FmhaPipeline::kHasDropout;
     static constexpr auto QScaleEnum        = FmhaPipeline::Problem::QScaleEnum;
     static constexpr bool kSkipMinSeqlenQ   = FmhaPipeline::Problem::kSkipMinSeqlenQ;
+    static constexpr FmhaSinkMode kSinkMode = FmhaPipeline::kSinkMode;
     static constexpr bool kHasSink          = FmhaPipeline::kHasSink;
+    static constexpr bool kHasStreamSink    = FmhaPipeline::kHasStreamSink;
+    static constexpr bool kHasGptOssSink    = FmhaPipeline::kHasGptOssSink;
 
     using AttentionVariant = ck_tile::remove_cvref_t<typename FmhaPipeline::AttentionVariant>;
     using FmhaMask         = ck_tile::remove_cvref_t<typename FmhaPipeline::FmhaMask>;
@@ -1439,10 +1443,14 @@ struct FmhaFwdKernel
             long_index_t batch_offset_q_descale = 0;
             long_index_t batch_offset_k_descale = 0;
             long_index_t batch_offset_v_descale = 0;
-            const float sink_value =
-                kargs.sink_ptr != nullptr
-                    ? (*(static_cast<const float*>(kargs.sink_ptr) + i_nhead)) / kargs.scale_s
-                    : -numeric<float>::infinity();
+            // GPT-OSS sink value: only computed and passed when kHasGptOssSink=true.
+            // When kHasGptOssSink=false, pipelines do not use sink_value at all.
+            const float sink_value = [&]() {
+                if constexpr(kHasGptOssSink)
+                    return (*(static_cast<const float*>(kargs.sink_ptr) + i_nhead)) / kargs.scale_s;
+                else
+                    return -numeric<float>::infinity();
+            }();
 
             if constexpr(kIsGroupMode)
             {
@@ -2184,10 +2192,12 @@ struct FmhaFwdKernel
             constexpr bool PrefillCase = FmhaPipeline::kM0 > 64;
             // divide problem
             const auto [i_tile_m, i_tile_n, i_nhead, i_batch] = GetTileIndex(kargs);
-            const float sink_value =
-                kargs.sink_ptr != nullptr
-                    ? (*(static_cast<const float*>(kargs.sink_ptr) + i_nhead)) / kargs.scale_s
-                    : -numeric<float>::infinity();
+            const float sink_value                            = [&]() {
+                if constexpr(kHasGptOssSink)
+                    return (*(static_cast<const float*>(kargs.sink_ptr) + i_nhead)) / kargs.scale_s;
+                else
+                    return -numeric<float>::infinity();
+            }();
 
             const index_t i_m0 = i_tile_m * FmhaPipeline::kM0;
             const index_t i_n1 = i_tile_n * FmhaPipeline::kN1;

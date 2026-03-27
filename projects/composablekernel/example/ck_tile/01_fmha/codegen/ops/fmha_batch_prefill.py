@@ -828,6 +828,7 @@ def write_blobs(
     receipt,
     optdim_list,
     mask_impl,
+    sink_modes=("none",),
 ) -> None:
     api_pool, kernels = get_fwd_blobs(kernel_filter, receipt, optdim_list, mask_impl)
     for kernel in kernels:
@@ -842,6 +843,7 @@ def list_blobs(
     receipt,
     optdim_list,
     mask_impl,
+    sink_modes=("none",),
 ) -> None:
     with file_path.open("a") as f:
         _, kernels = get_fwd_blobs(kernel_filter, receipt, optdim_list, mask_impl)

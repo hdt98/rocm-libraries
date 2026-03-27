@@ -34,6 +34,27 @@ from codegen.ops.fmha_fwd import (
 )
 
 
+SINK_MODE_MAP = {
+    "none": "ck_tile::FmhaSinkMode::kNone",
+    "stream": "ck_tile::FmhaSinkMode::kStreamLLM",
+    "gptoss": "ck_tile::FmhaSinkMode::kGptOss",
+    "both": "ck_tile::FmhaSinkMode::kBoth",
+}
+
+SINK_MODE_DISPATCH_MAP = {
+    "none": ("false", "false"),
+    "stream": ("true", "false"),
+    "gptoss": ("false", "true"),
+    "both": ("true", "true"),
+}
+
+SINK_NAME_MAP = {
+    "none": "_nsink",
+    "stream": "_ssink",
+    "gptoss": "_gsink",
+    "both": "_bsink",
+}
+
 FMHA_FWD_PAGEDKV_PIPELINE_MAP = {
     "qr_pagedkv": "ck_tile::BlockFmhaFwdPagedKVPipelineQRKSVS"
 }
@@ -66,7 +87,7 @@ using fmha_trait_{F_idx} = ck_tile::TileFmhaFwdPagedKVTraits<{F_spad},
                                                              {F_squant},
                                                              {F_occupancy},
                                                              {F_skip},
-                                                             {F_sink}>;
+                                                             {F_sink_mode}>;
 
 using fmha_variant_{F_idx} = ck_tile::ComposedAttention<{F_logits} * ck_tile::LOGITS_SOFT_CAP, CK_TILE_FMHA_FWD_FAST_EXP2>;
 
@@ -101,7 +122,7 @@ using fmha_kernel_{F_idx} =
     ck_tile::FmhaFwdPagedKVKernel<fmha_pipeline_{F_idx}, fmha_epilogue_{F_idx}>;
 
 using trait_{F_idx} = fmha_fwd_pagedkv_traits_<{F_hdim}, {F_dtype}, {F_mode},{F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout},
-                        {F_pipeline_enum}, {F_logits}, fmha_mask_{F_idx}, {F_bias}, {F_lse}, {F_pagedkv}, {F_squant}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, {F_skip}, {F_sink}>;
+                        {F_pipeline_enum}, {F_logits}, fmha_mask_{F_idx}, {F_bias}, {F_lse}, {F_pagedkv}, {F_squant}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, {F_skip}, {F_sink_mode}>;
 
 template<>
 float fmha_fwd_pagedkv_<trait_{F_idx}, {F_arch.tag}>(const ck_tile::stream_config& s, fmha_fwd_pagedkv_args a)
@@ -130,9 +151,9 @@ float fmha_fwd_pagedkv(fmha_fwd_pagedkv_traits& t, fmha_fwd_pagedkv_args& a, con
 }}
 """
 
-FMHA_FWD_API_INNER_DISPATCH = """{F_if}((t.is_group_mode == {F_mode}) && (t.is_v_rowmajor == {F_vlayout}) && (t.has_logits_soft_cap == {F_logits}) && ({F_mask_check}) && (t.bias_type == {F_bias_check}) && (t.has_lse == {F_lse})  && (t.use_pagedkv == {F_pagedkv}) && (t.do_fp8_static_quant == {F_squant}) && (t.skip_min_seqlen_q == {F_skip}) && (t.has_sink == {F_sink}) &&
+FMHA_FWD_API_INNER_DISPATCH = """{F_if}((t.is_group_mode == {F_mode}) && (t.is_v_rowmajor == {F_vlayout}) && (t.has_logits_soft_cap == {F_logits}) && ({F_mask_check}) && (t.bias_type == {F_bias_check}) && (t.has_lse == {F_lse})  && (t.use_pagedkv == {F_pagedkv}) && (t.do_fp8_static_quant == {F_squant}) && (t.skip_min_seqlen_q == {F_skip}) && (t.has_sink == {F_stream_sink}) && (t.has_gptoss_sink == {F_gptoss_sink}) &&
         ({F_scheck}) && ({F_skcheck}) && ({F_dcheck}) && ({F_dvcheck})) {{
-    using trait_ = fmha_fwd_pagedkv_traits_<{F_hdim}, {F_dtype}, {F_mode}, {F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout}, {F_pipeline_enum}, {F_logits}, {F_mask}, {F_bias}, {F_lse}, {F_pagedkv}, {F_squant}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, {F_skip},{F_sink}>;
+    using trait_ = fmha_fwd_pagedkv_traits_<{F_hdim}, {F_dtype}, {F_mode}, {F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout}, {F_pipeline_enum}, {F_logits}, {F_mask}, {F_bias}, {F_lse}, {F_pagedkv}, {F_squant}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, {F_skip},{F_sink_mode}>;
     return fmha_fwd_pagedkv_<trait_, {F_arch.tag}>(s, a);
 }}
 """
@@ -258,7 +279,7 @@ class FmhaFwdPipeline:
     F_squant: str  #
     F_mask: str  # value from MASK_MAP
     F_skip: str  # true/false
-    F_sink: str  # true/false
+    F_sink: str  # "none" / "stream" / "gptoss" / "both"
 
     @property
     def name(self) -> str:
@@ -323,10 +344,7 @@ class FmhaFwdPipeline:
             n += "_pagedkv"
         else:
             n += "_npagedkv"
-        if self.F_sink == "t":
-            n += "_sink"
-        else:
-            n += "_nsink"
+        n += SINK_NAME_MAP[self.F_sink]
 
         return n
 
@@ -370,7 +388,9 @@ class FmhaFwdApiPool:
                             F_lse=BOOL_MAP[trait.lse],
                             F_pagedkv=BOOL_MAP[trait.pagedkv],
                             F_skip=BOOL_MAP[trait.skip],
-                            F_sink=BOOL_MAP[trait.sink],
+                            F_sink_mode=SINK_MODE_MAP[trait.sink],
+                            F_stream_sink=SINK_MODE_DISPATCH_MAP[trait.sink][0],
+                            F_gptoss_sink=SINK_MODE_DISPATCH_MAP[trait.sink][1],
                             F_squant=BOOL_MAP[trait.squant],
                             F_scheck=trait.scheck,
                             F_skcheck=trait.skcheck,
@@ -488,7 +508,7 @@ class FmhaFwdKernel:
             F_pagedkv=BOOL_MAP[self.F_pipeline.F_pagedkv],
             F_squant=BOOL_MAP[self.F_pipeline.F_squant],
             F_skip=BOOL_MAP[self.F_pipeline.F_skip],
-            F_sink=BOOL_MAP[self.F_pipeline.F_sink],
+            F_sink_mode=SINK_MODE_MAP[self.F_pipeline.F_sink],
             F_occupancy=self.F_tile.F_occupancy,
             F_pipeline_enum=PIPELINE_ENUM_MAP[self.F_pipeline.tag],
             F_mask=get_mask_map(self.mask_impl)[self.F_pipeline.F_mask],
@@ -541,7 +561,9 @@ class FmhaFwdKernel:
 
 class KernelComponentFactoryBase:
     @staticmethod
-    def get_pipelines(dtype, hdim, mask_impl) -> List[FmhaFwdPipeline]:
+    def get_pipelines(
+        dtype, hdim, mask_impl, sink_modes=("none",)
+    ) -> List[FmhaFwdPipeline]:
         # this function will populate a list possible pipelines
         # TODO: the order of List matters! the later in this list will be also be checked later
         # TODO: currently for qr_pagedkv pipeline, let "t" padding to appear later!!
@@ -555,17 +577,17 @@ class KernelComponentFactoryBase:
                 BIAS_MAP.keys(),
                 ["t"],
                 ["f"],
-                ["t", "f"],
+                sink_modes,
             ):
                 pipelines.append(FmhaFwdPipeline("qr_pagedkv", "row", "t", "f", "f", "f", logits, bias, "f", pagedkv, squant, mask, skip, sink))  # fmt: skip
                 pipelines.append(FmhaFwdPipeline("qr_pagedkv", "row", "t", "t", "f", "f", logits, bias, "f", pagedkv, squant, mask, skip, sink))  # fmt: skip
         elif dtype in ["fp8", "bf8"]:
             # no need lse/dropout kernels
-            for logits, mask, bias in itertools.product(
-                ["t", "f"], get_mask_map(mask_impl).keys(), BIAS_MAP.keys()
+            for logits, mask, bias, sink in itertools.product(
+                ["t", "f"], get_mask_map(mask_impl).keys(), BIAS_MAP.keys(), sink_modes
             ):
-                pipelines.append(FmhaFwdPipeline("qr_pagedkv", "row", "f", "f", "f", "f", logits, bias, "f", "t", squant, mask, "f", "f"))  # fmt: skip
-                pipelines.append(FmhaFwdPipeline("qr_pagedkv", "row", "t", "t", "f", "f", logits, bias, "f", "t", squant, mask, "f", "f"))  # fmt: skip
+                pipelines.append(FmhaFwdPipeline("qr_pagedkv", "row", "f", "f", "f", "f", logits, bias, "f", "t", squant, mask, "f", sink))  # fmt: skip
+                pipelines.append(FmhaFwdPipeline("qr_pagedkv", "row", "t", "t", "f", "f", logits, bias, "f", "t", squant, mask, "f", sink))  # fmt: skip
         elif dtype in ["fp8fp16", "fp8bf16"]:
             pass  # TODO
         else:
@@ -655,7 +677,12 @@ def get_factory(target: str):
 
 
 def get_fwd_blobs(
-    targets: List[str], kernel_filter: Optional[str], receipt, optdim_list, mask_impl
+    targets: List[str],
+    kernel_filter: Optional[str],
+    receipt,
+    optdim_list,
+    mask_impl,
+    sink_modes=("none",),
 ) -> Tuple[FmhaFwdApiPool, List[FmhaFwdKernel]]:
     gen = list()
     api_pool = FmhaFwdApiPool(mask_impl)
@@ -669,7 +696,7 @@ def get_fwd_blobs(
         for hdim_str, mode in itertools.product(d.keys(), MODE_MAP.keys()):
             tile = d[hdim_str]
             hdim = int(hdim_str)
-            for pipeline in factory.get_pipelines(dtype, hdim, mask_impl):
+            for pipeline in factory.get_pipelines(dtype, hdim, mask_impl, sink_modes):
                 # if pipeline.F_pagedkv == "f":
                 #     continue
                 if mode == "group":
@@ -709,7 +736,7 @@ def get_fwd_blobs(
                     cond &= pipeline.F_bias in ["no", "alibi"]
                     cond &= pipeline.F_squant == "f"
                     cond &= pipeline.F_skip == "f"
-                    cond &= pipeline.F_sink == "f"
+                    cond &= pipeline.F_sink == "none"
                     if not cond:
                         continue
                 # PyTorch integration
@@ -719,7 +746,7 @@ def get_fwd_blobs(
                     cond &= pipeline.F_bias in ["no", "bias"]
                     cond &= pipeline.F_squant == "f"
                     cond &= pipeline.F_skip == "f"
-                    cond &= pipeline.F_sink == "f"
+                    cond &= pipeline.F_sink == "none"
                     if not cond:
                         continue
                 # Aiter(mha_fwd) integration
@@ -773,9 +800,10 @@ def write_blobs(
     receipt,
     optdim_list,
     mask_impl,
+    sink_modes=("none",),
 ) -> None:
     api_pool, kernels = get_fwd_blobs(
-        targets, kernel_filter, receipt, optdim_list, mask_impl
+        targets, kernel_filter, receipt, optdim_list, mask_impl, sink_modes
     )
     for kernel in kernels:
         write_single_fwd_kernel(kernel, output_dir)
@@ -789,10 +817,11 @@ def list_blobs(
     receipt,
     optdim_list,
     mask_impl,
+    sink_modes=("none",),
 ) -> None:
     with file_path.open("a") as f:
         _, kernels = get_fwd_blobs(
-            targets, kernel_filter, receipt, optdim_list, mask_impl
+            targets, kernel_filter, receipt, optdim_list, mask_impl, sink_modes
         )
         for kernel in kernels:
             f.write((file_path.parent / GEN_DIR / kernel.filename).as_posix() + "\n")

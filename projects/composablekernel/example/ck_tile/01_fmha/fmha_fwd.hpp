@@ -1393,8 +1393,8 @@ template <ck_tile::index_t HDim_,
           bool kPadD_,
           bool kPadDv_,
           bool kUseTrLoad_,
-          bool kSkipMinSeqlenQ_ = false,
-          bool kHasSink_        = false>
+          bool kSkipMinSeqlenQ_            = false,
+          ck_tile::FmhaSinkMode kSinkMode_ = ck_tile::FmhaSinkMode::kNone>
 struct fmha_fwd_traits_
 {
     static constexpr ck_tile::index_t HDim           = HDim_;
@@ -1420,7 +1420,12 @@ struct fmha_fwd_traits_
     static constexpr bool kPadDv                     = kPadDv_;
     static constexpr bool kUseTrLoad                 = kUseTrLoad_;
     static constexpr bool kSkipMinSeqlenQ            = kSkipMinSeqlenQ_;
-    static constexpr bool kHasSink                   = kHasSink_;
+    static constexpr ck_tile::FmhaSinkMode kSinkMode = kSinkMode_;
+    static constexpr bool kHasSink                   = (kSinkMode != ck_tile::FmhaSinkMode::kNone);
+    static constexpr bool kHasStreamSink = (kSinkMode == ck_tile::FmhaSinkMode::kStreamLLM ||
+                                            kSinkMode == ck_tile::FmhaSinkMode::kBoth);
+    static constexpr bool kHasGptOssSink =
+        (kSinkMode == ck_tile::FmhaSinkMode::kGptOss || kSinkMode == ck_tile::FmhaSinkMode::kBoth);
 };
 
 template <ck_tile::index_t HDim_,
@@ -1474,7 +1479,7 @@ struct fmha_fwd_batch_prefill_traits_ : public fmha_fwd_traits_<HDim_,
                                                                 kPadDv_,
                                                                 kUseTrLoad_,
                                                                 kSkipMinSeqlenQ_,
-                                                                false>
+                                                                ck_tile::FmhaSinkMode::kNone>
 {
     static constexpr auto kKVMemoryLayout            = kKVMemoryLayout_;
     static constexpr auto kKVLookupTable             = kKVLookupTable_;
@@ -1506,8 +1511,8 @@ template <ck_tile::index_t HDim_,
           bool kPadSK_,
           bool kPadD_,
           bool kPadDv_,
-          bool kSkipMinSeqlenQ_ = false,
-          bool kHasSink_        = false>
+          bool kSkipMinSeqlenQ_            = false,
+          ck_tile::FmhaSinkMode kSinkMode_ = ck_tile::FmhaSinkMode::kNone>
 struct fmha_fwd_pagedkv_traits_
 {
     static constexpr ck_tile::index_t HDim           = HDim_;
@@ -1532,7 +1537,12 @@ struct fmha_fwd_pagedkv_traits_
     static constexpr bool kPadD                      = kPadD_;
     static constexpr bool kPadDv                     = kPadDv_;
     static constexpr bool kSkipMinSeqlenQ            = kSkipMinSeqlenQ_;
-    static constexpr bool kHasSink                   = kHasSink_;
+    static constexpr ck_tile::FmhaSinkMode kSinkMode = kSinkMode_;
+    static constexpr bool kHasSink                   = (kSinkMode != ck_tile::FmhaSinkMode::kNone);
+    static constexpr bool kHasStreamSink = (kSinkMode == ck_tile::FmhaSinkMode::kStreamLLM ||
+                                            kSinkMode == ck_tile::FmhaSinkMode::kBoth);
+    static constexpr bool kHasGptOssSink =
+        (kSinkMode == ck_tile::FmhaSinkMode::kGptOss || kSinkMode == ck_tile::FmhaSinkMode::kBoth);
 };
 
 template <typename Traits_, typename Arch = void>
@@ -1555,7 +1565,7 @@ template <ck_tile::index_t HDim_,
           bool kStoreLse_,
           bool kDoFp8StaticQuant_,
           bool kIsPagedKV_,
-          bool kHasSink_,
+          ck_tile::FmhaSinkMode kSinkMode_,
           bool kPadS_,
           bool kPadSK_,
           bool kPadD_,
@@ -1583,7 +1593,12 @@ struct fmha_fwd_splitkv_traits_
     static constexpr bool kPadD                      = kPadD_;
     static constexpr bool kPadDv                     = kPadDv_;
     static constexpr bool kIsPagedKV                 = kIsPagedKV_;
-    static constexpr bool kHasSink                   = kHasSink_;
+    static constexpr ck_tile::FmhaSinkMode kSinkMode = kSinkMode_;
+    static constexpr bool kHasSink                   = (kSinkMode != ck_tile::FmhaSinkMode::kNone);
+    static constexpr bool kHasStreamSink = (kSinkMode == ck_tile::FmhaSinkMode::kStreamLLM ||
+                                            kSinkMode == ck_tile::FmhaSinkMode::kBoth);
+    static constexpr bool kHasGptOssSink =
+        (kSinkMode == ck_tile::FmhaSinkMode::kGptOss || kSinkMode == ck_tile::FmhaSinkMode::kBoth);
 };
 
 template <typename Traits_, typename Arch = void>
@@ -1670,7 +1685,8 @@ struct fmha_fwd_traits
     bool has_dropout;
     quant_scale_enum qscale_type;
     bool skip_min_seqlen_q = false;
-    bool has_sink          = false;
+    bool has_sink          = false; // StreamLLM sliding-window sink
+    bool has_gptoss_sink   = false; // GPT-OSS learnable softmax bias sink
     // TODO: padding check is inside this api
 };
 float fmha_fwd(fmha_fwd_traits, fmha_fwd_args, const ck_tile::stream_config&);
@@ -1689,7 +1705,8 @@ struct fmha_fwd_pagedkv_traits
     bool use_pagedkv         = true;
     bool do_fp8_static_quant = false;
     bool skip_min_seqlen_q   = false;
-    bool has_sink            = false;
+    bool has_sink            = false; // StreamLLM sliding-window sink
+    bool has_gptoss_sink     = false; // GPT-OSS learnable softmax bias sink
     // TODO: padding check is inside this api
 };
 
@@ -1709,7 +1726,8 @@ struct fmha_fwd_splitkv_traits
     bias_enum bias_type; // 0:no bias, 1:elementwise bias, 2:alibi. sync with BlockAttentionBiasEnum
     bool has_lse;
     bool do_fp8_static_quant = false;
-    bool has_sink            = false;
+    bool has_sink            = false; // StreamLLM sliding-window sink
+    bool has_gptoss_sink     = false; // GPT-OSS learnable softmax bias sink
     // TODO: padding check is inside this api
 };
 float fmha_fwd_splitkv(fmha_fwd_splitkv_traits,

@@ -6,6 +6,7 @@
 #include "ck_tile/core.hpp"
 #include "ck_tile/ops/fmha/block/block_attention_kvcache_layout_enum.hpp"
 #include "ck_tile/ops/fmha/block/block_rotary_embedding.hpp"
+#include "ck_tile/ops/fmha/pipeline/tile_fmha_traits.hpp"
 
 namespace ck_tile {
 
@@ -72,7 +73,10 @@ struct BlockFmhaPipelineProblem
     static constexpr bool kHasDropout       = Traits::kHasDropout;
     static constexpr auto QScaleEnum        = Traits::QScaleEnum;
     static constexpr index_t kBlockPerCu    = Traits::kBlockPerCu;
+    static constexpr FmhaSinkMode kSinkMode = Traits::kSinkMode;
     static constexpr bool kHasSink          = Traits::kHasSink;
+    static constexpr bool kHasStreamSink    = Traits::kHasStreamSink;
+    static constexpr bool kHasGptOssSink    = Traits::kHasGptOssSink;
 };
 
 template <typename QDataType_,
@@ -185,7 +189,10 @@ struct BlockFmhaFwdPagedKVPipelineProblem
     static constexpr bool kDoFp8StaticQuant = Traits::kDoFp8StaticQuant;
     static constexpr bool kIsPagedKV        = Traits::kIsPagedKV;
     static constexpr index_t kBlockPerCu    = Traits::kBlockPerCu;
+    static constexpr FmhaSinkMode kSinkMode = Traits::kSinkMode;
     static constexpr bool kHasSink          = Traits::kHasSink;
+    static constexpr bool kHasStreamSink    = Traits::kHasStreamSink;
+    static constexpr bool kHasGptOssSink    = Traits::kHasGptOssSink;
 };
 
 template <typename QDataType_,
@@ -239,7 +246,10 @@ struct BlockFmhaFwdSplitKVPipelineProblem
     static constexpr bool kHasUnevenSplits           = kIsGroupMode || Traits::kHasUnevenSplits;
     static constexpr bool kMergeNumHeadGroupsSeqLenQ = Traits::kMergeNumHeadGroupsSeqLenQ;
     static constexpr index_t kBlockPerCu             = Traits::kBlockPerCu;
+    static constexpr FmhaSinkMode kSinkMode          = Traits::kSinkMode;
     static constexpr bool kHasSink                   = Traits::kHasSink;
+    static constexpr bool kHasStreamSink             = Traits::kHasStreamSink;
+    static constexpr bool kHasGptOssSink             = Traits::kHasGptOssSink;
 };
 
 // extract tile size attributes to remove dependency on traits

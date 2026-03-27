@@ -6,6 +6,7 @@
 #include "ck_tile/core.hpp"
 #include "ck_tile/ops/fmha/block/block_attention_bias_enum.hpp"
 #include "ck_tile/ops/fmha/pipeline/block_fmha_fwd_pagedkv_pipeline_qr_ks_vs_default_policy.hpp"
+#include "ck_tile/ops/fmha/pipeline/tile_fmha_traits.hpp"
 #include "ck_tile/ops/gemm/warp/warp_wmma_gemm_gfx11_utils.hpp"
 #include "ck_tile/ops/reduce/block/block_reduce.hpp"
 
@@ -58,7 +59,10 @@ struct BlockFmhaFwdPagedKVPipelineQRKSVS
     static constexpr auto BiasEnum          = Problem::BiasEnum;
     static constexpr bool kStoreLSE         = Problem::kStoreLSE;
     static constexpr bool kIsPagedKV        = Problem::kIsPagedKV;
+    static constexpr FmhaSinkMode kSinkMode = Problem::kSinkMode;
     static constexpr bool kHasSink          = Problem::kHasSink;
+    static constexpr bool kHasStreamSink    = Problem::kHasStreamSink;
+    static constexpr bool kHasGptOssSink    = Problem::kHasGptOssSink;
 
     static_assert((CK_TILE_FMHA_FWD_FAST_EXP2 &&
                    (kHasLogitsSoftCap && Problem::BiasEnum == BlockAttentionBiasEnum::NO_BIAS ||
@@ -229,7 +233,7 @@ struct BlockFmhaFwdPagedKVPipelineQRKSVS
         auto l     = MLBlockTileType{};
 
         clear_tile(o_acc);
-        if(__builtin_isinf_sign(sink_v) >= 0)
+        if constexpr(kHasGptOssSink)
         {
 #if CK_TILE_FMHA_FWD_FAST_EXP2
             if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
@@ -249,7 +253,7 @@ struct BlockFmhaFwdPagedKVPipelineQRKSVS
         }
         const auto q_origin          = q_dram_window.get_window_origin();
         const auto tile_range_result = [&mask, &q_origin]() {
-            if constexpr(kHasSink)
+            if constexpr(kHasStreamSink)
                 return mask.GetSinkTileRangeAlongX(
                     q_origin.at(number<0>{}), number<kM0>{}, number<kN0>{});
             else
@@ -275,7 +279,8 @@ struct BlockFmhaFwdPagedKVPipelineQRKSVS
                 {
                     auto lse =
                         make_static_distributed_tensor<LSEDataType>(m.get_tile_distribution());
-                    set_tile(lse, SMPLComputeDataType{sink_v * scale_s});
+                    const SMPLComputeDataType sink_lse = sink_v * scale_s;
+                    set_tile(lse, sink_lse);
                     store_tile(lse_dram_window_tmp, tile_elementwise_in(lse_element_func, lse));
                 }
 
@@ -314,7 +319,7 @@ struct BlockFmhaFwdPagedKVPipelineQRKSVS
 
         const auto bias_origin      = bias_dram_block_window_tmp.get_window_origin();
         const index_t bias_n_offset = [&]() {
-            if constexpr(kHasSink)
+            if constexpr(kHasStreamSink)
                 return kv_load_start;
             else
                 return logical_seqlen_k_start -
@@ -360,7 +365,7 @@ struct BlockFmhaFwdPagedKVPipelineQRKSVS
             }
             const bool is_sink_tile  = ((num_sink_loop - 1) == i_total_loops);
             const auto k_move_offset = [&]() {
-                if constexpr(kHasSink)
+                if constexpr(kHasStreamSink)
                     return is_sink_tile ? logical_seqlen_k_start - sink_seq_end + kN0 : kN0;
                 else
                     return kN0;
@@ -530,7 +535,7 @@ struct BlockFmhaFwdPagedKVPipelineQRKSVS
                                         });
                         };
 
-                        if constexpr(kHasSink)
+                        if constexpr(kHasStreamSink)
                         {
                             apply_mask([&](auto row, auto col) {
                                 return mask.IsOutOfSinkBound(row, col);

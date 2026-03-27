@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
+#include "ck_tile/ops/fmha/pipeline/tile_fmha_traits.hpp"
 #include "ck_tile/ops/fmha/block/block_attention_bias_enum.hpp"
 #include "ck_tile/ops/fmha/pipeline/block_fmha_pipeline_qr_ks_vs_async_trload_policy.hpp"
 #include "ck_tile/ops/reduce/block/block_reduce.hpp"
@@ -69,7 +70,10 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
     static constexpr auto BiasEnum          = Problem::BiasEnum;
     static constexpr bool kStoreLSE         = Problem::kStoreLSE;
     static constexpr bool kHasUnevenSplits  = true;
+    static constexpr FmhaSinkMode kSinkMode = Problem::kSinkMode;
     static constexpr bool kHasSink          = Problem::kHasSink;
+    static constexpr bool kHasStreamSink    = Problem::kHasStreamSink;
+    static constexpr bool kHasGptOssSink    = Problem::kHasGptOssSink;
 
     static_assert((CK_TILE_FMHA_FWD_FAST_EXP2 &&
                    (kHasLogitsSoftCap && Problem::BiasEnum == BlockAttentionBiasEnum::NO_BIAS ||
@@ -194,7 +198,7 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
         auto l = MLBlockTileType{};
 
         clear_tile(o_acc);
-        if(__builtin_isinf_sign(sink_v) >= 0)
+        if constexpr(kHasGptOssSink)
         {
 #if CK_TILE_FMHA_FWD_FAST_EXP2
             if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
@@ -228,7 +232,8 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                 {
                     auto lse_acc =
                         make_static_distributed_tensor<LSEDataType>(m.get_tile_distribution());
-                    set_tile(lse_acc, SMPLComputeDataType{sink_v * scale_s});
+                    const SMPLComputeDataType sink_lse = sink_v * scale_s;
+                    set_tile(lse_acc, sink_lse);
                     store_tile(lse_acc_dram_window_tmp, lse_acc);
                 }
 
@@ -714,7 +719,7 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
         auto l = MLBlockTileType{};
 
         clear_tile(o_acc);
-        if(__builtin_isinf_sign(sink_v) >= 0)
+        if constexpr(kHasGptOssSink)
         {
 #if CK_TILE_FMHA_FWD_FAST_EXP2
             if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
@@ -748,7 +753,8 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                 {
                     auto lse_acc =
                         make_static_distributed_tensor<LSEDataType>(m.get_tile_distribution());
-                    set_tile(lse_acc, SMPLComputeDataType{sink_v * scale_s});
+                    const SMPLComputeDataType sink_lse = sink_v * scale_s;
+                    set_tile(lse_acc, sink_lse);
                     store_tile(lse_acc_dram_window_tmp, lse_acc);
                 }
 

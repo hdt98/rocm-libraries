@@ -46,6 +46,7 @@ def write_blobs(
     optdim_list: List[int],
     receipt,
     mask_impl,
+    sink_modes=("none",),
 ) -> None:
     if output_dir is None:
         output_dir = Path(__file__).parent
@@ -56,7 +57,18 @@ def write_blobs(
 
     for api, kernel_filter in zip(api_list, filters_list):
         handler = handlers[api][HandlerId.WRITE_BLOBS]
-        handler(targets, output_dir, kernel_filter, receipt, optdim_list, mask_impl)
+        if api == "bwd":
+            handler(targets, output_dir, kernel_filter, receipt, optdim_list, mask_impl)
+        else:
+            handler(
+                targets,
+                output_dir,
+                kernel_filter,
+                receipt,
+                optdim_list,
+                mask_impl,
+                sink_modes,
+            )
 
 
 # list all the files that will be generated
@@ -68,6 +80,7 @@ def list_blobs(
     optdim_list: List[int],
     receipt,
     mask_impl,
+    sink_modes=("none",),
 ) -> None:
     assert output_file is not None
     file_path = Path(output_file)
@@ -77,7 +90,18 @@ def list_blobs(
 
     for api, kernel_filter in zip(api_list, filters_list):
         handler = handlers[api][HandlerId.LIST_BLOBS]
-        handler(targets, file_path, kernel_filter, receipt, optdim_list, mask_impl)
+        if api == "bwd":
+            handler(targets, file_path, kernel_filter, receipt, optdim_list, mask_impl)
+        else:
+            handler(
+                targets,
+                file_path,
+                kernel_filter,
+                receipt,
+                optdim_list,
+                mask_impl,
+                sink_modes,
+            )
 
 
 if __name__ == "__main__":
@@ -150,12 +174,22 @@ if __name__ == "__main__":
         + "eg. --optdim=32,64,128,256",
     )
 
+    parser.add_argument(
+        "--sink",
+        default="none",
+        required=False,
+        help="comma-separated list of sink modes to generate instances for. "
+        + "Valid values: none, stream, gptoss, both. Default: none (only no-sink instances). "
+        + "eg. --sink=none,stream,gptoss",
+    )
+
     args = parser.parse_args()
     targets = args.targets.split(",")
     api_list = args.direction.split(",")
     filter_list = args.filter.split(",")
     filter_list.extend([""] * (len(api_list) - len(filter_list)))
     optdim_list = [int(hdim) for hdim in args.optdim.split(",")]
+    sink_modes = tuple(args.sink.split(","))
 
     if args.list_blobs is not None:
         list_blobs(
@@ -166,6 +200,7 @@ if __name__ == "__main__":
             optdim_list,
             int(args.receipt),
             mask_impl=args.mask,
+            sink_modes=sink_modes,
         )
     else:
         write_blobs(
@@ -176,4 +211,5 @@ if __name__ == "__main__":
             optdim_list,
             int(args.receipt),
             mask_impl=args.mask,
+            sink_modes=sink_modes,
         )

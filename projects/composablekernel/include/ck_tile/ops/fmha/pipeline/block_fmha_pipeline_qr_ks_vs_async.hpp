@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
+#include "ck_tile/ops/fmha/pipeline/tile_fmha_traits.hpp"
 #include "ck_tile/ops/common/tensor_layout.hpp"
 #include "ck_tile/ops/fmha/block/block_attention_bias_enum.hpp"
 #include "ck_tile/ops/fmha/pipeline/block_fmha_pipeline_qr_ks_vs_async_default_policy.hpp"
@@ -63,7 +64,10 @@ struct BlockFmhaPipelineQRKSVSAsync
     static constexpr auto BiasEnum          = Problem::BiasEnum;
     static constexpr bool kStoreLSE         = Problem::kStoreLSE;
     static constexpr bool kHasDropout       = Problem::kHasDropout;
+    static constexpr FmhaSinkMode kSinkMode = Problem::kSinkMode;
     static constexpr bool kHasSink          = Problem::kHasSink;
+    static constexpr bool kHasStreamSink    = Problem::kHasStreamSink;
+    static constexpr bool kHasGptOssSink    = Problem::kHasGptOssSink;
 
     // For BLOCKSCALE: shift value for exp2(x + shift) to scale P to [0, 2^shift]
     static constexpr float OCP_FP8_SHIFT  = 8.0f;
@@ -292,7 +296,7 @@ struct BlockFmhaPipelineQRKSVSAsync
         auto l     = MLBlockTileType{};
 
         clear_tile(o_acc);
-        if(__builtin_isinf_sign(sink_v) >= 0)
+        if constexpr(kHasGptOssSink)
         {
 #if CK_TILE_FMHA_FWD_FAST_EXP2
             if constexpr(BiasEnum == BlockAttentionBiasEnum::ALIBI ||
@@ -313,7 +317,7 @@ struct BlockFmhaPipelineQRKSVSAsync
         __builtin_amdgcn_sched_barrier(0);
         const auto q_origin          = q_dram_window.get_window_origin();
         const auto tile_range_result = [&mask, &q_origin]() {
-            if constexpr(kHasSink)
+            if constexpr(kHasStreamSink)
                 return mask.GetSinkTileRangeAlongX(
                     q_origin.at(number<0>{}), number<kM0>{}, number<kN0>{});
             else
@@ -343,7 +347,8 @@ struct BlockFmhaPipelineQRKSVSAsync
                 {
                     auto lse =
                         make_static_distributed_tensor<LSEDataType>(m.get_tile_distribution());
-                    set_tile(lse, SMPLComputeDataType{sink_v * scale_s});
+                    const SMPLComputeDataType sink_lse = sink_v * scale_s;
+                    set_tile(lse, sink_lse);
                     store_tile(lse_dram_window_tmp, tile_elementwise_in(lse_element_func, lse));
                 }
 
@@ -534,7 +539,7 @@ struct BlockFmhaPipelineQRKSVSAsync
 #endif
                 }
             }
-            if constexpr(kHasSink)
+            if constexpr(kHasStreamSink)
             {
                 if(i_total_loops == 0)
                     move_tile_window(bias_dram_window, {0, seqlen_k_start - sink_seq_end});
@@ -566,7 +571,7 @@ struct BlockFmhaPipelineQRKSVSAsync
                             });
                     };
 
-                    if constexpr(kHasSink)
+                    if constexpr(kHasStreamSink)
                     {
                         apply_mask([&](auto&&... args) {
                             return variant.LogitsSinkMask(std::forward<decltype(args)>(args)...);
@@ -747,7 +752,7 @@ struct BlockFmhaPipelineQRKSVSAsync
                     reinterpret_cast<char*>(smem_ptr) + Policy::template GetSmemSizeKV<Problem>();
 
                 index_t seq_offset = [&]() {
-                    if constexpr(!kHasSink)
+                    if constexpr(!kHasStreamSink)
                         return seqlen_k_start + i_total_loops * kN0;
 
                     const bool in_sink_phase = (num_sink_loop > i_total_loops);
@@ -845,7 +850,7 @@ struct BlockFmhaPipelineQRKSVSAsync
             i_total_loops++;
             if(i_total_loops < num_total_loop)
             {
-                if constexpr(kHasSink)
+                if constexpr(kHasStreamSink)
                 {
                     if(i_total_loops == 0)
                     {

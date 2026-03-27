@@ -40,6 +40,27 @@ FMHA_FWD_SPLITKV_PIPELINE_MAP = {
     "qr_nwarp_sshuffle": "ck_tile::BlockFmhaFwdSplitKVPipelineNWarpSShuffleQRKSVS",
 }
 
+SINK_MODE_MAP = {
+    "none": "ck_tile::FmhaSinkMode::kNone",
+    "stream": "ck_tile::FmhaSinkMode::kStreamLLM",
+    "gptoss": "ck_tile::FmhaSinkMode::kGptOss",
+    "both": "ck_tile::FmhaSinkMode::kBoth",
+}
+
+SINK_MODE_DISPATCH_MAP = {
+    "none": ("false", "false"),
+    "stream": ("true", "false"),
+    "gptoss": ("false", "true"),
+    "both": ("true", "true"),
+}
+
+SINK_NAME_MAP = {
+    "none": "_nsink",
+    "stream": "_ssink",
+    "gptoss": "_gsink",
+    "both": "_bsink",
+}
+
 FMHA_FWD_SPLITKV_KERNEL_BODY = """
 #include <iostream>
 
@@ -74,7 +95,7 @@ using fmha_trait = ck_tile::TileFmhaFwdSplitKVTraits<{F_spad},
                                                      kHasUnevenSplits,
                                                      kMergeNumHeadGroupsSeqLenQ,
                                                      {F_occupancy},
-                                                     {F_sink}>;
+                                                     {F_sink_mode}>;
 
 using fmha_pipeline_problem = ck_tile::BlockFmhaFwdSplitKVPipelineProblem<
     typename FmhaFwdTypeConfig<fmha_dtype_{F_idx}>::QDataType,
@@ -118,7 +139,7 @@ static void run(const ck_tile::stream_config& s, fmha_fwd_splitkv_args a)
 }} // anonymous namespace
 
 using trait_{F_idx} = fmha_fwd_splitkv_traits_<{F_hdim}, {F_dtype}, {F_mode}, {F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout},
-                        {F_pipeline_enum}, {F_logits}, fmha_mask_{F_idx}, {F_bias}, {F_lse}, {F_squant}, {F_pagedkv}, {F_sink}, {F_spad}, {F_skpad}, {F_dpad},
+                        {F_pipeline_enum}, {F_logits}, fmha_mask_{F_idx}, {F_bias}, {F_lse}, {F_squant}, {F_pagedkv}, {F_sink_mode}, {F_spad}, {F_skpad}, {F_dpad},
                         {F_dvpad}>;
 
 #pragma clang diagnostic push
@@ -280,8 +301,8 @@ float fmha_fwd_splitkv(fmha_fwd_splitkv_traits t, fmha_fwd_splitkv_args a, const
 """
 
 FMHA_FWD_SPLITKV_API_INNER_DISPATCH = """{F_if}((t.is_group_mode == {F_mode}) && (t.is_v_rowmajor == {F_vlayout}) && (t.has_logits_soft_cap == {F_logits}) && ({F_mask_check}) && (t.bias_type == {F_bias_check}) && (t.do_fp8_static_quant == {F_squant}) &&
-        ((a.block_table_ptr != nullptr) == {F_pagedkv}) && (t.has_sink == {F_sink}) && ({F_scheck}) && ({F_skcheck}) && ({F_dcheck}) && ({F_dvcheck})) {{
-    using traits_ = fmha_fwd_splitkv_traits_<{F_hdim}, {F_dtype}, {F_mode}, {F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout}, {F_pipeline_enum}, {F_logits}, {F_mask}, {F_bias}, true, {F_squant}, {F_pagedkv},{F_sink}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}>;
+        ((a.block_table_ptr != nullptr) == {F_pagedkv}) && (t.has_sink == {F_stream_sink}) && (t.has_gptoss_sink == {F_gptoss_sink}) && ({F_scheck}) && ({F_skcheck}) && ({F_dcheck}) && ({F_dvcheck})) {{
+    using traits_ = fmha_fwd_splitkv_traits_<{F_hdim}, {F_dtype}, {F_mode}, {F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout}, {F_pipeline_enum}, {F_logits}, {F_mask}, {F_bias}, true, {F_squant}, {F_pagedkv},{F_sink_mode}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}>;
 
     // get combine kernel tile sizes
     using OaccDataType = typename FmhaFwdTypeConfig<{F_dtype}>::OaccDataType;
@@ -427,7 +448,7 @@ class FmhaFwdSplitKVPipeline:
     F_lse: str  #
     F_squant: str  #
     F_pagedkv: str  # t/f
-    F_sink: str  # t/f
+    F_sink: str  # "none" / "stream" / "gptoss" / "both"
     F_mask: str  # value from MASK_MAP
 
     @property
@@ -488,10 +509,7 @@ class FmhaFwdSplitKVPipeline:
             n += "_pagedkv"
         else:
             n += "_npagedkv"
-        if self.F_sink == "t":
-            n += "_sink"
-        else:
-            n += "_nsink"
+        n += SINK_NAME_MAP[self.F_sink]
         return n
 
 
@@ -574,7 +592,9 @@ class FmhaFwdSplitKVApiPool:
                             F_lse=BOOL_MAP[trait.lse],
                             F_squant=BOOL_MAP[trait.squant],
                             F_pagedkv=BOOL_MAP[trait.pagedkv],
-                            F_sink=BOOL_MAP[trait.sink],
+                            F_sink_mode=SINK_MODE_MAP[trait.sink],
+                            F_stream_sink=SINK_MODE_DISPATCH_MAP[trait.sink][0],
+                            F_gptoss_sink=SINK_MODE_DISPATCH_MAP[trait.sink][1],
                             F_scheck=trait.scheck,
                             F_skcheck=trait.skcheck,
                             F_dcheck=trait.dcheck,
@@ -675,7 +695,7 @@ class FmhaFwdSplitKVKernel:
             F_squant=BOOL_MAP[self.F_pipeline.F_squant],
             F_pagedkv=BOOL_MAP[self.F_pipeline.F_pagedkv],
             F_occupancy=self.F_tile.F_occupancy,
-            F_sink=BOOL_MAP[self.F_pipeline.F_sink],
+            F_sink_mode=SINK_MODE_MAP[self.F_pipeline.F_sink],
             F_pipeline_enum=PIPELINE_ENUM_MAP[self.F_pipeline.tag],
             F_mask=get_mask_map(self.mask_impl)[self.F_pipeline.F_mask],
             F_mode=MODE_MAP[self.F_mode],
@@ -740,7 +760,9 @@ class FmhaFwdSplitKVCombineKernel:
 
 class KernelComponentFactoryBase:
     @staticmethod
-    def get_pipelines(dtype, hdim, mask_impl) -> List[FmhaFwdSplitKVPipeline]:
+    def get_pipelines(
+        dtype, hdim, mask_impl, sink_modes=("none",)
+    ) -> List[FmhaFwdSplitKVPipeline]:
         # this function will populate a list possible pipelines
         # TODO: the order of List matters! the later in this list will be also be checked later
         # TODO: currently for qr pipeline, let "t" padding to appear later!!
@@ -754,7 +776,7 @@ class KernelComponentFactoryBase:
                 get_mask_map(mask_impl).keys(),
                 BIAS_MAP.keys(),
                 ["t", "f"],
-                ["t", "f"],
+                sink_modes,
             ):
                 pipelines.append(Pipeline("qr", "row", "f", "t", "f", "f", logits, bias, "t", squant, pagedkv, sink, mask))  # fmt: skip
                 pipelines.append(Pipeline("qr", "row", "t", "f", "f", "f", logits, bias, "t", squant, pagedkv, sink, mask))  # fmt: skip
@@ -764,8 +786,8 @@ class KernelComponentFactoryBase:
             for logits, mask, bias in itertools.product(
                 ["t", "f"], get_mask_map(mask_impl).keys(), BIAS_MAP.keys()
             ):
-                pipelines.append(Pipeline("qr", "row", "f", "f", "f", "f", logits, bias, "t", squant, "f", "f", mask))  # fmt: skip
-                pipelines.append(Pipeline("qr", "row", "t", "t", "f", "f", logits, bias, "t", squant, "f", "f", mask))  # fmt: skip
+                pipelines.append(Pipeline("qr", "row", "f", "f", "f", "f", logits, bias, "t", squant, "f", "none", mask))  # fmt: skip
+                pipelines.append(Pipeline("qr", "row", "t", "t", "f", "f", logits, bias, "t", squant, "f", "none", mask))  # fmt: skip
         elif dtype in ["fp8fp16", "fp8bf16"]:
             # TODO
             None
@@ -891,7 +913,12 @@ def get_factory(target: str):
 
 
 def get_fwd_splitkv_blobs(
-    targets: List[str], kernel_filter: Optional[str], receipt, mask_impl, optdim_list
+    targets: List[str],
+    kernel_filter: Optional[str],
+    receipt,
+    mask_impl,
+    optdim_list,
+    sink_modes=("none",),
 ) -> List[FmhaFwdSplitKVKernel]:
     Kernel = FmhaFwdSplitKVKernel
 
@@ -907,7 +934,7 @@ def get_fwd_splitkv_blobs(
         for hdim_str, mode in itertools.product(d.keys(), MODE_MAP.keys()):
             tile = d[hdim_str]
             hdim = int(hdim_str)
-            for pipeline in factory.get_pipelines(dtype, hdim, mask_impl):
+            for pipeline in factory.get_pipelines(dtype, hdim, mask_impl, sink_modes):
                 if mode == "group":
                     if pipeline.F_spad != "t" or pipeline.F_skpad != "t":
                         # in group mode, spad/skpad must be true, since we can't predict if seqlen of current batch need pad or not
@@ -940,7 +967,7 @@ def get_fwd_splitkv_blobs(
                     cond &= pipeline.F_vlayout == "row"
                     cond &= pipeline.F_bias in ["no", "alibi"]
                     cond &= pipeline.F_squant == "f"
-                    cond &= pipeline.F_sink == "f"
+                    cond &= pipeline.F_sink == "none"
                     if not cond:
                         continue
                 # PyTorch integration
@@ -950,7 +977,7 @@ def get_fwd_splitkv_blobs(
                     cond &= pipeline.F_bias in ["no", "bias"]
                     cond &= pipeline.F_squant == "f"
                     cond &= mode == "batch"
-                    cond &= pipeline.F_sink == "f"
+                    cond &= pipeline.F_sink == "none"
                     if not cond:
                         continue
                 # Aiter(mha_varlen_fwd) integration
@@ -1056,6 +1083,7 @@ def write_blobs(
     receipt,
     optdim_list,
     mask_impl,
+    sink_modes=("none",),
 ) -> None:
     filter_list = filter_list.split("@")
     filter_list.extend([""] * (2 - len(filter_list)))
@@ -1066,7 +1094,7 @@ def write_blobs(
     for kernel in combine_kernels:
         write_single_kernel(kernel, output_dir)
     kernels = get_fwd_splitkv_blobs(
-        targets, filter_list[1], receipt, mask_impl, optdim_list
+        targets, filter_list[1], receipt, mask_impl, optdim_list, sink_modes
     )
     for kernel in kernels:
         write_single_kernel(kernel, output_dir)
@@ -1127,6 +1155,7 @@ def list_blobs(
     receipt,
     optdim_list,
     mask_impl,
+    sink_modes=("none",),
 ) -> None:
     filter_list = filter_list.split("@")
     filter_list.extend([""] * (2 - len(filter_list)))
@@ -1138,8 +1167,11 @@ def list_blobs(
         for kernel in kernels:
             f.write((file_path.parent / GEN_DIR / kernel.filename).as_posix() + "\n")
         kernels = get_fwd_splitkv_blobs(
-            targets, filter_list[1], receipt, mask_impl, optdim_list
+            targets, filter_list[1], receipt, mask_impl, optdim_list, sink_modes
         )
         for kernel in kernels:
             f.write((file_path.parent / GEN_DIR / kernel.filename).as_posix() + "\n")
-        f.write((file_path.parent / GEN_DIR / FMHA_FWD_SPLITKV_API_FILENAME).as_posix() + "\n")
+        f.write(
+            (file_path.parent / GEN_DIR / FMHA_FWD_SPLITKV_API_FILENAME).as_posix()
+            + "\n"
+        )
