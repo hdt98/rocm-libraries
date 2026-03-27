@@ -60,6 +60,21 @@ namespace rocRoller
                 return {result};
             }
 
+            std::vector<Expression::ExpressionPtr> operator()(ExpressionTransform const& e)
+            {
+                AssertFatal(e.forward.size() == dsts.size(),
+                            "ExpressionTransform forward size mismatch",
+                            ShowValue(e.forward.size()),
+                            ShowValue(dsts.size()));
+                std::vector<Expression::ExpressionPtr> rv;
+                rv.reserve(e.forward.size());
+                for(auto const& expr : e.forward)
+                {
+                    rv.push_back(positionalArgumentPropagation(expr, indexes));
+                }
+                return rv;
+            }
+
             std::vector<Expression::ExpressionPtr> operator()(PiecewiseAffineJoin const& e)
             {
                 AssertFatal(srcs.size() == e.strides.first.size(),
@@ -196,6 +211,21 @@ namespace rocRoller
 
                 setComment(result, "Split");
                 return {result};
+            }
+
+            std::vector<Expression::ExpressionPtr> operator()(ExpressionTransform const& e)
+            {
+                AssertFatal(e.reverse.size() == srcs.size(),
+                            "ExpressionTransform reverse size mismatch",
+                            ShowValue(e.reverse.size()),
+                            ShowValue(srcs.size()));
+                std::vector<Expression::ExpressionPtr> rv;
+                rv.reserve(e.reverse.size());
+                for(auto const& expr : e.reverse)
+                {
+                    rv.push_back(positionalArgumentPropagation(expr, indexes));
+                }
+                return rv;
             }
 
             std::vector<Expression::ExpressionPtr> operator()(PiecewiseAffineJoin const& e)
@@ -362,6 +392,22 @@ namespace rocRoller
                 return {index};
             }
 
+            std::vector<Expression::ExpressionPtr> operator()(ExpressionTransform const& e)
+            {
+                // ExpressionTransform applies arbitrary per-lane expressions that are not
+                // generally affine. Pass through the first src's index and delta unchanged
+                // so that stride computation can proceed. The actual index transformation
+                // only matters at codegen time, not for stride propagation.
+                AssertFatal(e.forward.size() == dsts.size(),
+                            "ExpressionTransform forward size mismatch",
+                            ShowValue(e.forward.size()),
+                            ShowValue(dsts.size()));
+                auto delta = getDelta(srcTags[0]);
+                for(size_t i = 0; i < dsts.size(); ++i)
+                    deltas.emplace(dstTags[i], delta);
+                return {indexes[0]};
+            }
+
             std::vector<Expression::ExpressionPtr> operator()(PiecewiseAffineJoin const& e)
             {
                 AssertFatal(srcs.size() == e.strides.first.size(),
@@ -503,6 +549,21 @@ namespace rocRoller
                 deltas.emplace(srcTags[0], delta);
                 setComment(index, "DSplit");
                 return {index};
+            }
+
+            std::vector<Expression::ExpressionPtr> operator()(ExpressionTransform const& e)
+            {
+                // Pass through the first dst's index and delta to the first src unchanged.
+                // ExpressionTransform applies a non-affine permutation; stride computation
+                // cannot be derived from the expression trees, so we pass through unchanged.
+                AssertFatal(e.reverse.size() == srcs.size(),
+                            "ExpressionTransform reverse size mismatch",
+                            ShowValue(e.reverse.size()),
+                            ShowValue(srcs.size()));
+                auto delta = getDelta(dstTags[0]);
+                for(size_t i = 0; i < srcs.size(); ++i)
+                    deltas.emplace(srcTags[i], delta);
+                return {indexes[0]};
             }
 
             std::vector<Expression::ExpressionPtr> operator()(PiecewiseAffineJoin const& e)

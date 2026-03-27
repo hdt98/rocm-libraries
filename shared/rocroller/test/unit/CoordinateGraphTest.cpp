@@ -1219,4 +1219,135 @@ namespace rocRollerTest
                              ARCH_CoordinateGraphTest,
                              supportedISATuples());
 
+    // ExpressionTransform edge tests
+    // Use namespace alias to avoid ambiguity between Expression namespace and Expression type.
+    namespace Expr = rocRoller::Expression;
+
+    // Forward: identity f($0) = $0
+    TEST_F(CoordinateGraphTest, ExpressionTransformIdentity)
+    {
+        auto arg0 = Expr::positionalArgument(0, Register::Type::Vector, DataType::UInt32);
+
+        ExpressionTransform edge{{arg0}, {arg0}};
+        EXPECT_EQ(edge.name(), "ExpressionTransform");
+
+        auto ct   = CoordinateGraph();
+        auto unit = Expr::literal(1u);
+        auto size = Expr::literal(8u);
+        auto src  = ct.addElement(SubDimension(0, size, unit));
+        auto dst  = ct.addElement(SubDimension(0, size, unit));
+        ct.addElement(edge, {src}, {dst});
+
+        auto idx   = Expr::literal(5u);
+        auto exprs = ct.forward({idx}, {src}, {dst});
+        ASSERT_EQ(1u, exprs.size());
+        auto result = std::get<unsigned int>(Expr::evaluate(exprs[0]));
+        EXPECT_EQ(5u, result);
+
+        auto exprs_r = ct.reverse({idx}, {src}, {dst});
+        ASSERT_EQ(1u, exprs_r.size());
+        result = std::get<unsigned int>(Expr::evaluate(exprs_r[0]));
+        EXPECT_EQ(5u, result);
+    }
+
+    // Forward: XOR  f($0) = $0 ^ 1
+    TEST_F(CoordinateGraphTest, ExpressionTransformXor)
+    {
+        auto arg0 = Expr::positionalArgument(0, Register::Type::Vector, DataType::UInt32);
+        auto one  = Expr::literal(1u);
+
+        // f($0) = $0 ^ 1   (self-inverse, so forward == reverse)
+        auto xorExpr = std::make_shared<Expr::Expression>(Expr::BitwiseXor{arg0, one});
+        ExpressionTransform edge{{xorExpr}, {xorExpr}};
+
+        auto ct   = CoordinateGraph();
+        auto unit = Expr::literal(1u);
+        auto size = Expr::literal(8u);
+        auto src  = ct.addElement(SubDimension(0, size, unit));
+        auto dst  = ct.addElement(SubDimension(0, size, unit));
+        ct.addElement(edge, {src}, {dst});
+
+        // f(4) = 4 ^ 1 = 5
+        auto idx   = Expr::literal(4u);
+        auto exprs = ct.forward({idx}, {src}, {dst});
+        ASSERT_EQ(1u, exprs.size());
+        auto result = std::get<unsigned int>(Expr::evaluate(exprs[0]));
+        EXPECT_EQ(5u, result);
+
+        // f(5) = 5 ^ 1 = 4  (reverse, same expression)
+        auto idx5    = Expr::literal(5u);
+        auto exprs_r = ct.reverse({idx5}, {src}, {dst});
+        ASSERT_EQ(1u, exprs_r.size());
+        result = std::get<unsigned int>(Expr::evaluate(exprs_r[0]));
+        EXPECT_EQ(4u, result);
+    }
+
+    // Two inputs, two outputs: forward  out0=$0+$1, out1=$0*$1
+    // and reverse             in0=$0-$1, in1=$0/$1
+    TEST_F(CoordinateGraphTest, ExpressionTransformTwoInputs)
+    {
+        auto arg0 = Expr::positionalArgument(0, Register::Type::Vector, DataType::UInt32);
+        auto arg1 = Expr::positionalArgument(1, Register::Type::Vector, DataType::UInt32);
+
+        // forward: [$0+$1, $0*$1]
+        auto fwd0 = arg0 + arg1;
+        auto fwd1 = arg0 * arg1;
+
+        // reverse (not mathematically correct, just testing plumbing): [$0-$1, $0/$1]
+        auto rev0 = arg0 - arg1;
+        auto rev1 = arg0 / arg1;
+
+        ExpressionTransform edge{{fwd0, fwd1}, {rev0, rev1}};
+
+        auto ct   = CoordinateGraph();
+        auto unit = Expr::literal(1u);
+        auto size = Expr::literal(32u);
+        auto s0   = ct.addElement(SubDimension(0, size, unit));
+        auto s1   = ct.addElement(SubDimension(0, size, unit));
+        auto d0   = ct.addElement(SubDimension(0, size, unit));
+        auto d1   = ct.addElement(SubDimension(0, size, unit));
+        ct.addElement(edge, {s0, s1}, {d0, d1});
+
+        // forward(3, 4) -> [7, 12]
+        auto three = Expr::literal(3u);
+        auto four  = Expr::literal(4u);
+        auto exprs = ct.forward({three, four}, {s0, s1}, {d0, d1});
+        ASSERT_EQ(2u, exprs.size());
+        EXPECT_EQ(7u, std::get<unsigned int>(Expr::evaluate(exprs[0])));
+        EXPECT_EQ(12u, std::get<unsigned int>(Expr::evaluate(exprs[1])));
+
+        // reverse(12, 4) -> [8, 3]
+        auto twelve  = Expr::literal(12u);
+        auto exprs_r = ct.reverse({twelve, four}, {s0, s1}, {d0, d1});
+        ASSERT_EQ(2u, exprs_r.size());
+        EXPECT_EQ(8u, std::get<unsigned int>(Expr::evaluate(exprs_r[0])));
+        EXPECT_EQ(3u, std::get<unsigned int>(Expr::evaluate(exprs_r[1])));
+    }
+
+    // Shift pattern: f($0) = $0 >> 1
+    TEST_F(CoordinateGraphTest, ExpressionTransformShift)
+    {
+        auto arg0 = Expr::positionalArgument(0, Register::Type::Vector, DataType::UInt32);
+        auto one  = Expr::literal(1u);
+
+        auto                shrExpr = arg0 >> one;
+        ExpressionTransform edge{{shrExpr}, {shrExpr}};
+
+        auto ct   = CoordinateGraph();
+        auto unit = Expr::literal(1u);
+        auto size = Expr::literal(16u);
+        auto src  = ct.addElement(SubDimension(0, size, unit));
+        auto dst  = ct.addElement(SubDimension(0, size, unit));
+        ct.addElement(edge, {src}, {dst});
+
+        // f(8) = 8 >> 1 = 4
+        auto exprs = ct.forward({Expr::literal(8u)}, {src}, {dst});
+        ASSERT_EQ(1u, exprs.size());
+        EXPECT_EQ(4u, std::get<unsigned int>(Expr::evaluate(exprs[0])));
+
+        // f(6) = 6 >> 1 = 3
+        exprs = ct.forward({Expr::literal(6u)}, {src}, {dst});
+        EXPECT_EQ(3u, std::get<unsigned int>(Expr::evaluate(exprs[0])));
+    }
+
 }

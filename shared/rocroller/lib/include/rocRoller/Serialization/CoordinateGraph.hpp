@@ -220,6 +220,28 @@ namespace rocRoller
         };
 
         template <typename IO, typename Context>
+        struct MappingTraits<KernelGraph::CoordinateGraph::ExpressionTransform, IO, Context>
+        {
+            using iot = IOTraits<IO>;
+
+            static void mapping(IO&                                                io,
+                                KernelGraph::CoordinateGraph::ExpressionTransform& edge,
+                                Context&                                           ctx)
+            {
+                iot::mapRequired(io, "forward", edge.forward);
+                iot::mapRequired(io, "reverse", edge.reverse);
+            }
+
+            static void mapping(IO& io, KernelGraph::CoordinateGraph::ExpressionTransform& edge)
+            {
+                AssertFatal((std::same_as<EmptyContext, Context>));
+
+                Context ctx;
+                mapping(io, edge, ctx);
+            }
+        };
+
+        template <typename IO, typename Context>
         struct MappingTraits<KernelGraph::CoordinateGraph::PiecewiseAffineJoin, IO, Context>
         {
             using iot = IOTraits<IO>;

@@ -11,6 +11,7 @@ namespace rocRoller
     {
         struct ConstructMacroTile;
         struct DestructMacroTile;
+        struct ExpressionTransform;
         struct Flatten;
         struct Forget;
         struct Inherit;
@@ -24,6 +25,7 @@ namespace rocRoller
 
         using CoordinateTransformEdge = std::variant<ConstructMacroTile,
                                                      DestructMacroTile,
+                                                     ExpressionTransform,
                                                      Flatten,
                                                      Forget,
                                                      Inherit,
