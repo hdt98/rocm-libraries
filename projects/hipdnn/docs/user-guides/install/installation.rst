@@ -56,7 +56,7 @@ Verify hipDNN installation
 ==========================
 
 The hipDNN library ships with executables that can be used to test the hipDNN library and plugins when the GPU hardware is available.
-These executables can be run individually or as a suite using the ``ctest`` driver program. (``ctest`` is isntalled as part of the CMake package.)
+These executables can be run individually or as a suite using the ``ctest`` driver program. (``ctest`` is installed as part of the CMake package.)
 
 Run hipDNN unit tests
 ---------------------
