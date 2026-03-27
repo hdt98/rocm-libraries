@@ -22,7 +22,7 @@ constexpr int BLOCK_Q = 16;
 // Kernel configuration parameters.
 struct Config
 {
-    int waves_per_wg;
+    int groups_per_wg;
 
     int kh = 3;
     int kw = 3;
@@ -33,24 +33,19 @@ struct Config
 
     hipconv::Direction direction = hipconv::Direction::Fprop;
 
-    constexpr int block_c() const { return group_size * waves_per_wg; }
-
-    constexpr int block_size() const { return waves_per_wg * WAVE_SIZE; }
+    constexpr int waves_per_wg() const { return groups_per_wg * 2; }
+    constexpr int block_c() const { return group_size * groups_per_wg; }
+    constexpr int block_size() const { return waves_per_wg() * WAVE_SIZE; }
 };
 
 // All instantiated configurations.
-// Max waves_per_wg = 8; limited by register allocation and LDS
+// Max groups_per_wg = 8; limited by register allocation and LDS
+// groups_per_wg = 2 performs better in practice.
 constexpr Config configs[] = {
-    {.waves_per_wg = 8, .direction = hipconv::Direction::Dgrad},
-    {.waves_per_wg = 4, .direction = hipconv::Direction::Dgrad},
-    {.waves_per_wg = 3, .direction = hipconv::Direction::Dgrad},
-    {.waves_per_wg = 2, .direction = hipconv::Direction::Dgrad},
-    {.waves_per_wg = 1, .direction = hipconv::Direction::Dgrad},
-    {.waves_per_wg = 8},
-    {.waves_per_wg = 4},
-    {.waves_per_wg = 3},
-    {.waves_per_wg = 2},
-    {.waves_per_wg = 1},
+    {.groups_per_wg = 2, .direction = hipconv::Direction::Dgrad},
+    {.groups_per_wg = 1, .direction = hipconv::Direction::Dgrad},
+    {.groups_per_wg = 2},
+    {.groups_per_wg = 1},
 };
 
 constexpr int NUM_CONFIGS = sizeof(configs) / sizeof(configs[0]);
@@ -63,8 +58,8 @@ inline bool is_valid_config(const hipconv::Conv2dParams& par, const Config& cfg)
     }
 
     // Require that the number of groups per work-group evenly divides the total number of
-    // workgroups.
-    if((par.groups % cfg.waves_per_wg) != 0)
+    // groups.
+    if((par.groups % cfg.groups_per_wg) != 0)
     {
         return false;
     }
@@ -133,8 +128,8 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     // uint4 vectors per channels fiber
     constexpr int BLOCK_C8 = cfg.block_c() / 8;
 
-    // Each wave processes one group of channels.
-    constexpr int BLOCK_GROUPS = cfg.waves_per_wg;
+    // Each pair of waves processes one group of channels.
+    constexpr int BLOCK_GROUPS = cfg.groups_per_wg;
 
     // Vectors to store (center only)
     constexpr int STORE_VECS = BLOCK_Q * BLOCK_C8;
@@ -164,6 +159,10 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     const int wave = tid / WAVE_SIZE;
     const int lane = tid % WAVE_SIZE;
 
+    // Each group is split across 2 waves.
+    const int wave_group = wave / 2;
+    const int wave_half  = wave % 2; // 0 = output channels 0-15, 1 = channels 16-31
+
     // Workgroup coordinates.
     const int block_q_n_idx   = blockIdx.x;
     const int block_n_mod_idx = block_q_n_idx % cfg.n_fold;
@@ -188,12 +187,10 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     const size_t wi_stride    = (size_t)wi * C8;
     const size_t wo_stride    = (size_t)wo * C8;
 
-    // Two-pass input loading.
-    // Each row needs BLOCK_W * BLOCK_C8 = 18 * waves*4 = 72*waves uint4 loads.
-    // Block has 64*waves threads, so always need 2 passes.
-    // 8*waves threads do a second load.
+    // Single-pass input loading.
+    // Each row needs BLOCK_W * BLOCK_C8 = 18 * groups_per_wg*4 = 72*groups_per_wg uint4 loads.
+    // Block has 128*groups_per_wg threads, so single pass always suffices (72 < 128).
     auto store_input_lds_0 = &input_lds[tid];
-    auto store_input_lds_1 = &input_lds[tid + cfg.block_size()];
 
     // Create the input buffer resource.
     auto input_bytes               = static_cast<size_t>(N) * hi * wi * C * sizeof(half);
@@ -201,12 +198,11 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     auto input_rsrc                = __builtin_amdgcn_make_buffer_rsrc(
         const_cast<_Float16*>(in), 0, input_bytes, rsrc_data_format);
     uint32_t input_voffset_0;
-    uint32_t input_voffset_1;
 
     // Map threads to global memory input buffer using a swizzle.
     using Sw = SwizzleT<cfg.block_c()>;
 
-    // First pass: all threads (tid < block_size)
+    // Single pass: all threads (tid < block_size)
     const int col_0          = Sw::x(tid);
     const int c8_0           = Sw::c8(tid);
     const int global_col_0   = (block_q - px) + col_0;
@@ -221,29 +217,9 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
         input_voffset_0 = input_bytes;
     }
 
-    // Second pass: overflow threads
-    const int tid_1          = tid + cfg.block_size();
-    const int col_1          = Sw::x(tid_1);
-    const int c8_1           = Sw::c8(tid_1);
-    const int global_col_1   = (block_q - px) + col_1;
-    const bool load_active_1 = (tid_1 < BLOCK_W * BLOCK_C8);
-    if(load_active_1 && 0 <= global_col_1 && global_col_1 < wi)
-    {
-        input_voffset_1 =
-            sizeof(uint4) * (offset_block + (size_t)global_col_1 * C8 + block_c8 + c8_1);
-    }
-    else
-    {
-        input_voffset_1 = input_bytes;
-    }
-
-    // Each wave computes one group of channels.
-    auto wave_group = wave;
-
     // Load weights from global memory through LDS into registers.
-    // Two output halves per filter position: weights_reg[khw][0] for k 0-15,
-    // weights_reg[khw][1] for k 16-31.
-    fp16x8_t weights_reg[cfg.kh * cfg.kw][2];
+    // Each wave loads only its half of output channels.
+    fp16x8_t weights_reg[cfg.kh * cfg.kw];
     {
         auto weight_bytes = static_cast<size_t>(groups * cfg.group_size) * cfg.kh * cfg.kw *
                             cfg.group_size * sizeof(half);
@@ -264,8 +240,8 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
         {
             // Dgrad: need W^T (32x32 transpose per filter position).
             // Each lane reads 8 elements via scalar LDS reads.
-            const int c_lo   = lane % 16;       // input channel 0-15
-            const int c_hi   = lane % 16 + 16;  // input channel 16-31
+            // wave_half selects which 16-channel half this wave handles.
+            const int c      = lane % 16 + wave_half * 16;
             const int k_base = (lane / 16) * 8; // 8 consecutive output channels
 
             const int row_stride = cfg.kh * cfg.kw * cfg.group_size;
@@ -276,10 +252,8 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
             {
                 for(int j = 0; j < 8; j++)
                 {
-                    weights_reg[khw][0][j] =
-                        wei_lds[(k_base + j) * row_stride + khw * cfg.group_size + c_lo];
-                    weights_reg[khw][1][j] =
-                        wei_lds[(k_base + j) * row_stride + khw * cfg.group_size + c_hi];
+                    weights_reg[khw][j] =
+                        wei_lds[(k_base + j) * row_stride + khw * cfg.group_size + c];
                 }
             }
         }
@@ -291,17 +265,14 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
             auto lane_k    = OperandLayout::outer(lane);
             auto lane_c8_w = OperandLayout::inner(lane) / 8;
 
-            auto k_lo = wave_group * cfg.group_size + lane_k;      // output channels 0-15
-            auto k_hi = wave_group * cfg.group_size + 16 + lane_k; // output channels 16-31
+            // wave_half selects which 16-channel half this wave handles.
+            auto k = wave_group * cfg.group_size + wave_half * 16 + lane_k;
 
             auto* weights_lds = reinterpret_cast<const uint4*>(lds_buf);
             for(int khw = 0; khw < cfg.kh * cfg.kw; khw++)
             {
-                weights_reg[khw][0] =
-                    *(const fp16x8_t*)(weights_lds + k_lo * (cfg.kh * cfg.kw * GROUP_SIZE_8) +
-                                       khw * GROUP_SIZE_8 + lane_c8_w);
-                weights_reg[khw][1] =
-                    *(const fp16x8_t*)(weights_lds + k_hi * (cfg.kh * cfg.kw * GROUP_SIZE_8) +
+                weights_reg[khw] =
+                    *(const fp16x8_t*)(weights_lds + k * (cfg.kh * cfg.kw * GROUP_SIZE_8) +
                                        khw * GROUP_SIZE_8 + lane_c8_w);
             }
         }
@@ -311,16 +282,11 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     // the input buffer_load_lds overwrites the same lds_buf region.
     __syncthreads();
 
-    // Load first chunk of inputs asynchronously (two passes).
+    // Load first chunk of inputs asynchronously (single pass).
     if(load_active_0)
     {
         __builtin_amdgcn_raw_ptr_buffer_load_lds(
             input_rsrc, store_input_lds_0, 16, input_voffset_0, 0, 0, 0);
-    }
-    if(load_active_1)
-    {
-        __builtin_amdgcn_raw_ptr_buffer_load_lds(
-            input_rsrc, store_input_lds_1, 16, input_voffset_1, 0, 0, 0);
     }
 
     // Map lanes to MFMA matrix coordinates.
@@ -355,19 +321,17 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
                 Sw::offset_uint4(lane_q + S, wave_group * GROUP_SIZE_8 + lane_c8);
         });
 
-    // Pre-compute the output LDS swizzle offsets (thread-constant).
-    // Two writes per lane: one for output channels 0-15, one for 16-31.
-    const int output_lds_offset_lo = Sw::offset_uint2(lane_q, wave_group * GROUP_SIZE_4 + lane_c4);
-    const int output_lds_offset_hi =
-        Sw::offset_uint2(lane_q, wave_group * GROUP_SIZE_4 + lane_c4 + 4);
+    // Pre-compute the output LDS swizzle offset (thread-constant).
+    // Single write per lane: wave_half selects which 16-channel half.
+    const int output_lds_offset =
+        Sw::offset_uint2(lane_q, wave_group * GROUP_SIZE_4 + wave_half * 4 + lane_c4);
 
-    // Circular buffer of accumulators: two per filter row (lo and hi output halves).
+    // Circular buffer of accumulators: one per filter row (single output half per wave).
     constexpr auto Zero = fp32x4_t{0.f, 0.f, 0.f, 0.f};
-    fp32x4_t acc[cfg.kh][2];
+    fp32x4_t acc[cfg.kh];
     for(int i = 0; i < cfg.kh; i++)
     {
-        acc[i][0] = Zero;
-        acc[i][1] = Zero;
+        acc[i] = Zero;
     }
 
     int tic = 1;
@@ -398,17 +362,6 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
                                                                  0,
                                                                  0);
                     }
-                    if(load_active_1)
-                    {
-                        __builtin_amdgcn_raw_ptr_buffer_load_lds(input_rsrc,
-                                                                 store_input_lds_1 +
-                                                                     tic * INPUT_LDS_BUFFER_SIZE_C8,
-                                                                 16,
-                                                                 input_voffset_1 + row_offset,
-                                                                 0,
-                                                                 0,
-                                                                 0);
-                    }
                 }
 
                 static_for<cfg.kw>(
@@ -424,19 +377,15 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
                                 constexpr int p_idx = (Y_LOCAL - R + cfg.kh) % cfg.kh;
                                 if constexpr(cfg.direction == hipconv::Direction::Dgrad)
                                 {
-                                    int w_idx     = (cfg.kh - 1 - R) * cfg.kw + (cfg.kw - 1 - S);
-                                    acc[p_idx][0] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
-                                        weights_reg[w_idx][0], input_reg, acc[p_idx][0], 0, 0, 0);
-                                    acc[p_idx][1] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
-                                        weights_reg[w_idx][1], input_reg, acc[p_idx][1], 0, 0, 0);
+                                    int w_idx  = (cfg.kh - 1 - R) * cfg.kw + (cfg.kw - 1 - S);
+                                    acc[p_idx] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
+                                        weights_reg[w_idx], input_reg, acc[p_idx], 0, 0, 0);
                                 }
                                 else
                                 {
-                                    int w_idx     = R * cfg.kw + S;
-                                    acc[p_idx][0] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
-                                        weights_reg[w_idx][0], input_reg, acc[p_idx][0], 0, 0, 0);
-                                    acc[p_idx][1] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
-                                        weights_reg[w_idx][1], input_reg, acc[p_idx][1], 0, 0, 0);
+                                    int w_idx  = R * cfg.kw + S;
+                                    acc[p_idx] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
+                                        weights_reg[w_idx], input_reg, acc[p_idx], 0, 0, 0);
                                 }
                             });
                     });
@@ -448,31 +397,21 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
                 int p_out             = y + py - (cfg.kh - 1);
                 if(p_out >= 0 && p_out < ho)
                 {
-                    // Convert and store lo half (output channels 0-15)
-                    __half2 halves_lo[2];
-                    halves_lo[0]    = __float22half2_rn({acc[P_FLUSH][0][0], acc[P_FLUSH][0][1]});
-                    halves_lo[1]    = __float22half2_rn({acc[P_FLUSH][0][2], acc[P_FLUSH][0][3]});
-                    auto out_reg_lo = *reinterpret_cast<const fp16x4_t*>(halves_lo);
+                    // Convert and store this wave's half of output channels
+                    __half2 halves[2];
+                    halves[0]    = __float22half2_rn({acc[P_FLUSH][0], acc[P_FLUSH][1]});
+                    halves[1]    = __float22half2_rn({acc[P_FLUSH][2], acc[P_FLUSH][3]});
+                    auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
 
-                    // Convert and store hi half (output channels 16-31)
-                    __half2 halves_hi[2];
-                    halves_hi[0]    = __float22half2_rn({acc[P_FLUSH][1][0], acc[P_FLUSH][1][1]});
-                    halves_hi[1]    = __float22half2_rn({acc[P_FLUSH][1][2], acc[P_FLUSH][1][3]});
-                    auto out_reg_hi = *reinterpret_cast<const fp16x4_t*>(halves_hi);
-
-                    auto* store_output_lds = reinterpret_cast<uint2*>(output_lds);
-                    store_output_lds[output_lds_offset_lo] =
-                        *reinterpret_cast<const uint2*>(&out_reg_lo);
-                    store_output_lds[output_lds_offset_hi] =
-                        *reinterpret_cast<const uint2*>(&out_reg_hi);
+                    auto* store_output_lds              = reinterpret_cast<uint2*>(output_lds);
+                    store_output_lds[output_lds_offset] = *reinterpret_cast<const uint2*>(&out_reg);
 
                     __syncthreads(); // output_lds fully written
 
                     if(store_output_global)
                         store_output_global[p_out * wo_stride] = *load_output_lds;
                 }
-                acc[P_FLUSH][0] = Zero;
-                acc[P_FLUSH][1] = Zero;
+                acc[P_FLUSH] = Zero;
             });
     }
 
@@ -503,17 +442,6 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
                                                                  0,
                                                                  0);
                     }
-                    if(load_active_1)
-                    {
-                        __builtin_amdgcn_raw_ptr_buffer_load_lds(input_rsrc,
-                                                                 store_input_lds_1 +
-                                                                     tic * INPUT_LDS_BUFFER_SIZE_C8,
-                                                                 16,
-                                                                 input_voffset_1 + row_offset,
-                                                                 0,
-                                                                 0,
-                                                                 0);
-                    }
                 }
 
                 static_for<cfg.kw>(
@@ -529,19 +457,15 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
                                 constexpr int p_idx = (Y_LOCAL - R + cfg.kh) % cfg.kh;
                                 if constexpr(cfg.direction == hipconv::Direction::Dgrad)
                                 {
-                                    int w_idx     = (cfg.kh - 1 - R) * cfg.kw + (cfg.kw - 1 - S);
-                                    acc[p_idx][0] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
-                                        weights_reg[w_idx][0], input_reg, acc[p_idx][0], 0, 0, 0);
-                                    acc[p_idx][1] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
-                                        weights_reg[w_idx][1], input_reg, acc[p_idx][1], 0, 0, 0);
+                                    int w_idx  = (cfg.kh - 1 - R) * cfg.kw + (cfg.kw - 1 - S);
+                                    acc[p_idx] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
+                                        weights_reg[w_idx], input_reg, acc[p_idx], 0, 0, 0);
                                 }
                                 else
                                 {
-                                    int w_idx     = R * cfg.kw + S;
-                                    acc[p_idx][0] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
-                                        weights_reg[w_idx][0], input_reg, acc[p_idx][0], 0, 0, 0);
-                                    acc[p_idx][1] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
-                                        weights_reg[w_idx][1], input_reg, acc[p_idx][1], 0, 0, 0);
+                                    int w_idx  = R * cfg.kw + S;
+                                    acc[p_idx] = __builtin_amdgcn_mfma_f32_16x16x32_f16(
+                                        weights_reg[w_idx], input_reg, acc[p_idx], 0, 0, 0);
                                 }
                             });
                     });
@@ -553,29 +477,20 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
                 int p_out             = y + py - (cfg.kh - 1);
                 if(p_out >= 0 && p_out < ho)
                 {
-                    __half2 halves_lo[2];
-                    halves_lo[0]    = __float22half2_rn({acc[P_FLUSH][0][0], acc[P_FLUSH][0][1]});
-                    halves_lo[1]    = __float22half2_rn({acc[P_FLUSH][0][2], acc[P_FLUSH][0][3]});
-                    auto out_reg_lo = *reinterpret_cast<const fp16x4_t*>(halves_lo);
+                    __half2 halves[2];
+                    halves[0]    = __float22half2_rn({acc[P_FLUSH][0], acc[P_FLUSH][1]});
+                    halves[1]    = __float22half2_rn({acc[P_FLUSH][2], acc[P_FLUSH][3]});
+                    auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
 
-                    __half2 halves_hi[2];
-                    halves_hi[0]    = __float22half2_rn({acc[P_FLUSH][1][0], acc[P_FLUSH][1][1]});
-                    halves_hi[1]    = __float22half2_rn({acc[P_FLUSH][1][2], acc[P_FLUSH][1][3]});
-                    auto out_reg_hi = *reinterpret_cast<const fp16x4_t*>(halves_hi);
-
-                    auto* store_output_lds = reinterpret_cast<uint2*>(output_lds);
-                    store_output_lds[output_lds_offset_lo] =
-                        *reinterpret_cast<const uint2*>(&out_reg_lo);
-                    store_output_lds[output_lds_offset_hi] =
-                        *reinterpret_cast<const uint2*>(&out_reg_hi);
+                    auto* store_output_lds              = reinterpret_cast<uint2*>(output_lds);
+                    store_output_lds[output_lds_offset] = *reinterpret_cast<const uint2*>(&out_reg);
 
                     __syncthreads(); // output_lds fully written
 
                     if(store_output_global)
                         store_output_global[p_out * wo_stride] = *load_output_lds;
                 }
-                acc[P_FLUSH][0] = Zero;
-                acc[P_FLUSH][1] = Zero;
+                acc[P_FLUSH] = Zero;
             });
     }
 
@@ -585,29 +500,21 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     for(int p_out = hi - cfg.kh + 1 + py; p_out < ho; p_out++)
     {
         int p_idx = (p_out - py + cfg.kh) % cfg.kh;
-        fp32x4_t slot_lo, slot_hi;
+        fp32x4_t slot;
         dispatch<cfg.kh>(p_idx,
                          [&]<int P>()
                          {
-                             slot_lo   = acc[P][0];
-                             slot_hi   = acc[P][1];
-                             acc[P][0] = Zero;
-                             acc[P][1] = Zero;
+                             slot   = acc[P];
+                             acc[P] = Zero;
                          });
 
-        __half2 halves_lo[2];
-        halves_lo[0]    = __float22half2_rn({slot_lo[0], slot_lo[1]});
-        halves_lo[1]    = __float22half2_rn({slot_lo[2], slot_lo[3]});
-        auto out_reg_lo = *reinterpret_cast<const fp16x4_t*>(halves_lo);
+        __half2 halves[2];
+        halves[0]    = __float22half2_rn({slot[0], slot[1]});
+        halves[1]    = __float22half2_rn({slot[2], slot[3]});
+        auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
 
-        __half2 halves_hi[2];
-        halves_hi[0]    = __float22half2_rn({slot_hi[0], slot_hi[1]});
-        halves_hi[1]    = __float22half2_rn({slot_hi[2], slot_hi[3]});
-        auto out_reg_hi = *reinterpret_cast<const fp16x4_t*>(halves_hi);
-
-        auto* store_output_lds                 = reinterpret_cast<uint2*>(output_lds);
-        store_output_lds[output_lds_offset_lo] = *reinterpret_cast<const uint2*>(&out_reg_lo);
-        store_output_lds[output_lds_offset_hi] = *reinterpret_cast<const uint2*>(&out_reg_hi);
+        auto* store_output_lds              = reinterpret_cast<uint2*>(output_lds);
+        store_output_lds[output_lds_offset] = *reinterpret_cast<const uint2*>(&out_reg);
 
         __syncthreads(); // output_lds fully written
 
