@@ -20,14 +20,31 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-# Benchmarks
+# Get the current branch, or fall back to DETACHED
+execute_process(
+  COMMAND ${GIT_EXECUTABLE} symbolic-ref -q --short HEAD
+  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+  OUTPUT_VARIABLE BRANCH_NAME
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+if(BRANCH_NAME STREQUAL "")
+  set(BRANCH_NAME "DETACHED")
+endif()
 
-function(add_rocrand_benchmark benchmark_src legacy)
+# Get the short commit hash
+execute_process(
+  COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
+  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+  OUTPUT_VARIABLE COMMIT_HASH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+function(add_benchmark benchmark_src)
   get_filename_component(BENCHMARK_TARGET ${benchmark_src} NAME_WE)
   add_executable(${BENCHMARK_TARGET} ${benchmark_src})
 
   if(HIP_COMPILER STREQUAL "nvcc")
-    set_property(TARGET ${BENCHMARK_TARGET} PROPERTY CUDA_STANDARD 14)
+    set_property(TARGET ${BENCHMARK_TARGET} PROPERTY CUDA_STANDARD 17)
     set_source_files_properties(${benchmark_src} PROPERTIES LANGUAGE CUDA)
     target_compile_options(${BENCHMARK_TARGET}
       PRIVATE
@@ -36,10 +53,19 @@ function(add_rocrand_benchmark benchmark_src legacy)
     target_link_libraries(${BENCHMARK_TARGET} ${CUDA_curand_LIBRARY})
   else()
     target_link_libraries(${BENCHMARK_TARGET} hip::device)
+    target_link_libraries(${BENCHMARK_TARGET} rocrand)
   endif()
-  target_link_libraries(${BENCHMARK_TARGET} roc::rocrand)
-  if(NOT legacy)
-    target_link_libraries(${BENCHMARK_TARGET} benchmark::benchmark)
+
+  target_include_directories(${BENCHMARK_TARGET} PRIVATE ../../../shared/primbench)
+
+  target_compile_definitions(${BENCHMARK_TARGET} PUBLIC BRANCH_NAME="${BRANCH_NAME}")
+  target_compile_definitions(${BENCHMARK_TARGET} PUBLIC COMMIT_HASH="${COMMIT_HASH}")
+
+  if(HIP_COMPILER STREQUAL "nvcc")
+    target_link_libraries(${BENCHMARK_TARGET} nvidia-ml)
+  else()
+    find_library(AMDSMI_LIB NAMES amd_smi REQUIRED)
+    target_link_libraries(${BENCHMARK_TARGET} ${AMDSMI_LIB})
   endif()
 
   set_target_properties(${BENCHMARK_TARGET}
@@ -63,21 +89,8 @@ function(add_rocrand_benchmark benchmark_src legacy)
   endif()
 endfunction()
 
-add_rocrand_benchmark("benchmark_rocrand_host_api.cpp" OFF)
-add_rocrand_benchmark("benchmark_rocrand_device_api.cpp" OFF)
-if(HIP_COMPILER STREQUAL "nvcc")
-  add_rocrand_benchmark("benchmark_curand_host_api.cpp" OFF)
-  add_rocrand_benchmark("benchmark_curand_device_api.cpp" OFF)
-endif()
-
-if(BUILD_LEGACY_BENCHMARK)
-  add_rocrand_benchmark("benchmark_rocrand_generate.cpp" ON)
-  add_rocrand_benchmark("benchmark_rocrand_kernel.cpp"   ON)
-  if(HIP_COMPILER STREQUAL "nvcc")
-    add_rocrand_benchmark("benchmark_curand_generate.cpp" ON)
-    add_rocrand_benchmark("benchmark_curand_kernel.cpp"   ON)
-  endif()
-endif()
+add_benchmark("benchmark_device_api.cpp")
+add_benchmark("benchmark_host_api.cpp")
 
 if(BUILD_BENCHMARK_TUNING)
   add_subdirectory(tuning)
