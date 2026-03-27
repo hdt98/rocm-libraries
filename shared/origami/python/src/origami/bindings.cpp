@@ -217,6 +217,16 @@ NB_MODULE(origami, m) {
       .def_rw("mem_bw_per_wg_coefficients", &hardware_t::mem_bw_per_wg_coefficients)
       .def_rw("NUM_XCD", &hardware_t::NUM_XCD);
 
+  nanobind::class_<origami::runtime_options>(m, "runtime_options")
+      .def_static("get", &origami::runtime_options::get,
+                  nanobind::rv_policy::reference,
+                  "Get the global runtime options instance")
+      .def_rw("debug_enabled", &origami::runtime_options::debug_enabled)
+      .def_rw("heuristics_enabled", &origami::runtime_options::heuristics_enabled)
+      .def_rw("heuristics_variance", &origami::runtime_options::heuristics_variance)
+      .def("update_from_env", &origami::runtime_options::update_from_env,
+           "Reload runtime options from environment variables");
+
   m.def("get_hardware_for_device",
         &hardware_t::get_hardware_for_device,
         "This gets a hardware object for a device.");

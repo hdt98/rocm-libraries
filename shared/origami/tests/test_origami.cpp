@@ -24,6 +24,7 @@
  *
  *******************************************************************************/
 
+#include <algorithm>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
@@ -168,6 +169,10 @@ TEST_CASE("Origami: best_macro_tile_size", "[origami]") {
       auto results = origami::rank_configs(problem, hardware, configs);
 
       REQUIRE(results.size() == configs.size());
+      double variance = origami::runtime_options::get().heuristics_variance;
+      auto min_it = std::min_element(results.begin(), results.end(),
+          [](const auto& a, const auto& b) { return a.latency < b.latency; });
+      REQUIRE(results[0].latency <= min_it->latency * (1.0 + variance));
     }
   }
 }
@@ -479,7 +484,15 @@ TEST_CASE("Origami: select_topk_configs unit test", "[origami]") {
       top_k_configs = origami::select_topk_configs(problem, hardware, config, 5);
       REQUIRE(top_k_configs.size() == 3);
 
-      // Test 4: Test with empty config list (should throw)
+      // Test 4: Verify top-ranked config is within heuristics_variance tolerance
+      {
+        double variance = origami::runtime_options::get().heuristics_variance;
+        auto min_it = std::min_element(top_k_configs.begin(), top_k_configs.end(),
+            [](const auto& a, const auto& b) { return a.latency < b.latency; });
+        REQUIRE(top_k_configs[0].latency <= min_it->latency * (1.0 + variance));
+      }
+
+      // Test 5: Test with empty config list (should throw)
       std::vector<origami::config_t> empty_configs;
       REQUIRE_THROWS_WITH(origami::select_topk_configs(problem, hardware, empty_configs, 5),
                           "No configurations provided.");

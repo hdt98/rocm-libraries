@@ -57,6 +57,10 @@ def test_rank_configs(hardware):
     assert len(ranked_configs) > 0
     assert len(ranked_configs) <= len(configs)
 
+    min_latency = min(c.latency for c in ranked_configs)
+    variance = origami.runtime_options.get().heuristics_variance
+    assert ranked_configs[0].latency <= min_latency * (1.0 + variance)
+
 
 @pytest.mark.integration
 def test_select_config_mnk(hardware):
@@ -90,6 +94,10 @@ def test_select_topk_configs(hardware):
     top_configs = origami.select_topk_configs(problem, hardware, configs, topk)
     assert len(top_configs) <= topk
     assert len(top_configs) > 0
+
+    min_latency = min(c.latency for c in top_configs)
+    variance = origami.runtime_options.get().heuristics_variance
+    assert top_configs[0].latency <= min_latency * (1.0 + variance)
 
 
 @pytest.mark.integration
