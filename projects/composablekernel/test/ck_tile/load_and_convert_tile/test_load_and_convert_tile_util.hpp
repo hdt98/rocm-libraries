@@ -30,9 +30,9 @@ class TestLoadAndConvert : public ::testing::Test
     protected:
     void RunTest()
     {
-        constexpr ck_tile::index_t M = 32;
-        constexpr ck_tile::index_t N = 32;
-        constexpr ck_tile::index_t K = 32;
+        constexpr ck_tile::index_t M = 256;
+        constexpr ck_tile::index_t N = 256;
+        constexpr ck_tile::index_t K = 64;
 
         ck_tile::HostTensor<XDataType> h_a({M, K});
         ck_tile::HostTensor<YDataType> h_c({M, K});
