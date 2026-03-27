@@ -187,6 +187,7 @@ namespace rocRoller
                                                      arg.getName()));
             }
 
+            rv.padTo(arg.getOffset());
             rv.append(arg.getName(), value);
         }
 

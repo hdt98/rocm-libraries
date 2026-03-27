@@ -429,6 +429,7 @@ namespace ArgumentLoaderGPUTest
         for(auto karg : m_context->kernel()->arguments())
         {
             auto value = Expression::evaluate(karg.getExpression(), commandArgs.runtimeArguments());
+            kernelArgs.padTo(karg.getOffset());
             kernelArgs.append(karg.getName(), value);
         }
 
