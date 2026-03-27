@@ -5100,10 +5100,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.states.lastValuAB - self.states.a.startVgprValu, "ValuAB")
     module.addComment1("Tail: add ValuA/B vgpr buffer [%u...%u) to pool" % \
         (self.states.a.startVgprValu, self.states.lastValuAB))
-    self.vgprPool.add(self.states.lastValuAB , \
-        self.states.lastVgprForReads - self.states.lastValuAB, "address vgpr")
-    module.addComment1("Tail: add address/G2L vgpr [%u...%u) to pool" % \
-        (self.states.lastValuAB, self.states.lastVgprForReads))
+    if not self.nllPapActive(kernel):
+      self.vgprPool.add(self.states.lastValuAB , \
+          self.states.lastVgprForReads - self.states.lastValuAB, "address vgpr")
+      module.addComment1("Tail: add address/G2L vgpr [%u...%u) to pool" % \
+          (self.states.lastValuAB, self.states.lastVgprForReads))
+    else:
+      module.addComment1("NLL PAP: G2L vgpr [%u...%u) held for prefetched data" % \
+          (self.states.lastValuAB, self.states.lastVgprForReads))
 
     self.removeSgprVarFromPool("SrdWS")
 
