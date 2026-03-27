@@ -11,15 +11,20 @@
 # Only device_conv* libraries are checked with if(TARGET).
 # All other libraries (utility, gtest_main, etc.) are always linked.
 macro(target_link_libraries_if_exist TARGET_NAME VISIBILITY)
-    foreach(lib IN LISTS ARGN)
+    set(_libs_to_link)
+    foreach(lib ${ARGN})
         if(lib MATCHES "^device_conv")
-            # Only check device_conv libraries conditionally
+            # Only add device_conv libraries if they exist
             if(TARGET ${lib})
-                target_link_libraries(${TARGET_NAME} ${VISIBILITY} ${lib})
+                list(APPEND _libs_to_link ${lib})
             endif()
         else()
-            # Always link non-device_conv libraries (utility, gtest_main, etc.)
-            target_link_libraries(${TARGET_NAME} ${VISIBILITY} ${lib})
+            # Always add non-device_conv libraries
+            list(APPEND _libs_to_link ${lib})
         endif()
     endforeach()
+    # Single target_link_libraries call with all libraries
+    if(_libs_to_link)
+        target_link_libraries(${TARGET_NAME} ${VISIBILITY} ${_libs_to_link})
+    endif()
 endmacro()
