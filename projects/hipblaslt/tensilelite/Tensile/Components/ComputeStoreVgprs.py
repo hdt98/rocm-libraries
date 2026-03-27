@@ -49,12 +49,8 @@ class ComputeStoreVgprsVALU(ComputeStoreVgprs):
         # tmpS1 = tmpS0+1
         # wgMT1 = tmpS0+2
 
-        # if writer.prefetchAcrossPersistent:
-        #     wg0="PrevWorkGroup0"
-        #     wg1="PrevWorkGroup1"
-        # else:
-        wg0="WorkGroup0"
-        wg1="WorkGroup1"
+        wg0=writer.storeWorkGroupSgpr(kernel, 0)
+        wg1=writer.storeWorkGroupSgpr(kernel, 1)
 
         # tid0, tid1: element offsets from the start of macroTile in 0 and 1 direction
         # These will live for entire GlobalWrite loop - allocate before tmps
@@ -222,8 +218,8 @@ class ComputeStoreVgprsMFMA(ComputeStoreVgprs):
             module.add(vectorStaticMultiply(vgpr(tid0), vgpr(tid0), kernel["MIOutputVectorWidth"], tmpSgprInfo, "thread0 * continuous_output"))
             module.add(VAddLShiftLeftU32(dst=vgpr(lsuTid0), src0=vgpr(tmpVgpr0), src1=vgpr(tid0), shiftHex=log2(kernel["VectorWidthA"]), comment="coordination 0 = vwA *(wave_id0 + tid0)"))
 
-            wg0="WorkGroup0"
-            wg1="WorkGroup1"
+            wg0=writer.storeWorkGroupSgpr(kernel, 0)
+            wg1=writer.storeWorkGroupSgpr(kernel, 1)
 
             # macro tile 0 part
             module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile0"], src1=sgpr(wg0), comment="wgp0 * MT0"))
@@ -343,8 +339,8 @@ class ComputeStoreVgprsMFMASwap(ComputeStoreVgprs):
             module.add(vectorStaticRemainder(dummy, tmpVgpr0, "Serial", matrixInstM, tmpVgpr1Res, tmpSgprInfo))
             module.add(VAddLShiftLeftU32(dst=vgpr(lsuTid0), src0=vgpr(tmpVgpr0), src1=vgpr(tid0), shiftHex=log2(kernel["VectorWidthA"]), comment="coordination 0 = vwA * (wave_id0 + tid0)"))
 
-            wg0="WorkGroup0"
-            wg1="WorkGroup1"
+            wg0=writer.storeWorkGroupSgpr(kernel, 0)
+            wg1=writer.storeWorkGroupSgpr(kernel, 1)
 
             # macro tile 0 part
             module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile0"], src1=sgpr(wg0), comment="wgp0 * MT0"))

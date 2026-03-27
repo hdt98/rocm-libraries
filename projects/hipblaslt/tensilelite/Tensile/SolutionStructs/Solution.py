@@ -1359,14 +1359,27 @@ class Solution(collections.abc.Mapping):
       if state.get("PrefetchAcrossPersistent", 0):
         if not state["BufferLoad"]:
           reject(state, printRejectionReason, "PrefetchAcrossPersistent requires BufferLoad")
-        if state["PrefetchGlobalRead"] < 2:
-          reject(state, printRejectionReason, "PrefetchAcrossPersistent requires PrefetchGlobalRead >= 2")
+        # if state["PrefetchGlobalRead"] < 2:
+        #   reject(state, printRejectionReason, "PrefetchAcrossPersistent requires PrefetchGlobalRead >= 2")
         if state["1LDSBuffer"] == 1:
           reject(state, printRejectionReason, "PrefetchAcrossPersistent requires 1LDSBuffer != 1 (double LDS buffer)")
         if state["DirectToVgprA"] or state["DirectToVgprB"]:
           reject(state, printRejectionReason, "PrefetchAcrossPersistent not supported with DirectToVgpr")
         if state["ProblemType"]["NumIndicesSummation"] > 1:
           reject(state, printRejectionReason, "PrefetchAcrossPersistent not supported with multiple summation indices")
+      if state["StreamK"] == 3 and state.get("PrefetchAcrossPersistent", 0):
+        if not state["BufferStore"]:
+          reject(state, printRejectionReason, "PrefetchAcrossPersistent NLL path requires BufferStore")
+        if state.get("SuppressNoLoadLoop", False):
+          reject(state, printRejectionReason, "PrefetchAcrossPersistent NLL path requires NoLoadLoop")
+        if state["DirectToLdsA"] or state["DirectToLdsB"]:
+          reject(state, printRejectionReason, "PrefetchAcrossPersistent NLL path not supported with DirectToLds")
+        if state["ProblemType"]["Sparse"]:
+          reject(state, printRejectionReason, "PrefetchAcrossPersistent NLL path not supported with sparse")
+        if state.get("UseCustomMainLoopSchedule", 0) == 1:
+          reject(state, printRejectionReason, "PrefetchAcrossPersistent NLL path not supported with custom main-loop scheduling")
+        if state["StoreRemapVectorWidth"]:
+          reject(state, printRejectionReason, "PrefetchAcrossPersistent NLL path not supported with StoreRemap")
       if not state["Valid"]:
         print2("in assignDerivedParameters, state['Valid'] = False")
         return
