@@ -99,19 +99,9 @@ template <index_t I>
 struct static_for_product<number<I>> : public static_for<0, I, 1>
 {
 };
-template <typename First, typename... Rest>
-struct static_for_product<First, Rest...>
-{
-    template <typename F>
-    CK_TILE_HOST_DEVICE constexpr void operator()(F f) const
-    {
-        static_for_product<First>{}([=](auto I) {
-            static_for_product<Rest...>{}([=](auto... Is) { //
-                f(I, Is...);
-            });
-        });
-    }
-};
+
+// Note: Multi-arg static_for_product<First, Rest...> specialization is defined
+// after static_ford (which it depends on). See below.
 
 struct identity
 {
@@ -229,6 +219,165 @@ struct static_ford : detail::ford_base<Lengths, Orders>
         });
     }
 };
+
+// ============================================================================
+// Optimized static_for_product implementation (multi-arg specialization)
+// Uses static_ford for O(1) template depth instead of recursive lambdas
+// ============================================================================
+
+namespace detail {
+
+// Helper to extract iteration count from dimension specifiers
+template <typename T>
+struct product_dim_length;
+
+// static_for<Begin, End, Step> -> number of iterations
+template <index_t Begin, index_t End, index_t Step>
+struct product_dim_length<static_for<Begin, End, Step>>
+{
+    static constexpr index_t value = (End - Begin) / Step;
+};
+
+// sequence<Is...> -> iterate over each element (size of sequence)
+template <index_t... Is>
+struct product_dim_length<sequence<Is...>>
+{
+    static constexpr index_t value = sizeof...(Is);
+};
+
+// number<N> -> iterate 0 to N-1
+template <index_t N>
+struct product_dim_length<number<N>>
+{
+    static constexpr index_t value = N;
+};
+
+// Helper to convert linear index component to the actual iteration value
+template <typename T>
+struct product_dim_value;
+
+// static_for<Begin, End, Step> -> Begin + idx * Step
+template <index_t Begin, index_t End, index_t Step>
+struct product_dim_value<static_for<Begin, End, Step>>
+{
+    template <index_t Idx>
+    static constexpr index_t get = Begin + Idx * Step;
+};
+
+// sequence<Is...> -> Is[idx]
+template <index_t... Is>
+struct product_dim_value<sequence<Is...>>
+{
+    template <index_t Idx>
+    static constexpr index_t get = sequence<Is...>::at(Idx);
+};
+
+// number<N> -> idx directly
+template <index_t N>
+struct product_dim_value<number<N>>
+{
+    template <index_t Idx>
+    static constexpr index_t get = Idx;
+};
+
+// Helper to call f with unpacked number<> arguments from a sequence
+template <typename... Dims>
+struct product_caller;
+
+template <typename Dim>
+struct product_caller<Dim>
+{
+    template <typename F, index_t Idx>
+    CK_TILE_HOST_DEVICE static constexpr void call(F& f)
+    {
+        f(number<product_dim_value<Dim>::template get<Idx>>{});
+    }
+};
+
+template <typename Dim0, typename Dim1, typename... Rest>
+struct product_caller<Dim0, Dim1, Rest...>
+{
+    template <typename F, index_t Idx0, index_t Idx1, index_t... IdxRest>
+    CK_TILE_HOST_DEVICE static constexpr void call(F& f)
+    {
+        f(number<product_dim_value<Dim0>::template get<Idx0>>{},
+          number<product_dim_value<Dim1>::template get<Idx1>>{},
+          number<product_dim_value<Rest>::template get<IdxRest>>{}...);
+    }
+};
+
+// Dispatcher that extracts indices from sequence and calls product_caller
+template <typename... Dims>
+struct product_dispatch;
+
+template <typename Dim>
+struct product_dispatch<Dim>
+{
+    template <typename F, index_t Idx>
+    CK_TILE_HOST_DEVICE static constexpr void call(F& f, sequence<Idx>)
+    {
+        product_caller<Dim>::template call<F, Idx>(f);
+    }
+};
+
+template <typename Dim0, typename Dim1>
+struct product_dispatch<Dim0, Dim1>
+{
+    template <typename F, index_t Idx0, index_t Idx1>
+    CK_TILE_HOST_DEVICE static constexpr void call(F& f, sequence<Idx0, Idx1>)
+    {
+        product_caller<Dim0, Dim1>::template call<F, Idx0, Idx1>(f);
+    }
+};
+
+template <typename Dim0, typename Dim1, typename Dim2>
+struct product_dispatch<Dim0, Dim1, Dim2>
+{
+    template <typename F, index_t Idx0, index_t Idx1, index_t Idx2>
+    CK_TILE_HOST_DEVICE static constexpr void call(F& f, sequence<Idx0, Idx1, Idx2>)
+    {
+        product_caller<Dim0, Dim1, Dim2>::template call<F, Idx0, Idx1, Idx2>(f);
+    }
+};
+
+template <typename Dim0, typename Dim1, typename Dim2, typename Dim3>
+struct product_dispatch<Dim0, Dim1, Dim2, Dim3>
+{
+    template <typename F, index_t Idx0, index_t Idx1, index_t Idx2, index_t Idx3>
+    CK_TILE_HOST_DEVICE static constexpr void call(F& f, sequence<Idx0, Idx1, Idx2, Idx3>)
+    {
+        product_caller<Dim0, Dim1, Dim2, Dim3>::template call<F, Idx0, Idx1, Idx2, Idx3>(f);
+    }
+};
+
+} // namespace detail
+
+// Optimized multi-dimensional product iteration using flat loop + index decomposition.
+// Avoids recursive lambda nesting that causes O(N) unique lambda type instantiations.
+//
+// Usage: static_for_product<number<2>, number<3>>{}([](auto i, auto j) { ... });
+//        static_for_product<sequence<1,2,3>, number<4>>{}([](auto i, auto j) { ... });
+template <typename First, typename... Rest>
+struct static_for_product<First, Rest...>
+{
+    // Build lengths sequence for static_ford
+    using Lengths = sequence<detail::product_dim_length<First>::value,
+                             detail::product_dim_length<Rest>::value...>;
+
+    template <typename F>
+    CK_TILE_HOST_DEVICE constexpr void operator()(F f) const
+    {
+        // Use static_ford for flat iteration with O(1) template depth
+        static_ford<Lengths>{}([&](auto idx) {
+            // Convert multi-index to actual iteration values and call f
+            detail::product_dispatch<First, Rest...>::call(f, idx);
+        });
+    }
+};
+
+// ============================================================================
+// End of static_for_product implementation
+// ============================================================================
 
 namespace detail {
 
