@@ -406,67 +406,6 @@ For a K-tile of size K_tile along k_gemm with filter X×C:
 | K_tile = X×C | Yes (always) | X |
 | K_tile > X×C | No | > X |
 
-### Precomputation cost summary
-
-| Computation | Cost | Frequency |
-|-------------|------|-----------|
-| M_base[0..M_tile-1] | 3 divmod + M_tile adds | Once per block |
-| K_base (per K-tile) | 2 divmod (or cheaper) | Once per K-tile |
-| Per-element offset | 2 additions + 2 register reads | Every load |
-
-### Amortized division cost per element load
-
-```
-cost_per_load = (3 + K_tiles × 2) / (M_tile × K_tile)
-              = 3 / (M_tile × K_tile) + 2 / M_tile
-```
-
-For analyzed case (M_tile=16, K_tile=64, K_tiles=8):
-```
-= 3 / (16 × 512) + 2 / 16 = 0.000366 + 0.125 ≈ 0.125 divisions/load
-```
-
-Compare with current (full unmerge on every move_tensor_coordinate call):
-```
-≈ 4 divisions per load (2 for M, 2 for K)
-```
-
-**Reduction factor: ~32× fewer integer divisions in the hot path.**
-
----
-
-## Practical Constraints and Edge Cases
-
-### When n_conv spans the tile
-
-Probability ≈ M_tile / (Ho × Wo). When it occurs (e.g., last few M-tiles):
-- n_conv changes once at the boundary
-- Add `NStride` to M_base for subsequent rows, similar to `wrap_delta`
-- Negligible frequency; can be handled with a branch
-
-> Test: [NConvConstantWithinTile](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L526)
-
-### When K_tile > X×C (y changes within K-tile)
-
-y-boundaries within K-tile: `⌊(x_0 + K_tile/C − 1) / X⌋`
-
-When y changes: add `DH × HiStride − X × DW × WiStride` to K_base at the boundary.
-This is the K-dimension equivalent of `wrap_delta`.
-
-### Non-unit stride with large strides
-
-Large SH or SW reduce Ho/Wo, which increases P(n_conv spans tile) and
-P(ho is constant per tile). Large strides favour the precomputed approach
-since M_base changes more slowly per output element.
-
-> Tests: [Stride2DecompositionVsReference](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L670) · [Stride2StepW](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp#L680)
-
-### Alignment of K_tile to C
-
-If K_tile is not a multiple of C, the K-tile may start mid-cycle in c_conv.
-Account for by initialising `c_start = k_start % C` and adjusting K_base
-and the x-transition point accordingly.
-
 
 ## Testing
 
@@ -474,7 +413,7 @@ Unit tests for the im2col index calculations:
 [test_im2col_index_mapping.cpp](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp)
 
 
-# Computation of the im2col indices in a tile window
+# Computation of the im2col indices in a CK tile window
 
 The tile window ([tile_window.hpp](../include/ck_tile/core/tensor/tile_window.hpp)) handles the loading of a given input tile of size 
 $M_{\text{tile}} \times K_{\text{tile}}$. Each workgroup (thread block) handles a single tile. The local tile coordinates are denoted by 
@@ -503,8 +442,8 @@ Creation of the tile window with the tile distribution triggers `prepare_coords`
 
 ## Tile distribution
 
-How different threads map to $(m_{\text{gemm}}, k_{\text{gemm}})$ depends on the tile distribution which provide mapping from the 
-thread index to the local tile index $(i,j)$. The `TiledIm2ColCoordinate` maps $(i,j) \rightarrow (m_{\text{gemm}}$ and $k_{\text{gemm}})$.
+How different threads map to $(m_{\text{gemm}}, k_{\text{gemm}})$ depends on the tile distribution that provides mapping from the 
+thread index to the local tile index $(m_{\text{gemm}}, k_{\text{gemm}})$. The `TiledIm2ColCoordinate` maps $(m_{\text{gemm}}, k_{\text{gemm}}) \rightarrow (n,h,w,y,x,c) \rightarrow \text{global mem address}$.
 
 For the convolution problem, the tile distribution is determined by the GEMM pipeline policy `GroupedConvUniversalPipelineAgBgCrPolicy` 
 ([grouped_conv_universal_pipeline_ag_bg_cr_policy.hpp](../include/ck_tile/ops/grouped_convolution/pipeline/grouped_conv_universal_pipeline_ag_bg_cr_policy.hpp)). This derives from `UniversalGemmBasePolicy` ([gemm_universal_pipeline_ag_bg_cr_policy.hpp](../include/ck_tile/ops/gemm/pipeline/gemm_universal_pipeline_ag_bg_cr_policy.hpp)) which
@@ -530,12 +469,124 @@ accessing the global memory.
 Recall that for a normal GEMM problem, we can store the matrix in row- or column-major order. Suppose we have row-major order and 
 assume threads in the workgroup are also organized in the row-major order, separated by the vector load size. In this ordering, 
 the memory access is coalesced and the memory controller can organize the memory accesses as few transactions as possible. 
-The tile distribution corresponding to a coalesced memory access is given by (assume vector load size 4 for 16-bit data type) 
+The tile distribution corresponding to a coalesced memory access is given by (assume vector load size 4 for 16-bit data type).
+
+Assume the following parameters
+
+```
+BlockSize=256, MPerBlock=128, KPerBlock=32, VecLoadSize=8, NumWaveGroups=1
+```
+
+The tile distribution encoding gives rise to the following parameters
+
+```
+LargestVec = (128 × 32) / (4 × 64) = 4096 / 256 = 16
+X1 = min(8, 16) = 8            ← actual vector load size (elements per thread)
+X0 = min(64, 32/8) = min(64, 4) = 4   ← threads in K direction per warp
+Y1 = 64 / 4 = 16              ← rows (M) per warp per iteration
+Y0 = (256/64) / 1 = 4         ← number of warps
+Y2 = 128 / (16 × 4) = 2       ← iterations per warp along M
+```
+
+Nomenclature: lane is thread index within wavefront (warp). The lane index takes values {0,...,63}.
+
+So the thread-to-$(m_{\text{loc}}, k_{\text{loc}})$ mapping is:
 
 
+| Variable | Maps to | Range |
+|----------|---------|-------|
+| warp_id (Y0) | m-block (groups of Y1 rows) | 0..3 |
+| lane_id / X0 (Y1) | m within warp | 0..15 |
+| iter (Y2) | m coarse | 0..1 |
+| lane_id % X0 (X0) | k-group | 0..3 |
+| vec_offset (X1) | k within group | 0..7 |
+
+Concretely: within a warp (lanes 0..63):
+
+```
+k_gemm = (lane_id % 4) * 8 + vec_offset → k strides by 8 between adjacent lane-groups
+m_gemm = (lane_id / 4) + warp_id*16 + iter*64 → consecutive rows for lanes 4..7, 8..11, etc.
+```
+
+4 consecutive lanes share the same m_gemm. Each group of 4 lanes covers 4×8=32 K elements (one full KPerBlock row).
+
+### Pure GEMM
+
+The linear global memory address is 
+
+```
+addr = m_gemm * K_total + k_gemm
+```
+
+Adjacent lanes (in groups of 4 lanes) have:
+
+- k_gemm values: {0, 8, 16, 24} + vec_offset (stride = X1 = 8 elements between lane-groups)
+- m_gemm values: same for all lanes in the group
+
+ The group of 4 lanes together covers k=0...31 contiguously and the four vector loads are coalesced into one 
+ 128-byte transaction (for fp16: 4 × 8 × 2 = 64 bytes per load, 2 loads cover 128B). 
+ Memory access is fully coalesced.
+
+### im2col GEMM
+
+The linear memory address is 
+
+```
+addr = = M_base(m_gemm) + K_offset(k_gemm) + const_g
+```
+
+Consider two conv cases
+
+- (N, G, C, K, Y, X, H, W) = (32, 32, 8, 8, 3, 3, 200, 200) (case A)
+- (N, G, C, K, Y, X, H, W) = (32, 1, 256, 256, 3, 3, 100, 100) (case B)
+
+---
+
+Case A
+
+For the lane group of 4 lanes, we have have same m_gemm (M_base is constant), but different k_gemm ∈ {0, 8, 16, 24} + vec_offset
+- K_offset at k_gemm=0: c_conv=0, x=0, y=0 → K_offset=0
+- K_offset at k_gemm=8: c_conv=0, x=1, y=0 → K_offset = DW×WiStride = 256
+- K_offset at k_gemm=16: c_conv=0, x=2, y=0 → K_offset = 2×256 = 512
+- K_offset at k_gemm=24: c_conv=0, x=0, y=1 → K_offset = DH×HiStride = 51200
+
+This results in non-coalesced memory access and partially explain why im2col has such hard time with these low number of channels per group cases.
 
 
-## Wave-uniform $m_{\text{gemm}}$ index
+---
+
+Case B
+
+We have KPerBlock < C (32 vs 256). This simplifies significantly the calculation $k_{\text{gemm}} \mapsto (y, x, c)$ as 
+we get $(y,x,c) = (0, 0, k_{\text{gemm}})$. Hence, for a group of 4 lanes, we have 
+
+- K_offset at k_gemm=0 → K_offset = 0
+- K_offset at k_gemm=8 → K_offset = 8
+- K_offset at k_gemm=16 → K_offset = 16
+- K_offset at k_gemm=24 → K_offset = 24
+
+Each 4 lane group corresponds to one 64B cache line (4 x 8 FP16/BF16 values). Hence, the memory access is coalesced in 
+the K-direction. 
+
+---
+
+In both cases, adjacent $m_{\text{gemm}}$ values are 256 elements apart and the memory access in the M-dimension is 
+non-coalesced.
+
+## Im2Col index calculation optimizations
+
+## Linear `K_offset`
+
+We can simplify `K_offset` calculation if `KPerBlock < C`. In this case, we can set 
+```
+y = x = 0
+c = k_gemm
+```
+and we have `K_offset(k_gemm) = k_gemm`.
+
+We need to add a runtime applicability check to ensure the condition `KPerBlock < C` is satisfied.
+
+### Wave-uniform $m_{\text{gemm}}$ index
 
 The fundamental equation:
 
