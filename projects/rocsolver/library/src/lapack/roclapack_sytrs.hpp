@@ -175,7 +175,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
     // ------------------
     auto idx2D = [](auto i, auto j, auto ld) { return (i + (j * static_cast<int64_t>(ld))); };
 
-    auto ceildiv = [](auto const n, auto const b) { return ((n - 1) / b + 1); };
+    auto ceildiv = [](auto const n, auto const b) { return ((n <= 0) ? 0 : ((n - 1) / b + 1)); };
 
     I nrhs = nrhs_arg;
     Istride offsetB = 0;
@@ -287,7 +287,14 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
     // scale a vector
     // -------------
     auto sytrs_scal = [=](I const n, T const alpha, T* const x, I const incx) {
-        T const zero = 0;
+        {
+            T const one = 1;
+            bool const has_work_to_do = (n >= 1) && (alpha != one);
+            if(!has_work_to_do)
+            {
+                return;
+            }
+        }
 
         __syncthreads();
 
@@ -295,7 +302,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
         {
             auto const ix = (incx == 1) ? ij : ij * static_cast<int64_t>(incx);
 
-            x[ix] = (alpha == zero) ? zero : (alpha * x[ix]);
+            x[ix] *= alpha;
         }
 
         __syncthreads();
@@ -328,17 +335,21 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
         I const leny = (is_no_trans) ? m : n;
 
         T const zero = 0;
+        T const one = 1;
 
         // --------------
         // scale vector y
         // --------------
-        for(I ij = 0 + ij_start; ij < leny; ij += ij_inc)
+        if(beta != one)
         {
-            auto const iy = (incy == 1) ? ij : ij * static_cast<int64_t>(incy);
-            y[iy] = (beta == zero) ? zero : (beta * y[iy]);
-        }
+            for(I ij = 0 + ij_start; ij < leny; ij += ij_inc)
+            {
+                auto const iy = (incy == 1) ? ij : ij * static_cast<int64_t>(incy);
+                y[iy] = (beta == zero) ? zero : (beta * y[iy]);
+            }
 
-        __syncthreads();
+            __syncthreads();
+        }
 
         for(I j = 0 + j_start; j < leny; j += j_inc)
         {
@@ -397,8 +408,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
     for(I bid = bid_start; bid < batch_count; bid += bid_inc)
     {
         // get array pointers
-        T* const A_ = load_ptr_batch<T>(AA, bid, shiftA, strideA);
-        I* const ipiv_ = ipivA + (bid * strideP);
+        T* const A_bid = load_ptr_batch<T>(AA, bid, shiftA, strideA);
+        I* const ipiv_bid = ipivA + (bid * strideP);
 
         T* const B_bid = load_ptr_batch<T>(BB, bid, shiftB, strideB) + offsetB;
 
@@ -406,7 +417,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
         // try to hold B in LDS
         // --------------------
 
-        T* const B_ = (use_B_lds) ? B_lds : B_bid;
+        T* const B_p = (use_B_lds) ? B_lds : B_bid;
         I const ldb = (use_B_lds) ? n : ldb_arg;
 
         if(use_B_lds)
@@ -443,11 +454,11 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
             __syncthreads();
         }
 
-        auto A = [=](auto i, auto j) -> T& { return (A_[idx2F(i, j, lda)]); };
+        auto A = [=](auto i, auto j) -> T& { return (A_bid[idx2F(i, j, lda)]); };
 
-        auto B = [=](auto i, auto j) -> T& { return (B_[idx2F(i, j, ldb)]); };
+        auto B = [=](auto i, auto j) -> T& { return (B_p[idx2F(i, j, ldb)]); };
 
-        auto ipiv = [=](auto i) -> I& { return (ipiv_[(i - 1)]); };
+        auto ipiv = [=](auto i) -> I& { return (ipiv_bid[(i - 1)]); };
 
         if(use_upper)
         {
@@ -955,13 +966,13 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
     }
 
     I const warp_size = get_warp_size();
-    I const max_blocks = 64 * 1024 - 2;
+    I const max_blocks = 64 * 1024 - 3;
     I const nbz = std::max(I(1), std::min(max_blocks, batch_count));
 
     // -----------------------------------------
     // each thread block handles about NB columns of B
     // -----------------------------------------
-    auto ceildiv = [](auto const n, auto const b) { return ((n - 1) / b + 1); };
+    auto ceildiv = [](auto const n, auto const b) { return ((n <= 0) ? 0 : ((n - 1) / b + 1)); };
     I const NB = SYTRS_MAX_THDS;
     I const nbx = ceildiv(nrhs, NB);
 
@@ -975,7 +986,7 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
     size_t const lds_size_max = get_lds_size();
 
     I const nx = warp_size;
-    I const ny = std::max(I(1), std::min(I(SYTRS_MAX_THDS), nthreads) / nx);
+    I const ny = std::max(I(1), nthreads / nx);
 
     // ------------------------------
     // check whether B can fit in LDS
