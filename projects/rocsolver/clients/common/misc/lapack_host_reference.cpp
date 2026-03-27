@@ -485,6 +485,50 @@ void zgetrs_(char* trans,
              int* ldb,
              int* info);
 
+void zsytrs2_(char* uplo,
+              int* n,
+              int* nrhs,
+              rocblas_double_complex* A,
+              int* lda,
+              int* ipiv,
+              rocblas_double_complex* B,
+              int* ldb,
+              rocblas_double_complex* work,
+              int* info);
+
+void csytrs2_(char* uplo,
+              int* n,
+              int* nrhs,
+              rocblas_float_complex* A,
+              int* lda,
+              int* ipiv,
+              rocblas_float_complex* B,
+              int* ldb,
+              rocblas_float_complex* work,
+              int* info);
+
+void dsytrs2_(char* uplo,
+              int* n,
+              int* nrhs,
+              double* A,
+              int* lda,
+              int* ipiv,
+              double* B,
+              int* ldb,
+              double* work,
+              int* info);
+
+void ssytrs2_(char* uplo,
+              int* n,
+              int* nrhs,
+              float* A,
+              int* lda,
+              int* ipiv,
+              float* B,
+              int* ldb,
+              float* work,
+              int* info);
+
 void ssytrs_(char* uplo, int* n, int* nrhs, float* A, int* lda, int* ipiv, float* B, int* ldb, int* info);
 void dsytrs_(char* uplo, int* n, int* nrhs, double* A, int* lda, int* ipiv, double* B, int* ldb, int* info);
 void csytrs_(char* uplo,
@@ -5775,6 +5819,70 @@ void cpu_sytrs<rocblas_double_complex>(rocblas_fill uplo,
     zsytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &info);
 }
 
+// sytrs2
+template <>
+void cpu_sytrs2<float>(rocblas_fill uplo,
+                       rocblas_int n,
+                       rocblas_int nrhs,
+                       float* A,
+                       rocblas_int lda,
+                       rocblas_int* ipiv,
+                       float* B,
+                       rocblas_int ldb)
+{
+    rocblas_int info = 0;
+    std::vector<float> work(n);
+    char uploC = rocblas2char_fill(uplo);
+    ssytrs2_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &(work[0]), &info);
+}
+
+template <>
+void cpu_sytrs2<double>(rocblas_fill uplo,
+                        rocblas_int n,
+                        rocblas_int nrhs,
+                        double* A,
+                        rocblas_int lda,
+                        rocblas_int* ipiv,
+                        double* B,
+                        rocblas_int ldb)
+{
+    rocblas_int info = 0;
+    std::vector<double> work(n);
+    char uploC = rocblas2char_fill(uplo);
+    dsytrs2_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &(work[0]), &info);
+}
+
+template <>
+void cpu_sytrs2<rocblas_float_complex>(rocblas_fill uplo,
+                                       rocblas_int n,
+                                       rocblas_int nrhs,
+                                       rocblas_float_complex* A,
+                                       rocblas_int lda,
+                                       rocblas_int* ipiv,
+                                       rocblas_float_complex* B,
+                                       rocblas_int ldb)
+{
+    rocblas_int info = 0;
+    std::vector<rocblas_float_complex> work(n);
+    char uploC = rocblas2char_fill(uplo);
+    csytrs2_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &(work[0]), &info);
+}
+
+template <>
+void cpu_sytrs2<rocblas_double_complex>(rocblas_fill uplo,
+                                        rocblas_int n,
+                                        rocblas_int nrhs,
+                                        rocblas_double_complex* A,
+                                        rocblas_int lda,
+                                        rocblas_int* ipiv,
+                                        rocblas_double_complex* B,
+                                        rocblas_int ldb)
+{
+    rocblas_int info = 0;
+    std::vector<rocblas_double_complex> work(n);
+    char uploC = rocblas2char_fill(uplo);
+    zsytrs2_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &(work[0]), &info);
+}
 // gesv
 template <>
 void cpu_gesv<float>(rocblas_int n,
