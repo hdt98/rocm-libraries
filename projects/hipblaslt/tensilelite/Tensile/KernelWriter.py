@@ -3448,6 +3448,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
     module.add(self.noLoadLoopBody(kernel, tensorParametersA, tensorParametersB, pack, packPre, isOptNLL, isNGLL, NLLfirst, NLLlast, NLLindex=NLLindex, \
                                    NLLnum=NLLnum, useTailloopInNll=useTailloopInNll, remainPgr=remainPgr))
 
+    if (not isOptNLL and not isNGLL and NLLindex == NLLnum - 1
+        and self.nllPapActive(kernel)):
+      module.add(self.prefetchAcrossPersistentNoLoadLoop(kernel, tensorParametersA, tensorParametersB))
+
     if self.do["executeToLoopEnd"] and isOptNLL:
       module.add(self.functionEnd(kernel, addLabel=False))
 
@@ -5339,7 +5343,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.addComment1("not-LocalSplitU: global write")
       module.add(self.notLocalSplitUGlobalWrite(kernel, tensorParametersA, tensorParametersB))
 
-    module.add(self.prefetchAcrossPersistentAfterGlobalWrite(kernel, tensorParametersA, tensorParametersB))
+    if not self.nllPapActive(kernel):
+      module.add(self.prefetchAcrossPersistentAfterGlobalWrite(kernel, tensorParametersA, tensorParametersB))
     module.add(self.functionEnd(kernel, addLabel=True))
 
     # Add a label at the end of the asm for indexing.
@@ -7710,6 +7715,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if kernel["StreamK"] and kernel.get("PrefetchAcrossPersistent"):
       self.defineSgpr("SkPrefetchPrimed", 1)
       self.states.numSgprStreamK += 1
+    if kernel["StreamK"] == 3 and kernel.get("PrefetchAcrossPersistent"):
+      self.defineSgpr("PrevWorkGroup0", 1)
+      self.defineSgpr("PrevWorkGroup1", 1)
+      self.defineSgpr("PrevWorkGroup2", 1)
+      self.defineSgpr("PrevStreamKLocalStart", 1)
+      self.defineSgpr("PrevStreamKLocalEnd", 1)
+      if len(kernel["SpaceFillingAlgo"]):
+        self.defineSgpr("PrevStreamKTileID", 1)
     # These SGPRs aren't used right away, add them to sgpr pool temporarily
     if self.states.doShadowInit and kernel["BufferStore"]:
       self.addSgprVarToPool("SrdC")
@@ -8588,6 +8601,38 @@ class KernelWriter(metaclass=abc.ABCMeta):
   @abc.abstractmethod
   def closePrefetchGlobalRead2orMore(self, kernel, tensorParametersA, tensorParametersB, idxPgr):
     return ""
+
+  ##############################################################################
+  # NLL PAP: helper accessors for store-visible state
+  ##############################################################################
+  def nllPapActive(self, kernel):
+    """Return True when NLL PAP is enabled for this kernel."""
+    return (kernel["StreamK"] == 3
+            and kernel.get("PrefetchAcrossPersistent", 0)
+            and not kernel.get("SuppressNoLoadLoop", False)
+            and kernel["PrefetchGlobalRead"] >= 2
+            and not kernel.get("UseCustomMainLoopSchedule", 0))
+
+  def storeWorkGroupSgpr(self, kernel, dim):
+    """Return the SGPR name for store-visible WorkGroup state.
+
+    When NLL PAP is active the live WorkGroup* holds the *next* tile's
+    state.  Store/fixup paths must read the snapshotted PrevWorkGroup*
+    instead.
+    """
+    if self.nllPapActive(kernel):
+      return "PrevWorkGroup%u" % dim
+    return "WorkGroup%u" % dim
+
+  def storeStreamKSgpr(self, kernel, sgprName):
+    """Return the SGPR name for store-visible StreamK state.
+
+    Accepted *sgprName* values: ``StreamKLocalStart``,
+    ``StreamKLocalEnd``, ``StreamKTileID``.
+    """
+    if self.nllPapActive(kernel):
+      return "Prev" + sgprName
+    return sgprName
 
   ##############################################################################
   # Prefetch across persistent loop (StreamK): optional SGPR warm-up before back-edge
