@@ -324,6 +324,7 @@ if (SUPPORTED_GPU_TARGETS MATCHES "gfx1250")
 endif()
 if (SUPPORTED_GPU_TARGETS MATCHES "gfx13")
     add_definitions(-DCK_EXTENSION_MX_TYPE)
+    add_definitions(-DCK_USE_GFX13)
     set(ENABLE_MX_TYPE "ON")
 endif()
 

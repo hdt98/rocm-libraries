@@ -29,8 +29,8 @@ function(add_wp_test TEST_CLASS_NAME KERNEL_TYPES TEST_SUFFIX)
         ${CMAKE_CURRENT_SOURCE_DIR})
 endfunction()
 
-# TestCkTileGemmPipelineWeightPreshuffle: gfx94/gfx95/gfx11/gfx12
-if(GPU_TARGETS MATCHES "gfx94|gfx95|gfx11|gfx12")
+# TestCkTileGemmPipelineWeightPreshuffle: gfx94/gfx95/gfx11/gfx12/gfx13
+if(GPU_TARGETS MATCHES "gfx94|gfx95|gfx11|gfx12|gfx13")
     add_wp_test(
         TestCkTileGemmPipelineWeightPreshuffle
         KernelTypesWeightPreshuffle

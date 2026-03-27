@@ -9,7 +9,7 @@ endif()
 list(APPEND EXAMPLE_GEMM_COMPILE_OPTIONS -Wno-global-constructors) # use global constructors to add kernel instances
 list(APPEND EXAMPLE_GEMM_COMPILE_OPTIONS -mllvm -enable-noalias-to-md-conversion=0)
 
-if(GPU_TARGETS MATCHES "gfx94|gfx95|gfx12")
+if(GPU_TARGETS MATCHES "gfx94|gfx95|gfx12|gfx13")
     set(EXE_NAME tile_example_gemm_quant)
     add_executable(${EXE_NAME}
         gemm_quant.cpp

@@ -114,6 +114,10 @@ float moe_gemm(const ck_tile::MoeFlatmmHostArgs<ScaleM, ScaleN>& args,
                                            ELayout,
                                            FlatmmConfig::NumWaveGroups>;
 
+    constexpr ck_tile::index_t VectorLoadSize = ck_tile::min(
+        static_cast<ck_tile::index_t>(FlatmmConfig::M_Warp_Tile * FlatmmConfig::K_Warp_Tile *
+                                      sizeof(ADataType) / 32),
+        16);
     using CodegenGemmTraits = ck_tile::TileGemmUniversalTraits<FlatmmConfig::kPadM,
                                                                FlatmmConfig::kPadN,
                                                                FlatmmConfig::kPadK,
@@ -125,7 +129,8 @@ float moe_gemm(const ck_tile::MoeFlatmmHostArgs<ScaleM, ScaleN>& args,
                                                                FlatmmConfig::UseStructuredSparsity,
                                                                false, // UsePersistentKernel_
                                                                FlatmmConfig::NumWaveGroups,
-                                                               true>; // Preshuffle_
+                                                               true, // Preshuffle_
+                                                               VectorLoadSize>;
 
     if constexpr(moe_kind == ck_tile::MoeFlatmmKind::kFFN_gemm1_gate_up)
     {
