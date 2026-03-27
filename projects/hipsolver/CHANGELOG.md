@@ -7,6 +7,10 @@ Full documentation for hipSOLVER is available at the [hipSOLVER Documentation](h
 
 ### Added
 ### Changed
+
+* Replaced occurrences of double underscores in test suite names within benchmarking client
+    * e.g., `checkin_lapack/GETRS.__float/0` was changed to `checkin_lapack/GETRS._float/0`
+
 ### Removed
 ### Optimized
 ### Resolved issues
