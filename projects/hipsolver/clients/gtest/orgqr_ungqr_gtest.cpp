@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -132,62 +132,62 @@ class UNGQR_COMPAT : public ORGQR_UNGQR<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(ORGQR, __float)
+TEST_P(ORGQR, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORGQR, __double)
+TEST_P(ORGQR, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNGQR, __float_complex)
+TEST_P(UNGQR, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNGQR, __double_complex)
+TEST_P(UNGQR, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORGQR_FORTRAN, __float)
+TEST_P(ORGQR_FORTRAN, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORGQR_FORTRAN, __double)
+TEST_P(ORGQR_FORTRAN, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNGQR_FORTRAN, __float_complex)
+TEST_P(UNGQR_FORTRAN, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNGQR_FORTRAN, __double_complex)
+TEST_P(UNGQR_FORTRAN, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORGQR_COMPAT, __float)
+TEST_P(ORGQR_COMPAT, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORGQR_COMPAT, __double)
+TEST_P(ORGQR_COMPAT, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNGQR_COMPAT, __float_complex)
+TEST_P(UNGQR_COMPAT, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNGQR_COMPAT, __double_complex)
+TEST_P(UNGQR_COMPAT, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

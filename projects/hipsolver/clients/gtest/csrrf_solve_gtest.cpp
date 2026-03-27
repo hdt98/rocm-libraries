@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2023-2024 Advanced Micro Devices, Inc.
+ * Copyright (C) 2023-2026 Advanced Micro Devices, Inc.
  * ************************************************************************ */
 
 #include "testing_csrrf_solve.hpp"
@@ -83,22 +83,22 @@ protected:
 
 // non-batch tests
 
-/*TEST_P(CSRRF_SOLVE, __float)
+/*TEST_P(CSRRF_SOLVE, _float)
 {
     run_tests<float>();
 }*/
 
-TEST_P(CSRRF_SOLVE, __double)
+TEST_P(CSRRF_SOLVE, _double)
 {
     run_tests<double>();
 }
 
-/*TEST_P(CSRRF_SOLVE, __float_complex)
+/*TEST_P(CSRRF_SOLVE, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(CSRRF_SOLVE, __double_complex)
+TEST_P(CSRRF_SOLVE, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }*/

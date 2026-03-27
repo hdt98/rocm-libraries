@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2023-2024 Advanced Micro Devices, Inc.
+ * Copyright (C) 2023-2026 Advanced Micro Devices, Inc.
  * ************************************************************************ */
 
 #include "testing_csrlsvchol.hpp"
@@ -99,42 +99,42 @@ class CSRLSVCHOLHOST : public CSRLSVCHOL_BASE<true>
 
 // non-batch tests
 
-TEST_P(CSRLSVCHOL, __float)
+TEST_P(CSRLSVCHOL, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(CSRLSVCHOL, __double)
+TEST_P(CSRLSVCHOL, _double)
 {
     run_tests<double>();
 }
 
-// TEST_P(CSRLSVCHOL, __float_complex)
+// TEST_P(CSRLSVCHOL, _float_complex)
 // {
 //     run_tests<rocblas_float_complex>();
 // }
 
-// TEST_P(CSRLSVCHOL, __double_complex)
+// TEST_P(CSRLSVCHOL, _double_complex)
 // {
 //     run_tests<rocblas_double_complex>();
 // }
 
-TEST_P(CSRLSVCHOLHOST, __float)
+TEST_P(CSRLSVCHOLHOST, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(CSRLSVCHOLHOST, __double)
+TEST_P(CSRLSVCHOLHOST, _double)
 {
     run_tests<double>();
 }
 
-// TEST_P(CSRLSVCHOLHOST, __float_complex)
+// TEST_P(CSRLSVCHOLHOST, _float_complex)
 // {
 //     run_tests<rocblas_float_complex>();
 // }
 
-// TEST_P(CSRLSVCHOLHOST, __double_complex)
+// TEST_P(CSRLSVCHOLHOST, _double_complex)
 // {
 //     run_tests<rocblas_double_complex>();
 // }

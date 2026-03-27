@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -138,62 +138,62 @@ class HEGVJ_COMPAT : public SYGVJ_HEGVJ<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(SYGVJ, __float)
+TEST_P(SYGVJ, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYGVJ, __double)
+TEST_P(SYGVJ, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEGVJ, __float_complex)
+TEST_P(HEGVJ, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEGVJ, __double_complex)
+TEST_P(HEGVJ, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(SYGVJ_FORTRAN, __float)
+TEST_P(SYGVJ_FORTRAN, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYGVJ_FORTRAN, __double)
+TEST_P(SYGVJ_FORTRAN, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEGVJ_FORTRAN, __float_complex)
+TEST_P(HEGVJ_FORTRAN, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEGVJ_FORTRAN, __double_complex)
+TEST_P(HEGVJ_FORTRAN, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(SYGVJ_COMPAT, __float)
+TEST_P(SYGVJ_COMPAT, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYGVJ_COMPAT, __double)
+TEST_P(SYGVJ_COMPAT, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEGVJ_COMPAT, __float_complex)
+TEST_P(HEGVJ_COMPAT, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEGVJ_COMPAT, __double_complex)
+TEST_P(HEGVJ_COMPAT, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }

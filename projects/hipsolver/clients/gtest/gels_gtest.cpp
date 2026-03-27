@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -134,82 +134,82 @@ class GELS_INPLACE : public GELS_BASE<API_NORMAL, true>
 
 // non-batch tests
 
-TEST_P(GELS, __float)
+TEST_P(GELS, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GELS, __double)
+TEST_P(GELS, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GELS, __float_complex)
+TEST_P(GELS, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GELS, __double_complex)
+TEST_P(GELS, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GELS_FORTRAN, __float)
+TEST_P(GELS_FORTRAN, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GELS_FORTRAN, __double)
+TEST_P(GELS_FORTRAN, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GELS_FORTRAN, __float_complex)
+TEST_P(GELS_FORTRAN, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GELS_FORTRAN, __double_complex)
+TEST_P(GELS_FORTRAN, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GELS_COMPAT, __float)
+TEST_P(GELS_COMPAT, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GELS_COMPAT, __double)
+TEST_P(GELS_COMPAT, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GELS_COMPAT, __float_complex)
+TEST_P(GELS_COMPAT, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GELS_COMPAT, __double_complex)
+TEST_P(GELS_COMPAT, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GELS_INPLACE, __float)
+TEST_P(GELS_INPLACE, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GELS_INPLACE, __double)
+TEST_P(GELS_INPLACE, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GELS_INPLACE, __float_complex)
+TEST_P(GELS_INPLACE, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GELS_INPLACE, __double_complex)
+TEST_P(GELS_INPLACE, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }

@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -169,62 +169,62 @@ class UNMTR_COMPAT : public ORMTR_UNMTR<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(ORMTR, __float)
+TEST_P(ORMTR, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORMTR, __double)
+TEST_P(ORMTR, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNMTR, __float_complex)
+TEST_P(UNMTR, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNMTR, __double_complex)
+TEST_P(UNMTR, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORMTR_FORTRAN, __float)
+TEST_P(ORMTR_FORTRAN, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORMTR_FORTRAN, __double)
+TEST_P(ORMTR_FORTRAN, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNMTR_FORTRAN, __float_complex)
+TEST_P(UNMTR_FORTRAN, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNMTR_FORTRAN, __double_complex)
+TEST_P(UNMTR_FORTRAN, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORMTR_COMPAT, __float)
+TEST_P(ORMTR_COMPAT, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORMTR_COMPAT, __double)
+TEST_P(ORMTR_COMPAT, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNMTR_COMPAT, __float_complex)
+TEST_P(UNMTR_COMPAT, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNMTR_COMPAT, __double_complex)
+TEST_P(UNMTR_COMPAT, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

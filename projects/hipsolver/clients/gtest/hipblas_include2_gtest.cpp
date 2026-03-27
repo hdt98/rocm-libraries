@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2023-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2023-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -140,22 +140,22 @@ protected:
 
 // non-batch tests
 
-TEST_P(HIPBLAS_INCLUDE2, __float)
+TEST_P(HIPBLAS_INCLUDE2, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(HIPBLAS_INCLUDE2, __double)
+TEST_P(HIPBLAS_INCLUDE2, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(HIPBLAS_INCLUDE2, __float_complex)
+TEST_P(HIPBLAS_INCLUDE2, _float_complex)
 {
     run_tests<hipsolverComplex>();
 }
 
-TEST_P(HIPBLAS_INCLUDE2, __double_complex)
+TEST_P(HIPBLAS_INCLUDE2, _double_complex)
 {
     run_tests<hipsolverDoubleComplex>();
 }

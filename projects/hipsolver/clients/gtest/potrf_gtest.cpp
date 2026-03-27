@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -116,124 +116,124 @@ class POTRF_COMPAT : public POTRF_BASE<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(POTRF, __float)
+TEST_P(POTRF, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(POTRF, __double)
+TEST_P(POTRF, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(POTRF, __float_complex)
+TEST_P(POTRF, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRF, __double_complex)
+TEST_P(POTRF, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(POTRF_FORTRAN, __float)
+TEST_P(POTRF_FORTRAN, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(POTRF_FORTRAN, __double)
+TEST_P(POTRF_FORTRAN, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(POTRF_FORTRAN, __float_complex)
+TEST_P(POTRF_FORTRAN, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRF_FORTRAN, __double_complex)
+TEST_P(POTRF_FORTRAN, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(POTRF_COMPAT, __float)
+TEST_P(POTRF_COMPAT, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(POTRF_COMPAT, __double)
+TEST_P(POTRF_COMPAT, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(POTRF_COMPAT, __float_complex)
+TEST_P(POTRF_COMPAT, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRF_COMPAT, __double_complex)
+TEST_P(POTRF_COMPAT, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
 // batched tests
 
-TEST_P(POTRF, batched__float)
+TEST_P(POTRF, batched_float)
 {
     run_tests<true, false, float>();
 }
 
-TEST_P(POTRF, batched__double)
+TEST_P(POTRF, batched_double)
 {
     run_tests<true, false, double>();
 }
 
-TEST_P(POTRF, batched__float_complex)
+TEST_P(POTRF, batched_float_complex)
 {
     run_tests<true, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRF, batched__double_complex)
+TEST_P(POTRF, batched_double_complex)
 {
     run_tests<true, false, rocblas_double_complex>();
 }
 
-TEST_P(POTRF_FORTRAN, batched__float)
+TEST_P(POTRF_FORTRAN, batched_float)
 {
     run_tests<true, false, float>();
 }
 
-TEST_P(POTRF_FORTRAN, batched__double)
+TEST_P(POTRF_FORTRAN, batched_double)
 {
     run_tests<true, false, double>();
 }
 
-TEST_P(POTRF_FORTRAN, batched__float_complex)
+TEST_P(POTRF_FORTRAN, batched_float_complex)
 {
     run_tests<true, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRF_FORTRAN, batched__double_complex)
+TEST_P(POTRF_FORTRAN, batched_double_complex)
 {
     run_tests<true, false, rocblas_double_complex>();
 }
 
-TEST_P(POTRF_COMPAT, batched__float)
+TEST_P(POTRF_COMPAT, batched_float)
 {
     run_tests<true, false, float>();
 }
 
-TEST_P(POTRF_COMPAT, batched__double)
+TEST_P(POTRF_COMPAT, batched_double)
 {
     run_tests<true, false, double>();
 }
 
-TEST_P(POTRF_COMPAT, batched__float_complex)
+TEST_P(POTRF_COMPAT, batched_float_complex)
 {
     run_tests<true, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRF_COMPAT, batched__double_complex)
+TEST_P(POTRF_COMPAT, batched_double_complex)
 {
     run_tests<true, false, rocblas_double_complex>();
 }

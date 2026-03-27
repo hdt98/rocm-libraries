@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2022-2024 Advanced Micro Devices, Inc.
+ * Copyright (C) 2022-2026 Advanced Micro Devices, Inc.
  *
  * ************************************************************************ */
 
@@ -105,22 +105,22 @@ class GESVDA_COMPAT : public GESVDA_BASE<API_COMPAT>
 
 // strided_batched tests
 
-TEST_P(GESVDA_COMPAT, strided_batched__float)
+TEST_P(GESVDA_COMPAT, strided_batched_float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GESVDA_COMPAT, strided_batched__double)
+TEST_P(GESVDA_COMPAT, strided_batched_double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GESVDA_COMPAT, strided_batched__float_complex)
+TEST_P(GESVDA_COMPAT, strided_batched_float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GESVDA_COMPAT, strided_batched__double_complex)
+TEST_P(GESVDA_COMPAT, strided_batched_double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }

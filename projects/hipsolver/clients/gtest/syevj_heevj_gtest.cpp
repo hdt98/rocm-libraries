@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -126,124 +126,124 @@ class HEEVJ_COMPAT : public SYEVJ_HEEVJ<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(SYEVJ, __float)
+TEST_P(SYEVJ, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYEVJ, __double)
+TEST_P(SYEVJ, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEEVJ, __float_complex)
+TEST_P(HEEVJ, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEEVJ, __double_complex)
+TEST_P(HEEVJ, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(SYEVJ_FORTRAN, __float)
+TEST_P(SYEVJ_FORTRAN, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYEVJ_FORTRAN, __double)
+TEST_P(SYEVJ_FORTRAN, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEEVJ_FORTRAN, __float_complex)
+TEST_P(HEEVJ_FORTRAN, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEEVJ_FORTRAN, __double_complex)
+TEST_P(HEEVJ_FORTRAN, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(SYEVJ_COMPAT, __float)
+TEST_P(SYEVJ_COMPAT, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYEVJ_COMPAT, __double)
+TEST_P(SYEVJ_COMPAT, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEEVJ_COMPAT, __float_complex)
+TEST_P(HEEVJ_COMPAT, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEEVJ_COMPAT, __double_complex)
+TEST_P(HEEVJ_COMPAT, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
 // strided_batched tests
 
-TEST_P(SYEVJ, strided_batched__float)
+TEST_P(SYEVJ, strided_batched_float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(SYEVJ, strided_batched__double)
+TEST_P(SYEVJ, strided_batched_double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(HEEVJ, strided_batched__float_complex)
+TEST_P(HEEVJ, strided_batched_float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(HEEVJ, strided_batched__double_complex)
+TEST_P(HEEVJ, strided_batched_double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(SYEVJ_FORTRAN, strided_batched__float)
+TEST_P(SYEVJ_FORTRAN, strided_batched_float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(SYEVJ_FORTRAN, strided_batched__double)
+TEST_P(SYEVJ_FORTRAN, strided_batched_double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(HEEVJ_FORTRAN, strided_batched__float_complex)
+TEST_P(HEEVJ_FORTRAN, strided_batched_float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(HEEVJ_FORTRAN, strided_batched__double_complex)
+TEST_P(HEEVJ_FORTRAN, strided_batched_double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(SYEVJ_COMPAT, strided_batched__float)
+TEST_P(SYEVJ_COMPAT, strided_batched_float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(SYEVJ_COMPAT, strided_batched__double)
+TEST_P(SYEVJ_COMPAT, strided_batched_double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(HEEVJ_COMPAT, strided_batched__float_complex)
+TEST_P(HEEVJ_COMPAT, strided_batched_float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(HEEVJ_COMPAT, strided_batched__double_complex)
+TEST_P(HEEVJ_COMPAT, strided_batched_double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }

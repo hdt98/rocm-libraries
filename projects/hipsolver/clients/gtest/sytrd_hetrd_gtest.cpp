@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -123,62 +123,62 @@ class HETRD_COMPAT : public SYTRD_HETRD<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(SYTRD, __float)
+TEST_P(SYTRD, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYTRD, __double)
+TEST_P(SYTRD, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HETRD, __float_complex)
+TEST_P(HETRD, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HETRD, __double_complex)
+TEST_P(HETRD, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(SYTRD_FORTRAN, __float)
+TEST_P(SYTRD_FORTRAN, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYTRD_FORTRAN, __double)
+TEST_P(SYTRD_FORTRAN, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HETRD_FORTRAN, __float_complex)
+TEST_P(HETRD_FORTRAN, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HETRD_FORTRAN, __double_complex)
+TEST_P(HETRD_FORTRAN, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(SYTRD_COMPAT, __float)
+TEST_P(SYTRD_COMPAT, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYTRD_COMPAT, __double)
+TEST_P(SYTRD_COMPAT, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HETRD_COMPAT, __float_complex)
+TEST_P(HETRD_COMPAT, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HETRD_COMPAT, __double_complex)
+TEST_P(HETRD_COMPAT, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
