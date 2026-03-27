@@ -435,9 +435,9 @@ inline std::map<std::string, int> initRegisterCaps(const IsaVersion&           i
         rv["PhysicalMaxVgprCU"] = 1024 * 32;
     else if(isaVersion[0] == 11)
         if(isaVersion[2] == 2)
-            rv["PhysicalMaxVgprCU"] = 1024 * 32;
+            rv["PhysicalMaxVgprCU"] = 2 * 1024 * 32;
         else
-            rv["PhysicalMaxVgprCU"] = 1536 * 32;
+            rv["PhysicalMaxVgprCU"] = 2 * 1536 * 32;
     else if(isaVersion[0] == 12)
         rv["PhysicalMaxVgprCU"] = 1536 * 32;
     else if(isaVersion[0] == 9)
