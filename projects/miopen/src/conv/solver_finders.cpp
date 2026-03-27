@@ -297,7 +297,6 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
 
             while(i < N_RUNS_MAX && elapsed < TIME_MS_MAX)
             {
-                IncrementKernelExecutionCounter();
                 invoker(handle, invoke_ctx);
 
                 // don't include warm-up run in our samples.

@@ -152,7 +152,7 @@ Note: By default the CPU verification is turned on. Verification can be disabled
 
 ### Kernel Name and Execution Time Logging
 
-The `MIOPEN_PERFORMANCE_LOGS` environment variable enables lightweight logging of kernel names and their execution times during MIOpenDriver runs. This is useful for debugging, performance analysis, and understanding which kernels are being executed under different configurations (e.g., different `MIOPEN_FIND_MODE` or `MIOPEN_FORCE` settings).
+The `MIOPEN_PERFORMANCE_LOGS` environment variable enables lightweight logging of kernel names and their execution times during MIOpenDriver runs. This is useful for debugging, performance analysis, and understanding which kernels are being executed under different configurations (e.g., different `MIOPEN_FIND_MODE` or `MIOPEN_FORCE` settings). It is meant for usage only with MIOpen driver commands and is untested for direct library usage.
 
 **Logging Levels:**
 

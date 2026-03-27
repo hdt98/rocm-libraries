@@ -583,13 +583,11 @@ auto GenericSearch(const Solver s,
                     AddPerformanceConfig(kernel_name, config_string);
 
                     // Warm-up run for every configuration to eliminate cold-start bias
-                    IncrementKernelExecutionCounter();
                     invoker(profile_h, invoke_ctx);
                     elapsed_time = profile_h.GetKernelTime();
                     samples.push_back(elapsed_time);
                     profile_h.ResetKernelTime();
 
-                    IncrementKernelExecutionCounter();
                     invoker(profile_h, invoke_ctx);
                     elapsed_time = profile_h.GetKernelTime();
                     samples.push_back(elapsed_time);
@@ -646,7 +644,6 @@ auto GenericSearch(const Solver s,
                     {
                         for(int i = 1; i < env::value(MIOPEN_TUNING_ITERATIONS); ++i)
                         {
-                            IncrementKernelExecutionCounter();
                             invoker(profile_h, invoke_ctx);
                             samples.push_back(profile_h.GetKernelTime());
                             profile_h.ResetKernelTime();
@@ -770,7 +767,6 @@ auto GenericSearch(const Solver s,
         // Run once with the default config and show score.
         const auto& invoker = profile_h.PrepareInvoker(*default_solution.invoker_factory,
                                                        default_solution.construction_params);
-        IncrementKernelExecutionCounter();
         invoker(profile_h, invoke_ctx);
         const auto default_time = profile_h.GetKernelTime();
         const auto score        = (best_time > 0.0f) ? default_time / best_time : 0.0f;

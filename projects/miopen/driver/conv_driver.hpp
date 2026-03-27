@@ -2292,10 +2292,6 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
         {
             out.FillGpuBufferWithNans(handle, outputTensor);
         }
-        if(performance_logging_enabled)
-        {
-            miopen::IncrementKernelExecutionCounter();
-        }
         rc = miopenConvolutionForward(GetHandle(),
                                       &alpha,
                                       in_tens,
@@ -2480,10 +2476,6 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuImmed(const bool is_transform)
         if(init_output_nan)
         {
             out.FillGpuBufferWithNans(handle, outputTensor);
-        }
-        if(performance_logging_enabled)
-        {
-            miopen::IncrementKernelExecutionCounter();
         }
         rc = miopenConvolutionForwardImmediate(
             handle,
@@ -2865,10 +2857,6 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuFind()
         {
             din.FillGpuBufferWithNans(handle, inputTensor);
         }
-        if(performance_logging_enabled)
-        {
-            miopen::IncrementKernelExecutionCounter();
-        }
         rc = miopenConvolutionBackwardData(GetHandle(),
                                            &alpha,
                                            outputTensor,
@@ -2990,7 +2978,7 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, floa
             const auto db_key = ss.str();
             const auto perf_db_key = problem.MakeNetworkConfig();
             
-            Print2DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes, db_key, perf_db_key);
+            Print2DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, inputBytes, db_key, perf_db_key);
         }
         else
         {
@@ -3050,7 +3038,7 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time, floa
             const auto db_key = ss.str();
             const auto perf_db_key = problem.MakeNetworkConfig();
             
-            Print3DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, in_d, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key, perf_db_key);
+            Print3DConvJsonLog("bwdd-conv", "backward", kernel_average_time, solution, in_n, in_c, in_h, in_w, in_d, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, inputBytes, db_key, perf_db_key);
         }
         else
         {
@@ -3155,10 +3143,6 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuFind()
         if(init_output_nan)
         {
             dwei.FillGpuBufferWithNans(handle, weightTensor);
-        }
-        if(performance_logging_enabled)
-        {
-            miopen::IncrementKernelExecutionCounter();
         }
         rc = miopenConvolutionBackwardWeights(GetHandle(),
                                               &alpha,
@@ -3282,7 +3266,7 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float
             const auto db_key = ss.str();
             const auto perf_db_key = problem.MakeNetworkConfig();
             
-            Print2DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, outputBytes, db_key, perf_db_key);
+            Print2DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, wei_h, wei_w, out_c, out_h, out_w, flopCnt, readBytes, weightBytes, db_key, perf_db_key);
         }
         else
         {
@@ -3342,7 +3326,7 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time, float
             const auto db_key = ss.str();
             const auto perf_db_key = problem.MakeNetworkConfig();
             
-            Print3DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, in_d, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, outputBytes, db_key, perf_db_key);
+            Print3DConvJsonLog("bwdw-conv", "backward-weights", kernel_average_time, solution, in_n, in_c, in_h, in_w, in_d, wei_h, wei_w, wei_d, out_c, out_h, out_w, out_d, flopCnt, readBytes, weightBytes, db_key, perf_db_key);
         }
         else
         {
@@ -3475,10 +3459,6 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuImmed()
         if(init_output_nan)
         {
             din.FillGpuBufferWithNans(handle, inputTensor);
-        }
-        if(performance_logging_enabled)
-        {
-            miopen::IncrementKernelExecutionCounter();
         }
         rc = miopenConvolutionBackwardDataImmediate(handle,
                                                     outputTensor,
@@ -3641,10 +3621,6 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuImmed()
         if(init_output_nan)
         {
             dwei.FillGpuBufferWithNans(handle, weightTensor);
-        }
-        if(performance_logging_enabled)
-        {
-            miopen::IncrementKernelExecutionCounter();
         }
         rc = miopenConvolutionBackwardWeightsImmediate(handle,
                                                        outputTensor,
@@ -4162,6 +4138,7 @@ int ConvDriver<Tgpu, Tref>::VerifyBackward()
         if(!is_wrw_run_failed)
             if(!TryReadVerificationCache(Direction::WrW, weightTensor, dwei_host.data.data()))
             {
+                miopen::ScopedKernelPhase phase_scope(miopen::KernelPhase::Validation);
                 if(UseGPUReference())
                     RunBackwardWeightsGPUReference();
                 else

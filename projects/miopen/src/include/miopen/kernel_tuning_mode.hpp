@@ -4,11 +4,10 @@
 #ifndef GUARD_MIOPEN_KERNEL_TUNING_MODE_HPP
 #define GUARD_MIOPEN_KERNEL_TUNING_MODE_HPP
 
-#include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <sstream>
 #include <string>
@@ -60,17 +59,6 @@ inline void SetKernelPhase(KernelPhase phase)
     GetKernelPhase() = phase;
 }
 
-/// Thread-local counter for execution/iteration tracking
-/// Used to group related kernels that belong to the same logical execution
-inline size_t& GetKernelExecutionCounter()
-{
-    thread_local size_t counter = 0;
-    return counter;
-}
-
-/// Increment and return the execution counter
-inline size_t IncrementKernelExecutionCounter() { return ++GetKernelExecutionCounter(); }
-
 /// Get the last printed solution name
 inline std::string& GetLastPrintedSolutionName()
 {
@@ -112,33 +100,9 @@ inline bool IsTransposeOrTransformKernel(const std::string& kernel_name)
            kernel_name.find("MN2NM") != std::string::npos;
 }
 
-/// Thread-local storage for solution-level timing accumulation
-struct SolutionTimingAccumulator
-{
-    size_t exec_id   = 0;
-    float total_time = 0.0f;
-    int kernel_count = 0;
-    std::string main_kernel_name;
-
-    void Reset(size_t new_exec_id)
-    {
-        exec_id      = new_exec_id;
-        total_time   = 0.0f;
-        kernel_count = 0;
-        main_kernel_name.clear();
-    }
-};
-
-inline SolutionTimingAccumulator& GetSolutionTimingAccumulator()
-{
-    thread_local SolutionTimingAccumulator accumulator;
-    return accumulator;
-}
-
 /// Structure to hold kernel execution data for JSON output (single execution)
 struct KernelExecutionData
 {
-    size_t exec_id;
     std::string kernel_name;
     float time_ms;
     bool is_transformation;
@@ -387,21 +351,17 @@ inline void FlushJsonAccumulator()
             min_exec_number = 1;  // Invoker timings start from execution 1
         }
 
-        if(show_kernels)
+        for(const auto& k : config.kernels)
         {
-            // Fallback to original kernel accumulation logic
-            for(const auto& k : config.kernels)
+            auto& grouped = grouped_kernels[k.kernel_name];
+            // Initialize on first occurrence
+            if(grouped.time_executions_ms.empty())
             {
-                auto& grouped = grouped_kernels[k.kernel_name];
-                // Initialize on first occurrence
-                if(grouped.time_executions_ms.empty())
-                {
-                    grouped.kernel_name = k.kernel_name;
-                    grouped.is_transformation = k.is_transformation;
-                }
-                // Append timing data
-                grouped.time_executions_ms.push_back(k.time_ms);
+                grouped.kernel_name = k.kernel_name;
+                grouped.is_transformation = k.is_transformation;
             }
+            // Append timing data
+            grouped.time_executions_ms.push_back(k.time_ms);
         }
         
         // Count transformations based on grouped kernels (not individual executions)
@@ -430,19 +390,31 @@ inline void FlushJsonAccumulator()
             }
             else
             {
-                // Use removeHighOutliersAndGetMean for more accurate timing
-                // (same as GenericSearch does)
-                std::vector<float> samples_copy = all_exec_times;
+                // Drop first two executions (warmup), then removeHighOutliersAndGetMean
+                // (same idea as GenericSearch). If too few samples, keep all.
+                static constexpr size_t kWarmupExecutions = 2;
+                std::vector<float> samples_copy;
+                if(all_exec_times.size() > kWarmupExecutions)
+                {
+                    samples_copy.assign(all_exec_times.begin() + kWarmupExecutions,
+                                        all_exec_times.end());
+                }
+                else
+                {
+                    samples_copy = all_exec_times;
+                }
                 config_time_ms = removeHighOutliersAndGetMean(samples_copy, 2.0f);
                 
                 // samples_copy is now sorted by removeHighOutliersAndGetMean
                 config_time_min = samples_copy.front();
                 config_time_max = samples_copy.back();
                 
-                // Calculate standard deviation using the mean from outlier removal
+                // Standard deviation over the same (post-warmup) samples vs. reported mean
+                const size_t std_begin =
+                    (all_exec_times.size() > kWarmupExecutions) ? kWarmupExecutions : 0;
                 float sq_sum = 0.0f;
-                int count = 0;
-                for(size_t i = 0; i < all_exec_times.size(); ++i)
+                int count    = 0;
+                for(size_t i = std_begin; i < all_exec_times.size(); ++i)
                 {
                     float diff = all_exec_times[i] - config_time_ms;
                     sq_sum += diff * diff;
@@ -525,12 +497,9 @@ inline void AddKernelToJsonAccumulator(const std::string& kernel_name,
     if(!logging_enabled)
         return;
 
-    const auto exec_id = GetKernelExecutionCounter();
-
     // Always store kernels individually
     auto& data = GetJsonAccumulator();
     data.current_config.kernels.push_back({
-        exec_id,
         kernel_name,
         time_ms,
         is_transform

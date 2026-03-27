@@ -12,6 +12,7 @@
 #include <string>
 
 #include <miopen/env.hpp>
+#include <miopen/kernel_tuning_mode.hpp>
 
 #ifdef __linux__
 #include <unistd.h>

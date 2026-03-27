@@ -289,7 +289,6 @@ std::vector<Solution> EvaluateConvSolutions(const ExecutionContext& ctx,
         {
             std::string solution_name = id.ToString();
             LogSolutionName(solution_name, id.Value(), conv_sol->workspace_sz);
-            IncrementKernelExecutionCounter();
         }
 
         std::vector<solver::ConvSolution> conv_sols;
@@ -1117,7 +1116,6 @@ void ConvolutionDescriptor::ConvolutionForwardImmediate(const Handle& handle,
             std::string solution_name = (solver_id.Value() != 0) ? solver_id.ToString()
                                                                 : std::string("UNKNOWN");
             LogSolutionName(solution_name, solver_id.Value(), workSpaceSize);
-            IncrementKernelExecutionCounter();
         }
         invoker(handle, invoke_ctx);
     });
@@ -1337,7 +1335,6 @@ void ConvolutionDescriptor::ConvolutionBackwardImmediate(const Handle& handle,
             std::string solution_name = (solver_id.Value() != 0) ? solver_id.ToString()
                                                                 : std::string("UNKNOWN");
             LogSolutionName(solution_name, solver_id.Value(), workSpaceSize);
-            IncrementKernelExecutionCounter();
         }
         invoker(handle, invoke_ctx);
     });
@@ -1549,7 +1546,6 @@ void ConvolutionDescriptor::ConvolutionWrwImmediate(const Handle& handle,
         if(IsLoggingKernel())
         {
             LogSolutionName(solver_id.ToString(), solver_id.Value(), workSpaceSize);
-            IncrementKernelExecutionCounter();
         }
         invoker(handle, invoke_ctx);
     });

@@ -7,7 +7,6 @@
 #include <miopen/check_numerics.hpp>
 #include <miopen/conv/data_invoke_params.hpp>
 #include <miopen/conv/wrw_invoke_params.hpp>
-#include <miopen/env.hpp>
 #include <miopen/hof_match.hpp>
 #include <miopen/kernel.hpp>
 #include <miopen/kernel_tuning_mode.hpp>
@@ -204,7 +203,6 @@ void Solution::RunImpl(const Handle& handle,
     if(invoker)
     {
         LogSolutionName(solver_name, solver_id, workspace_size);
-        IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
         checkNumericsOutput_();
         return;
@@ -223,7 +221,6 @@ void Solution::RunImpl(const Handle& handle,
 
         invoker = invoker_factory(kernel_handles);
         LogSolutionName(solver_name, solver_id, workspace_size);
-        IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
         checkNumericsOutput_();
         return;
@@ -236,7 +233,6 @@ void Solution::RunImpl(const Handle& handle,
     {
         invoker = *found_invoker;
         LogSolutionName(solver_name, solver_id, workspace_size);
-        IncrementKernelExecutionCounter();
         (*found_invoker)(handle, invoke_ctx);
         checkNumericsOutput_();
         return;
@@ -256,7 +252,6 @@ void Solution::RunImpl(const Handle& handle,
                                         conv_solution.construction_params);
         handle.RegisterInvoker(*invoker, net_cfg, GetSolver().ToString());
         LogSolutionName(solver_name, solver_id, workspace_size);
-        IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
         checkNumericsOutput_();
     }
@@ -427,7 +422,6 @@ void Solution::RunImpl(const Handle& handle,
         {
             invoker = (*mha_solution.invoker_factory)(kernel_handles);
             LogSolutionName(solver_name, solver_id, workspace_size);
-            IncrementKernelExecutionCounter();
             (*invoker)(handle, invoke_ctx);
         }
         else
@@ -444,7 +438,6 @@ void Solution::RunImpl(const Handle& handle,
     if(invoker)
     {
         LogSolutionName(solver_name, solver_id, workspace_size);
-        IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
         return;
     }
@@ -461,7 +454,6 @@ void Solution::RunImpl(const Handle& handle,
             handle.PrepareInvoker(*mha_solution.invoker_factory, mha_solution.construction_params);
         handle.RegisterInvoker(*invoker, net_cfg, GetSolver().ToString());
         LogSolutionName(solver_name, solver_id, workspace_size);
-        IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
     }
     else
@@ -556,7 +548,6 @@ void Solution::RunImpl(const Handle& handle,
         {
             invoker = (*softmax_solution.invoker_factory)(kernel_handles);
             LogSolutionName(solver_name, solver_id, 0);
-            IncrementKernelExecutionCounter();
             (*invoker)(handle, invoke_ctx);
         }
         else
@@ -573,7 +564,6 @@ void Solution::RunImpl(const Handle& handle,
     if(invoker)
     {
         LogSolutionName(solver_name, solver_id, 0);
-        IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
         return;
     }
@@ -591,7 +581,6 @@ void Solution::RunImpl(const Handle& handle,
                                         softmax_solution.construction_params);
         handle.RegisterInvoker(*invoker, net_cfg, GetSolver().ToString());
         LogSolutionName(solver_name, solver_id, 0);
-        IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_ctx);
     }
     else
@@ -647,7 +636,6 @@ void Solution::RunImpl(const Handle& handle,
         {
             invoker = (*solution.invoker_factory)(kernel_handles);
             LogSolutionName(solver_name, solver_id, workspace_size);
-            IncrementKernelExecutionCounter();
             (*invoker)(handle, invoke_params);
         }
         else
@@ -664,7 +652,6 @@ void Solution::RunImpl(const Handle& handle,
     if(invoker)
     {
         LogSolutionName(solver_name, solver_id, workspace_size);
-        IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_params);
         return;
     }
@@ -677,7 +664,6 @@ void Solution::RunImpl(const Handle& handle,
         invoker = handle.PrepareInvoker(*solution.invoker_factory, solution.construction_params);
         handle.RegisterInvoker(*invoker, net_cfg, GetSolver().ToString());
         LogSolutionName(solver_name, solver_id, workspace_size);
-        IncrementKernelExecutionCounter();
         (*invoker)(handle, invoke_params);
     }
     else
