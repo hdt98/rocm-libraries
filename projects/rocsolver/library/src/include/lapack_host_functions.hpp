@@ -136,7 +136,7 @@ static void call_las2(T& f, T& g, T& h, T& ssmin, T& ssmax)
     }
 }
 
-template <typename T, typename S = decltype(std::real(T{}))>
+template <typename T, typename S>
 static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
 {
     // ------------------------------------------------------
@@ -229,25 +229,23 @@ static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
     // NOTE: npow is integer type to follow lapack
     // --------------------------------------
     int const npow = static_cast<int>((std::log(safmin / eps) / std::log(radix) / two));
-    auto const safmn2 = std::pow(radix, npow);
-    auto const safmx2 = one / safmn2;
+    S const safmn2 = std::pow(radix, npow);
+    S const safmx2 = one / safmn2;
 
-    auto scale = std::max(abs1(f), abs1(g));
+    S scale = std::max(abs1(f), abs1(g));
     T fs = f;
     T gs = g;
     int count = 0;
 
     if(scale >= safmx2)
     {
-        bool has_work_count = false;
         do
         {
             count = count + 1;
             fs = fs * safmn2;
             gs = gs * safmn2;
             scale = scale * safmn2;
-            has_work_count = ((scale >= safmx2) && (count < 20));
-        } while(has_work_count);
+        } while(((scale >= safmx2) && (count < 20)));
     }
     else
     {
@@ -261,15 +259,13 @@ static void call_lartg(T& f, T& g, S& cs, T& sn, T& r)
                 return;
             }
 
-            bool has_work_scale = false;
             do
             {
                 count = count - 1;
                 fs = fs * safmx2;
                 gs = gs * safmx2;
                 scale = scale * safmx2;
-                has_work_scale = (scale <= safmn2);
-            } while(has_work_scale);
+            } while((scale <= safmn2));
         }
 
         S const f2 = abssq(fs);
