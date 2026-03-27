@@ -106,11 +106,13 @@ struct TiledIm2ColCoordinate
     index_t m_gemm;    // current absolute M index (needed for dm!=0 reinit)
     index_t k_gemm;    // current absolute K index (needed for K_gemm bound check)
     index_t c_conv_;   // current c_conv = k_gemm % C  (incremental K tracking)
-    index_t x_;        // current x filter index       (incremental K tracking)
-    index_t y_;        // current y filter index       (incremental K tracking)
     index_t ho_;       // output row   from m_gemm (cached to avoid divmod in move_step)
     index_t wo_;       // output col   from m_gemm (cached to avoid divmod in move_step)
     bool    valid;     // true iff (m_gemm, k_gemm) maps to non-padded input
+
+    // KPerBlock < C
+    constexpr index_t x_ = 0;        // current x filter index       (incremental K tracking)
+    constexpr index_t y_ = 0;        // current y filter index       (incremental K tracking)
 
     // -------------------------------------------------------------------------
     // M part: decode m_gemm → (n_conv, ho_, wo_) and compute M_base.
@@ -146,6 +148,7 @@ struct TiledIm2ColCoordinate
     {
         k_gemm = k;
 
+        /*
         // Decode k → (y_, x_, c_conv_)  [2 divmod]
         y_      = k / meta.XC;
         const index_t rem_k = k % meta.XC;
@@ -154,6 +157,11 @@ struct TiledIm2ColCoordinate
 
         // K_offset: depends only on k_gemm
         K_offset = y_ * meta.DH_HiStride + x_ * meta.DW_WiStride + c_conv_;
+        */
+
+        // When KPerBlock < C, we have linear mapping from k_gemm to K_offset.
+        c_conv_ = k_gemm; 
+        k_offset = c_conv_;
 
         // Validity: GEMM bounds + spatial padding check (uses cached ho_, wo_)
         const index_t ih = ho_ * meta.SH + y_ * meta.DH - meta.PH;
