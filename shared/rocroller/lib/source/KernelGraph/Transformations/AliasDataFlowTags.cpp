@@ -416,6 +416,9 @@ namespace rocRoller
 
                 for(auto const& rec : records)
                 {
+                    if(rec.rw == ControlFlowRWTracer::ReadWrite::READ)
+                        continue;
+
                     auto  op       = kgraph.control.getNode(rec.control);
                     auto* assignOp = std::get_if<CG::Assign>(&op);
 
@@ -434,14 +437,6 @@ namespace rocRoller
                             return vt;
                         }
                     }
-                    else
-                    {
-                        auto dt = CG::getDataType(op);
-                        if(dt != DataType::None && dt != DataType::Count)
-                        {
-                            return VariableType(dt);
-                        }
-                    }
                 }
 
                 return std::nullopt;
@@ -457,47 +452,6 @@ namespace rocRoller
                 for(auto const& [coordTag, records] : recordsByCoord)
                     result[coordTag] = getDataTypeFromOps(kgraph, coordTag, records);
 
-                auto isDataFlowEdge
-                    = [](auto const& edge) { return CT::isEdge<CT::DataFlowEdge>(edge); };
-
-                auto searchDataFlowEdge = [&]<Graph::Direction Dir>(std::optional<VariableType>& vt,
-                                                                    int coordTag) {
-                    for(auto neighbor :
-                        kgraph.coordinates.getConnectedNodeIndices<Dir>(coordTag, isDataFlowEdge))
-                    {
-                        auto it = result.find(neighbor);
-                        if(it != result.end() && it->second.has_value())
-                        {
-                            vt = it->second.value();
-                            return true;
-                        }
-                    }
-                    return false;
-                };
-
-                bool changed = true;
-                while(changed)
-                {
-                    changed = false;
-                    for(auto& [coordTag, vt] : result)
-                    {
-                        if(vt.has_value())
-                            continue;
-
-                        if(kgraph.coordinates.getElementType(coordTag) != Graph::ElementType::Node)
-                            continue;
-
-                        changed
-                            |= searchDataFlowEdge.template operator()<Graph::Direction::Upstream>(
-                                vt, coordTag);
-                        if(vt.has_value())
-                            continue;
-
-                        changed
-                            |= searchDataFlowEdge.template operator()<Graph::Direction::Downstream>(
-                                vt, coordTag);
-                    }
-                }
                 return result;
             }
 
