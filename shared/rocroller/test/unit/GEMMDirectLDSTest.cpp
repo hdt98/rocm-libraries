@@ -437,6 +437,26 @@ namespace GEMMTests
         EXPECT_EQ(ldsWriteStrides, expectedLDSWriteStrides);
     }
 
+    // Smoke test: ExpressionTransform(f($0) = $0 + 1 - 1) wired into the GR (StoreLDSTile)
+    // column path via LDSBankSwizzleMode::Swizzle. Verifies the full coordinate graph ->
+    // AssignIndexExpressions -> codegen pipeline works with an ExpressionTransform in place.
+    // The trivial identity should not change kernel results; correctness is verified by
+    // comparing against the reference output.
+    TEST_P(GEMMDirectLDSBasicTestSuite, GPU_GEMM_LoadPath_Direct2LDS_FP32_LDSSwizzleSmokeTest)
+    {
+        REQUIRE_ARCH_CAP(GPUCapability::HasMFMA);
+        GEMMProblem gemm;
+        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDS;
+        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDS;
+        gemm.transA         = "T";
+        gemm.transB         = "N";
+        gemm.m              = 3072;
+        gemm.n              = 4096;
+        gemm.k              = 4096;
+        gemm.ldsSwizzleMode = LDSBankSwizzleMode::Swizzle;
+        basicGEMM<float>(gemm);
+    }
+
     INSTANTIATE_TEST_SUITE_P(GEMMDirectLDSTest, GEMMDirectLDSBasicTestSuite, currentGPUISA());
 
     // ========================================================================

@@ -6,11 +6,13 @@
 #include <rocRoller/CommandSolution_fwd.hpp>
 #include <rocRoller/DataTypes/DataTypes_Utils.hpp>
 #include <rocRoller/Expression.hpp>
+#include <rocRoller/ExpressionTransformations.hpp>
 #include <rocRoller/KernelGraph/Transforms/AddTransposeLoadCT.hpp>
 #include <rocRoller/KernelGraph/Transforms/LowerTile.hpp>
 #include <rocRoller/KernelGraph/Transforms/LowerTile_details.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
 #include <rocRoller/KernelGraph/Visitors.hpp>
+#include <rocRoller/KernelOptions_detail.hpp>
 #include <rocRoller/Operations/Command.hpp>
 #include <rocRoller/Operations/Operations.hpp>
 #include <rocRoller/Utilities/Logging.hpp>
@@ -2221,11 +2223,35 @@ namespace rocRoller
                 {
                     // We are storing entire workgroup tiles
                     std::vector<uint> jammedTiles = {1, 1};
+
+                    // When LDS bank swizzle is enabled, remap the LDS column index (iMacY)
+                    // through an ExpressionTransform before passing it to addStoreThreadTileCT.
+                    // For now this is a trivial identity transform (f($0) = $0 + 1 - 1) that
+                    // validates the full pipeline without changing kernel semantics.
+                    // The real GR column rotation will replace this in Task 5.
+                    auto storeIMacY = iMacY;
+                    if(m_context->kernelOptions()->ldsSwizzleMode == LDSBankSwizzleMode::Swizzle)
+                    {
+                        using namespace Expression;
+                        auto arg0 = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
+                        auto one  = literal(1u);
+                        auto identity = (arg0 + one) - one; // f($0) = $0 + 1 - 1
+                        ExpressionTransform smokeTest{{identity}, {identity}};
+                        // swizzledIMacY is the intermediate node that thread coords flatten into.
+                        // The ExpressionTransform maps swizzledIMacY -> iMacY (edge goes
+                        // {swizzledIMacY} -> {iMacY} so that upstream traversal from iMacY
+                        // reaches swizzledIMacY, and thence the thread decomposition).
+                        // The Flatten({iMacX, iMacY}, {ldsTag}) below stays unchanged.
+                        auto swizzledIMacY = graph.coordinates.addElement(tile.tileIndex(1));
+                        graph.coordinates.addElement(smokeTest, {swizzledIMacY}, {iMacY});
+                        storeIMacY = swizzledIMacY;
+                    }
+
                     addStoreThreadTileCT(graph,
                                          connections,
                                          tileTag,
                                          iMacX,
-                                         iMacY,
+                                         storeIMacY,
                                          workgroupSizes,
                                          jammedTiles,
                                          rightmostFastest,
