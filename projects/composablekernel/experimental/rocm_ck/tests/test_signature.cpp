@@ -11,13 +11,13 @@ using namespace rocm_ck;
 // Signature construction
 // ============================================================================
 
-TEST(Signature, DefaultDtypeIsNullopt)
+TEST(Signature, DefaultsToNoDtype)
 {
     constexpr Signature sig{};
     EXPECT_FALSE(sig.dtype.has_value());
 }
 
-TEST(Signature, DtypeSetsValue)
+TEST(Signature, StoresExplicitDtype)
 {
     constexpr Signature sig{.dtype = DataType::FP16};
     EXPECT_TRUE(sig.dtype.has_value());
@@ -28,7 +28,7 @@ TEST(Signature, DtypeSetsValue)
 // Tensor
 // ============================================================================
 
-TEST(Tensor, Defaults)
+TEST(Tensor, DefaultsToAutoLayoutAndRankZero)
 {
     constexpr Tensor t{.name = "A"};
     EXPECT_EQ(t.name, "A");
@@ -37,7 +37,7 @@ TEST(Tensor, Defaults)
     EXPECT_EQ(t.layout, Layout::Auto);
 }
 
-TEST(Tensor, ExplicitOverrides)
+TEST(Tensor, StoresAllExplicitFields)
 {
     constexpr Tensor t{.name = "Q", .dtype = DataType::FP32, .rank = 3, .layout = Layout::Row};
     EXPECT_EQ(t.name, "Q");
@@ -50,14 +50,14 @@ TEST(Tensor, ExplicitOverrides)
 // Scalar
 // ============================================================================
 
-TEST(Scalar, DefaultDtypeIsFP32)
+TEST(Scalar, DefaultsToFP32Dtype)
 {
     constexpr Scalar s{.name = "alpha"};
     EXPECT_EQ(s.name, "alpha");
     EXPECT_EQ(s.dtype, DataType::FP32);
 }
 
-TEST(Scalar, ExplicitDtype)
+TEST(Scalar, StoresExplicitDtype)
 {
     constexpr Scalar s{.name = "scale", .dtype = DataType::FP16};
     EXPECT_EQ(s.dtype, DataType::FP16);
@@ -67,7 +67,7 @@ TEST(Scalar, ExplicitDtype)
 // Op variant
 // ============================================================================
 
-TEST(Op, DefaultIsMonostate)
+TEST(Op, DefaultsToMonostate)
 {
     constexpr Op op{};
     EXPECT_TRUE(std::holds_alternative<std::monostate>(op));
@@ -79,7 +79,7 @@ TEST(Op, HoldsGemmOp)
     EXPECT_TRUE(std::holds_alternative<GemmOp>(op));
 }
 
-TEST(Op, HoldsUnaryOps)
+TEST(Op, HoldsAllUnaryOpTypes)
 {
     constexpr Op relu = ReluOp{.in = "X", .out = "Y"};
     EXPECT_TRUE(std::holds_alternative<ReluOp>(relu));
@@ -91,7 +91,7 @@ TEST(Op, HoldsUnaryOps)
     EXPECT_TRUE(std::holds_alternative<SigmoidOp>(sigmoid));
 }
 
-TEST(Op, HoldsBinaryOps)
+TEST(Op, HoldsAllBinaryOpTypes)
 {
     constexpr Op add = AddOp{.lhs = "X", .rhs = "Y", .out = "Z"};
     EXPECT_TRUE(std::holds_alternative<AddOp>(add));
@@ -104,7 +104,7 @@ TEST(Op, HoldsBinaryOps)
 // GemmOp defaults
 // ============================================================================
 
-TEST(GemmOp, DefaultAccDtypeIsFP32)
+TEST(GemmOp, DefaultsAccDtypeToFP32)
 {
     constexpr GemmOp gemm{.lhs = "A", .rhs = "B", .out = "C"};
     EXPECT_EQ(gemm.acc_dtype, DataType::FP32);
@@ -114,7 +114,7 @@ TEST(GemmOp, DefaultAccDtypeIsFP32)
 // Capacity constants
 // ============================================================================
 
-TEST(Signature, CapacityConstants)
+TEST(Signature, DefinesExpectedCapacityLimits)
 {
     EXPECT_EQ(kMaxTensors, 16);
     EXPECT_EQ(kMaxScalars, 16);

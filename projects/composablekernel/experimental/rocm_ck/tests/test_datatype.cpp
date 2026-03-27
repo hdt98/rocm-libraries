@@ -13,7 +13,7 @@ using namespace rocm_ck;
 // data_type_bits
 // ============================================================================
 
-TEST(DataType, BitsFloatingPoint)
+TEST(DataType, ReportsCorrectBitsForFloatingPoint)
 {
     EXPECT_EQ(data_type_bits(DataType::FP64), 64);
     EXPECT_EQ(data_type_bits(DataType::FP32), 32);
@@ -21,7 +21,7 @@ TEST(DataType, BitsFloatingPoint)
     EXPECT_EQ(data_type_bits(DataType::BF16), 16);
 }
 
-TEST(DataType, BitsFP8)
+TEST(DataType, ReportsCorrectBitsForFP8Formats)
 {
     EXPECT_EQ(data_type_bits(DataType::FP8_FNUZ), 8);
     EXPECT_EQ(data_type_bits(DataType::BF8_FNUZ), 8);
@@ -29,7 +29,7 @@ TEST(DataType, BitsFP8)
     EXPECT_EQ(data_type_bits(DataType::BF8_OCP), 8);
 }
 
-TEST(DataType, BitsInteger)
+TEST(DataType, ReportsCorrectBitsForIntegers)
 {
     EXPECT_EQ(data_type_bits(DataType::I4), 4);
     EXPECT_EQ(data_type_bits(DataType::I8), 8);
@@ -46,7 +46,7 @@ TEST(DataType, BitsInteger)
 // data_type_name
 // ============================================================================
 
-TEST(DataType, NameRoundTrip)
+TEST(DataType, MapsEveryVariantToAValidName)
 {
     // Every DataType should have a non-"???" name
     constexpr DataType all_types[] = {DataType::FP64,
@@ -75,7 +75,7 @@ TEST(DataType, NameRoundTrip)
     }
 }
 
-TEST(DataType, SpecificNames)
+TEST(DataType, MapsVariantsToExpectedStrings)
 {
     EXPECT_STREQ(data_type_name(DataType::FP32), "FP32");
     EXPECT_STREQ(data_type_name(DataType::FP16), "FP16");
@@ -88,7 +88,7 @@ TEST(DataType, SpecificNames)
 // constexpr validation
 // ============================================================================
 
-TEST(DataType, ConstexprEvaluation)
+TEST(DataType, EvaluatesBitsAndNameAtCompileTime)
 {
     // Verify these functions work at compile time
     constexpr int fp32_bits = data_type_bits(DataType::FP32);
