@@ -474,31 +474,72 @@ Unit tests for the im2col index calculations:
 [test_im2col_index_mapping.cpp](../test/ck_tile/image_to_column/test_im2col_index_mapping.cpp)
 
 
-## Current status
+# Computation of the im2col indices in a tile window
 
-We have few issues to address in the current implementation
+The tile window ([tile_window.hpp](../include/ck_tile/core/tensor/tile_window.hpp)) handles the loading of a given input tile of size 
+$M_{\text{tile}} \times K_{\text{tile}}$. Each workgroup (thread block) handles a single tile. The local tile coordinates are denoted by 
+$m_{\text{gemm}}$ and $k_{\text{gemm}}$ and struct `TiledIm2ColCoordinate` struct provides mapping from the local GEMM tile coordinates
+to the linear memory address of the convolution input tensor in the global memory.
 
-- The `init` and `move_step` methods from TiledIm2ColCoordinate are called when we traverse over the K-dimension, that is, each workgroup (thread block) handeles a fixed M-tile for which the `init` is 
-called. When we traverse over the K-tile in a loop, we call the `move_step` method. The number of 
-interation in the loop is determined by Kgemm (=Y x X x C) / KPerBlock
+Struct `TiledIm2ColCoordinate` provides two methods for modifying the memory location 
 
-- For a given tile, we use `tensor_view.get_vectorized_elements<VectorSizeA>(coord, linear_offset)` to run vectorized load from the global memory
-  - projects/composablekernel/include/ck_tile/core/tensor/tile_window.hpp#L377-L381
-  - the final address in the global memory is `(M_base + K_offset) + ys_offset` where `(M_base + K_offset)` is computed once per tiles and `ys_offset` is again computed via the `move_step` function in TiledIm2ColCoordinate. This again happens via dm=0 path because the theread positions are pre-computed unless the space-filling curve (SFC) cross M-rows (this should not happen). 
-  via `prepare_coords` method ([tile_window.hpp#L107-L149](../include/ck_tile/core/tensor/tile_window.hpp#L107-L149)).
-  - The thread position preparation uses the expensive `init(m_gemm, k_gemm)` method. Hence, we might be calling `init(m_gemm, k_gemm)` multiple times. However, each threads calls `init(m_gemm, k_gemm)` only once. How the `(m_gemm, k_gemm)` are distributed over threads depends on the tile_distribution.
-  - Assume: 
-    * lane_id → K dimension (adjacent threads load adjacent K positions for memory coalescing)
-    * warp_id → M dimension (different warps cover different M rows)
-    Then the 3 M divmods (n_conv, ho, wo) compute the same value for all 64 threads in a warp — wavefront-uniform computation on the VALU, which is redundant. The 2 K divmods (y_, x_, c_conv_) are lane-specific — legitimately divergent.
-  - Actual tile distribution: tile_distribution_encoding_pattern_2d<BlockSize, MPerBlock, KPerBlock, VecLoadSize, thread_raked>
-    * We need to change the tile distribution such that m_gemm is purely wave-uniform, but this would require ver large KPerBlock sizes that are impractical.
+- `init`: initializes the input tensor coordinates from $m_{\text{gemm}}$ and $k_{\text{gemm}}$ and computes `M_base` and `K_offset` defined above.
+- `move_step`: move the address in the global memory by $(\Delta m, \Delta k)$. This method has two paths for $\Delta m = 0$ and $\Delta m \neq 0$, where $\Delta m = 0$ (i.e., movement alogn K-dim only) path being less expensive. For $\Delta m \neq 0$, `move_step` calls again the `init`.
 
-## Wave-uniform m_gemm index
+On the fwd convolution workflow, we [create](../include/ck_tile/ops/grouped_convolution/kernel/grouped_convolution_forward_kernel.hpp#915) the tile window from the tensor view via `make_tile_window` [method](../include/ck_tile/core/tensor/tile_window.hpp#1373), we a struct `tile_window_with_static_lengths` [struct](../include/ck_tile/core/tensor/tile_window.hpp#1294)
+thta inherits from the `tile_window_base` ([tile_window_base.hpp](../include/ck_tile/core/tensor/tile_window_base.hpp)). This is a very basic tile window that doesn't provide access to the device memory, i.e., there's no thread assignedment done.
+
+The simple tile window is passed to the GEMM pipeline that handles the selection of the tile distribution (mapping threads to data - in this data in global memory). Assume we use the universal V3 GEMM pipeline ([gemm_pipeline_ag_bg_cr_comp_v3.hpp](../include/ck_tile/ops/gemm/pipeline/gemm_pipeline_ag_bg_cr_comp_v3.hpp)). The GEMM pipeline creates two tile windows
+
+- LDS tile window that uses the above tile distribution - tile window for writing data to LDS, see [gemm_pipeline_ag_bg_cr_base.hpp, line 295](../include/ck_tile/ops/gemm/pipeline/gemm_pipeline_ag_bg_cr_base.hpp#L295)
+- DRAM tile window derived from the original static tile window, see [gemm_pipeline_ag_bg_cr_base.hpp, line 297](../include/ck_tile/ops/gemm/pipeline/gemm_pipeline_ag_bg_cr_base.hpp#L297)
+
+The relevant tile window for im2col index calculations is the DRAM tile window. The DRAM tile window is created via `make_tile_window` [overload](../include/ck_tile/core/tensor/tile_window.hpp#1180) with the tile distribution defined in the GEMM pipeline policy, see [gemm_pipeline_ag_bg_cr_base.hpp, line 199](../include/ck_tile/ops/gemm/pipeline/gemm_pipeline_ag_bg_cr_base.hpp#L199)
+
+Creation of the tile window with the tile distribution triggers `prepare_coords` [method](../include/ck_tile/core/tensor/tile_window.hpp#109) that creates for each thread
+
+- Window origin for the thread: $(m_{\text{gemm}}, k_{\text{gemm}})$ is computed from tile tile window origin and thread's local position in the tile (=`bottom_tensor_thread_origin_idx_tmp`). This invokes `init` from `TiledIm2ColCoordinate`.
+- Pre-computes the coordinates that the thread will access by moving the initial coordinate (thread's window origin) via `move_step` in `TiledIm2ColCoordinate`.
+
+## Tile distribution
+
+How different threads map to $(m_{\text{gemm}}, k_{\text{gemm}})$ depends on the tile distribution which provide mapping from the 
+thread index to the local tile index $(i,j)$. The `TiledIm2ColCoordinate` maps $(i,j) \rightarrow (m_{\text{gemm}}$ and $k_{\text{gemm}})$.
+
+For the convolution problem, the tile distribution is determined by the GEMM pipeline policy `GroupedConvUniversalPipelineAgBgCrPolicy` 
+([grouped_conv_universal_pipeline_ag_bg_cr_policy.hpp](../include/ck_tile/ops/grouped_convolution/pipeline/grouped_conv_universal_pipeline_ag_bg_cr_policy.hpp)). This derives from `UniversalGemmBasePolicy` ([gemm_universal_pipeline_ag_bg_cr_policy.hpp](../include/ck_tile/ops/gemm/pipeline/gemm_universal_pipeline_ag_bg_cr_policy.hpp)) which
+defines the method `MakeADramTileDistribution`. This method defines the tile distribution for the implicit-GEMM convolution.
+
+In the row-major layout, the tile distribution for the conv inout tensor global memory reads is given by
+
+```
+tile_distribution_encoding_pattern_2d<
+  BlockSize,
+  MPerBlock,
+  KPerBlock,
+  VecLoadSize,
+  tile_distribution_pattern::thread_raked,
+  NumWaveGroups>
+```
+
+This means the there's no customized tile distribution for implicit GEMM and we are using the standard GEMM tile distribution for 
+accessing the global memory.
+
+## Non-coalesced memory access
+
+Recall that for a normal GEMM problem, we can store the matrix in row- or column-major order. Suppose we have row-major order and 
+assume threads in the workgroup are also organized in the row-major order, separated by the vector load size. In this ordering, 
+the memory access is coalesced and the memory controller can organize the memory accesses as few transactions as possible. 
+The tile distribution corresponding to a coalesced memory access is given by (assume vector load size 4 for 16-bit data type) 
+
+
+
+
+## Wave-uniform $m_{\text{gemm}}$ index
 
 The fundamental equation:
 
-For wave-uniform m_gemm, all 64 lanes must map only to K. In thread_raked:
+For wave-uniform $m_{\text{gemm}}$, all 64 lanes must map only to K. In thread_raked:
 
 
 X0 = min(warp_size, KPerBlock / VecSize)
@@ -518,4 +559,5 @@ For VecSize=4:
 | 256       | = 256                       | 64              | 64 (wave-uniform) |
 
 This constraint is layout-agnostic (indpendent of the tile distribution). With 64 lanes each loading VecSize=4 elements, a warp covering one M row consumes 64×4=256 K elements per iteration. KPerBlock must be chosen to accommodate that.
-We can choose e.g. tile size (64, 64, 256) to achieve the wave-uniform m_gemm index.
+We can choose e.g. tile size (64, 64, 256) to achieve the wave-uniform m_gemm index. 
+However, the tile size required to have wave-uniform $m_{\text{gemm}}$ are typically sub-optimal from the MFMA perpective.
