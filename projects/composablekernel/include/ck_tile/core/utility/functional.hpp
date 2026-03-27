@@ -6,6 +6,7 @@
 #include "ck_tile/core/config.hpp"
 #include "ck_tile/core/numeric/integer.hpp"
 #include "ck_tile/core/numeric/integral_constant.hpp"
+#include "ck_tile/core/numeric/math.hpp"
 #include "ck_tile/core/container/sequence.hpp"
 #include <stdint.h>
 #include <utility>
@@ -135,65 +136,97 @@ struct idx_identity
 
 namespace detail {
 
-// RemainLengths: sequence<...>
-// Orders: sequence<...>
-template <class RemainLengths, class Orders>
-struct static_ford_impl
+// Helper array for storing compile-time indices
+template <index_t N>
+struct index_array
 {
-    CK_TILE_HOST_DEVICE constexpr static_ford_impl()
-    {
-        static_assert(RemainLengths::size() > 0, "wrong! should not get here");
-    }
+    index_t data[N > 0 ? N : 1];
 
-    // F signature: F(sequence<...>)
-    // CurrentOrderedId: sequence<...>
-    template <class F, class CurrentOrderedId>
-    CK_TILE_HOST_DEVICE constexpr void operator()(F f, CurrentOrderedId) const
-    {
-        static_for<0, RemainLengths::front(), 1>{}([=](auto I) {
-            static_ford_impl<decltype(RemainLengths::pop_front()), Orders>{}(
-                f, CurrentOrderedId::push_back(I));
-        });
-    }
+    CK_TILE_HOST_DEVICE constexpr index_t operator[](index_t i) const { return data[i]; }
 };
 
-template <class Orders>
-struct static_ford_impl<sequence<>, Orders>
+// Common base for static_ford providing compile-time constants
+template <class Lengths, class Orders>
+struct ford_base
 {
-    // F signature: F(sequence<...>)
-    // OrderedId: sequence<...>
-    template <class F, class OrderedId>
-    CK_TILE_HOST_DEVICE constexpr void operator()(F f, OrderedId) const
-    {
-        // retrive unordered Id
-        f(OrderedId::reorder_old_to_new(Orders{}));
-    }
-};
+    static constexpr index_t NDim = Lengths::size();
 
-} // namespace detail
+    static constexpr index_t TotalSize =
+        reduce_on_sequence(Lengths{}, multiplies<>{}, number<1>{});
 
-// Lengths is sequence<...>, it is the length of each dimension for
-// N-dimensional loop
-// Orders is sequence<...>, it is the order of dimension in which static_ford
-// will loop over each
-// dimension
-template <class Lengths,
-          class Orders = typename arithmetic_sequence_gen<0, Lengths::size(), 1>::type>
-struct static_ford
-{
-    CK_TILE_HOST_DEVICE constexpr static_ford()
+    static constexpr auto OrderedLengths = Lengths::reorder_new_to_old(Orders{});
+
+    using OrderedLengthsType = remove_cvref_t<decltype(OrderedLengths)>;
+
+    CK_TILE_HOST_DEVICE constexpr ford_base()
     {
         static_assert(Lengths::size() > 0, "wrong! Lengths is empty");
         static_assert(Lengths::size() == Orders::size(), "wrong! inconsistent size");
     }
+};
+
+// Index decomposer: converts linear index to N-dimensional indices
+// Uses precomputed strides for O(1) decomposition per dimension
+template <class OrderedLengths, class IndexSeq>
+struct index_decomposer;
+
+template <index_t... Ls, index_t... Is>
+struct index_decomposer<sequence<Ls...>, sequence<Is...>>
+{
+    static constexpr index_t NDim = sizeof...(Ls);
+
+    static constexpr index_array<NDim> lengths = {{Ls...}};
+
+    // Compute strides: strides[i] = product of lengths[i+1..N-1]
+    // strides[N-1] = 1, strides[i] = strides[i+1] * lengths[i+1]
+    static constexpr index_array<NDim> compute_strides()
+    {
+        index_array<NDim> result{};
+        if constexpr(NDim > 0)
+        {
+            result.data[NDim - 1] = 1;
+            for(index_t i = NDim - 2; i >= 0; --i)
+            {
+                result.data[i] = result.data[i + 1] * lengths[i + 1];
+            }
+        }
+        return result;
+    }
+
+    static constexpr index_array<NDim> strides = compute_strides();
+
+    // Compile-time decomposition: ordered_idx[i] = (linear_idx / strides[i]) % lengths[i]
+    template <index_t LinearIdx>
+    using decompose = sequence<((LinearIdx / strides[Is]) % lengths[Is])...>;
+};
+
+} // namespace detail
+
+// Optimized N-dimensional loop using flat iteration with index decomposition.
+// Uses O(1) template instantiation depth instead of recursive templates.
+//
+// Lengths is sequence<...>, it is the length of each dimension for N-dimensional loop
+// Orders is sequence<...>, it is the order of dimension in which static_ford
+// will loop over each dimension
+template <class Lengths,
+          class Orders = typename arithmetic_sequence_gen<0, Lengths::size(), 1>::type>
+struct static_ford : detail::ford_base<Lengths, Orders>
+{
+    using Base = detail::ford_base<Lengths, Orders>;
+    using Decomposer =
+        detail::index_decomposer<typename Base::OrderedLengthsType,
+                                 typename arithmetic_sequence_gen<0, Base::NDim, 1>::type>;
 
     // F signature: F(sequence<...> multi_id)
     // multi_id is the unordered multi-index
     template <class F>
     CK_TILE_HOST_DEVICE constexpr void operator()(F f) const
     {
-        constexpr auto ordered_lengths = Lengths::reorder_new_to_old(Orders{});
-        detail::static_ford_impl<decltype(ordered_lengths), Orders>{}(f, sequence<>{});
+        // Single flat loop with index decomposition - O(1) template depth
+        static_for<0, Base::TotalSize, 1>{}([&](auto linear_idx) {
+            using OrderedIdx = typename Decomposer::template decompose<linear_idx.value>;
+            f(OrderedIdx::reorder_old_to_new(Orders{}));
+        });
     }
 };
 
