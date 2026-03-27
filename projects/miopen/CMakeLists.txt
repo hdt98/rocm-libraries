@@ -374,8 +374,14 @@ if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_B
 
         foreach(arch IN LISTS GPU_TARGETS)
             miopen_sanitize_arch("${arch}" arch_safe)
-            set(per_arch_lib "${CK_PER_ARCH_DIR}/libdevice_conv_operations_${arch_safe}.a")
             set(target_name "ck_conv_${arch_safe}")
+
+            # Skip if already created (GPU_TARGETS may contain duplicates)
+            if(TARGET ${target_name})
+                continue()
+            endif()
+
+            set(per_arch_lib "${CK_PER_ARCH_DIR}/libdevice_conv_operations_${arch_safe}.a")
 
             add_custom_command(
                 OUTPUT "${per_arch_lib}"
