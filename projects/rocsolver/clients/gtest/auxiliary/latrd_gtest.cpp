@@ -144,42 +144,42 @@ protected:
 
 // non-batch tests
 
-TEST_P(LATRD, __float)
+TEST_P(LATRD, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(LATRD, __double)
+TEST_P(LATRD, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(LATRD, __float_complex)
+TEST_P(LATRD, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LATRD, __double_complex)
+TEST_P(LATRD, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(LATRD_FORSYTRD, __float)
+TEST_P(LATRD_FORSYTRD, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(LATRD_FORSYTRD, __double)
+TEST_P(LATRD_FORSYTRD, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(LATRD_FORSYTRD, __float_complex)
+TEST_P(LATRD_FORSYTRD, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LATRD_FORSYTRD, __double_complex)
+TEST_P(LATRD_FORSYTRD, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

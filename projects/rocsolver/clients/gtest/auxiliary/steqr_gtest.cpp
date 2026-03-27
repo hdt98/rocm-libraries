@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -109,42 +109,42 @@ class STEQR_HYBRID : public STEQR_BASE<1>
 
 // non-batch tests
 
-TEST_P(STEQR, __float)
+TEST_P(STEQR, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(STEQR, __double)
+TEST_P(STEQR, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(STEQR, __float_complex)
+TEST_P(STEQR, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(STEQR, __double_complex)
+TEST_P(STEQR, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(STEQR_HYBRID, __float)
+TEST_P(STEQR_HYBRID, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(STEQR_HYBRID, __double)
+TEST_P(STEQR_HYBRID, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(STEQR_HYBRID, __float_complex)
+TEST_P(STEQR_HYBRID, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(STEQR_HYBRID, __double_complex)
+TEST_P(STEQR_HYBRID, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

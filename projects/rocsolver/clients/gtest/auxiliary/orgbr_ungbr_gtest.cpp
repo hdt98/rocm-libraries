@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -137,22 +137,22 @@ class UNGBR : public ORGBR_UNGBR
 
 // non-batch tests
 
-TEST_P(ORGBR, __float)
+TEST_P(ORGBR, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORGBR, __double)
+TEST_P(ORGBR, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNGBR, __float_complex)
+TEST_P(UNGBR, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNGBR, __double_complex)
+TEST_P(UNGBR, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -182,106 +182,106 @@ protected:
 
 // non-batch tests
 
-TEST_P(GESVDJ, __float)
+TEST_P(GESVDJ, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GESVDJ, __double)
+TEST_P(GESVDJ, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GESVDJ, __float_complex)
+TEST_P(GESVDJ, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GESVDJ, __double_complex)
+TEST_P(GESVDJ, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GESVDJ_NOTRANSV, __float)
+TEST_P(GESVDJ_NOTRANSV, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GESVDJ_NOTRANSV, __double)
+TEST_P(GESVDJ_NOTRANSV, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GESVDJ_NOTRANSV, __float_complex)
+TEST_P(GESVDJ_NOTRANSV, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GESVDJ_NOTRANSV, __double_complex)
+TEST_P(GESVDJ_NOTRANSV, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
 // batched tests
 
-TEST_P(GESVDJ, batched__float)
+TEST_P(GESVDJ, batched_float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(GESVDJ, batched__double)
+TEST_P(GESVDJ, batched_double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(GESVDJ, batched__float_complex)
+TEST_P(GESVDJ, batched_float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(GESVDJ, batched__double_complex)
+TEST_P(GESVDJ, batched_double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
 // strided_batched tests
 
-TEST_P(GESVDJ, strided_batched__float)
+TEST_P(GESVDJ, strided_batched_float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GESVDJ, strided_batched__double)
+TEST_P(GESVDJ, strided_batched_double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GESVDJ, strided_batched__float_complex)
+TEST_P(GESVDJ, strided_batched_float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GESVDJ, strided_batched__double_complex)
+TEST_P(GESVDJ, strided_batched_double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(GESVDJ_NOTRANSV, strided_batched__float)
+TEST_P(GESVDJ_NOTRANSV, strided_batched_float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GESVDJ_NOTRANSV, strided_batched__double)
+TEST_P(GESVDJ_NOTRANSV, strided_batched_double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GESVDJ_NOTRANSV, strided_batched__float_complex)
+TEST_P(GESVDJ_NOTRANSV, strided_batched_float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GESVDJ_NOTRANSV, strided_batched__double_complex)
+TEST_P(GESVDJ_NOTRANSV, strided_batched_double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }

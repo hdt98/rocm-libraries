@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -120,126 +120,126 @@ class GELQF : public GELQ2_GELQF<true>
 
 // non-batch tests
 
-TEST_P(GELQ2, __float)
+TEST_P(GELQ2, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GELQ2, __double)
+TEST_P(GELQ2, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GELQ2, __float_complex)
+TEST_P(GELQ2, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GELQ2, __double_complex)
+TEST_P(GELQ2, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GELQF, __float)
+TEST_P(GELQF, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GELQF, __double)
+TEST_P(GELQF, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GELQF, __float_complex)
+TEST_P(GELQF, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GELQF, __double_complex)
+TEST_P(GELQF, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
 // batched tests
 
-TEST_P(GELQ2, batched__float)
+TEST_P(GELQ2, batched_float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(GELQ2, batched__double)
+TEST_P(GELQ2, batched_double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(GELQ2, batched__float_complex)
+TEST_P(GELQ2, batched_float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(GELQ2, batched__double_complex)
+TEST_P(GELQ2, batched_double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
-TEST_P(GELQF, batched__float)
+TEST_P(GELQF, batched_float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(GELQF, batched__double)
+TEST_P(GELQF, batched_double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(GELQF, batched__float_complex)
+TEST_P(GELQF, batched_float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(GELQF, batched__double_complex)
+TEST_P(GELQF, batched_double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
 // strided_batched cases
 
-TEST_P(GELQ2, strided_batched__float)
+TEST_P(GELQ2, strided_batched_float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GELQ2, strided_batched__double)
+TEST_P(GELQ2, strided_batched_double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GELQ2, strided_batched__float_complex)
+TEST_P(GELQ2, strided_batched_float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GELQ2, strided_batched__double_complex)
+TEST_P(GELQ2, strided_batched_double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(GELQF, strided_batched__float)
+TEST_P(GELQF, strided_batched_float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GELQF, strided_batched__double)
+TEST_P(GELQF, strided_batched_double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GELQF, strided_batched__float_complex)
+TEST_P(GELQF, strided_batched_float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GELQF, strided_batched__double_complex)
+TEST_P(GELQF, strided_batched_double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }

@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -116,22 +116,22 @@ class LACGV_64 : public LACGV_BASE<int64_t>
 
 // non-batch tests
 
-TEST_P(LACGV, __float_complex)
+TEST_P(LACGV, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LACGV, __double_complex)
+TEST_P(LACGV, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(LACGV_64, __float_complex)
+TEST_P(LACGV_64, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LACGV_64, __double_complex)
+TEST_P(LACGV_64, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

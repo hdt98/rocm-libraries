@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -127,126 +127,126 @@ class HEGST : public SYGSX_HEGSX<true>
 
 // non-batch tests
 
-TEST_P(SYGS2, __float)
+TEST_P(SYGS2, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYGS2, __double)
+TEST_P(SYGS2, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEGS2, __float_complex)
+TEST_P(HEGS2, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEGS2, __double_complex)
+TEST_P(HEGS2, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(SYGST, __float)
+TEST_P(SYGST, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYGST, __double)
+TEST_P(SYGST, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEGST, __float_complex)
+TEST_P(HEGST, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEGST, __double_complex)
+TEST_P(HEGST, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
 // batched tests
 
-TEST_P(SYGS2, batched__float)
+TEST_P(SYGS2, batched_float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(SYGS2, batched__double)
+TEST_P(SYGS2, batched_double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(HEGS2, batched__float_complex)
+TEST_P(HEGS2, batched_float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(HEGS2, batched__double_complex)
+TEST_P(HEGS2, batched_double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
-TEST_P(SYGST, batched__float)
+TEST_P(SYGST, batched_float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(SYGST, batched__double)
+TEST_P(SYGST, batched_double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(HEGST, batched__float_complex)
+TEST_P(HEGST, batched_float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(HEGST, batched__double_complex)
+TEST_P(HEGST, batched_double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
 // strided_batched cases
 
-TEST_P(SYGS2, strided_batched__float)
+TEST_P(SYGS2, strided_batched_float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(SYGS2, strided_batched__double)
+TEST_P(SYGS2, strided_batched_double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(HEGS2, strided_batched__float_complex)
+TEST_P(HEGS2, strided_batched_float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(HEGS2, strided_batched__double_complex)
+TEST_P(HEGS2, strided_batched_double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(SYGST, strided_batched__float)
+TEST_P(SYGST, strided_batched_float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(SYGST, strided_batched__double)
+TEST_P(SYGST, strided_batched_double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(HEGST, strided_batched__float_complex)
+TEST_P(HEGST, strided_batched_float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(HEGST, strided_batched__double_complex)
+TEST_P(HEGST, strided_batched_double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }

@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -132,42 +132,42 @@ class UNGQR : public ORGXR_UNGXR<true>
 
 // non-batch tests
 
-TEST_P(ORG2R, __float)
+TEST_P(ORG2R, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORG2R, __double)
+TEST_P(ORG2R, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNG2R, __float_complex)
+TEST_P(UNG2R, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNG2R, __double_complex)
+TEST_P(UNG2R, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORGQR, __float)
+TEST_P(ORGQR, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORGQR, __double)
+TEST_P(ORGQR, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNGQR, __float_complex)
+TEST_P(UNGQR, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNGQR, __double_complex)
+TEST_P(UNGQR, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

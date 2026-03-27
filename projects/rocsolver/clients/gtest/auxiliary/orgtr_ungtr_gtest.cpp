@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -105,22 +105,22 @@ class UNGTR : public ORGTR_UNGTR
 
 // non-batch tests
 
-TEST_P(ORGTR, __float)
+TEST_P(ORGTR, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORGTR, __double)
+TEST_P(ORGTR, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNGTR, __float_complex)
+TEST_P(UNGTR, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNGTR, __double_complex)
+TEST_P(UNGTR, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

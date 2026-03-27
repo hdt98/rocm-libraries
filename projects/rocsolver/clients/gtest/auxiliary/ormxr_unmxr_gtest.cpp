@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -156,42 +156,42 @@ class UNMQR : public ORMXR_UNMXR<true>
 
 // non-batch tests
 
-TEST_P(ORM2R, __float)
+TEST_P(ORM2R, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORM2R, __double)
+TEST_P(ORM2R, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNM2R, __float_complex)
+TEST_P(UNM2R, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNM2R, __double_complex)
+TEST_P(UNM2R, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORMQR, __float)
+TEST_P(ORMQR, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORMQR, __double)
+TEST_P(ORMQR, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNMQR, __float_complex)
+TEST_P(UNMQR, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNMQR, __double_complex)
+TEST_P(UNMQR, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

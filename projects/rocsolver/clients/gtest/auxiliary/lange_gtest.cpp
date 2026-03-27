@@ -129,42 +129,42 @@ class LANGE_64 : public LANGE_BASE<int64_t>
 
 // non-batch tests
 
-TEST_P(LANGE, __float)
+TEST_P(LANGE, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(LANGE, __double)
+TEST_P(LANGE, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(LANGE, __float_complex)
+TEST_P(LANGE, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LANGE, __double_complex)
+TEST_P(LANGE, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(LANGE_64, __float)
+TEST_P(LANGE_64, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(LANGE_64, __double)
+TEST_P(LANGE_64, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(LANGE_64, __float_complex)
+TEST_P(LANGE_64, _float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LANGE_64, __double_complex)
+TEST_P(LANGE_64, _double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

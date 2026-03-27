@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -132,66 +132,66 @@ class HEEVX : public SYEVX_HEEVX
 
 // non-batch tests
 
-TEST_P(SYEVX, __float)
+TEST_P(SYEVX, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYEVX, __double)
+TEST_P(SYEVX, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEEVX, __float_complex)
+TEST_P(HEEVX, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEEVX, __double_complex)
+TEST_P(HEEVX, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
 // batched tests
 
-TEST_P(SYEVX, batched__float)
+TEST_P(SYEVX, batched_float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(SYEVX, batched__double)
+TEST_P(SYEVX, batched_double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(HEEVX, batched__float_complex)
+TEST_P(HEEVX, batched_float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(HEEVX, batched__double_complex)
+TEST_P(HEEVX, batched_double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
 // strided_batched tests
 
-TEST_P(SYEVX, strided_batched__float)
+TEST_P(SYEVX, strided_batched_float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(SYEVX, strided_batched__double)
+TEST_P(SYEVX, strided_batched_double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(HEEVX, strided_batched__float_complex)
+TEST_P(HEEVX, strided_batched_float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(HEEVX, strided_batched__double_complex)
+TEST_P(HEEVX, strided_batched_double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }

@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -97,22 +97,22 @@ class STERF_HYBRID : public STERF_BASE<1>
 
 // non-batch tests
 
-TEST_P(STERF, __float)
+TEST_P(STERF, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(STERF, __double)
+TEST_P(STERF, _double)
 {
     run_tests<double>();
 }
 
-TEST_P(STERF_HYBRID, __float)
+TEST_P(STERF_HYBRID, _float)
 {
     run_tests<float>();
 }
 
-TEST_P(STERF_HYBRID, __double)
+TEST_P(STERF_HYBRID, _double)
 {
     run_tests<double>();
 }

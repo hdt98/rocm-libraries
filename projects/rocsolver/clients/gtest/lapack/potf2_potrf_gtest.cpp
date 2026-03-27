@@ -147,206 +147,206 @@ class POTRF_64 : public POTF2_POTRF<true, int64_t>
 
 // non-batch tests
 
-TEST_P(POTF2, __float)
+TEST_P(POTF2, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(POTF2, __double)
+TEST_P(POTF2, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(POTF2, __float_complex)
+TEST_P(POTF2, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(POTF2, __double_complex)
+TEST_P(POTF2, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(POTF2_64, __float)
+TEST_P(POTF2_64, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(POTF2_64, __double)
+TEST_P(POTF2_64, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(POTF2_64, __float_complex)
+TEST_P(POTF2_64, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(POTF2_64, __double_complex)
+TEST_P(POTF2_64, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(POTRF, __float)
+TEST_P(POTRF, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(POTRF, __double)
+TEST_P(POTRF, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(POTRF, __float_complex)
+TEST_P(POTRF, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRF, __double_complex)
+TEST_P(POTRF, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(POTRF_64, __float)
+TEST_P(POTRF_64, _float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(POTRF_64, __double)
+TEST_P(POTRF_64, _double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(POTRF_64, __float_complex)
+TEST_P(POTRF_64, _float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRF_64, __double_complex)
+TEST_P(POTRF_64, _double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
 // batched tests
 
-TEST_P(POTF2, batched__float)
+TEST_P(POTF2, batched_float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(POTF2, batched__double)
+TEST_P(POTF2, batched_double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(POTF2, batched__float_complex)
+TEST_P(POTF2, batched_float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(POTF2, batched__double_complex)
+TEST_P(POTF2, batched_double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
-TEST_P(POTRF, batched__float)
+TEST_P(POTRF, batched_float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(POTRF, batched__double)
+TEST_P(POTRF, batched_double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(POTRF, batched__float_complex)
+TEST_P(POTRF, batched_float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(POTRF, batched__double_complex)
+TEST_P(POTRF, batched_double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
 // strided_batched cases
 
-TEST_P(POTF2, strided_batched__float)
+TEST_P(POTF2, strided_batched_float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(POTF2, strided_batched__double)
+TEST_P(POTF2, strided_batched_double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(POTF2, strided_batched__float_complex)
+TEST_P(POTF2, strided_batched_float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(POTF2, strided_batched__double_complex)
+TEST_P(POTF2, strided_batched_double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(POTF2_64, strided_batched__float)
+TEST_P(POTF2_64, strided_batched_float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(POTF2_64, strided_batched__double)
+TEST_P(POTF2_64, strided_batched_double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(POTF2_64, strided_batched__float_complex)
+TEST_P(POTF2_64, strided_batched_float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(POTF2_64, strided_batched__double_complex)
+TEST_P(POTF2_64, strided_batched_double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(POTRF, strided_batched__float)
+TEST_P(POTRF, strided_batched_float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(POTRF, strided_batched__double)
+TEST_P(POTRF, strided_batched_double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(POTRF, strided_batched__float_complex)
+TEST_P(POTRF, strided_batched_float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(POTRF, strided_batched__double_complex)
+TEST_P(POTRF, strided_batched_double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(POTRF_64, strided_batched__float)
+TEST_P(POTRF_64, strided_batched_float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(POTRF_64, strided_batched__double)
+TEST_P(POTRF_64, strided_batched_double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(POTRF_64, strided_batched__float_complex)
+TEST_P(POTRF_64, strided_batched_float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(POTRF_64, strided_batched__double_complex)
+TEST_P(POTRF_64, strided_batched_double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
