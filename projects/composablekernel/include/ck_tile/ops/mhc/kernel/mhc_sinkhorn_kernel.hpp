@@ -73,10 +73,10 @@ struct MHCSinkhornKernel
             number<1>{},
             number<1>{});
 
-        auto matrix_tensor = pad_tensor_view(
-            matrix_tensor_naive,
-            make_tuple(number<kBlockM>{}, number<kN>{}, number<kN>{}),
-            sequence<true, false, false>{});
+        auto matrix_tensor =
+            pad_tensor_view(matrix_tensor_naive,
+                            make_tuple(number<kBlockM>{}, number<kN>{}, number<kN>{}),
+                            sequence<true, false, false>{});
 
         // Create tile distribution for batch processing
         // Each thread processes one complete nxn matrix

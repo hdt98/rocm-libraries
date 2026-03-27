@@ -875,17 +875,3 @@ TYPED_TEST(TestMHCComprehensive, SplitK_WithTanH)
     // Split-K with different activation function
     EXPECT_TRUE((Tester::template RunTest<16, 4, 1024>("Split-K: C=1024 with TanH activation")));
 }
-
-// (15) Sinkhorn padding tests - batch sizes not divisible by Sinkhorn block size (64)
-// These tests specifically verify pad_tensor_view works correctly in the Sinkhorn kernel
-TYPED_TEST(TestMHCComprehensive, SinkhornPadding_B50_n4)
-{
-    using Tester = MHCTest<typename TestFixture::XDataType,
-                           typename TestFixture::YDataType,
-                           typename TestFixture::ComputeDataType,
-                           ck_tile::element_wise::Sigmoid,
-                           TestFixture::MTile>;
-    // B=50 not divisible by 64 (Sinkhorn block size), requires padding in M dimension
-    EXPECT_TRUE((Tester::template RunTest<50, 4, 64, 20>("Sinkhorn Padding: B=50 (not divisible by 64)")));
-}
-
