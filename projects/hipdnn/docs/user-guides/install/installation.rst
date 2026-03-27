@@ -15,7 +15,7 @@ System requirements
 ===================
 
 - `An AMD GPU with ROCm support <https://github.com/ROCm/TheRock/blob/main/SUPPORTED_GPUS.md>`_
-- Linux or Windows operating system (see `Install AMD ROCm <https://advanced-micro-devices-rocm-internal--692.com.readthedocs.build/en/692/install/rocm.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_)
+- Linux or Windows operating system (see `Install AMD ROCm <https://rocm.docs.amd.com/en/7.12.0-preview/install/rocm.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman`_)
 
 Dependencies
 ============
@@ -43,7 +43,7 @@ Dependencies
 Install ROCm and hipDNN
 =======================
 
-Follow the instructions at `Install AMD ROCm <https://advanced-micro-devices-rocm-internal--692.com.readthedocs.build/en/692/install/rocm.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_ to install a ROCm development package that includes hipDNN.
+Follow the instructions at `Install AMD ROCm <https://rocm.docs.amd.com/en/7.12.0-preview/install/rocm.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_ to install a ROCm development package that includes hipDNN.
 ROCm development packages contain the ``.dev`` prefix.
 
 .. important::
