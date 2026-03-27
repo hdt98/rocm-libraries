@@ -186,6 +186,32 @@ def _per_wave_rows(lr_map: dict) -> dict[int, list[int]]:
     return {w: sorted(rows) for w, rows in sorted(wave_rows.items())}
 
 
+def _contiguous_segments(rows: list[int]) -> list[tuple[int, int]]:
+    """Group a sorted list of rows into (start, end_exclusive) segments."""
+    if not rows:
+        return []
+    segs = []
+    s = rows[0]
+    p = rows[0]
+    for r in rows[1:]:
+        if r == p + 1:
+            p = r
+        else:
+            segs.append((s, p + 1))
+            s = r
+            p = r
+    segs.append((s, p + 1))
+    return segs
+
+
+def _format_segments(dim: str, segs: list[tuple[int, int]]) -> str:
+    """Format segments as 'D[s1:e1,s2:e2,...]'."""
+    if not segs:
+        return f"{dim}[?]"
+    parts = ",".join(f"{s}:{e}" for s, e in segs)
+    return f"{dim}[{parts}]"
+
+
 def summarize_jamming(a_lr_map: dict, b_lr_map: dict):
     """
     Print wave → subtileC assignment derived from LR mappings.
@@ -202,14 +228,20 @@ def summarize_jamming(a_lr_map: dict, b_lr_map: dict):
         print("\n  [no LR data to derive jamming]")
         return
 
-    # Build per-wave M and N range strings
+    # Build per-wave range strings using contiguous segments
     wave_m: dict[int, str] = {}
     wave_n: dict[int, str] = {}
+    max_m_segs = 0
+    max_n_segs = 0
     for w in all_waves:
-        a_rows = a_waves.get(w, [])
-        b_rows = b_waves.get(w, [])
-        wave_m[w] = f"M[{min(a_rows)}:{max(a_rows)+1}]" if a_rows else "M[?]"
-        wave_n[w] = f"N[{min(b_rows)}:{max(b_rows)+1}]" if b_rows else "N[?]"
+        a_segs = _contiguous_segments(a_waves.get(w, []))
+        b_segs = _contiguous_segments(b_waves.get(w, []))
+        max_m_segs = max(max_m_segs, len(a_segs))
+        max_n_segs = max(max_n_segs, len(b_segs))
+        wave_m[w] = _format_segments("M", a_segs)
+        wave_n[w] = _format_segments("N", b_segs)
+
+    pattern = "contiguous" if max_m_segs <= 1 and max_n_segs <= 1 else "strided"
 
     # Derive jam factors
     unique_m_ranges = sorted(set(wave_m.values()))
@@ -220,7 +252,7 @@ def summarize_jamming(a_lr_map: dict, b_lr_map: dict):
     print()
     print("=" * 80)
     print(f"Jamming: {jam_m} along M x {jam_n} along N "
-          f"({len(all_waves)} waves)")
+          f"({len(all_waves)} waves, {pattern})")
     print()
 
     # Build a 2D grid: rows = M ranges, cols = N ranges
