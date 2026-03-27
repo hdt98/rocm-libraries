@@ -494,6 +494,21 @@ namespace GEMMTests
                         gemm.workgroupSizeX * gemm.workgroupSizeY);
     }
 
+    TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MT128x128x256_LDSSwizzle)
+    {
+        REQUIRE_ARCH_CAP(GPUCapability::HasMFMA_f8f6f4);
+        auto gemm           = GEMMProblemF8F6F4{32, 32, 64};
+        gemm.m              = 256;
+        gemm.n              = 256;
+        gemm.k              = 512;
+        gemm.macM           = 128;
+        gemm.macN           = 128;
+        gemm.macK           = 256;
+        gemm.ldsSwizzleMode = LDSBankSwizzleMode::Swizzle;
+
+        basicGEMM<FP4, FP4, float>(gemm);
+    }
+
     TEST_P(GEMMTestSuite, GPU_GEMM_DataType_FP16_AllLDS)
     {
         REQUIRE_ARCH_CAP(GPUCapability::HasMFMA);
