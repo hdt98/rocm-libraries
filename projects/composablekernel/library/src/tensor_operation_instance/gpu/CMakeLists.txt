@@ -470,7 +470,7 @@ endif()
 
 
 
-if(CK_DEVICE_OTHER_INSTANCES AND NOT MIOPEN_REQ_LIBS_ONLY)
+if(CK_DEVICE_OTHER_INSTANCES AND (NOT MIOPEN_REQ_LIBS_ONLY OR HIPTENSOR_REQ_LIBS_ONLY))
         add_library(device_other_operations ${CK_DEVICE_OTHER_INSTANCES})
         add_library(composablekernels::device_other_operations ALIAS device_other_operations)
         set_target_properties(device_other_operations PROPERTIES POSITION_INDEPENDENT_CODE ON)
