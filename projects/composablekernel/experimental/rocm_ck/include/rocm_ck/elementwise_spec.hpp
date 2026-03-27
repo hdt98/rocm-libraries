@@ -146,38 +146,4 @@ consteval ElementwiseSpec make_kernel(Signature sig, ElementwiseAlgorithm algo)
             algo.pad};
 }
 
-// ============================================================================
-// Compile-time tests
-// ============================================================================
-
-// --- Physical tensor table ---
-static_assert(make_kernel(Signature{.dtype = DataType::FP32,
-                                    .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-                          ElementwiseAlgorithm{1024, 1, 1024, true})
-                  .num_physical_tensors == 3);
-static_assert(make_kernel(Signature{.dtype = DataType::FP32,
-                                    .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-                          ElementwiseAlgorithm{1024, 1, 1024, true})
-                  .lhs()
-                  .dtype == DataType::FP32);
-static_assert(make_kernel(Signature{.dtype = DataType::FP32,
-                                    .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-                          ElementwiseAlgorithm{1024, 1, 1024, true})
-                  .output()
-                  .dtype == DataType::FP32);
-
-// --- Mixed types via Tensor override ---
-static_assert(make_kernel(Signature{.dtype   = DataType::FP16,
-                                    .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
-                                    .ops     = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-                          ElementwiseAlgorithm{1024, 1, 1024, true})
-                  .lhs()
-                  .dtype == DataType::FP16);
-static_assert(make_kernel(Signature{.dtype   = DataType::FP16,
-                                    .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
-                                    .ops     = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-                          ElementwiseAlgorithm{1024, 1, 1024, true})
-                  .output()
-                  .dtype == DataType::FP32);
-
 } // namespace rocm_ck

@@ -1,0 +1,271 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
+
+#include <rocm_ck/resolve.hpp>
+
+#include <gtest/gtest.h>
+
+using namespace rocm_ck;
+
+// ============================================================================
+// Simple GemmOp resolution
+// ============================================================================
+
+TEST(Resolve, SimpleGemmOpTensorCount)
+{
+    constexpr auto r = resolve(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.num_tensors, 3);
+}
+
+TEST(Resolve, SimpleGemmOpDtypeCascade)
+{
+    constexpr auto r = resolve(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.tensor("A").dtype, DataType::FP16);
+    EXPECT_EQ(r.tensor("B").dtype, DataType::FP16);
+    EXPECT_EQ(r.tensor("C").dtype, DataType::FP16);
+}
+
+TEST(Resolve, SimpleGemmOpRank)
+{
+    constexpr auto r = resolve(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.tensor("A").rank, 2);
+    EXPECT_EQ(r.tensor("B").rank, 2);
+    EXPECT_EQ(r.tensor("C").rank, 2);
+}
+
+TEST(Resolve, SimpleGemmOpLayout)
+{
+    constexpr auto r = resolve(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.tensor("A").layout, Layout::Row);
+    EXPECT_EQ(r.tensor("B").layout, Layout::Col);
+    EXPECT_EQ(r.tensor("C").layout, Layout::Row);
+}
+
+// ============================================================================
+// Custom tensor names
+// ============================================================================
+
+TEST(Resolve, CustomTensorNames)
+{
+    constexpr auto r = resolve(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "X", .rhs = "Y", .out = "Z"}}});
+
+    EXPECT_EQ(r.tensor("X").rank, 2);
+    EXPECT_EQ(r.tensor("Y").rank, 2);
+    EXPECT_EQ(r.tensor("Z").rank, 2);
+}
+
+// ============================================================================
+// dtype cascade
+// ============================================================================
+
+TEST(Resolve, DtypeCascadeBF16)
+{
+    constexpr auto r = resolve(
+        Signature{.dtype = DataType::BF16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.tensor("A").dtype, DataType::BF16);
+    EXPECT_EQ(r.tensor("C").dtype, DataType::BF16);
+}
+
+TEST(Resolve, ExplicitTensorDtypeOverridesCascade)
+{
+    constexpr auto r = resolve(Signature{.dtype   = DataType::FP16,
+                                         .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
+                                         .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.tensor("C").dtype, DataType::FP32);
+    EXPECT_EQ(r.tensor("A").dtype, DataType::FP16); // cascade still applies to A
+}
+
+// ============================================================================
+// Explicit tensor rank/layout overrides
+// ============================================================================
+
+TEST(Resolve, ExplicitRankOverride)
+{
+    constexpr auto r = resolve(Signature{.dtype   = DataType::FP16,
+                                         .tensors = {Tensor{.name = "A", .rank = 3}},
+                                         .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.tensor("A").rank, 3);
+}
+
+// ============================================================================
+// GEMM + Add + Relu chain
+// ============================================================================
+
+TEST(Resolve, GemmAddReluTensorCount)
+{
+    constexpr auto r = resolve(Signature{.dtype = DataType::FP16,
+                                         .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                   AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                                                   ReluOp{.in = "D", .out = "E"}}});
+
+    EXPECT_EQ(r.num_tensors, 6); // A, B, C, bias, D, E
+}
+
+TEST(Resolve, GemmAddReluPropagation)
+{
+    constexpr auto r = resolve(Signature{.dtype = DataType::FP16,
+                                         .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                   AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                                                   ReluOp{.in = "D", .out = "E"}}});
+
+    EXPECT_EQ(r.tensor("C").rank, 2);
+    EXPECT_EQ(r.tensor("bias").rank, 2);
+    EXPECT_EQ(r.tensor("bias").layout, Layout::Row);
+    EXPECT_EQ(r.tensor("D").rank, 2);
+    EXPECT_EQ(r.tensor("D").layout, Layout::Row);
+    EXPECT_EQ(r.tensor("E").rank, 2);
+    EXPECT_EQ(r.tensor("E").layout, Layout::Row);
+}
+
+TEST(Resolve, GemmAddReluTensorIndices)
+{
+    constexpr auto r = resolve(Signature{.dtype = DataType::FP16,
+                                         .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                   AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                                                   ReluOp{.in = "D", .out = "E"}}});
+
+    EXPECT_EQ(r.tensor_index("A"), 0);
+    EXPECT_EQ(r.tensor_index("B"), 1);
+    EXPECT_EQ(r.tensor_index("C"), 2);
+    EXPECT_EQ(r.tensor_index("bias"), 3);
+    EXPECT_EQ(r.tensor_index("D"), 4);
+    EXPECT_EQ(r.tensor_index("E"), 5);
+}
+
+// ============================================================================
+// Standalone AddOp
+// ============================================================================
+
+TEST(Resolve, StandaloneAddOp)
+{
+    constexpr auto r = resolve(
+        Signature{.dtype = DataType::FP32, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.num_tensors, 3);
+    EXPECT_EQ(r.tensor("A").rank, 0);              // no op implies rank
+    EXPECT_EQ(r.tensor("A").layout, Layout::Auto); // no op implies layout
+}
+
+// ============================================================================
+// FMHA pattern: two GemmOps + SoftmaxOp
+// ============================================================================
+
+TEST(Resolve, FMHAPattern)
+{
+    constexpr auto r = resolve(Signature{.dtype = DataType::FP16,
+                                         .ops   = {GemmOp{.lhs = "Q", .rhs = "K", .out = "S"},
+                                                   SoftmaxOp{.in = "S", .out = "P"},
+                                                   GemmOp{.lhs = "P", .rhs = "V", .out = "O"}}});
+
+    EXPECT_EQ(r.num_tensors, 6); // Q, K, S, P, V, O
+    EXPECT_EQ(r.tensor("Q").rank, 2);
+    EXPECT_EQ(r.tensor("S").rank, 2);
+    EXPECT_EQ(r.tensor("P").rank, 2); // propagated via SoftmaxOp
+    EXPECT_EQ(r.tensor("O").rank, 2);
+}
+
+// ============================================================================
+// Scalar tracking
+// ============================================================================
+
+TEST(Resolve, ScalarsPassThrough)
+{
+    constexpr auto r =
+        resolve(Signature{.dtype   = DataType::FP16,
+                          .scalars = {Scalar{.name = "alpha", .dtype = DataType::FP32},
+                                      Scalar{.name = "beta", .dtype = DataType::FP32}},
+                          .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.num_scalars, 2);
+    EXPECT_EQ(r.scalar("alpha").dtype, DataType::FP32);
+    EXPECT_EQ(r.scalar("beta").dtype, DataType::FP32);
+    EXPECT_EQ(r.scalar_index("alpha"), 0);
+    EXPECT_EQ(r.scalar_index("beta"), 1);
+}
+
+TEST(Resolve, NoScalarsYieldsZero)
+{
+    constexpr auto r = resolve(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.num_scalars, 0);
+}
+
+// ============================================================================
+// find_tensor / find_scalar (constexpr, not consteval — returns -1 on miss)
+// ============================================================================
+
+TEST(Resolve, FindTensorHit)
+{
+    constexpr auto r = resolve(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.find_tensor("A"), 0);
+    EXPECT_EQ(r.find_tensor("C"), 2);
+}
+
+TEST(Resolve, FindTensorMiss)
+{
+    constexpr auto r = resolve(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.find_tensor("Z"), -1);
+}
+
+TEST(Resolve, FindScalarMiss)
+{
+    constexpr auto r = resolve(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.find_scalar("nonexistent"), -1);
+}
+
+// ============================================================================
+// C++20 concepts
+// ============================================================================
+
+TEST(Concepts, BinaryOpLike)
+{
+    EXPECT_TRUE(BinaryOpLike<AddOp>);
+    EXPECT_TRUE(BinaryOpLike<MulOp>);
+    EXPECT_FALSE(BinaryOpLike<ReluOp>);
+    EXPECT_FALSE(BinaryOpLike<SoftmaxOp>);
+}
+
+TEST(Concepts, UnaryOpLike)
+{
+    EXPECT_TRUE(UnaryOpLike<ReluOp>);
+    EXPECT_TRUE(UnaryOpLike<FastGeluOp>);
+    EXPECT_TRUE(UnaryOpLike<GeluOp>);
+    EXPECT_TRUE(UnaryOpLike<SiluOp>);
+    EXPECT_TRUE(UnaryOpLike<SigmoidOp>);
+    EXPECT_TRUE(UnaryOpLike<SoftmaxOp>);
+    EXPECT_FALSE(UnaryOpLike<AddOp>);
+    EXPECT_FALSE(UnaryOpLike<GemmOp>);
+}
+
+TEST(Concepts, GemmOpIsNeither)
+{
+    // GemmOp has lhs/rhs/out AND is special-cased, not generic BinaryOpLike
+    // (it has .lhs, .rhs, .out but is handled separately in register_slots)
+    EXPECT_TRUE(BinaryOpLike<GemmOp>); // structurally matches, but dispatch special-cases it
+    EXPECT_FALSE(UnaryOpLike<GemmOp>);
+}
+
+TEST(Concepts, ScaleOpIsUnaryLike)
+{
+    EXPECT_TRUE(UnaryOpLike<ScaleOp>);
+    EXPECT_FALSE(BinaryOpLike<ScaleOp>);
+}
