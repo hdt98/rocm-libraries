@@ -100,9 +100,7 @@ __host__ __device__ constexpr auto GenerateMultipleFreeze(T idx, const Shape& sh
             // assuming the compiler would unfold parameters in ascending
             // order.
             auto tmp = idx;
-            static_for<0, i.value, 1>{}([&](auto j) {
-                tmp /= unrolled_shape.At(Number<j>{});
-            });
+            static_for<0, i.value, 1>{}([&](auto j) { tmp /= unrolled_shape.At(Number<j>{}); });
             const auto dim_idx = tmp % unrolled_shape.At(Number<i>{});
 #else
             // dimension offset from idx
