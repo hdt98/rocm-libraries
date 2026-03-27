@@ -14,6 +14,7 @@
 #include <rocRoller/DataTypes/DataTypes_BF6.hpp>
 #include <rocRoller/DataTypes/DataTypes_BF8.hpp>
 #include <rocRoller/DataTypes/DataTypes_BFloat16.hpp>
+#include <rocRoller/DataTypes/DataTypes_Buffer.hpp>
 #include <rocRoller/DataTypes/DataTypes_E4M3.hpp>
 #include <rocRoller/DataTypes/DataTypes_E4M3x4.hpp>
 #include <rocRoller/DataTypes/DataTypes_E5M3.hpp>

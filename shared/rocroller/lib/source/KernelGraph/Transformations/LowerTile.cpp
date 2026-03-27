@@ -2610,7 +2610,7 @@ namespace rocRoller
                                          iMacY,
                                          workgroupSizes,
                                          jammedTiles,
-                                         useSwappedAccess,
+                                         rightmostFastest,
                                          /*isGlobalToLDS=*/false);
                 }
                 else

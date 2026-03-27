@@ -333,6 +333,8 @@ namespace GPUArchitectureGenerator
                                                  {.xnack = true}},
                 rocRoller::GPUArchitectureTarget{rocRoller::GPUArchitectureGFX::GFX950,
                                                  {.sramecc = true}},
+                rocRoller::GPUArchitectureTarget{rocRoller::GPUArchitectureGFX::GFX950,
+                                                 {.sramecc = true, .xnack = true}},
                 rocRoller::GPUArchTargetGFX1250Rev0,
                 rocRoller::GPUArchTargetGFX1250Rev1,
             }},
@@ -343,6 +345,8 @@ namespace GPUArchitectureGenerator
                                                  {.xnack = true}},
                 rocRoller::GPUArchitectureTarget{rocRoller::GPUArchitectureGFX::GFX950,
                                                  {.sramecc = true}},
+                rocRoller::GPUArchitectureTarget{rocRoller::GPUArchitectureGFX::GFX950,
+                                                 {.sramecc = true, .xnack = true}},
                 rocRoller::GPUArchTargetGFX1250Rev0,
                 rocRoller::GPUArchTargetGFX1250Rev1,
             }},
@@ -363,6 +367,8 @@ namespace GPUArchitectureGenerator
                                                  {.xnack = true}},
                 rocRoller::GPUArchitectureTarget{rocRoller::GPUArchitectureGFX::GFX950,
                                                  {.sramecc = true}},
+                rocRoller::GPUArchitectureTarget{rocRoller::GPUArchitectureGFX::GFX950,
+                                                 {.sramecc = true, .xnack = true}},
                 rocRoller::GPUArchTargetGFX1250Rev0,
                 rocRoller::GPUArchTargetGFX1250Rev1,
             }},
@@ -504,7 +510,7 @@ namespace GPUArchitectureGenerator
 
             {rocRoller::GPUCapability::PackedWorkitemIDs,
              [](rocRoller::GPUArchitectureTarget x) -> bool {
-                 return x.isCDNA2GPU() || x.isCDNA3GPU() || x.isCDNA35GPU() || x.isRDNA4GPU()
+                 return x.isCDNA2GPU() || x.isCDNA3GPU() || x.isCDNA4GPU() || x.isRDNA4GPU()
                         || x.isCDNA5GPU();
              }},
             {rocRoller::GPUCapability::WorkgroupIdxViaTTMP,

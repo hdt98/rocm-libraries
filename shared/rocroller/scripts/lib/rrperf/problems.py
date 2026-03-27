@@ -198,12 +198,9 @@ class GEMMSolution:
     workgroup_cluster_size_y: int = 0
     workgroup_cluster_size_z: int = 0
 
-    unroll_x: int = 0
-    unroll_y: int = 0
-
-    loadLDS_A: bool = True
-    loadLDS_B: bool = True
-    storeLDS_D: bool = True
+    load_A: str = "BufferToLDSViaVGPR"
+    load_B: str = "BufferToLDSViaVGPR"
+    store: str = "VGPRToGlobalMemoryViaLDSWithBuffer"
     betaInFma: bool = True
 
     padLDS_A: tuple[int, int] = (0, 0)

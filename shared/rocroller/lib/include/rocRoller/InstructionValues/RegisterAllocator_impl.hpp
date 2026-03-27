@@ -345,31 +345,17 @@ namespace rocRoller
                       ? ReservedRegionSize()
                       : static_cast<int>(m_registers.size());
 
-            // Free blocks that can be used. {start, size}
-            std::vector<std::pair<int, int>> candidates;
-
-            // Loop through register collection and pick out appropriate free blocks
-            int candidateIdx = 0;
-            int first        = 0;
-            int last         = m_registers.size();
-
-            if(arch.HasCapability(GPUCapability::HasVGPRIndexing)
-               and regType() == Register::Type::Vector)
+            // Gather all candidate blocks
+            PerfectFitCandidates candidates(m_registers.size());
+            for(int searchPos = searchStart; searchPos < searchStop;)
             {
                 auto [start, blockSize]
                     = findContiguousRange(searchPos, chunkWidth, options, arch, rv);
                 if(start < 0)
                     break;
 
-            while(candidateIdx >= first && candidateIdx < last)
-            {
-                auto candidate = findContiguousRange(candidateIdx, width, options, arch, rv);
-                candidateIdx   = candidate.first;
-                if(candidateIdx >= 0)
-                {
-                    candidates.push_back(candidate);
-                    candidateIdx += candidate.second;
-                }
+                candidates.addCandidate(start, blockSize);
+                searchPos = start + blockSize;
             }
 
             if(candidates.empty())
@@ -429,34 +415,8 @@ namespace rocRoller
                     bool endAligned = (align(endStart, options) == endStart);
                     if(endAligned)
                     {
-                        if(blockSize < width)
-                        {
-                            continue;
-                        }
-
-                        std::vector<int> indices(width);
-
-                        // Try to use the end of this free block
-                        int start = align(idx + blockSize - width, options);
-
-                        // Check if chunk is outside of block, or if it runs up against the end of the total number of registers
-                        // The equal check in `start + width >= m_registers.size()`
-                        // is to avoid increasing register high-water mark by not allocating the last register
-                        if(start + width > idx + blockSize || start + width >= last)
-                        {
-                            // Should not use end of block, revert to using beginning
-                            start = idx;
-
-                            // Update candidate
-                            idx += width;
-                        }
-
-                        std::iota(indices.begin(), indices.end(), start);
-                        rv.insert(rv.begin(), indices.begin(), indices.end());
-
-                        // Update candidate
-                        blockSize -= width;
-
+                        allocateChunk(endStart, width);
+                        candidates.updateFromEnd(it, width);
                         found = true;
                     }
                 }

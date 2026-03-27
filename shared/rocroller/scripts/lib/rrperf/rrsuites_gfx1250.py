@@ -24,12 +24,12 @@
 ################################################################################
 
 import itertools
-import pathlib
+from pathlib import Path
 
 from rrperf.problems import TypeParameters
 from rrperf.rrsuites import codegen, mkGEMM
 
-repo_dir = pathlib.Path(__file__).resolve().parent.parent.parent.parent
+repo_dir = Path(__file__).resolve().parent.parent.parent.parent
 
 TYPE_CONFIGS_F8 = {
     "bf8bf8_fp16": dict(

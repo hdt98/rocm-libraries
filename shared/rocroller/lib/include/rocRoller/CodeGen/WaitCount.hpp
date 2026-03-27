@@ -35,7 +35,14 @@ namespace rocRoller
                   int                    kmcnt,
                   int                    expcnt,
                   int                    tensorcnt);
-        WaitCount(GPUArchitecture const& arch, GPUWaitQueue, int count);
+
+        /// Issues a waitcnt with the given count for the given queue.
+        WaitCount(GPUArchitecture const& arch, GPUWaitQueue queueForCount, int count);
+
+        /// Instructs the WaitcntObserver to sync the given queues.
+        WaitCount(GPUArchitecture const&       arch,
+                  EnumBitset<GPUWaitQueueType> queuesToSync,
+                  std::string const&           message = "");
 
         ~WaitCount() = default;
 
@@ -152,6 +159,8 @@ namespace rocRoller
         bool m_hasVSCnt       = false;
         bool m_hasEXPCnt      = false;
         bool m_hasTensorCnt   = false;
+
+        EnumBitset<GPUWaitQueueType> m_queuesToSync;
     };
 
     std::ostream& operator<<(std::ostream& stream, WaitCount const& wait);

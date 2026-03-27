@@ -30,6 +30,8 @@ namespace rocRoller
             return "EXPQueue";
         case GPUWaitQueueType::VSQueue:
             return "VSQueue";
+        case GPUWaitQueueType::TensorQueue:
+            return "TensorQueue";
         case GPUWaitQueueType::FinalInstruction:
             return "FinalInstruction";
         case GPUWaitQueueType::None:
@@ -65,6 +67,9 @@ namespace rocRoller
         case GPUWaitQueueType::VSQueue:
             return GPUWaitQueue::VSQueue;
 
+        case GPUWaitQueueType::TensorQueue:
+            return GPUWaitQueue::TensorQueue;
+
         case GPUWaitQueueType::FinalInstruction:
         case GPUWaitQueueType::None:
             return GPUWaitQueue::None;
@@ -90,6 +95,8 @@ namespace rocRoller
             return "EXPQueue";
         case GPUWaitQueue::VSQueue:
             return "VSQueue";
+        case GPUWaitQueue::TensorQueue:
+            return "TensorQueue";
         case GPUWaitQueue::Count:
             return "Count";
         case GPUWaitQueue::None:
@@ -147,65 +154,4 @@ namespace rocRoller
     {
         return m_maxOffsetValue;
     }
-
-    //--GPUWaitQueue
-    inline std::string GPUWaitQueue::toString() const
-    {
-        return GPUWaitQueue::toString(m_value);
-    }
-
-    inline std::string GPUWaitQueue::toString(GPUWaitQueue::Value value)
-    {
-        auto it = std::find_if(m_stringMap.begin(),
-                               m_stringMap.end(),
-                               [&value](auto const& mapping) { return value == mapping.second; });
-
-        if(it == m_stringMap.end())
-            return "";
-        return it->first;
-    }
-
-    inline std::unordered_map<std::string, GPUWaitQueue::Value> GPUWaitQueue::m_stringMap = {
-        {"None", Value::None},
-        {"LoadQueue", Value::LoadQueue},
-        {"StoreQueue", Value::StoreQueue},
-        {"DSQueue", Value::DSQueue},
-        {"KMQueue", Value::KMQueue},
-        {"EXPQueue", Value::EXPQueue},
-        {"VSQueue", Value::VSQueue},
-        {"TensorQueue", Value::TensorQueue},
-        {"Count", Value::Count},
-    };
-
-    //--GPUWaitQueueType
-    inline std::string GPUWaitQueueType::toString() const
-    {
-        return GPUWaitQueueType::toString(m_value);
-    }
-
-    inline std::string GPUWaitQueueType::toString(GPUWaitQueueType::Value value)
-    {
-        auto it = std::find_if(m_stringMap.begin(),
-                               m_stringMap.end(),
-                               [&value](auto const& mapping) { return value == mapping.second; });
-
-        if(it == m_stringMap.end())
-            return "";
-        return it->first;
-    }
-
-    inline const std::unordered_map<std::string, GPUWaitQueueType::Value>
-        GPUWaitQueueType::m_stringMap = {
-            {"None", Value::None},
-            {"LoadQueue", Value::LoadQueue},
-            {"StoreQueue", Value::StoreQueue},
-            {"SendMsgQueue", Value::SendMsgQueue},
-            {"SMemQueue", Value::SMemQueue},
-            {"DSQueue", Value::DSQueue},
-            {"EXPQueue", Value::EXPQueue},
-            {"VSQueue", Value::VSQueue},
-            {"TensorQueue", Value::TensorQueue},
-            {"FinalInstruction", Value::FinalInstruction},
-            {"Count", Value::Count},
-    };
 }

@@ -71,9 +71,10 @@ namespace HazardObserverTest
     {
         SUPPORTED_ARCH_SECTION(arch)
         {
-            if(arch.isRDNAGPU() || arch.isCDNA5GPU())
+            if(!arch.isCDNAGPU() || arch.isCDNA5GPU())
             {
-                SKIP(fmt::format("Skipping test on ", arch.toString()));
+                SKIP("Architecture " + arch.toString()
+                     + " does not meet requirements for this observer");
             }
 
             SECTION("v_readlane (2nd op) read as laneselect")
@@ -292,9 +293,9 @@ namespace HazardObserverTest
     {
         SUPPORTED_ARCH_SECTION(arch)
         {
-            if(arch.isRDNAGPU() || arch.isCDNA5GPU())
+            if(!arch.isCDNAGPU() || arch.isCDNA5GPU())
             {
-                SKIP(fmt::format("Skipping test on ", arch.toString()));
+                SKIP("This observer only applies to CDNA4 or earlier archictectures");
             }
 
             SECTION("Has hazard with 2nd op (non-trans) accessing the same register")
@@ -383,9 +384,9 @@ namespace HazardObserverTest
     {
         SUPPORTED_ARCH_SECTION(arch)
         {
-            if(arch.isRDNAGPU() || arch.isCDNA5GPU())
+            if(!arch.isCDNAGPU() || arch.isCDNA5GPU())
             {
-                SKIP(fmt::format("Skipping test on ", arch.toString()));
+                SKIP("This observer only applies to CDNA4 or earlier archictectures");
             }
 
             SECTION("Hazard with VALU write followed by a readlane or permlane")
@@ -492,9 +493,10 @@ namespace HazardObserverTest
 
         SUPPORTED_ARCH_SECTION(arch)
         {
-            if(arch.isRDNAGPU() || arch.isCDNA5GPU())
+            if(!arch.isCDNAGPU() || arch.isCDNA5GPU())
             {
-                SKIP(fmt::format("Skipping test on ", arch.toString()));
+                SKIP("Architecture " + arch.toString()
+                     + " does not meet requirements for this observer");
             }
 
             SECTION("Hazard on 94X with 2nd op is v_readlane")
@@ -600,9 +602,9 @@ namespace HazardObserverTest
     {
         SUPPORTED_ARCH_SECTION(arch)
         {
-            if(arch.isRDNAGPU() || arch.isCDNA5GPU())
+            if(!arch.isCDNAGPU() || arch.isCDNA5GPU())
             {
-                SKIP(fmt::format("Skipping test on ", arch.toString()));
+                SKIP("This observer only applies to CDNA4 or earlier archictectures");
             }
 
             auto context = TestContext::ForTarget(arch);
@@ -635,9 +637,10 @@ namespace HazardObserverTest
     {
         SUPPORTED_ARCH_SECTION(arch)
         {
-            if(arch.isRDNAGPU() || arch.isCDNA5GPU())
+            if(!arch.isCDNAGPU() || arch.isCDNA5GPU())
             {
-                SKIP(fmt::format("Skipping test on ", arch.toString()));
+                SKIP("Architecture " + arch.toString()
+                     + " does not meet requirements for this observer");
             }
 
             auto context = TestContext::ForTarget(arch);
@@ -661,9 +664,10 @@ namespace HazardObserverTest
     {
         SUPPORTED_ARCH_SECTION(arch)
         {
-            if(arch.isRDNAGPU() || arch.isCDNA5GPU())
+            if(!TestContext::ForTarget(arch)->targetArchitecture().HasCapability(
+                   GPUCapability::HasAccCD))
             {
-                SKIP(fmt::format("Skipping test on ", arch.toString()));
+                SKIP("Architecture " + arch.toString() + " does not use Accumulator registers.");
             }
 
             SECTION("NOPs added for buffer_store_dwordx4 followed by VALU")

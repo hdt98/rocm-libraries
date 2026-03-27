@@ -228,13 +228,11 @@ workgroupRemapXCCValue: -1
 workgroup_cluster_size_x: 0
 workgroup_cluster_size_y: 0
 workgroup_cluster_size_z: 0
-unroll_x: 0
-unroll_y: 0
-loadLDS_A: true
-loadLDS_B: true
-storeLDS_D: true
-direct2LDS_A: false
-direct2LDS_B: false
+load_A: BufferToLDSViaVGPR
+load_B: BufferToLDSViaVGPR
+padLDS_A: [0, 0]
+padLDS_B: [0, 0]
+store: VGPRToGlobalMemoryViaLDSWithBuffer
 prefetch: false
 prefetchInFlight: 0
 prefetchLDSFactor: 0
@@ -299,13 +297,11 @@ workgroupRemapXCCValue: -1
 workgroup_cluster_size_x: 0
 workgroup_cluster_size_y: 0
 workgroup_cluster_size_z: 0
-unroll_x: 0
-unroll_y: 0
-loadLDS_A: true
-loadLDS_B: true
-storeLDS_D: true
-direct2LDS_A: false
-direct2LDS_B: false
+load_A: BufferToLDSViaVGPR
+load_B: BufferToLDSViaVGPR
+padLDS_A: [0, 0]
+padLDS_B: [0, 0]
+store: VGPRToGlobalMemoryViaLDSWithBuffer
 prefetch: false
 prefetchInFlight: 0
 prefetchLDSFactor: 0
@@ -369,13 +365,11 @@ workgroupRemapXCCValue: -1
 workgroup_cluster_size_x: 0
 workgroup_cluster_size_y: 0
 workgroup_cluster_size_z: 0
-unroll_x: 0
-unroll_y: 0
-loadLDS_A: true
-loadLDS_B: true
-storeLDS_D: true
-direct2LDS_A: false
-direct2LDS_B: false
+load_A: BufferToLDSViaVGPR
+load_B: BufferToLDSViaVGPR
+padLDS_A: [0, 0]
+padLDS_B: [0, 0]
+store: VGPRToGlobalMemoryViaLDSWithBuffer
 prefetch: false
 prefetchInFlight: 0
 prefetchLDSFactor: 0

@@ -18,12 +18,23 @@ namespace rocRoller
     {
         auto ctx = m_context.lock();
 
-        VariableType rawPointer{DataType::Raw32, PointerType::PointerGlobal};
+        auto argLoader = ctx->argLoader();
 
-        m_argumentPointer
-            = std::make_shared<Register::Value>(ctx, Register::Type::Scalar, rawPointer, 1);
-        m_argumentPointer->setName("Kernel argument pointer");
-        co_yield m_argumentPointer->allocate();
+        if(argLoader->anyManuallyLoadedArguments())
+        {
+            VariableType rawPointer{DataType::Raw32, PointerType::PointerGlobal};
+            m_argumentPointer
+                = std::make_shared<Register::Value>(ctx, Register::Type::Scalar, rawPointer, 1);
+            m_argumentPointer->setName("Kernel argument pointer");
+            co_yield m_argumentPointer->allocate();
+        }
+        else
+        {
+            co_yield Instruction::Comment("No kernel argument pointer needed");
+        }
+
+        co_yield ctx->argLoader()->allocatePreloadedRegisters(m_preloadedRegOffset,
+                                                              m_numPreloadedRegs);
 
         m_workgroupIndex[0]
             = Register::Value::Placeholder(ctx, Register::Type::Scalar, DataType::UInt32, 1);

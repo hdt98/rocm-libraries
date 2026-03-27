@@ -88,11 +88,12 @@ namespace MatrixMultiplyTest
                   typename ACC = float,
                   DataType STA = DataType::None,
                   DataType STB = DataType::None>
-        void matrixMultiplyMacroTile(int               wave_m,
-                                     int               wave_n,
-                                     int               wave_k,
-                                     int               wave_b,
-                                     bool              useLDSB     = true,
+        void matrixMultiplyMacroTile(int                            wave_m,
+                                     int                            wave_n,
+                                     int                            wave_k,
+                                     int                            wave_b,
+                                     Parameters::Solution::LoadPath loadPathB
+                                     = Parameters::Solution::LoadPath::BufferToLDSViaVGPR,
                                      std::string       transA      = "N",
                                      std::string       transB      = "N",
                                      const ScaleParams scaleParams = {})
@@ -514,20 +515,20 @@ namespace MatrixMultiplyTest
                                           const ScaleParams scaleParams = {})
         {
             if(typeB == rocRoller::DataType::FP8)
-                matrixMultiplyMacroTileMixed<TA, FP8>(
-                    m, n, k, b, useLDSB, transA, transB, scaleParams);
+                matrixMultiplyMacroTile<TA, FP8, float>(
+                    m, n, k, b, loadPathB, transA, transB, scaleParams);
             else if(typeB == rocRoller::DataType::BF8)
-                matrixMultiplyMacroTileMixed<TA, BF8>(
-                    m, n, k, b, useLDSB, transA, transB, scaleParams);
+                matrixMultiplyMacroTile<TA, BF8, float>(
+                    m, n, k, b, loadPathB, transA, transB, scaleParams);
             else if(typeB == rocRoller::DataType::FP6)
-                matrixMultiplyMacroTileMixed<TA, FP6>(
-                    m, n, k, b, useLDSB, transA, transB, scaleParams);
+                matrixMultiplyMacroTile<TA, FP6, float>(
+                    m, n, k, b, loadPathB, transA, transB, scaleParams);
             else if(typeB == rocRoller::DataType::BF6)
-                matrixMultiplyMacroTileMixed<TA, BF6>(
-                    m, n, k, b, useLDSB, transA, transB, scaleParams);
+                matrixMultiplyMacroTile<TA, BF6, float>(
+                    m, n, k, b, loadPathB, transA, transB, scaleParams);
             else if(typeB == rocRoller::DataType::FP4)
-                matrixMultiplyMacroTileMixed<TA, FP4>(
-                    m, n, k, b, useLDSB, transA, transB, scaleParams);
+                matrixMultiplyMacroTile<TA, FP4, float>(
+                    m, n, k, b, loadPathB, transA, transB, scaleParams);
             else
                 Throw<FatalError>("Invalid type.");
         }
@@ -813,12 +814,12 @@ namespace MatrixMultiplyTest
                 = KernelGraph::CoordinateGraph::MacroTile({mac_m, mac_k},
                                                           LayoutType::MATRIX_A,
                                                           {wave_m, wave_n, wave_k, wave_b},
-                                                          MemoryType::WAVE_LDS);
+                                                          GetMemoryType(loadPathAB));
             auto macTileB
                 = KernelGraph::CoordinateGraph::MacroTile({mac_k, mac_n},
                                                           LayoutType::MATRIX_B,
                                                           {wave_m, wave_n, wave_k, wave_b},
-                                                          MemoryType::WAVE_LDS);
+                                                          GetMemoryType(loadPathAB));
             auto macTileC = KernelGraph::CoordinateGraph::MacroTile(
                 {mac_m, mac_n}, LayoutType::MATRIX_ACCUMULATOR, {wave_m, wave_n, wave_k, wave_b});
 

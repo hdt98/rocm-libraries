@@ -5,8 +5,6 @@
 
 #include <rocRoller/KernelOptions_detail.hpp>
 
-using namespace rocRoller;
-
 namespace MatrixMultiplyTest
 {
     using namespace rocRoller;

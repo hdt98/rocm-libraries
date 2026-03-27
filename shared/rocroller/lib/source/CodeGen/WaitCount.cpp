@@ -81,6 +81,10 @@ namespace rocRoller
         case GPUWaitQueue::TensorQueue:
             m_tensorcnt = count;
             break;
+        case GPUWaitQueue::None:
+        case GPUWaitQueue::Count:
+            Throw<FatalError>("Invalid GPUWaitQueue!");
+            break;
         }
     }
 

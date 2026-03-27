@@ -118,6 +118,7 @@ target_sources(rocroller
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/DataTypes/DataTypes_BF6.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/DataTypes/DataTypes_BF8.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/DataTypes/DataTypes_BFloat16.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/DataTypes/DataTypes_Buffer.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/DataTypes/DataTypes_E4M3.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/DataTypes/DataTypes_E4M3x4.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/DataTypes/DataTypes_E5M3.hpp"

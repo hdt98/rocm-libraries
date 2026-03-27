@@ -15,63 +15,17 @@ namespace rocRoller
      */
     enum class GPUWaitQueueType : int
     {
-    public:
-        enum Value : uint8_t
-        {
-            LoadQueue = 0,
-            StoreQueue,
-            SendMsgQueue,
-            SMemQueue,
-            DSQueue,
-            EXPQueue,
-            VSQueue,
-            TensorQueue,
-            FinalInstruction,
-            Count,
-            None = Count,
-        };
-
-        GPUWaitQueueType() = default;
-        // cppcheck-suppress noExplicitConstructor
-        constexpr GPUWaitQueueType(Value input)
-            : m_value(input)
-        {
-        }
-        explicit GPUWaitQueueType(std::string const& input)
-            : m_value(m_stringMap.at(input))
-        {
-        }
-        explicit constexpr GPUWaitQueueType(uint8_t input)
-            : m_value(static_cast<Value>(input))
-        {
-        }
-
-        constexpr operator uint8_t() const
-        {
-            return static_cast<uint8_t>(m_value);
-        }
-
-        std::string toString() const;
-
-        static std::string toString(Value);
-
-        struct Hash
-        {
-            std::size_t operator()(const GPUWaitQueueType& input) const
-            {
-                return std::hash<uint8_t>()((uint8_t)input.m_value);
-            };
-        };
-
-        template <typename T1, typename T2, typename T3>
-        friend struct rocRoller::Serialization::MappingTraits;
-
-        template <typename T1, typename T2>
-        friend struct rocRoller::Serialization::EnumTraits;
-
-    private:
-        Value                                               m_value = Value::Count;
-        static const std::unordered_map<std::string, Value> m_stringMap;
+        LoadQueue = 0,
+        StoreQueue,
+        SendMsgQueue,
+        SMemQueue,
+        DSQueue,
+        EXPQueue,
+        VSQueue,
+        TensorQueue,
+        FinalInstruction,
+        None,
+        Count,
     };
 
     std::string toString(GPUWaitQueueType);
@@ -81,87 +35,15 @@ namespace rocRoller
      */
     enum class GPUWaitQueue : int
     {
-    public:
-        enum Value : uint8_t
-        {
-            LoadQueue = 0,
-            StoreQueue,
-            KMQueue,
-            DSQueue,
-            EXPQueue,
-            VSQueue,
-            TensorQueue,
-            Count,
-            None = Count,
-        };
-
-        GPUWaitQueue() = default;
-        // cppcheck-suppress noExplicitConstructor
-        constexpr GPUWaitQueue(Value input)
-            : m_value(input)
-        {
-        }
-
-        explicit GPUWaitQueue(std::string const& input)
-            : m_value(GPUWaitQueue::m_stringMap[input])
-        {
-        }
-        explicit constexpr GPUWaitQueue(uint8_t input)
-            : m_value(static_cast<Value>(input))
-        {
-        }
-        // cppcheck-suppress noExplicitConstructor
-        constexpr GPUWaitQueue(GPUWaitQueueType input)
-        {
-            switch(input)
-            {
-            case GPUWaitQueueType::LoadQueue:
-                m_value = Value::LoadQueue;
-                break;
-            case GPUWaitQueueType::StoreQueue:
-                m_value = Value::StoreQueue;
-                break;
-            case GPUWaitQueueType::DSQueue:
-                m_value = Value::DSQueue;
-                break;
-            case GPUWaitQueueType::SendMsgQueue:
-            case GPUWaitQueueType::SMemQueue:
-                m_value = Value::KMQueue;
-                break;
-            case GPUWaitQueueType::EXPQueue:
-                m_value = Value::EXPQueue;
-                break;
-            case GPUWaitQueueType::VSQueue:
-                m_value = Value::VSQueue;
-                break;
-            case GPUWaitQueueType::TensorQueue:
-                m_value = Value::TensorQueue;
-                break;
-            default:
-                m_value = Value::None;
-            }
-        }
-
-        constexpr operator uint8_t() const
-        {
-            return static_cast<uint8_t>(m_value);
-        }
-
-        std::string toString() const;
-
-        static std::string toString(Value);
-
-        struct Hash
-        {
-            std::size_t operator()(const GPUWaitQueue& input) const
-            {
-                return std::hash<uint8_t>()((uint8_t)input.m_value);
-            };
-        };
-
-    private:
-        Value                                         m_value = Value::Count;
-        static std::unordered_map<std::string, Value> m_stringMap;
+        LoadQueue = 0,
+        StoreQueue,
+        KMQueue,
+        DSQueue,
+        EXPQueue,
+        VSQueue,
+        TensorQueue,
+        None,
+        Count,
     };
 
     constexpr GPUWaitQueue fromWaitQueueType(GPUWaitQueueType input);

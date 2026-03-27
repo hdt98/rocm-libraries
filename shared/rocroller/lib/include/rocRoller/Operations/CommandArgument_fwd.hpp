@@ -32,7 +32,6 @@ namespace rocRoller
         FP4,
         bool,
         Raw32,
-        E8M0,
         Buffer,
         TDM,
         // int16_t*,

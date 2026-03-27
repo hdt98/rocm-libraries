@@ -179,12 +179,8 @@ namespace rocRoller::Client::GEMMClient
                       descC,
                       hostScaleA,
                       hostScaleB,
-                      problemParams.types.scaleA == Operations::ScaleMode::Separate
-                          ? problemParams.types.scaleTypeA
-                          : DataType::None,
-                      problemParams.types.scaleB == Operations::ScaleMode::Separate
-                          ? problemParams.types.scaleTypeB
-                          : DataType::None,
+                      problemParams.types.scaleTypeA,
+                      problemParams.types.scaleTypeB,
                       -1.f,
                       1.f,
                       static_cast<uint>(scaleBlockSize),
@@ -1254,7 +1250,10 @@ namespace rocRoller::Client::GEMMClient::CLI
         std::make_pair("--schedulerCost", &SolutionParameters::schedulerCost),
         std::make_pair("--tailLoops", &SolutionParameters::tailLoops),
         std::make_pair("--streamK", &SolutionParameters::streamK),
-        std::make_pair("--ldsBankSwizzle", &SolutionParameters::ldsBankSwizzle));
+        std::make_pair("--ldsBankSwizzle", &SolutionParameters::ldsBankSwizzle),
+        std::make_pair("--workgroup_cluster_size_x", &SolutionParameters::workgroupClusterSizeX),
+        std::make_pair("--workgroup_cluster_size_y", &SolutionParameters::workgroupClusterSizeY),
+        std::make_pair("--workgroup_cluster_size_z", &SolutionParameters::workgroupClusterSizeZ));
 
     template <typename T, typename U>
     std::string getSolutionParameterArgumentName(U T::*member_ptr)
@@ -1808,11 +1807,6 @@ int main(int argc, const char* argv[])
                    "Workgroup mapping value. Default: -1")
         ->check(CLI::IsMember({-1}) | CLI::PositiveNumber);
 
-    app.add_flag(
-        "--workgroupRemapXCC", solution.workgroupRemapXCC, "Use an XCC-aware workgroup remapping.");
-    app.add_option("--workgroupRemapXCCValue",
-                   solution.workgroupRemapXCCValue,
-                   "Force an XCC-aware workgroup remapping value. (Optional)");
     app.add_option("--workgroup_cluster_size_x",
                    solution.workgroupClusterSizeX,
                    "Workgroup cluster size in the x dimension.");
@@ -1822,41 +1816,6 @@ int main(int argc, const char* argv[])
     app.add_option("--workgroup_cluster_size_z",
                    solution.workgroupClusterSizeZ,
                    "Workgroup cluster size in the z dimension.");
-    app.add_option("--unroll_x", solution.unrollX, "Unroll size in X.");
-    app.add_option("--unroll_y", solution.unrollY, "Unroll size in Y.");
-    app.add_flag("--loadLDS_A", solution.loadLDSA, "Use LDS when loading A.");
-    app.add_flag("--loadLDS_B", solution.loadLDSB, "Use LDS when loading B.");
-    app.add_flag("--storeLDS_D", solution.storeLDSD, "Use LDS when storing D.");
-    app.add_flag("--direct2LDS_A", solution.direct2LDSA, "Use direct-to-LDS when loading A.");
-    app.add_flag("--direct2LDS_B", solution.direct2LDSB, "Use direct-to-LDS when loading B.");
-    app.add_flag(
-        "--betaInFma", solution.betaInFma, "Use beta in FMA instruction instead of alpha.");
-    app.add_option("--scheduler", solution.scheduler, "Which scheduler to use.");
-    app.add_flag("--matchMemoryAccess",
-                 solution.matchMemoryAccess,
-                 "Match memory access to transpose.  Currently decreases performance.");
-    app.add_flag("--prefetch", solution.prefetch, "Enable prefetching (UnrollK=2 implied).");
-    app.add_option("--prefetchInFlight",
-                   solution.prefetchInFlight,
-                   "Number of prefetches in flight at the same time");
-    app.add_option("--prefetchLDSFactor",
-                   solution.prefetchLDSFactor,
-                   "Prefetch 1/prefetchLDSFactor of MacroTile from LDS");
-    auto prefetchMixMemOpsFlag
-        = app.add_flag("--prefetchMixMemOps",
-                       solution.prefetchMixMemOps,
-                       "Mix global and LDS memory operations during prefetching.");
-    app.add_flag("--streamK", solution.streamK, "Enable StreamK algorithm.");
-    app.add_flag("--streamKTwoTile", solution.streamKTwoTile, "Enable two-tile StreamK algorithm.");
-
-    app.add_flag("--loadLDSScale_A", solution.loadLDSScaleA, "Use LDS when loading A scale.");
-    app.add_flag("--loadLDSScale_B", solution.loadLDSScaleB, "Use LDS when loading B scale.");
-
-    app.add_flag(
-        "--swizzleScale", solution.swizzleScale, "Use Swizzle when loading A and B scale.");
-    app.add_flag("--prefetchScale",
-                 solution.prefetchScale,
-                 "Prefetch scale values with using Swizzled scales.");
 
     //
     // Benchmarking options

@@ -1129,7 +1129,7 @@ namespace rocRoller
                 m_options.contiguousChunkWidth = 1;
             }
 
-            m_options.forceReservedRegion = options.forceReservedRegion;
+            m_options.forceReservedRegion = opts.forceReservedRegion;
 
             AssertFatal(m_options.contiguousChunkWidth > 0, ShowValue(m_options));
         }
