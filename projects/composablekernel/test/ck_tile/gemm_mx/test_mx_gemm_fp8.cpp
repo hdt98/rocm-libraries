@@ -9,8 +9,8 @@ using Col = ck_tile::tensor_layout::gemm::ColumnMajor;
 
 // 16x16x128 warp tile configs
 // Only A=Row,B=Col is supported: KWarpTile=128 exceeds ds_read_tr limit, disabling transpose loads
-using MxFp8Types16 = ::testing::Types<
-    std::tuple<ck_tile::fp8_t, ck_tile::fp8_t, MXfp8_GemmConfig16, Row, Col, Row>>;
+using MxFp8Types16 =
+    ::testing::Types<std::tuple<ck_tile::fp8_t, ck_tile::fp8_t, MXfp8_GemmConfig16, Row, Col, Row>>;
 
 template <typename TypeParam>
 class TestMxGemmFp8_16 : public TestMxGemmUtil<std::tuple_element_t<0, TypeParam>,
@@ -32,11 +32,11 @@ TYPED_TEST(TestMxGemmFp8_16, BasicSizes)
 }
 
 // 32x32x64 warp tile configs (enables ds_read_tr for transpose loads)
-using MxFp8Types32 = ::testing::Types<
-    std::tuple<ck_tile::fp8_t, ck_tile::fp8_t, MXfp8_GemmConfig32, Row, Col, Row>,
-    std::tuple<ck_tile::fp8_t, ck_tile::fp8_t, MXfp8_GemmConfig32, Row, Row, Row>,
-    std::tuple<ck_tile::fp8_t, ck_tile::fp8_t, MXfp8_GemmConfig32, Col, Col, Row>,
-    std::tuple<ck_tile::fp8_t, ck_tile::fp8_t, MXfp8_GemmConfig32, Col, Row, Row>>;
+using MxFp8Types32 =
+    ::testing::Types<std::tuple<ck_tile::fp8_t, ck_tile::fp8_t, MXfp8_GemmConfig32, Row, Col, Row>,
+                     std::tuple<ck_tile::fp8_t, ck_tile::fp8_t, MXfp8_GemmConfig32, Row, Row, Row>,
+                     std::tuple<ck_tile::fp8_t, ck_tile::fp8_t, MXfp8_GemmConfig32, Col, Col, Row>,
+                     std::tuple<ck_tile::fp8_t, ck_tile::fp8_t, MXfp8_GemmConfig32, Col, Row, Row>>;
 
 template <typename TypeParam>
 class TestMxGemmFp8_32 : public TestMxGemmUtil<std::tuple_element_t<0, TypeParam>,

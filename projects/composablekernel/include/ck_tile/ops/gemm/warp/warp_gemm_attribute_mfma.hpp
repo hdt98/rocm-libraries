@@ -92,11 +92,11 @@ struct WarpGemmAttributeMfma
         constexpr index_t kNumBitsPerElem =
             sizeof(DataType_) * 8 / numeric_traits<remove_cvref_t<DataType_>>::PackedSize;
         constexpr index_t kSubtileMinorDim = 64 / kNumBitsPerElem;
-        constexpr index_t kPerLane = Impl::kABKPerLane / AttrNumAccessV_;
-        constexpr index_t kNeedsSplit = (kPerLane > kSubtileMinorDim) &&
-                                        (kPerLane % kSubtileMinorDim == 0);
+        constexpr index_t kPerLane         = Impl::kABKPerLane / AttrNumAccessV_;
+        constexpr index_t kNeedsSplit =
+            (kPerLane > kSubtileMinorDim) && (kPerLane % kSubtileMinorDim == 0);
         constexpr index_t kSplitFactor = kNeedsSplit ? (kPerLane / kSubtileMinorDim) : 1;
-        constexpr index_t kLastDim = kNeedsSplit ? kSubtileMinorDim : kPerLane;
+        constexpr index_t kLastDim     = kNeedsSplit ? kSubtileMinorDim : kPerLane;
 
         if constexpr(AttrNumAccessV_ == 1)
         {
@@ -104,8 +104,7 @@ struct WarpGemmAttributeMfma
             {
                 return tile_distribution_encoding<
                     sequence<>,
-                    tuple<sequence<kMNLane>,
-                          sequence<Impl::kABKLane, kSplitFactor, kLastDim>>,
+                    tuple<sequence<kMNLane>, sequence<Impl::kABKLane, kSplitFactor, kLastDim>>,
                     tuple<sequence<2, 1>>,
                     tuple<sequence<0, 0>>,
                     sequence<2, 2>,
@@ -140,10 +139,7 @@ struct WarpGemmAttributeMfma
                     return tile_distribution_encoding<
                         sequence<>,
                         tuple<sequence<kMNLane>,
-                              sequence<Impl::kABKLane,
-                                       AttrNumAccessV_,
-                                       kSplitFactor,
-                                       kLastDim>>,
+                              sequence<Impl::kABKLane, AttrNumAccessV_, kSplitFactor, kLastDim>>,
                         tuple<sequence<2, 1>>,
                         tuple<sequence<0, 0>>,
                         sequence<2, 2, 2>,
@@ -154,9 +150,7 @@ struct WarpGemmAttributeMfma
                     return tile_distribution_encoding<
                         sequence<>,
                         tuple<sequence<kMNLane>,
-                              sequence<Impl::kABKLane,
-                                       AttrNumAccessV_,
-                                       kLastDim>>,
+                              sequence<Impl::kABKLane, AttrNumAccessV_, kLastDim>>,
                         tuple<sequence<2, 1>>,
                         tuple<sequence<0, 0>>,
                         sequence<2, 2>,
@@ -170,10 +164,7 @@ struct WarpGemmAttributeMfma
                     return tile_distribution_encoding<
                         sequence<>,
                         tuple<sequence<kMNLane>,
-                              sequence<AttrNumAccessV_,
-                                       Impl::kABKLane,
-                                       kSplitFactor,
-                                       kLastDim>>,
+                              sequence<AttrNumAccessV_, Impl::kABKLane, kSplitFactor, kLastDim>>,
                         tuple<sequence<2, 1>>,
                         tuple<sequence<1, 0>>,
                         sequence<2, 2, 2>,
@@ -184,9 +175,7 @@ struct WarpGemmAttributeMfma
                     return tile_distribution_encoding<
                         sequence<>,
                         tuple<sequence<kMNLane>,
-                              sequence<AttrNumAccessV_,
-                                       Impl::kABKLane,
-                                       kLastDim>>,
+                              sequence<AttrNumAccessV_, Impl::kABKLane, kLastDim>>,
                         tuple<sequence<2, 1>>,
                         tuple<sequence<1, 0>>,
                         sequence<2, 2>,

@@ -677,9 +677,10 @@ CK_TILE_HOST void reference_mx_gemm(const HostTensor<ADataType>& a_m_k,
                 auto a_f4x2  = a_m_k(m, k);
                 auto a_scale = ck_tile::type_convert<AccDataType>(scale_a(m, k / ScaleBlockSize));
                 std::size_t flat_offset = a_m_k.mDesc.GetOffsetFromMultiIndex(m, k);
-                auto a_val = (flat_offset % 2 == 0)
-                    ? ck_tile::type_convert<AccDataType>(a_f4x2.template unpack<>(number<0>{}))
-                    : ck_tile::type_convert<AccDataType>(a_f4x2.template unpack<>(number<1>{}));
+                auto a_val =
+                    (flat_offset % 2 == 0)
+                        ? ck_tile::type_convert<AccDataType>(a_f4x2.template unpack<>(number<0>{}))
+                        : ck_tile::type_convert<AccDataType>(a_f4x2.template unpack<>(number<1>{}));
                 a_m_k_scaled(m, k) = a_val * a_scale;
             }
             else if constexpr(std::is_same_v<ADataType, pk_fp6x16_t>)
@@ -711,9 +712,10 @@ CK_TILE_HOST void reference_mx_gemm(const HostTensor<ADataType>& a_m_k,
                 auto b_f4x2  = b_k_n(k, n);
                 auto b_scale = ck_tile::type_convert<AccDataType>(scale_b(k / ScaleBlockSize, n));
                 std::size_t flat_offset = b_k_n.mDesc.GetOffsetFromMultiIndex(k, n);
-                auto b_val = (flat_offset % 2 == 0)
-                    ? ck_tile::type_convert<AccDataType>(b_f4x2.template unpack<>(number<0>{}))
-                    : ck_tile::type_convert<AccDataType>(b_f4x2.template unpack<>(number<1>{}));
+                auto b_val =
+                    (flat_offset % 2 == 0)
+                        ? ck_tile::type_convert<AccDataType>(b_f4x2.template unpack<>(number<0>{}))
+                        : ck_tile::type_convert<AccDataType>(b_f4x2.template unpack<>(number<1>{}));
                 b_k_n_scaled(k, n) = b_val * b_scale;
             }
             else if constexpr(std::is_same_v<BDataType, pk_fp6x16_t>)
