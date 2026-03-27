@@ -1,6 +1,8 @@
 # Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 
+include(ShardInstantiation)
+
 # NHWGC layout instances for grouped_conv2d_fwd
 set(GROUPED_CONV2D_FWD_NHWGC
    # dl
@@ -68,6 +70,23 @@ set(GROUPED_CONV2D_FWD_NHWGC
    xdl/merged_groups/device_grouped_conv2d_fwd_xdl_merged_groups_nhwgc_gkyxc_nhwgk_f32_instance.cpp
    xdl/merged_groups/device_grouped_conv2d_fwd_xdl_merged_groups_nhwgc_gkyxc_nhwgk_f32_tf32_instance.cpp
    xdl/merged_groups/device_grouped_conv2d_fwd_xdl_merged_groups_nhwgc_gkyxc_nhwgk_int8_instance.cpp
+)
+
+# Generate sharded instances from templates
+set(GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
+generate_sharded_instantiations(
+  INSTANCES_NAME device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_int8_mem_inter_instances
+  TEMPLATE_FILE xdl/mem/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_int8_mem_inter_instance.in
+  NUM_SHARDS 21
+  SRC_LIST GROUPED_CONV2D_FWD_NHWGC
+  OUTPUT_DIR ${GENERATED_DIR}/xdl/mem
+)
+generate_sharded_instantiations(
+  INSTANCES_NAME device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_int8_mem_intra_instances
+  TEMPLATE_FILE xdl/mem/device_grouped_conv2d_fwd_xdl_nhwgc_gkyxc_nhwgk_int8_mem_intra_instance.in
+  NUM_SHARDS 21
+  SRC_LIST GROUPED_CONV2D_FWD_NHWGC
+  OUTPUT_DIR ${GENERATED_DIR}/xdl/mem
 )
 
 add_instance_library(device_grouped_conv2d_fwd_nhwgc_instance ${GROUPED_CONV2D_FWD_NHWGC})

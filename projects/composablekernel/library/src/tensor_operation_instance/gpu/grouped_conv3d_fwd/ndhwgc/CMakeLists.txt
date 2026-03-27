@@ -1,6 +1,8 @@
 # Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 
+include(ShardInstantiation)
+
 # NDHWGC layout instances for grouped_conv3d_fwd
 set(GROUPED_CONV3D_FWD_NDHWGC
    # wmma
@@ -55,6 +57,24 @@ set(GROUPED_CONV3D_FWD_NDHWGC
    xdl/merged_groups/device_grouped_conv3d_fwd_xdl_merged_groups_ndhwgc_gkzyxc_ndhwgk_f16_instance.cpp
    xdl/merged_groups/device_grouped_conv3d_fwd_xdl_merged_groups_ndhwgc_gkzyxc_ndhwgk_f32_instance.cpp
    xdl/merged_groups/device_grouped_conv3d_fwd_xdl_merged_groups_ndhwgc_gkzyxc_ndhwgk_f32_tf32_instance.cpp
+)
+
+
+# Generate sharded instances from templates
+set(GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
+generate_sharded_instantiations(
+  INSTANCES_NAME device_grouped_conv3d_fwd_xdl_ndhwgc_gkzyxc_ndhwgk_bf16_comp_instances
+  TEMPLATE_FILE xdl/comp/device_grouped_conv3d_fwd_xdl_ndhwgc_gkzyxc_ndhwgk_bf16_comp_instance.in
+  NUM_SHARDS 12
+  SRC_LIST GROUPED_CONV3D_FWD_NDHWGC
+  OUTPUT_DIR ${GENERATED_DIR}/xdl/comp
+)
+generate_sharded_instantiations(
+  INSTANCES_NAME device_grouped_conv3d_fwd_xdl_ndhwgc_gkzyxc_ndhwgk_f16_comp_instances
+  TEMPLATE_FILE xdl/comp/device_grouped_conv3d_fwd_xdl_ndhwgc_gkzyxc_ndhwgk_f16_comp_instance.in
+  NUM_SHARDS 12
+  SRC_LIST GROUPED_CONV3D_FWD_NDHWGC
+  OUTPUT_DIR ${GENERATED_DIR}/xdl/comp
 )
 
 add_instance_library(device_grouped_conv3d_fwd_ndhwgc_instance ${GROUPED_CONV3D_FWD_NDHWGC})
