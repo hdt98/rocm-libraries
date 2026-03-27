@@ -15,7 +15,7 @@ System requirements
 ===================
 
 - `An AMD GPU with ROCm support <https://github.com/ROCm/TheRock/blob/main/SUPPORTED_GPUS.md>`_
-- Linux or Windows operating system (see `Install AMD ROCm <https://rocm.docs.amd.com/en/7.12.0-preview/install/rocm.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman`_)
+- Linux or Windows operating system (see `Install AMD ROCm <https://rocm.docs.amd.com/en/7.12.0-preview/install/rocm.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_)
 
 Dependencies
 ============
