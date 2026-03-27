@@ -15,6 +15,9 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
     * GECON_64
 
 ### Changed
+
+* Replaced occurrences of double underscores in test suite names within benchmarking client
+    * e.g., `daily_lapack/GETRI.__float/0` was changed to `daily_lapack/GETRI._float/0`
 ### Removed
 ### Optimized
 
