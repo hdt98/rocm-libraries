@@ -25,22 +25,20 @@
 #include <type_traits>
 
 #include "../../config.hpp"
-#include "../../detail/various.hpp"
 
 #include "../../functional.hpp"
 #include "../../intrinsics/thread.hpp"
 #include "../../type_traits.hpp"
 #include "../../types.hpp"
 
-#include "../../block/block_load.hpp"
 #include "../../block/block_scan.hpp"
-#include "../../block/block_store.hpp"
+
+#include "../../device/detail/device_config_helper.hpp"
 
 #include "../../warp/detail/warp_sort_stable.hpp"
 #include "../../warp/warp_load.hpp"
 #include "../../warp/warp_store.hpp"
 
-#include "../device_segmented_radix_sort_config.hpp"
 #include "device_radix_sort.hpp"
 
 BEGIN_ROCPRIM_NAMESPACE
@@ -91,7 +89,7 @@ public:
              class KeysOutputIterator,
              class ValuesInputIterator,
              class ValuesOutputIterator>
-    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    ROCPRIM_DEVICE ROCPRIM_INLINE
     void sort(KeysInputIterator    keys_input,
               key_type*            keys_tmp,
               KeysOutputIterator   keys_output,
@@ -169,7 +167,7 @@ public:
     }
 
     // When all iterators are raw pointers, this overload is used to minimize code duplication in the kernel
-    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    ROCPRIM_DEVICE ROCPRIM_INLINE
     void sort(key_type*     keys_input,
               key_type*     keys_tmp,
               key_type*     keys_output,
@@ -188,46 +186,24 @@ public:
         // iteration has a shorter mask.
         const unsigned int current_radix_bits = ::rocprim::min(RadixBits, end_bit - bit);
 
-        const bool is_first_iteration = (bit == begin_bit);
-
         key_type*   current_keys_input;
-        key_type*   current_keys_output;
         value_type* current_values_input;
-        value_type* current_values_output;
+
+        const bool is_first_iteration = (bit == begin_bit);
         if(is_first_iteration)
         {
-            if(to_output)
-            {
-                current_keys_input    = keys_input;
-                current_keys_output   = keys_output;
-                current_values_input  = values_input;
-                current_values_output = values_output;
-            }
-            else
-            {
-                current_keys_input    = keys_input;
-                current_keys_output   = keys_tmp;
-                current_values_input  = values_input;
-                current_values_output = values_tmp;
-            }
+            current_keys_input   = keys_input;
+            current_values_input = values_input;
         }
         else
         {
-            if(to_output)
-            {
-                current_keys_input    = keys_tmp;
-                current_keys_output   = keys_output;
-                current_values_input  = values_tmp;
-                current_values_output = values_output;
-            }
-            else
-            {
-                current_keys_input    = keys_output;
-                current_keys_output   = keys_tmp;
-                current_values_input  = values_output;
-                current_values_output = values_tmp;
-            }
+            current_keys_input   = to_output ? keys_tmp : keys_output;
+            current_values_input = to_output ? values_tmp : values_output;
         }
+
+        key_type*   current_keys_output   = to_output ? keys_output : keys_tmp;
+        value_type* current_values_output = to_output ? values_output : values_tmp;
+
         sort(current_keys_input,
              current_keys_output,
              current_values_input,
@@ -244,7 +220,7 @@ private:
              class KeysOutputIterator,
              class ValuesInputIterator,
              class ValuesOutputIterator>
-    ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+    ROCPRIM_DEVICE ROCPRIM_INLINE
     void sort(KeysInputIterator    keys_input,
               KeysOutputIterator   keys_output,
               ValuesInputIterator  values_input,
@@ -675,12 +651,15 @@ public:
               unsigned int         end_bit,
               storage_type&        storage)
     {
-        if(to_output)
+        constexpr bool is_tmp_and_output_overlappable
+            = std::is_same_v<KeysOutputIterator, Key*>
+              && std::is_same_v<ValuesOutputIterator, Value*>;
+        if constexpr (is_tmp_and_output_overlappable)
         {
             sort(keys_input,
-                 keys_output,
+                 to_output ? keys_output : keys_tmp,
                  values_input,
-                 values_output,
+                 to_output ? values_output : values_tmp,
                  begin_offset,
                  end_offset,
                  begin_bit,
@@ -688,16 +667,31 @@ public:
                  storage);
         }
         else
-        {
-            sort(keys_input,
-                 keys_tmp,
-                 values_input,
-                 values_tmp,
-                 begin_offset,
-                 end_offset,
-                 begin_bit,
-                 end_bit,
-                 storage);
+        {   
+            if(to_output)
+            {
+                sort(keys_input,
+                    keys_output,
+                    values_input,
+                    values_output,
+                    begin_offset,
+                    end_offset,
+                    begin_bit,
+                    end_bit,
+                    storage);
+            }
+            else
+            {
+                sort(keys_input,
+                    keys_tmp,
+                    values_input,
+                    values_tmp,
+                    begin_offset,
+                    end_offset,
+                    begin_bit,
+                    end_bit,
+                    storage);
+            }
         }
     }
 };
@@ -907,6 +901,7 @@ void sort_block_sized_segments(
         const bool use_long_radix_sort = end_offset - begin_offset > items_per_block;
         if(use_long_radix_sort)
         {
+            ROCPRIM_NO_UNROLL
             for(unsigned int bit = begin_bit; bit < end_bit; bit += radix_bits)
             {
                 long_radix_helper_type().sort(keys_input,
@@ -951,6 +946,8 @@ void sort_block_sized_segments(
     {
         const auto num_segments = segment_counts[0];
         const auto grid_size    = ::rocprim::detail::grid_size<0>();
+
+        ROCPRIM_NO_UNROLL
         for(auto block_id = start_block_id; block_id < num_segments; block_id += grid_size)
         {
             sort_segments(block_id);
@@ -1098,6 +1095,8 @@ void sort_warp_sized_segments(
     if constexpr(IsUnknownGridSize)
     {
         const auto grid_size = ::rocprim::detail::grid_size<0>();
+
+        ROCPRIM_NO_UNROLL
         for(auto block_id = start_block_id; block_id * config::warps_per_block < num_segments;
             block_id += grid_size)
         {

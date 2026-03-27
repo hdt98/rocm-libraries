@@ -134,7 +134,7 @@ struct radix_digit_count_helper
     ROCPRIM_DEVICE ROCPRIM_INLINE
     unsigned int get_counter(const unsigned stripe, const unsigned int digit)
     {
-        return digit * atomic_stripes + stripe;
+        return (digit * atomic_stripes) + stripe;
     }
 
     template<bool IsFull = false, class KeysInputIterator, class Offset>
@@ -161,6 +161,7 @@ struct radix_digit_count_helper
 
         ROCPRIM_UNROLL
         for(unsigned int i = 0; i < counters; i += BlockSize)
+        // constexpr_for_lt<0, counters, BlockSize>([&](auto i)
         {
             const unsigned int offset = i + flat_id;
             if(block_size_divides_counters_nicely || offset < counters)
@@ -168,9 +169,11 @@ struct radix_digit_count_helper
                 storage.digit_counters[offset] = 0;
             }
         }
+        // );
 
         ::rocprim::syncthreads();
 
+        ROCPRIM_NO_UNROLL
         for(Offset block_offset = begin_offset; block_offset < end_offset;
             block_offset += items_per_block)
         {
@@ -194,17 +197,19 @@ struct radix_digit_count_helper
 
             ROCPRIM_UNROLL
             for(unsigned int i = 0; i < ItemsPerThread; i++)
+            // constexpr_for_lt<0, ItemsPerThread, 1>([&](auto i)
             {
                 const bit_key_type bit_key = key_codec::encode(keys[i]);
                 const unsigned int digit
                     = key_codec::extract_digit(bit_key, bit, current_radix_bits);
-                const unsigned int pos = i * BlockSize + flat_id;
+                const unsigned int pos = (i * BlockSize) + flat_id;
 
                 if(IsFull || pos < valid_count)
                 {
                     atomic_add(&storage.digit_counters[get_counter(stripe, digit)], 1);
                 }
             }
+            // );
         }
 
         ::rocprim::syncthreads();
@@ -215,9 +220,11 @@ struct radix_digit_count_helper
             // Sum counters from all stripes
             ROCPRIM_UNROLL
             for(unsigned int stripe = 0; stripe < atomic_stripes; ++stripe)
+            // constexpr_for_lt<0, atomic_stripes, 1>([&](auto stripe)
             {
                 digit_count += storage.digit_counters[get_counter(stripe, flat_id)];
             }
+            // );
         }
     }
 };
@@ -415,6 +422,7 @@ struct radix_sort_and_scatter_helper
             storage.digit_offsets[flat_id] = digit_start;
         }
 
+        ROCPRIM_NO_UNROLL
         for(Offset block_offset = begin_offset; block_offset < end_offset;
             block_offset += items_per_block)
         {
@@ -471,14 +479,30 @@ struct radix_sort_and_scatter_helper
             unsigned int exclusive_digit_prefix[digits_per_thread];
             unsigned int digit_counts[digits_per_thread];
 
-            radix_rank_type{}.rank_keys(
-                keys,
-                ranks,
-                storage.rank,
-                [bit, current_radix_bits](const Key& key)
-                { return key_codec::extract_digit(key, bit, current_radix_bits); },
-                exclusive_digit_prefix,
-                digit_counts);
+            // Use a struct to enforce inlining.
+            //
+            // This struct effectively implements the following lambda:
+            //   auto digit_extractor = [begin_bit, pass_bits](const bit_key_type& key) { 
+            //     return key_codec::extract_digit(key, begin_bit, pass_bits);
+            //   }
+            struct digit_extractor
+            {
+                const unsigned int begin_bit;
+                const unsigned int pass_bits;
+
+                ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+                auto operator()(const Key& key) const
+                {
+                    return key_codec::extract_digit(key, begin_bit, pass_bits);
+                }
+            } const extract_digit{bit, current_radix_bits};
+
+            radix_rank_type{}.rank_keys(keys,
+                                        ranks,
+                                        storage.rank,
+                                        extract_digit,
+                                        exclusive_digit_prefix,
+                                        digit_counts);
 
             ::rocprim::syncthreads();
 
@@ -501,12 +525,11 @@ struct radix_sort_and_scatter_helper
             ROCPRIM_UNROLL
             for(unsigned int i = 0; i < ItemsPerThread; ++i)
             {
-                const unsigned int rank = i * BlockSize + flat_id;
+                const auto rank = (i * BlockSize) + flat_id;
                 if(IsFull || rank < valid_items)
                 {
-                    Key                key = storage.ordered_tile_keys[rank];
-                    const unsigned int digit
-                        = key_codec::extract_digit(key, bit, current_radix_bits);
+                    Key                key   = storage.ordered_tile_keys[rank];
+                    const unsigned int digit = extract_digit(key);
                     key_codec::decode_inplace(key);
                     const Offset global_offset        = storage.digit_offsets[digit];
                     keys_output[rank + global_offset] = key;
@@ -554,11 +577,11 @@ struct radix_sort_and_scatter_helper
                 ROCPRIM_UNROLL
                 for(unsigned int i = 0; i < ItemsPerThread; ++i)
                 {
-                    const unsigned int rank = i * BlockSize + flat_id;
+                    const auto rank = (i * BlockSize) + flat_id;
                     if(IsFull || rank < valid_items)
                     {
                         const Key key = storage.ordered_tile_keys[rank];
-                        digits[i]     = key_codec::extract_digit(key, bit, current_radix_bits);
+                        digits[i]     = extract_digit(key);
                     }
                 }
 
@@ -576,7 +599,7 @@ struct radix_sort_and_scatter_helper
                 ROCPRIM_UNROLL
                 for(unsigned int i = 0; i < ItemsPerThread; ++i)
                 {
-                    const unsigned int rank = i * BlockSize + flat_id;
+                    const auto rank = (i * BlockSize) + flat_id;
                     if(IsFull || rank < valid_items)
                     {
                         const Value  value                  = storage.ordered_tile_values[rank];

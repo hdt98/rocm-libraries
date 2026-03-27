@@ -24,11 +24,11 @@
 #include "../../config.hpp"
 #include "../../detail/various.hpp"
 #include "../../functional.hpp"
+#include "../../intrinsics/arch.hpp"
 #include "../../types.hpp"
 
 #include "../block_scan.hpp"
 #include "../config.hpp"
-#include "rocprim/intrinsics/arch.hpp"
 
 BEGIN_ROCPRIM_NAMESPACE
 
@@ -109,22 +109,25 @@ private:
     ROCPRIM_DEVICE ROCPRIM_INLINE
     unsigned int get_digit_counter(const unsigned int digit, const unsigned int warp)
     {
-        return digit * warps + warp;
+        return (digit * warps) + warp;
     }
 
     template<typename Key, unsigned int ItemsPerThread, typename DigitExtractor>
-    ROCPRIM_DEVICE void rank_keys_impl(const Key (&keys)[ItemsPerThread],
-                                       unsigned int (&ranks)[ItemsPerThread],
-                                       storage_type_& storage,
-                                       DigitExtractor digit_extractor)
+    ROCPRIM_DEVICE ROCPRIM_INLINE
+    void rank_keys_impl(const Key (&keys)[ItemsPerThread],
+                        unsigned int (&ranks)[ItemsPerThread],
+                        storage_type_& storage,
+                        DigitExtractor digit_extractor)
     {
-        const unsigned int flat_id = ::rocprim::detail::block_thread_id<0>();
-        const unsigned int warp_id = ::rocprim::warp_id();
+        const auto flat_id        = ::rocprim::detail::block_thread_id<0>();
+        const auto warp_id        = ::rocprim::warp_id();
+        const auto counter_offset = flat_id * counters_per_thread;
 
         ROCPRIM_UNROLL
         for(unsigned int i = 0; i < counters_per_thread; ++i)
         {
-            storage.counters[flat_id * counters_per_thread + i] = 0;
+            // We force unroll these because we don't trust the compiler...
+            storage.counters[counter_offset + i] = 0;
         }
 
         ::rocprim::syncthreads();
@@ -172,11 +175,11 @@ private:
 
         // Scan the per-warp counters to get a rank-offset per warp counter.
         digit_counter_type scan_counters[counters_per_thread];
-
+        
         ROCPRIM_UNROLL
         for(unsigned int i = 0; i < counters_per_thread; ++i)
         {
-            scan_counters[i] = storage.counters[flat_id * counters_per_thread + i];
+            scan_counters[i] = storage.counters[counter_offset + i];
         }
 
         block_scan_type().exclusive_scan(scan_counters, scan_counters, 0, storage.block_scan);
@@ -184,66 +187,86 @@ private:
         ROCPRIM_UNROLL
         for(unsigned int i = 0; i < counters_per_thread; ++i)
         {
-            storage.counters[flat_id * counters_per_thread + i] = scan_counters[i];
+            storage.counters[counter_offset + i] = scan_counters[i];
         }
 
         ::rocprim::syncthreads();
 
         // Add the per-warp rank counter to get the final rank.
-        ROCPRIM_UNROLL
-        for(unsigned int i = 0; i < ItemsPerThread; ++i)
-        {
-            ranks[i] += *digit_counters[i];
-        }
+        // for(unsigned int i = 0; i < ItemsPerThread; ++i)
+        constexpr_for_lt<0, ItemsPerThread, 1>([&](auto i) { ranks[i] += *digit_counters[i]; });
     }
 
     template<bool Descending, typename Key, unsigned int ItemsPerThread>
-    ROCPRIM_DEVICE void rank_keys_impl(const Key (&keys)[ItemsPerThread],
-                                       unsigned int (&ranks)[ItemsPerThread],
-                                       storage_type_&     storage,
-                                       const unsigned int begin_bit,
-                                       const unsigned int pass_bits)
+    ROCPRIM_DEVICE ROCPRIM_INLINE
+    void rank_keys_impl(const Key (&keys)[ItemsPerThread],
+                        unsigned int (&ranks)[ItemsPerThread],
+                        storage_type_&     storage,
+                        const unsigned int begin_bit,
+                        const unsigned int pass_bits)
     {
         using key_codec
             = decltype(::rocprim::traits::get<Key>().template radix_key_codec<Descending>());
         using bit_key_type = typename key_codec::bit_key_type;
 
         bit_key_type bit_keys[ItemsPerThread];
+
         ROCPRIM_UNROLL
         for(unsigned int i = 0; i < ItemsPerThread; ++i)
         {
             bit_keys[i] = key_codec::encode(keys[i]);
         }
 
+        // Use a struct to enforce inlining.
+        //
+        // This struct effectively implements the following lambda:
+        //   auto digit_extractor = [begin_bit, pass_bits](const bit_key_type& key) { 
+        //     return key_codec::extract_digit(key, begin_bit, pass_bits);
+        //   }
+        struct digit_extractor
+        {
+            const unsigned int begin_bit;
+            const unsigned int pass_bits;
+
+            ROCPRIM_DEVICE ROCPRIM_FORCE_INLINE
+            auto operator()(const bit_key_type& key) const
+            {
+                return key_codec::extract_digit(key, begin_bit, pass_bits);
+            }
+        };
+
         rank_keys_impl(bit_keys,
                        ranks,
                        storage,
-                       [begin_bit, pass_bits](const bit_key_type& key)
-                       { return key_codec::extract_digit(key, begin_bit, pass_bits); });
+                       digit_extractor{begin_bit, pass_bits});
     }
 
     template<unsigned int ItemsPerThread>
-    ROCPRIM_DEVICE void digit_prefix_count(unsigned int (&prefix)[digits_per_thread],
-                                           unsigned int (&counts)[digits_per_thread],
-                                           storage_type_& storage)
+    ROCPRIM_DEVICE ROCPRIM_INLINE
+    void digit_prefix_count(unsigned int (&prefix)[digits_per_thread],
+                            unsigned int (&counts)[digits_per_thread],
+                            storage_type_& storage)
     {
-        const unsigned int flat_id = ::rocprim::detail::block_thread_id<0>();
+        const auto flat_id      = ::rocprim::detail::block_thread_id<0>();
+        const auto digit_offset = flat_id * digits_per_thread;
 
         ROCPRIM_UNROLL
         for(unsigned int i = 0; i < digits_per_thread; ++i)
         {
-            const unsigned int digit = flat_id * digits_per_thread + i;
-            if(radix_digits % block_size == 0 || digit < radix_digits)
+            const auto digit = digit_offset + i;
+            if(radix_digits % block_size != 0 && digit >= radix_digits)
             {
-                // The counter for warp 0 holds the prefix of all the digits at this point.
-                prefix[i] = storage.counters[get_digit_counter(digit, 0)];
-                // To find the count, subtract the prefix of the next digit with that of the
-                // current digit.
-                const unsigned int next_prefix
-                    = digit + 1 == radix_digits ? block_size * ItemsPerThread
-                                                : storage.counters[get_digit_counter(digit + 1, 0)];
-                counts[i]                      = next_prefix - prefix[i];
+                return;
             }
+
+            // The counter for warp 0 holds the prefix of all the digits at this point.
+            prefix[i] = storage.counters[get_digit_counter(digit, 0)];
+            // To find the count, subtract the prefix of the next digit with that of the
+            // current digit.
+            const unsigned int next_prefix
+                = digit + 1 == radix_digits ? block_size * ItemsPerThread
+                                            : storage.counters[get_digit_counter(digit + 1, 0)];
+            counts[i] = next_prefix - prefix[i];
         }
     }
 
