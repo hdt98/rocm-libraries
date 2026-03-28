@@ -7,16 +7,16 @@ This example stress-tests the rocm_ck schema against a real 2D tiled kernel. GEM
 The same bridge pattern from example 03 works for GEMM. A `.hip` variant file assembles CK Tile's 7-type template stack with `using` declarations, then wraps it in a thin `extern "C"` function:
 
 ```cpp
-static constexpr rocm_ck::GemmKernel K = rocm_ck::make_kernel(
+static constexpr rocm_ck::GemmSpec spec = rocm_ck::make_spec(
     rocm_ck::Signature{.dtype = rocm_ck::DataType::FP16, .ops = {rocm_ck::GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     rocm_ck::GemmAlgorithm{...});
 
 extern "C" __global__ void gemm_fp16(rocm_ck::Args args) {
-    rocm_ck::runGemm<K>(args);
+    rocm_ck::run<spec>(args);
 }
 ```
 
-The 7 CK Tile types (TileGemmShape, TileGemmTraits, PipelineProblem, GemmPipeline, TilePartitioner, CShuffleEpilogue, GemmKernel) are assembled in `gemm_dev.hpp`'s `runGemm<K>` from the `GemmKernel` NTTP fields. Each `.hip` file is ~15 lines. Host code never includes CK Tile headers.
+The 7 CK Tile types (TileGemmShape, TileGemmTraits, PipelineProblem, GemmPipeline, TilePartitioner, CShuffleEpilogue, GemmSpec) are assembled in `gemm_dev.hpp`'s `run<S>` from the `GemmSpec` NTTP fields. Each `.hip` file is ~15 lines. Host code never includes CK Tile headers.
 
 > **Key difference from elementwise**: GEMM's bridge assembles 7 types (vs 4 for elementwise) and wires a 2D tile partitioner. But the pattern shape is identical — the bridge complexity scales with CK Tile's template depth, not with our schema.
 
@@ -29,11 +29,11 @@ The `Signature` (what to compute) and `GemmAlgorithm` (how to compute it) are in
 
 The same algorithm works across fp32, fp16, and bf16. The same type can use different tile configs (gemm_fp16 vs gemm_fp16_w32). This was proven by having 6 variants that mix types and tile shapes — no coupling between the axes.
 
-> **Implication**: Tuning is purely an algorithm-space search. Given a signature, sweep tile configs and let `make_kernel` reject invalid combinations at compile time. The search space is defined by `is_valid_warp_gemm` × divisibility constraints.
+> **Implication**: Tuning is purely an algorithm-space search. Given a signature, sweep tile configs and let `make_spec` reject invalid combinations at compile time. The search space is defined by `is_valid_warp_gemm` × divisibility constraints.
 
 ## 3. Dtype Cascade — Uniform Across Operations
 
-All operations use the same two-level dtype cascade: `Signature::dtype` sets a kernel-level default for all tensors; explicit `Tensor` entries in `sig.tensors[]` override specific tensors by name. After `resolve()` flattens the cascade, `make_kernel()` stores each physical tensor's dtype in the `physical_tensors[]` table. `GemmOp::acc_dtype` defaults to FP32 independently.
+All operations use the same two-level dtype cascade: `Signature::dtype` sets a kernel-level default for all tensors; explicit `Tensor` entries in `sig.tensors[]` override specific tensors by name. After `resolve()` flattens the cascade, `make_spec()` stores each physical tensor's dtype in the `physical_tensors[]` table. `GemmOp::acc_dtype` defaults to FP32 independently.
 
 ```cpp
 // Mixed precision: fp16 compute, fp32 output
@@ -64,7 +64,7 @@ GemmAlgorithm{
 };
 ```
 
-`Dim3` is a structural type — it works as an NTTP member. `K.block_tile.m` compiles cleanly in template arguments for `ck_tile::sequence<>`. Designated initializers make configs self-documenting.
+`Dim3` is a structural type — it works as an NTTP member. `S.block_tile.m` compiles cleanly in template arguments for `ck_tile::sequence<>`. Designated initializers make configs self-documenting.
 
 > **Why not `ck_tile::sequence<M,N,K>`**: Our schema is CK-independent. The _dev header maps `Dim3` fields to `ck_tile::sequence<>` in one place. If CK Tile's API changes, only `gemm_dev.hpp` needs updating.
 
@@ -78,7 +78,7 @@ The valid set of (dtype, warp_tile) combinations is hardware-specific and non-ob
 | FP16  | 16, 32         | 8, 16          |
 | BF16  | 16, 32         | 8, 16          |
 
-`make_kernel` checks five constraints in sequence: positive dimensions, `block_warps.k == 1`, warp tile validity, tile divisibility, and derives `thread_block_size`. An invalid config throws a readable message at compile time.
+`make_spec` checks five constraints in sequence: positive dimensions, `block_warps.k == 1`, warp tile validity, tile divisibility, and derives `thread_block_size`. An invalid config throws a readable message at compile time.
 
 > **Hard-won lesson**: The initial attempt used 256×256×64 block tile with 32×32×16 warp tile (copied from CK's `gemm_basic_invoker.hpp`). Failed on ALL architectures. Root causes: (1) no WarpGemmDispatcher for fp32 32×32×16, (2) 256×256 block tile requires 128KB LDS, exceeding 64KB limit. The fix — 128×128×32 with 16×16×16 — came from cross-referencing the dispatcher table with CK's own validated configs.
 
@@ -93,7 +93,7 @@ All variants now use the generic `Args` struct (1408 bytes) from `include/rocm_c
 | `physical_tensors[2]` (output) | 2 | `[M, N]` with layout-dependent strides |
 | `physical_tensors[3]` (D0, optional) | 3 | `[M, N]` — present for fused epilogue |
 
-`runGemm<K>` unpacks tensors and extracts leading dimension strides based on layout (RowMajor → `strides[0]`, ColMajor → `strides[1]`). The device code branches on `EpilogueTypes<K>::NumDTensors` (derived from `K.num_physical_tensors - 3`) with `if constexpr` — each branch is compiled away. On the host side, `k.num_physical_tensors > 3` determines whether D tensor slots need populating.
+`run<S>` unpacks tensors and extracts leading dimension strides based on layout (RowMajor → `strides[0]`, ColMajor → `strides[1]`). The device code branches on `EpilogueTypes<S>::NumDTensors` (derived from `S.num_physical_tensors - 3`) with `if constexpr` — each branch is compiled away. On the host side, `spec.num_physical_tensors > 3` determines whether D tensor slots need populating.
 
 > **Design evolution**: The original per-epilogue structs (`GemmArgs`, `GemmArgs1D`) kept the ABI minimal but required new structs for each D-tensor count. The generic Args eliminates this — adding D tensors is just populating more slots. The GPU only loads fields it reads, so the larger struct costs nothing at runtime.
 
@@ -119,7 +119,7 @@ Signature{.dtype = FP16,
                   ReluOp{.in = "D", .out = "E"}}}
 ```
 
-`make_kernel` pattern-matches the ops array to build the `epilogue_ops[]` chain in GemmKernel — a composable sequence of `EpilogueOp` values (Add, Mul, Relu, etc.). `ComposedCDEOp<K>` applies the chain with `if constexpr` unrolling, delegating activation math to CK Tile's optimized implementations.
+`make_spec` pattern-matches the ops array to build the `epilogue_ops[]` chain in GemmSpec — a composable sequence of `EpilogueOp` values (Add, Mul, Relu, etc.). `ComposedCDEOp<S>` applies the chain with `if constexpr` unrolling, delegating activation math to CK Tile's optimized implementations.
 
 > **Why a composable chain**: A fixed `CombineOp × Activation` enum model requires O(N×M) enum combinations. The epilogue_ops array is O(N+M) — add one `EpilogueOp` value and one `apply_op` clause. The representation mirrors the Signature's operator chain, minus the string names (which aren't structural types for NTTP).
 
@@ -130,18 +130,18 @@ CK Tile's `CShuffleEpilogue` is the universal epilogue for GEMM:
 - Handles D tensor fusion (bias addition, scaling)
 - Handles composed operations via a single functor parameter
 
-`ComposedCDEOp<Combine, Act>` is a thin functor that converts to float, applies combine (fold over D tensor pack), applies activation (delegates to CK Tile's optimized implementations), and casts to output type. All epilogue variation is captured in one template — no `if constexpr` branching in `runGemm`.
+`ComposedCDEOp<Combine, Act>` is a thin functor that converts to float, applies combine (fold over D tensor pack), applies activation (delegates to CK Tile's optimized implementations), and casts to output type. All epilogue variation is captured in one template — no `if constexpr` branching in `run`.
 
 ## 10. What Generalized from Elementwise
 
 | Pattern | Elementwise | GEMM | Verdict |
 |---------|------------|------|---------|
-| Config → consteval → Kernel | `Signature + ElementwiseAlgorithm` → `VectorAddKernel` | `Signature + GemmAlgorithm` → `GemmKernel` | Generalizes |
+| Config → consteval → Kernel | `Signature + ElementwiseAlgorithm` → `ElementwiseSpec` | `Signature + GemmAlgorithm` → `GemmSpec` | Generalizes |
 | Dtype cascade | 2 levels (Signature::dtype→Tensor::dtype) | 2 levels (Signature::dtype→Tensor::dtype) | Identical model |
 | `_api` / `_dev` header split | Yes | Yes | Generalizes |
 | `CkTypeMap` enum→type dispatch | Yes | Yes + `CkLayoutMap` | Generalizes (adds layout) |
 | Generic Args struct | 40 bytes (old) | 1408 bytes (shared) | Generalizes — one struct for all ops |
-| consteval validation in `make_kernel` | 6 checks | 5 checks | Generalizes (different checks) |
+| consteval validation in `make_spec` | 6 checks | 5 checks | Generalizes (different checks) |
 | One `.hip` file per variant | ~15 lines each | ~15 lines each | Generalizes |
 | `Signature` with operator composition | `AddOp{}` only | `GemmOp` + epilogue ops | Generalizes |
 

@@ -57,21 +57,21 @@ TEST(WarpGemm, RejectsAsymmetricAndIntegerConfigs)
 }
 
 // ============================================================================
-// make_kernel: plain GEMM
+// make_spec: plain GEMM
 // ============================================================================
 
-TEST(MakeKernel, ProducesThreePhysicalTensorsForPlainGemm)
+TEST(MakeSpec, ProducesThreePhysicalTensorsForPlainGemm)
 {
-    constexpr auto k = make_kernel(
+    constexpr auto k = make_spec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
     EXPECT_EQ(k.num_physical_tensors, 3);
 }
 
-TEST(MakeKernel, MapsGemmTensorsToSequentialSlots)
+TEST(MakeSpec, MapsGemmTensorsToSequentialSlots)
 {
-    constexpr auto k = make_kernel(
+    constexpr auto k = make_spec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -80,9 +80,9 @@ TEST(MakeKernel, MapsGemmTensorsToSequentialSlots)
     EXPECT_EQ(slot(k, "C"), 2);
 }
 
-TEST(MakeKernel, PropagatesDtypeToAllGemmTensors)
+TEST(MakeSpec, PropagatesDtypeToAllGemmTensors)
 {
-    constexpr auto k = make_kernel(
+    constexpr auto k = make_spec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -91,9 +91,9 @@ TEST(MakeKernel, PropagatesDtypeToAllGemmTensors)
     EXPECT_EQ(dtype(k, "C"), DataType::FP16);
 }
 
-TEST(MakeKernel, ComputesThreadBlockSizeFromWarps)
+TEST(MakeSpec, ComputesThreadBlockSizeFromWarps)
 {
-    constexpr auto k = make_kernel(
+    constexpr auto k = make_spec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -101,9 +101,9 @@ TEST(MakeKernel, ComputesThreadBlockSizeFromWarps)
     EXPECT_EQ(k.thread_block_size, 256);
 }
 
-TEST(MakeKernel, ReportsZeroEpilogueOpsForPlainGemm)
+TEST(MakeSpec, ReportsZeroEpilogueOpsForPlainGemm)
 {
-    constexpr auto k = make_kernel(
+    constexpr auto k = make_spec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -111,78 +111,78 @@ TEST(MakeKernel, ReportsZeroEpilogueOpsForPlainGemm)
 }
 
 // ============================================================================
-// make_kernel: GEMM + Add
+// make_spec: GEMM + Add
 // ============================================================================
 
-TEST(MakeKernel, RegistersAddAsEpilogueOp)
+TEST(MakeSpec, RegistersAddAsEpilogueOp)
 {
-    constexpr auto k = make_kernel(Signature{.dtype = DataType::FP16,
-                                             .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
-                                   GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+    constexpr auto k = make_spec(Signature{.dtype = DataType::FP16,
+                                           .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
     EXPECT_EQ(k.num_epilogue_ops, 1);
     EXPECT_EQ(k.epilogue_ops[0], EpilogueOp::Add);
     EXPECT_EQ(k.num_physical_tensors, 4); // A, B, D(output), bias(D0)
 }
 
-TEST(MakeKernel, PlacesBiasInD0SlotForGemmAdd)
+TEST(MakeSpec, PlacesBiasInD0SlotForGemmAdd)
 {
-    constexpr auto k = make_kernel(Signature{.dtype = DataType::FP16,
-                                             .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
-                                   GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+    constexpr auto k = make_spec(Signature{.dtype = DataType::FP16,
+                                           .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
     EXPECT_EQ(slot(k, "D"), 2);    // output slot
     EXPECT_EQ(slot(k, "bias"), 3); // D0 slot
 }
 
-TEST(MakeKernel, PropagatesDtypeToBiasTensor)
+TEST(MakeSpec, PropagatesDtypeToBiasTensor)
 {
-    constexpr auto k = make_kernel(Signature{.dtype = DataType::FP16,
-                                             .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
-                                   GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+    constexpr auto k = make_spec(Signature{.dtype = DataType::FP16,
+                                           .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
     EXPECT_EQ(dtype(k, "bias"), DataType::FP16);
 }
 
 // ============================================================================
-// make_kernel: GEMM + Add + Relu
+// make_spec: GEMM + Add + Relu
 // ============================================================================
 
-TEST(MakeKernel, RegistersAddAndReluAsEpilogueOps)
+TEST(MakeSpec, RegistersAddAndReluAsEpilogueOps)
 {
-    constexpr auto k = make_kernel(Signature{.dtype = DataType::FP16,
-                                             .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
-                                                       ReluOp{.in = "D", .out = "E"}}},
-                                   GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+    constexpr auto k = make_spec(Signature{.dtype = DataType::FP16,
+                                           .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                                                     ReluOp{.in = "D", .out = "E"}}},
+                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
     EXPECT_EQ(k.num_epilogue_ops, 2);
     EXPECT_TRUE(k.has_epilogue_op(EpilogueOp::Add));
     EXPECT_TRUE(k.has_epilogue_op(EpilogueOp::Relu));
 }
 
-TEST(MakeKernel, UsesFinalOutputSlotForGemmAddRelu)
+TEST(MakeSpec, UsesFinalOutputSlotForGemmAddRelu)
 {
-    constexpr auto k = make_kernel(Signature{.dtype = DataType::FP16,
-                                             .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
-                                                       ReluOp{.in = "D", .out = "E"}}},
-                                   GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+    constexpr auto k = make_spec(Signature{.dtype = DataType::FP16,
+                                           .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                                                     ReluOp{.in = "D", .out = "E"}}},
+                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
     EXPECT_EQ(slot(k, "E"), 2);           // final output in slot 2
     EXPECT_EQ(k.num_physical_tensors, 4); // A, B, E(output), bias(D0)
 }
 
 // ============================================================================
-// make_kernel: 32x32 warp tile
+// make_spec: 32x32 warp tile
 // ============================================================================
 
-TEST(MakeKernel, Accepts32x32WarpTileWithCorrectBlockSize)
+TEST(MakeSpec, Accepts32x32WarpTileWithCorrectBlockSize)
 {
-    constexpr auto k = make_kernel(
+    constexpr auto k = make_spec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {32, 32, 16}});
 
@@ -193,12 +193,12 @@ TEST(MakeKernel, Accepts32x32WarpTileWithCorrectBlockSize)
 }
 
 // ============================================================================
-// make_kernel: layout defaults
+// make_spec: layout defaults
 // ============================================================================
 
-TEST(MakeKernel, AssignsRowColRowLayoutByDefault)
+TEST(MakeSpec, AssignsRowColRowLayoutByDefault)
 {
-    constexpr auto k = make_kernel(
+    constexpr auto k = make_spec(
         Signature{.dtype = DataType::FP32, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -213,7 +213,7 @@ TEST(MakeKernel, AssignsRowColRowLayoutByDefault)
 
 TEST(GemmSpec, ProvidesLhsRhsOutputNamedAccessors)
 {
-    constexpr auto k = make_kernel(
+    constexpr auto k = make_spec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -227,9 +227,9 @@ TEST(GemmSpec, ProvidesLhsRhsOutputNamedAccessors)
 // Accumulator dtype
 // ============================================================================
 
-TEST(MakeKernel, DefaultsAccDtypeToFP32)
+TEST(MakeSpec, DefaultsAccDtypeToFP32)
 {
-    constexpr auto k = make_kernel(
+    constexpr auto k = make_spec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -240,9 +240,9 @@ TEST(MakeKernel, DefaultsAccDtypeToFP32)
 // Multiple data types
 // ============================================================================
 
-TEST(MakeKernel, ProducesFP32GemmWithMatchingAccDtype)
+TEST(MakeSpec, ProducesFP32GemmWithMatchingAccDtype)
 {
-    constexpr auto k = make_kernel(
+    constexpr auto k = make_spec(
         Signature{.dtype = DataType::FP32, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -250,9 +250,9 @@ TEST(MakeKernel, ProducesFP32GemmWithMatchingAccDtype)
     EXPECT_EQ(k.acc_dtype, DataType::FP32);
 }
 
-TEST(MakeKernel, ProducesBF16GemmWithCorrectDtype)
+TEST(MakeSpec, ProducesBF16GemmWithCorrectDtype)
 {
-    constexpr auto k = make_kernel(
+    constexpr auto k = make_spec(
         Signature{.dtype = DataType::BF16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 

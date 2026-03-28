@@ -4,7 +4,7 @@ This example is the design prototype for the production rocm_ck API. It validate
 
 ## 1. Config -> consteval -> Kernel: The Three-Layer Pattern
 
-The user-facing `Signature` + `ElementwiseAlgorithm` (using `std::optional`, `std::variant`, not valid as NTTPs) are transformed by `consteval make_kernel()` into `VectorAddKernel` (a structural type, valid as an NTTP). This separation is fundamental:
+The user-facing `Signature` + `ElementwiseAlgorithm` (using `std::optional`, `std::variant`, not valid as NTTPs) are transformed by `consteval make_spec()` into `ElementwiseSpec` (a structural type, valid as an NTTP). This separation is fundamental:
 
 - **Signature + Algorithm** — flexible, user-facing. Uses `std::optional` fields and operator composition so users specify only what differs from defaults.
 - **consteval** — validates and transforms. Throws at compile time if the config is invalid. Invalid configs never produce binaries.
@@ -12,12 +12,12 @@ The user-facing `Signature` + `ElementwiseAlgorithm` (using `std::optional`, `st
 
 ```cpp
 // User writes:
-constexpr auto kernel = make_kernel(
+constexpr auto kernel = make_spec(
     Signature{.dtype = DataType::FP32, .ops = {AddOp{}}},
     ElementwiseAlgorithm{.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true});
 
-// make_kernel returns a VectorAddKernel with all fields resolved and validated.
-// This value is used directly as a template parameter: runVectorAdd<kernel>(args)
+// make_spec returns a ElementwiseSpec with all fields resolved and validated.
+// This value is used directly as a template parameter: run<kernel>(args)
 ```
 
 > **Production implication**: Every rocm_ck operation will follow this pattern. The Signature defines WHAT; the Algorithm defines HOW. `consteval` is the bridge that enforces invariants.
@@ -49,7 +49,7 @@ Signature{.dtype = DataType::FP16,
 
 ## 3. consteval for Immediate Feedback
 
-Throwing in a `consteval` function produces a compile error at the call site with the throw message as the diagnostic. `make_kernel` validates 7 constraints:
+Throwing in a `consteval` function produces a compile error at the call site with the throw message as the diagnostic. `make_spec` validates 7 constraints:
 
 - Input types must match (`a_dtype == b_dtype` for vector add)
 - Tile dimensions must be positive
@@ -67,7 +67,7 @@ Invalid configs fail at compile time with readable messages like `"block_tile mu
 - **Signature**: `{dtype, tensors[], scalars[], ops[]}` — specifies the compute graph and types
 - **Algorithm**: `{block_tile, block_warps, warp_tile, pad}` — specifies the tile geometry
 
-The same signature can be paired with different algorithms to explore the tuning surface. The same algorithm can run on FP32, FP16, or BF16 (subject to `kVectorM` constraints validated by `make_kernel`).
+The same signature can be paired with different algorithms to explore the tuning surface. The same algorithm can run on FP32, FP16, or BF16 (subject to `kVectorM` constraints validated by `make_spec`).
 
 > **Production implication**: Tuning tools generate Algorithm variants; the Signature comes from the user's problem specification. This composition is how rocm_ck will expose its tuning surface.
 
@@ -80,9 +80,9 @@ Two header files, strict dependency boundary:
 | `rocm_vector_add_api.hpp` | None | Host, device, tests |
 | `rocm_vector_add_dev.hpp` | Yes (CK Tile) | Device only |
 
-The API header contains the config types, `make_kernel`, `VectorAddKernel`, and all compile-time validation. It is testable with `constexpr`/`consteval` without any GPU — the 10 `static_assert` tests in the source run on any C++20 compiler. The generic `Args` struct (from `args.hpp`) replaces per-operation args structs.
+The API header contains the config types, `make_spec`, `ElementwiseSpec`, and all compile-time validation. It is testable with `constexpr`/`consteval` without any GPU — the 10 `static_assert` tests in the source run on any C++20 compiler. The generic `Args` struct (from `args.hpp`) replaces per-operation args structs.
 
-The device header contains the CK Tile kernel implementation, `CkTypeMap`, and `runVectorAdd<K>`. It is compiled only with `--cuda-device-only` and never included in host code.
+The device header contains the CK Tile kernel implementation, `CkTypeMap`, and `run<S>`. It is compiled only with `--cuda-device-only` and never included in host code.
 
 > **Production implication**: This is the model for all rocm_ck operation headers. The `_api` header is the public interface; the `_dev` header is an implementation detail. Consumers include only `_api`.
 
@@ -117,13 +117,13 @@ Each variant file is ~15 lines:
 
 ```cpp
 #include "rocm_vector_add_dev.hpp"
-static constexpr rocm_ck::VectorAddKernel K = rocm_ck::make_kernel(
+static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_spec(
     rocm_ck::Signature{.dtype = rocm_ck::DataType::FP32,
                        .ops = {rocm_ck::AddOp{}}},
     rocm_ck::ElementwiseAlgorithm{1024, 1, 1024, true});
 
 extern "C" __global__ void vector_add_fp32_b1024(rocm_ck::Args args) {
-    rocm_ck::runVectorAdd<K>(args);
+    rocm_ck::run<spec>(args);
 }
 ```
 
@@ -149,7 +149,7 @@ This is the device-side bridge between the enum-based API (shared with the host)
 
 ## 9. Custom CK Tile Kernel Using Primitives
 
-`runVectorAdd` uses `load_tile`, `sweep_tile_span`, `store_tile` directly instead of the stock `ElementWiseKernel`:
+`run` uses `load_tile`, `sweep_tile_span`, `store_tile` directly instead of the stock `ElementWiseKernel`:
 
 ```cpp
 auto a_tile = ck_tile::load_tile(make_input_window(static_cast<const X*>(args.a)));

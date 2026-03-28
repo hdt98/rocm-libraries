@@ -34,7 +34,7 @@ using rocm_ck::DataType;
 using rocm_ck::GemmAlgorithm;
 using rocm_ck::GemmOp;
 using rocm_ck::GemmSpec;
-using rocm_ck::make_kernel;
+using rocm_ck::make_spec;
 using rocm_ck::ReluOp;
 using rocm_ck::Signature;
 
@@ -45,13 +45,13 @@ using rocm_ck::Signature;
 struct GemmVariant
 {
     const char* name;
-    GemmSpec kernel;
+    GemmSpec spec;
 };
 
 /// Build a GemmVariant from Signature + Algorithm.
 consteval GemmVariant make_variant(const char* name, Signature sig, GemmAlgorithm algo)
 {
-    return {name, make_kernel(sig, algo)};
+    return {name, make_spec(sig, algo)};
 }
 
 // clang-format off
@@ -149,13 +149,13 @@ int main(int argc, char** argv)
     bool all_passed  = true;
     int variants_run = 0;
 
-    for(const auto& variant : ALL_GEMM_VARIANTS)
+    for(const GemmVariant& variant : ALL_GEMM_VARIANTS)
     {
-        const GemmSpec& k = variant.kernel;
+        const GemmSpec& spec = variant.spec;
 
         // Per-variant grid dimensions from tile geometry
-        int grid_m    = (M + k.block_tile.m - 1) / k.block_tile.m;
-        int grid_n    = (N + k.block_tile.n - 1) / k.block_tile.n;
+        int grid_m    = (M + spec.block_tile.m - 1) / spec.block_tile.m;
+        int grid_n    = (N + spec.block_tile.n - 1) / spec.block_tile.n;
         int grid_size = grid_m * grid_n;
 
         // Load kernel
@@ -164,22 +164,21 @@ int main(int argc, char** argv)
             continue;
 
         // Allocate typed device buffers from physical tensor table
-        // lhs = lhs(), rhs = rhs(), output = output(), D0 = [3]
-        rocm_ck::TypedBuffer buf_a(k.lhs().dtype, M * K);
-        rocm_ck::TypedBuffer buf_b(k.rhs().dtype, K * N);
-        rocm_ck::TypedBuffer buf_c(k.output().dtype, M * N);
+        rocm_ck::TypedBuffer buf_a(spec.lhs().dtype, M * K);
+        rocm_ck::TypedBuffer buf_b(spec.rhs().dtype, K * N);
+        rocm_ck::TypedBuffer buf_c(spec.output().dtype, M * N);
 
         buf_a.upload(ref_a.data());
         buf_b.upload(ref_b.data());
         buf_c.zero();
 
         // D0 tensor (e.g., bias) is present when num_physical_tensors > 3
-        bool has_d0 = k.num_physical_tensors > 3;
+        bool has_d0 = spec.num_physical_tensors > 3;
 
         std::unique_ptr<rocm_ck::TypedBuffer> buf_d0;
         if(has_d0)
         {
-            buf_d0 = std::make_unique<rocm_ck::TypedBuffer>(k.physical_tensors[3].dtype, M * N);
+            buf_d0 = std::make_unique<rocm_ck::TypedBuffer>(spec.d0().dtype, M * N);
             buf_d0->upload(ref_d0.data());
         }
 
@@ -189,25 +188,25 @@ int main(int argc, char** argv)
                     N,
                     K,
                     grid_size,
-                    k.thread_block_size);
+                    spec.thread_block_size);
 
         // Build generic Args — slot indices from role-based accessors
         rocm_ck::Args kernel_args{};
         // lhs [M x K] RowMajor
-        kernel_args.tensors[k.lhs().args_slot] = {
-            buf_a.ptr(), {M, K, 0, 0, 0, 0}, {stride_A, 1, 0, 0, 0, 0}};
+        kernel_args.tensors[spec.lhs().args_slot] = {
+            buf_a.ptr(), rocm_ck::make_shape(M, K), rocm_ck::make_strides(stride_A, 1)};
         // rhs [K x N] ColumnMajor
-        kernel_args.tensors[k.rhs().args_slot] = {
-            buf_b.ptr(), {K, N, 0, 0, 0, 0}, {1, stride_B, 0, 0, 0, 0}};
+        kernel_args.tensors[spec.rhs().args_slot] = {
+            buf_b.ptr(), rocm_ck::make_shape(K, N), rocm_ck::make_strides(1, stride_B)};
         // Output [M x N] RowMajor
-        kernel_args.tensors[k.output().args_slot] = {
-            buf_c.ptr(), {M, N, 0, 0, 0, 0}, {stride_C, 1, 0, 0, 0, 0}};
+        kernel_args.tensors[spec.output().args_slot] = {
+            buf_c.ptr(), rocm_ck::make_shape(M, N), rocm_ck::make_strides(stride_C, 1)};
         // D0 [M x N] RowMajor (optional, for fused epilogue)
         if(has_d0)
         {
-            constexpr int stride_D0                              = N;
-            kernel_args.tensors[k.physical_tensors[3].args_slot] = {
-                buf_d0->ptr(), {M, N, 0, 0, 0, 0}, {stride_D0, 1, 0, 0, 0, 0}};
+            constexpr int stride_D0                  = N;
+            kernel_args.tensors[spec.d0().args_slot] = {
+                buf_d0->ptr(), rocm_ck::make_shape(M, N), rocm_ck::make_strides(stride_D0, 1)};
         }
 
         void* args_ptr          = &kernel_args;
@@ -222,7 +221,7 @@ int main(int argc, char** argv)
                                         grid_size,
                                         1,
                                         1,
-                                        k.thread_block_size,
+                                        spec.thread_block_size,
                                         1,
                                         1,
                                         0,
@@ -235,19 +234,20 @@ int main(int argc, char** argv)
         std::vector<float> result(M * N);
         buf_c.download(result.data());
 
-        // Select correct reference based on epilogue op chain
+        // Select correct reference based on epilogue op chain.
+        // Priority: GEMM+Add+ReLU > GEMM+Add > plain GEMM
         const float* ref = ref_c.data();
-        if(k.has_epilogue_op(rocm_ck::EpilogueOp::Add) &&
-           k.has_epilogue_op(rocm_ck::EpilogueOp::Relu))
+        if(spec.has_epilogue_op(rocm_ck::EpilogueOp::Add) &&
+           spec.has_epilogue_op(rocm_ck::EpilogueOp::Relu))
             ref = ref_add_relu.data();
-        else if(k.has_epilogue_op(rocm_ck::EpilogueOp::Add))
+        else if(spec.has_epilogue_op(rocm_ck::EpilogueOp::Add))
             ref = ref_add.data();
 
-        float tol   = rocm_ck::tolerance_for(k.output().dtype);
-        bool passed = true;
+        float tolerance = rocm_ck::tolerance_for(spec.output().dtype);
+        bool passed     = true;
         for(int i = 0; i < M * N; ++i)
         {
-            if(std::fabs(result[i] - ref[i]) > tol * std::fabs(ref[i]) + tol)
+            if(std::fabs(result[i] - ref[i]) > tolerance * std::fabs(ref[i]) + tolerance)
             {
                 int row = i / N;
                 int col = i % N;

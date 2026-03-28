@@ -37,9 +37,9 @@ constexpr int kMaxScalars = 16;
 /// All pointers are const void* — output tensors use const_cast on the device side.
 struct TensorArg
 {
-    const void* ptr;           //  8 bytes  (offset 0)
-    index_t lengths[kMaxRank]; // 24 bytes  (offset 8)   — int32
-    int64_t strides[kMaxRank]; // 48 bytes  (offset 32)  — int64
+    const void* ptr;                       //  8 bytes  (offset 0)
+    std::array<index_t, kMaxRank> lengths; // 24 bytes  (offset 8)   — int32
+    std::array<int64_t, kMaxRank> strides; // 48 bytes  (offset 32)  — int64
 };
 
 /// A scalar value passed by value through kernarg.
@@ -68,6 +68,28 @@ struct Args
     std::array<TensorArg, kMaxTensors> tensors;   // 16 x 80 = 1280 bytes
     std::array<ScalarValue, kMaxScalars> scalars; // 16 x  8 =  128 bytes
 };
+
+// =============================================================================
+// Shape / stride helpers — zero-fill unused dimensions
+// =============================================================================
+
+/// Build a shape array from 1–6 dimensions, zero-filling unused slots.
+/// Eliminates trailing-zero noise in example code:
+///   make_shape(M, K) instead of {M, K, 0, 0, 0, 0}
+constexpr std::array<index_t, kMaxRank> make_shape(
+    index_t d0, index_t d1 = 0, index_t d2 = 0, index_t d3 = 0, index_t d4 = 0, index_t d5 = 0)
+{
+    return {d0, d1, d2, d3, d4, d5};
+}
+
+/// Build a strides array from 1–6 dimensions, zero-filling unused slots.
+/// Eliminates trailing-zero noise in example code:
+///   make_strides(stride_A, 1) instead of {stride_A, 1, 0, 0, 0, 0}
+constexpr std::array<int64_t, kMaxRank> make_strides(
+    int64_t s0, int64_t s1 = 0, int64_t s2 = 0, int64_t s3 = 0, int64_t s4 = 0, int64_t s5 = 0)
+{
+    return {s0, s1, s2, s3, s4, s5};
+}
 
 // =============================================================================
 // ABI stability assertions

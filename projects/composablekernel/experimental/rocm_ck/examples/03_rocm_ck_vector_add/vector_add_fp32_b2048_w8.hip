@@ -6,7 +6,7 @@
 // Multi-warp FP32: 8 warps x 64 = 512 threads, 2048 elements per block.
 // Small warp_tile (64) forces kVectorM=1 (minimum vectorization) — contrast
 // with fp16_b1024_w2 where the narrow type allows kVectorM=8.
-static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_kernel(
+static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_spec(
     rocm_ck::Signature{
         .dtype = rocm_ck::DataType::FP32,
         .ops = {rocm_ck::AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},

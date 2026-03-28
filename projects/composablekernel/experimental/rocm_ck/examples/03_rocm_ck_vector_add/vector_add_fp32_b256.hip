@@ -5,7 +5,7 @@
 
 // Baseline single-warp FP32 variant. Smallest tile in the set.
 // Geometry: kVectorM=4 (128-bit / 32-bit), kRepeatM=1, 64 threads.
-static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_kernel(
+static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_spec(
     rocm_ck::Signature{
         .dtype = rocm_ck::DataType::FP32,
         .ops = {rocm_ck::AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},

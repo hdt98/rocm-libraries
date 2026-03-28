@@ -5,7 +5,7 @@
 
 // Narrower type doubles vectorization: FP16 gets kVectorM=8 (vs FP32's 4)
 // because 128-bit registers hold 8 half-precision values instead of 4 floats.
-static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_kernel(
+static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_spec(
     rocm_ck::Signature{
         .dtype = rocm_ck::DataType::FP16,
         .ops = {rocm_ck::AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},

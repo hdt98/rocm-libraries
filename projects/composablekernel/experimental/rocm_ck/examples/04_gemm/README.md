@@ -41,10 +41,10 @@ struct GemmAlgorithm {
 };
 ```
 
-Independent of data types — paired with `Signature` in the `make_kernel()` call:
+Independent of data types — paired with `Signature` in the `make_spec()` call:
 
 ```cpp
-make_kernel(
+make_spec(
     Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     GemmAlgorithm{.block_tile  = {128, 128, 32},
                   .block_warps = {2, 2, 1},
@@ -53,7 +53,7 @@ make_kernel(
 
 ### Consteval Validation
 
-`make_kernel()` performs compile-time validation:
+`make_spec()` performs compile-time validation:
 
 - **Warp tile validity**: Checks against CK Tile's `WarpGemmDispatcher` table
   via `is_valid_warp_gemm()`. For example, FP32 supports 32×32×{4,8} but not
@@ -65,23 +65,23 @@ make_kernel(
 
 Invalid configurations produce compile errors — no runtime surprises.
 
-### GemmKernel — Structural NTTP
+### GemmSpec — Structural NTTP
 
-`make_kernel()` produces a `GemmKernel` struct with all types, layouts, and
+`make_spec()` produces a `GemmSpec` struct with all types, layouts, and
 tile geometry resolved. All members are structural types (enums, ints,
-aggregates), so `GemmKernel` works as a C++20 non-type template parameter.
+aggregates), so `GemmSpec` works as a C++20 non-type template parameter.
 
 ### CK Tile Type Wiring (gemm_dev.hpp)
 
 `CkTypeMap` and `CkLayoutMap` map our schema enums to CK Tile's C++ types and
-layout tags. `runGemm<K>` wires the 7-type CK Tile GEMM stack (shape, traits,
-problem, pipeline, partitioner, epilogue, kernel) from a `GemmKernel` NTTP.
-Tile geometry flows from `K.block_tile`, `K.block_warps`, and `K.warp_tile`.
+layout tags. `run<S>` wires the 7-type CK Tile GEMM stack (shape, traits,
+problem, pipeline, partitioner, epilogue, kernel) from a `GemmSpec` NTTP.
+Tile geometry flows from `S.block_tile`, `S.block_warps`, and `S.warp_tile`.
 
 Each `.hip` variant file is ~20 lines:
 
 ```cpp
-static constexpr rocm_ck::GemmKernel kernel = rocm_ck::make_kernel(
+static constexpr rocm_ck::GemmSpec spec = rocm_ck::make_spec(
     rocm_ck::Signature{
         .dtype = rocm_ck::DataType::FP16,
         .ops = {rocm_ck::GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
@@ -90,7 +90,7 @@ static constexpr rocm_ck::GemmKernel kernel = rocm_ck::make_kernel(
                             .warp_tile   = {16, 16, 16}});
 
 extern "C" __global__ void gemm_fp16(rocm_ck::Args args) {
-    rocm_ck::runGemm<kernel>(args);
+    rocm_ck::run<spec>(args);
 }
 ```
 
@@ -107,14 +107,14 @@ Each epilogue step is a typed operator that references tensors by name:
 
 ```cpp
 // GEMM + bias addition
-make_kernel(
+make_spec(
     Signature{.dtype = DataType::FP16,
               .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
     GemmAlgorithm{...})
 
 // GEMM + bias + ReLU
-make_kernel(
+make_spec(
     Signature{.dtype = DataType::FP16,
               .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
@@ -122,15 +122,15 @@ make_kernel(
     GemmAlgorithm{...})
 ```
 
-`make_kernel()` pattern-matches the ops sequence to select the CK Tile epilogue:
+`make_spec()` pattern-matches the ops sequence to select the CK Tile epilogue:
 - `[GemmOp]` — plain GEMM (tensors 0-2: A, B, C)
 - `[GemmOp, AddOp]` — fused bias addition (tensors 0-3: A, B, E, D0)
 - `[GemmOp, AddOp, ReluOp]` — fused bias + activation (tensors 0-3: A, B, E, D0)
 
 All variants use the generic `Args` struct. Tensor slot count varies by
-epilogue — `runGemm` branches on `EpilogueTypes<K>::NumDTensors` (derived
-from `K.num_physical_tensors - 3`) at compile time on the device side.
-On the host side, `k.num_physical_tensors > 3` determines whether D
+epilogue — `run` branches on `EpilogueTypes<S>::NumDTensors` (derived
+from `S.num_physical_tensors - 3`) at compile time on the device side.
+On the host side, `spec.num_physical_tensors > 3` determines whether D
 tensor slots need populating.
 
 The "bias" tensor's dtype cascades from `Signature::dtype`. Explicit `Tensor`
@@ -159,9 +159,9 @@ metaprogramming, host runtime, and device code:
 
 | File | Compiled by | Purpose |
 |------|-------------|---------|
-| `gemm_kernel.hpp` | Both (g++ and hipcc) | **Metaprogramming** — structural types (`GemmKernel`, `GemmAlgorithm`, `Dim3`, `EpilogueOp`), `consteval` factories (`make_kernel`, `is_valid_warp_gemm`), named accessors (`tensor`, `slot`, `dtype`, `layout`), compile-time `static_assert` tests. No runtime code. |
-| `gemm_api.hpp` | Host only (g++) | **Host runtime** — arg assembly, launch helpers, runtime validation. Guards with `#error` on device compilation. Includes `_kernel.hpp`. |
-| `gemm_dev.hpp` | Device only (hipcc `--cuda-device-only`) | **Device code** — CK Tile bridge (`runGemm<K>`), `CkTypeMap`, `CkLayoutMap`, `EpilogueTypes`, `ComposedCDEOp`. Guards with `#error` on host compilation. Includes `_kernel.hpp`. |
+| `gemm_spec.hpp` | Both (g++ and hipcc) | **Metaprogramming** — structural types (`GemmSpec`, `GemmAlgorithm`, `Dim3`, `EpilogueOp`), `consteval` factories (`make_spec`, `is_valid_warp_gemm`), named accessors (`tensor`, `slot`, `dtype`, `layout`), compile-time `static_assert` tests. No runtime code. |
+| `gemm_api.hpp` | Host only (g++) | **Host runtime** — arg assembly, launch helpers, runtime validation. Guards with `#error` on device compilation. Includes `_spec.hpp`. |
+| `gemm_dev.hpp` | Device only (hipcc `--cuda-device-only`) | **Device code** — CK Tile bridge (`run<S>`), `CkTypeMap`, `CkLayoutMap`, `EpilogueTypes`, `ComposedCDEOp`. Guards with `#error` on host compilation. Includes `_spec.hpp`. |
 | `gemm_*.hip` | Device only | Variant instantiations (~20 lines each) — include only `_dev.hpp` |
 | `cpu_ref.{hpp,cpp}` | Host only | CPU reference GEMM for verification |
 | `main.cpp` | Host only | Host loader — multi-variant loop with D tensor support, CPU reference verification |
@@ -171,7 +171,7 @@ metaprogramming, host runtime, and device code:
 ### Compilation Boundary
 
 ```text
-                    gemm_kernel.hpp (metaprogramming)
+                    gemm_spec.hpp (metaprogramming)
                    /                \
          gemm_api.hpp            gemm_dev.hpp
          (host only)             (device only)
@@ -179,12 +179,12 @@ metaprogramming, host runtime, and device code:
          main.cpp                *.hip files
 ```
 
-`gemm_kernel.hpp` is pure metaprogramming: `consteval` factories, `constexpr`
+`gemm_spec.hpp` is pure metaprogramming: `consteval` factories, `constexpr`
 structural types, and `static_assert` tests. The compiler evaluates it all and
 produces constants. No runtime code is generated on either side.
 
 `.hip` files are compiled with `--cuda-device-only` and include only `gemm_dev.hpp`
-(which transitively includes `gemm_kernel.hpp`). `main.cpp` is compiled as plain C++
+(which transitively includes `gemm_spec.hpp`). `main.cpp` is compiled as plain C++
 and includes `gemm_api.hpp`. The `#error` guards enforce these boundaries —
 including the wrong header produces a clear compile error.
 

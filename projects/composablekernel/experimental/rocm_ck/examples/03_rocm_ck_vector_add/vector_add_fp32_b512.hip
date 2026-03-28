@@ -5,7 +5,7 @@
 
 // Tile scaling: same type and warp count as fp32_b256, 2x tile.
 // Doubling block_tile doubles kRepeatM (1 -> 2); threads stay at 64.
-static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_kernel(
+static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_spec(
     rocm_ck::Signature{
         .dtype = rocm_ck::DataType::FP32,
         .ops = {rocm_ck::AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},

@@ -5,7 +5,7 @@
 
 // Widening: FP16 inputs -> FP32 output. Tensor override sets output type.
 // The wider type (FP32) constrains kVectorM to 4 (vs 8 for homogeneous FP16).
-static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_kernel(
+static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_spec(
     rocm_ck::Signature{
         .dtype = rocm_ck::DataType::FP16,
         .tensors = {rocm_ck::Tensor{.name = "C", .dtype = rocm_ck::DataType::FP32}},
