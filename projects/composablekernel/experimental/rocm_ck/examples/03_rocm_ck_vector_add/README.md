@@ -109,33 +109,34 @@ The `_w8`/`_w2` suffixes indicate multi-warp variants.
 
 | File | Compiled by | Purpose |
 |------|-------------|---------|
-| `elementwise_spec.hpp` | Both (shared header in `include/rocm_ck/`) | **Structural types** — `ElementwiseSpec`, `ElementwiseAlgorithm`, `consteval` factory (`make_spec`). No runtime code. |
+| `elementwise_spec.hpp` | Both (`include/rocm_ck/`) | **Structural types** — `ElementwiseSpec`, `ElementwiseAlgorithm`, `consteval` factory (`make_spec`). No runtime code. |
 | `vector_add_variants.hpp` | Both (g++ and hipcc) | **Variant registry** — constexpr table of all kernel configurations, `consteval vector_add_variant_spec()` lookup, `findVariant()` selection. Single source of truth for device and host code. |
-| `elementwise_dev.hpp` | Device only (shared header in `include/rocm_ck/`) | **CK Tile bridge** — `run<S>`, `CkTypeMap`, `__device__` functions. Guards with `#error` on host compilation. |
-| `vector_add_*.hip` | Device only | Variant instantiations (~12 lines each) — include `vector_add_variants.hpp` and `elementwise_dev.hpp` |
 | `main.cpp` | Host only | Host loader — variant selection demo, verify-all, scaled-add test |
+| `vector_add_*.hip` | Device only | Variant instantiations (~12 lines each) — include `vector_add_variants.hpp` and `elementwise_dev.hpp` |
+| `elementwise_dev.hpp` | Device only (`include/rocm_ck/`) | **CK Tile bridge** — `run<S>`, `CkTypeMap`, `__device__` functions. Guards with `#error` on host compilation. |
 | `pack.py` | — | Archive packer with variant metadata |
 | `CMakeLists.txt` | — | Build system (variant × arch nested loop) |
 
 ### Compilation Boundary
 
 ```text
-    include/rocm_ck/elementwise_spec.hpp (shared structural types)
-                        |
-                        +-- include/rocm_ck/elementwise_dev.hpp (shared device code)
-                        |
-           vector_add_variants.hpp (example-local variant table)
-                       /            \
-             main.cpp                vector_add_*.hip
+    <rocm_ck/elementwise_spec.hpp>      (structural types)
+                    |
+       vector_add_variants.hpp          (example variant table)
+                 /        \
+          main.cpp      vector_add_*.hip
+           (host)           |
+                    <rocm_ck/elementwise_dev.hpp>  (device bridge: run<S>)
 ```
 
-Shared headers in `include/rocm_ck/` define structural types and the CK Tile
-bridge. The example-local `vector_add_variants.hpp` defines the variant table —
-included by both host and device code, ensuring specs are defined exactly once.
+`elementwise_spec.hpp` defines structural types (`ElementwiseSpec`,
+`ElementwiseAlgorithm`). `vector_add_variants.hpp` builds the variant table on
+top of those types — included by both host and device code, ensuring specs are
+defined exactly once.
 
 `.hip` files are compiled with `--cuda-device-only` and include both
 `vector_add_variants.hpp` (for the spec) and `elementwise_dev.hpp` (for
-`run<S>`). `main.cpp` includes `vector_add_variants.hpp` to access variant
+`run<S>`). `main.cpp` includes only `vector_add_variants.hpp` to access variant
 metadata and selection.
 
 ## Build
