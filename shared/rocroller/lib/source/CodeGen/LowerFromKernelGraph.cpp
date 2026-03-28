@@ -842,7 +842,7 @@ namespace rocRoller
                 }
                 else
                 {
-                    co_yield loadVGPRFromGlobalArray(userTag, user, dst);
+                    co_yield loadVGPRFromGlobalArray(tag, userTag, user, dst);
                 }
             }
 
@@ -876,15 +876,17 @@ namespace rocRoller
                     MemoryInstructions::MemoryKind::Global, vgpr, vPtr, nullptr, numBytes);
             }
 
-            Generator<Instruction>
-                loadVGPRFromGlobalArray(int userTag, User user, Register::ValuePtr vgpr)
+            Generator<Instruction> loadVGPRFromGlobalArray(int                loadTag,
+                                                           int                userTag,
+                                                           User               user,
+                                                           Register::ValuePtr vgpr)
             {
                 auto offset = Register::Value::Placeholder(
                     m_context, Register::Type::Vector, DataType::Int64, 1);
 
                 co_yield Instruction::Comment("GEN: LoadVGPR; user index");
 
-                auto indexes = m_graph->buildTransformer(userTag).reverse({userTag});
+                auto indexes = m_graph->buildTransformer(loadTag).reverse({userTag});
                 co_yield generateOffset(
                     offset, indexes[0], vgpr->variableType().dataType, user.offset);
 
