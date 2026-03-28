@@ -46,6 +46,7 @@ set(ROCM_CK_HOST_TESTS
     test_args.cpp
     test_physical_tensor.cpp
     test_schema_compatibility.cpp
+    test_validate.cpp
 )
 
 # Convenience target: `ninja rocm_ck_tests` builds all host tests
