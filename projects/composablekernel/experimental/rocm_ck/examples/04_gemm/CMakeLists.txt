@@ -41,6 +41,19 @@ set(KERNEL_VARIANTS gemm_fp32 gemm_fp16 gemm_bf16 gemm_fp16_w32 gemm_fp16_add ge
 set(ROCM_CK_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
 get_filename_component(ROCM_CK_INCLUDE_DIR "${ROCM_CK_INCLUDE_DIR}" ABSOLUTE)
 
+# --- Verify pack.py has entries for all KERNEL_VARIANTS ---
+# pack.py has a hardcoded VARIANTS list that must stay in sync with KERNEL_VARIANTS.
+# Missing entries cause silent failures (hsaco compiles but isn't archived).
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/pack.py PACK_PY_CONTENT)
+foreach(variant IN LISTS KERNEL_VARIANTS)
+    string(FIND "${PACK_PY_CONTENT}" "\"name\": \"${variant}\"" PACK_PY_MATCH)
+    if(PACK_PY_MATCH EQUAL -1)
+        message(FATAL_ERROR
+            "Variant '${variant}' is in KERNEL_VARIANTS but missing from pack.py. "
+            "Add a matching entry to pack.py or the kpack archive will be incomplete.")
+    endif()
+endforeach()
+
 # --- Compile each variant x architecture into .hsaco code objects ---
 # Uses --cuda-device-only to produce raw code objects without host stubs.
 # -std=c++20 is required for CK Tile headers and GemmSpec schema (consteval, structural NTTPs).
