@@ -207,6 +207,57 @@ TEST(MakeSpec, AssignsRowColRowLayoutByDefault)
     EXPECT_EQ(layout(k, "C"), Layout::Row);
 }
 
+TEST(MakeSpec, OverridesBLayoutToRowForRR)
+{
+    constexpr auto k = make_spec(Signature{.dtype   = DataType::FP16,
+                                           .tensors = {Tensor{.name = "B", .layout = Layout::Row}},
+                                           .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+
+    EXPECT_EQ(layout(k, "A"), Layout::Row);
+    EXPECT_EQ(layout(k, "B"), Layout::Row);
+    EXPECT_EQ(layout(k, "C"), Layout::Row);
+}
+
+TEST(MakeSpec, OverridesBothLayoutsForCC)
+{
+    constexpr auto k = make_spec(Signature{.dtype   = DataType::FP16,
+                                           .tensors = {Tensor{.name = "A", .layout = Layout::Col},
+                                                       Tensor{.name = "B", .layout = Layout::Col}},
+                                           .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+
+    EXPECT_EQ(layout(k, "A"), Layout::Col);
+    EXPECT_EQ(layout(k, "B"), Layout::Col);
+    EXPECT_EQ(layout(k, "C"), Layout::Row);
+}
+
+TEST(MakeSpec, OverridesALayoutForCR)
+{
+    constexpr auto k = make_spec(Signature{.dtype   = DataType::FP16,
+                                           .tensors = {Tensor{.name = "A", .layout = Layout::Col},
+                                                       Tensor{.name = "B", .layout = Layout::Row}},
+                                           .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+
+    EXPECT_EQ(layout(k, "A"), Layout::Col);
+    EXPECT_EQ(layout(k, "B"), Layout::Row);
+    EXPECT_EQ(layout(k, "C"), Layout::Row);
+}
+
+TEST(MakeSpec, LayoutOverrideFlowsToPhysicalTensorTable)
+{
+    constexpr auto k = make_spec(Signature{.dtype   = DataType::FP16,
+                                           .tensors = {Tensor{.name = "B", .layout = Layout::Row}},
+                                           .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+
+    // Verify the physical tensor table (what the device code sees)
+    EXPECT_EQ(k.lhs().layout, Layout::Row);
+    EXPECT_EQ(k.rhs().layout, Layout::Row);
+    EXPECT_EQ(k.output().layout, Layout::Row);
+}
+
 // ============================================================================
 // GemmSpec named accessors
 // ============================================================================

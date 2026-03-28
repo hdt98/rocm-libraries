@@ -99,6 +99,31 @@ TEST(Resolve, AllowsPerTensorRankOverride)
     EXPECT_EQ(r.tensor("A").rank, 3);
 }
 
+TEST(Resolve, AllowsPerTensorLayoutOverride)
+{
+    // Override B from default Col to Row (R×R layout)
+    constexpr auto r = resolve(Signature{.dtype   = DataType::FP16,
+                                         .tensors = {Tensor{.name = "B", .layout = Layout::Row}},
+                                         .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.tensor("A").layout, Layout::Row); // default preserved
+    EXPECT_EQ(r.tensor("B").layout, Layout::Row); // overridden from Col
+    EXPECT_EQ(r.tensor("C").layout, Layout::Row); // default preserved
+}
+
+TEST(Resolve, AllowsMultipleLayoutOverrides)
+{
+    // Override both A and B (C×C layout)
+    constexpr auto r = resolve(Signature{.dtype   = DataType::FP16,
+                                         .tensors = {Tensor{.name = "A", .layout = Layout::Col},
+                                                     Tensor{.name = "B", .layout = Layout::Col}},
+                                         .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.tensor("A").layout, Layout::Col);
+    EXPECT_EQ(r.tensor("B").layout, Layout::Col);
+    EXPECT_EQ(r.tensor("C").layout, Layout::Row); // default preserved
+}
+
 // ============================================================================
 // GEMM + Add + Relu chain
 // ============================================================================
