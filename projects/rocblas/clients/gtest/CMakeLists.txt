@@ -78,6 +78,7 @@ target_sources(rocblas-test
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/rocblas_gtest_main.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocblas_test.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/asan_helpers_gtest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/general_gtest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/set_get_pointer_mode_gtest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/set_get_atomics_mode_gtest.cpp"
