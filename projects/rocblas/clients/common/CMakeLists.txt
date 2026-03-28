@@ -12,8 +12,8 @@ target_link_libraries(rocblas-clients-common
         rocblas::warnings
 )
 
-if(ROCBLAS_ENABLE_ROCM_SMI)
-    target_link_libraries(rocblas-clients-common PRIVATE rocm_smi64)
+if(ROCBLAS_ENABLE_AMD_SMI)
+    target_link_libraries(rocblas-clients-common PRIVATE amd_smi)
 endif()
 
 if(NOT WIN32)

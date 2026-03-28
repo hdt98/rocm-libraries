@@ -22,8 +22,8 @@ if(ROCBLAS_ENABLE_BENCHMARKS OR ROCBLAS_BUILD_TESTING OR BUILD_TESTING)
         find_package(cblas)
     endif()
 
-    if(ROCBLAS_ENABLE_ROCM_SMI)
-        find_package(rocm_smi REQUIRED)
+    if(ROCBLAS_ENABLE_AMD_SMI)
+        find_package(amd_smi CONFIG REQUIRED)
     endif()
 
     find_package(GTest REQUIRED)

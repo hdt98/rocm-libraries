@@ -33,7 +33,7 @@
 # ROCBLAS_ENABLE_MARKER     - Enable rocTracer marker support
 # ROCBLAS_ENABLE_BLIS       - Enable BLIS support
 # ROCBLAS_ENABLE_FORTRAN    - Build Fortran clients
-# ROCBLAS_ENABLE_ROCM_SMI   - Require rocm_smi
+# ROCBLAS_ENABLE_AMD_SMI    - Require amd_smi
 # ROCM_LIBS_SUPERBUILD      - Build as ROCm libraries superbuild, not standalone
 # CMAKE_VERBOSE_MAKEFILE    - Enable verbose Makefile output
 # ==============================================================================
