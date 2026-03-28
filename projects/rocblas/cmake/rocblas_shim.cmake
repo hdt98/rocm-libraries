@@ -24,6 +24,7 @@
 # BUILD_VERBOSE             → CMAKE_VERBOSE_MAKEFILE
 # SKIP_LIBRARY              → ROCBLAS_ENABLE_HOST (inverted: SKIP_LIBRARY=ON → ROCBLAS_ENABLE_HOST=OFF)
 # LINK_BLIS                 → ROCBLAS_ENABLE_BLIS
+# Tensile_TEST_LOCAL_PATH   → ROCBLAS_TENSILE_SUBDIR_PATH (TheRock legacy)
 #
 # Modern Options (no legacy equivalent):
 # --------------------------------------
@@ -119,6 +120,15 @@ endif()
 
 # Additional mappings with special handling
 shim_mapping(BUILD_VERBOSE CMAKE_VERBOSE_MAKEFILE "Enable verbose output from Makefile builds.")
+
+# Map Tensile_TEST_LOCAL_PATH → ROCBLAS_TENSILE_SUBDIR_PATH
+# TheRock passes this to specify a local Tensile source tree.
+if(DEFINED Tensile_TEST_LOCAL_PATH AND NOT DEFINED ROCBLAS_TENSILE_SUBDIR_PATH)
+    set(ROCBLAS_TENSILE_SUBDIR_PATH "${Tensile_TEST_LOCAL_PATH}" CACHE STRING "Path to Tensile subdirectory." FORCE)
+    _rocblas_deprecation_warning(Tensile_TEST_LOCAL_PATH ROCBLAS_TENSILE_SUBDIR_PATH)
+    list(APPEND _ROCBLAS_LEGACY_OPTIONS_USED "Tensile_TEST_LOCAL_PATH=${Tensile_TEST_LOCAL_PATH}")
+    list(APPEND _ROCBLAS_CURRENT_OPTIONS "ROCBLAS_TENSILE_SUBDIR_PATH=${ROCBLAS_TENSILE_SUBDIR_PATH}")
+endif()
 
 # Map SKIP_LIBRARY → ROCBLAS_ENABLE_HOST (inverted logic)
 if(DEFINED SKIP_LIBRARY)
