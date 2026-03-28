@@ -5,10 +5,10 @@
  * Update parameters and propagate tile information.
  */
 
+#include <rocRoller/AssemblyKernel.hpp>
 #include <rocRoller/Expression.hpp>
 #include <rocRoller/KernelGraph/CoordinateGraph/Dimension.hpp>
 #include <rocRoller/KernelGraph/Transforms/UpdateParameters.hpp>
-#include <rocRoller/KernelGraph/Visitors.hpp>
 
 namespace rocRoller
 {
@@ -245,18 +245,11 @@ namespace rocRoller
             }
 
             template <typename T>
-            Dimension visitDimension(int tag, T const& dim)
+            void operator()(int, T const&)
             {
-                return dim;
             }
 
-            template <typename T>
-            Operation visitOperation(int tag, T const& op)
-            {
-                return op;
-            }
-
-            Operation visitOperation(int tag, TensorContraction const& op)
+            void operator()(int tag, TensorContraction const& op)
             {
                 auto lhsTag = m_graph.mapper.get(tag, NaryArgument::LHS);
                 auto rhsTag = m_graph.mapper.get(tag, NaryArgument::RHS);
@@ -276,11 +269,9 @@ namespace rocRoller
                     ntile.layoutType   = LayoutType::MATRIX_ACCUMULATOR;
                     m_graph.coordinates.setElement(dstTag, ntile);
                 }
-
-                return op;
             }
 
-            Operation visitOperation(int tag, Assign const& op)
+            void operator()(int tag, Assign const& op)
             {
                 auto dst       = m_graph.mapper.get(tag, NaryArgument::DEST);
                 auto maybeTile = m_graph.coordinates.get<MacroTile>(dst);
@@ -300,55 +291,45 @@ namespace rocRoller
                         m_graph.coordinates.setElement(dst, ntile);
                     }
                 }
-
-                return op;
             }
-        };
-
-        struct UpdateParametersVisitor
-        {
-            UpdateParametersVisitor(CommandParametersPtr params)
-            {
-                m_newDimensions = params->getDimensionInfo();
-            }
-
-            template <typename T>
-            Dimension visitDimension(int tag, T const& dim)
-            {
-                if(m_newDimensions.count(dim.commandTag) > 0)
-                {
-                    if(name(m_newDimensions.at(dim.commandTag)) == name(dim))
-                    {
-                        auto newDim = m_newDimensions.at(dim.commandTag);
-                        setCommandTag(newDim, dim.commandTag);
-                        return newDim;
-                    }
-                }
-                return dim;
-            }
-
-            template <typename T>
-            Operation visitOperation(int tag, T const& op)
-            {
-                return op;
-            }
-
-        private:
-            std::map<Operations::OperationTag, Dimension> m_newDimensions;
         };
 
         KernelGraph UpdateParameters::apply(KernelGraph const& original)
         {
-            if(!m_params)
+            if(not m_params)
                 return original;
 
-            auto updateVisitor = UpdateParametersVisitor(m_params);
-            auto kgraph        = rewriteDimensions(original, updateVisitor);
+            auto kgraph        = original;
+            auto newDimensions = m_params->getDimensionInfo();
 
-            // This visitor modifies the coordinate graph while
-            // rewriteDimensions walks the control graph.
+            for(auto tag : kgraph.coordinates.getNodes())
+            {
+                auto node = kgraph.coordinates.getNode(tag);
+                std::visit(
+                    [&](auto& dim) {
+                        if(newDimensions.count(dim.commandTag) > 0)
+                        {
+                            auto const& candidate = newDimensions.at(dim.commandTag);
+                            if(std::visit([](auto const& d) { return d.name(); }, candidate)
+                               == dim.name())
+                            {
+                                auto newDim = newDimensions.at(dim.commandTag);
+                                setCommandTag(newDim, dim.commandTag);
+                                kgraph.coordinates.setElement(tag, newDim);
+                            }
+                        }
+                    },
+                    node);
+            }
+
+            // PropagateTileInfoVisitor mutates coordinate nodes in-place
+            // while walking the control graph.
             auto infoVisitor = PropagateTileInfoVisitor(kgraph);
-            rewriteDimensions(kgraph, infoVisitor);
+            for(auto tag : kgraph.control.getNodes())
+            {
+                auto node = kgraph.control.getNode(tag);
+                std::visit([&](auto& op) { infoVisitor(tag, op); }, node);
+            }
 
             return kgraph;
         }
