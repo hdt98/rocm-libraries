@@ -200,6 +200,25 @@ VARIANTS = [
         "warp_k": 16,
         "block_size": 256,
     },
+    # Split-K: partition K dimension across blockIdx.z
+    {
+        "name": "gemm_fp16_splitk",
+        "a_dtype": "fp16",
+        "b_dtype": "fp16",
+        "c_dtype": "fp16",
+        "acc_dtype": "fp32",
+        "k_batch": 4,
+        "block_m": 128,
+        "block_n": 128,
+        "block_k": 32,
+        "warps_m": 2,
+        "warps_n": 2,
+        "warps_k": 1,
+        "warp_m": 16,
+        "warp_n": 16,
+        "warp_k": 16,
+        "block_size": 256,
+    },
 ]
 ARCHITECTURES = ["gfx90a", "gfx942", "gfx950"]
 
@@ -291,6 +310,8 @@ def main() -> None:
                     meta["b_layout"] = v["b_layout"]
                 if "c_layout" in v:
                     meta["c_layout"] = v["c_layout"]
+                if "k_batch" in v:
+                    meta["k_batch"] = v["k_batch"]
                 variant_metadata[v["name"]] = meta
 
         toc = {

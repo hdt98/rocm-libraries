@@ -38,6 +38,7 @@ struct GemmAlgorithm {
     Dim3 block_tile;   // Elements per thread block {M, N, K}
     Dim3 block_warps;  // Warp distribution {M, N, K}
     Dim3 warp_tile;    // Elements per warp per MFMA step {M, N, K}
+    int k_batch = 1;   // Split-K factor (1 = no split)
 };
 ```
 
@@ -153,6 +154,7 @@ entries can override it for mixed-precision epilogues.
 | `gemm_fp16_rr` | FP16 (R) | FP16 (R) | FP16 (R) | FP32 | — | 128×128×32 | 16×16×16 | 256 |
 | `gemm_fp16_cr` | FP16 (C) | FP16 (R) | FP16 (R) | FP32 | — | 128×128×32 | 16×16×16 | 256 |
 | `gemm_fp16_cc` | FP16 (C) | FP16 (C) | FP16 (R) | FP32 | — | 128×128×32 | 16×16×16 | 256 |
+| `gemm_fp16_splitk` | FP16 | FP16 | FP16 | FP32 | — | 128×128×32 | 16×16×16 | 256 | k_batch=4 |
 
 All variants use 128×128×32 block tile with 2×2×1 warp layout (4 warps =
 256 threads). `gemm_fp16_w32` demonstrates a wider 32×32 warp tile.
@@ -160,6 +162,9 @@ All variants use 128×128×32 block tile with 2×2×1 warp layout (4 warps =
 demonstrates composed epilogue (bias + activation). Layout variants
 (`_rr`, `_cr`, `_cc`) override GemmOp's BLAS-convention defaults (A=Row,
 B=Col) via explicit `Tensor` entries — R = RowMajor, C = ColumnMajor.
+`gemm_fp16_splitk` demonstrates Split-K scheduling — the K dimension is
+partitioned across `k_batch` thread block groups (blockIdx.z), with partial
+results accumulated via atomic addition.
 
 ## File Roles
 
@@ -217,24 +222,26 @@ Expected output:
 ```
 Opened build/gemm.kpack — architectures: gfx90a, gfx942
 Detected GPU: gfx90a
-gemm_fp32: M=512, N=512, K=256, grid=16, block=256
+gemm_fp32: M=512, N=512, K=256, grid=16x1, block=256
 gemm_fp32: PASSED
-gemm_fp16: M=512, N=512, K=256, grid=16, block=256
+gemm_fp16: M=512, N=512, K=256, grid=16x1, block=256
 gemm_fp16: PASSED
-gemm_bf16: M=512, N=512, K=256, grid=16, block=256
+gemm_bf16: M=512, N=512, K=256, grid=16x1, block=256
 gemm_bf16: PASSED
-gemm_fp16_w32: M=512, N=512, K=256, grid=16, block=256
+gemm_fp16_w32: M=512, N=512, K=256, grid=16x1, block=256
 gemm_fp16_w32: PASSED
-gemm_fp16_add: M=512, N=512, K=256, grid=16, block=256
+gemm_fp16_add: M=512, N=512, K=256, grid=16x1, block=256
 gemm_fp16_add: PASSED
-gemm_fp16_add_relu: M=512, N=512, K=256, grid=16, block=256
+gemm_fp16_add_relu: M=512, N=512, K=256, grid=16x1, block=256
 gemm_fp16_add_relu: PASSED
-gemm_fp16_rr: M=512, N=512, K=256, grid=16, block=256
+gemm_fp16_rr: M=512, N=512, K=256, grid=16x1, block=256
 gemm_fp16_rr: PASSED
-gemm_fp16_cr: M=512, N=512, K=256, grid=16, block=256
+gemm_fp16_cr: M=512, N=512, K=256, grid=16x1, block=256
 gemm_fp16_cr: PASSED
-gemm_fp16_cc: M=512, N=512, K=256, grid=16, block=256
+gemm_fp16_cc: M=512, N=512, K=256, grid=16x1, block=256
 gemm_fp16_cc: PASSED
+gemm_fp16_splitk: M=512, N=512, K=256, grid=16x4, block=256
+gemm_fp16_splitk: PASSED
 ```
 
 ## Design Notes
@@ -255,6 +262,13 @@ across fp32, fp16, and bf16 (with appropriate warp tiles). Separating "what
 types" from "how to tile" lets each vary independently — different types can
 share tile configs, and the same type can use different tile configs
 (`gemm_fp16` vs `gemm_fp16_w32`).
+
+**Split-K via k_batch.** When `k_batch > 1`, the K dimension is partitioned
+across `blockIdx.z`. Each Z-slice computes a partial sum over `K/k_batch`
+elements, and results are accumulated via atomic addition. The output buffer
+must be pre-zeroed. CK Tile's `UniversalGemmKernel` handles this
+automatically — no code changes needed beyond setting the field and
+launching with `grid_z = k_batch`.
 
 **Consteval catches mistakes at compile time.** Invalid warp tile / dtype
 combinations (e.g., fp32 with 32×32×16 warp tile) and bad tile divisibility

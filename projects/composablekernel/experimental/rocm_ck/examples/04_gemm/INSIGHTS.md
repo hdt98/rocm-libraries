@@ -169,7 +169,17 @@ This was validated with 3 layout variants (R×R, C×R, C×C) alongside the exist
 
 > **Design principle**: Operator-implied defaults + explicit overrides handle the common case (BLAS convention) and the general case (arbitrary layouts) with one mechanism. No layout enum in `GemmAlgorithm` needed.
 
-## 13. Open Design Questions
+## 13. Split-K Is a One-Field Extension
+
+Adding Split-K scheduling required adding a single `int k_batch = 1` field to `GemmAlgorithm` and `GemmSpec`. CK Tile's `UniversalGemmKernel` already supports Split-K via `blockIdx.z` — when `k_batch > 1`, each Z-slice processes a K partition and partial results are accumulated via atomic addition.
+
+The host side sets `grid_z = spec.k_batch` in the launch call. The device side passes `S.k_batch` to CK Tile's `KernelArgs`. The output buffer must be pre-zeroed (already done per-variant). No epilogue changes needed — the atomic accumulation is handled inside the CK Tile epilogue.
+
+The default `k_batch = 1` preserves backward compatibility — all existing variants continue to work with no changes.
+
+> **Design principle**: When the underlying library already supports a feature, exposing it through the schema should be a single field with a backward-compatible default. Split-K demonstrates this: one field in the schema, two lines in the device bridge, one line in the host launcher.
+
+## 14. Open Design Questions
 
 1. **Runtime epilogue parameters** — `ScaleOp` with a float scale can't be a consteval field. Needs a different args-passing mechanism (scalar in args struct? separate buffer?).
 2. **Composed activations** — CK Tile doesn't have built-in Add+GELU composition. Current model requires custom functors for each combination.

@@ -91,6 +91,14 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{.block_tile  = {128, 128, 32},
                                .block_warps = {2, 2, 1},
                                .warp_tile   = {16, 16, 16}}),
+    // --- Split-K: partition K dimension across blockIdx.z ---
+    make_variant("gemm_fp16_splitk",
+                 Signature{.dtype = DataType::FP16,
+                           .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {16, 16, 16},
+                               .k_batch     = 4}),
 };
 // clang-format on
 

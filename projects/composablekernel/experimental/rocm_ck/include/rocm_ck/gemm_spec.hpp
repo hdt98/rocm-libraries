@@ -77,6 +77,7 @@ struct GemmAlgorithm
     Dim3 block_tile;  // Elements per thread block {M, N, K}
     Dim3 block_warps; // Warp distribution {M, N, K}
     Dim3 warp_tile;   // Elements per warp per MFMA step {M, N, K}
+    int k_batch = 1;  // Split-K factor: partitions K across blockIdx.z
 };
 
 // ============================================================================
@@ -106,6 +107,7 @@ struct GemmSpec
     Dim3 block_warps;
     Dim3 warp_tile;
     int thread_block_size;
+    int k_batch; // Split-K factor (1 = no split)
 
     // Epilogue: composable op chain applied after matmul
     int num_epilogue_ops;
@@ -319,6 +321,9 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
     if(algo.warp_tile.m <= 0 || algo.warp_tile.n <= 0 || algo.warp_tile.k <= 0)
         throw "warp_tile dimensions must be positive";
 
+    if(algo.k_batch <= 0)
+        throw "k_batch must be positive";
+
     if(algo.block_warps.k != 1)
         throw "block_warps.k must be 1 (CShuffleEpilogue constraint)";
 
@@ -355,6 +360,7 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
             algo.block_warps,
             algo.warp_tile,
             thread_block_size,
+            algo.k_batch,
             num_epi_ops,
             epi_ops};
 }

@@ -309,3 +309,57 @@ TEST(MakeSpec, ProducesBF16GemmWithCorrectDtype)
 
     EXPECT_EQ(dtype(k, "A"), DataType::BF16);
 }
+
+// ============================================================================
+// Split-K (k_batch)
+// ============================================================================
+
+TEST(MakeSpec, DefaultsKBatchToOne)
+{
+    constexpr auto k = make_spec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+
+    EXPECT_EQ(k.k_batch, 1);
+}
+
+TEST(MakeSpec, AcceptsExplicitKBatch)
+{
+    constexpr auto k = make_spec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{.block_tile  = {128, 128, 32},
+                      .block_warps = {2, 2, 1},
+                      .warp_tile   = {16, 16, 16},
+                      .k_batch     = 4});
+
+    EXPECT_EQ(k.k_batch, 4);
+}
+
+TEST(MakeSpec, KBatchPreservesOtherFields)
+{
+    constexpr auto k = make_spec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{.block_tile  = {128, 128, 32},
+                      .block_warps = {2, 2, 1},
+                      .warp_tile   = {16, 16, 16},
+                      .k_batch     = 4});
+
+    EXPECT_EQ(k.num_physical_tensors, 3);
+    EXPECT_EQ(k.thread_block_size, 256);
+    EXPECT_EQ(k.block_tile.k, 32);
+}
+
+TEST(MakeSpec, KBatchWorksWithEpilogueOps)
+{
+    constexpr auto k = make_spec(Signature{.dtype = DataType::FP16,
+                                           .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+                                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                                               .block_warps = {2, 2, 1},
+                                               .warp_tile   = {16, 16, 16},
+                                               .k_batch     = 2});
+
+    EXPECT_EQ(k.k_batch, 2);
+    EXPECT_EQ(k.num_epilogue_ops, 1);
+    EXPECT_TRUE(k.has_epilogue_op(EpilogueOp::Add));
+}
