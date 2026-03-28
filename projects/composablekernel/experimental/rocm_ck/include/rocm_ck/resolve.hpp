@@ -315,12 +315,22 @@ consteval ResolvedSignature resolve(Signature sig)
         return num++;
     };
 
-    // Set rank/layout only if currently unknown.
+    // Set rank/layout only if currently unknown. Error on conflicting values.
     auto set_if_unknown = [&](int idx, int rank, Layout layout) {
-        if(infos[idx].rank == 0 && rank != 0)
-            infos[idx].rank = rank;
-        if(infos[idx].layout == Layout::Auto && layout != Layout::Auto)
-            infos[idx].layout = layout;
+        if(rank != 0)
+        {
+            if(infos[idx].rank == 0)
+                infos[idx].rank = rank;
+            else if(infos[idx].rank != rank)
+                throw "conflicting rank for tensor: two operators imply different ranks";
+        }
+        if(layout != Layout::Auto)
+        {
+            if(infos[idx].layout == Layout::Auto)
+                infos[idx].layout = layout;
+            else if(infos[idx].layout != layout)
+                throw "conflicting layout for tensor: two operators imply different layouts";
+        }
     };
 
     // ================================================================

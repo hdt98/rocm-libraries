@@ -159,6 +159,35 @@ TEST(Resolve, ResolvesStandaloneAddWithoutImpliedRank)
 }
 
 // ============================================================================
+// Conflict detection — redundant identical sets are silent
+// ============================================================================
+
+TEST(Resolve, AllowsRedundantIdenticalLayoutFromTwoGemmOps)
+{
+    // GemmOp1 outputs "C" as Row. GemmOp2 uses "C" as lhs (also Row).
+    // Two ops set the same layout → no conflict.
+    constexpr auto r = resolve(Signature{.dtype = DataType::FP16,
+                                         .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                   GemmOp{.lhs = "C", .rhs = "D", .out = "E"}}});
+
+    EXPECT_EQ(r.tensor("C").layout, Layout::Row);
+    EXPECT_EQ(r.tensor("C").rank, 2);
+}
+
+TEST(Resolve, AllowsPropagationThroughAddWithConsistentLayout)
+{
+    // GemmOp sets C=Row. AddOp connects C to bias and D.
+    // Propagation sets bias and D to Row (matching C) → no conflict.
+    constexpr auto r = resolve(Signature{.dtype = DataType::FP16,
+                                         .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                   AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}});
+
+    EXPECT_EQ(r.tensor("C").layout, Layout::Row);
+    EXPECT_EQ(r.tensor("bias").layout, Layout::Row);
+    EXPECT_EQ(r.tensor("D").layout, Layout::Row);
+}
+
+// ============================================================================
 // FMHA pattern: two GemmOps + SoftmaxOp
 // ============================================================================
 
