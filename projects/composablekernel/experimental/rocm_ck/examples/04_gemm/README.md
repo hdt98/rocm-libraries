@@ -160,34 +160,34 @@ demonstrates composed epilogue (bias + activation).
 
 | File | Compiled by | Purpose |
 |------|-------------|---------|
-| `gemm_spec.hpp` | Both (shared header in `include/rocm_ck/`) | **Structural types** — `GemmSpec`, `GemmAlgorithm`, `Dim3`, `EpilogueOp`, `consteval` factories (`make_spec`, `is_valid_warp_gemm`). No runtime code. |
+| `gemm_spec.hpp` | Both (`include/rocm_ck/`) | **Structural types** — `GemmSpec`, `GemmAlgorithm`, `Dim3`, `EpilogueOp`, `consteval` factories (`make_spec`, `is_valid_warp_gemm`). No runtime code. |
 | `gemm_variants.hpp` | Both (g++ and hipcc) | **Variant registry** — constexpr table of all kernel configurations, `consteval gemm_variant_spec()` lookup. Single source of truth for device and host code. |
-| `gemm_dev.hpp` | Device only (shared header in `include/rocm_ck/`) | **CK Tile bridge** — `run<S>`, `CkTypeMap`, `CkLayoutMap`, `EpilogueTypes`, `ComposedCDEOp`. Guards with `#error` on host compilation. |
-| `gemm_*.hip` | Device only | Variant instantiations (~12 lines each) — include `gemm_variants.hpp` and `gemm_dev.hpp` |
-| `cpu_ref.{hpp,cpp}` | Host only | CPU reference GEMM for verification |
 | `main.cpp` | Host only | Host loader — iterates `gemm_variants[]`, launches each, verifies against CPU reference |
+| `gemm_*.hip` | Device only | Variant instantiations (~12 lines each) — include `gemm_variants.hpp` and `gemm_dev.hpp` |
+| `gemm_dev.hpp` | Device only (`include/rocm_ck/`) | **CK Tile bridge** — `run<S>`, `CkTypeMap`, `CkLayoutMap`, `EpilogueTypes`, `ComposedCDEOp`. Guards with `#error` on host compilation. |
+| `cpu_ref.{hpp,cpp}` | Host only | CPU reference GEMM for verification |
 | `pack.py` | — | Archive packer with per-variant dtype, epilogue, and tile metadata |
 | `CMakeLists.txt` | — | Build system (variant × arch nested loop) |
 
 ### Compilation Boundary
 
 ```text
-        include/rocm_ck/gemm_spec.hpp (shared structural types)
-                        |
-                        +-- include/rocm_ck/gemm_dev.hpp (shared device code)
-                        |
-               gemm_variants.hpp (example-local variant table)
-                       /            \
-             main.cpp                gemm_*.hip
+        <rocm_ck/gemm_spec.hpp>      (structural types)
+                    |
+           gemm_variants.hpp         (example variant table)
+                 /        \
+          main.cpp      gemm_*.hip
+           (host)           |
+                    <rocm_ck/gemm_dev.hpp>  (device bridge: run<S>)
 ```
 
-Shared headers in `include/rocm_ck/` define structural types and the CK Tile
-bridge. The example-local `gemm_variants.hpp` defines the variant table —
-included by both host and device code, ensuring specs are defined exactly once.
+`gemm_spec.hpp` defines structural types (`GemmSpec`, `GemmAlgorithm`).
+`gemm_variants.hpp` builds the variant table on top of those types — included
+by both host and device code, ensuring specs are defined exactly once.
 
 `.hip` files are compiled with `--cuda-device-only` and include both
 `gemm_variants.hpp` (for the spec) and `gemm_dev.hpp` (for `run<S>`).
-`main.cpp` includes `gemm_variants.hpp` to iterate variant metadata.
+`main.cpp` includes only `gemm_variants.hpp` to iterate variant metadata.
 
 ## Build
 
