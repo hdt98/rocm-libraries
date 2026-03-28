@@ -1401,12 +1401,21 @@ inline void print_dry_header(std::string_view algo_name,
     size_t      status_column_width = status_header.size();
 
     std::cout << std::setw(status_column_width) << std::left << status_header << "  "
-              << std::setw(specialization_column_width) << std::left << "Specialization" << "  "
-              << std::setw(index_column_width) << std::right
-              << ("Index/" + std::to_string(specialization_count)) << "\n";
+              << std::setw(specialization_column_width) << std::left << "Specialization";
 
-    size_t underline_width
-        = status_column_width + 2 + specialization_column_width + 2 + index_column_width;
+    if(specialization_count > 1)
+    {
+        std::cout << "  " << std::setw(index_column_width) << std::right
+                  << ("Index/" + std::to_string(specialization_count));
+    }
+    std::cout << "\n";
+
+    size_t underline_width = status_column_width + 2 + specialization_column_width;
+
+    if(specialization_count > 1)
+    {
+        underline_width += 2 + index_column_width;
+    }
 
     for(size_t i = 0; i < underline_width; ++i)
         std::cout << horizontal_bar;
@@ -1429,13 +1438,23 @@ inline void print_header(std::string_view          algo_name,
               << std::setw(noise_column_width) << std::left << "Noise" << "  "
               << std::setw(gpu_temp_column_width) << std::left << "GPU °C" << "  "
               << std::setw(bytes_per_sec_column_width) << std::left << "Bytes/sec" << "  "
-              << std::setw(specialization_column_width) << std::left << "Specialization" << "  "
-              << std::setw(index_column_width) << std::right
-              << ("Index/" + std::to_string(specialization_count)) << "\n";
+              << std::setw(specialization_column_width) << std::left << "Specialization";
+
+    if(specialization_count > 1)
+    {
+        std::cout << "  " << std::setw(index_column_width) << std::right
+                  << ("Index/" + std::to_string(specialization_count));
+    }
+    std::cout << "\n";
 
     size_t underline_width = status_column_width + 2 + noise_column_width + 2
                              + gpu_temp_column_width + 2 + bytes_per_sec_column_width + 2
-                             + specialization_column_width + 2 + index_column_width;
+                             + specialization_column_width;
+
+    if(specialization_count > 1)
+    {
+        underline_width += 2 + index_column_width;
+    }
 
     for(size_t i = 0; i < underline_width; ++i)
         std::cout << horizontal_bar;
@@ -1461,7 +1480,8 @@ inline void print_dry_progress(std::string_view specialization,
                                std::string_view algo_name,
                                size_t           specialization_index,
                                size_t           specialization_column_width,
-                               size_t           index_column_width)
+                               size_t           index_column_width,
+                               bool             print_index)
 {
     std::ostringstream line;
 
@@ -1471,7 +1491,11 @@ inline void print_dry_progress(std::string_view specialization,
     line << clearline << green << std::setw(status_column_width) << std::left << "Success" << reset;
 
     line << "  " << std::setw(specialization_column_width) << std::left << specialization;
-    line << "  " << std::setw(index_column_width) << std::right << specialization_index;
+
+    if(print_index)
+    {
+        line << "  " << std::setw(index_column_width) << std::right << specialization_index;
+    }
 
     std::cout << line.str() << "\n" << std::flush;
 }
@@ -1516,6 +1540,7 @@ inline void print_progress(uint64_t         iteration,
                            size_t           specialization_index,
                            size_t           specialization_column_width,
                            size_t           index_column_width,
+                           bool             print_index,
                            double           elapsed_host_secs,
                            double           noise_timeout_secs,
                            double           noise_tolerance_percent,
@@ -1604,14 +1629,17 @@ inline void print_progress(uint64_t         iteration,
     line << "  " << std::setw(specialization_column_width) << std::left << specialization;
 
     // Index.
-    if(status_msg.empty() && estimated_remaining_secs > 0.0)
+    if(print_index)
     {
-        line << "  " << std::setw(index_column_width) << std::right
-             << format_eta(estimated_remaining_secs);
-    }
-    else
-    {
-        line << "  " << std::setw(index_column_width) << std::right << specialization_index;
+        if(status_msg.empty() && estimated_remaining_secs > 0.0)
+        {
+            line << "  " << std::setw(index_column_width) << std::right
+                 << format_eta(estimated_remaining_secs);
+        }
+        else
+        {
+            line << "  " << std::setw(index_column_width) << std::right << specialization_index;
+        }
     }
 
     // Colorized status messages.
@@ -2107,6 +2135,7 @@ public:
           flags::FlagTag   flags,
           size_t           specialization_column_width,
           size_t           index_column_width,
+          bool             print_index,
           cache_thrasher&  cache,
           gpu_warmer&      warmer)
         : stream(stream)
@@ -2123,6 +2152,7 @@ public:
         , m_flags(flags)
         , m_specialization_column_width(specialization_column_width)
         , m_index_column_width(index_column_width)
+        , m_print_index(print_index)
         , m_cache(cache)
         , m_warmer(warmer)
     {}
@@ -2348,6 +2378,7 @@ private:
                                  m_specialization_index,
                                  m_specialization_column_width,
                                  m_index_column_width,
+                                 m_print_index,
                                  elapsed_host_secs,
                                  s.noise_timeout_secs,
                                  s.noise_tolerance_percent,
@@ -2611,7 +2642,9 @@ private:
     flags::FlagTag m_flags;
 
     size_t m_specialization_column_width;
+
     size_t m_index_column_width;
+    bool   m_print_index;
 
     cache_thrasher& m_cache;
     gpu_warmer&     m_warmer;
@@ -3248,6 +3281,8 @@ public:
                                         std::string("Index/").size()
                                             + std::to_string(specializations.size()).size());
 
+        m_print_index = specializations.size() > 1;
+
         print_header(algorithm);
 
         run_all_specializations();
@@ -3580,6 +3615,7 @@ private:
                      m_flags,
                      m_specialization_column_width,
                      m_index_column_width,
+                     m_print_index,
                      m_cache,
                      m_warmer);
     }
@@ -3610,7 +3646,8 @@ private:
                                              algo,
                                              specialization_index,
                                              m_specialization_column_width,
-                                             m_index_column_width);
+                                             m_index_column_width,
+                                             m_print_index);
 
         get_logger().output_specialization(specialization_index,
                                            name,
@@ -3659,9 +3696,11 @@ private:
         m_stream_blocker; ///< Stream blocker to serialize output.
 
     size_t m_specialization_column_width; ///< Column width for specialization names.
-    size_t m_index_column_width; ///< Column width for specialization index.
 
-    detail::cache_thrasher m_cache = detail::cache_thrasher(); ///< Cache clearing utility.
+    size_t m_index_column_width; ///< Column width for specialization index.
+    bool   m_print_index; ///< Whether to print the index column.
+
+    detail::cache_thrasher m_cache; ///< Cache clearing utility.
 
     /// GPU warm-up utility.
     detail::gpu_warmer m_warmer = detail::gpu_warmer(m_settings, get_monitor());
