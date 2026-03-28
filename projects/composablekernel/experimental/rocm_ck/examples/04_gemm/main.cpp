@@ -12,7 +12,7 @@
 //   - Per-type tolerance for correctness verification
 
 #include "cpu_ref.hpp"
-#include "gemm_api.hpp"
+#include "gemm_variants.hpp"
 
 #include <rocm_ck/args.hpp>
 #include <rocm_ck/datatype_convert.hpp>
@@ -28,71 +28,6 @@
 #include <cstdlib>
 #include <memory>
 #include <vector>
-
-using rocm_ck::AddOp;
-using rocm_ck::DataType;
-using rocm_ck::GemmAlgorithm;
-using rocm_ck::GemmOp;
-using rocm_ck::GemmSpec;
-using rocm_ck::make_spec;
-using rocm_ck::ReluOp;
-using rocm_ck::Signature;
-
-// ============================================================================
-// Variant table — compile-time resolved via Signature + GemmAlgorithm
-// ============================================================================
-
-struct GemmVariant
-{
-    const char* name;
-    GemmSpec spec;
-};
-
-/// Build a GemmVariant from Signature + Algorithm.
-consteval GemmVariant make_variant(const char* name, Signature sig, GemmAlgorithm algo)
-{
-    return {name, make_spec(sig, algo)};
-}
-
-// clang-format off
-static constexpr GemmVariant ALL_GEMM_VARIANTS[] = {
-    make_variant("gemm_fp32",
-                 Signature{.dtype = DataType::FP32, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-                 GemmAlgorithm{.block_tile  = {128, 128, 32},
-                               .block_warps = {2, 2, 1},
-                               .warp_tile   = {16, 16, 16}}),
-    make_variant("gemm_fp16",
-                 Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-                 GemmAlgorithm{.block_tile  = {128, 128, 32},
-                               .block_warps = {2, 2, 1},
-                               .warp_tile   = {16, 16, 16}}),
-    make_variant("gemm_bf16",
-                 Signature{.dtype = DataType::BF16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-                 GemmAlgorithm{.block_tile  = {128, 128, 32},
-                               .block_warps = {2, 2, 1},
-                               .warp_tile   = {16, 16, 16}}),
-    make_variant("gemm_fp16_w32",
-                 Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-                 GemmAlgorithm{.block_tile  = {128, 128, 32},
-                               .block_warps = {2, 2, 1},
-                               .warp_tile   = {32, 32, 16}}),
-    make_variant("gemm_fp16_add",
-                 Signature{.dtype = DataType::FP16,
-                           .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                   AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
-                 GemmAlgorithm{.block_tile  = {128, 128, 32},
-                               .block_warps = {2, 2, 1},
-                               .warp_tile   = {16, 16, 16}}),
-    make_variant("gemm_fp16_add_relu",
-                 Signature{.dtype = DataType::FP16,
-                           .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                   AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
-                                   ReluOp{.in = "D", .out = "E"}}},
-                 GemmAlgorithm{.block_tile  = {128, 128, 32},
-                               .block_warps = {2, 2, 1},
-                               .warp_tile   = {16, 16, 16}}),
-};
-// clang-format on
 
 // ============================================================================
 // Main
@@ -149,9 +84,9 @@ int main(int argc, char** argv)
     bool all_passed  = true;
     int variants_run = 0;
 
-    for(const GemmVariant& variant : ALL_GEMM_VARIANTS)
+    for(const rocm_ck::GemmVariant& variant : rocm_ck::gemm_variants)
     {
-        const GemmSpec& spec = variant.spec;
+        const rocm_ck::GemmSpec& spec = variant.spec;
 
         // Per-variant grid dimensions from tile geometry
         int grid_m    = (M + spec.block_tile.m - 1) / spec.block_tile.m;

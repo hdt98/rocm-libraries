@@ -1,26 +1,28 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// Variant registry for programmatic kernel selection.
-// Host-only header — no CK Tile dependency.
+// Canonical vector-add variant table — single source of truth for all kernel specs.
+// Shared between device (.hip) and host (main.cpp) compilation.
+//
+// Device code uses vector_add_variant_spec("name") to look up a spec by name at
+// compile time. Host code iterates vector_add_variants[] for registry/dispatch.
 
 #pragma once
 
-#include "rocm_vector_add_api.hpp"
+#include <rocm_ck/elementwise_spec.hpp>
+
+#include <string_view>
 
 namespace rocm_ck {
 
-/// Descriptor for a compiled kernel variant in the kpack archive.
 struct ElementwiseVariant
 {
     const char* name;
     ElementwiseSpec spec;
 };
 
-/// Complete table of all compiled variants, matching the kpack archive contents.
-/// Each entry corresponds to a .hip file and its make_spec configuration.
 // clang-format off
-static constexpr ElementwiseVariant ALL_VARIANTS[] = {
+inline constexpr ElementwiseVariant vector_add_variants[] = {
     {"vector_add_fp32_b256", make_spec(
          Signature{.dtype = DataType::FP32, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
          ElementwiseAlgorithm{256, 1, 256, true})},
@@ -67,7 +69,17 @@ static constexpr ElementwiseVariant ALL_VARIANTS[] = {
 };
 // clang-format on
 
-static constexpr int ALL_VARIANTS_COUNT = sizeof(ALL_VARIANTS) / sizeof(ALL_VARIANTS[0]);
+inline constexpr int vector_add_variant_count =
+    sizeof(vector_add_variants) / sizeof(vector_add_variants[0]);
+
+/// Compile-time variant lookup by name. Typos cause compile errors.
+consteval ElementwiseSpec vector_add_variant_spec(const char* name)
+{
+    for(const auto& v : vector_add_variants)
+        if(std::string_view(v.name) == name)
+            return v.spec;
+    throw "unknown vector-add variant name";
+}
 
 /// Find the best variant for the given data types and problem size.
 /// Prefers the largest block_tile that divides problem_size cleanly (aligned).
@@ -79,22 +91,22 @@ findVariant(DataType in_dtype, DataType out_dtype, int problem_size)
     const ElementwiseVariant* best_aligned = nullptr;
     const ElementwiseVariant* best_padded  = nullptr;
 
-    for(int i = 0; i < ALL_VARIANTS_COUNT; ++i)
+    for(int i = 0; i < vector_add_variant_count; ++i)
     {
-        const auto& v = ALL_VARIANTS[i];
+        const auto& v = vector_add_variants[i];
         if(v.spec.lhs().dtype != in_dtype || v.spec.output().dtype != out_dtype)
             continue;
 
         if(isAligned(v.spec, problem_size))
         {
             if(!best_aligned || v.spec.block_tile > best_aligned->spec.block_tile)
-                best_aligned = &ALL_VARIANTS[i];
+                best_aligned = &vector_add_variants[i];
         }
 
         if(v.spec.pad)
         {
             if(!best_padded || v.spec.block_tile > best_padded->spec.block_tile)
-                best_padded = &ALL_VARIANTS[i];
+                best_padded = &vector_add_variants[i];
         }
     }
 
