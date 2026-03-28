@@ -177,4 +177,84 @@ namespace AliasDataFlowTagsTest
             }
         }
     }
+
+    TEST_CASE("AliasDataFlowTags infers datatype from Assign.", "[kernel-graph][graph-transforms]")
+    {
+        using namespace rocRoller::KernelGraph;
+        using namespace rocRoller::KernelGraph::CoordinateGraph;
+        using namespace rocRoller::KernelGraph::ControlGraph;
+        using namespace rocRoller::KernelGraph::AliasDataFlowTagsDetail;
+
+        enum class DataTypeSource
+        {
+            AssignVariableType,
+            ExpressionResultType,
+        };
+
+        struct TestGraph
+        {
+            rocRoller::KernelGraph::KernelGraph kgraph;
+            int                                 macroTile = -1;
+            int                                 writeOp   = -1;
+        };
+
+        constexpr int tileM            = 4;
+        constexpr int tileN            = 4;
+        constexpr int tileElementCount = tileM * tileN;
+
+        auto buildGraph = [&](DataTypeSource source) -> TestGraph {
+            TestGraph testGraph;
+            auto&     kgraph = testGraph.kgraph;
+
+            testGraph.macroTile = kgraph.coordinates.addElement(
+                MacroTile({tileM, tileN}, LayoutType::MATRIX_A, {1, 1}, MemoryType::WAVE));
+            auto kernel = kgraph.control.addElement(Kernel());
+            if(source == DataTypeSource::AssignVariableType)
+            {
+                // The extent's data type will come from the assign's variableType
+                testGraph.writeOp
+                    = kgraph.control.addElement(Assign{Register::Type::Vector,
+                                                       rocRoller::Expression::literal(1u),
+                                                       1,
+                                                       VariableType{DataType::Float}});
+            }
+            else
+            {
+                // The extent's data type will come from the assign's resultVariableType
+                testGraph.writeOp = kgraph.control.addElement(
+                    Assign{Register::Type::Vector, rocRoller::Expression::literal(1.0f)});
+            }
+
+            kgraph.control.addElement(Body(), {kernel}, {testGraph.writeOp});
+            // Connect the Assign destination to the MacroTile so the tracer records
+            // a WRITE for this coordinate.
+            kgraph.mapper.connect(testGraph.writeOp, testGraph.macroTile, NaryArgument::DEST);
+            return testGraph;
+        };
+
+        auto verify = [&](TestGraph const& testGraph) {
+            auto const& kgraph         = testGraph.kgraph;
+            auto        groupedExtents = getGroupedTagExtents(kgraph);
+
+            // The extent's data type will be found and included in groupedExtent
+            auto expectedKey = std::make_tuple(
+                MemoryType::WAVE, LayoutType::MATRIX_A, DataType::Float, tileElementCount);
+            REQUIRE(groupedExtents.size() == 1);
+            REQUIRE(groupedExtents.contains(expectedKey));
+        };
+
+        SECTION("datatype from Assign::variableType")
+        {
+            auto testGraph = buildGraph(DataTypeSource::AssignVariableType);
+            auto assign    = testGraph.kgraph.control.getNode<Assign>(testGraph.writeOp);
+            verify(testGraph);
+        }
+
+        SECTION("datatype from Assign expression result")
+        {
+            auto testGraph = buildGraph(DataTypeSource::ExpressionResultType);
+            auto assign    = testGraph.kgraph.control.getNode<Assign>(testGraph.writeOp);
+            verify(testGraph);
+        }
+    }
 }
