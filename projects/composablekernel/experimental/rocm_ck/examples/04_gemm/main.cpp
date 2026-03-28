@@ -10,6 +10,7 @@
 //   - Multi-variant iteration with per-variant grid launch parameters
 //   - Epilogue composition via operator chaining (e.g., GemmOp + AddOp + ReluOp)
 //   - Per-tensor layout support (Row, Col) via explicit Tensor entries
+//   - Split-K scheduling (k_batch > 1) with atomic accumulation
 //   - Per-type tolerance for correctness verification
 
 #include "cpu_ref.hpp"
@@ -98,6 +99,7 @@ int main(int argc, char** argv)
         int grid_m    = (M + spec.block_tile.m - 1) / spec.block_tile.m;
         int grid_n    = (N + spec.block_tile.n - 1) / spec.block_tile.n;
         int grid_size = grid_m * grid_n;
+        int grid_z    = spec.k_batch; // Split-K: k_batch partitions along blockIdx.z
 
         // Load kernel
         rocm_ck::KpackKernel kernel;
@@ -159,12 +161,13 @@ int main(int argc, char** argv)
             buf_d0->upload(ref_d0.data());
         }
 
-        std::printf("%s: M=%d, N=%d, K=%d, grid=%d, block=%d\n",
+        std::printf("%s: M=%d, N=%d, K=%d, grid=%dx%d, block=%d\n",
                     variant.name,
                     M,
                     N,
                     K,
                     grid_size,
+                    grid_z,
                     spec.thread_block_size);
 
         // Build generic Args — layout-aware strides from physical tensor table
@@ -195,7 +198,7 @@ int main(int argc, char** argv)
         HIP_CHECK(hipModuleLaunchKernel(kernel.function(),
                                         grid_size,
                                         1,
-                                        1,
+                                        grid_z,
                                         spec.thread_block_size,
                                         1,
                                         1,

@@ -262,7 +262,7 @@ __device__ void run(Args args)
                                {stride_B},                 // stride_Bs
                                {},                         // stride_Ds (empty)
                                stride_C,                   // stride_E
-                               1};                         // k_batch (no split-K)
+                               S.k_batch};                 // k_batch (split-K factor)
         CkKernel{}(kargs);
     }
     else if constexpr(NumDTensors == 1)
@@ -283,7 +283,7 @@ __device__ void run(Args args)
                                {stride_B},                 // stride_Bs
                                {stride_D0},                // stride_Ds (1 stride)
                                stride_C,                   // stride_E
-                               1};                         // k_batch (no split-K)
+                               S.k_batch};                 // k_batch (split-K factor)
         CkKernel{}(kargs);
     }
 }
