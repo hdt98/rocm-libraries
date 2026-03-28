@@ -107,6 +107,7 @@
 #include "common/lapack/testing_sygvx_hegvx.hpp"
 #include "common/lapack/testing_sytf2_sytrf.hpp"
 #include "common/lapack/testing_sytrs.hpp"
+#include "common/lapack/testing_sytrs2.hpp"
 #include "common/lapack/testing_sytxx_hetxx.hpp"
 #include "common/lapack/testing_trtri.hpp"
 
@@ -262,6 +263,13 @@ class rocsolver_dispatcher
             {"sytrs_64", testing_sytrs<false, false, T, int64_t>},
             {"sytrs_batched_64", testing_sytrs<true, true, T, int64_t>},
             {"sytrs_strided_batched_64", testing_sytrs<false, true, T, int64_t>},
+            // sytrs2
+            {"sytrs2", testing_sytrs2<false, false, T, rocblas_int>},
+            {"sytrs2_batched", testing_sytrs2<true, true, T, rocblas_int>},
+            {"sytrs2_strided_batched", testing_sytrs2<false, true, T, rocblas_int>},
+            {"sytrs2_64", testing_sytrs2<false, false, T, int64_t>},
+            {"sytrs2_batched_64", testing_sytrs2<true, true, T, int64_t>},
+            {"sytrs2_strided_batched_64", testing_sytrs2<false, true, T, int64_t>},
             // gesv
             {"gesv", testing_gesv<false, false, T>},
             {"gesv_batched", testing_gesv<true, true, T>},
