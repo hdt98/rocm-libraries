@@ -3,15 +3,11 @@
 //
 // Expected compilation failure cases for rocm_ck schema types.
 //
-// These are NOT tests — they are documentation of cases that SHOULD fail to
-// compile. Each case is commented out because uncommenting it must produce a
-// compile error (consteval throw).
+// These cases are documented here for reference. Each is also tested as an
+// actual compile-error test in compile_fail/*.cpp — verified via CMake
+// WILL_FAIL (ctest -R compile_fail).
 //
-// When we implement compile-error testing infrastructure (e.g., CMake
-// try_compile with expected failure), these cases should be converted to
-// proper negative tests.
-//
-// See tests/README.md for the testing strategy and known gaps.
+// See tests/README.md for the testing strategy.
 
 #include <rocm_ck/gemm_spec.hpp>
 
