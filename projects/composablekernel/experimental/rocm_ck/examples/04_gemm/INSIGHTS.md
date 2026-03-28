@@ -152,7 +152,24 @@ CK Tile's `CShuffleEpilogue` is the universal epilogue for GEMM:
 - **Scalar parameters**: Elementwise uses `scalars[0]`/`scalars[1]` for `alpha`/`beta`. GEMM's D-tensor fusion is data-driven (D tensor passed as a pointer in `tensors[3]`). Both fit in the generic Args — different slot types for different use cases.
 - **Grid calculation**: Elementwise uses `ceil(N / block_tile)`; GEMM uses `ceil(M/M_tile) × ceil(N/N_tile)` flattened to 1D via `GemmTile1DPartitioner`. More complex but CK Tile handles it.
 
-## 12. Open Design Questions
+## 12. Per-Tensor Layouts Need No Schema Changes
+
+The Signature already supports per-tensor layout overrides via explicit `Tensor` entries. `GemmOp` provides BLAS convention defaults (lhs→Row, rhs→Col, out→Row), but any tensor can be overridden:
+
+```cpp
+// A=Row (default), B=Row (override Col default) → R×R layout
+Signature{.dtype = DataType::FP16,
+          .tensors = {Tensor{.name = "B", .layout = Layout::Row}},
+          .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}}
+```
+
+The mechanism is `resolve()` Phase 3: explicit `Tensor` entries override operator-implied defaults. `gemm_dev.hpp` already maps both `Layout::Row` and `Layout::Col` via `CkLayoutMap`, and stride extraction handles both with `PT.layout == Layout::Row ? strides[0] : strides[1]`.
+
+This was validated with 3 layout variants (R×R, C×R, C×C) alongside the existing R×C default. All compile and pass correctness tests. **No schema changes were needed** — the existing override mechanism handles arbitrary layout combinations.
+
+> **Design principle**: Operator-implied defaults + explicit overrides handle the common case (BLAS convention) and the general case (arbitrary layouts) with one mechanism. No layout enum in `GemmAlgorithm` needed.
+
+## 13. Open Design Questions
 
 1. **Runtime epilogue parameters** — `ScaleOp` with a float scale can't be a consteval field. Needs a different args-passing mechanism (scalar in args struct? separate buffer?).
 2. **Composed activations** — CK Tile doesn't have built-in Add+GELU composition. Current model requires custom functors for each combination.

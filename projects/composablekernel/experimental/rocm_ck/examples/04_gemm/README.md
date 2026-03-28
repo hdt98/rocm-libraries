@@ -150,11 +150,16 @@ entries can override it for mixed-precision epilogues.
 | `gemm_fp16_w32` | FP16 | FP16 | FP16 | FP32 | — | 128×128×32 | 32×32×16 | 256 |
 | `gemm_fp16_add` | FP16 | FP16 | FP16 | FP32 | `+bias` | 128×128×32 | 16×16×16 | 256 |
 | `gemm_fp16_add_relu` | FP16 | FP16 | FP16 | FP32 | `+bias+relu` | 128×128×32 | 16×16×16 | 256 |
+| `gemm_fp16_rr` | FP16 (R) | FP16 (R) | FP16 (R) | FP32 | — | 128×128×32 | 16×16×16 | 256 |
+| `gemm_fp16_cr` | FP16 (C) | FP16 (R) | FP16 (R) | FP32 | — | 128×128×32 | 16×16×16 | 256 |
+| `gemm_fp16_cc` | FP16 (C) | FP16 (C) | FP16 (R) | FP32 | — | 128×128×32 | 16×16×16 | 256 |
 
 All variants use 128×128×32 block tile with 2×2×1 warp layout (4 warps =
 256 threads). `gemm_fp16_w32` demonstrates a wider 32×32 warp tile.
 `gemm_fp16_add` demonstrates fused bias addition. `gemm_fp16_add_relu`
-demonstrates composed epilogue (bias + activation).
+demonstrates composed epilogue (bias + activation). Layout variants
+(`_rr`, `_cr`, `_cc`) override GemmOp's BLAS-convention defaults (A=Row,
+B=Col) via explicit `Tensor` entries — R = RowMajor, C = ColumnMajor.
 
 ## File Roles
 
@@ -224,6 +229,12 @@ gemm_fp16_add: M=512, N=512, K=256, grid=16, block=256
 gemm_fp16_add: PASSED
 gemm_fp16_add_relu: M=512, N=512, K=256, grid=16, block=256
 gemm_fp16_add_relu: PASSED
+gemm_fp16_rr: M=512, N=512, K=256, grid=16, block=256
+gemm_fp16_rr: PASSED
+gemm_fp16_cr: M=512, N=512, K=256, grid=16, block=256
+gemm_fp16_cr: PASSED
+gemm_fp16_cc: M=512, N=512, K=256, grid=16, block=256
+gemm_fp16_cc: PASSED
 ```
 
 ## Design Notes
@@ -233,9 +244,11 @@ use the same `Signature` type. The operation is determined by the `ops`
 array — `GemmOp` for GEMM, `AddOp` for elementwise. Epilogues are expressed
 as additional operators in the graph rather than enum flags.
 
-**Layouts are non-optional.** Unlike data types (where defaults reduce
-boilerplate), layouts have universally sensible BLAS defaults: A=Row, B=Col,
-C=Row. Making them optional would add complexity without reducing verbosity.
+**Layouts default to BLAS convention, with per-tensor overrides.** `GemmOp`
+implies A=Row, B=Col, C=Row (standard BLAS convention). Explicit `Tensor`
+entries override individual tensors: `Tensor{.name = "B", .layout = Layout::Row}`
+switches B to RowMajor. No schema changes needed — the same resolve() override
+mechanism used for dtypes handles layouts.
 
 **Signature and Algorithm are independent.** The same tile geometry works
 across fp32, fp16, and bf16 (with appropriate warp tiles). Separating "what

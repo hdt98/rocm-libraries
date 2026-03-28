@@ -1,14 +1,15 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// Host-side loader for the kpack GEMM example. Loads fp32, fp16, bf16,
-// fp16_w32, fp16_add, and fp16_add_relu GEMM kernels from a kpack archive,
-// runs each on the detected GPU, and verifies against CPU reference.
+// Host-side loader for the kpack GEMM example. Loads GEMM kernel variants
+// from a kpack archive, runs each on the detected GPU, and verifies against
+// CPU reference.
 //
 // This example demonstrates:
 //   - Operator-centric Signature schema with GemmOp, AddOp, ReluOp
 //   - Multi-variant iteration with per-variant grid launch parameters
 //   - Epilogue composition via operator chaining (e.g., GemmOp + AddOp + ReluOp)
+//   - Per-tensor layout support (Row, Col) via explicit Tensor entries
 //   - Per-type tolerance for correctness verification
 
 #include "cpu_ref.hpp"
@@ -27,7 +28,23 @@
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
+#include <utility>
 #include <vector>
+
+// ============================================================================
+// Layout-aware stride helpers
+// ============================================================================
+
+/// Returns {row_stride, col_stride} for a matrix of size rows × cols.
+///   RowMajor: row_stride = cols, col_stride = 1
+///   ColMajor: row_stride = 1,    col_stride = rows
+std::pair<int, int> layout_strides(rocm_ck::Layout ly, int rows, int cols)
+{
+    if(ly == rocm_ck::Layout::Row)
+        return {cols, 1};
+    else
+        return {1, rows};
+}
 
 // ============================================================================
 // Main
@@ -51,17 +68,12 @@ int main(int argc, char** argv)
     constexpr int N = 512;
     constexpr int K = 256;
 
-    constexpr int stride_A = K; // A [M x K] RowMajor
-    constexpr int stride_B = K; // B [K x N] ColumnMajor
-    constexpr int stride_C = N; // C [M x N] RowMajor
-
-    // --- CPU reference (fp32, runs once) ---
+    // --- Input data (fp32, initialized once) ---
     // Values kept small (0-7) so all types are exact. Worst case accumulation:
     // 256 × (7 × 7) = 12544, within fp16 exact range.
     // D0 values are small (0-3) — worst case fused result: 12544 + 3 = 12547.
     std::vector<float> ref_a(M * K);
     std::vector<float> ref_b(K * N);
-    std::vector<float> ref_c(M * N, 0.0f);
     std::vector<float> ref_d0(M * N);
 
     for(int i = 0; i < M * K; ++i)
@@ -71,18 +83,12 @@ int main(int argc, char** argv)
     for(int i = 0; i < M * N; ++i)
         ref_d0[i] = static_cast<float>(i % 4);
 
-    cpu_gemm(ref_a.data(), ref_b.data(), ref_c.data(), M, N, K, stride_A, stride_B, stride_C);
-
-    // Fused references
-    std::vector<float> ref_add(M * N);
-    cpu_gemm_add(ref_add.data(), ref_c.data(), ref_d0.data(), M * N);
-
-    std::vector<float> ref_add_relu(M * N);
-    cpu_gemm_add_relu(ref_add_relu.data(), ref_c.data(), ref_d0.data(), M * N);
-
     // --- Run each variant ---
     bool all_passed  = true;
     int variants_run = 0;
+
+    // Per-variant CPU reference buffers (reused across iterations)
+    std::vector<float> ref_c(M * N, 0.0f);
 
     for(const rocm_ck::GemmVariant& variant : rocm_ck::gemm_variants)
     {
@@ -97,6 +103,42 @@ int main(int argc, char** argv)
         rocm_ck::KpackKernel kernel;
         if(!kernel.load(archive, variant.name))
             continue;
+
+        // --- Layout-aware strides from physical tensor table ---
+        auto [a_stride_m, a_stride_k] = layout_strides(spec.lhs().layout, M, K);
+        auto [b_stride_k, b_stride_n] = layout_strides(spec.rhs().layout, K, N);
+        auto [c_stride_m, c_stride_n] = layout_strides(spec.output().layout, M, N);
+
+        // --- Per-variant CPU reference (layout-dependent strides) ---
+        cpu_gemm(ref_a.data(),
+                 ref_b.data(),
+                 ref_c.data(),
+                 M,
+                 N,
+                 K,
+                 a_stride_m,
+                 a_stride_k,
+                 b_stride_k,
+                 b_stride_n,
+                 c_stride_m,
+                 c_stride_n);
+
+        // Fused epilogue references (element-wise on flat buffer — correct for RowMajor output)
+        const float* ref = ref_c.data();
+        std::vector<float> ref_fused;
+        if(spec.has_epilogue_op(rocm_ck::EpilogueOp::Add) &&
+           spec.has_epilogue_op(rocm_ck::EpilogueOp::Relu))
+        {
+            ref_fused.resize(M * N);
+            cpu_gemm_add_relu(ref_fused.data(), ref_c.data(), ref_d0.data(), M * N);
+            ref = ref_fused.data();
+        }
+        else if(spec.has_epilogue_op(rocm_ck::EpilogueOp::Add))
+        {
+            ref_fused.resize(M * N);
+            cpu_gemm_add(ref_fused.data(), ref_c.data(), ref_d0.data(), M * N);
+            ref = ref_fused.data();
+        }
 
         // Allocate typed device buffers from physical tensor table
         rocm_ck::TypedBuffer buf_a(spec.lhs().dtype, M * K);
@@ -125,23 +167,21 @@ int main(int argc, char** argv)
                     grid_size,
                     spec.thread_block_size);
 
-        // Build generic Args — slot indices from role-based accessors
+        // Build generic Args — layout-aware strides from physical tensor table
         rocm_ck::Args kernel_args{};
-        // lhs [M x K] RowMajor
         kernel_args.tensors[spec.lhs().args_slot] = {
-            buf_a.ptr(), rocm_ck::make_shape(M, K), rocm_ck::make_strides(stride_A, 1)};
-        // rhs [K x N] ColumnMajor
+            buf_a.ptr(), rocm_ck::make_shape(M, K), rocm_ck::make_strides(a_stride_m, a_stride_k)};
         kernel_args.tensors[spec.rhs().args_slot] = {
-            buf_b.ptr(), rocm_ck::make_shape(K, N), rocm_ck::make_strides(1, stride_B)};
-        // Output [M x N] RowMajor
+            buf_b.ptr(), rocm_ck::make_shape(K, N), rocm_ck::make_strides(b_stride_k, b_stride_n)};
         kernel_args.tensors[spec.output().args_slot] = {
-            buf_c.ptr(), rocm_ck::make_shape(M, N), rocm_ck::make_strides(stride_C, 1)};
-        // D0 [M x N] RowMajor (optional, for fused epilogue)
+            buf_c.ptr(), rocm_ck::make_shape(M, N), rocm_ck::make_strides(c_stride_m, c_stride_n)};
         if(has_d0)
         {
-            constexpr int stride_D0                  = N;
+            auto [d0_stride_m, d0_stride_n]          = layout_strides(spec.d0().layout, M, N);
             kernel_args.tensors[spec.d0().args_slot] = {
-                buf_d0->ptr(), rocm_ck::make_shape(M, N), rocm_ck::make_strides(stride_D0, 1)};
+                buf_d0->ptr(),
+                rocm_ck::make_shape(M, N),
+                rocm_ck::make_strides(d0_stride_m, d0_stride_n)};
         }
 
         void* args_ptr          = &kernel_args;
@@ -168,15 +208,6 @@ int main(int argc, char** argv)
         // Download and verify
         std::vector<float> result(M * N);
         buf_c.download(result.data());
-
-        // Select correct reference based on epilogue op chain.
-        // Priority: GEMM+Add+ReLU > GEMM+Add > plain GEMM
-        const float* ref = ref_c.data();
-        if(spec.has_epilogue_op(rocm_ck::EpilogueOp::Add) &&
-           spec.has_epilogue_op(rocm_ck::EpilogueOp::Relu))
-            ref = ref_add_relu.data();
-        else if(spec.has_epilogue_op(rocm_ck::EpilogueOp::Add))
-            ref = ref_add.data();
 
         float tolerance = rocm_ck::tolerance_for(spec.output().dtype);
         bool passed     = true;

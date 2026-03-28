@@ -9,20 +9,23 @@ void cpu_gemm(const float* a,
               int M,
               int N,
               int K,
-              int stride_A,
-              int stride_B,
-              int stride_C)
+              int a_stride_m,
+              int a_stride_k,
+              int b_stride_k,
+              int b_stride_n,
+              int c_stride_m,
+              int c_stride_n)
 {
-    for(int i = 0; i < M; ++i)
+    for(int m = 0; m < M; ++m)
     {
-        for(int j = 0; j < N; ++j)
+        for(int n = 0; n < N; ++n)
         {
             float sum = 0.0f;
-            for(int k_idx = 0; k_idx < K; ++k_idx)
+            for(int k = 0; k < K; ++k)
             {
-                sum += a[i * stride_A + k_idx] * b[j * stride_B + k_idx];
+                sum += a[m * a_stride_m + k * a_stride_k] * b[k * b_stride_k + n * b_stride_n];
             }
-            c[i * stride_C + j] = sum;
+            c[m * c_stride_m + n * c_stride_n] = sum;
         }
     }
 }
