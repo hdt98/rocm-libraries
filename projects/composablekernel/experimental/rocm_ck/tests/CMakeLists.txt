@@ -45,6 +45,7 @@ set(ROCM_CK_HOST_TESTS
     test_gemm_spec.cpp
     test_args.cpp
     test_physical_tensor.cpp
+    test_schema_compatibility.cpp
 )
 
 # Convenience target: `ninja rocm_ck_tests` builds all host tests
@@ -67,3 +68,9 @@ foreach(test_source ${ROCM_CK_HOST_TESTS})
 
     add_dependencies(rocm_ck_tests ${test_name})
 endforeach()
+
+# =============================================================================
+# Compile-error tests (expected failures)
+# =============================================================================
+
+add_subdirectory(compile_fail)
