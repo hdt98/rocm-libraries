@@ -8,7 +8,7 @@
 // variants. Each variant gets typed device buffers with host-side conversion
 // for upload/download/verification. Kernels compute c = alpha * a + beta * b.
 
-#include "rocm_vector_add_registry.hpp"
+#include "vector_add_variants.hpp"
 
 #include <rocm_ck/datatype_convert.hpp>
 #include <rocm_ck/datatype_utils.hpp>
@@ -23,8 +23,8 @@
 #include <cstdlib>
 #include <vector>
 
-using rocm_ck::ALL_VARIANTS;
-using rocm_ck::ALL_VARIANTS_COUNT;
+using rocm_ck::vector_add_variant_count;
+using rocm_ck::vector_add_variants;
 
 /// Run a single variant: load from archive, launch kernel, verify results.
 /// Returns true if the variant passed verification.
@@ -163,10 +163,10 @@ int main(int argc, char** argv)
     }
 
     // --- Verify all variants with plain add (alpha=1, beta=1) ---
-    std::printf("\nRunning all %d variants (alpha=1, beta=1):\n", ALL_VARIANTS_COUNT);
+    std::printf("\nRunning all %d variants (alpha=1, beta=1):\n", vector_add_variant_count);
     bool all_passed = true;
 
-    for(const auto& variant : ALL_VARIANTS)
+    for(const auto& variant : vector_add_variants)
     {
         if(!runVariant(variant, archive, host_a, host_b, 1.0f, 1.0f))
             all_passed = false;

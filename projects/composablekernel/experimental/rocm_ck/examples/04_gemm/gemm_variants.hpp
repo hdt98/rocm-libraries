@@ -1,0 +1,84 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
+//
+// Canonical GEMM variant table — single source of truth for all kernel specs.
+// Shared between device (.hip) and host (main.cpp) compilation.
+//
+// Device code uses gemm_variant_spec("name") to look up a spec by name at
+// compile time. Host code iterates gemm_variants[] for registry/dispatch.
+
+#pragma once
+
+#include <rocm_ck/gemm_spec.hpp>
+
+#include <string_view>
+
+namespace rocm_ck {
+
+struct GemmVariant
+{
+    const char* name;
+    GemmSpec spec;
+};
+
+consteval GemmVariant make_variant(const char* name, Signature sig, GemmAlgorithm algo)
+{
+    return {name, make_spec(sig, algo)};
+}
+
+// clang-format off
+inline constexpr GemmVariant gemm_variants[] = {
+    make_variant("gemm_fp32",
+                 Signature{.dtype = DataType::FP32,
+                           .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {16, 16, 16}}),
+    make_variant("gemm_fp16",
+                 Signature{.dtype = DataType::FP16,
+                           .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {16, 16, 16}}),
+    make_variant("gemm_bf16",
+                 Signature{.dtype = DataType::BF16,
+                           .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {16, 16, 16}}),
+    make_variant("gemm_fp16_w32",
+                 Signature{.dtype = DataType::FP16,
+                           .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {32, 32, 16}}),
+    make_variant("gemm_fp16_add",
+                 Signature{.dtype = DataType::FP16,
+                           .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                   AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {16, 16, 16}}),
+    make_variant("gemm_fp16_add_relu",
+                 Signature{.dtype = DataType::FP16,
+                           .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                   AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                                   ReluOp{.in = "D", .out = "E"}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {16, 16, 16}}),
+};
+// clang-format on
+
+inline constexpr int gemm_variant_count = sizeof(gemm_variants) / sizeof(gemm_variants[0]);
+
+/// Compile-time variant lookup by name. Typos cause compile errors.
+consteval GemmSpec gemm_variant_spec(const char* name)
+{
+    for(const auto& v : gemm_variants)
+        if(std::string_view(v.name) == name)
+            return v.spec;
+    throw "unknown GEMM variant name";
+}
+
+} // namespace rocm_ck
