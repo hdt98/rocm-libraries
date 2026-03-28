@@ -110,10 +110,12 @@ if(ROCBLAS_ENABLE_HIPBLASLT)
         PRIVATE
             BUILD_WITH_HIPBLASLT
     )
-    target_compile_definitions(rocblas-gemm-tune
-        PRIVATE
-            BUILD_WITH_HIPBLASLT
-    )
+    if(TARGET rocblas-gemm-tune)
+        target_compile_definitions(rocblas-gemm-tune
+            PRIVATE
+                BUILD_WITH_HIPBLASLT
+        )
+    endif()
 endif()
 
 add_subdirectory(perf_script)

@@ -8,7 +8,7 @@ set(TENSILE_CODE_OBJECT_VERSION "V4" CACHE STRING "Code object version")
 set(TENSILE_LOGIC "asm_full" CACHE STRING "Tensile logic directory name (e.g., asm_full, asm_lite, foo)")
 set(TENSILE_LOGIC_DIR
     "${tensile_SOURCE_DIR}/../../projects/rocblas/library/src/blas3/Tensile/Logic/${TENSILE_LOGIC}"
-    CACHE STRING "Path to directory containing logic files"
+    CACHE PATH "Directory containing Tensile logic files"
 )
 set(ROCBLAS_TENSILE_LIBPATH "${PROJECT_BINARY_DIR}/Tensile"
     CACHE STRING "Path to output the device gemm libraries."

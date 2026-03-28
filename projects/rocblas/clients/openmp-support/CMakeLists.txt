@@ -55,8 +55,6 @@ target_link_libraries(rocblas-example-openmp
         rocblas::warnings
 )
 
-target_include_directories(rocblas-example-openmp PRIVATE "${PROJECT_BINARY_DIR}/library/include")
-
 set_target_properties(rocblas-example-openmp PROPERTIES CXX_STANDARD 14)
 
 target_compile_definitions(rocblas-example-openmp PRIVATE ROCBLAS_INTERNAL_API ROCM_USE_FLOAT16)

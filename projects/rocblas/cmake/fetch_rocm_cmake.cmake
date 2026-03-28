@@ -12,8 +12,7 @@ if(NOT ROCmCMakeBuildTools_FOUND)
   FetchContent_Declare(
     rocm-cmake
     GIT_REPOSITORY https://github.com/ROCm/rocm-cmake.git
-    GIT_TAG develop
-    GIT_SHALLOW TRUE)
+    GIT_TAG c01b4f1fd36a94d26c76e7f617b57577b3b84275)
 
   # Use FetchContent_MakeAvailable to properly populate and make modules available
   FetchContent_MakeAvailable(rocm-cmake)

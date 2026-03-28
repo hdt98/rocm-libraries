@@ -94,6 +94,7 @@ if(ROCBLAS_ENABLE_TENSILE)
     set(ROCBLAS_TENSILE_INSTALL_DIR "\${CPACK_PACKAGING_INSTALL_PREFIX}${CMAKE_INSTALL_LIBDIR}/rocblas/library" CACHE PATH "Path to tensile library")
   endif()
   set(ROCBLAS_TENSILE_SUBDIR_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/tensile" CACHE STRING "Path to Tensile subdirectory")
+  cmake_path(ABSOLUTE_PATH ROCBLAS_TENSILE_SUBDIR_PATH BASE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" NORMALIZE)
 endif()
 set(ROCBLAS_CONFIG_DIR "\${CPACK_PACKAGING_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}" CACHE PATH "Path placed into ldconfig file")
 
@@ -169,7 +170,6 @@ if(ROCBLAS_ENABLE_HOST)
         set(BUILD_SHARED_LIBS OFF)
         set(TENSILE_BUILD_SHARED_LIBS OFF CACHE BOOL "Build Tensile as static library" FORCE)
         set(TENSILE_NO_ENUMERATE ON CACHE BOOL "Disable enumerating GPU targets for Tensile builds" FORCE)
-        # Static tensile-host links into shared librocblas.so, so needs PIC
         set(CMAKE_POSITION_INDEPENDENT_CODE ON)
         # Propagate ASAN setting to Tensile (coverage is independent)
         if(ROCBLAS_ENABLE_ASAN)
@@ -185,16 +185,8 @@ if(ROCBLAS_ENABLE_HOST)
   add_subdirectory(library)
 
   if(ROCBLAS_ENABLE_MARKER)
-    include(FindPackageHandleStandardArgs)
-
-    find_path(ROCTRACER_INCLUDE_DIR "roctracer/roctx.h")
-    find_library(ROCTX_LIBRARIES roctx64)
-
-    find_package_handle_standard_args(ROCTRACER
-      REQUIRED_VARS ROCTRACER_INCLUDE_DIR rocTracer
-      FAIL_MESSAGE "Could not find ROCTracer library or headers"
-    )
-    target_link_libraries(rocblas PRIVATE ${ROCTX_LIBRARIES})
+    find_package(ROCTracer REQUIRED)
+    target_link_libraries(rocblas PRIVATE ROCTracer::roctx)
   else()
     target_compile_definitions(rocblas PRIVATE DISABLE_ROCTX)
   endif()
@@ -470,10 +462,8 @@ rocm_create_package(
 if(ROCBLAS_ENABLE_COVERAGE OR BUILD_CODE_COVERAGE)
   message(STATUS "Configuring code coverage target")
 
-  if(CMAKE_BUILD_TYPE MATCHES "Debug" AND NOT WIN32)
-    target_compile_options(rocblas PRIVATE -O1 -gz -ggdb)
-    target_compile_options(rocblas64 PRIVATE -O1 -gz -ggdb)
-  endif()
+  target_compile_options(rocblas PRIVATE $<$<AND:$<CONFIG:Debug>,$<NOT:$<PLATFORM_ID:Windows>>>:-O1 -gz -ggdb>)
+  target_compile_options(rocblas64 PRIVATE $<$<AND:$<CONFIG:Debug>,$<NOT:$<PLATFORM_ID:Windows>>>:-O1 -gz -ggdb>)
   
   # Apply coverage instrumentation flags to rocblas library
   target_compile_options(rocblas PRIVATE -fprofile-instr-generate -fcoverage-mapping)

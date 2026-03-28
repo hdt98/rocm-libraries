@@ -8,9 +8,13 @@ target_sources(rocblas-helper
         "${CMAKE_CURRENT_SOURCE_DIR}/check_numerics_vector.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/handle.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/logging.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocblas_auxiliary.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocblas_ostream.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/utility.cpp"
+)
+
+target_sources(rocblas
+    PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocblas_auxiliary.cpp"
 )
 
 if(ROCBLAS_ENABLE_TENSILE OR ROCBLAS_ENABLE_HIPBLASLT)

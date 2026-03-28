@@ -1,7 +1,7 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 
-add_library(rocblas64 OBJECT)
+add_library(rocblas64 STATIC)
 add_library(rocblas::64 ALIAS rocblas64)
 
 target_link_libraries(rocblas64
@@ -11,7 +11,6 @@ target_link_libraries(rocblas64
         rocblas::warnings
 )
 
-# Link Tensile to propagate includes/defines (needed for ILP64 GEMM sources)
 if(ROCBLAS_ENABLE_TENSILE)
     target_link_libraries(rocblas64 PRIVATE roc::tensile-host)
 endif()
@@ -56,7 +55,7 @@ set_target_properties(rocblas64
         VISIBILITY_INLINES_HIDDEN ON
 )
 
-add_library(rocblas-helper OBJECT)
+add_library(rocblas-helper STATIC)
 add_library(rocblas::helper ALIAS rocblas-helper)
 
 target_link_libraries(rocblas-helper
@@ -75,7 +74,6 @@ target_include_directories(rocblas-helper
         "${CMAKE_CURRENT_SOURCE_DIR}/src/include"
 )
 
-# FLAG: -Werror=vla catches variable-length array usage to prevent stack issues
 target_compile_options(rocblas-helper
     PRIVATE
         -Werror=vla
@@ -134,7 +132,6 @@ target_link_libraries(rocblas
         rocblas::warnings
 )
 
-# Link Tensile directly to propagate includes/defines (OBJECT library doesn't propagate)
 if(ROCBLAS_ENABLE_TENSILE)
     target_link_libraries(rocblas PRIVATE roc::tensile-host)
 endif()
@@ -156,14 +153,12 @@ target_include_directories(rocblas
         "${CMAKE_CURRENT_SOURCE_DIR}/src/blas3/Tensile"
 )
 
-# FLAG: -Werror=vla catches variable-length array usage to prevent stack issues
 target_compile_options(rocblas
     PRIVATE
         --offload-compress
         -Werror=vla
 )
 
-# FLAG: -Werror=vla catches variable-length array usage to prevent stack issues
 target_compile_options(rocblas64
     PRIVATE
         -Werror=vla
@@ -189,7 +184,6 @@ if(ROCBLAS_ENABLE_HIPBLASLT)
     target_compile_definitions(rocblas PRIVATE BUILD_WITH_HIPBLASLT)
 endif()
 
-# Prevent symbols from static libraries (like Tensile) from being re-exported
 target_link_options(rocblas PRIVATE -Xlinker --exclude-libs=ALL)
 
 set_target_properties(rocblas
@@ -198,10 +192,6 @@ set_target_properties(rocblas
         RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/staging"
         VISIBILITY_INLINES_HIDDEN ON
 )
-
-if(ROCBLAS_ENABLE_MARKER)
-    target_link_libraries(rocblas PRIVATE ${ROCTX64_LIBRARY})
-endif()
 
 if(ROCBLAS_ENABLE_FORTRAN)
     add_library(rocblas-fortran-module STATIC)
@@ -225,7 +215,6 @@ endif()
 add_subdirectory(include)
 add_subdirectory(src)
 
-# TODO: Fix source code to use consistent include paths, then remove these configure_file calls
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/include/internal/rocblas-beta.h" "${PROJECT_BINARY_DIR}/include/rocblas/internal" COPYONLY)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/include/rocblas.h" "${PROJECT_BINARY_DIR}/include/rocblas" COPYONLY)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/include/rocblas_device_malloc.hpp" "${PROJECT_BINARY_DIR}/include/rocblas" COPYONLY)

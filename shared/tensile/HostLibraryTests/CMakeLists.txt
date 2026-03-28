@@ -24,7 +24,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/.." "${CMAKE_BINARY_DIR}/parent_build")
 endif()
 
-if(TESNILE_ENABLE_CTEST)
+if(TENSILE_ENABLE_CTEST)
   enable_testing()
 endif()
 
@@ -124,19 +124,8 @@ if(TENSILE_ENABLE_HIP)
   add_subdirectory(hip)
   target_link_libraries(tensile-tests
     PRIVATE
-      -Xlinker --whole-archive
-  )
-  target_link_libraries(tensile-tests
-    PRIVATE
       roc::tensile-host
-      test_kernels_lite
-      test_kernels_lite2
-      test_kernels_lite_mixed
-      test_tile_aware_selection
-    )
-  target_link_libraries(tensile-tests
-    PRIVATE
-      -Xlinker --no-whole-archive
+      $<LINK_LIBRARY:WHOLE_ARCHIVE,test_kernels_lite,test_kernels_lite2,test_kernels_lite_mixed,test_tile_aware_selection>
       hip::host
   )
   foreach(arch IN LISTS GPU_TARGETS)
