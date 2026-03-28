@@ -4,19 +4,20 @@ This example stress-tests the rocm_ck schema against a real 2D tiled kernel. GEM
 
 ## 1. Bridge Pattern Extends to GEMM
 
-The same bridge pattern from example 03 works for GEMM. A `.hip` variant file assembles CK Tile's 7-type template stack with `using` declarations, then wraps it in a thin `extern "C"` function:
+The same bridge pattern from example 03 works for GEMM. Variant specs are defined once in `gemm_variants.hpp`. Each `.hip` file looks up its spec by name and wraps it in a thin `extern "C"` kernel:
 
 ```cpp
-static constexpr rocm_ck::GemmSpec spec = rocm_ck::make_spec(
-    rocm_ck::Signature{.dtype = rocm_ck::DataType::FP16, .ops = {rocm_ck::GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-    rocm_ck::GemmAlgorithm{...});
+#include "gemm_variants.hpp"
+#include <rocm_ck/gemm_dev.hpp>
+
+static constexpr rocm_ck::GemmSpec spec = rocm_ck::gemm_variant_spec("gemm_fp16");
 
 extern "C" __global__ void gemm_fp16(rocm_ck::Args args) {
     rocm_ck::run<spec>(args);
 }
 ```
 
-The 7 CK Tile types (TileGemmShape, TileGemmTraits, PipelineProblem, GemmPipeline, TilePartitioner, CShuffleEpilogue, GemmSpec) are assembled in `gemm_dev.hpp`'s `run<S>` from the `GemmSpec` NTTP fields. Each `.hip` file is ~15 lines. Host code never includes CK Tile headers.
+The 7 CK Tile types (TileGemmShape, TileGemmTraits, PipelineProblem, GemmPipeline, TilePartitioner, CShuffleEpilogue, GemmSpec) are assembled in `gemm_dev.hpp`'s `run<S>` from the `GemmSpec` NTTP fields. Each `.hip` file is ~12 lines of lookup + kernel wrapper. Host code never includes CK Tile headers.
 
 > **Key difference from elementwise**: GEMM's bridge assembles 7 types (vs 4 for elementwise) and wires a 2D tile partitioner. But the pattern shape is identical — the bridge complexity scales with CK Tile's template depth, not with our schema.
 
@@ -142,7 +143,7 @@ CK Tile's `CShuffleEpilogue` is the universal epilogue for GEMM:
 | `CkTypeMap` enum→type dispatch | Yes | Yes + `CkLayoutMap` | Generalizes (adds layout) |
 | Generic Args struct | 40 bytes (old) | 1408 bytes (shared) | Generalizes — one struct for all ops |
 | consteval validation in `make_spec` | 6 checks | 5 checks | Generalizes (different checks) |
-| One `.hip` file per variant | ~15 lines each | ~15 lines each | Generalizes |
+| One `.hip` file per variant | ~12 lines each | ~12 lines each | Generalizes |
 | `Signature` with operator composition | `AddOp{}` only | `GemmOp` + epilogue ops | Generalizes |
 
 ## 11. What Didn't Generalize

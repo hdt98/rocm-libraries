@@ -247,24 +247,14 @@ experimental/rocm_ck/
     │   └── main.cpp
     ├── 03_rocm_ck_vector_add/      # Full tuning surface: variants + registry
     │   ├── CMakeLists.txt
-    │   ├── rocm_vector_add_spec.hpp  # Metaprogramming: types, consteval make_spec, static_asserts
-    │   ├── rocm_vector_add_api.hpp     # Host-only: arg assembly, launch helpers (guarded)
-    │   ├── rocm_vector_add_dev.hpp     # Device-only: CK Tile bridge, run<S> (guarded)
-    │   ├── rocm_vector_add_registry.hpp # Variant table + find_variant selection
-    │   ├── vector_add_*.hip            # 12 variant instantiations (include _dev.hpp only)
+    │   ├── vector_add_variants.hpp     # Variant table + consteval lookup + findVariant
+    │   ├── vector_add_*.hip            # 12 variant instantiations (~12 lines each)
     │   ├── pack.py                     # Variant-aware packer with metadata
     │   └── main.cpp                    # Variant selection demo + verify-all mode
     └── 04_gemm/                     # GEMM: multi-type via operator-centric Signature
         ├── CMakeLists.txt
-        ├── gemm_spec.hpp             # Metaprogramming: types, consteval make_spec, static_asserts
-        ├── gemm_api.hpp                # Host-only: arg assembly, launch helpers (guarded)
-        ├── gemm_dev.hpp                # Device-only: CK Tile bridge, run<S> (guarded)
-        ├── gemm_fp32.hip               # fp32 variant (include gemm_dev.hpp only)
-        ├── gemm_fp16.hip               # fp16 variant
-        ├── gemm_fp16_w32.hip           # fp16 variant with WarpTile=32
-        ├── gemm_fp16_add.hip           # fp16 + bias addition (fused epilogue)
-        ├── gemm_fp16_add_relu.hip      # fp16 + bias + ReLU (composed epilogue)
-        ├── gemm_bf16.hip               # bf16 variant
+        ├── gemm_variants.hpp           # Variant table + consteval lookup
+        ├── gemm_*.hip                  # 6 variant instantiations (~12 lines each)
         ├── cpu_ref.hpp                 # CPU reference GEMM implementation
         ├── cpu_ref.cpp                 # CPU reference implementation
         ├── pack.py                     # Variant-aware packer with dtype metadata

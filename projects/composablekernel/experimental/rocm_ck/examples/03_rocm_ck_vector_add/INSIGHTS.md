@@ -71,20 +71,21 @@ The same signature can be paired with different algorithms to explore the tuning
 
 > **Production implication**: Tuning tools generate Algorithm variants; the Signature comes from the user's problem specification. This composition is how rocm_ck will expose its tuning surface.
 
-## 5. _api / _dev Interface Model
+## 5. _spec / _variants / _dev Interface Model
 
-Two header files, strict dependency boundary:
+Three layers, strict dependency boundary:
 
 | Header | CK Tile dependency | Used by |
 |--------|-------------------|---------|
-| `rocm_vector_add_api.hpp` | None | Host, device, tests |
-| `rocm_vector_add_dev.hpp` | Yes (CK Tile) | Device only |
+| `elementwise_spec.hpp` (shared) | None | Host, device, tests |
+| `vector_add_variants.hpp` (example-local) | None | Host, device |
+| `elementwise_dev.hpp` (shared) | Yes (CK Tile) | Device only |
 
-The API header contains the config types, `make_spec`, `ElementwiseSpec`, and all compile-time validation. It is testable with `constexpr`/`consteval` without any GPU — the 10 `static_assert` tests in the source run on any C++20 compiler. The generic `Args` struct (from `args.hpp`) replaces per-operation args structs.
+The spec header (in `include/rocm_ck/`) contains config types, `make_spec`, `ElementwiseSpec`, and all compile-time validation. It is testable with `constexpr`/`consteval` without any GPU. The variants header defines the variant table and consteval lookup, shared by both device `.hip` files and host `main.cpp`. The generic `Args` struct (from `args.hpp`) replaces per-operation args structs.
 
 The device header contains the CK Tile kernel implementation, `CkTypeMap`, and `run<S>`. It is compiled only with `--cuda-device-only` and never included in host code.
 
-> **Production implication**: This is the model for all rocm_ck operation headers. The `_api` header is the public interface; the `_dev` header is an implementation detail. Consumers include only `_api`.
+> **Production implication**: This is the model for all rocm_ck operation headers. Shared `_spec` and `_dev` headers live in `include/rocm_ck/`. Example-local `_variants` headers define concrete configurations.
 
 ## 6. Generic Args ABI
 
@@ -113,14 +114,15 @@ ABI is locked with `static_assert` checks for size, alignment, standard layout, 
 
 ## 7. One .hip File Per Variant
 
-Each variant file is ~15 lines:
+Variant specs are defined once in `vector_add_variants.hpp`. Each `.hip` file
+looks up its spec by name and wraps it in a thin kernel:
 
 ```cpp
-#include "rocm_vector_add_dev.hpp"
-static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_spec(
-    rocm_ck::Signature{.dtype = rocm_ck::DataType::FP32,
-                       .ops = {rocm_ck::AddOp{}}},
-    rocm_ck::ElementwiseAlgorithm{1024, 1, 1024, true});
+#include "vector_add_variants.hpp"
+#include <rocm_ck/elementwise_dev.hpp>
+
+static constexpr rocm_ck::ElementwiseSpec spec =
+    rocm_ck::vector_add_variant_spec("vector_add_fp32_b1024");
 
 extern "C" __global__ void vector_add_fp32_b1024(rocm_ck::Args args) {
     rocm_ck::run<spec>(args);
@@ -129,7 +131,7 @@ extern "C" __global__ void vector_add_fp32_b1024(rocm_ck::Args args) {
 
 Separate files enable parallel compilation and clear traceability — each `.hip` produces one `.hsaco` per architecture. CMake loops over `(variant x arch)` to produce `N x M` code objects.
 
-> **Production implication**: Variant generation can be automated. The `.hip` file is mechanical — operation + config + symbol name. A code generator producing these files from a variant table is a natural next step.
+> **Production implication**: The `.hip` file is pure boilerplate — include, lookup, wrapper. At ~20+ variants, a code generator producing these files from the variant table is a natural next step.
 
 ## 8. CkTypeMap for Enum -> Type Dispatch
 
@@ -195,7 +197,7 @@ A `block_tile = 1024` with `block_warps = 1` still launches only 64 threads — 
 
 ## 12. Variant Registry and Selection
 
-`ALL_VARIANTS[]` is a constexpr table of `{name, kernel}` pairs. `findVariant()` selects at runtime:
+`vector_add_variants[]` is a constexpr table of `{name, spec}` pairs defined in `vector_add_variants.hpp`. `findVariant()` selects at runtime:
 
 1. Filter by matching `in_dtype` and `out_dtype`
 2. Among matches, prefer the largest `block_tile` that divides the problem size evenly (aligned)

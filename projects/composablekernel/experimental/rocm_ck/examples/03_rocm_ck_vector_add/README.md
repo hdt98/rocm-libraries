@@ -79,10 +79,12 @@ Derived quantities (validated at compile time by `make_spec`):
 
 ### Variant Registry
 
-`rocm_vector_add_registry.hpp` provides programmatic variant selection:
-- `ALL_VARIANTS[]` — constexpr table of all compiled kernel variants
-- `findVariant(in_dtype, out_dtype, problem_size)` — selects the best variant:
-  largest `block_tile` that divides `problem_size` cleanly, or padded fallback
+`vector_add_variants.hpp` is the single source of truth for all variant specs,
+shared by both device `.hip` files and the host `main.cpp`:
+- `vector_add_variants[]` — constexpr table of all compiled kernel variants
+- `vector_add_variant_spec("name")` — `consteval` lookup for device code (typo = compile error)
+- `findVariant(in_dtype, out_dtype, problem_size)` — runtime selection: largest
+  `block_tile` that divides `problem_size` cleanly, or padded fallback
 
 ## Compiled Variants
 
@@ -105,16 +107,12 @@ The `_w8`/`_w2` suffixes indicate multi-warp variants.
 
 ## File Roles
 
-Each example uses a three-file compilation boundary that separates
-metaprogramming, host runtime, and device code:
-
 | File | Compiled by | Purpose |
 |------|-------------|---------|
-| `rocm_vector_add_spec.hpp` | Both (g++ and hipcc) | **Metaprogramming** — structural types (`ElementwiseSpec`, `ElementwiseAlgorithm`), `consteval` factory (`make_spec`), compile-time `static_assert` tests. No runtime code — everything evaluates at compile time. |
-| `rocm_vector_add_api.hpp` | Host only (g++) | **Host runtime** — arg assembly, launch helpers, runtime validation. Guards with `#error` on device compilation. Includes `_spec.hpp`. |
-| `rocm_vector_add_dev.hpp` | Device only (hipcc `--cuda-device-only`) | **Device code** — CK Tile bridge (`run<S>`), `__device__` functions. Guards with `#error` on host compilation. Includes `_spec.hpp`. |
-| `rocm_vector_add_registry.hpp` | Host only | Variant table (`ALL_VARIANTS[]`) and `findVariant` selection |
-| `vector_add_*.hip` | Device only | Variant instantiations (~10 lines each) — include only `_dev.hpp` |
+| `elementwise_spec.hpp` | Both (shared header in `include/rocm_ck/`) | **Structural types** — `ElementwiseSpec`, `ElementwiseAlgorithm`, `consteval` factory (`make_spec`). No runtime code. |
+| `vector_add_variants.hpp` | Both (g++ and hipcc) | **Variant registry** — constexpr table of all kernel configurations, `consteval vector_add_variant_spec()` lookup, `findVariant()` selection. Single source of truth for device and host code. |
+| `elementwise_dev.hpp` | Device only (shared header in `include/rocm_ck/`) | **CK Tile bridge** — `run<S>`, `CkTypeMap`, `__device__` functions. Guards with `#error` on host compilation. |
+| `vector_add_*.hip` | Device only | Variant instantiations (~12 lines each) — include `vector_add_variants.hpp` and `elementwise_dev.hpp` |
 | `main.cpp` | Host only | Host loader — variant selection demo, verify-all, scaled-add test |
 | `pack.py` | — | Archive packer with variant metadata |
 | `CMakeLists.txt` | — | Build system (variant × arch nested loop) |
@@ -122,23 +120,23 @@ metaprogramming, host runtime, and device code:
 ### Compilation Boundary
 
 ```text
-                    _spec.hpp (metaprogramming)
-                   /            \
-          _api.hpp               _dev.hpp
-         (host only)            (device only)
-             |                       |
-         main.cpp              *.hip files
-       registry.hpp
+    include/rocm_ck/elementwise_spec.hpp (shared structural types)
+                        |
+                        +-- include/rocm_ck/elementwise_dev.hpp (shared device code)
+                        |
+           vector_add_variants.hpp (example-local variant table)
+                       /            \
+             main.cpp                vector_add_*.hip
 ```
 
-`_spec.hpp` is pure metaprogramming: `consteval` factories, `constexpr` structural
-types, and `static_assert` tests. The compiler evaluates it all and produces constants.
-No runtime code is generated on either side.
+Shared headers in `include/rocm_ck/` define structural types and the CK Tile
+bridge. The example-local `vector_add_variants.hpp` defines the variant table —
+included by both host and device code, ensuring specs are defined exactly once.
 
-`.hip` files are compiled with `--cuda-device-only` and include only `_dev.hpp`
-(which transitively includes `_spec.hpp`). `main.cpp` is compiled as plain C++
-and includes `_api.hpp` (via the registry). The `#error` guards enforce these
-boundaries — including the wrong header produces a clear compile error.
+`.hip` files are compiled with `--cuda-device-only` and include both
+`vector_add_variants.hpp` (for the spec) and `elementwise_dev.hpp` (for
+`run<S>`). `main.cpp` includes `vector_add_variants.hpp` to access variant
+metadata and selection.
 
 ## Build
 
