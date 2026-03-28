@@ -78,13 +78,12 @@ rocblas_status rocsolver_sytrs_impl(rocblas_handle handle,
         return rocblas_set_optimal_device_memory_size(handle, size_work);
 
     // memory workspace allocation
-    void* work = nullptr;
     rocblas_device_malloc mem(handle, size_work);
 
     if(!mem)
         return rocblas_status_memory_error;
 
-    work = mem[0];
+    void* const work = static_cast<void*>(mem[0]);
 
     // execution
     return rocsolver_sytrs_template<T>(handle, uplo, n, nrhs,
@@ -95,7 +94,7 @@ rocblas_status rocsolver_sytrs_impl(rocblas_handle handle,
 
                                        B, shiftB, ldb, strideB,
 
-                                       batch_count, (T*)work);
+                                       batch_count, work, size_work);
 }
 
 ROCSOLVER_END_NAMESPACE

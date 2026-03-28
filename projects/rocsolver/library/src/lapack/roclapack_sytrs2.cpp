@@ -73,7 +73,7 @@ rocblas_status rocsolver_sytrs2_impl(rocblas_handle handle,
     // memory workspace sizes:
     // size of reusable workspace
     size_t size_work = 0;
-    rocsolver_sytrs2_getMemorySize<T>(n, nrhs, batch_count, &size_work);
+    rocsolver_sytrs2_getMemorySize<T>(n, nrhs, batch_count, lda, ldb, &size_work);
 
     if(rocblas_is_device_memory_size_query(handle))
         return rocblas_set_optimal_device_memory_size(handle, size_work);

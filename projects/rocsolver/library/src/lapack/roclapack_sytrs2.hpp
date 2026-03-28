@@ -886,7 +886,7 @@ static rocblas_status apply_pivot_lower(rocblas_handle handle,
 //  The matrix A initially contains the factorization by SYTRF
 //  but has been modified by SYCONV  to use TRSM
 //  ----------------------------------------------------------
-template <typename T, typename I, typename UA, typename UB, typename Istride = rocblas_stride>
+template <typename T, typename I, typename UA, typename UB, typename Istride>
 static rocblas_status sytrs1_template(rocblas_handle handle,
 
                                       bool const is_upper,
@@ -969,8 +969,6 @@ static rocblas_status sytrs1_template(rocblas_handle handle,
 
             if(istat != rocblas_status_success)
             {
-                rocblas_set_pointer_mode(handle, old_mode);
-
                 return (rocblas_status_internal_error);
             }
         }
@@ -987,16 +985,12 @@ static rocblas_status sytrs1_template(rocblas_handle handle,
         bool const is_memory_ok = (pfree <= (pwork + size_work));
         if(!is_memory_ok)
         {
-            rocblas_set_pointer_mode(handle, old_mode);
             return (rocblas_status_memory_error);
         }
 
-        rocblas_status istat = rocblas_status_success;
-        if(is_upper)
         {
             T alpha = 1;
-            rocblas_fill const uplo = rocblas_fill_upper;
-            istat = rocblasCall_trsm<T, I>(
+            auto const istat = rocblasCall_trsm<T, I>(
 
                 handle, side, uplo, trans, diag, n, nrhs,
 
@@ -1009,31 +1003,11 @@ static rocblas_status sytrs1_template(rocblas_handle handle,
                 batch_count,
 
                 optim_mem, work1, work2, work3, work4);
-        }
-        else
-        {
-            T alpha = 1;
-            rocblas_fill const uplo = rocblas_fill_lower;
-            istat = rocblasCall_trsm(
 
-                handle, side, uplo, trans, diag, n, nrhs,
-
-                &alpha,
-
-                A_arg, shiftA, lda, strideA,
-
-                B_arg, shiftB, ldb, strideB,
-
-                batch_count,
-
-                optim_mem, work1, work2, work3, work4);
-        }
-
-        if(istat != rocblas_status_success)
-        {
-            rocblas_set_pointer_mode(handle, old_mode);
-
-            return (rocblas_status_internal_error);
+            if(istat != rocblas_status_success)
+            {
+                return (rocblas_status_internal_error);
+            }
         }
 
         pfree = pfree_saved;
@@ -1371,6 +1345,8 @@ template <typename T, typename I>
 void rocsolver_sytrs2_getMemorySize(I const n,
                                     I const nrhs,
                                     I const batch_count,
+                                    I const lda,
+                                    I const ldb,
                                     size_t* const p_size_work)
 {
     *p_size_work = 0;
@@ -1414,9 +1390,6 @@ void rocsolver_sytrs2_getMemorySize(I const n,
                 size_t lsize_work3 = 0;
                 size_t lsize_work4 = 0;
 
-                I const lda = n;
-                I const ldb = n;
-
                 rocblas_status const istat = rocblasCall_trsm_mem<BATCHED, T, I>(
                     side, trans, n, nrhs, lda, ldb, batch_count,
 
@@ -1436,9 +1409,6 @@ void rocsolver_sytrs2_getMemorySize(I const n,
                 size_t lsize_work2 = 0;
                 size_t lsize_work3 = 0;
                 size_t lsize_work4 = 0;
-
-                I const lda = n;
-                I const ldb = n;
 
                 rocblas_status const istat = rocblasCall_trsm_mem<BATCHED, T>(
                     side, trans, n, nrhs, lda, ldb, batch_count,
