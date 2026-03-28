@@ -5,7 +5,7 @@
 //
 // HOST ONLY: arg assembly, launch helpers, host-side validation.
 // This header must NOT be included from .hip files (device compilation).
-// Device code includes gemm_dev.hpp; shared types and make_kernel()
+// Device code includes gemm_dev.hpp; shared types and make_spec()
 // live in gemm_spec.hpp.
 //
 // Compilation boundary:

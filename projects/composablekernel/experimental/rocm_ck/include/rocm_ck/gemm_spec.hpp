@@ -5,7 +5,7 @@
 // template instantiation.
 //
 // SHARED header: compiled in both host and device (--cuda-device-only) passes.
-// Contains structural types, consteval make_kernel() factory, named accessors,
+// Contains structural types, consteval make_spec() factory, named accessors,
 // and warp tile validation. No runtime code.
 //
 // Compilation boundary:
@@ -71,7 +71,7 @@ struct Dim3
 };
 
 /// Algorithm: describes HOW a GEMM executes (tile geometry).
-/// Independent of data types — paired with Signature in make_kernel().
+/// Independent of data types — paired with Signature in make_spec().
 struct GemmAlgorithm
 {
     Dim3 block_tile;  // Elements per thread block {M, N, K}
@@ -129,6 +129,14 @@ struct GemmSpec
     /// GEMM output tensor (position 2 in the physical tensor table).
     /// Name varies by epilogue chain: "C" (plain), "D" (with combine), "E" (with activation).
     constexpr PhysicalTensor output() const { return physical_tensors[2]; }
+
+    /// First auxiliary tensor D0 (position 3 — e.g., bias for AddOp).
+    /// Only valid when num_physical_tensors > 3.
+    constexpr PhysicalTensor d0() const { return physical_tensors[3]; }
+
+    /// Second auxiliary tensor D1 (position 4 — e.g., second bias/scale).
+    /// Only valid when num_physical_tensors > 4.
+    constexpr PhysicalTensor d1() const { return physical_tensors[4]; }
 };
 
 // ============================================================================
@@ -136,7 +144,7 @@ struct GemmSpec
 // ============================================================================
 
 /// Lookup a physical tensor by name. consteval — compile-time only.
-/// Used in static_asserts and consteval make_kernel() result inspection.
+/// Used in static_asserts and consteval make_spec() result inspection.
 /// For runtime access, use GemmSpec::output() or physical_tensors[] directly.
 consteval PhysicalTensor tensor(GemmSpec k, std::string_view name)
 {
@@ -189,7 +197,7 @@ consteval bool is_valid_warp_gemm(DataType a_dtype, int m, int n, int k)
 }
 
 // ============================================================================
-// make_kernel: operator-centric Signature -> GemmSpec
+// make_spec: operator-centric Signature -> GemmSpec
 // ============================================================================
 
 /// Resolve and validate a GEMM using the operator-centric Signature.
@@ -211,13 +219,13 @@ consteval bool is_valid_warp_gemm(DataType a_dtype, int m, int n, int k)
 ///   - Block tile is divisible by (block_warps x warp_tile) in each dimension
 ///
 /// Derives thread_block_size = block_warps.m x block_warps.n x block_warps.k x 64.
-consteval GemmSpec make_kernel(Signature sig, GemmAlgorithm algo)
+consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
 {
     ResolvedSignature resolved = resolve(sig);
 
     // First op must be GemmOp
     if(!std::holds_alternative<GemmOp>(sig.ops[0]))
-        throw "GEMM make_kernel requires GemmOp as first operator";
+        throw "GEMM make_spec requires GemmOp as first operator";
     const GemmOp& gemm = std::get<GemmOp>(sig.ops[0]);
 
     TensorDesc a_td = resolved.tensor(gemm.lhs);

@@ -36,7 +36,7 @@ KPACK_VERSION = 1
 HEADER_SIZE = 16  # 4 (magic) + 4 (version) + 8 (toc_offset)
 
 # Variant metadata mirrors the constexpr ALL_VARIANTS table in
-# rocm_vector_add_registry.hpp. Each entry carries the make_kernel
+# rocm_vector_add_registry.hpp. Each entry carries the make_spec
 # parameters so the archive TOC can describe the tuning surface.
 VARIANTS = [
     {

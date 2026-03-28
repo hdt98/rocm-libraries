@@ -6,7 +6,7 @@
 
 #include <rocm_ck/gemm_dev.hpp>
 
-static constexpr rocm_ck::GemmSpec spec = rocm_ck::make_kernel(
+static constexpr rocm_ck::GemmSpec spec = rocm_ck::make_spec(
     rocm_ck::Signature{
         .dtype = rocm_ck::DataType::BF16,
         .ops = {rocm_ck::GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},

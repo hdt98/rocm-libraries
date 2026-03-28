@@ -14,7 +14,7 @@
 // run<S>:  wires the full CK Tile GEMM pipeline from K's types/layouts
 //
 // Tile geometry is parameterized through GemmSpec fields, validated by
-// make_kernel() against CK Tile's WarpGemmDispatcher table.
+// make_spec() against CK Tile's WarpGemmDispatcher table.
 //
 // Compilation boundary:
 //   _spec.hpp — schema types + consteval factory (both passes)
@@ -198,7 +198,7 @@ __device__ void run(Args args)
     index_t stride_C =
         static_cast<index_t>(PT_OUT.layout == Layout::Row ? t_c.strides[0] : t_c.strides[1]);
 
-    // --- Step 1: Tile geometry (from GemmSpec, validated by make_kernel) ---
+    // --- Step 1: Tile geometry (from GemmSpec, validated by make_spec) ---
     using GemmShape =
         ck_tile::TileGemmShape<ck_tile::sequence<S.block_tile.m, S.block_tile.n, S.block_tile.k>,
                                ck_tile::sequence<S.block_warps.m, S.block_warps.n, S.block_warps.k>,

@@ -5,7 +5,7 @@
 // elementwise template instantiation.
 //
 // SHARED header: compiled in both host and device (--cuda-device-only) passes.
-// Contains structural types and consteval make_kernel() factory. No runtime code.
+// Contains structural types and consteval make_spec() factory. No runtime code.
 //
 // Compilation boundary:
 //   _spec.hpp (this) — schema types + consteval factory (both passes)
@@ -24,7 +24,7 @@
 namespace rocm_ck {
 
 /// Algorithm: describes HOW the kernel executes (tile geometry, pipeline).
-/// Independent of data types — paired with Signature in make_kernel().
+/// Independent of data types — paired with Signature in make_spec().
 struct ElementwiseAlgorithm
 {
     int block_tile;  // Elements processed per thread block (BlockTile)
@@ -67,7 +67,7 @@ struct ElementwiseSpec
 constexpr bool isAligned(ElementwiseSpec k, int n) { return n > 0 && n % k.block_tile == 0; }
 
 // ============================================================================
-// make_kernel: operator-centric Signature -> ElementwiseSpec
+// make_spec: operator-centric Signature -> ElementwiseSpec
 // ============================================================================
 
 /// Resolve and validate a vector add using the operator-centric Signature.
@@ -81,19 +81,19 @@ constexpr bool isAligned(ElementwiseSpec k, int n) { return n > 0 && n % k.block
 ///   - block_warps is power of 2 (CK Tile reduce_on_sequence requirement)
 ///   - warp_tile >= warp_size (64)
 ///   - kVectorM >= 1 and block_tile divisibility
-consteval ElementwiseSpec make_kernel(Signature sig, ElementwiseAlgorithm algo)
+consteval ElementwiseSpec make_spec(Signature sig, ElementwiseAlgorithm algo)
 {
     ResolvedSignature resolved = resolve(sig);
 
     // First op must be AddOp
     if(!std::holds_alternative<AddOp>(sig.ops[0]))
-        throw "vector add make_kernel requires AddOp as first operator";
+        throw "vector add make_spec requires AddOp as first operator";
     const AddOp& add = std::get<AddOp>(sig.ops[0]);
 
     // Remaining ops must be empty
     for(int i = 1; i < kMaxOps; ++i)
         if(!std::holds_alternative<std::monostate>(sig.ops[i]))
-            throw "vector add make_kernel only supports a single AddOp";
+            throw "vector add make_spec only supports a single AddOp";
 
     TensorDesc a_td   = resolved.tensor(add.lhs);
     TensorDesc b_td   = resolved.tensor(add.rhs);

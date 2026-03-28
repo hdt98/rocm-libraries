@@ -5,7 +5,7 @@
 //
 // HOST ONLY: arg assembly, launch helpers, host-side validation.
 // This header must NOT be included from .hip files (device compilation).
-// Device code includes rocm_vector_add_dev.hpp; shared types and make_kernel()
+// Device code includes rocm_vector_add_dev.hpp; shared types and make_spec()
 // live in rocm_vector_add_spec.hpp.
 //
 // Compilation boundary:

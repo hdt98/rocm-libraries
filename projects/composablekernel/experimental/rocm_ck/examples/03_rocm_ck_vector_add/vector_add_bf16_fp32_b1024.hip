@@ -5,7 +5,7 @@
 
 // BF16 widening: BF16 inputs -> FP32 output. The most common mixed-type pattern
 // in ML training (BF16 storage, FP32 accumulation). Same geometry as fp16_fp32_b1024.
-static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_kernel(
+static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_spec(
     rocm_ck::Signature{
         .dtype = rocm_ck::DataType::BF16,
         .tensors = {rocm_ck::Tensor{.name = "C", .dtype = rocm_ck::DataType::FP32}},

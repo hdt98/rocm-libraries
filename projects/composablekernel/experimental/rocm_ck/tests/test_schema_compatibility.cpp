@@ -5,7 +5,7 @@
 //
 // These tests verify that schema changes (new fields, modified defaults,
 // validation rules) do NOT break existing variants. Each test freezes the
-// exact make_kernel() call from a .hip variant file and asserts on the
+// exact make_spec() call from a .hip variant file and asserts on the
 // full GemmSpec output.
 //
 // If a test fails after a schema change, the change is NOT backwards-
@@ -23,7 +23,7 @@ using namespace rocm_ck;
 
 TEST(SchemaCompat, GemmFP32)
 {
-    constexpr auto k = make_kernel(
+    constexpr auto k = make_spec(
         Signature{.dtype = DataType::FP32, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{
             .block_tile = {128, 128, 32}, .block_warps = {2, 2, 1}, .warp_tile = {16, 16, 16}});
@@ -52,7 +52,7 @@ TEST(SchemaCompat, GemmFP32)
 
 TEST(SchemaCompat, GemmFP16)
 {
-    constexpr auto k = make_kernel(
+    constexpr auto k = make_spec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{
             .block_tile = {128, 128, 32}, .block_warps = {2, 2, 1}, .warp_tile = {16, 16, 16}});
@@ -81,7 +81,7 @@ TEST(SchemaCompat, GemmFP16)
 
 TEST(SchemaCompat, GemmBF16)
 {
-    constexpr auto k = make_kernel(
+    constexpr auto k = make_spec(
         Signature{.dtype = DataType::BF16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{
             .block_tile = {128, 128, 32}, .block_warps = {2, 2, 1}, .warp_tile = {16, 16, 16}});
@@ -110,7 +110,7 @@ TEST(SchemaCompat, GemmBF16)
 
 TEST(SchemaCompat, GemmFP16W32)
 {
-    constexpr auto k = make_kernel(
+    constexpr auto k = make_spec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{
             .block_tile = {128, 128, 32}, .block_warps = {2, 2, 1}, .warp_tile = {32, 32, 16}});
@@ -139,12 +139,12 @@ TEST(SchemaCompat, GemmFP16W32)
 
 TEST(SchemaCompat, GemmFP16Add)
 {
-    constexpr auto k = make_kernel(Signature{.dtype = DataType::FP16,
-                                             .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
-                                   GemmAlgorithm{.block_tile  = {128, 128, 32},
-                                                 .block_warps = {2, 2, 1},
-                                                 .warp_tile   = {16, 16, 16}});
+    constexpr auto k = make_spec(Signature{.dtype = DataType::FP16,
+                                           .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+                                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                                               .block_warps = {2, 2, 1},
+                                               .warp_tile   = {16, 16, 16}});
 
     EXPECT_EQ(k.num_physical_tensors, 4);
     EXPECT_EQ(slot(k, "A"), 0);
@@ -172,13 +172,13 @@ TEST(SchemaCompat, GemmFP16Add)
 
 TEST(SchemaCompat, GemmFP16AddRelu)
 {
-    constexpr auto k = make_kernel(Signature{.dtype = DataType::FP16,
-                                             .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
-                                                       ReluOp{.in = "D", .out = "E"}}},
-                                   GemmAlgorithm{.block_tile  = {128, 128, 32},
-                                                 .block_warps = {2, 2, 1},
-                                                 .warp_tile   = {16, 16, 16}});
+    constexpr auto k = make_spec(Signature{.dtype = DataType::FP16,
+                                           .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                                                     ReluOp{.in = "D", .out = "E"}}},
+                                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                                               .block_warps = {2, 2, 1},
+                                               .warp_tile   = {16, 16, 16}});
 
     EXPECT_EQ(k.num_physical_tensors, 4);
     EXPECT_EQ(slot(k, "A"), 0);

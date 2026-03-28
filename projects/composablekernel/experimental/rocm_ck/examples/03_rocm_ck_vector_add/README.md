@@ -43,7 +43,7 @@ Signature{.dtype = DataType::FP32,
 `Signature::dtype` sets the default for all tensors. Explicit `Tensor` entries
 override specific tensors by name. For mixed types, `kVectorM` is constrained
 by the wider type (fewer elements per 128-bit register), validated at compile
-time by `make_kernel`.
+time by `make_spec`.
 
 ### Scaled Addition
 
@@ -55,7 +55,7 @@ scalar parameters are always present. For plain addition, pass
 
 ### Custom CK Tile Kernel
 
-The device kernel (`runVectorAdd`) uses CK Tile tile primitives directly
+The device kernel (`run`) uses CK Tile tile primitives directly
 (`load_tile`, `sweep_tile_span`, `store_tile`) rather than the stock
 `ElementWiseKernel`. This enables passing scalar parameters and provides
 a more instructive example of building custom kernels from CK Tile building
@@ -72,7 +72,7 @@ The algorithm exposes four independent knobs matching CK Tile's `ElementWiseShap
 | WarpTile | `warp_tile` | Controls vector load width (`kVectorM`) |
 | Pad | `pad` | Enable padding for unaligned problem sizes |
 
-Derived quantities (validated at compile time by `make_kernel`):
+Derived quantities (validated at compile time by `make_spec`):
 - `kVectorM = min(128 / max_type_bits, warp_tile / 64)` — vector elements per thread
 - `kRepeatM = block_tile / (block_warps × kVectorM × 64)` — iterations per warp
 - `thread_block_size = 64 × block_warps` — actual threads launched
@@ -110,9 +110,9 @@ metaprogramming, host runtime, and device code:
 
 | File | Compiled by | Purpose |
 |------|-------------|---------|
-| `rocm_vector_add_kernel.hpp` | Both (g++ and hipcc) | **Metaprogramming** — structural types (`VectorAddKernel`, `ElementwiseAlgorithm`), `consteval` factory (`make_kernel`), compile-time `static_assert` tests. No runtime code — everything evaluates at compile time. |
-| `rocm_vector_add_api.hpp` | Host only (g++) | **Host runtime** — arg assembly, launch helpers, runtime validation. Guards with `#error` on device compilation. Includes `_kernel.hpp`. |
-| `rocm_vector_add_dev.hpp` | Device only (hipcc `--cuda-device-only`) | **Device code** — CK Tile bridge (`runVectorAdd<K>`), `__device__` functions. Guards with `#error` on host compilation. Includes `_kernel.hpp`. |
+| `rocm_vector_add_spec.hpp` | Both (g++ and hipcc) | **Metaprogramming** — structural types (`ElementwiseSpec`, `ElementwiseAlgorithm`), `consteval` factory (`make_spec`), compile-time `static_assert` tests. No runtime code — everything evaluates at compile time. |
+| `rocm_vector_add_api.hpp` | Host only (g++) | **Host runtime** — arg assembly, launch helpers, runtime validation. Guards with `#error` on device compilation. Includes `_spec.hpp`. |
+| `rocm_vector_add_dev.hpp` | Device only (hipcc `--cuda-device-only`) | **Device code** — CK Tile bridge (`run<S>`), `__device__` functions. Guards with `#error` on host compilation. Includes `_spec.hpp`. |
 | `rocm_vector_add_registry.hpp` | Host only | Variant table (`ALL_VARIANTS[]`) and `findVariant` selection |
 | `vector_add_*.hip` | Device only | Variant instantiations (~10 lines each) — include only `_dev.hpp` |
 | `main.cpp` | Host only | Host loader — variant selection demo, verify-all, scaled-add test |
@@ -122,7 +122,7 @@ metaprogramming, host runtime, and device code:
 ### Compilation Boundary
 
 ```text
-                    _kernel.hpp (metaprogramming)
+                    _spec.hpp (metaprogramming)
                    /            \
           _api.hpp               _dev.hpp
          (host only)            (device only)
@@ -131,12 +131,12 @@ metaprogramming, host runtime, and device code:
        registry.hpp
 ```
 
-`_kernel.hpp` is pure metaprogramming: `consteval` factories, `constexpr` structural
+`_spec.hpp` is pure metaprogramming: `consteval` factories, `constexpr` structural
 types, and `static_assert` tests. The compiler evaluates it all and produces constants.
 No runtime code is generated on either side.
 
 `.hip` files are compiled with `--cuda-device-only` and include only `_dev.hpp`
-(which transitively includes `_kernel.hpp`). `main.cpp` is compiled as plain C++
+(which transitively includes `_spec.hpp`). `main.cpp` is compiled as plain C++
 and includes `_api.hpp` (via the registry). The `#error` guards enforce these
 boundaries — including the wrong header produces a clear compile error.
 
@@ -195,5 +195,5 @@ but available for tooling that inspects archives.
 
 **Unified Signature.** All operations share the same `Signature` struct. The
 operation type is determined by the operator structs in the `ops` array
-(`AddOp` for elementwise, `GemmOp` for GEMM, etc.). `make_kernel()` pattern-
+(`AddOp` for elementwise, `GemmOp` for GEMM, etc.). `make_spec()` pattern-
 matches the ops to select the appropriate kernel path and validation.

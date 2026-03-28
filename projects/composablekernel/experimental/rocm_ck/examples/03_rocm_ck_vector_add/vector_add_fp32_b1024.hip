@@ -4,7 +4,7 @@
 #include <rocm_ck/elementwise_dev.hpp>
 
 // Largest single-warp FP32 tile. kRepeatM=4 — each thread processes 4 chunks.
-static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_kernel(
+static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_spec(
     rocm_ck::Signature{
         .dtype = rocm_ck::DataType::FP32,
         .ops = {rocm_ck::AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},

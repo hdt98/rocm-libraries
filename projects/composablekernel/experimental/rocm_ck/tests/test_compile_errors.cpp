@@ -68,21 +68,21 @@ using namespace rocm_ck;
 // Expected error: "ScaleOp.scale references undeclared Scalar"
 
 // ============================================================================
-// make_kernel() — expected failures
+// make_spec() — expected failures
 // ============================================================================
 
 // First op is not GemmOp:
 //
-//   constexpr auto bad = make_kernel(
+//   constexpr auto bad = make_spec(
 //       Signature{.dtype = DataType::FP16,
 //                 .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
 //       GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 //
-// Expected error: "GEMM make_kernel requires GemmOp as first operator"
+// Expected error: "GEMM make_spec requires GemmOp as first operator"
 
 // Invalid warp tile for dtype:
 //
-//   constexpr auto bad = make_kernel(
+//   constexpr auto bad = make_spec(
 //       Signature{.dtype = DataType::FP32,
 //                 .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
 //       GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {32, 32, 16}});
@@ -92,7 +92,7 @@ using namespace rocm_ck;
 
 // block_warps.k != 1:
 //
-//   constexpr auto bad = make_kernel(
+//   constexpr auto bad = make_spec(
 //       Signature{.dtype = DataType::FP16,
 //                 .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
 //       GemmAlgorithm{{128, 128, 32}, {2, 2, 2}, {16, 16, 16}});
@@ -101,7 +101,7 @@ using namespace rocm_ck;
 
 // Block tile not divisible by warps * warp_tile:
 //
-//   constexpr auto bad = make_kernel(
+//   constexpr auto bad = make_spec(
 //       Signature{.dtype = DataType::FP16,
 //                 .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
 //       GemmAlgorithm{{100, 128, 32}, {2, 2, 1}, {16, 16, 16}});

@@ -4,7 +4,7 @@
 #include <rocm_ck/elementwise_dev.hpp>
 
 // FP16 large tile. kVectorM=8, kRepeatM=2.
-static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_kernel(
+static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_spec(
     rocm_ck::Signature{
         .dtype = rocm_ck::DataType::FP16,
         .ops = {rocm_ck::AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},

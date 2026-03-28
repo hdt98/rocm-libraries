@@ -5,7 +5,7 @@
 
 // Narrowing: FP32 inputs -> FP16 output. Same kVectorM=4 constraint as widening
 // (wider type always governs). Output stored in FP16 for reduced memory footprint.
-static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_kernel(
+static constexpr rocm_ck::ElementwiseSpec spec = rocm_ck::make_spec(
     rocm_ck::Signature{
         .dtype = rocm_ck::DataType::FP32,
         .tensors = {rocm_ck::Tensor{.name = "C", .dtype = rocm_ck::DataType::FP16}},
