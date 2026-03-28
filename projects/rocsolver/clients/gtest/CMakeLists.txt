@@ -32,6 +32,7 @@ set(roclapack_test_source
   lapack/getri_gtest.cpp
   lapack/getrs_gtest.cpp
   lapack/sytrs_gtest.cpp
+  lapack/sytrs2_gtest.cpp
   lapack/gesv_gtest.cpp
   lapack/potrs_gtest.cpp
   lapack/posv_gtest.cpp
