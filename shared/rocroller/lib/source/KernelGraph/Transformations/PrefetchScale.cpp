@@ -1,6 +1,8 @@
 // Copyright Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
+#include <rocRoller/AssemblyKernel.hpp>
+
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/Transforms/PrefetchScale.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>

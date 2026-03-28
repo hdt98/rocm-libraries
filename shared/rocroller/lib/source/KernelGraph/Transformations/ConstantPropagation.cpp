@@ -4,7 +4,6 @@
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/Transforms/ConstantPropagation.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
-#include <rocRoller/KernelGraph/Visitors.hpp>
 
 #include <queue>
 

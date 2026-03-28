@@ -6,7 +6,6 @@
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/Transforms/ModelAddresses.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
-#include <rocRoller/KernelGraph/Visitors.hpp>
 
 #include <algorithm>
 #include <cstring>

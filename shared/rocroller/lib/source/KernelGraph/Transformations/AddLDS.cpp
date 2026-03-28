@@ -25,7 +25,6 @@ unrolled) into LDS.  Subsequent loads in the loop read from LDS.
 #include <rocRoller/KernelGraph/Transforms/AddLDS.hpp>
 #include <rocRoller/KernelGraph/Transforms/Simplify.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
-#include <rocRoller/KernelGraph/Visitors.hpp>
 #include <rocRoller/Operations/Command.hpp>
 #include <rocRoller/Operations/Operations.hpp>
 

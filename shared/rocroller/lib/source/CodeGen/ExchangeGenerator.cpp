@@ -1,6 +1,8 @@
 // Copyright Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
+#include <rocRoller/AssemblyKernel.hpp>
+
 #include <rocRoller/CodeGen/Arithmetic/BitFieldExtract.hpp>
 #include <rocRoller/CodeGen/ExchangeGenerator.hpp>
 #include <rocRoller/Context.hpp>

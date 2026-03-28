@@ -188,7 +188,6 @@ target_sources(rocroller
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/KernelGraph/TopoVisitor_impl.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/KernelGraph/Utils.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/KernelGraph/Utils_impl.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/KernelGraph/Visitors.hpp"
 
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/KernelGraph/ControlGraph/ControlEdge.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/KernelGraph/ControlGraph/ControlEdge_fwd.hpp"

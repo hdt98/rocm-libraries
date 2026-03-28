@@ -6,7 +6,6 @@
 #include <rocRoller/KernelGraph/Transforms/RemoveSetCoordinate.hpp>
 #include <rocRoller/KernelGraph/Transforms/RemoveSetCoordinate_details.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
-#include <rocRoller/KernelGraph/Visitors.hpp>
 
 namespace rocRoller
 {

@@ -8,7 +8,6 @@
 #include <rocRoller/KernelGraph/Transforms/HoistLoopInvariant.hpp>
 #include <rocRoller/KernelGraph/Transforms/HoistLoopInvariant_detail.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
-#include <rocRoller/KernelGraph/Visitors.hpp>
 
 #include <algorithm>
 #include <optional>

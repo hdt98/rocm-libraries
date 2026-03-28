@@ -16,7 +16,6 @@
 #include <rocRoller/KernelGraph/CoordinateGraph/Transformer.hpp>
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/Transforms/All.hpp>
-#include <rocRoller/KernelGraph/Visitors.hpp>
 #include <rocRoller/TensorDescriptor.hpp>
 #include <rocRoller/Utilities/Settings.hpp>
 

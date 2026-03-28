@@ -15,7 +15,6 @@
 #include <rocRoller/KernelGraph/CoordinateGraph/Dimension.hpp>
 #include <rocRoller/KernelGraph/Transforms/Simplify.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
-#include <rocRoller/KernelGraph/Visitors.hpp>
 #include <rocRoller/Operations/Command.hpp>
 #include <rocRoller/Operations/Operations.hpp>
 

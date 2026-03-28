@@ -6,7 +6,6 @@
 #include <rocRoller/KernelGraph/Transforms/FuseLoops.hpp>
 #include <rocRoller/KernelGraph/Transforms/FuseLoops_detail.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
-#include <rocRoller/KernelGraph/Visitors.hpp>
 
 namespace rocRoller
 {

@@ -8,7 +8,7 @@
 
 #include <rocRoller/Expression.hpp>
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
-#include <rocRoller/KernelGraph/Visitors.hpp>
+#include <rocRoller/KernelGraph/Reindexer.hpp>
 
 namespace rocRoller
 {

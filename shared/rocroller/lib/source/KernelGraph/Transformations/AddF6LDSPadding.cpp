@@ -3,7 +3,6 @@
 
 #include <rocRoller/CodeGen/Utils.hpp>
 #include <rocRoller/KernelGraph/Transforms/AddF6LDSPadding.hpp>
-#include <rocRoller/KernelGraph/Visitors.hpp>
 
 namespace rocRoller
 {

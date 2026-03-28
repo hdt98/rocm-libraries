@@ -4,7 +4,6 @@
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/Transforms/CleanLoops.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
-#include <rocRoller/KernelGraph/Visitors.hpp>
 #include <rocRoller/Utilities/Logging.hpp>
 
 namespace rocRoller
