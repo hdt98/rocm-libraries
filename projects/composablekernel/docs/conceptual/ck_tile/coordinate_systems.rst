@@ -559,20 +559,135 @@ Real-World Example: Matrix Multiplication
        >;
        
        constexpr auto distribution = make_static_tile_distribution(Encoding{});
-       
+
        // Step 1: Get P-coordinates (thread identity)
        const auto p_coord = distribution.calculate_p_coord();
-       
+
        // Step 2: Iterate through Y-space (work assignment)
        sweep_tile(c_tile, [&](auto y_coord) {
            // Step 3: P+Y→X transformation
            const auto x_coord = distribution.calculate_index(p_coord, y_coord);
-           
+
            // Step 4: X→D transformation (handled by tensor view)
            // Step 5: Actual computation at these coordinates
            c_tile(y_coord) = compute_element(x_coord);
        });
    }
+
+Understanding the Encoding Parameters
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The six template arguments to ``tile_distribution_encoding`` map directly onto the
+coordinate-space concepts described above.
+
+**Arg 1 — R (Replication):** ``sequence<>``
+
+An empty sequence means no replication — every warp handles a unique portion of the
+output tile.
+
+**Arg 2 — H (Hierarchy):** ``tuple<sequence<4,2,8,4>, sequence<4,2,8,4>>``
+
+Each inner sequence factorises one X dimension into a hierarchy of sub-dimensions.
+Both M and N are factorised identically:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 15 15 15 55
+
+   * - Level
+     - M value
+     - N value
+     - Meaning
+   * - H[·][0]
+     - 4
+     - 4
+     - Outer repetitions — how many times each warp sweeps its patch
+   * - H[·][1]
+     - 2
+     - 2
+     - Warps per block in this dimension
+   * - H[·][2]
+     - 8
+     - 8
+     - Threads per warp in this dimension
+   * - H[·][3]
+     - 4
+     - 4
+     - Vector elements per thread (register-level granularity)
+
+Total tile coverage: ``(2×8×4) × (2×8×4) × 4×4 repetitions = 256×256`` output elements.
+
+**Args 3 & 4 — P major/minor (Thread Identity Mapping)**
+
+The P (partition) arguments assign hardware thread IDs to hierarchy levels using a
+two-level *RH coordinate system*:
+
+- **Major** selects which *group* of sub-dimensions: ``0`` = R dimensions,
+  ``1`` = H factors of X-dim 0 (M), ``2`` = H factors of X-dim 1 (N).
+- **Minor** selects which specific factor *within* that group (i.e., which
+  entry of the ``sequence<4,2,8,4>`` hierarchy).
+
+The full RH lookup table for this encoding:
+
+.. code-block:: text
+
+   (major=1, minor=0)  →  H[M][0] = 4   outer M repetitions
+   (major=1, minor=1)  →  H[M][1] = 2   warps along M
+   (major=1, minor=2)  →  H[M][2] = 8   threads/warp along M
+   (major=1, minor=3)  →  H[M][3] = 4   M vector elements
+   (major=2, minor=0)  →  H[N][0] = 4   outer N repetitions
+   (major=2, minor=1)  →  H[N][1] = 2   warps along N
+   (major=2, minor=2)  →  H[N][2] = 8   threads/warp along N
+   (major=2, minor=3)  →  H[N][3] = 4   N vector elements
+
+Each P dimension is formed by **merging** the sub-dimensions identified by its
+(major, minor) pairs:
+
+.. code-block:: text
+
+   P major: tuple<sequence<1, 2>, sequence<1, 2>>
+   P minor: tuple<sequence<1, 1>, sequence<2, 2>>
+
+   P0 (warp_id):  pairs (major=1,minor=1) and (major=2,minor=1)
+                  → H[M][1]=2 warps along M  ×  H[N][1]=2 warps along N
+                  → warp_id decoded into a 2×2 warp grid
+
+   P1 (lane_id):  pairs (major=1,minor=2) and (major=2,minor=2)
+                  → H[M][2]=8 threads/warp along M  ×  H[N][2]=8 threads/warp along N
+                  → lane_id decoded into an 8×8 thread layout within a warp
+
+**Args 5 & 6 — Y major/minor (Per-Thread Iteration)**
+
+Y dimensions identify the hierarchy levels that each thread *iterates over* rather
+than parallelises across:
+
+.. code-block:: text
+
+   Y major: sequence<1, 1, 2, 2>
+   Y minor: sequence<0, 3, 0, 3>
+
+   Y[0]: (major=1, minor=0)  →  H[M][0] = 4   outer M repetitions
+   Y[1]: (major=1, minor=3)  →  H[M][3] = 4   M vector elements
+   Y[2]: (major=2, minor=0)  →  H[N][0] = 4   outer N repetitions
+   Y[3]: (major=2, minor=3)  →  H[N][3] = 4   N vector elements
+
+Each thread therefore loops over a ``4×4×4×4 = 256``-element sub-block in Y-space,
+covering both the outer repetitions and the register-level vector elements in M and N.
+
+**Full Picture**
+
+.. code-block:: text
+
+   Thread block → 4 warps (2×2)
+   Each warp   → 64 threads in 8×8 layout (M × N)
+   Each thread → loops over 4×4 M repetitions × 4×4 N repetitions
+               = 256 output elements per thread
+   Total C tile = (2×8×4) × (2×8×4) × 4×4 repetitions
+                = 256 × 256 output elements
+
+The key symmetry: M and N are treated identically with ``sequence<4,2,8,4>``, so the
+output C tile has a perfectly square thread layout — warps tile a 2×2 grid, threads
+within each warp cover an 8×8 patch, and each thread holds a 4×4 register block.
 
 Performance Implications
 ------------------------

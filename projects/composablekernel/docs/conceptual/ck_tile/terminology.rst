@@ -48,8 +48,20 @@ The dimensions of P-space directly reflect the hardware's execution model. In a 
 
 .. code-block:: cpp
 
-   // Get current thread's P coordinates
-   auto p_idx = Distribution::_get_partition_index();
+   // For the matmul encoding with tuple<sequence<4,2,8,4>, sequence<4,2,8,4>>:
+   //
+   // P-space is 2-dimensional: P = [warp_id, lane_id]
+   //
+   //   P[0] = warp_id  (range 0..3, selects one of the 4 warps in the 2×2 warp grid)
+   //   P[1] = lane_id  (range 0..63, selects one thread in the 8×8 layout per warp)
+   //
+   // Thread 0 in warp 2:  P = [2, 0]
+   // Thread 5 in warp 1:  P = [1, 5]
+   //
+   // calculate_p_coord() reads hardware registers and returns the multi-index:
+   const auto p_coord = distribution.calculate_p_coord();
+   // p_coord[0] == get_warp_local_1d_id()   → which warp (0–3)
+   // p_coord[1] == get_lane_id()            → which lane (0–63)
 
 Y-Space (Yield Space)
 ~~~~~~~~~~~~~~~~~~~~~
@@ -61,8 +73,23 @@ Y-space serves as the primary iteration space for computational kernels. When a 
 
 .. code-block:: cpp
 
-   // Iterate over Y-space
-   sweep_tile(tensor, [](auto y_idx) { /*...*/ });
+   // For the matmul encoding, each thread's Y-space is 4-dimensional:
+   //
+   //   Y[0]: outer M repetitions  (range 0..3, from H[M][0]=4)
+   //   Y[1]: M vector elements    (range 0..3, from H[M][3]=4)
+   //   Y[2]: outer N repetitions  (range 0..3, from H[N][0]=4)
+   //   Y[3]: N vector elements    (range 0..3, from H[N][3]=4)
+   //
+   // A thread at Y=[1,2,0,3] is processing:
+   //   - 2nd outer M iteration, 3rd M vector element
+   //   - 1st outer N iteration, 4th N vector element
+   //
+   // sweep_tile visits all 4×4×4×4 = 256 Y coordinates per thread:
+   sweep_tile(c_tile, [&](auto y_idx) {
+       // y_idx is a compile-time multi_index<4>; the loop is fully unrolled
+       const auto x_coord = distribution.calculate_index(p_coord, y_idx);
+       c_tile(y_idx) = compute_element(x_coord);
+   });
 
 X-Space (Physical Tensor Space)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -74,23 +101,131 @@ The relationship between X-space and physical memory is direct but not necessari
 
 .. code-block:: cpp
 
-   // Calculate X coordinates from P+Y
-   auto x_idx = distribution.calculate_index(p_idx);
+   // For the matmul C-tile (256×256 output), X-space is 2-dimensional: X = [row, col]
+   //
+   // A thread with P=[warp_id=1, lane_id=10] at Y=[2, 3, 1, 0]:
+   //
+   //   warp_id=1 → warp grid position (0,1)  [2×2 warp grid, row-major]
+   //   lane_id=10 → thread grid position (1,2) [8×8 thread grid, row-major: 10/8=1, 10%8=2]
+   //
+   //   M position = Y[0]*64 + warp_row*32 + lane_row*4 + Y[1]
+   //              =  2*64  +    0*32    +    1*4    +  3  = 135
+   //   N position = Y[2]*64 + warp_col*32 + lane_col*4 + Y[3]
+   //              =  1*64  +    1*32    +    2*4    +  0  = 104
+   //
+   //   X = [135, 104]  ← row 135, column 104 of the C output matrix
+   //
+   const auto x_coord = distribution.calculate_index(p_coord, y_coord);
+   // x_coord[0] == global M index (0..255)
+   // x_coord[1] == global N index (0..255)
 
 R-Space (Replication Space)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The Replication Space, or R-space, introduces a advanced mechanism for expressing redundant computation patterns that enhance performance through data sharing. Unlike the other coordinate spaces which map to unique data elements, R-space enables multiple processing elements to compute the same values, facilitating efficient communication patterns. This replication serves multiple purposes: it can reduce global memory traffic by computing values locally rather than loading them, enable efficient reduction operations by providing private workspace for each thread group, and facilitate complex data exchange patterns that would otherwise require expensive synchronization.
+The Replication Space, or R-space, records which threads hold **redundant copies of
+the same data element**. Unlike the H-dimensions that partition unique elements across
+threads, an R-dimension of length ``k`` means that ``k`` threads all map to exactly
+the same tensor position -- they are replicas. R-space does not correspond to any
+X-dimension of the output tensor; it is a "phantom" dimension that exists solely to
+describe how many threads share each data location.
 
-R-space dimensions are optional and algorithm-specific. A matrix multiplication might use R-space to replicate portions of the input matrices across thread groups, enabling each group to compute partial products independently. The framework automatically manages the complexities of replication, including the allocation of private storage and the coordination of replicated computations.
+R-space arises in two distinct situations:
+
+1. **By design** -- when more threads exist than are needed to cover the tile uniquely.
+   For example, in GEMM the A-tile needs to be broadcast to every warp along the
+   N-direction; in softmax, multiple lanes share one row; in split-KV FMHA, excess
+   warps become replicas of the needed computation.
+
+2. **By reduction** -- after reducing a tensor dimension, the H sub-dimensions that
+   covered that dimension no longer map to distinct elements. The framework
+   automatically converts them into R-dimensions, recording that the threads which
+   used to hold different values now all hold the same reduced result.
+
+Once a distribution has non-trivial R-dimensions the framework must reduce the
+replicated values back to a single result. It does this automatically via:
+
+- **Cross-lane shuffles** -- when the lane P-dimension owns an R-dimension
+  (``does_p_own_r_[lane][r] == true``), ``warp_shuffle_down`` sweeps combine
+  adjacent replicas using ``lid_delta = ps_over_rs_derivative * 2^stage``.
+- **Cross-warp LDS reduction** -- when the warp P-dimension owns an R-dimension
+  (``does_p_own_r_[warp][r] == true``), partial results are written to shared
+  memory and combined there.
+- **Broadcast** -- after reduction the reduced value is sent back to all replica
+  threads via a reverse ``warp_shuffle_up`` sweep.
+
+**Key fields derived from RsLengths**:
+
+- ``NDimR`` -- number of R dimensions (zero for the common no-replication case)
+- ``does_p_own_r_[NDimP][NDimR]`` -- which partition dim (warp/lane) participates in each R dim, determining whether cross-warp or cross-lane sync is needed
+- ``ps_over_rs_derivative_[NDimP][NDimR]`` -- shuffle stride: how many P indices separate adjacent R indices
 
 **C++ Example**:
 
 .. code-block:: cpp
 
-   // R-dimensions in encoding
-   using Encoding = tile_distribution_encoding<
-       sequence<2>,  // rs_lengths: 2-way replication
-       /*...*/
+   // ── Case 1: No replication (matmul C-tile) ─────────────────────────────
+   //
+   // sequence<> means NDimR=0. rh_major=0 has no entries, so every
+   // (major,minor) pair in P and Y has major >= 1 (pure H-space).
+   // does_p_own_r_ is all-false; no reduction is generated.
+   //
+   using CTileEncoding = tile_distribution_encoding<
+       sequence<>,                              // R: empty — no replication
+       tuple<sequence<4, 2, 8, 4>,             // H for M
+             sequence<4, 2, 8, 4>>,            // H for N
+       tuple<sequence<1, 2>, sequence<1, 2>>,  // P major
+       tuple<sequence<1, 1>, sequence<2, 2>>,  // P minor
+       sequence<1, 1, 2, 2>,                   // Y major
+       sequence<0, 3, 0, 3>                    // Y minor
+   >;
+
+   // ── Case 2: GEMM A-tile — NWarp-way replication ────────────────────────
+   //
+   // The A matrix is only tiled along M and K, but the thread block has
+   // NWarp warps spread across N as well.  Those extra warps all need
+   // identical A data, so warp_id partially indexes into R[0] of length NWarp.
+   //
+   // does_p_own_r_[warp][0] == true  → cross-warp LDS reduction required
+   //
+   using ATileEncoding = tile_distribution_encoding<
+       sequence<NWarp>,                                // R: NWarp replica warps
+       tuple<sequence<MIterPerWarp, MWarp>, KIterSeq>, // H for M, H for K
+       tuple<sequence<1, 0>>,                          // P0 merges H[M][0] and R[0]
+       tuple<sequence<1, 0>>,
+       sequence<1, 2>,
+       sequence<0, 0>
+   >;
+
+   // ── Case 3: Softmax/topk — LanesPerRow-way replication ─────────────────
+   //
+   // Multiple lanes share one output row.  After the per-row reduction,
+   // all LanesPerRow lanes hold the same result.
+   // does_p_own_r_[lane][0] == true  → cross-lane warp_shuffle reduction
+   //
+   using SoftmaxEncoding = tile_distribution_encoding<
+       sequence<LanesPerRow>,                          // R: lane-level replication
+       tuple<sequence<IssuesPerCol, WarpsPerBlock,
+                      RowsPerWarpPerColIssue>,
+             sequence<1>>,
+       tuple<sequence<1>, sequence<1, 0>>,
+       tuple<sequence<1>, sequence<2, 0>>,
+       sequence<1, 2>,
+       sequence<0, 0>
+   >;
+
+   // ── Case 4: FMHA backward — two R dimensions ───────────────────────────
+   //
+   // A 1D reduction tile where NWarp warps AND N1 adjacent lanes within
+   // each warp all hold copies of the same row element.
+   // does_p_own_r_[warp][0] == true  → cross-warp LDS reduction on R[0]
+   // does_p_own_r_[lane][1] == true  → cross-lane shuffle  reduction on R[1]
+   //
+   using BwdReduceEncoding = tile_distribution_encoding<
+       sequence<NWarp, N1>,                            // R: two replication dims
+       tuple<sequence<M0, M1, M2>>,                   // H for M
+       tuple<sequence<0, 1>, sequence<0, 1>>,          // P0 merges R[0], H[0]; P1 merges R[1], H[1]
+       tuple<sequence<0, 0>, sequence<1, 1>>,
+       sequence<1>,
+       sequence<2>
    >;
 
 D-Space (Data Space)
@@ -103,8 +238,21 @@ The transformation from Y-space to D-space is more than a simple flattening oper
 
 .. code-block:: cpp
 
-   // Y-to-D descriptor linearizes storage
+   // For the matmul C-tile, each thread holds 256 output elements in registers.
+   // D-space linearises the 4D Y-space Y=[Y0,Y1,Y2,Y3] into a flat register index.
+   //
+   // With Y extents [4, 4, 4, 4] stored in row-major order:
+   //   D = Y[0]*64 + Y[1]*16 + Y[2]*4 + Y[3]
+   //
+   // Example:
+   //   Y = [2, 3, 1, 0]  →  D = 2*64 + 3*16 + 1*4 + 0 = 128 + 48 + 4 = 180
+   //
+   // The compiler sees a static array of 256 registers and indexes it directly:
+   //   c_registers[180]  ← the element at Y=[2,3,1,0]
+   //
+   // sweep_tile iterates D = 0..255 at compile time with no runtime index arithmetic.
    auto d_idx = ys_to_d_descriptor.calculate_offset(y_idx);
+   // d_idx is a compile-time constant when y_idx is compile-time → zero overhead
 
 Dimension Types
 ---------------
