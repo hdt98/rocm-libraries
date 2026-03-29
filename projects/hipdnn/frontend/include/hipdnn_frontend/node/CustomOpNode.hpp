@@ -7,6 +7,7 @@
 #include <hipdnn_frontend/Error.hpp>
 #include <hipdnn_frontend/attributes/CustomOpAttributes.hpp>
 #include <hipdnn_frontend/attributes/GraphAttributes.hpp>
+#include <hipdnn_frontend/detail/CustomOpPacker.hpp>
 
 namespace hipdnn_frontend::graph
 {
@@ -19,6 +20,11 @@ public:
         : INode(graphAttrs)
         , attributes(std::move(customOpAttributes))
     {
+    }
+
+    NodeType getNodeType() const override
+    {
+        return NodeType::CUSTOM_OP;
     }
 
     std::string getNodeName() const override
@@ -123,6 +129,13 @@ public:
         }
 
         return {ErrorCode::OK, ""};
+    }
+
+    Error create_operation(
+        std::unordered_map<int64_t, detail::ScopedHipdnnBackendDescriptor>& tensorDescs,
+        std::vector<detail::ScopedHipdnnBackendDescriptor>& operations) const override
+    {
+        return detail::createCustomOpOperation(attributes, tensorDescs, operations);
     }
 
     flatbuffers::Offset<hipdnn_data_sdk::data_objects::Node>
