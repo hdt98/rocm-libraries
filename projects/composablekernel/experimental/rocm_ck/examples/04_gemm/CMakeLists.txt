@@ -35,7 +35,7 @@ endif()
 
 # --- Kernel variants: types, warp tiles, fused epilogues, layout combinations ---
 set(KERNEL_VARIANTS gemm_fp32 gemm_fp16 gemm_bf16 gemm_fp16_w32 gemm_fp16_add gemm_fp16_add_relu
-    gemm_fp16_rr gemm_fp16_cr gemm_fp16_cc gemm_fp16_splitk)
+    gemm_fp16_rr gemm_fp16_cr gemm_fp16_cc gemm_fp16_splitk gemm_fp16_v3 gemm_fp16_add_add)
 
 # rocm_ck headers for device code (DataType, Layout enums used by gemm_api.hpp)
 set(ROCM_CK_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../include")

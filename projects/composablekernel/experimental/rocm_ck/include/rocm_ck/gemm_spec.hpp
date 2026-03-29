@@ -64,6 +64,20 @@ inline constexpr int kMaxEpilogueOps = 4;
 // Tile geometry types
 // ============================================================================
 
+/// Pipeline implementation strategy for the GEMM kernel.
+///
+/// V1: Simple pipeline — A/B from global memory, C in registers.
+///     Uses GemmPipelineProblem + GemmPipelineAGmemBGmemCRegV1.
+///
+/// V3: Compute-optimized pipeline — software-pipelined loads.
+///     Uses UniversalGemmPipelineProblem + GemmPipelineAgBgCrCompV3.
+///     Better compute utilization through overlapped memory/compute.
+enum class Pipeline
+{
+    V1,
+    V3
+};
+
 /// M x N x K dimension triple for tile geometry specification.
 struct Dim3
 {
@@ -74,10 +88,11 @@ struct Dim3
 /// Independent of data types — paired with Signature in make_spec().
 struct GemmAlgorithm
 {
-    Dim3 block_tile;  // Elements per thread block {M, N, K}
-    Dim3 block_warps; // Warp distribution {M, N, K}
-    Dim3 warp_tile;   // Elements per warp per MFMA step {M, N, K}
-    int k_batch = 1;  // Split-K factor: partitions K across blockIdx.z
+    Dim3 block_tile;                  // Elements per thread block {M, N, K}
+    Dim3 block_warps;                 // Warp distribution {M, N, K}
+    Dim3 warp_tile;                   // Elements per warp per MFMA step {M, N, K}
+    int k_batch       = 1;            // Split-K factor: partitions K across blockIdx.z
+    Pipeline pipeline = Pipeline::V1; // Pipeline implementation strategy
 };
 
 // ============================================================================
@@ -108,6 +123,9 @@ struct GemmSpec
     Dim3 warp_tile;
     int thread_block_size;
     int k_batch; // Split-K factor (1 = no split)
+
+    // Pipeline implementation strategy
+    Pipeline pipeline;
 
     // Epilogue: composable op chain applied after matmul
     int num_epilogue_ops;
@@ -244,6 +262,9 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
     std::string_view d0_name;
     DataType d0_dtype = DataType::FP32;
     Layout d0_layout  = Layout::Row;
+    std::string_view d1_name;
+    DataType d1_dtype = DataType::FP32;
+    Layout d1_layout  = Layout::Row;
 
     int next_op = 1;
 
@@ -259,6 +280,22 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
         d0_layout              = d0_td.layout != Layout::Auto ? d0_td.layout : Layout::Row;
         final_output           = add.out;
         next_op++;
+
+        // Second consecutive AddOp — second D tensor (Add+Add: result += D0 + D1).
+        // CK Tile's ComposedCDEOp folds D tensors via parameter pack:
+        //   ((result += convert(ds)), ...) applies one Add to ALL D tensors.
+        // Two consecutive AddOps with one EpilogueOp::Add gives correct behavior.
+        if(next_op < kMaxOps && std::holds_alternative<AddOp>(sig.ops[next_op]))
+        {
+            const AddOp& add2 = std::get<AddOp>(sig.ops[next_op]);
+            num_d_tensors     = 2;
+            d1_name           = add2.rhs;
+            TensorDesc d1_td  = resolved.tensor(d1_name);
+            d1_dtype          = d1_td.dtype;
+            d1_layout         = d1_td.layout != Layout::Auto ? d1_td.layout : Layout::Row;
+            final_output      = add2.out;
+            next_op++;
+        }
     }
     else if(next_op < kMaxOps && std::holds_alternative<MulOp>(sig.ops[next_op]))
     {
@@ -352,6 +389,11 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
         phys[num_phys] = {d0_name, d0_dtype, d0_layout, num_phys};
         num_phys++;
     }
+    if(num_d_tensors >= 2)
+    {
+        phys[num_phys] = {d1_name, d1_dtype, d1_layout, num_phys};
+        num_phys++;
+    }
 
     return {num_phys,
             phys,
@@ -361,6 +403,7 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
             algo.warp_tile,
             thread_block_size,
             algo.k_batch,
+            algo.pipeline,
             num_epi_ops,
             epi_ops};
 }

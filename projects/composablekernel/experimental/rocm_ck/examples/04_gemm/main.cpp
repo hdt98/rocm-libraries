@@ -76,6 +76,7 @@ int main(int argc, char** argv)
     std::vector<float> ref_a(M * K);
     std::vector<float> ref_b(K * N);
     std::vector<float> ref_d0(M * N);
+    std::vector<float> ref_d1(M * N);
 
     for(int i = 0; i < M * K; ++i)
         ref_a[i] = static_cast<float>(i % 8);
@@ -83,6 +84,8 @@ int main(int argc, char** argv)
         ref_b[i] = static_cast<float>(i % 8);
     for(int i = 0; i < M * N; ++i)
         ref_d0[i] = static_cast<float>(i % 4);
+    for(int i = 0; i < M * N; ++i)
+        ref_d1[i] = static_cast<float>(i % 3);
 
     // --- Run each variant ---
     bool all_passed  = true;
@@ -135,6 +138,13 @@ int main(int argc, char** argv)
             cpu_gemm_add_relu(ref_fused.data(), ref_c.data(), ref_d0.data(), M * N);
             ref = ref_fused.data();
         }
+        else if(spec.has_epilogue_op(rocm_ck::EpilogueOp::Add) && spec.num_physical_tensors > 4)
+        {
+            // Two D tensors: Add+Add (result = gemm + D0 + D1)
+            ref_fused.resize(M * N);
+            cpu_gemm_add_add(ref_fused.data(), ref_c.data(), ref_d0.data(), ref_d1.data(), M * N);
+            ref = ref_fused.data();
+        }
         else if(spec.has_epilogue_op(rocm_ck::EpilogueOp::Add))
         {
             ref_fused.resize(M * N);
@@ -151,14 +161,21 @@ int main(int argc, char** argv)
         buf_b.upload(ref_b.data());
         buf_c.zero();
 
-        // D0 tensor (e.g., bias) is present when num_physical_tensors > 3
+        // D tensors are present when num_physical_tensors > 3
         bool has_d0 = spec.num_physical_tensors > 3;
+        bool has_d1 = spec.num_physical_tensors > 4;
 
         std::unique_ptr<rocm_ck::TypedBuffer> buf_d0;
         if(has_d0)
         {
             buf_d0 = std::make_unique<rocm_ck::TypedBuffer>(spec.d0().dtype, M * N);
             buf_d0->upload(ref_d0.data());
+        }
+        std::unique_ptr<rocm_ck::TypedBuffer> buf_d1;
+        if(has_d1)
+        {
+            buf_d1 = std::make_unique<rocm_ck::TypedBuffer>(spec.d1().dtype, M * N);
+            buf_d1->upload(ref_d1.data());
         }
 
         std::printf("%s: M=%d, N=%d, K=%d, grid=%dx%d, block=%d\n",
@@ -185,6 +202,14 @@ int main(int argc, char** argv)
                 buf_d0->ptr(),
                 rocm_ck::make_shape(M, N),
                 rocm_ck::make_strides(d0_stride_m, d0_stride_n)};
+        }
+        if(has_d1)
+        {
+            auto [d1_stride_m, d1_stride_n]          = layout_strides(spec.d1().layout, M, N);
+            kernel_args.tensors[spec.d1().args_slot] = {
+                buf_d1->ptr(),
+                rocm_ck::make_shape(M, N),
+                rocm_ck::make_strides(d1_stride_m, d1_stride_n)};
         }
 
         void* args_ptr          = &kernel_args;

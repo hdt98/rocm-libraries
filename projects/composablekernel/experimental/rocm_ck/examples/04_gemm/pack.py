@@ -219,6 +219,46 @@ VARIANTS = [
         "warp_k": 16,
         "block_size": 256,
     },
+    # Pipeline V3: compute-optimized pipeline
+    {
+        "name": "gemm_fp16_v3",
+        "a_dtype": "fp16",
+        "b_dtype": "fp16",
+        "c_dtype": "fp16",
+        "acc_dtype": "fp32",
+        "pipeline": "V3",
+        "block_m": 128,
+        "block_n": 128,
+        "block_k": 32,
+        "warps_m": 2,
+        "warps_n": 2,
+        "warps_k": 1,
+        "warp_m": 16,
+        "warp_n": 16,
+        "warp_k": 16,
+        "block_size": 256,
+    },
+    # Multi-D: two D tensors (Add+Add: result = A*B + D0 + D1)
+    {
+        "name": "gemm_fp16_add_add",
+        "a_dtype": "fp16",
+        "b_dtype": "fp16",
+        "c_dtype": "fp16",
+        "acc_dtype": "fp32",
+        "combine": "add",
+        "d0_dtype": "fp16",
+        "d1_dtype": "fp16",
+        "block_m": 128,
+        "block_n": 128,
+        "block_k": 32,
+        "warps_m": 2,
+        "warps_n": 2,
+        "warps_k": 1,
+        "warp_m": 16,
+        "warp_n": 16,
+        "warp_k": 16,
+        "block_size": 256,
+    },
 ]
 ARCHITECTURES = ["gfx90a", "gfx942", "gfx950"]
 
@@ -312,6 +352,8 @@ def main() -> None:
                     meta["c_layout"] = v["c_layout"]
                 if "k_batch" in v:
                     meta["k_batch"] = v["k_batch"]
+                if "pipeline" in v:
+                    meta["pipeline"] = v["pipeline"]
                 variant_metadata[v["name"]] = meta
 
         toc = {
