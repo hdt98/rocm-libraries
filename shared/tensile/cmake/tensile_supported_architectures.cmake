@@ -91,7 +91,13 @@ function(tensile_validate_gpu_targets targets)
     string(REGEX REPLACE " +" ";" target_list "${target_flat}")
 
     foreach(target IN LISTS target_list)
-        list(FIND supported_list "${target}" idx)
+        # Strip :sramecc+/:sramecc- qualifiers before validation — sramecc is a
+        # hardware memory configuration flag that Tensile does not differentiate on.
+        # CI machines report fully-qualified targets (e.g. gfx950:sramecc+:xnack-)
+        # from rocm_agent_enumerator; strip the sramecc component so the lookup
+        # matches the supported list which only uses xnack variants.
+        string(REGEX REPLACE ":sramecc[+-]" "" target_stripped "${target}")
+        list(FIND supported_list "${target_stripped}" idx)
         if(idx EQUAL -1)
             message(FATAL_ERROR "Unsupported GPU target: ${target}\nSupported targets are: ${supported_list}")
         endif()
