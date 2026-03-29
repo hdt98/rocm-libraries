@@ -14,7 +14,7 @@ The user-facing `Signature` + `ElementwiseAlgorithm` (using `std::optional`, `st
 // User writes:
 constexpr auto kernel = make_spec(
     Signature{.dtype = DataType::FP32, .ops = {AddOp{}}},
-    ElementwiseAlgorithm{.block_tile = 1024, .block_warps = 1, .warp_tile = 1024, .pad = true});
+    ElementwiseAlgorithm{.block_tile = 1024, .block_waves = 1, .wave_tile = 1024, .pad = true});
 
 // make_spec returns a ElementwiseSpec with all fields resolved and validated.
 // This value is used directly as a template parameter: run<kernel>(args)
@@ -53,19 +53,19 @@ Throwing in a `consteval` function produces a compile error at the call site wit
 
 - Input types must match (`a_dtype == b_dtype` for vector add)
 - Tile dimensions must be positive
-- `block_warps` must be a power of 2
+- `block_waves` must be a power of 2
 - `kVectorM` must be >= 1 (validates type/tile compatibility)
-- `block_tile` must be divisible by `(block_warps * kVectorM * warp_size)`
+- `block_tile` must be divisible by `(block_waves * kVectorM * wavefront_size)`
 - `kRepeatM` must be >= 1
 
-Invalid configs fail at compile time with readable messages like `"block_tile must be divisible by (block_warps * kVectorM * warp_size)"`. This is dramatically better than runtime validation — broken kernel configs never produce `.hsaco` files.
+Invalid configs fail at compile time with readable messages like `"block_tile must be divisible by (block_waves * kVectorM * wavefront_size)"`. This is dramatically better than runtime validation — broken kernel configs never produce `.hsaco` files.
 
 ## 4. Signature / Algorithm Separation
 
 "What" (data types + operation) vs "How" (tile geometry) are orthogonal concerns:
 
 - **Signature**: `{dtype, tensors[], scalars[], ops[]}` — specifies the compute graph and types
-- **Algorithm**: `{block_tile, block_warps, warp_tile, pad}` — specifies the tile geometry
+- **Algorithm**: `{block_tile, block_waves, wave_tile, pad}` — specifies the tile geometry
 
 The same signature can be paired with different algorithms to explore the tuning surface. The same algorithm can run on FP32, FP16, or BF16 (subject to `kVectorM` constraints validated by `make_spec`).
 
@@ -177,23 +177,23 @@ The stock `ElementWiseKernel` default-constructs its functor — no path to pass
 For mixed-type operations, the wider type constrains vector width:
 
 ```
-kVectorM = min(128 / max_type_bits, warp_tile / warp_size)
+kVectorM = min(128 / max_type_bits, wave_tile / wavefront_size)
 ```
 
 FP16+FP32 mixed: `max_type_bits = 32`, so `kVectorM_a = 4` (vs 8 for homogeneous FP16). The constraint comes from the 128-bit vector register width — wider elements mean fewer elements per vector load/store.
 
 This is validated at `consteval` time. A tile configuration that works for FP32 may not work for FP8 (which allows 16 elements per vector but requires larger minimum block tiles).
 
-## 11. thread_block_size = warp_size * block_warps, NOT block_tile
+## 11. workgroup_size = wavefront_size * block_waves, NOT block_tile
 
-Common confusion caught during development. Block tile determines elements per block; threads are determined by warp count:
+Common confusion caught during development. Block tile determines elements per block; threads are determined by wavefront count:
 
 ```
-thread_block_size = warp_size * block_warps    (threads launched per block)
-block_tile        = thread_block_size * kRepeatM * kVectorM  (elements processed per block)
+workgroup_size = wavefront_size * block_waves    (threads launched per block)
+block_tile        = workgroup_size * kRepeatM * kVectorM  (elements processed per block)
 ```
 
-A `block_tile = 1024` with `block_warps = 1` still launches only 64 threads — each warp iterates `kRepeatM` times, processing `kVectorM` elements per iteration.
+A `block_tile = 1024` with `block_waves = 1` still launches only 64 threads — each wavefront iterates `kRepeatM` times, processing `kVectorM` elements per iteration.
 
 ## 12. Variant Registry and Selection
 
@@ -207,7 +207,7 @@ This is a simple but effective model. Production will need more dimensions (arch
 
 ## 13. Archive Metadata Mirrors Source
 
-`pack.py` embeds tuning parameters in the kpack TOC's `variant_metadata` section: block tile, block warps, warp tile, pad flag, input/output dtypes. This enables tooling to inspect archives without source code — a profiler can read the metadata to understand what kernel configuration produced a particular performance result.
+`pack.py` embeds tuning parameters in the kpack TOC's `variant_metadata` section: block tile, block waves, wave tile, pad flag, input/output dtypes. This enables tooling to inspect archives without source code — a profiler can read the metadata to understand what kernel configuration produced a particular performance result.
 
 Basic readers ignore the metadata; advanced tools consume it. The kpack format supports this naturally because MessagePack maps are extensible.
 

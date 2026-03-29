@@ -8,52 +8,52 @@
 using namespace rocm_ck;
 
 // ============================================================================
-// is_valid_warp_gemm
+// is_valid_mfma
 // ============================================================================
 
-TEST(WarpGemm, AcceptsFP32With16x16Tile)
+TEST(MfmaValidation, AcceptsFP32With16x16Tile)
 {
-    EXPECT_TRUE(is_valid_warp_gemm(DataType::FP32, 16, 16, 4));
-    EXPECT_TRUE(is_valid_warp_gemm(DataType::FP32, 16, 16, 8));
-    EXPECT_TRUE(is_valid_warp_gemm(DataType::FP32, 16, 16, 16));
+    EXPECT_TRUE(is_valid_mfma(DataType::FP32, 16, 16, 4));
+    EXPECT_TRUE(is_valid_mfma(DataType::FP32, 16, 16, 8));
+    EXPECT_TRUE(is_valid_mfma(DataType::FP32, 16, 16, 16));
 }
 
-TEST(WarpGemm, AcceptsFP32With32x32OnlyForSmallK)
+TEST(MfmaValidation, AcceptsFP32With32x32OnlyForSmallK)
 {
-    EXPECT_TRUE(is_valid_warp_gemm(DataType::FP32, 32, 32, 4));
-    EXPECT_TRUE(is_valid_warp_gemm(DataType::FP32, 32, 32, 8));
-    EXPECT_FALSE(is_valid_warp_gemm(DataType::FP32, 32, 32, 16)); // k=16 invalid at 32x32 for fp32
+    EXPECT_TRUE(is_valid_mfma(DataType::FP32, 32, 32, 4));
+    EXPECT_TRUE(is_valid_mfma(DataType::FP32, 32, 32, 8));
+    EXPECT_FALSE(is_valid_mfma(DataType::FP32, 32, 32, 16)); // k=16 invalid at 32x32 for fp32
 }
 
-TEST(WarpGemm, AcceptsFP16With16x16Tile)
+TEST(MfmaValidation, AcceptsFP16With16x16Tile)
 {
-    EXPECT_TRUE(is_valid_warp_gemm(DataType::FP16, 16, 16, 16));
-    EXPECT_TRUE(is_valid_warp_gemm(DataType::FP16, 16, 16, 32));
-    EXPECT_FALSE(is_valid_warp_gemm(DataType::FP16, 16, 16, 4));
+    EXPECT_TRUE(is_valid_mfma(DataType::FP16, 16, 16, 16));
+    EXPECT_TRUE(is_valid_mfma(DataType::FP16, 16, 16, 32));
+    EXPECT_FALSE(is_valid_mfma(DataType::FP16, 16, 16, 4));
 }
 
-TEST(WarpGemm, AcceptsFP16With32x32Tile)
+TEST(MfmaValidation, AcceptsFP16With32x32Tile)
 {
-    EXPECT_TRUE(is_valid_warp_gemm(DataType::FP16, 32, 32, 8));
-    EXPECT_TRUE(is_valid_warp_gemm(DataType::FP16, 32, 32, 16));
-    EXPECT_FALSE(is_valid_warp_gemm(DataType::FP16, 32, 32, 4)); // k=4 invalid at 32x32 for fp16
+    EXPECT_TRUE(is_valid_mfma(DataType::FP16, 32, 32, 8));
+    EXPECT_TRUE(is_valid_mfma(DataType::FP16, 32, 32, 16));
+    EXPECT_FALSE(is_valid_mfma(DataType::FP16, 32, 32, 4)); // k=4 invalid at 32x32 for fp16
 }
 
-TEST(WarpGemm, AcceptsSameTilesForBF16AsFP16)
+TEST(MfmaValidation, AcceptsSameTilesForBF16AsFP16)
 {
-    EXPECT_TRUE(is_valid_warp_gemm(DataType::BF16, 16, 16, 16));
-    EXPECT_TRUE(is_valid_warp_gemm(DataType::BF16, 32, 32, 16));
-    EXPECT_FALSE(is_valid_warp_gemm(DataType::BF16, 32, 32, 4));
+    EXPECT_TRUE(is_valid_mfma(DataType::BF16, 16, 16, 16));
+    EXPECT_TRUE(is_valid_mfma(DataType::BF16, 32, 32, 16));
+    EXPECT_FALSE(is_valid_mfma(DataType::BF16, 32, 32, 4));
 }
 
-TEST(WarpGemm, RejectsAsymmetricAndIntegerConfigs)
+TEST(MfmaValidation, RejectsAsymmetricAndIntegerConfigs)
 {
     // Asymmetric tiles not supported
-    EXPECT_FALSE(is_valid_warp_gemm(DataType::FP32, 16, 32, 8));
-    EXPECT_FALSE(is_valid_warp_gemm(DataType::FP16, 32, 16, 16));
+    EXPECT_FALSE(is_valid_mfma(DataType::FP32, 16, 32, 8));
+    EXPECT_FALSE(is_valid_mfma(DataType::FP16, 32, 16, 16));
 
-    // Integer types not supported in warp gemm validation
-    EXPECT_FALSE(is_valid_warp_gemm(DataType::I32, 16, 16, 4));
+    // Integer types not supported in MFMA validation
+    EXPECT_FALSE(is_valid_mfma(DataType::I32, 16, 16, 4));
 }
 
 // ============================================================================
@@ -98,7 +98,7 @@ TEST(MakeSpec, ComputesThreadBlockSizeFromWarps)
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
     // 2 * 2 * 1 * 64 = 256
-    EXPECT_EQ(k.thread_block_size, 256);
+    EXPECT_EQ(k.workgroup_size, 256);
 }
 
 TEST(MakeSpec, ReportsZeroEpilogueOpsForPlainGemm)
@@ -177,7 +177,7 @@ TEST(MakeSpec, UsesFinalOutputSlotForGemmAddRelu)
 }
 
 // ============================================================================
-// make_spec: 32x32 warp tile
+// make_spec: 32x32 MFMA tile
 // ============================================================================
 
 TEST(MakeSpec, Accepts32x32WarpTileWithCorrectBlockSize)
@@ -186,10 +186,10 @@ TEST(MakeSpec, Accepts32x32WarpTileWithCorrectBlockSize)
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {32, 32, 16}});
 
-    EXPECT_EQ(k.thread_block_size, 256);
-    EXPECT_EQ(k.warp_tile.m, 32);
-    EXPECT_EQ(k.warp_tile.n, 32);
-    EXPECT_EQ(k.warp_tile.k, 16);
+    EXPECT_EQ(k.workgroup_size, 256);
+    EXPECT_EQ(k.mfma_tile.m, 32);
+    EXPECT_EQ(k.mfma_tile.n, 32);
+    EXPECT_EQ(k.mfma_tile.k, 16);
 }
 
 // ============================================================================
@@ -328,8 +328,8 @@ TEST(MakeSpec, AcceptsExplicitKBatch)
     constexpr auto k = make_spec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{.block_tile  = {128, 128, 32},
-                      .block_warps = {2, 2, 1},
-                      .warp_tile   = {16, 16, 16},
+                      .block_waves = {2, 2, 1},
+                      .mfma_tile   = {16, 16, 16},
                       .k_batch     = 4});
 
     EXPECT_EQ(k.k_batch, 4);
@@ -340,12 +340,12 @@ TEST(MakeSpec, KBatchPreservesOtherFields)
     constexpr auto k = make_spec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{.block_tile  = {128, 128, 32},
-                      .block_warps = {2, 2, 1},
-                      .warp_tile   = {16, 16, 16},
+                      .block_waves = {2, 2, 1},
+                      .mfma_tile   = {16, 16, 16},
                       .k_batch     = 4});
 
     EXPECT_EQ(k.num_physical_tensors, 3);
-    EXPECT_EQ(k.thread_block_size, 256);
+    EXPECT_EQ(k.workgroup_size, 256);
     EXPECT_EQ(k.block_tile.k, 32);
 }
 
@@ -355,8 +355,8 @@ TEST(MakeSpec, KBatchWorksWithEpilogueOps)
                                            .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                                                      AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
                                  GemmAlgorithm{.block_tile  = {128, 128, 32},
-                                               .block_warps = {2, 2, 1},
-                                               .warp_tile   = {16, 16, 16},
+                                               .block_waves = {2, 2, 1},
+                                               .mfma_tile   = {16, 16, 16},
                                                .k_batch     = 2});
 
     EXPECT_EQ(k.k_batch, 2);

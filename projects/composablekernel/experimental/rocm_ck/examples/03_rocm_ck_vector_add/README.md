@@ -15,7 +15,7 @@ Kernel configuration is split into two orthogonal concerns:
   is a single `AddOp`. `resolve()` flattens the signature into concrete tensor
   descriptors at compile time.
 - **Algorithm** (`ElementwiseAlgorithm`): *How* the kernel executes — tile geometry,
-  warp count, vector width, padding.
+  wavefront count, vector width, padding.
 
 This separation lets the same operation (vector add) be compiled with many
 different tuning configurations, each producing a distinct `.hsaco` binary.
@@ -67,15 +67,15 @@ The algorithm exposes four independent knobs matching CK Tile's `ElementWiseShap
 
 | Parameter | Field | Description |
 |-----------|-------|-------------|
-| BlockTile | `block_tile` | Elements processed per thread block |
-| BlockWarps | `block_warps` | Warps per thread block (must be power of 2) |
-| WarpTile | `warp_tile` | Controls vector load width (`kVectorM`) |
+| BlockTile | `block_tile` | Elements processed per workgroup |
+| BlockWarps | `block_waves` | Wavefronts per workgroup (must be power of 2) |
+| WarpTile | `wave_tile` | Controls vector load width (`kVectorM`) |
 | Pad | `pad` | Enable padding for unaligned problem sizes |
 
 Derived quantities (validated at compile time by `make_spec`):
-- `kVectorM = min(128 / max_type_bits, warp_tile / 64)` — vector elements per thread
-- `kRepeatM = block_tile / (block_warps × kVectorM × 64)` — iterations per warp
-- `thread_block_size = 64 × block_warps` — actual threads launched
+- `kVectorM = min(128 / max_type_bits, wave_tile / 64)` — vector elements per work-item
+- `kRepeatM = block_tile / (block_waves × kVectorM × 64)` — iterations per wavefront
+- `workgroup_size = 64 × block_waves` — work-items per workgroup
 
 ### Variant Registry
 
@@ -103,7 +103,7 @@ shared by both device `.hip` files and the host `main.cpp`:
 | `fp32_fp16_b1024` | FP32 | FP16 | 1024 | 1 | 1024 | 64 |
 | `bf16_fp32_b1024` | BF16 | FP32 | 1024 | 1 | 1024 | 64 |
 
-The `_w8`/`_w2` suffixes indicate multi-warp variants.
+The `_w8`/`_w2` suffixes indicate multi-wave variants.
 
 ## File Roles
 
@@ -161,21 +161,21 @@ Expected output:
 Opened build/kernels.kpack — architectures: gfx90a, gfx942
 
 Variant selection for N=4096:
-  FP32 -> vector_add_fp32_b2048_w8 (tile=2048, warps=8)
-  FP16 -> vector_add_fp16_b1024 (tile=1024, warps=1)
-  BF16 -> vector_add_bf16_b1024 (tile=1024, warps=1)
+  FP32 -> vector_add_fp32_b2048_w8 (tile=2048, waves=8)
+  FP16 -> vector_add_fp16_b1024 (tile=1024, waves=1)
+  BF16 -> vector_add_bf16_b1024 (tile=1024, waves=1)
 
 Running all 12 variants (alpha=1, beta=1):
-  vector_add_fp32_b256: tile=256, warps=1, threads=64, N=4096 (aligned)
+  vector_add_fp32_b256: tile=256, waves=1, work_items=64, N=4096 (aligned)
   vector_add_fp32_b256 (grid=16, block=64): PASSED
   ...
-  vector_add_fp16_fp32_b1024: tile=1024, warps=1, threads=64, N=4096 (aligned)
+  vector_add_fp16_fp32_b1024: tile=1024, waves=1, work_items=64, N=4096 (aligned)
   vector_add_fp16_fp32_b1024 (grid=4, block=64): PASSED
-  vector_add_fp32_fp16_b1024: tile=1024, warps=1, threads=64, N=4096 (aligned)
+  vector_add_fp32_fp16_b1024: tile=1024, waves=1, work_items=64, N=4096 (aligned)
   vector_add_fp32_fp16_b1024 (grid=4, block=64): PASSED
 
 Scaled-add test (alpha=2, beta=0.5):
-  vector_add_fp32_b2048_w8: tile=2048, warps=8, threads=512, N=4096 (aligned)
+  vector_add_fp32_b2048_w8: tile=2048, waves=8, work_items=512, N=4096 (aligned)
   vector_add_fp32_b2048_w8 (grid=2, block=512): PASSED
 ```
 
@@ -183,13 +183,13 @@ Scaled-add test (alpha=2, beta=0.5):
 
 **C++20 required.** Struct NTTPs and `consteval` validation are C++20 features.
 
-**`thread_block_size = 64 × block_warps`, not `block_tile`.** The number of
-GPU threads equals the warp count times the wavefront size (64 on AMD CDNA).
-Each warp iterates `kRepeatM` times to cover its share of the block tile.
+**`workgroup_size = 64 × block_waves`, not `block_tile`.** The number of
+GPU threads equals the wavefront count times the wavefront size (64 on AMD CDNA).
+Each wavefront iterates `kRepeatM` times to cover its share of the block tile.
 
 **Archive metadata.** `pack.py` writes a `variant_metadata` section in the
 kpack TOC containing each variant's tuning parameters (in_dtype, out_dtype,
-block_tile, block_warps, warp_tile, pad). This is ignored by the kpack reader
+block_tile, block_waves, wave_tile, pad). This is ignored by the kpack reader
 but available for tooling that inspects archives.
 
 **Unified Signature.** All operations share the same `Signature` struct. The
