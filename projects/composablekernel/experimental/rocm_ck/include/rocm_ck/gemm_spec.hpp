@@ -6,7 +6,7 @@
 //
 // SHARED header: compiled in both host and device (--cuda-device-only) passes.
 // Contains structural types, consteval make_spec() factory, named accessors,
-// and warp tile validation. No runtime code.
+// and MFMA tile validation. No runtime code.
 //
 // Compilation boundary:
 //   _spec.hpp (this) — schema types + consteval factory (both passes)
@@ -74,7 +74,7 @@ inline constexpr int kMaxEpilogueOps = 4;
 ///     Better compute utilization through overlapped memory/compute.
 ///
 /// Preshuffle: Weight preshuffle pipeline — B matrix pre-rearranged for
-///     optimal SMEM loads. Uses WeightPreshufflePipelineAGmemBGmemCRegV2.
+///     optimal LDS loads. Uses WeightPreshufflePipelineAGmemBGmemCRegV2.
 ///     Requires A=RowMajor, B=ColumnMajor. Host must call preshuffle on B
 ///     before kernel launch.
 enum class Pipeline
@@ -109,9 +109,9 @@ struct Dim3
 /// Independent of data types — paired with Signature in make_spec().
 struct GemmAlgorithm
 {
-    Dim3 block_tile;                               // Elements per thread block {M, N, K}
-    Dim3 block_warps;                              // Warp distribution {M, N, K}
-    Dim3 warp_tile;                                // Elements per warp per MFMA step {M, N, K}
+    Dim3 block_tile;                               // Elements per workgroup {M, N, K}
+    Dim3 block_waves;                              // Wavefront layout within workgroup {M, N, K}
+    Dim3 mfma_tile;                                // MFMA instruction tile {M, N, K}
     int k_batch           = 1;                     // Split-K factor: partitions K across blockIdx.z
     Pipeline pipeline     = Pipeline::V1;          // Pipeline implementation strategy
     Scheduling scheduling = Scheduling::TileBased; // Work distribution strategy
@@ -141,9 +141,9 @@ struct GemmSpec
 
     // Tile geometry
     Dim3 block_tile;
-    Dim3 block_warps;
-    Dim3 warp_tile;
-    int thread_block_size;
+    Dim3 block_waves;
+    Dim3 mfma_tile;
+    int workgroup_size;
     int k_batch; // Split-K factor (1 = no split)
 
     // Pipeline implementation strategy
@@ -209,13 +209,13 @@ consteval DataType dtype(GemmSpec k, std::string_view name) { return tensor(k, n
 consteval Layout layout(GemmSpec k, std::string_view name) { return tensor(k, name).layout; }
 
 // ============================================================================
-// Warp tile validation
+// MFMA tile validation
 // ============================================================================
 
-/// Check if (a_dtype, warp_m, warp_n, warp_k) is a valid MFMA warp gemm
-/// configuration. Based on CK Tile's WarpGemmDispatcher specializations
-/// for gfx9 (MFMA). Only covers standard symmetric tile shapes.
-consteval bool is_valid_warp_gemm(DataType a_dtype, int m, int n, int k)
+/// Check if (a_dtype, m, n, k) maps to a valid MFMA instruction shape.
+/// Based on CK Tile's WarpGemmDispatcher specializations for gfx9.
+/// Only covers standard symmetric tile shapes.
+consteval bool is_valid_mfma(DataType a_dtype, int m, int n, int k)
 {
     if(a_dtype == DataType::FP32)
     {
@@ -259,11 +259,11 @@ consteval bool is_valid_warp_gemm(DataType a_dtype, int m, int n, int k)
 ///
 /// Validates:
 ///   - All tile dimensions are positive
-///   - block_warps.k == 1 (CShuffleEpilogue requires warps_m x warps_n block size)
-///   - Warp tile matches MFMA dispatcher table for the input dtype
-///   - Block tile is divisible by (block_warps x warp_tile) in each dimension
+///   - block_waves.k == 1 (CShuffleEpilogue requires waves_m x waves_n layout)
+///   - MFMA tile matches instruction table for the input dtype
+///   - Block tile is divisible by (block_waves x mfma_tile) in each dimension
 ///
-/// Derives thread_block_size = block_warps.m x block_warps.n x block_warps.k x 64.
+/// Derives workgroup_size = block_waves.m x block_waves.n x block_waves.k x wavefront_size.
 consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
 {
     ResolvedSignature resolved = resolve(sig);
@@ -378,16 +378,16 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
     // Tile validation
     if(algo.block_tile.m <= 0 || algo.block_tile.n <= 0 || algo.block_tile.k <= 0)
         throw "block_tile dimensions must be positive";
-    if(algo.block_warps.m <= 0 || algo.block_warps.n <= 0 || algo.block_warps.k <= 0)
-        throw "block_warps dimensions must be positive";
-    if(algo.warp_tile.m <= 0 || algo.warp_tile.n <= 0 || algo.warp_tile.k <= 0)
-        throw "warp_tile dimensions must be positive";
+    if(algo.block_waves.m <= 0 || algo.block_waves.n <= 0 || algo.block_waves.k <= 0)
+        throw "block_waves dimensions must be positive";
+    if(algo.mfma_tile.m <= 0 || algo.mfma_tile.n <= 0 || algo.mfma_tile.k <= 0)
+        throw "mfma_tile dimensions must be positive";
 
     if(algo.k_batch <= 0)
         throw "k_batch must be positive";
 
-    if(algo.block_warps.k != 1)
-        throw "block_warps.k must be 1 (CShuffleEpilogue constraint)";
+    if(algo.block_waves.k != 1)
+        throw "block_waves.k must be 1 (CShuffleEpilogue constraint)";
 
     // Pipeline-specific constraints
     if(algo.pipeline == Pipeline::Preshuffle)
@@ -402,18 +402,18 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
     if(algo.scheduling == Scheduling::StreamK && algo.k_batch > 1)
         throw "Stream-K scheduling is incompatible with split-K (k_batch > 1)";
 
-    if(!is_valid_warp_gemm(a_td.dtype, algo.warp_tile.m, algo.warp_tile.n, algo.warp_tile.k))
-        throw "warp_tile is not a valid MFMA configuration for this dtype";
+    if(!is_valid_mfma(a_td.dtype, algo.mfma_tile.m, algo.mfma_tile.n, algo.mfma_tile.k))
+        throw "mfma_tile is not a valid MFMA instruction shape for this dtype";
 
-    if(algo.block_tile.m % (algo.block_warps.m * algo.warp_tile.m) != 0)
-        throw "block_tile.m must be divisible by (block_warps.m * warp_tile.m)";
-    if(algo.block_tile.n % (algo.block_warps.n * algo.warp_tile.n) != 0)
-        throw "block_tile.n must be divisible by (block_warps.n * warp_tile.n)";
-    if(algo.block_tile.k % (algo.block_warps.k * algo.warp_tile.k) != 0)
-        throw "block_tile.k must be divisible by (block_warps.k * warp_tile.k)";
+    if(algo.block_tile.m % (algo.block_waves.m * algo.mfma_tile.m) != 0)
+        throw "block_tile.m must be divisible by (block_waves.m * mfma_tile.m)";
+    if(algo.block_tile.n % (algo.block_waves.n * algo.mfma_tile.n) != 0)
+        throw "block_tile.n must be divisible by (block_waves.n * mfma_tile.n)";
+    if(algo.block_tile.k % (algo.block_waves.k * algo.mfma_tile.k) != 0)
+        throw "block_tile.k must be divisible by (block_waves.k * mfma_tile.k)";
 
-    int thread_block_size =
-        algo.block_warps.m * algo.block_warps.n * algo.block_warps.k * warp_size;
+    int workgroup_size =
+        algo.block_waves.m * algo.block_waves.n * algo.block_waves.k * wavefront_size;
 
     // Build physical tensor table
     int num_phys = 3;
@@ -437,9 +437,9 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
             phys,
             acc,
             algo.block_tile,
-            algo.block_warps,
-            algo.warp_tile,
-            thread_block_size,
+            algo.block_waves,
+            algo.mfma_tile,
+            workgroup_size,
             algo.k_batch,
             algo.pipeline,
             algo.scheduling,

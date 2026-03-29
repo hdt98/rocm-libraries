@@ -160,7 +160,7 @@ __device__ void run(Args args)
     // Device-side validation — catches invalid manual construction.
     static_assert(S.num_physical_tensors >= 3,
                   "kernel must have at least lhs, rhs, and output tensors");
-    static_assert(S.thread_block_size > 0, "thread_block_size must be positive");
+    static_assert(S.workgroup_size > 0, "workgroup_size must be positive");
     static_assert(EpilogueTypes<S>::NumDTensors <= 2,
                   "at most 2 D tensors supported in this example");
     static_assert(S.scheduling == Scheduling::TileBased,
@@ -215,10 +215,13 @@ __device__ void run(Args args)
     void* c_ptr = c_typed;
 
     // --- Step 1: Tile geometry (from GemmSpec, validated by make_spec) ---
+    // --- CK Tile type mapping ---
+    // rocm_ck "block_waves" -> CK Tile "BlockWarps" / "MWave"
+    // rocm_ck "mfma_tile"   -> CK Tile "WarpTile" / "MPerXdl"
     using GemmShape =
         ck_tile::TileGemmShape<ck_tile::sequence<S.block_tile.m, S.block_tile.n, S.block_tile.k>,
-                               ck_tile::sequence<S.block_warps.m, S.block_warps.n, S.block_warps.k>,
-                               ck_tile::sequence<S.warp_tile.m, S.warp_tile.n, S.warp_tile.k>>;
+                               ck_tile::sequence<S.block_waves.m, S.block_waves.n, S.block_waves.k>,
+                               ck_tile::sequence<S.mfma_tile.m, S.mfma_tile.n, S.mfma_tile.k>>;
 
     // --- Step 2-4: Traits, problem, pipeline (selected by S.pipeline) ---
     //
@@ -230,7 +233,7 @@ __device__ void run(Args args)
         GemmShape,
         ck_tile::TileGemmTraits<false, false, false, ALayout, BLayout, CLayout>>>;
 
-    // V3: compute-optimized (software-pipelined loads, double SMEM buffer)
+    // V3: compute-optimized (software-pipelined loads, double LDS buffer)
     using V3Pipeline = ck_tile::GemmPipelineAgBgCrCompV3<ck_tile::UniversalGemmPipelineProblem<
         AType,
         BType,
@@ -276,11 +279,11 @@ __device__ void run(Args args)
                                                                    EpiOp,
                                                                    TilePartitioner::MPerBlock,
                                                                    TilePartitioner::NPerBlock,
-                                                                   S.block_warps.m,
-                                                                   S.block_warps.n,
-                                                                   S.warp_tile.m,
-                                                                   S.warp_tile.n,
-                                                                   S.warp_tile.k,
+                                                                   S.block_waves.m, // MWave
+                                                                   S.block_waves.n, // NWave
+                                                                   S.mfma_tile.m,   // MPerXdl
+                                                                   S.mfma_tile.n,   // NPerXdl
+                                                                   S.mfma_tile.k,   // KPerXdl
                                                                    TransposeC>>;
 
     // --- Step 7: Kernel (ties everything together) ---

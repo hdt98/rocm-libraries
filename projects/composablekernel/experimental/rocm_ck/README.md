@@ -7,7 +7,7 @@ Describe GPU kernels as data (Signature + Algorithm), validate at compile time, 
 rocm_ck replaces CK Tile's template-parameter API with a data-driven schema. Kernels are defined by two pure-data structs — no template parameters at the user level:
 
 - **Signature** (what to compute) — a directed compute graph where tensors are nodes, operators are edges, and scalars are named parameters. Expressed with C++ designated initializers.
-- **Algorithm** (how to compute) — tile geometry, pipeline strategy, warp configuration, padding. Independent of data types.
+- **Algorithm** (how to compute) — tile geometry, pipeline strategy, wavefront layout, padding. Independent of data types.
 
 These flow through a compile-time pipeline:
 
@@ -42,8 +42,8 @@ static constexpr rocm_ck::GemmSpec spec = rocm_ck::make_spec(
                 rocm_ck::AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
                 rocm_ck::ReluOp{.in = "D", .out = "E"}}},
     rocm_ck::GemmAlgorithm{.block_tile  = {128, 128, 32},
-                            .block_warps = {2, 2, 1},
-                            .warp_tile   = {16, 16, 16}});
+                            .block_waves = {2, 2, 1},
+                            .mfma_tile   = {16, 16, 16}});
 
 extern "C" __global__ void gemm_fp16_add_relu(rocm_ck::Args args)
 {
@@ -68,7 +68,7 @@ between metaprogramming, host runtime, and device code:
 ```
 
 **`_spec.hpp`** is pure metaprogramming. It contains `consteval` factories
-(`make_spec`, `is_valid_warp_gemm`), `constexpr` structural types
+(`make_spec`, `is_valid_mfma`), `constexpr` structural types
 (`GemmSpec`, `ElementwiseSpec`), named accessors, and `static_assert` tests.
 The compiler evaluates everything at compile time — no runtime code is generated
 on either side. Both host (g++) and device (hipcc `--cuda-device-only`) passes
@@ -140,8 +140,8 @@ Proves that CK Tile kernels can be compiled into standalone `.hsaco` code object
 
 Production-ready pattern with:
 
-- **Signature/Algorithm separation** — *what* (operator graph + data types) vs *how* (tile geometry, warp count, vector width, padding)
-- **12 compiled variants** across FP32, FP16, BF16 with different block sizes, multi-warp, and mixed-precision
+- **Signature/Algorithm separation** — *what* (operator graph + data types) vs *how* (tile geometry, wavefront count, vector width, padding)
+- **12 compiled variants** across FP32, FP16, BF16 with different block sizes, multi-wave, and mixed-precision
 - **Constexpr validation** via `make_spec` that catches invalid configurations at compile time
 - **Variant registry** with `find_variant(DataType, problem_size)` for automatic kernel selection
 - **Archive metadata** — tuning parameters stored in the kpack TOC for tooling
@@ -195,7 +195,7 @@ experimental/rocm_ck/
 │   ├── CMakeLists.txt              # INTERFACE library target "rocm_ck"
 │   └── rocm_ck/
 │       │ # Types — pure definitions, no runtime, no CK deps
-│       ├── types.hpp               # index_t, warp_size
+│       ├── types.hpp               # index_t, wavefront_size
 │       ├── datatype_utils.hpp      # DataType enum, data_type_bits(), data_type_name()
 │       ├── layout.hpp              # Layout enum (Row, Col, Contiguous, Auto)
 │       ├── tensor_desc.hpp         # TensorDesc: name, dtype, rank, layout

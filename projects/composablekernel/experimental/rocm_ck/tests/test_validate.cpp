@@ -12,7 +12,7 @@ using namespace rocm_ck;
 static constexpr auto test_spec = make_spec(
     Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     GemmAlgorithm{
-        .block_tile = {128, 128, 32}, .block_warps = {2, 2, 1}, .warp_tile = {16, 16, 16}});
+        .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .mfma_tile = {16, 16, 16}});
 
 // A GemmSpec with a D0 tensor (4 physical tensors: A, B, D, C).
 static constexpr auto test_spec_d0 = make_spec(
@@ -20,7 +20,7 @@ static constexpr auto test_spec_d0 = make_spec(
               .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                         AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
     GemmAlgorithm{
-        .block_tile = {128, 128, 32}, .block_warps = {2, 2, 1}, .warp_tile = {16, 16, 16}});
+        .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .mfma_tile = {16, 16, 16}});
 
 // ============================================================================
 // validate() — passes when all tensors are filled

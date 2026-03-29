@@ -55,12 +55,12 @@ static bool runVariant(const rocm_ck::ElementwiseVariant& variant,
 
     // Launch
     const int grid_size  = (num_elements + variant.spec.block_tile - 1) / variant.spec.block_tile;
-    const int block_size = variant.spec.thread_block_size;
+    const int block_size = variant.spec.workgroup_size;
     const bool aligned   = rocm_ck::isAligned(variant.spec, num_elements);
-    std::printf("  %s: tile=%d, warps=%d, threads=%d, N=%d %s\n",
+    std::printf("  %s: tile=%d, waves=%d, work_items=%d, N=%d %s\n",
                 variant.name,
                 variant.spec.block_tile,
-                variant.spec.block_warps,
+                variant.spec.block_waves,
                 block_size,
                 num_elements,
                 aligned ? "(aligned)" : "(padded)");
@@ -145,11 +145,11 @@ int main(int argc, char** argv)
     {
         const auto* best = rocm_ck::findVariant(dt, dt, NUM_ELEMENTS);
         if(best)
-            std::printf("  %s -> %s (tile=%d, warps=%d)\n",
+            std::printf("  %s -> %s (tile=%d, waves=%d)\n",
                         rocm_ck::data_type_name(dt),
                         best->name,
                         best->spec.block_tile,
-                        best->spec.block_warps);
+                        best->spec.block_waves);
     }
     // Mixed-type: widening variants (narrow input -> FP32 output)
     for(auto in_dt : {rocm_ck::DataType::FP16, rocm_ck::DataType::BF16})

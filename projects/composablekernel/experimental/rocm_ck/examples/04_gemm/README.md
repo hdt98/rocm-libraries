@@ -35,9 +35,9 @@ Describes tile geometry through three `Dim3{m, n, k}` fields:
 struct Dim3 { int m, n, k; };
 
 struct GemmAlgorithm {
-    Dim3 block_tile;   // Elements per thread block {M, N, K}
-    Dim3 block_warps;  // Warp distribution {M, N, K}
-    Dim3 warp_tile;    // Elements per warp per MFMA step {M, N, K}
+    Dim3 block_tile;   // Elements per workgroup {M, N, K}
+    Dim3 block_waves;  // Wavefront layout within workgroup {M, N, K}
+    Dim3 mfma_tile;    // MFMA instruction tile {M, N, K}
     int k_batch = 1;   // Split-K factor (1 = no split)
 };
 ```
@@ -48,8 +48,8 @@ Independent of data types — paired with `Signature` in the `make_spec()` call:
 make_spec(
     Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     GemmAlgorithm{.block_tile  = {128, 128, 32},
-                  .block_warps = {2, 2, 1},
-                  .warp_tile   = {32, 32, 16}})
+                  .block_waves = {2, 2, 1},
+                  .mfma_tile   = {32, 32, 16}})
 ```
 
 ### Consteval Validation
@@ -57,12 +57,12 @@ make_spec(
 `make_spec()` performs compile-time validation:
 
 - **Warp tile validity**: Checks against CK Tile's `WarpGemmDispatcher` table
-  via `is_valid_warp_gemm()`. For example, FP32 supports 32×32×{4,8} but not
+  via `is_valid_mfma()`. For example, FP32 supports 32×32×{4,8} but not
   32×32×16, while FP16 supports 32×32×{8,16}.
 - **Tile divisibility**: `block_tile.m` must be divisible by
-  `block_warps.m × warp_tile.m` (and similarly for N and K).
-- **CShuffleEpilogue constraint**: `block_warps.k` must be 1.
-- **Thread block size**: Derived as `block_warps.m × block_warps.n × 64`.
+  `block_waves.m × mfma_tile.m` (and similarly for N and K).
+- **CShuffleEpilogue constraint**: `block_waves.k` must be 1.
+- **Workgroup size**: Derived as `block_waves.m × block_waves.n × wavefront_size`.
 
 Invalid configurations produce compile errors — no runtime surprises.
 
@@ -77,7 +77,7 @@ aggregates), so `GemmSpec` works as a C++20 non-type template parameter.
 `CkTypeMap` and `CkLayoutMap` map our schema enums to CK Tile's C++ types and
 layout tags. `run<S>` wires the 7-type CK Tile GEMM stack (shape, traits,
 problem, pipeline, partitioner, epilogue, kernel) from a `GemmSpec` NTTP.
-Tile geometry flows from `S.block_tile`, `S.block_warps`, and `S.warp_tile`.
+Tile geometry flows from `S.block_tile`, `S.block_waves`, and `S.mfma_tile`.
 
 ### Variant Table (gemm_variants.hpp)
 
@@ -156,21 +156,21 @@ entries can override it for mixed-precision epilogues.
 | `gemm_fp16_cc` | FP16 (C) | FP16 (C) | FP16 (R) | FP32 | — | 128×128×32 | 16×16×16 | 256 |
 | `gemm_fp16_splitk` | FP16 | FP16 | FP16 | FP32 | — | 128×128×32 | 16×16×16 | 256 | k_batch=4 |
 
-All variants use 128×128×32 block tile with 2×2×1 warp layout (4 warps =
-256 threads). `gemm_fp16_w32` demonstrates a wider 32×32 warp tile.
+All variants use 128×128×32 block tile with 2×2×1 wavefront layout (4 waves =
+256 work-items). `gemm_fp16_w32` demonstrates a wider 32×32 MFMA tile.
 `gemm_fp16_add` demonstrates fused bias addition. `gemm_fp16_add_relu`
 demonstrates composed epilogue (bias + activation). Layout variants
 (`_rr`, `_cr`, `_cc`) override GemmOp's BLAS-convention defaults (A=Row,
 B=Col) via explicit `Tensor` entries — R = RowMajor, C = ColumnMajor.
 `gemm_fp16_splitk` demonstrates Split-K scheduling — the K dimension is
-partitioned across `k_batch` thread block groups (blockIdx.z), with partial
+partitioned across `k_batch` workgroups (blockIdx.z), with partial
 results accumulated via atomic addition.
 
 ## File Roles
 
 | File | Compiled by | Purpose |
 |------|-------------|---------|
-| `gemm_spec.hpp` | Both (`include/rocm_ck/`) | **Structural types** — `GemmSpec`, `GemmAlgorithm`, `Dim3`, `EpilogueOp`, `consteval` factories (`make_spec`, `is_valid_warp_gemm`). No runtime code. |
+| `gemm_spec.hpp` | Both (`include/rocm_ck/`) | **Structural types** — `GemmSpec`, `GemmAlgorithm`, `Dim3`, `EpilogueOp`, `consteval` factories (`make_spec`, `is_valid_mfma`). No runtime code. |
 | `gemm_variants.hpp` | Both (g++ and hipcc) | **Variant registry** — constexpr table of all kernel configurations, `consteval gemm_variant_spec()` lookup. Single source of truth for device and host code. |
 | `main.cpp` | Host only | Host loader — iterates `gemm_variants[]`, launches each, verifies against CPU reference |
 | `gemm_*.hip` | Device only | Variant instantiations (~12 lines each) — include `gemm_variants.hpp` and `gemm_dev.hpp` |
@@ -258,7 +258,7 @@ switches B to RowMajor. No schema changes needed — the same resolve() override
 mechanism used for dtypes handles layouts.
 
 **Signature and Algorithm are independent.** The same tile geometry works
-across fp32, fp16, and bf16 (with appropriate warp tiles). Separating "what
+across fp32, fp16, and bf16 (with appropriate MFMA tiles). Separating "what
 types" from "how to tile" lets each vary independently — different types can
 share tile configs, and the same type can use different tile configs
 (`gemm_fp16` vs `gemm_fp16_w32`).
@@ -270,9 +270,9 @@ must be pre-zeroed. CK Tile's `UniversalGemmKernel` handles this
 automatically — no code changes needed beyond setting the field and
 launching with `grid_z = k_batch`.
 
-**Consteval catches mistakes at compile time.** Invalid warp tile / dtype
-combinations (e.g., fp32 with 32×32×16 warp tile) and bad tile divisibility
-produce compile errors, not runtime crashes. The `is_valid_warp_gemm()`
+**Consteval catches mistakes at compile time.** Invalid MFMA tile / dtype
+combinations (e.g., fp32 with 32×32×16 MFMA tile) and bad tile divisibility
+produce compile errors, not runtime crashes. The `is_valid_mfma()`
 lookup table mirrors CK Tile's WarpGemmDispatcher specializations.
 
 **Test values kept small.** Input values are `i % 8` (max 7). Worst-case

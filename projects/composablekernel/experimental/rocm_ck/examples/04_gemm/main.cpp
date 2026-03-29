@@ -226,7 +226,7 @@ int main(int argc, char** argv)
                     grid_size,
                     grid_y,
                     grid_z,
-                    spec.thread_block_size,
+                    spec.workgroup_size,
                     is_batched ? " (batched)" : "");
 
         // Build generic Args — layout-aware strides from physical tensor table
@@ -275,7 +275,7 @@ int main(int argc, char** argv)
                                         grid_size,
                                         grid_y,
                                         grid_z,
-                                        spec.thread_block_size,
+                                        spec.workgroup_size,
                                         1,
                                         1,
                                         0,
