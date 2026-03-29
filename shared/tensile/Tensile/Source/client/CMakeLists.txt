@@ -13,6 +13,7 @@ target_sources(tensile-client-lib
         "${CMAKE_CURRENT_SOURCE_DIR}/source/LibraryUpdateReporter.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/MetaRunListener.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/PerformanceReporter.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/source/ProgramOptions.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/ProgressListener.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/Reference.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/source/ReferenceValidator.cpp"
