@@ -21,53 +21,96 @@ struct ElementwiseVariant
     ElementwiseSpec spec;
 };
 
-// clang-format off
 inline constexpr ElementwiseVariant vector_add_variants[] = {
-    {"vector_add_fp32_b256", make_spec(
-         Signature{.dtype = DataType::FP32, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+    {"vector_add_fp32_b256",
+     make_spec(
+         Signature{
+             .dtype = DataType::FP32,
+             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+         },
          ElementwiseAlgorithm{256, 1, 256, true})},
-    {"vector_add_fp32_b512", make_spec(
-         Signature{.dtype = DataType::FP32, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+    {"vector_add_fp32_b512",
+     make_spec(
+         Signature{
+             .dtype = DataType::FP32,
+             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+         },
          ElementwiseAlgorithm{512, 1, 512, true})},
-    {"vector_add_fp32_b1024", make_spec(
-         Signature{.dtype = DataType::FP32, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+    {"vector_add_fp32_b1024",
+     make_spec(
+         Signature{
+             .dtype = DataType::FP32,
+             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+         },
          ElementwiseAlgorithm{1024, 1, 1024, true})},
-    {"vector_add_fp16_b512", make_spec(
-         Signature{.dtype = DataType::FP16, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+    {"vector_add_fp16_b512",
+     make_spec(
+         Signature{
+             .dtype = DataType::FP16,
+             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+         },
          ElementwiseAlgorithm{512, 1, 512, true})},
-    {"vector_add_fp16_b1024", make_spec(
-         Signature{.dtype = DataType::FP16, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+    {"vector_add_fp16_b1024",
+     make_spec(
+         Signature{
+             .dtype = DataType::FP16,
+             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+         },
          ElementwiseAlgorithm{1024, 1, 1024, true})},
-    {"vector_add_bf16_b512", make_spec(
-         Signature{.dtype = DataType::BF16, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+    {"vector_add_bf16_b512",
+     make_spec(
+         Signature{
+             .dtype = DataType::BF16,
+             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+         },
          ElementwiseAlgorithm{512, 1, 512, true})},
-    {"vector_add_bf16_b1024", make_spec(
-         Signature{.dtype = DataType::BF16, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+    {"vector_add_bf16_b1024",
+     make_spec(
+         Signature{
+             .dtype = DataType::BF16,
+             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+         },
          ElementwiseAlgorithm{1024, 1, 1024, true})},
-    {"vector_add_fp32_b2048_w8", make_spec(
-         Signature{.dtype = DataType::FP32, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+    {"vector_add_fp32_b2048_w8",
+     make_spec(
+         Signature{
+             .dtype = DataType::FP32,
+             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+         },
          ElementwiseAlgorithm{2048, 8, 64, true})},
-    {"vector_add_fp16_b1024_w2", make_spec(
-         Signature{.dtype = DataType::FP16, .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+    {"vector_add_fp16_b1024_w2",
+     make_spec(
+         Signature{
+             .dtype = DataType::FP16,
+             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+         },
          ElementwiseAlgorithm{1024, 2, 512, true})},
     // Mixed-type variants
-    {"vector_add_fp16_fp32_b1024", make_spec(
-         Signature{.dtype = DataType::FP16,
-                   .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
-                   .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+    {"vector_add_fp16_fp32_b1024",
+     make_spec(
+         Signature{
+             .dtype   = DataType::FP16,
+             .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
+             .ops     = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+         },
          ElementwiseAlgorithm{1024, 1, 1024, true})},
-    {"vector_add_fp32_fp16_b1024", make_spec(
-         Signature{.dtype = DataType::FP32,
-                   .tensors = {Tensor{.name = "C", .dtype = DataType::FP16}},
-                   .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+    {"vector_add_fp32_fp16_b1024",
+     make_spec(
+         Signature{
+             .dtype   = DataType::FP32,
+             .tensors = {Tensor{.name = "C", .dtype = DataType::FP16}},
+             .ops     = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+         },
          ElementwiseAlgorithm{1024, 1, 1024, true})},
-    {"vector_add_bf16_fp32_b1024", make_spec(
-         Signature{.dtype = DataType::BF16,
-                   .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
-                   .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+    {"vector_add_bf16_fp32_b1024",
+     make_spec(
+         Signature{
+             .dtype   = DataType::BF16,
+             .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
+             .ops     = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+         },
          ElementwiseAlgorithm{1024, 1, 1024, true})},
 };
-// clang-format on
 
 inline constexpr int vector_add_variant_count =
     sizeof(vector_add_variants) / sizeof(vector_add_variants[0]);
