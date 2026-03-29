@@ -116,6 +116,34 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{.block_tile  = {128, 128, 32},
                                .block_warps = {2, 2, 1},
                                .warp_tile   = {16, 16, 16}}),
+    // --- Batched GEMM: batch dimension via blockIdx.y (runtime, same spec as unbatched) ---
+    make_variant("gemm_fp16_batched",
+                 Signature{.dtype = DataType::FP16,
+                           .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {16, 16, 16}}),
+    // --- Architecture-adaptive: per-arch tile configs (separate variants) ---
+    make_variant("gemm_fp16_gfx90a",
+                 Signature{.dtype = DataType::FP16,
+                           .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {16, 16, 16}}),
+    make_variant("gemm_fp16_gfx942",
+                 Signature{.dtype = DataType::FP16,
+                           .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                 GemmAlgorithm{.block_tile  = {256, 256, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {32, 32, 16}}),
+    // --- Preshuffle: B matrix pre-rearranged for optimal SMEM loads ---
+    make_variant("gemm_fp16_preshuffle",
+                 Signature{.dtype = DataType::FP16,
+                           .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {16, 16, 16},
+                               .pipeline    = Pipeline::Preshuffle}),
 };
 // clang-format on
 

@@ -62,11 +62,19 @@ union ScalarValue
 /// Slot ordering matches Signature: tensors[i] <-> Signature::tensors[i].
 /// Trivially copyable, standard layout — required for kernarg passing.
 ///
-/// sizeof = 1408 bytes (34% of the 4096-byte HSA kernarg budget).
+/// sizeof = 1552 bytes (38% of the 4096-byte HSA kernarg budget).
 struct Args
 {
     std::array<TensorArg, kMaxTensors> tensors;   // 16 x 80 = 1280 bytes
     std::array<ScalarValue, kMaxScalars> scalars; // 16 x  8 =  128 bytes
+
+    // Batch parameters (0 = unbatched, >0 = batched GEMM with blockIdx.y indexing)
+    index_t batch_count = 0; //  4 bytes
+    // Per-tensor batch stride in elements (0 = broadcast across batch)
+    std::array<int64_t, kMaxTensors> batch_strides = {}; // 16 x 8 = 128 bytes
+
+    // Workspace pointer for Stream-K partial reduction (nullptr when unused)
+    void* workspace_ptr = nullptr; //  8 bytes
 };
 
 // =============================================================================
@@ -115,7 +123,7 @@ static_assert(sizeof(ScalarValue) == 8, "unexpected ScalarValue size");
 static_assert(std::is_trivially_copyable_v<Args>,
               "Args must be trivially copyable for kernarg passing");
 static_assert(std::is_standard_layout_v<Args>, "Args must be standard layout for kernarg passing");
-static_assert(sizeof(Args) == 1408, "unexpected Args size");
+static_assert(sizeof(Args) == 1552, "unexpected Args size");
 static_assert(alignof(Args) == 8, "unexpected Args alignment");
 
 } // namespace rocm_ck
