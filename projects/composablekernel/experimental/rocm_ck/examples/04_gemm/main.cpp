@@ -28,6 +28,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -94,14 +95,42 @@ int main(int argc, char** argv)
     // Per-variant CPU reference buffers (reused across iterations)
     std::vector<float> ref_c(M * N, 0.0f);
 
+    // Detect GPU architecture for arch-adaptive variant filtering
+    hipDeviceProp_t dev_props;
+    HIP_CHECK(hipGetDeviceProperties(&dev_props, 0));
+    const char* gpu_arch = dev_props.gcnArchName;
+
+    // Batch count for the batched variant
+    constexpr int BatchCount = 4;
+
     for(const rocm_ck::GemmVariant& variant : rocm_ck::gemm_variants)
     {
         const rocm_ck::GemmSpec& spec = variant.spec;
+
+        // Skip arch-specific variants that don't match the current GPU
+        if(std::strncmp(variant.name, "gemm_fp16_gfx90a", 16) == 0 &&
+           std::strstr(gpu_arch, "gfx90a") == nullptr)
+            continue;
+        if(std::strncmp(variant.name, "gemm_fp16_gfx942", 16) == 0 &&
+           std::strstr(gpu_arch, "gfx942") == nullptr)
+            continue;
+
+        // Skip preshuffle — requires host-side B matrix rearrangement (not yet wired)
+        if(spec.pipeline == rocm_ck::Pipeline::Preshuffle)
+        {
+            std::printf("%s: SKIPPED (requires host-side preshuffle)\n", variant.name);
+            continue;
+        }
+
+        // Batched variant uses batch dimension
+        bool is_batched = (std::strcmp(variant.name, "gemm_fp16_batched") == 0);
+        int batch_count = is_batched ? BatchCount : 0;
 
         // Per-variant grid dimensions from tile geometry
         int grid_m    = (M + spec.block_tile.m - 1) / spec.block_tile.m;
         int grid_n    = (N + spec.block_tile.n - 1) / spec.block_tile.n;
         int grid_size = grid_m * grid_n;
+        int grid_y    = is_batched ? batch_count : 1; // batch dimension
         int grid_z    = spec.k_batch; // Split-K: k_batch partitions along blockIdx.z
 
         // Load kernel
@@ -153,12 +182,23 @@ int main(int argc, char** argv)
         }
 
         // Allocate typed device buffers from physical tensor table
-        rocm_ck::TypedBuffer buf_a(spec.lhs().dtype, M * K);
-        rocm_ck::TypedBuffer buf_b(spec.rhs().dtype, K * N);
-        rocm_ck::TypedBuffer buf_c(spec.output().dtype, M * N);
+        // Batched variants replicate input data across batch elements
+        int buf_batch = is_batched ? batch_count : 1;
 
-        buf_a.upload(ref_a.data());
-        buf_b.upload(ref_b.data());
+        std::vector<float> src_a(M * K * buf_batch);
+        std::vector<float> src_b(K * N * buf_batch);
+        for(int b = 0; b < buf_batch; ++b)
+        {
+            std::copy(ref_a.begin(), ref_a.end(), src_a.begin() + b * M * K);
+            std::copy(ref_b.begin(), ref_b.end(), src_b.begin() + b * K * N);
+        }
+
+        rocm_ck::TypedBuffer buf_a(spec.lhs().dtype, M * K * buf_batch);
+        rocm_ck::TypedBuffer buf_b(spec.rhs().dtype, K * N * buf_batch);
+        rocm_ck::TypedBuffer buf_c(spec.output().dtype, M * N * buf_batch);
+
+        buf_a.upload(src_a.data());
+        buf_b.upload(src_b.data());
         buf_c.zero();
 
         // D tensors are present when num_physical_tensors > 3
@@ -178,14 +218,16 @@ int main(int argc, char** argv)
             buf_d1->upload(ref_d1.data());
         }
 
-        std::printf("%s: M=%d, N=%d, K=%d, grid=%dx%d, block=%d\n",
+        std::printf("%s: M=%d, N=%d, K=%d, grid=%dx%dx%d, block=%d%s\n",
                     variant.name,
                     M,
                     N,
                     K,
                     grid_size,
+                    grid_y,
                     grid_z,
-                    spec.thread_block_size);
+                    spec.thread_block_size,
+                    is_batched ? " (batched)" : "");
 
         // Build generic Args — layout-aware strides from physical tensor table
         rocm_ck::Args kernel_args{};
@@ -195,6 +237,15 @@ int main(int argc, char** argv)
             buf_b.ptr(), rocm_ck::make_shape(K, N), rocm_ck::make_strides(b_stride_k, b_stride_n)};
         kernel_args.tensors[spec.output().args_slot] = {
             buf_c.ptr(), rocm_ck::make_shape(M, N), rocm_ck::make_strides(c_stride_m, c_stride_n)};
+
+        // Batch parameters
+        if(is_batched)
+        {
+            kernel_args.batch_count                            = batch_count;
+            kernel_args.batch_strides[spec.lhs().args_slot]    = M * K;
+            kernel_args.batch_strides[spec.rhs().args_slot]    = K * N;
+            kernel_args.batch_strides[spec.output().args_slot] = M * N;
+        }
         if(has_d0)
         {
             auto [d0_stride_m, d0_stride_n]          = layout_strides(spec.d0().layout, M, N);
@@ -222,7 +273,7 @@ int main(int argc, char** argv)
 
         HIP_CHECK(hipModuleLaunchKernel(kernel.function(),
                                         grid_size,
-                                        1,
+                                        grid_y,
                                         grid_z,
                                         spec.thread_block_size,
                                         1,
@@ -233,8 +284,8 @@ int main(int argc, char** argv)
                                         launch_config));
         HIP_CHECK(hipDeviceSynchronize());
 
-        // Download and verify
-        std::vector<float> result(M * N);
+        // Download and verify (for batched, download all and verify batch 0)
+        std::vector<float> result(M * N * buf_batch);
         buf_c.download(result.data());
 
         float tolerance = rocm_ck::tolerance_for(spec.output().dtype);

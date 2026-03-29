@@ -259,6 +259,79 @@ VARIANTS = [
         "warp_k": 16,
         "block_size": 256,
     },
+    # Batched GEMM: batch dimension via blockIdx.y
+    {
+        "name": "gemm_fp16_batched",
+        "a_dtype": "fp16",
+        "b_dtype": "fp16",
+        "c_dtype": "fp16",
+        "acc_dtype": "fp32",
+        "block_m": 128,
+        "block_n": 128,
+        "block_k": 32,
+        "warps_m": 2,
+        "warps_n": 2,
+        "warps_k": 1,
+        "warp_m": 16,
+        "warp_n": 16,
+        "warp_k": 16,
+        "block_size": 256,
+    },
+    # Architecture-adaptive: gfx90a config (128x128x32, 16x16x16 warp)
+    {
+        "name": "gemm_fp16_gfx90a",
+        "a_dtype": "fp16",
+        "b_dtype": "fp16",
+        "c_dtype": "fp16",
+        "acc_dtype": "fp32",
+        "block_m": 128,
+        "block_n": 128,
+        "block_k": 32,
+        "warps_m": 2,
+        "warps_n": 2,
+        "warps_k": 1,
+        "warp_m": 16,
+        "warp_n": 16,
+        "warp_k": 16,
+        "block_size": 256,
+    },
+    # Architecture-adaptive: gfx942 config (256x256x32, 32x32x16 warp)
+    {
+        "name": "gemm_fp16_gfx942",
+        "a_dtype": "fp16",
+        "b_dtype": "fp16",
+        "c_dtype": "fp16",
+        "acc_dtype": "fp32",
+        "block_m": 256,
+        "block_n": 256,
+        "block_k": 32,
+        "warps_m": 2,
+        "warps_n": 2,
+        "warps_k": 1,
+        "warp_m": 32,
+        "warp_n": 32,
+        "warp_k": 16,
+        "block_size": 256,
+    },
+    # Preshuffle: weight preshuffle pipeline
+    {
+        "name": "gemm_fp16_preshuffle",
+        "a_dtype": "fp16",
+        "b_dtype": "fp16",
+        "c_dtype": "fp16",
+        "acc_dtype": "fp32",
+        "pipeline": "Preshuffle",
+        "block_m": 128,
+        "block_n": 128,
+        "block_k": 32,
+        "warps_m": 2,
+        "warps_n": 2,
+        "warps_k": 1,
+        "warp_m": 16,
+        "warp_n": 16,
+        "warp_k": 16,
+        "block_size": 256,
+    },
 ]
 ARCHITECTURES = ["gfx90a", "gfx942", "gfx950"]
 
@@ -354,6 +427,8 @@ def main() -> None:
                     meta["k_batch"] = v["k_batch"]
                 if "pipeline" in v:
                     meta["pipeline"] = v["pipeline"]
+                if "scheduling" in v:
+                    meta["scheduling"] = v["scheduling"]
                 variant_metadata[v["name"]] = meta
 
         toc = {

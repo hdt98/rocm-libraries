@@ -72,10 +72,31 @@ inline constexpr int kMaxEpilogueOps = 4;
 /// V3: Compute-optimized pipeline — software-pipelined loads.
 ///     Uses UniversalGemmPipelineProblem + GemmPipelineAgBgCrCompV3.
 ///     Better compute utilization through overlapped memory/compute.
+///
+/// Preshuffle: Weight preshuffle pipeline — B matrix pre-rearranged for
+///     optimal SMEM loads. Uses WeightPreshufflePipelineAGmemBGmemCRegV2.
+///     Requires A=RowMajor, B=ColumnMajor. Host must call preshuffle on B
+///     before kernel launch.
 enum class Pipeline
 {
     V1,
-    V3
+    V3,
+    Preshuffle
+};
+
+/// Tile-to-CU work distribution strategy.
+///
+/// TileBased: Standard 1D tile partitioner. Each tile mapped to one block.
+///     Grid: ceil(M/TileM) * ceil(N/TileN) x 1 x k_batch.
+///     Uses GemmKernel<GemmTile1DPartitioner, Pipeline, Epilogue>.
+///
+/// StreamK: Work-balanced scheduling across CUs. Tiles streamed across blocks.
+///     Grid: num_CUs * occupancy (not tile-based).
+///     Uses StreamKKernel<StreamKTilePartitioner, Pipeline, Epilogue>.
+enum class Scheduling
+{
+    TileBased,
+    StreamK
 };
 
 /// M x N x K dimension triple for tile geometry specification.
@@ -84,15 +105,16 @@ struct Dim3
     int m, n, k;
 };
 
-/// Algorithm: describes HOW a GEMM executes (tile geometry).
+/// Algorithm: describes HOW a GEMM executes (tile geometry, scheduling).
 /// Independent of data types — paired with Signature in make_spec().
 struct GemmAlgorithm
 {
-    Dim3 block_tile;                  // Elements per thread block {M, N, K}
-    Dim3 block_warps;                 // Warp distribution {M, N, K}
-    Dim3 warp_tile;                   // Elements per warp per MFMA step {M, N, K}
-    int k_batch       = 1;            // Split-K factor: partitions K across blockIdx.z
-    Pipeline pipeline = Pipeline::V1; // Pipeline implementation strategy
+    Dim3 block_tile;                               // Elements per thread block {M, N, K}
+    Dim3 block_warps;                              // Warp distribution {M, N, K}
+    Dim3 warp_tile;                                // Elements per warp per MFMA step {M, N, K}
+    int k_batch           = 1;                     // Split-K factor: partitions K across blockIdx.z
+    Pipeline pipeline     = Pipeline::V1;          // Pipeline implementation strategy
+    Scheduling scheduling = Scheduling::TileBased; // Work distribution strategy
 };
 
 // ============================================================================
@@ -126,6 +148,9 @@ struct GemmSpec
 
     // Pipeline implementation strategy
     Pipeline pipeline;
+
+    // Work distribution strategy
+    Scheduling scheduling;
 
     // Epilogue: composable op chain applied after matmul
     int num_epilogue_ops;
@@ -364,6 +389,19 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
     if(algo.block_warps.k != 1)
         throw "block_warps.k must be 1 (CShuffleEpilogue constraint)";
 
+    // Pipeline-specific constraints
+    if(algo.pipeline == Pipeline::Preshuffle)
+    {
+        if(a_td.layout != Layout::Row)
+            throw "Preshuffle pipeline requires A layout = Row";
+        if(b_td.layout != Layout::Col)
+            throw "Preshuffle pipeline requires B layout = Col";
+    }
+
+    // Scheduling constraints
+    if(algo.scheduling == Scheduling::StreamK && algo.k_batch > 1)
+        throw "Stream-K scheduling is incompatible with split-K (k_batch > 1)";
+
     if(!is_valid_warp_gemm(a_td.dtype, algo.warp_tile.m, algo.warp_tile.n, algo.warp_tile.k))
         throw "warp_tile is not a valid MFMA configuration for this dtype";
 
@@ -404,6 +442,7 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
             thread_block_size,
             algo.k_batch,
             algo.pipeline,
+            algo.scheduling,
             num_epi_ops,
             epi_ops};
 }
