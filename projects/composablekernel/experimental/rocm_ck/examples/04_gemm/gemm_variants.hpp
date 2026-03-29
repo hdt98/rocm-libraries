@@ -99,6 +99,23 @@ inline constexpr GemmVariant gemm_variants[] = {
                                .block_warps = {2, 2, 1},
                                .warp_tile   = {16, 16, 16},
                                .k_batch     = 4}),
+    // --- Pipeline V3: compute-optimized pipeline ---
+    make_variant("gemm_fp16_v3",
+                 Signature{.dtype = DataType::FP16,
+                           .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {16, 16, 16},
+                               .pipeline    = Pipeline::V3}),
+    // --- Multi-D: two D tensors (Add+Add: result = A*B + D0 + D1) ---
+    make_variant("gemm_fp16_add_add",
+                 Signature{.dtype = DataType::FP16,
+                           .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                   AddOp{.lhs = "C", .rhs = "bias0", .out = "D"},
+                                   AddOp{.lhs = "D", .rhs = "bias1", .out = "E"}}},
+                 GemmAlgorithm{.block_tile  = {128, 128, 32},
+                               .block_warps = {2, 2, 1},
+                               .warp_tile   = {16, 16, 16}}),
 };
 // clang-format on
 

@@ -30,6 +30,12 @@ void cpu_gemm(const float* a,
     }
 }
 
+void cpu_gemm_add_add(float* e, const float* c, const float* d0, const float* d1, int count)
+{
+    for(int i = 0; i < count; ++i)
+        e[i] = c[i] + d0[i] + d1[i];
+}
+
 void cpu_gemm_add(float* e, const float* c, const float* d0, int count)
 {
     for(int i = 0; i < count; ++i)
