@@ -1,7 +1,8 @@
 
 # LEGACY: Set -DPython3_EXECUTABLE=python3 for pipelines that expect that
+# Must use CACHE FILEPATH so FindPython3 honours the hint (normal variables are invisible to find_package)
 if (NOT Python3_EXECUTABLE)
-  set(Python3_EXECUTABLE "python3")
+  find_program(Python3_EXECUTABLE python3)
 endif()
 
 if (DEFINED ENV{ROCM_PATH})

@@ -1,7 +1,7 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 
-add_library(rocblas64 STATIC)
+add_library(rocblas64 OBJECT)
 add_library(rocblas::64 ALIAS rocblas64)
 
 target_link_libraries(rocblas64
@@ -55,7 +55,7 @@ set_target_properties(rocblas64
         VISIBILITY_INLINES_HIDDEN ON
 )
 
-add_library(rocblas-helper STATIC)
+add_library(rocblas-helper OBJECT)
 add_library(rocblas::helper ALIAS rocblas-helper)
 
 target_link_libraries(rocblas-helper

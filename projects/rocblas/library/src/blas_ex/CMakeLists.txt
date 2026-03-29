@@ -39,7 +39,11 @@ target_sources(rocblas
         # SYRK_EX
         "${CMAKE_CURRENT_SOURCE_DIR}/rocblas_syrk_ex.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocblas_syrk_ex_kernels.cpp"
-        
+
+        # HERK_EX
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocblas_herk_ex.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/rocblas_herk_ex_kernels.cpp"
+
         # GEAM_EX
         "${CMAKE_CURRENT_SOURCE_DIR}/rocblas_geam_ex.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocblas_geam_ex_kernels.cpp"
