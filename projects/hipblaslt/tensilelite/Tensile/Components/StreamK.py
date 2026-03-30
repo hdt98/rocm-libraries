@@ -288,7 +288,7 @@ class StreamK(Component):
     def graWorkGroup(self, writer, kernel, tPA, tPB):
         pass
 
-    def prefetchPersistentTileProlog(self, writer, kernel, tPA, tPB):
+    def prefetchPersistentTileProlog(self, writer, kernel, tPA, tPB, skipLroReset=False):
         """Recompute StreamK tile locals and map tile index to WorkGroup* for the *next* tile.
 
         After each persistent iteration's main body, ``StreamKIter`` already holds the starting
@@ -298,10 +298,14 @@ class StreamK(Component):
         are warm before the persistent back-edge. ``KernelWriterAssembly.prefetchAcrossPersistentAfterGlobalWrite``
         then runs ``setupNewTile(..., persistentPrefetchTail=True)`` to issue the first PGR into the
         alternate LDS buffer and set ``SkPrefetchPrimed`` so the next ``setupNewTile`` can skip the
-        redundant first ``globalReadDo`` while still performing ``globalReadIncrementAB``."""
+        redundant first ``globalReadDo`` while still performing ``globalReadIncrementAB``.
+
+        When ``skipLroReset`` is True the local-read-offset reset inside
+        ``skTileIndex`` is suppressed.  This is needed when PAP runs *before*
+        the NLL body: the NLL still needs the current tile's read pointers."""
         module = Module("StreamK prefetchPersistentTileProlog")
         sTmp = writer.sgprPool.checkOutAligned(4, 2, "SKPrefetchTemp")
-        module.add(self.skTileIndex(writer, kernel, sTmp, tPA, tPB))
+        module.add(self.skTileIndex(writer, kernel, sTmp, tPA, tPB, skipLroReset=skipLroReset))
         module.add(self.skIndexToWG(writer, kernel, sTmp))
         writer.sgprPool.checkIn(sTmp)
         return module
@@ -326,12 +330,14 @@ class StreamK(Component):
         writer.releaseStreamKConstSgpr(sIpt)
         return module
 
-    def skTileIndex(self, writer, kernel, sTmp, tPA, tPB):
+    def skTileIndex(self, writer, kernel, sTmp, tPA, tPB, skipLroReset=False):
         module = Module("StreamK skTileIndex")
         skConstsInVgprs = writer.isStreamKConstantsToVgprEnabled(kernel)
 
-        # Always reset pointers to handle odd-exit case which moves LRO to the upper bank
-        if kernel["PrefetchGlobalRead"]: # not self.prefetchAcrossPersistent
+        # Always reset pointers to handle odd-exit case which moves LRO to the upper bank.
+        # Skipped when the NLL PAP calls this before the NLL body: the current
+        # tile's local read pointers must stay intact for the remaining MACs.
+        if kernel["PrefetchGlobalRead"] and not skipLroReset:
             module.add(writer.localReadResetOffsets(kernel, tPA))
             if kernel["ProblemType"]["MXBlockA"] and "MX" in tPA:
                 module.add(writer.localReadResetOffsets(kernel, tPA["MX"]))

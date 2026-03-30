@@ -16303,8 +16303,8 @@ class KernelWriterAssembly(KernelWriter):
     module.add(SBarrier(comment="NLL PAP: sync before next-tile prefetch"))
 
     skComponent = Component.StreamK.find(self)
-    module.add(skComponent.prefetchPersistentTileProlog(self, kernel, tensorParametersA, tensorParametersB))
-    module.add(self.setupNewTile(kernel, tensorParametersA, tensorParametersB, isOptNLL=False, persistentPrefetchTail=True))
+    module.add(skComponent.prefetchPersistentTileProlog(self, kernel, tensorParametersA, tensorParametersB, skipLroReset=True))
+    module.add(self.setupNewTile(kernel, tensorParametersA, tensorParametersB, isOptNLL=True, persistentPrefetchTail=True))
     module.add(skipLabel)
     return module
 

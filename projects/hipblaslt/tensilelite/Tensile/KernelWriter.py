@@ -2483,7 +2483,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
       tPMRef = tensorParametersB
 
     if kernel["StreamK"] != 0:
-      module.add(self.localReadAddresses(kernel, tensorParametersA, tensorParametersB, tPM))
+      if not persistentPrefetchTail:
+        module.add(self.localReadAddresses(kernel, tensorParametersA, tensorParametersB, tPM))
       module.add(self.localWriteAddresses(kernel, tensorParametersA, tensorParametersB, tPM))
 
     tdmA: bool = kernel["enableTDMA"]
@@ -2783,23 +2784,27 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     # LRO and LWA as assigned
     # init lds read pointers before each unrolled loop
-    module.addComment0("local read addresses: init pointers a")
-    module.add(self.localReadInitPointers(kernel, tensorParametersA, tensorParametersA))
-    if kernel["ProblemType"]["MXBlockA"]:
-      module.addComment0("local read addresses: init pointers mxsa")
-      module.add(self.localReadInitPointers(kernel, tensorParametersA, tensorParametersA["MX"]))
-    if kernel["ProblemType"]["MXBlockB"]:
-      module.addComment0("local read addresses: init pointers mxsb")
-      module.add(self.localReadInitPointers(kernel, tensorParametersA, tensorParametersB["MX"]))
-    if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
-      module.addComment0("local read addresses: init pointers metadata")
-      module.add(self.localReadInitPointers(kernel, tensorParametersA, tPM))
-    module.addComment0("local read addresses: init pointers b")
-    module.add(self.localReadInitPointers(kernel, tensorParametersA, tensorParametersB))
-    if self.states.IncLdsBufSwitch:
-      # IncLdsBufSwitch case, need to initialize local write inc register
-      module.addComment0("local write addresses: reset inc")
-      module.add(self.localWriteResetOffsets(kernel,  False, tensorParametersA))
+    # When persistentPrefetchTail=True, skip: the NLL body still needs the
+    # current read pointer position, and the top-of-loop setupNewTile
+    # re-initialises these pointers before the next iteration uses them.
+    if not persistentPrefetchTail:
+      module.addComment0("local read addresses: init pointers a")
+      module.add(self.localReadInitPointers(kernel, tensorParametersA, tensorParametersA))
+      if kernel["ProblemType"]["MXBlockA"]:
+        module.addComment0("local read addresses: init pointers mxsa")
+        module.add(self.localReadInitPointers(kernel, tensorParametersA, tensorParametersA["MX"]))
+      if kernel["ProblemType"]["MXBlockB"]:
+        module.addComment0("local read addresses: init pointers mxsb")
+        module.add(self.localReadInitPointers(kernel, tensorParametersA, tensorParametersB["MX"]))
+      if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+        module.addComment0("local read addresses: init pointers metadata")
+        module.add(self.localReadInitPointers(kernel, tensorParametersA, tPM))
+      module.addComment0("local read addresses: init pointers b")
+      module.add(self.localReadInitPointers(kernel, tensorParametersA, tensorParametersB))
+      if self.states.IncLdsBufSwitch:
+        # IncLdsBufSwitch case, need to initialize local write inc register
+        module.addComment0("local write addresses: reset inc")
+        module.add(self.localWriteResetOffsets(kernel,  False, tensorParametersA))
 
     if self.do["executeToInitEnd"] and not persistentPrefetchTail:
       module.add(self.functionEnd(kernel, addLabel=False))
@@ -3444,13 +3449,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
         module.add(self._wait(kernel, tensorParametersA, tensorParametersB, -1, 0, -1, "4wait for local write"))
       module.add(self._syncThreads(kernel, "Wait GR->LW done, sync LDS%u"%self.states.ldsWriteTokenIdx, memoryToken=self.states.ldsWriteTokenIdx))
 
-    # generate no Load Loop Body code
-    module.add(self.noLoadLoopBody(kernel, tensorParametersA, tensorParametersB, pack, packPre, isOptNLL, isNGLL, NLLfirst, NLLlast, NLLindex=NLLindex, \
-                                   NLLnum=NLLnum, useTailloopInNll=useTailloopInNll, remainPgr=remainPgr))
-
     if (not isOptNLL and not isNGLL and NLLindex == NLLnum - 1
         and self.nllPapActive(kernel)):
       module.add(self.prefetchAcrossPersistentNoLoadLoop(kernel, tensorParametersA, tensorParametersB))
+
+    # generate no Load Loop Body code
+    module.add(self.noLoadLoopBody(kernel, tensorParametersA, tensorParametersB, pack, packPre, isOptNLL, isNGLL, NLLfirst, NLLlast, NLLindex=NLLindex, \
+                                   NLLnum=NLLnum, useTailloopInNll=useTailloopInNll, remainPgr=remainPgr))
 
     if self.do["executeToLoopEnd"] and isOptNLL:
       module.add(self.functionEnd(kernel, addLabel=False))
