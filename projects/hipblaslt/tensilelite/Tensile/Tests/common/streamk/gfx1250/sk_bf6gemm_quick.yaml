@@ -1,0 +1,113 @@
+TestParameters:
+  marks: [skip-gfx900, skip-gfx906, skip-gfx908, skip-gfx90a, skip-gfx942, skip-gfx1010, skip-gfx1011, skip-gfx1012, skip-gfx1030, skip-gfx1100, skip-gfx1101, skip-gfx1102, skip-gfx1200, skip-gfx1201]
+
+GlobalParameters:
+  NumElementsToValidate: -1
+  BoundsCheck: False
+  KernelTime: False
+  CpuThreads: 32
+  DataInitTypeA: 3
+  DataInitTypeB: 3
+  DataInitTypeC: 3
+  DataInitTypeAlpha: 1
+  DataInitTypeBeta: 1
+  MaxWorkspaceSize: 134217728
+  ISA: [[12, 5, 0]]
+
+BenchmarkProblems:
+  - # B6SS TN
+    -
+      OperationType: GEMM
+      DataType: B6
+      DestDataType: S
+      ComputeDataType: S
+      HighPrecisionAccumulate: True
+      TransposeA: True
+      TransposeB: False
+      UseBeta: True
+      Batched: True
+    -
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: ["Assembly"]
+      ForkParameters:
+        - MatrixInstruction:
+          - [16, 16, 128, 1, 1, 1,1, 1,2]
+          - [16, 16, 128, 1, 1, 2,4, 2,1]
+        - 1LDSBuffer: [0]
+        - DepthU: [128]
+        - GlobalReadPerMfma: [1]
+        - GlobalReadVectorWidthA: [16]
+        - GlobalReadVectorWidthB: [16]
+        - InnerUnroll: [1]
+        - LdsBlockSizePerPadA: [0]
+        - LdsBlockSizePerPadB: [0]
+        - LdsPadA: [0]
+        - LdsPadB: [0]
+        - LocalReadVectorWidth: [32]
+        - LocalWritePerMfma: [-1]
+        - PrefetchGlobalRead: [2]
+        - PrefetchLocalRead: [1]
+        - ScheduleIterAlg: [3]
+        - SourceSwap: [1]
+        - StoreVectorWidth: [-1]
+        - StreamK: [3]
+        - TransposeLDS: [1]
+        - VectorWidthA: [1]
+        - VectorWidthB: [1]
+        - WavefrontSize: [32]
+        - WorkGroupMapping: [1]
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [127, 127, 1, 512]
+          - Exact: [128, 128, 1, 512]
+          - Exact: [256, 256, 1, 512]
+
+  - # B6SS NT
+    -
+      OperationType: GEMM
+      DataType: B6
+      DestDataType: S
+      ComputeDataType: S
+      HighPrecisionAccumulate: True
+      TransposeA: False
+      TransposeB: True
+      UseBeta: True
+      Batched: True
+    -
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: ["Assembly"]
+      ForkParameters:
+        - MatrixInstruction:
+          - [16, 16, 128, 1, 1, 1,1, 1,2]
+        - 1LDSBuffer: [1]
+        - DepthU: [128]
+        - GlobalReadPerMfma: [1]
+        - GlobalReadVectorWidthA: [16]
+        - GlobalReadVectorWidthB: [16]
+        - InnerUnroll: [1]
+        - LdsBlockSizePerPadA: [0]
+        - LdsBlockSizePerPadB: [0]
+        - LdsPadA: [0]
+        - LdsPadB: [0]
+        - LDSTrInst: [True]
+        - LocalReadVectorWidth: [32]
+        - LocalWritePerMfma: [-1]
+        - PrefetchGlobalRead: [2]
+        - PrefetchLocalRead: [1]
+        - ScheduleIterAlg: [3]
+        - SourceSwap: [1]
+        - StoreVectorWidth: [-1]
+        - StreamK: [3]
+        - TransposeLDS: [0]
+        - VectorWidthA: [1]
+        - VectorWidthB: [1]
+        - WavefrontSize: [32]
+        - WorkGroupMapping: [1]
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [128, 128, 1, 512]
+          - Exact: [256, 256, 1, 512]
