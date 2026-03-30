@@ -84,18 +84,36 @@ enum class Pipeline
     Preshuffle
 };
 
-/// Tile-to-CU work distribution strategy.
+/// Tile-to-workgroup distribution strategy.
 ///
-/// TileBased: Standard 1D tile partitioner. Each tile mapped to one block.
-///     Grid: ceil(M/TileM) * ceil(N/TileN) x 1 x k_batch.
+/// Controls how GEMM output tiles are assigned to workgroups. This is spatial
+/// decomposition, not instruction scheduling (which is Pipeline's concern:
+/// Intrawave/Interwave).
+///
+/// Direct: 2D grid with direct blockIdx mapping.
+///     Grid: (M/TileM) x (N/TileN) x k_batch.
+///     Mapping: blockIdx.x → M tiles, blockIdx.y → N tiles.
+///     Uses GemmKernel<GemmTile2DPartitioner, Pipeline, Epilogue>.
+///
+/// Linear: 1D grid with row-major linearized tile indexing (default).
+///     Grid: (M/TileM * N/TileN) x 1 x k_batch.
+///     Mapping: blockIdx.x linearized across M x N tile space.
 ///     Uses GemmKernel<GemmTile1DPartitioner, Pipeline, Epilogue>.
 ///
-/// StreamK: Work-balanced scheduling across CUs. Tiles streamed across blocks.
-///     Grid: num_CUs * occupancy (not tile-based).
+/// SpatiallyLocal: 1D grid with locality-aware grouping for multi-die GPUs.
+///     Grid: (M/TileM * N/TileN) x 1 x k_batch.
+///     Mapping: adjacent tiles grouped to same die for L2 cache locality.
+///     Uses GemmKernel<GemmSpatiallyLocalTilePartitioner, Pipeline, Epilogue>.
+///
+/// StreamK: 1D grid with iteration-range streaming for work balancing.
+///     Grid: device_CUs * occupancy (not tile-based).
+///     Mapping: dynamic iteration range assignment across workgroups.
 ///     Uses StreamKKernel<StreamKTilePartitioner, Pipeline, Epilogue>.
-enum class Scheduling
+enum class TilePartitioner
 {
-    TileBased,
+    Direct,
+    Linear,
+    SpatiallyLocal,
     StreamK
 };
 
@@ -105,16 +123,16 @@ struct Dim3
     int m, n, k;
 };
 
-/// Algorithm: describes HOW a GEMM executes (tile geometry, scheduling).
+/// Algorithm: describes HOW a GEMM executes (tile geometry, partitioning).
 /// Independent of data types — paired with Signature in make_spec().
 struct GemmAlgorithm
 {
-    Dim3 block_tile;                               // Elements per workgroup {M, N, K}
-    Dim3 block_waves;                              // Wavefront layout within workgroup {M, N, K}
-    Dim3 mfma_tile;                                // MFMA instruction tile {M, N, K}
-    int k_batch           = 1;                     // Split-K factor: partitions K across blockIdx.z
-    Pipeline pipeline     = Pipeline::V1;          // Pipeline implementation strategy
-    Scheduling scheduling = Scheduling::TileBased; // Work distribution strategy
+    Dim3 block_tile;                      // Elements per workgroup {M, N, K}
+    Dim3 block_waves;                     // Wavefront layout within workgroup {M, N, K}
+    Dim3 mfma_tile;                       // MFMA instruction tile {M, N, K}
+    int k_batch                      = 1; // Split-K factor: partitions K across blockIdx.z
+    Pipeline pipeline                = Pipeline::V1;            // Pipeline implementation strategy
+    TilePartitioner tile_partitioner = TilePartitioner::Linear; // Tile-to-workgroup distribution
 };
 
 // ============================================================================
@@ -149,8 +167,8 @@ struct GemmSpec
     // Pipeline implementation strategy
     Pipeline pipeline;
 
-    // Work distribution strategy
-    Scheduling scheduling;
+    // Tile-to-workgroup distribution strategy
+    TilePartitioner tile_partitioner;
 
     // Epilogue: composable op chain applied after matmul
     int num_epilogue_ops;
@@ -398,9 +416,9 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
             throw "Preshuffle pipeline requires B layout = Col";
     }
 
-    // Scheduling constraints
-    if(algo.scheduling == Scheduling::StreamK && algo.k_batch > 1)
-        throw "Stream-K scheduling is incompatible with split-K (k_batch > 1)";
+    // Tile partitioner constraints
+    if(algo.tile_partitioner == TilePartitioner::StreamK && algo.k_batch > 1)
+        throw "Stream-K tile partitioning is incompatible with split-K (k_batch > 1)";
 
     if(!is_valid_mfma(a_td.dtype, algo.mfma_tile.m, algo.mfma_tile.n, algo.mfma_tile.k))
         throw "mfma_tile is not a valid MFMA instruction shape for this dtype";
@@ -442,7 +460,7 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
             workgroup_size,
             algo.k_batch,
             algo.pipeline,
-            algo.scheduling,
+            algo.tile_partitioner,
             num_epi_ops,
             epi_ops};
 }

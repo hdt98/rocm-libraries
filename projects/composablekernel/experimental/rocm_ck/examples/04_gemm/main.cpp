@@ -10,7 +10,7 @@
 //   - Multi-variant iteration with per-variant grid launch parameters
 //   - Epilogue composition via operator chaining (e.g., GemmOp + AddOp + ReluOp)
 //   - Per-tensor layout support (Row, Col) via explicit Tensor entries
-//   - Split-K scheduling (k_batch > 1) with atomic accumulation
+//   - Split-K tile partitioning (k_batch > 1) with atomic accumulation
 //   - Per-type tolerance for correctness verification
 
 #include "cpu_ref.hpp"

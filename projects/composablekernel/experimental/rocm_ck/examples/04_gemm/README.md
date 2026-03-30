@@ -162,7 +162,7 @@ All variants use 128×128×32 block tile with 2×2×1 wavefront layout (4 waves 
 demonstrates composed epilogue (bias + activation). Layout variants
 (`_rr`, `_cr`, `_cc`) override GemmOp's BLAS-convention defaults (A=Row,
 B=Col) via explicit `Tensor` entries — R = RowMajor, C = ColumnMajor.
-`gemm_fp16_splitk` demonstrates Split-K scheduling — the K dimension is
+`gemm_fp16_splitk` demonstrates Split-K tile partitioning — the K dimension is
 partitioned across `k_batch` workgroups (blockIdx.z), with partial
 results accumulated via atomic addition.
 

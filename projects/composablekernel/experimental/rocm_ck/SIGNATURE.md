@@ -4,7 +4,7 @@ A kernel **signature** is the mathematical contract: what a kernel computes. It 
 typed tensors, scalar parameters, and the operation that relates them.
 
 The signature says nothing about *how* the kernel computes — tile geometry, pipeline
-strategy, and scheduling belong to the **algorithm**. Together, a signature and an
+strategy, and tile partitioning belong to the **algorithm**. Together, a signature and an
 algorithm fully specify a compiled kernel variant.
 
 ## Tensors
