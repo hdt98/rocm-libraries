@@ -1063,12 +1063,17 @@ namespace rocRoller
             // coordinates.  Compute per-iteration addresses from
             // scratch instead of using base + stride.
             bool ldsSwizzleActive = false;
-            if(m_context->kernelOptions()->ldsSwizzleMode == LDSBankSwizzleMode::Swizzle
-               && m_graph->control.get<LoadLDSTile>(info.tag))
             {
-                auto macTileTag  = m_graph->mapper.get<MacroTile>(info.tag);
-                auto macTile     = m_graph->coordinates.getNode<MacroTile>(macTileTag);
-                ldsSwizzleActive = (macTile.layoutType == LayoutType::MATRIX_A);
+                auto swzMode = m_context->kernelOptions()->ldsSwizzleMode;
+                if(swzMode != LDSBankSwizzleMode::None
+                   && m_graph->control.get<LoadLDSTile>(info.tag))
+                {
+                    auto macTileTag  = m_graph->mapper.get<MacroTile>(info.tag);
+                    auto macTile     = m_graph->coordinates.getNode<MacroTile>(macTileTag);
+                    ldsSwizzleActive = (swzMode == LDSBankSwizzleMode::Swizzle
+                                        || swzMode == LDSBankSwizzleMode::SwizzleA)
+                                       && macTile.layoutType == LayoutType::MATRIX_A;
+                }
             }
 
             if(ldsSwizzleActive && allStridesAreLiteral)

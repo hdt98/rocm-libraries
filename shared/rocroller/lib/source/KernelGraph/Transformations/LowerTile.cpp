@@ -2012,9 +2012,10 @@ namespace rocRoller
                     break;
                 case MemoryType::WAVE_Direct2LDS:
                 {
-                    bool d2lSwizzle
-                        = m_context->kernelOptions()->ldsSwizzleMode == LDSBankSwizzleMode::Swizzle
-                          && tile.layoutType == LayoutType::MATRIX_A;
+                    auto swzMode    = m_context->kernelOptions()->ldsSwizzleMode;
+                    bool d2lSwizzle = (swzMode == LDSBankSwizzleMode::Swizzle
+                                       || swzMode == LDSBankSwizzleMode::SwizzleA)
+                                      && tile.layoutType == LayoutType::MATRIX_A;
                     loadMacroTile_VGPR(graph,
                                        connections,
                                        userTag,
@@ -2143,7 +2144,9 @@ namespace rocRoller
                 // iMacX via DataFlowTag (resolved to register at codegen).
                 // The forward expression is identity (pass-through).
                 auto tileIMacY = iMacY;
-                if(m_context->kernelOptions()->ldsSwizzleMode == LDSBankSwizzleMode::Swizzle
+                auto swzMode2  = m_context->kernelOptions()->ldsSwizzleMode;
+                if((swzMode2 == LDSBankSwizzleMode::Swizzle
+                    || swzMode2 == LDSBankSwizzleMode::SwizzleA)
                    && tile.layoutType == LayoutType::MATRIX_A)
                 {
                     using namespace Expression;
@@ -2343,9 +2346,10 @@ namespace rocRoller
                 auto iMacX = graph.coordinates.addElement(tile.tileIndex(0));
                 auto iMacY = graph.coordinates.addElement(tile.tileIndex(1));
 
-                bool ldsSwizzle
-                    = m_context->kernelOptions()->ldsSwizzleMode == LDSBankSwizzleMode::Swizzle
-                      && tile.layoutType == LayoutType::MATRIX_A;
+                auto swzMode3   = m_context->kernelOptions()->ldsSwizzleMode;
+                bool ldsSwizzle = (swzMode3 == LDSBankSwizzleMode::Swizzle
+                                   || swzMode3 == LDSBankSwizzleMode::SwizzleA)
+                                  && tile.layoutType == LayoutType::MATRIX_A;
 
                 logger->info("StoreLDSTile: tag={} tileTag={} memoryType={} layoutType={} "
                              "ldsSwizzle={}",

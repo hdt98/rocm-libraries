@@ -15,6 +15,10 @@ namespace rocRoller
             return "None";
         case LDSBankSwizzleMode::Swizzle:
             return "Swizzle";
+        case LDSBankSwizzleMode::SwizzleA:
+            return "SwizzleA";
+        case LDSBankSwizzleMode::SwizzleB:
+            return "SwizzleB";
         default:
             break;
         }
