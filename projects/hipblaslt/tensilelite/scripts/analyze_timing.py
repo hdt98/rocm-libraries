@@ -97,8 +97,9 @@ TIMING_HIERARCHY = {
             "pre_solution": {},
             "kernel_solving": {},
             "warmup_runs": {},
-            "benchmark_runs": {},
-            "gpu_kernel_execution": {},
+            "benchmark_runs": {
+                "gpu_kernel_execution": {},
+            },
             "post_solution": {
                 "post_solution_perf_calc": {},
                 "post_solution_reporting": {},
@@ -152,7 +153,6 @@ CPP_PHASE_GROUPS = {
         "kernel_solving",
         "warmup_runs",
         "benchmark_runs",
-        "gpu_kernel_execution",
         "post_solution",
         "post_problem",
         "finalize_report",
