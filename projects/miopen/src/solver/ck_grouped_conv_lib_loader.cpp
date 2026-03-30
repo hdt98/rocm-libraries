@@ -166,9 +166,7 @@ void CKGroupedConvLibLoader::LoadLibrary(const std::string& device_name)
     };
 #else
     constexpr int flags = RTLD_NOW | RTLD_NODELETE;
-    auto try_load       = [](const std::string& path) -> void* {
-        return dlopen(path.c_str(), flags);
-    };
+    auto try_load = [](const std::string& path) -> void* { return dlopen(path.c_str(), flags); };
     auto get_load_error = []() -> std::string {
         const char* err = dlerror();
         return err ? err : "unknown error";
@@ -247,16 +245,16 @@ bool CKGroupedConvLibLoader::LoadSymbols()
 {
 // Helper macro: resolve a symbol or return false on failure.
 #ifdef _WIN32
-#define LOAD_SYM(member, name)                                                                  \
-    do                                                                                          \
-    {                                                                                           \
-        member = reinterpret_cast<decltype(member)>(                                            \
-            GetProcAddress(static_cast<HMODULE>(lib_handle_), #name));                          \
-        if(member == nullptr)                                                                   \
-        {                                                                                       \
-            MIOPEN_LOG_W("GetProcAddress failed for " #name ": error " << GetLastError());      \
-            return false;                                                                       \
-        }                                                                                       \
+#define LOAD_SYM(member, name)                                                             \
+    do                                                                                     \
+    {                                                                                      \
+        member = reinterpret_cast<decltype(member)>(                                       \
+            GetProcAddress(static_cast<HMODULE>(lib_handle_), #name));                     \
+        if(member == nullptr)                                                              \
+        {                                                                                  \
+            MIOPEN_LOG_W("GetProcAddress failed for " #name ": error " << GetLastError()); \
+            return false;                                                                  \
+        }                                                                                  \
     } while(false)
 #else
 #define LOAD_SYM(member, name)                                                  \

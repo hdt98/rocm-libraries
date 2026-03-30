@@ -59,7 +59,7 @@ CK_GROUPED_CONV_API size_t ckgrpconv_kernel_list_size(const CKKernelListHandle* 
 /// Pointer to the idx-th kernel ID string (null-terminated, valid for the
 /// lifetime of the handle).  Returns nullptr on out-of-range.
 CK_GROUPED_CONV_API const char* ckgrpconv_kernel_list_get(const CKKernelListHandle* handle,
-                                                           size_t idx);
+                                                          size_t idx);
 
 /// Free a kernel list handle returned by any fill_valid_kernels function.
 CK_GROUPED_CONV_API void ckgrpconv_kernel_list_free(CKKernelListHandle* handle);
@@ -77,11 +77,11 @@ CK_GROUPED_CONV_API CKKernelListHandle* ckgrpconv_fwd_fill_valid_kernels(
 CK_GROUPED_CONV_API bool ckgrpconv_fwd_is_applicable(
     const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
 
-CK_GROUPED_CONV_API bool ckgrpconv_fwd_is_args_supported(
-    const miopen::conv::ProblemDescription* problem,
-    const char* kernel_id,
-    miopenDataType_t data_type,
-    bool use_tf32);
+CK_GROUPED_CONV_API bool
+ckgrpconv_fwd_is_args_supported(const miopen::conv::ProblemDescription* problem,
+                                const char* kernel_id,
+                                miopenDataType_t data_type,
+                                bool use_tf32);
 
 CK_GROUPED_CONV_API size_t ckgrpconv_fwd_get_workspace_size(
     const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
@@ -100,11 +100,11 @@ CK_GROUPED_CONV_API CKKernelListHandle* ckgrpconv_bwd_fill_valid_kernels(
 CK_GROUPED_CONV_API bool ckgrpconv_bwd_is_applicable(
     const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
 
-CK_GROUPED_CONV_API bool ckgrpconv_bwd_is_args_supported(
-    const miopen::conv::ProblemDescription* problem,
-    const char* kernel_id,
-    miopenDataType_t data_type,
-    bool use_tf32);
+CK_GROUPED_CONV_API bool
+ckgrpconv_bwd_is_args_supported(const miopen::conv::ProblemDescription* problem,
+                                const char* kernel_id,
+                                miopenDataType_t data_type,
+                                bool use_tf32);
 
 CK_GROUPED_CONV_API size_t ckgrpconv_bwd_get_workspace_size(
     const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
@@ -123,11 +123,11 @@ CK_GROUPED_CONV_API CKKernelListHandle* ckgrpconv_wrw_fill_valid_kernels(
 CK_GROUPED_CONV_API bool ckgrpconv_wrw_is_applicable(
     const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
 
-CK_GROUPED_CONV_API bool ckgrpconv_wrw_is_args_supported(
-    const miopen::conv::ProblemDescription* problem,
-    const char* kernel_id,
-    miopenDataType_t data_type,
-    bool use_tf32);
+CK_GROUPED_CONV_API bool
+ckgrpconv_wrw_is_args_supported(const miopen::conv::ProblemDescription* problem,
+                                const char* kernel_id,
+                                miopenDataType_t data_type,
+                                bool use_tf32);
 
 CK_GROUPED_CONV_API size_t ckgrpconv_wrw_get_workspace_size(
     const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
