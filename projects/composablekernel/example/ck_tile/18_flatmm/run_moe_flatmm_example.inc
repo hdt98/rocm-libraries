@@ -12,7 +12,8 @@ template <typename FlatmmConfig,
           typename DsLayout,
           typename ELayout,
           ck_tile::MoeFlatmmKind kind,
-          typename CDEElementWise = ck_tile::element_wise::PassThrough,
+          typename CDEElementWise  = ck_tile::element_wise::PassThrough,
+          typename FusedActivation = ck_tile::moe::MoeSilu,
           typename MoeHostArgs>
 float invoke_moe_gemm(int n_warmup, int n_repeat, const MoeHostArgs& args)
 {
@@ -27,7 +28,8 @@ float invoke_moe_gemm(int n_warmup, int n_repeat, const MoeHostArgs& args)
                               DsLayout,
                               ELayout,
                               kind,
-                              CDEElementWise>(
+                              CDEElementWise,
+                              FusedActivation>(
         args, ck_tile::stream_config{nullptr, true, 1, n_warmup, n_repeat, true, true, 50});
 
     std::string op_name{"Moe Gemm"};
@@ -72,16 +74,17 @@ int run_moe_gemm_example_with_layouts(int argc,
     constexpr int ScaleGranularityM = 1;
     constexpr int ScaleGranularityN = 1;
 
-    const ck_tile::index_t N          = arg_parser.get_int("N");
-    const ck_tile::index_t K          = arg_parser.get_int("K");
-    ck_tile::index_t stride_A         = arg_parser.get_int("stride_A");
-    ck_tile::index_t stride_B         = arg_parser.get_int("stride_B");
-    ck_tile::index_t stride_C         = arg_parser.get_int("stride_C");
-    const ck_tile::index_t num_tokens = arg_parser.get_int("NumTokens");
-    const ck_tile::index_t topk       = arg_parser.get_int("TopK");
-    const ck_tile::index_t warmup     = arg_parser.get_int("warmup");
-    const ck_tile::index_t repeat     = arg_parser.get_int("repeat");
-    const ck_tile::index_t experts    = arg_parser.get_int("experts");
+    const ck_tile::index_t N             = arg_parser.get_int("N");
+    const ck_tile::index_t K             = arg_parser.get_int("K");
+    ck_tile::index_t stride_A            = arg_parser.get_int("stride_A");
+    ck_tile::index_t stride_B            = arg_parser.get_int("stride_B");
+    ck_tile::index_t stride_C            = arg_parser.get_int("stride_C");
+    const ck_tile::index_t num_tokens    = arg_parser.get_int("NumTokens");
+    const ck_tile::index_t topk          = arg_parser.get_int("TopK");
+    const ck_tile::index_t warmup        = arg_parser.get_int("warmup");
+    const ck_tile::index_t repeat        = arg_parser.get_int("repeat");
+    const ck_tile::index_t experts       = arg_parser.get_int("experts");
+    const ck_tile::index_t activation_id = arg_parser.get_int("activation");
 
     // TODO: replace the magic declaration
     const ck_tile::index_t MPerBlock = FlatmmConfig::M_Tile;
@@ -241,17 +244,62 @@ int run_moe_gemm_example_with_layouts(int argc,
                             per_token_scale_dev_ptr,
                             per_channel_scale_dev_ptr};
 
-    invoke_moe_gemm<FlatmmConfig,
-                    ADataType,
-                    BDataType,
-                    ck_tile::tuple<>,
-                    AccDataType,
-                    CDataType,
-                    ALayout,
-                    BLayout,
-                    ck_tile::tuple<>,
-                    CLayout,
-                    kind>(warmup, repeat, gemm_desc);
+    // Select activation function based on activation_id
+    // 0 = MoeSilu, 2 = Swiglu, 3 = Swiglu_STEP
+    if(activation_id == 0)
+    {
+        invoke_moe_gemm<FlatmmConfig,
+                        ADataType,
+                        BDataType,
+                        ck_tile::tuple<>,
+                        AccDataType,
+                        CDataType,
+                        ALayout,
+                        BLayout,
+                        ck_tile::tuple<>,
+                        CLayout,
+                        kind,
+                        ck_tile::element_wise::PassThrough,
+                        ck_tile::moe::MoeSilu>(warmup, repeat, gemm_desc);
+    }
+    else if(activation_id == 2)
+    {
+        invoke_moe_gemm<FlatmmConfig,
+                        ADataType,
+                        BDataType,
+                        ck_tile::tuple<>,
+                        AccDataType,
+                        CDataType,
+                        ALayout,
+                        BLayout,
+                        ck_tile::tuple<>,
+                        CLayout,
+                        kind,
+                        ck_tile::element_wise::PassThrough,
+                        ck_tile::moe::Swiglu>(warmup, repeat, gemm_desc);
+    }
+    else if(activation_id == 3)
+    {
+        invoke_moe_gemm<FlatmmConfig,
+                        ADataType,
+                        BDataType,
+                        ck_tile::tuple<>,
+                        AccDataType,
+                        CDataType,
+                        ALayout,
+                        BLayout,
+                        ck_tile::tuple<>,
+                        CLayout,
+                        kind,
+                        ck_tile::element_wise::PassThrough,
+                        ck_tile::moe::Swiglu_STEP>(warmup, repeat, gemm_desc);
+    }
+    else
+    {
+        std::cout << "Invalid activation type: " << activation_id << "\n";
+        std::cout << "Supported types: 0=MoeSilu, 2=Swiglu, 3=Swiglu_STEP\n";
+        return -1;
+    }
 
     c_m_n_dev_buf.FromDevice(c_m_n_tensor.data());
 
@@ -271,36 +319,106 @@ int run_moe_gemm_example_with_layouts(int argc,
 
         c_m_n_ref_buf->SetZero();
 
-        ck_tile::reference_moe_gemm_gpu<ADataType,
-                                        BDataType,
-                                        AccDataType,
-                                        CDataType,
-                                        ALayout,
-                                        BLayout,
-                                        CLayout,
-                                        static_cast<int>(kind),
-                                        ck_tile::moe::MoeSilu>(
-            p_sorted_token_ids_dev,
-            p_expert_ids_dev,
-            p_max_token_id_dev,
-            static_cast<const ADataType*>(p_a),
-            static_cast<const BDataType*>(p_b_origin),
-            static_cast<CDataType*>(c_m_n_ref_buf->GetDeviceBuffer()),
-            p_sorted_expert_weight_dev,
-            num_tokens,
-            MPerBlock,
-            topk,
-            M,
-            N,
-            K,
-            stride_A,
-            stride_B,
-            stride_C,
-            1,
-            1,
-            K,
-            static_cast<float*>(per_token_scale_dev_buf.GetDeviceBuffer()),
-            static_cast<float*>(per_channel_scale_dev_buf.GetDeviceBuffer()));
+        // Select activation function based on activation_id for CPU reference
+        if(activation_id == 0)
+        {
+            ck_tile::reference_moe_gemm_gpu<ADataType,
+                                            BDataType,
+                                            AccDataType,
+                                            CDataType,
+                                            ALayout,
+                                            BLayout,
+                                            CLayout,
+                                            static_cast<int>(kind),
+                                            ck_tile::moe::MoeSilu>(
+                p_sorted_token_ids_dev,
+                p_expert_ids_dev,
+                p_max_token_id_dev,
+                static_cast<const ADataType*>(p_a),
+                static_cast<const BDataType*>(p_b_origin),
+                static_cast<CDataType*>(c_m_n_ref_buf->GetDeviceBuffer()),
+                p_sorted_expert_weight_dev,
+                num_tokens,
+                MPerBlock,
+                topk,
+                M,
+                N,
+                K,
+                stride_A,
+                stride_B,
+                stride_C,
+                1,
+                1,
+                K,
+                static_cast<float*>(per_token_scale_dev_buf.GetDeviceBuffer()),
+                static_cast<float*>(per_channel_scale_dev_buf.GetDeviceBuffer()));
+        }
+        else if(activation_id == 2)
+        {
+            ck_tile::reference_moe_gemm_gpu<ADataType,
+                                            BDataType,
+                                            AccDataType,
+                                            CDataType,
+                                            ALayout,
+                                            BLayout,
+                                            CLayout,
+                                            static_cast<int>(kind),
+                                            ck_tile::moe::Swiglu>(
+                p_sorted_token_ids_dev,
+                p_expert_ids_dev,
+                p_max_token_id_dev,
+                static_cast<const ADataType*>(p_a),
+                static_cast<const BDataType*>(p_b_origin),
+                static_cast<CDataType*>(c_m_n_ref_buf->GetDeviceBuffer()),
+                p_sorted_expert_weight_dev,
+                num_tokens,
+                MPerBlock,
+                topk,
+                M,
+                N,
+                K,
+                stride_A,
+                stride_B,
+                stride_C,
+                1,
+                1,
+                K,
+                static_cast<float*>(per_token_scale_dev_buf.GetDeviceBuffer()),
+                static_cast<float*>(per_channel_scale_dev_buf.GetDeviceBuffer()));
+        }
+        else if(activation_id == 3)
+        {
+            ck_tile::reference_moe_gemm_gpu<ADataType,
+                                            BDataType,
+                                            AccDataType,
+                                            CDataType,
+                                            ALayout,
+                                            BLayout,
+                                            CLayout,
+                                            static_cast<int>(kind),
+                                            ck_tile::moe::Swiglu_STEP>(
+                p_sorted_token_ids_dev,
+                p_expert_ids_dev,
+                p_max_token_id_dev,
+                static_cast<const ADataType*>(p_a),
+                static_cast<const BDataType*>(p_b_origin),
+                static_cast<CDataType*>(c_m_n_ref_buf->GetDeviceBuffer()),
+                p_sorted_expert_weight_dev,
+                num_tokens,
+                MPerBlock,
+                topk,
+                M,
+                N,
+                K,
+                stride_A,
+                stride_B,
+                stride_C,
+                1,
+                1,
+                K,
+                static_cast<float*>(per_token_scale_dev_buf.GetDeviceBuffer()),
+                static_cast<float*>(per_channel_scale_dev_buf.GetDeviceBuffer()));
+        }
 
         c_m_n_ref_buf->FromDevice(c_m_n_host_ref.data());
 

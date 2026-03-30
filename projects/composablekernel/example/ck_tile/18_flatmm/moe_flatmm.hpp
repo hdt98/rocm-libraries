@@ -163,7 +163,8 @@ auto create_args(int argc, char* argv[])
         .insert("prec", "fp16", "data type. fp16/bf16/fp8/bf8")
         .insert(
             "warp_tile", "0", "0: 16x16, 1: 32x32, 2: 16x16x128 (950 only), 3: 32x32x64 (950 only)")
-        .insert("repeat", "10", "number of iterations to benchmark the kernel.");
+        .insert("repeat", "10", "number of iterations to benchmark the kernel.")
+        .insert("activation", "0", "Activation type: 0=MoeSilu, 2=Swiglu, 3=Swiglu_STEP");
 
     bool result = arg_parser.parse(argc, argv);
     return std::make_tuple(result, arg_parser);

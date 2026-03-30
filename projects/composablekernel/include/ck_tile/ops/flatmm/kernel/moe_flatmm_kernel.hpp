@@ -159,11 +159,11 @@ struct Swiglu
     }
 
     template <typename T>
-    CK_TILE_HOST_DEVICE T operator()(T gate, T linear) const
+    CK_TILE_HOST_DEVICE T operator()(T gate, T linear = 1) const
     {
         static_assert(std::is_same_v<T, float> || std::is_same_v<T, double> ||
-                          std::is_same_v<T, ck_tile::fp16_t> || std::is_same_v<T, int8_t> ||
-                          std::is_same_v<T, int32_t>,
+                          std::is_same_v<T, ck_tile::fp16_t> || std::is_same_v<T, ck_tile::bf16_t> ||
+                          std::is_same_v<T, int8_t> || std::is_same_v<T, int32_t>,
                       "Data type is not supported by this operation!");
 
         constexpr T one = type_convert<T>(1);
@@ -173,12 +173,53 @@ struct Swiglu
 
         if constexpr(std::is_same_v<T, float>)
         {
-            return gate * __builtin_amdgcn_rcpf(one + ck_tile::exp(alpha * -gate)) * (linear + 1);
+            return gate * __builtin_amdgcn_rcpf(one + ck_tile::exp(alpha * -gate)) * (linear + one);
         }
         else
         {
-            return gate * (one / (one + ck_tile::exp(alpha * -gate))) * (linear + 1);
+            return gate * (one / (one + ck_tile::exp(alpha * -gate))) * (linear + one);
         }
+    }
+};
+
+struct Swiglu_STEP
+{
+    const float alpha;      // Unused, kept for compatibility
+    const float limit;      // Used for clamping gate_silu and up
+    const float out_limit;  // Unused, output range controlled by limit
+
+    CK_TILE_HOST_DEVICE
+    Swiglu_STEP(float alpha_ = 1.702f, float limit_ = 7.0f, float out_limit_ = 15.0f)
+        : alpha(alpha_), limit(limit_), out_limit(out_limit_)
+    {
+    }
+
+    template <typename T>
+    CK_TILE_HOST_DEVICE T operator()(T gate, T linear = 1) const
+    {
+        static_assert(std::is_same_v<T, float> || std::is_same_v<T, double> ||
+                          std::is_same_v<T, ck_tile::fp16_t> || std::is_same_v<T, ck_tile::bf16_t> ||
+                          std::is_same_v<T, int8_t> || std::is_same_v<T, int32_t>,
+                      "Data type is not supported by this operation!");
+
+        constexpr T one = type_convert<T>(1);
+
+        gate   = gate < limit ? gate : limit;
+        linear = linear < limit ? (linear > -limit ? linear : -limit) : limit;
+
+        if constexpr(std::is_same_v<T, float>)
+        {
+            T out = gate * __builtin_amdgcn_rcpf(one + ck_tile::exp(alpha * -gate)) * (linear + one);
+			out = out < out_limit ? (out > -out_limit ? out : -out_limit) : out_limit;
+			return out;
+        }
+        else
+        {
+            T out = gate * (one / (one + ck_tile::exp(alpha * -gate))) * (linear + one);
+			out = out < out_limit ? (out > -out_limit ? out : -out_limit) : out_limit;
+			return out;
+        }
+
     }
 };
 

@@ -89,6 +89,7 @@ template <typename FlatmmConfig,
           typename ELayout,
           ck_tile::MoeFlatmmKind moe_kind = ck_tile::MoeFlatmmKind::kFFN_gemm1_gate_only,
           typename CDEElementWise         = ck_tile::element_wise::PassThrough,
+          typename FusedActivation        = ck_tile::moe::MoeSilu,
           typename ScaleM,
           typename ScaleN>
 float moe_gemm(const ck_tile::MoeFlatmmHostArgs<ScaleM, ScaleN>& args,
@@ -189,8 +190,11 @@ float moe_gemm(const ck_tile::MoeFlatmmHostArgs<ScaleM, ScaleN>& args,
         using CodegenFlatmmPipeline =
             ck_tile::MoeFlatmmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem>;
 
-        using Kernel = ck_tile::
-            MoeFlatmmKernel<TilePartitioner, CodegenFlatmmPipeline, GemmEpilogue, moe_kind>;
+        using Kernel = ck_tile::MoeFlatmmKernel<TilePartitioner,
+                                                CodegenFlatmmPipeline,
+                                                GemmEpilogue,
+                                                moe_kind,
+                                                FusedActivation>;
 
         auto kargs = Kernel::MakeKernelArgs(args);
 
