@@ -494,16 +494,41 @@ namespace GEMMTests
                         gemm.workgroupSizeX * gemm.workgroupSizeY);
     }
 
-    TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MT128x128x256_LDSSwizzle)
+    TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MT256x256x128_LDSSwizzle)
     {
         REQUIRE_ARCH_CAP(GPUCapability::HasMFMA_f8f6f4);
         auto gemm           = GEMMProblemF8F6F4{32, 32, 64};
-        gemm.m              = 256;
+        gemm.m              = 512;
         gemm.n              = 256;
         gemm.k              = 512;
-        gemm.macM           = 128;
-        gemm.macN           = 128;
+        gemm.macM           = 256;
+        gemm.macN           = 256;
+        gemm.macK           = 128;
+        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDS;
+        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDS;
+        gemm.storePath      = SolutionParams::StorePath::VGPRToGlobalMemoryWithBuffer;
+        gemm.transA         = "T";
+        gemm.transB         = "N";
+        gemm.ldsSwizzleMode = LDSBankSwizzleMode::Swizzle;
+
+        basicGEMM<FP4, FP4, float>(gemm);
+    }
+
+    TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MT256x256x256_LDSSwizzle)
+    {
+        REQUIRE_ARCH_CAP(GPUCapability::HasMFMA_f8f6f4);
+        auto gemm           = GEMMProblemF8F6F4{32, 32, 64};
+        gemm.m              = 512;
+        gemm.n              = 256;
+        gemm.k              = 512;
+        gemm.macM           = 256;
+        gemm.macN           = 256;
         gemm.macK           = 256;
+        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDS;
+        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDS;
+        gemm.storePath      = SolutionParams::StorePath::VGPRToGlobalMemoryWithBuffer;
+        gemm.transA         = "T";
+        gemm.transB         = "N";
         gemm.ldsSwizzleMode = LDSBankSwizzleMode::Swizzle;
 
         basicGEMM<FP4, FP4, float>(gemm);

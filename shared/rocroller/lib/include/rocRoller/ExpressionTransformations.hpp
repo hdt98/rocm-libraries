@@ -127,6 +127,14 @@ namespace rocRoller
                                                     std::vector<ExpressionPtr> arguments);
 
         /**
+         * Replace DataFlowTag nodes in `expr` whose tags appear in
+         * `tagValues` with the corresponding expression.  Tags not
+         * present in the map are left unchanged.
+         */
+        ExpressionPtr replaceDataFlowTags(ExpressionPtr                       expr,
+                                          std::map<int, ExpressionPtr> const& tagValues);
+
+        /**
          * @brief Attempt to compute e^x operations by using exp2(x * log2(e)).
          *
          * @param expr Input expression

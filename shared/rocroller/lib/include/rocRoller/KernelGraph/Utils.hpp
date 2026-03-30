@@ -550,7 +550,8 @@ namespace rocRoller
                                   std::array<unsigned int, 3> const& workgroupSizes,
                                   std::vector<unsigned int> const&   jammedTiles,
                                   bool                               rightmostFastest,
-                                  bool                               isGlobalToLDS = false);
+                                  bool                               isGlobalToLDS = false,
+                                  bool                               ldsSwizzle    = false);
 
         /**
          * @brief Store version of addLoadMacroTileCT.

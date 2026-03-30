@@ -405,7 +405,11 @@ namespace rocRoller
                 auto delta = getDelta(srcTags[0]);
                 for(size_t i = 0; i < dsts.size(); ++i)
                     deltas.emplace(dstTags[i], delta);
-                return {indexes[0]};
+                std::vector<Expression::ExpressionPtr> rv;
+                rv.reserve(dsts.size());
+                for(size_t i = 0; i < dsts.size(); ++i)
+                    rv.push_back(indexes[0]);
+                return rv;
             }
 
             std::vector<Expression::ExpressionPtr> operator()(PiecewiseAffineJoin const& e)
@@ -553,9 +557,9 @@ namespace rocRoller
 
             std::vector<Expression::ExpressionPtr> operator()(ExpressionTransform const& e)
             {
-                // Pass through the first dst's index and delta to the first src unchanged.
-                // ExpressionTransform applies a non-affine permutation; stride computation
-                // cannot be derived from the expression trees, so we pass through unchanged.
+                // ExpressionTransform carries non-affine per-lane expressions.
+                // Pass through the first dst's delta unchanged; the actual
+                // transform only matters at codegen time (reverse propagation).
                 AssertFatal(e.reverse.size() == srcs.size(),
                             "ExpressionTransform reverse size mismatch",
                             ShowValue(e.reverse.size()),
@@ -563,7 +567,11 @@ namespace rocRoller
                 auto delta = getDelta(dstTags[0]);
                 for(size_t i = 0; i < srcs.size(); ++i)
                     deltas.emplace(srcTags[i], delta);
-                return {indexes[0]};
+                std::vector<Expression::ExpressionPtr> rv;
+                rv.reserve(e.reverse.size());
+                for(size_t i = 0; i < e.reverse.size(); ++i)
+                    rv.push_back(positionalArgumentPropagation(e.reverse[i], indexes));
+                return rv;
             }
 
             std::vector<Expression::ExpressionPtr> operator()(PiecewiseAffineJoin const& e)

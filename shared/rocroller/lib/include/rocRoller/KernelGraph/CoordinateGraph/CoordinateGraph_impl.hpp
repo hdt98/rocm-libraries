@@ -5,6 +5,7 @@
 
 #include <vector>
 
+#include <rocRoller/ExpressionTransformations.hpp>
 #include <rocRoller/KernelGraph/CoordinateGraph/CoordinateGraph.hpp>
 
 namespace rocRoller
@@ -86,6 +87,16 @@ namespace rocRoller
                     AssertFatal(visitedExprs.size() == keys.size(), ShowValue(visitedExprs));
                     for(size_t i = 0; i < visitedExprs.size(); i++)
                     {
+                        // Resolve any DataFlowTag references that match
+                        // coordinates already computed in exprMap.  This
+                        // allows ExpressionTransform edges to reference
+                        // coordinates outside their graph neighbourhood
+                        // (e.g. iMacX in the LR swizzle).
+                        if(visitedExprs[i])
+                        {
+                            visitedExprs[i]
+                                = Expression::replaceDataFlowTags(visitedExprs[i], exprMap);
+                        }
                         exprMap[keys[i]] = std::move(visitedExprs[i]);
                     }
                 }

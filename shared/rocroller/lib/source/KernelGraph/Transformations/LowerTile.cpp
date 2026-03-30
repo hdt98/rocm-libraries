@@ -818,7 +818,8 @@ namespace rocRoller
                                  std::array<unsigned int, 3> const& workgroupSizes,
                                  std::vector<unsigned int> const&   jammedTiles,
                                  bool                               rightmostFastest,
-                                 bool                               isGlobalToLDS)
+                                 bool                               isGlobalToLDS,
+                                 bool                               ldsSwizzle = false)
         {
             auto macTile = graph.coordinates.getNode<MacroTile>(macTileTag);
             auto thrTile = ThreadTile(macTile);
@@ -911,6 +912,59 @@ namespace rocRoller
                     graph.coordinates.addElement(Tile(), {iMacX}, {nThrX, iThrX});
             }
 
+            // GR swizzle for Direct2LDS: permute the global read column so
+            // that each thread reads from a swizzled global position and D2L
+            // writes sequentially to LDS, producing a swizzled LDS layout.
+            //
+            // Graph topology (load side):
+            //   iMacY --Tile--> {grSwizzleNThrY, iThrY}
+            //   grSwizzleNThrY --ET--> {nThrY}
+            //   {nThrX, nThrY} --Flatten--> workitemX
+            //
+            // The ET edge goes FROM grSwizzleNThrY TO nThrY (downstream).
+            // Upstream traversal (used for D2L load offset computation)
+            // applies the reverse expression: swizzle(nThrY, nThrX) where
+            // nThrX is referenced via DataFlowTag (already resolved at
+            // that point in the traversal).
+            auto grSwizzleNThrY = nThrY;
+            if(ldsSwizzle && isGlobalToLDS)
+            {
+                using namespace Expression;
+                auto K = thrTile.wsizes.at(1);
+                auto R = 16u / K;
+
+                auto K_lit = literal(K);
+                auto logR  = literal(static_cast<unsigned int>(__builtin_ctz(R)));
+
+                // nThrX via DataFlowTag -- resolved to its expression during traversal
+                auto nThrX_ref = std::make_shared<rocRoller::Expression::Expression>(
+                    DataFlowTag{nThrX, Register::Type::Vector, DataType::UInt32});
+
+                // Reverse expression: computes grSwizzleNThrY from nThrY
+                // $0 = nThrY (col index within the thread-tile-number space)
+                auto rev_arg0  = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
+                auto ldsRowId  = nThrX_ref >> logR;
+                auto swap_mask = (ldsRowId ^ literal(1u)) & literal(1u);
+                auto swap_col  = rev_arg0 ^ swap_mask;
+                auto gr_rot    = K_lit - ((ldsRowId >> literal(1u)) << literal(1u));
+                auto swizzled  = (swap_col + gr_rot) & (K_lit - literal(1u));
+
+                // Forward expression: identity pass-through
+                auto fwd_arg0 = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
+                ExpressionTransform grSwizzle{{fwd_arg0}, {swizzled}};
+
+                grSwizzleNThrY = graph.coordinates.addElement(ThreadTileNumber(1, literal(K)));
+                graph.coordinates.addElement(grSwizzle, {grSwizzleNThrY}, {nThrY});
+
+                auto logger = rocRoller::Log::getLogger();
+                logger->info("GR swizzle (load): nThrY={} nThrX={} grSwizzleNThrY={} K={} R={}",
+                             nThrY,
+                             nThrX,
+                             grSwizzleNThrY,
+                             K,
+                             R);
+            }
+
             if(jammedTiles.size() > 1 && jammedTiles[1] > 1)
             {
                 auto jammedWavetileY = graph.coordinates.addElement(
@@ -920,10 +974,10 @@ namespace rocRoller
                 {
                     if(rightmostFastest)
                         graph.coordinates.addElement(
-                            Tile(), {iMacY}, {jammedWavetileY, nThrY, iThrY});
+                            Tile(), {iMacY}, {jammedWavetileY, grSwizzleNThrY, iThrY});
                     else
                         graph.coordinates.addElement(
-                            Tile(), {iMacY}, {jammedWavetileY, iThrY, nThrY});
+                            Tile(), {iMacY}, {jammedWavetileY, iThrY, grSwizzleNThrY});
                 }
                 else
                     graph.coordinates.addElement(Tile(), {iMacY}, {jammedWavetileY, nThrY, iThrY});
@@ -933,9 +987,9 @@ namespace rocRoller
                 if(isGlobalToLDS)
                 {
                     if(rightmostFastest)
-                        graph.coordinates.addElement(Tile(), {iMacY}, {nThrY, iThrY});
+                        graph.coordinates.addElement(Tile(), {iMacY}, {grSwizzleNThrY, iThrY});
                     else
-                        graph.coordinates.addElement(Tile(), {iMacY}, {iThrY, nThrY});
+                        graph.coordinates.addElement(Tile(), {iMacY}, {iThrY, grSwizzleNThrY});
                 }
                 else
                     graph.coordinates.addElement(Tile(), {iMacY}, {nThrY, iThrY});
@@ -1265,7 +1319,8 @@ namespace rocRoller
                                   std::array<unsigned int, 3> const& workgroupSizes,
                                   std::vector<unsigned int> const&   jammedTiles,
                                   bool                               rightmostFastest,
-                                  bool                               isGlobalToLDS)
+                                  bool                               isGlobalToLDS,
+                                  bool                               ldsSwizzle)
         {
             auto macTile = graph.coordinates.getNode<MacroTile>(macTileTag);
 
@@ -1364,35 +1419,33 @@ namespace rocRoller
                     graph.coordinates.addElement(Flatten(), {nThrX, iThrX}, {iMacX});
             }
 
+            // Note: No GR column swizzle on the store side.  For D2L the
+            // LDS write address (M0) must remain un-swizzled because the
+            // hardware writes sequentially at M0 + lane*16.  The GR swizzle
+            // is applied only on the load side (addLoadThreadTileCT) where
+            // it permutes the global read offset (v16/offen) so that each
+            // lane fetches from a different global column, producing a
+            // swizzled data layout in LDS without shifting M0.
+            auto grSwizzleNThrY = nThrY;
+
             if(jammedTiles.size() > 1 && jammedTiles[1] > 1)
             {
                 auto jammedWavetileY = graph.coordinates.addElement(
                     JammedWaveTileNumber(1, literal(jammedTiles[1]), literal(1)));
                 connections.push_back(DC<JammedWaveTileNumber>(jammedWavetileY, 1));
-                if(isGlobalToLDS)
-                {
-                    if(rightmostFastest)
-                        graph.coordinates.addElement(
-                            Flatten(), {jammedWavetileY, nThrY, iThrY}, {iMacY});
-                    else
-                        graph.coordinates.addElement(
-                            Flatten(), {jammedWavetileY, iThrY, nThrY}, {iMacY});
-                }
+                if(rightmostFastest)
+                    graph.coordinates.addElement(
+                        Flatten(), {jammedWavetileY, grSwizzleNThrY, iThrY}, {iMacY});
                 else
                     graph.coordinates.addElement(
-                        Flatten(), {jammedWavetileY, nThrY, iThrY}, {iMacY});
+                        Flatten(), {jammedWavetileY, iThrY, grSwizzleNThrY}, {iMacY});
             }
             else
             {
-                if(isGlobalToLDS)
-                {
-                    if(rightmostFastest)
-                        graph.coordinates.addElement(Flatten(), {nThrY, iThrY}, {iMacY});
-                    else
-                        graph.coordinates.addElement(Flatten(), {iThrY, nThrY}, {iMacY});
-                }
+                if(rightmostFastest)
+                    graph.coordinates.addElement(Flatten(), {grSwizzleNThrY, iThrY}, {iMacY});
                 else
-                    graph.coordinates.addElement(Flatten(), {nThrY, iThrY}, {iMacY});
+                    graph.coordinates.addElement(Flatten(), {iThrY, grSwizzleNThrY}, {iMacY});
             }
         }
 
@@ -1534,7 +1587,8 @@ namespace rocRoller
                                 std::vector<unsigned int> const& jammedTiles,
                                 CommandParametersPtr             params,
                                 ContextPtr                       context,
-                                bool                             isGlobalToLDS)
+                                bool                             isGlobalToLDS,
+                                bool                             ldsSwizzle = false)
         {
             auto workgroupSizes = context->kernel()->workgroupSize();
 
@@ -1552,7 +1606,8 @@ namespace rocRoller
                                 workgroupSizes,
                                 jammedTiles,
                                 rightmostFastest,
-                                isGlobalToLDS);
+                                isGlobalToLDS,
+                                ldsSwizzle);
 
             graph.coordinates.addElement(DataFlow(), {userTag}, {macTileTag});
         }
@@ -1662,7 +1717,8 @@ namespace rocRoller
                                  iMacY,
                                  workgroupSizes,
                                  jammedTiles,
-                                 rightmostFastest);
+                                 rightmostFastest,
+                                 /*isGlobalToLDS=*/false);
 
             graph.coordinates.addElement(DataFlow(), {macTileTag}, {userTag});
         }
@@ -1955,6 +2011,10 @@ namespace rocRoller
                                           m_context);
                     break;
                 case MemoryType::WAVE_Direct2LDS:
+                {
+                    bool d2lSwizzle
+                        = m_context->kernelOptions()->ldsSwizzleMode == LDSBankSwizzleMode::Swizzle
+                          && tile.layoutType == LayoutType::MATRIX_A;
                     loadMacroTile_VGPR(graph,
                                        connections,
                                        userTag,
@@ -1963,8 +2023,10 @@ namespace rocRoller
                                        {1, 1},
                                        m_params,
                                        m_context,
-                                       /*isGlobalToLDS=*/true);
-                    break;
+                                       /*isGlobalToLDS=*/true,
+                                       /*ldsSwizzle=*/d2lSwizzle);
+                }
+                break;
                 default:
                     Throw<FatalError>("LoadTiled: MacroTile memory type not supported yet.",
                                       ShowValue(tile.memoryType));
@@ -2057,10 +2119,85 @@ namespace rocRoller
                                         false);
                 }
 
+                // LR column rotation: when LDS bank swizzle is enabled, insert an
+                // ExpressionTransform between ldsTag and iMacY that permutes
+                // the K-column read address to match the GR swizzle layout.
+                //
+                // Graph topology (swizzle enabled):
+                //   ldsTag --Tile--> {iMacX, rawIMacY}
+                //   {rawIMacY} --ExpressionTransform--> {iMacY}
+                //   iMacX, iMacY --> addLoadWaveTileCT (unchanged)
+                //
+                // rawIMacY is the swizzled column position in LDS.  The ET
+                // reverse expression (used by coords.reverse() for LoadLDSTile)
+                // computes the matching swizzled LDS column via the same GR
+                // permutation.
+                //
+                // Graph topology (swizzle enabled):
+                //   ldsTag --Tile--> {iMacX, rawIMacY}
+                //   {rawIMacY} --ET--> {iMacY}
+                //   iMacX, iMacY --> addLoadWaveTileCT (unchanged)
+                //
+                // The ET has 1 src (rawIMacY) and 1 dst (iMacY).
+                // The reverse expression applies the GR permutation using
+                // iMacX via DataFlowTag (resolved to register at codegen).
+                // The forward expression is identity (pass-through).
+                auto tileIMacY = iMacY;
+                if(m_context->kernelOptions()->ldsSwizzleMode == LDSBankSwizzleMode::Swizzle
+                   && tile.layoutType == LayoutType::MATRIX_A)
+                {
+                    using namespace Expression;
+
+                    auto thrTile = ThreadTile(tile);
+                    auto K       = static_cast<unsigned int>(thrTile.wsizes.at(1));
+                    auto E       = static_cast<unsigned int>(tile.subTileSizes.at(1));
+                    auto R       = 16u / K;
+
+                    auto logE = literal(static_cast<unsigned int>(__builtin_ctz(E)));
+                    auto logR = literal(static_cast<unsigned int>(__builtin_ctz(R)));
+
+                    // Reverse: $0 = iMacY (logical column)
+                    auto arg0 = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
+                    // iMacX via DataFlowTag -- resolved to register at codegen
+                    auto iMacX_ref = std::make_shared<rocRoller::Expression::Expression>(
+                        DataFlowTag{iMacX, Register::Type::Vector, DataType::UInt32});
+                    auto K_lit = literal(K);
+                    auto E_lit = literal(E);
+
+                    auto col_chunk = arg0 >> logE;
+                    auto element   = arg0 & (E_lit - literal(1u));
+                    auto ldsRowId  = iMacX_ref >> logR;
+                    // LR inverse swizzle: undo the GR permutation.
+                    // GR applies f(x) = (x ^ swap_mask + rotation) & (K-1)
+                    // Inverse is f^-1(y) = ((y + inv_rotation) & (K-1)) ^ swap_mask
+                    // where inv_rotation = (K - rotation) & (K-1) = (ldsRowId>>1)<<1
+                    auto swap_mask       = (ldsRowId ^ literal(1u)) & literal(1u);
+                    auto inv_rotation    = (ldsRowId >> literal(1u)) << literal(1u);
+                    auto unrotated_chunk = (col_chunk + inv_rotation) & (K_lit - literal(1u));
+                    auto swizzled_chunk  = unrotated_chunk ^ swap_mask;
+                    auto swizzled_iMacY  = swizzled_chunk * E_lit + element;
+
+                    // Forward: identity (pass-through)
+                    auto fwd0 = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
+                    ExpressionTransform lrSwizzle{{fwd0}, {swizzled_iMacY}};
+
+                    auto rawIMacY = graph.coordinates.addElement(tile.tileIndex(1));
+                    graph.coordinates.addElement(lrSwizzle, {rawIMacY}, {iMacY});
+                    tileIMacY = rawIMacY;
+
+                    logger->info("LR swizzle: ldsTag={} iMacX={} iMacY={} "
+                                 "rawIMacY={} layout={}",
+                                 ldsTag,
+                                 iMacX,
+                                 iMacY,
+                                 rawIMacY,
+                                 toString(tile.layoutType));
+                }
+
                 if(rightmostFastest)
-                    graph.coordinates.addElement(Tile(), {ldsTag}, {iMacX, iMacY});
+                    graph.coordinates.addElement(Tile(), {ldsTag}, {iMacX, tileIMacY});
                 else
-                    graph.coordinates.addElement(Tile(), {ldsTag}, {iMacY, iMacX});
+                    graph.coordinates.addElement(Tile(), {ldsTag}, {tileIMacY, iMacX});
 
                 for(auto& dc : connections)
                 {
@@ -2206,6 +2343,18 @@ namespace rocRoller
                 auto iMacX = graph.coordinates.addElement(tile.tileIndex(0));
                 auto iMacY = graph.coordinates.addElement(tile.tileIndex(1));
 
+                bool ldsSwizzle
+                    = m_context->kernelOptions()->ldsSwizzleMode == LDSBankSwizzleMode::Swizzle
+                      && tile.layoutType == LayoutType::MATRIX_A;
+
+                logger->info("StoreLDSTile: tag={} tileTag={} memoryType={} layoutType={} "
+                             "ldsSwizzle={}",
+                             tag,
+                             tileTag,
+                             toString(tile.memoryType),
+                             toString(tile.layoutType),
+                             ldsSwizzle);
+
                 if(tile.memoryType == MemoryType::VGPR)
                 {
                     // We are storing entire workgroup tiles
@@ -2217,45 +2366,25 @@ namespace rocRoller
                                          iMacY,
                                          workgroupSizes,
                                          jammedTiles,
-                                         rightmostFastest);
+                                         rightmostFastest,
+                                         /*isGlobalToLDS=*/false,
+                                         ldsSwizzle);
                 }
                 else if(tile.memoryType == MemoryType::WAVE_Direct2LDS)
                 {
                     // We are storing entire workgroup tiles
                     std::vector<uint> jammedTiles = {1, 1};
 
-                    // When LDS bank swizzle is enabled, remap the LDS column index (iMacY)
-                    // through an ExpressionTransform before passing it to addStoreThreadTileCT.
-                    // For now this is a trivial identity transform (f($0) = $0 + 1 - 1) that
-                    // validates the full pipeline without changing kernel semantics.
-                    // The real GR column rotation will replace this in Task 5.
-                    auto storeIMacY = iMacY;
-                    if(m_context->kernelOptions()->ldsSwizzleMode == LDSBankSwizzleMode::Swizzle)
-                    {
-                        using namespace Expression;
-                        auto arg0 = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
-                        auto one  = literal(1u);
-                        auto identity = (arg0 + one) - one; // f($0) = $0 + 1 - 1
-                        ExpressionTransform smokeTest{{identity}, {identity}};
-                        // swizzledIMacY is the intermediate node that thread coords flatten into.
-                        // The ExpressionTransform maps swizzledIMacY -> iMacY (edge goes
-                        // {swizzledIMacY} -> {iMacY} so that upstream traversal from iMacY
-                        // reaches swizzledIMacY, and thence the thread decomposition).
-                        // The Flatten({iMacX, iMacY}, {ldsTag}) below stays unchanged.
-                        auto swizzledIMacY = graph.coordinates.addElement(tile.tileIndex(1));
-                        graph.coordinates.addElement(smokeTest, {swizzledIMacY}, {iMacY});
-                        storeIMacY = swizzledIMacY;
-                    }
-
                     addStoreThreadTileCT(graph,
                                          connections,
                                          tileTag,
                                          iMacX,
-                                         storeIMacY,
+                                         iMacY,
                                          workgroupSizes,
                                          jammedTiles,
                                          rightmostFastest,
-                                         /*isGlobalToLDS=*/true);
+                                         /*isGlobalToLDS=*/true,
+                                         ldsSwizzle);
                 }
                 else
                 {

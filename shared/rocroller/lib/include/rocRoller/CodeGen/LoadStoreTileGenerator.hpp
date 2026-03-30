@@ -188,6 +188,9 @@ namespace rocRoller
             template <MemoryInstructions::MemoryDirection Dir>
             Generator<Instruction> moveTileLiteralStrides(LoadStoreTileInfo& info);
             template <MemoryInstructions::MemoryDirection Dir>
+            Generator<Instruction> moveTileSwizzledLDS(LoadStoreTileInfo&            info,
+                                                       CoordinateGraph::Transformer& coords);
+            template <MemoryInstructions::MemoryDirection Dir>
             Generator<Instruction> moveTileColStrideOne(LoadStoreTileInfo& info);
             template <MemoryInstructions::MemoryDirection Dir>
             Generator<Instruction> moveTileRuntimeStrides(LoadStoreTileInfo& info);

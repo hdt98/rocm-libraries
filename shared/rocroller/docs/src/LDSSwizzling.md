@@ -38,6 +38,29 @@ numRowsPerBankRow = 256 / 128 = 2
 rowsPerWave       = 64 / 8 = 8
 ```
 
+## `ds_read_b128` Thread Phases
+
+The LDS unit processes a `ds_read_b128` from a 64-lane wave in 4 phases,
+each executing 16 threads simultaneously. The 16 threads in a phase access
+LDS in parallel, so bank conflicts only occur between threads within the
+same phase. The phase assignment follows the hardware SIMD layout:
+
+| Phase | Threads                                   |
+|-------|-------------------------------------------|
+| 0     | T0-3, T12-15, T20-23, T24-27              |
+| 1     | T32-35, T44-47, T52-55, T56-59            |
+| 2     | T4-7, T8-11, T16-19, T28-31               |
+| 3     | T36-39, T40-43, T48-51, T60-63            |
+
+Each `ds_read_b128` reads 16 bytes (4 banks) per thread. With 16 threads
+per phase and 64 banks total (16 bank groups of 4), zero bank conflicts
+means each thread in a phase accesses a distinct bank group.
+
+Without swizzling, threads within a phase that read the same K-column chunk
+hit the same bank group, causing 4x serialization. The swizzle permutes
+column assignments so that the 16 threads in each phase spread across all
+16 bank groups.
+
 ## Implementing in rocRoller
 
 Gated by a new compile-time kernel option (`LDSBankSwizzleMode`). Two sides need to change:
@@ -194,10 +217,10 @@ the tile's row/column structure. For `rightmostFastest=true` and
 ```
 Current graph (relevant edges):
 
-  Workitem ──Tile──→ {nThrX, nThrY}     // nThrX=row (slow), nThrY=col (fast)
-  nThrX, iThrX ──Flatten──→ iMacX       // M-row within tile
-  nThrY, iThrY ──Flatten──→ iMacY       // K-column within tile
-  iMacX, iMacY ──Flatten──→ ldsTag      // linear LDS offset (in StoreLDSTile visitor)
+  Workitem --Tile---> {nThrX, nThrY}     // nThrX=row (slow), nThrY=col (fast)
+  nThrX, iThrX --Flatten---> iMacX       // M-row within tile
+  nThrY, iThrY --Flatten---> iMacY       // K-column within tile
+  iMacX, iMacY --Flatten---> ldsTag      // linear LDS offset (in StoreLDSTile visitor)
 ```
 
 Key dimensions:
@@ -210,11 +233,11 @@ With swizzle, insert an `ExpressionTransform` that remaps `nThrY` based on
 ```
 With swizzle:
 
-  Workitem ──Tile──→ {nThrX, nThrY}
-  {nThrY, nThrX} ──ExpressionTransform──→ swizzled_nThrY   // NEW
-  nThrX, iThrX ──Flatten──→ iMacX                          // unchanged
-  swizzled_nThrY, iThrY ──Flatten──→ iMacY                 // was nThrY
-  iMacX, iMacY ──Flatten──→ ldsTag
+  Workitem --Tile---> {nThrX, nThrY}
+  {nThrY, nThrX} --ExpressionTransform---> swizzled_nThrY   // NEW
+  nThrX, iThrX --Flatten---> iMacX                          // unchanged
+  swizzled_nThrY, iThrY --Flatten---> iMacY                 // was nThrY
+  iMacX, iMacY --Flatten---> ldsTag
 ```
 
 `nThrX` is input to both the Flatten for `iMacX` and the ExpressionTransform
@@ -245,9 +268,9 @@ non-contiguous) layout:
 ```
 Current graph (relevant edges):
 
-  iWaveY ──Tile──→ {blockNumber, blockIndex}   // K-column decomposition
-  blockNumber, iWaveX ──Flatten──→ lane        // lane = blockNumber*16 + iWaveX
-  blockIndex ──PassThrough──→ vgpr
+  iWaveY --Tile---> {blockNumber, blockIndex}   // K-column decomposition
+  blockNumber, iWaveX --Flatten---> lane        // lane = blockNumber*16 + iWaveX
+  blockIndex --PassThrough---> vgpr
 ```
 
 Key dimensions:
@@ -261,10 +284,10 @@ produce the swizzled K-column group for LDS addressing:
 ```
 With swizzle:
 
-  {blockNumber, iWaveX} ──ExpressionTransform──→ swizzled_blockNumber  // NEW
-  iWaveY ──Tile──→ {swizzled_blockNumber, blockIndex}                  // was blockNumber
-  blockNumber, iWaveX ──Flatten──→ lane                                // unchanged
-  blockIndex ──PassThrough──→ vgpr
+  {blockNumber, iWaveX} --ExpressionTransform---> swizzled_blockNumber  // NEW
+  iWaveY --Tile---> {swizzled_blockNumber, blockIndex}                  // was blockNumber
+  blockNumber, iWaveX --Flatten---> lane                                // unchanged
+  blockIndex --PassThrough---> vgpr
 ```
 
 `blockNumber` remains the input to the lane Flatten (physical lane assignment
@@ -285,7 +308,7 @@ swizzled_col = (ldsRowId % 2 == 0) ? (base_col ^ 1) : base_col
 ```
 
 Note: the MATRIX_B case follows the same pattern but with X/Y swapped
-(iWaveX ↔ iWaveY, waveX ↔ waveY). The swizzle expressions are identical.
+(iWaveX <-> iWaveY, waveX <-> waveY). The swizzle expressions are identical.
 
 ### TODO
 
@@ -318,7 +341,7 @@ Note: the MATRIX_B case follows the same pattern but with X/Y swapped
 
 5. GR column rotation
    - In `addStoreThreadTileCT` (`LowerTile.cpp:1258`), when swizzle enabled:
-     add `ExpressionTransform({nThrY, nThrX} → swizzled_nThrY)` and use
+     add `ExpressionTransform({nThrY, nThrX} -> swizzled_nThrY)` and use
      `swizzled_nThrY` in the Flatten to `iMacY` (replacing `nThrY`)
    - Expression inputs: `$0=nThrY` (base_col), `$1=nThrX` (row within tile)
    - Derive `ldsRowId = $1 / numRowsPerBankRow` inside the expression
@@ -326,7 +349,7 @@ Note: the MATRIX_B case follows the same pattern but with X/Y swapped
 
 6. LR column rotation
    - In `addLoadWaveTileCT` (`LowerTile.cpp:529`), MATRIX_A case, when swizzle
-     enabled: add `ExpressionTransform({blockNumber, iWaveX} → swizzled_blockNumber)`
+     enabled: add `ExpressionTransform({blockNumber, iWaveX} -> swizzled_blockNumber)`
      and use `swizzled_blockNumber` in the Tile from `iWaveY` (replacing `blockNumber`)
    - Expression inputs: `$0=blockNumber` (SIMDIndex), `$1=iWaveX` (laneInSIMD)
    - Derive `ldsRowId = $1 / numRowsPerBankRow` inside the expression
