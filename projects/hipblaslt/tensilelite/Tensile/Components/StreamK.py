@@ -298,22 +298,19 @@ class StreamK(Component):
     def graWorkGroup(self, writer, kernel, tPA, tPB):
         pass
 
-    def prefetchPersistentTileProlog(self, writer, kernel, tPA, tPB, skipLroReset=False):
+    def prefetchAcrossPersistentSetupNextTile(self, writer, kernel, tPA, tPB, skipLroReset=False):
         """Recompute StreamK tile locals and map tile index to WorkGroup* for the *next* tile.
 
         After each persistent iteration's main body, ``StreamKIter`` already holds the starting
         global iteration index for the next chunk (set at the beginning of ``graWorkGroup``).
         Running ``skTileIndex`` + ``skIndexToWG`` here matches the start of the next
         ``setupNewTile`` / ``graWorkGroup`` (without advancing ``StreamKIter`` again), so SGPRs
-        are warm before the persistent back-edge. ``KernelWriterAssembly.prefetchAcrossPersistentAfterGlobalWrite``
-        then runs ``setupNewTile(..., persistentPrefetchTail=True)`` to issue the first PGR into the
-        alternate LDS buffer and set ``SkPrefetchPrimed`` so the next ``setupNewTile`` can skip the
-        redundant first ``globalReadDo`` while still performing ``globalReadIncrementAB``.
+        are warm before the persistent back-edge.
 
         When ``skipLroReset`` is True the local-read-offset reset inside
         ``skTileIndex`` is suppressed.  This is needed when PAP runs *before*
         the NLL body: the NLL still needs the current tile's read pointers."""
-        module = Module("StreamK prefetchPersistentTileProlog")
+        module = Module("StreamK prefetchAcrossPersistentSetupNextTile")
         sTmp = writer.sgprPool.checkOutAligned(4, 2, "SKPrefetchTemp")
         module.add(self.skTileIndex(writer, kernel, sTmp, tPA, tPB, skipLroReset=skipLroReset))
         module.add(self.skIndexToWG(writer, kernel, sTmp))
@@ -345,7 +342,7 @@ class StreamK(Component):
         skConstsInVgprs = writer.isStreamKConstantsToVgprEnabled(kernel)
 
         # Always reset pointers to handle odd-exit case which moves LRO to the upper bank.
-        # Skipped when the NLL PAP calls this before the NLL body: the current
+        # Skipped when PAP calls this before the NLL body: the current
         # tile's local read pointers must stay intact for the remaining MACs.
         if kernel["PrefetchGlobalRead"] and not skipLroReset:
             if not kernel["UseSubtileImpl"]:
@@ -2209,8 +2206,8 @@ class StreamKOff(StreamK):
         module = Module("StreamK Off graWorkGroup")
         return module
 
-    def prefetchPersistentTileProlog(self, writer, kernel, tPA, tPB):
-        module = Module("StreamK Off prefetchPersistentTileProlog")
+    def prefetchAcrossPersistentSetupNextTile(self, writer, kernel, tPA, tPB):
+        module = Module("StreamK Off prefetchAcrossPersistentSetupNextTile")
         return module
 
     def computeLoadSrd(self, writer, kernel, tP, sTmp):
