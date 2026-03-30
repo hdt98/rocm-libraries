@@ -331,11 +331,7 @@ void preloadCustomKernels(SolutionCache& cache)
                     getKernelName("f4gemm_bf16_per1x32Fp4_BpreShuffle_128x128", nonTemporalA, nonTemporalB),
                     mxfp4Kernel,
                     params.workgroupTile,
-                    getCoPath() / "rr_custom_kernels.co"));
-
-            for (bool streamK : {false, true})
-            {
-                params.streamK = streamK;
+                    getCoPath() / "rr_custom_kernels.co"));            
 
                 params.workgroupTile    = {128, 256, 256};
                 cache.addKernel(
@@ -476,7 +472,6 @@ void preloadCustomKernels(SolutionCache& cache)
                             getCoPath() / "rr_custom_kernels.co"));
                     mxfp4Kernel.swizzleA = true; // Reset for next iteration
                 }
-            }
         }
     }
 }
