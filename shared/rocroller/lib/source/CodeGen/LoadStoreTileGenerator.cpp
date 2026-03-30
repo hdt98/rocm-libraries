@@ -1456,8 +1456,8 @@ namespace rocRoller
                 {
                     inst.setModelledAddresses(modelledAddresses->second);
                     if(GPUInstructionInfo::isLDS(inst.getOpCode()))
-                        inst.addComment(
-                            fmt::format("Modelled addresses: {}", modelledAddresses->second));
+                        inst.addComment(fmt::format("Modelled addresses (normalized): {}",
+                                                    modelledAddresses->second));
                 }
                 return inst;
             };
@@ -1840,8 +1840,8 @@ namespace rocRoller
                 {
                     inst.setModelledAddresses(modelledAddresses->second);
                     if(GPUInstructionInfo::isLDS(inst.getOpCode()))
-                        inst.addComment(
-                            fmt::format("Modelled addresses: {}", modelledAddresses->second));
+                        inst.addComment(fmt::format("Modelled addresses (normalized): {}",
+                                                    modelledAddresses->second));
                 }
                 return inst;
             };
