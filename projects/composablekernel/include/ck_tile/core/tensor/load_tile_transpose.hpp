@@ -188,6 +188,70 @@ struct DefaultTranspose
                                                                               : 0;
     };
 };
+
+// Normalize a distribution encoding so that the last K sub-dimension equals SubtileMinorDim.
+// ds_read_tr loads SubtileMinorDim (= 64 / bits_per_element) elements per instruction.
+// When the last K sub-dim is a multiple of SubtileMinorDim, this struct splits it into
+// sequence<..., factor, SubtileMinorDim> and adds a corresponding Y dimension.
+// This is a no-op when the encoding is already compatible.
+template <typename DstrEncode, typename DataType>
+struct NormalizeEncodingForTranspose
+{
+    static constexpr index_t NumBits =
+        sizeof(DataType) * 8 / numeric_traits<remove_cvref_t<DataType>>::PackedSize;
+    static constexpr index_t SubtileMinorDim = 64 / NumBits;
+
+    static constexpr auto I0 = number<0>{};
+    static constexpr auto I1 = number<1>{};
+
+    static constexpr auto k_dim    = DstrEncode::hs_lengthss_[I1];
+    static constexpr index_t last_k = k_dim[number<k_dim.size() - 1>{}];
+
+    static constexpr bool needs_split =
+        (last_k > SubtileMinorDim) && (last_k % SubtileMinorDim == 0);
+    static constexpr index_t split_factor = needs_split ? (last_k / SubtileMinorDim) : 1;
+
+    static constexpr auto new_k_dim = []() {
+        if constexpr(needs_split)
+            return k_dim.pop_back()
+                .push_back(number<split_factor>{})
+                .push_back(number<SubtileMinorDim>{});
+        else
+            return k_dim;
+    }();
+
+    static constexpr auto new_hs = generate_tuple(
+        [](auto i) {
+            if constexpr(i == 0)
+                return DstrEncode::hs_lengthss_[I0];
+            else
+                return new_k_dim;
+        },
+        number<2>{});
+
+    static constexpr auto new_ys_major = []() {
+        if constexpr(needs_split)
+            return DstrEncode::ys_to_rhs_major_.push_back(number<2>{});
+        else
+            return DstrEncode::ys_to_rhs_major_;
+    }();
+
+    static constexpr auto new_ys_minor = []() {
+        if constexpr(needs_split)
+            return DstrEncode::ys_to_rhs_minor_.push_back(
+                number<DstrEncode::ys_to_rhs_minor_[number<DstrEncode::NDimY - 1>{}] + 1>{});
+        else
+            return DstrEncode::ys_to_rhs_minor_;
+    }();
+
+    using type = tile_distribution_encoding<typename DstrEncode::RsLengths,
+                                            remove_cvref_t<decltype(new_hs)>,
+                                            typename DstrEncode::Ps2RHssMajor,
+                                            typename DstrEncode::Ps2RHssMinor,
+                                            remove_cvref_t<decltype(new_ys_major)>,
+                                            remove_cvref_t<decltype(new_ys_minor)>>;
+};
+
 template <typename TileDistribution_, typename DataType_, typename Policy>
 struct TransposeTileDistrChecker
 {
@@ -206,7 +270,15 @@ template <typename TileDistributionEncoding_,
           bool ReverseDirection = false>
 struct TransposeTileDistributionTraits
 {
-    using InDstrEncode                      = remove_cvref_t<TileDistributionEncoding_>;
+    using RawDstrEncode = remove_cvref_t<TileDistributionEncoding_>;
+    // Normalize only for ReverseDirection=true (InputTileDistributionTraits).
+    // The original block encoding's last K sub-dim may exceed SubtileMinorDim and need splitting.
+    // For ReverseDirection=false (OutputTileDistributionTraits), the encoding is already
+    // transposed and has the correct structure.
+    using InDstrEncode = std::conditional_t<
+        ReverseDirection,
+        typename NormalizeEncodingForTranspose<RawDstrEncode, DataType_>::type,
+        RawDstrEncode>;
     static constexpr auto input_hs_lengthss = InDstrEncode::hs_lengthss_;
     static constexpr index_t LaneGroupSize =
         Policy::template ValidationTraits<InDstrEncode, ReverseDirection>::LaneGroupSize;
@@ -416,13 +488,6 @@ CK_TILE_DEVICE void load_tile_transpose_with_offset(
     constexpr auto input_distr  = TileDistribution_{};
     constexpr auto output_distr = typename DistributedTensor_::StaticTileDistribution{};
 
-    // Check that the tile distribution of out_tensor is the expected one for transposed loads.
-    using OutTileDstrEncode = typename OutputTileDistributionTraits<
-        typename TileDistribution_::DstrEncode,
-        typename BottomTensorView_::DataType>::TransposedDstrEncode;
-    static_assert(std::is_same_v<decltype(make_static_tile_distribution(OutTileDstrEncode{})),
-                                 remove_cvref_t<decltype(output_distr)>>);
-
     // Check that the datatype of out_tensor matches that of the bottom tensor view.
     static_assert(std::is_same_v<typename DistributedTensor_::DataType,
                                  typename BottomTensorView_::DataType>);
@@ -440,8 +505,12 @@ CK_TILE_DEVICE void load_tile_transpose_with_offset(
     constexpr auto y_out_element_space_size = y_out_desc.get_element_space_size();
     static_assert(y_in_element_space_size == y_out_element_space_size,
                   "the element space size is not the same!");
-    static_assert(y_in_lengths[NDimYIn - 1] == y_out_lengths[NDimYOut - 1],
-                  "the vector length is not the same!");
+    // The input (transposed) and output distributions may have different last-Y sizes when
+    // NormalizeEncodingForTranspose splits the K-dim for transpose validation. The split is
+    // a virtual subdivision so the flat buffer layout is identical; only require divisibility.
+    static_assert(y_out_lengths[NDimYOut - 1] % y_in_lengths[NDimYIn - 1] == 0 ||
+                  y_in_lengths[NDimYIn - 1] % y_out_lengths[NDimYOut - 1] == 0,
+                  "vector lengths must be related by a split factor");
     constexpr index_t vecLoadSize = y_in_lengths[NDimYIn - 1];
     constexpr index_t num_of_access =
         reduce_on_sequence(y_in_lengths, multiplies<>{}, number<1>{}) / vecLoadSize;
