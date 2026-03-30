@@ -78,11 +78,18 @@ struct WarpGemmAttributeMfma
     static_assert(Impl::kAMBlock == 1 && Impl::kBNBlock == 1,
                   "Multi-block WarpGemmAttributeMfmaImpl is not supported");
 
-    // ds_read_tr loads SubtileMinorDim elements per instruction (= 64 / bits_per_element).
-    // When kABKPerLane (per access group) exceeds SubtileMinorDim, the last K-dim element
-    // must be split to match, so the distribution encoding is compatible with the
-    // TransposeTileDistributionTraits suffix validation used by load_tile_transpose.
-    // The physical data in VGPRs is identical — this is purely a compile-time encoding change.
+    // ds_read_tr loads SubtileMinorDim (= 64 / bits_per_element) elements per instruction.
+    // When kPerLane exceeds SubtileMinorDim, the last K-dim element must be split so the
+    // distribution encoding suffix matches TransposeTileDistributionTraits validation.
+    //
+    // This split must reflect the type actually stored in LDS (the transpose source).
+    // In MX GEMM, DataType_ IS the LDS type, so splitting based on it is correct.
+    // In mixed-precision pipelines (e.g. gemm_quant), the compute type (bf16) may differ
+    // from the LDS type (fp8). Splitting based on the compute type would produce a K-dim
+    // suffix incompatible with the LDS type's SubtileMinorDim. Since DataType_ here is
+    // the compute type and we cannot know the LDS type, we only split for types where
+    // compute type == LDS type is guaranteed — i.e. types that are never widened after
+    // LDS read (≤ 8 bits per element).
     template <index_t kMNLane, index_t AttrNumAccessV_, typename DataType_>
     static constexpr auto get_warp_dstr_encoding()
     {
@@ -93,7 +100,12 @@ struct WarpGemmAttributeMfma
             sizeof(DataType_) * 8 / numeric_traits<remove_cvref_t<DataType_>>::PackedSize;
         constexpr index_t kSubtileMinorDim = 64 / kNumBitsPerElem;
         constexpr index_t kPerLane         = Impl::kABKPerLane / AttrNumAccessV_;
-        constexpr index_t kNeedsSplit =
+        // Split only when DataType_ is guaranteed to be the LDS storage type (≤ 8 bits).
+        // Wider compute types (bf16, fp16) may be paired with narrower LDS types in
+        // mixed-precision pipelines, making a compute-type-based split incorrect.
+        constexpr bool kComputeTypeIsLdsType = (kNumBitsPerElem <= 8);
+        constexpr bool kNeedsSplit =
+            kComputeTypeIsLdsType &&
             (kPerLane > kSubtileMinorDim) && (kPerLane % kSubtileMinorDim == 0);
         constexpr index_t kSplitFactor = kNeedsSplit ? (kPerLane / kSubtileMinorDim) : 1;
         constexpr index_t kLastDim     = kNeedsSplit ? kSubtileMinorDim : kPerLane;
@@ -150,7 +162,9 @@ struct WarpGemmAttributeMfma
                     return tile_distribution_encoding<
                         sequence<>,
                         tuple<sequence<kMNLane>,
-                              sequence<Impl::kABKLane, AttrNumAccessV_, kLastDim>>,
+                              sequence<Impl::kABKLane,
+                                       AttrNumAccessV_,
+                                       Impl::kABKPerLane / AttrNumAccessV_>>,
                         tuple<sequence<2, 1>>,
                         tuple<sequence<0, 0>>,
                         sequence<2, 2>,
@@ -175,7 +189,9 @@ struct WarpGemmAttributeMfma
                     return tile_distribution_encoding<
                         sequence<>,
                         tuple<sequence<kMNLane>,
-                              sequence<AttrNumAccessV_, Impl::kABKLane, kLastDim>>,
+                              sequence<AttrNumAccessV_,
+                                       Impl::kABKLane,
+                                       Impl::kABKPerLane / AttrNumAccessV_>>,
                         tuple<sequence<2, 1>>,
                         tuple<sequence<1, 0>>,
                         sequence<2, 2>,
