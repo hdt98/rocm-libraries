@@ -311,11 +311,12 @@ class GemmKernelBuilder:
         combinations = []
         for combo in all_combinations:
             pipeline, epilogue, scheduler = combo[:3]
+            a_preshuffle_quant_val = combo[6]
             if is_trait_combination_valid(
                 pipeline,
                 epilogue,
                 scheduler,
-                persistent_or_a_preshuffle_quant,
+                a_preshuffle_quant_val,
                 self.kernel_name_prefix,
             ):
                 combinations.append(combo)
@@ -496,13 +497,8 @@ using BLayout = {b_layout};
 using CLayout = {c_layout};
 """
         if self.kernel_name_prefix == "gemm_aquant":
-            # AQ layout: follows ALayout except for CRR where AQ is RowMajor
-            layout_code = str(self.layout).strip().lower()
-            if layout_code == "crr":
-                aq_layout = "ck_tile::tensor_layout::gemm::RowMajor"
-            else:
-                aq_layout = a_layout
-            instance_code += f"""using AQLayout = {aq_layout};
+            # AQ scale tensor is always RowMajor regardless of A matrix layout
+            instance_code += """using AQLayout = ck_tile::tensor_layout::gemm::RowMajor;
 """
 
         if self.kernel_name_prefix == "gemm_multi_d":
@@ -959,7 +955,10 @@ struct SelectedKernel {{
         instance_code += """
 
             // Epilogue"""
-        instance_code += self.populate_default_gemm_aquant()
+        if epilogue == "cshuffle":
+            instance_code += self.populate_cshuffle_gemm_aquant()
+        else:
+            instance_code += self.populate_default_gemm_aquant()
 
         instance_code += f"""
 
@@ -1189,6 +1188,29 @@ struct SelectedKernel {{
                 TransposeC>;  // isCTransposed_
 
             using GemmEpilogue = ck_tile::DefaultGemm2DEpilogue<EpilogueProblem>;"""
+        return instance_code
+
+    def populate_cshuffle_gemm_aquant(self):
+        instance_code = """
+            using EpilogueProblem = ck_tile::CShuffleEpilogueProblem<
+                ADataType,
+                BDataType,
+                ck_tile::tuple<>,  // DsDataType
+                AccDataType,
+                CDataType,
+                ck_tile::tuple<>,  // DsLayout
+                CLayout,
+                ck_tile::element_wise::PassThrough,
+                TileM,  // kM_
+                TileN,  // kN_
+                WarpPerBlock_M,  // MWave_
+                WarpPerBlock_N,  // NWave_
+                WarpTileM,  // kMPerXdl_
+                WarpTileN,  // kNPerXdl_
+                WarpTileK,  // kKPerXdl_
+                TransposeC>;  // isCTransposed_
+
+            using GemmEpilogue = ck_tile::CShuffleEpilogue<EpilogueProblem>;"""
         return instance_code
 
     def _generate_cmake_individual_targets(self, kernel_list):

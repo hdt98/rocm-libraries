@@ -206,8 +206,10 @@ TRAIT_UNSUPPORTED_COMBINATIONS = {
 }
 
 AQUANT_TRAIT_UNSUPPORTED_COMBINATIONS = {
-    ("mem", "default", "intrawave"),
+    ("mem", "default", "interwave"),
+    ("mem", "cshuffle", "interwave"),
     ("compv3", "default", "interwave"),
+    ("compv3", "cshuffle", "interwave"),
 }
 
 
