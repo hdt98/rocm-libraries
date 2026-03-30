@@ -184,13 +184,12 @@ struct Swiglu
 
 struct Swiglu_STEP
 {
-    const float alpha;      // Unused, kept for compatibility
-    const float limit;      // Used for clamping gate_silu and up
-    const float out_limit;  // Unused, output range controlled by limit
+    const float alpha;
+    const float limit;
 
     CK_TILE_HOST_DEVICE
-    Swiglu_STEP(float alpha_ = 1.702f, float limit_ = 7.0f, float out_limit_ = 15.0f)
-        : alpha(alpha_), limit(limit_), out_limit(out_limit_)
+    Swiglu_STEP(float alpha_ = 1.702f, float limit_ = 7.0f)
+        : alpha(alpha_), limit(limit_)
     {
     }
 
@@ -204,22 +203,22 @@ struct Swiglu_STEP
 
         constexpr T one = type_convert<T>(1);
 
-        gate   = gate < limit ? gate : limit;
-        linear = linear < limit ? (linear > -limit ? linear : -limit) : limit;
-
+        // Apply Silu to gate: gate = gate * sigmoid(gate)
         if constexpr(std::is_same_v<T, float>)
         {
-            T out = gate * __builtin_amdgcn_rcpf(one + ck_tile::exp(alpha * -gate)) * (linear + one);
-			out = out < out_limit ? (out > -out_limit ? out : -out_limit) : out_limit;
-			return out;
+            gate = gate * __builtin_amdgcn_rcpf(one + ck_tile::exp(-gate));
         }
         else
         {
-            T out = gate * (one / (one + ck_tile::exp(alpha * -gate))) * (linear + one);
-			out = out < out_limit ? (out > -out_limit ? out : -out_limit) : out_limit;
-			return out;
+            gate = gate * (one / (one + ck_tile::exp(-gate)));
         }
 
+        // Clip gate and linear (up)
+        gate   = gate < limit ? gate : limit;
+        linear = linear < limit ? (linear > -limit ? linear : -limit) : limit;
+
+        // Return silu(gate) * up
+        return gate * linear;
     }
 };
 
