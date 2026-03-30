@@ -70,8 +70,6 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
     static constexpr auto BiasEnum          = Problem::BiasEnum;
     static constexpr bool kStoreLSE         = Problem::kStoreLSE;
     static constexpr bool kHasUnevenSplits  = true;
-    static constexpr FmhaSinkMode kSinkMode = Problem::kSinkMode;
-    static constexpr bool kHasSink          = Problem::kHasSink;
     static constexpr bool kHasStreamSink    = Problem::kHasStreamSink;
     static constexpr bool kHasGptOssSink    = Problem::kHasGptOssSink;
 

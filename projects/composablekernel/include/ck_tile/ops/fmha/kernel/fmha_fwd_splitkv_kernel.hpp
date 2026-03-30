@@ -53,9 +53,6 @@ struct FmhaFwdSplitKVKernel
     static constexpr bool kDoFp8StaticQuant = FmhaPipeline::Problem::kDoFp8StaticQuant;
     static constexpr bool kIsPagedKV        = FmhaPipeline::Problem::kIsPagedKV;
     static constexpr FmhaSinkMode kSinkMode = FmhaPipeline::Problem::kSinkMode;
-    static constexpr bool kHasSink          = FmhaPipeline::Problem::kHasSink;
-    static constexpr bool kHasStreamSink    = FmhaPipeline::Problem::kHasStreamSink;
-    static constexpr bool kHasGptOssSink    = FmhaPipeline::Problem::kHasGptOssSink;
     static constexpr bool kMergeNumHeadGroupsSeqLenQ =
         FmhaPipeline::Problem::kMergeNumHeadGroupsSeqLenQ;
     using AttentionVariant = ck_tile::remove_cvref_t<typename FmhaPipeline::AttentionVariant>;

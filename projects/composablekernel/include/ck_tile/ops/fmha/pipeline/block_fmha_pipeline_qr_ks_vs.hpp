@@ -65,8 +65,6 @@ struct BlockFmhaPipelineQRKSVS
     static constexpr bool kStoreLSE         = Problem::kStoreLSE;
     static constexpr bool kHasDropout       = Problem::kHasDropout;
     static constexpr auto QScaleEnum        = Problem::QScaleEnum;
-    static constexpr FmhaSinkMode kSinkMode = Problem::kSinkMode;
-    static constexpr bool kHasSink          = Problem::kHasSink;
     static constexpr bool kHasStreamSink    = Problem::kHasStreamSink;
     static constexpr bool kHasGptOssSink    = Problem::kHasGptOssSink;
 

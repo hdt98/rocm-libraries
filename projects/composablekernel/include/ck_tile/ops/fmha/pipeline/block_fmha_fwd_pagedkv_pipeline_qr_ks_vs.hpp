@@ -60,7 +60,6 @@ struct BlockFmhaFwdPagedKVPipelineQRKSVS
     static constexpr bool kStoreLSE         = Problem::kStoreLSE;
     static constexpr bool kIsPagedKV        = Problem::kIsPagedKV;
     static constexpr FmhaSinkMode kSinkMode = Problem::kSinkMode;
-    static constexpr bool kHasSink          = Problem::kHasSink;
     static constexpr bool kHasStreamSink    = Problem::kHasStreamSink;
     static constexpr bool kHasGptOssSink    = Problem::kHasGptOssSink;
 

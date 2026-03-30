@@ -68,9 +68,6 @@ struct FmhaFwdKernel
     static constexpr bool kHasDropout       = FmhaPipeline::kHasDropout;
     static constexpr auto QScaleEnum        = FmhaPipeline::Problem::QScaleEnum;
     static constexpr bool kSkipMinSeqlenQ   = FmhaPipeline::Problem::kSkipMinSeqlenQ;
-    static constexpr FmhaSinkMode kSinkMode = FmhaPipeline::kSinkMode;
-    static constexpr bool kHasSink          = FmhaPipeline::kHasSink;
-    static constexpr bool kHasStreamSink    = FmhaPipeline::kHasStreamSink;
     static constexpr bool kHasGptOssSink    = FmhaPipeline::kHasGptOssSink;
 
     using AttentionVariant = ck_tile::remove_cvref_t<typename FmhaPipeline::AttentionVariant>;
