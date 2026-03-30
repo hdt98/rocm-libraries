@@ -15181,7 +15181,7 @@ class KernelWriterAssembly(KernelWriter):
         calculateVectorGlobalOffsetCommon(tmpSgpr)
     return module
 
-  def calculateVectorGlobalStride(self, offsetInVgpr, offsetOutVgpr, tmpSgpr, dim, strideName:str):
+  def calculateVectorGlobalStride(self, kernel, offsetInVgpr, offsetOutVgpr, tmpSgpr, dim, strideName:str):
     module = Module("")
     def calculateVectorGlobalStrideCommon(s):
       module.add(SMulI32(dst=sgpr(s), src0=sgpr(strideName), src1=sgpr(self.storeWorkGroupSgpr(self.states.kernel, 2)), comment="Stride * WG"))
@@ -15361,7 +15361,7 @@ class KernelWriterAssembly(KernelWriter):
       module.add(self.shiftSrd("Bias"))
       if biasOffsetVgpr not in offsetIsInit:
         offsetIsInit[biasOffsetVgpr] = 1
-        module.addModuleAsFlatItems(self.calculateVectorGlobalStride(offsetVgpr, biasOffsetVgpr, tmpSgpr, dim, "BiasStride"))
+        module.addModuleAsFlatItems(self.calculateVectorGlobalStride(kernel, offsetVgpr, biasOffsetVgpr, tmpSgpr, dim, "BiasStride"))
         module.add(VLShiftLeftB32(dst=vgpr(biasOffsetVgpr), \
                                   shiftHex=hex(log2(biasBpe)), \
                                   src=vgpr(biasOffsetVgpr), \
