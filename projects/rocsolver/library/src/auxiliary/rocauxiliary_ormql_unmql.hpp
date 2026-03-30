@@ -189,13 +189,13 @@ rocblas_status rocsolver_ormql_unmql_template(rocblas_handle handle,
             handle, side, trans, m, n, k, A, shiftA, lda, strideA, ipiv, strideP, C, shiftC, ldc,
             strideC, batch_count, scalars, AbyxORwork, diagORtmptr, workArr);
 
-    rocblas_int ldw = xxMQx_BLOCKSIZE;
+    I ldw = xxMQx_BLOCKSIZE;
     rocblas_stride strideW = rocblas_stride(ldw) * ldw;
 
     // determine limits and indices
     bool left = (side == rocblas_side_left);
     bool transpose = (trans != rocblas_operation_none);
-    rocblas_int start, step, nq, ncol, nrow;
+    I start, step, nq, ncol, nrow;
     if(left)
     {
         nq = m;
@@ -227,8 +227,8 @@ rocblas_status rocsolver_ormql_unmql_template(rocblas_handle handle,
         }
     }
 
-    rocblas_int i, ib;
-    for(rocblas_int j = 0; j < k; j += ldw)
+    I i, ib;
+    for(I j = 0; j < k; j += ldw)
     {
         i = start + step * j; // current householder block
         ib = std::min(ldw, k - i);
@@ -243,9 +243,9 @@ rocblas_status rocsolver_ormql_unmql_template(rocblas_handle handle,
 
         // generate triangular factor of current block reflector
         rocsolver_larft_template<T>(handle, rocblas_backward_direction, rocblas_column_wise,
-                                    (I)(nq - k + i + ib), (I)ib, A, shiftA + idx2D(0, i, lda),
-                                    (I)lda, strideA, ipiv + i, strideP, trfact, (I)ldw, strideW,
-                                    (I)batch_count, scalars, AbyxORwork, workArr);
+                                    (nq - k + i + ib), ib, A, shiftA + idx2D(0, i, lda), lda,
+                                    strideA, ipiv + i, strideP, trfact, ldw, strideW, batch_count,
+                                    scalars, AbyxORwork, workArr);
 
         // apply current block reflector
         rocsolver_larfb_template<BATCHED, STRIDED, T>(
