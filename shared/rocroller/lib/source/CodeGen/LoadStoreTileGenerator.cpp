@@ -644,28 +644,19 @@ namespace rocRoller
 
             auto offsetType = getOffsetDataTypeFromGraph(info.tag, *m_graph, /*isD2L=*/false);
 
-            Log::info("moveTileSwizzledLDS: tag={} target={} rowCoord={} colCoord={}",
-                      info.tag,
-                      target,
-                      rowCoord,
-                      colCoord);
-            Log::info("  rowCoord in required={} rowCoord in coords={}",
-                      std::find(required.begin(), required.end(), rowCoord) != required.end(),
-                      coords.hasCoordinate(rowCoord));
-            Log::info("  colCoord in required={} colCoord in coords={}",
-                      std::find(required.begin(), required.end(), colCoord) != required.end(),
-                      coords.hasCoordinate(colCoord));
-            if(coords.hasCoordinate(rowCoord))
-                Log::info("  rowCoord value in coords: {}",
-                          toString(coords.getCoordinate(rowCoord)));
-            for(auto coord : required)
+            // Get the LDS region base offset.  The coordinate graph's
+            // reverse traversal produces tile-relative (0-based) element
+            // indices.  For MATRIX_A the region starts at LDS offset 0 so
+            // no correction is needed, but MATRIX_B (and double-buffered
+            // slots) may start at a non-zero byte offset.
+            uint32_t ldsRegionBase = 0;
             {
-                auto dimName = Graph::variantToString(m_graph->coordinates.getElement(coord));
-                Log::info("  required coord {}({}) rowMatch={} colMatch={}",
-                          coord,
-                          dimName,
-                          coord == rowCoord,
-                          coord == colCoord);
+                auto [ldsTag, _lds] = m_graph->getDimension<LDS>(info.tag);
+                if(m_context->registerTagManager()->hasRegister(ldsTag))
+                {
+                    auto ldsAlloc = m_context->registerTagManager()->getRegister(ldsTag);
+                    ldsRegionBase = ldsAlloc->getLDSAllocation()->offset();
+                }
             }
 
             // For each (row, vgpr_block), build a Transformer with:
@@ -708,11 +699,6 @@ namespace rocRoller
                     }
 
                     auto indexExpr = xform.reverse({target})[0];
-                    if(i == 0 && r == 0)
-                    {
-                        Log::info("  i=0 r=0: indexExpr={}", toString(indexExpr));
-                        Log::info("  varType.dataType={}", toString(info.varType.dataType));
-                    }
 
                     // The coordinate graph produces indices in segment (unpacked)
                     // element units (e.g. FP4 elements for FP4x8 data).  Use the
@@ -721,6 +707,12 @@ namespace rocRoller
                     auto segmentType = DataTypeInfo::Get(info.varType).segmentVariableType;
                     auto byteExpr
                         = AssignIndexExpressionsDetail::ToBytes(indexExpr, segmentType.dataType);
+
+                    // Add the LDS region base offset.  The coordinate graph
+                    // reverse produces a tile-relative byte address; the
+                    // region base shifts it to the correct absolute position.
+                    if(ldsRegionBase > 0)
+                        byteExpr = byteExpr + Expression::literal(ldsRegionBase);
 
                     auto offsetReg = Register::Value::Placeholder(
                         m_context, Register::Type::Vector, offsetType, 1);
@@ -1070,9 +1062,12 @@ namespace rocRoller
                 {
                     auto macTileTag  = m_graph->mapper.get<MacroTile>(info.tag);
                     auto macTile     = m_graph->coordinates.getNode<MacroTile>(macTileTag);
-                    ldsSwizzleActive = (swzMode == LDSBankSwizzleMode::Swizzle
-                                        || swzMode == LDSBankSwizzleMode::SwizzleA)
-                                       && macTile.layoutType == LayoutType::MATRIX_A;
+                    ldsSwizzleActive = ((swzMode == LDSBankSwizzleMode::Swizzle
+                                         || swzMode == LDSBankSwizzleMode::SwizzleA)
+                                        && macTile.layoutType == LayoutType::MATRIX_A)
+                                       || ((swzMode == LDSBankSwizzleMode::Swizzle
+                                            || swzMode == LDSBankSwizzleMode::SwizzleB)
+                                           && macTile.layoutType == LayoutType::MATRIX_B);
                 }
             }
 
