@@ -74,6 +74,8 @@ foreach(gpu_target IN LISTS GPU_TARGETS)
             ${MIOPEN_CK_BUILD_INCLUDE_DIR}
             ${MIOPEN_CK_LIBRARY_INCLUDE_DIR}
         )
+    else()
+        target_link_libraries(${lib_name} PRIVATE composable_kernel::device_conv_operations)
     endif()
 
     # MIOpen internal headers (for ProblemDescription, ConvSolution, etc.)
