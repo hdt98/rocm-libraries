@@ -66,6 +66,13 @@ void CkFmhaBwdPlan::execute(const CkFmhaHandle& handle,
     args.dk_ptr = findBuffer(params_.dk_uid, deviceBuffers, numDeviceBuffers);
     args.dv_ptr = findBuffer(params_.dv_uid, deviceBuffers, numDeviceBuffers);
 
+    if (args.q_ptr == nullptr || args.k_ptr == nullptr || args.v_ptr == nullptr ||
+        args.o_ptr == nullptr || args.do_ptr == nullptr || args.lse_ptr == nullptr ||
+        args.dq_ptr == nullptr || args.dk_ptr == nullptr || args.dv_ptr == nullptr) {
+        throw hipdnn_plugin_sdk::HipdnnPluginException(
+            HIPDNN_PLUGIN_STATUS_BAD_PARAM, "CkFmhaBwdPlan: missing required device buffer");
+    }
+
     if (params_.bias_uid > 0)
         args.bias_ptr = findBuffer(params_.bias_uid, deviceBuffers, numDeviceBuffers);
     if (params_.dbias_uid > 0)
@@ -126,37 +133,38 @@ void CkFmhaBwdPlan::execute(const CkFmhaHandle& handle,
         args.nhead_stride_dv = sk * dv;
         args.batch_stride_dv = hk * sk * dv;
     } else {
-        args.stride_q = dq;
+        // BSHD: [batch, seq, head, dim]
+        args.stride_q = hq * dq;
         args.nhead_stride_q = dq;
-        args.batch_stride_q = sq * hq * dq;
+        args.batch_stride_q = static_cast<int64_t>(sq) * hq * dq;
 
-        args.stride_k = dq;
+        args.stride_k = hk * dq;
         args.nhead_stride_k = dq;
-        args.batch_stride_k = sk * hk * dq;
+        args.batch_stride_k = static_cast<int64_t>(sk) * hk * dq;
 
-        args.stride_v = dv;
+        args.stride_v = hk * dv;
         args.nhead_stride_v = dv;
-        args.batch_stride_v = sk * hk * dv;
+        args.batch_stride_v = static_cast<int64_t>(sk) * hk * dv;
 
-        args.stride_o = dv;
+        args.stride_o = hq * dv;
         args.nhead_stride_o = dv;
-        args.batch_stride_o = sq * hq * dv;
+        args.batch_stride_o = static_cast<int64_t>(sq) * hq * dv;
 
-        args.stride_do = dv;
+        args.stride_do = hq * dv;
         args.nhead_stride_do = dv;
-        args.batch_stride_do = sq * hq * dv;
+        args.batch_stride_do = static_cast<int64_t>(sq) * hq * dv;
 
-        args.stride_dq = dq;
+        args.stride_dq = hq * dq;
         args.nhead_stride_dq = dq;
-        args.batch_stride_dq = sq * hq * dq;
+        args.batch_stride_dq = static_cast<int64_t>(sq) * hq * dq;
 
-        args.stride_dk = dq;
+        args.stride_dk = hk * dq;
         args.nhead_stride_dk = dq;
-        args.batch_stride_dk = sk * hk * dq;
+        args.batch_stride_dk = static_cast<int64_t>(sk) * hk * dq;
 
-        args.stride_dv = dv;
+        args.stride_dv = hk * dv;
         args.nhead_stride_dv = dv;
-        args.batch_stride_dv = sk * hk * dv;
+        args.batch_stride_dv = static_cast<int64_t>(sk) * hk * dv;
     }
 
     // LSE strides (always dense 1D per head per batch)
@@ -183,8 +191,8 @@ void CkFmhaBwdPlan::execute(const CkFmhaHandle& handle,
     args.split_stride_dq_acc = 0;
 
     // Dropout inverse scaling
-    if (params_.has_dropout)
-        args.p_undrop = 1.0f;  // p_drop is set from seed/offset at runtime
+    if (params_.has_dropout && params_.dropout_probability > 0.0f)
+        args.p_undrop = 1.0f / (1.0f - params_.dropout_probability);
     else
         args.p_undrop = 1.0f;
 

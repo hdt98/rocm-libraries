@@ -57,6 +57,13 @@ void CkFmhaFwdPlan::execute(const CkFmhaHandle& handle,
     args.v_ptr = findBuffer(params_.v_uid, deviceBuffers, numDeviceBuffers);
     args.o_ptr = findBuffer(params_.o_uid, deviceBuffers, numDeviceBuffers);
 
+    if (args.q_ptr == nullptr || args.k_ptr == nullptr || args.v_ptr == nullptr ||
+        args.o_ptr == nullptr) {
+        throw hipdnn_plugin_sdk::HipdnnPluginException(
+            HIPDNN_PLUGIN_STATUS_BAD_PARAM,
+            "CkFmhaFwdPlan: missing required Q/K/V/O device buffer");
+    }
+
     if (params_.bias_uid > 0)
         args.bias_ptr = findBuffer(params_.bias_uid, deviceBuffers, numDeviceBuffers);
     if (params_.lse_uid > 0)

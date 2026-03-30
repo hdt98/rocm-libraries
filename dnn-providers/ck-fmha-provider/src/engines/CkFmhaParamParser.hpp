@@ -57,6 +57,7 @@ struct ParsedBwdParams {
     bool has_dbias = false;
     bool has_dropout = false;
     float scale = 0.0f;
+    float dropout_probability = 0.0f;
     int64_t window_left = -1;
     int64_t window_right = -1;
 

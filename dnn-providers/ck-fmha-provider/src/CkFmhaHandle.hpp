@@ -20,14 +20,17 @@
 struct CkFmhaContext;
 
 namespace ck_fmha_plugin {
-
 class CkFmhaContainer;
-
 }  // namespace ck_fmha_plugin
 
 struct CkFmhaHandle : HipdnnEnginePluginHandle {
     CkFmhaHandle();
     ~CkFmhaHandle() override;
+
+    CkFmhaHandle(const CkFmhaHandle&) = delete;
+    CkFmhaHandle& operator=(const CkFmhaHandle&) = delete;
+    CkFmhaHandle(CkFmhaHandle&&) = delete;
+    CkFmhaHandle& operator=(CkFmhaHandle&&) = delete;
 
     void setStream(hipStream_t stream) {
         stream_ = stream;
@@ -61,7 +64,7 @@ struct CkFmhaHandle : HipdnnEnginePluginHandle {
     }
 
     const ck_tile::dispatcher::FmhaExecutionPlan* getCachedPlan(const std::string& key) const;
-    void cachePlan(const std::string& key, ck_tile::dispatcher::FmhaExecutionPlan plan);
+    void cachePlan(const std::string& key, ck_tile::dispatcher::FmhaExecutionPlan plan) const;
 
     void loadSupplementalKernels(const std::string& dir_path);
 
@@ -72,7 +75,7 @@ struct CkFmhaHandle : HipdnnEnginePluginHandle {
     std::shared_ptr<ck_tile::dispatcher::FmhaDispatcher> dispatcher_;
 
     mutable std::mutex plan_cache_mutex_;
-    std::unordered_map<std::string, ck_tile::dispatcher::FmhaExecutionPlan> plan_cache_;
+    mutable std::unordered_map<std::string, ck_tile::dispatcher::FmhaExecutionPlan> plan_cache_;
 
     std::unordered_map<const void*, std::unique_ptr<flatbuffers::DetachedBuffer>>
         engine_details_buffers_;

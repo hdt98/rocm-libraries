@@ -17,8 +17,12 @@ namespace {
 std::string detect_gfx_arch() {
     hipDeviceProp_t prop;
     int device = 0;
-    if (hipGetDevice(&device) != hipSuccess) return "gfx942";
-    if (hipGetDeviceProperties(&prop, device) != hipSuccess) return "gfx942";
+    if (hipGetDevice(&device) != hipSuccess)
+        throw hipdnn_plugin_sdk::HipdnnPluginException(HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR,
+                                                       "CkFmhaHandle: hipGetDevice failed");
+    if (hipGetDeviceProperties(&prop, device) != hipSuccess)
+        throw hipdnn_plugin_sdk::HipdnnPluginException(
+            HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR, "CkFmhaHandle: hipGetDeviceProperties failed");
     return prop.gcnArchName;
 }
 
@@ -65,7 +69,8 @@ const ck_tile::dispatcher::FmhaExecutionPlan* CkFmhaHandle::getCachedPlan(
     return (it != plan_cache_.end()) ? &it->second : nullptr;
 }
 
-void CkFmhaHandle::cachePlan(const std::string& key, ck_tile::dispatcher::FmhaExecutionPlan plan) {
+void CkFmhaHandle::cachePlan(const std::string& key,
+                             ck_tile::dispatcher::FmhaExecutionPlan plan) const {
     std::lock_guard<std::mutex> lock(plan_cache_mutex_);
     plan_cache_.emplace(std::move(key), std::move(plan));
 }

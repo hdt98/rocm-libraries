@@ -4,12 +4,15 @@
 #include "CkFmhaJit.hpp"
 
 #include <dlfcn.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
 #include <sstream>
+#include <vector>
 
 namespace ck_fmha_plugin {
 
@@ -33,6 +36,25 @@ std::string problem_to_jit_name(const ck_tile::dispatcher::FmhaProblem& p) {
     return ss.str();
 }
 
+int run_subprocess(const std::vector<std::string>& args) {
+    std::vector<const char*> argv;
+    argv.reserve(args.size() + 1);
+    for (const auto& a : args) argv.push_back(a.c_str());
+    argv.push_back(nullptr);
+
+    pid_t pid = fork();
+    if (pid < 0) return -1;
+
+    if (pid == 0) {
+        execvp(argv[0], const_cast<char* const*>(argv.data()));
+        _exit(127);
+    }
+
+    int status = 0;
+    waitpid(pid, &status, 0);
+    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+}
+
 }  // namespace
 
 JitResult jit_compile_kernel(const ck_tile::dispatcher::FmhaProblem& problem,
@@ -46,40 +68,35 @@ JitResult jit_compile_kernel(const ck_tile::dispatcher::FmhaProblem& problem,
     std::string so_name = "libdispatcher_fmha_" + kernel_name + ".so";
     std::string so_path = cache_dir + "/" + so_name;
 
-    // Cache hit
     if (std::filesystem::exists(so_path)) {
         auto elapsed = std::chrono::steady_clock::now() - start;
-        double secs = std::chrono::duration<double>(elapsed).count();
-        return {true, so_path, "", secs};
+        return {true, so_path, "", std::chrono::duration<double>(elapsed).count()};
     }
 
-    // Shell out to Python JIT pipeline
-    // This invokes setup_fmha_dispatcher via a small inline Python script
-    std::ostringstream cmd;
-    cmd << "python3 -c \"" << "import sys; sys.path.insert(0, '"
-        << std::getenv("CK_DISPATCHER_PYTHON_PATH")  // must be set
-        << "'); " << "from fmha_utils import FmhaKernelConfig, setup_fmha_dispatcher; "
-        << "cfg = FmhaKernelConfig(" << "data_type='" << problem.data_type << "', "
-        << "hdim_q=" << problem.hdim_q << ", " << "hdim_v=" << problem.hdim_v << ", "
-        << "gfx_arch='" << gfx_arch << "'" << "); "
-        << "r = setup_fmha_dispatcher(cfg, output_dir=__import__('pathlib').Path('" << cache_dir
-        << "')); " << "print('OK' if r.success else f'FAIL:{r.error}')\"";
+    const char* py_path_env = std::getenv("CK_DISPATCHER_PYTHON_PATH");
+    if (py_path_env == nullptr) {
+        return {false, "", "CK_DISPATCHER_PYTHON_PATH environment variable not set", 0.0};
+    }
+    std::string py_path(py_path_env);
 
-    std::string full_cmd = cmd.str();
-    HIPDNN_PLUGIN_LOG_INFO("JIT compile: " << full_cmd);
+    std::ostringstream script;
+    script << "import sys; sys.path.insert(0, '" << py_path << "'); "
+           << "from fmha_utils import FmhaKernelConfig, setup_fmha_dispatcher; "
+           << "cfg = FmhaKernelConfig(" << "data_type='" << problem.data_type << "', "
+           << "hdim_q=" << problem.hdim_q << ", " << "hdim_v=" << problem.hdim_v << ", "
+           << "gfx_arch='" << gfx_arch << "'); " << "r = setup_fmha_dispatcher(cfg, "
+           << "output_dir=__import__('pathlib').Path('" << cache_dir << "')); "
+           << "exit(0 if r.success else 1)";
 
-    int rc = std::system(full_cmd.c_str());
+    std::vector<std::string> args = {"python3", "-c", script.str()};
+
+    HIPDNN_PLUGIN_LOG_INFO("JIT compile: " << kernel_name << " for " << gfx_arch);
+
+    int rc = run_subprocess(args);
     auto elapsed = std::chrono::steady_clock::now() - start;
     double secs = std::chrono::duration<double>(elapsed).count();
 
     if (rc != 0 || !std::filesystem::exists(so_path)) {
-        // Try to find whatever .so was produced
-        for (auto& entry : std::filesystem::directory_iterator(cache_dir)) {
-            if (entry.path().extension() == ".so") {
-                so_path = entry.path();
-                return {true, so_path, "", secs};
-            }
-        }
         return {false, "", "JIT compilation failed (rc=" + std::to_string(rc) + ")", secs};
     }
 

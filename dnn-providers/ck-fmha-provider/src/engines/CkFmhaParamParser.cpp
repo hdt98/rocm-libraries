@@ -167,6 +167,8 @@ ParsedBwdParams parseBwdGraph(const hipdnn_data_sdk::flatbuffer_utilities::IGrap
 
     p.has_dbias = (p.dbias_uid != 0);
     p.has_dropout = (p.seed_uid != 0 && p.offset_uid != 0);
+    if (attr->dropout_probability().has_value())
+        p.dropout_probability = attr->dropout_probability().value();
 
     const auto* q_tensor = lookupTensor(graph, p.q_uid);
     const auto* k_tensor = lookupTensor(graph, p.k_uid);

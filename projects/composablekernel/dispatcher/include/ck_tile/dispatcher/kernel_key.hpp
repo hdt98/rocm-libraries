@@ -180,7 +180,6 @@ struct KernelKey
                         algorithm.scheduler,
                         algorithm.block_size,
                         gfx_arch,
-                        signature.structured_sparsity,
                         algorithm.persistent,
                         algorithm.double_buffer,
                         algorithm.preshuffle,

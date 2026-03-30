@@ -63,7 +63,7 @@ void register_tile_kernel(Registry& registry, const std::string& kernel_name)
     key.algorithm.transpose_c     = SelectedKernel::TransposeC;
     key.algorithm.num_wave_groups = 1; // Extract if available
 
-    key.gfx_arch = 942; // Extract from build configuration
+    key.gfx_arch = "gfx942";
 
     // Create kernel instance
     auto kernel_instance = std::make_shared<TileKernelInstance<SelectedKernel>>(key, kernel_name);

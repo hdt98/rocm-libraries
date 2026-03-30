@@ -55,7 +55,7 @@ void CkFmhaFwdPlanBuilder::buildPlan(const CkFmhaHandle& handle,
                 HIPDNN_PLUGIN_STATUS_BAD_PARAM,
                 "No CK FMHA forward kernel for: " + problem.to_string());
         }
-        const_cast<CkFmhaHandle&>(handle).cachePlan(cache_key, std::move(plan));
+        handle.cachePlan(cache_key, std::move(plan));
         cached = handle.getCachedPlan(cache_key);
     }
 
