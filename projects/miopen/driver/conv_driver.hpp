@@ -2011,8 +2011,7 @@ void ConvDriver<Tgpu, Tref>::GetSolutionAfterFind(
     }
     if(rc != miopenStatusSuccess           // (formatting)
        || immed_count < 1                  // It should not be so if Find succeeded.
-       || found_algo != solution.algorithm // These must match.
-       || solution.time < 0)               // Fallback mode (no entry in find-db -- disabled?)
+       || found_algo != solution.algorithm) // These must match.
     {
         // Ignore errors, just skip printing the solver information.
         solution.solution_id = 0;
