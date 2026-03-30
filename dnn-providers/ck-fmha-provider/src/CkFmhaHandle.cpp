@@ -6,6 +6,9 @@
 #include <dlfcn.h>
 
 #include <cstdlib>
+#include <filesystem>
+
+#include "CkFmhaJit.hpp"
 
 // REGISTER_GENERATED_KERNELS is defined via -include of the generated dispatch header
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
@@ -30,7 +33,6 @@ std::string detect_gfx_arch() {
 
 CkFmhaHandle::CkFmhaHandle() {
     gfx_arch_ = detect_gfx_arch();
-    // Truncate to base arch name (e.g. "gfx942:sramecc+:xnack-" -> "gfx942")
     auto colon = gfx_arch_.find(':');
     if (colon != std::string::npos) gfx_arch_ = gfx_arch_.substr(0, colon);
 
@@ -43,12 +45,11 @@ CkFmhaHandle::CkFmhaHandle() {
     dispatcher_->set_benchmarking(false);
 
     const char* lib_path_env = std::getenv("CK_FMHA_KERNEL_LIB_PATH");
-    if (lib_path_env != nullptr) {
-        loadSupplementalKernels(lib_path_env);
-    }
+    if (lib_path_env != nullptr) loadSupplementalKernels(lib_path_env);
 
     HIPDNN_PLUGIN_LOG_INFO("CkFmhaHandle: arch=" << gfx_arch_
-                                                 << " kernels=" << registry_->get_all().size());
+                                                 << " kernels=" << registry_->get_all().size()
+                                                 << " jit=" << (jitEnabled() ? "on" : "off"));
 }
 
 CkFmhaHandle::~CkFmhaHandle() {
@@ -75,9 +76,42 @@ void CkFmhaHandle::cachePlan(const std::string& key,
     plan_cache_.emplace(std::move(key), std::move(plan));
 }
 
+bool CkFmhaHandle::jitEnabled() {
+    const char* env = std::getenv("CK_FMHA_ENABLE_JIT");
+    return env != nullptr && std::string(env) == "1";
+}
+
+bool CkFmhaHandle::jitAndLoad(const ck_tile::dispatcher::FmhaProblem& problem) const {
+    if (!jitEnabled()) return false;
+
+    std::lock_guard<std::mutex> lock(jit_mutex_);
+
+    // Double-check after acquiring lock -- another thread may have JIT'd the same kernel
+    if (dispatcher_->select_kernel(problem) != nullptr) return true;
+
+    HIPDNN_PLUGIN_LOG_INFO("JIT: compiling kernel for " << problem.to_string());
+
+    auto result = ck_fmha_plugin::jit_compile_kernel(problem, gfx_arch_);
+    if (!result.success) {
+        HIPDNN_PLUGIN_LOG_WARN("JIT compilation failed: " << result.error);
+        return false;
+    }
+
+    HIPDNN_PLUGIN_LOG_INFO("JIT: compiled in " << result.build_time_s << "s -> " << result.so_path);
+
+    int added = ck_fmha_plugin::load_jit_library(result.so_path, *registry_, gfx_arch_);
+    if (added <= 0) {
+        HIPDNN_PLUGIN_LOG_WARN("JIT: no kernels loaded from " << result.so_path);
+        return false;
+    }
+
+    HIPDNN_PLUGIN_LOG_INFO("JIT: loaded " << added
+                                          << " kernel(s), total=" << registry_->get_all().size());
+
+    return dispatcher_->select_kernel(problem) != nullptr;
+}
+
 void CkFmhaHandle::loadSupplementalKernels(const std::string& dir_path) {
-    // Load .so files from the directory and merge their kernels
-    // The stable ABI is: extern "C" int ck_fmha_register_kernels(FmhaRegistry&, const char*)
     using RegisterFn = int (*)(ck_tile::dispatcher::FmhaRegistry&, const char*);
 
     namespace fs = std::filesystem;

@@ -68,6 +68,14 @@ struct CkFmhaHandle : HipdnnEnginePluginHandle {
 
     void loadSupplementalKernels(const std::string& dir_path);
 
+    /// JIT-compile a kernel for the given problem if CK_FMHA_ENABLE_JIT=1.
+    /// Compiles via fork/execvp -> python3 -> hipcc, loads the resulting .so,
+    /// merges kernels into the live registry.
+    /// Returns true if a kernel is now available for the problem.
+    bool jitAndLoad(const ck_tile::dispatcher::FmhaProblem& problem) const;
+
+    static bool jitEnabled();
+
    private:
     hipStream_t stream_ = nullptr;
     std::string gfx_arch_;
@@ -77,8 +85,9 @@ struct CkFmhaHandle : HipdnnEnginePluginHandle {
     mutable std::mutex plan_cache_mutex_;
     mutable std::unordered_map<std::string, ck_tile::dispatcher::FmhaExecutionPlan> plan_cache_;
 
+    mutable std::mutex jit_mutex_;
+    mutable std::vector<void*> supplemental_lib_handles_;
+
     std::unordered_map<const void*, std::unique_ptr<flatbuffers::DetachedBuffer>>
         engine_details_buffers_;
-
-    std::vector<void*> supplemental_lib_handles_;
 };

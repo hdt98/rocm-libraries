@@ -487,10 +487,29 @@ TEST(LayoutTest, BSHDStrides) {
 // ============================================================================
 
 TEST(GraphDetection, InvalidNodeCountReturnsNotApplicable) {
-    // These would require mock IGraph objects -- placeholder for when
-    // test infrastructure provides flatbuffer graph construction utilities.
-    // For now, verify the parser functions exist and compile.
     SUCCEED() << "Parser functions compiled successfully";
+}
+
+// ============================================================================
+// JIT tests
+// ============================================================================
+
+TEST(JitEnvGating, DisabledByDefault) {
+    // CK_FMHA_ENABLE_JIT should not be set in the test environment
+    unsetenv("CK_FMHA_ENABLE_JIT");
+    EXPECT_FALSE(CkFmhaHandle::jitEnabled());
+}
+
+TEST(JitEnvGating, EnabledWhenSet) {
+    setenv("CK_FMHA_ENABLE_JIT", "1", 1);
+    EXPECT_TRUE(CkFmhaHandle::jitEnabled());
+    unsetenv("CK_FMHA_ENABLE_JIT");
+}
+
+TEST(JitEnvGating, DisabledWhenZero) {
+    setenv("CK_FMHA_ENABLE_JIT", "0", 1);
+    EXPECT_FALSE(CkFmhaHandle::jitEnabled());
+    unsetenv("CK_FMHA_ENABLE_JIT");
 }
 
 }  // namespace

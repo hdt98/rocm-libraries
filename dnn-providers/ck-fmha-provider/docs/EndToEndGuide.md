@@ -264,3 +264,64 @@ B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 Dq=128 Dv=128       0.04        193.80
 4. **`hipdnnSetEnginePluginPaths_ext` called BEFORE `hipdnnCreate`** -- the
    backend loads plugins during handle creation, not after. Setting the path
    after would have no effect.
+
+## Part 2: JIT Path
+
+When a shape has no precompiled kernel (e.g., h256 which is not in the 96
+kernel set), the plugin transparently JIT-compiles one.
+
+### What triggers JIT
+
+```
+CkFmhaFwdPlanBuilder::isApplicable()
+  select_kernel(problem) -> nullptr (no precompiled kernel)
+  handle.jitAndLoad(problem)
+    check CK_FMHA_ENABLE_JIT=1 env var
+    jit_compile_kernel(problem, gfx_arch)
+      fork() -> python3 -c "from fmha_utils import setup_fmha_dispatcher; ..."
+        generate_fmha_fallback.py -> hipcc -> .so  (~16-31s first time)
+      capture stdout -> .so path
+    load_jit_library(so_path, registry, gfx_arch)
+      dlopen(.so)
+      dlsym("ck_fmha_register_kernels")
+      fn(registry, arch)  -> kernel merged into live registry
+    select_kernel(problem) -> non-null -> return true
+```
+
+### Cache behavior
+
+The JIT `.so` is cached on disk by `setup_fmha_dispatcher`. On subsequent
+calls for the same kernel config, the `.so` is loaded from disk (~1ms).
+The plugin's registry also caches in memory -- once a JIT kernel is loaded,
+it stays in the registry for the lifetime of the handle.
+
+### Running the JIT demo
+
+```bash
+CK_FMHA_ENABLE_JIT=1 \
+CK_DISPATCHER_PYTHON_PATH=<ck>/dispatcher/python \
+HIPDNN_PLUGIN_PATH=<hipDNN>/build/lib/hipdnn_plugins/engines \
+  ./ck_fmha_e2e_demo --warmup 1 --repeat 3
+```
+
+### Verified output (MI355X gfx950)
+
+```
+=== Forward SDPA (fp16, BHSD, no mask) ===
+Shape                                             Time(ms)    TFLOPS
+B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 Dq=128 Dv=128       0.05        184.43
+B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 Dq=256 Dv=256       0.06        274.09  <- JIT'd during isApplicable
+
+=== Part 2: JIT Compilation (ENABLED) ===
+Shape                                             JIT(s)      Time(ms)    TFLOPS
+B=2 Hq=8 Hk=4 Sq=1024 Sk=1024 Dq=256 Dv=256       0.41        0.05        374.89  <- cached
+B=1 Hq=8 Hk=8 Sq=2048 Sk=2048 Dq=256 Dv=256       0.60        0.08        457.80  <- cached
+```
+
+### Environment variables for JIT
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CK_FMHA_ENABLE_JIT` | Yes | Set to `1` to enable JIT fallback |
+| `CK_DISPATCHER_PYTHON_PATH` | Yes | Path to `<ck>/dispatcher/python` |
+| `CK_FMHA_JIT_CACHE_DIR` | No | Cache directory (default: `/tmp/ck_fmha_jit`) |

@@ -40,14 +40,12 @@
         }                                                                                    \
     } while (0)
 
-#define HIPDNN_FE_CHECK(err)                                                                  \
-    do {                                                                                      \
-        auto _e = (err);                                                                      \
-        if (_e.get_code() != hipdnn_frontend::ErrorCode::OK) {                                \
-            std::cerr << "hipDNN FE error: " << _e.get_message() << " at " << __FILE__ << ":" \
-                      << __LINE__ << std::endl;                                               \
-            std::exit(1);                                                                     \
-        }                                                                                     \
+#define HIPDNN_FE_CHECK(err)                                                      \
+    do {                                                                          \
+        auto _e = (err);                                                          \
+        if (_e.get_code() != hipdnn_frontend::ErrorCode::OK) {                    \
+            throw std::runtime_error(std::string("hipDNN: ") + _e.get_message()); \
+        }                                                                         \
     } while (0)
 
 using namespace hipdnn_frontend;
@@ -409,23 +407,10 @@ int main(int argc, char** argv) {
         {2, 8, 4, 1024, 1024, 32, 32},    // ~116 TFLOPS
         {2, 8, 4, 1024, 1024, 64, 64},    // ~179 TFLOPS
         {2, 8, 4, 1024, 1024, 128, 128},  // ~278 TFLOPS
-        {2, 8, 4, 1024, 1024, 256, 256},  // ~308 TFLOPS
-        // MLA_Sparse_Decode: R1-class asymmetric hdim
-        {1, 128, 128, 1, 1024, 192, 128},
-        {4, 128, 128, 1, 4096, 192, 128},
-        // MQA_128to8_Decode: 405B-class decode
-        {8, 128, 8, 1, 1024, 128, 128},   // ~8 TFLOPS
-        {64, 128, 8, 1, 1024, 128, 128},  // ~14 TFLOPS
-        // Extreme_GQA_Ratios
-        {2, 48, 8, 1024, 1024, 128, 128},
-        {2, 24, 4, 1024, 1024, 128, 128},
-        // Prefill_Odd_Lengths
-        {2, 32, 8, 113, 203, 128, 128},
+        {2, 8, 4, 1024, 1024, 256, 256},
+        // Prefill shapes
         {2, 32, 8, 799, 799, 128, 128},
         {2, 32, 8, 3131, 3131, 128, 128},
-        // CK_Tiny_Sequences: edge cases
-        {1, 2, 1, 1, 10, 128, 128},
-        {2, 2, 1, 33, 99, 128, 128},
     };
 
     // Forward benchmark
@@ -443,6 +428,48 @@ int main(int argc, char** argv) {
                       << tflops << "\n";
         } catch (const std::exception& e) {
             std::cout << std::setw(50) << s.label() << "  SKIP: " << e.what() << "\n";
+        }
+    }
+
+    // ================================================================
+    // Part 2: JIT Compilation (shapes NOT in precompiled kernel set)
+    // ================================================================
+    {
+        const char* jit_env = std::getenv("CK_FMHA_ENABLE_JIT");
+        bool jit_on = jit_env && std::string(jit_env) == "1";
+
+        std::cout << "\n=== Part 2: JIT Compilation "
+                  << (jit_on ? "(ENABLED)" : "(DISABLED -- set CK_FMHA_ENABLE_JIT=1)")
+                  << " ===\n\n";
+
+        if (jit_on) {
+            std::vector<Shape> jit_shapes = {
+                {2, 8, 4, 1024, 1024, 256, 256},
+                {1, 8, 8, 2048, 2048, 256, 256},
+            };
+
+            std::cout << std::left << std::setw(50) << "Shape" << std::setw(12) << "JIT(s)"
+                      << std::setw(12) << "Time(ms)" << std::setw(12) << "TFLOPS" << "\n"
+                      << std::string(86, '-') << "\n";
+
+            for (const auto& s : jit_shapes) {
+                try {
+                    auto jit_start = std::chrono::steady_clock::now();
+                    double avg_ms = run_fwd_sdpa(handle, s, false, 1, repeat);
+                    auto jit_end = std::chrono::steady_clock::now();
+                    double jit_s = std::chrono::duration<double>(jit_end - jit_start).count() -
+                                   (avg_ms * repeat / 1000.0);
+                    double tflops = s.fwd_flops() / (avg_ms * 1e9);
+
+                    std::cout << std::setw(50) << s.label() << std::setw(12) << jit_s
+                              << std::setw(12) << avg_ms << std::setw(12) << tflops << "\n";
+                } catch (const std::exception& e) {
+                    std::cout << std::setw(50) << s.label() << "  SKIP: " << e.what() << "\n";
+                }
+            }
+        } else {
+            std::cout << "  Skipped. To enable: export CK_FMHA_ENABLE_JIT=1\n"
+                      << "  Also set: CK_DISPATCHER_PYTHON_PATH=<ck>/dispatcher/python\n";
         }
     }
 

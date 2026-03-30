@@ -7,6 +7,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <array>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -25,34 +26,44 @@ std::string get_jit_cache_dir(const std::string& user_dir) {
     return "/tmp/ck_fmha_jit";
 }
 
-std::string problem_to_jit_name(const ck_tile::dispatcher::FmhaProblem& p) {
-    std::ostringstream ss;
-    ss << p.data_type << "_h" << p.hdim_q;
-    if (p.hdim_v != p.hdim_q) ss << "x" << p.hdim_v;
-    ss << "_m" << p.mask_type << "_b" << p.bias_type;
-    if (p.has_lse) ss << "_lse";
-    if (p.has_dropout) ss << "_drop";
-    if (p.has_dbias) ss << "_dbias";
-    return ss.str();
-}
-
-int run_subprocess(const std::vector<std::string>& args) {
-    std::vector<const char*> argv;
-    argv.reserve(args.size() + 1);
-    for (const auto& a : args) argv.push_back(a.c_str());
-    argv.push_back(nullptr);
+std::string run_subprocess_capture(const std::vector<std::string>& args) {
+    int pipefd[2];
+    if (pipe(pipefd) < 0) return "";
 
     pid_t pid = fork();
-    if (pid < 0) return -1;
+    if (pid < 0) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return "";
+    }
 
     if (pid == 0) {
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+        close(pipefd[1]);
+
+        std::vector<const char*> argv;
+        for (const auto& a : args) argv.push_back(a.c_str());
+        argv.push_back(nullptr);
         execvp(argv[0], const_cast<char* const*>(argv.data()));
         _exit(127);
     }
 
+    close(pipefd[1]);
+    std::string output;
+    std::array<char, 4096> buf;
+    ssize_t n;
+    while ((n = read(pipefd[0], buf.data(), buf.size())) > 0)
+        output.append(buf.data(), static_cast<size_t>(n));
+    close(pipefd[0]);
+
     int status = 0;
     waitpid(pid, &status, 0);
-    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) return "";
+
+    // Trim trailing whitespace
+    while (!output.empty() && (output.back() == '\n' || output.back() == ' ')) output.pop_back();
+    return output;
 }
 
 }  // namespace
@@ -64,43 +75,47 @@ JitResult jit_compile_kernel(const ck_tile::dispatcher::FmhaProblem& problem,
     std::string cache_dir = get_jit_cache_dir(output_dir);
     std::filesystem::create_directories(cache_dir);
 
-    std::string kernel_name = problem_to_jit_name(problem);
-    std::string so_name = "libdispatcher_fmha_" + kernel_name + ".so";
-    std::string so_path = cache_dir + "/" + so_name;
-
-    if (std::filesystem::exists(so_path)) {
-        auto elapsed = std::chrono::steady_clock::now() - start;
-        return {true, so_path, "", std::chrono::duration<double>(elapsed).count()};
-    }
-
     const char* py_path_env = std::getenv("CK_DISPATCHER_PYTHON_PATH");
-    if (py_path_env == nullptr) {
+    if (py_path_env == nullptr)
         return {false, "", "CK_DISPATCHER_PYTHON_PATH environment variable not set", 0.0};
-    }
+
     std::string py_path(py_path_env);
 
+    // The script compiles a kernel and prints the .so path to stdout.
+    // setup_fmha_dispatcher handles caching internally -- if the .so
+    // already exists it loads instantly.
     std::ostringstream script;
-    script << "import sys; sys.path.insert(0, '" << py_path << "'); "
+    script << "import sys; " << "sys.path.insert(0, '" << py_path << "'); "
+           << "sys.path.insert(0, '" << py_path << "/../codegen'); "
            << "from fmha_utils import FmhaKernelConfig, setup_fmha_dispatcher; "
-           << "cfg = FmhaKernelConfig(" << "data_type='" << problem.data_type << "', "
-           << "hdim_q=" << problem.hdim_q << ", " << "hdim_v=" << problem.hdim_v << ", "
-           << "gfx_arch='" << gfx_arch << "'); " << "r = setup_fmha_dispatcher(cfg, "
-           << "output_dir=__import__('pathlib').Path('" << cache_dir << "')); "
-           << "exit(0 if r.success else 1)";
+           << "from pathlib import Path; " << "cfg = FmhaKernelConfig(" << "data_type='"
+           << problem.data_type << "', " << "hdim_q=" << problem.hdim_q << ", "
+           << "hdim_v=" << problem.hdim_v << ", " << "gfx_arch='" << gfx_arch << "'" << "); "
+           << "r = setup_fmha_dispatcher(cfg, " << "output_dir=Path('" << cache_dir << "')); "
+           << "print(r.library_path if r.success else 'FAIL:' + str(r.error))";
 
     std::vector<std::string> args = {"python3", "-c", script.str()};
 
-    HIPDNN_PLUGIN_LOG_INFO("JIT compile: " << kernel_name << " for " << gfx_arch);
+    HIPDNN_PLUGIN_LOG_INFO("JIT compile: hdim=" << problem.hdim_q << "x" << problem.hdim_v << " "
+                                                << problem.data_type << " for " << gfx_arch);
 
-    int rc = run_subprocess(args);
+    std::string output = run_subprocess_capture(args);
     auto elapsed = std::chrono::steady_clock::now() - start;
     double secs = std::chrono::duration<double>(elapsed).count();
 
-    if (rc != 0 || !std::filesystem::exists(so_path)) {
-        return {false, "", "JIT compilation failed (rc=" + std::to_string(rc) + ")", secs};
+    if (output.empty() || output.substr(0, 5) == "FAIL:") {
+        std::string err = output.empty() ? "subprocess failed" : output.substr(5);
+        HIPDNN_PLUGIN_LOG_WARN("JIT compilation failed: " << err);
+        return {false, "", err, secs};
     }
 
-    return {true, so_path, "", secs};
+    if (!std::filesystem::exists(output)) {
+        HIPDNN_PLUGIN_LOG_WARN("JIT .so not found: " << output);
+        return {false, "", "JIT .so not found at: " + output, secs};
+    }
+
+    HIPDNN_PLUGIN_LOG_INFO("JIT compiled in " << secs << "s -> " << output);
+    return {true, output, "", secs};
 }
 
 int load_jit_library(const std::string& so_path, ck_tile::dispatcher::FmhaRegistry& registry,

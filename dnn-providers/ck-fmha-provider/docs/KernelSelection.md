@@ -186,3 +186,48 @@ than runtime kernel selection:
 AITER's advantage: v3 ASM pipeline kernels (gfx942-specific) that outperform
 CK tile kernels for bf16 h128 seqlen > 128. These are not yet integrated
 into the hipDNN plugin.
+
+## JIT Fallback
+
+When `CK_FMHA_ENABLE_JIT=1`, the plugin transparently JIT-compiles kernels
+for shapes that have no precompiled match.
+
+### Flow
+
+```
+isApplicable(handle, graph)
+  select_kernel(problem) -> nullptr
+  handle.jitAndLoad(problem)
+    check CK_FMHA_ENABLE_JIT=1
+    jit_compile_kernel(problem, arch)
+      fork/execvp -> python3 -> setup_fmha_dispatcher
+        generate_fmha_fallback.py -> hipcc -> .so
+      capture stdout -> .so path
+    load_jit_library(so_path, registry, arch)
+      dlopen -> dlsym("ck_fmha_register_kernels") -> merge
+    select_kernel(problem) -> non-null
+  return true
+```
+
+### How JIT integrates with seqtune selection
+
+The JIT-compiled kernel is registered into the same live `FmhaRegistry`.
+After JIT, `select_first_fit()` picks it using the same seqtune scoring
+as precompiled kernels. The JIT kernel participates in category/rank/tile
+scoring identically -- it has no special priority or bypass.
+
+### Timing
+
+| Phase | Time |
+|-------|------|
+| First JIT (codegen + hipcc + link) | 16-31s |
+| Cached JIT (.so exists on disk) | < 1s |
+| Registry lookup after JIT | < 1ms |
+
+### Environment variables
+
+| Variable | Required | Default |
+|----------|----------|---------|
+| `CK_FMHA_ENABLE_JIT` | Yes (opt-in) | off |
+| `CK_DISPATCHER_PYTHON_PATH` | Yes for JIT | -- |
+| `CK_FMHA_JIT_CACHE_DIR` | No | `/tmp/ck_fmha_jit` |

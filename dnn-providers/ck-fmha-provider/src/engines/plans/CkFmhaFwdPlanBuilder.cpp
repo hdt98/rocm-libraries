@@ -20,7 +20,11 @@ bool CkFmhaFwdPlanBuilder::isApplicable(
     try {
         auto params = CkFmhaParamParser::parseFwdGraph(opGraph);
         auto problem = CkFmhaParamParser::buildFwdProblem(params, handle.gfxArch());
-        return handle.dispatcher()->select_kernel(problem) != nullptr;
+
+        if (handle.dispatcher()->select_kernel(problem) != nullptr) return true;
+
+        // No precompiled kernel -- try JIT if enabled
+        return handle.jitAndLoad(problem);
     } catch (...) {
         return false;
     }
@@ -29,14 +33,12 @@ bool CkFmhaFwdPlanBuilder::isApplicable(
 size_t CkFmhaFwdPlanBuilder::getMaxWorkspaceSize(
     const CkFmhaHandle&, const hipdnn_data_sdk::flatbuffer_utilities::IGraph&,
     const CkFmhaSettings&) const {
-    return 0;  // Dense forward SDPA requires no workspace
+    return 0;
 }
 
 void CkFmhaFwdPlanBuilder::initializeExecutionSettings(
     const CkFmhaHandle&, const hipdnn_data_sdk::flatbuffer_utilities::IGraph&,
-    const hipdnn_data_sdk::flatbuffer_utilities::IEngineConfig&, CkFmhaSettings&) const {
-    // No knob-derived settings for forward yet
-}
+    const hipdnn_data_sdk::flatbuffer_utilities::IEngineConfig&, CkFmhaSettings&) const {}
 
 void CkFmhaFwdPlanBuilder::buildPlan(const CkFmhaHandle& handle,
                                      const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph,
@@ -45,11 +47,16 @@ void CkFmhaFwdPlanBuilder::buildPlan(const CkFmhaHandle& handle,
     auto params = CkFmhaParamParser::parseFwdGraph(opGraph);
     auto problem = CkFmhaParamParser::buildFwdProblem(params, handle.gfxArch());
 
-    // Check plan cache
     auto cache_key = problem.canonical_key();
     auto* cached = handle.getCachedPlan(cache_key);
     if (cached == nullptr) {
         auto plan = handle.dispatcher()->plan(problem);
+
+        // JIT fallback: if no plan from precompiled kernels, try JIT
+        if (!plan.is_valid()) {
+            if (handle.jitAndLoad(problem)) plan = handle.dispatcher()->plan(problem);
+        }
+
         if (!plan.is_valid()) {
             throw hipdnn_plugin_sdk::HipdnnPluginException(
                 HIPDNN_PLUGIN_STATUS_BAD_PARAM,

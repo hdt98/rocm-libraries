@@ -40,6 +40,22 @@ For the complete step-by-step with every flag and include path, see
 **[docs/EndToEndGuide.md](docs/EndToEndGuide.md)** -- it documents exactly
 what was run on an MI355X (gfx950) to produce the verified TFLOPS output below.
 
+### JIT Mode (optional)
+
+For shapes without precompiled kernels (e.g., h256), the plugin can
+JIT-compile kernels on demand via the CK codegen + hipcc pipeline:
+
+```bash
+CK_FMHA_ENABLE_JIT=1 \
+CK_DISPATCHER_PYTHON_PATH=<ck>/dispatcher/python \
+HIPDNN_PLUGIN_PATH=<plugin_dir> \
+  ./ck_fmha_e2e_demo --warmup 2 --repeat 5
+```
+
+First compilation takes ~16-31s per kernel. Subsequent calls load from
+disk cache instantly. See [docs/EndToEndGuide.md](docs/EndToEndGuide.md#part-2-jit-path)
+for the full JIT walkthrough.
+
 ## End-to-End Flow
 
 ### 1. Plugin Discovery
@@ -328,8 +344,9 @@ cmake --build build
 | Variable | Description |
 |----------|-------------|
 | `CK_FMHA_KERNEL_LIB_PATH` | Directory of supplemental precompiled kernel `.so` files |
+| `CK_FMHA_ENABLE_JIT` | Set to `1` to enable JIT compilation fallback for missing kernels |
 | `CK_FMHA_JIT_CACHE_DIR` | Cache directory for JIT-compiled kernels (default: `/tmp/ck_fmha_jit`) |
-| `CK_DISPATCHER_PYTHON_PATH` | Path to CK dispatcher Python modules (for JIT) |
+| `CK_DISPATCHER_PYTHON_PATH` | Path to CK dispatcher Python modules (required for JIT) |
 
 ## Architecture
 
