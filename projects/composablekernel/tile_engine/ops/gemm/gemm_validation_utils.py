@@ -854,6 +854,28 @@ def validate_gemm_aquant(
 ) -> Tuple[bool, str]:
     """Validate AQuant GEMM-specific constraints."""
 
+    # Validate whole workgroup cover configuration (same check as validate_gemm).
+    # This catches cases where the tile distribution cannot evenly divide across
+    # the wavefront (e.g. N=192 with fp8 VecSize=16 → X0=12, 64/12 not integer).
+    whole_workgroup_cover_valid, whole_workgroup_cover_error = (
+        validate_whole_wg_cover_configuration(
+            tile_m,
+            tile_n,
+            tile_k,
+            warp_m,
+            warp_n,
+            warp_k,
+            layout,
+            a_datatype,
+            b_datatype,
+        )
+    )
+    if not whole_workgroup_cover_valid:
+        logging.debug(
+            f"Whole workgroup cover configuration validation failed: {whole_workgroup_cover_error}"
+        )
+        return False, whole_workgroup_cover_error
+
     # AQuant-specific: tile_k must be a multiple of group_size_k
     # (KPerBlockAQ = KPerBlock / QuantGroupSize::kK must be integer > 0)
     if tile_k % group_size_k != 0 or tile_k < group_size_k:
