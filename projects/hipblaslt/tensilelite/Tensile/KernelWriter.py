@@ -2508,6 +2508,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
     module.addComment1("global read addresses: work-group")
     if not forceNoTileCode and not persistentPrefetchTail:
       module.add(self.graWorkGroup(kernel, tensorParametersA, tensorParametersB))
+      if self.nllPapActive(kernel):
+        module.add(SMovB32(dst=sgpr("PrevWorkGroup0"), src=sgpr("WorkGroup0"), comment="PAP: keep Prev in sync for ShadowInit SRD"))
+        module.add(SMovB32(dst=sgpr("PrevWorkGroup1"), src=sgpr("WorkGroup1"), comment="PAP: keep Prev in sync for ShadowInit SRD"))
+        module.add(SMovB32(dst=sgpr("PrevWorkGroup2"), src=sgpr("WorkGroup2"), comment="PAP: keep Prev in sync for ShadowInit SRD"))
+        module.add(SMovB32(dst=sgpr("PrevStreamKLocalStart"), src=sgpr("StreamKLocalStart"), comment="PAP: keep Prev in sync for store"))
+        module.add(SMovB32(dst=sgpr("PrevStreamKLocalEnd"), src=sgpr("StreamKLocalEnd"), comment="PAP: keep Prev in sync for store"))
+        if len(kernel["SpaceFillingAlgo"]):
+          module.add(SMovB32(dst=sgpr("PrevStreamKTileID"), src=sgpr("StreamKTileID"), comment="PAP: keep Prev in sync for store"))
 
 
     self.dontAppendCode = forceNoTileCode
