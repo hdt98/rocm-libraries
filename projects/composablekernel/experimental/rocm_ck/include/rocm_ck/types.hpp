@@ -15,6 +15,10 @@ namespace rocm_ck {
 /// Matches ck_tile::index_t but avoids pulling in CK Tile headers.
 using index_t = std::int32_t;
 
+/// 64-bit index type for large strides (batch_stride * nhead can exceed int32).
+/// Matches ck_tile::long_index_t.
+using long_index_t = std::int64_t;
+
 /// CDNA wavefront size (64 work-items per wavefront).
 constexpr int wavefront_size = 64;
 
