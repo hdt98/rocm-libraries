@@ -181,10 +181,21 @@ replicated values back to a single result. It does this automatically via:
    // ── Case 2: GEMM A-tile — NWarp-way replication ────────────────────────
    //
    // The A matrix is only tiled along M and K, but the thread block has
-   // NWarp warps spread across N as well.  Those extra warps all need
+   // NWarp warps spread across N as well.  Those NWarp warps all need
    // identical A data, so warp_id partially indexes into R[0] of length NWarp.
    //
-   // does_p_own_r_[warp][0] == true  → cross-warp LDS reduction required
+   // warp_id = warp_m_idx * NWarp + warp_n_idx
+   //   warp_m_idx → H[M][1] → contributes to M position in global memory
+   //   warp_n_idx → R[0]    → dropped by calculate_index; does not affect address
+   //
+   // Result: Warp(m,0), Warp(m,1), ..., Warp(m,NWarp-1) all compute the
+   // same global memory address and independently load the same A rows.
+   //
+   // does_p_own_r_[warp][0] == true  → framework knows warp_id encodes R[0],
+   //                                   so the R component is excluded from the
+   //                                   X-coordinate formula (no reduction needed:
+   //                                   A is read-only; each warp holds its own
+   //                                   private copy and uses it independently)
    //
    using ATileEncoding = tile_distribution_encoding<
        sequence<NWarp>,                                // R: NWarp replica warps
@@ -265,7 +276,7 @@ The structure of H-dimensions follows a specific pattern that reflects the GPU's
 
 This hierarchical decomposition enables critical optimizations. By explicitly encoding the distribution strategy at compile time, the framework can generate code that perfectly matches the hardware's capabilities. The vector width aligns with the GPU's memory transaction size. The thread count per warp matches the hardware's SIMD width. The warp count per block balances parallelism with resource constraints. The repetition factor enables loop unrolling and software pipelining. Together, these factors create a distribution strategy that achieves near-optimal performance.
 
-**C++ Example**:
+**C++ Example (GEMM — matmul C-tile)**:
 
 .. code-block:: cpp
 
@@ -273,6 +284,72 @@ This hierarchical decomposition enables critical optimizations. By explicitly en
        sequence<4, 2, 8, 4>,  // H0: M dimension
        sequence<4, 2, 8, 4>   // H1: N dimension
    >;
+
+**iGEMM Convolution Example**:
+
+Implicit GEMM (iGEMM) recasts convolution as matrix multiplication **without
+physically copying data**. A ``tensor_descriptor`` applies coordinate transforms
+that map the logical GEMM indices back to the physical 4-D tensor strides at
+compile time. The H-dimension encoding operates entirely in the logical GEMM
+space:
+
+.. code-block:: text
+
+   Forward convolution:  output = conv(input, weight)
+
+   iGEMM mapping:
+     M      =  N × Ho × Wo     (batch × output spatial positions)
+     K      =  C × Fy × Fx     (input channels × filter taps)
+     N_gemm =  K_out            (output channels / number of filters)
+
+   Three GEMM tiles, each with its own H-dimension encoding:
+
+   A tile  [M × K]      ← input data  (N,C,H,W) logically reshaped
+   B tile  [K × N_gemm] ← filter data (Kout,C,Fy,Fx) logically reshaped
+   C tile  [M × N_gemm] ← output data (N,Kout,Ho,Wo)
+
+.. code-block:: cpp
+
+   // A tile (input data) — thread-raked pattern
+   //
+   //   K1 = vector load width (e.g. 8 fp16 elements = 16 bytes)
+   //   K0 = K / K1                   threads covering the K dimension
+   //   M1 = warp_size / K0           threads per warp covering M
+   //   M0 = block_size / warp_size   number of warps
+   //   M2 = MPerBlock / (M1 * M0)    M iterations per thread
+   //
+   using ATileHs = tuple<
+       sequence<M0,   // warps — parallel across N×Ho×Wo rows
+                M1,   // threads/warp along M
+                M2>,  // M iterations per thread  ← Y-space
+       sequence<K0,   // threads covering C×Fy×Fx columns
+                K1>   // vector load width         ← Y-space
+   >;
+   // P0 (warp_id) → M0 (H0[0])           which warp handles which M rows
+   // P1 (lane_id) → M1 (H0[1]), K0 (H1[0])  lane's M+K position in tile
+   // Y0           → M2 (H0[2])           outer M loop (compile-time unrolled)
+   // Y1           → K1 (H1[1])           vector elements along K
+
+   // B tile (filter data) — same 3+2 pattern along N_gemm × K
+   using BTileHs = tuple<
+       sequence<N0,   // warps along output-channel dimension
+                N1,   // threads/warp along N_gemm
+                N2>,  // N iterations per thread
+       sequence<K0,   // threads covering C×Fy×Fx
+                K1>   // vector load width
+   >;
+
+   // C tile (output data) — symmetric 2D distribution (same as matmul C-tile)
+   using CTileHs = tuple<
+       sequence<M_reps, M_warps, M_lanes, M_vec>,  // M = N×Ho×Wo
+       sequence<N_reps, N_warps, N_lanes, N_vec>   // N = K_out
+   >;
+
+The crucial point: **the H-dimension encoding is identical to a plain GEMM**.
+The iGEMM "magic" happens in the ``tensor_descriptor`` for A and B, which
+applies an ``embed`` + ``merge`` transform chain at compile time to convert
+``(m_idx, k_idx)`` → ``(n, c, h, w)`` using the actual convolution strides,
+padding, and dilation — with zero runtime overhead.
 
 RH-Dimensions (R + H Dimensions Combined)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

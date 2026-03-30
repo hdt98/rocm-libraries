@@ -97,6 +97,66 @@ The transpose adaptor reorders tensor dimensions according to a permutation patt
    multi_index<3> top_coord{0, 1, 2};
    // After transpose [2, 0, 1]: coord becomes [2, 0, 1]
 
+Understanding ``transform_tensor_descriptor`` Arguments
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``transform_tensor_descriptor`` takes four arguments. Reading the transpose
+example above:
+
+.. code-block:: text
+
+   transform_tensor_descriptor(
+       original_desc,          // Arg 1: source descriptor to transform
+       make_tuple(...),        // Arg 2: one transform object per NEW output dimension
+       make_tuple(...),        // Arg 3: which OLD dimension(s) each transform reads from
+       make_tuple(...)         // Arg 4: which NEW dimension(s) each transform writes to
+   )
+
+**Arg 2 — transform objects**
+
+Each entry is a transform returned by a ``make_*_transform`` factory function.
+There is one entry per transform, and the total number of output dimensions
+equals the sum of dimensions each transform produces.
+
+**Args 3 & 4 — ``sequence<...>{}`` entries**
+
+The width of each ``sequence`` inside ``make_tuple`` encodes how many
+dimensions that one transform touches simultaneously:
+
+.. code-block:: text
+
+   number of entries in make_tuple(...)  =  number of transforms
+   width of each sequence<...>{}         =  dimensions that transform reads/writes
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 15 35
+
+   * - Pattern
+     - Transforms
+     - Dims each
+     - Use case
+   * - ``make_tuple(sequence<0, 1>{})``
+     - 1
+     - 2 inputs
+     - merge (N→1): one transform consumes two old dims jointly
+   * - ``make_tuple(sequence<0, 1, 2>{})``
+     - 1
+     - 3 inputs
+     - merge (N→1): consumes three old dims
+   * - ``make_tuple(sequence<0>{}, sequence<1>{})``
+     - 2
+     - 1 each
+     - two independent pass-throughs
+   * - ``make_tuple(sequence<0, 1>{}, sequence<2>{})``
+     - 2
+     - 2 then 1
+     - merge dims 0+1, pass-through dim 2
+
+In the transpose example, three separate ``sequence<k>{}`` entries mean three
+independent pass-through transforms, each moving one old dimension to one new
+dimension — the reordering comes from choosing *which* old dim each reads from.
+
 Single-Stage Adaptors: Custom Transform Chains
 ----------------------------------------------
 
@@ -106,15 +166,15 @@ Custom adaptors can be created by specifying which transforms to use and how the
 
    // Create a descriptor that merges 2x3 dimensions into single dimension
    auto base_desc = make_naive_tensor_descriptor_packed(make_tuple(2, 3));
-   
+
    // Apply merge transform
    auto merged_desc = transform_tensor_descriptor(
        base_desc,
        make_tuple(make_merge_transform(make_tuple(2, 3))),
-       make_tuple(sequence<0, 1>{}),  // merge dims 0,1
-       make_tuple(sequence<0>{})      // to single dim 0
+       make_tuple(sequence<0, 1>{}),  // ONE entry, TWO indices: one transform reads dims 0 AND 1
+       make_tuple(sequence<0>{})      // ONE entry, ONE index:  produces new dim 0
    );
-   
+
    // The adaptor is embedded in the descriptor
    // To use it:
    multi_index<1> top_coord{5};  // 1D coordinate
@@ -333,10 +393,25 @@ CK Tile provides several common transform chain patterns used throughout GPU ker
 
    auto merged = transform_tensor_descriptor(
        input,
-       make_tuple(make_merge_transform(make_tuple(M, K))),
-       make_tuple(sequence<0, 1>{}),
-       make_tuple(sequence<0>{})
+       make_tuple(make_merge_transform(make_tuple(M, K))), // 1 transform: N→1
+       make_tuple(sequence<0, 1>{}),  // 1 entry, 2 indices: reads old dims 0 AND 1 jointly
+       make_tuple(sequence<0>{})      // 1 entry, 1 index:  produces new dim 0
    );
+   // Result: 2-D [M, K] → 1-D [M*K]
+   // calculate_lower_index recovers (row, col) from flat index via magic division
+
+**Dimension Splitting**
+
+.. code-block:: cpp
+
+   auto split = transform_tensor_descriptor(
+       input,
+       make_tuple(make_unmerge_transform(make_tuple(M, K))), // 1 transform: 1→N
+       make_tuple(sequence<0>{}),      // 1 entry, 1 index:  reads old dim 0
+       make_tuple(sequence<0, 1>{})    // 1 entry, 2 indices: produces new dims 0 AND 1
+   );
+   // Result: 1-D [M*K] → 2-D [M, K]  (exact inverse of the merge above)
+   // calculate_lower_index computes flat = row*K + col via precomputed strides
 
 For complete GEMM optimization strategies, see :ref:`ck_tile_gemm_optimization`.
 
