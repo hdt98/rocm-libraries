@@ -12,6 +12,7 @@ from .core import (
     discover_catch2_tests,
     discover_ctest_tests,
     discover_gtest_tests,
+    discover_pytest_tests,
     get_test_commands,
     list_tests,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "discover_catch2_tests",
     "discover_ctest_tests",
     "discover_gtest_tests",
+    "discover_pytest_tests",
     "get_test_commands",
     "list_tests",
 ]

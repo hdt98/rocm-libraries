@@ -87,6 +87,29 @@ def build_catch2_filter_args(include: list[str], exclude: list[str]) -> list[str
     return args
 
 
+def build_pytest_filter_args(include: list[str], exclude: list[str]) -> list[str]:
+    """
+    Build pytest command-line arguments.
+
+    Args:
+        include: List of test paths (directories or files)
+        exclude: List of marker names to exclude (e.g., ["slow"])
+
+    Returns:
+        List of command-line arguments (e.g., ['client/', '-m', 'not slow'])
+    """
+    args = list(include)
+
+    if exclude:
+        marker_expr = " and ".join(f"not {m}" for m in exclude)
+        args.extend(["-m", marker_expr])
+        logger.info(f"pytest marker expression: {marker_expr}")
+    else:
+        logger.debug(f"pytest paths: {include}")
+
+    return args
+
+
 def build_ctest_filter_args(include: list[str], exclude: list[str]) -> list[str]:
     """
     Build CTest command-line filter arguments.
@@ -311,6 +334,53 @@ def discover_catch2_tests(
         return parse_catch2_xml(xml_file)
 
 
+def discover_pytest_tests(
+    executable: str,
+    include: list[str] = None,
+    exclude: list[str] = None,
+    build_dir: Path | None = None,
+) -> set[Test]:
+    """
+    Discover pytest tests by running pytest --collect-only.
+
+    Args:
+        executable: Path to pytest executable
+        include: List of test paths (directories or files)
+        exclude: List of marker names to exclude (e.g., ["slow"])
+        build_dir: Optional working directory
+
+    Returns:
+        Set of Test objects
+    """
+    if include is None:
+        include = []
+    if exclude is None:
+        exclude = []
+
+    logger.info(f"Discovering pytest tests from {executable}")
+
+    cwd = str(build_dir) if build_dir else None
+    logger.debug(f"Working directory: {cwd}")
+
+    cmd = [executable, "--collect-only", "-q", "--no-header"]
+    filter_args = build_pytest_filter_args(include, exclude)
+    cmd.extend(filter_args)
+
+    logger.info(f"Running command: {' '.join(cmd)}")
+    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+    logger.debug(f"Command completed with return code: {result.returncode}")
+
+    tests = set()
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        # Test IDs contain '::' and are not summary/warning lines
+        if "::" in line and not line.startswith(("=", "E", "W", ">")):
+            tests.add(Test(name=line, framework="pytest"))
+
+    logger.info(f"Discovered {len(tests)} pytest tests")
+    return tests
+
+
 def discover_ctest_tests(
     executable: str,
     include: list[str] = None,
@@ -414,6 +484,10 @@ def list_tests_for_executable(
         )
     elif framework == "ctest":
         return discover_ctest_tests(
+            executable, include_patterns, exclude_patterns, build_dir
+        )
+    elif framework == "pytest":
+        return discover_pytest_tests(
             executable, include_patterns, exclude_patterns, build_dir
         )
     else:
@@ -527,6 +601,10 @@ def get_test_commands(profile_name: str, config_file: Path | None = None) -> dic
 
         elif framework == "ctest":
             filter_args = build_ctest_filter_args(include, exclude)
+            cmd.extend(filter_args)
+
+        elif framework == "pytest":
+            filter_args = build_pytest_filter_args(include, exclude)
             cmd.extend(filter_args)
 
         logger.debug(f"Command for {executable}: {' '.join(cmd)}")

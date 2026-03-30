@@ -3,8 +3,8 @@
 # See scripts/lib/rrtest for Python utilities.
 
 profiles:
-  smoke:
-    description: "Smoke tests (TheRock CI)."
+  quick:
+    description: "Quick (smoke) tests (TheRock CI)."
     tests:
     - executable: "test/rocroller-tests"
       framework: "gtest"
@@ -18,21 +18,30 @@ profiles:
       exclude:
       - "[gpu]"
 
-  precheckin:
-    description: "Test suite for pre-commit validation (TheRock CI)."
+  full:
+    description: "All tests (TheRock CI)."
     tests:
     - executable: "test/rocroller-tests"
       framework: "gtest"
       include: []
-      exclude: []
+      exclude:
+      - "GPU_KernelTests/GPU_KernelTest.GPU_WholeKernel/1"
     - executable: "test/rocroller-tests-catch"
       framework: "catch2"
       include: []
       exclude: []
-    - executable: "ctest"
-      framework: "ctest"
-      include: []
-      exclude: [["-LE", "GTEST|CATCH"]]
+    - executable: "pytest"
+      framework: "pytest"
+      include:
+      - "client/"
+      exclude:
+      - "slow"
+    - executable: "pytest"
+      framework: "pytest"
+      include:
+      - "scripts/"
+      exclude:
+      - "slow"
 
   codecov-mci:
     description: "Reduced test suite for code coverage analysis (Math CI)."

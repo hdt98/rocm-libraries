@@ -15,6 +15,7 @@ from rrtest.core import (
     discover_catch2_tests,
     discover_ctest_tests,
     discover_gtest_tests,
+    discover_pytest_tests,
 )
 
 
@@ -96,3 +97,29 @@ def test_discover_ctest_tests_no_filters(build_dir):
 
     for test in tests:
         assert test.framework == "ctest", f"Test {test.name} should be ctest framework"
+
+
+def test_discover_pytest_tests_no_filters():
+    """Test discovering pytest tests without any filters."""
+    tests = discover_pytest_tests("pytest", include=["scripts/"])
+
+    assert isinstance(tests, set), "discover_pytest_tests should return a set"
+    assert len(tests) > 0, "Should discover pytest tests"
+
+    for test in tests:
+        assert (
+            test.framework == "pytest"
+        ), f"Test {test.name} should be pytest framework"
+        assert "::" in test.name, f"Test ID {test.name} should contain '::'"
+
+
+def test_discover_pytest_tests_with_marker_exclude():
+    """Test that excluding a marker reduces the discovered test set."""
+    all_tests = discover_pytest_tests("pytest", include=["scripts/"])
+    filtered_tests = discover_pytest_tests(
+        "pytest", include=["scripts/"], exclude=["slow"]
+    )
+
+    assert len(filtered_tests) <= len(
+        all_tests
+    ), "Filtered tests should be <= all tests"

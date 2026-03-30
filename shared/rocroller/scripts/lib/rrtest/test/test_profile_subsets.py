@@ -5,8 +5,8 @@
 Unit tests to verify profile subset relationships.
 
 These tests ensure that profile hierarchies are maintained:
-- smoke <= precheckin (smoke tests are a subset of precheckin)
-- codecov <= precheckin (codecov tests are a subset of precheckin)
+- quick <= full (quick tests are a subset of full)
+- codecov-mci <= precheckin-mci (codecov tests are a subset of precheckin-mci)
 """
 
 from pathlib import Path
@@ -21,29 +21,29 @@ def build_dir():
     return Path("build")
 
 
-def test_smoke_subset_of_precheckin(build_dir):
-    """Test that smoke profile tests are a subset of precheckin."""
-    smoke = list_tests("smoke", build_dir)
-    precheckin = list_tests("precheckin", build_dir)
+def test_quick_subset_of_full(build_dir):
+    """Test that quick profile tests are a subset of full."""
+    quick = list_tests("quick", build_dir)
+    full = list_tests("full", build_dir)
 
-    assert len(smoke) > 0, "smoke profile should have tests"
-    assert len(precheckin) > 0, "precheckin profile should have tests"
+    assert len(quick) > 0, "quick profile should have tests"
+    assert len(full) > 0, "full profile should have tests"
 
-    assert smoke.issubset(precheckin), (
-        f"smoke tests should be a subset of precheckin. "
-        f"Found {len(smoke - precheckin)} tests in smoke but not in precheckin"
+    assert quick.issubset(full), (
+        f"quick tests should be a subset of full. "
+        f"Found {len(quick - full)} tests in quick but not in full"
     )
 
 
 def test_codecov_subset_of_precheckin_mci(build_dir):
-    """Test that codecov profile tests are a subset of precheckin."""
+    """Test that codecov-mci profile tests are a subset of precheckin-mci."""
     codecov = list_tests("codecov-mci", build_dir)
     precheckin = list_tests("precheckin-mci", build_dir)
 
-    assert len(codecov) > 0, "codecov profile should have tests"
-    assert len(precheckin) > 0, "precheckin profile should have tests"
+    assert len(codecov) > 0, "codecov-mci profile should have tests"
+    assert len(precheckin) > 0, "precheckin-mci profile should have tests"
 
     assert codecov.issubset(precheckin), (
-        f"codecov tests should be a subset of precheckin. "
-        f"Found {len(codecov - precheckin)} tests in codecov but not in precheckin"
+        f"codecov-mci tests should be a subset of precheckin-mci. "
+        f"Found {len(codecov - precheckin)} tests in codecov-mci but not in precheckin-mci"
     )
