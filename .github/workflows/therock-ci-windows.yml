@@ -13,6 +13,12 @@ on:
         type: string
       test_runs_on:
         type: string
+      artifact_run_id:
+        type: string
+        default: ""
+      use_prebuilt_artifacts:
+        type: string
+        default: "false"
 
 permissions:
   contents: read
@@ -20,6 +26,7 @@ permissions:
 jobs:
   therock-build-windows:
     name: Build (${{ inputs.amdgpu_families }})
+    if: ${{ inputs.use_prebuilt_artifacts == 'false' }}
     runs-on: azure-windows-scale-rocm
     outputs:
       AMDGPU_FAMILIES: ${{ env.AMDGPU_FAMILIES }}
@@ -169,6 +176,17 @@ jobs:
   therock-test-windows:
     name: Test (${{ inputs.amdgpu_families }})
     needs: [therock-build-windows]
+    # The use_prebuilt_artifacts "or" statement ensures that tests will run if
+    # previous build step is run or skipped
+    if: >-
+      ${{
+        !failure() &&
+        !cancelled() &&
+        (
+          inputs.use_prebuilt_artifacts == 'false' ||
+          inputs.use_prebuilt_artifacts == 'true'
+        )
+      }}
     uses: ./.github/workflows/therock-test-packages.yml
     with:
       projects_to_test: ${{ inputs.projects_to_test }}
@@ -176,4 +194,5 @@ jobs:
       test_runs_on: ${{ inputs.test_runs_on }}
       platform: "windows"
       test_type: ${{ inputs.test_type }}
+      artifact_run_id: ${{ inputs.artifact_run_id }}
     secrets: inherit
