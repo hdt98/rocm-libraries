@@ -427,8 +427,8 @@ def main() -> None:
                     meta["k_batch"] = v["k_batch"]
                 if "pipeline" in v:
                     meta["pipeline"] = v["pipeline"]
-                if "scheduling" in v:
-                    meta["scheduling"] = v["scheduling"]
+                if "tile_partitioner" in v:
+                    meta["tile_partitioner"] = v["tile_partitioner"]
                 variant_metadata[v["name"]] = meta
 
         toc = {

@@ -12,7 +12,7 @@
 //
 // Supports:
 //   - Pipeline selection: V1, V3, Preshuffle
-//   - Scheduling: TileBased (standard), StreamK (work-balanced)
+//   - Tile partitioning: Linear (standard), StreamK (work-balanced)
 //   - Batched GEMM: batch dimension via blockIdx.y (runtime, in Args)
 //
 // Compilation boundary:
@@ -153,7 +153,7 @@ struct EpilogueTypes
 ///
 /// Supports batched GEMM (batch dimension via blockIdx.y when batch_count > 0),
 /// multiple pipeline strategies (V1, V3, Preshuffle), and scheduled variants
-/// (TileBased, StreamK).
+/// (Linear, StreamK).
 template <GemmSpec S>
 __device__ void run(Args args)
 {
@@ -163,8 +163,8 @@ __device__ void run(Args args)
     static_assert(S.workgroup_size > 0, "workgroup_size must be positive");
     static_assert(EpilogueTypes<S>::NumDTensors <= 2,
                   "at most 2 D tensors supported in this example");
-    static_assert(S.scheduling == Scheduling::TileBased,
-                  "only TileBased scheduling supported in run<S>(); "
+    static_assert(S.tile_partitioner == TilePartitioner::Linear,
+                  "only Linear tile partitioning supported in run<S>(); "
                   "Stream-K requires a separate entry point");
 
     // Physical tensor table: role-based access (compile-time constants)

@@ -171,7 +171,7 @@ This was validated with 3 layout variants (R×R, C×R, C×C) alongside the exist
 
 ## 13. Split-K Is a One-Field Extension
 
-Adding Split-K scheduling required adding a single `int k_batch = 1` field to `GemmAlgorithm` and `GemmSpec`. CK Tile's `UniversalGemmKernel` already supports Split-K via `blockIdx.z` — when `k_batch > 1`, each Z-slice processes a K partition and partial results are accumulated via atomic addition.
+Adding Split-K required adding a single `int k_batch = 1` field to `GemmAlgorithm` and `GemmSpec`. CK Tile's `UniversalGemmKernel` already supports Split-K via `blockIdx.z` — when `k_batch > 1`, each Z-slice processes a K partition and partial results are accumulated via atomic addition.
 
 The host side sets `grid_z = spec.k_batch` in the launch call. The device side passes `S.k_batch` to CK Tile's `KernelArgs`. The output buffer must be pre-zeroed (already done per-variant). No epilogue changes needed — the atomic accumulation is handled inside the CK Tile epilogue.
 
