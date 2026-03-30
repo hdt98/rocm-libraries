@@ -65,13 +65,6 @@ class GemmKernelBuilder:
         tile_configs = self._get_tile_configs()
         trait_combos = self._generate_trait_combinations()
 
-        print(
-            "HELLO: Total tile configs after validation:",
-            len(tile_configs),
-            "Total trait combinations after validation:",
-            len(trait_combos),
-        )
-
         kernel_list = []
         for tile_config in tile_configs:
             for trait_combo in trait_combos:
@@ -311,12 +304,12 @@ class GemmKernelBuilder:
         combinations = []
         for combo in all_combinations:
             pipeline, epilogue, scheduler = combo[:3]
-            a_preshuffle_quant_val = combo[6]
+            # a_preshuffle_quant_val = combo[6]
             if is_trait_combination_valid(
                 pipeline,
                 epilogue,
                 scheduler,
-                a_preshuffle_quant_val,
+                persistent_or_a_preshuffle_quant,
                 self.kernel_name_prefix,
             ):
                 combinations.append(combo)
