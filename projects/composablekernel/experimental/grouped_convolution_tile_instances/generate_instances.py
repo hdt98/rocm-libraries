@@ -3,6 +3,7 @@
 
 import argparse
 import shutil
+from functools import partial
 from pathlib import Path
 
 class ConvInstanceTemplateParams:
@@ -88,6 +89,9 @@ def get_dtype(problem_name):
         return "ck_tile::bf16_t"
     else:
         raise RuntimeError("Cannot parse data type from problem name: " + problem_name)
+
+def get_warp_size(warp_op):
+    return 32 if warp_op == "wmma" else 64
 
 def get_k_mfma(dtype, m_per_xdl, n_per_xdl):
     if m_per_xdl != n_per_xdl:
@@ -201,7 +205,7 @@ def generate_conv_cpp(
             f.write(content)
 
 
-def parse_fwd_instances(instances, problem_name):
+def parse_fwd_instances(instances, problem_name, warp_op):
     convs = []
     for instance_id, instance in enumerate(instances):
         if instance.find("#") != -1 or instance.find(";") != -1:
@@ -211,8 +215,12 @@ def parse_fwd_instances(instances, problem_name):
         params_str = instance[start:end]
         args = parse_instance_string(params_str)
 
-        is_v3_instance = instance.find("Xdl_CShuffle_V3") != -1
+        is_v3_instance = instance.find("CShuffle_V3") != -1
         split_image = instance.find("Large_Tensor") != -1
+
+        if split_image:
+            print(f"Skipping instance {instance_id} with split_image since it's not supported yet.")
+            continue
 
         if is_v3_instance:
             spec = args[14]
@@ -230,7 +238,7 @@ def parse_fwd_instances(instances, problem_name):
             c_scalar_per_vector = int(args[43])
             scheduler = args[44]
             pipeline_version = args[45]
-            direct_load = args[48] == "true"
+            direct_load = False if warp_op == "wmma" else args[48] == "true"
             num_groups_to_merge = int(args[49])
         else:
             spec = args[14]
@@ -239,17 +247,30 @@ def parse_fwd_instances(instances, problem_name):
             n_per_block = int(args[19])
             k_per_block = int(args[20])
             k1 = int(args[21])
-            m_per_xdl = int(args[23])
-            n_per_xdl = int(args[24])
-            m_xdl_per_wave = int(args[25])
-            n_xdl_per_wave = int(args[26])
-            a_scalar_per_vector = int(args[31])
-            b_scalar_per_vector = int(args[38])
-            c_scalar_per_vector = int(args[44])
-            scheduler = "Intrawave"
-            pipeline_version = "v1"
-            direct_load = 0
-            num_groups_to_merge = 0 if split_image else int(args[48])
+            if warp_op == "wmma":
+                m_per_xdl = int(args[22])
+                n_per_xdl = int(args[23])
+                m_xdl_per_wave = int(args[24])
+                n_xdl_per_wave = int(args[25])
+                a_scalar_per_vector = int(args[30])
+                b_scalar_per_vector = int(args[37])
+                c_scalar_per_vector = int(args[43])
+                scheduler = "Intrawave"
+                pipeline_version = "v1"
+                direct_load = 0
+                num_groups_to_merge = 1
+            else:
+                m_per_xdl = int(args[23])
+                n_per_xdl = int(args[24])
+                m_xdl_per_wave = int(args[25])
+                n_xdl_per_wave = int(args[26])
+                a_scalar_per_vector = int(args[31])
+                b_scalar_per_vector = int(args[38])
+                c_scalar_per_vector = int(args[44])
+                scheduler = "Intrawave"
+                pipeline_version = "v1"
+                direct_load = 0
+                num_groups_to_merge = 1 if split_image else int(args[48])
 
         double_smem_buffer = pipeline_version == "v4"
         num_wave_groups = 1
@@ -266,14 +287,10 @@ def parse_fwd_instances(instances, problem_name):
 
         m_warp = int(m_per_block / (m_per_xdl * m_xdl_per_wave))
         n_warp = int(n_per_block / (n_per_xdl * n_xdl_per_wave))
-        warp_size = 64
-        k_warp = int(block_size / (warp_size * m_warp * n_warp))
+        k_warp = int(block_size / (get_warp_size(warp_op) * m_warp * n_warp))
         dtype = get_dtype(problem_name)
         k_per_xdl = max(k1, get_k_mfma(dtype, m_per_xdl, n_per_xdl))
 
-        if split_image:
-            print(f"Skipping instance {instance_id} with split_image since it's not supported yet.")
-            continue
         if pipeline_version == "V5":
             print(f"Skipping instance {instance_id} with V5 since it's not supported yet.")
             continue
@@ -302,7 +319,7 @@ def parse_fwd_instances(instances, problem_name):
         convs.append(conv)
     return convs
 
-def parse_bwd_weight_instances(instances, problem_name):
+def parse_bwd_weight_instances(instances, problem_name, warp_op):
     convs = []
 
     for instance_id, instance in enumerate(instances):
@@ -317,9 +334,9 @@ def parse_bwd_weight_instances(instances, problem_name):
         
         direct_load = False
 
-        is_v3_instance = instance.find("Xdl_CShuffleV3") != -1
         is_two_stage_instance = instance.find("TwoStage") != -1
         is_explicit_gemm = device_op_name.find("Explicit") != -1
+        is_v3_instance = not is_explicit_gemm and not is_two_stage_instance and instance.find("CShuffleV3") != -1
 
         if is_explicit_gemm:
             gemm_params = device_op_name = instance.split("<")[2].split(">")[1].split(",")
@@ -350,7 +367,6 @@ def parse_bwd_weight_instances(instances, problem_name):
             a_scalar_per_vector = int(vector_read[0])
             b_scalar_per_vector = int(vector_read[1])
             c_scalar_per_vector_seq = [int(x) for x in vector_read[2].strip("Seq").strip("(").strip(")").split(",")]
-
             if len(set(c_scalar_per_vector_seq)) != 1:
                 raise RuntimeError(f"c_scalar_per_vector must be the same across all waves for instance {instance_id} with device op {device_op_name}. Found values: {c_scalar_per_vector_seq}")
             
@@ -385,8 +401,8 @@ def parse_bwd_weight_instances(instances, problem_name):
                 if len(args) != 45:
                     raise RuntimeError(f"Wrong number of parameters in the V3 XDL CShuffle instance string: {instance}")
 
-                direct_load = int(args[43]) == 1
-                num_groups_to_merge = int(args[44])
+                direct_load = False if warp_op == "wmma" else int(args[43]) == 1
+                num_groups_to_merge = 1 if warp_op == "wmma" else int(args[44])
 
                 # Block GEMM pipeline parameters
                 block_gemm_pipeline_scheduler = args[39]
@@ -404,9 +420,14 @@ def parse_bwd_weight_instances(instances, problem_name):
 
             else:
                 # Regular V1 XDL CShuffle instance
-                if len(args) != 43:
-                    raise RuntimeError(f"Wrong number of parameters in the XDL CShuffle instance string: {instance}\n" + 
-                                       f"Expected 43 parameters for V1 instance. Found {len(args)} parameters.")
+                if warp_op == "wmma":
+                    if len(args) != 42:
+                        raise RuntimeError(f"Wrong number of parameters in the XDL CShuffle instance string: {instance}\n" + 
+                                        f"Expected 42 parameters for V1 instance. Found {len(args)} parameters.")
+                else:
+                    if len(args) != 43:
+                        raise RuntimeError(f"Wrong number of parameters in the XDL CShuffle instance string: {instance}\n" + 
+                                        f"Expected 43 parameters for V1 instance. Found {len(args)} parameters.")
                 
                 num_groups_to_merge = 1
 
@@ -446,8 +467,7 @@ def parse_bwd_weight_instances(instances, problem_name):
 
         m_warp = int(m_per_block / (m_per_xdl * m_xdl_per_wave))
         n_warp = int(n_per_block / (n_per_xdl * n_xdl_per_wave))
-        warp_size = 64
-        k_warp = int(block_size / (warp_size * m_warp * n_warp))
+        k_warp = int(block_size / (get_warp_size(warp_op) * m_warp * n_warp))
         dtype = get_dtype(problem_name)
 
         k_per_xdl = max(k1, get_k_mfma(dtype, m_per_xdl, n_per_xdl))
@@ -458,7 +478,7 @@ def parse_bwd_weight_instances(instances, problem_name):
         if pipeline_version == "V6":
             print(f"Skipping instance {instance_id} with V6 since it's not supported yet.")
             continue
-        if m_per_block > (warp_size * a_scalar_per_vector) or n_per_block > (warp_size * b_scalar_per_vector):
+        if m_per_block > (get_warp_size(warp_op) * a_scalar_per_vector) or n_per_block > (get_warp_size(warp_op) * b_scalar_per_vector):
             print(f"Skipping instance {instance_id} with multiple warps per continous tile dim since it's not supported yet.")
             continue
 
@@ -486,7 +506,7 @@ def parse_bwd_weight_instances(instances, problem_name):
             
     return convs
 
-def parse_bwd_data_instances(instances, problem_name):
+def parse_bwd_data_instances(instances, problem_name, warp_op):
     convs = []
 
     for instance_id, instance in enumerate(instances):
@@ -498,29 +518,71 @@ def parse_bwd_data_instances(instances, problem_name):
         params_str = instance[start:end]
         args = parse_instance_string(params_str)
 
-        is_v1_instance = instance.find("Xdl_CShuffle<") != -1
+        is_v3_instance = instance.find("CShuffleV3<") != -1
         
-        if is_v1_instance:
+        if warp_op == "wmma":
+            if is_v3_instance:
+                if len(args) != 50:
+                    raise RuntimeError(f"Wrong number of parameters in the V3 WMMA CShuffle instance string: {instance}\n" + 
+                                        f"Expected 48 parameters for V3 instance. Found {len(args)} parameters.")
+            else:
+                if len(args) != 44:
+                    raise RuntimeError(f"Wrong number of parameters in the V1 WMMA CShuffle instance string: {instance}\n" + 
+                                        f"Expected 44 parameters for V1 instance. Found {len(args)} parameters.")
+        else:
             if len(args) != 51:
                 raise RuntimeError(f"Wrong number of parameters in the V1 XDL CShuffle instance string: {instance}\n" + 
                                     f"Expected 51 parameters for V1 instance. Found {len(args)} parameters.")
-        else:
-            raise RuntimeError(f"Only V1 XDL CShuffle instances are supported for backward data. Found instance: {instance}")
-        
         spec = args[13]
-        block_size = int(args[17])
-        m_per_block = int(args[18])
-        n_per_block = int(args[19])
-        k_per_block = int(args[20])
-        ak1 = int(args[21])
-        bk1 = int(args[22])
-        m_per_xdl = int(args[23])
-        n_per_xdl = int(args[24])
-        m_xdl_per_wave = int(args[25])
-        n_xdl_per_wave = int(args[26])
-        a_scalar_per_vector = int(args[31])
-        b_scalar_per_vector = int(args[38])
-        c_scalar_per_vector = int(args[44])
+        if warp_op == "wmma":
+            if is_v3_instance:
+                block_size = int(args[16])
+                m_per_block = int(args[17])
+                n_per_block = int(args[18])
+                k_per_block = int(args[19])
+                ak1 = int(args[20])
+                bk1 = int(args[21])
+                m_per_xdl = int(args[22])
+                n_per_xdl = int(args[23])
+                m_xdl_per_wave = int(args[24])
+                n_xdl_per_wave = int(args[25])
+                a_scalar_per_vector = int(args[30])
+                b_scalar_per_vector = int(args[37])
+                c_scalar_per_vector = int(args[43])
+                block_gemm_pipeline_scheduler = args[44]
+                blk_gemm_pipeline_version = args[45]
+            else:
+                block_size = int(args[14])
+                m_per_block = int(args[15])
+                n_per_block = int(args[16])
+                k_per_block = int(args[17])
+                ak1 = int(args[18])
+                bk1 = int(args[18])
+                m_per_xdl = int(args[19])
+                n_per_xdl = int(args[20])
+                m_xdl_per_wave = int(args[21])
+                n_xdl_per_wave = int(args[22])
+                a_scalar_per_vector = int(args[27])
+                b_scalar_per_vector = int(args[34])
+                c_scalar_per_vector = int(args[40])
+                block_gemm_pipeline_scheduler = args[41]
+                blk_gemm_pipeline_version = "v1"
+        else:
+            block_size = int(args[17])
+            m_per_block = int(args[18])
+            n_per_block = int(args[19])
+            k_per_block = int(args[20])
+            ak1 = int(args[21])
+            bk1 = int(args[22])
+            m_per_xdl = int(args[23])
+            n_per_xdl = int(args[24])
+            m_xdl_per_wave = int(args[25])
+            n_xdl_per_wave = int(args[26])
+            a_scalar_per_vector = int(args[31])
+            b_scalar_per_vector = int(args[38])
+            c_scalar_per_vector = int(args[44])
+            block_gemm_pipeline_scheduler = args[46]
+            blk_gemm_pipeline_version = "v1"
 
         if ak1 != bk1:
             raise RuntimeError(f"Not supported instance {instance_id} since ak1 != bk1. ak1: {ak1}, bk1: {bk1} in instance: {instance}")
@@ -538,13 +600,8 @@ def parse_bwd_data_instances(instances, problem_name):
         direct_load = False
 
         # Block GEMM pipeline parameters
-        block_gemm_pipeline_scheduler = args[46]
         if block_gemm_pipeline_scheduler == "Default":
             block_gemm_pipeline_scheduler = "Intrawave"
-
-        blk_gemm_pipeline_version = "v1"
-        if block_gemm_pipeline_scheduler == "Interwave":
-            blk_gemm_pipeline_version = "v1"
 
         # Sanity check for Block GEMM pipeline parameters
         # Scheduler must be either Intrawave or Interwave.
@@ -574,8 +631,7 @@ def parse_bwd_data_instances(instances, problem_name):
 
         m_warp = int(m_per_block / (m_per_xdl * m_xdl_per_wave))
         n_warp = int(n_per_block / (n_per_xdl * n_xdl_per_wave))
-        warp_size = 64
-        k_warp = int(block_size / (warp_size * m_warp * n_warp))
+        k_warp = int(block_size / (get_warp_size(warp_op) * m_warp * n_warp))
         dtype = get_dtype(problem_name)
 
         k_per_xdl = max(k1, get_k_mfma(dtype, m_per_xdl, n_per_xdl))
@@ -615,10 +671,10 @@ def parse_bwd_data_instances(instances, problem_name):
             
     return convs
 
-def generate_instances_fwd(instances, problem_name, config, filter_pattern, instances_path):
+def generate_instances_fwd(instances, problem_name, config, filter_pattern, instances_path, *, warp_op):
     direction = "forward"
     signature_name = f"SIGNATURE_{config.upper()}_FWD"
-    instances = parse_fwd_instances(instances, problem_name)
+    instances = parse_fwd_instances(instances, problem_name, warp_op)
     generate_calls_inc(instances, problem_name, direction, filter_pattern)
     generate_defs_inc(
         instances,
@@ -631,10 +687,10 @@ def generate_instances_fwd(instances, problem_name, config, filter_pattern, inst
         instances, problem_name, config, direction, signature_name, filter_pattern, instances_path
     )
 
-def generate_instances_bwd_weight(instances, problem_name, config, filter_pattern, instances_path):
+def generate_instances_bwd_weight(instances, problem_name, config, filter_pattern, instances_path, *, warp_op):
     direction = "backward_weight"
     signature_name = f"SIGNATURE_{config.upper()}_BWD_WEIGHT"
-    instances = parse_bwd_weight_instances(instances, problem_name)
+    instances = parse_bwd_weight_instances(instances, problem_name, warp_op)
     generate_calls_inc(instances, problem_name, direction, filter_pattern)
     generate_defs_inc(
         instances,
@@ -647,10 +703,10 @@ def generate_instances_bwd_weight(instances, problem_name, config, filter_patter
         instances, problem_name, config, direction, signature_name, filter_pattern, instances_path
     )
 
-def generate_instances_bwd_data(instances, problem_name, config, filter_pattern, instances_path):
+def generate_instances_bwd_data(instances, problem_name, config, filter_pattern, instances_path, *, warp_op):
     direction = "backward_data"
     signature_name = f"SIGNATURE_{config.upper()}_BWD_DATA"
-    instances = parse_bwd_data_instances(instances, problem_name)
+    instances = parse_bwd_data_instances(instances, problem_name, warp_op)
     generate_calls_inc(instances, problem_name, direction, filter_pattern)
     generate_defs_inc(
         instances,
@@ -663,14 +719,19 @@ def generate_instances_bwd_data(instances, problem_name, config, filter_pattern,
         instances, problem_name, config, direction, signature_name, filter_pattern, instances_path
     )
 
-def process_direction(configs, direction, generate_func, configs_prefix, filter_pattern, instances_path):
+def process_direction(configs, direction, generate_func, configs_prefix, filter_pattern, instances_path, warp_op):
     """Helper function to process a single direction."""
     for config in configs:
         instances = []
         generate_dir = Path(__file__).resolve().parent
-        config_path = f"{generate_dir}/configs/{direction}/{configs_prefix}/{config}.conf"
-        with open(config_path, "r") as file:
-            instances = file.readlines()
+        config_path = f"{generate_dir}/configs/{warp_op}/{direction}/{configs_prefix}/{config}.conf"
+        
+        try:
+            with open(config_path, "r") as file:
+                instances = file.readlines()
+        except FileNotFoundError:
+            print(f"Warning: File {config_path} not found, process empty config.")
+            instances = []
         
         # Determine problem name based on direction
         if direction == "forward":
@@ -742,6 +803,13 @@ if __name__ == "__main__":
         default="../build/experimental/grouped_convolution_tile_instances",
         help="Directory store generated instances."
     )
+    parser.add_argument(
+        "--warp_op",
+        choices=["xdl", "wmma"],
+        type=str,
+        default="xdl",
+        help="Warp operator selection (xdl for gfx9, wmma for gfx11/gfx12)."
+    )
     args = parser.parse_args()
 
     # apply empty filter
@@ -756,15 +824,19 @@ if __name__ == "__main__":
         raise RuntimeError("wrong mode")
 
     copy_includes(args.instances_dir)
+    gen_fwd        = partial(generate_instances_fwd,        warp_op=args.warp_op)
+    gen_bwd_weight = partial(generate_instances_bwd_weight, warp_op=args.warp_op)
+    gen_bwd_data   = partial(generate_instances_bwd_data, warp_op=args.warp_op)
+
     match args.direction:
         case "forward":
-            process_direction(fwd_configs, args.direction, generate_instances_fwd, configs_prefix, args.filter_pattern, args.instances_dir)
+            process_direction(fwd_configs, args.direction, gen_fwd, configs_prefix, args.filter_pattern, args.instances_dir, args.warp_op)
         case "backward_weight":
-            process_direction(bwd_weight_configs, args.direction, generate_instances_bwd_weight, configs_prefix, args.filter_pattern, args.instances_dir)
+            process_direction(bwd_weight_configs, args.direction, gen_bwd_weight, configs_prefix, args.filter_pattern, args.instances_dir, args.warp_op)
         case "backward_data":
-            process_direction(bwd_data_configs, args.direction, generate_instances_bwd_data, configs_prefix, args.filter_pattern, args.instances_dir)
+            process_direction(bwd_data_configs, args.direction, gen_bwd_data, configs_prefix, args.filter_pattern, args.instances_dir, args.warp_op)
         case "all":
-            process_direction(fwd_configs, "forward", generate_instances_fwd, configs_prefix, args.filter_pattern, args.instances_dir)
-            process_direction(bwd_weight_configs, "backward_weight", generate_instances_bwd_weight, configs_prefix, args.filter_pattern, args.instances_dir)
-            process_direction(bwd_data_configs, "backward_data", generate_instances_bwd_data, configs_prefix, args.filter_pattern, args.instances_dir)
+            process_direction(fwd_configs, "forward", gen_fwd, configs_prefix, args.filter_pattern, args.instances_dir, args.warp_op)
+            process_direction(bwd_weight_configs, "backward_weight", gen_bwd_weight, configs_prefix, args.filter_pattern, args.instances_dir, args.warp_op)
+            process_direction(bwd_data_configs, "backward_data", gen_bwd_data, configs_prefix, args.filter_pattern, args.instances_dir, args.warp_op)
 

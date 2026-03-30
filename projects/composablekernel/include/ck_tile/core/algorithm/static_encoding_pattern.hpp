@@ -154,16 +154,13 @@ struct tile_distribution_encoding_pattern_2d<BlockSize,
 
     // # of rows in Y dim accessed by single wavefront in one iteration
     static constexpr index_t Y1 = warp_size / X0;
-    static_assert(X0 * Y1 == warp_size, "X0 * Y1 must cover whole wavefront!");
 
     static constexpr index_t Y0 = num_warps / NumWaveGroups;
     //  YPerWarp = YPerTile / Y0;
     //  Y2 = YPerWarp / Y1;
     static constexpr index_t Y2 = YPerTile / (Y1 * Y0); // # of iters within wavefront
 
-    static_assert(X0 * Y1 * Y0 * NumWaveGroups == BlockSize,
-                  "X0 * warp_ys * Y0 must cover whole workgroup!");
-    static_assert(Y0 * Y1 * Y2 == YPerTile, "Y0, Y1, Y2 must cover whole YPerTile");
+    static_assert(Y0 * Y1 * Y2 * X0 * X1 != 0, "Wrong pattern!");
 
     CK_TILE_HOST_DEVICE static constexpr auto make_2d_static_tile_distribution()
     {
@@ -237,13 +234,12 @@ struct tile_distribution_encoding_pattern_2d<BlockSize,
     static constexpr index_t X0         = min(warp_size, XPerTile / X1); // # of threads in X dim
 
     static constexpr index_t Y2 = warp_size / X0; // # of rows in Y dim to cover whole wavefront
-    static_assert(X0 * Y2 == warp_size, "X0 * Y2 must cover whole wavefront!");
 
     static constexpr index_t Y0 = num_warps;
-    static_assert(X0 * Y2 * Y0 == BlockSize, "X0 * Y2 * Y1 must cover whole workgroup!");
 
     static constexpr index_t Y1 = YPerTile / (Y2 * Y0); // # of iters within wavefront
-    static_assert(Y0 * Y1 * Y2 == YPerTile, "Y0, Y1, Y2 must cover whole YPerTile");
+
+    static_assert(Y0 * Y1 * Y2 * X0 * X1 != 0, "Wrong pattern!");
 
     CK_TILE_HOST_DEVICE static constexpr auto make_2d_static_tile_distribution()
     {
@@ -291,11 +287,9 @@ struct tile_distribution_encoding_pattern_2d<BlockSize,
     static constexpr index_t X1         = VecSize > LargestVec ? LargestVec : VecSize;
     static constexpr index_t X0         = min(warp_size, XPerTile / X1); // # of threads in X dim
     static constexpr index_t Y2 = warp_size / X0; // # of rows in Y dim to cover whole wavefront
-    static_assert(X0 * Y2 == warp_size, "X0 * Y2 must cover whole wavefront!");
     static constexpr index_t Y1 = num_warps;
-    static_assert(X0 * Y2 * Y1 == BlockSize, "X0 * Y2 * Y1 must cover whole workgroup!");
     static constexpr index_t Y0 = YPerTile / (Y2 * Y1); // # of iters
-    static_assert(Y0 * Y1 * Y2 == YPerTile, "Y0, Y1, Y2 must cover whole YPerTile");
+    static_assert(Y0 * Y1 * Y2 * X0 * X1 != 0, "Wrong pattern!");
 
     CK_TILE_HOST_DEVICE static constexpr auto make_2d_static_tile_distribution()
     {

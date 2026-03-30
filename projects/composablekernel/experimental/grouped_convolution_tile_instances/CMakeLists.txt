@@ -8,12 +8,21 @@ if(GPU_TARGETS MATCHES "gfx9|gfx1[12]")
      NOT EXISTS ${INSTANCES_DIR}/backward_weight OR
      NOT EXISTS ${INSTANCES_DIR}/backward_data)
     find_package(Python3 COMPONENTS Interpreter Development)
-    execute_process(
-      COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/generate_instances.py --mode=tests --instances_dir=${CMAKE_CURRENT_BINARY_DIR}
-      RESULT_VARIABLE ret
-      OUTPUT_VARIABLE output
-      ERROR_VARIABLE error
-    )
+    if(GPU_TARGETS MATCHES "gfx9")
+      execute_process(
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/generate_instances.py --mode=tests --warp_op=xdl --instances_dir=${CMAKE_CURRENT_BINARY_DIR}
+        RESULT_VARIABLE ret
+        OUTPUT_VARIABLE output
+        ERROR_VARIABLE error
+      )
+    else()
+      execute_process(
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/generate_instances.py --mode=tests --warp_op=wmma --instances_dir=${CMAKE_CURRENT_BINARY_DIR}
+        RESULT_VARIABLE ret
+        OUTPUT_VARIABLE output
+        ERROR_VARIABLE error
+      )
+    endif()
 
     if(NOT ret EQUAL 0)
       message(FATAL_ERROR "Failed to generate instances. Return code: ${ret}\nOutput: ${output}\nError: ${error}")
