@@ -136,10 +136,8 @@ struct WarpGemmAttributeMfma
             }
         }
     }
-    using AWarpDstrEncoding =
-        decltype(get_warp_dstr_encoding<Impl::kAMLane, AttrNumAccessAV>());
-    using BWarpDstrEncoding =
-        decltype(get_warp_dstr_encoding<Impl::kBNLane, AttrNumAccessBV>());
+    using AWarpDstrEncoding = decltype(get_warp_dstr_encoding<Impl::kAMLane, AttrNumAccessAV>());
+    using BWarpDstrEncoding = decltype(get_warp_dstr_encoding<Impl::kBNLane, AttrNumAccessBV>());
 
     using CWarpDstrEncoding = tile_distribution_encoding<
         sequence<>,

@@ -204,7 +204,7 @@ struct NormalizeEncodingForTranspose
     static constexpr auto I0 = number<0>{};
     static constexpr auto I1 = number<1>{};
 
-    static constexpr auto k_dim    = DstrEncode::hs_lengthss_[I1];
+    static constexpr auto k_dim     = DstrEncode::hs_lengthss_[I1];
     static constexpr index_t last_k = k_dim[number<k_dim.size() - 1>{}];
 
     static constexpr bool needs_split =
@@ -275,10 +275,10 @@ struct TransposeTileDistributionTraits
     // The original block encoding's last K sub-dim may exceed SubtileMinorDim and need splitting.
     // For ReverseDirection=false (OutputTileDistributionTraits), the encoding is already
     // transposed and has the correct structure.
-    using InDstrEncode = std::conditional_t<
-        ReverseDirection,
-        typename NormalizeEncodingForTranspose<RawDstrEncode, DataType_>::type,
-        RawDstrEncode>;
+    using InDstrEncode =
+        std::conditional_t<ReverseDirection,
+                           typename NormalizeEncodingForTranspose<RawDstrEncode, DataType_>::type,
+                           RawDstrEncode>;
     static constexpr auto input_hs_lengthss = InDstrEncode::hs_lengthss_;
     static constexpr index_t LaneGroupSize =
         Policy::template ValidationTraits<InDstrEncode, ReverseDirection>::LaneGroupSize;
@@ -509,7 +509,7 @@ CK_TILE_DEVICE void load_tile_transpose_with_offset(
     // NormalizeEncodingForTranspose splits the K-dim for transpose validation. The split is
     // a virtual subdivision so the flat buffer layout is identical; only require divisibility.
     static_assert(y_out_lengths[NDimYOut - 1] % y_in_lengths[NDimYIn - 1] == 0 ||
-                  y_in_lengths[NDimYIn - 1] % y_out_lengths[NDimYOut - 1] == 0,
+                      y_in_lengths[NDimYIn - 1] % y_out_lengths[NDimYOut - 1] == 0,
                   "vector lengths must be related by a split factor");
     constexpr index_t vecLoadSize = y_in_lengths[NDimYIn - 1];
     constexpr index_t num_of_access =
