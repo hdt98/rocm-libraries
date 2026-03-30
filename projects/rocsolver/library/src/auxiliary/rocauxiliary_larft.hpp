@@ -591,11 +591,14 @@ rocblas_status rocsolver_larft_template(rocblas_handle handle,
     // setup tau (changing signs) and account for the non-stored 1's on the
     // householder vectors
     I blocks = (k - 1) / BS2 + 1;
-    ROCSOLVER_LAUNCH_KERNEL((set_triangular<T, I, U>), dim3(blocks, blocks, batch_count),
+    ROCSOLVER_LAUNCH_KERNEL((set_triangular<T, I, U>),
+                            dim3(static_cast<uint32_t>(blocks), static_cast<uint32_t>(blocks),
+                                 static_cast<uint32_t>(batch_count)),
                             dim3(BS2, BS2), 0, stream, n, k, V, shiftV, ldv, strideV, tau, strideT,
                             F, ldf, strideF, direct, storev, use_gemm);
-    ROCSOLVER_LAUNCH_KERNEL((set_tau<T, I>), dim3(blocks, batch_count), dim3(BS2, 1), 0, stream, k,
-                            tau, strideT);
+    ROCSOLVER_LAUNCH_KERNEL((set_tau<T, I>),
+                            dim3(static_cast<uint32_t>(blocks), static_cast<uint32_t>(batch_count)),
+                            dim3(BS2, 1), 0, stream, k, tau, strideT);
 
     const hipDeviceProp_t* props = rocblas_internal_get_device_prop(handle);
     size_t lmemsize = sizeof(T) * (k + 1) * k;
