@@ -84,6 +84,8 @@ consteval auto visit_op(const Op& op, F&& f)
         return f(std::get<SoftmaxOp>(op));
     if(std::holds_alternative<ScaleOp>(op))
         return f(std::get<ScaleOp>(op));
+    if(std::holds_alternative<FmhaBwdOp>(op))
+        return f(std::get<FmhaBwdOp>(op));
     return f(std::get<std::monostate>(op));
 }
 
@@ -191,6 +193,21 @@ register_slots(const Op& op, const Signature& sig, auto& find_or_add, auto& set_
             set_if_unknown(find_or_add(typed_op.out), 2, Layout::Row);
             return typed_op.out;
         }
+        else if constexpr(std::is_same_v<T, FmhaBwdOp>)
+        {
+            // FmhaBwdOp: 6 inputs + 3 outputs, all rank 2 except
+            // LSE and D (rank 1). Outputs are dQ, dK, dV.
+            set_if_unknown(find_or_add(typed_op.q), 2, Layout::Row);
+            set_if_unknown(find_or_add(typed_op.k), 2, Layout::Row);
+            set_if_unknown(find_or_add(typed_op.v), 2, Layout::Row);
+            find_or_add(typed_op.lse); // rank 1, no layout default
+            set_if_unknown(find_or_add(typed_op.do_), 2, Layout::Row);
+            find_or_add(typed_op.d); // rank 1, no layout default
+            set_if_unknown(find_or_add(typed_op.dq), 2, Layout::Row);
+            set_if_unknown(find_or_add(typed_op.dk), 2, Layout::Row);
+            set_if_unknown(find_or_add(typed_op.dv), 2, Layout::Row);
+            return typed_op.dq; // first output
+        }
         else if constexpr(std::is_same_v<T, ScaleOp>)
         {
             // ScaleOp is unary + scalar reference validation
@@ -245,10 +262,11 @@ consteval void propagate_slots(const Op& op, auto& propagate_binary, auto& propa
     visit_op(op, [&](const auto& typed_op) {
         using T = std::remove_cvref_t<decltype(typed_op)>;
 
-        if constexpr(std::is_same_v<T, std::monostate> || std::is_same_v<T, GemmOp>)
+        if constexpr(std::is_same_v<T, std::monostate> || std::is_same_v<T, GemmOp> ||
+                     std::is_same_v<T, FmhaBwdOp>)
         {
             // monostate: nothing to do
-            // GemmOp: rank/layout already set in register_slots
+            // GemmOp/FmhaBwdOp: rank/layout already set in register_slots
         }
         else if constexpr(BinaryOpLike<T>)
         {
