@@ -128,6 +128,8 @@ private:
 
     using SolutionFreeFn = void (*)(ConvSolution*);
 
+    // cppcheck cannot parse function-pointer aliases with globally-qualified return types
+    // cppcheck-suppress internalAstError
     using FillValidKernelsFn = ::CKKernelListHandle* (*)(const miopen::conv::ProblemDescription*,
                                                          miopenDataType_t,
                                                          bool);
