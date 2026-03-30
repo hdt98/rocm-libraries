@@ -99,42 +99,42 @@ class CSRLSVCHOLHOST : public CSRLSVCHOL_BASE<true>
 
 // non-batch tests
 
-TEST_P(CSRLSVCHOL, _float)
+TEST_P(CSRLSVCHOL, Float)
 {
     run_tests<float>();
 }
 
-TEST_P(CSRLSVCHOL, _double)
+TEST_P(CSRLSVCHOL, Double)
 {
     run_tests<double>();
 }
 
-// TEST_P(CSRLSVCHOL, _float_complex)
+// TEST_P(CSRLSVCHOL, FloatComplex)
 // {
 //     run_tests<rocblas_float_complex>();
 // }
 
-// TEST_P(CSRLSVCHOL, _double_complex)
+// TEST_P(CSRLSVCHOL, DoubleComplex)
 // {
 //     run_tests<rocblas_double_complex>();
 // }
 
-TEST_P(CSRLSVCHOLHOST, _float)
+TEST_P(CSRLSVCHOLHOST, Float)
 {
     run_tests<float>();
 }
 
-TEST_P(CSRLSVCHOLHOST, _double)
+TEST_P(CSRLSVCHOLHOST, Double)
 {
     run_tests<double>();
 }
 
-// TEST_P(CSRLSVCHOLHOST, _float_complex)
+// TEST_P(CSRLSVCHOLHOST, FloatComplex)
 // {
 //     run_tests<rocblas_float_complex>();
 // }
 
-// TEST_P(CSRLSVCHOLHOST, _double_complex)
+// TEST_P(CSRLSVCHOLHOST, DoubleComplex)
 // {
 //     run_tests<rocblas_double_complex>();
 // }

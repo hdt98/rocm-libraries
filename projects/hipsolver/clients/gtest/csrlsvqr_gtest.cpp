@@ -99,42 +99,42 @@ class CSRLSVQRHOST : public CSRLSVQR_BASE<true>
 
 // non-batch tests
 
-TEST_P(CSRLSVQR, _float)
+TEST_P(CSRLSVQR, Float)
 {
     run_tests<float>();
 }
 
-TEST_P(CSRLSVQR, _double)
+TEST_P(CSRLSVQR, Double)
 {
     run_tests<double>();
 }
 
-TEST_P(CSRLSVQR, _float_complex)
+TEST_P(CSRLSVQR, FloatComplex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(CSRLSVQR, _double_complex)
+TEST_P(CSRLSVQR, DoubleComplex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-// TEST_P(CSRLSVQRHOST, _float)
+// TEST_P(CSRLSVQRHOST, Float)
 // {
 //     run_tests<float>();
 // }
 
-// TEST_P(CSRLSVQRHOST, _double)
+// TEST_P(CSRLSVQRHOST, Double)
 // {
 //     run_tests<double>();
 // }
 
-// TEST_P(CSRLSVQRHOST, _float_complex)
+// TEST_P(CSRLSVQRHOST, FloatComplex)
 // {
 //     run_tests<rocblas_float_complex>();
 // }
 
-// TEST_P(CSRLSVQRHOST, _double_complex)
+// TEST_P(CSRLSVQRHOST, DoubleComplex)
 // {
 //     run_tests<rocblas_double_complex>();
 // }

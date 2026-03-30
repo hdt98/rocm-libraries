@@ -127,62 +127,62 @@ class POTRS_COMPAT : public POTRS_BASE<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(POTRS, _float)
+TEST_P(POTRS, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(POTRS, _double)
+TEST_P(POTRS, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(POTRS, _float_complex)
+TEST_P(POTRS, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRS, _double_complex)
+TEST_P(POTRS, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(POTRS_FORTRAN, _float)
+TEST_P(POTRS_FORTRAN, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(POTRS_FORTRAN, _double)
+TEST_P(POTRS_FORTRAN, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(POTRS_FORTRAN, _float_complex)
+TEST_P(POTRS_FORTRAN, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRS_FORTRAN, _double_complex)
+TEST_P(POTRS_FORTRAN, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(POTRS_COMPAT, _float)
+TEST_P(POTRS_COMPAT, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(POTRS_COMPAT, _double)
+TEST_P(POTRS_COMPAT, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(POTRS_COMPAT, _float_complex)
+TEST_P(POTRS_COMPAT, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRS_COMPAT, _double_complex)
+TEST_P(POTRS_COMPAT, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }

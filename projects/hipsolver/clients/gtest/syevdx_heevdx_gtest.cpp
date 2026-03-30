@@ -126,42 +126,42 @@ class HEEVDX_COMPAT : public SYEVDX_HEEVDX<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(SYEVDX, _float)
+TEST_P(SYEVDX, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYEVDX, _double)
+TEST_P(SYEVDX, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEEVDX, _float_complex)
+TEST_P(HEEVDX, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEEVDX, _double_complex)
+TEST_P(HEEVDX, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(SYEVDX_COMPAT, _float)
+TEST_P(SYEVDX_COMPAT, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYEVDX_COMPAT, _double)
+TEST_P(SYEVDX_COMPAT, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEEVDX_COMPAT, _float_complex)
+TEST_P(HEEVDX_COMPAT, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEEVDX_COMPAT, _double_complex)
+TEST_P(HEEVDX_COMPAT, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }

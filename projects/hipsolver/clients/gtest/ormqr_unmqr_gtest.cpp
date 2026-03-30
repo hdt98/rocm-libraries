@@ -156,62 +156,62 @@ class UNMQR_COMPAT : public ORMQR_UNMQR<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(ORMQR, _float)
+TEST_P(ORMQR, Float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORMQR, _double)
+TEST_P(ORMQR, Double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNMQR, _float_complex)
+TEST_P(UNMQR, FloatComplex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNMQR, _double_complex)
+TEST_P(UNMQR, DoubleComplex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORMQR_FORTRAN, _float)
+TEST_P(ORMQR_FORTRAN, Float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORMQR_FORTRAN, _double)
+TEST_P(ORMQR_FORTRAN, Double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNMQR_FORTRAN, _float_complex)
+TEST_P(UNMQR_FORTRAN, FloatComplex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNMQR_FORTRAN, _double_complex)
+TEST_P(UNMQR_FORTRAN, DoubleComplex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORMQR_COMPAT, _float)
+TEST_P(ORMQR_COMPAT, Float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORMQR_COMPAT, _double)
+TEST_P(ORMQR_COMPAT, Double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNMQR_COMPAT, _float_complex)
+TEST_P(UNMQR_COMPAT, FloatComplex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNMQR_COMPAT, _double_complex)
+TEST_P(UNMQR_COMPAT, DoubleComplex)
 {
     run_tests<rocblas_double_complex>();
 }

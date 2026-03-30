@@ -139,122 +139,122 @@ class GETRF_COMPAT_NPVT_64 : public GETRF_BASE<API_COMPAT, true, int64_t, size_t
 
 // non-batch tests
 
-TEST_P(GETRF, _float)
+TEST_P(GETRF, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GETRF, _double)
+TEST_P(GETRF, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GETRF, _float_complex)
+TEST_P(GETRF, FloatComplex)
 {
     run_tests<false, false, hipsolverComplex>();
 }
 
-TEST_P(GETRF, _double_complex)
+TEST_P(GETRF, DoubleComplex)
 {
     run_tests<false, false, hipsolverDoubleComplex>();
 }
 
-TEST_P(GETRF_NPVT, _float)
+TEST_P(GETRF_NPVT, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GETRF_NPVT, _double)
+TEST_P(GETRF_NPVT, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GETRF_NPVT, _float_complex)
+TEST_P(GETRF_NPVT, FloatComplex)
 {
     run_tests<false, false, hipsolverComplex>();
 }
 
-TEST_P(GETRF_NPVT, _double_complex)
+TEST_P(GETRF_NPVT, DoubleComplex)
 {
     run_tests<false, false, hipsolverDoubleComplex>();
 }
 
-TEST_P(GETRF_FORTRAN, _float)
+TEST_P(GETRF_FORTRAN, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GETRF_FORTRAN, _double)
+TEST_P(GETRF_FORTRAN, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GETRF_FORTRAN, _float_complex)
+TEST_P(GETRF_FORTRAN, FloatComplex)
 {
     run_tests<false, false, hipsolverComplex>();
 }
 
-TEST_P(GETRF_FORTRAN, _double_complex)
+TEST_P(GETRF_FORTRAN, DoubleComplex)
 {
     run_tests<false, false, hipsolverDoubleComplex>();
 }
 
-TEST_P(GETRF_COMPAT, _float)
+TEST_P(GETRF_COMPAT, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GETRF_COMPAT, _double)
+TEST_P(GETRF_COMPAT, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GETRF_COMPAT, _float_complex)
+TEST_P(GETRF_COMPAT, FloatComplex)
 {
     run_tests<false, false, hipsolverComplex>();
 }
 
-TEST_P(GETRF_COMPAT, _double_complex)
+TEST_P(GETRF_COMPAT, DoubleComplex)
 {
     run_tests<false, false, hipsolverDoubleComplex>();
 }
 
-TEST_P(GETRF_COMPAT_64, _float)
+TEST_P(GETRF_COMPAT_64, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GETRF_COMPAT_64, _double)
+TEST_P(GETRF_COMPAT_64, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GETRF_COMPAT_64, _float_complex)
+TEST_P(GETRF_COMPAT_64, FloatComplex)
 {
     run_tests<false, false, hipsolverComplex>();
 }
 
-TEST_P(GETRF_COMPAT_64, _double_complex)
+TEST_P(GETRF_COMPAT_64, DoubleComplex)
 {
     run_tests<false, false, hipsolverDoubleComplex>();
 }
 
-TEST_P(GETRF_COMPAT_NPVT_64, _float)
+TEST_P(GETRF_COMPAT_NPVT_64, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GETRF_COMPAT_NPVT_64, _double)
+TEST_P(GETRF_COMPAT_NPVT_64, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GETRF_COMPAT_NPVT_64, _float_complex)
+TEST_P(GETRF_COMPAT_NPVT_64, FloatComplex)
 {
     run_tests<false, false, hipsolverComplex>();
 }
 
-TEST_P(GETRF_COMPAT_NPVT_64, _double_complex)
+TEST_P(GETRF_COMPAT_NPVT_64, DoubleComplex)
 {
     run_tests<false, false, hipsolverDoubleComplex>();
 }

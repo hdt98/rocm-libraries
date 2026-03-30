@@ -134,82 +134,82 @@ class GELS_INPLACE : public GELS_BASE<API_NORMAL, true>
 
 // non-batch tests
 
-TEST_P(GELS, _float)
+TEST_P(GELS, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GELS, _double)
+TEST_P(GELS, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GELS, _float_complex)
+TEST_P(GELS, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GELS, _double_complex)
+TEST_P(GELS, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GELS_FORTRAN, _float)
+TEST_P(GELS_FORTRAN, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GELS_FORTRAN, _double)
+TEST_P(GELS_FORTRAN, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GELS_FORTRAN, _float_complex)
+TEST_P(GELS_FORTRAN, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GELS_FORTRAN, _double_complex)
+TEST_P(GELS_FORTRAN, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GELS_COMPAT, _float)
+TEST_P(GELS_COMPAT, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GELS_COMPAT, _double)
+TEST_P(GELS_COMPAT, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GELS_COMPAT, _float_complex)
+TEST_P(GELS_COMPAT, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GELS_COMPAT, _double_complex)
+TEST_P(GELS_COMPAT, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GELS_INPLACE, _float)
+TEST_P(GELS_INPLACE, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GELS_INPLACE, _double)
+TEST_P(GELS_INPLACE, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GELS_INPLACE, _float_complex)
+TEST_P(GELS_INPLACE, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GELS_INPLACE, _double_complex)
+TEST_P(GELS_INPLACE, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }

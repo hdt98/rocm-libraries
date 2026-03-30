@@ -116,62 +116,62 @@ class UNGTR_COMPAT : public ORGTR_UNGTR<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(ORGTR, _float)
+TEST_P(ORGTR, Float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORGTR, _double)
+TEST_P(ORGTR, Double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNGTR, _float_complex)
+TEST_P(UNGTR, FloatComplex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNGTR, _double_complex)
+TEST_P(UNGTR, DoubleComplex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORGTR_FORTRAN, _float)
+TEST_P(ORGTR_FORTRAN, Float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORGTR_FORTRAN, _double)
+TEST_P(ORGTR_FORTRAN, Double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNGTR_FORTRAN, _float_complex)
+TEST_P(UNGTR_FORTRAN, FloatComplex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNGTR_FORTRAN, _double_complex)
+TEST_P(UNGTR_FORTRAN, DoubleComplex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORGTR_COMPAT, _float)
+TEST_P(ORGTR_COMPAT, Float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORGTR_COMPAT, _double)
+TEST_P(ORGTR_COMPAT, Double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNGTR_COMPAT, _float_complex)
+TEST_P(UNGTR_COMPAT, FloatComplex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNGTR_COMPAT, _double_complex)
+TEST_P(UNGTR_COMPAT, DoubleComplex)
 {
     run_tests<rocblas_double_complex>();
 }

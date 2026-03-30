@@ -151,62 +151,62 @@ class GESVDJ_COMPAT : public GESVDJ_BASE<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(GESVDJ, _float)
+TEST_P(GESVDJ, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GESVDJ, _double)
+TEST_P(GESVDJ, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GESVDJ, _float_complex)
+TEST_P(GESVDJ, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GESVDJ, _double_complex)
+TEST_P(GESVDJ, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GESVDJ_FORTRAN, _float)
+TEST_P(GESVDJ_FORTRAN, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GESVDJ_FORTRAN, _double)
+TEST_P(GESVDJ_FORTRAN, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GESVDJ_FORTRAN, _float_complex)
+TEST_P(GESVDJ_FORTRAN, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GESVDJ_FORTRAN, _double_complex)
+TEST_P(GESVDJ_FORTRAN, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GESVDJ_COMPAT, _float)
+TEST_P(GESVDJ_COMPAT, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GESVDJ_COMPAT, _double)
+TEST_P(GESVDJ_COMPAT, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GESVDJ_COMPAT, _float_complex)
+TEST_P(GESVDJ_COMPAT, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GESVDJ_COMPAT, _double_complex)
+TEST_P(GESVDJ_COMPAT, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }

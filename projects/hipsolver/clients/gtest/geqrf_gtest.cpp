@@ -123,82 +123,82 @@ class GEQRF_COMPAT_64 : public GEQRF_BASE<API_COMPAT, int64_t, size_t>
 
 // non-batch tests
 
-TEST_P(GEQRF, _float)
+TEST_P(GEQRF, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GEQRF, _double)
+TEST_P(GEQRF, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GEQRF, _float_complex)
+TEST_P(GEQRF, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GEQRF, _double_complex)
+TEST_P(GEQRF, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GEQRF_FORTRAN, _float)
+TEST_P(GEQRF_FORTRAN, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GEQRF_FORTRAN, _double)
+TEST_P(GEQRF_FORTRAN, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GEQRF_FORTRAN, _float_complex)
+TEST_P(GEQRF_FORTRAN, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GEQRF_FORTRAN, _double_complex)
+TEST_P(GEQRF_FORTRAN, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GEQRF_COMPAT, _float)
+TEST_P(GEQRF_COMPAT, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GEQRF_COMPAT, _double)
+TEST_P(GEQRF_COMPAT, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GEQRF_COMPAT, _float_complex)
+TEST_P(GEQRF_COMPAT, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GEQRF_COMPAT, _double_complex)
+TEST_P(GEQRF_COMPAT, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GEQRF_COMPAT_64, _float)
+TEST_P(GEQRF_COMPAT_64, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GEQRF_COMPAT_64, _double)
+TEST_P(GEQRF_COMPAT_64, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GEQRF_COMPAT_64, _float_complex)
+TEST_P(GEQRF_COMPAT_64, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GEQRF_COMPAT_64, _double_complex)
+TEST_P(GEQRF_COMPAT_64, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }

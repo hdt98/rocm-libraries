@@ -140,22 +140,22 @@ protected:
 
 // non-batch tests
 
-TEST_P(HIPBLAS_INCLUDE2, _float)
+TEST_P(HIPBLAS_INCLUDE2, Float)
 {
     run_tests<float>();
 }
 
-TEST_P(HIPBLAS_INCLUDE2, _double)
+TEST_P(HIPBLAS_INCLUDE2, Double)
 {
     run_tests<double>();
 }
 
-TEST_P(HIPBLAS_INCLUDE2, _float_complex)
+TEST_P(HIPBLAS_INCLUDE2, FloatComplex)
 {
     run_tests<hipsolverComplex>();
 }
 
-TEST_P(HIPBLAS_INCLUDE2, _double_complex)
+TEST_P(HIPBLAS_INCLUDE2, DoubleComplex)
 {
     run_tests<hipsolverDoubleComplex>();
 }

@@ -138,62 +138,62 @@ class HEGVJ_COMPAT : public SYGVJ_HEGVJ<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(SYGVJ, _float)
+TEST_P(SYGVJ, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYGVJ, _double)
+TEST_P(SYGVJ, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEGVJ, _float_complex)
+TEST_P(HEGVJ, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEGVJ, _double_complex)
+TEST_P(HEGVJ, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(SYGVJ_FORTRAN, _float)
+TEST_P(SYGVJ_FORTRAN, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYGVJ_FORTRAN, _double)
+TEST_P(SYGVJ_FORTRAN, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEGVJ_FORTRAN, _float_complex)
+TEST_P(HEGVJ_FORTRAN, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEGVJ_FORTRAN, _double_complex)
+TEST_P(HEGVJ_FORTRAN, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(SYGVJ_COMPAT, _float)
+TEST_P(SYGVJ_COMPAT, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYGVJ_COMPAT, _double)
+TEST_P(SYGVJ_COMPAT, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEGVJ_COMPAT, _float_complex)
+TEST_P(HEGVJ_COMPAT, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEGVJ_COMPAT, _double_complex)
+TEST_P(HEGVJ_COMPAT, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }

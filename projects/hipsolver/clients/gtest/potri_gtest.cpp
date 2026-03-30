@@ -110,62 +110,62 @@ class POTRI_COMPAT : public POTRI_BASE<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(POTRI, _float)
+TEST_P(POTRI, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(POTRI, _double)
+TEST_P(POTRI, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(POTRI, _float_complex)
+TEST_P(POTRI, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRI, _double_complex)
+TEST_P(POTRI, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(POTRI_FORTRAN, _float)
+TEST_P(POTRI_FORTRAN, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(POTRI_FORTRAN, _double)
+TEST_P(POTRI_FORTRAN, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(POTRI_FORTRAN, _float_complex)
+TEST_P(POTRI_FORTRAN, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRI_FORTRAN, _double_complex)
+TEST_P(POTRI_FORTRAN, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(POTRI_COMPAT, _float)
+TEST_P(POTRI_COMPAT, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(POTRI_COMPAT, _double)
+TEST_P(POTRI_COMPAT, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(POTRI_COMPAT, _float_complex)
+TEST_P(POTRI_COMPAT, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRI_COMPAT, _double_complex)
+TEST_P(POTRI_COMPAT, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }

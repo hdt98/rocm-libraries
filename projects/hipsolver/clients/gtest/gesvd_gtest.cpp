@@ -186,82 +186,82 @@ class GESVD_NRWK : public GESVD_BASE<API_NORMAL, true>
 
 // non-batch tests
 
-TEST_P(GESVD, _float)
+TEST_P(GESVD, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GESVD, _double)
+TEST_P(GESVD, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GESVD, _float_complex)
+TEST_P(GESVD, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GESVD, _double_complex)
+TEST_P(GESVD, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GESVD_FORTRAN, _float)
+TEST_P(GESVD_FORTRAN, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GESVD_FORTRAN, _double)
+TEST_P(GESVD_FORTRAN, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GESVD_FORTRAN, _float_complex)
+TEST_P(GESVD_FORTRAN, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GESVD_FORTRAN, _double_complex)
+TEST_P(GESVD_FORTRAN, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GESVD_COMPAT, _float)
+TEST_P(GESVD_COMPAT, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GESVD_COMPAT, _double)
+TEST_P(GESVD_COMPAT, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GESVD_COMPAT, _float_complex)
+TEST_P(GESVD_COMPAT, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GESVD_COMPAT, _double_complex)
+TEST_P(GESVD_COMPAT, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GESVD_NRWK, _float)
+TEST_P(GESVD_NRWK, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GESVD_NRWK, _double)
+TEST_P(GESVD_NRWK, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GESVD_NRWK, _float_complex)
+TEST_P(GESVD_NRWK, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GESVD_NRWK, _double_complex)
+TEST_P(GESVD_NRWK, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }

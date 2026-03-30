@@ -79,22 +79,22 @@ protected:
 
 // non-batch tests
 
-/*TEST_P(CSRRF_REFACTLU, _float)
+/*TEST_P(CSRRF_REFACTLU, Float)
 {
     run_tests<float>();
 }*/
 
-TEST_P(CSRRF_REFACTLU, _double)
+TEST_P(CSRRF_REFACTLU, Double)
 {
     run_tests<double>();
 }
 
-/*TEST_P(CSRRF_REFACTLU, _float_complex)
+/*TEST_P(CSRRF_REFACTLU, FloatComplex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(CSRRF_REFACTLU, _double_complex)
+TEST_P(CSRRF_REFACTLU, DoubleComplex)
 {
     run_tests<rocblas_double_complex>();
 }*/

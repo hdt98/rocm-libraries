@@ -129,83 +129,83 @@ class GESV_INPLACE : public GESV_BASE<API_NORMAL, true>
 
 // non-batch tests
 
-TEST_P(GESV, _float)
+TEST_P(GESV, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GESV, _double)
+TEST_P(GESV, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GESV, _float_complex)
+TEST_P(GESV, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GESV, _double_complex)
+TEST_P(GESV, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GESV_FORTRAN, _float)
+TEST_P(GESV_FORTRAN, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GESV_FORTRAN, _double)
+TEST_P(GESV_FORTRAN, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GESV_FORTRAN, _float_complex)
+TEST_P(GESV_FORTRAN, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GESV_FORTRAN, _double_complex)
+TEST_P(GESV_FORTRAN, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GESV_COMPAT, _float)
+TEST_P(GESV_COMPAT, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GESV_COMPAT, _double)
+TEST_P(GESV_COMPAT, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GESV_COMPAT, _float_complex)
+TEST_P(GESV_COMPAT, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GESV_COMPAT, _double_complex)
+TEST_P(GESV_COMPAT, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
 #if defined(__HIP_PLATFORM_HCC__) || defined(__HIP_PLATFORM_AMD__)
-TEST_P(GESV_INPLACE, _float)
+TEST_P(GESV_INPLACE, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GESV_INPLACE, _double)
+TEST_P(GESV_INPLACE, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GESV_INPLACE, _float_complex)
+TEST_P(GESV_INPLACE, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GESV_INPLACE, _double_complex)
+TEST_P(GESV_INPLACE, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }

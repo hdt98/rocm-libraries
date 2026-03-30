@@ -169,62 +169,62 @@ class UNMTR_COMPAT : public ORMTR_UNMTR<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(ORMTR, _float)
+TEST_P(ORMTR, Float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORMTR, _double)
+TEST_P(ORMTR, Double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNMTR, _float_complex)
+TEST_P(UNMTR, FloatComplex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNMTR, _double_complex)
+TEST_P(UNMTR, DoubleComplex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORMTR_FORTRAN, _float)
+TEST_P(ORMTR_FORTRAN, Float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORMTR_FORTRAN, _double)
+TEST_P(ORMTR_FORTRAN, Double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNMTR_FORTRAN, _float_complex)
+TEST_P(UNMTR_FORTRAN, FloatComplex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNMTR_FORTRAN, _double_complex)
+TEST_P(UNMTR_FORTRAN, DoubleComplex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORMTR_COMPAT, _float)
+TEST_P(ORMTR_COMPAT, Float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORMTR_COMPAT, _double)
+TEST_P(ORMTR_COMPAT, Double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNMTR_COMPAT, _float_complex)
+TEST_P(UNMTR_COMPAT, FloatComplex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNMTR_COMPAT, _double_complex)
+TEST_P(UNMTR_COMPAT, DoubleComplex)
 {
     run_tests<rocblas_double_complex>();
 }

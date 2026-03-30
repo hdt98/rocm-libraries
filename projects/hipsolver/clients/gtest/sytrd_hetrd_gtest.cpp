@@ -123,62 +123,62 @@ class HETRD_COMPAT : public SYTRD_HETRD<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(SYTRD, _float)
+TEST_P(SYTRD, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYTRD, _double)
+TEST_P(SYTRD, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HETRD, _float_complex)
+TEST_P(HETRD, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HETRD, _double_complex)
+TEST_P(HETRD, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(SYTRD_FORTRAN, _float)
+TEST_P(SYTRD_FORTRAN, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYTRD_FORTRAN, _double)
+TEST_P(SYTRD_FORTRAN, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HETRD_FORTRAN, _float_complex)
+TEST_P(HETRD_FORTRAN, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HETRD_FORTRAN, _double_complex)
+TEST_P(HETRD_FORTRAN, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(SYTRD_COMPAT, _float)
+TEST_P(SYTRD_COMPAT, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYTRD_COMPAT, _double)
+TEST_P(SYTRD_COMPAT, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HETRD_COMPAT, _float_complex)
+TEST_P(HETRD_COMPAT, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HETRD_COMPAT, _double_complex)
+TEST_P(HETRD_COMPAT, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }

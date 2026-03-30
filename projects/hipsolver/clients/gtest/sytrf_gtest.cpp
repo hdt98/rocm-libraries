@@ -114,62 +114,62 @@ class SYTRF_COMPAT : public SYTRF_BASE<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(SYTRF, _float)
+TEST_P(SYTRF, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYTRF, _double)
+TEST_P(SYTRF, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(SYTRF, _float_complex)
+TEST_P(SYTRF, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(SYTRF, _double_complex)
+TEST_P(SYTRF, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(SYTRF_FORTRAN, _float)
+TEST_P(SYTRF_FORTRAN, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYTRF_FORTRAN, _double)
+TEST_P(SYTRF_FORTRAN, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(SYTRF_FORTRAN, _float_complex)
+TEST_P(SYTRF_FORTRAN, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(SYTRF_FORTRAN, _double_complex)
+TEST_P(SYTRF_FORTRAN, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(SYTRF_COMPAT, _float)
+TEST_P(SYTRF_COMPAT, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYTRF_COMPAT, _double)
+TEST_P(SYTRF_COMPAT, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(SYTRF_COMPAT, _float_complex)
+TEST_P(SYTRF_COMPAT, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(SYTRF_COMPAT, _double_complex)
+TEST_P(SYTRF_COMPAT, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }

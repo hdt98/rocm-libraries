@@ -132,62 +132,62 @@ class UNGQR_COMPAT : public ORGQR_UNGQR<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(ORGQR, _float)
+TEST_P(ORGQR, Float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORGQR, _double)
+TEST_P(ORGQR, Double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNGQR, _float_complex)
+TEST_P(UNGQR, FloatComplex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNGQR, _double_complex)
+TEST_P(UNGQR, DoubleComplex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORGQR_FORTRAN, _float)
+TEST_P(ORGQR_FORTRAN, Float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORGQR_FORTRAN, _double)
+TEST_P(ORGQR_FORTRAN, Double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNGQR_FORTRAN, _float_complex)
+TEST_P(UNGQR_FORTRAN, FloatComplex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNGQR_FORTRAN, _double_complex)
+TEST_P(UNGQR_FORTRAN, DoubleComplex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORGQR_COMPAT, _float)
+TEST_P(ORGQR_COMPAT, Float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORGQR_COMPAT, _double)
+TEST_P(ORGQR_COMPAT, Double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNGQR_COMPAT, _float_complex)
+TEST_P(UNGQR_COMPAT, FloatComplex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNGQR_COMPAT, _double_complex)
+TEST_P(UNGQR_COMPAT, DoubleComplex)
 {
     run_tests<rocblas_double_complex>();
 }

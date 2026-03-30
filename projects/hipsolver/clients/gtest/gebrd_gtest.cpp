@@ -119,62 +119,62 @@ class GEBRD_COMPAT : public GEBRD_BASE<API_COMPAT>
 
 // non-batch tests
 
-TEST_P(GEBRD, _float)
+TEST_P(GEBRD, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GEBRD, _double)
+TEST_P(GEBRD, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GEBRD, _float_complex)
+TEST_P(GEBRD, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GEBRD, _double_complex)
+TEST_P(GEBRD, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GEBRD_FORTRAN, _float)
+TEST_P(GEBRD_FORTRAN, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GEBRD_FORTRAN, _double)
+TEST_P(GEBRD_FORTRAN, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GEBRD_FORTRAN, _float_complex)
+TEST_P(GEBRD_FORTRAN, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GEBRD_FORTRAN, _double_complex)
+TEST_P(GEBRD_FORTRAN, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GEBRD_COMPAT, _float)
+TEST_P(GEBRD_COMPAT, Float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GEBRD_COMPAT, _double)
+TEST_P(GEBRD_COMPAT, Double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GEBRD_COMPAT, _float_complex)
+TEST_P(GEBRD_COMPAT, FloatComplex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GEBRD_COMPAT, _double_complex)
+TEST_P(GEBRD_COMPAT, DoubleComplex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
