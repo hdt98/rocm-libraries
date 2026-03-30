@@ -268,6 +268,40 @@ if(ROCROLLER_BUILD_TESTING OR BUILD_TESTING)
             COMPONENT tests
         )
     endif()
+    install(
+        DIRECTORY scripts/lib/rrtest
+        DESTINATION scripts/lib
+        COMPONENT tests
+    )
+    install(
+        FILES test-profiles.yaml
+        DESTINATION .
+        COMPONENT tests
+    )
+    install(
+        DIRECTORY scripts/
+        DESTINATION scripts
+        COMPONENT tests
+        PATTERN "*.pyc" EXCLUDE
+        PATTERN "__pycache__" EXCLUDE
+    )
+    install(
+        FILES pytest.ini
+        DESTINATION .
+        COMPONENT tests
+    )
+    if(ROCROLLER_ENABLE_CLIENT)
+        install(
+            TARGETS rocroller-gemm
+            DESTINATION client
+            COMPONENT tests
+        )
+        install(
+            FILES client/test_gemm_client.py client/test_split_liveness.py
+            DESTINATION client
+            COMPONENT tests
+        )
+    endif()
 endif()
 
 rocm_export_targets(
