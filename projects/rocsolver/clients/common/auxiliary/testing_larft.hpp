@@ -293,10 +293,10 @@ void testing_larft(Arguments& argus)
     rocblas_local_handle handle;
     char directC = argus.get<char>("direct");
     char storevC = argus.get<char>("storev");
-    I k = argus.get<rocblas_int>("k");
-    I n = argus.get<rocblas_int>("n");
-    I ldv = argus.get<rocblas_int>("ldv", storevC == 'C' ? n : k);
-    I ldt = argus.get<rocblas_int>("ldt", k);
+    I k = argus.get<I>("k");
+    I n = argus.get<I>("n");
+    I ldv = argus.get<I>("ldv", storevC == 'C' ? n : k);
+    I ldt = argus.get<I>("ldt", k);
 
     rocblas_direct direct = char2rocblas_direct(directC);
     rocblas_storev storev = char2rocblas_storev(storevC);
