@@ -207,7 +207,9 @@ def run(args):
     if args.get("is_workflow_dispatch"):
         amdgpu_families_input = args.get("amdgpu_families_input", "")
         if not amdgpu_families_input:
-            logging.info(f"Skipping {platform} - no amdgpu_families specified in workflow_dispatch")
+            logging.info(
+                f"Skipping {platform} - no amdgpu_families specified in workflow_dispatch"
+            )
             set_github_output(
                 {f"{platform}_projects": json.dumps([]), "test_type": "standard"}
             )

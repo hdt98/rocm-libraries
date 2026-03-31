@@ -20,6 +20,6 @@ Here are additional labels that manipulate the CI behavior. The labels we provid
 
 For `workflow_dispatch`, you are able to trigger CI in [GitHub's therock-ci.yml workflow page](https://github.com/ROCm/rocm-libraries/actions/workflows/therock-ci.yml). To trigger a workflow dispatch, click "Run workflow" and fill in the fields accordingly.
 
-If TheRock CI artifacts are available from build, you are able to re-use these builds for tests! In the `workflow_dispatch` trigger, you can enable `If enabled, the CI will pull (Linux|Windows) artifacts using artifact_run_id and only run tests` checkbox with a provided artifact ID in this field: `If provided, the tests will run on this artifact ID`. 
+If TheRock CI artifacts are available from build, you are able to re-use these builds for tests! In the `workflow_dispatch` trigger, you can enable `If enabled, the CI will pull (Linux|Windows) artifacts using artifact_run_id and only run tests` checkbox with a provided artifact ID in this field: `If provided, the tests will run on this artifact ID`.
 
 > For example, the artifact ID is `23785925228` in the URL `https://github.com/ROCm/rocm-libraries/actions/runs/23785925228`, where this run built various components in TheRock CI
