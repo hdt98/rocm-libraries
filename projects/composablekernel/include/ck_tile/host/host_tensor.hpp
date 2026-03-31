@@ -861,5 +861,14 @@ auto get_default_stride(std::size_t row,
     else
         return stride;
 }
+/// Returns a bool_constant indicating whether the given layout tag is row-major.
+/// Used with host_tensor_descriptor() to select stride ordering at compile time.
+template <typename Layout>
+static constexpr inline auto is_row_major(Layout)
+{
+    return bool_constant<
+        std::is_same_v<remove_cvref_t<Layout>, tensor_layout::gemm::RowMajor>>{};
+}
+
 } // namespace ck_tile
 #pragma clang diagnostic pop

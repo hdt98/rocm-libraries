@@ -98,22 +98,22 @@ int run_multiple_d_gemm_example_with_layouts(int argc,
     const int n_repeat = arg_parser.get_int("repeat");
     const int k_batch  = arg_parser.get_int("kbatch");
 
-    StrideA  = get_default_stride(M, K, StrideA, is_row_major(a_layout));
-    StrideB  = get_default_stride(K, N, StrideB, is_row_major(b_layout));
-    StrideD0 = get_default_stride(M, N, StrideD0, is_row_major(d0_layout));
-    StrideD1 = get_default_stride(M, N, StrideD1, is_row_major(d1_layout));
-    StrideE  = get_default_stride(M, N, StrideE, is_row_major(e_layout));
+    StrideA  = get_default_stride(M, K, StrideA, ck_tile::is_row_major(a_layout));
+    StrideB  = get_default_stride(K, N, StrideB, ck_tile::is_row_major(b_layout));
+    StrideD0 = get_default_stride(M, N, StrideD0, ck_tile::is_row_major(d0_layout));
+    StrideD1 = get_default_stride(M, N, StrideD1, ck_tile::is_row_major(d1_layout));
+    StrideE  = get_default_stride(M, N, StrideE, ck_tile::is_row_major(e_layout));
 
     ck_tile::HostTensor<ADataType> a_m_k_tesnor(
-        host_tensor_descriptor(M, K, StrideA, is_row_major(a_layout)));
+        host_tensor_descriptor(M, K, StrideA, ck_tile::is_row_major(a_layout)));
     ck_tile::HostTensor<BDataType> b_k_n_tensors(
-        host_tensor_descriptor(K, N, StrideB, is_row_major(b_layout)));
+        host_tensor_descriptor(K, N, StrideB, ck_tile::is_row_major(b_layout)));
     ck_tile::HostTensor<D0DataType> d0_m_n_tensors(
-        host_tensor_descriptor(M, N, StrideD0, is_row_major(d0_layout)));
+        host_tensor_descriptor(M, N, StrideD0, ck_tile::is_row_major(d0_layout)));
     ck_tile::HostTensor<D1DataType> d1_m_n_tensors(
-        host_tensor_descriptor(M, N, StrideD1, is_row_major(d1_layout)));
+        host_tensor_descriptor(M, N, StrideD1, ck_tile::is_row_major(d1_layout)));
     ck_tile::HostTensor<EDataType> e_m_n_device_result(
-        host_tensor_descriptor(M, N, StrideE, is_row_major(e_layout)));
+        host_tensor_descriptor(M, N, StrideE, ck_tile::is_row_major(e_layout)));
 
     ck_tile::FillUniformDistribution<ADataType>{-5.f, 5.f}(a_m_k_tesnor);
     ck_tile::FillUniformDistribution<BDataType>{-5.f, 5.f}(b_k_n_tensors);
@@ -191,7 +191,7 @@ int run_multiple_d_gemm_example_with_layouts(int argc,
     e_m_n_dev_buf.FromDevice(e_m_n_device_result.data());
 
     ck_tile::HostTensor<EDataType> e_m_n_host_ref(
-        host_tensor_descriptor(M, N, StrideE, is_row_major(e_layout)));
+        host_tensor_descriptor(M, N, StrideE, ck_tile::is_row_major(e_layout)));
     e_m_n_host_ref.SetZero();
 
     ck_tile::reference_gemm_multiple_d<ADataType,

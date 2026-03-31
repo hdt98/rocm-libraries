@@ -134,34 +134,34 @@ int run_gemm_multi_abd_example_with_layouts(int argc,
     const int n_repeat = arg_parser.get_int("repeat");
     const int k_batch  = arg_parser.get_int("kbatch");
 
-    StrideA0 = get_default_stride(M, N, StrideA0, is_row_major(a1_layout));
-    StrideA1 = get_default_stride(M, N, StrideA1, is_row_major(a1_layout));
+    StrideA0 = get_default_stride(M, N, StrideA0, ck_tile::is_row_major(a1_layout));
+    StrideA1 = get_default_stride(M, N, StrideA1, ck_tile::is_row_major(a1_layout));
 
-    StrideB0 = get_default_stride(K, N, StrideB0, is_row_major(b0_layout));
-    StrideB1 = get_default_stride(K, N, StrideB1, is_row_major(b1_layout));
+    StrideB0 = get_default_stride(K, N, StrideB0, ck_tile::is_row_major(b0_layout));
+    StrideB1 = get_default_stride(K, N, StrideB1, ck_tile::is_row_major(b1_layout));
 
-    StrideD0 = get_default_stride(M, N, StrideD0, is_row_major(d0_layout));
-    StrideD1 = get_default_stride(M, N, StrideD1, is_row_major(d1_layout));
+    StrideD0 = get_default_stride(M, N, StrideD0, ck_tile::is_row_major(d0_layout));
+    StrideD1 = get_default_stride(M, N, StrideD1, ck_tile::is_row_major(d1_layout));
 
-    StrideE = get_default_stride(M, N, StrideE, is_row_major(e_layout));
+    StrideE = get_default_stride(M, N, StrideE, ck_tile::is_row_major(e_layout));
 
     ck_tile::HostTensor<A0DataType> a0_m_k_tesnor(
-        host_tensor_descriptor(M, K, StrideA0, is_row_major(a0_layout)));
+        host_tensor_descriptor(M, K, StrideA0, ck_tile::is_row_major(a0_layout)));
     ck_tile::HostTensor<A1DataType> a1_m_k_tesnor(
-        host_tensor_descriptor(M, K, StrideA1, is_row_major(a1_layout)));
+        host_tensor_descriptor(M, K, StrideA1, ck_tile::is_row_major(a1_layout)));
 
     ck_tile::HostTensor<B0DataType> b0_k_n_tensors(
-        host_tensor_descriptor(K, N, StrideB0, is_row_major(b0_layout)));
+        host_tensor_descriptor(K, N, StrideB0, ck_tile::is_row_major(b0_layout)));
     ck_tile::HostTensor<B1DataType> b1_k_n_tensors(
-        host_tensor_descriptor(K, N, StrideB1, is_row_major(b1_layout)));
+        host_tensor_descriptor(K, N, StrideB1, ck_tile::is_row_major(b1_layout)));
 
     ck_tile::HostTensor<D0DataType> d0_m_n_tensors(
-        host_tensor_descriptor(M, N, StrideD0, is_row_major(d0_layout)));
+        host_tensor_descriptor(M, N, StrideD0, ck_tile::is_row_major(d0_layout)));
     ck_tile::HostTensor<D1DataType> d1_m_n_tensors(
-        host_tensor_descriptor(M, N, StrideD1, is_row_major(d1_layout)));
+        host_tensor_descriptor(M, N, StrideD1, ck_tile::is_row_major(d1_layout)));
 
     ck_tile::HostTensor<EDataType> e_m_n_device_result(
-        host_tensor_descriptor(M, N, StrideE, is_row_major(e_layout)));
+        host_tensor_descriptor(M, N, StrideE, ck_tile::is_row_major(e_layout)));
 
     ck_tile::FillUniformDistribution<A0DataType>{-1.f, 1.f}(a0_m_k_tesnor);
     ck_tile::FillUniformDistribution<A1DataType>{-1.f, 1.f}(a1_m_k_tesnor);
@@ -238,11 +238,11 @@ int run_gemm_multi_abd_example_with_layouts(int argc,
     e_m_n_dev_buf.FromDevice(e_m_n_device_result.data());
 
     ck_tile::HostTensor<A0DataType> a_m_k_host_ref_element_result(
-        host_tensor_descriptor(M, K, StrideA0, is_row_major(a0_layout)));
+        host_tensor_descriptor(M, K, StrideA0, ck_tile::is_row_major(a0_layout)));
     ck_tile::HostTensor<B0DataType> b_k_n_host_ref_element_result(
-        host_tensor_descriptor(K, N, StrideB0, is_row_major(b0_layout)));
+        host_tensor_descriptor(K, N, StrideB0, ck_tile::is_row_major(b0_layout)));
     ck_tile::HostTensor<EDataType> e_m_n_host_ref(
-        host_tensor_descriptor(M, N, StrideE, is_row_major(e_layout)));
+        host_tensor_descriptor(M, N, StrideE, ck_tile::is_row_major(e_layout)));
     a_m_k_host_ref_element_result.SetZero();
     b_k_n_host_ref_element_result.SetZero();
     e_m_n_host_ref.SetZero();
