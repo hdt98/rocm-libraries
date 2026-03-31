@@ -68,6 +68,13 @@ namespace rocRoller
             std::unordered_map<int, std::vector<size_t>> modelledAddresses;
 
             /**
+            * Pre-computed swizzled LDS offsets: (baseOffsetTag, colVal) -> assignTag.
+            * Set by AssignIndexExpressions for swizzled LDS loads.
+            * Read by LoadStoreTileGenerator::getOffset() to skip inline swizzle ALU.
+            */
+            std::map<std::pair<int, unsigned int>, int> swizzlePrecomputed;
+
+            /**
             * Set up the coordinate graph and transducer for existing transformers.
             */
             void initializeTransformersForCodeGen(rocRoller::Expression::ExpressionTransducer);

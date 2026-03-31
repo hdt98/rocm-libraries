@@ -350,37 +350,51 @@ namespace rocRoller
                         auto colVal = getUnsignedInt(evaluate(colOnlyExpr));
                         if(colVal > 0)
                         {
-                            auto cacheKey = std::make_pair(info.rowOffsetReg.get(),
-                                                           static_cast<unsigned int>(colVal));
-                            auto it       = m_swizzleCache.find(cacheKey);
-                            if(it != m_swizzleCache.end())
+                            // Check for pre-computed swizzle register (placed before K loop)
+                            auto precompKey
+                                = std::make_pair(offsetTag, static_cast<unsigned int>(colVal));
+                            auto preIt = m_graph->swizzlePrecomputed.find(precompKey);
+                            if(preIt != m_graph->swizzlePrecomputed.end())
                             {
-                                info.rowOffsetReg = it->second;
+                                info.rowOffsetReg
+                                    = m_context->registerTagManager()->getRegister(preIt->second);
                             }
                             else
                             {
-                                auto macTileTag = m_graph->mapper.get<MacroTile>(info.tag);
-                                auto macTile = m_graph->coordinates.getNode<MacroTile>(macTileTag);
-                                auto thrTile = ThreadTile(macTile);
-                                auto K    = static_cast<unsigned int>(thrTile.wsizes.at(kSubdim));
-                                auto Keff = std::min(K, 8u);
-                                auto colMask = (Keff - 1u) << 4;
+                                // Fallback: compute inline (for non-precomputed cases)
+                                auto cacheKey = std::make_pair(info.rowOffsetReg.get(),
+                                                               static_cast<unsigned int>(colVal));
+                                auto it       = m_swizzleCache.find(cacheKey);
+                                if(it != m_swizzleCache.end())
+                                {
+                                    info.rowOffsetReg = it->second;
+                                }
+                                else
+                                {
+                                    auto macTileTag = m_graph->mapper.get<MacroTile>(info.tag);
+                                    auto macTile
+                                        = m_graph->coordinates.getNode<MacroTile>(macTileTag);
+                                    auto thrTile = ThreadTile(macTile);
+                                    auto K = static_cast<unsigned int>(thrTile.wsizes.at(kSubdim));
+                                    auto Keff    = std::min(K, 8u);
+                                    auto colMask = (Keff - 1u) << 4;
 
-                                // new = ((base + colVal) & colMask) | (base & ~colMask)
-                                auto base = info.rowOffsetReg->expression();
-                                auto newCol
-                                    = (base
-                                       + Expression::literal(static_cast<unsigned int>(colVal)))
-                                      & Expression::literal(colMask);
-                                auto rowBits  = base & Expression::literal(~colMask);
-                                auto combined = newCol | rowBits;
+                                    // new = ((base + colVal) & colMask) | (base & ~colMask)
+                                    auto base = info.rowOffsetReg->expression();
+                                    auto newCol
+                                        = (base
+                                           + Expression::literal(static_cast<unsigned int>(colVal)))
+                                          & Expression::literal(colMask);
+                                    auto rowBits  = base & Expression::literal(~colMask);
+                                    auto combined = newCol | rowBits;
 
-                                auto tmp
-                                    = info.rowOffsetReg->placeholder(Register::Type::Vector, {});
-                                co_yield generate(
-                                    tmp, convert(info.rowOffsetReg->variableType(), combined));
-                                m_swizzleCache[cacheKey] = tmp;
-                                info.rowOffsetReg        = tmp;
+                                    auto tmp = info.rowOffsetReg->placeholder(
+                                        Register::Type::Vector, {});
+                                    co_yield generate(
+                                        tmp, convert(info.rowOffsetReg->variableType(), combined));
+                                    m_swizzleCache[cacheKey] = tmp;
+                                    info.rowOffsetReg        = tmp;
+                                }
                             }
                         }
                     }

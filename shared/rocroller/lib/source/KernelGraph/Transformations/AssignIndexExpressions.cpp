@@ -20,6 +20,7 @@
 #include <rocRoller/KernelGraph/Transforms/LowerTile_details.hpp>
 #include <rocRoller/KernelGraph/Transforms/Simplify.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
+#include <rocRoller/KernelOptions_detail.hpp>
 #include <rocRoller/Utilities/Error.hpp>
 
 namespace rocRoller::KernelGraph
@@ -1517,6 +1518,15 @@ namespace rocRoller::KernelGraph
                 // Create Assign nodes for each placeholder
                 for(auto const& nodeInfo : chain.nodeInfos)
                     createAssignsForPlaceholder(kgraph, nodeInfo, m_context, m_command);
+
+                // Pre-compute swizzled LDS offsets for each K-column value.
+                // This places Assign nodes before the K loop so that the loop
+                // body can use pre-computed registers instead of recomputing
+                // the modular-add swizzle every iteration.
+                if(!spec.isStorePartOfGlobalToLDSOp)
+                {
+                    addSwizzlePrecompute(kgraph, candidates, chain, spec);
+                }
             }
 
             return kgraph;
@@ -1652,6 +1662,144 @@ namespace rocRoller::KernelGraph
                 insertAfter(kgraph, nodeInfo.nopTag, assignStrideTag, assignStrideTag);
             if(assignBaseTag != -1)
                 insertAfter(kgraph, nodeInfo.nopTag, assignBaseTag, assignBaseTag);
+        }
+
+        /**
+         * @brief Pre-compute swizzled LDS offsets for a chain.
+         *
+         * For swizzled LDS LoadLDSTile operations, creates Assign nodes that
+         * compute ((base + colVal) & colMask) | (base & ~colMask) for each
+         * K-column value (mfmaId > 0). These are placed after the chain's
+         * base Assign (before the K loop) so getOffset() can use them
+         * instead of recomputing inline.
+         */
+        void addSwizzlePrecompute(KernelGraph&            kgraph,
+                                  std::vector<int> const& candidates,
+                                  IndexChain const&       chain,
+                                  IndexChainSpec const&   spec) const
+        {
+            auto swzMode = m_context->kernelOptions()->ldsSwizzleMode;
+            if(swzMode == LDSBankSwizzleMode::None)
+                return;
+
+            if(candidates.empty())
+                return;
+
+            auto candidate = candidates[0];
+
+            // Check if this candidate is a LoadLDSTile
+            if(!kgraph.control.get<LoadLDSTile>(candidate))
+                return;
+
+            // Get MacroTile to determine layout and K parameters
+            auto macTileTag = kgraph.mapper.get<MacroTile>(candidate);
+            auto macTile    = kgraph.coordinates.getNode<MacroTile>(macTileTag);
+            auto dataType   = getDataType(kgraph.control.getNode(candidate));
+
+            // Skip scale types
+            if(isScaleType(dataType))
+                return;
+
+            bool isA = (swzMode == LDSBankSwizzleMode::Swizzle
+                        || swzMode == LDSBankSwizzleMode::SwizzleA)
+                       && macTile.layoutType == LayoutType::MATRIX_A;
+            bool isB = (swzMode == LDSBankSwizzleMode::Swizzle
+                        || swzMode == LDSBankSwizzleMode::SwizzleB)
+                       && macTile.layoutType == LayoutType::MATRIX_B;
+            if(!isA && !isB)
+                return;
+
+            // Compute K parameters from tile size and element bits
+            int  kDim          = isA ? 1 : 0;
+            auto elementBits   = DataTypeInfo::Get(dataType).elementBits;
+            auto elemsPerChunk = 128u / elementBits;
+            auto tileK         = static_cast<unsigned int>(macTile.sizes.at(kDim));
+            auto K             = tileK / elemsPerChunk;
+            auto Keff          = std::min(K, 8u);
+            auto E             = elemsPerChunk;
+            auto colMask       = (Keff - 1u) << 4;
+
+            // Compute stride in bytes per K-column chunk (E elements * elementBits/8)
+            auto strideKBytes = E * elementBits / 8;
+
+            // Cap at Keff <= 4 to limit register pressure. For K=8 with
+            // scaling + prefetch, the 14 extra VGPRs can exceed the 256
+            // VGPR limit. K=4 adds only 3 VGPRs per matrix (6 total).
+            if(Keff > 4)
+                return;
+
+            // Find the base Offset coordinate tag (subdim 0 for loads).
+            // The connections have already been applied to the candidate.
+            auto baseOffsetTag = kgraph.mapper.get<Offset>(candidate, 0);
+            if(baseOffsetTag < 0)
+                return;
+
+            Log::debug("addSwizzlePrecompute: candidate={} K={} Keff={} E={} "
+                       "strideKBytes={} colMask=0x{:x} baseOffsetTag={}",
+                       candidate,
+                       K,
+                       Keff,
+                       E,
+                       strideKBytes,
+                       colMask,
+                       baseOffsetTag);
+
+            // Create Assign nodes for each mfmaId > 0
+            auto baseExpr = std::make_shared<Expression::Expression>(
+                Expression::DataFlowTag{baseOffsetTag, Register::Type::Vector, DataType::UInt32});
+
+            int lastInsertionPoint = chain.bottom;
+
+            for(unsigned int mfmaId = 1; mfmaId < Keff; ++mfmaId)
+            {
+                auto colVal = mfmaId * strideKBytes;
+
+                // swizzled = ((base + colVal) & colMask) | (base & ~colMask)
+                auto newCol
+                    = (baseExpr + Expression::literal(colVal)) & Expression::literal(colMask);
+                auto rowBits  = baseExpr & Expression::literal(~colMask);
+                auto swizzled = newCol | rowBits;
+                auto expr     = convert(DataType::UInt32, swizzled);
+
+                auto assignNode         = Assign{Register::Type::Vector, expr};
+                assignNode.variableType = DataType::UInt32;
+                auto assignTag          = kgraph.control.addElement(assignNode);
+
+                // Create an Offset edge between two Adhoc nodes so that
+                // trackOffsetAndStride() in AddDeallocate picks it up as
+                // a register to keep alive through all LoadLDSTile users.
+                auto srcNode = kgraph.coordinates.addElement(
+                    Adhoc(fmt::format("SwzSrc_{}_{}", baseOffsetTag, colVal)));
+                auto dstNode = kgraph.coordinates.addElement(
+                    Adhoc(fmt::format("SwzDst_{}_{}", baseOffsetTag, colVal)));
+                auto newOffsetTag = kgraph.coordinates.addElement(Offset(), {srcNode}, {dstNode});
+
+                // Connect the Assign to write to this Offset edge tag
+                kgraph.mapper.connect(assignTag, newOffsetTag, NaryArgument::DEST);
+
+                // Insert after the last insertion point in the control graph
+                insertAfter(kgraph, lastInsertionPoint, assignTag, assignTag);
+                lastInsertionPoint = assignTag;
+
+                // Store in the pre-computed map
+                kgraph.swizzlePrecomputed[{baseOffsetTag, colVal}] = newOffsetTag;
+
+                // Connect all LoadLDSTile candidates to this Offset edge so
+                // AddDeallocate's trackOffsetAndStride() keeps the register
+                // alive through the K loop body. Use high subdimensions
+                // to avoid clashing with the base Offset (subdim 0).
+                for(auto cand : candidates)
+                    kgraph.mapper.connect<Offset>(
+                        cand, newOffsetTag, 100 + static_cast<int>(mfmaId));
+
+                Log::debug("  mfmaId={} colVal={} assignTag={} newOffsetTag={} "
+                           "connected to {} candidates",
+                           mfmaId,
+                           colVal,
+                           assignTag,
+                           newOffsetTag,
+                           candidates.size());
+            }
         }
 
     private:
