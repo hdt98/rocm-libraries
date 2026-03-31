@@ -6,6 +6,9 @@
 #include <flatbuffers/flatbuffers.h>
 
 #include <ck_tile/dispatcher_fmha.hpp>
+#ifdef CK_FMHA_ENABLE_ML_HEURISTIC
+#include <ck_tile/dispatcher/fmha_ml_heuristic.hpp>
+#endif
 #include <hipdnn_plugin_sdk/EngineManager.hpp>
 #include <hipdnn_plugin_sdk/PluginBaseTypes.hpp>
 #include <hipdnn_plugin_sdk/PluginException.hpp>
@@ -90,4 +93,8 @@ struct CkFmhaHandle : HipdnnEnginePluginHandle {
 
     std::unordered_map<const void*, std::unique_ptr<flatbuffers::DetachedBuffer>>
         engine_details_buffers_;
+
+#ifdef CK_FMHA_ENABLE_ML_HEURISTIC
+    std::shared_ptr<ck_tile::dispatcher::FmhaMLHeuristic> ml_heuristic_;
+#endif
 };

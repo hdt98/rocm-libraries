@@ -47,6 +47,25 @@ CkFmhaHandle::CkFmhaHandle() {
     const char* lib_path_env = std::getenv("CK_FMHA_KERNEL_LIB_PATH");
     if (lib_path_env != nullptr) loadSupplementalKernels(lib_path_env);
 
+#ifdef CK_FMHA_ENABLE_ML_HEURISTIC
+    const char* model_path_env = std::getenv("CK_FMHA_ML_MODEL_PATH");
+    if (model_path_env != nullptr) {
+        try {
+            ml_heuristic_ = std::make_shared<ck_tile::dispatcher::FmhaMLHeuristic>(model_path_env,
+                                                                                   registry_.get());
+            if (ml_heuristic_->is_loaded()) {
+                dispatcher_->set_heuristic(
+                    [h = ml_heuristic_](const ck_tile::dispatcher::FmhaProblem& p) {
+                        return (*h)(p);
+                    });
+                HIPDNN_PLUGIN_LOG_INFO("CkFmhaHandle: ML heuristic loaded from " << model_path_env);
+            }
+        } catch (const std::exception& e) {
+            HIPDNN_PLUGIN_LOG_WARN("CkFmhaHandle: ML heuristic failed: " << e.what());
+        }
+    }
+#endif
+
     HIPDNN_PLUGIN_LOG_INFO("CkFmhaHandle: arch=" << gfx_arch_
                                                  << " kernels=" << registry_->get_all().size()
                                                  << " jit=" << (jitEnabled() ? "on" : "off"));
