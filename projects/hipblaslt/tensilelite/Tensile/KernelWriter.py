@@ -2459,7 +2459,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
   ##############################################################################
   # returns list of modules or text
   ##############################################################################
-  def setupNewTile(self, kernel, tensorParametersA, tensorParametersB, isOptNLL=False, forceNoTileCode=False, forceNoGRCode=False, isPrefetchAcrossPersistent=False):
+  def setupNewTile(self, kernel, tensorParametersA, tensorParametersB, isOptNLL=False, forceNoTileCode=False, forceNoGRCode=False, isPrefetchAcrossPersistentActive=False):
     module = Module("setupNewTile")
 
     ####################################
@@ -2469,16 +2469,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     # work-group assignments
     module.addComment1("global read addresses: work-group")
-    if not forceNoTileCode and not isPrefetchAcrossPersistent:
+    if not forceNoTileCode and not isPrefetchAcrossPersistentActive:
       module.add(self.graWorkGroup(kernel, tensorParametersA, tensorParametersB))
-      if self.nllPapActive(kernel):
-        module.add(SMovB32(dst=sgpr("PrevWorkGroup0"), src=sgpr("WorkGroup0"), comment="PAP: keep Prev in sync for ShadowInit SRD"))
-        module.add(SMovB32(dst=sgpr("PrevWorkGroup1"), src=sgpr("WorkGroup1"), comment="PAP: keep Prev in sync for ShadowInit SRD"))
-        module.add(SMovB32(dst=sgpr("PrevWorkGroup2"), src=sgpr("WorkGroup2"), comment="PAP: keep Prev in sync for ShadowInit SRD"))
-        module.add(SMovB32(dst=sgpr("PrevStreamKLocalStart"), src=sgpr("StreamKLocalStart"), comment="PAP: keep Prev in sync for store"))
-        module.add(SMovB32(dst=sgpr("PrevStreamKLocalEnd"), src=sgpr("StreamKLocalEnd"), comment="PAP: keep Prev in sync for store"))
-        if len(kernel["SpaceFillingAlgo"]):
-          module.add(SMovB32(dst=sgpr("PrevStreamKTileID"), src=sgpr("StreamKTileID"), comment="PAP: keep Prev in sync for store"))
+      if self.isPrefetchAcrossPersistentEnabled(kernel):
+        module.add(self.prefetchAcrossPersistentSnapshot(kernel))
 
 
     self.dontAppendCode = forceNoTileCode
@@ -2491,7 +2485,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       tPMRef = tensorParametersB
 
     if kernel["StreamK"] != 0:
-      if not isPrefetchAcrossPersistent:
+      if not isPrefetchAcrossPersistentActive:
         module.add(self.localReadAddresses(kernel, tensorParametersA, tensorParametersB, tPM))
         module.add(self.localWriteAddresses(kernel, tensorParametersA, tensorParametersB, tPM))
 
@@ -2500,7 +2494,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     tdmInited: bool = False
 
     # -- Per-thread offset computation: reused across tiles, skip for PAP --
-    if not isPrefetchAcrossPersistent:
+    if not isPrefetchAcrossPersistentActive:
 
       #TODO: TDM wave separated
       if tdmA and tdmB and prod(kernel["MIWaveGroup"]) > 1:
@@ -2698,7 +2692,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         module.addComment1("global read addresses: addresses b")
         module.add(self.graAddresses(kernel, tensorParametersB))
 
-    if not isPrefetchAcrossPersistent:
+    if not isPrefetchAcrossPersistentActive:
       # workgroup SGPRs no longer needed
       if not tdmA:
         module.add(self.removeGROffsetsVariableSgprsFromPool(kernel))
@@ -2729,7 +2723,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.dontAppendCode = False
     self.dontAppendCode = self.dontAppendCode or forceNoTileCode
 
-    if not isPrefetchAcrossPersistent:
+    if not isPrefetchAcrossPersistentActive:
       # Add increment code
       gsuComponent = Component.GSU.find(self)
       module.add(gsuComponent.setupNewTile(self, kernel, tensorParametersA, tensorParametersB, tPM))
@@ -2762,7 +2756,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # we can't init in shadow of this prefetch
     # since that would initC inside the other summation loops
 
-    if self.states.doShadowInit != 2 and not isPrefetchAcrossPersistent:
+    if self.states.doShadowInit != 2 and not isPrefetchAcrossPersistentActive:
       module.add(self.initC(kernel))
       if kernel["ProblemType"]["Gradient"] and kernel["ProblemType"]["UseBias"] and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B"):
         module.add(self.initSumUnroll(kernel))
@@ -2796,10 +2790,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     # LRO and LWA as assigned
     # init lds read pointers before each unrolled loop
-    # When isPrefetchAcrossPersistent=True, skip: the NLL body still needs the
+    # When isPrefetchAcrossPersistentActive=True, skip: the NLL body still needs the
     # current read pointer position, and the top-of-loop setupNewTile
     # re-initialises these pointers before the next iteration uses them.
-    if not isPrefetchAcrossPersistent:
+    if not isPrefetchAcrossPersistentActive:
       module.addComment0("local read addresses: init pointers a")
       module.add(self.localReadInitPointers(kernel, tensorParametersA, tensorParametersA))
       if kernel["ProblemType"]["MXBlockA"]:
@@ -2818,7 +2812,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         module.addComment0("local write addresses: reset inc")
         module.add(self.localWriteResetOffsets(kernel,  False, tensorParametersA))
 
-    if self.do["executeToInitEnd"] and not isPrefetchAcrossPersistent:
+    if self.do["executeToInitEnd"] and not isPrefetchAcrossPersistentActive:
       module.add(self.functionEnd(kernel, addLabel=False))
 
     ####################################
@@ -2839,7 +2833,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       usePrimedSkip = (
         kernel.get("PrefetchAcrossPersistent")
         and kernel["StreamK"]
-        and not isPrefetchAcrossPersistent
+        and not isPrefetchAcrossPersistentActive
       )
       lbl_prefetchPrimedMerge = Label(self.labels.getNameInc("SK_PrefetchPrimedMerge"), "")
       if usePrimedSkip:
@@ -2885,7 +2879,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         if kernel["DirectToVgprB"]:
           tPB = None
 
-      if not isPrefetchAcrossPersistent:
+      if not isPrefetchAcrossPersistentActive:
         module.add(self.globalReadIncrementAB(kernel, tPA, tPB, self.states.unrollIdx, pfi))
       else:
         module.add(SMovB32(dst=sgpr("SkPrefetchPrimed"), src=1, comment="first PGR for next persistent iter prefetched"))
@@ -3465,7 +3459,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.add(self._syncThreads(kernel, "Wait GR->LW done, sync LDS%u"%self.states.ldsWriteTokenIdx, memoryToken=self.states.ldsWriteTokenIdx))
 
     if (not isOptNLL and not isNGLL and NLLindex == NLLnum - 1
-        and self.prefetchAcrossPersistentActive(kernel)):
+        and self.isPrefetchAcrossPersistentEnabled(kernel)):
       module.add(self.prefetchAcrossPersistent(kernel, tensorParametersA, tensorParametersB))
 
     # generate no Load Loop Body code
@@ -4735,7 +4729,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.states.lastValuAB - self.states.a.startVgprValu, "ValuAB")
     module.addComment1("Tail: add ValuA/B vgpr buffer [%u...%u) to pool" % \
         (self.states.a.startVgprValu, self.states.lastValuAB))
-    if not self.prefetchAcrossPersistentActive(kernel):
+    if not self.isPrefetchAcrossPersistentEnabled(kernel):
       self.vgprPool.add(self.states.lastValuAB , \
           self.states.lastVgprForReads - self.states.lastValuAB, "address vgpr")
       module.addComment1("Tail: add address/G2L vgpr [%u...%u) to pool" % \
@@ -8627,7 +8621,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
   ##############################################################################
   # PAP: helper accessors for store-visible state
   ##############################################################################
-  def prefetchAcrossPersistentActive(self, kernel):
+  def isPrefetchAcrossPersistentEnabled(self, kernel):
     """Return True when PAP is enabled for this kernel."""
     return (kernel["StreamK"] == 3
             and kernel.get("PrefetchAcrossPersistent", 0)
@@ -8642,7 +8636,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     state.  Store/fixup paths must read the snapshotted PrevWorkGroup*
     instead.
     """
-    if self.prefetchAcrossPersistentActive(kernel):
+    if self.isPrefetchAcrossPersistentEnabled(kernel):
       return "PrevWorkGroup%u" % dim
     return "WorkGroup%u" % dim
 
@@ -8652,7 +8646,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     Accepted *sgprName* values: ``StreamKLocalStart``,
     ``StreamKLocalEnd``, ``StreamKTileID``.
     """
-    if self.prefetchAcrossPersistentActive(kernel):
+    if self.isPrefetchAcrossPersistentEnabled(kernel):
       return "Prev" + sgprName
     return sgprName
 
