@@ -32,33 +32,15 @@ from codegen.ops.fmha_fwd import (
     FMHA_FWD_API_PER_ARCH,
     FMHA_FWD_API_PER_DTYPE,
     FMHA_FWD_API_PER_HDIM_CASE,
+    SINK_MODE_MAP,
+    SINK_MODE_DISPATCH_MAP,
+    SINK_NAME_MAP,
 )
 
 
 FMHA_FWD_SPLITKV_PIPELINE_MAP = {
     "qr": "ck_tile::BlockFmhaFwdSplitKVPipelineQRKSVS",
     "qr_nwarp_sshuffle": "ck_tile::BlockFmhaFwdSplitKVPipelineNWarpSShuffleQRKSVS",
-}
-
-SINK_MODE_MAP = {
-    "none": "ck_tile::FmhaSinkMode::kNone",
-    "stream": "ck_tile::FmhaSinkMode::kStreamLLM",
-    "gptoss": "ck_tile::FmhaSinkMode::kGptOss",
-    "both": "ck_tile::FmhaSinkMode::kBoth",
-}
-
-SINK_MODE_DISPATCH_MAP = {
-    "none": ("false", "false"),
-    "stream": ("true", "false"),
-    "gptoss": ("false", "true"),
-    "both": ("true", "true"),
-}
-
-SINK_NAME_MAP = {
-    "none": "_nsink",
-    "stream": "_ssink",
-    "gptoss": "_gsink",
-    "both": "_bsink",
 }
 
 FMHA_FWD_SPLITKV_KERNEL_BODY = """
