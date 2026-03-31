@@ -43,12 +43,10 @@ auto calculateRtolAtol(const index_t k_dim,
     using ComputeType =
         std::conditional_t<sizeof(ADataType) < sizeof(BDataType), ADataType, BDataType>;
     // Calculate thresholds
-    const auto relative_tolerance =
-        get_relative_threshold<ComputeType, CDataType, AccDataType>(
-            integer_divide_ceil(k_dim, k_batch));
-    const auto absolute_tolerance =
-        get_absolute_threshold<ComputeType, CDataType, AccDataType>(
-            max_accumulated_value / k_batch, integer_divide_ceil(k_dim, k_batch));
+    const auto relative_tolerance = get_relative_threshold<ComputeType, CDataType, AccDataType>(
+        integer_divide_ceil(k_dim, k_batch));
+    const auto absolute_tolerance = get_absolute_threshold<ComputeType, CDataType, AccDataType>(
+        max_accumulated_value / k_batch, integer_divide_ceil(k_dim, k_batch));
     // Calculate error due to multiple WGs working in the same C macro tile
     const auto relative_tolerance_split_k =
         get_relative_threshold<CDataType, CDataType, CDataType>(k_batch);
@@ -78,12 +76,10 @@ auto calculateRtolAtol(const index_t k_dim,
     using ComputeType =
         std::conditional_t<sizeof(ComputeTypeAB) < sizeof(D0DataType), ComputeTypeAB, D0DataType>;
     // Calculate thresholds
-    const auto relative_tolerance =
-        get_relative_threshold<ComputeType, EDataType, AccDataType>(
-            integer_divide_ceil(k_dim, k_batch));
-    const auto absolute_tolerance =
-        get_absolute_threshold<ComputeType, EDataType, AccDataType>(
-            max_accumulated_value / k_batch, integer_divide_ceil(k_dim, k_batch));
+    const auto relative_tolerance = get_relative_threshold<ComputeType, EDataType, AccDataType>(
+        integer_divide_ceil(k_dim, k_batch));
+    const auto absolute_tolerance = get_absolute_threshold<ComputeType, EDataType, AccDataType>(
+        max_accumulated_value / k_batch, integer_divide_ceil(k_dim, k_batch));
     // Calculate error due to multiple WGs working in the same E macro tile
     const auto relative_tolerance_split_k =
         get_relative_threshold<EDataType, EDataType, EDataType>(k_batch);

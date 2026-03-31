@@ -104,8 +104,9 @@ int run_gemm_example_with_layouts_universal(ck_tile::ArgParser& arg_parser,
         // Verify results
         const float max_accumulated_value =
             *std::max_element(c_m_n_ref.mData.begin(), c_m_n_ref.mData.end());
-        const auto rtol_atol = ck_tile::calculateRtolAtol<ADataType, BDataType, AccDataType, CDataType>(
-            K, kbatch, max_accumulated_value);
+        const auto rtol_atol =
+            ck_tile::calculateRtolAtol<ADataType, BDataType, AccDataType, CDataType>(
+                K, kbatch, max_accumulated_value);
         bool pass = do_verify(c_m_n_dev_result, c_m_n_ref, rtol_atol, "CPU");
 
         std::cout << "Async input scheduler test: " << (pass ? "PASS" : "FAIL") << std::endl;

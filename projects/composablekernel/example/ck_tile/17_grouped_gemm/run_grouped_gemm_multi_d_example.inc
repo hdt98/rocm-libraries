@@ -342,8 +342,8 @@ int run_grouped_gemm_multi_d_example_with_layouts(int argc,
             const float max_accumulated_value =
                 *std::max_element(e_m_n_host_refs[i].mData.begin(), e_m_n_host_refs[i].mData.end());
 
-            const auto rtol_atol =
-                ck_tile::calculateRtolAtol<ADataType, BDataType, D0DataType, EDataType, AccDataType>(
+            const auto rtol_atol = ck_tile::
+                calculateRtolAtol<ADataType, BDataType, D0DataType, EDataType, AccDataType>(
                     Ks[i], 1, max_accumulated_value);
 
             pass &=

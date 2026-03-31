@@ -717,8 +717,9 @@ int run_gemm_example_with_layouts_two_stage(ck_tile::ArgParser& arg_parser,
             a_m_k, b_k_n, c_m_n_host_ref);
         const float max_accumulated_value =
             *std::max_element(c_m_n_host_ref.mData.begin(), c_m_n_host_ref.mData.end());
-        const auto rtol_atol = ck_tile::calculateRtolAtol<ADataType, BDataType, AccDataType, CDataType>(
-            K, kbatch, max_accumulated_value);
+        const auto rtol_atol =
+            ck_tile::calculateRtolAtol<ADataType, BDataType, AccDataType, CDataType>(
+                K, kbatch, max_accumulated_value);
         pass = ck_tile::check_err(c_m_n_dev_result,
                                   c_m_n_host_ref,
                                   "Error: Incorrect results!",
@@ -767,8 +768,9 @@ int run_gemm_example_with_layouts_two_stage(ck_tile::ArgParser& arg_parser,
 
         const float max_accumulated_value =
             *std::max_element(c_m_n_gpu_ref.mData.begin(), c_m_n_gpu_ref.mData.end());
-        const auto rtol_atol = ck_tile::calculateRtolAtol<ADataType, BDataType, AccDataType, CDataType>(
-            K, kbatch, max_accumulated_value);
+        const auto rtol_atol =
+            ck_tile::calculateRtolAtol<ADataType, BDataType, AccDataType, CDataType>(
+                K, kbatch, max_accumulated_value);
         pass = ck_tile::check_err(c_m_n_dev_result,
                                   c_m_n_gpu_ref,
                                   "Error: Incorrect results!",
