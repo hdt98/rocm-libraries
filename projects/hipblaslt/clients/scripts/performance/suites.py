@@ -128,6 +128,82 @@ def matmul_set_6():
     problemlist = [Problem(args={"--log_function_name" : "" , "--yaml" : "matmul_probset6_bench.yaml"})]
     yield ProblemSet(benchType="matmul", name="benchset_6", problems=problemlist)
 
+def matmul_mxfp8_gfx1250_poc():
+    """gfx1250 MXFP8 minimal POC benchset."""
+
+    base = {
+        "--log_function_name": "",
+        "--api_method": "cpp",
+        "--algo_method": "heuristic",
+        "--requested_solution": "1",
+        "--print_kernel_info": "",
+        "--a_type": "f8_r",
+        "--b_type": "f8_r",
+        "--c_type": "f32_r",
+        "--d_type": "f32_r",
+        "--compute_type": "f32_r",
+        "--transA": "T",
+        "--transB": "N",
+        "--alpha": "1",
+        "--beta": "0",
+        "--iters": "10",
+        "--cold_iters": "2",
+        "--rotating": "512",
+    }
+
+    vec32_256 = dict(base)
+    vec32_256.update({
+        "--sizem": "256",
+        "--sizen": "256",
+        "--sizek": "256",
+        "--scaleA": "3",
+        "--scaleB": "3",
+    })
+
+    vec32_4096 = dict(base)
+    vec32_4096.update({
+        "--sizem": "4096",
+        "--sizen": "4096",
+        "--sizek": "4096",
+        "--scaleA": "3",
+        "--scaleB": "3",
+    })
+
+    preswizzle_256 = dict(base)
+    preswizzle_256.update({
+        "--sizem": "256",
+        "--sizen": "256",
+        "--sizek": "256",
+        "--scaleA": "1001",
+        "--scaleB": "1001",
+        "--swizzleA": "",
+        "--swizzleB": "",
+    })
+
+    preswizzle_4096 = dict(base)
+    preswizzle_4096.update({
+        "--sizem": "4096",
+        "--sizen": "4096",
+        "--sizek": "4096",
+        "--scaleA": "1001",
+        "--scaleB": "1001",
+        "--swizzleA": "",
+        "--swizzleB": "",
+    })
+
+    problemlist = [
+        Problem(args=vec32_256),
+        Problem(args=vec32_4096),
+        Problem(args=preswizzle_256),
+        Problem(args=preswizzle_4096),
+    ]
+    yield ProblemSet(benchType="matmul", name="mxfp8_gfx1250_poc", problems=problemlist)
+
+def mxfp8_gfx1250_poc():
+    """Alias entry for --suite mxfp8_gfx1250_poc."""
+
+    yield from matmul_mxfp8_gfx1250_poc()
+
 def ci_perf_job():
     """run basic job for PR-CI"""
 
@@ -180,7 +256,12 @@ def all(problems_dir=None):
         yield from api_overhead()
         yield from amax_set_1()
 
-        if "gfx942" in target_arch:
+        if "gfx1250" in target_arch:
+            # Dedicated MXFP8 coverage for gfx1250 bring-up.
+            yield from matmul_mxfp8_gfx1250_poc()
+            # Keep existing general set for signal continuity.
+            yield from matmul_set_3()
+        elif "gfx942" in target_arch:
             # Put focused tests set for gfx942
             yield from matmul_set_1() # this problemset is an initial test example for gfx942
             yield from matmul_set_2()

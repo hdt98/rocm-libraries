@@ -754,7 +754,34 @@ def run():
     archs, requestedPredicateMap = splitArchsFromPredicates(archs)
 
     targetIsas = [gfxToIsa(a) for a in archs]
-    isaInfoMap = makeIsaInfoMap(targetIsas, cxxCompiler)
+    isaInfoTargets = list(targetIsas)
+    gfx1250Isa = gfxToIsa("gfx1250")
+    # Coverage expansion for gfx1250:
+    # allow multiple fallback logic families, prioritized by order.
+    gfx1250LogicFallbacks = ["gfx1201", "gfx1200"]
+    fallbackEnv = os.environ.get("HIPBLASLT_GFX1250_LOGIC_FALLBACKS", "")
+    if fallbackEnv.strip():
+        gfx1250LogicFallbacks = [a.strip() for a in fallbackEnv.split(",") if a.strip()]
+
+    fallbackIsas = []
+    for fallbackArch in gfx1250LogicFallbacks:
+        try:
+            fallbackIsa = gfxToIsa(fallbackArch)
+        except Exception:
+            printWarning(f"Unknown gfx1250 fallback architecture '{fallbackArch}', ignoring.")
+            continue
+        fallbackIsas.append((fallbackArch, fallbackIsa))
+        if gfx1250Isa in targetIsas and fallbackIsa not in isaInfoTargets:
+            isaInfoTargets.append(fallbackIsa)
+
+    isaInfoMap = makeIsaInfoMap(isaInfoTargets, cxxCompiler)
+    if gfx1250Isa in targetIsas:
+        for fallbackArch, fallbackIsa in fallbackIsas:
+            if fallbackIsa in isaInfoMap:
+                # Reuse fallback capability table for solution filtering while
+                # still emitting gfx1250 code objects.
+                isaInfoMap[gfx1250Isa] = isaInfoMap[fallbackIsa]
+                break
     assignGlobalParameters(arguments, isaInfoMap)
 
     asmToolchain = makeAssemblyToolchain(
@@ -786,12 +813,25 @@ def run():
     else:
         printExit(f"Unrecognized LogicFormat: {arguments['LogicFormat']}")
 
+    logicArchAliases = {
+        "gfx1250": gfx1250LogicFallbacks,
+    }
+    logicMatchArchs = list(archs)
+    for arch in archs:
+        aliases = logicArchAliases.get(arch, [])
+        if isinstance(aliases, str):
+            aliases = [aliases]
+        for aliasArch in aliases:
+            if aliasArch not in logicMatchArchs:
+                logicMatchArchs.append(aliasArch)
+    print1(f"# Logic aliases:    {', '.join(logicMatchArchs)}")
+
     def archMatch(arch: str, archs: List[str]):
         return (arch in archs) or any(a.startswith(arch) for a in archs)
 
     def validLogicFile(p: Path):
         return p.suffix == logicExtFormat and (
-            "all" in archs or archMatch(load_logic_gfx_arch(p), archs)
+            "all" in logicMatchArchs or archMatch(load_logic_gfx_arch(p), logicMatchArchs)
         )
 
     globPattern = os.path.join(
@@ -883,19 +923,33 @@ def run():
     LibraryIO.write(filename, libraryMapping, "msgpack")
 
     start_msl = timer()
+    reverseLogicAliases = {}
+    for fallbackArch in gfx1250LogicFallbacks:
+        reverseLogicAliases[fallbackArch] = "gfx1250"
     for archName, newMasterLibrary in masterLibraries.items():
-        if archName in archs:
-            if arguments["LazyLibraryLoading"]:
-                masterFile = os.path.join(newLibraryDir, "TensileLibrary_lazy_" + archName)
+        outputArchName = archName
+        if archName not in archs:
+            aliasedArch = reverseLogicAliases.get(archName)
+            if aliasedArch is None:
+                for sourceArch, targetArch in reverseLogicAliases.items():
+                    if archName.startswith(sourceArch):
+                        aliasedArch = targetArch
+                        break
+            if aliasedArch in archs:
+                outputArchName = aliasedArch
             else:
-                masterFile = os.path.join(newLibraryDir, "TensileLibrary_" + archName)
-            newMasterLibrary.applyNaming(splitGSU)
-            LibraryIO.write(masterFile, state(newMasterLibrary), arguments["LibraryFormat"])
+                continue
+        if arguments["LazyLibraryLoading"]:
+            masterFile = os.path.join(newLibraryDir, "TensileLibrary_lazy_" + outputArchName)
+        else:
+            masterFile = os.path.join(newLibraryDir, "TensileLibrary_" + outputArchName)
+        newMasterLibrary.applyNaming(splitGSU)
+        LibraryIO.write(masterFile, state(newMasterLibrary), arguments["LibraryFormat"])
 
-            ParallelMap2(writeMsl,
-                         newMasterLibrary.lazyLibraries.items(),
-                         "Writing master solution libraries",
-                         return_as="list")
+        ParallelMap2(writeMsl,
+                     newMasterLibrary.lazyLibraries.items(),
+                     "Writing master solution libraries",
+                     return_as="list")
     stop_msl = timer()
     print(f"Time to write master solution libraries (s): {(stop_msl-start_msl):3.2f}")
 

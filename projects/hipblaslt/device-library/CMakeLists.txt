@@ -83,5 +83,10 @@ add_custom_target(tensilelite-device-libraries ALL
     DEPENDS "${output_stamp}"
 )
 
-add_subdirectory(extops)
+option(HIPBLASLT_ENABLE_EXTOPS "Build hipBLASLt extops device library" OFF)
+if(HIPBLASLT_ENABLE_EXTOPS)
+    add_subdirectory(extops)
+else()
+    message(STATUS "Skipping extops device-library generation.")
+endif()
 add_subdirectory(matrix-transform)

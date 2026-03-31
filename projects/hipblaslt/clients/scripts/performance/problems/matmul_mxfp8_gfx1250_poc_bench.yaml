@@ -1,0 +1,103 @@
+---
+include: ../../../tests/data/hipblaslt_common.yaml
+include: ../../../tests/data/matmul_common.yaml
+
+Definitions:
+  # Preswizzled MX path (Block_32_UE8M0_32_8_EXT)
+  - &mxf8_mxfp8_precision_dst_fp32_preswizzled
+    { a_type: f8_r, b_type: f8_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scaleA: 1001, scaleB: 1001, scale_type: f32_r, swizzle_a: true, swizzle_b: true}
+
+Tests:
+- name: matmul_mxfp8_gfx1250_poc_vec32_256
+  category: pre_checkin
+  function:
+    matmul:
+      - { a_type: f8_r, b_type: f8_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scaleA: 3, scaleB: 3, scale_type: f32_r }
+  matrix_size: [ { M: 256, N: 256, K: 256 } ]
+  initialization: trig_float
+  transA: T
+  transB: N
+  gpu_arch: 'gfx1250'
+  algo_method: 2
+  solution_index: 195
+  api_method: 2
+  print_kernel_info: true
+  iters: 10
+  cold_iters: 2
+  rotating: 512
+
+- name: matmul_mxfp8_gfx1250_poc_vec32_4096
+  category: pre_checkin
+  function:
+    matmul:
+      - { a_type: f8_r, b_type: f8_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scaleA: 3, scaleB: 3, scale_type: f32_r }
+  matrix_size: [ { M: 4096, N: 4096, K: 4096 } ]
+  initialization: trig_float
+  transA: T
+  transB: N
+  gpu_arch: 'gfx1250'
+  algo_method: 2
+  solution_index: 198
+  api_method: 2
+  print_kernel_info: true
+  iters: 10
+  cold_iters: 2
+  rotating: 512
+
+- name: matmul_mxfp8_gfx1250_poc_preswizzled_256
+  category: pre_checkin
+  function:
+    matmul:
+      - { a_type: f8_r, b_type: f8_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scaleA: 1001, scaleB: 1001, scale_type: f32_r, swizzle_a: true, swizzle_b: true }
+  matrix_size: [ { M: 256, N: 256, K: 256 } ]
+  initialization: trig_float
+  transA: T
+  transB: N
+  gpu_arch: 'gfx1250'
+  algo_method: 2
+  solution_index: 195
+  api_method: 2
+  print_kernel_info: true
+  iters: 10
+  cold_iters: 2
+  rotating: 512
+
+- name: matmul_mxfp8_gfx1250_poc_preswizzled_4096
+  category: pre_checkin
+  function:
+    matmul:
+      - { a_type: f8_r, b_type: f8_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scaleA: 1001, scaleB: 1001, scale_type: f32_r, swizzle_a: true, swizzle_b: true }
+  matrix_size: [ { M: 4096, N: 4096, K: 4096 } ]
+  initialization: trig_float
+  transA: T
+  transB: N
+  gpu_arch: 'gfx1250'
+  algo_method: 2
+  solution_index: 198
+  api_method: 2
+  print_kernel_info: true
+  iters: 10
+  cold_iters: 2
+  rotating: 512
+
+- name: matmul_mxfp8_gfx1250_poc_extension
+  category: nightly
+  function:
+    matmul:
+      - { a_type: f8_r, b_type: f8_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scaleA: 3, scaleB: 3, scale_type: f32_r }
+      - { a_type: f8_r, b_type: f8_r, c_type: f32_r, d_type: f32_r, compute_type: c_f32_r, scaleA: 1001, scaleB: 1001, scale_type: f32_r, swizzle_a: true, swizzle_b: true }
+  matrix_size:
+    - { M: 7168, N: 4096, K: 16384 }
+  initialization: trig_float
+  transA: T
+  transB: N
+  gpu_arch: 'gfx1250'
+  # Keep extension on heuristic for future coverage expansion.
+  requested_solution_num: 1
+  algo_method: 0
+  api_method: 2
+  print_kernel_info: true
+  iters: 10
+  cold_iters: 2
+  rotating: 512
+...
