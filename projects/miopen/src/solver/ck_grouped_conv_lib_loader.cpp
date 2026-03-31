@@ -74,9 +74,8 @@ std::string GetMIOpenLibDir()
     Dl_info info;
     if(dladdr(reinterpret_cast<void*>(miopenCreate), &info) != 0)
     {
-        char* real = realpath(info.dli_fname, nullptr);
-        std::string path(real ? real : info.dli_fname);
-        free(real);
+        std::unique_ptr<char, decltype(&free)> real(realpath(info.dli_fname, nullptr), free);
+        std::string path(real != nullptr ? real.get() : info.dli_fname);
         auto slash = path.rfind('/');
         if(slash != std::string::npos)
             return path.substr(0, slash);
@@ -168,6 +167,7 @@ void CKGroupedConvLibLoader::LoadLibrary(const std::string& device_name)
     constexpr int flags = RTLD_NOW | RTLD_NODELETE;
     auto try_load = [](const std::string& path) -> void* { return dlopen(path.c_str(), flags); };
     auto get_load_error = []() -> std::string {
+        // NOLINTNEXTLINE(concurrency-mt-unsafe)
         const char* err = dlerror();
         return err ? err : "unknown error";
     };
@@ -263,7 +263,8 @@ bool CKGroupedConvLibLoader::LoadSymbols()
         member = reinterpret_cast<decltype(member)>(dlsym(lib_handle_, #name)); \
         if(member == nullptr)                                                   \
         {                                                                       \
-            MIOPEN_LOG_W("dlsym failed for " #name ": " << dlerror());          \
+            MIOPEN_LOG_W("dlsym failed for " #name ": "                         \
+                         << dlerror()); /* NOLINT(concurrency-mt-unsafe) */     \
             return false;                                                       \
         }                                                                       \
     } while(false)
