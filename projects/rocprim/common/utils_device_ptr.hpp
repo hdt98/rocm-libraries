@@ -78,6 +78,7 @@ public:
 
         size_type storage_size = number_of_ele_ * value_size;
         HIP_CHECK(common::hipMallocHelper(&device_raw_ptr_, storage_size));
+		std::cout << data.data() << ", " << device_raw_ptr_ << std::endl;
         HIP_CHECK(hipMemcpy(device_raw_ptr_, data.data(), storage_size, hipMemcpyHostToDevice));
     }
 
@@ -527,11 +528,17 @@ public:
     /// This function will store loaded values into std::vector
     auto load() const
     {
+		std::cout << "allocating host vector" << std::endl;
+		std::cout.flush();
         std::vector<value_type> ret(number_of_ele_);
+		std::cout << "calling hipMemcpy" << std::endl;
+		std::cout.flush();
         HIP_CHECK(hipMemcpy(ret.data(),
                             device_raw_ptr_,
                             number_of_ele_ * value_size,
                             hipMemcpyDeviceToHost));
+		std::cout << "Completed hipMemcpy" << std::endl;
+		std::cout.flush();
         return ret;
     }
 
