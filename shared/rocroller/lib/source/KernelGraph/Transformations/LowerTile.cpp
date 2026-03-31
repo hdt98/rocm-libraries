@@ -901,21 +901,25 @@ namespace rocRoller
             if(ldsSwizzle && isGlobalToLDS && macTile.layoutType == LayoutType::MATRIX_B)
             {
                 using namespace Expression;
-                auto K = thrTile.wsizes.at(0);
-                auto R = 16u / K;
+                auto K    = thrTile.wsizes.at(0);
+                auto Keff = std::min<unsigned int>(K, 8u);
+                auto R    = 16u / Keff;
 
-                auto K_lit = literal(K);
-                auto logR  = literal(static_cast<unsigned int>(__builtin_ctz(R)));
+                auto Keff_lit = literal(Keff);
+                auto logR     = literal(static_cast<unsigned int>(__builtin_ctz(R)));
 
                 auto nThrY_ref = std::make_shared<rocRoller::Expression::Expression>(
                     DataFlowTag{nThrY, Register::Type::Vector, DataType::UInt32});
 
-                auto rev_arg0  = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
-                auto ldsRowId  = nThrY_ref >> logR;
-                auto swap_mask = (ldsRowId ^ literal(1u)) & literal(1u);
-                auto swap_col  = rev_arg0 ^ swap_mask;
-                auto gr_rot    = K_lit - ((ldsRowId >> literal(1u)) << literal(1u));
-                auto swizzled  = (swap_col + gr_rot) & (K_lit - literal(1u));
+                auto rev_arg0 = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
+                auto col_lo   = rev_arg0 & (Keff_lit - literal(1u));
+                auto col_hi   = rev_arg0 >> literal(static_cast<unsigned int>(__builtin_ctz(Keff)));
+                auto ldsRowId = nThrY_ref >> logR;
+                auto swap_mask   = (ldsRowId ^ literal(1u)) & literal(1u);
+                auto swap_col    = col_lo ^ swap_mask;
+                auto gr_rot      = Keff_lit - ((ldsRowId >> literal(1u)) << literal(1u));
+                auto swizzled_lo = (swap_col + gr_rot) & (Keff_lit - literal(1u));
+                auto swizzled    = col_hi * Keff_lit + swizzled_lo;
 
                 auto fwd_arg0 = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
                 ExpressionTransform grSwizzle{{fwd_arg0}, {swizzled}};
@@ -924,7 +928,7 @@ namespace rocRoller
                 graph.coordinates.addElement(grSwizzle, {grSwizzleNThrX}, {nThrX});
 
                 auto logger = rocRoller::Log::getLogger();
-                logger->info("GR swizzle B: K={} R={}", K, R);
+                logger->info("GR swizzle B: K={} Keff={} R={}", K, Keff, R);
             }
 
             if(jammedTiles.size() > 0 && jammedTiles[0] > 1)
@@ -976,11 +980,12 @@ namespace rocRoller
             if(ldsSwizzle && isGlobalToLDS && macTile.layoutType == LayoutType::MATRIX_A)
             {
                 using namespace Expression;
-                auto K = thrTile.wsizes.at(1);
-                auto R = 16u / K;
+                auto K    = thrTile.wsizes.at(1);
+                auto Keff = std::min<unsigned int>(K, 8u);
+                auto R    = 16u / Keff;
 
-                auto K_lit = literal(K);
-                auto logR  = literal(static_cast<unsigned int>(__builtin_ctz(R)));
+                auto Keff_lit = literal(Keff);
+                auto logR     = literal(static_cast<unsigned int>(__builtin_ctz(R)));
 
                 // nThrX via DataFlowTag -- resolved to its expression during traversal
                 auto nThrX_ref = std::make_shared<rocRoller::Expression::Expression>(
@@ -988,12 +993,15 @@ namespace rocRoller
 
                 // Reverse expression: computes grSwizzleNThrY from nThrY
                 // $0 = nThrY (col index within the thread-tile-number space)
-                auto rev_arg0  = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
-                auto ldsRowId  = nThrX_ref >> logR;
-                auto swap_mask = (ldsRowId ^ literal(1u)) & literal(1u);
-                auto swap_col  = rev_arg0 ^ swap_mask;
-                auto gr_rot    = K_lit - ((ldsRowId >> literal(1u)) << literal(1u));
-                auto swizzled  = (swap_col + gr_rot) & (K_lit - literal(1u));
+                auto rev_arg0 = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
+                auto col_lo   = rev_arg0 & (Keff_lit - literal(1u));
+                auto col_hi   = rev_arg0 >> literal(static_cast<unsigned int>(__builtin_ctz(Keff)));
+                auto ldsRowId = nThrX_ref >> logR;
+                auto swap_mask   = (ldsRowId ^ literal(1u)) & literal(1u);
+                auto swap_col    = col_lo ^ swap_mask;
+                auto gr_rot      = Keff_lit - ((ldsRowId >> literal(1u)) << literal(1u));
+                auto swizzled_lo = (swap_col + gr_rot) & (Keff_lit - literal(1u));
+                auto swizzled    = col_hi * Keff_lit + swizzled_lo;
 
                 // Forward expression: identity pass-through
                 auto fwd_arg0 = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
@@ -1003,12 +1011,14 @@ namespace rocRoller
                 graph.coordinates.addElement(grSwizzle, {grSwizzleNThrY}, {nThrY});
 
                 auto logger = rocRoller::Log::getLogger();
-                logger->info("GR swizzle (load): nThrY={} nThrX={} grSwizzleNThrY={} K={} R={}",
-                             nThrY,
-                             nThrX,
-                             grSwizzleNThrY,
-                             K,
-                             R);
+                logger->info(
+                    "GR swizzle (load): nThrY={} nThrX={} grSwizzleNThrY={} K={} Keff={} R={}",
+                    nThrY,
+                    nThrX,
+                    grSwizzleNThrY,
+                    K,
+                    Keff,
+                    R);
             }
 
             if(jammedTiles.size() > 1 && jammedTiles[1] > 1)
@@ -2059,12 +2069,13 @@ namespace rocRoller
                 case MemoryType::WAVE_Direct2LDS:
                 {
                     auto swzMode    = m_context->kernelOptions()->ldsSwizzleMode;
-                    bool d2lSwizzle = ((swzMode == LDSBankSwizzleMode::Swizzle
-                                        || swzMode == LDSBankSwizzleMode::SwizzleA)
-                                       && tile.layoutType == LayoutType::MATRIX_A)
-                                      || ((swzMode == LDSBankSwizzleMode::Swizzle
-                                           || swzMode == LDSBankSwizzleMode::SwizzleB)
-                                          && tile.layoutType == LayoutType::MATRIX_B);
+                    bool d2lSwizzle = !isScaleType(varType.dataType)
+                                      && (((swzMode == LDSBankSwizzleMode::Swizzle
+                                            || swzMode == LDSBankSwizzleMode::SwizzleA)
+                                           && tile.layoutType == LayoutType::MATRIX_A)
+                                          || ((swzMode == LDSBankSwizzleMode::Swizzle
+                                               || swzMode == LDSBankSwizzleMode::SwizzleB)
+                                              && tile.layoutType == LayoutType::MATRIX_B));
                     loadMacroTile_VGPR(graph,
                                        connections,
                                        userTag,
@@ -2196,29 +2207,41 @@ namespace rocRoller
                 auto tileIMacX = iMacX;
                 {
                     auto swzMode2  = m_context->kernelOptions()->ldsSwizzleMode;
+                    auto lrVarType = getVariableType(graph, loadTag);
                     bool isA       = tile.layoutType == LayoutType::MATRIX_A;
                     bool isB       = tile.layoutType == LayoutType::MATRIX_B;
-                    bool doSwizzle = ((swzMode2 == LDSBankSwizzleMode::Swizzle
-                                       || swzMode2 == LDSBankSwizzleMode::SwizzleA)
-                                      && isA)
-                                     || ((swzMode2 == LDSBankSwizzleMode::Swizzle
-                                          || swzMode2 == LDSBankSwizzleMode::SwizzleB)
-                                         && isB);
+                    bool doSwizzle = !isScaleType(lrVarType.dataType)
+                                     && (((swzMode2 == LDSBankSwizzleMode::Swizzle
+                                           || swzMode2 == LDSBankSwizzleMode::SwizzleA)
+                                          && isA)
+                                         || ((swzMode2 == LDSBankSwizzleMode::Swizzle
+                                              || swzMode2 == LDSBankSwizzleMode::SwizzleB)
+                                             && isB));
 
                     if(doSwizzle)
                     {
                         using namespace Expression;
 
-                        auto thrTile = ThreadTile(tile);
-                        // A: K=wsizes[1], E=subTileSizes[1], permute iMacY using iMacX
-                        // B: K=wsizes[0], E=subTileSizes[0], permute iMacX using iMacY
-                        int  kDim = isA ? 1 : 0;
-                        auto K    = static_cast<unsigned int>(thrTile.wsizes.at(kDim));
-                        auto E    = static_cast<unsigned int>(tile.subTileSizes.at(kDim));
-                        auto R    = 16u / K;
+                        // The LR swizzle must invert the GR swizzle.  The GR
+                        // permutes K-column chunks where each chunk is 16 bytes
+                        // (one D2L write unit).  Compute K from the macro tile
+                        // size and the element bit-width so the LR K matches the
+                        // GR K regardless of the wave instruction shape.
+                        int  kDim          = isA ? 1 : 0;
+                        auto elementBits   = DataTypeInfo::Get(lrVarType.dataType).elementBits;
+                        auto elemsPerChunk = 128u / elementBits; // elements in 16B
+                        auto tileK         = static_cast<unsigned int>(tile.sizes.at(kDim));
+                        auto K             = tileK / elemsPerChunk;
+                        auto E             = elemsPerChunk;
+                        // Cap K at 8 so R >= 2 (pair-swap needs at least 2 rows
+                        // per rotation group).  When K > 8, the swizzle operates
+                        // on groups of K/Keff adjacent K-column chunks.
+                        auto Keff = std::min<unsigned int>(K, 8u);
+                        auto Eeff = E * (K / Keff);
+                        auto R    = 16u / Keff;
 
-                        auto logE = literal(static_cast<unsigned int>(__builtin_ctz(E)));
-                        auto logR = literal(static_cast<unsigned int>(__builtin_ctz(R)));
+                        auto logEeff = literal(static_cast<unsigned int>(__builtin_ctz(Eeff)));
+                        auto logR    = literal(static_cast<unsigned int>(__builtin_ctz(R)));
 
                         // row_coord provides ldsRowId; col_coord is permuted
                         int row_coord = isA ? iMacX : iMacY;
@@ -2227,18 +2250,19 @@ namespace rocRoller
                         auto arg0 = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
                         auto row_ref = std::make_shared<rocRoller::Expression::Expression>(
                             DataFlowTag{row_coord, Register::Type::Vector, DataType::UInt32});
-                        auto K_lit = literal(K);
-                        auto E_lit = literal(E);
+                        auto Keff_lit = literal(Keff);
+                        auto Eeff_lit = literal(Eeff);
 
-                        auto col_chunk = arg0 >> logE;
-                        auto element   = arg0 & (E_lit - literal(1u));
+                        auto col_chunk = arg0 >> logEeff;
+                        auto element   = arg0 & (Eeff_lit - literal(1u));
                         auto ldsRowId  = row_ref >> logR;
                         // LR inverse swizzle: undo the GR permutation.
-                        auto swap_mask       = (ldsRowId ^ literal(1u)) & literal(1u);
-                        auto inv_rotation    = (ldsRowId >> literal(1u)) << literal(1u);
-                        auto unrotated_chunk = (col_chunk + inv_rotation) & (K_lit - literal(1u));
-                        auto swizzled_chunk  = unrotated_chunk ^ swap_mask;
-                        auto swizzled_col    = swizzled_chunk * E_lit + element;
+                        auto swap_mask    = (ldsRowId ^ literal(1u)) & literal(1u);
+                        auto inv_rotation = (ldsRowId >> literal(1u)) << literal(1u);
+                        auto unrotated_chunk
+                            = (col_chunk + inv_rotation) & (Keff_lit - literal(1u));
+                        auto swizzled_chunk = unrotated_chunk ^ swap_mask;
+                        auto swizzled_col   = swizzled_chunk * Eeff_lit + element;
 
                         auto fwd0 = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
                         ExpressionTransform lrSwizzle{{fwd0}, {swizzled_col}};
@@ -2250,8 +2274,13 @@ namespace rocRoller
                         else
                             tileIMacX = rawCol;
 
-                        logger->info(
-                            "LR swizzle {}: K={} E={} R={}", toString(tile.layoutType), K, E, R);
+                        logger->info("LR swizzle {}: K={} Keff={} E={} Eeff={} R={}",
+                                     toString(tile.layoutType),
+                                     K,
+                                     Keff,
+                                     E,
+                                     Eeff,
+                                     R);
                     }
                 }
 
@@ -2405,12 +2434,14 @@ namespace rocRoller
                 auto iMacY = graph.coordinates.addElement(tile.tileIndex(1));
 
                 auto swzMode3   = m_context->kernelOptions()->ldsSwizzleMode;
-                bool ldsSwizzle = ((swzMode3 == LDSBankSwizzleMode::Swizzle
-                                    || swzMode3 == LDSBankSwizzleMode::SwizzleA)
-                                   && tile.layoutType == LayoutType::MATRIX_A)
-                                  || ((swzMode3 == LDSBankSwizzleMode::Swizzle
-                                       || swzMode3 == LDSBankSwizzleMode::SwizzleB)
-                                      && tile.layoutType == LayoutType::MATRIX_B);
+                bool isScale    = isScaleType(ostore.varType.dataType);
+                bool ldsSwizzle = !isScale
+                                  && (((swzMode3 == LDSBankSwizzleMode::Swizzle
+                                        || swzMode3 == LDSBankSwizzleMode::SwizzleA)
+                                       && tile.layoutType == LayoutType::MATRIX_A)
+                                      || ((swzMode3 == LDSBankSwizzleMode::Swizzle
+                                           || swzMode3 == LDSBankSwizzleMode::SwizzleB)
+                                          && tile.layoutType == LayoutType::MATRIX_B));
 
                 logger->info("StoreLDSTile: tag={} tileTag={} memoryType={} layoutType={} "
                              "ldsSwizzle={}",

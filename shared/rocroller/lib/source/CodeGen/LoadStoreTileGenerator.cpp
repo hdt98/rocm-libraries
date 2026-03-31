@@ -362,8 +362,9 @@ namespace rocRoller
                                 auto macTileTag = m_graph->mapper.get<MacroTile>(info.tag);
                                 auto macTile = m_graph->coordinates.getNode<MacroTile>(macTileTag);
                                 auto thrTile = ThreadTile(macTile);
-                                auto K = static_cast<unsigned int>(thrTile.wsizes.at(kSubdim));
-                                auto colMask = (K - 1u) << 4;
+                                auto K    = static_cast<unsigned int>(thrTile.wsizes.at(kSubdim));
+                                auto Keff = std::min(K, 8u);
+                                auto colMask = (Keff - 1u) << 4;
 
                                 // new = ((base + colVal) & colMask) | (base & ~colMask)
                                 auto base = info.rowOffsetReg->expression();
