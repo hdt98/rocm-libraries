@@ -267,7 +267,9 @@ int run_gemm_multi_abd_example_with_layouts(int argc,
         const float max_accumulated_value =
             *std::max_element(e_m_n_host_ref.mData.begin(), e_m_n_host_ref.mData.end());
 
-        const auto rtol_atol = calculate_rtol_atol(K, 1, max_accumulated_value);
+        const auto rtol_atol =
+            ck_tile::calculateRtolAtol<A0DataType, B0DataType, D0DataType, EDataType, AccDataType>(
+                K, 1, max_accumulated_value);
 
         pass &= ck_tile::check_err(e_m_n_device_result,
                                    e_m_n_host_ref,
