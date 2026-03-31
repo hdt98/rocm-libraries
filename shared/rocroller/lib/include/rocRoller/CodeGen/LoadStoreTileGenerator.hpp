@@ -8,6 +8,7 @@
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/RegisterTagManager.hpp>
 
+#include <map>
 #include <rocRoller/Expression_fwd.hpp>
 #include <string>
 #include <vector>
@@ -132,6 +133,10 @@ namespace rocRoller
             KernelGraphPtr                   m_graph;
             Expression::ExpressionTransducer m_fastArith;
             unsigned int                     m_workgroupSizeTotal;
+
+            // Cache for swizzled LDS column offsets: (base register, colVal) -> swizzled register.
+            // Avoids recomputing the modular-add for each ds_read with the same base and K-column.
+            std::map<std::pair<Register::Value*, unsigned int>, Register::ValuePtr> m_swizzleCache;
 
             inline Generator<Instruction> generate(auto&                     dest,
                                                    Expression::ExpressionPtr expr) const;
