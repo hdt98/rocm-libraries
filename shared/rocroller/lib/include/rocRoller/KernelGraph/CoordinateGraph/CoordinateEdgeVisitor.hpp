@@ -62,17 +62,22 @@ namespace rocRoller
 
             std::vector<Expression::ExpressionPtr> operator()(ExpressionTransform const& e)
             {
-                AssertFatal(e.forward.size() == dsts.size(),
-                            "ExpressionTransform forward size mismatch",
-                            ShowValue(e.forward.size()),
-                            ShowValue(dsts.size()));
-                std::vector<Expression::ExpressionPtr> rv;
-                rv.reserve(e.forward.size());
-                for(auto const& expr : e.forward)
+                Throw<FatalError>(
+                    "Forward traversal through ExpressionTransform is currently unused");
+
+                if constexpr(false)
                 {
-                    rv.push_back(positionalArgumentPropagation(expr, indexes));
+                    AssertFatal(e.forward.size() == dsts.size(),
+                                "ExpressionTransform forward size mismatch",
+                                ShowValue(e.forward.size()),
+                                ShowValue(dsts.size()));
+                    std::vector<Expression::ExpressionPtr> rv;
+                    rv.reserve(e.forward.size());
+                    for(size_t i = 0; i < e.forward.size(); ++i)
+                        rv.push_back(positionalArgumentPropagation(e.forward[i], indexes));
+                    return rv;
                 }
-                return rv;
+                return {};
             }
 
             std::vector<Expression::ExpressionPtr> operator()(PiecewiseAffineJoin const& e)
@@ -394,22 +399,25 @@ namespace rocRoller
 
             std::vector<Expression::ExpressionPtr> operator()(ExpressionTransform const& e)
             {
-                // ExpressionTransform applies arbitrary per-lane expressions that are not
-                // generally affine. Pass through the first src's index and delta unchanged
-                // so that stride computation can proceed. The actual index transformation
-                // only matters at codegen time, not for stride propagation.
-                AssertFatal(e.forward.size() == dsts.size(),
-                            "ExpressionTransform forward size mismatch",
-                            ShowValue(e.forward.size()),
-                            ShowValue(dsts.size()));
-                auto delta = getDelta(srcTags[0]);
-                for(size_t i = 0; i < dsts.size(); ++i)
-                    deltas.emplace(dstTags[i], delta);
-                std::vector<Expression::ExpressionPtr> rv;
-                rv.reserve(dsts.size());
-                for(size_t i = 0; i < dsts.size(); ++i)
-                    rv.push_back(indexes[0]);
-                return rv;
+                Throw<FatalError>(
+                    "Forward diff traversal through ExpressionTransform is currently unused");
+
+                if constexpr(false)
+                {
+                    AssertFatal(e.forward.size() == dsts.size(),
+                                "ExpressionTransform forward size mismatch",
+                                ShowValue(e.forward.size()),
+                                ShowValue(dsts.size()));
+                    auto delta = getDelta(srcTags[0]);
+                    for(size_t i = 0; i < dsts.size(); ++i)
+                        deltas.emplace(dstTags[i], delta);
+                    std::vector<Expression::ExpressionPtr> rv;
+                    rv.reserve(dsts.size());
+                    for(size_t i = 0; i < dsts.size(); ++i)
+                        rv.push_back(indexes[0]);
+                    return rv;
+                }
+                return {};
             }
 
             std::vector<Expression::ExpressionPtr> operator()(PiecewiseAffineJoin const& e)
