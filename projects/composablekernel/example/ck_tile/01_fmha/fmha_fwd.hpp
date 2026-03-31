@@ -1421,7 +1421,6 @@ struct fmha_fwd_traits_
     static constexpr bool kUseTrLoad                 = kUseTrLoad_;
     static constexpr bool kSkipMinSeqlenQ            = kSkipMinSeqlenQ_;
     static constexpr ck_tile::FmhaSinkMode kSinkMode = kSinkMode_;
-    static constexpr bool kHasSink                   = (kSinkMode != ck_tile::FmhaSinkMode::kNone);
     static constexpr bool kHasStreamSink = (kSinkMode == ck_tile::FmhaSinkMode::kStreamLLM ||
                                             kSinkMode == ck_tile::FmhaSinkMode::kBoth);
     static constexpr bool kHasGptOssSink =
@@ -1538,7 +1537,6 @@ struct fmha_fwd_pagedkv_traits_
     static constexpr bool kPadDv                     = kPadDv_;
     static constexpr bool kSkipMinSeqlenQ            = kSkipMinSeqlenQ_;
     static constexpr ck_tile::FmhaSinkMode kSinkMode = kSinkMode_;
-    static constexpr bool kHasSink                   = (kSinkMode != ck_tile::FmhaSinkMode::kNone);
     static constexpr bool kHasStreamSink = (kSinkMode == ck_tile::FmhaSinkMode::kStreamLLM ||
                                             kSinkMode == ck_tile::FmhaSinkMode::kBoth);
     static constexpr bool kHasGptOssSink =
@@ -1594,7 +1592,6 @@ struct fmha_fwd_splitkv_traits_
     static constexpr bool kPadDv                     = kPadDv_;
     static constexpr bool kIsPagedKV                 = kIsPagedKV_;
     static constexpr ck_tile::FmhaSinkMode kSinkMode = kSinkMode_;
-    static constexpr bool kHasSink                   = (kSinkMode != ck_tile::FmhaSinkMode::kNone);
     static constexpr bool kHasStreamSink = (kSinkMode == ck_tile::FmhaSinkMode::kStreamLLM ||
                                             kSinkMode == ck_tile::FmhaSinkMode::kBoth);
     static constexpr bool kHasGptOssSink =

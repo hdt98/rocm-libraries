@@ -52,8 +52,6 @@ struct TileFmhaTraits
     static constexpr index_t kBlockPerCu    = kBlockPerCu_;
     static constexpr bool kSkipMinSeqlenQ   = kSkipMinSeqlenQ_;
     static constexpr FmhaSinkMode kSinkMode = kSinkMode_;
-    // Derived convenience constants
-    static constexpr bool kHasSink = (kSinkMode != FmhaSinkMode::kNone);
     static constexpr bool kHasStreamSink =
         (kSinkMode == FmhaSinkMode::kStreamLLM || kSinkMode == FmhaSinkMode::kBoth);
     static constexpr bool kHasGptOssSink =
@@ -147,7 +145,6 @@ struct TileFmhaFwdPagedKVTraits
     static constexpr index_t kBlockPerCu    = kBlockPerCu_;
     static constexpr bool kSkipMinSeqlenQ   = kSkipMinSeqlenQ_;
     static constexpr FmhaSinkMode kSinkMode = kSinkMode_;
-    static constexpr bool kHasSink          = (kSinkMode != FmhaSinkMode::kNone);
     static constexpr bool kHasStreamSink =
         (kSinkMode == FmhaSinkMode::kStreamLLM || kSinkMode == FmhaSinkMode::kBoth);
     static constexpr bool kHasGptOssSink =
@@ -185,7 +182,6 @@ struct TileFmhaFwdSplitKVTraits
     static constexpr bool kMergeNumHeadGroupsSeqLenQ = kMergeNumHeadGroupsSeqLenQ_;
     static constexpr index_t kBlockPerCu             = kBlockPerCu_;
     static constexpr FmhaSinkMode kSinkMode          = kSinkMode_;
-    static constexpr bool kHasSink                   = (kSinkMode != FmhaSinkMode::kNone);
     static constexpr bool kHasStreamSink =
         (kSinkMode == FmhaSinkMode::kStreamLLM || kSinkMode == FmhaSinkMode::kBoth);
     static constexpr bool kHasGptOssSink =
