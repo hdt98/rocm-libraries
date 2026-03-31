@@ -20,9 +20,7 @@ The public repository for hipDNN is located at `https://github.com/ROCm/rocm-lib
 
 .. note::
 
-  hipDNN is in beta. Running production workloads is not recommended.
-
-  hipDNN is only supported on ROCm 7.12 or later.
+  hipDNN is in beta. Running production workloads is not recommended. hipDNN is only supported on ROCm 7.12.
 
 .. grid:: 2
   :gutter: 3
