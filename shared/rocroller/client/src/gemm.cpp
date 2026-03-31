@@ -1474,6 +1474,7 @@ namespace rocRoller::Client::GEMMClient::CLI
         update(SN(&SP::swizzleScale), solution.swizzleScale);
         update(SN(&SP::swizzleTileSize), solution.swizzleTileSize);
         update(SN(&SP::prefetchScale), solution.prefetchScale);
+        update(SN(&SP::ldsBankSwizzle), solution.ldsBankSwizzle);
 
         // Prefetching
 
