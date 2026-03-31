@@ -200,6 +200,14 @@ def validateMIParameters(
         else ptype["F32XdlMathOp"]
     )
 
+    if not solution.get("EnableF32XdlMathOp", False):
+      # For MFMA validation, use MacDataTypeA + MacDataTypeB combination as key
+      macDataTypeA = ptype.get("MacDataTypeA", miDataType)
+      macDataTypeB = ptype.get("MacDataTypeB", miDataType)
+      miDataTypeKey = macDataTypeA.toChar() + macDataTypeB.toChar()
+    else:
+      miDataTypeKey = miDataType.toChar() + miDataType.toChar()
+
     mi4 = solution[MI_KEY]
     miEnabled = solution[MI_ENABLED_KEY]
     assert len(mi4) == 4 or len(mi4) == 0, elineno() + ": MI length not 4 or 0"

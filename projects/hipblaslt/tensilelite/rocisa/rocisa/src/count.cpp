@@ -52,7 +52,7 @@ namespace rocisa
             int count = 0;
             for(const auto& i : ptr->itemList)
             {
-                count += countX<T>(i);
+                count += countX<T>(i, weights);
             }
             return count;
         }

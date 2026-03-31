@@ -119,7 +119,7 @@ globalParameters["ExitOnFails"] = (
     1  # 1: Exit after benchmark run if failures detected.  2: Exit during benchmark run.
 )
 globalParameters["CpuThreads"] = (
-    1
+    -1
 )  # How many CPU threads to use for kernel generation.  0=no threading, -1 == nproc, N=min(nproc,N).  TODO - 0 sometimes fails with a kernel name error?  0 does not check error codes correctly
 globalParameters["NumWarmups"] = 0
 globalParameters["TimingInstrumentation"] = False  # Enable detailed timing instrumentation output
@@ -137,6 +137,7 @@ globalParameters["CMakeBuildType"] = (
 )
 globalParameters["LogicFormat"] = "yaml"  # set library backend (yaml, or json)
 globalParameters["LibraryFormat"] = "yaml"  # set library backend (yaml, or msgpack)
+globalParameters["MXScaleFormat"] = 0  # MX scale data format (0=none, 1=pre-swizzle for GPU kernel layout)
 
 # True/False: CSV will/won't export WinnerGFlops, WinnerTimeUS, WinnerIdx, WinnerName.
 # TODO - if no side-effect, we can set default to True. This can make analyzing "LibraryLogic" (AddFromCSV) faster
@@ -177,6 +178,8 @@ globalParameters["DataInitTypeScaleB"] = 2
 globalParameters["DataInitTypeScaleC"] = 2
 globalParameters["DataInitTypeScaleD"] = 2
 globalParameters["DataInitTypeScaleAlphaVec"] = 3
+globalParameters["DataInitTypeMXSA"] = 1
+globalParameters["DataInitTypeMXSB"] = 1
 globalParameters["DataInitValueActivationArgs"] = [2.0, 2.0]
 globalParameters["DataInitTypeMXSA"] = 1
 globalParameters["DataInitTypeMXSB"] = 1
@@ -302,10 +305,6 @@ globalParameters["AsmDebug"] = (
     False  # Set to True to keep debug information for compiled code objects
 )
 
-# if ROCmAgentEnumeratorPath is "rocm_agent_enumerator", the arch path is /opt/rocm/bin/rocm_agent_enumerator ;
-# otherwise it is /opt/rocm/llvm/bin/amdgpu-arch
-globalParameters["ROCmAgentEnumeratorPath"] = None
-
 globalParameters["UseEffLike"] = True  # Set to False to use winnerGFlops as the performance metric
 
 globalParameters["DisableAsmComments"] = False  # Set to True to disable assembly comments in generated assembly code
@@ -419,6 +418,7 @@ defaultBenchmarkCommonParameters = [
     {"GlobalSplitUCoalesced": [False]},
     {"GlobalSplitUWorkGroupMappingRoundRobin": [False]},
     {"Use64bShadowLimit": [True]},
+    {"Use64bShadowLimitMX": [False]}, # Disable Use64bShadowLimit for MXSA/B by default
     {"NumLoadsCoalescedA": [1]},
     {"NumLoadsCoalescedB": [1]},
     {"WorkGroup": [[16, 16, 1]]},
@@ -626,9 +626,6 @@ def assignGlobalParameters(config, isaInfoMap: Dict[IsaVersion, IsaInfo]):
 
     if "CodeObjectVersion" in config:
         globalParameters["CodeObjectVersion"] = config["CodeObjectVersion"]
-
-    if "ROCmAgentEnumeratorPath" in config:
-        globalParameters["ROCmAgentEnumeratorPath"] = config["ROCmAgentEnumeratorPath"]
 
     if getVerbosity() >= 1:
         printCapabilitiesTable(isaInfoMap)

@@ -29,24 +29,25 @@ from rocisa.functions import BranchIfNotZero
 
 from Tensile.Common.DataType import DataType
 
-def allocPostLoopSrdSuppressRaw(ch: str, chAddress: str, labelStr: str, sgprLength) -> Module:
-    module = Module("allocPostLoopSrdSuppress")
-    label  = Label("%sAddrValid"%labelStr, "")
-    label2 = Label("%sAddrValid_End"%labelStr, "")
-    # Buffer-load uses one base read pointer stored in the SRD - set it here:
-    module.add(SMovB64(dst=sgpr("Srd%s+0"%ch, 2), src=sgpr("Address%s+0"%chAddress, 2), comment="init SRD base address" ))
-    module.add(SMovB32(dst=sgpr("Srd%s+3"%ch), src="Srd127_96", comment="Set bits 127_96 in post-loop SRD"))
-    module.add(BranchIfNotZero("Address%s"%chAddress, DataType('int64').toEnum(), label))
-    module.add(SMovB32(dst=sgpr("Srd%s+2"%ch), src=0))
-    module.add(SBranch(label2.getLabelName()))
-    module.add(label)
-    module.add(SMovB32(dst=sgpr("Srd%s+2"%ch), src=sgprLength))
-    module.add(label2)
-    module.addSpaceLine()
-    return module
-
-def allocPostLoopSrdSuppress(ch: str, labelStr: str, sgprLength) -> Module:
-    return allocPostLoopSrdSuppressRaw(ch, ch, labelStr, sgprLength)
+def tdmWait(states, kernel, tPA, tPB, tensorcnt: int, comment: str) -> Module:
+  #TODO: refactor this
+  skipGR = tensorcnt > -1
+  vmcnt = 0 if skipGR else -1
+  mod = Module()
+  if skipGR:
+    #TODO: remove
+    # numMXSA = kernel["NumLoadsPerpendicularMXSA"] * kernel["NumLoadsCoalescedMXSA"] if kernel["ProblemType"]["MXBlockA"] else 0
+    # numMXSB = kernel["NumLoadsPerpendicularMXSB"] * kernel["NumLoadsCoalescedMXSB"] if kernel["ProblemType"]["MXBlockB"] else 0
+    # numM = 0
+    # if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+    #   numM = kernel["NumLoadsPerpendicularMetadata"] * kernel["NumLoadsCoalescedMetadata"]
+    # numGR = 0
+    # if tensorcnt > -1:
+    #   numGR += tensorcnt * (numMXSA + numMXSB + numM)
+    # vmcnt += numGR
+    mod.add(SWaitCnt(vlcnt=vmcnt))
+  mod.add(SWaitTensorcnt(tensorcnt=tensorcnt, comment=comment))
+  return mod
 
 def tdmWait(states, kernel, tPA, tPB, tensorcnt: int, comment: str) -> Module:
   #TODO: refactor this
@@ -231,7 +232,7 @@ def accVgprImagNumOffset(kernel):
 def mapAcctoArchRegs(kernel, maxAgpr=256, write=False):
   acc2arch, _ = accToArchMapper(kernel)
 
-  complexMultiplier = 2 if kernel["ProblemType"]["DataType"].isComplex() else 1
+  complexMultiplier = 2 if kernel["ProblemType"]["MacDataTypeA"].isComplex() else 1
   itemList = [None] * kernel["MIRegPerOut"] * complexMultiplier * len(acc2arch)
   accImOffset = accVgprImagNumOffset(kernel)
   for i in range(len(acc2arch)):

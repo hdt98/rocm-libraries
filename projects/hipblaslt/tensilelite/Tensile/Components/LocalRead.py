@@ -221,19 +221,31 @@ class LocalReadMFMA(LocalRead):
     #  dst (dst = True)
     #   valOffset  0 - 31: X reg,  0 - 31
     # Do index transpose if transpose is true
-    def TXInterleaveLayoutIdx(self, idx):
+    def TXInterleaveLayoutIdx(self, idx, miInputPerThread=8):
+        halfM = miInputPerThread // 2
         retIdx = idx
         XTchar = "X"
-        if idx % 8 < 4:
-            # T case, convert to T
+        if idx % miInputPerThread < halfM:
             XTchar = "T"
-            retIdxUpper = (idx // 8) * 4
-            retIdxLower = idx % 4
+            retIdxUpper = (idx // miInputPerThread) * halfM
+            retIdxLower = idx % halfM
             retIdx = retIdxUpper + retIdxLower
         return retIdx, XTchar
 
+    @staticmethod
+    def _genDsReadConvTable(miInputPerThread, lrvwTile):
+        halfM = miInputPerThread // 2
+        numRows = lrvwTile
+        colsPerRow = halfM // lrvwTile
+        table = []
+        for group in range(2):
+            for col in range(colsPerRow):
+                for row in range(numRows):
+                    table.append(row * miInputPerThread + col * lrvwTile + group * halfM)
+        return table
+
     def getTransposeXorTIndex(self, writer, kernel, idx, tc, lrvwTile, dst, isNext, localRead=False):
-        assert(kernel["MIInputPerThread"] == 8)
+        mipt = kernel["MIInputPerThread"]
         assert(lrvwTile <= 4, "lrvwTile is %d"%lrvwTile)
         abmatrixinfo = writer.states.a if tc == 'A' else writer.states.b
         if isNext:
@@ -244,23 +256,26 @@ class LocalReadMFMA(LocalRead):
             useDirect32XEmulation = abmatrixinfo.useDirect32XEmulationThis
         TF32EmuInterleaveTreg = abmatrixinfo.TF32EmuInterleaveTreg
         swapBlockSizeSub = abmatrixinfo.swapBlockSizeSub
-        blockH = kernel["MIInputPerThread"]
+        blockH = mipt
         blockW = lrvwTile
         blockSize = blockH * blockW
         # default: no change
         XTchar = "X"
         if localRead:
             if lrvwTile > 1:
-                # local read and lrvwTile > 1 case
-                dsReadConvTable4 = [0,  8, 16, 24,  4, 12, 20, 28]
-                dsReadConvTable2 = [0,  8,  2, 10,  4, 12,  6, 14]
-                dsReadConvTable = dsReadConvTable4 if lrvwTile == 4 else dsReadConvTable2
+                dsReadConvTable = self._genDsReadConvTable(mipt, lrvwTile)
                 blockIdx = idx // blockSize
                 idxInBlk = idx % blockSize
                 tableIdx = idxInBlk // blockW
                 idx = dsReadConvTable[tableIdx] + blockIdx * blockSize
             if TF32EmuInterleaveTreg:
-                idx, XTchar = self.TXInterleaveLayoutIdx(idx)
+                if writer.states.doFullPackCodePrefetch:
+                    idx, XTchar = self.TXInterleaveLayoutIdx(idx, kernel["MIInputPerThread"])
+                else:
+                    withinGroup = idx % 8
+                    if withinGroup < 4:
+                        XTchar = "T"
+                        idx = (idx // 8) * 4 + withinGroup
             elif writer.states.doFullPackCodePrefetch:
                 # full pack code prefetch case, dst of local read is always T reg
                 # use T as destination
@@ -275,9 +290,13 @@ class LocalReadMFMA(LocalRead):
                 # no register conversion (use X 0-31)
                 pass
             elif TF32EmuInterleaveTreg:
-                # T reg interleave layout (common for both lrvwTile==1 and >1)
-                # Conversion for src only. No conversion in dst case.
-                idx, XTchar = self.TXInterleaveLayoutIdx(idx)
+                if writer.states.doFullPackCodePrefetch:
+                    idx, XTchar = self.TXInterleaveLayoutIdx(idx, kernel["MIInputPerThread"])
+                else:
+                    withinGroup = idx % 8
+                    if withinGroup < 4:
+                        XTchar = "T"
+                        idx = (idx // 8) * 4 + withinGroup
             elif writer.states.doFullPackCodePrefetch:
                 # full pack code prefetch case, dst of local read is always T reg
                 XTchar = "T" # use T reg for wider local read + transpose code
@@ -323,26 +342,14 @@ class LocalReadMFMA(LocalRead):
     #   reg 7 reg 15 reg 23 reg 31
     def getTransposeIndex(self, kernel, idx, lrvwTile):
         if lrvwTile == 1:
-            return idx # no transpose case, simply return idx
-        # do transpose for lrvwTile x lrvwTile (=2x2 or 4x4)
-        # 8 comes from kernel["MIInputPerThread"]
-        assert(kernel["MIInputPerThread"] == 8)
+            return idx
+        mipt = kernel["MIInputPerThread"]
         assert(lrvwTile <= 4, "lrvwTile is %d"%lrvwTile)
-        # index conversion table for MIInputPerThread==8
-        convArray2 = [0,  8,  2, 10,  4, 12,  6, 14,  1,  9,  3, 11,  5, 13,  7, 15]
-        convArray4 = [0,  8, 16, 24,  4, 12, 20, 28,  1,  9, 17, 25,  5, 13, 21, 29,  2, 10, 18, 26,  6, 14, 22, 30,  3, 11, 19, 27,  7, 15, 23, 31]
-        blockH = kernel["MIInputPerThread"]
-        blockW = lrvwTile
-        blockSize = blockH * blockW
+        blockSize = mipt * lrvwTile
         blockIdx = idx // blockSize
         idxInBlk = idx % blockSize
-        tableIdx = idxInBlk
-        if lrvwTile == 4:
-            swappedIdx = convArray4[tableIdx] + blockIdx * blockSize
-        elif lrvwTile == 2:
-            swappedIdx = convArray2[tableIdx] + blockIdx * blockSize
-        else:
-            swappedIdx = idx
+        dsTable = self._genDsReadConvTable(mipt, lrvwTile)
+        swappedIdx = dsTable[idxInBlk % mipt] + (idxInBlk // mipt) + blockIdx * blockSize
         return swappedIdx
 
     # if prefetch is for NextLoop or not
@@ -874,6 +881,9 @@ class LocalReadMFMA(LocalRead):
                         packCodePre = packPre.add(Module("packCodePre"))
 
                     tmpvgpr = []
+                    is_wmma_v3 = writer.states.asmCaps.get("HasWMMA_V3", False)
+                    multiGroupXF32 = kernel["UseF32XEmulation"] and is_wmma_v3 and numVgpr * numReadsPerUnroll > 8
+                    outerBaseValuiIdx = baseValuiIdx
                     for tiIdx in range(0, numTilePerInst):
                         for rIdx in range(0, numReadsPerUnroll):
                             valuiIdx = int(valufIdx)
@@ -1007,6 +1017,19 @@ class LocalReadMFMA(LocalRead):
                                             self.pack4LowBitsFinal(kernel, writer, tc, valuiIdx, bufferIdx, iui, packCodeT, lrvwTile, tmpvgprFP32, useDirect32XEmulation)
                                     if valuiIdx % 8 == 4 and (not allPack4LoDone):
                                         self.releaseTmpVregForPack(kernel, writer, tc, baseValuiIdx, tmpvgprFP32, useDirect32XEmulation)
+                                    # For WMMA V3 multigroup XF32: rearrange packed BF16 data so all
+                                    # hi values are contiguous (X0+0..7) followed by lo values (X0+8..15).
+                                    # Must happen here in pack code (not MAC code) to avoid the scheduler
+                                    # interleaving the swap with residual/TF32_2 packing operations.
+                                    if multiGroupXF32 and rIdx == numReadsPerUnroll - 1:
+                                        halfGroup = 4
+                                        for i in range(halfGroup):
+                                            swapIdx1 = outerBaseValuiIdx + halfGroup + i
+                                            swapIdx2 = outerBaseValuiIdx + halfGroup * 2 + i
+                                            swapVgpr1 = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, swapIdx1))
+                                            swapVgpr2 = vgpr("Valu%s_X%u_I%u+%u"%(tc, bufferIdx, iui, swapIdx2))
+                                            packCodeT.add(VSwapB32(dst=swapVgpr1, src=swapVgpr2,
+                                                comment="XF32 pack rearrange %s: swap [%d] <-> [%d]"%(tc, swapIdx1, swapIdx2)))
 
                                 if kernel["ConvertAfterDS"] and (tP["bpe"] != tP["bpeDS"]):
                                     if tP["bpe"] == 2 and tP["bpeDS"] == 4:
@@ -1389,6 +1412,18 @@ class LocalReadMFMA(LocalRead):
                             # load read instrution
                             paramList = []
 
+                            # gfx1250 LDS offset formula shared by XF32 and BF16/Half/FP8/etc paths.
+                            # The WMMA V3 LDS layout uses a *2 factor on the unroll stride.
+                            def calcGfx1250LdsOffset():
+                                if kernel["UnrollMajorLDS%s" % tP["tensorChar"]]:
+                                    incOffset = rIdx * numElementPerRead * UnrollStride * 2
+                                    incOffset += tiIdx * matrixInstTO * vectorWidth * tileStride
+                                else:
+                                    vw = kernel[f"LocalReadVectorWidth{tc if('MXS' not in tc) else 'MXS'}"]
+                                    incOffset = (rIdx // vw) * UnrollStride * vw
+                                    incOffset += rIdx * numElementPerRead * UnrollStride
+                                return int((incOffset + offset_val + tP["localReadOffset"]) * tP["bpeDS"])
+
                             for oIdx in range(0, numOffsets):
                                 if perpStride > 1 and kernel["ProblemType"]["TLU%s"%tc] == 0:
                                     permBlock = kernel["MatrixInstK"] if kernel["ProblemType"]["TLU%s"%tc] == 1 else kernel["VectorWidth%s"%tc] * kernel["MatrixInstM"]
@@ -1426,35 +1461,32 @@ class LocalReadMFMA(LocalRead):
                                     # Previously a single ds_read could be used to load all inputs for mfma
                                     # For emulated TF32, 2x ds_read is required along with a different mfma layout
                                     # so we need to adjust the offsets accordingly for the second ds_read.
-                                    # Numbers here are specific to the mfma layout
-                                    incOffset = 0
-                                    midIdx = numReadsPerUnroll // 2
-                                    if rIdx >= midIdx:
-                                        if kernel["UnrollMajorLDS%s" % tP["tensorChar"]] == False:
-                                            if kernel["MatrixInstM"] == 32:
-                                                incOffset = midIdx * numElementPerRead * UnrollStride
-                                            elif kernel["MatrixInstM"] == 16:
-                                                incOffset = 3 * midIdx * numElementPerRead * UnrollStride
-                                        else:
-                                            if kernel["MatrixInstM"] == 32 and kernel["MatrixInstK"] == 16:
-                                                incOffset = 4
-                                            elif kernel["MatrixInstM"] == 16 and kernel["MatrixInstK"] == 32:
-                                                incOffset = 12
-                                    incOffset = rIdx * numElementPerRead * UnrollStride + incOffset
-                                    offset_val = (incOffset + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
+                                    if tuple(kernel["ISA"][:2]) == (12, 5):
+                                        # gfx1250 WMMA V3: shared offset formula with BF16/Half (see calcGfx1250LdsOffset)
+                                        offset_val = calcGfx1250LdsOffset()
+                                    else:
+                                        # Numbers here are specific to the mfma layout (gfx950)
+                                        incOffset = 0
+                                        midIdx = numReadsPerUnroll // 2
+                                        if rIdx >= midIdx:
+                                            if kernel["UnrollMajorLDS%s" % tP["tensorChar"]] == False:
+                                                if kernel["MatrixInstM"] == 32:
+                                                    incOffset = midIdx * numElementPerRead * UnrollStride
+                                                elif kernel["MatrixInstM"] == 16:
+                                                    incOffset = 3 * midIdx * numElementPerRead * UnrollStride
+                                            else:
+                                                if kernel["MatrixInstM"] == 32 and kernel["MatrixInstK"] == 16:
+                                                    incOffset = 4
+                                                elif kernel["MatrixInstM"] == 16 and kernel["MatrixInstK"] == 32:
+                                                    incOffset = 12
+                                        incOffset = rIdx * numElementPerRead * UnrollStride + incOffset
+                                        offset_val = (incOffset + offset_val + tP["localReadOffset"]) * tP["bpeDS"]
                                 # For wmma_v3, the maximum number of bytes per read is 16 bytes in 4 vgprs, which happens in the case of fp16/bf16/fp8/bf8/fp6/bf6/f4.
                                 elif tuple(kernel["ISA"][:2]) == (12, 5) \
                                         and (kernel["ProblemType"][MacDataType].is8bitFloat() or kernel["ProblemType"][MacDataType].isBFloat16() \
                                             or kernel["ProblemType"][MacDataType].isHalf() or kernel["ProblemType"][MacDataType].isFloat4() \
                                                 or kernel["ProblemType"][MacDataType].is6bitFloat() or kernel["ProblemType"][MacDataType].isInt8()):
-                                    if kernel["UnrollMajorLDS%s" % tP["tensorChar"]]:
-                                        incOffset = rIdx * numElementPerRead * UnrollStride * 2
-                                        incOffset += tiIdx * matrixInstTO * vectorWidth * tileStride
-                                    else:
-                                        vw = kernel[f"LocalReadVectorWidth{tc if('MXS' not in tc) else 'MXS'}"]
-                                        incOffset = (rIdx // vw) * UnrollStride * vw
-                                        incOffset += rIdx * numElementPerRead * UnrollStride
-                                    offset_val = int((incOffset + offset_val + tP["localReadOffset"]) * tP["bpeDS"])
+                                    offset_val = calcGfx1250LdsOffset()
                                 else:
                                     offset_val = int((rIdx * numElementPerRead * UnrollStride + offset_val + tP["localReadOffset"]) * tP["bpeDS"])
 

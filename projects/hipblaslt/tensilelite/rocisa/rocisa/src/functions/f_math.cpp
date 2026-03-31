@@ -307,29 +307,23 @@ namespace rocisa
         }
         return module;
     }
-
     template std::shared_ptr<Module>
         vectorMultiplyBpe<std::string, std::string>(std::string, std::string, float, const std::string&);
     template std::shared_ptr<Module>
         vectorMultiplyBpe<int, int>(int, int, float, const std::string&);
-
     template std::shared_ptr<Module>
         vectorMultiply64Bpe<int, int, int>(int, int, float, int, const std::string&);
-
     template std::shared_ptr<Module>
         scalarMultiplyBpe<int, int>(int, int, float, const std::string&);
     template std::shared_ptr<Module>
         scalarMultiplyBpe<std::string, std::string>(std::string, std::string, float, const std::string&);
     template std::shared_ptr<Module>
         scalarMultiplyBpe<int, std::string>(int, std::string, float, const std::string&);
-
     template std::shared_ptr<Module>
         scalarMultiply64Bpe<int, int, int>(int, int, float, int, const std::string&);
     template std::shared_ptr<Module>
         scalarMultiply64Bpe<std::string, std::string, int>(std::string, std::string, float, int, const std::string&);
-
 } // namespace rocisa
-
 void math_func(nb::module_ m)
 {
     m.def("vectorStaticDivideAndRemainder",
@@ -458,7 +452,6 @@ void math_func(nb::module_ m)
           nb::arg("tmpVgprRes") = std::nullopt,
           nb::arg("tmpSgprRes") = std::nullopt,
           nb::arg("comment")    = "");
-
     m.def("scalarStaticDivideAndRemainder",
           nb::overload_cast<int, int, int, int, std::optional<rocisa::ContinuousRegister>, int>(
               &rocisa::scalarStaticDivideAndRemainder<int, int, int>),
@@ -742,3 +735,4 @@ void math_func(nb::module_ m)
         nb::arg("tmp"),
         nb::arg("comment")    = "");
 }
+

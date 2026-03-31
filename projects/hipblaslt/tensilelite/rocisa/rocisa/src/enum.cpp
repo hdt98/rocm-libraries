@@ -137,6 +137,7 @@ void init_enum(nb::module_ m)
         .value("INST_B6_B8", rocisa::InstType::INST_B6_B8)
         .value("INST_CVT", rocisa::InstType::INST_CVT)
         .value("INST_MACRO", rocisa::InstType::INST_MACRO)
+        .value("INST_B192", rocisa::InstType::INST_B192)
         .value("INST_NOTYPE", rocisa::InstType::INST_NOTYPE)
         .export_values();
 

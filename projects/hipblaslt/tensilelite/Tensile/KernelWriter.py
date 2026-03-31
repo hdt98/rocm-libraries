@@ -1931,7 +1931,15 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if not schedulePackConsiderMetadata:
               insertABcount = 0
               isLastNop = False
-              if kernel["UseF32XEmulation"]:
+              isWmmaXf32Direct = kernel["UseF32XEmulation"] and kernel.get("UseDirect32XEmulation", False) and not kernel["UseMFMAF32XEmulation"]
+              if isWmmaXf32Direct:
+                # XF32 direct emulation with multigroup WMMA V3: place ALL pack
+                # items (including the rearrange swaps) before the first WMMA to
+                # ensure all bf16_hi and bf16_lo values are fully packed.
+                while packItems:
+                  iterCode.add(packItems.pop(0))
+                  curPackIdx += 1
+              elif kernel["UseF32XEmulation"]:
                 if instPerPackA > 0 or instPerPackB == 0 and packItems:
                   tmp = []
                   num, _ = self._packItemsConditional(instPerPackA, packItems, tmp, ["__TF32_1_A", "__TF32_2_A"])
@@ -1953,40 +1961,41 @@ class KernelWriter(metaclass=abc.ABCMeta):
                   if packItems:
                     iterCode.add(packItems.pop(0))
                     curPackIdx += 1
-              for j in range(instPerPackMXSA):
-                if packItems:
-                  iterCode.add(packItems.pop(0))
-                  curPackIdx += 1
-              for j in range(instPerPackMXSB):
-                if packItems:
-                  iterCode.add(packItems.pop(0))
-                  curPackIdx += 1
-              if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
-                for j in range(ceil(instPerPackM)):
+              if not isWmmaXf32Direct:
+                for j in range(instPerPackMXSA):
                   if packItems:
                     iterCode.add(packItems.pop(0))
                     curPackIdx += 1
-              if kernel["UseF32XEmulation"]:
-                if instPerPackB > 0 or instPerPackA == 0 and packItems:
-                  tmp = []
-                  num, _ = self._packItemsConditional(instPerPackB, packItems, tmp, ["__TF32_1_B", "__TF32_2_B"])
-                  if num > 0:
-                    insertABcount += 1
-                    instPerPackB -= num
-                  if not firstDone and instPerPackA == 0:
+                for j in range(instPerPackMXSB):
+                  if packItems:
+                    iterCode.add(packItems.pop(0))
+                    curPackIdx += 1
+                if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+                  for j in range(ceil(instPerPackM)):
+                    if packItems:
+                      iterCode.add(packItems.pop(0))
+                      curPackIdx += 1
+                if kernel["UseF32XEmulation"]:
+                  if instPerPackB > 0 or instPerPackA == 0 and packItems:
+                    tmp = []
                     num, _ = self._packItemsConditional(instPerPackB, packItems, tmp, ["__TF32_1_B", "__TF32_2_B"])
                     if num > 0:
                       insertABcount += 1
                       instPerPackB -= num
-                  firstDone = True
-                  for n in tmp:
-                    isLastNop = isinstance(n, SNop)
-                    iterCode.add(n)
-              else:
-                for j in range(instPerPackB):
-                  if packItems:
-                    iterCode.add(packItems.pop(0))
-                    curPackIdx += 1
+                    if not firstDone and instPerPackA == 0:
+                      num, _ = self._packItemsConditional(instPerPackB, packItems, tmp, ["__TF32_1_B", "__TF32_2_B"])
+                      if num > 0:
+                        insertABcount += 1
+                        instPerPackB -= num
+                    firstDone = True
+                    for n in tmp:
+                      isLastNop = isinstance(n, SNop)
+                      iterCode.add(n)
+                else:
+                  for j in range(instPerPackB):
+                    if packItems:
+                      iterCode.add(packItems.pop(0))
+                      curPackIdx += 1
               # since packed register need to wait 2 quad cycle to finish packing
               # we insert pack instruction if we can, or s_nop
               while curPackIdx < numPack+2 and not kernel["UseF32XEmulation"]:
@@ -4589,10 +4598,20 @@ class KernelWriter(metaclass=abc.ABCMeta):
       moduleMacroDTLLWVgpr, vgprLW = self.tailLoopAllocDTLLWVgpr(kernel)
       module.add(moduleMacroDTLLWVgpr)
 
-      module.add(self.calculateLoopNumIter(kernel, tensorParametersA, tensorParametersB, -1))
+      is_wmma_v3 = self.states.asmCaps.get("HasWMMA_V3", False)
+      if not is_wmma_v3:
+        module.add(self.calculateLoopNumIter(kernel, tensorParametersA, tensorParametersB, -1))
       if self.states.actualSummationLoops==1 and self.states.staggerUCode:
         module.addComment1("remove stagger offsets for tail loop")
+        if is_wmma_v3:
+          skipRemoveStaggerLabel = Label("SkipRemoveStagger", "")
+          module.add(SCmpEQU32(src0=sgpr("OrigLoopCounter"), src1=0, comment="skip if main loop was not executed"))
+          module.add(SCBranchSCC1(labelName=skipRemoveStaggerLabel.getLabelName(), comment="skip removeStagger"))
         module.add(self.removeStaggerAB(kernel, tensorParametersA, tensorParametersB))
+        if is_wmma_v3:
+          module.add(skipRemoveStaggerLabel)
+      if is_wmma_v3:
+        module.add(self.calculateLoopNumIter(kernel, tensorParametersA, tensorParametersB, -1))
 
       tensorParameters1st = tensorParametersA
       tensorParameters2nd = tensorParametersB
@@ -5311,17 +5330,24 @@ class KernelWriter(metaclass=abc.ABCMeta):
       vwm = kernel["GlobalReadVectorWidthMetadata"]
 
     # force lrvwTile = 1 for numBytes >= 4 + MIInputPerThread > 1
-    # Enabled lrvwTile>1 for UseF32XEmulation except for UseCustomMainLoopSchedule (TODO: enable for CMS)
-    # TODO: implement extra logic to swap vgprs after local read to suport lrvwTile > 1 for umBytes >= 4 + MIInputPerThread > 1
-    #       (except for UseF32XEmulation)
+    # Exempt from forcing lrvwTile=1:
+    #   - MFMA-based XF32 emulation (gfx950): pack code already handles lrvwTile > 1
+    #   - CMS kernels: schedules are designed with lrvwTile > 1 and manage pack-code placement explicitly
+    # Non-MFMA XF32 (e.g. gfx1250 WMMA) without CMS must use lrvwTile=1 because
+    # the default scheduler's local reads don't match the XF32 pack code's expectations.
+    # TODO: implement extra logic to swap vgprs after local read to suport lrvwTile > 1 for numBytes >= 4 + MIInputPerThread > 1
+    isCMS = kernel["UseCustomMainLoopSchedule"]
+    isMfmaXf32 = kernel["UseMFMAF32XEmulation"]
     forceLrvwTile1 = kernel["ProblemType"]["MacDataTypeA"].numBytes() >= 4 and \
-      (kernel["EnableMatrixInstruction"] and kernel["MIInputPerThread"] > 1 and (not kernel["UseF32XEmulation"]))
+      (kernel["EnableMatrixInstruction"] and kernel["MIInputPerThread"] > 1) and \
+      not (kernel["UseF32XEmulation"] and (isMfmaXf32 or isCMS))
     if not kernel["UnrollMajorLDSA"] and not forceLrvwTile1:
       self.states.lrvwTileA = kernel["VectorWidthA"]
     else:
       self.states.lrvwTileA = 1
     forceLrvwTile1 = kernel["ProblemType"]["MacDataTypeB"].numBytes() >= 4 and \
-      (kernel["EnableMatrixInstruction"] and kernel["MIInputPerThreadB"] > 1 and (not kernel["UseF32XEmulation"]))
+      (kernel["EnableMatrixInstruction"] and kernel["MIInputPerThreadB"] > 1) and \
+      not (kernel["UseF32XEmulation"] and (isMfmaXf32 or isCMS))
     if not kernel["UnrollMajorLDSB"] and not forceLrvwTile1:
       self.states.lrvwTileB = kernel["VectorWidthB"]
     else:
