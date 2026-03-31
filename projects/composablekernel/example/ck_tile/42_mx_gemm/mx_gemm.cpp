@@ -11,6 +11,7 @@
 #include <type_traits>
 
 #include "ck_tile/host.hpp"
+#include "ck_tile/host/gemm_rtol_atol.hpp"
 #include "mx_gemm.hpp"
 #include "mx_gemm_instance.hpp"
 

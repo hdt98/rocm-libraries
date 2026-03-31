@@ -8,6 +8,20 @@
 
 namespace ck_tile {
 
+/// Computes relative and absolute error tolerance thresholds for GEMM verification
+/// without split-K accumulation error (single-WG, no split-K).
+template <typename ADataType, typename BDataType, typename AccDataType, typename CDataType>
+auto calculateRtolAtol(const index_t k_dim, const float max_accumulated_value)
+{
+    using ComputeType =
+        std::conditional_t<sizeof(ADataType) < sizeof(BDataType), ADataType, BDataType>;
+    const auto relative_tolerance =
+        get_relative_threshold<ComputeType, CDataType, AccDataType>(k_dim);
+    const auto absolute_tolerance =
+        get_absolute_threshold<ComputeType, CDataType, AccDataType>(max_accumulated_value, k_dim);
+    return make_tuple(relative_tolerance, absolute_tolerance);
+}
+
 /// Computes relative and absolute error tolerance thresholds for GEMM verification.
 /// Accounts for split-K (or multi-WG) accumulation error in addition to per-element
 /// compute error.
