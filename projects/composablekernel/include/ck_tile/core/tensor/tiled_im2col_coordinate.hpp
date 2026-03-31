@@ -115,8 +115,6 @@ struct TiledIm2ColCoordinate
     index_t m_gemm;    // current absolute M index (needed for dm!=0 reinit)
     index_t k_gemm;    // current absolute K index (needed for K_gemm bound check)
     index_t c_conv_;   // current c_conv = k_gemm % C  (incremental K tracking)
-    index_t x_;        // current x filter index       (incremental K tracking)
-    index_t y_;        // current y filter index       (incremental K tracking)
     index_t ho_;       // output row   from m_gemm (cached to avoid divmod in move_step)
     index_t wo_;       // output col   from m_gemm (cached to avoid divmod in move_step)
     bool    valid;     // true iff (m_gemm, k_gemm) maps to non-padded input
