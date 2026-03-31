@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #pragma once
+#include "ck_tile/host/gemm_rtol_atol.hpp"
 #include "ck_tile/ops/common/utils.hpp"
 
 template <typename Layout>
@@ -9,31 +10,6 @@ static constexpr inline auto is_row_major(Layout)
 {
     return ck_tile::bool_constant<
         std::is_same_v<ck_tile::remove_cvref_t<Layout>, ck_tile::tensor_layout::gemm::RowMajor>>{};
-}
-
-template <typename ADataType, typename BDataType, typename AccDataType, typename CDataType>
-auto calculateRtolAtol(const ck_tile::index_t k_dim,
-                       const ck_tile::index_t k_batch,
-                       const float max_accumulated_value)
-{
-    using ComputeType =
-        std::conditional_t<sizeof(ADataType) < sizeof(BDataType), ADataType, BDataType>;
-    // Calculate thresholds
-    const auto relative_tolerance =
-        ck_tile::get_relative_threshold<ComputeType, CDataType, AccDataType>(
-            ck_tile::integer_divide_ceil(k_dim, k_batch));
-    const auto absolute_tolerance =
-        ck_tile::get_absolute_threshold<ComputeType, CDataType, AccDataType>(
-            max_accumulated_value / k_batch, ck_tile::integer_divide_ceil(k_dim, k_batch));
-    // Calculate error due to multiple WGs working in the same C macro tile
-    const auto relative_tolerance_split_k =
-        ck_tile::get_relative_threshold<CDataType, CDataType, CDataType>(k_batch);
-    const auto absolute_tolerance_split_k =
-        ck_tile::get_absolute_threshold<CDataType, CDataType, CDataType>(max_accumulated_value,
-                                                                         k_batch);
-    // Use higher threshold
-    return ck_tile::make_tuple(std::max(relative_tolerance, relative_tolerance_split_k),
-                               std::max(absolute_tolerance, absolute_tolerance_split_k));
 }
 
 template <typename GemmConfiguration,
@@ -298,7 +274,7 @@ int runGemmExampleWithLayouts(int argc,
         const float max_accumulated_value =
             *std::max_element(c_m_n_reference.mData.begin(), c_m_n_reference.mData.end());
         const auto relative_absolute_tolerances =
-            calculateRtolAtol<ADataType, BDataType, AccumulatorDataType, CDataType>(
+            ck_tile::calculateRtolAtol<ADataType, BDataType, AccumulatorDataType, CDataType>(
                 k_dim, num_wgs_per_tile, max_accumulated_value);
         pass = doVerify(c_m_n_device_result, c_m_n_reference, relative_absolute_tolerances, "CPU");
     }
@@ -325,7 +301,7 @@ int runGemmExampleWithLayouts(int argc,
         const float max_accumulated_value =
             *std::max_element(c_m_n_reference.mData.begin(), c_m_n_reference.mData.end());
         const auto relative_absolute_tolerances =
-            calculateRtolAtol<ADataType, BDataType, AccumulatorDataType, CDataType>(
+            ck_tile::calculateRtolAtol<ADataType, BDataType, AccumulatorDataType, CDataType>(
                 k_dim, num_wgs_per_tile, max_accumulated_value);
         pass = doVerify(c_m_n_device_result, c_m_n_reference, relative_absolute_tolerances, "GPU");
     }
