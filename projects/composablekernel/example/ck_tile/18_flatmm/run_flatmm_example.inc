@@ -156,7 +156,7 @@ int run_flatmm_example_with_layouts(int argc,
             a_host, b_origin_host, c_ref_host);
         const float max_accumulated_value =
             *std::max_element(c_ref_host.mData.begin(), c_ref_host.mData.end());
-        const auto rtol_atol = calculate_rtol_atol<ADataType, BDataType, AccDataType, CDataType>(
+        const auto rtol_atol = ck_tile::calculateRtolAtol<ADataType, BDataType, AccDataType, CDataType>(
             K, kbatch, max_accumulated_value);
         pass = ck_tile::check_err(c_rslt_host,
                                   c_ref_host,
@@ -243,7 +243,7 @@ int run_flatmm_example_with_layouts(int argc,
         c_gpu_ref_dev_buf.FromDevice(c_gpu_ref_host.data());
         const float max_accumulated_value =
             *std::max_element(c_gpu_ref_host.mData.begin(), c_gpu_ref_host.mData.end());
-        const auto rtol_atol = calculate_rtol_atol<ADataType, BDataType, AccDataType, CDataType>(
+        const auto rtol_atol = ck_tile::calculateRtolAtol<ADataType, BDataType, AccDataType, CDataType>(
             K, kbatch, max_accumulated_value);
         pass = ck_tile::check_err(c_rslt_host,
                                   c_gpu_ref_host,

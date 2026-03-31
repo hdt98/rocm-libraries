@@ -18,6 +18,7 @@
 #include "ck_tile/ops/flatmm.hpp"
 #include "ck_tile/ops/moe_flatmm.hpp"
 #include "ck_tile/host.hpp"
+#include "ck_tile/host/gemm_rtol_atol.hpp"
 #include "ck_tile/host/reference/reference_moe_gemm.hpp"
 
 template <typename Layout>
@@ -44,27 +45,6 @@ auto flatmm_shuffle_b(const ck_tile::HostTensor<T>& t)
                                    ItemsPerAccess});
     std::copy(t.begin(), t.end(), t_view.begin());
     return ck_tile::reference_permute(t_view, {0, 2, 1, 3});
-}
-
-template <typename ADataType, typename BDataType, typename AccDataType, typename CDataType>
-auto calculate_rtol_atol(const ck_tile::index_t K,
-                         const ck_tile::index_t kbatch,
-                         const float max_accumulated_value)
-{
-    using ComputeType =
-        std::conditional_t<sizeof(ADataType) < sizeof(BDataType), ADataType, BDataType>;
-    // Calculate thresholds
-    const auto rtol = ck_tile::get_relative_threshold<ComputeType, CDataType, AccDataType>(
-        ck_tile::integer_divide_ceil(K, kbatch));
-    const auto atol = ck_tile::get_absolute_threshold<ComputeType, CDataType, AccDataType>(
-        max_accumulated_value / kbatch, ck_tile::integer_divide_ceil(K, kbatch));
-    // Calculate error due to split_k accumulation
-    const auto rtol_split_k =
-        ck_tile::get_relative_threshold<CDataType, CDataType, CDataType>(kbatch);
-    const auto atol_split_k = ck_tile::get_absolute_threshold<CDataType, CDataType, CDataType>(
-        max_accumulated_value, kbatch);
-    // Use higher threshold
-    return ck_tile::make_tuple(std::max(rtol, rtol_split_k), std::max(atol, atol_split_k));
 }
 
 // gemm1
