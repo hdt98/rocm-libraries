@@ -16822,11 +16822,11 @@ class KernelWriterAssembly(KernelWriter):
   ##############################################################################
   def prefetchAcrossPersistent(self, kernel, tensorParametersA, tensorParametersB):
     module = Module("prefetchAcrossPersistent")
-    if not self.prefetchAcrossPersistentActive(kernel):
+    if not self.isPrefetchAcrossPersistentEnabled(kernel):
       return module
 
     # Snapshot MUST be unconditional: the store path always reads Prev*
-    # when prefetchAcrossPersistentActive is true.  If skipped, Prev* == live (correct).
+    # when isPrefetchAcrossPersistentEnabled is true.  If skipped, Prev* == live (correct).
     # If it runs, Prev* preserves the current tile while live advances.
     module.add(self.prefetchAcrossPersistentSnapshot(kernel))
 
@@ -16841,7 +16841,7 @@ class KernelWriterAssembly(KernelWriter):
 
     skComponent = Component.StreamK.find(self)
     module.add(skComponent.prefetchAcrossPersistentSetupNextTile(self, kernel, tensorParametersA, tensorParametersB, skipLroReset=True))
-    module.add(self.setupNewTile(kernel, tensorParametersA, tensorParametersB, isOptNLL=True, isPrefetchAcrossPersistent=True))
+    module.add(self.setupNewTile(kernel, tensorParametersA, tensorParametersB, isOptNLL=True, isPrefetchAcrossPersistentActive=True))
     module.add(skipLabel)
     return module
 
