@@ -56,8 +56,8 @@ struct FmhaFwdPagedKVKernel
     static constexpr bool kDoFp8StaticQuant = FmhaPipeline::Problem::kDoFp8StaticQuant;
     static constexpr bool kSkipMinSeqlenQ   = FmhaPipeline::Problem::kSkipMinSeqlenQ;
     static constexpr bool kIsPagedKV        = FmhaPipeline::Problem::kIsPagedKV;
-    static constexpr FmhaSinkMode kSinkMode  = FmhaPipeline::kSinkMode;
-    static constexpr bool kHasGptOssSink    = FmhaPipeline::kHasGptOssSink;
+    static constexpr FmhaSinkMode kSinkMode  = FmhaPipeline::Problem::kSinkMode;
+    static constexpr bool kHasGptOssSink    = FmhaPipeline::Problem::kHasGptOssSink;
 
     using AttentionVariant = ck_tile::remove_cvref_t<typename FmhaPipeline::AttentionVariant>;
     using FmhaMask         = ck_tile::remove_cvref_t<typename FmhaPipeline::FmhaMask>;
