@@ -281,10 +281,10 @@ std::vector<Solution> EvaluateConvSolutions(const ExecutionContext& ctx,
     {
         const auto id      = solver::Id{conv_sol->solver_id};
         const auto& solver = id.GetSolver();
-        
+
         // Log the solver being benchmarked during tuning/Find phase
         CompileSolution(id, ctx, problem);
-        
+
         if(IsLoggingKernel())
         {
             std::string solution_name = id.ToString();
@@ -1113,8 +1113,8 @@ void ConvolutionDescriptor::ConvolutionForwardImmediate(const Handle& handle,
         if(IsLoggingKernel())
         {
             // Log the selected solver for execution phase kernel tracking
-            std::string solution_name = (solver_id.Value() != 0) ? solver_id.ToString()
-                                                                : std::string("UNKNOWN");
+            std::string solution_name =
+                (solver_id.Value() != 0) ? solver_id.ToString() : std::string("UNKNOWN");
             LogSolutionName(solution_name, solver_id.Value(), workSpaceSize);
         }
         invoker(handle, invoke_ctx);
@@ -1330,10 +1330,10 @@ void ConvolutionDescriptor::ConvolutionBackwardImmediate(const Handle& handle,
         const auto invoke_ctx = conv::DataInvokeParams{
             tensors, workSpace, workSpaceSize, this->attribute.gfx90aFp16alt.GetBwd()};
         if(IsLoggingKernel())
-        {            
+        {
             // Log the selected solver for execution phase kernel tracking
-            std::string solution_name = (solver_id.Value() != 0) ? solver_id.ToString()
-                                                                : std::string("UNKNOWN");
+            std::string solution_name =
+                (solver_id.Value() != 0) ? solver_id.ToString() : std::string("UNKNOWN");
             LogSolutionName(solution_name, solver_id.Value(), workSpaceSize);
         }
         invoker(handle, invoke_ctx);

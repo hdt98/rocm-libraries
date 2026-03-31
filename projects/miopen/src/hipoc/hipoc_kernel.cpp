@@ -125,7 +125,7 @@ void HIPOCKernelInvoke::run(void* args, std::size_t size) const
         {
             float elapsed_time = 0.0f;
             (void)hipEventElapsedTime(&elapsed_time, start.get(), stop.get());
-            
+
             const bool is_transpose = IsTransposeOrTransformKernel(GetName());
             AddKernelToJsonAccumulator(GetName(), elapsed_time, is_transpose);
         }
@@ -208,7 +208,7 @@ void HIPOCKernelInvoke::run_cooperative(void** kern_args) const
         {
             float elapsed_time = 0.0f;
             (void)hipEventElapsedTime(&elapsed_time, start.get(), stop.get());
-            
+
             const bool is_transpose = IsTransposeOrTransformKernel(GetName());
             AddKernelToJsonAccumulator(GetName(), elapsed_time, is_transpose);
         }

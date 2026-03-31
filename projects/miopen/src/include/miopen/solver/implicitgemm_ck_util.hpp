@@ -384,33 +384,33 @@ ConvSolution InitAnyInvokerFactory(const ProblemDescriptionType& problem,
     }
 #endif
 
-    result.invoker_factory =
-        [kernel_id  = kernel_id,
-         ck_args    = CKArgsType{problem},
-         sh_conv_ptr = std::shared_ptr{std::move(*ptr_iter)}](const std::vector<Kernel>&) mutable {
-            return [kernel_id = kernel_id, ck_args = std::move(ck_args), sh_conv_ptr = std::move(sh_conv_ptr)](
-                       const Handle& handle, const AnyInvokeParams& primitive_parameters) {
-                
-                const auto& data_ctx = primitive_parameters.CastTo<CastType>();
-                auto argument_ptr    = ck_args.MakeArgPtr(sh_conv_ptr, data_ctx);
-                auto invoker_ptr     = sh_conv_ptr->MakeInvokerPointer();
-                
-                {
-                    WorkAroundHipEventProfiler prf(handle);
-                    invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
-                }
-                
-                
-                if(handle.IsProfilingEnabled())
-                {
-                    float elapsed_time = handle.GetKernelTime();
-                      
-                    AddKernelToJsonAccumulator(kernel_id, elapsed_time, false);
-                    handle.ResetKernelTime();
-                    handle.AccumKernelTime(elapsed_time);
-                }
-            };
+    result.invoker_factory = [kernel_id   = kernel_id,
+                              ck_args     = CKArgsType{problem},
+                              sh_conv_ptr = std::shared_ptr{std::move(*ptr_iter)}](
+                                 const std::vector<Kernel>&) mutable {
+        return [kernel_id   = kernel_id,
+                ck_args     = std::move(ck_args),
+                sh_conv_ptr = std::move(sh_conv_ptr)](const Handle& handle,
+                                                      const AnyInvokeParams& primitive_parameters) {
+            const auto& data_ctx = primitive_parameters.CastTo<CastType>();
+            auto argument_ptr    = ck_args.MakeArgPtr(sh_conv_ptr, data_ctx);
+            auto invoker_ptr     = sh_conv_ptr->MakeInvokerPointer();
+
+            {
+                WorkAroundHipEventProfiler prf(handle);
+                invoker_ptr->Run(argument_ptr.get(), {handle.GetStream(), false});
+            }
+
+            if(handle.IsProfilingEnabled())
+            {
+                float elapsed_time = handle.GetKernelTime();
+
+                AddKernelToJsonAccumulator(kernel_id, elapsed_time, false);
+                handle.ResetKernelTime();
+                handle.AccumKernelTime(elapsed_time);
+            }
         };
+    };
     return result;
 }
 
@@ -1258,7 +1258,7 @@ ConvSolution InitInvokerFactoryNCHW(const ExecutionContext& ctx,
             }
 
             auto invoker_ptr = sh_conv_ptr->MakeInvokerPointer();
-            
+
             {
                 WorkAroundHipEventProfiler prf(handle);
                 MIOPEN_LOG_I2("kernel_name = " << kernel_id);
@@ -1376,8 +1376,7 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                 }
 
                 auto invoker_ptr = sh_conv_ptr->MakeInvokerPointer();
-                
-                
+
                 {
                     WorkAroundHipEventProfiler prf(handle);
                     MIOPEN_LOG_I2("kernel_name = " << kernel_id);
@@ -1387,7 +1386,7 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                 if(handle.IsProfilingEnabled())
                 {
                     elapsed += handle.GetKernelTime();
-                    
+
                     // Kernel logging for CK kernels
                     if(IsLoggingKernel())
                     {
@@ -1448,7 +1447,7 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                 if(handle.IsProfilingEnabled())
                 {
                     elapsed += handle.GetKernelTime();
-                    
+
                     // Kernel logging for CK kernels
                     if(IsLoggingKernel())
                     {

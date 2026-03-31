@@ -24,10 +24,10 @@ namespace miopen {
 /// Determines the context in which kernels are executed for logging purposes
 enum class KernelPhase
 {
-    Unknown,       // Default/unset phase
-    Execution,     // Normal kernel execution
-    Validation,    // Validation phase
-    SolverTuning,   // Solver tuning/search phase
+    Unknown,      // Default/unset phase
+    Execution,    // Normal kernel execution
+    Validation,   // Validation phase
+    SolverTuning, // Solver tuning/search phase
     Tuning
 };
 
@@ -36,12 +36,12 @@ inline const char* KernelPhaseToString(KernelPhase phase)
 {
     switch(phase)
     {
-    case KernelPhase::Unknown:      return "unknown";
-    case KernelPhase::Execution:    return "execution";
-    case KernelPhase::Validation:   return "validation";
+    case KernelPhase::Unknown: return "unknown";
+    case KernelPhase::Execution: return "execution";
+    case KernelPhase::Validation: return "validation";
     case KernelPhase::SolverTuning: return "solver_tuning";
-    case KernelPhase::Tuning:       return "tuning";
-    default:                        return "unknown";
+    case KernelPhase::Tuning: return "tuning";
+    default: return "unknown";
     }
 }
 
@@ -54,10 +54,7 @@ inline KernelPhase& GetKernelPhase()
 }
 
 /// Set the current kernel phase
-inline void SetKernelPhase(KernelPhase phase)
-{
-    GetKernelPhase() = phase;
-}
+inline void SetKernelPhase(KernelPhase phase) { GetKernelPhase() = phase; }
 
 /// Get the last printed solution name
 inline std::string& GetLastPrintedSolutionName()
@@ -111,11 +108,11 @@ struct KernelExecutionData
 /// Structure to hold performance config data with its kernels
 struct PerformanceConfigData
 {
-    std::string config_name;        // Kernel name (if available) or solution name
-    std::string config_descriptor;  // Performance config parameters string
+    std::string config_name;       // Kernel name (if available) or solution name
+    std::string config_descriptor; // Performance config parameters string
     std::vector<KernelExecutionData> kernels;
-    std::vector<float> invoker_times_ms;  // Direct timing from invoker (if available)
-    
+    std::vector<float> invoker_times_ms; // Direct timing from invoker (if available)
+
     void Clear()
     {
         config_name.clear();
@@ -133,19 +130,18 @@ struct GroupedKernelData
     bool is_transformation;
 };
 
-
 /// Structure to hold solution data for JSON output
 struct SolutionExecutionData
 {
     std::string solution_name;
     uint64_t solver_id;
     std::string phase;
-    size_t workspace_bytes = 0; // Workspace size for this solution
+    size_t workspace_bytes = 0;                             // Workspace size for this solution
     std::vector<PerformanceConfigData> performance_configs; // Array of performance configs
-    
+
     // Current config being accumulated (temporary)
     PerformanceConfigData current_config;
-    
+
     void Clear()
     {
         solution_name.clear();
@@ -155,7 +151,7 @@ struct SolutionExecutionData
         performance_configs.clear();
         current_config.Clear();
     }
-    
+
     void FinalizeCurrentConfig()
     {
         // Finalize if we have a config name and either kernels OR invoker times
@@ -210,7 +206,7 @@ inline SolutionExecutionData& GetJsonAccumulator()
 inline bool IsLoggingKernel()
 {
     const KernelPhase current_phase = GetKernelPhase();
-    const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
+    const auto log_level            = env::value(MIOPEN_PERFORMANCE_LOGS);
     if(log_level > 2)
     {
         // Log all kernels (all phases) when log_level > 2
@@ -225,28 +221,28 @@ inline bool IsLoggingKernel()
 }
 
 /// Check if Performance Logs are enabled mode is enabled
-inline bool IsPerformanceLoggingEnabled() 
-{ 
+inline bool IsPerformanceLoggingEnabled()
+{
     const auto log_level = env::value(MIOPEN_PERFORMANCE_LOGS);
-    return log_level > 0; 
+    return log_level > 0;
 }
 
 /// Add a new performance config with its name and descriptor
 /// This creates a new performance config entry. Call AddInvokerTimes() afterwards
 /// to add timing samples to this config.
 inline void AddPerformanceConfig(const std::string& config_name,
-                                  const std::string& config_descriptor = "")
+                                 const std::string& config_descriptor = "")
 {
     const bool logging_enabled = IsLoggingKernel();
     if(logging_enabled)
     {
         auto& data = GetJsonAccumulator();
-        
+
         // Finalize the previous config if it exists
         data.FinalizeCurrentConfig();
-        
+
         // Start a new config
-        data.current_config.config_name = config_name;
+        data.current_config.config_name       = config_name;
         data.current_config.config_descriptor = config_descriptor;
     }
 }
@@ -258,15 +254,16 @@ inline void AddInvokerTimes(const std::vector<float>& invoker_times_ms)
     const bool logging_enabled = IsLoggingKernel();
     if(!logging_enabled)
         return;
-    
+
     auto& data = GetJsonAccumulator();
-    
+
     if(data.current_config.config_name.empty())
     {
-        std::cerr << "WARNING: AddInvokerTimes called but no performance config exists" << std::endl;
+        std::cerr << "WARNING: AddInvokerTimes called but no performance config exists"
+                  << std::endl;
         return;
     }
-    
+
     // Add times to the current performance config
     data.current_config.invoker_times_ms = invoker_times_ms;
 }
@@ -295,9 +292,8 @@ inline void FlushJsonAccumulator()
     // Output JSON with solution-level metrics
     std::cerr << "{\"solution\":\"" << JsonEscape(data.solution_name) << "\","
               << "\"solver_id\":" << data.solver_id << ","
-              << "\"workspace_bytes\":" << data.workspace_bytes << ","
-              << "\"phase\":\"" << data.phase << "\","
-              << "\"performance_configs\":[";
+              << "\"workspace_bytes\":" << data.workspace_bytes << "," << "\"phase\":\""
+              << data.phase << "\"," << "\"performance_configs\":[";
 
     // Output each performance config
     bool first_config = true;
@@ -306,7 +302,7 @@ inline void FlushJsonAccumulator()
         if(!first_config)
             std::cerr << ",";
         first_config = false;
-        
+
         // Determine config_name: prefer first kernel name, fallback to config.config_name
         std::string display_name = config.config_name;
         if(!config.kernels.empty())
@@ -321,34 +317,35 @@ inline void FlushJsonAccumulator()
                 }
             }
         }
-        
+
         // If all kernels are transformations or there are no kernels, use the solution name
         if(display_name == config.config_name)
         {
             display_name = data.solution_name;
         }
-        
+
         std::cerr << "{\"config_name\":\"" << JsonEscape(display_name) << "\",";
-        
+
         // Output config_descriptor if present
         if(!config.config_descriptor.empty())
         {
-            std::cerr << "\"config_descriptor\":\"" << JsonEscape(config.config_descriptor) << "\",";
+            std::cerr << "\"config_descriptor\":\"" << JsonEscape(config.config_descriptor)
+                      << "\",";
         }
-        
+
         // Group kernels by kernel_name for this config
         std::map<std::string, GroupedKernelData> grouped_kernels;
-        
+
         // Variables for config-level aggregation
         std::vector<float> all_exec_times;
-        size_t min_exec_number = std::numeric_limits<size_t>::max();
+        size_t min_exec_number    = std::numeric_limits<size_t>::max();
         int total_transformations = 0;
-        
+
         // Check if we have invoker timings - if so, use those instead of kernel accumulation
         if(!config.invoker_times_ms.empty())
         {
-            all_exec_times = config.invoker_times_ms;
-            min_exec_number = 1;  // Invoker timings start from execution 1
+            all_exec_times  = config.invoker_times_ms;
+            min_exec_number = 1; // Invoker timings start from execution 1
         }
 
         for(const auto& k : config.kernels)
@@ -357,13 +354,13 @@ inline void FlushJsonAccumulator()
             // Initialize on first occurrence
             if(grouped.time_executions_ms.empty())
             {
-                grouped.kernel_name = k.kernel_name;
+                grouped.kernel_name       = k.kernel_name;
                 grouped.is_transformation = k.is_transformation;
             }
             // Append timing data
             grouped.time_executions_ms.push_back(k.time_ms);
         }
-        
+
         // Count transformations based on grouped kernels (not individual executions)
         for(const auto& entry : grouped_kernels)
         {
@@ -372,18 +369,18 @@ inline void FlushJsonAccumulator()
                 total_transformations++;
             }
         }
-        
+
         // Calculate config-level statistics
-        float config_time_ms = 0.0f;
+        float config_time_ms  = 0.0f;
         float config_time_std = 0.0f;
         float config_time_min = 0.0f;
         float config_time_max = 0.0f;
-        
+
         if(!all_exec_times.empty())
         {
             if(all_exec_times.size() <= 1)
             {
-                config_time_ms = all_exec_times[0];
+                config_time_ms  = all_exec_times[0];
                 config_time_std = 0.0f;
                 config_time_min = config_time_ms;
                 config_time_max = config_time_ms;
@@ -404,11 +401,11 @@ inline void FlushJsonAccumulator()
                     samples_copy = all_exec_times;
                 }
                 config_time_ms = removeHighOutliersAndGetMean(samples_copy, 2.0f);
-                
+
                 // samples_copy is now sorted by removeHighOutliersAndGetMean
                 config_time_min = samples_copy.front();
                 config_time_max = samples_copy.back();
-                
+
                 // Standard deviation over the same (post-warmup) samples vs. reported mean
                 const size_t std_begin =
                     (all_exec_times.size() > kWarmupExecutions) ? kWarmupExecutions : 0;
@@ -423,10 +420,10 @@ inline void FlushJsonAccumulator()
                 config_time_std = (count > 1) ? std::sqrt(sq_sum / count) : 0.0f;
             }
         }
-        
+
         // Output config-level aggregated stats
         std::cerr << "\"exec_number\":" << min_exec_number << ",";
-        
+
         std::cerr << "\"time_executions_ms\":[";
         for(size_t i = 0; i < all_exec_times.size(); ++i)
         {
@@ -435,13 +432,13 @@ inline void FlushJsonAccumulator()
             std::cerr << all_exec_times[i];
         }
         std::cerr << "],";
-        
+
         std::cerr << "\"time_ms\":" << config_time_ms << ","
                   << "\"time_std_ms\":" << config_time_std << ","
                   << "\"time_min_ms\":" << config_time_min << ","
                   << "\"time_max_ms\":" << config_time_max << ","
                   << "\"number_of_transformations\":" << total_transformations;
-        
+
         // Only output kernels array if show_kernels is true (log_level 2 or 4)
         if(show_kernels)
         {
@@ -465,20 +462,22 @@ inline void FlushJsonAccumulator()
                 }
 
                 std::cerr << "],";
-                std::cerr << "\"is_transformation\":" << (g.is_transformation ? "true" : "false") << "}";
+                std::cerr << "\"is_transformation\":" << (g.is_transformation ? "true" : "false")
+                          << "}";
             }
-            
+
             std::cerr << "]"; // Close kernels array
-        }else
+        }
+        else
         {
             std::cerr << ",\"kernels\":null";
         }
-        
+
         std::cerr << "}"; // Close config object
     }
-    
+
     std::cerr << "]}" << std::endl; // Close performance_configs array and root object
-    
+
     // Only clear the performance configs, preserve solution-level metadata
     // This ensures solution_name, solver_id, and phase remain available until overwritten
     data.performance_configs.clear();
@@ -489,9 +488,8 @@ inline void FinalizeJsonLogging() { FlushJsonAccumulator(); }
 
 /// Add kernel to JSON accumulator
 /// All kernels are stored individually when logging is enabled
-inline void AddKernelToJsonAccumulator(const std::string& kernel_name,
-                                       float time_ms,
-                                       bool is_transform)
+inline void
+AddKernelToJsonAccumulator(const std::string& kernel_name, float time_ms, bool is_transform)
 {
     const bool logging_enabled = IsLoggingKernel();
     if(!logging_enabled)
@@ -499,21 +497,18 @@ inline void AddKernelToJsonAccumulator(const std::string& kernel_name,
 
     // Always store kernels individually
     auto& data = GetJsonAccumulator();
-    data.current_config.kernels.push_back({
-        kernel_name,
-        time_ms,
-        is_transform
-    });
+    data.current_config.kernels.push_back({kernel_name, time_ms, is_transform});
 }
 
 /// Log solution name if appropriate for the current log level
 /// Only prints if the solution name has changed since the last call
-inline void LogSolutionName(const std::string& solution_name, uint64_t solver_id, size_t workspace_bytes = 0)
+inline void
+LogSolutionName(const std::string& solution_name, uint64_t solver_id, size_t workspace_bytes = 0)
 {
     const bool logging_enabled = IsLoggingKernel();
     if(logging_enabled && !solution_name.empty())
     {
-        auto& last_solution = GetLastPrintedSolutionName();
+        auto& last_solution  = GetLastPrintedSolutionName();
         auto& last_solver_id = GetLastPrintedSolverId();
 
         // Check if solution name or solver_id has changed
@@ -524,13 +519,13 @@ inline void LogSolutionName(const std::string& solution_name, uint64_t solver_id
 
             // Set up new solution in accumulator
             const KernelPhase current_phase = GetKernelPhase();
-            auto& data         = GetJsonAccumulator();
-            data.solution_name = solution_name;
-            data.solver_id     = solver_id;
-            data.workspace_bytes = workspace_bytes;
-            data.phase         = KernelPhaseToString(current_phase);
-            last_solution      = solution_name;
-            last_solver_id     = solver_id;
+            auto& data                      = GetJsonAccumulator();
+            data.solution_name              = solution_name;
+            data.solver_id                  = solver_id;
+            data.workspace_bytes            = workspace_bytes;
+            data.phase                      = KernelPhaseToString(current_phase);
+            last_solution                   = solution_name;
+            last_solver_id                  = solver_id;
         }
     }
 }
@@ -540,16 +535,12 @@ inline void LogSolutionName(const std::string& solution_name, uint64_t solver_id
 class ScopedKernelPhase
 {
 public:
-    explicit ScopedKernelPhase(KernelPhase phase)
-        : prev_phase(GetKernelPhase())
+    explicit ScopedKernelPhase(KernelPhase phase) : prev_phase(GetKernelPhase())
     {
         SetKernelPhase(phase);
     }
 
-    ~ScopedKernelPhase()
-    {
-        SetKernelPhase(prev_phase);
-    }
+    ~ScopedKernelPhase() { SetKernelPhase(prev_phase); }
 
     ScopedKernelPhase(const ScopedKernelPhase&)            = delete;
     ScopedKernelPhase& operator=(const ScopedKernelPhase&) = delete;

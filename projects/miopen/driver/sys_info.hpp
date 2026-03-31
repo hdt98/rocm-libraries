@@ -47,7 +47,7 @@ public:
 #ifdef __linux__
         // Check if JSON mode is enabled
         const bool json_mode = miopen::IsPerformanceLoggingEnabled();
-        
+
         // System information collection
         const std::string timestamp = GetTimestamp();
         const std::string hostname  = GetHostname();
@@ -62,26 +62,24 @@ public:
         if(json_mode)
         {
             std::cout << "{\"timestamp\":\"" << JsonEscape(timestamp) << "\","
-                      << "\"system_info\":{"
-                      << "\"hostname\":\"" << JsonEscape(hostname) << "\","
-                      << "\"os\":\"" << JsonEscape(osInfo) << "\","
-                      << "\"cpu_vendor\":\"" << JsonEscape(cpuVendor) << "\","
-                      << "\"cpu_model\":\"" << JsonEscape(cpuModel) << "\","
-                      << "\"ram_size\":\"" << JsonEscape(ramSize) << "\","
-                      << "\"gpu_model\":\"" << JsonEscape(gpuInfo) << "\"},"
-                      << "\"build_info\":{"
-                      << "\"rocm\":\"" << JsonEscape(hipVer) << "\","
-                      << "\"miopen_version\":\"" << miopMajor << "." << miopMinor << "." << miopPatch << "\","
-                      << "\"amdgpu_driver\":\"" << JsonEscape(amdgpuVer) << "\"}}" << std::endl;
+                      << "\"system_info\":{" << "\"hostname\":\"" << JsonEscape(hostname) << "\","
+                      << "\"os\":\"" << JsonEscape(osInfo) << "\"," << "\"cpu_vendor\":\""
+                      << JsonEscape(cpuVendor) << "\"," << "\"cpu_model\":\""
+                      << JsonEscape(cpuModel) << "\"," << "\"ram_size\":\"" << JsonEscape(ramSize)
+                      << "\"," << "\"gpu_model\":\"" << JsonEscape(gpuInfo) << "\"},"
+                      << "\"build_info\":{" << "\"rocm\":\"" << JsonEscape(hipVer) << "\","
+                      << "\"miopen_version\":\"" << miopMajor << "." << miopMinor << "."
+                      << miopPatch << "\"," << "\"amdgpu_driver\":\"" << JsonEscape(amdgpuVer)
+                      << "\"}}" << std::endl;
         }
         else
         {
             std::cout << "Timestamp: " << timestamp << "; " << "Host Name: " << hostname << "; "
-                  << "Operating System: " << osInfo << "; " << "ROCm: " << hipVer << "; "
-                  << "MIOpen Driver: " << miopMajor << "." << miopMinor << "." << miopPatch << "; "
-                  << "CPU Vendor: " << cpuVendor << "; " << "CPU Model: " << cpuModel << "; "
-                  << "RAM Size: " << ramSize << "; " << "GPU Model: " << gpuInfo << "; "
-                  << "AMDGPU Driver: " << amdgpuVer << std::endl;
+                      << "Operating System: " << osInfo << "; " << "ROCm: " << hipVer << "; "
+                      << "MIOpen Driver: " << miopMajor << "." << miopMinor << "." << miopPatch
+                      << "; " << "CPU Vendor: " << cpuVendor << "; " << "CPU Model: " << cpuModel
+                      << "; " << "RAM Size: " << ramSize << "; " << "GPU Model: " << gpuInfo << "; "
+                      << "AMDGPU Driver: " << amdgpuVer << std::endl;
         }
 #else
         miopMajor;
@@ -90,8 +88,8 @@ public:
         const bool json_mode = miopen::IsPerformanceLoggingEnabled();
         if(json_mode)
         {
-            std::cout << "{\"build_info\":{"
-                    << "\"miopen_version\":\"" << miopMajor << "." << miopMinor << "." << miopPatch << "\"}}" << std::endl;
+            std::cout << "{\"build_info\":{" << "\"miopen_version\":\"" << miopMajor << "."
+                      << miopMinor << "." << miopPatch << "\"}}" << std::endl;
         }
 #endif
     }
@@ -100,32 +98,32 @@ private:
     std::string JsonEscape(const std::string& str)
     {
         std::ostringstream oss;
-        for (char c : str)
+        for(char c : str)
         {
-            switch (c)
+            switch(c)
             {
-                case '"':  oss << "\\\""; break;
-                case '\\': oss << "\\\\"; break;
-                case '\b': oss << "\\b"; break;
-                case '\f': oss << "\\f"; break;
-                case '\n': oss << "\\n"; break;
-                case '\r': oss << "\\r"; break;
-                case '\t': oss << "\\t"; break;
-                default:
-                    if (c < 32 || c > 126)
-                    {
-                        oss << "\\u" << std::hex << std::setw(4) << std::setfill('0') 
-                            << static_cast<int>(static_cast<unsigned char>(c));
-                    }
-                    else
-                    {
-                        oss << c;
-                    }
+            case '"': oss << "\\\""; break;
+            case '\\': oss << "\\\\"; break;
+            case '\b': oss << "\\b"; break;
+            case '\f': oss << "\\f"; break;
+            case '\n': oss << "\\n"; break;
+            case '\r': oss << "\\r"; break;
+            case '\t': oss << "\\t"; break;
+            default:
+                if(c < 32 || c > 126)
+                {
+                    oss << "\\u" << std::hex << std::setw(4) << std::setfill('0')
+                        << static_cast<int>(static_cast<unsigned char>(c));
+                }
+                else
+                {
+                    oss << c;
+                }
             }
         }
         return oss.str();
     }
-    
+
     std::string GetTimestamp()
     {
         std::stringstream ss;

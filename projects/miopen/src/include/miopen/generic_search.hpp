@@ -548,37 +548,35 @@ auto GenericSearch(const Solver s,
 
             Invoker invoker;
 
-
             try
             {
                 if(current_solution.invoker_factory.has_value())
                 {
                     invoker = profile_h.PrepareInvoker(*current_solution.invoker_factory,
                                                        current_solution.construction_params);
-                    
-                    
+
                     // Log solution name for grouped kernel logging (only once per solution)
                     const auto solver_name = s.SolverDbId();
-                    const auto solver_id = miopen::solver::Id(solver_name).Value();
-                    
+                    const auto solver_id   = miopen::solver::Id(solver_name).Value();
+
                     // LogSolutionName only sets up the solution context once
                     LogSolutionName(solver_name, solver_id, current_solution.workspace_sz);
-                    
+
                     // Add this specific performance config with kernel name extracted from solution
                     const auto config_string = current_config.ToString();
-                    
+
                     // Extract kernel name from first kernel in solution (if available)
                     std::string kernel_name;
-                    if(!current_solution.construction_params.empty() && 
-                    !current_solution.construction_params[0].kernel_name.empty())
+                    if(!current_solution.construction_params.empty() &&
+                       !current_solution.construction_params[0].kernel_name.empty())
                     {
                         kernel_name = current_solution.construction_params[0].kernel_name;
                     }
                     else
                     {
-                        kernel_name = solver_name;  // Fallback to solver name
+                        kernel_name = solver_name; // Fallback to solver name
                     }
-                    
+
                     // Pass kernel name and config string as descriptor
                     AddPerformanceConfig(kernel_name, config_string);
 
@@ -657,7 +655,7 @@ auto GenericSearch(const Solver s,
                     if(ret == 0)
                     {
                         is_passed = true;
-                        
+
                         if(IsLoggingKernel())
                         {
                             // Add the timing samples to the current performance config
@@ -690,7 +688,8 @@ auto GenericSearch(const Solver s,
                 }
                 else
                 {
-                    // Config didn't pass threshold for additional runs, but still add the single sample
+                    // Config didn't pass threshold for additional runs, but still add the single
+                    // sample
                     if(IsLoggingKernel())
                     {
                         AddInvokerTimes(samples);

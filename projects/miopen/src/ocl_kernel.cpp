@@ -64,8 +64,8 @@ void OCLKernelInvoke::run() const
     if(callback)
     {
         clWaitForEvents(1, &ev);
-        // Profiling is enable when Performance Logs are see `Run` in handleocl.cpp so this is nested in callback
-        // Log to JSON accumulator
+        // Profiling is enable when Performance Logs are see `Run` in handleocl.cpp so this is
+        // nested in callback Log to JSON accumulator
         if(IsLoggingKernel())
         {
             // Match handleocl.cpp `SetProfilingResult`
@@ -74,7 +74,7 @@ void OCLKernelInvoke::run() const
             clGetEventProfilingInfo(ev, CL_PROFILING_COMMAND_END, sizeof(size_t), &end, nullptr);
             float elapsed_time = static_cast<float>(end - st) * 1.0e-6; // NOLINT
 
-            auto kernel_name = GetName();
+            auto kernel_name        = GetName();
             const bool is_transpose = IsTransposeOrTransformKernel(kernel_name);
             AddKernelToJsonAccumulator(kernel_name, elapsed_time, is_transpose);
         }

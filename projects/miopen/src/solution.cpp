@@ -198,8 +198,8 @@ void Solution::RunImpl(const Handle& handle,
     };
 
     const auto solver_name = GetSolver().ToString();
-    const auto solver_id = GetSolver().Value();
-    
+    const auto solver_id   = GetSolver().Value();
+
     if(invoker)
     {
         LogSolutionName(solver_name, solver_id, workspace_size);
@@ -265,11 +265,11 @@ void Solution::RunImpl(const Handle& handle,
                        const std::unordered_map<miopenTensorArgumentId_t, RunInput>& inputs,
                        Data_t workspace,
                        std::size_t workspace_size,
-    [[maybe_unused]] const MhaDescriptor& mha_desc)
+                       [[maybe_unused]] const MhaDescriptor& mha_desc)
 {
     const auto solver_name = GetSolver().ToString();
-    const auto solver_id = GetSolver().Value();
-    
+    const auto solver_id   = GetSolver().Value();
+
     const Problem& problem_casted = std::get<Problem>(problem.item);
 
     const auto get_input_checked = [&](auto name, const std::string& name_str) {
@@ -469,7 +469,7 @@ void Solution::RunImpl(const Handle& handle,
                        const SoftmaxDescriptor& softmax_desc)
 {
     const auto solver_name = GetSolver().ToString();
-    const auto solver_id = GetSolver().Value();
+    const auto solver_id   = GetSolver().Value();
 
     const auto& problem_casted = std::get<Problem>(problem.item);
 
@@ -596,8 +596,8 @@ void Solution::RunImpl(const Handle& handle,
                        const FusedProblem& problem_)
 {
     const auto solver_name = GetSolver().ToString();
-    const auto solver_id = GetSolver().Value();
-    
+    const auto solver_id   = GetSolver().Value();
+
     const auto buffer_getter = [&](auto id, auto&& descriptor) {
         const auto found = inputs.find(id);
         if(found == inputs.end())

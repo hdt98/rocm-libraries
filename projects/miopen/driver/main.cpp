@@ -77,15 +77,16 @@ int main(int argc, char* argv[])
             }
             else
             {
-                std::cout << "{\"error\":\"ParseCmdLineArgs() FAILED, rc = " << rc << "\"}" << std::endl;
+                std::cout << "{\"error\":\"ParseCmdLineArgs() FAILED, rc = " << rc << "\"}"
+                          << std::endl;
             }
             return rc;
-        }        
+        }
 
         drv->GetandSetData();
 
         rc = drv->AllocateBuffersAndCopy();
-        
+
         if(rc != 0)
         {
             if(!json_mode)
@@ -94,7 +95,8 @@ int main(int argc, char* argv[])
             }
             else
             {
-                std::cout << "{\"error\":\"AllocateBuffersAndCopy() FAILED, rc = " << rc << "\"}" << std::endl;
+                std::cout << "{\"error\":\"AllocateBuffersAndCopy() FAILED, rc = " << rc << "\"}"
+                          << std::endl;
             }
             return rc;
         }
@@ -125,13 +127,13 @@ int main(int argc, char* argv[])
             {
                 if(!json_mode)
                 {
-                    std::cout << "RunForwardGPU() FAILED, rc = " << "0x" << std::hex << rc << std::dec
-                              << std::endl;
+                    std::cout << "RunForwardGPU() FAILED, rc = " << "0x" << std::hex << rc
+                              << std::dec << std::endl;
                 }
                 else
                 {
-                    std::cout << "{\"error\":\"RunForwardGPU() FAILED, rc = 0x" 
-                              << std::hex << rc << std::dec << "\"}" << std::endl;
+                    std::cout << "{\"error\":\"RunForwardGPU() FAILED, rc = 0x" << std::hex << rc
+                              << std::dec << "\"}" << std::endl;
                 }
             }
             if(verifyarg) // Verify even if Run() failed.
@@ -146,13 +148,13 @@ int main(int argc, char* argv[])
             {
                 if(!json_mode)
                 {
-                    std::cout << "RunBackwardGPU() FAILED, rc = " << "0x" << std::hex << rc << std::dec
-                              << std::endl;
+                    std::cout << "RunBackwardGPU() FAILED, rc = " << "0x" << std::hex << rc
+                              << std::dec << std::endl;
                 }
                 else
                 {
-                    std::cout << "{\"error\":\"RunBackwardGPU() FAILED, rc = 0x" 
-                              << std::hex << rc << std::dec << "\"}" << std::endl;
+                    std::cout << "{\"error\":\"RunBackwardGPU() FAILED, rc = 0x" << std::hex << rc
+                              << std::dec << "\"}" << std::endl;
                 }
             }
             if(verifyarg) // Verify even if Run() failed.
@@ -168,7 +170,7 @@ int main(int argc, char* argv[])
     {
         // Flush any accumulated performance logging data before exiting
         miopen::FinalizeJsonLogging();
-        
+
         if(!json_mode)
         {
             std::cerr << "Error: " << ex.what() << std::endl;
@@ -183,7 +185,7 @@ int main(int argc, char* argv[])
     {
         // Flush any accumulated performance logging data before exiting
         miopen::FinalizeJsonLogging();
-        
+
         if(!json_mode)
         {
             std::cerr << "Error: " << ex.what() << std::endl;

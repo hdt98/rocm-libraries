@@ -270,20 +270,21 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
             if(IsLoggingKernel())
             {
                 LogSolutionName(sol.solver_id, solver_id_obj.Value(), sol.workspace_sz);
-                
+
                 // Extract kernel name from first kernel in solution (if available)
                 std::string kernel_name;
-                if(!sol.construction_params.empty() && 
-                !sol.construction_params[0].kernel_name.empty())
+                if(!sol.construction_params.empty() &&
+                   !sol.construction_params[0].kernel_name.empty())
                 {
                     kernel_name = sol.construction_params[0].kernel_name;
                 }
                 else
                 {
-                    kernel_name = sol.solver_id;  // Fallback to solver name
+                    kernel_name = sol.solver_id; // Fallback to solver name
                 }
-                
-                // Log performance config before timing runs. We don't have config descriptor so leave it blank.
+
+                // Log performance config before timing runs. We don't have config descriptor so
+                // leave it blank.
                 AddPerformanceConfig(kernel_name, "");
             }
             // Run invoker max 8 times, with ~5 sec time limit.
@@ -325,7 +326,7 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
                 // Remove outliers that are more than 2 positive modified z-score's away, and get
                 // the mean.
                 elapsed = miopen::removeHighOutliersAndGetMean(samples, 2.0f);
-                
+
                 if(IsLoggingKernel())
                 {
                     // Update the performance config with the collected samples
