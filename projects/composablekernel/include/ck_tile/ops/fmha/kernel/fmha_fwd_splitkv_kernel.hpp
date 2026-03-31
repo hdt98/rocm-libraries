@@ -7,7 +7,6 @@
 #include "ck_tile/ops/common.hpp"
 #include "ck_tile/ops/fmha/block/block_attention_bias_enum.hpp"
 #include "ck_tile/ops/fmha/block/variants.hpp"
-#include "ck_tile/ops/fmha/pipeline/tile_fmha_traits.hpp"
 
 #include <string>
 #include <type_traits>
@@ -52,7 +51,7 @@ struct FmhaFwdSplitKVKernel
     static constexpr bool kStoreLSE         = FmhaPipeline::kStoreLSE;
     static constexpr bool kDoFp8StaticQuant = FmhaPipeline::Problem::kDoFp8StaticQuant;
     static constexpr bool kIsPagedKV        = FmhaPipeline::Problem::kIsPagedKV;
-    static constexpr FmhaSinkMode kSinkMode  = FmhaPipeline::Problem::kSinkMode;
+    static constexpr bool kHasStreamSink    = FmhaPipeline::Problem::kHasStreamSink;
     static constexpr bool kHasGptOssSink    = FmhaPipeline::Problem::kHasGptOssSink;
     static constexpr bool kMergeNumHeadGroupsSeqLenQ =
         FmhaPipeline::Problem::kMergeNumHeadGroupsSeqLenQ;
@@ -105,7 +104,7 @@ struct FmhaFwdSplitKVKernel
             (kHasLogitsSoftCap ? "_logits" : "_nlogits" ) + (BiasEnum == BlockAttentionBiasEnum::NO_BIAS ? _SS_("_nbias") : (_SS_("_") + BlockAttentionBiasEnumToStr<BiasEnum>::name)) +
             (kHasMask ? "_" + _SS_(FmhaMask::name) : "_nmask") + (kStoreLSE ? "_lse" : "_nlse" ) +
             (kDoFp8StaticQuant ? "_squant" : "_nsquant") + (kIsPagedKV ? "_pagedkv" : "_npagedkv" ) +
-            (kSinkMode == FmhaSinkMode::kNone ? "_nsink" : kSinkMode == FmhaSinkMode::kStreamLLM ? "_ssink" : kSinkMode == FmhaSinkMode::kGptOss ? "_gsink" : "_bsink");
+            (!kHasStreamSink && !kHasGptOssSink ? "_nsink" : kHasStreamSink && !kHasGptOssSink ? "_ssink" : !kHasStreamSink && kHasGptOssSink ? "_gsink" : "_bsink");
         #undef _SS_
         #undef _TS_
         // clang-format on
