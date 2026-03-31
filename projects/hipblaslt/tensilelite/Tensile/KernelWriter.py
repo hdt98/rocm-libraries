@@ -6650,7 +6650,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
       vgprIdx += numVgprAddressDbg
 
       # for cgemm or zgemm + MIAV case, allocate 2 or 4 vgpr for alpha calculation (cannot use tmp vgpr in write batch)
-      if kernel["ProblemType"]["MacDataTypeA"].isComplex() and kernel["MIArchVgpr"]:
+      if kernel["ProblemType"]["MacDataTypeA"].isComplex() \
+        and kernel["MIArchVgpr"] \
+        and (kernel["_GlobalAccumulation"] == 'SingleBuffer' or kernel["_GlobalAccumulation"] == None):
+
         # need proper alignment
         vgprIdx = ((vgprIdx+2 - 1)//2)*2
         self.states.startVgprAlphaTmp = vgprIdx
