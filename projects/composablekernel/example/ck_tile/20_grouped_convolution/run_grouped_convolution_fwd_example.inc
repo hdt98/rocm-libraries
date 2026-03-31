@@ -174,7 +174,7 @@ int run_grouped_conv_fwd_example_with_layouts(
         const float max_accumulated_value =
             *std::max_element(output_host_ref.mData.begin(), output_host_ref.mData.end());
         const auto rtol_atol =
-            calculate_rtol_atol<InDataType, WeiDataType, AccDataType, OutDataType>(
+            ck_tile::calculateRtolAtol<InDataType, WeiDataType, AccDataType, OutDataType>(
                 GemmK, kbatch, max_accumulated_value);
         pass = ck_tile::check_err(output,
                                   output_host_ref,
@@ -220,7 +220,7 @@ int run_grouped_conv_fwd_example_with_layouts(
         const float max_accumulated_value =
             *std::max_element(output_gpu_ref.mData.begin(), output_gpu_ref.mData.end());
         const auto rtol_atol =
-            calculate_rtol_atol<InDataType, WeiDataType, AccDataType, OutDataType>(
+            ck_tile::calculateRtolAtol<InDataType, WeiDataType, AccDataType, OutDataType>(
                 GemmK, kbatch, max_accumulated_value);
         pass = ck_tile::check_err(output,
                                   output_gpu_ref,

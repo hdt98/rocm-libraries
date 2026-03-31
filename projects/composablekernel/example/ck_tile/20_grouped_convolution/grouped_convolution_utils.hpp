@@ -9,33 +9,12 @@
 
 #include "ck_tile/core.hpp"
 #include "ck_tile/host/kernel_launch.hpp"
+#include "ck_tile/host/gemm_rtol_atol.hpp"
 #include "ck_tile/ops/epilogue.hpp"
 #include "ck_tile/ops/gemm.hpp"
 #include "ck_tile/ops/grouped_convolution.hpp"
 #include "ck_tile/ops/elementwise/unary_element_wise_operation.hpp"
 #include "conv_configs.hpp"
-
-template <typename InDataType, typename WeiDataType, typename AccDataType, typename OutDataType>
-auto calculate_rtol_atol(const ck_tile::index_t GemmK,
-                         const ck_tile::index_t kbatch,
-                         const float max_accumulated_value)
-{
-    using ComputeType =
-        std::conditional_t<sizeof(InDataType) < sizeof(WeiDataType), InDataType, WeiDataType>;
-    // Calculate thresholds
-    const auto rtol = ck_tile::get_relative_threshold<ComputeType, OutDataType, AccDataType>(
-        ck_tile::integer_divide_ceil(GemmK, kbatch));
-    const auto atol = ck_tile::get_absolute_threshold<ComputeType, OutDataType, AccDataType>(
-        max_accumulated_value / kbatch, ck_tile::integer_divide_ceil(GemmK, kbatch));
-    // Calculate error due to split_k accumulation
-    const auto rtol_split_k =
-        ck_tile::get_relative_threshold<OutDataType, OutDataType, OutDataType>(kbatch);
-    const auto atol_split_k =
-        ck_tile::get_absolute_threshold<OutDataType, OutDataType, OutDataType>(
-            max_accumulated_value, kbatch);
-    // Use higher threshold
-    return ck_tile::make_tuple(std::max(rtol, rtol_split_k), std::max(atol, atol_split_k));
-}
 
 ck_tile::index_t fill_spatial_dimensions(std::vector<ck_tile::index_t>& filter_spatial_lengths,
                                          std::vector<ck_tile::index_t>& image_spatial_lengths,

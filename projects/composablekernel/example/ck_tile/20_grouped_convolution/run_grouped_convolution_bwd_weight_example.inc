@@ -176,7 +176,7 @@ int run_grouped_conv_bwd_weight_example_with_layouts(ck_tile::ArgParser& arg_par
 
         const ck_tile::index_t split_k = res.split_k;
         const auto rtol_atol =
-            calculate_rtol_atol<InDataType, WeiDataType, AccDataType, OutDataType>(
+            ck_tile::calculateRtolAtol<InDataType, WeiDataType, AccDataType, OutDataType>(
                 GemmK, split_k, max_accumulated_value);
         pass = ck_tile::check_err(weight,
                                   weight_host_ref,
@@ -224,7 +224,7 @@ int run_grouped_conv_bwd_weight_example_with_layouts(ck_tile::ArgParser& arg_par
         const float max_accumulated_value =
             *std::max_element(weight_gpu_ref.mData.begin(), weight_gpu_ref.mData.end());
         const auto rtol_atol =
-            calculate_rtol_atol<InDataType, WeiDataType, AccDataType, OutDataType>(
+            ck_tile::calculateRtolAtol<InDataType, WeiDataType, AccDataType, OutDataType>(
                 GemmK, kbatch, max_accumulated_value);
         pass = ck_tile::check_err(weight,
                                   weight_gpu_ref,
