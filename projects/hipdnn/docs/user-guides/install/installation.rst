@@ -8,13 +8,13 @@
 hipDNN installation
 *******************
 
-The hipDNN frontend API is distributed as a header-only library. It requires a development ROCm package installation.
+The hipDNN frontend API is distributed as a header-only library. It requires a ROCm development package installation.
 These development packages contain the ``.dev`` prefix.
 
 System requirements
 ===================
 
-- `An AMD GPU with ROCm support <https://github.com/ROCm/TheRock/blob/main/SUPPORTED_GPUS.md>`_
+- `An AMD GPU with ROCm support <https://rocm.docs.amd.com/en/7.12.0-preview/about/release-notes.html#hardware-support>`_
 - Linux or Windows operating system (see `Install AMD ROCm <https://rocm.docs.amd.com/en/7.12.0-preview/install/rocm.html?fam=instinct&gpu=mi355x&os=ubuntu&os-version=24.04&i=pkgman>`_)
 
 Dependencies
@@ -28,7 +28,7 @@ Dependencies
      - Version
      - Description
    * - ROCm development installation
-     - ROCm 7.12.0 or later
+     - ROCm 7.12.0
      - AMD GPU programming stack
    * - CMake
      - 3.25.2 or later
