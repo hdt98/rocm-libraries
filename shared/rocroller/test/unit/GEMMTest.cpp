@@ -512,6 +512,11 @@ namespace GEMMTests
         gemm.ldsSwizzleMode = LDSBankSwizzleMode::Swizzle;
 
         basicGEMM<FP4, FP4, float>(gemm);
+
+        // macK=128, MI 32x32x64, K=4: 1 unique colVal>0 per matrix -> 2 v_or_b32
+        std::string generatedCode = m_context->instructions()->toString();
+        EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
+        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 2);
     }
 
     TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MT256x256x128_LDSSwizzleA)
@@ -532,6 +537,11 @@ namespace GEMMTests
         gemm.ldsSwizzleMode = LDSBankSwizzleMode::SwizzleA;
 
         basicGEMM<FP4, FP4, float>(gemm);
+
+        // SwizzleA only: 1 v_or_b32 for A, 0 for B
+        std::string generatedCode = m_context->instructions()->toString();
+        EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
+        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 1);
     }
 
     TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MT256x256x128_LDSSwizzleB)
@@ -552,6 +562,11 @@ namespace GEMMTests
         gemm.ldsSwizzleMode = LDSBankSwizzleMode::SwizzleB;
 
         basicGEMM<FP4, FP4, float>(gemm);
+
+        // SwizzleB only: 0 for A, 1 v_or_b32 for B
+        std::string generatedCode = m_context->instructions()->toString();
+        EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
+        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 1);
     }
 
     TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MT256x256x256_LDSSwizzle)
@@ -572,6 +587,27 @@ namespace GEMMTests
         gemm.ldsSwizzleMode = LDSBankSwizzleMode::Swizzle;
 
         basicGEMM<FP4, FP4, float>(gemm);
+
+        // macK=256, MI 32x32x64, K=8: 3 unique colVal>0 per matrix -> 6 v_or_b32
+        std::string generatedCode = m_context->instructions()->toString();
+        EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
+        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 6);
+    }
+
+    TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MI16x16x128_MT64x64x256_LDSSwizzle)
+    {
+        REQUIRE_ARCH_CAP(GPUCapability::HasMFMA_f8f6f4);
+        auto gemm           = GEMMProblemF8F6F4{16, 16, 128};
+        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDS;
+        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDS;
+        gemm.ldsSwizzleMode = LDSBankSwizzleMode::Swizzle;
+
+        basicGEMM<FP4, FP4, float>(gemm);
+
+        // macK=256, MI 16x16x128, K=8: 1 unique colVal>0 per matrix -> 2 v_or_b32
+        std::string generatedCode = m_context->instructions()->toString();
+        EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
+        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 2);
     }
 
     TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MI16x16x128_MT256x256x256_LDSSwizzle)
@@ -594,6 +630,11 @@ namespace GEMMTests
         gemm.ldsSwizzleMode = LDSBankSwizzleMode::Swizzle;
 
         basicGEMM<FP4, FP4, float>(gemm);
+
+        // macK=256, MI 16x16x128, K=8: 1 unique colVal>0 per matrix -> 2 v_or_b32
+        std::string generatedCode = m_context->instructions()->toString();
+        EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
+        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 2);
     }
 
     TEST_P(GEMMTestSuite, GPU_GEMM_DataType_FP16_AllLDS)

@@ -2237,11 +2237,10 @@ namespace rocRoller
                         // per rotation group).  When K > 8, the swizzle operates
                         // on groups of K/Keff adjacent K-column chunks.
                         auto Keff = std::min<unsigned int>(K, 8u);
-                        auto Eeff = E * (K / Keff);
                         auto R    = 16u / Keff;
 
-                        auto logEeff = literal(static_cast<unsigned int>(__builtin_ctz(Eeff)));
-                        auto logR    = literal(static_cast<unsigned int>(__builtin_ctz(R)));
+                        auto logE = literal(static_cast<unsigned int>(__builtin_ctz(E)));
+                        auto logR = literal(static_cast<unsigned int>(__builtin_ctz(R)));
 
                         // row_coord provides ldsRowId; col_coord is permuted
                         int row_coord = isA ? iMacX : iMacY;
@@ -2251,18 +2250,24 @@ namespace rocRoller
                         auto row_ref = std::make_shared<rocRoller::Expression::Expression>(
                             DataFlowTag{row_coord, Register::Type::Vector, DataType::UInt32});
                         auto Keff_lit = literal(Keff);
-                        auto Eeff_lit = literal(Eeff);
+                        auto E_lit    = literal(E);
 
-                        auto col_chunk = arg0 >> logEeff;
-                        auto element   = arg0 & (Eeff_lit - literal(1u));
-                        auto ldsRowId  = row_ref >> logR;
-                        // LR inverse swizzle: undo the GR permutation.
-                        auto swap_mask    = (ldsRowId ^ literal(1u)) & literal(1u);
-                        auto inv_rotation = (ldsRowId >> literal(1u)) << literal(1u);
-                        auto unrotated_chunk
-                            = (col_chunk + inv_rotation) & (Keff_lit - literal(1u));
-                        auto swizzled_chunk = unrotated_chunk ^ swap_mask;
-                        auto swizzled_col   = swizzled_chunk * Eeff_lit + element;
+                        // Decompose element index into full chunk + sub-element.
+                        // full_chunk is in [0..K-1], sub_elem in [0..E-1].
+                        auto full_chunk = arg0 >> logE;
+                        auto sub_elem   = arg0 & (E_lit - literal(1u));
+                        // Mirror the GR hi/lo split over Keff.
+                        auto chunk_lo = full_chunk & (Keff_lit - literal(1u));
+                        auto chunk_hi
+                            = full_chunk >> literal(static_cast<unsigned int>(__builtin_ctz(Keff)));
+                        auto ldsRowId = row_ref >> logR;
+                        // LR inverse swizzle: undo the GR permutation on chunk_lo.
+                        auto swap_mask       = (ldsRowId ^ literal(1u)) & literal(1u);
+                        auto inv_rotation    = (ldsRowId >> literal(1u)) << literal(1u);
+                        auto unrotated_chunk = (chunk_lo + inv_rotation) & (Keff_lit - literal(1u));
+                        auto swizzled_chunk  = unrotated_chunk ^ swap_mask;
+                        auto swizzled_col
+                            = (chunk_hi * Keff_lit + swizzled_chunk) * E_lit + sub_elem;
 
                         auto fwd0 = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
                         ExpressionTransform lrSwizzle{{fwd0}, {swizzled_col}};
@@ -2274,12 +2279,11 @@ namespace rocRoller
                         else
                             tileIMacX = rawCol;
 
-                        logger->info("LR swizzle {}: K={} Keff={} E={} Eeff={} R={}",
+                        logger->info("LR swizzle {}: K={} Keff={} E={} R={}",
                                      toString(tile.layoutType),
                                      K,
                                      Keff,
                                      E,
-                                     Eeff,
                                      R);
                     }
                 }
