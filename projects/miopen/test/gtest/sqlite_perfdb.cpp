@@ -754,8 +754,11 @@ public:
 
             for(auto i = 0u; i < DBMultiThreadedTestWork::threads_count; i++)
             {
+                // Use unique_lock instead of shared_lock so threads serialize their SQLite
+                // writes. Concurrent SQLite writes from multiple threads trigger SQLITE_BUSY
+                // retries that can take hours under CI with the exponential backoff policy.
                 threads.emplace_back([c, &mutex, i]() {
-                    std::shared_lock<std::shared_mutex> lock(mutex);
+                    std::unique_lock<std::shared_mutex> lock(mutex);
                     DBMultiThreadedTestWork::WorkItem(i, c, "mt");
                 });
             }
@@ -794,8 +797,11 @@ public:
 
             for(auto i = 0u; i < DBMultiThreadedTestWork::threads_count; i++)
             {
+                // Use unique_lock instead of shared_lock to serialize SQLite reads.
+                // Even reads can compete with writes from other tests or processes,
+                // and the serial ordering keeps the test deterministic.
                 threads.emplace_back([c, &mutex, i]() {
-                    std::shared_lock<std::shared_mutex> lock(mutex);
+                    std::unique_lock<std::shared_mutex> lock(mutex);
                     DBMultiThreadedTestWork::ReadWorkItem(i, c, "mt");
                 });
             }
@@ -873,10 +879,11 @@ public:
 
     static void WorkItem(unsigned int id, const std::string& db_path, bool write)
     {
-        {
-            auto& file_lock = miopen::LockFile::Get(LockFilePath(db_path));
-            std::lock_guard<miopen::LockFile> lock(file_lock);
-        }
+        // Hold the lock for the duration of DB work to prevent concurrent SQLite access
+        // across child processes. Without this, all children write to the same SQLite
+        // file simultaneously, causing SQLITE_BUSY retries that can take hours under CI.
+        auto& file_lock = miopen::LockFile::Get(LockFilePath(db_path));
+        std::lock_guard<miopen::LockFile> lock(file_lock);
 
         const auto c = [&db_path]() { return SQLitePerfDb(DbKinds::PerfDb, db_path, false); };
 
@@ -1177,8 +1184,11 @@ public:
 
             for(auto i = 0u; i < DBMultiThreadedTestWork::threads_count; i++)
             {
+                // Use unique_lock instead of shared_lock to serialize SQLite reads.
+                // Even reads can compete with writes from other tests or processes,
+                // and the serial ordering keeps the test deterministic.
                 threads.emplace_back([c, &mutex, i]() {
-                    std::shared_lock<std::shared_mutex> lock(mutex);
+                    std::unique_lock<std::shared_mutex> lock(mutex);
                     DBMultiThreadedTestWork::ReadWorkItem(i, c, "mt");
                 });
             }
@@ -1218,8 +1228,11 @@ public:
 
             for(auto i = 0u; i < DBMultiThreadedTestWork::threads_count; i++)
             {
+                // Use unique_lock instead of shared_lock so threads serialize their SQLite
+                // writes. MultiFileDb still uses SQLitePerfDb underneath, so concurrent
+                // writes trigger SQLITE_BUSY retries with the same exponential backoff risk.
                 threads.emplace_back([c, &mutex, i]() {
-                    std::shared_lock<std::shared_mutex> lock(mutex);
+                    std::unique_lock<std::shared_mutex> lock(mutex);
                     DBMultiThreadedTestWork::WorkItem(i, c, "mt");
                 });
             }
