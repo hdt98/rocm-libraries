@@ -72,7 +72,7 @@ struct BlockFmhaPipelineProblem
     static constexpr bool kHasDropout       = Traits::kHasDropout;
     static constexpr auto QScaleEnum        = Traits::QScaleEnum;
     static constexpr index_t kBlockPerCu    = Traits::kBlockPerCu;
-    static constexpr auto kSinkMode = Traits::kSinkMode;
+    static constexpr auto kSinkMode         = Traits::kSinkMode;
     static constexpr bool kHasStreamSink    = Traits::kHasStreamSink;
     static constexpr bool kHasGptOssSink    = Traits::kHasGptOssSink;
 };
@@ -187,7 +187,7 @@ struct BlockFmhaFwdPagedKVPipelineProblem
     static constexpr bool kDoFp8StaticQuant = Traits::kDoFp8StaticQuant;
     static constexpr bool kIsPagedKV        = Traits::kIsPagedKV;
     static constexpr index_t kBlockPerCu    = Traits::kBlockPerCu;
-    static constexpr auto kSinkMode = Traits::kSinkMode;
+    static constexpr auto kSinkMode         = Traits::kSinkMode;
     static constexpr bool kHasStreamSink    = Traits::kHasStreamSink;
     static constexpr bool kHasGptOssSink    = Traits::kHasGptOssSink;
 };
@@ -243,7 +243,7 @@ struct BlockFmhaFwdSplitKVPipelineProblem
     static constexpr bool kHasUnevenSplits           = kIsGroupMode || Traits::kHasUnevenSplits;
     static constexpr bool kMergeNumHeadGroupsSeqLenQ = Traits::kMergeNumHeadGroupsSeqLenQ;
     static constexpr index_t kBlockPerCu             = Traits::kBlockPerCu;
-    static constexpr auto kSinkMode          = Traits::kSinkMode;
+    static constexpr auto kSinkMode                  = Traits::kSinkMode;
     static constexpr bool kHasStreamSink             = Traits::kHasStreamSink;
     static constexpr bool kHasGptOssSink             = Traits::kHasGptOssSink;
 };

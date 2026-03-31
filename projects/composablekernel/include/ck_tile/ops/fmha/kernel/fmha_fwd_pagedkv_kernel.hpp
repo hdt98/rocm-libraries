@@ -919,7 +919,7 @@ struct FmhaFwdPagedKVKernel
         long_index_t batch_offset_lse  = 0;
         long_index_t batch_offset_o    = 0;
         index_t kv_l2p_offset          = 0;
-        const float sink_value = [&]() {
+        const float sink_value         = [&]() {
             if constexpr(kHasGptOssSink)
                 return (*(static_cast<const float*>(kargs.sink_ptr) + i_nhead)) / kargs.scale_s;
             else

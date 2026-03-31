@@ -291,7 +291,7 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
     static constexpr bool kHasDropout       = Problem::kHasDropout;
     static constexpr auto kKVMemoryLayout   = Problem::kKVMemoryLayout;
     static constexpr auto QScaleEnum        = Problem::QScaleEnum;
-    static constexpr auto kSinkMode = Problem::kSinkMode;
+    static constexpr auto kSinkMode         = Problem::kSinkMode;
     static constexpr bool kHasStreamSink    = Problem::kHasStreamSink;
     static constexpr bool kHasGptOssSink    = Problem::kHasGptOssSink;
 
