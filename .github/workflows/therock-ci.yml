@@ -96,6 +96,7 @@ jobs:
         env:
           PROJECTS: ${{ inputs.projects }}
           PLATFORM: "linux"
+          AMDGPU_FAMILIES_INPUT: ${{ inputs.linux_amdgpu_families }}
         run: |
           python .github/scripts/therock_configure_ci.py
 
@@ -104,6 +105,7 @@ jobs:
         env:
           PROJECTS: ${{ inputs.projects }}
           PLATFORM: "windows"
+          AMDGPU_FAMILIES_INPUT: ${{ inputs.windows_amdgpu_families }}
         run: |
           python .github/scripts/therock_configure_ci.py
 

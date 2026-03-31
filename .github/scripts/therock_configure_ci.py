@@ -202,6 +202,17 @@ def retrieve_projects(args):
 
 def run(args):
     platform = args.get("platform")
+
+    # For workflow_dispatch: skip platform if amdgpu_families_input is empty
+    if args.get("is_workflow_dispatch"):
+        amdgpu_families_input = args.get("amdgpu_families_input", "")
+        if not amdgpu_families_input:
+            logging.info(f"Skipping {platform} - no amdgpu_families specified in workflow_dispatch")
+            set_github_output(
+                {f"{platform}_projects": json.dumps([]), "test_type": "standard"}
+            )
+            return
+
     project_to_run, test_type = retrieve_projects(args)
     set_github_output(
         {f"{platform}_projects": json.dumps(project_to_run), "test_type": test_type}
@@ -222,6 +233,8 @@ if __name__ == "__main__":
 
     input_projects = os.getenv("PROJECTS", "")
     args["input_projects"] = input_projects
+
+    args["amdgpu_families_input"] = os.getenv("AMDGPU_FAMILIES_INPUT", "")
 
     args["base_ref"] = os.environ.get("BASE_REF", "HEAD^")
 
