@@ -189,7 +189,14 @@ if __name__ == "__main__":
     filter_list = args.filter.split(",")
     filter_list.extend([""] * (len(api_list) - len(filter_list)))
     optdim_list = [int(hdim) for hdim in args.optdim.split(",")]
-    sink_modes = tuple(args.sink.split(","))
+    sink_modes = tuple(s.strip() for s in args.sink.split(","))
+    valid_sink_modes = {"none", "stream", "gptoss", "both"}
+    invalid_sink_modes = set(sink_modes) - valid_sink_modes
+    if invalid_sink_modes:
+        parser.error(
+            f"Invalid sink mode(s): {sorted(invalid_sink_modes)}. "
+            f"Valid values are: {sorted(valid_sink_modes)}"
+        )
 
     if args.list_blobs is not None:
         list_blobs(
