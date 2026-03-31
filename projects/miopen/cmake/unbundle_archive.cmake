@@ -135,11 +135,14 @@ foreach(obj IN LISTS obj_files)
         continue()
     endif()
 
-    # Replace the .hip_fatbin section with the single-arch fatbin
+    # Replace the .hip_fatbin section with the single-arch fatbin.
+    # Use --remove-section + --add-section instead of --update-section to avoid
+    # COFF size constraint ("new section cannot be larger than previous section").
     set(thin_obj "${work_dir}/thin_${obj_name}")
     execute_process(
         COMMAND ${LLVM_OBJCOPY}
-            --update-section .hip_fatbin=${thin_fatbin}
+            --remove-section=.hip_fatbin
+            --add-section=.hip_fatbin=${thin_fatbin}
             "${obj}" "${thin_obj}"
         RESULT_VARIABLE patch_result)
 
