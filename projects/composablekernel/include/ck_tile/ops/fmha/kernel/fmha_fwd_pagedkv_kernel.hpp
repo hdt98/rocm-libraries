@@ -56,7 +56,8 @@ struct FmhaFwdPagedKVKernel
     static constexpr bool kDoFp8StaticQuant = FmhaPipeline::Problem::kDoFp8StaticQuant;
     static constexpr bool kSkipMinSeqlenQ   = FmhaPipeline::Problem::kSkipMinSeqlenQ;
     static constexpr bool kIsPagedKV        = FmhaPipeline::Problem::kIsPagedKV;
-    static constexpr FmhaSinkMode kSinkMode = FmhaPipeline::kSinkMode;
+    static constexpr FmhaSinkMode kSinkMode  = FmhaPipeline::kSinkMode;
+    static constexpr bool kHasGptOssSink    = FmhaPipeline::kHasGptOssSink;
 
     using AttentionVariant = ck_tile::remove_cvref_t<typename FmhaPipeline::AttentionVariant>;
     using FmhaMask         = ck_tile::remove_cvref_t<typename FmhaPipeline::FmhaMask>;
@@ -919,10 +920,12 @@ struct FmhaFwdPagedKVKernel
         long_index_t batch_offset_lse  = 0;
         long_index_t batch_offset_o    = 0;
         index_t kv_l2p_offset          = 0;
-        const float sink_value =
-            kargs.sink_ptr != nullptr
-                ? (*(static_cast<const float*>(kargs.sink_ptr) + i_nhead)) / kargs.scale_s
-                : -numeric<float>::infinity();
+        const float sink_value = [&]() {
+            if constexpr(kHasGptOssSink)
+                return (*(static_cast<const float*>(kargs.sink_ptr) + i_nhead)) / kargs.scale_s;
+            else
+                return -numeric<float>::infinity();
+        }();
 
         if constexpr(kIsGroupMode)
         {
