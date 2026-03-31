@@ -52,7 +52,8 @@ struct FmhaFwdSplitKVKernel
     static constexpr bool kStoreLSE         = FmhaPipeline::kStoreLSE;
     static constexpr bool kDoFp8StaticQuant = FmhaPipeline::Problem::kDoFp8StaticQuant;
     static constexpr bool kIsPagedKV        = FmhaPipeline::Problem::kIsPagedKV;
-    static constexpr FmhaSinkMode kSinkMode = FmhaPipeline::Problem::kSinkMode;
+    static constexpr FmhaSinkMode kSinkMode  = FmhaPipeline::Problem::kSinkMode;
+    static constexpr bool kHasGptOssSink    = FmhaPipeline::Problem::kHasGptOssSink;
     static constexpr bool kMergeNumHeadGroupsSeqLenQ =
         FmhaPipeline::Problem::kMergeNumHeadGroupsSeqLenQ;
     using AttentionVariant = ck_tile::remove_cvref_t<typename FmhaPipeline::AttentionVariant>;
@@ -621,10 +622,12 @@ struct FmhaFwdSplitKVKernel
         long_index_t batch_offset_o_acc   = 0;
         index_t kv_l2p_offset =
             0; // logical-to-physical offset of seqlen_k coordinate. only used for paged-kvcache
-        const float sink_value =
-            kargs.sink_ptr != nullptr
-                ? (*(static_cast<const float*>(kargs.sink_ptr) + i_nhead)) / kargs.scale_s
-                : -numeric<float>::infinity();
+        const float sink_value = [&]() {
+            if constexpr(kHasGptOssSink)
+                return (*(static_cast<const float*>(kargs.sink_ptr) + i_nhead)) / kargs.scale_s;
+            else
+                return -numeric<float>::infinity();
+        }();
 
         if constexpr(kIsGroupMode)
         {
