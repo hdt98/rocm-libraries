@@ -1332,11 +1332,7 @@ class StreamK(Component):
         # allow expanding vgpr pool for OptNLL
         # preventOverflow = True #(not isOptNLL)
         # ss.setupStoreElementsForBatch(kernel, gwvw, batchElements, batchElementSgprs, preventOverflow=preventOverflow, isWorkspace=True)
-        ss.setupStoreElementsForBatch(kernel, gwvw, batchElements, batchElementSgprs, isOptNLL=False, factorDim=0, isWorkspace=True)
-
-        if kernel["LocalSplitU"] > 1 and elementStartIdx > 0:
-            for i in range(len(ss.elementSumIdx)):
-                ss.elementSumIdx[i] += elementStartIdx * gwvw
+        ss.setupStoreElementsForBatch(kernel, gwvw, batchElements, batchElementSgprs, False, 0, True, elementStartIdx)
 
         loadsIssued = 0
         storesIssued = 0

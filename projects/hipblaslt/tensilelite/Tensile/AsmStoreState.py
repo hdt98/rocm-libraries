@@ -466,7 +466,7 @@ class StoreState:
 
         return self.elementCoord0, self.elementCoord1
 
-    def setupStoreElementsForBatchWihoutVgprCheckOut(self, kernel, gwvw, batchElements, batchElementSgprs, isOptNLL, factorDim, isWorkspace=False):
+    def setupStoreElementsForBatchWihoutVgprCheckOut(self, kernel, gwvw, batchElements, batchElementSgprs, isOptNLL, factorDim, isWorkspace=False, elementStartIdx=0):
 
         self.elementAddr              = []
         self.elementDataE             = []
@@ -517,9 +517,9 @@ class StoreState:
             sumIdx = 0
             if kernel["LocalSplitU"] > 1:
                 if len(self.elementSumIdx) == 0:
-                    sumIdx = kw.states.c.startVgprValu
+                    sumIdx = kw.states.c.startVgprValu // self.cfg.numVgprPerValuC + elementStartIdx * gwvw
                 else:
-                    sumIdx = self.elementSumIdx[-1] + self.cfg.numVgprPerValuC * self.cfg.gwvw
+                    sumIdx = self.elementSumIdx[-1] + self.cfg.gwvw
             else:
                 bestVw                  = kernel["VectorWidthA"]
                 elementsLoadedPerVw     = kernel["NumThreads"] * bestVw
@@ -758,7 +758,7 @@ class StoreState:
         # reset flag
         self.isReset = False
 
-    def setupStoreElementsForBatch(self, kernel, gwvw, batchElements, batchElementSgprs, isOptNLL, factorDim, isWorkspace=False):
+    def setupStoreElementsForBatch(self, kernel, gwvw, batchElements, batchElementSgprs, isOptNLL, factorDim, isWorkspace=False, elementStartIdx=0):
 
         self.elementAddr              = []
         self.elementDataE             = []
@@ -811,7 +811,7 @@ class StoreState:
             sumIdx = 0
             if kernel["LocalSplitU"] > 1:
                 if len(self.elementSumIdx) == 0:
-                    sumIdx = kw.states.c.startVgprValu // self.cfg.numVgprPerValuC
+                    sumIdx = kw.states.c.startVgprValu // self.cfg.numVgprPerValuC + elementStartIdx * gwvw
                 else:
                     sumIdx = self.elementSumIdx[-1] + self.cfg.gwvw
             else:

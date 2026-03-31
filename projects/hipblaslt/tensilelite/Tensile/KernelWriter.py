@@ -2564,7 +2564,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # which loop iteration to reset the LRO,
       # note if PLR=0, isResetLroIter is False for all u
       isResetLroIter = 1 if kernel["ForceUnrollSubIter"] else (u == localWriteEndIter)
-      isSwapAndResetLwoIter = (u == localWriteEndIter) if kernel["ForceUnrollSubIter"] else isResetLroIter
+      isSwapAndResetLwoIter = (u == localWriteEndIter)
       isSwapLroIter = isResetLroIter
       if kernel["ScheduleIterAlg"] == 3:
         isSwapAndResetLwoIter = (u == self.states.lwEndMfmaIndex//(self.states.numMfmaPerIter))
@@ -3101,7 +3101,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # which loop iteration to reset the LRO,
       # note if PLR=0, isResetLroIter is False for all u
       isResetLroIter = 1 if kernel["ForceUnrollSubIter"] else (u == localWriteEndIter)
-      isSwapAndResetLwoIter = (u == localWriteEndIter) if kernel["ForceUnrollSubIter"] else isResetLroIter
+      isSwapAndResetLwoIter = (u == localWriteEndIter)
       isSwapLroIter = isResetLroIter
       if kernel["ScheduleIterAlg"] == 3:
         isSwapAndResetLwoIter = (u == self.states.lwEndMfmaIndex//(self.states.numMfmaPerIter))
