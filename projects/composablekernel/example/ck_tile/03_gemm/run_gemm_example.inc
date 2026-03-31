@@ -159,7 +159,7 @@ float invoke_gemm(ck_tile::DeviceMem& a_m_k_dev_buf,
 }
 
 template <typename CDataType>
-bool do_verify(const ck_tile::HostTensor<CDataType>& c_m_n_dev_result,
+bool doVerify(const ck_tile::HostTensor<CDataType>& c_m_n_dev_result,
                const ck_tile::HostTensor<CDataType>& c_m_n_ref,
                const ck_tile::tuple<double, double>& rtol_atol,
                const char* variant)
@@ -177,7 +177,7 @@ bool do_verify(const ck_tile::HostTensor<CDataType>& c_m_n_dev_result,
     return pass;
 }
 
-std::tuple<ck_tile::index_t, ck_tile::index_t, ck_tile::index_t> inline parse_gemm_size(
+std::tuple<ck_tile::index_t, ck_tile::index_t, ck_tile::index_t> inline parseGemmSize(
     ck_tile::ArgParser& arg_parser)
 {
     ck_tile::index_t M = arg_parser.get_int("m");
@@ -395,7 +395,7 @@ int run_gemm_example_with_layouts(ck_tile::ArgParser& arg_parser,
         const auto rtol_atol =
             ck_tile::calculateRtolAtol<ADataTypeCompute, BDataTypeCompute, AccDataType, CDataType>(
                 K, kbatch, max_accumulated_value);
-        pass = do_verify(c_m_n_dev_result, c_m_n_ref, rtol_atol, "CPU");
+        pass = doVerify(c_m_n_dev_result, c_m_n_ref, rtol_atol, "CPU");
     }
     else if(arg_parser.get_int("v") == 2)
     {
@@ -432,7 +432,7 @@ int run_gemm_example_with_layouts(ck_tile::ArgParser& arg_parser,
         const auto rtol_atol =
             ck_tile::calculateRtolAtol<ADataTypeCompute, BDataTypeCompute, AccDataType, CDataType>(
                 K, kbatch, max_accumulated_value);
-        pass = do_verify(c_m_n_dev_result, c_m_n_ref, rtol_atol, "GPU");
+        pass = doVerify(c_m_n_dev_result, c_m_n_ref, rtol_atol, "GPU");
     }
 
     if(arg_parser.get_int("json") == 1)

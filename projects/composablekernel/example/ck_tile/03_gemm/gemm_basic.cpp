@@ -15,7 +15,7 @@ int run_gemm_example(ck_tile::ArgParser& arg_parser)
     std::string c_layout  = arg_parser.get_str("c_layout");
 
     std::tuple<ck_tile::index_t, ck_tile::index_t, ck_tile::index_t> gemm_sizes =
-        parse_gemm_size(arg_parser);
+        parseGemmSize(arg_parser);
 
     int m = std::get<0>(gemm_sizes);
     int n = std::get<1>(gemm_sizes);
