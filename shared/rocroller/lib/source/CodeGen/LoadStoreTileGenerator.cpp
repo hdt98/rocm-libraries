@@ -113,7 +113,8 @@ namespace rocRoller
          */
         ExpressionPtr LoadStoreTileGenerator::getOffsetExpr(int  opTag,
                                                             bool isStorePartOfGlobalToLDS,
-                                                            Transformer const& coords)
+                                                            Transformer const& coords,
+                                                            int                subdimFilter)
         {
             rocRoller::Log::getLogger()->debug("KernelGraph::LoadStoreTileGenerator::getOffsetExpr("
                                                "operationTag: {}, isStorePartOfGlobalToLDS: {})",
@@ -150,6 +151,9 @@ namespace rocRoller
                 auto const subDimension = m_graph->mapper.getConnectionSubdimension(opTag, unroll);
 
                 if(subDimension == -1)
+                    continue;
+
+                if(subdimFilter >= 0 && subDimension != subdimFilter)
                     continue;
 
                 auto strideTag = getUnrollStrideCoordinate(opTag, subDimension);
@@ -279,16 +283,104 @@ namespace rocRoller
                 co_return;
             }
 
-            if(rowOffsetExpr)
-                rocRoller::Log::getLogger()->debug("  rowOffsetExpr: {}", toString(rowOffsetExpr));
+            // For swizzled LDS reads, the column offset (mfmaId stride) cannot
+            // be folded into the literal offset because the swizzle makes the
+            // physical distance between K-chunks per-lane.  Split the unroll
+            // contributions by subdimension:
+            //   row subdim (WTN) -> literal offset (swizzle-invariant)
+            //   col subdim (mfmaId / K) -> modular add within column field
+            //
+            // The K dimension's subdimension depends on the matrix layout:
+            //   MATRIX_A: K is subdim 1, row (M) is subdim 0
+            //   MATRIX_B: K is subdim 0, row (N) is subdim 1
+            //
+            // The column occupies bits [4 : 4+log2(K)-1] of the LDS byte
+            // address (each chunk is 16 bytes).  Advancing by colVal bytes
+            // must wrap within the column field (mod K chunks) without
+            // disturbing the row bits above.  We compute:
+            //   new = ((base + colVal) & colMask) | (base & ~colMask)
+            // where colMask = (K - 1) << 4.
+            {
+                int  kSubdim       = -1;
+                bool isSwizzledLDS = false;
+                auto swzMode       = m_context->kernelOptions()->ldsSwizzleMode;
+                if(swzMode != LDSBankSwizzleMode::None
+                   && m_graph->control.get<LoadLDSTile>(info.tag))
+                {
+                    auto macTileTag = m_graph->mapper.get<MacroTile>(info.tag);
+                    auto macTile    = m_graph->coordinates.getNode<MacroTile>(macTileTag);
+                    bool isA        = (swzMode == LDSBankSwizzleMode::Swizzle
+                                || swzMode == LDSBankSwizzleMode::SwizzleA)
+                               && macTile.layoutType == LayoutType::MATRIX_A;
+                    bool isB = (swzMode == LDSBankSwizzleMode::Swizzle
+                                || swzMode == LDSBankSwizzleMode::SwizzleB)
+                               && macTile.layoutType == LayoutType::MATRIX_B;
+                    isSwizzledLDS = isA || isB;
+                    if(isA)
+                        kSubdim = 1;
+                    else if(isB)
+                        kSubdim = 0;
+                }
+
+                if(isSwizzledLDS && rowOffsetExpr)
+                {
+                    int  rowSubdim = 1 - kSubdim;
+                    auto rowOnlyExpr
+                        = getOffsetExpr(info.tag, false, coords, /*subdimFilter=*/rowSubdim);
+                    auto colOnlyExpr
+                        = getOffsetExpr(info.tag, false, coords, /*subdimFilter=*/kSubdim);
+
+                    // Row part (WTN stride): fold into literal offset
+                    if(rowOnlyExpr
+                       && Expression::evaluationTimes(rowOnlyExpr)[EvaluationTime::Translate]
+                       && info.offset->regType() == Register::Type::Literal)
+                    {
+                        auto rowVal     = getUnsignedInt(evaluate(rowOnlyExpr));
+                        auto prevOffset = getUnsignedInt(info.offset->getLiteralValue());
+                        info.offset     = Register::Value::Literal(rowVal + prevOffset);
+                    }
+
+                    // Column part (mfmaId stride): modular add within the
+                    // column bit-field of the swizzled LDS address.
+                    if(colOnlyExpr
+                       && Expression::evaluationTimes(colOnlyExpr)[EvaluationTime::Translate])
+                    {
+                        auto colVal = getUnsignedInt(evaluate(colOnlyExpr));
+                        if(colVal > 0)
+                        {
+                            auto macTileTag = m_graph->mapper.get<MacroTile>(info.tag);
+                            auto macTile    = m_graph->coordinates.getNode<MacroTile>(macTileTag);
+                            auto thrTile    = ThreadTile(macTile);
+                            auto K          = static_cast<unsigned int>(thrTile.wsizes.at(kSubdim));
+                            auto colMask    = (K - 1u) << 4;
+
+                            // new = ((base + colVal) & colMask) | (base & ~colMask)
+                            auto base = info.rowOffsetReg->expression();
+                            auto newCol
+                                = (base + Expression::literal(static_cast<unsigned int>(colVal)))
+                                  & Expression::literal(colMask);
+                            auto rowBits  = base & Expression::literal(~colMask);
+                            auto combined = newCol | rowBits;
+
+                            auto tmp = info.rowOffsetReg->placeholder(Register::Type::Vector, {});
+                            co_yield generate(tmp,
+                                              convert(info.rowOffsetReg->variableType(), combined));
+                            info.rowOffsetReg = tmp;
+                        }
+                    }
+
+                    // Already handled; skip standard rowOffsetExpr processing
+                    rowOffsetExpr = nullptr;
+                }
+            }
 
             if(rowOffsetExpr
                && Expression::evaluationTimes(rowOffsetExpr)[EvaluationTime::Translate]
                && info.offset->regType() == Register::Type::Literal)
             {
-                info.offset
-                    = Register::Value::Literal(getUnsignedInt(evaluate(rowOffsetExpr))
-                                               + getUnsignedInt(info.offset->getLiteralValue()));
+                auto rowOffsetVal = getUnsignedInt(evaluate(rowOffsetExpr));
+                auto prevOffset   = getUnsignedInt(info.offset->getLiteralValue());
+                info.offset       = Register::Value::Literal(rowOffsetVal + prevOffset);
                 rowOffsetExpr.reset();
             }
 
@@ -576,163 +668,6 @@ namespace rocRoller
                         }
                     }
                     offsetValue += rowStride;
-                }
-            }
-        }
-
-        /**
-         * @brief Load or store a tile from swizzled LDS.
-         *
-         * When the LDS bank swizzle is active, the LDS address is a
-         * non-linear function of the row and column coordinates
-         * (the column permutation depends on the row). Instead of
-         * using base + stride, build a Transformer for each
-         * (row, VGPR-block) iteration and compute the full
-         * swizzled address via reverse().
-         */
-        template <MemoryInstructions::MemoryDirection Dir>
-        Generator<Instruction> LoadStoreTileGenerator::moveTileSwizzledLDS(LoadStoreTileInfo& info,
-                                                                           Transformer& coords)
-        {
-            Log::debug("KernelGraph::LoadStoreTileGenerator::moveTileSwizzledLDS<{}>",
-                       toString(Dir));
-
-            co_yield Instruction::Comment("LDS bank swizzle: per-iteration address computation");
-            co_yield Instruction::Comment(toString(info));
-
-            auto typeInfo = DataTypeInfo::Get(info.data->variableType().dataType);
-
-            // Compute loop parameters (same as moveTileLiteralStrides)
-            uint numVGPRBlocks = 1;
-            if(!info.isTransposedTile && info.colStrideAttributes.unitStride)
-            {
-                if(info.colStrideAttributes.elementBlockSize > 0
-                   && (info.n * info.packedAmount) > info.colStrideAttributes.elementBlockSize)
-                {
-                    AssertFatal((info.n * info.packedAmount)
-                                    % info.colStrideAttributes.elementBlockSize
-                                == 0);
-                    numVGPRBlocks
-                        = (info.n * info.packedAmount) / info.colStrideAttributes.elementBlockSize;
-                }
-            }
-
-            auto bitsPerMove     = info.n * info.elementBits / numVGPRBlocks;
-            auto bytesPerMove    = bitsPerMove / 8u;
-            auto elementsPerMove = bitsPerMove / typeInfo.elementBits;
-
-            co_yield Instruction::Comment(concatenate("SwizzledLDS: ",
-                                                      ShowValue(info.m),
-                                                      ShowValue(info.n),
-                                                      ShowValue(numVGPRBlocks),
-                                                      ShowValue(elementsPerMove),
-                                                      ShowValue(bytesPerMove)));
-
-            // Identify the code-gen coordinates (the dimensions that
-            // the row/block loop iterates).  For MATRIX_A this is
-            // {WaveTileNumber(1), VGPR}; for MATRIX_B it is
-            // {WaveTileNumber(0), VGPR}.
-            auto codegenCoords = getCodeGeneratorCoordinates(*m_graph, info.tag, /*isD2L=*/false);
-            AssertFatal(codegenCoords.size() == 2,
-                        "Expected 2 code-gen coordinates for swizzled LDS");
-            int rowCoord = codegenCoords[0]; // slow (WaveTileNumber)
-            int colCoord = codegenCoords[1]; // fast (VGPR)
-
-            // Identify the LDS target and required coordinates
-            auto [target, direction]    = getOperationTarget(info.tag, *m_graph, /*isD2L=*/false);
-            auto [required, pathCoords] = findRequiredCoordinates(target, direction, *m_graph);
-
-            auto offsetType = getOffsetDataTypeFromGraph(info.tag, *m_graph, /*isD2L=*/false);
-
-            // Get the LDS region base offset.  The coordinate graph's
-            // reverse traversal produces tile-relative (0-based) element
-            // indices.  For MATRIX_A the region starts at LDS offset 0 so
-            // no correction is needed, but MATRIX_B (and double-buffered
-            // slots) may start at a non-zero byte offset.
-            uint32_t ldsRegionBase = 0;
-            {
-                auto [ldsTag, _lds] = m_graph->getDimension<LDS>(info.tag);
-                if(m_context->registerTagManager()->hasRegister(ldsTag))
-                {
-                    auto ldsAlloc = m_context->registerTagManager()->getRegister(ldsTag);
-                    ldsRegionBase = ldsAlloc->getLDSAllocation()->offset();
-                }
-            }
-
-            // For each (row, vgpr_block), build a Transformer with:
-            //   - Thread coords from live registers
-            //   - Unroll coords from the code-gen Transformer
-            //   - Row/column coords set to the current iteration values
-            for(uint64_t i = 0; i < info.m; ++i)
-            {
-                for(uint r = 0; r < numVGPRBlocks; ++r)
-                {
-                    Transformer xform(&m_graph->coordinates);
-
-                    for(auto coord : required)
-                    {
-                        if(coord == rowCoord)
-                        {
-                            xform.setCoordinate(coord,
-                                                Expression::literal(static_cast<unsigned int>(i)));
-                        }
-                        else if(coord == colCoord)
-                        {
-                            // VGPR flat index for this block
-                            auto vgprIdx = static_cast<unsigned int>((i * numVGPRBlocks + r)
-                                                                     * elementsPerMove);
-                            xform.setCoordinate(coord, Expression::literal(vgprIdx));
-                        }
-                        else if(coords.hasCoordinate(coord))
-                        {
-                            xform.setCoordinate(coord, coords.getCoordinate(coord));
-                        }
-                        else if(m_context->registerTagManager()->hasRegister(coord))
-                        {
-                            auto reg = m_context->registerTagManager()->getRegister(coord);
-                            xform.setCoordinate(coord, reg->expression());
-                        }
-                        else
-                        {
-                            xform.setCoordinate(coord, Expression::literal(0u));
-                        }
-                    }
-
-                    auto indexExpr = xform.reverse({target})[0];
-
-                    // The coordinate graph produces indices in segment (unpacked)
-                    // element units (e.g. FP4 elements for FP4x8 data).  Use the
-                    // segment data type so ToBytes converts correctly (4-bit -> 0.5
-                    // bytes per element rather than 32-bit -> 4 bytes per packed unit).
-                    auto segmentType = DataTypeInfo::Get(info.varType).segmentVariableType;
-                    auto byteExpr
-                        = AssignIndexExpressionsDetail::ToBytes(indexExpr, segmentType.dataType);
-
-                    // Add the LDS region base offset.  The coordinate graph
-                    // reverse produces a tile-relative byte address; the
-                    // region base shifts it to the correct absolute position.
-                    if(ldsRegionBase > 0)
-                        byteExpr = byteExpr + Expression::literal(ldsRegionBase);
-
-                    auto offsetReg = Register::Value::Placeholder(
-                        m_context, Register::Type::Vector, offsetType, 1);
-                    offsetReg->setName(concatenate("SwizzledLDS_", i, "_", r));
-
-                    co_yield generate(offsetReg, convert(offsetType, byteExpr));
-
-                    auto start = (i * numVGPRBlocks + r) * elementsPerMove;
-                    auto stop  = (i * numVGPRBlocks + r + 1) * elementsPerMove;
-
-                    co_yield m_context->mem()->moveData<Dir>(
-                        info.kind,
-                        offsetReg,
-                        info.data->element(Generated(iota(start, stop))),
-                        Register::Value::Literal(0u),
-                        bytesPerMove,
-                        "",
-                        false,
-                        info.bufDesc,
-                        info.bufOpts);
                 }
             }
         }
@@ -1050,32 +985,7 @@ namespace rocRoller
                 // set global read offset
             }
 
-            // When LDS bank swizzle is active for LDS loads, the
-            // address is a non-linear function of the row/column
-            // coordinates.  Compute per-iteration addresses from
-            // scratch instead of using base + stride.
-            bool ldsSwizzleActive = false;
-            {
-                auto swzMode = m_context->kernelOptions()->ldsSwizzleMode;
-                if(swzMode != LDSBankSwizzleMode::None
-                   && m_graph->control.get<LoadLDSTile>(info.tag))
-                {
-                    auto macTileTag  = m_graph->mapper.get<MacroTile>(info.tag);
-                    auto macTile     = m_graph->coordinates.getNode<MacroTile>(macTileTag);
-                    ldsSwizzleActive = ((swzMode == LDSBankSwizzleMode::Swizzle
-                                         || swzMode == LDSBankSwizzleMode::SwizzleA)
-                                        && macTile.layoutType == LayoutType::MATRIX_A)
-                                       || ((swzMode == LDSBankSwizzleMode::Swizzle
-                                            || swzMode == LDSBankSwizzleMode::SwizzleB)
-                                           && macTile.layoutType == LayoutType::MATRIX_B);
-                }
-            }
-
-            if(ldsSwizzleActive && allStridesAreLiteral)
-            {
-                co_yield moveTileSwizzledLDS<Dir>(info, coords);
-            }
-            else if(allStridesAreLiteral)
+            if(allStridesAreLiteral)
             {
                 co_yield moveTileLiteralStrides<Dir>(info);
             }
