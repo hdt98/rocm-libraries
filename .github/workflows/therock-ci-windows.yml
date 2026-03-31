@@ -176,16 +176,10 @@ jobs:
   therock-test-windows:
     name: Test (${{ inputs.amdgpu_families }})
     needs: [therock-build-windows]
-    # The use_prebuilt_artifacts "or" statement ensures that tests will run if
-    # previous build step is run or skipped
     if: >-
       ${{
         !failure() &&
-        !cancelled() &&
-        (
-          inputs.use_prebuilt_artifacts == 'false' ||
-          inputs.use_prebuilt_artifacts == 'true'
-        )
+        !cancelled()
       }}
     uses: ./.github/workflows/therock-test-packages.yml
     with:
