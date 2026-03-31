@@ -21,13 +21,13 @@
 // ---------------------------------------------------------------------------
 
 template <typename PrecType>
-struct ConvConfigComputeV3_TiledIm2Col : public ConvConfigWaveUniformM<PrecType>
+struct ConvConfigComputeV3_TiledIm2Col : public ConvConfigComputeV6<PrecType>
 {
     static constexpr bool UseTiledIm2Col = true;
 };
 
 template <typename PrecType>
-struct ConvConfigComputeV3_GenericIm2Col : public ConvConfigWaveUniformM<PrecType>
+struct ConvConfigComputeV3_GenericIm2Col : public ConvConfigComputeV6<PrecType>
 {
     static constexpr bool UseTiledIm2Col = false;
 };

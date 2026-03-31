@@ -136,17 +136,23 @@ struct tile_window_with_static_distribution
             const index_t m_raw = bottom_tensor_thread_origin_idx_tmp[number<0>{}];
             const index_t k_raw = bottom_tensor_thread_origin_idx_tmp[number<1>{}];
 
-            // When wave_uniform_m, broadcast m_gemm from lane 0 so the compiler
-            // can schedule the 3 M divmods on the scalar unit (SALU).
-            const index_t m_for_init = [&]() {
-                if constexpr(DescType::wave_uniform_m)
-                    return amd_wave_read_first_lane(m_raw);
-                else
-                    return m_raw;
-            }();
-
-            bottom_tensor_thread_coord_tmp.init_m(m_for_init, meta);  // 3 divmods (SALU when wave_uniform_m)
-            bottom_tensor_thread_coord_tmp.init_k(k_raw, meta);        // 2 divmods (VALU, lane-specific k_gemm)
+            bottom_tensor_thread_coord_tmp.init_m(m_raw, meta); 
+            if(meta.C % meta.KPerBlock == 0) 
+            {
+                // SGPR after this
+                const index_t k_start = amd_wave_read_first_lane((k_raw / meta.KPerBlock) * meta.KPerBlock);
+                // const index_t y = amd_wave_read_first_lane(k_start / meta.XC);
+                // const index_t x = amd_wave_read_first_lane((k_start % meta.XC) / meta.C);
+                // const index_t c_base = amd_wave_read_first_lane(k_start % meta.C);
+                // VGPR, lane-specific
+                const index_t k_loc   = k_raw - k_start;
+                bottom_tensor_thread_coord_tmp.init_k_aligned(k_start, k_loc, meta);                     
+            }
+            else
+            {
+                bottom_tensor_thread_coord_tmp.init_k(k_raw, meta);
+            }
+            bottom_tensor_thread_coord_tmp.init_valid(meta);
         }
         else
         {

@@ -1016,6 +1016,14 @@ struct TransformConvFwdToGemm_V2
         meta.PW          = static_cast<index_t>(InLeftPadW_);
         meta.M_gemm      = static_cast<index_t>(N_ * Ho_ * Wo_);
         meta.K_gemm      = static_cast<index_t>(Y_ * X_ * C_);
+
+        // Precompute magic-division multipliers for the four runtime divisors.
+        // These replace integer division in init_m / init_k with multiply+shift on device.
+        meta.mdiv_HoWo = mdiv2(static_cast<uint32_t>(Ho_ * Wo_));
+        meta.mdiv_Wo   = mdiv2(static_cast<uint32_t>(Wo_));
+        meta.mdiv_XC   = mdiv2(static_cast<uint32_t>(X_ * C_));
+        meta.mdiv_C    = mdiv2(static_cast<uint32_t>(C_));
+
         return meta;
     }
 

@@ -575,16 +575,16 @@ non-coalesced.
 
 ## Im2Col index calculation optimizations
 
-## Linear `K_offset`
+## Pre-compute k_gamm → (y,x,c) values
 
-We can simplify `K_offset` calculation if `KPerBlock < C`. In this case, we can set 
-```
-y = x = 0
-c = k_gemm
-```
-and we have `K_offset(k_gemm) = k_gemm`.
+We can pre-compute the k_gemm indices and store them in LDS or in constant memory.
 
-We need to add a runtime applicability check to ensure the condition `KPerBlock < C` is satisfied.
+AMD GPUs do not have a dedicated constant memory cache per CU. The `__constant__` qualifier 
+bahaves as `const __restrict__` pointer to global memory. However, since the K_gemm is fairly small,
+the data will be stored efficiently to L1/L2 caches or to LDS.
+
+We can in principle have the first wave to compute the k_gemm indices and store them in LDS for the next waves.
+However, this requires LDS synch, that will probably be more costly than the computing indices on the fly.
 
 ### Wave-uniform $m_{\text{gemm}}$ index
 
