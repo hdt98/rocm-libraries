@@ -93,7 +93,7 @@ rocblas_status rocsolver_sytrs2_strided_batched_impl(rocblas_handle handle,
         return rocblas_status_memory_error;
     }
 
-    T* const work = static_cast<T*>(mem[0]);
+    void* const work = static_cast<void*>(mem[0]);
 
     // execution
     return rocsolver_sytrs2_template<T>(handle, uplo, n, nrhs,

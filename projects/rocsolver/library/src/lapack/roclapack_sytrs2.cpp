@@ -65,9 +65,9 @@ rocblas_status rocsolver_sytrs2_impl(rocblas_handle handle,
     rocblas_stride const shiftB = 0;
 
     // normal (non-batched non-strided) execution
-    rocblas_stride const strideA = 0;
-    rocblas_stride const strideB = 0;
-    rocblas_stride const strideP = 0;
+    rocblas_stride const strideA = rocblas_stride(lda) * n;
+    rocblas_stride const strideB = rocblas_stride(ldb) * nrhs;
+    rocblas_stride const strideP = n;
     I const batch_count = 1;
 
     // memory workspace sizes:
@@ -76,16 +76,17 @@ rocblas_status rocsolver_sytrs2_impl(rocblas_handle handle,
     rocsolver_sytrs2_getMemorySize<T>(n, nrhs, batch_count, lda, ldb, &size_work);
 
     if(rocblas_is_device_memory_size_query(handle))
+    {
         return rocblas_set_optimal_device_memory_size(handle, size_work);
+    }
 
     // memory workspace allocation
-    void* work = nullptr;
     rocblas_device_malloc mem(handle, size_work);
 
     if(!mem)
         return rocblas_status_memory_error;
 
-    work = mem[0];
+    void* const work = static_cast<void*>(mem[0]);
 
     // execution
     return rocsolver_sytrs2_template<T>(handle, uplo, n, nrhs,

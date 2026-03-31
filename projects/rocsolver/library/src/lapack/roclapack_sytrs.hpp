@@ -918,7 +918,12 @@ rocblas_status rocsolver_sytrs_argCheck(rocblas_handle handle,
 }
 
 template <typename T, typename I>
-void rocsolver_sytrs_getMemorySize(I const n, I const nrhs, I const batch_count, size_t* const p_size_work)
+void rocsolver_sytrs_getMemorySize(I const n,
+                                   I const nrhs,
+                                   I const batch_count,
+                                   I const lda,
+                                   I const ldb,
+                                   size_t* const p_size_work)
 {
     // ---------------------------
     // request at least 1 byte to avoid possibly getting
@@ -929,7 +934,7 @@ void rocsolver_sytrs_getMemorySize(I const n, I const nrhs, I const batch_count,
     if(use_sytrs2<T>(n, nrhs, batch_count))
     {
         size_t size_sytrs2 = 0;
-        rocsolver_sytrs2_getMemorySize<T, I>(n, nrhs, batch_count, &size_sytrs2);
+        rocsolver_sytrs2_getMemorySize<T, I>(n, nrhs, batch_count, lda, ldb, &size_sytrs2);
 
         size_work += size_sytrs2;
     }
