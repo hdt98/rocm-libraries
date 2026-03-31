@@ -1193,6 +1193,7 @@ pipeline {
     agent none
     triggers {
         parameterizedCron(CRON_SETTINGS)
+        pollSCM('H/15 * * * *')
     }
     options {
         skipDefaultCheckout()
