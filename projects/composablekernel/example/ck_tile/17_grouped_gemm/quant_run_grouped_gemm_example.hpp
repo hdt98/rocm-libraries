@@ -17,6 +17,7 @@
 #include "ck_tile/ops/gemm/pipeline/tile_gemm_traits.hpp"
 #include "ck_tile/ops/gemm_quant.hpp"
 #include "ck_tile/host.hpp"
+#include "ck_tile/host/gemm_rtol_atol.hpp"
 
 #include "quant_grouped_gemm_config.hpp"
 #include "quant_invoke_grouped_gemm_kernel.hpp"
@@ -27,8 +28,6 @@ static constexpr inline auto is_row_major(Layout layout_)
     return ck_tile::bool_constant<std::is_same_v<ck_tile::remove_cvref_t<decltype(layout_)>,
                                                  ck_tile::tensor_layout::gemm::RowMajor>>{};
 }
-
-#include "ck_tile/host/gemm_rtol_atol.hpp"
 
 template <typename GemmConfig,
           typename ADataType,

@@ -18,7 +18,6 @@
 #include "ck_tile/ops/flatmm.hpp"
 #include "ck_tile/ops/moe_flatmm.hpp"
 #include "ck_tile/host.hpp"
-#include "ck_tile/host/gemm_rtol_atol.hpp"
 #include "ck_tile/host/reference/reference_moe_gemm.hpp"
 
 template <typename Layout>

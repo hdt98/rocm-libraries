@@ -10,6 +10,11 @@ namespace ck_tile {
 
 /// Computes relative and absolute error tolerance thresholds for GEMM verification
 /// without split-K accumulation error (single-WG, no split-K).
+/// @return tuple<double, double> where [0] = relative tolerance (rtol),
+///                                     [1] = absolute tolerance (atol).
+/// @note Does NOT support pk_fp4_t operand types. For block-scale quantized GEMMs
+///       using pk_fp4_t, use the local calculate_rtol_atol in
+///       example/ck_tile/38_block_scale_gemm/gemm_utils.hpp instead.
 template <typename ADataType, typename BDataType, typename AccDataType, typename CDataType>
 auto calculateRtolAtol(const index_t k_dim, const float max_accumulated_value)
 {
@@ -25,6 +30,11 @@ auto calculateRtolAtol(const index_t k_dim, const float max_accumulated_value)
 /// Computes relative and absolute error tolerance thresholds for GEMM verification.
 /// Accounts for split-K (or multi-WG) accumulation error in addition to per-element
 /// compute error.
+/// @return tuple<double, double> where [0] = relative tolerance (rtol),
+///                                     [1] = absolute tolerance (atol).
+/// @note Does NOT support pk_fp4_t operand types. For block-scale quantized GEMMs
+///       using pk_fp4_t, use the local calculate_rtol_atol in
+///       example/ck_tile/38_block_scale_gemm/gemm_utils.hpp instead.
 template <typename ADataType, typename BDataType, typename AccDataType, typename CDataType>
 auto calculateRtolAtol(const index_t k_dim,
                        const index_t k_batch,
@@ -51,6 +61,9 @@ auto calculateRtolAtol(const index_t k_dim,
 
 /// 5-parameter variant for multi-D GEMMs where a D tensor participates in the accumulation
 /// and its precision affects the effective compute type (3-way minimum-precision selection).
+/// D0DataType = first D-tensor (bias/residual input); EDataType = output tensor (replaces C).
+/// @return tuple<double, double> where [0] = relative tolerance (rtol),
+///                                     [1] = absolute tolerance (atol).
 template <typename ADataType,
           typename BDataType,
           typename D0DataType,
