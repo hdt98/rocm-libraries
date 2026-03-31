@@ -1133,7 +1133,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
             traits.has_logits_soft_cap = 0.f < logits_soft_cap;
             traits.mask_type           = mask.type;
             traits.bias_type           = bias.type;
-            traits.has_sink            = mask.sink > 0 ? true : false; // StreamLLM sink
+            traits.has_stream_sink     = mask.sink > 0 ? true : false; // StreamLLM sink
             traits.has_gptoss_sink     = init_sink_value != 0;         // GPT-OSS sink
             traits.has_lse             = lse;
 

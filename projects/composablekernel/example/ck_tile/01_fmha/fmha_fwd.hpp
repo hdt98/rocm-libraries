@@ -1685,7 +1685,7 @@ struct fmha_fwd_traits
     bool has_dropout;
     quant_scale_enum qscale_type;
     bool skip_min_seqlen_q = false;
-    bool has_sink          = false; // StreamLLM sliding-window sink
+    bool has_stream_sink   = false; // StreamLLM sliding-window sink
     bool has_gptoss_sink   = false; // GPT-OSS learnable softmax bias sink
     // TODO: padding check is inside this api
 };
@@ -1705,7 +1705,7 @@ struct fmha_fwd_pagedkv_traits
     bool use_pagedkv         = true;
     bool do_fp8_static_quant = false;
     bool skip_min_seqlen_q   = false;
-    bool has_sink            = false; // StreamLLM sliding-window sink
+    bool has_stream_sink     = false; // StreamLLM sliding-window sink
     bool has_gptoss_sink     = false; // GPT-OSS learnable softmax bias sink
     // TODO: padding check is inside this api
 };
@@ -1726,7 +1726,7 @@ struct fmha_fwd_splitkv_traits
     bias_enum bias_type; // 0:no bias, 1:elementwise bias, 2:alibi. sync with BlockAttentionBiasEnum
     bool has_lse;
     bool do_fp8_static_quant = false;
-    bool has_sink            = false; // StreamLLM sliding-window sink
+    bool has_stream_sink     = false; // StreamLLM sliding-window sink
     bool has_gptoss_sink     = false; // GPT-OSS learnable softmax bias sink
     // TODO: padding check is inside this api
 };
