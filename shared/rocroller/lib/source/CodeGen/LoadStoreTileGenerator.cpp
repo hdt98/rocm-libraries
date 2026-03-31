@@ -113,8 +113,7 @@ namespace rocRoller
          */
         ExpressionPtr LoadStoreTileGenerator::getOffsetExpr(int  opTag,
                                                             bool isStorePartOfGlobalToLDS,
-                                                            Transformer const& coords,
-                                                            int                subdimFilter)
+                                                            Transformer const& coords)
         {
             rocRoller::Log::getLogger()->debug("KernelGraph::LoadStoreTileGenerator::getOffsetExpr("
                                                "operationTag: {}, isStorePartOfGlobalToLDS: {})",
@@ -151,9 +150,6 @@ namespace rocRoller
                 auto const subDimension = m_graph->mapper.getConnectionSubdimension(opTag, unroll);
 
                 if(subDimension == -1)
-                    continue;
-
-                if(subdimFilter >= 0 && subDimension != subdimFilter)
                     continue;
 
                 auto strideTag = getUnrollStrideCoordinate(opTag, subDimension);
@@ -281,127 +277,6 @@ namespace rocRoller
             if(isStorePartOfGlobalToLDS)
             {
                 co_return;
-            }
-
-            // For swizzled LDS reads, the column offset (mfmaId stride) cannot
-            // be folded into the literal offset because the swizzle makes the
-            // physical distance between K-chunks per-lane.  Split the unroll
-            // contributions by subdimension:
-            //   row subdim (WTN) -> literal offset (swizzle-invariant)
-            //   col subdim (mfmaId / K) -> modular add within column field
-            //
-            // The K dimension's subdimension depends on the matrix layout:
-            //   MATRIX_A: K is subdim 1, row (M) is subdim 0
-            //   MATRIX_B: K is subdim 0, row (N) is subdim 1
-            //
-            // The column occupies bits [4 : 4+log2(K)-1] of the LDS byte
-            // address (each chunk is 16 bytes).  Advancing by colVal bytes
-            // must wrap within the column field (mod K chunks) without
-            // disturbing the row bits above.  We compute:
-            //   new = ((base + colVal) & colMask) | (base & ~colMask)
-            // where colMask = (K - 1) << 4.
-            {
-                int  kSubdim       = -1;
-                bool isSwizzledLDS = false;
-                auto swzMode       = m_context->kernelOptions()->ldsSwizzleMode;
-                if(swzMode != LDSBankSwizzleMode::None
-                   && m_graph->control.get<LoadLDSTile>(info.tag))
-                {
-                    auto macTileTag = m_graph->mapper.get<MacroTile>(info.tag);
-                    auto macTile    = m_graph->coordinates.getNode<MacroTile>(macTileTag);
-                    bool isA        = (swzMode == LDSBankSwizzleMode::Swizzle
-                                || swzMode == LDSBankSwizzleMode::SwizzleA)
-                               && macTile.layoutType == LayoutType::MATRIX_A;
-                    bool isB = (swzMode == LDSBankSwizzleMode::Swizzle
-                                || swzMode == LDSBankSwizzleMode::SwizzleB)
-                               && macTile.layoutType == LayoutType::MATRIX_B;
-                    isSwizzledLDS = isA || isB;
-                    if(isA)
-                        kSubdim = 1;
-                    else if(isB)
-                        kSubdim = 0;
-                }
-
-                if(isSwizzledLDS && rowOffsetExpr)
-                {
-                    int  rowSubdim = 1 - kSubdim;
-                    auto rowOnlyExpr
-                        = getOffsetExpr(info.tag, false, coords, /*subdimFilter=*/rowSubdim);
-                    auto colOnlyExpr
-                        = getOffsetExpr(info.tag, false, coords, /*subdimFilter=*/kSubdim);
-
-                    // Row part (WTN stride): fold into literal offset
-                    if(rowOnlyExpr
-                       && Expression::evaluationTimes(rowOnlyExpr)[EvaluationTime::Translate]
-                       && info.offset->regType() == Register::Type::Literal)
-                    {
-                        auto rowVal     = getUnsignedInt(evaluate(rowOnlyExpr));
-                        auto prevOffset = getUnsignedInt(info.offset->getLiteralValue());
-                        info.offset     = Register::Value::Literal(rowVal + prevOffset);
-                    }
-
-                    // Column part (mfmaId stride): modular add within the
-                    // column bit-field of the swizzled LDS address.
-                    // Cache the result so identical (base, colVal) pairs reuse
-                    // the same VGPR instead of recomputing.
-                    if(colOnlyExpr
-                       && Expression::evaluationTimes(colOnlyExpr)[EvaluationTime::Translate])
-                    {
-                        auto colVal = getUnsignedInt(evaluate(colOnlyExpr));
-                        if(colVal > 0)
-                        {
-                            // Check for pre-computed swizzle register (placed before K loop)
-                            auto precompKey
-                                = std::make_pair(offsetTag, static_cast<unsigned int>(colVal));
-                            auto preIt = m_graph->swizzlePrecomputed.find(precompKey);
-                            if(preIt != m_graph->swizzlePrecomputed.end())
-                            {
-                                info.rowOffsetReg
-                                    = m_context->registerTagManager()->getRegister(preIt->second);
-                            }
-                            else
-                            {
-                                // Fallback: compute inline (for non-precomputed cases)
-                                auto cacheKey = std::make_pair(info.rowOffsetReg.get(),
-                                                               static_cast<unsigned int>(colVal));
-                                auto it       = m_swizzleCache.find(cacheKey);
-                                if(it != m_swizzleCache.end())
-                                {
-                                    info.rowOffsetReg = it->second;
-                                }
-                                else
-                                {
-                                    auto macTileTag = m_graph->mapper.get<MacroTile>(info.tag);
-                                    auto macTile
-                                        = m_graph->coordinates.getNode<MacroTile>(macTileTag);
-                                    auto thrTile = ThreadTile(macTile);
-                                    auto K = static_cast<unsigned int>(thrTile.wsizes.at(kSubdim));
-                                    auto Keff    = std::min(K, 8u);
-                                    auto colMask = (Keff - 1u) << 4;
-
-                                    // new = ((base + colVal) & colMask) | (base & ~colMask)
-                                    auto base = info.rowOffsetReg->expression();
-                                    auto newCol
-                                        = (base
-                                           + Expression::literal(static_cast<unsigned int>(colVal)))
-                                          & Expression::literal(colMask);
-                                    auto rowBits  = base & Expression::literal(~colMask);
-                                    auto combined = newCol | rowBits;
-
-                                    auto tmp = info.rowOffsetReg->placeholder(
-                                        Register::Type::Vector, {});
-                                    co_yield generate(
-                                        tmp, convert(info.rowOffsetReg->variableType(), combined));
-                                    m_swizzleCache[cacheKey] = tmp;
-                                    info.rowOffsetReg        = tmp;
-                                }
-                            }
-                        }
-                    }
-
-                    // Already handled; skip standard rowOffsetExpr processing
-                    rowOffsetExpr = nullptr;
-                }
             }
 
             if(rowOffsetExpr

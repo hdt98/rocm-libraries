@@ -41,6 +41,14 @@ namespace rocRoller::KernelGraph
         int              forLoop                    = -1;
         bool             replaceWithScope           = true;
         bool             isStorePartOfGlobalToLDSOp = false;
+
+        // Per-K-Unroll chain separation for LDS bank swizzle.
+        // When >= 0, this chain is specific to one K Unroll value (mfmaId along K).
+        // The K Unroll coordinate is included in the base computation (not as a stride),
+        // so coords.reverse() traverses the LR swizzle ExpressionTransform and produces
+        // the correct swizzled address. Different K Unroll values get separate chains.
+        int swizzleKUnrollValue = -1;
+        int swizzleKUnrollCoord = -1; // coordinate tag of the K Unroll dimension
     };
 
     bool operator<(const IndexChainSpec& a, const IndexChainSpec& b)
@@ -51,14 +59,16 @@ namespace rocRoller::KernelGraph
                         a.direction,
                         a.forLoop,
                         a.replaceWithScope,
-                        a.isStorePartOfGlobalToLDSOp)
+                        a.isStorePartOfGlobalToLDSOp,
+                        a.swizzleKUnrollValue)
                < std::tie(b.target,
                           b.coords,
                           b.location,
                           b.direction,
                           b.forLoop,
                           b.replaceWithScope,
-                          b.isStorePartOfGlobalToLDSOp);
+                          b.isStorePartOfGlobalToLDSOp,
+                          b.swizzleKUnrollValue);
     }
 
     /**
@@ -327,7 +337,8 @@ namespace rocRoller::KernelGraph
     std::vector<RequiredCoordinateInfo> getRequiredCoordinatesInfo(int                op,
                                                                    int                location,
                                                                    KernelGraph const& graph,
-                                                                   bool isStorePartOfGlobalToLDSOp)
+                                                                   bool isStorePartOfGlobalToLDSOp,
+                                                                   int  swizzleKUnrollCoord = -1)
     {
         auto [target, direction] = getOperationTarget(op, graph, isStorePartOfGlobalToLDSOp);
         auto [required, path]    = findRequiredCoordinates(target, direction, graph);
@@ -423,7 +434,8 @@ namespace rocRoller::KernelGraph
                                    int                              candidate,
                                    bool                             isStorePartOfGlobalToLDSOp,
                                    const std::vector<int>&          strideCoords,
-                                   std::vector<DeferredConnection>& connections)
+                                   std::vector<DeferredConnection>& connections,
+                                   int                              swizzleKUnrollCoord = -1)
     {
         auto [target, direction]
             = getOperationTarget(candidate, kgraph, isStorePartOfGlobalToLDSOp);
@@ -432,6 +444,10 @@ namespace rocRoller::KernelGraph
 
         for(auto const& unroll : unrolls)
         {
+            // Skip the K Unroll coordinate when swizzle chain separation is
+            // active -- its offset is baked into the base, no stride needed.
+            if(swizzleKUnrollCoord >= 0 && unroll == swizzleKUnrollCoord)
+                continue;
             auto proxy = followIdentify(unroll, kgraph);
 
             auto const subDimension = kgraph.mapper.getConnectionSubdimension(candidate, unroll);
@@ -562,8 +578,11 @@ namespace rocRoller::KernelGraph
         std::vector<int>                strideCoords;
 
         int  locationForCoordInfo = (spec.forLoop > 0) ? spec.forLoop : spec.location;
-        auto requiredCoords       = getRequiredCoordinatesInfo(
-            op, locationForCoordInfo, graph, spec.isStorePartOfGlobalToLDSOp);
+        auto requiredCoords       = getRequiredCoordinatesInfo(op,
+                                                         locationForCoordInfo,
+                                                         graph,
+                                                         spec.isStorePartOfGlobalToLDSOp,
+                                                         spec.swizzleKUnrollCoord);
 
         for(auto const& info : requiredCoords)
         {
@@ -633,8 +652,12 @@ namespace rocRoller::KernelGraph
                     graph, edges.offset, edges.stride, offsetDataType, step);
         }
 
-        addUnrollStrideConnection(
-            graph, op, spec.isStorePartOfGlobalToLDSOp, strideCoords, connections);
+        addUnrollStrideConnection(graph,
+                                  op,
+                                  spec.isStorePartOfGlobalToLDSOp,
+                                  strideCoords,
+                                  connections,
+                                  spec.swizzleKUnrollCoord);
 
         // Link chain nodes with Sequence edges
         for(size_t i = 1; i < chain.size(); ++i)
@@ -1144,13 +1167,15 @@ namespace rocRoller::KernelGraph
                         int                location,
                         Graph::Direction   direction,
                         bool               isStorePartOfGlobalToLDSOp,
-                        int                forLoop          = -1,
-                        bool               replaceWithScope = true)
+                        int                forLoop             = -1,
+                        bool               replaceWithScope    = true,
+                        int                swizzleKUnrollValue = -1,
+                        int                swizzleKUnrollCoord = -1)
         {
             // Build coordinate list for deduplication key
             std::vector<int> specCoords;
-            for(auto const& info :
-                getRequiredCoordinatesInfo(candidate, location, graph, isStorePartOfGlobalToLDSOp))
+            for(auto const& info : getRequiredCoordinatesInfo(
+                    candidate, location, graph, isStorePartOfGlobalToLDSOp, swizzleKUnrollCoord))
             {
                 specCoords.push_back(info.coord);
             }
@@ -1161,7 +1186,9 @@ namespace rocRoller::KernelGraph
                                 direction,
                                 forLoop,
                                 replaceWithScope,
-                                isStorePartOfGlobalToLDSOp};
+                                isStorePartOfGlobalToLDSOp,
+                                swizzleKUnrollValue,
+                                swizzleKUnrollCoord};
             m_chains[spec].push_back(candidate);
         }
 
@@ -1227,6 +1254,92 @@ namespace rocRoller::KernelGraph
             });
         }
 
+        /**
+         * @brief Detect if a candidate is a swizzled LDS load and extract the
+         * K Unroll coordinate and its value from upstream SetCoordinate.
+         *
+         * Returns (kUnrollCoord, kUnrollValue) where kUnrollCoord is the
+         * Unroll coordinate tag for the K dimension and kUnrollValue is
+         * the literal value set by the enclosing SetCoordinate.
+         * Returns (-1, -1) if not a swizzled LDS load.
+         */
+        std::pair<int, int> getSwizzleKUnrollInfo(KernelGraph const& kgraph, int candidate) const
+        {
+            auto swzMode = m_context->kernelOptions()->ldsSwizzleMode;
+            if(swzMode == LDSBankSwizzleMode::None)
+                return {-1, -1};
+
+            if(!kgraph.control.get<LoadLDSTile>(candidate))
+                return {-1, -1};
+
+            auto macTileTag = kgraph.mapper.get<MacroTile>(candidate);
+            auto macTile    = kgraph.coordinates.getNode<MacroTile>(macTileTag);
+            auto dataType   = getDataType(kgraph.control.getNode(candidate));
+
+            if(isScaleType(dataType))
+                return {-1, -1};
+
+            bool isA = (swzMode == LDSBankSwizzleMode::Swizzle
+                        || swzMode == LDSBankSwizzleMode::SwizzleA)
+                       && macTile.layoutType == LayoutType::MATRIX_A;
+            bool isB = (swzMode == LDSBankSwizzleMode::Swizzle
+                        || swzMode == LDSBankSwizzleMode::SwizzleB)
+                       && macTile.layoutType == LayoutType::MATRIX_B;
+            if(!isA && !isB)
+                return {-1, -1};
+
+            // K subdimension: dim 1 for MATRIX_A, dim 0 for MATRIX_B
+            int kSubdim = isA ? 1 : 0;
+
+            // Find the K Unroll coordinate and its value from upstream SetCoordinate
+            auto [target, direction]
+                = getOperationTarget(candidate, kgraph, /*isStorePartOfGlobalToLDSOp=*/false);
+            auto [required, path] = findRequiredCoordinates(target, direction, kgraph);
+            auto unrolls          = filterCoordinates<Unroll>(required, kgraph);
+
+            int kUnrollCoord = -1;
+            for(auto const& unroll : unrolls)
+            {
+                auto sdim = kgraph.mapper.getConnectionSubdimension(candidate, unroll);
+                if(sdim == kSubdim)
+                {
+                    kUnrollCoord = unroll;
+                    break;
+                }
+            }
+
+            if(kUnrollCoord < 0)
+                return {-1, -1};
+
+            // Walk upstream via Body edges to find the SetCoordinate that sets
+            // this K Unroll coordinate value for this candidate.
+            int current = candidate;
+            while(true)
+            {
+                auto parents = kgraph.control.getInputNodeIndices<Body>(current).to<std::vector>();
+                if(parents.empty())
+                    break;
+
+                current            = parents[0];
+                auto maybeSetCoord = kgraph.control.get<SetCoordinate>(current);
+                if(!maybeSetCoord)
+                    continue;
+
+                auto coordTag = kgraph.mapper.get<Unroll>(current);
+                if(coordTag != kUnrollCoord)
+                    continue;
+
+                auto valueExpr = maybeSetCoord->value;
+                if(!evaluationTimes(valueExpr)[EvaluationTime::Translate])
+                    break;
+
+                auto value = static_cast<int>(getUnsignedInt(evaluate(valueExpr)));
+                return {kUnrollCoord, value};
+            }
+
+            return {-1, -1};
+        }
+
         void stage(KernelGraph const& kgraph, int candidate, bool isStorePartOfGlobalToLDSOp)
         {
             auto node = kgraph.control.getNode<Operation>(candidate);
@@ -1244,6 +1357,11 @@ namespace rocRoller::KernelGraph
             Log::debug("  target: {}", target);
             for(auto r : required)
                 Log::debug("  required: {}: {}", r, toString(kgraph.coordinates.getNode(r)));
+
+            // Detect swizzled LDS load and extract K Unroll info for chain separation
+            auto [swizzleKUnrollCoord, swizzleKUnrollValue]
+                = isStorePartOfGlobalToLDSOp ? std::pair{-1, -1}
+                                             : getSwizzleKUnrollInfo(kgraph, candidate);
 
             // Gather loop context information
             auto maybeForLoop  = findContainingOperation<ForLoopOp>(candidate, kgraph);
@@ -1263,7 +1381,9 @@ namespace rocRoller::KernelGraph
                            placement->direction,
                            isStorePartOfGlobalToLDSOp,
                            placement->forLoop,
-                           placement->replaceWithScope);
+                           placement->replaceWithScope,
+                           swizzleKUnrollValue,
+                           swizzleKUnrollCoord);
                 return;
             }
 
@@ -1281,7 +1401,9 @@ namespace rocRoller::KernelGraph
                            GD::Upstream,
                            isStorePartOfGlobalToLDSOp,
                            -1,
-                           false);
+                           false,
+                           swizzleKUnrollValue,
+                           swizzleKUnrollCoord);
                 return;
             }
 
@@ -1295,7 +1417,10 @@ namespace rocRoller::KernelGraph
                            *maybeForLoop,
                            GD::Upstream,
                            isStorePartOfGlobalToLDSOp,
-                           *maybeForLoop);
+                           *maybeForLoop,
+                           true,
+                           swizzleKUnrollValue,
+                           swizzleKUnrollCoord);
                 return;
             }
 
@@ -1311,7 +1436,10 @@ namespace rocRoller::KernelGraph
                            *maybeScope,
                            GD::Upstream,
                            isStorePartOfGlobalToLDSOp,
-                           -1);
+                           -1,
+                           true,
+                           swizzleKUnrollValue,
+                           swizzleKUnrollCoord);
                 return;
             }
 
@@ -1330,7 +1458,9 @@ namespace rocRoller::KernelGraph
                            GD::Upstream,
                            isStorePartOfGlobalToLDSOp,
                            -1,
-                           false);
+                           false,
+                           swizzleKUnrollValue,
+                           swizzleKUnrollCoord);
                 return;
             }
 
@@ -1347,7 +1477,10 @@ namespace rocRoller::KernelGraph
                            kernel,
                            GD::Downstream,
                            isStorePartOfGlobalToLDSOp,
-                           -1);
+                           -1,
+                           true,
+                           swizzleKUnrollValue,
+                           swizzleKUnrollCoord);
                 return;
             }
 
@@ -1361,7 +1494,10 @@ namespace rocRoller::KernelGraph
                            *maybeForLoop,
                            GD::Upstream,
                            isStorePartOfGlobalToLDSOp,
-                           *maybeForLoop);
+                           *maybeForLoop,
+                           true,
+                           swizzleKUnrollValue,
+                           swizzleKUnrollCoord);
                 return;
             }
 
@@ -1517,16 +1653,12 @@ namespace rocRoller::KernelGraph
 
                 // Create Assign nodes for each placeholder
                 for(auto const& nodeInfo : chain.nodeInfos)
-                    createAssignsForPlaceholder(kgraph, nodeInfo, m_context, m_command);
-
-                // Pre-compute swizzled LDS offsets for each K-column value.
-                // This places Assign nodes before the K loop so that the loop
-                // body can use pre-computed registers instead of recomputing
-                // the modular-add swizzle every iteration.
-                if(!spec.isStorePartOfGlobalToLDSOp)
-                {
-                    addSwizzlePrecompute(kgraph, candidates, chain, spec);
-                }
+                    createAssignsForPlaceholder(kgraph,
+                                                nodeInfo,
+                                                m_context,
+                                                m_command,
+                                                spec.swizzleKUnrollValue,
+                                                spec.swizzleKUnrollCoord);
             }
 
             return kgraph;
@@ -1539,7 +1671,9 @@ namespace rocRoller::KernelGraph
         static void createAssignsForPlaceholder(KernelGraph&         kgraph,
                                                 ChainNodeInfo const& nodeInfo,
                                                 ContextPtr           context,
-                                                CommandPtr           command)
+                                                CommandPtr           command,
+                                                int                  swizzleKUnrollValue = -1,
+                                                int                  swizzleKUnrollCoord = -1)
         {
             int target = nodeInfo.target;
 
@@ -1607,10 +1741,36 @@ namespace rocRoller::KernelGraph
                 }
             }
 
-            // Set remaining coordinates to 0
+            // Set remaining coordinates to 0 (or actual value for swizzled K Unroll)
             for(auto coord : required)
+            {
                 if((coord != nodeInfo.increment) && (!xform.hasCoordinate(coord)))
-                    xform.setCoordinate(coord, L(0u));
+                {
+                    // For swizzle chain separation, set the K Unroll coordinate
+                    // to its actual value so coords.reverse() traverses the LR
+                    // swizzle ExpressionTransform with the correct K-column.
+                    if(swizzleKUnrollCoord >= 0 && coord == swizzleKUnrollCoord
+                       && swizzleKUnrollValue >= 0)
+                    {
+                        xform.setCoordinate(coord,
+                                            L(static_cast<unsigned int>(swizzleKUnrollValue)));
+                    }
+                    else
+                        xform.setCoordinate(coord, L(0u));
+                }
+            }
+
+            // For swizzle chain separation: the K Unroll coordinate may not
+            // be in this nodeInfo's `required` list (e.g., it's on a parallel
+            // branch of the Tile transform), but coords.reverse() still
+            // traverses through it.  Ensure it's set in the transformer so
+            // the ExpressionTransform receives the correct column value.
+            if(swizzleKUnrollCoord >= 0 && swizzleKUnrollValue >= 0
+               && !xform.hasCoordinate(swizzleKUnrollCoord))
+            {
+                xform.setCoordinate(swizzleKUnrollCoord,
+                                    L(static_cast<unsigned int>(swizzleKUnrollValue)));
+            }
 
             // Set the increment coordinate to zero if it doesn't already have a value
             bool initializeIncrement
@@ -1662,144 +1822,6 @@ namespace rocRoller::KernelGraph
                 insertAfter(kgraph, nodeInfo.nopTag, assignStrideTag, assignStrideTag);
             if(assignBaseTag != -1)
                 insertAfter(kgraph, nodeInfo.nopTag, assignBaseTag, assignBaseTag);
-        }
-
-        /**
-         * @brief Pre-compute swizzled LDS offsets for a chain.
-         *
-         * For swizzled LDS LoadLDSTile operations, creates Assign nodes that
-         * compute ((base + colVal) & colMask) | (base & ~colMask) for each
-         * K-column value (mfmaId > 0). These are placed after the chain's
-         * base Assign (before the K loop) so getOffset() can use them
-         * instead of recomputing inline.
-         */
-        void addSwizzlePrecompute(KernelGraph&            kgraph,
-                                  std::vector<int> const& candidates,
-                                  IndexChain const&       chain,
-                                  IndexChainSpec const&   spec) const
-        {
-            auto swzMode = m_context->kernelOptions()->ldsSwizzleMode;
-            if(swzMode == LDSBankSwizzleMode::None)
-                return;
-
-            if(candidates.empty())
-                return;
-
-            auto candidate = candidates[0];
-
-            // Check if this candidate is a LoadLDSTile
-            if(!kgraph.control.get<LoadLDSTile>(candidate))
-                return;
-
-            // Get MacroTile to determine layout and K parameters
-            auto macTileTag = kgraph.mapper.get<MacroTile>(candidate);
-            auto macTile    = kgraph.coordinates.getNode<MacroTile>(macTileTag);
-            auto dataType   = getDataType(kgraph.control.getNode(candidate));
-
-            // Skip scale types
-            if(isScaleType(dataType))
-                return;
-
-            bool isA = (swzMode == LDSBankSwizzleMode::Swizzle
-                        || swzMode == LDSBankSwizzleMode::SwizzleA)
-                       && macTile.layoutType == LayoutType::MATRIX_A;
-            bool isB = (swzMode == LDSBankSwizzleMode::Swizzle
-                        || swzMode == LDSBankSwizzleMode::SwizzleB)
-                       && macTile.layoutType == LayoutType::MATRIX_B;
-            if(!isA && !isB)
-                return;
-
-            // Compute K parameters from tile size and element bits
-            int  kDim          = isA ? 1 : 0;
-            auto elementBits   = DataTypeInfo::Get(dataType).elementBits;
-            auto elemsPerChunk = 128u / elementBits;
-            auto tileK         = static_cast<unsigned int>(macTile.sizes.at(kDim));
-            auto K             = tileK / elemsPerChunk;
-            auto Keff          = std::min(K, 8u);
-            auto E             = elemsPerChunk;
-            auto colMask       = (Keff - 1u) << 4;
-
-            // Compute stride in bytes per K-column chunk (E elements * elementBits/8)
-            auto strideKBytes = E * elementBits / 8;
-
-            // Cap at Keff <= 4 to limit register pressure. For K=8 with
-            // scaling + prefetch, the 14 extra VGPRs can exceed the 256
-            // VGPR limit. K=4 adds only 3 VGPRs per matrix (6 total).
-            if(Keff > 4)
-                return;
-
-            // Find the base Offset coordinate tag (subdim 0 for loads).
-            // The connections have already been applied to the candidate.
-            auto baseOffsetTag = kgraph.mapper.get<Offset>(candidate, 0);
-            if(baseOffsetTag < 0)
-                return;
-
-            Log::debug("addSwizzlePrecompute: candidate={} K={} Keff={} E={} "
-                       "strideKBytes={} colMask=0x{:x} baseOffsetTag={}",
-                       candidate,
-                       K,
-                       Keff,
-                       E,
-                       strideKBytes,
-                       colMask,
-                       baseOffsetTag);
-
-            // Create Assign nodes for each mfmaId > 0
-            auto baseExpr = std::make_shared<Expression::Expression>(
-                Expression::DataFlowTag{baseOffsetTag, Register::Type::Vector, DataType::UInt32});
-
-            int lastInsertionPoint = chain.bottom;
-
-            for(unsigned int mfmaId = 1; mfmaId < Keff; ++mfmaId)
-            {
-                auto colVal = mfmaId * strideKBytes;
-
-                // swizzled = ((base + colVal) & colMask) | (base & ~colMask)
-                auto newCol
-                    = (baseExpr + Expression::literal(colVal)) & Expression::literal(colMask);
-                auto rowBits  = baseExpr & Expression::literal(~colMask);
-                auto swizzled = newCol | rowBits;
-                auto expr     = convert(DataType::UInt32, swizzled);
-
-                auto assignNode         = Assign{Register::Type::Vector, expr};
-                assignNode.variableType = DataType::UInt32;
-                auto assignTag          = kgraph.control.addElement(assignNode);
-
-                // Create an Offset edge between two Adhoc nodes so that
-                // trackOffsetAndStride() in AddDeallocate picks it up as
-                // a register to keep alive through all LoadLDSTile users.
-                auto srcNode = kgraph.coordinates.addElement(
-                    Adhoc(fmt::format("SwzSrc_{}_{}", baseOffsetTag, colVal)));
-                auto dstNode = kgraph.coordinates.addElement(
-                    Adhoc(fmt::format("SwzDst_{}_{}", baseOffsetTag, colVal)));
-                auto newOffsetTag = kgraph.coordinates.addElement(Offset(), {srcNode}, {dstNode});
-
-                // Connect the Assign to write to this Offset edge tag
-                kgraph.mapper.connect(assignTag, newOffsetTag, NaryArgument::DEST);
-
-                // Insert after the last insertion point in the control graph
-                insertAfter(kgraph, lastInsertionPoint, assignTag, assignTag);
-                lastInsertionPoint = assignTag;
-
-                // Store in the pre-computed map
-                kgraph.swizzlePrecomputed[{baseOffsetTag, colVal}] = newOffsetTag;
-
-                // Connect all LoadLDSTile candidates to this Offset edge so
-                // AddDeallocate's trackOffsetAndStride() keeps the register
-                // alive through the K loop body. Use high subdimensions
-                // to avoid clashing with the base Offset (subdim 0).
-                for(auto cand : candidates)
-                    kgraph.mapper.connect<Offset>(
-                        cand, newOffsetTag, 100 + static_cast<int>(mfmaId));
-
-                Log::debug("  mfmaId={} colVal={} assignTag={} newOffsetTag={} "
-                           "connected to {} candidates",
-                           mfmaId,
-                           colVal,
-                           assignTag,
-                           newOffsetTag,
-                           candidates.size());
-            }
         }
 
     private:

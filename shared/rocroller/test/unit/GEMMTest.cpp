@@ -513,10 +513,10 @@ namespace GEMMTests
 
         basicGEMM<FP4, FP4, float>(gemm);
 
-        // macK=128, MI 32x32x64, K=4: (Keff-1)*2 = 3*2 = 6 v_or_b32 (prolog)
+        // Per-K-Unroll chain separation: swizzle baked into base, no v_or_b32
         std::string generatedCode = m_context->instructions()->toString();
         EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
-        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 6);
+        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 0);
     }
 
     TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MT256x256x128_LDSSwizzleA)
@@ -538,10 +538,10 @@ namespace GEMMTests
 
         basicGEMM<FP4, FP4, float>(gemm);
 
-        // SwizzleA only: (Keff-1)*1 = 3 v_or_b32 (prolog)
+        // Per-K-Unroll chain separation: swizzle baked into base, no v_or_b32
         std::string generatedCode = m_context->instructions()->toString();
         EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
-        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 3);
+        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 0);
     }
 
     TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MT256x256x128_LDSSwizzleB)
@@ -563,10 +563,10 @@ namespace GEMMTests
 
         basicGEMM<FP4, FP4, float>(gemm);
 
-        // SwizzleB only: (Keff-1)*1 = 3 v_or_b32 (prolog)
+        // Per-K-Unroll chain separation: swizzle baked into base, no v_or_b32
         std::string generatedCode = m_context->instructions()->toString();
         EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
-        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 3);
+        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 0);
     }
 
     TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MT256x256x256_LDSSwizzle)
@@ -588,11 +588,10 @@ namespace GEMMTests
 
         basicGEMM<FP4, FP4, float>(gemm);
 
-        // macK=256, MI 32x32x64, K=8: Keff>4 so falls back to inline cache
-        // 3 unique colVal>0 per matrix -> 6 v_or_b32 (in loop)
+        // Per-K-Unroll chain separation: swizzle baked into base, no v_or_b32
         std::string generatedCode = m_context->instructions()->toString();
         EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
-        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 6);
+        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 0);
     }
 
     TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MI16x16x128_MT64x64x256_LDSSwizzle)
@@ -605,11 +604,10 @@ namespace GEMMTests
 
         basicGEMM<FP4, FP4, float>(gemm);
 
-        // macK=256, MI 16x16x128, K=8: Keff>4 so falls back to inline cache
-        // 1 unique colVal>0 per matrix -> 2 v_or_b32 (in loop)
+        // Per-K-Unroll chain separation: swizzle baked into base, no v_or_b32
         std::string generatedCode = m_context->instructions()->toString();
         EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
-        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 2);
+        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 0);
     }
 
     TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MI16x16x128_MT256x256x256_LDSSwizzle)
@@ -633,11 +631,10 @@ namespace GEMMTests
 
         basicGEMM<FP4, FP4, float>(gemm);
 
-        // macK=256, MI 16x16x128, K=8: Keff>4 so falls back to inline cache
-        // 1 unique colVal>0 per matrix -> 2 v_or_b32 (in loop)
+        // Per-K-Unroll chain separation: swizzle baked into base, no v_or_b32
         std::string generatedCode = m_context->instructions()->toString();
         EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
-        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 2);
+        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 0);
     }
 
     TEST_P(GEMMTestSuite, GPU_GEMM_DataType_FP16_AllLDS)
