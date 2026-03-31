@@ -976,31 +976,7 @@ struct BlockFmhaPipelineQRKSVS
             }
         } while(++i_total_loops < num_total_loop);
 
-        // finally, O  -- normalize BEFORE storing LSE to avoid VGPR aliasing:
-        // the lse tile creation (below) may reuse o_acc VGPRs; normalizing first
-        // ensures o_acc is fully consumed before those registers can be reused.
-        constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
-
-        sweep_tile_span(o_spans[number<0>{}], [&](auto idx0) {
-            constexpr auto i_idx = make_tuple(idx0);
-            const auto tmp       = [&]() {
-                // When bias carries -inf masks the denominator can be zero; guard the normalization
-                // so we do not divide by zero after a fully masked row.
-                if constexpr(FmhaMask::IsMasking ||
-                             BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS)
-                {
-                    return l[i_idx] == 0.f ? 0.f : 1 / l[i_idx];
-                }
-                else
-                    return 1 / l[i_idx];
-            }();
-            sweep_tile_span(o_spans[number<1>{}], [&](auto idx1) {
-                constexpr auto i_j_idx = make_tuple(idx0, idx1);
-                o_acc(i_j_idx) *= tmp;
-            });
-        });
-
-        // store lse -- AFTER O normalization to prevent VGPR reuse corruption
+        // store lse
         if constexpr(kStoreLSE)
         {
             auto lse = make_static_distributed_tensor<LSEDataType>(m.get_tile_distribution());
@@ -1041,6 +1017,28 @@ struct BlockFmhaPipelineQRKSVS
 
             store_tile(lse_dram_window_tmp, tile_elementwise_in(lse_element_func, lse));
         }
+
+        // finally, O
+        constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
+
+        sweep_tile_span(o_spans[number<0>{}], [&](auto idx0) {
+            constexpr auto i_idx = make_tuple(idx0);
+            const auto tmp       = [&]() {
+                // When bias carries -inf masks the denominator can be zero; guard the normalization
+                // so we do not divide by zero after a fully masked row.
+                if constexpr(FmhaMask::IsMasking ||
+                             BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS)
+                {
+                    return l[i_idx] == 0.f ? 0.f : 1 / l[i_idx];
+                }
+                else
+                    return 1 / l[i_idx];
+            }();
+            sweep_tile_span(o_spans[number<1>{}], [&](auto idx1) {
+                constexpr auto i_j_idx = make_tuple(idx0, idx1);
+                o_acc(i_j_idx) *= tmp;
+            });
+        });
 
         o_acc = tile_elementwise_in(o_acc_element_func, o_acc);
 
