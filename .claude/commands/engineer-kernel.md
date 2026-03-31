@@ -97,7 +97,12 @@ CK_LOGGING=1 ./bin/example_grouped_conv_fwd_xdl_bf16 <args>
 ```
 to see which applicability check fails. Then go back to step 2.
 
-If we don't see performance improvement, go back to Step 2 and propose different template parameters.
+If you don't see performance improvement, you can consult `/profile-kernel` to get insights why the
+given candidate didn't improve performance. You can also provide a baseline and candidate (as separate conv fwd executables) to inspect the differences between the baseline and the candidate.
+
+If you don't see performance improvement go back to step 2 with the optional input from `/profile-kernel`.
+
+If you have a candidate that improves performance, you can proceed to step 5.
 
 ### Step 5 — Hand off candidate to the tester
 
