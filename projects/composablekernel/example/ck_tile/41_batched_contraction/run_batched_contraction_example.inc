@@ -8,28 +8,8 @@
 #include <cmath>
 #include <chrono>
 #include "contraction_utils.hpp"
+#include "ck_tile/host/gemm_rtol_atol.hpp"
 #include "ck_tile/host/reference/reference_batched_contraction.hpp"
-
-template <typename ADataType, typename BDataType, typename EDataType, typename AccDataType>
-auto calculate_rtol_atol(const ck_tile::index_t K,
-                         const ck_tile::index_t kbatch,
-                         const float max_accumulated_value)
-{
-    using ComputeType =
-        std::conditional_t<sizeof(ADataType) < sizeof(BDataType), ADataType, BDataType>;
-
-    const auto rtol = ck_tile::get_relative_threshold<ComputeType, EDataType, AccDataType>(
-        ck_tile::integer_divide_ceil(K, kbatch));
-    const auto atol = ck_tile::get_absolute_threshold<ComputeType, EDataType, AccDataType>(
-        max_accumulated_value / kbatch, ck_tile::integer_divide_ceil(K, kbatch));
-
-    const auto rtol_split_k =
-        ck_tile::get_relative_threshold<EDataType, EDataType, EDataType>(kbatch);
-    const auto atol_split_k = ck_tile::get_absolute_threshold<EDataType, EDataType, EDataType>(
-        max_accumulated_value, kbatch);
-
-    return ck_tile::make_tuple(std::max(rtol, rtol_split_k), std::max(atol, atol_split_k));
-}
 
 template <typename ADataType,
           typename BDataType,
@@ -455,7 +435,7 @@ int run_batched_contraction_example_with_layouts(
             *std::max_element(e_full_dims_host_ref.mData.begin(), e_full_dims_host_ref.mData.end());
 
         const auto rtol_atol =
-            calculate_rtol_atol<::ADataType, ::BDataType, ::EDataType, ::AccDataType>(
+            ck_tile::calculateRtolAtol<::ADataType, ::BDataType, ::AccDataType, ::EDataType>(
                 K_total, kbatch, max_accumulated_value);
 
         pass = ck_tile::check_err(e_full_dims_host,
