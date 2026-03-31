@@ -28,26 +28,7 @@ static constexpr inline auto is_row_major(Layout layout_)
                                                  ck_tile::tensor_layout::gemm::RowMajor>>{};
 }
 
-template <typename ADataType, typename BDataType, typename AccDataType, typename CDataType>
-static auto calculate_rtol_atol(const ck_tile::index_t K,
-                                const ck_tile::index_t kbatch,
-                                const float max_accumulated_value)
-{
-    using ComputeType =
-        std::conditional_t<sizeof(ADataType) < sizeof(BDataType), ADataType, BDataType>;
-    // Calculate thresholds
-    const auto rtol = ck_tile::get_relative_threshold<ComputeType, CDataType, AccDataType>(
-        ck_tile::integer_divide_ceil(K, kbatch));
-    const auto atol = ck_tile::get_absolute_threshold<ComputeType, CDataType, AccDataType>(
-        max_accumulated_value / kbatch, ck_tile::integer_divide_ceil(K, kbatch));
-    // Calculate error due to split_k accumulation
-    const auto rtol_split_k =
-        ck_tile::get_relative_threshold<CDataType, CDataType, CDataType>(kbatch);
-    const auto atol_split_k = ck_tile::get_absolute_threshold<CDataType, CDataType, CDataType>(
-        max_accumulated_value, kbatch);
-    // Use higher threshold
-    return ck_tile::make_tuple(std::max(rtol, rtol_split_k), std::max(atol, atol_split_k));
-}
+#include "ck_tile/host/gemm_rtol_atol.hpp"
 
 template <typename GemmConfig,
           typename ADataType,
@@ -531,7 +512,7 @@ int run_grouped_gemm_example_with_layouts(const ck_tile::ArgParser& arg_parser,
             const float max_accumulated_value =
                 *std::max_element(c_m_n_host_ref.mData.begin(), c_m_n_host_ref.mData.end());
             const auto rtol_atol =
-                calculate_rtol_atol<ADataType, BDataType, AccDataType, CDataType>(
+                ck_tile::calculateRtolAtol<ADataType, BDataType, AccDataType, CDataType>(
                     Ks[i], kbatch, max_accumulated_value);
             pass &= ck_tile::check_err(c_m_n_tensors[i],
                                        c_m_n_host_ref,
