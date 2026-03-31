@@ -246,14 +246,12 @@ namespace AliasDataFlowTagsTest
         SECTION("datatype from Assign::variableType")
         {
             auto testGraph = buildGraph(DataTypeSource::AssignVariableType);
-            auto assign    = testGraph.kgraph.control.getNode<Assign>(testGraph.writeOp);
             verify(testGraph);
         }
 
         SECTION("datatype from Assign expression result")
         {
             auto testGraph = buildGraph(DataTypeSource::ExpressionResultType);
-            auto assign    = testGraph.kgraph.control.getNode<Assign>(testGraph.writeOp);
             verify(testGraph);
         }
     }
