@@ -214,6 +214,21 @@ function(add_instance_library INSTANCE_NAME)
     set(result ${result} PARENT_SCOPE)
 endfunction(add_instance_library INSTANCE_NAME)
 
+# Helper macro to add layout-specific instance objects to CK_DEVICE_CONV_INSTANCES
+# Usage: ADD_CONV_LAYOUT_INSTANCES(operation_name layout1 layout2 ...)
+# Example: ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_fwd_convscale ndhwgc gndhwc)
+macro(ADD_CONV_LAYOUT_INSTANCES OP_NAME)
+    foreach(layout IN LISTS ARGN)
+        set(target_name "device_${OP_NAME}_${layout}_instance")
+        if(TARGET ${target_name})
+            list(APPEND CK_DEVICE_CONV_INSTANCES $<TARGET_OBJECTS:${target_name}>)
+            message(STATUS "Added ${target_name} to CK_DEVICE_CONV_INSTANCES")
+        else()
+            message(STATUS "Target ${target_name} does not exist (may be filtered by MIOPEN_REQ_LIBS_ONLY)")
+        endif()
+    endforeach()
+endmacro()
+
 
 file(GLOB dir_list LIST_DIRECTORIES true *)
 set(CK_DEVICE_OTHER_INSTANCES)
@@ -461,6 +476,52 @@ if(NOT HIPTENSOR_REQ_LIBS_ONLY OR MIOPEN_REQ_LIBS_ONLY)
     add_subdirectory(grouped_conv3d_bwd_data_scale)
     add_subdirectory(grouped_conv3d_bwd_weight_bilinear)
     add_subdirectory(grouped_conv3d_bwd_weight_scale)
+
+    # Collect layout-specific instance targets into CK_DEVICE_CONV_INSTANCES
+    # Each layout subdirectory creates targets like device_grouped_conv3d_fwd_convscale_ndhwgc_instance
+    # We need to explicitly add these to CK_DEVICE_CONV_INSTANCES since they're excluded from auto-discovery
+
+    message(DEBUG "Collecting layout-specific convolution instances...")
+
+    # 1D convolutions
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv1d_fwd gnwc nwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv1d_bwd_weight gnwc nwgc)
+
+    # 2D convolutions - core operations
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv2d_fwd nhwgc gnhwc ngchw)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv2d_bwd_data nhwgc gnhwc ngchw)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv2d_bwd_weight nhwgc gnhwc ngchw)
+
+    # 2D convolutions - variants
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv2d_fwd_clamp nhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv2d_fwd_bias_clamp nhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv2d_fwd_bias_bnorm_clamp nhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv2d_fwd_dynamic_op nhwgc)
+
+    # 3D convolutions - core operations
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_fwd ndhwgc gndhwc ngcdhw)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_bwd_data ndhwgc gndhwc ngcdhw)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_bwd_weight ndhwgc gndhwc ngcdhw)
+
+    # 3D convolutions - variants
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_fwd_scale ndhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_fwd_clamp ndhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_fwd_bias_clamp ndhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_fwd_bias_bnorm_clamp ndhwgc nhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_fwd_bilinear ndhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_fwd_convscale ndhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_fwd_convscale_add ndhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_fwd_convscale_relu ndhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_fwd_convinvscale ndhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_fwd_dynamic_op ndhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_fwd_scaleadd_ab ndhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_fwd_scaleadd_scaleadd_relu ndhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_bwd_data_bilinear ndhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_bwd_data_scale ndhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_bwd_weight_bilinear ndhwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_bwd_weight_scale ndhwgc)
+
+    message(STATUS "Collected layout-specific convolution instances for umbrella library")
 endif()
 
 # =============================================================================
