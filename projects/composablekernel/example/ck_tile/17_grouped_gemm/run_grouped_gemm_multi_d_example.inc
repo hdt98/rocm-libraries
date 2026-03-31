@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #pragma once
+#include "ck_tile/host/gemm_rtol_atol.hpp"
 
 struct MultiplyMultiply
 {
@@ -20,38 +21,6 @@ static constexpr inline auto is_row_major(Layout layout_)
 {
     return ck_tile::bool_constant<std::is_same_v<ck_tile::remove_cvref_t<decltype(layout_)>,
                                                  ck_tile::tensor_layout::gemm::RowMajor>>{};
-}
-
-template <typename ADataType,
-          typename BDataType,
-          typename D0DataType,
-          typename EDataType,
-          typename AccDataType>
-auto calculate_rtol_atol(const ck_tile::index_t K,
-                         const ck_tile::index_t kbatch,
-                         const float max_accumulated_value)
-{
-    using ComputeTypeAB =
-        std::conditional_t<sizeof(ADataType) < sizeof(BDataType), ADataType, BDataType>;
-
-    using ComputeType =
-        std::conditional_t<sizeof(ComputeTypeAB) < sizeof(D0DataType), ComputeTypeAB, D0DataType>;
-    // Calculate thresholds
-    const auto rtol = ck_tile::get_relative_threshold<ComputeType, EDataType, AccDataType>(
-        ck_tile::integer_divide_ceil(K, kbatch));
-
-    const auto atol = ck_tile::get_absolute_threshold<ComputeType, EDataType, AccDataType>(
-        max_accumulated_value / kbatch, ck_tile::integer_divide_ceil(K, kbatch));
-
-    // Calculate error due to split_k accumulation
-    const auto rtol_split_k =
-        ck_tile::get_relative_threshold<EDataType, EDataType, EDataType>(kbatch);
-
-    const auto atol_split_k = ck_tile::get_absolute_threshold<EDataType, EDataType, EDataType>(
-        max_accumulated_value, kbatch);
-
-    // Use higher threshold
-    return ck_tile::make_tuple(std::max(rtol, rtol_split_k), std::max(atol, atol_split_k));
 }
 
 template <typename GemmConfig,
@@ -374,7 +343,7 @@ int run_grouped_gemm_multi_d_example_with_layouts(int argc,
                 *std::max_element(e_m_n_host_refs[i].mData.begin(), e_m_n_host_refs[i].mData.end());
 
             const auto rtol_atol =
-                calculate_rtol_atol<ADataType, BDataType, D0DataType, EDataType, AccDataType>(
+                ck_tile::calculateRtolAtol<ADataType, BDataType, D0DataType, EDataType, AccDataType>(
                     Ks[i], 1, max_accumulated_value);
 
             pass &=
