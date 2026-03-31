@@ -332,6 +332,17 @@ namespace TensileLite
 
                 auto comp = [](const std::pair<int, double>& e1, const std::pair<int, double>& e2) { return e1.second < e2.second; };
                 std::stable_sort(performance.begin(),performance.end(),comp);
+                if(performance.empty())
+                {
+                    m_currentIdx        = 0;
+                    m_currentPrediction = 0.0;
+                    m_currentSolutionIdx = m_firstSolutionIdx;
+                    if(m_reporter && m_reporter->logAtLevel(LogLevel::Verbose))
+                        m_reporter->log(
+                            LogLevel::Verbose,
+                            "[AllSolutionsIterator::preProblem] no eligible solutions after prediction prefilter\n");
+                    return;
+                }
                 // TODO: This is the simple threshold method.
                 // May use the best perf * 1.x as threshold in the future.
                 size_t index    = std::min(performance.size() - 1, size_t(performance.size() * m_predictionThreshold));

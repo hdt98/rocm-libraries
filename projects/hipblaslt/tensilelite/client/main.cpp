@@ -928,7 +928,7 @@ int main(int argc, const char* argv[])
         if(result != hipSuccess)
         {
             std::string str = "Lazy loading failed. (" + std::to_string(int(result)) + ").";
-            std::runtime_error(str.c_str());
+            throw std::runtime_error(str);
         }
     }
 
@@ -1045,10 +1045,11 @@ int main(int argc, const char* argv[])
     while(listeners.needMoreBenchmarkRuns())
     {
         listeners.preBenchmarkRun();
-        const auto flushGridSize = flush_grid_size();
+        const auto flushGridSize = runKernels ? flush_grid_size() : 0;
         for(auto icacheFlush : icacheFlushArgs)
         {
-            benchmarkTimer->setIFlushTimeUs(icacheFlush ? flushTimeMs * 1000 : 0.f);
+            if(benchmarkTimer)
+                benchmarkTimer->setIFlushTimeUs(icacheFlush ? flushTimeMs * 1000 : 0.f);
 
             for(int problemIdx = firstProblemIdx; problemIdx <= lastProblemIdx; problemIdx++)
             {

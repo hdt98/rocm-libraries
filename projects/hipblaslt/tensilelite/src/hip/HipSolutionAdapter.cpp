@@ -27,6 +27,7 @@
 #include <hip/hip_ext.h>
 #include <hip/hip_runtime.h>
 
+#include <algorithm>
 #include <cstddef>
 
 #include <Tensile/Debug.hpp>
@@ -44,6 +45,29 @@ namespace TensileLite
 {
     namespace hip
     {
+        namespace
+        {
+            std::vector<std::string> helperKernelVariants(std::string const& arch)
+            {
+                std::vector<std::string> variants;
+                auto appendUnique = [&](std::string const& suffix) {
+                    if(std::find(variants.begin(), variants.end(), suffix) == variants.end())
+                        variants.push_back(suffix);
+                };
+
+                if(arch.find("xnack-") != std::string::npos)
+                    appendUnique("-xnack-");
+                else if(arch.find("xnack+") != std::string::npos)
+                    appendUnique("-xnack+");
+
+                appendUnique("");
+                appendUnique("-xnack-");
+                appendUnique("-xnack+");
+
+                return variants;
+            }
+        } // namespace
+
         SolutionAdapter::SolutionAdapter()
             : m_debug(Debug::Instance().printKernelArguments())
             , m_debugSkipLaunch(Debug::Instance().skipKernelLaunch())
@@ -88,15 +112,25 @@ namespace TensileLite
 
         hipError_t SolutionAdapter::loadCodeObjectFile(std::string const& path)
         {
+            return loadCodeObjectFile(path, true);
+        }
+
+        hipError_t SolutionAdapter::loadCodeObjectFile(std::string const& path, bool logFailure)
+        {
             Debug::Instance().markerStart("loadCodeObjectFile", path);
             hipModule_t module;
 
-            HIP_CHECK_RETURN_WITH_LOG(hipModuleLoad(&module, path.c_str()),
-                [&](hipError_t error) {
+            hipError_t err = hipModuleLoad(&module, path.c_str());
+            if(err != hipSuccess)
+            {
+                if(logFailure)
+                {
                     std::cerr << "hipModuleLoad failed: " << path.c_str() << std::endl
-                            << " error: " << hipGetErrorString(error) << std::endl;
+                              << " error: " << hipGetErrorString(err) << std::endl;
                 }
-            );
+                Debug::Instance().markerStop();
+                return err;
+            }
 
             if(m_debug)
                 std::cout << "loaded code object " << path << std::endl;
@@ -301,6 +335,7 @@ namespace TensileLite
         hipError_t SolutionAdapter::initializeLazyLoading(std::string arch,
                                                           std::string codeObjDir)
         {
+            std::string fullArch = arch;
             //Ensure there's a slash at the end of the path
             if(!codeObjDir.empty())
             {
@@ -327,26 +362,40 @@ namespace TensileLite
 
             if(!loaded)
             {
-                hipError_t err;
-                //Try xnack variations
-                for(auto ver : {"", "-xnack-", "-xnack+"})
+                hipError_t  err        = hipErrorFileNotFound;
+                hipError_t  reportErr  = hipErrorFileNotFound;
+                std::string reportPath = "";
+                auto        variants   = helperKernelVariants(fullArch);
+
+                for(auto const& ver : variants)
                 {
                     std::string modifiedCOName = helperKernelName + ver + ".hsaco";
-                    err                        = loadCodeObjectFile(codeObjDir + modifiedCOName);
+                    std::string fullPath       = codeObjDir + modifiedCOName;
+                    err                        = loadCodeObjectFile(fullPath, false);
 
                     if(err == hipSuccess)
                     {
                         return err;
                     }
-                    else if(err == hipErrorFileNotFound)
+
+                    if(reportPath.empty()
+                       || (reportErr == hipErrorFileNotFound && err != hipErrorFileNotFound))
+                    {
+                        reportPath = fullPath;
+                        reportErr  = err;
+                    }
+
+                    if(err == hipErrorFileNotFound || err == hipErrorNoBinaryForGpu)
                     {
                         // We expect that we could fail for cases when we have xnack variations
-                        // so clear hipErrorFileNotFound between iterations.
+                        // or device-specific code object variants, so clear probe errors.
                         (void)hipGetLastError();
                     }
                 }
 
-                return err;
+                std::cerr << "hipModuleLoad failed: " << reportPath << std::endl
+                          << " error: " << hipGetErrorString(reportErr) << std::endl;
+                return reportErr;
             }
 
             return hipSuccess;

@@ -90,6 +90,8 @@ namespace TensileLite
             hipError_t initKernels(std::vector<std::string> const& kernelNames);
 
         private:
+            hipError_t loadCodeObjectFile(std::string const& path, bool logFailure);
+
             hipError_t getKernel(hipFunction_t& rv, std::string const& name);
 
             std::mutex m_access;
