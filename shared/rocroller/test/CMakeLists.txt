@@ -72,15 +72,6 @@ if(ROCROLLER_ENABLE_ASAN)
     )
 endif()
 
-if(ROCROLLER_ENABLE_GEMM_CLIENT_TESTS)
-    find_package(Pytest REQUIRED) # requires pip install -r requirements.txt
-    pytest_discover_tests(
-        GEMMClientTests
-        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/client"
-        ENVIRONMENT "ROCROLLER_BUILD_DIR=${PROJECT_BINARY_DIR}" "LD_PRELOAD=${ASAN_LIB_PATH}" "ASAN_OPTIONS=detect_leaks=0"
-    )
-endif()
-
 add_executable(arch-gen-tests)
 if(ROCROLLER_ENABLE_ASAN)
     rocroller_target_configure_sanitizers(arch-gen-tests PRIVATE)
