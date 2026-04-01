@@ -537,7 +537,8 @@ namespace rocRoller
                                 std::vector<unsigned int> const& jammedTiles,
                                 CommandParametersPtr             params,
                                 ContextPtr                       context,
-                                bool                             isGlobalToLDS = false);
+                                bool                             isGlobalToLDS = false,
+                                bool                             ldsSwizzle    = false);
 
         /**
          * @brief Store version of addLoadThreadTileCT.

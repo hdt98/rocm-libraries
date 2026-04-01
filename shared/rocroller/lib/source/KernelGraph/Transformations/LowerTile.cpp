@@ -993,7 +993,7 @@ namespace rocRoller
                                  std::vector<unsigned int> const&   jammedTiles,
                                  bool                               rightmostFastest,
                                  bool                               isGlobalToLDS,
-                                 bool                               ldsSwizzle = false)
+                                 bool                               ldsSwizzle)
         {
             auto macTile = graph.coordinates.getNode<MacroTile>(macTileTag);
             auto thrTile = ThreadTile(macTile);
@@ -1613,19 +1613,30 @@ namespace rocRoller
                 auto jammedWavetileY = graph.coordinates.addElement(
                     JammedWaveTileNumber(1, literal(jammedTiles[1]), literal(1)));
                 connections.push_back(DC<JammedWaveTileNumber>(jammedWavetileY, 1));
-                if(rightmostFastest)
-                    graph.coordinates.addElement(
-                        Flatten(), {jammedWavetileY, grSwizzleNThrY, iThrY}, {iMacY});
+                if(isGlobalToLDS)
+                {
+                    if(rightmostFastest)
+                        graph.coordinates.addElement(
+                            Flatten(), {jammedWavetileY, grSwizzleNThrY, iThrY}, {iMacY});
+                    else
+                        graph.coordinates.addElement(
+                            Flatten(), {jammedWavetileY, iThrY, grSwizzleNThrY}, {iMacY});
+                }
                 else
                     graph.coordinates.addElement(
-                        Flatten(), {jammedWavetileY, iThrY, grSwizzleNThrY}, {iMacY});
+                        Flatten(), {jammedWavetileY, nThrY, iThrY}, {iMacY});
             }
             else
             {
-                if(rightmostFastest)
-                    graph.coordinates.addElement(Flatten(), {grSwizzleNThrY, iThrY}, {iMacY});
+                if(isGlobalToLDS)
+                {
+                    if(rightmostFastest)
+                        graph.coordinates.addElement(Flatten(), {grSwizzleNThrY, iThrY}, {iMacY});
+                    else
+                        graph.coordinates.addElement(Flatten(), {iThrY, grSwizzleNThrY}, {iMacY});
+                }
                 else
-                    graph.coordinates.addElement(Flatten(), {iThrY, grSwizzleNThrY}, {iMacY});
+                    graph.coordinates.addElement(Flatten(), {nThrY, iThrY}, {iMacY});
             }
         }
 
@@ -1768,7 +1779,7 @@ namespace rocRoller
                                 CommandParametersPtr             params,
                                 ContextPtr                       context,
                                 bool                             isGlobalToLDS,
-                                bool                             ldsSwizzle = false)
+                                bool                             ldsSwizzle)
         {
             auto workgroupSizes = context->kernel()->workgroupSize();
 
