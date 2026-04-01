@@ -67,7 +67,9 @@ template <ck::index_t NDimSpatial,
           typename AComputeDataType,
           typename BComputeDataType,
           ck::LoopScheduler LoopSched,
-          ck::index_t NumGroupsToMerge>
+          ck::index_t NumGroupsToMerge,
+          bool DoubleBuffer,
+          ck::index_t SplitKFactor>
 struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle;
 
 } // namespace ck::tensor_operation::device
@@ -128,7 +130,9 @@ template <ck::index_t NDimSpatial,
           typename AComputeDataType_,
           typename BComputeDataType_,
           ck::LoopScheduler LoopSched,
-          ck::index_t NumGroupsToMerge>
+          ck::index_t NumGroupsToMerge,
+          bool DoubleBuffer,
+          ck::index_t SplitKFactor>
 struct InstanceTraits<ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<
     NDimSpatial,
     ALayout_,
@@ -178,7 +182,9 @@ struct InstanceTraits<ck::tensor_operation::device::DeviceGroupedConvFwdMultiple
     AComputeDataType_,
     BComputeDataType_,
     LoopSched,
-    NumGroupsToMerge>>
+    NumGroupsToMerge,
+    DoubleBuffer,
+    SplitKFactor>>
 {
     /// @brief Tag type identifying this device kernel variant
     using device_kernel_tag = DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_Tag;
@@ -350,6 +356,8 @@ struct InstanceTraits<ck::tensor_operation::device::DeviceGroupedConvFwdMultiple
         oss << "," << detail::type_name<BComputeDataType>();       // 47. BComputeDataType
         oss << "," << detail::loop_scheduler_name(kLoopScheduler); // 48. LoopSched
         oss << "," << kNumGroupsToMerge;                           // 49. NumGroupsToMerge
+        oss << "," << (DoubleBuffer ? "true" : "false");           // 50. DoubleBuffer
+        oss << "," << SplitKFactor;                                  // 51. SplitKFactor
         oss << ">";
 
         return oss.str();
