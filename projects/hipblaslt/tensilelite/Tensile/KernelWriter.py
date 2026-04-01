@@ -2496,7 +2496,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
   ##############################################################################
   # returns list of modules or text
   ##############################################################################
-  def setupNewTile(self, kernel, tensorParametersA, tensorParametersB, isOptNLL=False, forceNoTileCode=False, forceNoGRCode=False, isPrefetchAcrossPersistentActive=False):
+  def setupNewTile(self, kernel, tensorParametersA, tensorParametersB, isOptNLL=False, forceNoTileCode=False, forceNoGRCode=False, forPrefetchAcrossPersistent=False):
     module = Module("setupNewTile")
 
     ####################################
@@ -2506,16 +2506,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     # work-group assignments
     module.addComment1("global read addresses: work-group")
-    if not forceNoTileCode and not isPrefetchAcrossPersistentActive:
+    if not forceNoTileCode and not forPrefetchAcrossPersistent:
       module.add(self.graWorkGroup(kernel, tensorParametersA, tensorParametersB))
-      if self.nllPapActive(kernel):
-        module.add(SMovB32(dst=sgpr("PrevWorkGroup0"), src=sgpr("WorkGroup0"), comment="PAP: keep Prev in sync for ShadowInit SRD"))
-        module.add(SMovB32(dst=sgpr("PrevWorkGroup1"), src=sgpr("WorkGroup1"), comment="PAP: keep Prev in sync for ShadowInit SRD"))
-        module.add(SMovB32(dst=sgpr("PrevWorkGroup2"), src=sgpr("WorkGroup2"), comment="PAP: keep Prev in sync for ShadowInit SRD"))
-        module.add(SMovB32(dst=sgpr("PrevStreamKLocalStart"), src=sgpr("StreamKLocalStart"), comment="PAP: keep Prev in sync for store"))
-        module.add(SMovB32(dst=sgpr("PrevStreamKLocalEnd"), src=sgpr("StreamKLocalEnd"), comment="PAP: keep Prev in sync for store"))
-        if len(kernel["SpaceFillingAlgo"]):
-          module.add(SMovB32(dst=sgpr("PrevStreamKTileID"), src=sgpr("StreamKTileID"), comment="PAP: keep Prev in sync for store"))
+      if self.isPrefetchAcrossPersistentEnabled(kernel):
+        module.add(self.prefetchAcrossPersistentSnapshot(kernel))
 
 
     self.dontAppendCode = forceNoTileCode
@@ -2528,7 +2522,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       tPMRef = tensorParametersB
 
     if kernel["StreamK"] != 0:
-      if not kernel["UseSubtileImpl"] and not isPrefetchAcrossPersistentActive:
+      if not kernel["UseSubtileImpl"] and not forPrefetchAcrossPersistent:
         module.add(self.localReadAddresses(kernel, tensorParametersA, tensorParametersB, tPM))
         module.add(self.localWriteAddresses(kernel, tensorParametersA, tensorParametersB, tPM))
 
@@ -2537,13 +2531,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
     tdmInited: bool = False
 
     # TODO: This can probably be moved later, after setupnewtile
-    if not isPrefetchAcrossPersistentActive and not tdmA:
+    if not forPrefetchAcrossPersistent and not tdmA:
       module.add(self.removeGRSrdVariableSgprsFromPool(kernel))
 
     # tile assignments
     if not kernel["UseSubtileImpl"]:
       # -- Per-thread offset computation: reused across tiles, skip for PAP --
-      if not isPrefetchAcrossPersistentActive:
+      if not forPrefetchAcrossPersistent:
         #TODO: TDM wave separated
         if tdmA and tdmB and prod(kernel["MIWaveGroup"]) > 1:
           module.add(self.initTDMDescriptorWaveSeparated(kernel, tensorParametersA, tensorParametersB))
@@ -2799,7 +2793,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # we can't init in shadow of this prefetch
       # since that would initC inside the other summation loops
 
-      if self.states.doShadowInit != 2 and not isPrefetchAcrossPersistentActive:
+      if self.states.doShadowInit != 2 and not forPrefetchAcrossPersistent:
         module.add(self.initC(kernel))
         if kernel["ProblemType"]["Gradient"] and kernel["ProblemType"]["UseBias"] and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B"):
           module.add(self.initSumUnroll(kernel))
@@ -2833,10 +2827,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
       # LRO and LWA as assigned
       # init lds read pointers before each unrolled loop
-      # When isPrefetchAcrossPersistentActive=True, skip: the NLL body still needs the
+      # When forPrefetchAcrossPersistent=True, skip: the NLL body still needs the
       # current read pointer position, and the top-of-loop setupNewTile
       # re-initialises these pointers before the next iteration uses them.
-      if not isPrefetchAcrossPersistentActive:
+      if not forPrefetchAcrossPersistent:
         module.addComment0("local read addresses: init pointers a")
         module.add(self.localReadInitPointers(kernel, tensorParametersA, tensorParametersA))
         if kernel["ProblemType"]["MXBlockA"]:
@@ -2855,7 +2849,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           module.addComment0("local write addresses: reset inc")
           module.add(self.localWriteResetOffsets(kernel,  False, tensorParametersA))
 
-      if self.do["executeToInitEnd"] and not isPrefetchAcrossPersistentActive:
+      if self.do["executeToInitEnd"] and not forPrefetchAcrossPersistent:
         module.add(self.functionEnd(kernel, addLabel=False))
 
       ####################################
@@ -2875,7 +2869,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         usePrimedSkip = (
           kernel.get("PrefetchAcrossPersistent")
           and kernel["StreamK"]
-          and not isPrefetchAcrossPersistentActive
+          and not forPrefetchAcrossPersistent
         )
         lbl_prefetchPrimedMerge = Label(self.labels.getNameInc("SK_PrefetchPrimedMerge"), "")
         if usePrimedSkip:
@@ -2918,7 +2912,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
             tPA = None
           if kernel["DirectToVgprB"]:
             tPB = None
-        if not isPrefetchAcrossPersistentActive:
+        if not forPrefetchAcrossPersistent:
           module.add(self.globalReadIncrementAB(kernel, tPA, tPB, self.states.unrollIdx, pfi))
         else:
           module.add(SMovB32(dst=sgpr("SkPrefetchPrimed"), src=1, comment="first PGR for next persistent iter prefetched"))
