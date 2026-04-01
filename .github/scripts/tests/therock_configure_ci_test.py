@@ -23,7 +23,7 @@ class ConfigureCITest(unittest.TestCase):
         self.assertIn("rocprim", str(project_to_run))
         self.assertIn("hipcub", str(project_to_run))
         self.assertIn("rocwmma", str(project_to_run))
-        self.assertEqual(test_type, "full")
+        self.assertEqual(test_type, "standard")
 
     @patch("subprocess.run")
     def test_pull_request_empty(self, mock_run):
@@ -50,7 +50,7 @@ class ConfigureCITest(unittest.TestCase):
         project_to_run, test_type = therock_configure_ci.retrieve_projects(args)
         self.assertIn("rocprim", str(project_to_run))
         self.assertIn("hipcub", str(project_to_run))
-        self.assertEqual(test_type, "full")
+        self.assertEqual(test_type, "standard")
 
     @patch("subprocess.run")
     def test_workflow_dispatch_bad_input(self, mock_run):
@@ -76,7 +76,7 @@ class ConfigureCITest(unittest.TestCase):
 
         project_to_run, test_type = therock_configure_ci.retrieve_projects(args)
         self.assertGreaterEqual(len(project_to_run), 5)
-        self.assertEqual(test_type, "full")
+        self.assertEqual(test_type, "standard")
 
     @patch("subprocess.run")
     def test_workflow_dispatch_empty(self, mock_run):
@@ -101,7 +101,7 @@ class ConfigureCITest(unittest.TestCase):
 
         project_to_run, test_type = therock_configure_ci.retrieve_projects(args)
         self.assertIn("rocprim", str(project_to_run))
-        self.assertEqual(test_type, "full")
+        self.assertEqual(test_type, "standard")
 
     def test_is_path_workflow_file_related_to_ci(self):
         workflow_path = ".github/workflows/therocktest.yml"
@@ -201,7 +201,7 @@ class ConfigureCITest(unittest.TestCase):
         )
 
         self.assertEqual(projects, [])
-        self.assertEqual(test_type, "full")
+        self.assertEqual(test_type, "standard")
 
     @patch("therock_configure_ci.get_modified_paths")
     def test_retrieve_projects_runs_ci_for_non_skippable_paths(self, mock_get_modified):
@@ -212,7 +212,7 @@ class ConfigureCITest(unittest.TestCase):
         )
 
         self.assertIn("rocprim", str(projects))
-        self.assertEqual(test_type, "full")
+        self.assertEqual(test_type, "standard")
 
     @patch("therock_configure_ci.get_modified_paths")
     def test_retrieve_projects_runs_ci_for_two_projects(self, mock_get_modified):
@@ -228,7 +228,7 @@ class ConfigureCITest(unittest.TestCase):
 
         self.assertIn("rocprim", str(projects))
         self.assertIn("hipcub", str(projects))
-        self.assertEqual(test_type, "full")
+        self.assertEqual(test_type, "standard")
 
     @patch("therock_configure_ci.get_modified_paths")
     def test_retrieve_projects_skips_ci_for_ai_config_files(self, mock_get_modified):
@@ -244,7 +244,7 @@ class ConfigureCITest(unittest.TestCase):
         )
 
         self.assertEqual(projects, [])
-        self.assertEqual(test_type, "full")
+        self.assertEqual(test_type, "standard")
 
     @patch("therock_configure_ci.get_modified_paths")
     def test_retrieve_projects_runs_ci_for_workflow_paths(self, mock_get_modified):
@@ -255,6 +255,149 @@ class ConfigureCITest(unittest.TestCase):
         )
 
         # All projects should be tested with smoke tests.. make sure we get at least 4 projects
+        self.assertGreaterEqual(len(projects), 5)
+        self.assertEqual(test_type, "smoke")
+
+    def test_parse_test_labels_single_project(self):
+        labels = ["test:rocblas"]
+        projects, test_type = therock_configure_ci.parse_test_labels(labels)
+        self.assertIn("blas", projects)
+        self.assertIsNone(test_type)
+
+    def test_parse_test_labels_multiple_projects(self):
+        labels = ["test:rocblas", "test:miopen", "test:rocprim"]
+        projects, test_type = therock_configure_ci.parse_test_labels(labels)
+        self.assertIn("blas", projects)
+        self.assertIn("miopen", projects)
+        self.assertIn("prim", projects)
+        self.assertIsNone(test_type)
+
+    def test_parse_test_labels_with_test_type(self):
+        labels = ["test:rocblas", "test_type:comprehensive"]
+        projects, test_type = therock_configure_ci.parse_test_labels(labels)
+        self.assertIn("blas", projects)
+        self.assertEqual(test_type, "comprehensive")
+
+    def test_parse_test_labels_multiple_test_types(self):
+        # Should use the most comprehensive one
+        labels = ["test:rocblas", "test_type:smoke", "test_type:comprehensive"]
+        projects, test_type = therock_configure_ci.parse_test_labels(labels)
+        self.assertIn("blas", projects)
+        self.assertEqual(test_type, "comprehensive")
+
+    def test_parse_test_labels_test_type_only(self):
+        labels = ["test_type:smoke"]
+        projects, test_type = therock_configure_ci.parse_test_labels(labels)
+        self.assertEqual(len(projects), 0)
+        self.assertEqual(test_type, "smoke")
+
+    def test_parse_test_labels_unknown_project(self):
+        labels = ["test:unknownproject"]
+        projects, test_type = therock_configure_ci.parse_test_labels(labels)
+        self.assertEqual(len(projects), 0)
+        self.assertIsNone(test_type)
+
+    def test_parse_test_labels_unknown_test_type(self):
+        labels = ["test_type:unknown"]
+        projects, test_type = therock_configure_ci.parse_test_labels(labels)
+        self.assertEqual(len(projects), 0)
+        self.assertIsNone(test_type)
+
+    def test_parse_test_labels_empty(self):
+        labels = []
+        projects, test_type = therock_configure_ci.parse_test_labels(labels)
+        self.assertEqual(len(projects), 0)
+        self.assertIsNone(test_type)
+
+    def test_parse_test_labels_deduplicates_projects(self):
+        # Both rocblas and hipblas map to 'blas'
+        labels = ["test:rocblas", "test:hipblas"]
+        projects, test_type = therock_configure_ci.parse_test_labels(labels)
+        # Should only have 'blas' once
+        self.assertEqual(projects.count("blas"), 1)
+
+    @patch("therock_configure_ci.get_modified_paths")
+    def test_retrieve_projects_with_test_label(self, mock_get_modified):
+        mock_get_modified.return_value = []
+
+        pr_labels_json = '{"labels": [{"name": "test:rocblas"}]}'
+        projects, test_type = therock_configure_ci.retrieve_projects(
+            {"is_pull_request": True, "base_ref": "HEAD^", "pr_labels": pr_labels_json}
+        )
+
+        self.assertGreater(len(projects), 0)
+        self.assertIn("BLAS", str(projects))
+        self.assertEqual(test_type, "standard")
+
+    @patch("therock_configure_ci.get_modified_paths")
+    def test_retrieve_projects_with_test_label_and_type(self, mock_get_modified):
+        mock_get_modified.return_value = []
+
+        pr_labels_json = '{"labels": [{"name": "test:rocblas"}, {"name": "test_type:comprehensive"}]}'
+        projects, test_type = therock_configure_ci.retrieve_projects(
+            {"is_pull_request": True, "base_ref": "HEAD^", "pr_labels": pr_labels_json}
+        )
+
+        self.assertGreater(len(projects), 0)
+        self.assertIn("BLAS", str(projects))
+        self.assertEqual(test_type, "comprehensive")
+
+    @patch("therock_configure_ci.get_modified_paths")
+    def test_retrieve_projects_with_multiple_test_labels(self, mock_get_modified):
+        mock_get_modified.return_value = []
+
+        pr_labels_json = '{"labels": [{"name": "test:rocblas"}, {"name": "test:miopen"}, {"name": "test_type:smoke"}]}'
+        projects, test_type = therock_configure_ci.retrieve_projects(
+            {"is_pull_request": True, "base_ref": "HEAD^", "pr_labels": pr_labels_json}
+        )
+
+        # Should test both blas and miopen
+        self.assertGreaterEqual(len(projects), 2)
+        projects_str = str(projects)
+        self.assertIn("BLAS", projects_str)
+        self.assertIn("MIOPEN", projects_str)
+        self.assertEqual(test_type, "smoke")
+
+    @patch("therock_configure_ci.get_modified_paths")
+    def test_retrieve_projects_label_overrides_skippable_paths(self, mock_get_modified):
+        # Only skippable paths modified
+        mock_get_modified.return_value = ["README.md", "docs/guide.rst"]
+
+        pr_labels_json = '{"labels": [{"name": "test:rocblas"}]}'
+        projects, test_type = therock_configure_ci.retrieve_projects(
+            {"is_pull_request": True, "base_ref": "HEAD^", "pr_labels": pr_labels_json}
+        )
+
+        # Should run tests even with only skippable paths because of label
+        self.assertGreater(len(projects), 0)
+        self.assertIn("BLAS", str(projects))
+
+    @patch("therock_configure_ci.get_modified_paths")
+    def test_retrieve_projects_label_combines_with_file_changes(self, mock_get_modified):
+        # File change in rocprim
+        mock_get_modified.return_value = ["projects/rocprim/src/main.cpp"]
+
+        pr_labels_json = '{"labels": [{"name": "test:rocblas"}]}'
+        projects, test_type = therock_configure_ci.retrieve_projects(
+            {"is_pull_request": True, "base_ref": "HEAD^", "pr_labels": pr_labels_json}
+        )
+
+        # Should test both rocprim (from files) and rocblas (from label)
+        self.assertGreaterEqual(len(projects), 2)
+        projects_str = str(projects)
+        self.assertIn("PRIM", projects_str)  # rocprim
+        self.assertIn("BLAS", projects_str)  # rocblas
+
+    @patch("therock_configure_ci.get_modified_paths")
+    def test_retrieve_projects_nightly_with_label_test_type(self, mock_get_modified):
+        mock_get_modified.return_value = []
+
+        pr_labels_json = '{"labels": [{"name": "test_type:smoke"}]}'
+        projects, test_type = therock_configure_ci.retrieve_projects(
+            {"is_nightly": True, "base_ref": "HEAD^", "pr_labels": pr_labels_json}
+        )
+
+        # Nightly should test all projects, but label should override test type
         self.assertGreaterEqual(len(projects), 5)
         self.assertEqual(test_type, "smoke")
 
