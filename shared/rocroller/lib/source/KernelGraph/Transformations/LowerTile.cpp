@@ -133,21 +133,16 @@ namespace rocRoller
             auto rowRef = positionalArgument(1, Register::Type::Vector, DataType::UInt32);
 
             // $0 = input column index
-            auto inputCol      = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
-            auto columnInGroup = inputCol & (numCol - literal(1u));
-            auto groupIndex    = inputCol >> logNumCol;
+            auto inputCol = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
 
             // Swap adjacent columns on even bank rows (bit is 1 on even, 0 on odd)
-            auto bankRowIdx     = rowRef >> logRows;
-            auto swapOnEvenRow  = (bankRowIdx ^ literal(1u)) & literal(1u);
-            auto swappedInGroup = columnInGroup ^ swapOnEvenRow;
+            auto bankRowIdx    = rowRef >> logRows;
+            auto swapOnEvenRow = (bankRowIdx ^ literal(1u)) & literal(1u);
+            auto swappedCol    = inputCol ^ swapOnEvenRow;
 
             // Rotate columns within numColumns by (bankRowIdx / 2) * 2
-            auto rotation        = numCol - ((bankRowIdx >> literal(1u)) << literal(1u));
-            auto swizzledInGroup = (swappedInGroup + rotation) & (numCol - literal(1u));
-
-            // Reassemble: groupIndex * numColumns + swizzledInGroup
-            auto swizzledCol = groupIndex * numCol + swizzledInGroup;
+            auto rotation    = numCol - ((bankRowIdx >> literal(1u)) << literal(1u));
+            auto swizzledCol = (swappedCol + rotation) & (numCol - literal(1u));
 
             // Forward is identity pass-through
             auto forwardArg = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
@@ -179,22 +174,18 @@ namespace rocRoller
             auto inputElemIdx = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
 
             // Decompose into chunk index and sub-element offset
-            auto fullChunk  = inputElemIdx >> logElems;
+            auto chunkIdx   = inputElemIdx >> logElems;
             auto subElement = inputElemIdx & (elemsLit - literal(1u));
 
-            // Split chunk into group index (unswizzled) and position within group (swizzled)
-            auto chunkInGroup    = fullChunk & (numCol - literal(1u));
-            auto chunkGroupIndex = fullChunk >> logNumCol;
-
             // Inverse permutation: un-rotate first, then un-swap
-            auto bankRowIdx       = rowRef >> logRows;
-            auto swapOnEvenRow    = (bankRowIdx ^ literal(1u)) & literal(1u);
-            auto invRotation      = (bankRowIdx >> literal(1u)) << literal(1u);
-            auto unrotatedInGroup = (chunkInGroup + invRotation) & (numCol - literal(1u));
-            auto swizzledInGroup  = unrotatedInGroup ^ swapOnEvenRow;
+            auto bankRowIdx     = rowRef >> logRows;
+            auto swapOnEvenRow  = (bankRowIdx ^ literal(1u)) & literal(1u);
+            auto invRotation    = (bankRowIdx >> literal(1u)) << literal(1u);
+            auto unrotatedChunk = (chunkIdx + invRotation) & (numCol - literal(1u));
+            auto swizzledChunk  = unrotatedChunk ^ swapOnEvenRow;
 
-            // Reassemble: (chunkGroupIndex * numColumns + swizzledInGroup) * elementsPerChunk + subElement
-            auto swizzledCol = (chunkGroupIndex * numCol + swizzledInGroup) * elemsLit + subElement;
+            // Reassemble: swizzledChunk * elementsPerChunk + subElement
+            auto swizzledCol = swizzledChunk * elemsLit + subElement;
 
             // Forward is identity pass-through
             auto forwardArg = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
