@@ -22,6 +22,7 @@
 #include "origami/gemm.hpp"
 #include "origami/streamk.hpp"
 #include "origami/simulator/tensilelite/formocast_simulator.hpp"
+#include "origami/new_cycle_model/predict.hpp"
 
 namespace origami {
 
@@ -918,6 +919,11 @@ double compute_total_latency(const problem_t& problem,
   // Use Formocast simulation model if prediction_mode is set to simulation
   if (config.prediction_mode == prediction_modes_t::simulation) {
     return compute_formocast_latency(problem, hardware, config);
+  }
+
+  if (config.prediction_mode == prediction_modes_t::new_cycle_model ||
+      new_cycle_model::is_enabled()) {
+    return new_cycle_model::predict(problem, hardware, config);
   }
 
   // Extract parameters from structured types

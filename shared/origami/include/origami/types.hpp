@@ -189,6 +189,7 @@ enum class reduction_t : std::uint32_t {
 enum class prediction_modes_t : std::uint32_t {
   estimation = 0,     ///< Fast analytical estimation-based prediction (typically faster)
   simulation = 1,     ///< Slow simulation-like prediction (typically more accurate)
+  new_cycle_model = 2, ///< MCUL-based cycle model with SK compute ranking
   count,              ///< Count of prediction modes
   none = 0xFFFFFFFFu  ///< Explicitly invalid
 };
