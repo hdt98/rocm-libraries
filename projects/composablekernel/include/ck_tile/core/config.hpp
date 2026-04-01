@@ -227,6 +227,12 @@
 #endif
 #endif // CK_TILE_ENABLE_CLUSTER_LAUNCH
 
+#if defined(__gfx950__) || defined(__gfx125__) || defined(__gfx13__)
+#define CK_TILE_ENABLE_TR_LOAD_FEATURE 1
+#else
+#define CK_TILE_ENABLE_TR_LOAD_FEATURE 0
+#endif
+
 // workaround for ROCm 6.2 and later
 #ifndef CK_TILE_WORKAROUND_ROCM_6_2_SCRATCH_MEMORY_ISSUE
 #if(HIP_VERSION_MAJOR == 6 && HIP_VERSION_MINOR == 2 && HIP_VERSION_PATCH >= 41133) ||  \

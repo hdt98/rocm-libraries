@@ -1171,11 +1171,39 @@ struct tile_window_with_static_distribution
                                                    number<i_access_unsupport_>          = {},
                                                    bool_constant<oob_conditional_check> = {}) const
     {
-        using Traits   = typename Base::Traits;
-        using vector_t = typename Traits::vector_t;
-        using SFC_Ys   = typename Traits::SFC_Ys;
+        using Traits = typename Base::Traits;
+
+        // Derive the transpose vector size from the Policy's QuadInputEncoding.
+        // This matches the number of elements read by the DS_READ_TR hardware instruction
+        // (e.g., 8 fp16 elements for DS_LOAD_TR16_B128 on gfx13/gfx125),
+        // which may differ from the regular LDS load's ScalarPerVector (derived from the
+        // LDS tensor descriptor's safe vector length).
+        using InDstrEncode = typename Base::TileDstr::DstrEncode;
+        static constexpr index_t LaneGroupSizeTr =
+            Policy::template ValidationTraits<InDstrEncode>::LaneGroupSize;
+        static constexpr index_t TransposeVecSize =
+            Policy::template GetTransposeVecSize<LaneGroupSizeTr>();
+        using vector_t = thread_buffer<typename Base::DataType, TransposeVecSize>;
 
         constexpr auto tile_dstr = typename Base::TileDstr{};
+
+        // Build a transpose-specific SFC that steps TransposeVecSize elements per access
+        // along VectorDimY, so each iteration corresponds to exactly one DS_READ_TR call.
+        // Replace the VectorDimY slot in scalars_per_access_ with TransposeVecSize.
+        // (Traits::scalars_per_access_ uses ScalarPerVector which may be smaller than
+        //  TransposeVecSize; DS_READ_TR always reads TransposeVecSize elements at once.)
+        constexpr auto thread_tensor_lengths_ys =
+            to_sequence(tile_dstr.get_ys_to_d_descriptor().get_lengths());
+        constexpr auto transpose_scalars_per_access = Traits::scalars_per_access_.modify(
+            number<Traits::VectorDimY>{}, number<TransposeVecSize>{});
+        using DimAccessOrder  = typename arithmetic_sequence_gen<0, Base::NDimY, 1>::type;
+        using TransposeSFC_Ys = space_filling_curve<decltype(thread_tensor_lengths_ys),
+                                                    DimAccessOrder,
+                                                    decltype(transpose_scalars_per_access),
+                                                    false /*!!! no snaked curve! */>;
+
+        static constexpr index_t TransposeNumAccess         = TransposeSFC_Ys::get_num_of_access();
+        static constexpr index_t TransposeNumAccessPerCoord = TransposeNumAccess / NumCoord;
 
         constexpr auto group_func = Policy::group_func;
 
@@ -1185,19 +1213,21 @@ struct tile_window_with_static_distribution
             auto window_adaptor_thread_coord = pre_computed_coords_[iCoord][I0];
             auto bottom_tensor_thread_coord  = pre_computed_coords_[iCoord][I1];
 
-            static_for<0, NumAccessPerCoord, 1>{}([&](auto iCoordAccess) {
-                constexpr auto iAccess = number<iCoord * NumAccessPerCoord + iCoordAccess>{};
+            static_for<0, TransposeNumAccessPerCoord, 1>{}([&](auto iCoordAccess) {
+                constexpr auto iAccess =
+                    number<iCoord * TransposeNumAccessPerCoord + iCoordAccess>{};
 
                 // data index [y0, y1, ...]
-                constexpr auto idx_ys_start = SFC_Ys::get_index(iAccess);
+                constexpr auto idx_ys_start = TransposeSFC_Ys::get_index(iAccess);
 
-                // read from bottom tensor
+                // read from bottom tensor using DS_READ_TR instruction
+                // vector_t has TransposeVecSize elements, matching the hardware instruction
                 const vector_t vec_value =
                     this->get_bottom_tensor_view()
                         .template get_transpose_vectorized_elements<vector_t>(
                             bottom_tensor_thread_coord, offset);
-                // write into distributed tensor
-                static_for<0, Traits::ScalarPerVector, 1>{}([&](auto j) {
+                // write all TransposeVecSize elements into distributed tensor
+                static_for<0, TransposeVecSize, 1>{}([&](auto j) {
                     constexpr auto orig_idx_ys = generate_tuple(
                         [&](auto jj) {
                             return jj == Traits::VectorDimY ? (idx_ys_start[jj] + j)
@@ -1214,9 +1244,9 @@ struct tile_window_with_static_distribution
                         vec_value.template get_as<typename Base::DataType>()[j];
                 });
                 // move thread coordinate
-                if constexpr(iCoordAccess != (NumAccessPerCoord - 1))
+                if constexpr(iCoordAccess != (TransposeNumAccessPerCoord - 1))
                 {
-                    constexpr auto idx_diff_ys = SFC_Ys::get_forward_step(iAccess);
+                    constexpr auto idx_diff_ys = TransposeSFC_Ys::get_forward_step(iAccess);
 
                     constexpr auto idx_diff_ps_ys = container_concat(
                         generate_tuple([&](auto) { return number<0>{}; }, number<Base::NDimP>{}),

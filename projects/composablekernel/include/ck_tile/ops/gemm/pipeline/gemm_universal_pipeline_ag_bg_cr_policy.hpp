@@ -84,7 +84,7 @@ struct UniversalGemmBasePolicy
     template <typename Problem>
     using BLdsDataType_ = typename LdsDataTypes_<Problem>::BType;
 
-#if defined(__gfx950__) || defined(__gfx125__)
+#if defined(__gfx950__) || defined(__gfx125__) || defined(__gfx13__)
     // The combination of pk_int4_t and transposed loading causes numerical errors.
     // Therefore do not use transposed loading in this case.
     // Also, transpose load (ds_read_tr) requires specific tile distribution patterns

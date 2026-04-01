@@ -1102,7 +1102,7 @@ struct buffer_view<address_space_enum::lds,
 
         if(is_valid_element)
         {
-#if defined(__gfx950__) || defined(__gfx125__)
+#if defined(__gfx950__) || defined(__gfx125__) || defined(__gfx13__)
             constexpr index_t t_per_x = scalar_per_x_vector / scalar_per_t_vector;
             return amd_transpose_load_to_vgpr<remove_cvref_t<T>, t_per_x>(p_data_ + i +
                                                                           linear_offset);
