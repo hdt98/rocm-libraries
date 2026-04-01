@@ -54,6 +54,7 @@ when interpreting the analysis output.
 The report should consist of the summary of the most relevant bottleneck (if provided only the conv shape) or 
 a summary of the most relevant differences (if provided two implementations).
 
-## Hand-off 
+## Hand-off
 
-Pass the results back to user (or `/engineer-kernel`).
+Pass the bottleneck analysis directly to `/engineer-kernel`. The engineer will use it to adjust
+template parameters without routing through the orchestrator.

@@ -58,19 +58,19 @@ Invoke the Kernel Engineer role:
 > following shape and propose a new instance: [shape]"
 
 Iterate until compilation succeeds (max 15 attempts before asking the user to intervene).
-Input may include optional profiling feedback from the Kernel Profiler.
 
 ### 3. Profile the kernel (optional — only if Engineer cannot improve performance)
 
-If the Kernel Engineer reports no improvement after a candidate attempt, invoke the Kernel Profiler
-to identify hardware bottlenecks:
+If the Kernel Engineer reports no improvement after a candidate attempt, trigger the inner
+Engineer ↔ Profiler optimization loop:
 
-> "Acting as the Kernel Profiler (see `.claude/commands/profile-kernel.md`), profile the
-> kernel that the Kernel Engineer provided for the shape we are currently working on.
-> Provide feedback for the Kernel Engineer: [shape]"
+> "Acting as the Kernel Engineer (see `.claude/commands/engineer-kernel.md`), work directly
+> with the Kernel Profiler (`/profile-kernel`) to improve performance for the shape: [shape].
+> Run at most 10 Engineer ↔ Profiler iterations, then report back with a candidate or a
+> 'no improvement' conclusion."
 
-Once the profiling feedback is ready, go back to step 2 with that feedback. Run at most 10
-Kernel Engineer ↔ Kernel Profiler iterations before concluding that the shape is already optimized.
+The engineer and profiler communicate directly — the orchestrator waits for the engineer to
+report back with either a performant candidate or a conclusion that the shape is already optimal.
 
 ### 4. Test correctness
 

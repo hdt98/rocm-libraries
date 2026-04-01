@@ -447,10 +447,12 @@ CK_LOGGING=1 ./bin/example_grouped_conv_fwd_xdl_bf16 <args>
 ```
 to see which applicability check fails. Then go back to step 2.
 
-If you don't see performance improvement, you can consult `/profile-kernel` to get insights why the
-given candidate didn't improve performance. You can also provide a baseline and candidate (as separate conv fwd executables) to inspect the differences between the baseline and the candidate.
-
-If you don't see performance improvement, go back to step 2 with the optional input from `/profile-kernel`.
+If you don't see performance improvement, invoke `/profile-kernel` directly to get hardware insights.
+Provide the current candidate as the shape to profile (or a baseline + candidate pair for comparison).
+The profiler will return bottleneck analysis (MFMA utilization, memory efficiency) directly to you —
+use that feedback to adjust template parameters and go back to step 2.
+The orchestrator has set a cap on Engineer ↔ Profiler iterations; track your own count and report
+back to the orchestrator once you have a candidate or have exhausted the allowed iterations.
 
 If you have a candidate that improves performance, you can proceed to step 5.
 
