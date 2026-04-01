@@ -31,6 +31,8 @@ endif()
 
 find_package(hip REQUIRED)
 
+get_target_property(_PYORIGAMI_HIP_INCLUDE hip::amdhip64 INTERFACE_INCLUDE_DIRECTORIES)
+
 include(FetchContent)
 FetchContent_Declare(
     nanobind
@@ -61,8 +63,9 @@ set_target_properties(_pyorigami PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/src/origami"
 )
 
-# Link against origami library and HIP
-target_link_libraries(_pyorigami PRIVATE ${ORIGAMI_TARGET} hip::host)
+# Link against origami (HIP is loaded dynamically by liborigami)
+target_link_libraries(_pyorigami PRIVATE ${ORIGAMI_TARGET})
+target_include_directories(_pyorigami PRIVATE "${_PYORIGAMI_HIP_INCLUDE}")
 
 set_target_properties(_pyorigami PROPERTIES
     CXX_STANDARD 17                    # We can make this optional too if we want to support newer standards
@@ -71,9 +74,7 @@ set_target_properties(_pyorigami PROPERTIES
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
 )
-target_compile_definitions(_pyorigami PRIVATE
-    __HIP_PLATFORM_AMD__
-)
+target_compile_definitions(_pyorigami PRIVATE __HIP_PLATFORM_AMD__=1)
 
 if(ORIGAMI_PYTHON_ENABLE_WARNINGS)
     target_compile_options(_pyorigami PRIVATE

@@ -1,6 +1,7 @@
 // Copyright Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
+#include "origami/hip_runtime_loader.hpp"
 #include "origami/hardware.hpp"
 #include "origami/types.hpp"
 
@@ -92,8 +93,8 @@ hardware_t hardware_t::get_hardware_for_properties(hipDeviceProp_t properties) {
 
 hardware_t hardware_t::get_hardware_for_device(int deviceId) {
   hipDeviceProp_t prop;
-  hipError_t e = hipGetDeviceProperties(&prop, deviceId);
-  if (e) { throw std::runtime_error(hipGetErrorString(e)); }
+  hipError_t e = detail::hip_get_device_properties(&prop, deviceId);
+  if (e) { throw std::runtime_error(detail::hip_get_error_string(e)); }
   return get_hardware_for_properties(prop);
 }
 

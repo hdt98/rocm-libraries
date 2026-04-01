@@ -28,6 +28,9 @@ option(ORIGAMI_ENABLE_FETCH "Auto-fetch dependencies with FetchContent" ON)
 
 find_package(hip REQUIRED)
 
+# HIP headers for hipDeviceProp_t; libamdhip64 is loaded at runtime (see hip_runtime_loader.cpp).
+get_target_property(_ORIGAMI_HIP_INCLUDE hip::amdhip64 INTERFACE_INCLUDE_DIRECTORIES)
+
 if(ORIGAMI_BUILD_SHARED_LIBS OR (BUILD_SHARED_LIBS AND ORIGAMI_STANDALONE))
     add_library(origami SHARED)
 else()
@@ -63,16 +66,20 @@ target_sources(
               $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/origami/origami.hpp>
               $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/origami/streamk.hpp>
               $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/origami/types.hpp>
+              $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/origami/hip_runtime_loader.hpp>
               $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/origami/simulator/tensilelite/formocast_simulator.hpp>
               $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/origami/simulator/tensilelite/formocast.hpp>
 )
 
 target_link_libraries(origami PUBLIC roc::origami-headers)
 
+target_compile_definitions(origami PRIVATE __HIP_PLATFORM_AMD__=1)
+
 target_sources(
     origami
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/origami/gemm.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/src/origami/hardware.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/origami/hip_runtime_loader.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/src/origami/heuristics.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/src/origami/logger.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/src/origami/origami.cpp"
@@ -82,7 +89,8 @@ target_sources(
             "${CMAKE_CURRENT_SOURCE_DIR}/src/simulator/tensilelite/formocast.cpp"
 )
 
-target_link_libraries(origami PUBLIC hip::host)
+target_include_directories(origami PRIVATE "${_ORIGAMI_HIP_INCLUDE}")
+target_link_libraries(origami PRIVATE ${CMAKE_DL_LIBS})
 
 if(ORIGAMI_ENABLE_PYTHON)
     add_subdirectory(python)
