@@ -117,17 +117,17 @@ namespace rocRoller
          *   swizzledCol  = (swappedCol + rotation) & (effectiveColumns - 1)
          *
          * The transform has one positional argument ($0 = input column)
-         * and references the row coordinate via DataFlowTag.
+         * and receives the row coordinate as positionalArgument(1)
+         * via a downstream neighbor on the ExpressionTransform edge.
          */
-        ExpressionTransform buildGRSwizzleTransform(LDSSwizzleParams const& params, int rowCoordTag)
+        ExpressionTransform buildGRSwizzleTransform(LDSSwizzleParams const& params)
         {
             auto effCols = literal(params.effectiveColumns);
             auto logEffCols
                 = literal(static_cast<unsigned int>(__builtin_ctz(params.effectiveColumns)));
             auto logRows = literal(static_cast<unsigned int>(__builtin_ctz(params.rowsPerBankRow)));
 
-            auto rowRef = std::make_shared<rocRoller::Expression::Expression>(
-                DataFlowTag{rowCoordTag, Register::Type::Vector, DataType::UInt32});
+            auto rowRef = positionalArgument(1, Register::Type::Vector, DataType::UInt32);
 
             // $0 = input column index
             auto inputCol      = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
@@ -165,9 +165,10 @@ namespace rocRoller
          * are swizzled, and the result is reassembled.
          *
          * The transform has one positional argument ($0 = element index)
-         * and references the row coordinate via DataFlowTag.
+         * and receives the row coordinate as positionalArgument(1)
+         * via a downstream neighbor on the ExpressionTransform edge.
          */
-        ExpressionTransform buildLRSwizzleTransform(LDSSwizzleParams const& params, int rowCoordTag)
+        ExpressionTransform buildLRSwizzleTransform(LDSSwizzleParams const& params)
         {
             auto effCols = literal(params.effectiveColumns);
             auto logEffCols
@@ -177,8 +178,7 @@ namespace rocRoller
             auto logRows = literal(static_cast<unsigned int>(__builtin_ctz(params.rowsPerBankRow)));
             auto elemsLit = literal(params.elementsPerChunk);
 
-            auto rowRef = std::make_shared<rocRoller::Expression::Expression>(
-                DataFlowTag{rowCoordTag, Register::Type::Vector, DataType::UInt32});
+            auto rowRef = positionalArgument(1, Register::Type::Vector, DataType::UInt32);
 
             // $0 = element index within the K dimension
             auto inputElemIdx = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
@@ -1050,11 +1050,11 @@ namespace rocRoller
             {
                 auto numColumns = thrTile.wsizes.at(0);
                 auto params     = LDSSwizzleParams::fromColumnCount(numColumns);
-                auto grSwizzle  = buildGRSwizzleTransform(params, nThrY);
+                auto grSwizzle  = buildGRSwizzleTransform(params);
 
                 grSwizzleNThrX
                     = graph.coordinates.addElement(ThreadTileNumber(0, literal(numColumns)));
-                graph.coordinates.addElement(grSwizzle, {grSwizzleNThrX}, {nThrX});
+                graph.coordinates.addElement(grSwizzle, {grSwizzleNThrX}, {nThrX, nThrY});
 
                 Log::getLogger()->info("GR swizzle B: K={} Keff={} R={}",
                                        params.numColumns,
@@ -1101,11 +1101,11 @@ namespace rocRoller
             {
                 auto numColumns = thrTile.wsizes.at(1);
                 auto params     = LDSSwizzleParams::fromColumnCount(numColumns);
-                auto grSwizzle  = buildGRSwizzleTransform(params, nThrX);
+                auto grSwizzle  = buildGRSwizzleTransform(params);
 
                 grSwizzleNThrY
                     = graph.coordinates.addElement(ThreadTileNumber(1, literal(numColumns)));
-                graph.coordinates.addElement(grSwizzle, {grSwizzleNThrY}, {nThrY});
+                graph.coordinates.addElement(grSwizzle, {grSwizzleNThrY}, {nThrY, nThrX});
 
                 Log::getLogger()->info(
                     "GR swizzle (load): nThrY={} nThrX={} grSwizzleNThrY={} K={} Keff={} R={}",
@@ -2295,9 +2295,9 @@ namespace rocRoller
                 //   {rawIMacY} --ET--> {iMacY}
                 //   iMacX, iMacY --> addLoadWaveTileCT (unchanged)
                 //
-                // The ET has 1 src (rawIMacY) and 1 dst (iMacY).
+                // The ET has 1 src (rawIMacY) and 1 dst (iMacY, rowCoord).
                 // The reverse expression applies the GR permutation using
-                // iMacX via DataFlowTag (resolved to register at codegen).
+                // the row coordinate via positionalArgument(1).
                 // The forward expression is identity (pass-through).
                 auto tileIMacY = iMacY;
                 auto tileIMacX = iMacX;
@@ -2318,10 +2318,10 @@ namespace rocRoller
                         int rowCoord = isA ? iMacX : iMacY;
                         int colCoord = isA ? iMacY : iMacX;
 
-                        auto lrSwizzle = buildLRSwizzleTransform(params, rowCoord);
+                        auto lrSwizzle = buildLRSwizzleTransform(params);
 
                         auto rawCol = graph.coordinates.addElement(tile.tileIndex(kDim));
-                        graph.coordinates.addElement(lrSwizzle, {rawCol}, {colCoord});
+                        graph.coordinates.addElement(lrSwizzle, {rawCol}, {colCoord, rowCoord});
                         if(isA)
                             tileIMacY = rawCol;
                         else
