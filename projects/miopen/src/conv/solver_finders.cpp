@@ -323,16 +323,14 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
 
             if(samples.size() > 0)
             {
-                // Remove outliers that are more than 2 positive modified z-score's away, and get
-                // the mean.
-                elapsed = miopen::removeHighOutliersAndGetMean(samples, 2.0f);
-
                 if(IsLoggingKernel())
                 {
                     // Update the performance config with the collected samples
-                    // Pass kernel name, config string as descriptor, and samples
                     AddInvokerTimes(samples);
                 }
+                // Remove outliers that are more than 2 positive modified z-score's away, and get
+                // the mean.
+                elapsed = miopen::removeHighOutliersAndGetMean(samples, 2.0f);
             }
             else
             {

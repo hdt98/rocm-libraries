@@ -249,6 +249,7 @@ inline void AddPerformanceConfig(const std::string& config_name,
 
 /// Add invoker timing samples to the current performance config
 /// This should be called after AddPerformanceConfig() and after kernel execution completes
+/// Invoker times are exepected to be in order of execution with all invokations
 inline void AddInvokerTimes(const std::vector<float>& invoker_times_ms)
 {
     const bool logging_enabled = IsLoggingKernel();

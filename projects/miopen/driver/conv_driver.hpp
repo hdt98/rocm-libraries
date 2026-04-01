@@ -1842,11 +1842,6 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
 
     const bool performance_logging_enabled = miopen::IsPerformanceLoggingEnabled();
 
-    if(!performance_logging_enabled)
-    {
-        printf("GPU Kernel Time Forward Conv. Elapsed: %f ms (average)\n", kernel_average_time);
-    }
-
     const auto num_dim = miopen::deref(inputTensor).GetNumDims() - 2;
     if(num_dim != 2 && num_dim != 3)
     {
@@ -1998,6 +1993,7 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
         }
         else
         {
+            printf("GPU Kernel Time Forward Conv. Elapsed: %f ms (average)\n", kernel_average_time);
             printf("stats: name, n, c, do, ho, wo, z, y, x, k, flopCnt, bytesRead, bytesWritten, "
                    "GFLOPs, "
                    "GB/s, timeMs\n");
