@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     April 2012
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -409,9 +409,11 @@ rocblas_status rocsolver_gesdd_template(rocblas_handle handle,
         rocblas_int ldv_gemm = n;
         rocblas_int strideV_gemm = n * n;
 
-        rocsolver_gemm(handle, rocblas_operation_conjugate_transpose, rocblas_operation_none, n, n,
-                       m, &neg_one, A, shiftA, lda, strideA, A, shiftA, lda, strideA, &zero, V_gemm,
-                       0, ldv_gemm, strideV_gemm, batch_count, (T**)workArr);
+        ROCBLAS_CHECK_WITH_POINTER_MODE(
+            handle, old_mode,
+            rocsolver_gemm(handle, rocblas_operation_conjugate_transpose, rocblas_operation_none, n,
+                           n, m, &neg_one, A, shiftA, lda, strideA, A, shiftA, lda, strideA, &zero,
+                           V_gemm, 0, ldv_gemm, strideV_gemm, batch_count, (T**)workArr));
 
         rocsolver_syevd_heevd_template<false, STRIDED, T>(
             handle, rocblas_evect_original, rocblas_fill_upper, n, V_gemm, 0, ldv_gemm,
@@ -423,9 +425,11 @@ rocblas_status rocsolver_gesdd_template(rocblas_handle handle,
         rocblas_int ldu_gemm = (leftv ? ldu : m);
         rocblas_int strideU_gemm = (leftv ? strideU : m * n);
 
-        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n, n, &one, A,
-                       shiftA, lda, strideA, V_gemm, 0, ldv_gemm, strideV_gemm, &zero, U_gemm, 0,
-                       ldu_gemm, strideU_gemm, batch_count, (T**)workArr);
+        ROCBLAS_CHECK_WITH_POINTER_MODE(
+            handle, old_mode,
+            rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n, n, &one, A,
+                           shiftA, lda, strideA, V_gemm, 0, ldv_gemm, strideV_gemm, &zero, U_gemm,
+                           0, ldu_gemm, strideU_gemm, batch_count, (T**)workArr));
 
         // Apply QR factorization to AV, obtaining U from Q and S from the
         // diagonal of R; notice that, since the QR decomposition is not
@@ -465,9 +469,11 @@ rocblas_status rocsolver_gesdd_template(rocblas_handle handle,
         rocblas_int ldu_gemm = (leftv ? ldu : m);
         rocblas_int strideU_gemm = (leftv ? strideU : m * m);
 
-        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_conjugate_transpose, m, m,
-                       n, &neg_one, A, shiftA, lda, strideA, A, shiftA, lda, strideA, &zero, U_gemm,
-                       0, ldu_gemm, strideU_gemm, batch_count, (T**)workArr);
+        ROCBLAS_CHECK_WITH_POINTER_MODE(
+            handle, old_mode,
+            rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_conjugate_transpose, m,
+                           m, n, &neg_one, A, shiftA, lda, strideA, A, shiftA, lda, strideA, &zero,
+                           U_gemm, 0, ldu_gemm, strideU_gemm, batch_count, (T**)workArr));
 
         rocsolver_syevd_heevd_template<false, STRIDED, T>(
             handle, rocblas_evect_original, rocblas_fill_upper, m, U_gemm, 0, ldu_gemm,
@@ -479,9 +485,11 @@ rocblas_status rocsolver_gesdd_template(rocblas_handle handle,
         rocblas_int ldv_gemm = (rightv ? ldv : m);
         rocblas_int strideV_gemm = (rightv ? strideV : m * n);
 
-        rocsolver_gemm(handle, rocblas_operation_conjugate_transpose, rocblas_operation_none, m, n,
-                       m, &one, U_gemm, 0, ldu_gemm, strideU_gemm, A, shiftA, lda, strideA, &zero,
-                       V_gemm, 0, ldv_gemm, strideV_gemm, batch_count, (T**)workArr);
+        ROCBLAS_CHECK_WITH_POINTER_MODE(
+            handle, old_mode,
+            rocsolver_gemm(handle, rocblas_operation_conjugate_transpose, rocblas_operation_none, m,
+                           n, m, &one, U_gemm, 0, ldu_gemm, strideU_gemm, A, shiftA, lda, strideA,
+                           &zero, V_gemm, 0, ldv_gemm, strideV_gemm, batch_count, (T**)workArr));
 
         // Apply LQ factorization to U^*A, obtaining S from the diagonal of L and V^* from Q
         rocsolver_gelqf_template<false, STRIDED, T>(handle, m, n, V_gemm, 0, ldv_gemm, strideV_gemm,

@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     April 2012
- * Copyright (C) 2020-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -653,13 +653,17 @@ rocblas_status rocsolver_gesvd_template(rocblas_handle handle,
 
                 // update
                 if(row)
-                    rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n, k,
-                                   &one, A, shiftA, lda, strideA, bufferT, shiftT, ldt, strideT,
-                                   &zero, bufferC, shiftC, ldc, strideC, batch_count, workArr);
+                    ROCBLAS_CHECK_WITH_POINTER_MODE(
+                        handle, old_mode,
+                        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n,
+                                       k, &one, A, shiftA, lda, strideA, bufferT, shiftT, ldt, strideT,
+                                       &zero, bufferC, shiftC, ldc, strideC, batch_count, workArr));
                 else
-                    rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n, k,
-                                   &one, bufferT, shiftT, ldt, strideT, A, shiftA, lda, strideA,
-                                   &zero, bufferC, shiftC, ldc, strideC, batch_count, workArr);
+                    ROCBLAS_CHECK_WITH_POINTER_MODE(
+                        handle, old_mode,
+                        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n,
+                                       k, &one, bufferT, shiftT, ldt, strideT, A, shiftA, lda, strideA,
+                                       &zero, bufferC, shiftC, ldc, strideC, batch_count, workArr));
 
                 // copy to overwrite A
                 ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(blocks_m, blocks_n, batch_count),
@@ -670,13 +674,17 @@ rocblas_status rocsolver_gesvd_template(rocblas_handle handle,
             {
                 // update
                 if(row)
-                    rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n, k,
-                                   &one, A, shiftA, lda, strideA, bufferT, shiftT, ldt, strideT,
-                                   &zero, UV, shiftUV, lduv, strideUV, batch_count, workArr);
+                    ROCBLAS_CHECK_WITH_POINTER_MODE(
+                        handle, old_mode,
+                        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n,
+                                       k, &one, A, shiftA, lda, strideA, bufferT, shiftT, ldt, strideT,
+                                       &zero, UV, shiftUV, lduv, strideUV, batch_count, workArr));
                 else
-                    rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n, k,
-                                   &one, bufferT, shiftT, ldt, strideT, A, shiftA, lda, strideA,
-                                   &zero, UV, shiftUV, lduv, strideUV, batch_count, workArr);
+                    ROCBLAS_CHECK_WITH_POINTER_MODE(
+                        handle, old_mode,
+                        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n,
+                                       k, &one, bufferT, shiftT, ldt, strideT, A, shiftA, lda, strideA,
+                                       &zero, UV, shiftUV, lduv, strideUV, batch_count, workArr));
 
                 // overwrite A if required
                 if(othervO)
@@ -688,13 +696,18 @@ rocblas_status rocsolver_gesvd_template(rocblas_handle handle,
             {
                 // update
                 if(row)
-                    rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n, k,
-                                   &one, UV, shiftUV, lduv, strideUV, bufferT, shiftT, ldt, strideT,
-                                   &zero, A, shiftA, lda, strideA, batch_count, workArr);
+                    ROCBLAS_CHECK_WITH_POINTER_MODE(
+                        handle, old_mode,
+                        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n,
+                                       k, &one, UV, shiftUV, lduv, strideUV, bufferT, shiftT, ldt,
+                                       strideT, &zero, A, shiftA, lda, strideA, batch_count, workArr));
                 else
-                    rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n, k,
-                                   &one, bufferT, shiftT, ldt, strideT, UV, shiftUV, lduv, strideUV,
-                                   &zero, A, shiftA, lda, strideA, batch_count, workArr);
+                    ROCBLAS_CHECK_WITH_POINTER_MODE(
+                        handle, old_mode,
+                        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, m, n,
+                                       k, &one, bufferT, shiftT, ldt, strideT, UV, shiftUV, lduv,
+                                       strideUV, &zero, A, shiftA, lda, strideA, batch_count,
+                                       workArr));
 
                 // copy back to U/V
                 ROCSOLVER_LAUNCH_KERNEL(copy_mat<T>, dim3(blocks_m, blocks_n, batch_count),

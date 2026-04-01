@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     December 2016
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -235,10 +235,12 @@ rocblas_status rocsolver_gels_outofplace_template(rocblas_handle handle,
                                     strideA, info);
 
             // solve RX = Q'B
-            rocsolver_trsm_upper<BATCHED, STRIDED, T>(
-                handle, rocblas_side_left, rocblas_operation_none, rocblas_diagonal_non_unit, n,
-                nrhs, A, shiftA, lda, strideA, B, shiftB, ldb, strideB, batch_count, optim_mem,
-                work_x_temp, workArr_temp_arr, diag_trfac_invA, trfact_workTrmm_invA_arr);
+            ROCBLAS_CHECK_WITH_POINTER_MODE(
+                handle, old_mode,
+                rocsolver_trsm_upper<BATCHED, STRIDED, T>(
+                    handle, rocblas_side_left, rocblas_operation_none, rocblas_diagonal_non_unit, n,
+                    nrhs, A, shiftA, lda, strideA, B, shiftB, ldb, strideB, batch_count, optim_mem,
+                    work_x_temp, workArr_temp_arr, diag_trfac_invA, trfact_workTrmm_invA_arr));
 
             // copy result to X
             ROCSOLVER_LAUNCH_KERNEL((copy_mat<T, U>), dim3(copyblocksmin, copyblocksy, batch_count),
@@ -262,11 +264,13 @@ rocblas_status rocsolver_gels_outofplace_template(rocblas_handle handle,
                                     shiftX, ldx, strideX);
 
             // solve R'Y = B (here Y = Q'X)
-            rocsolver_trsm_upper<BATCHED, STRIDED, T>(
-                handle, rocblas_side_left, rocblas_operation_conjugate_transpose,
-                rocblas_diagonal_non_unit, n, nrhs, A, shiftA, lda, strideA, X, shiftX, ldx,
-                strideX, batch_count, optim_mem, work_x_temp, workArr_temp_arr, diag_trfac_invA,
-                trfact_workTrmm_invA_arr);
+            ROCBLAS_CHECK_WITH_POINTER_MODE(
+                handle, old_mode,
+                rocsolver_trsm_upper<BATCHED, STRIDED, T>(
+                    handle, rocblas_side_left, rocblas_operation_conjugate_transpose,
+                    rocblas_diagonal_non_unit, n, nrhs, A, shiftA, lda, strideA, X, shiftX, ldx,
+                    strideX, batch_count, optim_mem, work_x_temp, workArr_temp_arr, diag_trfac_invA,
+                    trfact_workTrmm_invA_arr));
 
             // zero row n to m-1 of X in cases where info is zero
             const rocblas_int zeroblocksx = (m - n - 1) / BS2 + 1;
@@ -299,10 +303,12 @@ rocblas_status rocsolver_gels_outofplace_template(rocblas_handle handle,
                                     shiftX, ldx, strideX);
 
             // solve LY = B (here Y = QX)
-            rocsolver_trsm_lower<BATCHED, STRIDED, T>(
-                handle, rocblas_side_left, rocblas_operation_none, rocblas_diagonal_non_unit, m,
-                nrhs, A, shiftA, lda, strideA, X, shiftX, ldx, strideX, batch_count, optim_mem,
-                work_x_temp, workArr_temp_arr, diag_trfac_invA, trfact_workTrmm_invA_arr);
+            ROCBLAS_CHECK_WITH_POINTER_MODE(
+                handle, old_mode,
+                rocsolver_trsm_lower<BATCHED, STRIDED, T>(
+                    handle, rocblas_side_left, rocblas_operation_none, rocblas_diagonal_non_unit, m,
+                    nrhs, A, shiftA, lda, strideA, X, shiftX, ldx, strideX, batch_count, optim_mem,
+                    work_x_temp, workArr_temp_arr, diag_trfac_invA, trfact_workTrmm_invA_arr));
 
             // zero row m to n-1 of X in cases where info is zero
             const rocblas_int zeroblocksx = (n - m - 1) / BS2 + 1;
@@ -332,11 +338,13 @@ rocblas_status rocsolver_gels_outofplace_template(rocblas_handle handle,
                                     strideA, info);
 
             // solve L'X = QB
-            rocsolver_trsm_lower<BATCHED, STRIDED, T>(
-                handle, rocblas_side_left, rocblas_operation_conjugate_transpose,
-                rocblas_diagonal_non_unit, m, nrhs, A, shiftA, lda, strideA, B, shiftB, ldb,
-                strideB, batch_count, optim_mem, work_x_temp, workArr_temp_arr, diag_trfac_invA,
-                trfact_workTrmm_invA_arr);
+            ROCBLAS_CHECK_WITH_POINTER_MODE(
+                handle, old_mode,
+                rocsolver_trsm_lower<BATCHED, STRIDED, T>(
+                    handle, rocblas_side_left, rocblas_operation_conjugate_transpose,
+                    rocblas_diagonal_non_unit, m, nrhs, A, shiftA, lda, strideA, B, shiftB, ldb,
+                    strideB, batch_count, optim_mem, work_x_temp, workArr_temp_arr, diag_trfac_invA,
+                    trfact_workTrmm_invA_arr));
 
             // copy result to X
             ROCSOLVER_LAUNCH_KERNEL((copy_mat<T, U>), dim3(copyblocksmin, copyblocksy, batch_count),

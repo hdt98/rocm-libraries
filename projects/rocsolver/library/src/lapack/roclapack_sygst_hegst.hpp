@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     December 2016
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -181,11 +181,13 @@ rocblas_status rocsolver_sygst_hegst_template(rocblas_handle handle,
 
                 if(k + kb < n)
                 {
-                    rocsolver_trsm_upper<BATCHED, STRIDED, T>(
-                        handle, rocblas_side_left, rocblas_operation_conjugate_transpose,
-                        rocblas_diagonal_non_unit, kb, n - k - kb, B, shiftB + idx2D(k, k, ldb),
-                        ldb, strideB, A, shiftA + idx2D(k, k + kb, lda), lda, strideA, batch_count,
-                        optim_mem, work_x_temp, workArr_temp_arr, store_wcs_invA, invA_arr);
+                    ROCBLAS_CHECK_WITH_POINTER_MODE(
+                        handle, old_mode,
+                        rocsolver_trsm_upper<BATCHED, STRIDED, T>(
+                            handle, rocblas_side_left, rocblas_operation_conjugate_transpose,
+                            rocblas_diagonal_non_unit, kb, n - k - kb, B, shiftB + idx2D(k, k, ldb),
+                            ldb, strideB, A, shiftA + idx2D(k, k + kb, lda), lda, strideA, batch_count,
+                            optim_mem, work_x_temp, workArr_temp_arr, store_wcs_invA, invA_arr));
 
                     rocblasCall_symm_hemm(handle, rocblas_side_left, uplo, kb, n - k - kb,
                                           &t_minhalf, A, shiftA + idx2D(k, k, lda), lda, strideA, B,
@@ -203,11 +205,14 @@ rocblas_status rocsolver_sygst_hegst_template(rocblas_handle handle,
                                           shiftB + idx2D(k, k + kb, ldb), ldb, strideB, &t_one, A,
                                           shiftA + idx2D(k, k + kb, lda), lda, strideA, batch_count);
 
-                    rocsolver_trsm_upper<BATCHED, STRIDED, T>(
-                        handle, rocblas_side_right, rocblas_operation_none, rocblas_diagonal_non_unit,
-                        kb, n - k - kb, B, shiftB + idx2D(k + kb, k + kb, ldb), ldb, strideB, A,
-                        shiftA + idx2D(k, k + kb, lda), lda, strideA, batch_count, optim_mem,
-                        work_x_temp, workArr_temp_arr, store_wcs_invA, invA_arr);
+                    ROCBLAS_CHECK_WITH_POINTER_MODE(
+                        handle, old_mode,
+                        rocsolver_trsm_upper<BATCHED, STRIDED, T>(
+                            handle, rocblas_side_right, rocblas_operation_none,
+                            rocblas_diagonal_non_unit, kb, n - k - kb, B,
+                            shiftB + idx2D(k + kb, k + kb, ldb), ldb, strideB, A,
+                            shiftA + idx2D(k, k + kb, lda), lda, strideA, batch_count, optim_mem,
+                            work_x_temp, workArr_temp_arr, store_wcs_invA, invA_arr));
                 }
             }
         }
@@ -225,11 +230,13 @@ rocblas_status rocsolver_sygst_hegst_template(rocblas_handle handle,
 
                 if(k + kb < n)
                 {
-                    rocsolver_trsm_lower<BATCHED, STRIDED, T>(
-                        handle, rocblas_side_right, rocblas_operation_conjugate_transpose,
-                        rocblas_diagonal_non_unit, n - k - kb, kb, B, shiftB + idx2D(k, k, ldb),
-                        ldb, strideB, A, shiftA + idx2D(k + kb, k, lda), lda, strideA, batch_count,
-                        optim_mem, work_x_temp, workArr_temp_arr, store_wcs_invA, invA_arr);
+                    ROCBLAS_CHECK_WITH_POINTER_MODE(
+                        handle, old_mode,
+                        rocsolver_trsm_lower<BATCHED, STRIDED, T>(
+                            handle, rocblas_side_right, rocblas_operation_conjugate_transpose,
+                            rocblas_diagonal_non_unit, n - k - kb, kb, B, shiftB + idx2D(k, k, ldb),
+                            ldb, strideB, A, shiftA + idx2D(k + kb, k, lda), lda, strideA, batch_count,
+                            optim_mem, work_x_temp, workArr_temp_arr, store_wcs_invA, invA_arr));
 
                     rocblasCall_symm_hemm(handle, rocblas_side_right, uplo, n - k - kb, kb,
                                           &t_minhalf, A, shiftA + idx2D(k, k, lda), lda, strideA, B,
@@ -247,11 +254,14 @@ rocblas_status rocsolver_sygst_hegst_template(rocblas_handle handle,
                                           shiftB + idx2D(k + kb, k, ldb), ldb, strideB, &t_one, A,
                                           shiftA + idx2D(k + kb, k, lda), lda, strideA, batch_count);
 
-                    rocsolver_trsm_lower<BATCHED, STRIDED, T>(
-                        handle, rocblas_side_left, rocblas_operation_none, rocblas_diagonal_non_unit,
-                        n - k - kb, kb, B, shiftB + idx2D(k + kb, k + kb, ldb), ldb, strideB, A,
-                        shiftA + idx2D(k + kb, k, lda), lda, strideA, batch_count, optim_mem,
-                        work_x_temp, workArr_temp_arr, store_wcs_invA, invA_arr);
+                    ROCBLAS_CHECK_WITH_POINTER_MODE(
+                        handle, old_mode,
+                        rocsolver_trsm_lower<BATCHED, STRIDED, T>(
+                            handle, rocblas_side_left, rocblas_operation_none,
+                            rocblas_diagonal_non_unit, n - k - kb, kb, B,
+                            shiftB + idx2D(k + kb, k + kb, ldb), ldb, strideB, A,
+                            shiftA + idx2D(k + kb, k, lda), lda, strideA, batch_count, optim_mem,
+                            work_x_temp, workArr_temp_arr, store_wcs_invA, invA_arr));
                 }
             }
         }

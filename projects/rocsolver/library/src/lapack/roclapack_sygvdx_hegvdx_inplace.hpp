@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     December 2016
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -298,15 +298,19 @@ rocblas_status rocsolver_sygvdx_hegvdx_inplace_template(rocblas_handle handle,
         if(itype == rocblas_eform_ax || itype == rocblas_eform_abx)
         {
             if(uplo == rocblas_fill_upper)
-                rocsolver_trsm_upper<BATCHED, STRIDED, T>(
-                    handle, rocblas_side_left, rocblas_operation_none, rocblas_diagonal_non_unit, n,
-                    temp_nev, B, shiftB, ldb, strideB, A, shiftA, lda, strideA, batch_count,
-                    optim_mem, work1, work2, work3, work4);
+                ROCBLAS_CHECK_WITH_POINTER_MODE(
+                    handle, old_mode,
+                    rocsolver_trsm_upper<BATCHED, STRIDED, T>(
+                        handle, rocblas_side_left, rocblas_operation_none,
+                        rocblas_diagonal_non_unit, n, temp_nev, B, shiftB, ldb, strideB, A, shiftA,
+                        lda, strideA, batch_count, optim_mem, work1, work2, work3, work4));
             else
-                rocsolver_trsm_lower<BATCHED, STRIDED, T>(
-                    handle, rocblas_side_left, rocblas_operation_conjugate_transpose,
-                    rocblas_diagonal_non_unit, n, temp_nev, B, shiftB, ldb, strideB, A, shiftA, lda,
-                    strideA, batch_count, optim_mem, work1, work2, work3, work4);
+                ROCBLAS_CHECK_WITH_POINTER_MODE(
+                    handle, old_mode,
+                    rocsolver_trsm_lower<BATCHED, STRIDED, T>(
+                        handle, rocblas_side_left, rocblas_operation_conjugate_transpose,
+                        rocblas_diagonal_non_unit, n, temp_nev, B, shiftB, ldb, strideB, A, shiftA,
+                        lda, strideA, batch_count, optim_mem, work1, work2, work3, work4));
         }
         else
         {

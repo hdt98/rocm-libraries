@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     December 2016
- * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -382,10 +382,12 @@ rocblas_status rocsolver_getri_template(rocblas_handle handle,
                                 0, stream, n, j, jb, A, shiftA, lda, strideA, info, tmpcopy, strideW);
 
         if(j + jb < n)
-            rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, n, jb,
-                           n - j - jb, &minone, A, shiftA + idx2D(0, j + jb, lda), lda, strideA,
-                           tmpcopy, j + jb, ldw, strideW, &one, A, shiftA + idx2D(0, j, lda), lda,
-                           strideA, batch_count, workArr);
+            ROCBLAS_CHECK_WITH_POINTER_MODE(
+                handle, old_mode,
+                rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, n, jb,
+                               n - j - jb, &minone, A, shiftA + idx2D(0, j + jb, lda), lda, strideA,
+                               tmpcopy, j + jb, ldw, strideW, &one, A, shiftA + idx2D(0, j, lda),
+                               lda, strideA, batch_count, workArr));
 
         rocblasCall_trsm(handle, rocblas_side_right, rocblas_fill_lower, rocblas_operation_none,
                          rocblas_diagonal_unit, n, jb, &one, tmpcopy, j, ldw, strideW, A,
