@@ -330,6 +330,17 @@ def get_user_max_frequency():
     '''
     Get the maximum frequency from the user when the GPU frequency cannot be determined
     '''
+    # Non-interactive guard: when stdin is not a tty (CI, --build-only via
+    # pytest, etc.) we cannot prompt.  Returning None is safe because:
+    #   - The caller in Tensile() already handles None/<=0 with a warning and
+    #     skips store_max_frequency().
+    #   - The downstream consumer (LibraryLogic.read_max_freq) also handles a
+    #     missing MAX_FREQ env var gracefully (returns None, caller checks).
+    #   - The entire frequency block is gated on `not buildOnly`, so build-only
+    #     runs never reach this path.
+    if not sys.stdin.isatty():
+        printWarning("Cannot prompt for GPU frequency in non-interactive mode")
+        return None
     while True:
         try:
             user_input = input("Please enter the maximum frequency (MHz): ")
@@ -487,6 +498,9 @@ def Tensile(userArgs):
                  "First run using this flag, then rerun with --use-cache.")
     argParser.add_argument("--restore-from-log", type=str, dest="RestoreLog",
             help="A log file captured in previous tuning. ONLY RELIABLE when configs yaml not changes")
+    argParser.add_argument("--gpu-targets", dest="gpuTargets", default=None,
+            help="Semicolon-separated GPU targets (e.g. gfx942). "
+                 "Overrides ISA auto-detection and YAML config ISA.")
 
     addCommonArguments(argParser)
     args = argParser.parse_args(userArgs)
@@ -569,7 +583,7 @@ def Tensile(userArgs):
     UseEffLike = config["GlobalParameters"].get("UseEffLike", globalParameters["UseEffLike"])
     UseEffLike = False if isRhel8() else UseEffLike
 
-    if 'LibraryLogic' in config and UseEffLike:
+    if 'LibraryLogic' in config and UseEffLike and not buildOnly:
         max_frequency = get_gpu_max_frequency(device_id)
 
         if not max_frequency or max_frequency <= 0:
@@ -579,16 +593,25 @@ def Tensile(userArgs):
             print(f"Could not detect valid GPU frequency for device {device_id}")
             max_frequency = get_user_max_frequency()
 
-        print(f"Successfully retrieve Max frequency: {max_frequency} for device {device_id}")
-        store_max_frequency(max_frequency)
+        if not max_frequency or max_frequency <= 0:
+            printWarning("Could not determine GPU frequency. "
+                         "Skipping frequency-dependent configuration.")
+        else:
+            print(f"Successfully retrieved max frequency: "
+                  f"{max_frequency} for device {device_id}")
+            store_max_frequency(max_frequency)
 
     cxxCompiler, \
     cCompiler, \
-    offloadBundler, \
-    enumerator = validateToolchain(args.CxxCompiler,
-                                   args.CCompiler,
-                                   args.OffloadBundler,
-                                   ToolchainDefaults.DEVICE_ENUMERATOR)
+    offloadBundler = validateToolchain(args.CxxCompiler,
+                                       args.CCompiler,
+                                       args.OffloadBundler)
+
+    if args.gpuTargets:
+        enumerator = None  # not needed — ISA comes from --gpu-targets
+    else:
+        enumerator = validateToolchain(args.DeviceEnumerator)
+
     asmToolchain = makeAssemblyToolchain(
         cxxCompiler,
         offloadBundler,
@@ -600,9 +623,19 @@ def Tensile(userArgs):
         offloadBundler,
     )
 
-    if "ISA" in config["GlobalParameters"]:
+    if args.gpuTargets:
+        from Tensile.Common.Architectures import gfxToIsa
+        isaList = []
+        for arch in args.gpuTargets.split(";"):
+            arch = arch.strip()
+            if not arch:
+                continue
+            isa = gfxToIsa(arch)
+            if isa is None:
+                printExit(f"Unrecognized GPU target: '{arch}'")
+            isaList.append(isa)
+    elif "ISA" in config["GlobalParameters"]:
         isaList = [IsaVersion(isa[0], isa[1], isa[2]) for isa in config["GlobalParameters"]["ISA"]]
-
     else:
         isaList = [detectGlobalCurrentISA(device_id, enumerator)]
 

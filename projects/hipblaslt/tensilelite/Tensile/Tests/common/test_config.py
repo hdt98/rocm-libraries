@@ -22,282 +22,71 @@
 #
 ################################################################################
 
-import glob
 import os
 import pytest
+import shutil
 import subprocess
-import yaml
+import sys
 
-from Tensile import Tensile
-from Tensile.Common.DataType import DataType
-
-################################################################################
-# Locate Executables
-# rocm-smi, hip-clang, rocm_agent_enumerator
-################################################################################
-def isExe( filePath ):
-  return os.path.isfile(filePath) and os.access(filePath, os.X_OK)
-
-def locateExe( defaultPath, exeName ): # /opt/rocm/bin, hip-clang
-  # look in path first
-  for path in os.environ["PATH"].split(os.pathsep):
-    exePath = os.path.join(path, exeName)
-    if isExe(exePath):
-      return exePath
-  # look in default path second
-  exePath = os.path.join(defaultPath, exeName)
-  if isExe(exePath):
-    return exePath
-  return None
-
-def get_rocm_version_or_none():
-    """Gets the ROCm version from the version file."""
-    try:
-        rocmpath = os.environ.get("ROCM_PATH", "/opt/rocm")
-        version_file_path = os.path.join(rocmpath, ".info/version")
-
-        with open(version_file_path, 'r') as f:
-            # Read the first line and strip whitespace
-            version_string = f.readline().strip()
-            return version_string
-    except (FileNotFoundError, IOError):
-        return None
+from artifact_helpers import compress_output, extract_artifact
+from config_helpers import disable_timer_and_hwmonitor, verify_timer_and_hwmonitor
 
 
-def walkDict(root, path=""):
+def _run_tensile(args):
+    """Run Tensile in a subprocess for full process-level isolation.
+
+    Streams stdout/stderr to the parent process so pytest captures output
+    normally.  Raises CalledProcessError on non-zero exit, which pytest
+    reports as a test failure with the full subprocess output.
     """
-    Recursively walks a structure which may consist of dictionaries, lists,
-    and other objects. Yields (object, path) for each object in the
-    structure.
+    subprocess.run(
+        [sys.executable, "-c",
+         "from Tensile.Tensile import Tensile; import sys; Tensile(sys.argv[1:])",
+         *args],
+        check=True,
+    )
+
+
+def test_config(tensile_args, config, tmpdir, pytestconfig):
+    """Full round-trip test: build -> compress -> wipe -> extract -> run.
+
+    Verifies that the compressed artifact contains everything needed for
+    the use-cache phase.  Both the build and run phases are executed in
+    separate subprocesses to ensure full process-level isolation — no
+    shared module-level state (globalParameters, ISA caches, toolchain
+    singletons, etc.) can leak between phases.
+
+    Only runs when neither --build-only nor --use-cache is set (i.e.,
+    the default local workflow).
     """
-    yield root, path
-    if isinstance(root, dict):
-        for key, value in root.items():
-            keypath = key
-            if path != "":
-                keypath = path + "." + str(keypath)
-            yield from walkDict(value, keypath)
-    elif isinstance(root, list):
-        for i,obj in enumerate(root):
-            keypath = str(i)
-            if path != "":
-                keypath = path + "." + keypath
-            yield from walkDict(obj, keypath)
+    if pytestconfig.getoption("--build-only") or pytestconfig.getoption("--use-cache"):
+        pytest.skip("split mode active — use test_config_build or test_config_run")
 
-def markNamed(name):
-    """
-    Gets a mark by a name contained in a variable.
-    """
-    return getattr(pytest.mark, name)
-
-def configMarks(filepath, rootDir, availableArchs):
-    """
-    Returns a list of marks to add to a particular YAML config path.  Currently gets a mark for:
-
-     - Root directory name.  This separates tests into pre_checkin, nightly, etc.
-     - Expected failures. Include 'xfail' in the name of the YAML file.
-     - Anything in yaml["TestParameters"]["marks"]
-     - validate / validateAll - whether the test validates (all?) results.
-     - Data type(s) used in the YAML
-     - Problem type(s) used in the YAML
-     - Kernel language(s) used in the YAML
-    """
-    relpath = os.path.relpath(filepath, rootDir)
-    components = relpath.split(os.path.sep)
-
-    # First part of directory - nightly, pre-checkin, etc.
-    marks = list([markNamed(component) for component in components[:-1]])
-
-    if 'xfail' in relpath or 'wip' in relpath:
-        marks.append(pytest.mark.xfail)
-    if 'disabled' in relpath:
-        marks.append(pytest.mark.skip)
-
-    try:
-        with open(filepath) as f:
-            doc = yaml.load(f, yaml.SafeLoader)
-    except yaml.parser.ParserError:
-        marks.append(pytest.mark.syntax_error)
-        return marks
-
-    if "TestParameters" in doc:
-        if "marks" in doc["TestParameters"]:
-            marks += [markNamed(m) for m in doc["TestParameters"]["marks"]]
-
-    # Architecture specific xfail marks
-    for arch in availableArchs:
-        ArchFail = "xfail-%s" % arch
-        if markNamed(ArchFail) in marks:
-            marks.append(pytest.mark.xfail)
-        ArchSkip = "skip-%s" % arch
-        if markNamed(ArchSkip) in marks:
-            marks.append(pytest.mark.skip)
-
-    validate = True
-    validateAll = False
-    try:
-        if doc["GlobalParameters"]['NumElementsToValidate'] == 0:
-            validate = False
-        if doc["GlobalParameters"]['NumElementsToValidate'] == -1:
-            validateAll = True
-    except KeyError:
-        pass
-
-    if validate:
-        marks.append(pytest.mark.validate)
-    if validateAll:
-        marks.append(pytest.mark.validateAll)
-
-    dataTypes = set([problem[0]["DataType"] for problem in doc["BenchmarkProblems"]])
-    operationTypes = set([problem[0]["OperationType"] for problem in doc["BenchmarkProblems"]])
-
-    languages = set()
-    #print ("***doc=", doc)
-    for obj, path in walkDict(doc):
-        #print ("  obj=", obj, "path=", path)
-        if "KernelLanguage" in path and isinstance(obj, str):
-            languages.add(obj)
-
-    for l in languages:
-        marks.append(markNamed(l))
-
-    for dt in dataTypes:
-        dataType = DataType(dt)
-        marks.append(markNamed(dataType.toName()))
-
-    for operationType in operationTypes:
-        marks.append(markNamed(operationType))
-
-    return marks
-
-def findAvailableArchs():
-    availableArchs = []
-    rocmpath = "/opt/rocm"
-    if "ROCM_PATH" in os.environ:
-        rocmpath = os.environ.get("ROCM_PATH")
-    if "TENSILE_ROCM_PATH" in os.environ:
-        rocmpath = os.environ.get("TENSILE_ROCM_PATH")
-    rocmAgentEnum = os.path.join(rocmpath, "bin/rocm_agent_enumerator")
-    output = subprocess.check_output([rocmAgentEnum, "-t", "GPU"])
-    lines = output.decode().splitlines()
-    for line in lines:
-        line = line.strip()
-        if (not line in availableArchs) and (not "gfx000" in line):
-            availableArchs.append(line)
-    return availableArchs
-
-def findConfigs(rootDir=None):
-    """
-    Walks rootDir (defaults to trying to find Tensile/Tests) and returns a
-    list of test parameters, one for each YAML file.
-    """
-    if rootDir ==  None:
-        rootDir = os.path.dirname(os.path.dirname(__file__))
-        printRoot = os.path.dirname(os.path.dirname(rootDir))
-    else:
-        printRoot = rootDir
-
-    availableArchs = findAvailableArchs()
-    globaParamArchsStr = ';'.join(availableArchs)
-    os.environ["PyTestBuildArchNames"] = globaParamArchsStr
-
-    rocm_version = get_rocm_version_or_none()
-
-    params = []
-    for (dirpath, dirnames, filenames) in os.walk(rootDir):
-        for filename in filenames:
-            # Conditionally skip icache_flush.yaml on rocm 7.1 due to ROCm bug.
-            if filename == "icache_flush.yaml" and rocm_version and rocm_version.startswith("7.1"):
-                print(f"INFO: Skipping '{filename}' on ROCm {rocm_version}.")
-                continue
-
-            # Skip build client script
-            if filename == "build_client.yaml":
-                continue
-            # filter out yamls in logic_yaml since they are not meant for Tensile.py
-            elif filename.endswith('.yaml') and "logic_yaml" not in dirpath:
-                filepath = os.path.join(rootDir, dirpath, filename)
-                if not "test_data" in filepath:
-                    marks = configMarks(filepath, rootDir, availableArchs)
-
-                    # Conditionally xfail icache_flush.yaml on rocm 7.1 due to ROCm bug.
-                    if filename == "icache_flush.yaml" and rocm_version and rocm_version.startswith("7.1"):
-                        reason = "Test is expected to fail on ROCm 7.1 due to a known bug."
-                        marks.append(pytest.mark.xfail(reason=reason, strict=True))
-
-                    relpath = os.path.relpath(filepath, printRoot)
-                    params.append(pytest.param(filepath, marks=marks, id=relpath))
-    return params
-
-def _disable_timer_and_hwmonitor(args):
-    """Append --global-parameters to disable BenchmarkTimer and HardwareMonitor.
-
-    Inserts the overrides after the existing --global-parameters flag if present,
-    otherwise appends it. Modifies args in place.
-    """
-    try:
-        idx = args.index("--global-parameters")
-    except ValueError:
-        args.append("--global-parameters")
-        idx = len(args) - 1
-    args.insert(idx + 1, "BenchmarkTimer=0")
-    args.insert(idx + 2, "HardwareMonitor=0")
-
-
-def _parse_ini_value(ini_path, key):
-    """Parse a key=value from a Tensile client .ini file. Returns None if not found."""
-    with open(ini_path) as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith(key + "="):
-                return line.split("=", 1)[1]
-    return None
-
-
-def _verify_timer_and_hwmonitor(output_dir, expect_disabled):
-    """Verify benchmark-timer and hardware-monitor values in generated .ini files.
-
-    Args:
-        output_dir: The Tensile output directory to search for .ini files.
-        expect_disabled: If True, assert both parameters are disabled.
-            If False, assert benchmark-timer is enabled (hardware-monitor
-            is only checked for presence since some architectures like
-            gfx950 force-disable it).
-    """
-    ini_files = glob.glob(os.path.join(output_dir, "**", "*.ini"), recursive=True)
-    assert ini_files, "Expected at least one .ini file in the output directory"
-
-    # Values that indicate the feature is disabled (int 0 from CLI override,
-    # or bool False from code).
-    disabled_values = {"0", "False"}
-
-    for ini_file in ini_files:
-        bt_value = _parse_ini_value(ini_file, "benchmark-timer")
-        hm_value = _parse_ini_value(ini_file, "hardware-monitor")
-
-        assert bt_value is not None, \
-            f"benchmark-timer not found in {ini_file}"
-        assert hm_value is not None, \
-            f"hardware-monitor not found in {ini_file}"
-
-        if expect_disabled:
-            assert bt_value in disabled_values, \
-                f"Expected benchmark-timer disabled in {ini_file}, got {bt_value}"
-            assert hm_value in disabled_values, \
-                f"Expected hardware-monitor disabled in {ini_file}, got {hm_value}"
-        else:
-            assert bt_value not in disabled_values, \
-                f"Expected benchmark-timer enabled in {ini_file}, got {bt_value}"
-
-
-@pytest.mark.parametrize("config", findConfigs())
-def test_config(tensile_args, config, tmpdir):
-    args = [config, tmpdir.strpath, *tensile_args]
+    output_dir = os.path.join(tmpdir.strpath, "output")
     is_benchmark_timer_config = "benchmark_timer" in os.path.basename(config)
-    # Disable timer and hwmonitor for CI correctness-only runs.
-    # benchmark_timer tests retain timing to verify it works.
-    if not is_benchmark_timer_config:
-        _disable_timer_and_hwmonitor(args)
-    Tensile.Tensile(args)
 
-    _verify_timer_and_hwmonitor(tmpdir.strpath, expect_disabled=not is_benchmark_timer_config)
+    # Step 1: Build (in subprocess)
+    build_args = [config, output_dir, "--build-only", *tensile_args]
+    if not is_benchmark_timer_config:
+        disable_timer_and_hwmonitor(build_args)
+    _run_tensile(build_args)
+
+    # Step 2: Compress
+    artifact_path = compress_output(output_dir)
+
+    # Step 3: Delete everything except the artifact
+    shutil.rmtree(output_dir)
+
+    # Step 4: Extract
+    extract_artifact(artifact_path, output_dir)
+    os.remove(artifact_path)
+
+    # Step 5: Run with cache (in subprocess — clean process, no leftover state)
+    run_args = [config, output_dir, "--use-cache", *tensile_args]
+    if not is_benchmark_timer_config:
+        disable_timer_and_hwmonitor(run_args)
+    _run_tensile(run_args)
+
+    # Step 6: Verify
+    verify_timer_and_hwmonitor(output_dir,
+                                expect_disabled=not is_benchmark_timer_config)
