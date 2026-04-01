@@ -2802,6 +2802,9 @@ struct MIOPEN_INTERNALS_EXPORT GemmFwd1x1_0_2 final : GemmFwdBase
 
     bool MayNeedWorkspace() const override { return true; }
 
+    bool IsSlow(const ExecutionContext& context,
+                const miopen::conv::ProblemDescription& problem) const override;
+
     bool IsApplicable(const ExecutionContext&,
                       const miopen::conv::ProblemDescription&) const override;
 
@@ -2838,6 +2841,9 @@ struct MIOPEN_INTERNALS_EXPORT GemmFwd1x1_0_1 final : GemmFwdBase
 
     bool MayNeedWorkspace() const override { return true; }
 
+    bool IsSlow(const ExecutionContext& context,
+                const miopen::conv::ProblemDescription& problem) const override;
+
     bool IsApplicable(const ExecutionContext&,
                       const miopen::conv::ProblemDescription&) const override;
 
@@ -2855,6 +2861,9 @@ struct MIOPEN_INTERNALS_EXPORT GemmFwdRest final : GemmFwdBase
                             const miopen::conv::ProblemDescription&) const override;
 
     bool MayNeedWorkspace() const override { return true; }
+
+    bool IsSlow(const ExecutionContext& context,
+                const miopen::conv::ProblemDescription& problem) const override;
 
     bool IsApplicable(const ExecutionContext&,
                       const miopen::conv::ProblemDescription&) const override;
@@ -2886,6 +2895,9 @@ struct MIOPEN_INTERNALS_EXPORT GemmBwd1x1_stride2 final : GemmBwdBase
 
     bool MayNeedWorkspace() const override { return true; }
 
+    bool IsSlow(const ExecutionContext& context,
+                const miopen::conv::ProblemDescription& problem) const override;
+
     bool IsApplicable(const ExecutionContext&,
                       const miopen::conv::ProblemDescription&) const override;
 
@@ -2904,6 +2916,9 @@ struct MIOPEN_INTERNALS_EXPORT GemmBwd1x1_stride1 final : GemmBwdBase
 
     bool MayNeedWorkspace() const override { return true; }
 
+    bool IsSlow(const ExecutionContext& context,
+                const miopen::conv::ProblemDescription& problem) const override;
+
     bool IsApplicable(const ExecutionContext&,
                       const miopen::conv::ProblemDescription& problem) const override;
 
@@ -2921,6 +2936,9 @@ struct MIOPEN_INTERNALS_EXPORT GemmBwdRest final : GemmBwdBase
                             const miopen::conv::ProblemDescription&) const override;
 
     bool MayNeedWorkspace() const override { return true; }
+
+    bool IsSlow(const ExecutionContext& context,
+                const miopen::conv::ProblemDescription& problem) const override;
 
     bool IsApplicable(const ExecutionContext&,
                       const miopen::conv::ProblemDescription&) const override;
@@ -2946,6 +2964,9 @@ struct MIOPEN_INTERNALS_EXPORT GemmWrw1x1_stride1 final : GemmWrwBase
 {
     const std::string& SolverDbId() const override { return GetSolverDbId<GemmWrw1x1_stride1>(); }
 
+    bool IsSlow(const ExecutionContext& context,
+                const miopen::conv::ProblemDescription& problem) const override;
+
     bool IsApplicable(const ExecutionContext&,
                       const miopen::conv::ProblemDescription&) const override;
 
@@ -2963,6 +2984,9 @@ struct MIOPEN_INTERNALS_EXPORT GemmWrwUniversal final : GemmWrwBase
                             const miopen::conv::ProblemDescription&) const override;
 
     bool MayNeedWorkspace() const override { return true; }
+
+    bool IsSlow(const ExecutionContext& context,
+                const miopen::conv::ProblemDescription& problem) const override;
 
     bool IsApplicable(const ExecutionContext&,
                       const miopen::conv::ProblemDescription&) const override;
@@ -4159,7 +4183,8 @@ struct PerformanceConfigHipImplicitGemmFwdXdlops
         : PerformanceConfigHipImplicitGemmFwdXdlops(0, "")
     {
     }
-    void HeuristicInit(const miopen::conv::ProblemDescription&);
+    void DefaultKernelFromList(const ExecutionContext& ctx);
+    void HeuristicInit(const ExecutionContext&, const miopen::conv::ProblemDescription&);
     bool SetNextValue(const miopen::conv::ProblemDescription&);
     bool IsValidValue() const;
     bool IsValid(const ExecutionContext&, const miopen::conv::ProblemDescription& problem) const
@@ -4239,7 +4264,8 @@ struct PerformanceConfigHipImplicitGemmBwdXdlops
         : PerformanceConfigHipImplicitGemmBwdXdlops(0, "")
     {
     }
-    void HeuristicInit(const miopen::conv::ProblemDescription&);
+    void DefaultKernelFromList(const ExecutionContext& ctx);
+    void HeuristicInit(const ExecutionContext&, const miopen::conv::ProblemDescription&);
     bool SetNextValue(const miopen::conv::ProblemDescription&);
     bool IsValidValue() const;
     bool IsValid(const ExecutionContext&, const miopen::conv::ProblemDescription& problem) const
@@ -4309,6 +4335,8 @@ struct PerformanceConfigHipImplicitGemmGroupFwdXdlops
         : PerformanceConfigHipImplicitGemmGroupFwdXdlops(0, "")
     {
     }
+
+    void DefaultKernelFromList(const ExecutionContext& ctx);
     MIOPEN_INTERNALS_EXPORT void HeuristicInit(const ExecutionContext&,
                                                const miopen::conv::ProblemDescription&);
     bool SetNextValue(const miopen::conv::ProblemDescription&);
@@ -4400,6 +4428,7 @@ struct PerformanceConfigHipImplicitGemm3DGroupFwdXdlops
         : PerformanceConfigHipImplicitGemm3DGroupFwdXdlops(0, "")
     {
     }
+    void DefaultKernelFromList(const ExecutionContext& ctx);
     MIOPEN_INTERNALS_EXPORT void HeuristicInit(const ExecutionContext&,
                                                const miopen::conv::ProblemDescription&);
     bool SetNextValue(const miopen::conv::ProblemDescription&);
@@ -4477,6 +4506,7 @@ struct PerformanceConfigHipImplicitGemm3DGroupWrwXdlops
         : PerformanceConfigHipImplicitGemm3DGroupWrwXdlops(0, "")
     {
     }
+    void DefaultKernelFromList(const ExecutionContext& ctx);
     void HeuristicInit(const ExecutionContext&, const miopen::conv::ProblemDescription&);
     bool SetNextValue(const miopen::conv::ProblemDescription&);
     bool IsValidValue() const;
@@ -4561,6 +4591,7 @@ struct PerformanceConfigHipImplicitGemm3DGroupBwdXdlops
         : PerformanceConfigHipImplicitGemm3DGroupBwdXdlops(0, "")
     {
     }
+    void DefaultKernelFromList(const ExecutionContext& ctx);
     void HeuristicInit(const ExecutionContext&, const miopen::conv::ProblemDescription&);
     bool SetNextValue(const miopen::conv::ProblemDescription&);
     bool IsValidValue() const;
@@ -4642,6 +4673,7 @@ struct PerformanceConfigHipImplicitGemmGroupBwdXdlops
     {
     }
 
+    void DefaultKernelFromList(const ExecutionContext& ctx);
     MIOPEN_INTERNALS_EXPORT void HeuristicInit(const ExecutionContext&,
                                                const miopen::conv::ProblemDescription&);
     bool SetNextValue(const miopen::conv::ProblemDescription&);
@@ -4738,6 +4770,8 @@ struct PerformanceConfigHipImplicitGemmGroupWrwXdlops
         : PerformanceConfigHipImplicitGemmGroupWrwXdlops(0, "")
     {
     }
+
+    void DefaultKernelFromList(const ExecutionContext& ctx);
     MIOPEN_INTERNALS_EXPORT void HeuristicInit(const ExecutionContext&,
                                                const miopen::conv::ProblemDescription&);
     bool SetNextValue(const miopen::conv::ProblemDescription&);
