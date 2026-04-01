@@ -224,9 +224,9 @@ float gemm_stage1(const GemmSplitKHostArgs& args, const ck_tile::stream_config& 
         std::cout << "Flushing cache..." << std::endl;
 
         ck_tile::HostTensor<ADataType> a_m(ck_tile::host_tensor_descriptor(
-            args.M, args.K, args.stride_A, is_row_major(ALayout{})));
+            args.M, args.K, args.stride_A, ck_tile::is_row_major(ALayout{})));
         ck_tile::HostTensor<BDataType> b_n(ck_tile::host_tensor_descriptor(
-            args.K, args.N, args.stride_B, is_row_major(BLayout{})));
+            args.K, args.N, args.stride_B, ck_tile::is_row_major(BLayout{})));
 
         auto size_a_buffer = a_m.get_element_space_size_in_bytes();
         auto size_b_buffer = b_n.get_element_space_size_in_bytes();
@@ -586,16 +586,16 @@ int run_gemm_example_with_layouts_two_stage(ck_tile::ArgParser& arg_parser,
 
     const bool preshuffle = GemmConfig::Preshuffle;
 
-    stride_A = ck_tile::get_default_stride(M, K, stride_A, is_row_major(a_layout));
-    stride_B = ck_tile::get_default_stride(K, N, stride_B, is_row_major(b_layout));
-    stride_C = ck_tile::get_default_stride(M, N, stride_C, is_row_major(CLayout{}));
+    stride_A = ck_tile::get_default_stride(M, K, stride_A, ck_tile::is_row_major(a_layout));
+    stride_B = ck_tile::get_default_stride(K, N, stride_B, ck_tile::is_row_major(b_layout));
+    stride_C = ck_tile::get_default_stride(M, N, stride_C, ck_tile::is_row_major(CLayout{}));
 
     ck_tile::HostTensor<ADataType> a_m_k(
-        ck_tile::host_tensor_descriptor(M, K, stride_A, is_row_major(a_layout)));
+        ck_tile::host_tensor_descriptor(M, K, stride_A, ck_tile::is_row_major(a_layout)));
     ck_tile::HostTensor<BDataType> b_k_n(
-        ck_tile::host_tensor_descriptor(K, N, stride_B, is_row_major(b_layout)));
+        ck_tile::host_tensor_descriptor(K, N, stride_B, ck_tile::is_row_major(b_layout)));
     ck_tile::HostTensor<CDataType> c_m_n_dev_result(
-        ck_tile::host_tensor_descriptor(M, N, stride_C, is_row_major(CLayout{})));
+        ck_tile::host_tensor_descriptor(M, N, stride_C, ck_tile::is_row_major(CLayout{})));
 
     if(init_method == 0)
     {
@@ -710,7 +710,7 @@ int run_gemm_example_with_layouts_two_stage(ck_tile::ArgParser& arg_parser,
     if(arg_parser.get_int("v") == 1)
     {
         ck_tile::HostTensor<CDataType> c_m_n_host_ref(
-            ck_tile::host_tensor_descriptor(M, N, stride_C, is_row_major(CLayout{})));
+            ck_tile::host_tensor_descriptor(M, N, stride_C, ck_tile::is_row_major(CLayout{})));
         c_m_n_host_ref.SetZero();
 
         ck_tile::reference_gemm<ADataType, BDataType, AccDataType, CDataType>(
@@ -745,7 +745,7 @@ int run_gemm_example_with_layouts_two_stage(ck_tile::ArgParser& arg_parser,
 
         // memory on host to store gpu reference result
         ck_tile::HostTensor<CDataType> c_m_n_gpu_ref(
-            ck_tile::host_tensor_descriptor(M, N, stride_C, is_row_major(CLayout{})));
+            ck_tile::host_tensor_descriptor(M, N, stride_C, ck_tile::is_row_major(CLayout{})));
         // memory on device to store gpu reference result
         ck_tile::DeviceMem c_m_n_gpu_buf_ref(c_m_n_gpu_ref.get_element_space_size_in_bytes());
 
