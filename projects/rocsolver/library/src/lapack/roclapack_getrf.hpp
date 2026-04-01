@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     December 2016
- * Copyright (C) 2019-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -520,18 +520,19 @@ rocblas_status getrf_panelLU(rocblas_handle handle,
         // update trailing sub-block
         if(k + jb < nn)
         {
-            rocsolver_trsm_lower<BATCHED, STRIDED, T>(
+            ROCBLAS_CHECK(rocsolver_trsm_lower<BATCHED, STRIDED, T>(
                 handle, rocblas_side_left, rocblas_operation_none, rocblas_diagonal_unit, jb,
                 nn - k - jb, A, shiftA + idx2D(k, k, inca, lda), inca, lda, strideA, A,
                 shiftA + idx2D(k, k + jb, inca, lda), inca, lda, strideA, batch_count, optim_mem,
-                work1, work2, work3, work4);
+                work1, work2, work3, work4));
 
             if(k + jb < mm)
-                rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, mm - k - jb,
-                               nn - k - jb, jb, &minone, A, shiftA + idx2D(k + jb, k, inca, lda),
-                               inca, lda, strideA, A, shiftA + idx2D(k, k + jb, inca, lda), inca,
-                               lda, strideA, &one, A, shiftA + idx2D(k + jb, k + jb, inca, lda),
-                               inca, lda, strideA, batch_count, (T**)nullptr);
+                ROCBLAS_CHECK(rocsolver_gemm(
+                    handle, rocblas_operation_none, rocblas_operation_none, mm - k - jb,
+                    nn - k - jb, jb, &minone, A, shiftA + idx2D(k + jb, k, inca, lda), inca, lda,
+                    strideA, A, shiftA + idx2D(k, k + jb, inca, lda), inca, lda, strideA, &one, A,
+                    shiftA + idx2D(k + jb, k + jb, inca, lda), inca, lda, strideA, batch_count,
+                    (T**)nullptr));
         }
     }
 
@@ -724,11 +725,13 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
                                                work4, optim_mem, pivotval, pivotidx, j, iipiv, m);
 
             // update remaining rows in outer panel
-            rocsolver_trsm_upper<BATCHED, STRIDED, T>(
-                handle, rocblas_side_right, rocblas_operation_none, rocblas_diagonal_non_unit,
-                m - j - jb, jb, A, shiftA + idx2D(j, j, inca, lda), inca, lda, strideA, A,
-                shiftA + idx2D(jb + j, j, inca, lda), inca, lda, strideA, batch_count, optim_mem,
-                work1, work2, work3, work4);
+            ROCBLAS_CHECK_WITH_POINTER_MODE(
+                handle, old_mode,
+                rocsolver_trsm_upper<BATCHED, STRIDED, T>(
+                    handle, rocblas_side_right, rocblas_operation_none, rocblas_diagonal_non_unit,
+                    m - j - jb, jb, A, shiftA + idx2D(j, j, inca, lda), inca, lda, strideA, A,
+                    shiftA + idx2D(jb + j, j, inca, lda), inca, lda, strideA, batch_count,
+                    optim_mem, work1, work2, work3, work4));
         }
 
         // update trailing matrix
@@ -737,19 +740,23 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
         nn = n - nextpiv; //size for the matrix update
         if(nextpiv < n)
         {
-            rocsolver_trsm_lower<BATCHED, STRIDED, T>(
-                handle, rocblas_side_left, rocblas_operation_none, rocblas_diagonal_unit, jb, nn, A,
-                shiftA + idx2D(j, j, inca, lda), inca, lda, strideA, A,
-                shiftA + idx2D(j, nextpiv, inca, lda), inca, lda, strideA, batch_count, optim_mem,
-                work1, work2, work3, work4);
+            ROCBLAS_CHECK_WITH_POINTER_MODE(
+                handle, old_mode,
+                rocsolver_trsm_lower<BATCHED, STRIDED, T>(
+                    handle, rocblas_side_left, rocblas_operation_none, rocblas_diagonal_unit, jb,
+                    nn, A, shiftA + idx2D(j, j, inca, lda), inca, lda, strideA, A,
+                    shiftA + idx2D(j, nextpiv, inca, lda), inca, lda, strideA, batch_count,
+                    optim_mem, work1, work2, work3, work4));
 
             if(nextpiv < m)
             {
-                rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, mm, nn, jb,
-                               &minone, A, shiftA + idx2D(nextpiv, j, inca, lda), inca, lda,
-                               strideA, A, shiftA + idx2D(j, nextpiv, inca, lda), inca, lda,
-                               strideA, &one, A, shiftA + idx2D(nextpiv, nextpiv, inca, lda), inca,
-                               lda, strideA, batch_count, (T**)nullptr);
+                ROCBLAS_CHECK_WITH_POINTER_MODE(
+                    handle, old_mode,
+                    rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, mm, nn,
+                                   jb, &minone, A, shiftA + idx2D(nextpiv, j, inca, lda), inca, lda,
+                                   strideA, A, shiftA + idx2D(j, nextpiv, inca, lda), inca, lda,
+                                   strideA, &one, A, shiftA + idx2D(nextpiv, nextpiv, inca, lda),
+                                   inca, lda, strideA, batch_count, (T**)nullptr));
             }
         }
     }

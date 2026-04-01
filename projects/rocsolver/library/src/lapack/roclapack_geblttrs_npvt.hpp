@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -170,10 +170,10 @@ rocblas_status rocsolver_geblttrs_npvt_template(rocblas_handle handle,
     for(rocblas_int k = 0; k < nblocks; k++)
     {
         if(k > 0)
-            rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, nb, nrhs, nb,
-                           &minone, A, shiftA + (k - 1) * bsa, inca, lda, strideA, X,
-                           shiftX + (k - 1) * bsx, incx, ldx, strideX, &one, X, shiftX + k * bsx,
-                           incx, ldx, strideX, batch_count, (T**)nullptr);
+            ROCBLAS_CHECK(rocsolver_gemm(
+                handle, rocblas_operation_none, rocblas_operation_none, nb, nrhs, nb, &minone, A,
+                shiftA + (k - 1) * bsa, inca, lda, strideA, X, shiftX + (k - 1) * bsx, incx, ldx,
+                strideX, &one, X, shiftX + k * bsx, incx, ldx, strideX, batch_count, (T**)nullptr));
 
         rocsolver_getrs_template<BATCHED, STRIDED, T>(
             handle, rocblas_operation_none, nb, nrhs, B, shiftB + k * bsb, incb, ldb, strideB,
@@ -184,10 +184,10 @@ rocblas_status rocsolver_geblttrs_npvt_template(rocblas_handle handle,
     // backward solve
     for(rocblas_int k = nblocks - 2; k >= 0; k--)
     {
-        rocsolver_gemm(handle, rocblas_operation_none, rocblas_operation_none, nb, nrhs, nb,
-                       &minone, C, shiftC + k * bsc, incc, ldc, strideC, X, shiftX + (k + 1) * bsx,
-                       incx, ldx, strideX, &one, X, shiftX + k * bsx, incx, ldx, strideX,
-                       batch_count, (T**)nullptr);
+        ROCBLAS_CHECK(rocsolver_gemm(
+            handle, rocblas_operation_none, rocblas_operation_none, nb, nrhs, nb, &minone, C,
+            shiftC + k * bsc, incc, ldc, strideC, X, shiftX + (k + 1) * bsx, incx, ldx, strideX,
+            &one, X, shiftX + k * bsx, incx, ldx, strideX, batch_count, (T**)nullptr));
     }
 
     return rocblas_status_success;
