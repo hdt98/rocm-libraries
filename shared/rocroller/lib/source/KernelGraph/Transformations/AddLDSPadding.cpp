@@ -375,6 +375,14 @@ namespace rocRoller
                 return;
             }
 
+            // Skip scale buffers for LDS padding in FP4 for correctness
+            if(maybeLayoutTypeAndDataType->second == DataType::E8M0)
+            {
+                Log::debug("KernelGraph::AddLDSPadding: skipping LDS tag {} (E8M0 scale buffer)",
+                           ldsTag);
+                return;
+            }
+
             auto const& [loadWidth, laneWidth]
                 = GetLoadAndLaneWidth(graph,
                                       ldsTag,

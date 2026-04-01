@@ -2,7 +2,7 @@
 #
 # MIT License
 #
-# Copyright (C) 2024-2026 AMD ROCm(TM) Software
+# Copyright 2024-2026 AMD ROCm(TM) Software
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -1416,6 +1416,8 @@ def fp4_target_d2lds_mi16x16x128_st32x8_pf2x1():
         loadScale_A="BufferToLDS",
         loadScale_B="BufferToLDS",
         storeLDS_D=False,
+        padLDS_A=1024,16,
+        padLDS_B=1024,16,
         prefetch=True,
         prefetchInFlight=2,
         prefetchLDSFactor=1,
