@@ -4,13 +4,6 @@
 #pragma once
 #include "ck_tile/host/gemm_rtol_atol.hpp"
 
-template <typename Layout>
-static constexpr inline auto is_row_major(Layout layout_)
-{
-    return ck_tile::bool_constant<std::is_same_v<ck_tile::remove_cvref_t<decltype(layout_)>,
-                                                 ck_tile::tensor_layout::gemm::RowMajor>>{};
-}
-
 template <typename GemmConfig,
           typename ADataType,
           typename AQDataType,
@@ -261,22 +254,22 @@ int run_abquant_grouped_gemm_example_with_layouts(
                 "K must be divisible by BQuantGroupSize::kK for ABQuantGrouped mode");
         }
 
-        stride_As[i]  = ck_tile::get_default_stride(M, K, stride_As[i], is_row_major(a_layout));
-        stride_Bs[i]  = ck_tile::get_default_stride(K, N, stride_Bs[i], is_row_major(b_layout));
-        stride_Cs[i]  = ck_tile::get_default_stride(M, N, stride_Cs[i], is_row_major(CLayout{}));
-        stride_AQs[i] = ck_tile::get_default_stride(M, AQK, stride_AQs[i], is_row_major(aq_layout));
-        stride_BQs[i] = ck_tile::get_default_stride(BQK, N, stride_BQs[i], is_row_major(bq_layout));
+        stride_As[i]  = ck_tile::get_default_stride(M, K, stride_As[i], ck_tile::is_row_major(a_layout));
+        stride_Bs[i]  = ck_tile::get_default_stride(K, N, stride_Bs[i], ck_tile::is_row_major(b_layout));
+        stride_Cs[i]  = ck_tile::get_default_stride(M, N, stride_Cs[i], ck_tile::is_row_major(CLayout{}));
+        stride_AQs[i] = ck_tile::get_default_stride(M, AQK, stride_AQs[i], ck_tile::is_row_major(aq_layout));
+        stride_BQs[i] = ck_tile::get_default_stride(BQK, N, stride_BQs[i], ck_tile::is_row_major(bq_layout));
 
         a_m_k_tensors.push_back(ck_tile::HostTensor<ADataType>(
-            ck_tile::host_tensor_descriptor(M, K, stride_As[i], is_row_major(a_layout))));
+            ck_tile::host_tensor_descriptor(M, K, stride_As[i], ck_tile::is_row_major(a_layout))));
         b_k_n_tensors.push_back(ck_tile::HostTensor<BDataType>(
-            ck_tile::host_tensor_descriptor(K, N, stride_Bs[i], is_row_major(b_layout))));
+            ck_tile::host_tensor_descriptor(K, N, stride_Bs[i], ck_tile::is_row_major(b_layout))));
         c_m_n_tensors.push_back(ck_tile::HostTensor<CDataType>(
-            ck_tile::host_tensor_descriptor(M, N, stride_Cs[i], is_row_major(CLayout{}))));
+            ck_tile::host_tensor_descriptor(M, N, stride_Cs[i], ck_tile::is_row_major(CLayout{}))));
         aq_tensors.push_back(ck_tile::HostTensor<AQDataType>(
-            ck_tile::host_tensor_descriptor(M, AQK, stride_AQs[i], is_row_major(aq_layout))));
+            ck_tile::host_tensor_descriptor(M, AQK, stride_AQs[i], ck_tile::is_row_major(aq_layout))));
         bq_tensors.push_back(ck_tile::HostTensor<BQDataType>(
-            ck_tile::host_tensor_descriptor(BQK, N, stride_BQs[i], is_row_major(bq_layout))));
+            ck_tile::host_tensor_descriptor(BQK, N, stride_BQs[i], ck_tile::is_row_major(bq_layout))));
 
         std::cout << "gemm[" << i << "]" << " a_m_k: " << a_m_k_tensors[i].mDesc
                   << " b_k_n: " << b_k_n_tensors[i].mDesc << " c_m_n: " << c_m_n_tensors[i].mDesc
@@ -384,7 +377,7 @@ int run_abquant_grouped_gemm_example_with_layouts(
         for(int i = 0; i < group_count; ++i)
         {
             ck_tile::HostTensor<CDataType> c_m_n_host_ref(ck_tile::host_tensor_descriptor(
-                Ms[i], Ns[i], stride_Cs[i], is_row_major(CLayout{})));
+                Ms[i], Ns[i], stride_Cs[i], ck_tile::is_row_major(CLayout{})));
             c_m_n_host_ref.SetZero();
 
             // Reference implementation for ABQuantGrouped

@@ -16,13 +16,6 @@ struct MultiplyMultiply
     }
 };
 
-template <typename Layout>
-static constexpr inline auto is_row_major(Layout layout_)
-{
-    return ck_tile::bool_constant<std::is_same_v<ck_tile::remove_cvref_t<decltype(layout_)>,
-                                                 ck_tile::tensor_layout::gemm::RowMajor>>{};
-}
-
 template <typename GemmConfig,
           typename ADataType,
           typename BDataType,
@@ -210,26 +203,26 @@ int run_grouped_gemm_multi_d_example_with_layouts(int argc,
         const ck_tile::index_t N = Ns[i];
         const ck_tile::index_t K = Ks[i];
 
-        stride_As[i] = ck_tile::get_default_stride(M, K, stride_As[i], is_row_major(a_layout));
-        stride_Bs[i] = ck_tile::get_default_stride(K, N, stride_Bs[i], is_row_major(b_layout));
+        stride_As[i] = ck_tile::get_default_stride(M, K, stride_As[i], ck_tile::is_row_major(a_layout));
+        stride_Bs[i] = ck_tile::get_default_stride(K, N, stride_Bs[i], ck_tile::is_row_major(b_layout));
 
-        stride_D0[i] = ck_tile::get_default_stride(M, N, stride_D0[i], is_row_major(d0_layout));
-        stride_D1[i] = ck_tile::get_default_stride(M, N, stride_D1[i], is_row_major(d1_layout));
+        stride_D0[i] = ck_tile::get_default_stride(M, N, stride_D0[i], ck_tile::is_row_major(d0_layout));
+        stride_D1[i] = ck_tile::get_default_stride(M, N, stride_D1[i], ck_tile::is_row_major(d1_layout));
 
-        stride_Es[i] = ck_tile::get_default_stride(M, N, stride_Es[i], is_row_major(e_layout));
+        stride_Es[i] = ck_tile::get_default_stride(M, N, stride_Es[i], ck_tile::is_row_major(e_layout));
 
         a_m_k_tensors.push_back(ck_tile::HostTensor<ADataType>(
-            ck_tile::host_tensor_descriptor(M, K, stride_As[i], is_row_major(a_layout))));
+            ck_tile::host_tensor_descriptor(M, K, stride_As[i], ck_tile::is_row_major(a_layout))));
         b_k_n_tensors.push_back(ck_tile::HostTensor<BDataType>(
-            ck_tile::host_tensor_descriptor(K, N, stride_Bs[i], is_row_major(b_layout))));
+            ck_tile::host_tensor_descriptor(K, N, stride_Bs[i], ck_tile::is_row_major(b_layout))));
 
         d0_m_n_tensors.push_back(ck_tile::HostTensor<D0DataType>(
-            ck_tile::host_tensor_descriptor(M, N, stride_D0[i], is_row_major(d0_layout))));
+            ck_tile::host_tensor_descriptor(M, N, stride_D0[i], ck_tile::is_row_major(d0_layout))));
         d1_m_n_tensors.push_back(ck_tile::HostTensor<D1DataType>(
-            ck_tile::host_tensor_descriptor(M, N, stride_D1[i], is_row_major(d1_layout))));
+            ck_tile::host_tensor_descriptor(M, N, stride_D1[i], ck_tile::is_row_major(d1_layout))));
 
         e_m_n_tensors.push_back(ck_tile::HostTensor<EDataType>(
-            ck_tile::host_tensor_descriptor(M, N, stride_Es[i], is_row_major(e_layout))));
+            ck_tile::host_tensor_descriptor(M, N, stride_Es[i], ck_tile::is_row_major(e_layout))));
 
         std::cout << "gemm[" << i << "]" << " a_m_k: " << a_m_k_tensors[i].mDesc
                   << " b_k_n: " << b_k_n_tensors[i].mDesc << " d0_m_n: " << d0_m_n_tensors[i].mDesc
@@ -324,7 +317,7 @@ int run_grouped_gemm_multi_d_example_with_layouts(int argc,
         for(int i = 0; i < group_count; ++i)
         {
             e_m_n_host_refs.push_back(ck_tile::HostTensor<EDataType>(
-                host_tensor_descriptor(Ms[i], Ns[i], stride_Es[i], is_row_major(e_layout))));
+                host_tensor_descriptor(Ms[i], Ns[i], stride_Es[i], ck_tile::is_row_major(e_layout))));
 
             e_m_n_host_refs[i].SetZero();
 
