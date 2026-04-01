@@ -97,6 +97,45 @@ ConvFwdOddC        // Odd input channel count (C not divisible by vector width)
 - Larger BlockSize (128 vs 64) makes it worse (~20.7 TFlops) due to fewer blocks and less parallelism.
 - The shape is limited by memory bandwidth; no XDL kernel variant meaningfully exceeds 22 TFlops.
 
+### Rule 5: K=3, G=1 shapes have an irreducible low TFLOPs ceiling
+**Shapes:** C=96, K=3, G=1, 3D conv with filter 3×3×3 (all pad/spatial variants in WAN i2v set)
+- N_gemm = K = 3, which is far smaller than NPerXDL = 32. The MFMA instruction wastes 29/32 of its N capacity.
+- G = 1 means group merging (NumGroupsToMerge > 1) is inapplicable.
+- Total FLOPs is only ~1–3 GFLOPs per shape; at ~700–900 GB/s the kernel is already near the memory BW ceiling.
+- **No XDL kernel tuning can materially improve TFLOPs for this class.** Mark as irreducible and skip.
+
+### Rule 6: CDEBlockTransferClusterLengths formula for standard CShuffle
+**Parameters affected:** CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock, CDEBlockTransferScalarPerVector_NPerBlock
+**Rule:** The cluster and scalar vector must satisfy `S<1, A, 1, B>` where:
+- `A = CShuffleMTile / thread_slice_M`, `B = CShuffleNTile / ScalarPerVector`
+- `A × B = BlockSize` (cluster product equals block size)
+- `thread_slice_M = CShuffleMTile / A` must be a positive integer
+- `ScalarPerVector = CShuffleNTile / B` must be a positive integer and divide K
+- `CShuffleMTile = CShuffleMXdlPerWavePerShuffle × MWave × MPerXDL`
+- `CShuffleNTile = CShuffleNXdlPerWavePerShuffle × NWave × NPerXDL`
+- `MWave = MPerBlock / (MXdlPerWave × MPerXDL)`, `NWave = NPerBlock / (NXdlPerWave × NPerXDL)`
+
+**Derivation:** From static_assert in thread_group_tensor_slice_transfer_v7.hpp:
+`SliceLengths == thread_slice_lengths * ThreadClusterLengths`
+where SliceLengths = `S<1, CShuffleMTile, 1, CShuffleNTile>`.
+
+**Example (16×16 MFMA, BlockSize=64, MPerXDL=NPerXDL=16, MWave=NWave=1, CShuffleXdl=1):**
+- CShuffleMTile=16, CShuffleNTile=16. A×B=64. Valid: S<1,16,1,4>/ScalarPerVector=4.
+- S<1,32,1,2>/ScalarPerVector=8 FAILS: thread_slice_M=16/32=0.5 (not integer).
+
+### Rule 7: V3 kernel rejects shapes where AK0 × M × AK1 × sizeof(A) > 2 GB
+**Check:** `AreDescriptorsSmallerThan2GB()` in V3 validates the logical A-descriptor size
+= (K_gemm / AK1) × M_gemm × AK1 × sizeof(ADataType) = K_gemm × M_gemm × sizeof(ADataType) ≤ 2 GB.
+**Examples:**
+- C=192, D=3, H=554 (M=229632, K_gemm=5184): 229632 × 5184 × 2 = 2.38 GB → V3 REJECTED
+- C=384, D=3, H=278 (M=57408, K_gemm=10368): 57408 × 10368 × 2 = 1.19 GB → V3 accepted
+**Workaround:** For shapes exceeding 2 GB (typically large C or large spatial with small D_out),
+use `DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle` (standard CShuffle). Double buffering
+(NumGemmKPrefetchStage=2, DoubleBuffer=true) can be added but measured marginal improvement
+vs the single-buffer version for this shape class.
+**Note:** The `DeviceGroupedConvFwdMultipleD_Xdl_CShuffle_Large_Tensor` variant exists
+specifically for large-tensor shapes and does NOT have this 2 GB limit.
+
 ---
 
 ## How to Add a Rule
