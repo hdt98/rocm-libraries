@@ -470,12 +470,17 @@ struct GridwiseBatchedGemmMultipleDSoftmaxGemm_Xdl_CShuffle
     __device__ static auto GetGemm0WaveMNIdx(const index_t thread_id)
     {
         constexpr auto WaveSize = MfmaSelector<FloatAB, MPerXdl, NPerXdl>::selected_mfma.wave_size;
+#if defined(__gfx13__)
+        constexpr index_t NumNInput = WaveSize / MPerXdl;
+        return make_multi_index(thread_id / NumNInput, thread_id % NumNInput);
+#else
         constexpr auto wave_threadid_to_mn_idx_adaptor = make_single_stage_tensor_adaptor(
             make_tuple(make_merge_transform(make_tuple(WaveSize / MPerXdl, MPerXdl))),
             make_tuple(Sequence<0, 1>{}),
             make_tuple(Sequence<0>{}));
 
         return wave_threadid_to_mn_idx_adaptor.CalculateBottomIndex(make_multi_index(thread_id));
+#endif
     }
 
     static constexpr auto MakeD0sGridPointer()
@@ -825,6 +830,43 @@ struct GridwiseBatchedGemmMultipleDSoftmaxGemm_Xdl_CShuffle
         const auto wave_id     = GetGemm0WaveIdx();
         const auto wave_m_n_id = GetGemm0WaveMNIdx(wave_id[I2]); // I2: 0~63
 
+#if defined(__gfx13__)
+        auto d0s_threadwise_copy = generate_tuple(
+            [&](auto i) {
+                using D0DataType = remove_cvref_t<tuple_element_t<i.value, D0sDataType>>;
+                return ThreadwiseTensorSliceTransfer_v2<
+                    D0DataType,
+                    D0DataType,
+                    decltype(d0s_griddesc_m0_n0_m1_n1_m2_n2_m3_n3_n4_n5[i]),
+                    decltype(d0_thread_desc_m0_n0_m1_n1_m2_n2_m3_n3_n4_n5),
+                    Sequence<I1, // MBlockId
+                             I1, // NBlockID
+                             m0, // MRepeat
+                             n0, // NRepeat
+                             m1, // MWaveId
+                             n1, // NWaveId
+                             m2, // MPerXdl
+                             n2, // NGroupNum
+                             n3, // NInputNum
+                             n4>,
+                    Sequence<0, 1, 2, 3, 4, 5, 6, 7, 8, 9>,
+                    9,
+                    2, // D0sTransferSrcScalarPerVector,
+                    1,
+                    false>(d0s_griddesc_m0_n0_m1_n1_m2_n2_m3_n3_n4_n5[i],
+                           make_multi_index(block_work_idx[I0], // MBlockId
+                                            0,                  // NBlockId
+                                            0,                  // mrepeat
+                                            0,                  // nrepeat
+                                            wave_id[I0],        // MWaveId
+                                            wave_id[I1],        // NWaveId
+                                            wave_m_n_id[I0],    // MPerXdl
+                                            0,                  // group
+                                            wave_m_n_id[I1],    // NInputIndex
+                                            0));                // register number
+            },
+            Number<NumD0Tensor>{});
+#else
         auto d0s_threadwise_copy = generate_tuple(
             [&](auto i) {
                 using D0DataType = remove_cvref_t<tuple_element_t<i.value, D0sDataType>>;
@@ -860,6 +902,7 @@ struct GridwiseBatchedGemmMultipleDSoftmaxGemm_Xdl_CShuffle
                                             0));                // register number
             },
             Number<NumD0Tensor>{});
+#endif
         // acc_thread_desc_m0_n0_m1_n1_m2_n2_n3_n4 to acc_thread_desc_k0_m_k1
         // n0_n1_n2_n3 -> k0
         // m0_m1_m2 -> m
@@ -1020,7 +1063,18 @@ struct GridwiseBatchedGemmMultipleDSoftmaxGemm_Xdl_CShuffle
         constexpr auto tn2 = thread_cluster_m0_n0_m1_n1_m2_n2_n3_n4.At(I5);
         constexpr auto tn3 = thread_cluster_m0_n0_m1_n1_m2_n2_n3_n4.At(I6);
         constexpr auto tn4 = thread_cluster_m0_n0_m1_n1_m2_n2_n3_n4.At(I7);
-
+#if(defined(__gfx13__))
+        constexpr auto m0_n_m1_to_m_n_adaptor = make_single_stage_tensor_adaptor(
+            make_tuple(make_unmerge_transform(make_tuple(tm0 * tm1, tm2)),
+                       make_unmerge_transform(make_tuple(tn0 * tn1 * tn2, tn3 * tn4))),
+            make_tuple(Sequence<0>{}, Sequence<1>{}),
+            make_tuple(Sequence<0, 2>{}, Sequence<1, 3>{}));
+        constexpr auto threadid_to_m0_n_m1_adaptor = make_single_stage_tensor_adaptor(
+            make_tuple(
+                make_merge_transform(make_tuple(tm0 * tm1, tn0 * tn1 * tn2, tm2, tn3 * tn4))),
+            make_tuple(Sequence<0, 1, 2, 3>{}),
+            make_tuple(Sequence<0>{}));
+#else
         // get acc0 thread map
         constexpr auto m0_n_m1_to_m_n_adaptor = make_single_stage_tensor_adaptor(
             make_tuple(make_unmerge_transform(make_tuple(tm0 * tm1, tm2)),
@@ -1032,6 +1086,7 @@ struct GridwiseBatchedGemmMultipleDSoftmaxGemm_Xdl_CShuffle
                 make_merge_transform(make_tuple(tm0 * tm1, tn0 * tn1 * tn2 * tn3 * tn4, tm2))),
             make_tuple(Sequence<0, 1, 2>{}),
             make_tuple(Sequence<0>{}));
+#endif
         const auto threadid_to_m_n_thread_cluster_adaptor =
             chain_tensor_adaptors(m0_n_m1_to_m_n_adaptor, threadid_to_m0_n_m1_adaptor);
 

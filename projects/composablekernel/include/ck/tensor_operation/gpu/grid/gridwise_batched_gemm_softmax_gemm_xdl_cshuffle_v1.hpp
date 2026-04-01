@@ -876,7 +876,18 @@ struct GridwiseBatchedGemmSoftmaxGemm_Xdl_CShuffle
         constexpr auto tn2 = thread_cluster_m0_n0_m1_n1_m2_n2_n3_n4.At(I5);
         constexpr auto tn3 = thread_cluster_m0_n0_m1_n1_m2_n2_n3_n4.At(I6);
         constexpr auto tn4 = thread_cluster_m0_n0_m1_n1_m2_n2_n3_n4.At(I7);
-
+#if(defined(__gfx13__))
+        constexpr auto m0_n_m1_to_m_n_adaptor = make_single_stage_tensor_adaptor(
+            make_tuple(make_unmerge_transform(make_tuple(tm0 * tm1, tm2)),
+                       make_unmerge_transform(make_tuple(tn0 * tn1 * tn2, tn3 * tn4))),
+            make_tuple(Sequence<0>{}, Sequence<1>{}),
+            make_tuple(Sequence<0, 2>{}, Sequence<1, 3>{}));
+        constexpr auto threadid_to_m0_n_m1_adaptor = make_single_stage_tensor_adaptor(
+            make_tuple(
+                make_merge_transform(make_tuple(tm0 * tm1, tn0 * tn1 * tn2, tm2, tn3 * tn4))),
+            make_tuple(Sequence<0, 1, 2, 3>{}),
+            make_tuple(Sequence<0>{}));
+#else
         // get acc0 thread map
         constexpr auto m0_n_m1_to_m_n_adaptor = make_single_stage_tensor_adaptor(
             make_tuple(make_unmerge_transform(make_tuple(tm0 * tm1, tm2)),
@@ -888,6 +899,7 @@ struct GridwiseBatchedGemmSoftmaxGemm_Xdl_CShuffle
                 make_merge_transform(make_tuple(tm0 * tm1, tn0 * tn1 * tn2 * tn3 * tn4, tm2))),
             make_tuple(Sequence<0, 1, 2>{}),
             make_tuple(Sequence<0>{}));
+#endif
         const auto threadid_to_m_n_thread_cluster_adaptor =
             chain_tensor_adaptors(m0_n_m1_to_m_n_adaptor, threadid_to_m0_n_m1_adaptor);
 
@@ -1106,11 +1118,18 @@ struct GridwiseBatchedGemmSoftmaxGemm_Xdl_CShuffle
                     auto I = Number<c_thread_slice_desc_m_n.CalculateOffset(make_tuple(iM, iN))>{};
                     FloatGemmAcc acc1 = acc1_thread_buf[I]; // P*V
                     FloatGemmAcc c    = c_thread_buf[I];    // O
+
+                    const FloatGemmAcc running_sum_old = running_sum[iM];
+                    const FloatGemmAcc running_max_old = running_max[iM];
+                    const FloatGemmAcc running_sum_den = running_sum_new[iM];
+                    const FloatGemmAcc running_max_cur = running_max_new[iM];
+                    const FloatGemmAcc max_cur         = max[iM];
+
                     FloatGemmAcc c_new =
-                        (running_sum[iM] * math::exp(running_max[iM] - running_max_new[iM]) * c +
-                         math::exp(max[iM] - running_max_new[iM]) * acc1) /
-                        running_sum_new[iM]; // Formula by Dao et al.,
-                                             // https://arxiv.org/pdf/2205.14135v2.pdf section 3.1
+                        (running_sum_old * math::exp(running_max_old - running_max_cur) * c +
+                         math::exp(max_cur - running_max_cur) * acc1) /
+                        running_sum_den; // Formula by Dao et al.,
+                                         // https://arxiv.org/pdf/2205.14135v2.pdf section 3.1
 
                     c_thread_buf(I) = c_new; // O_new
                 });
