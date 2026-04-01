@@ -500,6 +500,9 @@ def Tensile(userArgs):
                  "First run using this flag, then rerun with --use-cache.")
     argParser.add_argument("--restore-from-log", type=str, dest="RestoreLog",
             help="A log file captured in previous tuning. ONLY RELIABLE when configs yaml not changes")
+    argParser.add_argument("--gpu-targets", dest="gpuTargets", default=None,
+            help="Semicolon-separated GPU targets (e.g. gfx942). "
+                 "Overrides ISA auto-detection and YAML config ISA.")
 
     addCommonArguments(argParser)
     args = argParser.parse_args(userArgs)
@@ -602,11 +605,16 @@ def Tensile(userArgs):
 
     cxxCompiler, \
     cCompiler, \
-    offloadBundler, \
-    enumerator = validateToolchain(args.CxxCompiler,
-                                   args.CCompiler,
-                                   args.OffloadBundler,
-                                   ToolchainDefaults.DEVICE_ENUMERATOR if args.rocm_agent_enumerator is None else args.rocm_agent_enumerator)
+    offloadBundler = validateToolchain(args.CxxCompiler,
+                                       args.CCompiler,
+                                       args.OffloadBundler)
+
+    if args.gpuTargets:
+        enumerator = None
+    else:
+        device_enum = args.rocm_agent_enumerator if args.rocm_agent_enumerator is not None else args.DeviceEnumerator
+        enumerator = validateToolchain(device_enum)
+
     asmToolchain = makeAssemblyToolchain(
         cxxCompiler,
         offloadBundler,
@@ -618,9 +626,19 @@ def Tensile(userArgs):
         offloadBundler,
     )
 
-    if "ISA" in config["GlobalParameters"]:
+    if args.gpuTargets:
+        from Tensile.Common.Architectures import gfxToIsa
+        isaList = []
+        for arch in args.gpuTargets.split(";"):
+            arch = arch.strip()
+            if not arch:
+                continue
+            isa = gfxToIsa(arch)
+            if isa is None:
+                printExit(f"Unrecognized GPU target: '{arch}'")
+            isaList.append(isa)
+    elif "ISA" in config["GlobalParameters"]:
         isaList = [IsaVersion(isa[0], isa[1], isa[2]) for isa in config["GlobalParameters"]["ISA"]]
-
     else:
         isaList = [detectGlobalCurrentISA(device_id, enumerator)]
 
