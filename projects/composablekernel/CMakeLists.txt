@@ -675,6 +675,7 @@ option(BUILD_CK_DEVICE_INSTANCES "Build device operation instances in library/" 
 option(BUILD_CK_PROFILER "Build the CK profiler in profiler/" ON)
 option(BUILD_CK_TILE_ENGINE_TESTS "Build tile engine tests (gemm_tile_engine and gemm_streamk_tile_engine)" ON)
 option(BUILD_CK_TILE_FMHA_TESTS "Build FMHA tests" ON)
+option(BUILD_CK_TILE_CSHUFFLE_LDS_BENCHMARKS "Build CShuffleLds microbenchmarks (requires BUILD_CK_EXAMPLES=ON)" OFF)
 
 if(BUILD_CK_DEVICE_INSTANCES)
     # Optimization: Search only in library/src where all instance files actually live
