@@ -16165,11 +16165,6 @@ class KernelWriterAssembly(KernelWriter):
     if not self.isPrefetchAcrossPersistentEnabled(kernel):
       return module
 
-    # Snapshot MUST be unconditional: the store path always reads Prev*
-    # when isPrefetchAcrossPersistentEnabled is true.  If skipped, Prev* == live (correct).
-    # If it runs, Prev* preserves the current tile while live advances.
-    module.add(self.prefetchAcrossPersistentSnapshot(kernel))
-
     skipLabel = Label(self.labels.getNameInc("SK_SkipNllPAP"), "")
     # Parallel reduction (no synchronizer): WGs do not advance across tiles
     module.add(SCmpEQU64(src0=sgpr("AddressFlags", 2), src1=hex(0), comment="Parallel reduction: skip PAP"))
@@ -16181,7 +16176,7 @@ class KernelWriterAssembly(KernelWriter):
 
     skComponent = Component.StreamK.find(self)
     module.add(skComponent.prefetchAcrossPersistentSetupNextTile(self, kernel, tensorParametersA, tensorParametersB, skipLroReset=True))
-    module.add(self.setupNewTile(kernel, tensorParametersA, tensorParametersB, isOptNLL=True, isPrefetchAcrossPersistentActive=True))
+    module.add(self.setupNewTile(kernel, tensorParametersA, tensorParametersB, isOptNLL=True, forPrefetchAcrossPersistent=True))
     module.add(skipLabel)
     return module
 
