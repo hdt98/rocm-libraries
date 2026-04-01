@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -330,6 +330,16 @@ constexpr auto rocblas2string_status(rocblas_status status)
         if(_status != rocblas_status_success)   \
             return _status;                     \
     }
+#define ROCBLAS_CHECK_WITH_POINTER_MODE(handle, old_mode, ...) \
+    do                                                         \
+    {                                                          \
+        rocblas_status _status = (__VA_ARGS__);                \
+        if(_status != rocblas_status_success)                  \
+        {                                                      \
+            rocblas_set_pointer_mode(handle, old_mode);        \
+            return _status;                                    \
+        }                                                      \
+    } while(0)
 #define THROW_IF_ROCBLAS_ERROR(...)             \
     {                                           \
         rocblas_status _status = (__VA_ARGS__); \
