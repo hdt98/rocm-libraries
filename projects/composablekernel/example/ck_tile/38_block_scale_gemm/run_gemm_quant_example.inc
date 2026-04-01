@@ -262,9 +262,9 @@ float gemm_calc_quant(const ck_tile::QuantGemmHostArgs& args, const ck_tile::str
             std::cout << "Flushing cache..." << std::endl;
 
             ck_tile::HostTensor<typename TypeConfig::ADataType> a_m(ck_tile::host_tensor_descriptor(
-                args.M, args.K, args.stride_A, is_row_major(ALayout{})));
+                args.M, args.K, args.stride_A, ck_tile::is_row_major(ALayout{})));
             ck_tile::HostTensor<typename TypeConfig::BDataType> b_n(ck_tile::host_tensor_descriptor(
-                args.K, args.N, args.stride_B, is_row_major(BLayout{})));
+                args.K, args.N, args.stride_B, ck_tile::is_row_major(BLayout{})));
 
             auto size_a_buffer = a_m.get_element_space_size_in_bytes();
             auto size_b_buffer = b_n.get_element_space_size_in_bytes();
@@ -497,30 +497,30 @@ int run_gemm_example_with_layouts(const ck_tile::ArgParser& arg_parser,
     bool flush_cache             = arg_parser.get_bool("flush_cache");
     int rotating_count           = arg_parser.get_int("rotating_count");
 
-    stride_A = ck_tile::get_default_stride(M, K, stride_A, is_row_major(a_layout));
-    stride_B = ck_tile::get_default_stride(K, N, stride_B, is_row_major(b_layout));
-    stride_C = ck_tile::get_default_stride(M, N, stride_C, is_row_major(CLayout{}));
+    stride_A = ck_tile::get_default_stride(M, K, stride_A, ck_tile::is_row_major(a_layout));
+    stride_B = ck_tile::get_default_stride(K, N, stride_B, ck_tile::is_row_major(b_layout));
+    stride_C = ck_tile::get_default_stride(M, N, stride_C, ck_tile::is_row_major(CLayout{}));
 
     // Conditional stride calculation based on QuantMode
     if constexpr(QuantMode == ck_tile::QuantType::AQuantGrouped)
     {
-        stride_AQ = ck_tile::get_default_stride(M, AQK, stride_AQ, is_row_major(aq_layout));
+        stride_AQ = ck_tile::get_default_stride(M, AQK, stride_AQ, ck_tile::is_row_major(aq_layout));
         stride_BQ = 0; // No B quantization
     }
     else if constexpr(QuantMode == ck_tile::QuantType::BQuantGrouped)
     {
         stride_AQ = 0; // No A quantization
-        stride_BQ = ck_tile::get_default_stride(BQK, BQN, stride_BQ, is_row_major(bq_layout));
+        stride_BQ = ck_tile::get_default_stride(BQK, BQN, stride_BQ, ck_tile::is_row_major(bq_layout));
     }
     else if constexpr(QuantMode == ck_tile::QuantType::ABQuantGrouped)
     {
-        stride_AQ = ck_tile::get_default_stride(M, AQK, stride_AQ, is_row_major(aq_layout));
-        stride_BQ = ck_tile::get_default_stride(BQK, BQN, stride_BQ, is_row_major(bq_layout));
+        stride_AQ = ck_tile::get_default_stride(M, AQK, stride_AQ, ck_tile::is_row_major(aq_layout));
+        stride_BQ = ck_tile::get_default_stride(BQK, BQN, stride_BQ, ck_tile::is_row_major(bq_layout));
     }
     else if constexpr(QuantMode == ck_tile::QuantType::RowColQuant)
     {
-        stride_AQ = ck_tile::get_default_stride(M, 1, stride_AQ, is_row_major(aq_layout));
-        stride_BQ = ck_tile::get_default_stride(1, N, stride_BQ, is_row_major(bq_layout));
+        stride_AQ = ck_tile::get_default_stride(M, 1, stride_AQ, ck_tile::is_row_major(aq_layout));
+        stride_BQ = ck_tile::get_default_stride(1, N, stride_BQ, ck_tile::is_row_major(bq_layout));
     }
     else if constexpr(QuantMode == ck_tile::QuantType::TensorQuant)
     {
@@ -529,11 +529,11 @@ int run_gemm_example_with_layouts(const ck_tile::ArgParser& arg_parser,
     }
 
     ck_tile::HostTensor<ADataType> a_m_k(
-        ck_tile::host_tensor_descriptor(M, K, stride_A, is_row_major(a_layout)));
+        ck_tile::host_tensor_descriptor(M, K, stride_A, ck_tile::is_row_major(a_layout)));
     ck_tile::HostTensor<BDataType> b_k_n(
-        ck_tile::host_tensor_descriptor(K, N, stride_B, is_row_major(b_layout)));
+        ck_tile::host_tensor_descriptor(K, N, stride_B, ck_tile::is_row_major(b_layout)));
     ck_tile::HostTensor<CDataType> c_m_n_dev_result(
-        ck_tile::host_tensor_descriptor(M, N, stride_C, is_row_major(CLayout{})));
+        ck_tile::host_tensor_descriptor(M, N, stride_C, ck_tile::is_row_major(CLayout{})));
 
     // Create AQ tensor with appropriate shape
     std::unique_ptr<ck_tile::HostTensor<AQDataType>> aq_tensor_ptr = nullptr;
@@ -542,12 +542,12 @@ int run_gemm_example_with_layouts(const ck_tile::ArgParser& arg_parser,
                  QuantMode == ck_tile::QuantType::RowColQuant)
     {
         aq_tensor_ptr = std::make_unique<ck_tile::HostTensor<AQDataType>>(
-            ck_tile::host_tensor_descriptor(M, AQK, stride_AQ, is_row_major(aq_layout)));
+            ck_tile::host_tensor_descriptor(M, AQK, stride_AQ, ck_tile::is_row_major(aq_layout)));
     }
     else if constexpr(QuantMode == ck_tile::QuantType::TensorQuant)
     {
         aq_tensor_ptr = std::make_unique<ck_tile::HostTensor<AQDataType>>(
-            ck_tile::host_tensor_descriptor(1, 1, stride_AQ, is_row_major(aq_layout)));
+            ck_tile::host_tensor_descriptor(1, 1, stride_AQ, ck_tile::is_row_major(aq_layout)));
     }
 
     // Create BQ tensor with appropriate shape
@@ -558,7 +558,7 @@ int run_gemm_example_with_layouts(const ck_tile::ArgParser& arg_parser,
                  QuantMode == ck_tile::QuantType::TensorQuant)
     {
         bq_tensor_ptr = std::make_unique<ck_tile::HostTensor<BQDataType>>(
-            ck_tile::host_tensor_descriptor(BQK, BQN, stride_BQ, is_row_major(bq_layout)));
+            ck_tile::host_tensor_descriptor(BQK, BQN, stride_BQ, ck_tile::is_row_major(bq_layout)));
     }
 
     std::mt19937 gen(42);
@@ -842,7 +842,7 @@ int run_gemm_example_with_layouts(const ck_tile::ArgParser& arg_parser,
         std::cout << "Performing CPU verification..." << std::endl;
 
         ck_tile::HostTensor<CDataType> c_m_n_host_ref(
-            ck_tile::host_tensor_descriptor(M, N, stride_C, is_row_major(CLayout{})));
+            ck_tile::host_tensor_descriptor(M, N, stride_C, ck_tile::is_row_major(CLayout{})));
         c_m_n_host_ref.SetZero();
 
         // Track start time for reference operation

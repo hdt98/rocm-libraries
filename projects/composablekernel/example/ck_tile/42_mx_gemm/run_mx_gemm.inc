@@ -82,18 +82,18 @@ int run_mx_gemm_with_layouts(int argc, char* argv[], ALayout, BLayout, CLayout)
     // Use get_default_stride helper for automatic leading dimension calculation (only if not
     // explicitly provided)
     if(stride_A == 0)
-        stride_A = ck_tile::get_default_stride(M, K, 0, is_row_major(ALayout{}));
+        stride_A = ck_tile::get_default_stride(M, K, 0, ck_tile::is_row_major(ALayout{}));
     if(stride_B == 0)
-        stride_B = ck_tile::get_default_stride(K, N, 0, is_row_major(BLayout{}));
+        stride_B = ck_tile::get_default_stride(K, N, 0, ck_tile::is_row_major(BLayout{}));
     if(stride_C == 0)
-        stride_C = ck_tile::get_default_stride(M, N, 0, is_row_major(CLayout{}));
+        stride_C = ck_tile::get_default_stride(M, N, 0, ck_tile::is_row_major(CLayout{}));
 
     ck_tile::HostTensor<ADataType> a_host(
-        ck_tile::host_tensor_descriptor(M, K, stride_A, is_row_major(ALayout{})));
+        ck_tile::host_tensor_descriptor(M, K, stride_A, ck_tile::is_row_major(ALayout{})));
     ck_tile::HostTensor<BDataType> b_host(
-        ck_tile::host_tensor_descriptor(K, N, stride_B, is_row_major(BLayout{})));
+        ck_tile::host_tensor_descriptor(K, N, stride_B, ck_tile::is_row_major(BLayout{})));
     ck_tile::HostTensor<CDataType> c_host(
-        ck_tile::host_tensor_descriptor(M, N, stride_C, is_row_major(CLayout{})));
+        ck_tile::host_tensor_descriptor(M, N, stride_C, ck_tile::is_row_major(CLayout{})));
 
     // Scale tensors - follow parent matrix layouts for optimal memory access
     // A scales: [M, K/32] with A's layout
@@ -103,14 +103,14 @@ int run_mx_gemm_with_layouts(int argc, char* argv[], ALayout, BLayout, CLayout)
 
     // Follow A/BLayout to get the layouts for the scale tensors
     ck_tile::index_t stride_scale_a =
-        ck_tile::get_default_stride(M, scale_k_size, 0, is_row_major(ALayout{}));
+        ck_tile::get_default_stride(M, scale_k_size, 0, ck_tile::is_row_major(ALayout{}));
     ck_tile::index_t stride_scale_b =
-        ck_tile::get_default_stride(scale_k_size, N, 0, is_row_major(BLayout{}));
+        ck_tile::get_default_stride(scale_k_size, N, 0, ck_tile::is_row_major(BLayout{}));
 
     ck_tile::HostTensor<ScaleType> scale_a_host(
-        ck_tile::host_tensor_descriptor(M, scale_k_size, stride_scale_a, is_row_major(ALayout{})));
+        ck_tile::host_tensor_descriptor(M, scale_k_size, stride_scale_a, ck_tile::is_row_major(ALayout{})));
     ck_tile::HostTensor<ScaleType> scale_b_host(
-        ck_tile::host_tensor_descriptor(scale_k_size, N, stride_scale_b, is_row_major(BLayout{})));
+        ck_tile::host_tensor_descriptor(scale_k_size, N, stride_scale_b, ck_tile::is_row_major(BLayout{})));
     int seed = 1234;
     switch(init_method)
     {
@@ -213,7 +213,7 @@ int run_mx_gemm_with_layouts(int argc, char* argv[], ALayout, BLayout, CLayout)
 
         // compute reference
         ck_tile::HostTensor<CDataType> c_m_n_host_ref(
-            ck_tile::host_tensor_descriptor(M, N, stride_C, is_row_major(CLayout{})));
+            ck_tile::host_tensor_descriptor(M, N, stride_C, ck_tile::is_row_major(CLayout{})));
         c_m_n_host_ref.SetZero();
 
         ck_tile::reference_mx_gemm<ADataType, BDataType, ScaleType, AccDataType, CDataType>(
