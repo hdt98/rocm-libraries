@@ -153,9 +153,9 @@ float invoke_gemm(ck_tile::DeviceMem& a_m_k_dev_buf,
 
 template <typename CDataType>
 bool doVerify(const ck_tile::HostTensor<CDataType>& c_m_n_dev_result,
-               const ck_tile::HostTensor<CDataType>& c_m_n_ref,
-               const ck_tile::tuple<double, double>& rtol_atol,
-               const char* variant)
+              const ck_tile::HostTensor<CDataType>& c_m_n_ref,
+              const ck_tile::tuple<double, double>& rtol_atol,
+              const char* variant)
 {
     bool pass = ck_tile::check_err(c_m_n_dev_result,
                                    c_m_n_ref,

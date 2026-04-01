@@ -109,17 +109,27 @@ int run_a16w4_moe_gemm_example_with_layouts(int argc,
     stride_A = ck_tile::get_default_stride(
         IsInputGemm ? num_tokens : num_tokens * topk, K, stride_A, ck_tile::is_row_major(a_layout));
     stride_B = ck_tile::get_default_stride(K, N, stride_B, ck_tile::is_row_major(b_layout));
-    stride_C = ck_tile::get_default_stride(
-        IsInputGemm ? num_tokens * topk : num_tokens, outputN, stride_C, ck_tile::is_row_major(CLayout{}));
+    stride_C = ck_tile::get_default_stride(IsInputGemm ? num_tokens * topk : num_tokens,
+                                           outputN,
+                                           stride_C,
+                                           ck_tile::is_row_major(CLayout{}));
 
-    auto a_m_k_tensor = ck_tile::HostTensor<ADataType>(ck_tile::host_tensor_descriptor(
-        IsInputGemm ? num_tokens : num_tokens * topk, K, stride_A, ck_tile::is_row_major(a_layout)));
+    auto a_m_k_tensor = ck_tile::HostTensor<ADataType>(
+        ck_tile::host_tensor_descriptor(IsInputGemm ? num_tokens : num_tokens * topk,
+                                        K,
+                                        stride_A,
+                                        ck_tile::is_row_major(a_layout)));
     auto b_k_n_tensor = ck_tile::HostTensor<BDataType>(
         ck_tile::is_row_major(b_layout)
-            ? ck_tile::host_tensor_descriptor(experts * N, K, stride_B, ck_tile::is_row_major(b_layout))
-            : ck_tile::host_tensor_descriptor(K, experts * N, stride_B, ck_tile::is_row_major(b_layout)));
-    auto c_m_n_tensor = ck_tile::HostTensor<CDataType>(ck_tile::host_tensor_descriptor(
-        IsInputGemm ? num_tokens * topk : num_tokens, outputN, stride_C, ck_tile::is_row_major(CLayout{})));
+            ? ck_tile::host_tensor_descriptor(
+                  experts * N, K, stride_B, ck_tile::is_row_major(b_layout))
+            : ck_tile::host_tensor_descriptor(
+                  K, experts * N, stride_B, ck_tile::is_row_major(b_layout)));
+    auto c_m_n_tensor = ck_tile::HostTensor<CDataType>(
+        ck_tile::host_tensor_descriptor(IsInputGemm ? num_tokens * topk : num_tokens,
+                                        outputN,
+                                        stride_C,
+                                        ck_tile::is_row_major(CLayout{})));
 
     ck_tile::HostTensor<ScaleType> scale_b(ck_tile::HostTensorDescriptor(
         {K * experts / ScaleGranularityK, N / ScaleGranularityN}, {N / ScaleGranularityN, 1}));

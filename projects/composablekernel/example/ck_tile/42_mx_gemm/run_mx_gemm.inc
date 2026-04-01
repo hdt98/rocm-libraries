@@ -107,10 +107,10 @@ int run_mx_gemm_with_layouts(int argc, char* argv[], ALayout, BLayout, CLayout)
     ck_tile::index_t stride_scale_b =
         ck_tile::get_default_stride(scale_k_size, N, 0, ck_tile::is_row_major(BLayout{}));
 
-    ck_tile::HostTensor<ScaleType> scale_a_host(
-        ck_tile::host_tensor_descriptor(M, scale_k_size, stride_scale_a, ck_tile::is_row_major(ALayout{})));
-    ck_tile::HostTensor<ScaleType> scale_b_host(
-        ck_tile::host_tensor_descriptor(scale_k_size, N, stride_scale_b, ck_tile::is_row_major(BLayout{})));
+    ck_tile::HostTensor<ScaleType> scale_a_host(ck_tile::host_tensor_descriptor(
+        M, scale_k_size, stride_scale_a, ck_tile::is_row_major(ALayout{})));
+    ck_tile::HostTensor<ScaleType> scale_b_host(ck_tile::host_tensor_descriptor(
+        scale_k_size, N, stride_scale_b, ck_tile::is_row_major(BLayout{})));
     int seed = 1234;
     switch(init_method)
     {

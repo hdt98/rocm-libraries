@@ -58,10 +58,16 @@ int run_mx_flatmm_with_layouts(const ck_tile::ArgParser& arg_parser,
     ck_tile::HostTensor<CDataType> c_rslt_host(
         ck_tile::host_tensor_descriptor(M, N, stride_C, ck_tile::is_row_major(CLayout{})));
 
-    ck_tile::HostTensor<ScaleType> scale_a(ck_tile::host_tensor_descriptor(
-        M / ScaleGranularityM, K / ScaleGranularityK, scale_stride_A, ck_tile::is_row_major(a_layout)));
-    ck_tile::HostTensor<ScaleType> scale_b(ck_tile::host_tensor_descriptor(
-        K / ScaleGranularityK, N / ScaleGranularityN, scale_stride_B, ck_tile::is_row_major(b_layout)));
+    ck_tile::HostTensor<ScaleType> scale_a(
+        ck_tile::host_tensor_descriptor(M / ScaleGranularityM,
+                                        K / ScaleGranularityK,
+                                        scale_stride_A,
+                                        ck_tile::is_row_major(a_layout)));
+    ck_tile::HostTensor<ScaleType> scale_b(
+        ck_tile::host_tensor_descriptor(K / ScaleGranularityK,
+                                        N / ScaleGranularityN,
+                                        scale_stride_B,
+                                        ck_tile::is_row_major(b_layout)));
     if constexpr(std::is_same_v<ADataType, ck_tile::pk_fp6x16_t>)
     {
         auto a_buffer_bytes = a_host.get_element_space_size_in_bytes();

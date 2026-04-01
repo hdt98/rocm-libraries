@@ -254,11 +254,16 @@ int run_abquant_grouped_gemm_example_with_layouts(
                 "K must be divisible by BQuantGroupSize::kK for ABQuantGrouped mode");
         }
 
-        stride_As[i]  = ck_tile::get_default_stride(M, K, stride_As[i], ck_tile::is_row_major(a_layout));
-        stride_Bs[i]  = ck_tile::get_default_stride(K, N, stride_Bs[i], ck_tile::is_row_major(b_layout));
-        stride_Cs[i]  = ck_tile::get_default_stride(M, N, stride_Cs[i], ck_tile::is_row_major(CLayout{}));
-        stride_AQs[i] = ck_tile::get_default_stride(M, AQK, stride_AQs[i], ck_tile::is_row_major(aq_layout));
-        stride_BQs[i] = ck_tile::get_default_stride(BQK, N, stride_BQs[i], ck_tile::is_row_major(bq_layout));
+        stride_As[i] =
+            ck_tile::get_default_stride(M, K, stride_As[i], ck_tile::is_row_major(a_layout));
+        stride_Bs[i] =
+            ck_tile::get_default_stride(K, N, stride_Bs[i], ck_tile::is_row_major(b_layout));
+        stride_Cs[i] =
+            ck_tile::get_default_stride(M, N, stride_Cs[i], ck_tile::is_row_major(CLayout{}));
+        stride_AQs[i] =
+            ck_tile::get_default_stride(M, AQK, stride_AQs[i], ck_tile::is_row_major(aq_layout));
+        stride_BQs[i] =
+            ck_tile::get_default_stride(BQK, N, stride_BQs[i], ck_tile::is_row_major(bq_layout));
 
         a_m_k_tensors.push_back(ck_tile::HostTensor<ADataType>(
             ck_tile::host_tensor_descriptor(M, K, stride_As[i], ck_tile::is_row_major(a_layout))));
@@ -266,10 +271,10 @@ int run_abquant_grouped_gemm_example_with_layouts(
             ck_tile::host_tensor_descriptor(K, N, stride_Bs[i], ck_tile::is_row_major(b_layout))));
         c_m_n_tensors.push_back(ck_tile::HostTensor<CDataType>(
             ck_tile::host_tensor_descriptor(M, N, stride_Cs[i], ck_tile::is_row_major(CLayout{}))));
-        aq_tensors.push_back(ck_tile::HostTensor<AQDataType>(
-            ck_tile::host_tensor_descriptor(M, AQK, stride_AQs[i], ck_tile::is_row_major(aq_layout))));
-        bq_tensors.push_back(ck_tile::HostTensor<BQDataType>(
-            ck_tile::host_tensor_descriptor(BQK, N, stride_BQs[i], ck_tile::is_row_major(bq_layout))));
+        aq_tensors.push_back(ck_tile::HostTensor<AQDataType>(ck_tile::host_tensor_descriptor(
+            M, AQK, stride_AQs[i], ck_tile::is_row_major(aq_layout))));
+        bq_tensors.push_back(ck_tile::HostTensor<BQDataType>(ck_tile::host_tensor_descriptor(
+            BQK, N, stride_BQs[i], ck_tile::is_row_major(bq_layout))));
 
         std::cout << "gemm[" << i << "]" << " a_m_k: " << a_m_k_tensors[i].mDesc
                   << " b_k_n: " << b_k_n_tensors[i].mDesc << " c_m_n: " << c_m_n_tensors[i].mDesc

@@ -175,7 +175,8 @@ int runGemmExampleWithLayouts(int argc,
 
     stride_a = ck_tile::get_default_stride(m_dim, k_dim, stride_a, ck_tile::is_row_major(a_layout));
     stride_b = ck_tile::get_default_stride(k_dim, n_dim, stride_b, ck_tile::is_row_major(b_layout));
-    stride_c = ck_tile::get_default_stride(m_dim, n_dim, stride_c, ck_tile::is_row_major(CLayout{}));
+    stride_c =
+        ck_tile::get_default_stride(m_dim, n_dim, stride_c, ck_tile::is_row_major(CLayout{}));
 
     ck_tile::HostTensor<ADataType> a_m_k_host(
         ck_tile::host_tensor_descriptor(m_dim, k_dim, stride_a, ck_tile::is_row_major(a_layout)));

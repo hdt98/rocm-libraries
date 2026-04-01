@@ -15,4 +15,3 @@ struct MultiplyMultiply
         e = ck_tile::type_convert<E>(x0_f);
     }
 };
-

@@ -203,13 +203,18 @@ int run_grouped_gemm_multi_d_example_with_layouts(int argc,
         const ck_tile::index_t N = Ns[i];
         const ck_tile::index_t K = Ks[i];
 
-        stride_As[i] = ck_tile::get_default_stride(M, K, stride_As[i], ck_tile::is_row_major(a_layout));
-        stride_Bs[i] = ck_tile::get_default_stride(K, N, stride_Bs[i], ck_tile::is_row_major(b_layout));
+        stride_As[i] =
+            ck_tile::get_default_stride(M, K, stride_As[i], ck_tile::is_row_major(a_layout));
+        stride_Bs[i] =
+            ck_tile::get_default_stride(K, N, stride_Bs[i], ck_tile::is_row_major(b_layout));
 
-        stride_D0[i] = ck_tile::get_default_stride(M, N, stride_D0[i], ck_tile::is_row_major(d0_layout));
-        stride_D1[i] = ck_tile::get_default_stride(M, N, stride_D1[i], ck_tile::is_row_major(d1_layout));
+        stride_D0[i] =
+            ck_tile::get_default_stride(M, N, stride_D0[i], ck_tile::is_row_major(d0_layout));
+        stride_D1[i] =
+            ck_tile::get_default_stride(M, N, stride_D1[i], ck_tile::is_row_major(d1_layout));
 
-        stride_Es[i] = ck_tile::get_default_stride(M, N, stride_Es[i], ck_tile::is_row_major(e_layout));
+        stride_Es[i] =
+            ck_tile::get_default_stride(M, N, stride_Es[i], ck_tile::is_row_major(e_layout));
 
         a_m_k_tensors.push_back(ck_tile::HostTensor<ADataType>(
             ck_tile::host_tensor_descriptor(M, K, stride_As[i], ck_tile::is_row_major(a_layout))));
@@ -316,8 +321,8 @@ int run_grouped_gemm_multi_d_example_with_layouts(int argc,
     {
         for(int i = 0; i < group_count; ++i)
         {
-            e_m_n_host_refs.push_back(ck_tile::HostTensor<EDataType>(
-                host_tensor_descriptor(Ms[i], Ns[i], stride_Es[i], ck_tile::is_row_major(e_layout))));
+            e_m_n_host_refs.push_back(ck_tile::HostTensor<EDataType>(host_tensor_descriptor(
+                Ms[i], Ns[i], stride_Es[i], ck_tile::is_row_major(e_layout))));
 
             e_m_n_host_refs[i].SetZero();
 

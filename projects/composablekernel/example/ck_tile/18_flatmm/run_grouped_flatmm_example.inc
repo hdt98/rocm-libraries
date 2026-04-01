@@ -160,13 +160,15 @@ int run_contiguous_grouped_flatmm_example_with_layouts(
     ck_tile::index_t stride_C = 0;
 
     stride_A = ck_tile::get_default_stride(M, K, stride_A, ck_tile::is_row_major(a_layout));
-    stride_B = ck_tile::get_default_stride(K, N * group_count, stride_B, ck_tile::is_row_major(b_layout));
+    stride_B =
+        ck_tile::get_default_stride(K, N * group_count, stride_B, ck_tile::is_row_major(b_layout));
     stride_C = ck_tile::get_default_stride(M, N, stride_C, ck_tile::is_row_major(c_layout));
 
     ck_tile::HostTensor<ADataType> a_m_k_tensor(
         ck_tile::host_tensor_descriptor(M, K, stride_A, ck_tile::is_row_major(a_layout)));
-    ck_tile::HostTensor<BDataType> b_k_n_tensor(ck_tile::HostTensor<BDataType>(
-        ck_tile::host_tensor_descriptor(K, N * group_count, stride_B, ck_tile::is_row_major(b_layout))));
+    ck_tile::HostTensor<BDataType> b_k_n_tensor(
+        ck_tile::HostTensor<BDataType>(ck_tile::host_tensor_descriptor(
+            K, N * group_count, stride_B, ck_tile::is_row_major(b_layout))));
     ck_tile::HostTensor<CDataType> c_m_n_tensor(ck_tile::HostTensor<CDataType>(
         ck_tile::host_tensor_descriptor(M, N, stride_C, ck_tile::is_row_major(c_layout))));
 
@@ -375,16 +377,21 @@ int run_masked_grouped_flatmm_example_with_layouts(
     ck_tile::index_t stride_B = K;
     ck_tile::index_t stride_C = N;
 
-    stride_A = ck_tile::get_default_stride(group_count * M, K, stride_A, ck_tile::is_row_major(a_layout));
-    stride_B = ck_tile::get_default_stride(K, N * group_count, stride_B, ck_tile::is_row_major(b_layout));
-    stride_C = ck_tile::get_default_stride(group_count * M, N, stride_C, ck_tile::is_row_major(c_layout));
+    stride_A =
+        ck_tile::get_default_stride(group_count * M, K, stride_A, ck_tile::is_row_major(a_layout));
+    stride_B =
+        ck_tile::get_default_stride(K, N * group_count, stride_B, ck_tile::is_row_major(b_layout));
+    stride_C =
+        ck_tile::get_default_stride(group_count * M, N, stride_C, ck_tile::is_row_major(c_layout));
 
-    ck_tile::HostTensor<ADataType> a_m_k_tensor(
-        ck_tile::host_tensor_descriptor(group_count * M, K, stride_A, ck_tile::is_row_major(a_layout)));
-    ck_tile::HostTensor<BDataType> b_k_n_tensor(ck_tile::HostTensor<BDataType>(
-        ck_tile::host_tensor_descriptor(K, N * group_count, stride_B, ck_tile::is_row_major(b_layout))));
-    ck_tile::HostTensor<CDataType> c_m_n_tensor(ck_tile::HostTensor<CDataType>(
-        ck_tile::host_tensor_descriptor(group_count * M, N, stride_C, ck_tile::is_row_major(c_layout))));
+    ck_tile::HostTensor<ADataType> a_m_k_tensor(ck_tile::host_tensor_descriptor(
+        group_count * M, K, stride_A, ck_tile::is_row_major(a_layout)));
+    ck_tile::HostTensor<BDataType> b_k_n_tensor(
+        ck_tile::HostTensor<BDataType>(ck_tile::host_tensor_descriptor(
+            K, N * group_count, stride_B, ck_tile::is_row_major(b_layout))));
+    ck_tile::HostTensor<CDataType> c_m_n_tensor(
+        ck_tile::HostTensor<CDataType>(ck_tile::host_tensor_descriptor(
+            group_count * M, N, stride_C, ck_tile::is_row_major(c_layout))));
 
     ck_tile::HostTensor<AccDataType> per_token_scale(
         ck_tile::HostTensorDescriptor({group_count * M}, {1}));
@@ -490,8 +497,8 @@ int run_masked_grouped_flatmm_example_with_layouts(
         ck_tile::hip_check_error(hipMalloc(&d_C, group_count * M * N * sizeof(CDataType)));
         ck_tile::hip_check_error(hipMemset(d_C, 0, group_count * M * N * sizeof(CDataType)));
 
-        ck_tile::HostTensor<CDataType> c_gpu_ref_host(
-            ck_tile::host_tensor_descriptor(group_count * M, N, stride_C, ck_tile::is_row_major(CLayout{})));
+        ck_tile::HostTensor<CDataType> c_gpu_ref_host(ck_tile::host_tensor_descriptor(
+            group_count * M, N, stride_C, ck_tile::is_row_major(CLayout{})));
         for(int i = 0; i < group_count; ++i)
         {
             ck_tile::hip_check_error(hipMemcpy(d_B,

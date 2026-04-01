@@ -866,8 +866,7 @@ auto get_default_stride(std::size_t row,
 template <typename Layout>
 static constexpr inline auto is_row_major(Layout)
 {
-    return bool_constant<
-        std::is_same_v<remove_cvref_t<Layout>, tensor_layout::gemm::RowMajor>>{};
+    return bool_constant<std::is_same_v<remove_cvref_t<Layout>, tensor_layout::gemm::RowMajor>>{};
 }
 
 } // namespace ck_tile

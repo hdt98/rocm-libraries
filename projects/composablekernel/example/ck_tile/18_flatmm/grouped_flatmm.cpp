@@ -166,10 +166,16 @@ float grouped_flatmm(const KernelArguments& args, const ck_tile::stream_config& 
             static constexpr ck_tile::index_t BPackedSize =
                 std::is_same_v<BDataType, ck_tile::pk_int4_t> ? 2 : 1;
 
-            ck_tile::HostTensor<ADataType> a_m(ck_tile::host_tensor_descriptor(
-                args.group_count * args.M, args.K, args.stride_A, ck_tile::is_row_major(ALayout{})));
-            ck_tile::HostTensor<BDataType> b_n(ck_tile::host_tensor_descriptor(
-                args.K, args.group_count * args.N, args.stride_B, ck_tile::is_row_major(BLayout{})));
+            ck_tile::HostTensor<ADataType> a_m(
+                ck_tile::host_tensor_descriptor(args.group_count * args.M,
+                                                args.K,
+                                                args.stride_A,
+                                                ck_tile::is_row_major(ALayout{})));
+            ck_tile::HostTensor<BDataType> b_n(
+                ck_tile::host_tensor_descriptor(args.K,
+                                                args.group_count * args.N,
+                                                args.stride_B,
+                                                ck_tile::is_row_major(BLayout{})));
 
             auto size_a_buffer = a_m.get_element_space_size_in_bytes() / APackedSize;
             auto size_b_buffer = b_n.get_element_space_size_in_bytes() / BPackedSize;

@@ -504,18 +504,22 @@ int run_gemm_example_with_layouts(const ck_tile::ArgParser& arg_parser,
     // Conditional stride calculation based on QuantMode
     if constexpr(QuantMode == ck_tile::QuantType::AQuantGrouped)
     {
-        stride_AQ = ck_tile::get_default_stride(M, AQK, stride_AQ, ck_tile::is_row_major(aq_layout));
+        stride_AQ =
+            ck_tile::get_default_stride(M, AQK, stride_AQ, ck_tile::is_row_major(aq_layout));
         stride_BQ = 0; // No B quantization
     }
     else if constexpr(QuantMode == ck_tile::QuantType::BQuantGrouped)
     {
         stride_AQ = 0; // No A quantization
-        stride_BQ = ck_tile::get_default_stride(BQK, BQN, stride_BQ, ck_tile::is_row_major(bq_layout));
+        stride_BQ =
+            ck_tile::get_default_stride(BQK, BQN, stride_BQ, ck_tile::is_row_major(bq_layout));
     }
     else if constexpr(QuantMode == ck_tile::QuantType::ABQuantGrouped)
     {
-        stride_AQ = ck_tile::get_default_stride(M, AQK, stride_AQ, ck_tile::is_row_major(aq_layout));
-        stride_BQ = ck_tile::get_default_stride(BQK, BQN, stride_BQ, ck_tile::is_row_major(bq_layout));
+        stride_AQ =
+            ck_tile::get_default_stride(M, AQK, stride_AQ, ck_tile::is_row_major(aq_layout));
+        stride_BQ =
+            ck_tile::get_default_stride(BQK, BQN, stride_BQ, ck_tile::is_row_major(bq_layout));
     }
     else if constexpr(QuantMode == ck_tile::QuantType::RowColQuant)
     {
