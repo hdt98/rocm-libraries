@@ -1,3 +1,4 @@
+
 /*******************************************************************************
  *
  * MIT License
@@ -28,7 +29,7 @@
 
 #include <hip/hip_runtime.h>
 
-namespace origami::detail {
+namespace origami {
 
 /**
  * @return true if libamdhip64 was loaded and required symbols were resolved.
@@ -38,4 +39,4 @@ bool hip_runtime_available();
 hipError_t hip_get_device_properties(hipDeviceProp_t* prop, int deviceId);
 const char* hip_get_error_string(hipError_t err);
 
-}  // namespace origami::detail
+}  // namespace origami

@@ -15,7 +15,7 @@
 #include <dlfcn.h>
 #endif
 
-namespace origami::detail {
+namespace origami {
 
 namespace {
 
@@ -28,36 +28,119 @@ using dl_handle_t = HMODULE;
 using dl_handle_t = void*;
 #endif
 
-dl_handle_t g_hip_lib                    = nullptr;
-hipGetDeviceProperties_fn g_get_props    = nullptr;
-hipGetErrorString_fn g_get_error_string  = nullptr;
+dl_handle_t g_hip_lib                   = nullptr;
+hipGetDeviceProperties_fn g_get_props     = nullptr;
+hipGetErrorString_fn g_get_error_string = nullptr;
 std::string g_load_error;
 std::mutex g_mutex;
+
+void append_path_sep(std::string& base) {
+  if(base.empty()) return;
+#if defined(_WIN32)
+  if(base.back() != '\\' && base.back() != '/') base += '\\';
+#else
+  if(base.back() != '/') base += '/';
+#endif
+}
+
+/** Split env (e.g. LD_LIBRARY_PATH or PATH) and append full paths to lib under each directory. */
+#if defined(_WIN32)
+void append_path_env_candidates(std::vector<std::string>& out, const char* env_val, const char* dll_name) {
+  if(!env_val) return;
+  std::string s(env_val);
+  size_t start = 0;
+  while(start <= s.size()) {
+    // PATH uses ';' only; do not split on ':' (drive letters use C:...).
+    size_t end = s.find(';', start);
+    if(end == std::string::npos) end = s.size();
+    std::string dir = s.substr(start, end - start);
+    while(!dir.empty() && (dir.back() == ' ' || dir.back() == '\t')) dir.pop_back();
+    if(!dir.empty()) {
+      append_path_sep(dir);
+      out.push_back(dir + dll_name);
+    }
+    if(end == s.size()) break;
+    start = end + 1;
+  }
+}
+#else
+void append_ld_library_path_candidates(std::vector<std::string>& out,
+                                       const char* lib6,
+                                       const char* lib) {
+  const char* env_val = std::getenv("LD_LIBRARY_PATH");
+  if(!env_val) return;
+  std::string s(env_val);
+  size_t start = 0;
+  while(start <= s.size()) {
+    size_t end = s.find(':', start);
+    if(end == std::string::npos) end = s.size();
+    std::string dir = s.substr(start, end - start);
+    while(!dir.empty() && dir.back() == '/') dir.pop_back();
+    if(!dir.empty()) {
+      dir += '/';
+      out.push_back(dir + lib6);
+      out.push_back(dir + lib);
+    }
+    if(end == s.size()) break;
+    start = end + 1;
+  }
+}
+#endif
 
 std::vector<std::string> hip_library_candidates() {
   std::vector<std::string> out;
 #if defined(_WIN32)
+  constexpr const char* kDll = "amdhip64.dll";
+
   if(const char* hip_path = std::getenv("HIP_PATH")) {
     std::string base(hip_path);
-    if(!base.empty() && base.back() != '\\' && base.back() != '/') base += '\\';
-    out.push_back(base + "bin\\amdhip64.dll");
+    append_path_sep(base);
+    out.push_back(base + kDll);
   }
-  out.push_back("amdhip64.dll");
-#else
   if(const char* rocm = std::getenv("ROCM_PATH")) {
     std::string base(rocm);
-    if(!base.empty() && base.back() != '/') base += '/';
-    out.push_back(base + "lib/libamdhip64.so.6");
-    out.push_back(base + "lib/libamdhip64.so");
+    append_path_sep(base);
+    out.push_back(base + "bin\\" + kDll);
+  }
+  // PATH before default install locations (parallel to LD_LIBRARY_PATH before /opt/rocm on Linux).
+  append_path_env_candidates(out, std::getenv("PATH"), kDll);
+  // Typical ROCm layout under Program Files
+  if(const char* pf = std::getenv("ProgramFiles")) {
+    std::string b(pf);
+    append_path_sep(b);
+    out.push_back(b + "AMD\\ROCm\\bin\\" + kDll);
+    out.push_back(b + "ROCm\\bin\\" + kDll);
+  }
+  if(const char* pfx86 = std::getenv("ProgramFiles(x86)")) {
+    std::string b(pfx86);
+    append_path_sep(b);
+    out.push_back(b + "AMD\\ROCm\\bin\\" + kDll);
+  }
+  out.push_back(kDll);
+#else
+  constexpr const char* kSo6 = "libamdhip64.so.6";
+  constexpr const char* kSo  = "libamdhip64.so";
+
+  if(const char* rocm = std::getenv("ROCM_PATH")) {
+    std::string base(rocm);
+    append_path_sep(base);
+    out.push_back(base + "lib/" + kSo6);
+    out.push_back(base + "lib/" + kSo);
   }
   if(const char* hip_path = std::getenv("HIP_PATH")) {
     std::string base(hip_path);
-    if(!base.empty() && base.back() != '/') base += '/';
-    out.push_back(base + "lib/libamdhip64.so.6");
-    out.push_back(base + "lib/libamdhip64.so");
+    append_path_sep(base);
+    out.push_back(base + "lib/" + kSo6);
+    out.push_back(base + "lib/" + kSo);
   }
-  out.push_back("libamdhip64.so.6");
-  out.push_back("libamdhip64.so");
+  append_ld_library_path_candidates(out, kSo6, kSo);
+  {
+    std::string opt("/opt/rocm/");
+    out.push_back(opt + "lib/" + kSo6);
+    out.push_back(opt + "lib/" + kSo);
+  }
+  out.push_back(kSo6);
+  out.push_back(kSo);
 #endif
   return out;
 }
@@ -148,4 +231,4 @@ const char* hip_get_error_string(hipError_t err) {
   return g_get_error_string(err);
 }
 
-}  // namespace origami::detail
+}  // namespace origami
