@@ -61,29 +61,76 @@ namespace rocRoller
         /**
          * Parameters for LDS bank swizzle column permutation.
          *
-         * The swizzle eliminates 4x LDS bank conflicts on ds_read_b128
-         * by permuting K-column assignments so that the 4 SIMDs in a
-         * wave access distinct bank groups.
+         * The motivation is LDS read (LR) performance: when a wave
+         * issues ds_read_b128 to load an MMA tile from LDS, the 4
+         * SIMDs read simultaneously.  If a tile's K dimension spans
+         * fewer than 16 dwordx4 columns, the limited column diversity
+         * causes bank conflicts across SIMDs.
+         *
+         * An LDS bank row is the unit of LDS that a single read phase
+         * can access without bank conflicts.  On GFX950, LDS has
+         * 64 banks x 4 bytes = 256 bytes per bank row, holding
+         * exactly 16 dwordx4 columns.  When a tile row's K dimension
+         * spans fewer than 16 columns (e.g. 4 for FP4 macK=128),
+         * multiple tile rows pack into the same bank row and reads
+         * from different rows hit the same banks.
+         *
+         * The swizzle permutes K-column assignments per tile row so
+         * that rows sharing a bank row access distinct column positions.
+         * The GR (Global Read / Direct2LDS) side writes data into LDS
+         * with the permuted layout; the LR (LDS Read) side applies
+         * the inverse permutation to read back correct logical elements.
+         *
+         * How the 16-column bank row is divided depends on data type
+         * and tile K:
+         *
+         *   numColumns = tileK / (128 / elementBits)
+         *              = number of dwordx4 chunks one tile row occupies
+         *
+         *   rowsPerBankRow = 16 / numColumns
+         *                  = tile rows packed into one bank row
+         *
+         * Examples (tile rows x columns = 16 dwordx4 per bank row):
+         *   FP4  macK=128:  4 cols/row x 4 rows/bank-row
+         *   FP4  macK=256:  8 cols/row x 2 rows/bank-row
+         *   FP8  macK=128:  8 cols/row x 2 rows/bank-row
+         *   FP16 macK=128: 16 cols/row x 1 row/bank-row  (no conflicts)
+         *   FP16 macK=64:   8 cols/row x 2 rows/bank-row
+         *   FP16 macK=32:   4 cols/row x 4 rows/bank-row
+         *
+         * Note: The 16-column constant assumes GFX950 (64 LDS banks).
+         * Other architectures have 32 banks (128-byte bank rows,
+         * 8 dwordx4 columns).
          */
         struct LDSSwizzleParams
         {
-            unsigned int numColumns; // K-column chunks in the tile
-            unsigned int effectiveColumns; // min(numColumns, 8) -- swizzle granularity
-            unsigned int rowsPerBankRow; // rows sharing one bank row = 16 / effectiveColumns
-            unsigned int elementsPerChunk; // elements per 16-byte chunk = 128 / elementBits
+            unsigned int numColumns; ///< dwordx4 chunks per tile row in K
+            unsigned int rowsPerBankRow; ///< tile rows per LDS bank row (conflict-free access unit)
+            unsigned int elementsPerChunk; ///< elements per dwordx4 chunk = 128 / elementBits
 
+            /// 16 = dwordx4 columns per bank row on GFX950 (64 LDS banks).
+            static constexpr unsigned int columnsPerBankRow = 16u;
+
+            /// Compute from tile K dimension and element size.
+            /// When numColumns >= columnsPerBankRow, each tile row fills
+            /// an entire bank row and swizzle is unnecessary.
             static LDSSwizzleParams compute(unsigned int tileK, unsigned int elementBits)
             {
-                auto elems   = 128u / elementBits;
-                auto cols    = tileK / elems;
-                auto effCols = std::min(cols, 8u);
-                return {cols, effCols, 16u / effCols, elems};
+                auto elems = 128u / elementBits; // elements per dwordx4
+                auto cols  = tileK / elems; // dwordx4 chunks per tile row
+                return {cols, columnsPerBankRow / cols, elems};
             }
 
+            /// Compute from a pre-computed column count (GR path).
             static LDSSwizzleParams fromColumnCount(unsigned int numCols)
             {
-                auto effCols = std::min(numCols, 8u);
-                return {numCols, effCols, 16u / effCols, 0u};
+                return {numCols, columnsPerBankRow / numCols, 0u};
+            }
+
+            /// True when swizzle is unnecessary (tile row fills the bank row).
+            bool noConflicts() const
+            {
+                return numColumns >= columnsPerBankRow;
             }
         };
 
@@ -109,41 +156,46 @@ namespace rocRoller
         /**
          * Build the GR (Global Read) swizzle ExpressionTransform.
          *
-         * Applies swap-then-rotate to the K-column index:
-         *   ldsRowId     = row / rowsPerBankRow
-         *   swapMask     = (ldsRowId ^ 1) & 1
-         *   swappedCol   = columnLo ^ swapMask
-         *   rotation     = effectiveColumns - ((ldsRowId / 2) * 2)
-         *   swizzledCol  = (swappedCol + rotation) & (effectiveColumns - 1)
+         * Permutes the K-column index so that tile rows sharing the
+         * same LDS bank row land on distinct dwordx4 columns.
          *
-         * The transform has one positional argument ($0 = input column)
-         * and receives the row coordinate as positionalArgument(1)
-         * via a downstream neighbor on the ExpressionTransform edge.
+         * bankRowIdx identifies which bank row a tile row belongs to:
+         *   bankRowIdx = row / rowsPerBankRow
+         *
+         * The permutation is swap-then-rotate within numColumns:
+         *   swapMask     = (bankRowIdx ^ 1) & 1       -- toggle on even/odd
+         *   swappedCol   = columnInGroup ^ swapMask
+         *   rotation     = numColumns - ((bankRowIdx / 2) * 2)
+         *   swizzledCol  = (swappedCol + rotation) & (numColumns - 1)
+         *
+         * The transform has two positional arguments:
+         *   $0 = input K-column chunk index
+         *   $1 = tile row coordinate (used to derive bankRowIdx)
          */
         ExpressionTransform buildGRSwizzleTransform(LDSSwizzleParams const& params)
         {
-            auto effCols = literal(params.effectiveColumns);
-            auto logEffCols
-                = literal(static_cast<unsigned int>(__builtin_ctz(params.effectiveColumns)));
+            auto numCol    = literal(params.numColumns);
+            auto logNumCol = literal(static_cast<unsigned int>(__builtin_ctz(params.numColumns)));
             auto logRows = literal(static_cast<unsigned int>(__builtin_ctz(params.rowsPerBankRow)));
 
             auto rowRef = positionalArgument(1, Register::Type::Vector, DataType::UInt32);
 
             // $0 = input column index
             auto inputCol      = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
-            auto columnInGroup = inputCol & (effCols - literal(1u));
-            auto groupIndex    = inputCol >> logEffCols;
+            auto columnInGroup = inputCol & (numCol - literal(1u));
+            auto groupIndex    = inputCol >> logNumCol;
 
             // Swap adjacent columns on even bank rows (bit is 1 on even, 0 on odd)
-            auto ldsRowId       = rowRef >> logRows;
-            auto swapOnEvenRow  = (ldsRowId ^ literal(1u)) & literal(1u);
+            auto bankRowIdx     = rowRef >> logRows;
+            auto swapOnEvenRow  = (bankRowIdx ^ literal(1u)) & literal(1u);
             auto swappedInGroup = columnInGroup ^ swapOnEvenRow;
 
-            // Rotate columns within the group by (ldsRowId / 2) * 2
-            auto rotation        = effCols - ((ldsRowId >> literal(1u)) << literal(1u));
-            auto swizzledInGroup = (swappedInGroup + rotation) & (effCols - literal(1u));
+            // Rotate columns within numColumns by (bankRowIdx / 2) * 2
+            auto rotation        = numCol - ((bankRowIdx >> literal(1u)) << literal(1u));
+            auto swizzledInGroup = (swappedInGroup + rotation) & (numCol - literal(1u));
 
-            auto swizzledCol = groupIndex * effCols + swizzledInGroup;
+            // Reassemble: groupIndex * numColumns + swizzledInGroup
+            auto swizzledCol = groupIndex * numCol + swizzledInGroup;
 
             // Forward is identity pass-through
             auto forwardArg = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
@@ -153,26 +205,31 @@ namespace rocRoller
         /**
          * Build the LR (LDS Read) swizzle ExpressionTransform.
          *
-         * Applies the inverse of the GR permutation (un-rotate, then un-swap):
-         *   ldsRowId          = row / rowsPerBankRow
-         *   swapOnEvenRow     = (ldsRowId ^ 1) & 1
-         *   invRotation       = (ldsRowId / 2) * 2
-         *   unrotatedInGroup  = (chunkInGroup + invRotation) & (effectiveColumns - 1)
+         * Applies the inverse of the GR permutation so that the wave
+         * reads the correct (un-swizzled) logical element from the
+         * swizzled LDS layout.  The inverse is un-rotate then un-swap:
+         *   bankRowIdx        = row / rowsPerBankRow
+         *   swapOnEvenRow     = (bankRowIdx ^ 1) & 1
+         *   invRotation       = (bankRowIdx / 2) * 2
+         *   unrotatedInGroup  = (chunkInGroup + invRotation) & (numColumns - 1)
          *   swizzledInGroup   = unrotatedInGroup ^ swapOnEvenRow
          *
-         * The input is an element index (not a chunk index).  It is
-         * decomposed into chunk and sub-element, the chunk's low bits
-         * are swizzled, and the result is reassembled.
+         * Unlike the GR transform, the input here is an element index
+         * (not a chunk index).  It is decomposed into a dwordx4 chunk
+         * index and a sub-element offset; only the chunk index's low
+         * bits (within-group position) are swizzled, then the result
+         * is reassembled with the group index and sub-element:
+         *   swizzledElem = (chunkGroupIndex * numColumns + swizzledInGroup)
+         *                  * elementsPerChunk + subElement
          *
-         * The transform has one positional argument ($0 = element index)
-         * and receives the row coordinate as positionalArgument(1)
-         * via a downstream neighbor on the ExpressionTransform edge.
+         * The transform has two positional arguments:
+         *   $0 = element index within the K dimension
+         *   $1 = tile row coordinate (used to derive bankRowIdx)
          */
         ExpressionTransform buildLRSwizzleTransform(LDSSwizzleParams const& params)
         {
-            auto effCols = literal(params.effectiveColumns);
-            auto logEffCols
-                = literal(static_cast<unsigned int>(__builtin_ctz(params.effectiveColumns)));
+            auto numCol    = literal(params.numColumns);
+            auto logNumCol = literal(static_cast<unsigned int>(__builtin_ctz(params.numColumns)));
             auto logElems
                 = literal(static_cast<unsigned int>(__builtin_ctz(params.elementsPerChunk)));
             auto logRows = literal(static_cast<unsigned int>(__builtin_ctz(params.rowsPerBankRow)));
@@ -188,19 +245,18 @@ namespace rocRoller
             auto subElement = inputElemIdx & (elemsLit - literal(1u));
 
             // Split chunk into group index (unswizzled) and position within group (swizzled)
-            auto chunkInGroup    = fullChunk & (effCols - literal(1u));
-            auto chunkGroupIndex = fullChunk >> logEffCols;
+            auto chunkInGroup    = fullChunk & (numCol - literal(1u));
+            auto chunkGroupIndex = fullChunk >> logNumCol;
 
             // Inverse permutation: un-rotate first, then un-swap
-            auto ldsRowId         = rowRef >> logRows;
-            auto swapOnEvenRow    = (ldsRowId ^ literal(1u)) & literal(1u);
-            auto invRotation      = (ldsRowId >> literal(1u)) << literal(1u);
-            auto unrotatedInGroup = (chunkInGroup + invRotation) & (effCols - literal(1u));
+            auto bankRowIdx       = rowRef >> logRows;
+            auto swapOnEvenRow    = (bankRowIdx ^ literal(1u)) & literal(1u);
+            auto invRotation      = (bankRowIdx >> literal(1u)) << literal(1u);
+            auto unrotatedInGroup = (chunkInGroup + invRotation) & (numCol - literal(1u));
             auto swizzledInGroup  = unrotatedInGroup ^ swapOnEvenRow;
 
-            // Reassemble: (chunkGroupIndex * effectiveColumns + swizzledInGroup) * elementsPerChunk + subElement
-            auto swizzledCol
-                = (chunkGroupIndex * effCols + swizzledInGroup) * elemsLit + subElement;
+            // Reassemble: (chunkGroupIndex * numColumns + swizzledInGroup) * elementsPerChunk + subElement
+            auto swizzledCol = (chunkGroupIndex * numCol + swizzledInGroup) * elemsLit + subElement;
 
             // Forward is identity pass-through
             auto forwardArg = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
@@ -1044,22 +1100,26 @@ namespace rocRoller
             connections.push_back(DC<ElementNumber>(elementNumberY, 1));
 
             // GR swizzle for Direct2LDS MATRIX_B: permute K-column (nThrX,
-            // dim 0) based on N-row (nThrY).
+            // dim 0) based on N-row (nThrY) so that tile rows sharing
+            // the same LDS bank row write to distinct dwordx4
+            // columns.  numColumns = dwordx4 chunks per tile row in K.
             auto grSwizzleNThrX = nThrX;
             if(ldsSwizzle && isGlobalToLDS && macTile.layoutType == LayoutType::MATRIX_B)
             {
                 auto numColumns = thrTile.wsizes.at(0);
                 auto params     = LDSSwizzleParams::fromColumnCount(numColumns);
-                auto grSwizzle  = buildGRSwizzleTransform(params);
 
-                grSwizzleNThrX
-                    = graph.coordinates.addElement(ThreadTileNumber(0, literal(numColumns)));
-                graph.coordinates.addElement(grSwizzle, {grSwizzleNThrX}, {nThrX, nThrY});
+                if(!params.noConflicts())
+                {
+                    auto grSwizzle = buildGRSwizzleTransform(params);
 
-                Log::getLogger()->info("GR swizzle B: K={} Keff={} R={}",
-                                       params.numColumns,
-                                       params.effectiveColumns,
-                                       params.rowsPerBankRow);
+                    grSwizzleNThrX
+                        = graph.coordinates.addElement(ThreadTileNumber(0, literal(numColumns)));
+                    graph.coordinates.addElement(grSwizzle, {grSwizzleNThrX}, {nThrX, nThrY});
+
+                    Log::getLogger()->info(
+                        "GR swizzle B: K={} R={}", params.numColumns, params.rowsPerBankRow);
+                }
             }
 
             if(jammedTiles.size() > 0 && jammedTiles[0] > 1)
@@ -1093,28 +1153,31 @@ namespace rocRoller
             }
 
             // GR swizzle for Direct2LDS MATRIX_A: permute the K-column
-            // (nThrY, dim 1) based on M-row (nThrX) so that each thread
-            // reads from a swizzled global position and D2L writes
-            // sequentially to LDS, producing a swizzled LDS layout.
+            // (nThrY, dim 1) based on M-row (nThrX) so that tile rows
+            // sharing the same LDS bank row write to distinct dwordx4
+            // columns.  numColumns = dwordx4 chunks per tile row in K.
             auto grSwizzleNThrY = nThrY;
             if(ldsSwizzle && isGlobalToLDS && macTile.layoutType == LayoutType::MATRIX_A)
             {
                 auto numColumns = thrTile.wsizes.at(1);
                 auto params     = LDSSwizzleParams::fromColumnCount(numColumns);
-                auto grSwizzle  = buildGRSwizzleTransform(params);
 
-                grSwizzleNThrY
-                    = graph.coordinates.addElement(ThreadTileNumber(1, literal(numColumns)));
-                graph.coordinates.addElement(grSwizzle, {grSwizzleNThrY}, {nThrY, nThrX});
+                if(!params.noConflicts())
+                {
+                    auto grSwizzle = buildGRSwizzleTransform(params);
 
-                Log::getLogger()->info(
-                    "GR swizzle (load): nThrY={} nThrX={} grSwizzleNThrY={} K={} Keff={} R={}",
-                    nThrY,
-                    nThrX,
-                    grSwizzleNThrY,
-                    params.numColumns,
-                    params.effectiveColumns,
-                    params.rowsPerBankRow);
+                    grSwizzleNThrY
+                        = graph.coordinates.addElement(ThreadTileNumber(1, literal(numColumns)));
+                    graph.coordinates.addElement(grSwizzle, {grSwizzleNThrY}, {nThrY, nThrX});
+
+                    Log::getLogger()->info(
+                        "GR swizzle (load): nThrY={} nThrX={} grSwizzleNThrY={} K={} R={}",
+                        nThrY,
+                        nThrX,
+                        grSwizzleNThrY,
+                        params.numColumns,
+                        params.rowsPerBankRow);
+                }
             }
 
             if(jammedTiles.size() > 1 && jammedTiles[1] > 1)
@@ -2285,20 +2348,22 @@ namespace rocRoller
                 //   {rawIMacY} --ExpressionTransform--> {iMacY}
                 //   iMacX, iMacY --> addLoadWaveTileCT (unchanged)
                 //
-                // rawIMacY is the swizzled column position in LDS.  The ET
-                // reverse expression (used by coords.reverse() for LoadLDSTile)
-                // computes the matching swizzled LDS column via the same GR
-                // permutation.
+                // LR (LDS Read) swizzle: un-permute the K-column so that
+                // each wave reads the correct logical element from the
+                // swizzled LDS layout produced by the GR swizzle.
+                //
+                // The inverse permutation uses the same bankRowIdx derivation
+                // (row / rowsPerBankRow) to undo swap-then-rotate.
                 //
                 // Graph topology (swizzle enabled):
                 //   ldsTag --Tile--> {iMacX, rawIMacY}
-                //   {rawIMacY} --ET--> {iMacY}
-                //   iMacX, iMacY --> addLoadWaveTileCT (unchanged)
+                //   {rawIMacY} --ET--> {iMacY, rowCoord}
                 //
-                // The ET has 1 src (rawIMacY) and 1 dst (iMacY, rowCoord).
-                // The reverse expression applies the GR permutation using
-                // the row coordinate via positionalArgument(1).
-                // The forward expression is identity (pass-through).
+                // The ET has 1 upstream (rawIMacY) and 2 downstream
+                // (iMacY = K-column, rowCoord = tile row).  In reverse
+                // traversal, both downstream nodes are inputs:
+                //   $0 = iMacY (element index in K)
+                //   $1 = rowCoord (tile row, used to derive bankRowIdx)
                 auto tileIMacY = iMacY;
                 auto tileIMacX = iMacX;
                 {
@@ -2315,22 +2380,24 @@ namespace rocRoller
                         auto tileK       = static_cast<unsigned int>(tile.sizes.at(kDim));
                         auto params      = LDSSwizzleParams::compute(tileK, elementBits);
 
-                        int rowCoord = isA ? iMacX : iMacY;
-                        int colCoord = isA ? iMacY : iMacX;
+                        if(!params.noConflicts())
+                        {
+                            int rowCoord = isA ? iMacX : iMacY;
+                            int colCoord = isA ? iMacY : iMacX;
 
-                        auto lrSwizzle = buildLRSwizzleTransform(params);
+                            auto lrSwizzle = buildLRSwizzleTransform(params);
 
-                        auto rawCol = graph.coordinates.addElement(tile.tileIndex(kDim));
-                        graph.coordinates.addElement(lrSwizzle, {rawCol}, {colCoord, rowCoord});
-                        if(isA)
-                            tileIMacY = rawCol;
-                        else
-                            tileIMacX = rawCol;
+                            auto rawCol = graph.coordinates.addElement(tile.tileIndex(kDim));
+                            graph.coordinates.addElement(lrSwizzle, {rawCol}, {colCoord, rowCoord});
+                            if(isA)
+                                tileIMacY = rawCol;
+                            else
+                                tileIMacX = rawCol;
+                        }
 
-                        logger->info("LR swizzle {}: K={} Keff={} E={} R={}",
+                        logger->info("LR swizzle {}: K={} E={} R={}",
                                      toString(tile.layoutType),
                                      params.numColumns,
-                                     params.effectiveColumns,
                                      params.elementsPerChunk,
                                      params.rowsPerBankRow);
                     }
