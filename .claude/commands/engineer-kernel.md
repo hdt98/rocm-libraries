@@ -374,6 +374,7 @@ This will give limits to the `MPerXdl` and `NPerXdl` parameters.
 ### Step 1 — Analyze the shape
 
 Compute the key derived quantities that drive tile selection:
+- **G** = number of conv groups
 - **M_gemm** = N × Do × Ho × Wo (output spatial pixels, maps to M dimension of the GEMM)
 - **N_gemm** = K (output channels per group, maps to N dimension)
 - **K_gemm** = C × Z × Y × X (input channels × filter pixels, maps to K dimension of the GEMM)
@@ -383,6 +384,8 @@ Identify the shape class:
 - Is the filter 1×1 with no padding? → prefer `ConvFwd1x1P0` or `ConvFwd1x1S1P0`
 - Is the filter 3×3 with stride=1, dilation=1, no padding? → `ConvFwd3x3S1D1P0` may apply (NHWGC only)
 - Otherwise → `ConvFwdDefault`
+- Is K small (< NPerXDL = 32) **and G > 1**? → group merging is a candidate (see Step 2)
+- Is K small **and G = 1**? → group merging is inapplicable; the shape may be bandwidth-limited
 
 Check `INSTANCE_CONSTRAINTS.md` for known constraints before proceeding.
 
@@ -400,6 +403,7 @@ must equal BlockSize, and MPerBlock / MPerXDL and NPerBlock / NPerXDL give MXdlP
 | Small K_gemm | 64 | 64 | 64 | 32 | 8 | 8 | Small tile |
 | Odd C | 256 | 128 | 128 | 32 | 8 | 8 | ScalarPerVector=1 for A |
 
+Default values:
 MPerXDL = NPerXDL = 32 (gfx9 XDL instruction size).
 AK1 = BK1 = 8 for bf16 (128-bit load / 2 bytes = 8 elements).
 
@@ -407,6 +411,12 @@ For `ABlockTransferThreadClusterLengths_AK0_M_AK1`: `S<KPerBlock/AK1, BlockSize/
 
 Use the optimization strategies listed above to fine tune template parameters. 
 Take the feedback from `/profile-kernel` into account (if provided).
+
+If **K** is very small (K < NPerXDL = 32) **and G > 1**, consider merging multiple conv groups to increase
+**N_gemm = NumGroupsToMerge × K** and improve compute efficiency. `NumGroupsToMerge` must divide G.
+If **G = 1**, group merging is inapplicable — the shape is likely bandwidth-limited and may have a low
+TFLOPs ceiling regardless of instance choice; document this in `INSTANCE_CONSTRAINTS.md` and report
+to the orchestrator.
 
 ### Step 3 — Add the instance to the fwd conv example
 
@@ -468,9 +478,15 @@ If the tester gives green light, you can proceed to step 7. If the kernel fails 
 
 ### Step 7 — Add the final instance
 
-Edit `device_grouped_conv_fwd_xdl_instance.hpp`, adding the new instance to the appropriate
-template alias (e.g. `device_grouped_conv_fwd_xdl_bf16_instances`). Add a comment explaining
-the target shape class.
+Choose the correct instance header based on the kernel type:
+
+- **Standard instance** (NumGroupsToMerge = 1): add to `device_grouped_conv_fwd_xdl_instance.hpp`
+- **Merged-groups instance** (NumGroupsToMerge > 1): add to `device_grouped_conv_fwd_xdl_merged_groups_instance.hpp`
+- **Memory-bound instance**: add to `device_grouped_conv_fwd_xdl_mem_instance.hpp`
+- **Compute-bound instance**: add to `device_grouped_conv_fwd_xdl_comp_instance.hpp`
+- **Large tensor instance**: add to `device_grouped_conv_fwd_xdl_large_tensor_instance.hpp`
+
+Add a comment explaining the target shape class.
 
 ### Step 8 — Compile the CK profiler
 
