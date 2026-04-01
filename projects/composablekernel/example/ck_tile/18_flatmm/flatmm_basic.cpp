@@ -40,13 +40,6 @@ constexpr const char* DataTypeToString()
     }
 }
 
-template <typename Layout>
-static constexpr inline auto is_row_major(Layout layout_)
-{
-    return ck_tile::bool_constant<std::is_same_v<ck_tile::remove_cvref_t<decltype(layout_)>,
-                                                 ck_tile::tensor_layout::gemm::RowMajor>>{};
-}
-
 // mfma_type, 0:32x32, 1:16x16
 template <typename FlatmmConfig, typename T>
 auto shuffle_b_v0(const ck_tile::HostTensor<T>& t)
@@ -224,9 +217,9 @@ float flatmm_calc(const ck_tile::ScaleFlatmmHostArgs<ScaleM, ScaleN>& args,
                 std::is_same_v<BDataType, ck_tile::pk_int4_t> ? 2 : 1;
 
             ck_tile::HostTensor<ADataType> a_m(ck_tile::host_tensor_descriptor(
-                args.M, args.K, args.stride_A, is_row_major(ALayout{})));
+                args.M, args.K, args.stride_A, ck_tile::is_row_major(ALayout{})));
             ck_tile::HostTensor<BDataType> b_n(ck_tile::host_tensor_descriptor(
-                args.K, args.N, args.stride_B, is_row_major(BLayout{})));
+                args.K, args.N, args.stride_B, ck_tile::is_row_major(BLayout{})));
 
             auto size_a_buffer = a_m.get_element_space_size_in_bytes() / APackedSize;
             auto size_b_buffer = b_n.get_element_space_size_in_bytes() / BPackedSize;

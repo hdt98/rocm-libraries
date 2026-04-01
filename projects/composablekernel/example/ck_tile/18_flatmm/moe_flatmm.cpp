@@ -20,13 +20,6 @@
 #include "ck_tile/host.hpp"
 #include "ck_tile/host/reference/reference_moe_gemm.hpp"
 
-template <typename Layout>
-static constexpr inline auto is_row_major(Layout layout_)
-{
-    return ck_tile::bool_constant<std::is_same_v<ck_tile::remove_cvref_t<decltype(layout_)>,
-                                                 ck_tile::tensor_layout::gemm::RowMajor>>{};
-}
-
 template <typename FlatmmConfig, typename T>
 auto flatmm_shuffle_b(const ck_tile::HostTensor<T>& t)
 {
@@ -205,9 +198,9 @@ float moe_gemm(const ck_tile::MoeFlatmmHostArgs<ScaleM, ScaleN>& args,
                                                                : args.NumTokens,
                 args.K,
                 args.stride_A,
-                is_row_major(ALayout{})));
+                ck_tile::is_row_major(ALayout{})));
             ck_tile::HostTensor<BDataType> b_n(ck_tile::host_tensor_descriptor(
-                args.K, args.N * args.NumExperts, args.stride_B, is_row_major(BLayout{})));
+                args.K, args.N * args.NumExperts, args.stride_B, ck_tile::is_row_major(BLayout{})));
 
             const int outputN =
                 moe_kind == ck_tile::MoeFlatmmKind::kFFN_gemm1_gate_up ? args.N / 2 : args.N;

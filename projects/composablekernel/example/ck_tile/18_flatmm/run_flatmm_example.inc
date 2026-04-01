@@ -38,16 +38,16 @@ int run_flatmm_example_with_layouts(int argc,
     ck_tile::index_t init_method = arg_parser.get_int("init");
     // persistent not added
 
-    stride_A = ck_tile::get_default_stride(M, K, stride_A, is_row_major(a_layout));
-    stride_B = ck_tile::get_default_stride(K, N, stride_B, is_row_major(b_layout));
-    stride_C = ck_tile::get_default_stride(M, N, stride_C, is_row_major(CLayout{}));
+    stride_A = ck_tile::get_default_stride(M, K, stride_A, ck_tile::is_row_major(a_layout));
+    stride_B = ck_tile::get_default_stride(K, N, stride_B, ck_tile::is_row_major(b_layout));
+    stride_C = ck_tile::get_default_stride(M, N, stride_C, ck_tile::is_row_major(CLayout{}));
 
     ck_tile::HostTensor<ADataType> a_host(
-        ck_tile::host_tensor_descriptor(M, K, stride_A, is_row_major(a_layout)));
+        ck_tile::host_tensor_descriptor(M, K, stride_A, ck_tile::is_row_major(a_layout)));
     ck_tile::HostTensor<BDataType> b_origin_host(
-        ck_tile::host_tensor_descriptor(K, N, stride_B, is_row_major(b_layout)));
+        ck_tile::host_tensor_descriptor(K, N, stride_B, ck_tile::is_row_major(b_layout)));
     ck_tile::HostTensor<CDataType> c_rslt_host(
-        ck_tile::host_tensor_descriptor(M, N, stride_C, is_row_major(CLayout{})));
+        ck_tile::host_tensor_descriptor(M, N, stride_C, ck_tile::is_row_major(CLayout{})));
 
     ck_tile::HostTensor<AccDataType> per_token_scale(ck_tile::HostTensorDescriptor({M}, {1}));
     ck_tile::HostTensor<AccDataType> per_channel_scale(ck_tile::HostTensorDescriptor({N}, {1}));
@@ -149,7 +149,7 @@ int run_flatmm_example_with_layouts(int argc,
         if(ScaleGranularityM != -1 || ScaleGranularityN != -1)
             throw std::runtime_error("ScaleAB is not supported for CPU verification!\n");
         ck_tile::HostTensor<CDataType> c_ref_host(
-            ck_tile::host_tensor_descriptor(M, N, stride_C, is_row_major(CLayout{})));
+            ck_tile::host_tensor_descriptor(M, N, stride_C, ck_tile::is_row_major(CLayout{})));
         c_ref_host.SetZero();
 
         ck_tile::reference_gemm<ADataType, BDataType, AccDataType, CDataType>(
@@ -176,7 +176,7 @@ int run_flatmm_example_with_layouts(int argc,
         b_origin_dev_buf.ToDevice(b_origin_host.data());
 
         ck_tile::HostTensor<CDataType> c_gpu_ref_host(
-            ck_tile::host_tensor_descriptor(M, N, stride_C, is_row_major(CLayout{})));
+            ck_tile::host_tensor_descriptor(M, N, stride_C, ck_tile::is_row_major(CLayout{})));
         ck_tile::DeviceMem c_gpu_ref_dev_buf(c_gpu_ref_host.get_element_space_size_in_bytes());
         c_gpu_ref_host.SetZero();
         c_gpu_ref_dev_buf.SetZero();

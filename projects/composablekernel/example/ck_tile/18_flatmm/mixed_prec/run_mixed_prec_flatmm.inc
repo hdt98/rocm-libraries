@@ -41,16 +41,16 @@ int run_mixed_prec_flatmm_with_layouts(int argc,
     ck_tile::index_t n_warmup    = arg_parser.get_int("warmup");
     ck_tile::index_t n_repeat    = arg_parser.get_int("repeat");
 
-    stride_A = ck_tile::get_default_stride(M, K, stride_A, is_row_major(a_layout));
-    stride_B = ck_tile::get_default_stride(K, N, stride_B, is_row_major(b_layout));
-    stride_C = ck_tile::get_default_stride(M, N, stride_C, is_row_major(CLayout{}));
+    stride_A = ck_tile::get_default_stride(M, K, stride_A, ck_tile::is_row_major(a_layout));
+    stride_B = ck_tile::get_default_stride(K, N, stride_B, ck_tile::is_row_major(b_layout));
+    stride_C = ck_tile::get_default_stride(M, N, stride_C, ck_tile::is_row_major(CLayout{}));
 
     ck_tile::HostTensor<ADataType> a_host(
-        ck_tile::host_tensor_descriptor(M, K, stride_A, is_row_major(a_layout)));
+        ck_tile::host_tensor_descriptor(M, K, stride_A, ck_tile::is_row_major(a_layout)));
     ck_tile::HostTensor<BDataType> b_origin_host(
-        ck_tile::host_tensor_descriptor(K, N, stride_B, is_row_major(b_layout)));
+        ck_tile::host_tensor_descriptor(K, N, stride_B, ck_tile::is_row_major(b_layout)));
     ck_tile::HostTensor<CDataType> c_rslt_host(
-        ck_tile::host_tensor_descriptor(M, N, stride_C, is_row_major(CLayout{})));
+        ck_tile::host_tensor_descriptor(M, N, stride_C, ck_tile::is_row_major(CLayout{})));
 
     ck_tile::HostTensor<ScaleType> scale_b(ck_tile::HostTensorDescriptor(
         {K / DequantGranularityK, N / DequantGranularityN}, {N / DequantGranularityN, 1}));
@@ -69,7 +69,7 @@ int run_mixed_prec_flatmm_with_layouts(int argc,
     }
 
     ck_tile::HostTensor<BDataType> b_shuffle_host(
-        ck_tile::host_tensor_descriptor(K, N, stride_B, is_row_major(b_layout)));
+        ck_tile::host_tensor_descriptor(K, N, stride_B, ck_tile::is_row_major(b_layout)));
     preShuffleWeight<FlatmmConfig>(b_origin_host.begin(), b_shuffle_host.begin(), N, K);
 
     ck_tile::HostTensor<ScaleType> scale_b_shuffle = preShuffleScale<FlatmmConfig>(scale_b);
@@ -123,7 +123,7 @@ int run_mixed_prec_flatmm_with_layouts(int argc,
         b_origin_dev_buf.ToDevice(b_origin_host.data());
 
         ck_tile::HostTensor<CDataType> c_gpu_ref_host(
-            ck_tile::host_tensor_descriptor(M, N, stride_C, is_row_major(CLayout{})));
+            ck_tile::host_tensor_descriptor(M, N, stride_C, ck_tile::is_row_major(CLayout{})));
         ck_tile::DeviceMem c_gpu_ref_dev_buf(c_gpu_ref_host.get_element_space_size_in_bytes());
 
         ck_tile::HostTensor<AccDataType> scale_A(

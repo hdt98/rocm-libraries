@@ -36,14 +36,14 @@ int run_mx_flatmm_with_layouts(const ck_tile::ArgParser& arg_parser,
     ck_tile::index_t n_warmup    = arg_parser.get_int("warmup");
     ck_tile::index_t n_repeat    = arg_parser.get_int("repeat");
 
-    stride_A = ck_tile::get_default_stride(M, K, stride_A, is_row_major(a_layout));
-    stride_B = ck_tile::get_default_stride(K, N, stride_B, is_row_major(b_layout));
-    stride_C = ck_tile::get_default_stride(M, N, stride_C, is_row_major(c_layout));
+    stride_A = ck_tile::get_default_stride(M, K, stride_A, ck_tile::is_row_major(a_layout));
+    stride_B = ck_tile::get_default_stride(K, N, stride_B, ck_tile::is_row_major(b_layout));
+    stride_C = ck_tile::get_default_stride(M, N, stride_C, ck_tile::is_row_major(c_layout));
 
     auto scale_stride_A = ck_tile::get_default_stride(
-        M / ScaleGranularityM, K / ScaleGranularityK, 0, is_row_major(a_layout));
+        M / ScaleGranularityM, K / ScaleGranularityK, 0, ck_tile::is_row_major(a_layout));
     auto scale_stride_B = ck_tile::get_default_stride(
-        K / ScaleGranularityK, N / ScaleGranularityN, 0, is_row_major(b_layout));
+        K / ScaleGranularityK, N / ScaleGranularityN, 0, ck_tile::is_row_major(b_layout));
 
     if(K % ScaleGranularityK != 0)
         throw std::runtime_error("wrong! K must be multiple of ScaleGranularityK.");
@@ -52,16 +52,16 @@ int run_mx_flatmm_with_layouts(const ck_tile::ArgParser& arg_parser,
         throw std::runtime_error("wrong! K must be multiple of packed size.");
 
     ck_tile ::HostTensor<ADataType> a_host(
-        ck_tile::host_tensor_descriptor(M, K, stride_A, is_row_major(a_layout)));
+        ck_tile::host_tensor_descriptor(M, K, stride_A, ck_tile::is_row_major(a_layout)));
     ck_tile::HostTensor<BDataType> b_origin_host(
-        ck_tile::host_tensor_descriptor(K, N, stride_B, is_row_major(b_layout)));
+        ck_tile::host_tensor_descriptor(K, N, stride_B, ck_tile::is_row_major(b_layout)));
     ck_tile::HostTensor<CDataType> c_rslt_host(
-        ck_tile::host_tensor_descriptor(M, N, stride_C, is_row_major(CLayout{})));
+        ck_tile::host_tensor_descriptor(M, N, stride_C, ck_tile::is_row_major(CLayout{})));
 
     ck_tile::HostTensor<ScaleType> scale_a(ck_tile::host_tensor_descriptor(
-        M / ScaleGranularityM, K / ScaleGranularityK, scale_stride_A, is_row_major(a_layout)));
+        M / ScaleGranularityM, K / ScaleGranularityK, scale_stride_A, ck_tile::is_row_major(a_layout)));
     ck_tile::HostTensor<ScaleType> scale_b(ck_tile::host_tensor_descriptor(
-        K / ScaleGranularityK, N / ScaleGranularityN, scale_stride_B, is_row_major(b_layout)));
+        K / ScaleGranularityK, N / ScaleGranularityN, scale_stride_B, ck_tile::is_row_major(b_layout)));
     if constexpr(std::is_same_v<ADataType, ck_tile::pk_fp6x16_t>)
     {
         auto a_buffer_bytes = a_host.get_element_space_size_in_bytes();
@@ -161,7 +161,7 @@ int run_mx_flatmm_with_layouts(const ck_tile::ArgParser& arg_parser,
     if(arg_parser.get_int("v") == 1)
     {
         ck_tile::HostTensor<CDataType> c_m_n_host_ref(
-            ck_tile::host_tensor_descriptor(M, N, stride_C, is_row_major(CLayout{})));
+            ck_tile::host_tensor_descriptor(M, N, stride_C, ck_tile::is_row_major(CLayout{})));
         c_m_n_host_ref.SetZero();
 
         ck_tile::reference_mx_gemm<ADataType, BDataType, ScaleType, AccDataType, CDataType>(
