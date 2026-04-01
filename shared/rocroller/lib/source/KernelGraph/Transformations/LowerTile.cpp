@@ -60,47 +60,8 @@ namespace rocRoller
 
         /**
          * Parameters for LDS bank swizzle column permutation.
-         *
-         * The motivation is LDS read (LR) performance: when a wave
-         * issues ds_read_b128 to load an MMA tile from LDS, the 4
-         * SIMDs read simultaneously.  If a tile's K dimension spans
-         * fewer than 16 dwordx4 columns, the limited column diversity
-         * causes bank conflicts across SIMDs.
-         *
-         * An LDS bank row is the unit of LDS that a single read phase
-         * can access without bank conflicts.  On GFX950, LDS has
-         * 64 banks x 4 bytes = 256 bytes per bank row, holding
-         * exactly 16 dwordx4 columns.  When a tile row's K dimension
-         * spans fewer than 16 columns (e.g. 4 for FP4 macK=128),
-         * multiple tile rows pack into the same bank row and reads
-         * from different rows hit the same banks.
-         *
-         * The swizzle permutes K-column assignments per tile row so
-         * that rows sharing a bank row access distinct column positions.
-         * The GR (Global Read / Direct2LDS) side writes data into LDS
-         * with the permuted layout; the LR (LDS Read) side applies
-         * the inverse permutation to read back correct logical elements.
-         *
-         * How the 16-column bank row is divided depends on data type
-         * and tile K:
-         *
-         *   numColumns = tileK / (128 / elementBits)
-         *              = number of dwordx4 chunks one tile row occupies
-         *
-         *   rowsPerBankRow = 16 / numColumns
-         *                  = tile rows packed into one bank row
-         *
-         * Examples (tile rows x columns = 16 dwordx4 per bank row):
-         *   FP4  macK=128:  4 cols/row x 4 rows/bank-row
-         *   FP4  macK=256:  8 cols/row x 2 rows/bank-row
-         *   FP8  macK=128:  8 cols/row x 2 rows/bank-row
-         *   FP16 macK=128: 16 cols/row x 1 row/bank-row  (no conflicts)
-         *   FP16 macK=64:   8 cols/row x 2 rows/bank-row
-         *   FP16 macK=32:   4 cols/row x 4 rows/bank-row
-         *
-         * Note: The 16-column constant assumes GFX950 (64 LDS banks).
-         * Other architectures have 32 banks (128-byte bank rows,
-         * 8 dwordx4 columns).
+         * Permutes K-column assignments per tile row to eliminate
+         * ds_read_b128 bank conflicts.  See docs/src/LDSSwizzling.md.
          */
         struct LDSSwizzleParams
         {
@@ -156,21 +117,12 @@ namespace rocRoller
         /**
          * Build the GR (Global Read) swizzle ExpressionTransform.
          *
-         * Permutes the K-column index so that tile rows sharing the
-         * same LDS bank row land on distinct dwordx4 columns.
-         *
-         * bankRowIdx identifies which bank row a tile row belongs to:
-         *   bankRowIdx = row / rowsPerBankRow
-         *
-         * The permutation is swap-then-rotate within numColumns:
-         *   swapMask     = (bankRowIdx ^ 1) & 1       -- toggle on even/odd
-         *   swappedCol   = columnInGroup ^ swapMask
-         *   rotation     = numColumns - ((bankRowIdx / 2) * 2)
-         *   swizzledCol  = (swappedCol + rotation) & (numColumns - 1)
-         *
-         * The transform has two positional arguments:
+         * Swap-then-rotate permutation on K-column chunk index.
          *   $0 = input K-column chunk index
          *   $1 = tile row coordinate (used to derive bankRowIdx)
+         *
+         * The group splitting (columnInGroup/groupIndex) is required
+         * so that the Tile edge can algebraically invert the expression.
          */
         ExpressionTransform buildGRSwizzleTransform(LDSSwizzleParams const& params)
         {
@@ -205,24 +157,10 @@ namespace rocRoller
         /**
          * Build the LR (LDS Read) swizzle ExpressionTransform.
          *
-         * Applies the inverse of the GR permutation so that the wave
-         * reads the correct (un-swizzled) logical element from the
-         * swizzled LDS layout.  The inverse is un-rotate then un-swap:
-         *   bankRowIdx        = row / rowsPerBankRow
-         *   swapOnEvenRow     = (bankRowIdx ^ 1) & 1
-         *   invRotation       = (bankRowIdx / 2) * 2
-         *   unrotatedInGroup  = (chunkInGroup + invRotation) & (numColumns - 1)
-         *   swizzledInGroup   = unrotatedInGroup ^ swapOnEvenRow
-         *
-         * Unlike the GR transform, the input here is an element index
-         * (not a chunk index).  It is decomposed into a dwordx4 chunk
-         * index and a sub-element offset; only the chunk index's low
-         * bits (within-group position) are swizzled, then the result
-         * is reassembled with the group index and sub-element:
-         *   swizzledElem = (chunkGroupIndex * numColumns + swizzledInGroup)
-         *                  * elementsPerChunk + subElement
-         *
-         * The transform has two positional arguments:
+         * Inverse of the GR permutation (un-rotate then un-swap).
+         * Input is an element index, decomposed into dwordx4 chunk
+         * and sub-element; only the chunk's within-group bits are
+         * swizzled, then reassembled.
          *   $0 = element index within the K dimension
          *   $1 = tile row coordinate (used to derive bankRowIdx)
          */
@@ -1139,10 +1077,8 @@ namespace rocRoller
             connections.push_back(DC<ElementNumber>(elementNumberX, 0));
             connections.push_back(DC<ElementNumber>(elementNumberY, 1));
 
-            // GR swizzle for Direct2LDS MATRIX_B: permute K-column (nThrX,
-            // dim 0) based on N-row (nThrY) so that tile rows sharing
-            // the same LDS bank row write to distinct dwordx4
-            // columns.  numColumns = dwordx4 chunks per tile row in K.
+            // GR swizzle for Direct2LDS MATRIX_B: permute K-column
+            // (nThrX, dim 0) based on N-row (nThrY).
             auto grSwizzleNThrX = nThrX;
             if(ldsSwizzle && isGlobalToLDS && macTile.layoutType == LayoutType::MATRIX_B)
             {
@@ -1192,10 +1128,8 @@ namespace rocRoller
                     graph.coordinates.addElement(Tile(), {iMacX}, {nThrX, iThrX});
             }
 
-            // GR swizzle for Direct2LDS MATRIX_A: permute the K-column
-            // (nThrY, dim 1) based on M-row (nThrX) so that tile rows
-            // sharing the same LDS bank row write to distinct dwordx4
-            // columns.  numColumns = dwordx4 chunks per tile row in K.
+            // GR swizzle for Direct2LDS MATRIX_A: permute K-column
+            // (nThrY, dim 1) based on M-row (nThrX).
             auto grSwizzleNThrY = nThrY;
             if(ldsSwizzle && isGlobalToLDS && macTile.layoutType == LayoutType::MATRIX_A)
             {
@@ -2379,31 +2313,10 @@ namespace rocRoller
                                         false);
                 }
 
-                // LR column rotation: when LDS bank swizzle is enabled, insert an
-                // ExpressionTransform between ldsTag and iMacY that permutes
-                // the K-column read address to match the GR swizzle layout.
-                //
-                // Graph topology (swizzle enabled):
+                // LR swizzle: insert ExpressionTransform that un-permutes
+                // the K-column so the wave reads the correct logical element.
                 //   ldsTag --Tile--> {iMacX, rawIMacY}
-                //   {rawIMacY} --ExpressionTransform--> {iMacY}
-                //   iMacX, iMacY --> addLoadWaveTileCT (unchanged)
-                //
-                // LR (LDS Read) swizzle: un-permute the K-column so that
-                // each wave reads the correct logical element from the
-                // swizzled LDS layout produced by the GR swizzle.
-                //
-                // The inverse permutation uses the same bankRowIdx derivation
-                // (row / rowsPerBankRow) to undo swap-then-rotate.
-                //
-                // Graph topology (swizzle enabled):
-                //   ldsTag --Tile--> {iMacX, rawIMacY}
-                //   {rawIMacY} --ET--> {iMacY, rowCoord}
-                //
-                // The ET has 1 upstream (rawIMacY) and 2 downstream
-                // (iMacY = K-column, rowCoord = tile row).  In reverse
-                // traversal, both downstream nodes are inputs:
-                //   $0 = iMacY (element index in K)
-                //   $1 = rowCoord (tile row, used to derive bankRowIdx)
+                //   {rawIMacY} --ET--> {colCoord, rowCoord}
                 auto tileIMacY = iMacY;
                 auto tileIMacX = iMacX;
                 {
