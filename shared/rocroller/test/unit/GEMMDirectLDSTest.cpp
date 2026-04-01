@@ -437,10 +437,6 @@ namespace GEMMTests
         EXPECT_EQ(ldsWriteStrides, expectedLDSWriteStrides);
     }
 
-    // Smoke test: ExpressionTransform(f($0) = $0 + 1 - 1) wired into the GR (StoreLDSTile)
-    // column path via LDSBankSwizzleMode::Swizzle. Verifies the full coordinate graph ->
-    // AssignIndexExpressions -> codegen pipeline works with an ExpressionTransform in place.
-
     INSTANTIATE_TEST_SUITE_P(GEMMDirectLDSTest, GEMMDirectLDSBasicTestSuite, currentGPUISA());
 
     // ========================================================================

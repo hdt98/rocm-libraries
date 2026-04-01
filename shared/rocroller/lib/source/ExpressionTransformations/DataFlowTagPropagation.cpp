@@ -104,6 +104,5 @@ namespace rocRoller
         {
             return dataFlowTagPropagation(expr, *context->registerTagManager());
         }
-
     }
 }
