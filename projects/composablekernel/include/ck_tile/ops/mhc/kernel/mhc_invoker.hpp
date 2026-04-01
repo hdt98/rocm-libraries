@@ -14,7 +14,12 @@
 namespace ck_tile {
 
 // MHC Invoker
-// Provides type definitions and helper methods for the 3-stage MHC pipeline
+// Provides type definitions and helper methods for the 3-stage MHC pipeline.
+//
+// This invoker instantiates kernel classes when the expansion factor `n` is known at runtime.
+// Since the Sinkhorn kernel requires `n` at compile time, a dispatcher selects from a limited
+// set of pre-compiled instances.
+//
 template <typename XDataType_, // X and Phi input matrices type
           typename YDataType_,
           typename ComputeDataType_,
@@ -29,7 +34,8 @@ struct MHCInvoker
     using ActivationFunc  = ck_tile::remove_cvref_t<ActivationFunc_>;
 
     static constexpr ck_tile::index_t MTile = MTile_;
-    static constexpr bool UseLogSinkhorn    = UseLogSinkhorn_;
+
+    static constexpr bool UseLogSinkhorn = UseLogSinkhorn_;
 
     // Kernel type definitions
     using Problem = ck_tile::MHCProblemGemmDist<XDataType, ComputeDataType, YDataType, MTile>;

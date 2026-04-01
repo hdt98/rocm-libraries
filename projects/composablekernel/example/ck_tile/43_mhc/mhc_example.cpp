@@ -41,7 +41,7 @@ template <typename XDataType,
           ck_tile::index_t MTile  = 32>
 bool run_mhc(const ck_tile::ArgParser& arg_parser)
 {
-    using PhiDataType = XDataType;
+    using PhiDataType = XDataType; // For clarity, both input matrices must be of the same type.
 
     const int B = arg_parser.get_int("B");
     const int n = arg_parser.get_int("n");
@@ -94,8 +94,11 @@ bool run_mhc(const ck_tile::ArgParser& arg_parser)
     d_phi_mem.ToDevice(h_phi.data());
     d_output_mem.ToDevice(h_output.data());
 
-    // Use invoker for kernel type definitions
-    // Use log-domain Sinkhorn for better numerical stability
+    // Use the invoker for kernel type definitions if `n` is known at runtime (Sinkhorn kernel
+    // requirement). Use log-domain Sinkhorn for better numerical stability.
+    //
+    // If `n` is already known at compile time, feel free to declare the kernel type directly
+    // (i.e., without use of the invoker). This allows specifying an arbitrary value for `n`.
     constexpr bool use_log_sinkhorn = true;
     using Invoker                   = ck_tile::
         MHCInvoker<XDataType, YDataType, ComputeDataType, ActivationFunc, MTile, use_log_sinkhorn>;
@@ -123,8 +126,8 @@ bool run_mhc(const ck_tile::ArgParser& arg_parser)
     ck_tile::DeviceMem d_workspace_mem(workspace_size);
     ck_tile::DeviceMem d_partial_norms_mem(partial_norms_size);
 
-    (void)hipMemset(d_workspace_mem.GetDeviceBuffer(), 0, workspace_size);
-    (void)hipMemset(d_partial_norms_mem.GetDeviceBuffer(), 0, partial_norms_size);
+    HIP_CHECK_ERROR(hipMemset(d_workspace_mem.GetDeviceBuffer(), 0, workspace_size));
+    HIP_CHECK_ERROR(hipMemset(d_partial_norms_mem.GetDeviceBuffer(), 0, partial_norms_size));
 
     std::cout << "  Workspace size: " << workspace_size / (1024.0 * 1024.0) << " MB" << std::endl;
 
@@ -306,7 +309,7 @@ int main(int argc, char* argv[])
 
     // Run with BF16 inputs, float output and compute, M=64 tile
     bool pass = run_mhc<ck_tile::bf16_t, // XDataType = PhiDataType
-                        float,           // YDataType
+                        ck_tile::bf16_t, // YDataType
                         float,           // ComputeDataType
                         ck_tile::element_wise::Sigmoid,
                         64>(arg_parser); // MTile=64

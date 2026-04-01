@@ -28,8 +28,8 @@ class MHCTest
     template <int B, int n, int C, int sinkhorn_iters = 0, bool UseLogSinkhorn = true>
     static bool RunTest(const std::string& test_name)
     {
-        const int nC         = n * C;
-        const int output_dim = 2 * n + n * n;
+        constexpr int nC         = n * C;
+        constexpr int output_dim = 2 * n + n * n;
 
         std::cout << "\n--- " << test_name << " ---" << std::endl;
         std::cout << "  B=" << B << ", n=" << n << ", C=" << C << ", Sinkhorn=" << sinkhorn_iters
@@ -84,8 +84,8 @@ class MHCTest
         ck_tile::DeviceMem d_workspace_mem(workspace_size);
         ck_tile::DeviceMem d_partial_norms_mem(partial_norms_size);
 
-        (void)hipMemset(d_workspace_mem.GetDeviceBuffer(), 0, workspace_size);
-        (void)hipMemset(d_partial_norms_mem.GetDeviceBuffer(), 0, partial_norms_size);
+        HIP_CHECK_ERROR(hipMemset(d_workspace_mem.GetDeviceBuffer(), 0, workspace_size));
+        HIP_CHECK_ERROR(hipMemset(d_partial_norms_mem.GetDeviceBuffer(), 0, partial_norms_size));
 
         const ck_tile::index_t reduction_threads = ReductionKernel::BlockSize();
         const ck_tile::index_t reduction_blocks =
@@ -99,6 +99,12 @@ class MHCTest
         // Launch GPU kernels: 3-stage pipeline (GEMM -> Reduction -> Sinkhorn)
         if(sinkhorn_iters > 0)
         {
+            if(!Invoker::IsSupportedArgument(n))
+            {
+                throw std::runtime_error(
+                    "Arguments not supported! Skipping the executing of the mHC kernel!\n");
+            }
+
             // Launch all three stages together
             ck_tile::launch_kernel(
                 ck_tile::stream_config{nullptr, false},
@@ -874,4 +880,15 @@ TYPED_TEST(TestMHCComprehensive, SplitK_WithTanH)
                            TestFixture::MTile>;
     // Split-K with different activation function
     EXPECT_TRUE((Tester::template RunTest<16, 4, 1024>("Split-K: C=1024 with TanH activation")));
+}
+
+TYPED_TEST(TestMHCComprehensive, UnsupportedN_WithSinkhorn_ThrowsException)
+{
+    using Tester = MHCTest<typename TestFixture::XDataType,
+                           typename TestFixture::YDataType,
+                           typename TestFixture::ComputeDataType,
+                           ck_tile::element_wise::Sigmoid,
+                           TestFixture::MTile>;
+    EXPECT_THROW((Tester::template RunTest<16, 5, 64, 20>("n=5 with Sinkhorn (should throw)")),
+                 std::runtime_error);
 }

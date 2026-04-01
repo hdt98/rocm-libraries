@@ -174,10 +174,6 @@ struct MHCReductionKernel
                 const index_t global_n = global_idx % output_dim;
 
                 // Compute norm from partial norms for this batch element
-                //
-                // Note: the GEMM/norm kernel, using the split-k setup, writes the partial norm
-                //  in a coalesced way [grid_k, batch]. However this kernel is setup to reduce
-                //. per batch, hence reads the partial norm in a strided way [batch, grid_k]
                 ComputeDataType sum_squares = 0.0f;
                 for(index_t k = 0; k < grid_k; ++k)
                 {
@@ -191,19 +187,16 @@ struct MHCReductionKernel
                 if(global_n < n)
                 {
                     // H^pre: (alpha_pre/norm) * sigma(value) + bias
-                    YDataType activated;
-                    Activation{}(activated, type_convert<YDataType>(value));
-                    final_value =
-                        (alpha_pre / norm) * type_convert<ComputeDataType>(activated) + bias;
+                    ComputeDataType activated;
+                    Activation{}(activated, value);
+                    final_value = (alpha_pre / norm) * activated + bias;
                 }
                 else if(global_n < 2 * n)
                 {
                     // H^post: (alpha_post/norm) * 2*sigma(value) + bias
-                    YDataType activated;
-                    Activation{}(activated, type_convert<YDataType>(value));
-                    final_value =
-                        (alpha_post / norm) * 2.0f * type_convert<ComputeDataType>(activated) +
-                        bias;
+                    ComputeDataType activated;
+                    Activation{}(activated, value);
+                    final_value = (alpha_post / norm) * 2.0f * activated + bias;
                 }
                 else
                 {

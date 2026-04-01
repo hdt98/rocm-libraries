@@ -46,9 +46,8 @@ struct MHCKernelFused
     using Policy     = ck_tile::remove_cvref_t<Policy_>;
 
     using XDataType       = ck_tile::remove_cvref_t<typename Problem::XDataType>;
-    using ComputeDataType = ck_tile::remove_cvref_t<typename Problem::ComputeDataType>;
-    using YDataType       = ck_tile::remove_cvref_t<typename Problem::YDataType>;
     using PhiDataType     = ck_tile::remove_cvref_t<typename Problem::PhiDataType>;
+    using ComputeDataType = ck_tile::remove_cvref_t<typename Problem::ComputeDataType>;
 
     static constexpr index_t kMTile = Problem::BlockGemmShape::kM;
     static constexpr index_t kNTile = Problem::BlockGemmShape::kN;

@@ -25,14 +25,14 @@ struct MHCSinkhornKernel
     CK_TILE_HOST static constexpr index_t BlockSize() { return kBlockSize; }
 
     // Log-sum-exp function for numerical stability (only used in log domain)
-    CK_TILE_DEVICE ComputeDataType log_sum_exp(const ComputeDataType* log_values, index_t n) const
+    CK_TILE_DEVICE ComputeDataType log_sum_exp(const ComputeDataType* log_values) const
     {
         if constexpr(!UseLogDomain)
             return 0.0f; // Not used in non-log domain
 
         // Find max for numerical stability
         ComputeDataType max_val = log_values[0];
-        for(index_t i = 1; i < n; ++i)
+        for(index_t i = 1; i < kN; ++i)
         {
             max_val = ck_tile::max(max_val, log_values[i]);
         }
@@ -44,7 +44,7 @@ struct MHCSinkhornKernel
 
         // Compute log(sum(exp(log_values - max_val))) + max_val
         ComputeDataType sum = 0.0f;
-        for(index_t i = 0; i < n; ++i)
+        for(index_t i = 0; i < kN; ++i)
         {
             sum += ck_tile::exp(log_values[i] - max_val);
         }
@@ -53,11 +53,8 @@ struct MHCSinkhornKernel
     }
 
     // Each thread processes one batch element's nxn matrix
-    CK_TILE_DEVICE void operator()(YDataType* p_output,
-                                   index_t batch,
-                                   index_t output_dim,
-                                   index_t n,
-                                   index_t sinkhorn_iters) const
+    CK_TILE_DEVICE void
+    operator()(YDataType* p_output, index_t batch, index_t output_dim, index_t sinkhorn_iters) const
     {
         // Calculate block's starting batch index
         constexpr index_t kBlockM = kBlockSize;
@@ -65,10 +62,10 @@ struct MHCSinkhornKernel
 
         // Create 3D tensor view covering the batch data [batch, n, n]
         auto matrix_tensor_naive = make_naive_tensor_view<address_space_enum::global>(
-            p_output + 2 * n, // Start at first batch's H^res
-            make_tuple(batch, n, n),
+            p_output + 2 * kN, // Start at first batch's H^res
+            make_tuple(batch, kN, kN),
             make_tuple(output_dim,
-                       n,
+                       kN,
                        1), // Stride: output_dim between batches, n between rows, 1 within row
             number<1>{},
             number<1>{});
@@ -190,7 +187,7 @@ struct MHCSinkhornKernel
                         row_values[col] = matrix[row * kN + col];
                     }
 
-                    ComputeDataType log_row_sum = log_sum_exp(row_values, kN);
+                    ComputeDataType log_row_sum = log_sum_exp(row_values);
 
                     // Handle degenerate row
                     if(::isinf(log_row_sum) && log_row_sum < 0)
@@ -252,7 +249,7 @@ struct MHCSinkhornKernel
                         col_values[row] = matrix[row * kN + col];
                     }
 
-                    ComputeDataType log_col_sum = log_sum_exp(col_values, kN);
+                    ComputeDataType log_col_sum = log_sum_exp(col_values);
 
                     // Handle degenerate column
                     if(::isinf(log_col_sum) && log_col_sum < 0)
@@ -355,12 +352,12 @@ struct MHCSinkhornKernelDispatcher
         if(n == 4)
         {
             MHCSinkhornKernel<YDataType, ComputeDataType, 4, UseLogDomain>{}(
-                p_output, batch, output_dim, n, sinkhorn_iters);
+                p_output, batch, output_dim, sinkhorn_iters);
         }
         else if(n == 8)
         {
             MHCSinkhornKernel<YDataType, ComputeDataType, 8, UseLogDomain>{}(
-                p_output, batch, output_dim, n, sinkhorn_iters);
+                p_output, batch, output_dim, sinkhorn_iters);
         }
         else
         {

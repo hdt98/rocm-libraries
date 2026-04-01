@@ -14,9 +14,6 @@
 namespace ck_tile {
 
 // MHC Problem - Reusing GEMM Pipeline Tile Distributions
-// This approach reuses the proven tile distributions from GEMM pipeline
-// which are designed to work correctly with make_tile_window and offsets
-
 template <typename XDataType_, typename ComputeDataType_, typename YDataType_, index_t MTile_ = 16>
 struct MHCProblemGemmDist
 {
