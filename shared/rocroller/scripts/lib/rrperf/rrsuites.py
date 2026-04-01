@@ -1691,7 +1691,7 @@ def fp4_target_d2lds_mi16x16x128_st32x8_pf2x1_both():
 
 
 def fp4_target_d2lds_mi16x16x128_st32x8_pf2x1_lds_swizzle():
-    yield from addLDSBankSwizzle(fp4_target_d2lds_mi16x16x128_st32x8_pf2x1())
+    yield from addLDSBankSwizzle(fp4_target_d2lds_mi16x16x128_st32x8_pf2x1_wgm())
 
 
 def does_this_fail():
