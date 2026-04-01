@@ -28,8 +28,14 @@ substituted into the `.inc` file):
 projects/composablekernel/example/30_grouped_conv_fwd_multiple_d/run_grouped_conv_fwd_example.inc
 ```
 
-However, the user (or `/engineer-kernel`) should have updated the .inc file 
-and your task is to build the example bin (just in case) and run:
+The `.inc` file must already contain the candidate instance (done by `/engineer-kernel`).
+Always rebuild to ensure the binary matches:
+
+```bash
+ninja -j16 example_grouped_conv_fwd_xdl_bf16 2>&1 | tail -5
+```
+
+Then run:
 
 ```bash
 ./bin/example_grouped_conv_fwd_xdl_bf16 <args>

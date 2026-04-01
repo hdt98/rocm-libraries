@@ -18,41 +18,36 @@ In this case, the input consists of
 - Path to the candidate implementation
 - `<args>` for the cmd line executables. 
 
-## Profiling method 
+## Profiling method
 
 ```bash
 cd projects/composablekernel/build-gfx950
 ```
 
-Use the grouped fwd conv example (requires rebuilding with the instance
-substituted into the `.inc` file):
-
-```
-projects/composablekernel/example/30_grouped_conv_fwd_multiple_d/run_grouped_conv_fwd_example.inc
-```
-
-However, the user (or `/engineer-kernel`) should have updated the .inc file 
-and your task is to build the example bin (just in case) and run 
+The `.inc` file must already contain the candidate instance (done by `/engineer-kernel`).
+Always rebuild before profiling to ensure the binary matches the current `.inc` file:
 
 ```bash
-./bin/example_grouped_conv_fwd_xdl_bf16 <args>
+ninja -j16 example_grouped_conv_fwd_xdl_bf16 2>&1 | tail -5
 ```
 
-under the `rocprof-compute`. Here `<args>` are provided by the user, but you need to modify it.
-You need to set the validation flag to "0" to disable validation. 
-Also, set the number of warm-up iters to zero and the number repeats to one. The `rocprof-compute` takes care of 
-running the fwd conv example enough times.
-Running the conv fwd example exe with argument `--help` prints out the list of expected arguments.
+Modify `<args>` to disable validation, set warm-up to 0, and repeats to 1
+(rocprof-compute handles repetition internally):
 
-You need to run both profiling and analysis steps and inspect the analysis output file to understand what are 
-the bottlenecks in the current fwd conv kernel instance candidate. 
+```bash
+# Profile step
+rocprof-compute profile -n ck_conv -- \
+    ./bin/example_grouped_conv_fwd_xdl_bf16 <args with verify=0, warmup=0, repeat=1>
 
-Note that we are using im2col implicit GEMM and we are interested in the MFMA utilization and the overhead 
-related to the memory transfers. 
+# Analyze step
+rocprof-compute analyze -p ck_conv/
+```
 
-If you are provided with two version to compare, you need to run the profiling step one for the baseline and 
-once for the candidate. Then run the analysis step for both the results files to get a summary report. 
-From the summary report, you can provide the relevant changes to the user (or `/engineer-kernel`).
+When comparing two implementations, run profile and analyze for each separately,
+using distinct `-n` names (e.g. `-n ck_baseline` and `-n ck_candidate`).
+
+We use im2col implicit GEMM; focus on **MFMA utilization** and **memory bandwidth efficiency**
+when interpreting the analysis output.
 
 ## Output
 

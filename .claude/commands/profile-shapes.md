@@ -60,16 +60,13 @@ After profiling, parse the results and produce a ranked table of the **bottom N 
 Rank | TFLOPs | Shape summary (G, N, C, K, spatial dims, filter, stride) | Best instance name
 ```
 
-Then write the full results to:
-- `projects/composablekernel/build-gfx950/data/i2v_results_iter_<iteration_number>.txt` (or t2v)
-where `<iteration_number>` is the current iteration of instance improvements. The `<iteration_number>` 
-should start from 0 and be increamented by 1 each time `/engineer-kernel` is given a new shape to work on.
+Write the full results to the output file path provided by the caller (e.g. the orchestrator
+`/tune-kernel` will supply a path like `data/i2v_<iter>.txt`). Do **not** manage the iteration
+counter yourself — always use the path given to you.
 
 Flag any shapes where no valid instance was found (0 TFLOPs or error).
 
 ## Hand-off
 
-After ranking the shapes against the current set of kernels available for CK Profiler, 
-summarise the worst-performing shape classes and suggest a new shape for 
-`/engineer-kernel` to work on. Hence, this should be an iterative process between you and 
-`/engineer-kernel` to improve the available kernel instances until we reach a clear plateau.
+Return the ranked table and the path of the written results file to the caller (`/tune-kernel`).
+The orchestrator is responsible for updating `_current.txt` and deciding next steps.
