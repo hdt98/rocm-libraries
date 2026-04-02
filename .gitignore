@@ -12,3 +12,6 @@ CMakeUserPresets.json
 
 # Miscellanous tools
 .cline_storage/
+
+#Clangd cache
+**/.cache/clangd/*
