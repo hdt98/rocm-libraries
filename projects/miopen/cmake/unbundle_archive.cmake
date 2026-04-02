@@ -34,9 +34,15 @@ endif()
 execute_process(
     COMMAND ${AR} x "${FAT_ARCHIVE}"
     WORKING_DIRECTORY "${work_dir}"
+    OUTPUT_VARIABLE ar_output
+    ERROR_VARIABLE  ar_error
     RESULT_VARIABLE ar_result)
 if(NOT ar_result EQUAL 0)
-    message(FATAL_ERROR "Failed to extract ${FAT_ARCHIVE}")
+    message(FATAL_ERROR
+        "Failed to extract ${FAT_ARCHIVE}\n"
+        "  exit code: ${ar_result}\n"
+        "  stderr: ${ar_error}\n"
+        "  stdout: ${ar_output}")
 endif()
 
 file(GLOB obj_files "${work_dir}/*.o" "${work_dir}/*.obj")
@@ -132,10 +138,16 @@ foreach(obj IN LISTS obj_files)
             "--input=${fatbin_file}"
             ${unbundle_outputs}
             --unbundle
+        OUTPUT_VARIABLE unbundle_output
+        ERROR_VARIABLE  unbundle_error
         RESULT_VARIABLE unbundle_result)
 
     if(NOT unbundle_result EQUAL 0)
-        message(FATAL_ERROR "Failed to unbundle ${obj_name} for ${ARCH}")
+        message(FATAL_ERROR
+            "Failed to unbundle ${obj_name} for ${ARCH}\n"
+            "  exit code: ${unbundle_result}\n"
+            "  stderr: ${unbundle_error}\n"
+            "  stdout: ${unbundle_output}")
         continue()
     endif()
 
@@ -148,10 +160,16 @@ foreach(obj IN LISTS obj_files)
             "--input=${host_output}" "--input=${device_output}"
             "--output=${thin_fatbin}"
             --compress
+        OUTPUT_VARIABLE rebundle_output
+        ERROR_VARIABLE  rebundle_error
         RESULT_VARIABLE rebundle_result)
 
     if(NOT rebundle_result EQUAL 0)
-        message(FATAL_ERROR "Failed to re-bundle ${obj_name} for ${ARCH}")
+        message(FATAL_ERROR
+            "Failed to re-bundle ${obj_name} for ${ARCH}\n"
+            "  exit code: ${rebundle_result}\n"
+            "  stderr: ${rebundle_error}\n"
+            "  stdout: ${rebundle_output}")
         continue()
     endif()
 
@@ -190,33 +208,60 @@ foreach(obj IN LISTS obj_files)
         COMMAND ${LLVM_OBJCOPY}
             --update-section=.hip_fatbin=${thin_fatbin}
             "${obj}" "${thin_obj}"
+        OUTPUT_VARIABLE patch_output
+        ERROR_VARIABLE  patch_error
         RESULT_VARIABLE patch_result)
 
     if(patch_result EQUAL 0)
         list(APPEND thin_objs "${thin_obj}")
     else()
-        message(FATAL_ERROR "Failed to patch ${obj_name} for ${ARCH}")
+        message(FATAL_ERROR
+            "Failed to patch ${obj_name} for ${ARCH}\n"
+            "  exit code: ${patch_result}\n"
+            "  stderr: ${patch_error}\n"
+            "  stdout: ${patch_output}")
     endif()
 endforeach()
 
 # Create per-arch archive from patched objects
 if(thin_objs)
+    list(LENGTH thin_objs count)
+
+    # Write object list to a response file to avoid command-line length
+    # limits on Windows (~1400 objects can exceed the 32767 char cap).
+    set(rsp_file "${work_dir}/thin_objs.rsp")
+    file(WRITE "${rsp_file}" "")
+    foreach(_obj IN LISTS thin_objs)
+        file(APPEND "${rsp_file}" "${_obj}\n")
+    endforeach()
+
     execute_process(
-        COMMAND ${AR} rcs "${OUTPUT}" ${thin_objs}
+        COMMAND ${AR} rcs "${OUTPUT}" "@${rsp_file}"
+        OUTPUT_VARIABLE ar_output
+        ERROR_VARIABLE  ar_error
         RESULT_VARIABLE ar_result)
     if(NOT ar_result EQUAL 0)
-        message(FATAL_ERROR "Failed to create ${OUTPUT}")
+        message(FATAL_ERROR
+            "Failed to create ${OUTPUT}\n"
+            "  exit code: ${ar_result}\n"
+            "  stderr: ${ar_error}\n"
+            "  stdout: ${ar_output}\n"
+            "  object count: ${count}")
     endif()
-    list(LENGTH thin_objs count)
     message(STATUS "Created ${OUTPUT} with ${count} objects")
 else()
     message(FATAL_ERROR "No objects found for ${ARCH} in ${FAT_ARCHIVE}, creating empty archive")
     # Create an empty archive so the build does not fail with a missing output.
     execute_process(
         COMMAND ${AR} rcs "${OUTPUT}"
+        OUTPUT_VARIABLE ar_output
+        ERROR_VARIABLE  ar_error
         RESULT_VARIABLE ar_empty_result)
     if(NOT ar_empty_result EQUAL 0)
-        message(FATAL_ERROR "Failed to create empty archive ${OUTPUT}")
+        message(FATAL_ERROR
+            "Failed to create empty archive ${OUTPUT}\n"
+            "  exit code: ${ar_empty_result}\n"
+            "  stderr: ${ar_error}")
     endif()
 endif()
 
