@@ -107,6 +107,26 @@ __host__ __device__ constexpr auto make_offset_table(OffsetFunc f)
     return OffsetTable<N, OffsetFunc>(f, std::make_index_sequence<N>{});
 }
 
+// Simple fixed-size array for precomputed offsets (simpler than OffsetTable)
+template <index_t N>
+struct OffsetArray
+{
+    index_t data_[N];
+    __host__ __device__ constexpr index_t operator[](index_t i) const { return data_[i]; }
+};
+
+template <index_t N, typename OffsetFunc, index_t... Is>
+__host__ __device__ constexpr auto make_offset_array_impl(OffsetFunc f, std::index_sequence<Is...>)
+{
+    return OffsetArray<N>{{f(Number<Is>{})...}};
+}
+
+template <index_t N, typename OffsetFunc>
+__host__ __device__ constexpr auto make_offset_array(OffsetFunc f)
+{
+    return make_offset_array_impl<N>(f, std::make_index_sequence<N>{});
+}
+
 // ====================================================================================
 
 // static buffer for vector
