@@ -133,8 +133,6 @@ bool run_gemm(const ProblemType& problem_size, const ExecutionConfig& config)
     auto c_element_op = CElementOp{};
 
     // do GEMM
-    auto gemm      = DeviceGemmV2Instance{};
-    auto invoker   = gemm.MakeInvoker();
     float ave_time = 0;
 
     auto argument = gemm.MakeArgument(static_cast<ADataType*>(a_m_k_device_buf.GetDeviceBuffer()),

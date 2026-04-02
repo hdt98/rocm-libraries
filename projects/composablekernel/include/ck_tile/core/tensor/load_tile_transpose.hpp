@@ -91,7 +91,7 @@ struct DefaultTranspose
                                        sequence<2>,
                                        sequence<0>>;
 #else // gfx13
-        static_assert(LaneGroupSize == 32, "LaneGroupSize must be 32");
+        static_assert(LaneGroupSize == 32 || LaneGroupSize == 64, "LaneGroupSize must be 32 or 64");
         using InputEncoding = tile_distribution_encoding<sequence<>,
                                                          tuple<sequence<2, 2, 4>, sequence<2, 8>>,
                                                          tuple<sequence<1, 1, 2, 1>>,
@@ -147,20 +147,22 @@ struct DefaultTranspose
                                        sequence<2>,
                                        sequence<0>>;
 #else // gfx13
-        static_assert(LaneGroupSize == 32, "LaneGroupSize must be 32");
-        using InputEncoding = tile_distribution_encoding<sequence<>,
-                                                         tuple<sequence<2, 8>, sequence<2, 8>>,
-                                                         tuple<sequence<1, 2, 1>>,
-                                                         tuple<sequence<0, 0, 1>>,
-                                                         sequence<2>,
-                                                         sequence<1>>;
+        static_assert(LaneGroupSize == 32 || LaneGroupSize == 64, "LaneGroupSize must be 32 or 64");
+        using InputEncoding =
+            tile_distribution_encoding<sequence<>,
+                                       tuple<sequence<2, 8>, sequence<LaneGroupSize / 32, 2, 8>>,
+                                       tuple<sequence<1, 2, 1>>,
+                                       tuple<sequence<0, 1, 1>>,
+                                       sequence<2, 2>,
+                                       sequence<0, 2>>;
 
-        using OutputEncoding = tile_distribution_encoding<sequence<>,
-                                                          tuple<sequence<16>, sequence<2, 2, 4>>,
-                                                          tuple<sequence<1, 2>>,
-                                                          tuple<sequence<0, 1>>,
-                                                          sequence<2, 2>,
-                                                          sequence<0, 2>>;
+        using OutputEncoding =
+            tile_distribution_encoding<sequence<>,
+                                       tuple<sequence<16>, sequence<LaneGroupSize / 32 * 2, 2, 4>>,
+                                       tuple<sequence<1, 2>>,
+                                       tuple<sequence<0, 1>>,
+                                       sequence<2, 2>,
+                                       sequence<0, 2>>;
 #endif
     };
 
@@ -286,9 +288,12 @@ struct DefaultTranspose
             ValidationTraitsImpl<InDstrEncode, ReverseDirection, 16>::value ? 16 : 0;
 #else // gfx13
         static constexpr bool value =
-            ValidationTraitsImpl<InDstrEncode, ReverseDirection, 32>::value;
+            ValidationTraitsImpl<InDstrEncode, ReverseDirection, 32>::value ||
+            ValidationTraitsImpl<InDstrEncode, ReverseDirection, 64>::value;
         static constexpr index_t LaneGroupSize =
-            ValidationTraitsImpl<InDstrEncode, ReverseDirection, 32>::value ? 32 : 0;
+            ValidationTraitsImpl<InDstrEncode, ReverseDirection, 32>::value   ? 32
+            : ValidationTraitsImpl<InDstrEncode, ReverseDirection, 64>::value ? 64
+                                                                              : 0;
 #endif
     };
 };

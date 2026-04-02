@@ -105,7 +105,10 @@ template <typename PrecType, index_t M_Warp_Tile, bool IsFlatMM = false>
 constexpr index_t get_k_warp_tile()
 {
 #if CK_TILE_USE_WMMA
-#if defined(CK_USE_GFX1250)
+#if defined(CK_USE_GFX13)
+    constexpr bool is_8bit = sizeof(PrecType) == 1;
+    return is_8bit ? 32 : 16;
+#elif defined(CK_USE_GFX1250)
     if constexpr(M_Warp_Tile == 32)
     {
         return 128;

@@ -184,6 +184,26 @@ using WarpGemmAttributeWmmaImpl_f16_16x16x64_bf8_f8 =
     WarpGemmAttributeWmmaImpl<WmmaTraits<gfx125_t, bf8_t, fp8_t, fp16_t, 16, 16, 64>>;
 
 template <typename AType, typename BType>
+using WarpGemmAttributeWmmaImpl_f32_16x16x32 =
+    WarpGemmAttributeWmmaImpl<WmmaTraits<DeviceIp, AType, BType, float, 16, 16, 32>>;
+
+template <typename AType, typename BType>
+using WarpGemmAttributeWmmaImpl_f16_16x16x32 =
+    WarpGemmAttributeWmmaImpl<WmmaTraits<DeviceIp, AType, BType, fp16_t, 16, 16, 32>>;
+
+template <typename AType, typename BType>
+using WarpGemmAttributeWmmaImpl_i32_16x16x32 =
+    WarpGemmAttributeWmmaImpl<WmmaTraits<DeviceIp, AType, BType, int32_t, 16, 16, 32>>;
+
+template <typename AType, typename BType>
+using WarpGemmAttributeWmmaImpl_f32_16x16x64 =
+    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx125_t, AType, BType, float, 16, 16, 64>>;
+
+template <typename AType, typename BType>
+using WarpGemmAttributeWmmaImpl_f16_16x16x64 =
+    WarpGemmAttributeWmmaImpl<WmmaTraits<gfx125_t, AType, BType, fp16_t, 16, 16, 64>>;
+
+template <typename AType, typename BType>
 using WarpGemmAttributeWmmaImpl_f32_16x16x128_f8f6f4 =
     WarpGemmAttributeWmmaImpl<WmmaTraits<gfx125_t, AType, BType, float, 16, 16, 128>>;
 
