@@ -10,6 +10,7 @@ on:
       - opened
       - synchronize
       - reopened
+      - labeled
   workflow_dispatch:
     inputs:
       projects:
