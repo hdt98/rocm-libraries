@@ -886,6 +886,23 @@ class KernelComponentFactoryGfx950(
         return result
 
 
+class KernelComponentFactoryGfx942(KernelComponentFactoryGfx9):
+    """gfx942: drop NPerBlock (F_bn0) == 128 tiles for fp8-family dtypes."""
+
+    @classmethod
+    def get_hdim_tile_size_dict(cls, dtype: str) -> Optional[dict]:
+        result = super().get_hdim_tile_size_dict(dtype)
+        if (
+            dtype in cls._DT_FP8
+            or dtype in cls._DT_FP8BF16
+            or dtype in cls._DT_I8FP8BF16
+            or dtype in cls._DT_I4FP8BF16
+        ):
+            for key in result:
+                result[key] = [tile for tile in result[key] if tile.F_bn0 != 128]
+        return result
+
+
 class CustomFactory(KernelComponentFactoryGfx9, CompatibilityRuleFactoryGfx9):
     @classmethod
     def get_hdim_tile_size_dict(cls, dtype: str) -> Optional[dict]:
@@ -904,6 +921,8 @@ def get_factory(target: str):
 
     if target.startswith("gfx950"):
         return KernelComponentFactoryGfx950
+    if target.startswith("gfx942"):
+        return KernelComponentFactoryGfx942
     if target.startswith("gfx9"):
         return KernelComponentFactoryGfx9
 
