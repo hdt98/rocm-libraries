@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include "ck_tile/core/concepts.hpp"
 #include "ck_tile/core/algorithm/cluster_descriptor.hpp"
 #include "ck_tile/core/algorithm/coordinate_transform.hpp"
 #include "ck_tile/core/algorithm/indexing_adaptor.hpp"

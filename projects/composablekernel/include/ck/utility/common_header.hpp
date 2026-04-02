@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ck/ck.hpp"
+#include "ck/utility/concepts.hpp"
 #include "ck/utility/array.hpp"
 #include "ck/utility/container_helper.hpp"
 #include "ck/utility/statically_indexed_array.hpp"
