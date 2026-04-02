@@ -209,7 +209,7 @@ namespace rocRoller
                 return graph;
             }
 
-            graph.control.freezeCache();
+            //graph.control.freezeCache();
 
             // For each LDS coordinate, find dependent operations and ensure barriers exist
             for(int ldsCoord : ldsCoordinates)
@@ -352,7 +352,7 @@ namespace rocRoller
                 }
             }
 
-            graph.control.unfreezeCache();
+            //graph.control.unfreezeCache();
 
             return graph;
         }
