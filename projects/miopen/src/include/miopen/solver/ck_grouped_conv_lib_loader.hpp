@@ -28,12 +28,26 @@ struct ProblemDescription;
 namespace solver {
 struct ConvSolution;
 
-enum class CKConvDirection
+enum class CKSolverSlot
 {
-    Fwd = 0,
-    Bwd = 1,
-    Wrw = 2
+    GrpConvFwd      = 0,
+    GrpConvBwd      = 1,
+    GrpConvWrw      = 2,
+    DepthwiseFwd    = 3,
+    FusedBiasRelu   = 4,
+    GrpFwdActiv     = 5,
+    GrpFwdBiasActiv = 6,
+    FusedBiasResAdd = 7,
+    GrpConv3dFwd    = 8,
+    GrpConv3dBwd    = 9,
+    Count           = 10,
+    // Backward-compatible aliases
+    Fwd = GrpConvFwd,
+    Bwd = GrpConvBwd,
+    Wrw = GrpConvWrw
 };
+
+using CKConvDirection = CKSolverSlot;
 
 /// Query the HIP runtime for the current device's architecture name.
 /// Returns an empty string on failure or when not using the HIP backend.
@@ -46,7 +60,7 @@ inline std::string GetCurrentDeviceName()
     hipDeviceProp_t props{};
     if(hipGetDeviceProperties(&props, device) != hipSuccess)
         return {};
-    return {props.gcnArchName};
+    return std::string(props.gcnArchName);
 #else
     return {};
 #endif
@@ -128,8 +142,6 @@ private:
 
     using SolutionFreeFn = void (*)(ConvSolution*);
 
-    // cppcheck cannot parse function-pointer aliases with globally-qualified return types
-    // cppcheck-suppress internalAstError
     using FillValidKernelsFn = ::CKKernelListHandle* (*)(const miopen::conv::ProblemDescription*,
                                                          miopenDataType_t,
                                                          bool);
@@ -166,7 +178,7 @@ private:
         GetSolutionFn get_solution            = nullptr;
     };
 
-    DirectionFns dir_fns_[3]; // indexed by static_cast<int>(CKConvDirection)
+    DirectionFns slot_fns_[static_cast<int>(CKSolverSlot::Count)];
 
     // Helper: extract kernel list from handle
     std::vector<std::string> ExtractKernelList(::CKKernelListHandle* handle) const;

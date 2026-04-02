@@ -26,7 +26,7 @@ struct ConvSolution;
 
 /// API version constant. Bump when the set of extern "C" symbols or their
 /// semantics change.  The loader checks this at dlopen time.
-#define CK_GROUPED_CONV_API_VERSION 1
+#define CK_GROUPED_CONV_API_VERSION 2
 
 /// Opaque handle wrapping a list of valid kernel ID strings.
 /// Allocated by the impl library, freed by the caller via
@@ -137,5 +137,187 @@ ckgrpconv_wrw_get_solution(const miopen::ExecutionContext* ctx,
                            const miopen::conv::ProblemDescription* problem,
                            const char* kernel_id,
                            bool use_tf32);
+
+// -- Depthwise FWD (S1) -----------------------------------------------------
+
+CK_GROUPED_CONV_API CKKernelListHandle* ckgrpconv_depthwise_fwd_fill_valid_kernels(
+    const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
+
+CK_GROUPED_CONV_API bool
+ckgrpconv_depthwise_fwd_is_applicable(const miopen::conv::ProblemDescription* problem,
+                                      miopenDataType_t data_type,
+                                      bool use_tf32);
+
+CK_GROUPED_CONV_API bool
+ckgrpconv_depthwise_fwd_is_args_supported(const miopen::conv::ProblemDescription* problem,
+                                          const char* kernel_id,
+                                          miopenDataType_t data_type,
+                                          bool use_tf32);
+
+CK_GROUPED_CONV_API size_t
+ckgrpconv_depthwise_fwd_get_workspace_size(const miopen::conv::ProblemDescription* problem,
+                                           miopenDataType_t data_type);
+
+CK_GROUPED_CONV_API miopen::solver::ConvSolution*
+ckgrpconv_depthwise_fwd_get_solution(const miopen::ExecutionContext* ctx,
+                                     const miopen::conv::ProblemDescription* problem,
+                                     const char* kernel_id,
+                                     bool use_tf32);
+
+// -- Fused bias+ReLU (S2) ---------------------------------------------------
+
+CK_GROUPED_CONV_API CKKernelListHandle* ckgrpconv_fused_biasrelu_fill_valid_kernels(
+    const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
+
+CK_GROUPED_CONV_API bool
+ckgrpconv_fused_biasrelu_is_applicable(const miopen::conv::ProblemDescription* problem,
+                                       miopenDataType_t data_type,
+                                       bool use_tf32);
+
+CK_GROUPED_CONV_API bool
+ckgrpconv_fused_biasrelu_is_args_supported(const miopen::conv::ProblemDescription* problem,
+                                           const char* kernel_id,
+                                           miopenDataType_t data_type,
+                                           bool use_tf32);
+
+CK_GROUPED_CONV_API size_t
+ckgrpconv_fused_biasrelu_get_workspace_size(const miopen::conv::ProblemDescription* problem,
+                                            miopenDataType_t data_type);
+
+CK_GROUPED_CONV_API miopen::solver::ConvSolution*
+ckgrpconv_fused_biasrelu_get_solution(const miopen::ExecutionContext* ctx,
+                                      const miopen::conv::ProblemDescription* problem,
+                                      const char* kernel_id,
+                                      bool use_tf32);
+
+// -- Grouped FWD activation (S3) --------------------------------------------
+
+CK_GROUPED_CONV_API CKKernelListHandle* ckgrpconv_grpfwd_activ_fill_valid_kernels(
+    const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
+
+CK_GROUPED_CONV_API bool
+ckgrpconv_grpfwd_activ_is_applicable(const miopen::conv::ProblemDescription* problem,
+                                     miopenDataType_t data_type,
+                                     bool use_tf32);
+
+CK_GROUPED_CONV_API bool
+ckgrpconv_grpfwd_activ_is_args_supported(const miopen::conv::ProblemDescription* problem,
+                                         const char* kernel_id,
+                                         miopenDataType_t data_type,
+                                         bool use_tf32);
+
+CK_GROUPED_CONV_API size_t
+ckgrpconv_grpfwd_activ_get_workspace_size(const miopen::conv::ProblemDescription* problem,
+                                          miopenDataType_t data_type);
+
+CK_GROUPED_CONV_API miopen::solver::ConvSolution*
+ckgrpconv_grpfwd_activ_get_solution(const miopen::ExecutionContext* ctx,
+                                    const miopen::conv::ProblemDescription* problem,
+                                    const char* kernel_id,
+                                    bool use_tf32);
+
+// -- Grouped FWD bias+activation (S4) ---------------------------------------
+
+CK_GROUPED_CONV_API CKKernelListHandle* ckgrpconv_grpfwd_biasactiv_fill_valid_kernels(
+    const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
+
+CK_GROUPED_CONV_API bool
+ckgrpconv_grpfwd_biasactiv_is_applicable(const miopen::conv::ProblemDescription* problem,
+                                         miopenDataType_t data_type,
+                                         bool use_tf32);
+
+CK_GROUPED_CONV_API bool
+ckgrpconv_grpfwd_biasactiv_is_args_supported(const miopen::conv::ProblemDescription* problem,
+                                             const char* kernel_id,
+                                             miopenDataType_t data_type,
+                                             bool use_tf32);
+
+CK_GROUPED_CONV_API size_t
+ckgrpconv_grpfwd_biasactiv_get_workspace_size(const miopen::conv::ProblemDescription* problem,
+                                              miopenDataType_t data_type);
+
+CK_GROUPED_CONV_API miopen::solver::ConvSolution*
+ckgrpconv_grpfwd_biasactiv_get_solution(const miopen::ExecutionContext* ctx,
+                                        const miopen::conv::ProblemDescription* problem,
+                                        const char* kernel_id,
+                                        bool use_tf32);
+
+// -- Fused bias+resadd+ReLU (S5) --------------------------------------------
+
+CK_GROUPED_CONV_API CKKernelListHandle* ckgrpconv_fused_biasresadd_fill_valid_kernels(
+    const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
+
+CK_GROUPED_CONV_API bool
+ckgrpconv_fused_biasresadd_is_applicable(const miopen::conv::ProblemDescription* problem,
+                                         miopenDataType_t data_type,
+                                         bool use_tf32);
+
+CK_GROUPED_CONV_API bool
+ckgrpconv_fused_biasresadd_is_args_supported(const miopen::conv::ProblemDescription* problem,
+                                             const char* kernel_id,
+                                             miopenDataType_t data_type,
+                                             bool use_tf32);
+
+CK_GROUPED_CONV_API size_t
+ckgrpconv_fused_biasresadd_get_workspace_size(const miopen::conv::ProblemDescription* problem,
+                                              miopenDataType_t data_type);
+
+CK_GROUPED_CONV_API miopen::solver::ConvSolution*
+ckgrpconv_fused_biasresadd_get_solution(const miopen::ExecutionContext* ctx,
+                                        const miopen::conv::ProblemDescription* problem,
+                                        const char* kernel_id,
+                                        bool use_tf32);
+
+// -- 3D grouped FWD (S6) ---------------------------------------------------
+
+CK_GROUPED_CONV_API CKKernelListHandle* ckgrpconv_3d_fwd_fill_valid_kernels(
+    const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
+
+CK_GROUPED_CONV_API bool
+ckgrpconv_3d_fwd_is_applicable(const miopen::conv::ProblemDescription* problem,
+                               miopenDataType_t data_type,
+                               bool use_tf32);
+
+CK_GROUPED_CONV_API bool
+ckgrpconv_3d_fwd_is_args_supported(const miopen::conv::ProblemDescription* problem,
+                                   const char* kernel_id,
+                                   miopenDataType_t data_type,
+                                   bool use_tf32);
+
+CK_GROUPED_CONV_API size_t
+ckgrpconv_3d_fwd_get_workspace_size(const miopen::conv::ProblemDescription* problem,
+                                    miopenDataType_t data_type);
+
+CK_GROUPED_CONV_API miopen::solver::ConvSolution*
+ckgrpconv_3d_fwd_get_solution(const miopen::ExecutionContext* ctx,
+                              const miopen::conv::ProblemDescription* problem,
+                              const char* kernel_id,
+                              bool use_tf32);
+
+// -- 3D grouped BWD (S7) ---------------------------------------------------
+
+CK_GROUPED_CONV_API CKKernelListHandle* ckgrpconv_3d_bwd_fill_valid_kernels(
+    const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
+
+CK_GROUPED_CONV_API bool
+ckgrpconv_3d_bwd_is_applicable(const miopen::conv::ProblemDescription* problem,
+                               miopenDataType_t data_type,
+                               bool use_tf32);
+
+CK_GROUPED_CONV_API bool
+ckgrpconv_3d_bwd_is_args_supported(const miopen::conv::ProblemDescription* problem,
+                                   const char* kernel_id,
+                                   miopenDataType_t data_type,
+                                   bool use_tf32);
+
+CK_GROUPED_CONV_API size_t
+ckgrpconv_3d_bwd_get_workspace_size(const miopen::conv::ProblemDescription* problem,
+                                    miopenDataType_t data_type);
+
+CK_GROUPED_CONV_API miopen::solver::ConvSolution*
+ckgrpconv_3d_bwd_get_solution(const miopen::ExecutionContext* ctx,
+                              const miopen::conv::ProblemDescription* problem,
+                              const char* kernel_id,
+                              bool use_tf32);
 
 } // extern "C"
