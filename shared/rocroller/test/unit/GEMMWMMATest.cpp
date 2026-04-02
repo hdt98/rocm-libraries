@@ -244,16 +244,30 @@ namespace GEMMTests
         REQUIRE_ARCH_CAP(GPUCapability::HasWMMA);
         auto [typeA, typeB, waveK, transOp, loadPathA, loadPathB] = std::get<1>(GetParam());
 
+        KernelOptions options{m_context->kernelOptions()};
+        options->favourF8F6F4OverF8MatrixInstruction = false;
+        setKernelOptions(options);
+
+        GEMMProblem gemm;
+
         switch(waveK)
         {
         case 16:
             REQUIRE_ARCH_CAP(GPUCapability::HasWMMA_f32_16x16x16_f8);
             break;
+        case 64:
+            REQUIRE_ARCH_CAP(GPUCapability::HasWMMA_f32_16x16x64_f8);
+            break;
+        case 128:
+            REQUIRE_ARCH_REVISION_ID(1);
+            gemm.macK = waveK * 4;
+            gemm.k    = gemm.macK * 4;
+            REQUIRE_ARCH_CAP(GPUCapability::HasWMMA_f32_16x16x128_f8);
+            break;
         default:
             Throw<FatalError>("Invalid waveK value.", ShowValue(waveK));
         }
 
-        GEMMProblem gemm;
         gemm.waveM = 16;
         gemm.waveN = 16;
         gemm.waveK = waveK;

@@ -2288,6 +2288,19 @@ int main(int argc, const char* argv[])
                             solution.macK,
                             solution.waveK));
 
+    AssertFatal(solution.macK % solution.waveK == 0,
+                fmt::format("macK must be a multiple of waveK. macK: {} waveK: {}",
+                            solution.macK,
+                            solution.waveK));
+
+    AssertFatal(problem.k >= solution.macK,
+                fmt::format("K must be >= macK. K: {} macK: {}", problem.k, solution.macK));
+
+    AssertFatal(problem.k % solution.macK == 0 || solution.tailLoops,
+                fmt::format("K must be a multiple of macK (or enable tailLoops). K: {} macK: {}",
+                            problem.k,
+                            solution.macK));
+
     if(types.scaleSkipPermlane == rocRoller::ScaleSkipPermlaneMode::PreSwizzleScaleGFX950)
     {
         AssertFatal(solution.swizzleTileSize.m == 32 && solution.swizzleTileSize.n == 32

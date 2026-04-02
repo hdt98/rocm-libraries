@@ -134,6 +134,19 @@ namespace GEMMTests
                         "MacroTile size mismatch (N)",
                         ShowValue(N),
                         ShowValue(gemm.macN));
+            AssertFatal(K >= gemm.macK, "K must be >= macK", ShowValue(K), ShowValue(gemm.macK));
+            AssertFatal(K % gemm.macK == 0 || gemm.tailLoops,
+                        "K must be a multiple of macK (or enable tailLoops)",
+                        ShowValue(K),
+                        ShowValue(gemm.macK));
+            AssertFatal(gemm.macK >= gemm.waveK,
+                        "macK must be >= waveK",
+                        ShowValue(gemm.macK),
+                        ShowValue(gemm.waveK));
+            AssertFatal(gemm.macK % gemm.waveK == 0,
+                        "macK must be a multiple of waveK",
+                        ShowValue(gemm.macK),
+                        ShowValue(gemm.waveK));
 
             if(gemm.scaleAMode == Operations::ScaleMode::Separate
                || gemm.scaleBMode == Operations::ScaleMode::Separate)
