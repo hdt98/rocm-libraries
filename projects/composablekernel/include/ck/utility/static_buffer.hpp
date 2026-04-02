@@ -11,14 +11,15 @@
 namespace ck {
 
 // static buffer for scalar
+// Uses StaticallyIndexedArray_v2 (contiguous T data_[N]) for O(1) runtime indexing
 template <AddressSpaceEnum AddressSpace,
           typename T,
           index_t N,
           bool InvalidElementUseNumericalZeroValue> // TODO remove this bool, no longer needed
-struct StaticBuffer : public StaticallyIndexedArray<T, N>
+struct StaticBuffer : public StaticallyIndexedArray_v2<T, N>
 {
     using type = T;
-    using base = StaticallyIndexedArray<T, N>;
+    using base = StaticallyIndexedArray_v2<T, N>;
 
     __host__ __device__ constexpr StaticBuffer() : base{} {}
 
@@ -44,14 +45,14 @@ struct StaticBuffer : public StaticallyIndexedArray<T, N>
 
     __host__ __device__ static constexpr bool IsDynamicBuffer() { return false; }
 
-    // read access
+    // read access (compile-time index)
     template <index_t I>
     __host__ __device__ constexpr const T& operator[](Number<I> i) const
     {
         return base::operator[](i);
     }
 
-    // write access
+    // write access (compile-time index)
     template <index_t I>
     __host__ __device__ constexpr T& operator()(Number<I> i)
     {
@@ -59,47 +60,18 @@ struct StaticBuffer : public StaticallyIndexedArray<T, N>
     }
 
     // ========================================================================
-    // RUNTIME INDEXING (NEW API - backward compatible)
+    // RUNTIME INDEXING (O(1) instantiations via direct array access)
     // ========================================================================
     // NOTE: Using named methods (At/at) instead of operator[] to avoid
     // ambiguity with the existing operator[](Number<I>) since Number<I>
     // implicitly converts to index_t.
 
-    // Runtime read access - generates identical assembly when index is constexpr
-    // Implementation: Recursive constexpr dispatch (optimized away by compiler)
-    __host__ __device__ __forceinline__ const T& At(index_t i) const
-    {
-        return runtime_at_impl(*this, i, Number<0>{}, Number<N>{});
-    }
+    // Runtime read access - O(1) template instantiations (direct data_[i])
+    __host__ __device__ __forceinline__ const T& At(index_t i) const { return base::data_[i]; }
 
-    // Runtime write access - generates identical assembly when index is constexpr
-    __host__ __device__ __forceinline__ T& At(index_t i)
-    {
-        return runtime_at_impl(*this, i, Number<0>{}, Number<N>{});
-    }
+    // Runtime write access - O(1) template instantiations (direct data_[i])
+    __host__ __device__ __forceinline__ T& At(index_t i) { return base::data_[i]; }
 
-private:
-    // Helper: Binary search dispatch for runtime indexing
-    // When i is constexpr, compiler optimizes to direct access
-    template <typename Self, index_t Begin, index_t End>
-    __host__ __device__ static constexpr auto& runtime_at_impl(
-        Self& self, index_t i, Number<Begin>, Number<End>)
-    {
-        if constexpr (End - Begin == 1) {
-            // Base case: single element
-            return self(Number<Begin>{});
-        } else {
-            // Recursive case: binary split
-            constexpr index_t Mid = (Begin + End) / 2;
-            if (i < Mid) {
-                return runtime_at_impl(self, i, Number<Begin>{}, Number<Mid>{});
-            } else {
-                return runtime_at_impl(self, i, Number<Mid>{}, Number<End>{});
-            }
-        }
-    }
-
-public:
     // ========================================================================
 
     __host__ __device__ void Set(T x)

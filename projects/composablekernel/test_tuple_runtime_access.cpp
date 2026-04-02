@@ -1,5 +1,9 @@
-// Test: Does binary search dispatch with constexpr indices optimize away?
-// This tests the CORE CLAIM: runtime indexing with constexpr offsets = zero overhead
+// Test: O(1) runtime buffer indexing with StaticallyIndexedArray_v2
+// This tests: runtime indexing via direct data_[i] access produces identical assembly
+// to compile-time Number<I> indexing
+//
+// This is a STANDALONE test using a minimal reimplementation of StaticBuffer
+// to verify the O(1) approach. The cluster build verifies the real CK code.
 
 #include <hip/hip_runtime.h>
 
@@ -8,106 +12,77 @@ using index_t = int32_t;
 template <index_t I>
 struct Number {
     static constexpr index_t value = I;
+    __host__ __device__ constexpr operator index_t() const { return I; }
 };
 
-// Tuple-like structure (mimics CK's StaticallyIndexedArray)
+// Minimal O(1) buffer implementation (mirrors StaticallyIndexedArray_v2 + StaticBuffer)
 template <typename T, index_t N>
-struct MyTuple;
+struct O1Buffer {
+    T data_[N];
 
-template <typename T>
-struct MyTuple<T, 0> {};
-
-template <typename T, index_t N>
-struct MyTuple {
-    T head;
-    MyTuple<T, N-1> tail;
-
+    // Compile-time read access (existing API)
     template <index_t I>
-    __device__ const T& get(Number<I>) const {
-        if constexpr (I == 0) return head;
-        else return tail.get(Number<I-1>{});
-    }
+    __host__ __device__ constexpr const T& operator[](Number<I>) const { return data_[I]; }
 
+    // Compile-time write access (existing API)
     template <index_t I>
-    __device__ T& get(Number<I>) {
-        if constexpr (I == 0) return head;
-        else return tail.get(Number<I-1>{});
-    }
+    __host__ __device__ constexpr T& operator()(Number<I>) { return data_[I]; }
 
-    // Runtime access via binary search
-    template <index_t Begin, index_t End>
-    __device__ const T& runtime_get(index_t i, Number<Begin>, Number<End>) const {
-        if constexpr (End - Begin == 1) {
-            return get(Number<Begin>{});
-        } else {
-            constexpr index_t Mid = (Begin + End) / 2;
-            if (i < Mid) {
-                return runtime_get(i, Number<Begin>{}, Number<Mid>{});
-            } else {
-                return runtime_get(i, Number<Mid>{}, Number<End>{});
-            }
-        }
-    }
+    // O(1) runtime read access - DIRECT ARRAY ACCESS
+    __host__ __device__ __forceinline__ const T& At(index_t i) const { return data_[i]; }
 
-    __device__ const T& operator[](index_t i) const {
-        return runtime_get(i, Number<0>{}, Number<N>{});
-    }
+    // O(1) runtime write access - DIRECT ARRAY ACCESS
+    __host__ __device__ __forceinline__ T& At(index_t i) { return data_[i]; }
 };
 
-// BASELINE: Compile-time indexing (8 instantiations)
+// BASELINE: Compile-time indexing with Number<>
 __global__ void kernel_compile_time(const float* src, float* dst)
 {
-    MyTuple<float, 8> buf;
+    O1Buffer<float, 8> buf;
 
-    // Initialize
-    buf.get(Number<0>{}) = src[0];
-    buf.get(Number<1>{}) = src[1];
-    buf.get(Number<2>{}) = src[2];
-    buf.get(Number<3>{}) = src[3];
-    buf.get(Number<4>{}) = src[4];
-    buf.get(Number<5>{}) = src[5];
-    buf.get(Number<6>{}) = src[6];
-    buf.get(Number<7>{}) = src[7];
+    // Initialize with compile-time indices
+    buf(Number<0>{}) = src[0];
+    buf(Number<1>{}) = src[1];
+    buf(Number<2>{}) = src[2];
+    buf(Number<3>{}) = src[3];
+    buf(Number<4>{}) = src[4];
+    buf(Number<5>{}) = src[5];
+    buf(Number<6>{}) = src[6];
+    buf(Number<7>{}) = src[7];
 
     if (threadIdx.x == 0) {
         // Manual unroll with Number<>
-        dst[0] = buf.get(Number<0>{});
-        dst[1] = buf.get(Number<1>{});
-        dst[2] = buf.get(Number<2>{});
-        dst[3] = buf.get(Number<3>{});
-        dst[4] = buf.get(Number<4>{});
-        dst[5] = buf.get(Number<5>{});
-        dst[6] = buf.get(Number<6>{});
-        dst[7] = buf.get(Number<7>{});
+        dst[0] = buf[Number<0>{}];
+        dst[1] = buf[Number<1>{}];
+        dst[2] = buf[Number<2>{}];
+        dst[3] = buf[Number<3>{}];
+        dst[4] = buf[Number<4>{}];
+        dst[5] = buf[Number<5>{}];
+        dst[6] = buf[Number<6>{}];
+        dst[7] = buf[Number<7>{}];
     }
 }
 
-// OPTIMIZED: Runtime indexing with constexpr indices
+// OPTIMIZED: Runtime indexing with O(1) direct data_[i] access
 __global__ void kernel_runtime(const float* src, float* dst)
 {
-    MyTuple<float, 8> buf;
+    O1Buffer<float, 8> buf;
 
-    // Initialize with runtime loop
-    #pragma unroll
-    for (index_t i = 0; i < 8; ++i) {
-        // This creates a constexpr i value per unrolled iteration
-        buf.get(Number<0>{}) = src[0]; // Hack: can't write to buf[i]
-        // Actually, let me use compile-time init
-    }
-    buf.get(Number<0>{}) = src[0];
-    buf.get(Number<1>{}) = src[1];
-    buf.get(Number<2>{}) = src[2];
-    buf.get(Number<3>{}) = src[3];
-    buf.get(Number<4>{}) = src[4];
-    buf.get(Number<5>{}) = src[5];
-    buf.get(Number<6>{}) = src[6];
-    buf.get(Number<7>{}) = src[7];
+    // Initialize with compile-time indices (same as baseline)
+    buf(Number<0>{}) = src[0];
+    buf(Number<1>{}) = src[1];
+    buf(Number<2>{}) = src[2];
+    buf(Number<3>{}) = src[3];
+    buf(Number<4>{}) = src[4];
+    buf(Number<5>{}) = src[5];
+    buf(Number<6>{}) = src[6];
+    buf(Number<7>{}) = src[7];
 
     if (threadIdx.x == 0) {
-        // Runtime loop with #pragma unroll - creates constexpr i per iteration
+        // Runtime loop with #pragma unroll - compiler unrolls with constexpr i
         #pragma unroll
         for (index_t i = 0; i < 8; ++i) {
-            dst[i] = buf[i];  // Runtime indexing!
+            dst[i] = buf.At(i);  // O(1) runtime indexing via data_[i]
         }
     }
 }

@@ -99,6 +99,12 @@ struct StaticallyIndexedArray_v2
         return At(i);
     }
 
+    // Runtime read access - O(1) instantiations (direct array access)
+    __host__ __device__ __forceinline__ const T& At(index_t i) const { return data_[i]; }
+
+    // Runtime write access - O(1) instantiations (direct array access)
+    __host__ __device__ __forceinline__ T& At(index_t i) { return data_[i]; }
+
     __host__ __device__ static constexpr bool IsStaticBuffer() { return true; }
 
     T data_[N];
