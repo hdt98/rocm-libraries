@@ -5,17 +5,20 @@
 // dQ/dK/dV kernel family — the main backward kernel that computes query, key,
 // and value gradients via 5 GEMMs.
 //
-// This header has NO CK Tile dependency. It is included by both host code
-// (main.cpp) and device code (.hip files) to share the kernel ABI and
-// compile-time-validated configuration. Requires HIP for dim3.
+// SHARED header: compiled in both host and device (--cuda-device-only) passes.
+// Contains structural types, consteval make_spec() factory, and named slot
+// constants. No runtime code, no HIP dependency.
+//
+// Compilation boundary:
+//   _spec.hpp (this) — consteval factory + slot constants (both passes)
+//   _api.hpp         — host-only helpers: grid_size (host pass only, #error on device)
+//   _dev.hpp         — CK Tile bridge + __device__ code (device pass only, #error on host)
 
 #pragma once
 
-#include "rocm_fmha_bwd_common.hpp"
+#include <rocm_ck/ops/fmha_bwd/common.hpp>
 
 #include <rocm_ck/datatype_utils.hpp>
-
-#include <hip/hip_runtime.h>
 
 #include <cstdint>
 
@@ -48,7 +51,7 @@ struct FmhaBwdDQDKDVAlgorithm
     // Tuning — padding and occupancy
     int pad_hdim_q   = 0;  // 0 (no pad), 1 (small pad), or 8 (full vec pad)
     int pad_hdim_v   = 0;  // 0, 1, or 8
-    int block_per_cu = -1; // occupancy hint (-1 = auto, resolved in make_kernel)
+    int block_per_cu = -1; // occupancy hint (-1 = auto, resolved in make_spec)
 };
 
 /// Config: user-facing Signature + Algorithm pair.
@@ -60,7 +63,7 @@ struct FmhaBwdDQDKDVConfig
 
 /// Validated kernel descriptor — structural type, safe for use as NTTP.
 /// All optional/default values are resolved; no std::optional.
-struct FmhaBwdDQDKDVKernel
+struct FmhaBwdDQDKDVSpec
 {
     // From Signature
     DataType dtype;
@@ -115,7 +118,7 @@ constexpr int RANDVAL = 11; // optional: present if has_dropout
 /// Minimum tensor slot count (max_used_index + 1) for a given config.
 /// Slot indices are fixed (BIAS=9, DBIAS=10, RANDVAL=11) regardless of
 /// which features are enabled — unused slots are simply not populated.
-consteval int requiredTensors(FmhaBwdDQDKDVKernel k)
+constexpr int requiredTensors(FmhaBwdDQDKDVSpec k)
 {
     if(k.has_dropout)
         return RANDVAL + 1; // 12
@@ -137,7 +140,7 @@ constexpr int DROP_SEED      = 6; // u64: dropout RNG seed
 constexpr int DROP_OFFSET    = 7; // u64: dropout RNG offset
 
 /// Minimum scalar slot count (max_used_index + 1) for a given config.
-consteval int requiredScalars(FmhaBwdDQDKDVKernel k)
+constexpr int requiredScalars(FmhaBwdDQDKDVSpec k)
 {
     if(k.has_dropout)
         return DROP_OFFSET + 1; // 8
@@ -147,15 +150,15 @@ consteval int requiredScalars(FmhaBwdDQDKDVKernel k)
 } // namespace fmha_bwd_dqdkdv_slots
 
 // ---------------------------------------------------------------------------
-// make_kernel — consteval validation
+// make_spec — consteval validation
 // ---------------------------------------------------------------------------
 
 /// Validate config and produce a structural kernel descriptor.
 /// Overload resolution: each kernel family has its own Config type,
-/// so make_kernel(FmhaBwdDQDKDVConfig) is unambiguous.
+/// so make_spec(FmhaBwdDQDKDVConfig) is unambiguous.
 /// All compile-time constraints are checked here; invalid configs produce
 /// a compile error with a descriptive message.
-consteval FmhaBwdDQDKDVKernel make_kernel(FmhaBwdDQDKDVConfig cfg)
+consteval FmhaBwdDQDKDVSpec make_spec(FmhaBwdDQDKDVConfig cfg)
 {
     auto sig  = cfg.signature;
     auto algo = cfg.algorithm;
@@ -209,7 +212,7 @@ consteval FmhaBwdDQDKDVKernel make_kernel(FmhaBwdDQDKDVConfig cfg)
         throw "block_per_cu must be positive (or -1 for auto)";
 
     // --- build the kernel descriptor ---
-    FmhaBwdDQDKDVKernel k{
+    FmhaBwdDQDKDVSpec k{
         .dtype            = sig.dtype,
         .hdim_q           = sig.hdim_q,
         .hdim_v           = sig.hdim_v,
@@ -229,155 +232,15 @@ consteval FmhaBwdDQDKDVKernel make_kernel(FmhaBwdDQDKDVConfig cfg)
     return k;
 }
 
-// ---------------------------------------------------------------------------
-// make_kernel compile-time tests
-// ---------------------------------------------------------------------------
-
+// Compile canary: dropout variant exercises bias/dropout/slot count paths.
 // clang-format off
-
-// --- Valid configs compile ---
-
-// Baseline: FP16, d128, batch, no features
-static_assert(make_kernel(FmhaBwdDQDKDVConfig{
-    .signature = {.dtype = DataType::FP16,
-                  .hdim_q = 128, .hdim_v = 128,
-                  .mode = FmhaMode::BATCH},
-    .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}
-    }).dtype == DataType::FP16);
-
-// BF16 axis
-static_assert(make_kernel(FmhaBwdDQDKDVConfig{
-    .signature = {.dtype = DataType::BF16,
-                  .hdim_q = 128, .hdim_v = 128,
-                  .mode = FmhaMode::BATCH},
-    .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}
-    }).dtype == DataType::BF16);
-
-// Mask axis
-static_assert(make_kernel(FmhaBwdDQDKDVConfig{
-    .signature = {.dtype = DataType::FP16,
-                  .hdim_q = 128, .hdim_v = 128,
-                  .mode = FmhaMode::BATCH},
-    .algorithm = {.has_mask = true,
-                  .pad_hdim_q = 8, .pad_hdim_v = 8}
-    }).has_mask == true);
-
-// Deterministic axis
-static_assert(make_kernel(FmhaBwdDQDKDVConfig{
-    .signature = {.dtype = DataType::FP16,
-                  .hdim_q = 128, .hdim_v = 128,
-                  .mode = FmhaMode::BATCH},
-    .algorithm = {.is_deterministic = true,
-                  .pad_hdim_q = 8, .pad_hdim_v = 8}
-    }).is_deterministic == true);
-
-// Group mode axis
-static_assert(make_kernel(FmhaBwdDQDKDVConfig{
-    .signature = {.dtype = DataType::FP16,
-                  .hdim_q = 128, .hdim_v = 128,
-                  .mode = FmhaMode::GROUP},
-    .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}
-    }).mode == FmhaMode::GROUP);
-
-// Computed fields
-static_assert(make_kernel(FmhaBwdDQDKDVConfig{
-    .signature = {.dtype = DataType::FP16,
-                  .hdim_q = 128, .hdim_v = 128,
-                  .mode = FmhaMode::BATCH},
-    .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}
-    }).block_size == 256);
-
-static_assert(make_kernel(FmhaBwdDQDKDVConfig{
-    .signature = {.dtype = DataType::FP16,
-                  .hdim_q = 128, .hdim_v = 128,
-                  .mode = FmhaMode::BATCH},
-    .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}
-    }).block_n0 == 128);
-
-// block_per_cu defaults to 1 when -1
-static_assert(make_kernel(FmhaBwdDQDKDVConfig{
-    .signature = {.dtype = DataType::FP16,
-                  .hdim_q = 128, .hdim_v = 128,
-                  .mode = FmhaMode::BATCH},
-    .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}
-    }).block_per_cu == 1);
-
-// Slot counts: plain = 9 tensors (DV+1), 4 scalars (NHEAD_RATIO_QK+1)
-static_assert(fmha_bwd_dqdkdv_slots::requiredTensors(make_kernel(
-    FmhaBwdDQDKDVConfig{
-        .signature = {.dtype = DataType::FP16,
-                      .hdim_q = 128, .hdim_v = 128,
-                      .mode = FmhaMode::BATCH},
-        .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}})) == 9);
-
-static_assert(fmha_bwd_dqdkdv_slots::requiredScalars(make_kernel(
-    FmhaBwdDQDKDVConfig{
-        .signature = {.dtype = DataType::FP16,
-                      .hdim_q = 128, .hdim_v = 128,
-                      .mode = FmhaMode::BATCH},
-        .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}})) == 4);
-
-// Bias: 10 tensors (BIAS+1)
-static_assert(fmha_bwd_dqdkdv_slots::requiredTensors(make_kernel(
-    FmhaBwdDQDKDVConfig{
-        .signature = {.dtype = DataType::FP16,
-                      .hdim_q = 128, .hdim_v = 128,
-                      .mode = FmhaMode::BATCH},
-        .algorithm = {.bias_type = FmhaBiasType::ELEMENTWISE,
-                      .pad_hdim_q = 8, .pad_hdim_v = 8}})) == 10);
-
-// Dropout: 12 tensors (RANDVAL+1), 8 scalars (DROP_OFFSET+1)
-static_assert(fmha_bwd_dqdkdv_slots::requiredTensors(make_kernel(
+static_assert(fmha_bwd_dqdkdv_slots::requiredTensors(make_spec(
     FmhaBwdDQDKDVConfig{
         .signature = {.dtype = DataType::FP16,
                       .hdim_q = 128, .hdim_v = 128,
                       .mode = FmhaMode::BATCH},
         .algorithm = {.has_dropout = true,
                       .pad_hdim_q = 8, .pad_hdim_v = 8}})) == 12);
-
-static_assert(fmha_bwd_dqdkdv_slots::requiredScalars(make_kernel(
-    FmhaBwdDQDKDVConfig{
-        .signature = {.dtype = DataType::FP16,
-                      .hdim_q = 128, .hdim_v = 128,
-                      .mode = FmhaMode::BATCH},
-        .algorithm = {.has_dropout = true,
-                      .pad_hdim_q = 8, .pad_hdim_v = 8}})) == 8);
-
-// Invalid configs (uncommenting produces consteval compile errors):
-//
-// make_kernel({.signature = {.dtype = DataType::FP32, ...}})
-//   — FP32 not supported
-//
-// make_kernel({.signature = {.hdim_q = 100, ...}})
-//   — invalid hdim_q
-//
-// make_kernel({.signature = {.mode = FmhaMode::GROUP},
-//              .algorithm = {.pad_hdim_q = 0, .pad_hdim_v = 0}})
-//   — group mode requires padding
-//
-// make_kernel({.algorithm = {.has_bias_grad = true,
-//                            .bias_type = FmhaBiasType::NONE}})
-//   — has_bias_grad requires bias_type != NONE
-//
-// make_kernel({.algorithm = {.pad_hdim_q = 4}})
-//   — pad_hdim_q must be 0, 1, or 8
-
 // clang-format on
-
-// ---------------------------------------------------------------------------
-// Grid calculation
-// ---------------------------------------------------------------------------
-
-/// Compute the launch grid for dQ/dK/dV.
-/// Matches CK Tile's FmhaBwdDQDKDVKernel::GridSize():
-///   dim3(ceil(seqlen_k / kN0), nhead, batch).
-/// block_n0 comes from FmhaBwdDQDKDVKernel::block_n0 (kN0).
-/// Precondition: block_n0 > 0, seqlen_k >= 0, batch > 0, nhead > 0.
-constexpr dim3 dqdkdv_grid_size(int batch, int nhead, int seqlen_k, int block_n0)
-{
-    return dim3(static_cast<unsigned>((seqlen_k + block_n0 - 1) / block_n0),
-                static_cast<unsigned>(nhead),
-                static_cast<unsigned>(batch));
-}
 
 } // namespace rocm_ck
