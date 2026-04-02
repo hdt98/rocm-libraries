@@ -83,7 +83,7 @@ def parse_test_labels(pr_labels: List[str]) -> tuple[List[str], Optional[str]]:
             label_to_project_map[label_name] = project
 
     # Valid test types in order of comprehensiveness (least to most)
-    valid_test_types = ["smoke", "standard", "comprehensive", "full"]
+    valid_test_types = ["quick", "standard", "comprehensive", "full"]
     test_type_priority = {t: i for i, t in enumerate(valid_test_types)}
 
     for label in pr_labels:
@@ -271,7 +271,7 @@ def retrieve_projects(args):
             subtrees = list(subtree_to_project_map.keys())
             # Only override test_type if not already set by label (and it's a PR)
             if not (label_test_type and args.get("is_pull_request")):
-                test_type = "smoke"
+                test_type = "quick"
 
     # for nightly runs, run everything with full tests
     if args.get("is_nightly"):
