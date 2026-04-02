@@ -4,6 +4,7 @@ enable_language(HIP)
 add_library(hipconv STATIC
     src/registry.cpp
     src/grouped/grouped_conv.cpp
+    src/conv3d/conv3d.cpp
 )
 set_target_properties(hipconv PROPERTIES
     POSITION_INDEPENDENT_CODE ON
@@ -12,6 +13,7 @@ set_target_properties(hipconv PROPERTIES
 set_source_files_properties(
     src/registry.cpp
     src/grouped/grouped_conv.cpp
+    src/conv3d/conv3d.cpp
     PROPERTIES LANGUAGE HIP
 )
 

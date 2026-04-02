@@ -3,6 +3,7 @@
 // This file implements the public interface to hipconv
 
 #include "conv2d_params.hpp"
+#include "conv3d_params.hpp"
 #include "export.hpp"
 
 #include <hip/hip_runtime.h>
@@ -17,7 +18,8 @@ namespace hipconv
 enum class Algorithm
 {
     Grouped,
-    Direct
+    Direct,
+    Direct3d, // 3D forward convolution
 };
 
 // Kernel configuration selects an algorithm, a kernel variant within that
@@ -46,5 +48,21 @@ HIPCONV_API void launch(KernelConfig cfg,
                         hipStream_t stream = nullptr);
 
 HIPCONV_API void get_tolerance(KernelConfig cfg, const Conv2dParams& par, float& atol, float& rtol);
+
+// ---- 3D convolution API ----
+// KernelConfig is reused (algorithm = Algorithm::Direct3d).
+
+HIPCONV_API std::vector<KernelConfig> get_valid_configs(const Conv3dParams& par);
+
+HIPCONV_API std::optional<KernelConfig> find_config(const Conv3dParams& par);
+
+HIPCONV_API void launch(KernelConfig cfg,
+                        const Conv3dParams& par,
+                        const void* in,
+                        const void* wei,
+                        void* out,
+                        hipStream_t stream = nullptr);
+
+HIPCONV_API void get_tolerance(KernelConfig cfg, const Conv3dParams& par, float& atol, float& rtol);
 
 } // namespace hipconv
