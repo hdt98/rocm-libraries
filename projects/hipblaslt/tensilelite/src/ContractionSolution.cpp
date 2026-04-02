@@ -1206,7 +1206,13 @@ namespace TensileLite
         {
             uint32_t synchronizerUsage
                 = sizeMapping.synchronizerSizePerWG * problem.getNumTiles(sizeMapping, 1) * B;
-            gsuVal = synchronizerUsage > 409600 ? 1 : gsuVal;
+
+            if (problem.groupedGemm() && (problem.groupedGemmCount() > 1))
+            {
+                gsuVal = synchronizerUsage > (409600 * 16 / problem.groupedGemmCount()) ? 1 : gsuVal;
+            }
+            else
+                gsuVal = synchronizerUsage > (409600 * 16) ? 1 : gsuVal;
         }
 
         // Avoid selecting a gsu value that would make launch grid over the limit
@@ -1417,10 +1423,7 @@ namespace TensileLite
             rv.numWorkGroups.z = 1;
         }
 
-        //short-term workaround
-        int             deviceId;
-        hipDeviceProp_t deviceProperties;
-
+        // Use arch from existing hardware to avoid repeated hipGetDeviceProperties (SWDEV-579719)
         auto removePrefix = [](const std::string& s) {
             size_t pos = s.find("gfx");
             if(pos != std::string::npos)
@@ -1429,10 +1432,7 @@ namespace TensileLite
             }
             return s;
         };
-
-        static_cast<void>(hipGetDevice(&deviceId));
-        static_cast<void>(hipGetDeviceProperties(&deviceProperties, deviceId));
-        auto gpu_arch_no_prefix = removePrefix(deviceProperties.gcnArchName);
+        auto gpu_arch_no_prefix = removePrefix(hardware.archName());
         if(internalArgsSupport.version >= 1)
         {
             rv.numWorkGroups.x *= (rv.numWorkGroups.y * rv.numWorkGroups.z);
