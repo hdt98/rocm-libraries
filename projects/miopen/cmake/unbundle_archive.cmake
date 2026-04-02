@@ -156,12 +156,35 @@ foreach(obj IN LISTS obj_files)
     endif()
 
     # Replace the .hip_fatbin section with the single-arch fatbin.
-    # Must use --update-section (not --remove-section + --add-section) because
-    # .hipFatBinSegment has a relocation at +0x8 that references .hip_fatbin,
-    # and llvm-objcopy refuses to remove a section that is a relocation target.
-    # --update-section replaces the content in-place, preserving relocations.
-    # Note: COFF --update-section requires new size <= original, but this always
-    # holds since we replace a multi-arch fatbin with a single-arch compressed one.
+    # --update-section preserves relocations (.hipFatBinSegment references
+    # .hip_fatbin) and works on both ELF and COFF, but requires the new
+    # content to be no larger than the original section.
+    # For multi-arch bundles this holds: we removed device code blobs.
+    # For single-arch bundles, re-encoding adds overhead that can make the
+    # thin fatbin larger than the original. In that case the object already
+    # contains only our target arch, so use it unchanged.
+    file(SIZE "${fatbin_file}" _orig_fatbin_size)
+    file(SIZE "${thin_fatbin}" _thin_fatbin_size)
+
+    if(_thin_fatbin_size GREATER _orig_fatbin_size)
+        # Count device targets (those containing "gfx"). If more than one,
+        # the thin fatbin should have been smaller — something is wrong.
+        set(_num_device_targets 0)
+        foreach(_t IN LISTS all_targets)
+            if(_t MATCHES "gfx")
+                math(EXPR _num_device_targets "${_num_device_targets} + 1")
+            endif()
+        endforeach()
+        if(NOT _num_device_targets EQUAL 1)
+            message(FATAL_ERROR
+                "Thin fatbin for ${obj_name} is larger than original "
+                "(${_thin_fatbin_size} > ${_orig_fatbin_size}) but bundle "
+                "has ${_num_device_targets} device targets")
+        endif()
+        list(APPEND thin_objs "${obj}")
+        continue()
+    endif()
+
     set(thin_obj "${work_dir}/thin_${obj_name}")
     execute_process(
         COMMAND ${LLVM_OBJCOPY}
