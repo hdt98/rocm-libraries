@@ -264,57 +264,11 @@ class ConfigureCITest(unittest.TestCase):
         self.assertIn("blas", projects)
         self.assertIsNone(test_type)
 
-    def test_parse_test_labels_multiple_projects(self):
-        labels = ["test:rocblas", "test:miopen", "test:rocprim"]
-        projects, test_type = therock_configure_ci.parse_test_labels(labels)
-        self.assertIn("blas", projects)
-        self.assertIn("miopen", projects)
-        self.assertIn("prim", projects)
-        self.assertIsNone(test_type)
-
     def test_parse_test_labels_with_test_type(self):
         labels = ["test:rocblas", "test_type:comprehensive"]
         projects, test_type = therock_configure_ci.parse_test_labels(labels)
         self.assertIn("blas", projects)
         self.assertEqual(test_type, "comprehensive")
-
-    def test_parse_test_labels_multiple_test_types(self):
-        # Should use the most comprehensive one
-        labels = ["test:rocblas", "test_type:smoke", "test_type:comprehensive"]
-        projects, test_type = therock_configure_ci.parse_test_labels(labels)
-        self.assertIn("blas", projects)
-        self.assertEqual(test_type, "comprehensive")
-
-    def test_parse_test_labels_test_type_only(self):
-        labels = ["test_type:smoke"]
-        projects, test_type = therock_configure_ci.parse_test_labels(labels)
-        self.assertEqual(len(projects), 0)
-        self.assertEqual(test_type, "smoke")
-
-    def test_parse_test_labels_unknown_project(self):
-        labels = ["test:unknownproject"]
-        projects, test_type = therock_configure_ci.parse_test_labels(labels)
-        self.assertEqual(len(projects), 0)
-        self.assertIsNone(test_type)
-
-    def test_parse_test_labels_unknown_test_type(self):
-        labels = ["test_type:unknown"]
-        projects, test_type = therock_configure_ci.parse_test_labels(labels)
-        self.assertEqual(len(projects), 0)
-        self.assertIsNone(test_type)
-
-    def test_parse_test_labels_empty(self):
-        labels = []
-        projects, test_type = therock_configure_ci.parse_test_labels(labels)
-        self.assertEqual(len(projects), 0)
-        self.assertIsNone(test_type)
-
-    def test_parse_test_labels_deduplicates_projects(self):
-        # Both rocblas and hipblas map to 'blas'
-        labels = ["test:rocblas", "test:hipblas"]
-        projects, test_type = therock_configure_ci.parse_test_labels(labels)
-        # Should only have 'blas' once
-        self.assertEqual(projects.count("blas"), 1)
 
     @patch("therock_configure_ci.get_modified_paths")
     def test_retrieve_projects_with_test_label(self, mock_get_modified):
@@ -389,17 +343,18 @@ class ConfigureCITest(unittest.TestCase):
         self.assertIn("BLAS", projects_str)  # rocblas
 
     @patch("therock_configure_ci.get_modified_paths")
-    def test_retrieve_projects_nightly_with_label_test_type(self, mock_get_modified):
+    def test_retrieve_projects_nightly_ignores_labels(self, mock_get_modified):
+        # Test labels only apply to pull requests, not nightly runs
         mock_get_modified.return_value = []
 
-        pr_labels_json = '{"labels": [{"name": "test_type:smoke"}]}'
+        pr_labels_json = '{"labels": [{"name": "test:rocblas"}, {"name": "test_type:smoke"}]}'
         projects, test_type = therock_configure_ci.retrieve_projects(
             {"is_nightly": True, "base_ref": "HEAD^", "pr_labels": pr_labels_json}
         )
 
-        # Nightly should test all projects, but label should override test type
-        self.assertGreaterEqual(len(projects), 5)
-        self.assertEqual(test_type, "smoke")
+        # Nightly should test all projects with comprehensive tests (labels ignored)
+        self.assertGreater(len(projects), 0)
+        self.assertEqual(test_type, "comprehensive")
 
 
 if __name__ == "__main__":

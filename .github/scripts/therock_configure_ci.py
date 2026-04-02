@@ -238,8 +238,8 @@ def retrieve_projects(args):
 
     subtrees = get_changed_path_projects(modified_paths)
 
-    # If test: labels are present, add those projects to the build/test list
-    if label_projects:
+    # If test: labels are present (only for pull requests), add those projects to the build/test list
+    if label_projects and args.get("is_pull_request"):
         logging.info(f"Projects specified by labels: {label_projects}")
         # Find at least one subtree that maps to each labeled project
         # We need actual subtrees because collect_projects_to_run expects them
@@ -268,16 +268,14 @@ def retrieve_projects(args):
                 "Enabling all projects since a related workflow file was modified"
             )
             subtrees = list(subtree_to_project_map.keys())
-            # Only override test_type if not already set by label
-            if not label_test_type:
+            # Only override test_type if not already set by label (and it's a PR)
+            if not (label_test_type and args.get("is_pull_request")):
                 test_type = "smoke"
 
-    # for nightly runs, run everything with full tests
+    # for nightly runs, run everything with full tests (labels don't apply)
     if args.get("is_nightly"):
         subtrees = list(subtree_to_project_map.keys())
-        # Only override test_type if not already set by label
-        if not label_test_type:
-            test_type = "comprehensive"
+        test_type = "comprehensive"
 
     project_to_run = collect_projects_to_run(subtrees)
 
