@@ -1740,20 +1740,23 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                             ave_time += launch_flat_desc_gemm_kernel(integral_constant<bool, false>{}, flat_idx);
                     }
                 }
-                if(!used_flat_desc && has_loop_in_all_gemm)
+                if(!used_flat_desc)
                 {
-                    ave_time += launch_kernel(integral_constant<bool, true>{},
-                                              integral_constant<bool, false>{});
-                }
-                else if(no_loop_in_all_gemm)
-                {
-                    ave_time += launch_kernel(integral_constant<bool, false>{},
-                                              integral_constant<bool, true>{});
-                }
-                else
-                {
-                    ave_time += launch_kernel(integral_constant<bool, false>{},
-                                              integral_constant<bool, false>{});
+                    if(has_loop_in_all_gemm)
+                    {
+                        ave_time += launch_kernel(integral_constant<bool, true>{},
+                                                  integral_constant<bool, false>{});
+                    }
+                    else if(no_loop_in_all_gemm)
+                    {
+                        ave_time += launch_kernel(integral_constant<bool, false>{},
+                                                  integral_constant<bool, true>{});
+                    }
+                    else
+                    {
+                        ave_time += launch_kernel(integral_constant<bool, false>{},
+                                                  integral_constant<bool, false>{});
+                    }
                 }
             }
 
