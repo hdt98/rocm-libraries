@@ -4,6 +4,7 @@
 #pragma once
 
 #include "statically_indexed_array.hpp"
+#include <utility> // for std::index_sequence
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
@@ -57,6 +58,50 @@ struct StaticBuffer : public StaticallyIndexedArray<T, N>
         return base::operator()(i);
     }
 
+    // ========================================================================
+    // RUNTIME INDEXING (NEW API - backward compatible)
+    // ========================================================================
+    // NOTE: Using named methods (At/at) instead of operator[] to avoid
+    // ambiguity with the existing operator[](Number<I>) since Number<I>
+    // implicitly converts to index_t.
+
+    // Runtime read access - generates identical assembly when index is constexpr
+    // Implementation: Recursive constexpr dispatch (optimized away by compiler)
+    __host__ __device__ __forceinline__ const T& At(index_t i) const
+    {
+        return runtime_at_impl(*this, i, Number<0>{}, Number<N>{});
+    }
+
+    // Runtime write access - generates identical assembly when index is constexpr
+    __host__ __device__ __forceinline__ T& At(index_t i)
+    {
+        return runtime_at_impl(*this, i, Number<0>{}, Number<N>{});
+    }
+
+private:
+    // Helper: Binary search dispatch for runtime indexing
+    // When i is constexpr, compiler optimizes to direct access
+    template <typename Self, index_t Begin, index_t End>
+    __host__ __device__ static constexpr auto& runtime_at_impl(
+        Self& self, index_t i, Number<Begin>, Number<End>)
+    {
+        if constexpr (End - Begin == 1) {
+            // Base case: single element
+            return self(Number<Begin>{});
+        } else {
+            // Recursive case: binary split
+            constexpr index_t Mid = (Begin + End) / 2;
+            if (i < Mid) {
+                return runtime_at_impl(self, i, Number<Begin>{}, Number<Mid>{});
+            } else {
+                return runtime_at_impl(self, i, Number<Mid>{}, Number<End>{});
+            }
+        }
+    }
+
+public:
+    // ========================================================================
+
     __host__ __device__ void Set(T x)
     {
         static_for<0, N, 1>{}([&](auto i) { operator()(i) = T{x}; });
@@ -64,6 +109,33 @@ struct StaticBuffer : public StaticallyIndexedArray<T, N>
 
     __host__ __device__ void Clear() { Set(T{0}); }
 };
+
+// ====================================================================================
+// OffsetTable: Compile-time offset computation for runtime indexing
+// ====================================================================================
+
+template <index_t N, typename OffsetFunc>
+struct OffsetTable
+{
+    index_t data[N];
+
+    // Compute all offsets at compile time using parameter pack expansion
+    template <index_t... Is>
+    __host__ __device__ constexpr OffsetTable(OffsetFunc f, std::index_sequence<Is...>)
+        : data{f(Number<Is>{})...}
+    {
+    }
+
+    __host__ __device__ constexpr index_t operator[](index_t i) const { return data[i]; }
+};
+
+template <index_t N, typename OffsetFunc>
+__host__ __device__ constexpr auto make_offset_table(OffsetFunc f)
+{
+    return OffsetTable<N, OffsetFunc>(f, std::make_index_sequence<N>{});
+}
+
+// ====================================================================================
 
 // static buffer for vector
 template <AddressSpaceEnum AddressSpace,
