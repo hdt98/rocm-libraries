@@ -47,7 +47,7 @@ import os
 import requests
 import time
 import logging
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -361,3 +361,107 @@ class GitHubCLIClient:
             else:
                 email = f"{username}@users.noreply.github.com"
         return name, email
+
+    # ── Merge Queue helpers ───────────────────────────────────────────
+
+    def get_pr_reviews(self, repo: str, pr_number: int) -> List[dict]:
+        """Fetch all reviews for a pull request."""
+        url = f"{self.api_url}/repos/{repo}/pulls/{pr_number}/reviews?per_page=100"
+        return self._get_paginated_json(
+            url, f"Failed to fetch reviews for PR #{pr_number} in {repo}"
+        )
+
+    def get_check_runs(self, repo: str, sha: str) -> List[dict]:
+        """Fetch check runs for a commit SHA."""
+        url = f"{self.api_url}/repos/{repo}/commits/{sha}/check-runs?per_page=100"
+        data = self._get_json(url, f"Failed to fetch check runs for {sha}")
+        return data.get("check_runs", [])
+
+    def get_combined_status(self, repo: str, sha: str) -> Dict:
+        """Fetch the combined commit status for a SHA."""
+        url = f"{self.api_url}/repos/{repo}/commits/{sha}/status"
+        return self._get_json(url, f"Failed to fetch status for {sha}")
+
+    def update_pr_branch(self, repo: str, pr_number: int) -> bool:
+        """Update a PR branch by merging the base branch into it.
+
+        Returns True on success, False on conflict or error.
+        """
+        url = f"{self.api_url}/repos/{repo}/pulls/{pr_number}/update-branch"
+        result = self._request_json(
+            "PUT", url, {"expected_head_sha": None},
+            f"Failed to update branch for PR #{pr_number} in {repo}",
+        )
+        # Empty dict with no error means 204/success, or result has "message"
+        if result.get("message") and "merge conflict" in result["message"].lower():
+            return False
+        return True
+
+    def merge_pr(self, repo: str, pr_number: int, method: str = "squash") -> bool:
+        """Merge a pull request. Returns True on success."""
+        url = f"{self.api_url}/repos/{repo}/pulls/{pr_number}/merge"
+        result = self._request_json(
+            "PUT",
+            url,
+            {"merge_method": method},
+            f"Failed to merge PR #{pr_number} in {repo}",
+        )
+        return result.get("merged", False)
+
+    def add_labels(self, repo: str, issue_number: int, labels: List[str]) -> None:
+        """Add labels to an issue or PR."""
+        url = f"{self.api_url}/repos/{repo}/issues/{issue_number}/labels"
+        self._request_json(
+            "POST", url, {"labels": labels},
+            f"Failed to add labels to #{issue_number} in {repo}",
+        )
+
+    def remove_label(self, repo: str, issue_number: int, label: str) -> None:
+        """Remove a single label from an issue or PR."""
+        url = f"{self.api_url}/repos/{repo}/issues/{issue_number}/labels/{label}"
+        self._request_json(
+            "DELETE", url, None,
+            f"Failed to remove label '{label}' from #{issue_number} in {repo}",
+        )
+
+    def add_comment(self, repo: str, issue_number: int, body: str) -> dict:
+        """Add a comment to an issue or PR."""
+        url = f"{self.api_url}/repos/{repo}/issues/{issue_number}/comments"
+        return self._request_json(
+            "POST", url, {"body": body},
+            f"Failed to add comment to #{issue_number} in {repo}",
+        )
+
+    def update_comment(self, repo: str, comment_id: int, body: str) -> dict:
+        """Update an existing comment."""
+        url = f"{self.api_url}/repos/{repo}/issues/comments/{comment_id}"
+        return self._request_json(
+            "PATCH", url, {"body": body},
+            f"Failed to update comment {comment_id} in {repo}",
+        )
+
+    def get_comments(self, repo: str, issue_number: int) -> List[dict]:
+        """Fetch all comments on an issue or PR."""
+        url = f"{self.api_url}/repos/{repo}/issues/{issue_number}/comments?per_page=100"
+        return self._get_paginated_json(
+            url, f"Failed to fetch comments for #{issue_number} in {repo}",
+        )
+
+    def get_collaborator_permission(self, repo: str, username: str) -> str:
+        """Get a user's permission level on a repository."""
+        url = f"{self.api_url}/repos/{repo}/collaborators/{username}/permission"
+        data = self._get_json(
+            url, f"Failed to check permissions for {username} in {repo}"
+        )
+        return data.get("permission", "")
+
+    def search_issues(
+        self, query: str, sort: str = "created", order: str = "asc"
+    ) -> List[dict]:
+        """Search issues/PRs using the GitHub search API."""
+        url = (
+            f"{self.api_url}/search/issues"
+            f"?q={requests.utils.quote(query)}&sort={sort}&order={order}&per_page=100"
+        )
+        data = self._get_json(url, f"Failed to search issues: {query}")
+        return data.get("items", [])

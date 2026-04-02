@@ -1,0 +1,52 @@
+name: Merge Queue Status
+
+on:
+  pull_request_target:
+    types: [synchronize]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  eject-on-push:
+    # Only act on PRs that are in the merge queue, and only when a human
+    # pushed (not the bot updating the branch via the processor).
+    if: >-
+      contains(join(github.event.pull_request.labels.*.name, ','), 'mq:') &&
+      github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github
+          sparse-checkout-cone-mode: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests
+        name: Install dependencies
+
+      - name: Eject PR from merge queue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          python -c "
+          import os, sys
+          sys.path.insert(0, '.github/scripts')
+          from github_cli_client import GitHubCLIClient
+          from merge_queue import dequeue_pr
+
+          client = GitHubCLIClient()
+          dequeue_pr(
+              client,
+              os.environ['REPO'],
+              int(os.environ['PR_NUMBER']),
+              'New commits were pushed while in the merge queue. '
+              'Removed from all queues — please re-enqueue with \`/merge\` after CI passes.',
+          )
+          "
