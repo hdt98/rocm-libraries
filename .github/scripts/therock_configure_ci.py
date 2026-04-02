@@ -67,11 +67,6 @@ def parse_test_labels(pr_labels: List[str]) -> tuple[List[str], Optional[str]]:
     """
     Parse PR labels to extract test projects and test type.
 
-    Returns:
-        tuple[List[str], Optional[str]]: A tuple of (projects_to_test, test_type)
-        - projects_to_test: List of project names from 'test:*' labels
-        - test_type: Test type from 'test_type:*' label, or None if not specified
-
     Examples:
         ['test:rocblas', 'test:miopen'] -> (['rocblas', 'miopen'], None)
         ['test:rocblas', 'test_type:comprehensive'] -> (['rocblas'], 'comprehensive')
@@ -88,7 +83,7 @@ def parse_test_labels(pr_labels: List[str]) -> tuple[List[str], Optional[str]]:
             label_to_project_map[label_name] = project
 
     # Valid test types in order of comprehensiveness (least to most)
-    valid_test_types = ["smoke", "standard", "comprehensive"]
+    valid_test_types = ["smoke", "standard", "comprehensive", "full"]
     test_type_priority = {t: i for i, t in enumerate(valid_test_types)}
 
     for label in pr_labels:
@@ -104,7 +99,7 @@ def parse_test_labels(pr_labels: List[str]) -> tuple[List[str], Optional[str]]:
 
         # Parse test_type:* labels
         elif label.startswith("test_type:"):
-            label_test_type = label[10:]  # Remove 'test_type:' prefix
+            label_test_type = label.split("test_type:")[-1]  # Remove 'test_type:' prefix
             if label_test_type in valid_test_types:
                 # If multiple test_type labels, use the most comprehensive one
                 if test_type is None or test_type_priority[label_test_type] > test_type_priority[test_type]:
@@ -272,7 +267,7 @@ def retrieve_projects(args):
             if not (label_test_type and args.get("is_pull_request")):
                 test_type = "smoke"
 
-    # for nightly runs, run everything with full tests (labels don't apply)
+    # for nightly runs, run everything with full tests
     if args.get("is_nightly"):
         subtrees = list(subtree_to_project_map.keys())
         test_type = "comprehensive"
