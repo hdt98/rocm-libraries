@@ -208,6 +208,12 @@ def run_ck_grouped_conv_fwd(args, capture_output=False):
     cmd += [str(args.in_channels)]
     add_conv_params_to_cmd(args, cmd)
 
+    # Add optional named arguments
+    if args.instance != -1:
+        cmd += ["--instance", str(args.instance)]
+    if args.list_instances:
+        cmd += ["--list-instances"]
+
     result = run_ck_profiler_cmd(cmd, capture_output)
     return result
 
@@ -229,6 +235,13 @@ def run_ck_grouped_conv_bwd_data(args, capture_output=False):
     add_conv_params_to_cmd(args, cmd)
 
     cmd += [str(args.split_k_value)]
+    
+    # Add optional named arguments
+    if args.instance != -1:
+        cmd += ["--instance", str(args.instance)]
+    if args.list_instances:
+        cmd += ["--list-instances"]
+    
     return run_ck_profiler_cmd(cmd, capture_output)
 
 
@@ -249,6 +262,13 @@ def run_ck_grouped_conv_bwd_weight(args, capture_output=False):
     add_conv_params_to_cmd(args, cmd)
 
     cmd += [str(args.split_k_value)]
+    
+    # Add optional named arguments
+    if args.instance != -1:
+        cmd += ["--instance", str(args.instance)]
+    if args.list_instances:
+        cmd += ["--list-instances"]
+    
     return run_ck_profiler_cmd(cmd, capture_output)
 
 
@@ -638,6 +658,22 @@ def create_conv_parser():
         default=1,
         required=False,
         help="Number of Groups (Default=1)",
+    )
+    parser.add_argument(
+        "-instance",
+        "--instance",
+        type=int,
+        default=-1,
+        required=False,
+        help="Instance index (Default=-1)",
+    )
+    parser.add_argument(
+        "-list-instances",
+        "--list-instances",
+        action="store_true",
+        default=False,
+        required=False,
+        help="List valid instances without running",
     )
     return parser
 
