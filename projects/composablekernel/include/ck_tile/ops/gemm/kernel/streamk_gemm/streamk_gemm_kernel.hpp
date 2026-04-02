@@ -538,7 +538,11 @@ struct StreamKKernel
     CK_TILE_DEVICE void operator()(StreamKKernelArgs kargs) const
     {
         __shared__ char smem_ptr_0[UniversalGemmKernel::GetSmemSize()];
+        index_t block_idx         = ck_tile::get_block_1d_id();
+        index_t grid_size         = kargs.tile_partitioner.grid_size().x;
         const index_t dp_num_loop = kargs.tile_partitioner.get_iters_per_tile();
+
+        block_idx = kargs.tile_partitioner.remap_xcd(block_idx, grid_size, kargs.num_xccs);
 
         StreamKDispatch(
             kargs.tile_partitioner,
@@ -546,7 +550,7 @@ struct StreamKKernel
                 BaseGemm(kargs, tile_idx, dp_num_loop, 0, 0, kargs.K, smem_ptr_0);
             },
             [&](index_t sk_cta_idx) { StreamKGemm(kargs, sk_cta_idx, smem_ptr_0); },
-            kargs.num_xccs);
+            block_idx);
     }
 
     private:

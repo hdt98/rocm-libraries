@@ -262,12 +262,8 @@ template <typename TilePartitioner_, typename DPTileFunc, typename SKFunc>
 CK_TILE_DEVICE void StreamKDispatch(const TilePartitioner_& tile_partitioner,
                                     DPTileFunc dp_tile_func,
                                     SKFunc sk_func,
-                                    index_t num_xccs)
+                                    index_t block_idx)
 {
-    index_t grid_size = tile_partitioner.grid_size().x;
-    index_t block_idx = get_block_1d_id();
-    block_idx         = tile_partitioner.remap_xcd(block_idx, grid_size, num_xccs);
-
     if constexpr(TilePartitioner_::PERSISTENT)
     {
         // Persistent: each workgroup loops over multiple DP tiles, then does SK work
