@@ -79,30 +79,13 @@ def parse_test_labels(pr_labels: List[str]) -> tuple[List[str], Optional[str]]:
     projects_to_test = []
     test_type = None
 
-    # Map of label project names to internal project names
-    label_to_project_map = {
-        "rocblas": "blas",
-        "hipblas": "blas",
-        "hipblaslt": "blas",
-        "miopen": "miopen",
-        "rocprim": "prim",
-        "hipcub": "prim",
-        "rocthrust": "prim",
-        "rocrand": "rand",
-        "hiprand": "rand",
-        "rocfft": "fft",
-        "hipfft": "fft",
-        "rocsparse": "sparse",
-        "hipsparse": "sparse",
-        "hipsparselt": "sparse",
-        "rocsolver": "solver",
-        "hipsolver": "solver",
-        "rocwmma": "rocwmma",
-        "hipdnn": "hipdnn",
-        "miopen-provider": "miopen-provider",
-        "hipblaslt-provider": "hipblaslt-provider",
-        "composablekernel": "miopen",
-    }
+    # Build label_to_project_map from subtree_to_project_map
+    label_to_project_map = {}
+    for subtree, project in subtree_to_project_map.items():
+        # Extract the project name from the subtree path (e.g., "projects/rocblas" -> "rocblas")
+        if subtree.startswith("projects/") or subtree.startswith("dnn-providers/"):
+            label_name = subtree.split("/")[-1]
+            label_to_project_map[label_name] = project
 
     # Valid test types in order of comprehensiveness (least to most)
     valid_test_types = ["smoke", "standard", "comprehensive"]
