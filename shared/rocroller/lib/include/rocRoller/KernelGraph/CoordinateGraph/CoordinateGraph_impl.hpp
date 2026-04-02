@@ -163,7 +163,7 @@ namespace rocRoller
         requires(std::constructible_from<CoordinateGraph::Element, T>) inline std::optional<
             T> CoordinateGraph::get(int tag) const
         {
-            auto x = getElement(tag);
+            auto const& x = getElement(tag);
             if constexpr(std::constructible_from<Edge, T>)
             {
                 if(std::holds_alternative<Edge>(x))

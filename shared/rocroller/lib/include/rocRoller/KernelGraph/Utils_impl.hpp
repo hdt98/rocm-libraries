@@ -340,7 +340,7 @@ namespace rocRoller::KernelGraph
         using namespace ControlGraph;
         using namespace CoordinateGraph;
 
-        const auto element = kgraph.control.getElement(srcOpTag);
+        const auto& element = kgraph.control.getElement(srcOpTag);
         AssertFatal(std::holds_alternative<Operation>(element),
                     concatenate("Expected Operation but got Edge", ShowValue(srcOpTag)));
 
@@ -354,8 +354,8 @@ namespace rocRoller::KernelGraph
 
         for(auto conn : kgraph.mapper.getCoordinateConnections(macroTileTag))
         {
-            const auto dstOpTag = conn.control;
-            const auto element  = kgraph.control.getElement(dstOpTag);
+            const auto  dstOpTag = conn.control;
+            const auto& element  = kgraph.control.getElement(dstOpTag);
             AssertFatal(std::holds_alternative<Operation>(element),
                         concatenate("Expected Operation but got Edge", ShowValue(dstOpTag)));
 

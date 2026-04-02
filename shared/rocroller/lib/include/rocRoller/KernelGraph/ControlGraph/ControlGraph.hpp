@@ -58,6 +58,7 @@ namespace rocRoller
             Invalid = 0, //< Cache is empty
             Partial, //< Cache does not have all the orders between nodes
             Valid, //< Cache has all orders of nodes
+            Frozen,
             Count
         };
 
@@ -244,6 +245,25 @@ namespace rocRoller
             void setRestricted()
             {
                 m_changesRestricted = true;
+            }
+
+            void freezeCache() const
+            {
+                if(m_cacheStatus != CacheStatus::Frozen)
+                {
+                    populateOrderCache();
+                    m_cacheStatus = CacheStatus::Frozen;
+                }
+            }
+
+            void unfreezeCache() const
+            {
+                AssertFatal(m_cacheStatus == CacheStatus::Frozen,
+                            "Cannot unfreeze cache when the status is not frozen");
+
+                m_orderCache.clear();
+                m_descendentCache.clear();
+                m_cacheStatus = CacheStatus::Invalid;
             }
 
         private:

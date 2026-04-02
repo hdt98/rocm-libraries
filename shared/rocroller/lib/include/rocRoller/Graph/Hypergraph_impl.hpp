@@ -316,7 +316,7 @@ namespace rocRoller
             auto match = false;
             for(auto e : getNeighbours<Graph::Direction::Downstream>(inputs[0]))
             {
-                auto elem = getElement(e);
+                auto const& elem = getElement(e);
                 if(!edgePredicate(std::get<Edge>(elem)))
                     continue;
 

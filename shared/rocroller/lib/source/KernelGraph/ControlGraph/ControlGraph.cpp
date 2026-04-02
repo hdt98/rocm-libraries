@@ -112,6 +112,9 @@ namespace rocRoller::KernelGraph::ControlGraph
     {
         Hypergraph<Operation, ControlEdge, false>::clearCache(modification);
 
+        if(m_cacheStatus == CacheStatus::Frozen)
+            return;
+
         if(modification == Graph::GraphModification::AddElement
            && m_cacheStatus != CacheStatus::Invalid)
         {
@@ -196,7 +199,7 @@ namespace rocRoller::KernelGraph::ControlGraph
     {
         TIMER(t, "populateOrderCache");
 
-        if(m_cacheStatus == CacheStatus::Valid)
+        if(m_cacheStatus == CacheStatus::Valid || m_cacheStatus == CacheStatus::Frozen)
             return;
 
         m_orderCache.clear();
@@ -505,7 +508,7 @@ namespace rocRoller::KernelGraph::ControlGraph
 
     NodeOrdering ControlGraph::compareNodes(CacheOnlyPolicy const, int nodeA, int nodeB) const
     {
-        AssertFatal(m_cacheStatus == CacheStatus::Valid);
+        AssertFatal(m_cacheStatus == CacheStatus::Valid or m_cacheStatus == CacheStatus::Frozen);
 
         validateNodes(*this, nodeA, nodeB);
         return lookupOrder(CacheOnly, nodeA, nodeB);
