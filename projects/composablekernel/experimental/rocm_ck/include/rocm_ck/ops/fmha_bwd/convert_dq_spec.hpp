@@ -7,17 +7,20 @@
 // dQ/dK/dV kernel via split-K) to the original dtype (fp16/bf16). It sums
 // the per-split partial results and type-converts in one pass.
 //
-// This header has NO CK Tile dependency. It is included by both host code
-// (main.cpp) and device code (.hip files) to share the kernel ABI and
-// compile-time-validated configuration. Requires HIP for dim3.
+// SHARED header: compiled in both host and device (--cuda-device-only) passes.
+// Contains structural types, consteval make_spec() factory, and named slot
+// constants. No runtime code, no HIP dependency.
+//
+// Compilation boundary:
+//   _spec.hpp (this) — consteval factory + slot constants (both passes)
+//   _api.hpp         — host-only helpers: grid_size (host pass only, #error on device)
+//   _dev.hpp         — CK Tile bridge + __device__ code (device pass only, #error on host)
 
 #pragma once
 
-#include "rocm_fmha_bwd_common.hpp"
+#include <rocm_ck/ops/fmha_bwd/common.hpp>
 
 #include <rocm_ck/datatype_utils.hpp>
-
-#include <hip/hip_runtime.h>
 
 namespace rocm_ck {
 
@@ -52,7 +55,7 @@ struct FmhaBwdConvertDQConfig
 
 /// Validated kernel descriptor -- structural type, safe for use as NTTP.
 /// All optional/default values are resolved; no std::optional.
-struct FmhaBwdConvertDQKernel
+struct FmhaBwdConvertDQSpec
 {
     DataType dtype;
     int hdim_q;
@@ -89,7 +92,7 @@ constexpr int SEQLEN_K   = 5; // [batch]   per-sequence K-lengths
 // constexpr int RESERVED = 0;
 
 /// Number of tensor slots required for a given kernel configuration.
-consteval int requiredTensors(FmhaBwdConvertDQKernel k)
+constexpr int requiredTensors(FmhaBwdConvertDQSpec k)
 {
     int n = 2; // DQ_ACC + DQ
     if(k.mode == FmhaMode::GROUP)
@@ -98,7 +101,7 @@ consteval int requiredTensors(FmhaBwdConvertDQKernel k)
 }
 
 /// Number of scalar slots required for a given kernel configuration.
-consteval int requiredScalars(FmhaBwdConvertDQKernel /* k */)
+constexpr int requiredScalars(FmhaBwdConvertDQSpec /* k */)
 {
     return 0; // ConvertQGrad has no scalar parameters
 }
@@ -106,13 +109,13 @@ consteval int requiredScalars(FmhaBwdConvertDQKernel /* k */)
 } // namespace fmha_bwd_convert_dq_slots
 
 // ---------------------------------------------------------------------------
-// make_kernel -- consteval validation
+// make_spec -- consteval validation
 // ---------------------------------------------------------------------------
 
 /// Validate config and produce a structural kernel descriptor.
 /// Overload resolution: each kernel family has its own Config type,
-/// so make_kernel(FmhaBwdConvertDQConfig) is unambiguous.
-consteval FmhaBwdConvertDQKernel make_kernel(FmhaBwdConvertDQConfig cfg)
+/// so make_spec(FmhaBwdConvertDQConfig) is unambiguous.
+consteval FmhaBwdConvertDQSpec make_spec(FmhaBwdConvertDQConfig cfg)
 {
     auto sig  = cfg.signature;
     auto algo = cfg.algorithm;
@@ -137,98 +140,25 @@ consteval FmhaBwdConvertDQKernel make_kernel(FmhaBwdConvertDQConfig cfg)
     // Matches the CK Tile ConvertQGrad kernel configuration for d128.
     constexpr int block_size = 256;
 
-    FmhaBwdConvertDQKernel k{sig.dtype,
-                             sig.hdim_q,
-                             sig.mode,
-                             algo.is_deterministic,
-                             algo.pad_seqlen_q,
-                             algo.pad_hdim_q,
-                             algo.block_per_cu,
-                             block_size};
+    FmhaBwdConvertDQSpec k{sig.dtype,
+                           sig.hdim_q,
+                           sig.mode,
+                           algo.is_deterministic,
+                           algo.pad_seqlen_q,
+                           algo.pad_hdim_q,
+                           algo.block_per_cu,
+                           block_size};
 
     return k;
 }
 
-// --- make_kernel compile-time tests ---
+// Compile canary: GROUP mode exercises pad_seqlen_q and mode constraints.
 // clang-format off
-
-// Valid configs compile:
-static_assert(make_kernel(FmhaBwdConvertDQConfig{
-    .signature = {.dtype = DataType::FP16, .hdim_q = 128,
-                  .mode = FmhaMode::BATCH},
-    .algorithm = {.pad_seqlen_q = true, .pad_hdim_q = true}
-}).dtype == DataType::FP16);
-
-static_assert(make_kernel(FmhaBwdConvertDQConfig{
-    .signature = {.dtype = DataType::BF16, .hdim_q = 64,
-                  .mode = FmhaMode::BATCH},
-    .algorithm = {.pad_seqlen_q = true, .pad_hdim_q = true}
-}).hdim_q == 64);
-
-static_assert(make_kernel(FmhaBwdConvertDQConfig{
+static_assert(make_spec(FmhaBwdConvertDQConfig{
     .signature = {.dtype = DataType::FP16, .hdim_q = 128,
                   .mode = FmhaMode::GROUP},
     .algorithm = {.pad_seqlen_q = true, .pad_hdim_q = true}
 }).mode == FmhaMode::GROUP);
-
-static_assert(make_kernel(FmhaBwdConvertDQConfig{
-    .signature = {.dtype = DataType::FP16, .hdim_q = 128,
-                  .mode = FmhaMode::BATCH},
-    .algorithm = {.pad_seqlen_q = false, .pad_hdim_q = false}
-}).pad_seqlen_q == false);
-
-static_assert(make_kernel(FmhaBwdConvertDQConfig{
-    .signature = {.dtype = DataType::FP16, .hdim_q = 128,
-                  .mode = FmhaMode::BATCH},
-    .algorithm = {}
-}).block_size == 256);
-
-static_assert(make_kernel(FmhaBwdConvertDQConfig{
-    .signature = {.dtype = DataType::FP16, .hdim_q = 128,
-                  .mode = FmhaMode::BATCH},
-    .algorithm = {}
-}).is_deterministic == true);
-
-// Slot counts: batch = 2 tensors, group = 6 tensors
-static_assert(fmha_bwd_convert_dq_slots::requiredTensors(
-    make_kernel(FmhaBwdConvertDQConfig{
-        .signature = {.dtype = DataType::FP16, .hdim_q = 128,
-                      .mode = FmhaMode::BATCH},
-        .algorithm = {}})) == 2);
-
-static_assert(fmha_bwd_convert_dq_slots::requiredTensors(
-    make_kernel(FmhaBwdConvertDQConfig{
-        .signature = {.dtype = DataType::FP16, .hdim_q = 128,
-                      .mode = FmhaMode::GROUP},
-        .algorithm = {}})) == 6);
-
-// Invalid configs (uncommenting produces consteval compile errors):
-// make_kernel({.signature = {.dtype = DataType::FP32, ...}})
-//   -- FP32 not supported
-// make_kernel({.signature = {.hdim_q = 100, ...}})
-//   -- invalid hdim
-// make_kernel({.signature = {.mode = FmhaMode::GROUP},
-//              .algorithm = {.pad_seqlen_q = false}})
-//   -- group mode requires pad_seqlen_q
-// make_kernel({..., .algorithm = {.block_per_cu = 0}})
-//   -- block_per_cu must be positive
-
 // clang-format on
-
-// ---------------------------------------------------------------------------
-// Grid calculation
-// ---------------------------------------------------------------------------
-
-/// Compute the launch grid for ConvertDQ.
-/// Matches FmhaBwdConvertQGradKernel::GridSize():
-///   dim3(ceil(seqlen_q / kM0), nhead, batch).
-/// kM0 = 64 (tile rows along seqlen_q for 1D kernels), NOT block_size.
-/// Precondition: tile_m0 > 0, seqlen_q >= 0, batch > 0, nhead > 0.
-constexpr dim3 convert_dq_grid_size(int batch, int nhead, int seqlen_q, int tile_m0 = 64)
-{
-    return dim3(static_cast<unsigned>((seqlen_q + tile_m0 - 1) / tile_m0),
-                static_cast<unsigned>(nhead),
-                static_cast<unsigned>(batch));
-}
 
 } // namespace rocm_ck

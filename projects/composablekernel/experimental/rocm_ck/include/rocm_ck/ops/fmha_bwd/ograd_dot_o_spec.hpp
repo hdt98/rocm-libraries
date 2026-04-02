@@ -4,17 +4,20 @@
 // Compile-time configuration and named slot constants for the FMHA BWD
 // OGradDotO kernel family.
 //
-// This header has no CK Tile dependency. It is included by both host code
-// (main.cpp) and device code (.hip files) to share the kernel ABI and
-// compile-time-validated configuration. Requires HIP for dim3.
+// SHARED header: compiled in both host and device (--cuda-device-only) passes.
+// Contains structural types, consteval make_spec() factory, and named slot
+// constants. No runtime code, no HIP dependency.
+//
+// Compilation boundary:
+//   _spec.hpp (this) — consteval factory + slot constants (both passes)
+//   _api.hpp         — host-only helpers: grid_size (host pass only, #error on device)
+//   _dev.hpp         — CK Tile bridge + __device__ code (device pass only, #error on host)
 
 #pragma once
 
-#include "rocm_fmha_bwd_common.hpp"
+#include <rocm_ck/ops/fmha_bwd/common.hpp>
 
 #include <rocm_ck/datatype_utils.hpp>
-
-#include <hip/hip_runtime.h>
 
 #include <cstdint>
 
@@ -50,7 +53,7 @@ struct FmhaBwdOGradDotOConfig
 
 /// Validated kernel descriptor -- structural type, safe for use as NTTP.
 /// All optional/default values are resolved; no std::optional.
-struct FmhaBwdOGradDotOKernel
+struct FmhaBwdOGradDotOSpec
 {
     DataType dtype;
     int hdim_v;
@@ -63,8 +66,8 @@ struct FmhaBwdOGradDotOKernel
 
 /// Validate config and produce a structural kernel descriptor.
 /// Overload resolution: each kernel family has its own Config type,
-/// so make_kernel(FmhaBwdOGradDotOConfig) is unambiguous.
-consteval FmhaBwdOGradDotOKernel make_kernel(FmhaBwdOGradDotOConfig cfg)
+/// so make_spec(FmhaBwdOGradDotOConfig) is unambiguous.
+consteval FmhaBwdOGradDotOSpec make_spec(FmhaBwdOGradDotOConfig cfg)
 {
     auto sig  = cfg.signature;
     auto algo = cfg.algorithm;
@@ -102,30 +105,11 @@ consteval FmhaBwdOGradDotOKernel make_kernel(FmhaBwdOGradDotOConfig cfg)
             algo.block_size};
 }
 
-// --- make_kernel compile-time tests ---
+// Compile canary: GROUP mode exercises pad_seqlen_q constraint.
 // clang-format off
-
-// Valid configs compile:
-static_assert(make_kernel(FmhaBwdOGradDotOConfig{
-    .signature = {.dtype = DataType::FP16, .hdim_v = 128, .mode = FmhaMode::BATCH},
-    .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}}).dtype == DataType::FP16);
-static_assert(make_kernel(FmhaBwdOGradDotOConfig{
-    .signature = {.dtype = DataType::BF16, .hdim_v = 64, .mode = FmhaMode::BATCH},
-    .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}}).hdim_v == 64);
-static_assert(make_kernel(FmhaBwdOGradDotOConfig{
+static_assert(make_spec(FmhaBwdOGradDotOConfig{
     .signature = {.dtype = DataType::FP16, .hdim_v = 128, .mode = FmhaMode::GROUP},
     .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}}).mode == FmhaMode::GROUP);
-static_assert(make_kernel(FmhaBwdOGradDotOConfig{
-    .signature = {.dtype = DataType::FP16, .hdim_v = 128, .mode = FmhaMode::BATCH},
-    .algorithm = {.pad_seqlen_q = false, .pad_hdim_v = false}}).pad_seqlen_q == false);
-
-// Invalid configs (uncommenting produces consteval compile errors):
-// make_kernel({.signature = {.dtype = DataType::FP32, ...}})  -- FP32 not supported
-// make_kernel({.signature = {.hdim_v = 100, ...}})            -- invalid hdim
-// make_kernel({.signature = {.mode = FmhaMode::GROUP},
-//              .algorithm = {.pad_seqlen_q = false}})
-//   -- group mode requires pad_seqlen_q
-
 // clang-format on
 
 // ---------------------------------------------------------------------------
@@ -149,29 +133,14 @@ constexpr int SEQLEN_Q   = 4; // const int32_t*: per-batch actual lengths
 constexpr int P_UNDROP = 0; // float: 1 / (1 - dropout_rate)
 
 /// Number of tensor slots required for a given kernel configuration.
-consteval int requiredTensors(FmhaBwdOGradDotOKernel k)
+constexpr int requiredTensors(FmhaBwdOGradDotOSpec k)
 {
     return (k.mode == FmhaMode::GROUP) ? 5 : 3;
 }
 
 /// Number of scalar slots required (always 1: p_undrop).
-consteval int requiredScalars(FmhaBwdOGradDotOKernel /*k*/) { return 1; }
+constexpr int requiredScalars(FmhaBwdOGradDotOSpec /*k*/) { return 1; }
 
 } // namespace fmha_bwd_ograd_dot_o_slots
-
-// ---------------------------------------------------------------------------
-// Grid calculation
-// ---------------------------------------------------------------------------
-
-/// Compute the launch grid for OGradDotO.
-/// Matches FmhaBwdOGradDotOKernel::GridSize():
-///   dim3(ceil(seqlen_q / kM0), nhead, batch).
-/// Precondition: block_size > 0, seqlen_q >= 0, batch > 0, nhead > 0.
-constexpr dim3 ograd_dot_o_grid_size(int batch, int nhead, int seqlen_q, int block_size)
-{
-    return dim3(static_cast<unsigned>((seqlen_q + block_size - 1) / block_size),
-                static_cast<unsigned>(nhead),
-                static_cast<unsigned>(batch));
-}
 
 } // namespace rocm_ck

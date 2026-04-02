@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //
 // Device-side bridge for FMHA BWD ConvertDQ. Maps the validated kernel
-// descriptor (FmhaBwdConvertDQKernel) to the CK Tile template chain.
+// descriptor (FmhaBwdConvertDQSpec) to the CK Tile template chain.
 //
 // ConvertDQ sums split-K partial results from the deterministic dQ/dK/dV
 // kernel and type-converts dQ_acc (fp32) to dQ (fp16/bf16) in one pass.
@@ -11,11 +11,21 @@
 // CK Tile's Kargs via aggregate initialization. No __builtin_bit_cast,
 // no ABI matching required.
 //
-// Uses C++20 struct NTTPs: template <FmhaBwdConvertDQKernel K>.
+// Uses C++20 struct NTTPs: template <FmhaBwdConvertDQSpec K>.
+//
+// Compilation boundary:
+//   _spec.hpp — consteval factory + slot constants (both passes)
+//   _api.hpp  — host-only helpers: grid_size (host pass only, #error on device)
+//   _dev.hpp (this) — CK Tile bridge + __device__ code (device pass only, #error on host)
 
 #pragma once
 
-#include "rocm_fmha_bwd_convert_dq_api.hpp"
+#ifndef __HIP_DEVICE_COMPILE__
+#error "convert_dq_dev.hpp requires device compilation." \
+       " Host code should include <rocm_ck/ops/fmha_bwd/convert_dq_api.hpp>."
+#endif
+
+#include <rocm_ck/ops/fmha_bwd/convert_dq_spec.hpp>
 
 #include <rocm_ck/args.hpp>
 #include <rocm_ck/ck_type_map.hpp>
@@ -25,7 +35,7 @@
 
 namespace rocm_ck {
 
-/// Maps a FmhaBwdConvertDQKernel descriptor to the full CK Tile type chain.
+/// Maps a FmhaBwdConvertDQSpec descriptor to the full CK Tile type chain.
 ///
 /// Template chain (matches dispatcher codegen):
 ///   FmhaBwdConvertQGradKernel<Pipeline>
@@ -41,7 +51,7 @@ namespace rocm_ck {
 ///      Defaults to hdim_q which matches the most common tile configs
 ///      (d128->kN0=128, d64->kN0=64). Override via the kN0 template
 ///      parameter for tile configs where kN0 != hdim_q.
-template <FmhaBwdConvertDQKernel K, int kN0 = K.hdim_q>
+template <FmhaBwdConvertDQSpec K, int kN0 = K.hdim_q>
 struct FmhaBwdConvertDQTypes
 {
     using QGradDataType    = typename CkTypeMap<K.dtype>::type;
@@ -108,7 +118,7 @@ struct FmhaBwdConvertDQTypes
 /// it to void* here. This is safe because the host allocated it as mutable.
 ///
 /// Call this from an extern "C" __global__ wrapper.
-template <FmhaBwdConvertDQKernel K, int kN0 = K.hdim_q>
+template <FmhaBwdConvertDQSpec K, int kN0 = K.hdim_q>
 __device__ void runFmhaBwdConvertDQ(Args args)
 {
     using T     = FmhaBwdConvertDQTypes<K, kN0>;

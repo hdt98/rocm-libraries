@@ -2,17 +2,27 @@
 // SPDX-License-Identifier: MIT
 //
 // Device-side bridge for FMHA BWD dQ/dK/dV. Maps the validated kernel
-// descriptor (FmhaBwdDQDKDVKernel) to the CK Tile template chain.
+// descriptor (FmhaBwdDQDKDVSpec) to the CK Tile template chain.
 //
 // Unpacks generic rocm_ck::Args via named slot constants, then constructs
 // CK Tile's Kargs via field-by-field assignment. MakeKargs()/MakeKargsImpl()
 // are host-only, so we initialize directly on the device side.
 //
-// Uses C++20 struct NTTPs: template <FmhaBwdDQDKDVKernel K>.
+// Uses C++20 struct NTTPs: template <FmhaBwdDQDKDVSpec K>.
+//
+// Compilation boundary:
+//   _spec.hpp — consteval factory + slot constants (both passes)
+//   _api.hpp  — host-only helpers: grid_size (host pass only, #error on device)
+//   _dev.hpp (this) — CK Tile bridge + __device__ code (device pass only, #error on host)
 
 #pragma once
 
-#include "rocm_fmha_bwd_dqdkdv_api.hpp"
+#ifndef __HIP_DEVICE_COMPILE__
+#error "dqdkdv_dev.hpp requires device compilation." \
+       " Host code should include <rocm_ck/ops/fmha_bwd/dqdkdv_api.hpp>."
+#endif
+
+#include <rocm_ck/ops/fmha_bwd/dqdkdv_spec.hpp>
 
 #include <rocm_ck/args.hpp>
 #include <rocm_ck/ck_type_map.hpp>
@@ -43,10 +53,10 @@ consteval ck_tile::BlockAttentionBiasEnum biasTypeToCkEnum(FmhaBiasType bt)
 // FmhaBwdDQDKDVTypes — maps kernel descriptor to CK Tile type chain
 // =========================================================================
 
-/// Maps a FmhaBwdDQDKDVKernel descriptor to the full CK Tile type chain.
+/// Maps a FmhaBwdDQDKDVSpec descriptor to the full CK Tile type chain.
 ///
 /// Template chain (matches dispatcher codegen):
-///   FmhaBwdDQDKDVKernel<Pipeline, KGradEpi, VGradEpi, QGradEpi>
+///   FmhaBwdDQDKDVSpec<Pipeline, KGradEpi, VGradEpi, QGradEpi>
 ///     -> BlockFmhaBwdDQDKDVPipeline<PipelineProblem>
 ///       -> BlockFmhaBwdPipelineProblem<Q,K,V,Gemm,LSE,Acc,D,Bias,RandVal,
 ///              O,dO,dQ,dK,dV,dBias, Shape, isGroup, isDet, Mask, Dropout,
@@ -54,7 +64,7 @@ consteval ck_tile::BlockAttentionBiasEnum biasTypeToCkEnum(FmhaBiasType bt)
 ///         -> TileFmhaBwdTraits<padQ, padV, BiasEnum, hasBiasGrad, blockPerCu>
 ///         -> TileFmhaBwdShape<BlockTile, G0BW, G0WT, G1BW, G1WT,
 ///              G2BW, G2WT, G3BW, G3WT, G4BW, G4WT, maxSeqLenQ>
-template <FmhaBwdDQDKDVKernel K>
+template <FmhaBwdDQDKDVSpec K>
 struct FmhaBwdDQDKDVTypes
 {
     // --- Data types ---
@@ -210,7 +220,7 @@ struct FmhaBwdDQDKDVTypes
 
     // --- Kernel ---
     using Kernel =
-        ck_tile::FmhaBwdDQDKDVKernel<Pipeline, KGradEpilogue, VGradEpilogue, QGradEpilogue>;
+        ck_tile::FmhaBwdDQDKDVSpec<Pipeline, KGradEpilogue, VGradEpilogue, QGradEpilogue>;
 
     using Kargs = typename Kernel::Kargs;
 };
@@ -268,7 +278,7 @@ struct FmhaBwdDQDKDVTypes
 /// The nhead_stride_dq_acc is long_index_t (int64).
 ///
 /// Call this from an extern "C" __global__ wrapper.
-template <FmhaBwdDQDKDVKernel K>
+template <FmhaBwdDQDKDVSpec K>
 __device__ void runFmhaBwdDQDKDV(Args args)
 {
     using T     = FmhaBwdDQDKDVTypes<K>;
