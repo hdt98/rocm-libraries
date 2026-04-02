@@ -27,7 +27,208 @@ using WeiElementOp = PassThrough;
 using OutElementOp = PassThrough;
 
 // Split-K 3D conv instance (Filter3x3Stride1Pad0, SplitKFactor=-1 = auto-deduce).
-// Same tile geometry as the baseline 3D instance in run_grouped_conv_fwd_example.inc.
+// This instance is good for cases where K=96 and C=96
+// template <ck::index_t NDimSpatial, int SplitKFactor>
+// using ConvFwdSplitK =
+//     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<
+//         NDimSpatial,
+//         InputLayout<NDimSpatial>,
+//         WeightLayout<NDimSpatial>,
+//         ck::Tuple<>,
+//         OutputLayout<NDimSpatial>,
+//         InKernelDataType,
+//         WeiKernelDataType,
+//         AccDataType,
+//         CShuffleDataType,
+//         ck::Tuple<>,
+//         OutKernelDataType,
+//         InElementOp,
+//         WeiElementOp,
+//         OutElementOp,
+//         //ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0,
+//         ck::tensor_operation::device::ConvolutionForwardSpecialization::Default,
+//         GemmSpec,
+//         1,               // NumGemmKPrefetchStage
+//         256,             // BlockSize
+//         256, 96,  32,   // MPerBlock=256, NPerBlock=32, KPerBlock=64
+//           8,   8,        // AK1, BK1
+//          32,  32,        // MPerXDL, NPerXDL
+//           4,   3,        // MXdlPerWave=2, NXdlPerWave=1
+//                          //   → MWave=256/(2×32)=4, NWave=32/(1×32)=1, WaveSize=64 ✓ (Rule 1)
+//         S<4, 64, 1>, S<1, 0, 2>, S<1, 0, 2>, 2, 8, 8, 1,  // A: AK0=64/8=8, S<8,32,1>=256 ✓ (Rule 2)
+//         S<4, 32, 1>, S<1, 0, 2>, S<1, 0, 2>, 2, 8, 8, 1,  // B: BK0=64/8=8, S<8,32,1>=256 ✓ (Rule 2)
+//         1, 1,
+//         S<1, 64, 1, 4>,  // CDE: CShuffleTile=128×32; B=32/8=4, A=64; product=256 ✓ (Rule 6)
+//         8,               // ScalarPerVector: NWave×NPerXDL=32, 32%8=0 ✓; K=96, 96%8=0 ✓
+//         BF16,            // AComputeDataType (explicit to avoid unpack default complexity)
+//         BF16,            // BComputeDataType
+//         ck::LoopScheduler::Default,
+//         1,               // NumGroupsToMerge
+//         false,           // DoubleBuffer
+//         SplitKFactor>;             // SplitKFactor = -1 (auto-deduce k_batch)
+
+// K = 192 instance
+// template <ck::index_t NDimSpatial, int SplitKFactor>
+// using ConvFwdSplitK =
+//     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<
+//         NDimSpatial,
+//         InputLayout<NDimSpatial>,
+//         WeightLayout<NDimSpatial>,
+//         ck::Tuple<>,
+//         OutputLayout<NDimSpatial>,
+//         InKernelDataType,
+//         WeiKernelDataType,
+//         AccDataType,
+//         CShuffleDataType,
+//         ck::Tuple<>,
+//         OutKernelDataType,
+//         InElementOp,
+//         WeiElementOp,
+//         OutElementOp,
+//         ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0,
+//         //ck::tensor_operation::device::ConvolutionForwardSpecialization::Default,
+//         GemmSpec,
+//         1,               // NumGemmKPrefetchStage
+//         256,             // BlockSize
+//         128, 192,  32,   // MPerBlock=256, NPerBlock=32, KPerBlock=64
+//           8,   8,        // AK1, BK1
+//          32,  32,        // MPerXDL, NPerXDL
+//           2,   3,        // MXdlPerWave=2, NXdlPerWave=1
+//                          //   → MWave=256/(2×32)=4, NWave=32/(1×32)=1, WaveSize=64 ✓ (Rule 1)
+//         S<4, 64, 1>, S<1, 0, 2>, S<1, 0, 2>, 2, 8, 8, 1,  // A: AK0=64/8=8, S<8,32,1>=256 ✓ (Rule 2)
+//         S<4, 64, 1>, S<1, 0, 2>, S<1, 0, 2>, 2, 8, 8, 1,  // B: BK0=64/8=8, S<8,32,1>=256 ✓ (Rule 2)
+//         1, 1,
+//         S<1, 32, 1, 8>,  // CDE: CShuffleTile=128×32; B=32/8=4, A=64; product=256 ✓ (Rule 6)
+//         8,               // ScalarPerVector: NWave×NPerXDL=32, 32%8=0 ✓; K=96, 96%8=0 ✓
+//         BF16,            // AComputeDataType (explicit to avoid unpack default complexity)
+//         BF16,            // BComputeDataType
+//         ck::LoopScheduler::Default,
+//         1,               // NumGroupsToMerge
+//         false,           // DoubleBuffer
+//         SplitKFactor>;             // SplitKFactor = -1 (auto-deduce k_batch)
+
+// K = 384 instance
+// template <ck::index_t NDimSpatial, int SplitKFactor>
+// using ConvFwdSplitK =
+//     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<
+//         NDimSpatial,
+//         InputLayout<NDimSpatial>,
+//         WeightLayout<NDimSpatial>,
+//         ck::Tuple<>,
+//         OutputLayout<NDimSpatial>,
+//         InKernelDataType,
+//         WeiKernelDataType,
+//         AccDataType,
+//         CShuffleDataType,
+//         ck::Tuple<>,
+//         OutKernelDataType,
+//         InElementOp,
+//         WeiElementOp,
+//         OutElementOp,
+//         ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0,
+//         //ck::tensor_operation::device::ConvolutionForwardSpecialization::Default,
+//         GemmSpec,
+//         2,               // NumGemmKPrefetchStage
+//         256,             // BlockSize
+//         128, 192,  32,   // MPerBlock=256, NPerBlock=32, KPerBlock=64
+//           8,   8,        // AK1, BK1
+//          32,  32,        // MPerXDL, NPerXDL
+//           2,   3,        // MXdlPerWave=2, NXdlPerWave=1
+//                          //   → MWave=256/(2×32)=4, NWave=32/(1×32)=1, WaveSize=64 ✓ (Rule 1)
+//         S<4, 64, 1>, S<1, 0, 2>, S<1, 0, 2>, 2, 8, 8, 1,  // A: AK0=64/8=8, S<8,32,1>=256 ✓ (Rule 2)
+//         S<4, 64, 1>, S<1, 0, 2>, S<1, 0, 2>, 2, 8, 8, 1,  // B: BK0=64/8=8, S<8,32,1>=256 ✓ (Rule 2)
+//         1, 1,
+//         S<1, 32, 1, 8>,  // CDE: CShuffleTile=128×32; B=32/8=4, A=64; product=256 ✓ (Rule 6)
+//         8,               // ScalarPerVector: NWave×NPerXDL=32, 32%8=0 ✓; K=96, 96%8=0 ✓
+//         BF16,            // AComputeDataType (explicit to avoid unpack default complexity)
+//         BF16,            // BComputeDataType
+//         ck::LoopScheduler::Default,
+//         1,               // NumGroupsToMerge
+//         true,           // DoubleBuffer
+//         SplitKFactor>;             // SplitKFactor = -1 (auto-deduce k_batch)
+
+// C = 384, Split-K double buffer instance
+// template <ck::index_t NDimSpatial, int SplitKFactor>
+// using ConvFwdSplitK =
+//     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<
+//         NDimSpatial,
+//         InputLayout<NDimSpatial>,
+//         WeightLayout<NDimSpatial>,
+//         ck::Tuple<>,
+//         OutputLayout<NDimSpatial>,
+//         InKernelDataType,
+//         WeiKernelDataType,
+//         AccDataType,
+//         CShuffleDataType,
+//         ck::Tuple<>,
+//         OutKernelDataType,
+//         InElementOp,
+//         WeiElementOp,
+//         OutElementOp,
+//         //ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0,
+//         ck::tensor_operation::device::ConvolutionForwardSpecialization::Default,
+//         GemmSpec,
+//         2,               // NumGemmKPrefetchStage
+//         256,             // BlockSize
+//         128, 192,  32,   // MPerBlock=256, NPerBlock=32, KPerBlock=64
+//           8,   8,        // AK1, BK1
+//          32,  32,        // MPerXDL, NPerXDL
+//           2,   3,        // MXdlPerWave=2, NXdlPerWave=1
+//                          //   → MWave=256/(2×32)=4, NWave=32/(1×32)=1, WaveSize=64 ✓ (Rule 1)
+//         S<4, 64, 1>, S<1, 0, 2>, S<1, 0, 2>, 2, 8, 8, 1,  // A: AK0=64/8=8, S<8,32,1>=256 ✓ (Rule 2)
+//         S<4, 64, 1>, S<1, 0, 2>, S<1, 0, 2>, 2, 8, 8, 1,  // B: BK0=64/8=8, S<8,32,1>=256 ✓ (Rule 2)
+//         1, 1,
+//         S<1, 32, 1, 8>,  // CDE: CShuffleTile=128×32; B=32/8=4, A=64; product=256 ✓ (Rule 6)
+//         8,               // ScalarPerVector: NWave×NPerXDL=32, 32%8=0 ✓; K=96, 96%8=0 ✓
+//         BF16,            // AComputeDataType (explicit to avoid unpack default complexity)
+//         BF16,            // BComputeDataType
+//         ck::LoopScheduler::Default,
+//         1,               // NumGroupsToMerge
+//         true,           // DoubleBuffer
+//         SplitKFactor>;             // SplitKFactor = -1 (auto-deduce k_batch)
+
+// C = 384, Split-K
+template <ck::index_t NDimSpatial, int SplitKFactor>
+using ConvFwdSplitK =
+    ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<
+        NDimSpatial,
+        InputLayout<NDimSpatial>,
+        WeightLayout<NDimSpatial>,
+        ck::Tuple<>,
+        OutputLayout<NDimSpatial>,
+        InKernelDataType,
+        WeiKernelDataType,
+        AccDataType,
+        CShuffleDataType,
+        ck::Tuple<>,
+        OutKernelDataType,
+        InElementOp,
+        WeiElementOp,
+        OutElementOp,
+        //ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0,
+        ck::tensor_operation::device::ConvolutionForwardSpecialization::Default,
+        GemmSpec,
+        2,               // NumGemmKPrefetchStage
+        256,             // BlockSize
+        256, 192,  32,   // MPerBlock=256, NPerBlock=32, KPerBlock=64
+          8,   8,        // AK1, BK1
+         32,  32,        // MPerXDL, NPerXDL
+          4,   3,        // MXdlPerWave=2, NXdlPerWave=1
+                         //   → MWave=256/(2×32)=4, NWave=32/(1×32)=1, WaveSize=64 ✓ (Rule 1)
+        S<4, 64, 1>, S<1, 0, 2>, S<1, 0, 2>, 2, 8, 8, 1,  // A: AK0=64/8=8, S<8,32,1>=256 ✓ (Rule 2)
+        S<4, 64, 1>, S<1, 0, 2>, S<1, 0, 2>, 2, 8, 8, 1,  // B: BK0=64/8=8, S<8,32,1>=256 ✓ (Rule 2)
+        1, 1,
+        S<1, 64, 1, 4>,  // CDE: CShuffleTile=128×32; B=32/8=4, A=64; product=256 ✓ (Rule 6)
+        8,               // ScalarPerVector: NWave×NPerXDL=32, 32%8=0 ✓; K=96, 96%8=0 ✓
+        BF16,            // AComputeDataType (explicit to avoid unpack default complexity)
+        BF16,            // BComputeDataType
+        ck::LoopScheduler::Default,
+        1,               // NumGroupsToMerge
+        true,           // DoubleBuffer
+        SplitKFactor>;             // SplitKFactor = -1 (auto-deduce k_batch)
+
+/*
+// This instance is good for cases where K=3 and C=96
 template <ck::index_t NDimSpatial, int SplitKFactor>
 using ConvFwdSplitK =
     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<
@@ -46,16 +247,17 @@ using ConvFwdSplitK =
         WeiElementOp,
         OutElementOp,
         ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0,
+        //ck::tensor_operation::device::ConvolutionForwardSpecialization::Default,
         GemmSpec,
         1,               // NumGemmKPrefetchStage
         256,             // BlockSize
-        256, 32,  64,   // MPerBlock=256, NPerBlock=32, KPerBlock=64
-          8,   8,        // AK1, BK1
+        256, 96,  32,   // MPerBlock=256, NPerBlock=32, KPerBlock=64
+          1,   1,        // AK1, BK1
          32,  32,        // MPerXDL, NPerXDL
-          2,   1,        // MXdlPerWave=2, NXdlPerWave=1
+          4,   3,        // MXdlPerWave=2, NXdlPerWave=1
                          //   → MWave=256/(2×32)=4, NWave=32/(1×32)=1, WaveSize=64 ✓ (Rule 1)
-        S<8, 32, 1>, S<1, 0, 2>, S<1, 0, 2>, 2, 8, 8, 1,  // A: AK0=64/8=8, S<8,32,1>=256 ✓ (Rule 2)
-        S<8, 32, 1>, S<1, 0, 2>, S<1, 0, 2>, 2, 8, 8, 1,  // B: BK0=64/8=8, S<8,32,1>=256 ✓ (Rule 2)
+        S<4, 64, 1>, S<1, 0, 2>, S<1, 0, 2>, 2, 1, 1, 1,  // A: AK0=64/8=8, S<8,32,1>=256 ✓ (Rule 2)
+        S<4, 32, 1>, S<1, 0, 2>, S<1, 0, 2>, 2, 1, 1, 1,  // B: BK0=64/8=8, S<8,32,1>=256 ✓ (Rule 2)
         1, 1,
         S<1, 64, 1, 4>,  // CDE: CShuffleTile=128×32; B=32/8=4, A=64; product=256 ✓ (Rule 6)
         8,               // ScalarPerVector: NWave×NPerXDL=32, 32%8=0 ✓; K=96, 96%8=0 ✓
@@ -65,6 +267,7 @@ using ConvFwdSplitK =
         1,               // NumGroupsToMerge
         false,           // DoubleBuffer
         SplitKFactor>;             // SplitKFactor = -1 (auto-deduce k_batch)
+*/
 
 template <ck::index_t NDimSpatial>
 using HostConvFwdInstance = ck::tensor_operation::host::ReferenceConvFwd<NDimSpatial,
@@ -264,6 +467,8 @@ bool run_grouped_conv3d_fwd_splitk_example(int argc, char* argv[])
         std::cerr << "This example only supports 3D spatial convolutions\n";
         return false;
     }
+
+    //return run_grouped_conv_fwd_splitk<3, 1>(config, conv_param);
 
     if (split_k == -1)
     {
