@@ -22,6 +22,14 @@ set(work_dir "${work_dir}/_unbundle_${ARCH}")
 file(REMOVE_RECURSE "${work_dir}")
 file(MAKE_DIRECTORY "${work_dir}")
 
+# Strip feature suffixes (e.g., gfx942:sramecc+:xnack- → gfx942)
+string(FIND "${ARCH}" ":" _colon_pos)
+if(_colon_pos GREATER -1)
+    string(SUBSTRING "${ARCH}" 0 ${_colon_pos} BASE_ARCH)
+else()
+    set(BASE_ARCH "${ARCH}")
+endif()
+
 # Extract .o files from fat archive
 execute_process(
     COMMAND ${AR} x "${FAT_ARCHIVE}"
@@ -75,8 +83,20 @@ foreach(obj IN LISTS obj_files)
         list(APPEND all_targets "${line}")
         if(line MATCHES "^host-")
             set(host_target "${line}")
-        elseif(line MATCHES "${ARCH}$" OR line MATCHES "${ARCH}:")
-            set(matched_target "${line}")
+        else()
+            # Try full ARCH first (handles archives built with feature qualifiers),
+            # then fall back to base arch without feature suffixes.
+            # Use literal substring match — MATCHES uses regex, and arch
+            # strings like gfx942:sramecc+:xnack- contain regex metacharacters.
+            string(FIND "${line}" "${ARCH}" _arch_pos)
+            if(NOT _arch_pos EQUAL -1)
+                set(matched_target "${line}")
+            elseif(NOT BASE_ARCH STREQUAL ARCH)
+                string(FIND "${line}" "${BASE_ARCH}" _arch_pos)
+                if(NOT _arch_pos EQUAL -1)
+                    set(matched_target "${line}")
+                endif()
+            endif()
         endif()
     endforeach()
 
@@ -115,7 +135,7 @@ foreach(obj IN LISTS obj_files)
         RESULT_VARIABLE unbundle_result)
 
     if(NOT unbundle_result EQUAL 0)
-        message(WARNING "Failed to unbundle ${obj_name} for ${ARCH}")
+        message(FATAL_ERROR "Failed to unbundle ${obj_name} for ${ARCH}")
         continue()
     endif()
 
@@ -131,25 +151,28 @@ foreach(obj IN LISTS obj_files)
         RESULT_VARIABLE rebundle_result)
 
     if(NOT rebundle_result EQUAL 0)
-        message(WARNING "Failed to re-bundle ${obj_name} for ${ARCH}")
+        message(FATAL_ERROR "Failed to re-bundle ${obj_name} for ${ARCH}")
         continue()
     endif()
 
     # Replace the .hip_fatbin section with the single-arch fatbin.
-    # Use --remove-section + --add-section instead of --update-section to avoid
-    # COFF size constraint ("new section cannot be larger than previous section").
+    # Must use --update-section (not --remove-section + --add-section) because
+    # .hipFatBinSegment has a relocation at +0x8 that references .hip_fatbin,
+    # and llvm-objcopy refuses to remove a section that is a relocation target.
+    # --update-section replaces the content in-place, preserving relocations.
+    # Note: COFF --update-section requires new size <= original, but this always
+    # holds since we replace a multi-arch fatbin with a single-arch compressed one.
     set(thin_obj "${work_dir}/thin_${obj_name}")
     execute_process(
         COMMAND ${LLVM_OBJCOPY}
-            --remove-section=.hip_fatbin
-            --add-section=.hip_fatbin=${thin_fatbin}
+            --update-section=.hip_fatbin=${thin_fatbin}
             "${obj}" "${thin_obj}"
         RESULT_VARIABLE patch_result)
 
     if(patch_result EQUAL 0)
         list(APPEND thin_objs "${thin_obj}")
     else()
-        message(WARNING "Failed to patch ${obj_name} for ${ARCH}")
+        message(FATAL_ERROR "Failed to patch ${obj_name} for ${ARCH}")
     endif()
 endforeach()
 
@@ -164,7 +187,7 @@ if(thin_objs)
     list(LENGTH thin_objs count)
     message(STATUS "Created ${OUTPUT} with ${count} objects")
 else()
-    message(WARNING "No objects found for ${ARCH} in ${FAT_ARCHIVE}, creating empty archive")
+    message(FATAL_ERROR "No objects found for ${ARCH} in ${FAT_ARCHIVE}, creating empty archive")
     # Create an empty archive so the build does not fail with a missing output.
     execute_process(
         COMMAND ${AR} rcs "${OUTPUT}"
