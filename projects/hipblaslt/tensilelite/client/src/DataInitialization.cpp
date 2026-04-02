@@ -29,11 +29,13 @@
 #include "Utility.hpp"
 // #include "DataInitializationTyped.hpp"
 
+#include <Tensile/Tensile.hpp>
 #include <Tensile/Utils.hpp>
 
 #include <hip/hip_runtime.h>
 
 #include <algorithm>
+#include <cstring>
 #include <list>
 #include <map>
 #include <tuple>
@@ -42,6 +44,13 @@ namespace TensileLite
 {
     namespace Client
     {
+        SwizzleSlabLayoutType GetSwizzleSlabLayoutType(AMDGPU::Processor gpuProc)
+        {
+            if(gpuProc == AMDGPU::Processor::gfx1200 || gpuProc == AMDGPU::Processor::gfx1201)
+                return SwizzleSlabLayoutType::SWZ_SLAB_RDNA4;
+            return SwizzleSlabLayoutType::SWZ_SLAB_CDNA3;
+        }
+
         template <typename K, typename T, std::size_t MaxNumEntries = 128>
         class LRUCache
         {
@@ -106,7 +115,7 @@ namespace TensileLite
 
         using BitWidth        = uint8_t;
         using Size            = uint64_t;
-        using SwizzleCacheKey = std::tuple<BitWidth, Size, Size>;
+        using SwizzleCacheKey = std::tuple<BitWidth, Size, Size, SwizzleSlabLayoutType>;
         using SwizzleCacheVal = ::Tensor::Manipulation::Tensor;
         using SwizzleCache    = LRUCache<SwizzleCacheKey, SwizzleCacheVal>;
         static thread_local SwizzleCache g_swizzleCache;
@@ -338,10 +347,11 @@ namespace TensileLite
             return stream;
         }
 
-        void calculateKforSwizzling(rocisa::DataType datatype,
-                                    size_t&          MiK,
-                                    size_t&          MiKv,
-                                    size_t&          PackK)
+        /// MiK / MiKv / PackK for host swizzle slab on CDNA3-class paths (legacy client layout).
+        void calculateKforSwizzlingCdna3Slab(rocisa::DataType datatype,
+                                             size_t&          MiK,
+                                             size_t&          MiKv,
+                                             size_t&          PackK)
         {
             switch(datatype)
             {
@@ -379,6 +389,77 @@ namespace TensileLite
             }
 
             PackK = 16 / MiKv / rocisa::GetElementSize(datatype);
+        }
+
+        /// RDNA4 WMMA FP16/BF16 TN swizzle-A slab (matches asmStandaloneRunner doSwizzleFp16).
+        void calculateKforSwizzlingRdna4Fp16Slab(rocisa::DataType datatype,
+                                                 size_t&          MiK,
+                                                 size_t&          MiKv,
+                                                 size_t&          PackK)
+        {
+            switch(datatype)
+            {
+            case rocisa::DataType::Half:
+            case rocisa::DataType::BFloat16:
+                MiK   = 16;
+                MiKv  = 8;
+                PackK = 1;
+                break;
+            default:
+                throw std::runtime_error("unsupported datatype for swizzling");
+            }
+        }
+
+        static AMDGPU::Processor gpuProcessorForDataInit(
+            std::shared_ptr<TensileLite::Hardware const> const& hardware)
+        {
+            if(hardware)
+            {
+                if(auto const* amd = dynamic_cast<AMDGPU const*>(hardware.get()))
+                    return amd->processor;
+                return AMDGPU::Processor::gfx000;
+            }
+            int dev = 0;
+            if(hipGetDevice(&dev) != hipSuccess)
+                return AMDGPU::Processor::gfx000;
+            hipDeviceProp_t prop{};
+            if(hipGetDeviceProperties(&prop, dev) != hipSuccess)
+                return AMDGPU::Processor::gfx000;
+            return AMDGPU::toProcessor(prop.gcnArchName);
+        }
+
+        void calculateKforSwizzlingTensor(SwizzleSlabLayoutType         slabLayout,
+                                          ContractionProblemGemm const& problem,
+                                          size_t                        tensorIndex,
+                                          rocisa::DataType              dt,
+                                          size_t&                       MiK,
+                                          size_t&                       MiKv,
+                                          size_t&                       PackK)
+        {
+            static auto isRdna4SupportedSwizzleTensor = 
+                [](ContractionProblemGemm const& problem, size_t tensorIndex, rocisa::DataType dt) -> bool {
+                    return tensorIndex == ContractionProblemGemm::TENSOR::A &&
+                           problem.swizzleTensorA() &&
+                           problem.transA() &&
+                           (dt == rocisa::DataType::Half || dt == rocisa::DataType::BFloat16);
+            };
+
+            switch(slabLayout)
+            {
+            case SwizzleSlabLayoutType::SWZ_SLAB_RDNA4:
+                if(!isRdna4SupportedSwizzleTensor(problem, tensorIndex, dt))
+                    throw std::runtime_error(
+                        "[DataInitialization] RDNA4 (gfx1200/gfx1201): host swizzle slab requires "
+                        "FP16/BF16 TN with SwizzleTensorA on tensor A.");
+                calculateKforSwizzlingRdna4Fp16Slab(dt, MiK, MiKv, PackK);
+                break;
+            case SwizzleSlabLayoutType::SWZ_SLAB_CDNA3:
+                calculateKforSwizzlingCdna3Slab(dt, MiK, MiKv, PackK);
+                break;
+            case SwizzleSlabLayoutType::SWZ_SLAB_UNKNOWN:
+                throw std::runtime_error("unsupported slab layout");
+                break;
+            }
         }
 
         template <typename T>
@@ -873,7 +954,8 @@ namespace TensileLite
         }
 
         DataInitialization::DataInitialization(po::variables_map const&    args,
-                                               ClientProblemFactory const& problemFactory)
+                                               ClientProblemFactory const& problemFactory,
+                                               std::shared_ptr<TensileLite::Hardware const> hardware)
             : m_maxBatch(0)
             , m_stridedBatched(args["strided-batched"].as<bool>())
             , m_sparse(args["sparse"].as<int>())
@@ -882,6 +964,8 @@ namespace TensileLite
             , m_keepPristineCopyOnGPU(args["pristine-on-gpu"].as<bool>())
             , m_workspaceSize(problemFactory.workspaceSize())
             , m_pruneMode(args["prune-mode"].as<PruneSparseMode>())
+            , m_gpuProcessor(gpuProcessorForDataInit(hardware))
+            , m_swizzleSlabLayoutType(GetSwizzleSlabLayoutType(m_gpuProcessor))
 
         {
             m_rotatingBuffer
@@ -959,7 +1043,8 @@ namespace TensileLite
                             //TODO: support more swizzle types,
                             //      currently, if A then it means MiM = 16, if B then it means MiN = 16
                             size_t MiM_N = 16, MiK = 0, MiKv = 0, PackK = 0;
-                            calculateKforSwizzling(dataType, MiK, MiKv, PackK);
+                            calculateKforSwizzlingTensor(
+                                m_swizzleSlabLayoutType, problem, i, dataType, MiK, MiKv, PackK);
                             numAllocatedElements = getSwizzledTensorNumAllocatedElements(
                                 problem.tensors()[i], MiM_N, MiK, PackK);
                             numAllocatedBytes
@@ -1514,7 +1599,13 @@ namespace TensileLite
                         //TODO: support more swizzle types,
                         //      currently, if A then it means MiM = 16, if B then it means MiN = 16
                         size_t MiM_N = 16, MiK = 0, MiKv = 0, PackK = 0;
-                        calculateKforSwizzling(problem.tensors()[i].dataType(), MiK, MiKv, PackK);
+                        calculateKforSwizzlingTensor(m_swizzleSlabLayoutType,
+                                                     problem,
+                                                     i,
+                                                     problem.tensors()[i].dataType(),
+                                                     MiK,
+                                                     MiKv,
+                                                     PackK);
                         padding = pUnit.maxElements
                                   - getSwizzledTensorNumAllocatedElements(
                                       problem.tensors()[i], MiM_N, MiK, PackK);
@@ -1882,7 +1973,8 @@ namespace TensileLite
                             //TODO: support more swizzle types,
                             //      currently, if A then it means MiM = 16, if B then it means MiN = 16
                             size_t MiM_N = 16, MiK = 0, MiKv = 0, PackK = 0;
-                            calculateKforSwizzling(desc.dataType(), MiK, MiKv, PackK);
+                            calculateKforSwizzlingTensor(
+                                m_swizzleSlabLayoutType, problem, i, desc.dataType(), MiK, MiKv, PackK);
                             swizzlePadding
                                 = getSwizzledTensorNumAllocatedElements(desc, MiM_N, MiK, PackK)
                                   - desc.totalAllocatedElements();
@@ -2076,15 +2168,18 @@ namespace TensileLite
                     using Tensor = Tensor::Manipulation::Tensor;
                     // currently, if A then it means MiM = 16, if B then it means MiN = 16
                     size_t MiM_N = 16, MiK = 0, MiKv = 0, PackK = 0;
-                    calculateKforSwizzling(desc.dataType(), MiK, MiKv, PackK);
+                    calculateKforSwizzlingTensor(
+                        m_swizzleSlabLayoutType, problem, i, desc.dataType(), MiK, MiKv, PackK);
                     auto                          unrolledSize = desc.sizes()[0];
                     auto                          tiledSize    = desc.sizes()[1];
                     ::Tensor::Manipulation::Shape paddedShape{
                         ((tiledSize / MiM_N) + !!(tiledSize % MiM_N)) * MiM_N,
                         (unrolledSize / (MiK * PackK) + !!(unrolledSize % (MiK * PackK))) * MiK
                             * PackK};
-                    auto swizzleKey
-                        = std::make_tuple(toBitWidth(desc.dataType()), unrolledSize, tiledSize);
+                    auto swizzleKey = std::make_tuple(toBitWidth(desc.dataType()),
+                                                      unrolledSize,
+                                                      tiledSize,
+                                                      m_swizzleSlabLayoutType);
 
                     if(g_swizzleCache.count(swizzleKey))
                     {

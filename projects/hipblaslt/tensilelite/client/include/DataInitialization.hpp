@@ -28,8 +28,12 @@
 
 #include "ProgramOptions.hpp"
 
+#include <Tensile/AMDGPU.hpp>
 #include <Tensile/ContractionProblem.hpp>
 #include <Tensile/hip/HipUtils.hpp>
+
+#include <cstdint>
+#include <memory>
 
 #include "ClientProblemFactory.hpp"
 #include "Rotating.hpp"
@@ -41,6 +45,8 @@
 
 namespace TensileLite
 {
+    class Hardware;
+
     namespace Client
     {
         // Problem-indept. from 0~7, and 16, and 23~26 (fixed values for every problem)
@@ -113,6 +119,17 @@ namespace TensileLite
         std::ostream& operator<<(std::ostream& stream, BoundsCheckMode const& mode);
         std::istream& operator>>(std::istream& stream, BoundsCheckMode& mode);
 
+
+        /// Derived only from GPU (see GetSwizzleSlabLayoutType). Selects MiK/MiKv/PackK for host swizzle.
+        enum class SwizzleSlabLayoutType : std::uint8_t
+        {
+            SWZ_SLAB_CDNA3 = 0, ///< calculateKforSwizzlingCdna3Slab
+            SWZ_SLAB_RDNA4,     ///< calculateKforSwizzlingRdna4Fp16Slab (Currently supported FP16/BF16 TN swizzle-A only)
+            SWZ_SLAB_UNKNOWN
+        };
+
+        SwizzleSlabLayoutType GetSwizzleSlabLayoutType(AMDGPU::Processor gpuProc);
+
         enum class PruneSparseMode
         {
             PruneRandom = 0, // random
@@ -133,7 +150,8 @@ namespace TensileLite
             static double GetRepresentativeBetaValue(po::variables_map const& args);
 
             DataInitialization(po::variables_map const&    args,
-                               ClientProblemFactory const& problemFactory);
+                               ClientProblemFactory const& problemFactory,
+                               std::shared_ptr<TensileLite::Hardware const> hardware = nullptr);
             ~DataInitialization();
 
             /**
@@ -1016,6 +1034,12 @@ namespace TensileLite
             int64_t                         m_rotatingBuffer = 0;
             std::shared_ptr<RotatingMemory> m_rm;
             int32_t                         m_rotatingMode = 0;
+
+            /// From client \p hardware when provided; else queried once via HIP (see constructor).
+            AMDGPU::Processor m_gpuProcessor = AMDGPU::Processor::gfx000;
+
+            /// From \ref m_gpuProcessor; used with swizzle slab MiK/MiKv/PackK and LRU cache keys.
+            SwizzleSlabLayoutType m_swizzleSlabLayoutType = SwizzleSlabLayoutType::SWZ_SLAB_UNKNOWN;
         };
 
         template <>
