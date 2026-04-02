@@ -2,6 +2,8 @@
 # SPDX-License-Identifier:  MIT
 
 set(TENSILELITE_BUILD_PARALLEL_LEVEL "" CACHE STRING "Number of CPU cores to use for building device libraries (will use nproc if unset).")
+option(HIPBLASLT_ENABLE_EXOPTS "" ON)
+option(HIPBLASLT_ENABLE_TRANSFORM "" ON)
 set(TENSILELITE_KEEP_BUILD_TMP OFF CACHE STRING "Keep temporary build directory for device libraries (turning this ON  bloat the build size).")
 set(TENSILELITE_ASM_DEBUG "" CACHE STRING "Keep debug information for built code objects.")
 set(TENSILELITE_LOGIC_FILTER "" CACHE STRING "Cutomsized logic filter, default is *, i.e. all logics.")
