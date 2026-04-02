@@ -150,9 +150,9 @@ def collect_projects_to_run(subtrees):
             # If `project_to_add` is not included, only run build and tests for the optional project
             else:
                 projects.add(project_to_add)
-                local_project_map[project_to_add]["cmake_options"] = project_options_to_add[
-                    "cmake_options"
-                ]
+                local_project_map[project_to_add]["cmake_options"] = (
+                    project_options_to_add["cmake_options"]
+                )
                 local_project_map[project_to_add]["projects_to_test"] = (
                     project_options_to_add["projects_to_test"]
                 )

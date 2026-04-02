@@ -327,7 +327,9 @@ class ConfigureCITest(unittest.TestCase):
         self.assertIn("BLAS", str(projects))
 
     @patch("therock_configure_ci.get_modified_paths")
-    def test_retrieve_projects_label_combines_with_file_changes(self, mock_get_modified):
+    def test_retrieve_projects_label_combines_with_file_changes(
+        self, mock_get_modified
+    ):
         # File change in rocprim
         mock_get_modified.return_value = ["projects/rocprim/src/main.cpp"]
 
@@ -347,7 +349,9 @@ class ConfigureCITest(unittest.TestCase):
         # Test labels only apply to pull requests, not nightly runs
         mock_get_modified.return_value = []
 
-        pr_labels_json = '{"labels": [{"name": "test:rocblas"}, {"name": "test_type:smoke"}]}'
+        pr_labels_json = (
+            '{"labels": [{"name": "test:rocblas"}, {"name": "test_type:smoke"}]}'
+        )
         projects, test_type = therock_configure_ci.retrieve_projects(
             {"is_nightly": True, "base_ref": "HEAD^", "pr_labels": pr_labels_json}
         )

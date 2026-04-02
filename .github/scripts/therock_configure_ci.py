@@ -99,10 +99,16 @@ def parse_test_labels(pr_labels: List[str]) -> tuple[List[str], Optional[str]]:
 
         # Parse test_type:* labels
         elif label.startswith("test_type:"):
-            label_test_type = label.split("test_type:")[-1]  # Remove 'test_type:' prefix
+            label_test_type = label.split("test_type:")[
+                -1
+            ]  # Remove 'test_type:' prefix
             if label_test_type in valid_test_types:
                 # If multiple test_type labels, use the most comprehensive one
-                if test_type is None or test_type_priority[label_test_type] > test_type_priority[test_type]:
+                if (
+                    test_type is None
+                    or test_type_priority[label_test_type]
+                    > test_type_priority[test_type]
+                ):
                     test_type = label_test_type
             else:
                 logging.warning(f"Unknown test type in label: {label}")
