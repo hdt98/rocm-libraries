@@ -5,7 +5,7 @@
 // OGradDotO kernel family.
 //
 // SHARED header: compiled in both host and device (--cuda-device-only) passes.
-// Contains structural types, consteval make_spec() factory, and named slot
+// Contains structural types, consteval makeSpec() factory, and named slot
 // constants. No runtime code, no HIP dependency.
 //
 // Compilation boundary:
@@ -66,8 +66,8 @@ struct FmhaBwdOGradDotOSpec
 
 /// Validate config and produce a structural kernel descriptor.
 /// Overload resolution: each kernel family has its own Config type,
-/// so make_spec(FmhaBwdOGradDotOConfig) is unambiguous.
-consteval FmhaBwdOGradDotOSpec make_spec(FmhaBwdOGradDotOConfig cfg)
+/// so makeSpec(FmhaBwdOGradDotOConfig) is unambiguous.
+consteval FmhaBwdOGradDotOSpec makeSpec(FmhaBwdOGradDotOConfig cfg)
 {
     auto sig  = cfg.signature;
     auto algo = cfg.algorithm;
@@ -107,7 +107,7 @@ consteval FmhaBwdOGradDotOSpec make_spec(FmhaBwdOGradDotOConfig cfg)
 
 // Compile canary: GROUP mode exercises pad_seqlen_q constraint.
 // clang-format off
-static_assert(make_spec(FmhaBwdOGradDotOConfig{
+static_assert(makeSpec(FmhaBwdOGradDotOConfig{
     .signature = {.dtype = DataType::FP16, .hdim_v = 128, .mode = FmhaMode::GROUP},
     .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}}).mode == FmhaMode::GROUP);
 // clang-format on

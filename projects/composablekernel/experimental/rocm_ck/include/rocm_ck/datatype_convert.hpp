@@ -26,7 +26,7 @@ namespace rocm_ck {
 // ============================================================================
 
 /// Convert float to bf16 using round-to-nearest-even.
-inline std::uint16_t float_to_bf16_bits(float f)
+inline std::uint16_t floatToBf16Bits(float f)
 {
     std::uint32_t u;
     std::memcpy(&u, &f, sizeof(u));
@@ -36,7 +36,7 @@ inline std::uint16_t float_to_bf16_bits(float f)
 }
 
 /// Convert bf16 bits back to float.
-inline float bf16_bits_to_float(std::uint16_t bits)
+inline float bf16BitsToFloat(std::uint16_t bits)
 {
     std::uint32_t u = static_cast<std::uint32_t>(bits) << 16;
     float f;
@@ -102,7 +102,7 @@ inline int clz(std::uint32_t x)
 /// Template parameters: exp/mant widths of the destination fp8 format.
 /// IsFnuz selects FNUZ vs OCP encoding for NaN, zero, and bias.
 template <int DstExp, int DstMant, int DstBias, bool IsFnuz>
-inline std::uint8_t float_to_fp8_generic(float src)
+inline std::uint8_t floatToFp8Generic(float src)
 {
     // Float format: sign(1) + exp(8) + mant(23), bias=127
     constexpr int SrcExp  = 8;
@@ -256,7 +256,7 @@ inline std::uint8_t float_to_fp8_generic(float src)
 
 /// Generic fp8 → float conversion.
 template <int SrcExp, int SrcMant, int SrcBias, bool IsFnuz>
-inline float fp8_to_float_generic(std::uint8_t x)
+inline float fp8ToFloatGeneric(std::uint8_t x)
 {
     constexpr int DstExp          = 8;
     constexpr int DstMant         = 23;
@@ -353,43 +353,43 @@ inline float fp8_to_float_generic(std::uint8_t x)
 // --- Public FP8/BF8 conversion functions ---
 
 // E4M3 FNUZ (FP8, gfx942 native): bias=8, max=240, NaN=0x80, no -0
-inline std::uint8_t float_to_fp8e4m3_fnuz(float f)
+inline std::uint8_t floatToFp8e4m3Fnuz(float f)
 {
-    return detail::float_to_fp8_generic<4, 3, 8, true>(f);
+    return detail::floatToFp8Generic<4, 3, 8, true>(f);
 }
-inline float fp8e4m3_fnuz_to_float(std::uint8_t bits)
+inline float fp8e4m3FnuzToFloat(std::uint8_t bits)
 {
-    return detail::fp8_to_float_generic<4, 3, 8, true>(bits);
+    return detail::fp8ToFloatGeneric<4, 3, 8, true>(bits);
 }
 
 // E5M2 FNUZ (BF8, gfx942 native): bias=16, max=57344, NaN=0x80, no -0
-inline std::uint8_t float_to_fp8e5m2_fnuz(float f)
+inline std::uint8_t floatToFp8e5m2Fnuz(float f)
 {
-    return detail::float_to_fp8_generic<5, 2, 16, true>(f);
+    return detail::floatToFp8Generic<5, 2, 16, true>(f);
 }
-inline float fp8e5m2_fnuz_to_float(std::uint8_t bits)
+inline float fp8e5m2FnuzToFloat(std::uint8_t bits)
 {
-    return detail::fp8_to_float_generic<5, 2, 16, true>(bits);
+    return detail::fp8ToFloatGeneric<5, 2, 16, true>(bits);
 }
 
 // E4M3 OCP (FP8, gfx950 native): bias=7, max=448, NaN=0x7F, has -0
-inline std::uint8_t float_to_fp8e4m3_ocp(float f)
+inline std::uint8_t floatToFp8e4m3Ocp(float f)
 {
-    return detail::float_to_fp8_generic<4, 3, 7, false>(f);
+    return detail::floatToFp8Generic<4, 3, 7, false>(f);
 }
-inline float fp8e4m3_ocp_to_float(std::uint8_t bits)
+inline float fp8e4m3OcpToFloat(std::uint8_t bits)
 {
-    return detail::fp8_to_float_generic<4, 3, 7, false>(bits);
+    return detail::fp8ToFloatGeneric<4, 3, 7, false>(bits);
 }
 
 // E5M2 OCP (BF8, gfx950 native): bias=15, max=57344, NaN=0x7F, has -0, has Inf
-inline std::uint8_t float_to_fp8e5m2_ocp(float f)
+inline std::uint8_t floatToFp8e5m2Ocp(float f)
 {
-    return detail::float_to_fp8_generic<5, 2, 15, false>(f);
+    return detail::floatToFp8Generic<5, 2, 15, false>(f);
 }
-inline float fp8e5m2_ocp_to_float(std::uint8_t bits)
+inline float fp8e5m2OcpToFloat(std::uint8_t bits)
 {
-    return detail::fp8_to_float_generic<5, 2, 15, false>(bits);
+    return detail::fp8ToFloatGeneric<5, 2, 15, false>(bits);
 }
 
 // ============================================================================
@@ -397,18 +397,18 @@ inline float fp8e5m2_ocp_to_float(std::uint8_t bits)
 // ============================================================================
 
 /// Convert a float to the device type and store into a byte buffer.
-inline void float_to_typed(DataType dt, float value, void* dst)
+inline void floatToTyped(DataType dt, float value, void* dst)
 {
     switch(dt)
     {
     case DataType::FP64: *static_cast<double*>(dst) = static_cast<double>(value); break;
     case DataType::FP32: *static_cast<float*>(dst) = value; break;
     case DataType::FP16: *static_cast<_Float16*>(dst) = static_cast<_Float16>(value); break;
-    case DataType::BF16: *static_cast<std::uint16_t*>(dst) = float_to_bf16_bits(value); break;
-    case DataType::FP8_FNUZ: *static_cast<std::uint8_t*>(dst) = float_to_fp8e4m3_fnuz(value); break;
-    case DataType::BF8_FNUZ: *static_cast<std::uint8_t*>(dst) = float_to_fp8e5m2_fnuz(value); break;
-    case DataType::FP8_OCP: *static_cast<std::uint8_t*>(dst) = float_to_fp8e4m3_ocp(value); break;
-    case DataType::BF8_OCP: *static_cast<std::uint8_t*>(dst) = float_to_fp8e5m2_ocp(value); break;
+    case DataType::BF16: *static_cast<std::uint16_t*>(dst) = floatToBf16Bits(value); break;
+    case DataType::FP8_FNUZ: *static_cast<std::uint8_t*>(dst) = floatToFp8e4m3Fnuz(value); break;
+    case DataType::BF8_FNUZ: *static_cast<std::uint8_t*>(dst) = floatToFp8e5m2Fnuz(value); break;
+    case DataType::FP8_OCP: *static_cast<std::uint8_t*>(dst) = floatToFp8e4m3Ocp(value); break;
+    case DataType::BF8_OCP: *static_cast<std::uint8_t*>(dst) = floatToFp8e5m2Ocp(value); break;
     case DataType::I8: {
         int clamped = std::clamp(static_cast<int>(std::round(value)), -128, 127);
         *static_cast<std::int8_t*>(dst) = static_cast<std::int8_t>(clamped);
@@ -428,24 +428,24 @@ inline void float_to_typed(DataType dt, float value, void* dst)
     case DataType::U16:
     case DataType::U32:
     case DataType::U64:
-        std::fprintf(stderr, "%s: host conversion not implemented\n", data_type_name(dt));
+        std::fprintf(stderr, "%s: host conversion not implemented\n", dataTypeName(dt));
         std::abort();
     }
 }
 
 /// Read a typed value from a byte buffer and convert to float.
-inline float typed_to_float(DataType dt, const void* src)
+inline float typedToFloat(DataType dt, const void* src)
 {
     switch(dt)
     {
     case DataType::FP64: return static_cast<float>(*static_cast<const double*>(src));
     case DataType::FP32: return *static_cast<const float*>(src);
     case DataType::FP16: return static_cast<float>(*static_cast<const _Float16*>(src));
-    case DataType::BF16: return bf16_bits_to_float(*static_cast<const std::uint16_t*>(src));
-    case DataType::FP8_FNUZ: return fp8e4m3_fnuz_to_float(*static_cast<const std::uint8_t*>(src));
-    case DataType::BF8_FNUZ: return fp8e5m2_fnuz_to_float(*static_cast<const std::uint8_t*>(src));
-    case DataType::FP8_OCP: return fp8e4m3_ocp_to_float(*static_cast<const std::uint8_t*>(src));
-    case DataType::BF8_OCP: return fp8e5m2_ocp_to_float(*static_cast<const std::uint8_t*>(src));
+    case DataType::BF16: return bf16BitsToFloat(*static_cast<const std::uint16_t*>(src));
+    case DataType::FP8_FNUZ: return fp8e4m3FnuzToFloat(*static_cast<const std::uint8_t*>(src));
+    case DataType::BF8_FNUZ: return fp8e5m2FnuzToFloat(*static_cast<const std::uint8_t*>(src));
+    case DataType::FP8_OCP: return fp8e4m3OcpToFloat(*static_cast<const std::uint8_t*>(src));
+    case DataType::BF8_OCP: return fp8e5m2OcpToFloat(*static_cast<const std::uint8_t*>(src));
     case DataType::I8: return static_cast<float>(*static_cast<const std::int8_t*>(src));
     case DataType::I32: return static_cast<float>(*static_cast<const std::int32_t*>(src));
     case DataType::I4:
@@ -455,10 +455,10 @@ inline float typed_to_float(DataType dt, const void* src)
     case DataType::U16:
     case DataType::U32:
     case DataType::U64:
-        std::fprintf(stderr, "%s: host conversion not implemented\n", data_type_name(dt));
+        std::fprintf(stderr, "%s: host conversion not implemented\n", dataTypeName(dt));
         std::abort();
     }
-    return 0.0f;
+    return 0.0f; // unreachable — silences -Wreturn-type
 }
 
 /// Tolerance for verification based on output data type.
@@ -469,7 +469,7 @@ inline float typed_to_float(DataType dt, const void* src)
 /// Values are calibrated to ~1 ULP at magnitude 1.0 for each format:
 ///   FP8 E4M3 (3 mant bits): ULP at 1.0 = 2^-3 = 0.125
 ///   BF8 E5M2 (2 mant bits): ULP at 1.0 = 2^-2 = 0.25
-inline float tolerance_for(DataType dt)
+inline float toleranceFor(DataType dt)
 {
     switch(dt)
     {

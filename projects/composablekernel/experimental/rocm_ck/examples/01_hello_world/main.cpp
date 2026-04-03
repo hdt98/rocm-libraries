@@ -48,7 +48,7 @@ int main(int argc, char** argv)
     std::printf("\n");
 
     // --- Detect the current GPU architecture ---
-    std::string gpu_arch = rocm_ck::get_gpu_arch();
+    std::string gpu_arch = rocm_ck::getGpuArch();
     if(gpu_arch.empty())
     {
         std::fprintf(stderr, "Failed to detect GPU architecture\n");

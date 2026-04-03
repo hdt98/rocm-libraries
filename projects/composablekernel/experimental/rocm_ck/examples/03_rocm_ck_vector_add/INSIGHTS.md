@@ -4,7 +4,7 @@ This example is the design prototype for the production rocm_ck API. It validate
 
 ## 1. Config -> consteval -> Kernel: The Three-Layer Pattern
 
-The user-facing `Signature` + `ElementwiseAlgorithm` (using `std::optional`, `std::variant`, not valid as NTTPs) are transformed by `consteval make_spec()` into `ElementwiseSpec` (a structural type, valid as an NTTP). This separation is fundamental:
+The user-facing `Signature` + `ElementwiseAlgorithm` (using `std::optional`, `std::variant`, not valid as NTTPs) are transformed by `consteval makeSpec()` into `ElementwiseSpec` (a structural type, valid as an NTTP). This separation is fundamental:
 
 - **Signature + Algorithm** — flexible, user-facing. Uses `std::optional` fields and operator composition so users specify only what differs from defaults.
 - **consteval** — validates and transforms. Throws at compile time if the config is invalid. Invalid configs never produce binaries.
@@ -12,11 +12,11 @@ The user-facing `Signature` + `ElementwiseAlgorithm` (using `std::optional`, `st
 
 ```cpp
 // User writes:
-constexpr auto kernel = make_spec(
+constexpr auto kernel = makeSpec(
     Signature{.dtype = DataType::FP32, .ops = {AddOp{}}},
     ElementwiseAlgorithm{.block_tile = 1024, .block_waves = 1, .wave_tile = 1024, .pad = true});
 
-// make_spec returns a ElementwiseSpec with all fields resolved and validated.
+// makeSpec returns a ElementwiseSpec with all fields resolved and validated.
 // This value is used directly as a template parameter: run<kernel>(args)
 ```
 
@@ -49,7 +49,7 @@ Signature{.dtype = DataType::FP16,
 
 ## 3. consteval for Immediate Feedback
 
-Throwing in a `consteval` function produces a compile error at the call site with the throw message as the diagnostic. `make_spec` validates 7 constraints:
+Throwing in a `consteval` function produces a compile error at the call site with the throw message as the diagnostic. `makeSpec` validates 7 constraints:
 
 - Input types must match (`a_dtype == b_dtype` for vector add)
 - Tile dimensions must be positive
@@ -67,7 +67,7 @@ Invalid configs fail at compile time with readable messages like `"block_tile mu
 - **Signature**: `{dtype, tensors[], scalars[], ops[]}` — specifies the compute graph and types
 - **Algorithm**: `{block_tile, block_waves, wave_tile, pad}` — specifies the tile geometry
 
-The same signature can be paired with different algorithms to explore the tuning surface. The same algorithm can run on FP32, FP16, or BF16 (subject to `kVectorM` constraints validated by `make_spec`).
+The same signature can be paired with different algorithms to explore the tuning surface. The same algorithm can run on FP32, FP16, or BF16 (subject to `kVectorM` constraints validated by `makeSpec`).
 
 > **Production implication**: Tuning tools generate Algorithm variants; the Signature comes from the user's problem specification. This composition is how rocm_ck will expose its tuning surface.
 
@@ -81,7 +81,7 @@ Three layers, strict dependency boundary:
 | `vector_add_variants.hpp` (example-local) | None | Host, device |
 | `elementwise_dev.hpp` (shared) | Yes (CK Tile) | Device only |
 
-The spec header (in `include/rocm_ck/`) contains config types, `make_spec`, `ElementwiseSpec`, and all compile-time validation. It is testable with `constexpr`/`consteval` without any GPU. The variants header defines the variant table and consteval lookup, shared by both device `.hip` files and host `main.cpp`. The generic `Args` struct (from `args.hpp`) replaces per-operation args structs.
+The spec header (in `include/rocm_ck/`) contains config types, `makeSpec`, `ElementwiseSpec`, and all compile-time validation. It is testable with `constexpr`/`consteval` without any GPU. The variants header defines the variant table and consteval lookup, shared by both device `.hip` files and host `main.cpp`. The generic `Args` struct (from `args.hpp`) replaces per-operation args structs.
 
 The device header contains the CK Tile kernel implementation, `CkTypeMap`, and `run<S>`. It is compiled only with `--cuda-device-only` and never included in host code.
 
@@ -101,9 +101,12 @@ struct TensorArg {
 union ScalarValue { float f32; int32_t i32; uint32_t u32; double f64; };  // 8 bytes
 
 struct Args {
-    std::array<TensorArg, kMaxTensors> tensors;   // 1280 bytes
-    std::array<ScalarValue, kMaxScalars> scalars;  //  128 bytes
-};  // 1408 bytes total (34% of 4KB kernarg budget)
+    std::array<TensorArg, kMaxTensors> tensors;       // 16 x 80 = 1280 bytes
+    std::array<ScalarValue, kMaxScalars> scalars;      // 16 x  8 =  128 bytes
+    index_t batch_count = 0;                           //  4 bytes
+    std::array<long_index_t, kMaxTensors> batch_strides = {}; // 128 bytes
+    void* workspace_ptr = nullptr;                     //  8 bytes
+};  // 1552 bytes total (38% of 4KB kernarg budget)
 ```
 
 Tensor slots carry their own shape — problem dimensions (N, M, K) are derivable from tensor lengths rather than redundant scalar fields. Pointers are `const void*` because the actual type depends on the variant — type dispatch happens inside the device kernel via `CkTypeMap`. Output tensors use `const_cast` on the device side.

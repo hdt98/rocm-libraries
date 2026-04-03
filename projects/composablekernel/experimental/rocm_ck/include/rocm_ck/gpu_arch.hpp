@@ -16,7 +16,7 @@ namespace rocm_ck {
 /// Returns the base GPU architecture name (e.g. "gfx942") for the given device.
 /// Strips feature flags from HIP's full ISA string (e.g. "gfx942:sramecc+:xnack-").
 /// Returns empty string on failure — caller decides error policy.
-inline std::string get_gpu_arch(int device_id = 0)
+inline std::string getGpuArch(int device_id = 0)
 {
     hipDeviceProp_t device_props;
     if(hipGetDeviceProperties(&device_props, device_id) != hipSuccess)

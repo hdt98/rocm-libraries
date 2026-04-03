@@ -27,17 +27,17 @@ TEST(FmhaBwdDqDkDv, AlgorithmDefaults)
 }
 
 // ============================================================================
-// make_spec happy path
+// makeSpec happy path
 // ============================================================================
 
 TEST(FmhaBwdDqDkDv, MakeSpecBaseline)
 {
     constexpr auto k =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
 
     EXPECT_EQ(k.dtype, DataType::FP16);
     EXPECT_EQ(k.hdim_q, 128);
@@ -58,46 +58,46 @@ TEST(FmhaBwdDqDkDv, MakeSpecBaseline)
 TEST(FmhaBwdDqDkDv, MakeSpecBF16)
 {
     constexpr auto k =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::BF16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::BF16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
     EXPECT_EQ(k.dtype, DataType::BF16);
 }
 
 TEST(FmhaBwdDqDkDv, MakeSpecAllHdimsQ)
 {
     constexpr auto k32 =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 32,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 32,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
     constexpr auto k64 =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 64,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 64,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
     constexpr auto k96 =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 96,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 96,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
     constexpr auto k128 =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
     constexpr auto k256 =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 256,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 256,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
 
     EXPECT_EQ(k32.hdim_q, 32);
     EXPECT_EQ(k64.hdim_q, 64);
@@ -109,35 +109,35 @@ TEST(FmhaBwdDqDkDv, MakeSpecAllHdimsQ)
 TEST(FmhaBwdDqDkDv, MakeSpecAllHdimsV)
 {
     constexpr auto k32 =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 32,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 32,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
     constexpr auto k64 =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 64,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 64,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
     constexpr auto k96 =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 96,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 96,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
     constexpr auto k128 =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
     constexpr auto k256 =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 256,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 256,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
 
     EXPECT_EQ(k32.hdim_v, 32);
     EXPECT_EQ(k64.hdim_v, 64);
@@ -148,7 +148,7 @@ TEST(FmhaBwdDqDkDv, MakeSpecAllHdimsV)
 
 TEST(FmhaBwdDqDkDv, MakeSpecWithMask)
 {
-    constexpr auto k = make_spec(FmhaBwdDQDKDVConfig{
+    constexpr auto k = makeSpec(FmhaBwdDQDKDVConfig{
         .signature =
             {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.has_mask = true, .pad_hdim_q = 8, .pad_hdim_v = 8}});
@@ -157,7 +157,7 @@ TEST(FmhaBwdDqDkDv, MakeSpecWithMask)
 
 TEST(FmhaBwdDqDkDv, MakeSpecWithDropout)
 {
-    constexpr auto k = make_spec(FmhaBwdDQDKDVConfig{
+    constexpr auto k = makeSpec(FmhaBwdDQDKDVConfig{
         .signature =
             {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.has_dropout = true, .pad_hdim_q = 8, .pad_hdim_v = 8}});
@@ -166,7 +166,7 @@ TEST(FmhaBwdDqDkDv, MakeSpecWithDropout)
 
 TEST(FmhaBwdDqDkDv, MakeSpecDeterministic)
 {
-    constexpr auto k = make_spec(FmhaBwdDQDKDVConfig{
+    constexpr auto k = makeSpec(FmhaBwdDQDKDVConfig{
         .signature =
             {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.is_deterministic = true, .pad_hdim_q = 8, .pad_hdim_v = 8}});
@@ -175,7 +175,7 @@ TEST(FmhaBwdDqDkDv, MakeSpecDeterministic)
 
 TEST(FmhaBwdDqDkDv, MakeSpecBiasElementwise)
 {
-    constexpr auto k = make_spec(FmhaBwdDQDKDVConfig{
+    constexpr auto k = makeSpec(FmhaBwdDQDKDVConfig{
         .signature =
             {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.bias_type = FmhaBiasType::ELEMENTWISE, .pad_hdim_q = 8, .pad_hdim_v = 8}});
@@ -184,7 +184,7 @@ TEST(FmhaBwdDqDkDv, MakeSpecBiasElementwise)
 
 TEST(FmhaBwdDqDkDv, MakeSpecBiasAlibi)
 {
-    constexpr auto k = make_spec(FmhaBwdDQDKDVConfig{
+    constexpr auto k = makeSpec(FmhaBwdDQDKDVConfig{
         .signature =
             {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.bias_type = FmhaBiasType::ALIBI, .pad_hdim_q = 8, .pad_hdim_v = 8}});
@@ -194,14 +194,14 @@ TEST(FmhaBwdDqDkDv, MakeSpecBiasAlibi)
 TEST(FmhaBwdDqDkDv, MakeSpecBiasGrad)
 {
     constexpr auto k =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.bias_type     = FmhaBiasType::ELEMENTWISE,
-                                                    .has_bias_grad = true,
-                                                    .pad_hdim_q    = 8,
-                                                    .pad_hdim_v    = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.bias_type     = FmhaBiasType::ELEMENTWISE,
+                                                   .has_bias_grad = true,
+                                                   .pad_hdim_q    = 8,
+                                                   .pad_hdim_v    = 8}});
     EXPECT_TRUE(k.has_bias_grad);
     EXPECT_EQ(k.bias_type, FmhaBiasType::ELEMENTWISE);
 }
@@ -209,11 +209,11 @@ TEST(FmhaBwdDqDkDv, MakeSpecBiasGrad)
 TEST(FmhaBwdDqDkDv, MakeSpecGroupMode)
 {
     constexpr auto k =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::GROUP},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::GROUP},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
     EXPECT_EQ(k.mode, FmhaMode::GROUP);
 }
 
@@ -221,11 +221,11 @@ TEST(FmhaBwdDqDkDv, MakeSpecGroupModePartialPadQ)
 {
     // GROUP with pad_hdim_q=8, pad_hdim_v=0 is valid (AND condition)
     constexpr auto k =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::GROUP},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 0}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::GROUP},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 0}});
     EXPECT_EQ(k.pad_hdim_q, 8);
     EXPECT_EQ(k.pad_hdim_v, 0);
 }
@@ -234,11 +234,11 @@ TEST(FmhaBwdDqDkDv, MakeSpecGroupModePartialPadV)
 {
     // GROUP with pad_hdim_q=0, pad_hdim_v=8 is valid (AND condition)
     constexpr auto k =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::GROUP},
-                                      .algorithm = {.pad_hdim_q = 0, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::GROUP},
+                                     .algorithm = {.pad_hdim_q = 0, .pad_hdim_v = 8}});
     EXPECT_EQ(k.pad_hdim_q, 0);
     EXPECT_EQ(k.pad_hdim_v, 8);
 }
@@ -247,23 +247,23 @@ TEST(FmhaBwdDqDkDv, MakeSpecAllPadValues)
 {
     // All valid pad values: 0, 1, 8
     constexpr auto k0 =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 0, .pad_hdim_v = 0}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 0, .pad_hdim_v = 0}});
     constexpr auto k1 =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 1, .pad_hdim_v = 1}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 1, .pad_hdim_v = 1}});
     constexpr auto k8 =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
 
     EXPECT_EQ(k0.pad_hdim_q, 0);
     EXPECT_EQ(k1.pad_hdim_q, 1);
@@ -272,7 +272,7 @@ TEST(FmhaBwdDqDkDv, MakeSpecAllPadValues)
 
 TEST(FmhaBwdDqDkDv, MakeSpecExplicitBlockPerCu)
 {
-    constexpr auto k = make_spec(FmhaBwdDQDKDVConfig{
+    constexpr auto k = makeSpec(FmhaBwdDQDKDVConfig{
         .signature =
             {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8, .block_per_cu = 2}});
@@ -281,7 +281,7 @@ TEST(FmhaBwdDqDkDv, MakeSpecExplicitBlockPerCu)
 
 TEST(FmhaBwdDqDkDv, BlockPerCuAutoResolvesToOne)
 {
-    constexpr auto k = make_spec(FmhaBwdDQDKDVConfig{
+    constexpr auto k = makeSpec(FmhaBwdDQDKDVConfig{
         .signature =
             {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}}); // block_per_cu defaults to -1
@@ -323,45 +323,45 @@ TEST(FmhaBwdDqDkDv, ScalarSlotIndicesFixed)
 TEST(FmhaBwdDqDkDv, RequiredTensorsPlain)
 {
     constexpr auto k =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
     EXPECT_EQ(S::requiredTensors(k), 9);
 }
 
 TEST(FmhaBwdDqDkDv, RequiredTensorsWithBias)
 {
     constexpr auto k =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.bias_type     = FmhaBiasType::ELEMENTWISE,
-                                                    .has_bias_grad = false,
-                                                    .pad_hdim_q    = 8,
-                                                    .pad_hdim_v    = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.bias_type     = FmhaBiasType::ELEMENTWISE,
+                                                   .has_bias_grad = false,
+                                                   .pad_hdim_q    = 8,
+                                                   .pad_hdim_v    = 8}});
     EXPECT_EQ(S::requiredTensors(k), 10);
 }
 
 TEST(FmhaBwdDqDkDv, RequiredTensorsWithBiasGrad)
 {
     constexpr auto k =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.bias_type     = FmhaBiasType::ELEMENTWISE,
-                                                    .has_bias_grad = true,
-                                                    .pad_hdim_q    = 8,
-                                                    .pad_hdim_v    = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.bias_type     = FmhaBiasType::ELEMENTWISE,
+                                                   .has_bias_grad = true,
+                                                   .pad_hdim_q    = 8,
+                                                   .pad_hdim_v    = 8}});
     EXPECT_EQ(S::requiredTensors(k), 11);
 }
 
 TEST(FmhaBwdDqDkDv, RequiredTensorsWithDropout)
 {
-    constexpr auto k = make_spec(FmhaBwdDQDKDVConfig{
+    constexpr auto k = makeSpec(FmhaBwdDQDKDVConfig{
         .signature =
             {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.has_dropout = true, .pad_hdim_q = 8, .pad_hdim_v = 8}});
@@ -371,17 +371,17 @@ TEST(FmhaBwdDqDkDv, RequiredTensorsWithDropout)
 TEST(FmhaBwdDqDkDv, RequiredScalarsPlain)
 {
     constexpr auto k =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
     EXPECT_EQ(S::requiredScalars(k), 4);
 }
 
 TEST(FmhaBwdDqDkDv, RequiredScalarsWithDropout)
 {
-    constexpr auto k = make_spec(FmhaBwdDQDKDVConfig{
+    constexpr auto k = makeSpec(FmhaBwdDQDKDVConfig{
         .signature =
             {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.has_dropout = true, .pad_hdim_q = 8, .pad_hdim_v = 8}});
@@ -391,17 +391,17 @@ TEST(FmhaBwdDqDkDv, RequiredScalarsWithDropout)
 TEST(FmhaBwdDqDkDv, RequiredTensorsGroupSameAsBatch)
 {
     constexpr auto k_batch =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::BATCH},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::BATCH},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
     constexpr auto k_group =
-        make_spec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
-                                                    .hdim_q = 128,
-                                                    .hdim_v = 128,
-                                                    .mode   = FmhaMode::GROUP},
-                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
+        makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
+                                                   .hdim_q = 128,
+                                                   .hdim_v = 128,
+                                                   .mode   = FmhaMode::GROUP},
+                                     .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
     EXPECT_EQ(S::requiredTensors(k_batch), S::requiredTensors(k_group));
 }
 

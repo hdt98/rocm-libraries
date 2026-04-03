@@ -37,30 +37,33 @@ struct Dim3 { int m, n, k; };
 struct GemmAlgorithm {
     Dim3 block_tile;   // Elements per workgroup {M, N, K}
     Dim3 block_waves;  // Wavefront layout within workgroup {M, N, K}
-    Dim3 warp_tile;    // Warp instruction tile {M, N, K}
+    Dim3 wave_tile;    // Wave instruction tile {M, N, K} (MFMA on CDNA, WMMA on RDNA)
     int k_batch = 1;   // Split-K factor (1 = no split)
+    Pipeline pipeline                    = Pipeline::V1;
+    PipelineScheduler pipeline_scheduler = PipelineScheduler::Intrawave;
+    TilePartitioner tile_partitioner     = TilePartitioner::Linear;
 };
 ```
 
-Independent of data types — paired with `Signature` in the `make_spec()` call:
+Independent of data types — paired with `Signature` in the `makeSpec()` call:
 
 ```cpp
-make_spec(
+makeSpec(
     Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     GemmAlgorithm{.block_tile  = {128, 128, 32},
                   .block_waves = {2, 2, 1},
-                  .warp_tile   = {32, 32, 16}})
+                  .wave_tile   = {32, 32, 16}})
 ```
 
 ### Consteval Validation
 
-`make_spec()` performs compile-time validation:
+`makeSpec()` performs compile-time validation:
 
-- **Warp tile validity**: Checks against CK Tile's `WarpGemmDispatcher` table
-  via `is_valid_warp_tile()`. For example, FP32 supports 32×32×{4,8} but not
+- **Wave tile validity**: Checks against CK Tile's `WarpGemmDispatcher` table
+  via `isValidWaveTile()`. For example, FP32 supports 32×32×{4,8} but not
   32×32×16, while FP16 supports 32×32×{8,16}.
 - **Tile divisibility**: `block_tile.m` must be divisible by
-  `block_waves.m × warp_tile.m` (and similarly for N and K).
+  `block_waves.m × wave_tile.m` (and similarly for N and K).
 - **CShuffleEpilogue constraint**: `block_waves.k` must be 1.
 - **Workgroup size**: Derived as `block_waves.m × block_waves.n × wavefront_size`.
 
@@ -68,7 +71,7 @@ Invalid configurations produce compile errors — no runtime surprises.
 
 ### GemmSpec — Structural NTTP
 
-`make_spec()` produces a `GemmSpec` struct with all types, layouts, and
+`makeSpec()` produces a `GemmSpec` struct with all types, layouts, and
 tile geometry resolved. All members are structural types (enums, ints,
 aggregates), so `GemmSpec` works as a C++20 non-type template parameter.
 
@@ -77,7 +80,7 @@ aggregates), so `GemmSpec` works as a C++20 non-type template parameter.
 `CkTypeMap` and `CkLayoutMap` map our schema enums to CK Tile's C++ types and
 layout tags. `run<S>` wires the 7-type CK Tile GEMM stack (shape, traits,
 problem, pipeline, partitioner, epilogue, kernel) from a `GemmSpec` NTTP.
-Tile geometry flows from `S.block_tile`, `S.block_waves`, and `S.warp_tile`.
+Tile geometry flows from `S.block_tile`, `S.block_waves`, and `S.wave_tile`.
 
 ### Variant Table (gemm_variants.hpp)
 
@@ -112,14 +115,14 @@ Each epilogue step is a typed operator that references tensors by name:
 
 ```cpp
 // GEMM + bias addition
-make_spec(
+makeSpec(
     Signature{.dtype = DataType::FP16,
               .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
     GemmAlgorithm{...})
 
 // GEMM + bias + ReLU
-make_spec(
+makeSpec(
     Signature{.dtype = DataType::FP16,
               .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
@@ -127,7 +130,7 @@ make_spec(
     GemmAlgorithm{...})
 ```
 
-`make_spec()` pattern-matches the ops sequence to select the CK Tile epilogue:
+`makeSpec()` pattern-matches the ops sequence to select the CK Tile epilogue:
 - `[GemmOp]` — plain GEMM (tensors 0-2: A, B, C)
 - `[GemmOp, AddOp]` — fused bias addition (tensors 0-3: A, B, E, D0)
 - `[GemmOp, AddOp, ReluOp]` — fused bias + activation (tensors 0-3: A, B, E, D0)
@@ -143,21 +146,29 @@ entries can override it for mixed-precision epilogues.
 
 ## Compiled Variants
 
-| Variant | A | B | Out | Acc | Epilogue | BlockTile | WarpTile | Threads |
-|---------|---|---|-----|-----|----------|-----------|----------|---------|
-| `gemm_fp32` | FP32 | FP32 | FP32 | FP32 | — | 128×128×32 | 16×16×16 | 256 |
-| `gemm_fp16` | FP16 | FP16 | FP16 | FP32 | — | 128×128×32 | 16×16×16 | 256 |
-| `gemm_bf16` | BF16 | BF16 | BF16 | FP32 | — | 128×128×32 | 16×16×16 | 256 |
-| `gemm_fp16_w32` | FP16 | FP16 | FP16 | FP32 | — | 128×128×32 | 32×32×16 | 256 |
-| `gemm_fp16_add` | FP16 | FP16 | FP16 | FP32 | `+bias` | 128×128×32 | 16×16×16 | 256 |
-| `gemm_fp16_add_relu` | FP16 | FP16 | FP16 | FP32 | `+bias+relu` | 128×128×32 | 16×16×16 | 256 |
-| `gemm_fp16_rr` | FP16 (R) | FP16 (R) | FP16 (R) | FP32 | — | 128×128×32 | 16×16×16 | 256 |
-| `gemm_fp16_cr` | FP16 (C) | FP16 (R) | FP16 (R) | FP32 | — | 128×128×32 | 16×16×16 | 256 |
-| `gemm_fp16_cc` | FP16 (C) | FP16 (C) | FP16 (R) | FP32 | — | 128×128×32 | 16×16×16 | 256 |
-| `gemm_fp16_splitk` | FP16 | FP16 | FP16 | FP32 | — | 128×128×32 | 16×16×16 | 256 | k_batch=4 |
+| Variant | A | B | Out | Epilogue | BlockTile | WaveTile | Pipeline | Notes |
+|---------|---|---|-----|----------|-----------|----------|----------|-------|
+| `gemm_fp32` | FP32 | FP32 | FP32 | — | 128×128×32 | 16×16×16 | V1 | |
+| `gemm_fp16` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | V1 | |
+| `gemm_bf16` | BF16 | BF16 | BF16 | — | 128×128×32 | 16×16×16 | V1 | |
+| `gemm_fp16_w32` | FP16 | FP16 | FP16 | — | 128×128×32 | 32×32×16 | V1 | Wider wave tile |
+| `gemm_fp16_add` | FP16 | FP16 | FP16 | `+bias` | 128×128×32 | 16×16×16 | V1 | |
+| `gemm_fp16_add_relu` | FP16 | FP16 | FP16 | `+bias+relu` | 128×128×32 | 16×16×16 | V1 | |
+| `gemm_fp16_rr` | FP16 (R) | FP16 (R) | FP16 (R) | — | 128×128×32 | 16×16×16 | V1 | |
+| `gemm_fp16_cr` | FP16 (C) | FP16 (R) | FP16 (R) | — | 128×128×32 | 16×16×16 | V1 | |
+| `gemm_fp16_cc` | FP16 (C) | FP16 (C) | FP16 (R) | — | 128×128×32 | 16×16×16 | V1 | |
+| `gemm_fp16_splitk` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | V1 | k_batch=4 |
+| `gemm_fp16_v3` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | V3 | Software-pipelined |
+| `gemm_fp16_add_add` | FP16 | FP16 | FP16 | `+D0+D1` | 128×128×32 | 16×16×16 | V1 | Two D tensors |
+| `gemm_fp16_batched` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | V1 | Batched (blockIdx.y) |
+| `gemm_fp16_gfx90a` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | V1 | gfx90a only |
+| `gemm_fp16_gfx942` | FP16 | FP16 | FP16 | — | 256×256×32 | 16×16×16 | V1 | gfx942 only, large tile |
+| `gemm_fp16_preshuffle` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | Preshuffle | B pre-rearranged |
+| `gemm_fp16_memory` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | Memory | Interwave scheduling |
+| `gemm_fp8_fnuz` | FP8 | FP8 | FP16 | — | 128×128×64 | 16×16×32 | V1 | gfx942+, mixed output |
 
-All variants use 128×128×32 block tile with 2×2×1 wavefront layout (4 waves =
-256 work-items). `gemm_fp16_w32` demonstrates a wider 32×32 warp tile.
+Most variants use 128×128×32 block tile with 2×2×1 wavefront layout (4 waves =
+256 work-items). `gemm_fp16_w32` demonstrates a wider 32×32 wave tile.
 `gemm_fp16_add` demonstrates fused bias addition. `gemm_fp16_add_relu`
 demonstrates composed epilogue (bias + activation). Layout variants
 (`_rr`, `_cr`, `_cc`) override GemmOp's BLAS-convention defaults (A=Row,
@@ -165,12 +176,16 @@ B=Col) via explicit `Tensor` entries — R = RowMajor, C = ColumnMajor.
 `gemm_fp16_splitk` demonstrates Split-K tile partitioning — the K dimension is
 partitioned across `k_batch` workgroups (blockIdx.z), with partial
 results accumulated via atomic addition.
+`gemm_fp16_v3` uses the V3 pipeline for software-pipelined loads.
+`gemm_fp16_memory` uses the Memory pipeline with Interwave scheduling.
+`gemm_fp16_preshuffle` uses weight preshuffling for optimized LDS loads.
+`gemm_fp8_fnuz` demonstrates FP8 FNUZ input with FP16 output (gfx942+ only).
 
 ## File Roles
 
 | File | Compiled by | Purpose |
 |------|-------------|---------|
-| `gemm_spec.hpp` | Both (`include/rocm_ck/`) | **Structural types** — `GemmSpec`, `GemmAlgorithm`, `Dim3`, `EpilogueOp`, `consteval` factories (`make_spec`, `is_valid_warp_tile`). No runtime code. |
+| `gemm_spec.hpp` | Both (`include/rocm_ck/`) | **Structural types** — `GemmSpec`, `GemmAlgorithm`, `Dim3`, `EpilogueOp`, `consteval` factories (`makeSpec`, `isValidWaveTile`). No runtime code. |
 | `gemm_variants.hpp` | Both (g++ and hipcc) | **Variant registry** — constexpr table of all kernel configurations, `consteval gemm_variant_spec()` lookup. Single source of truth for device and host code. |
 | `main.cpp` | Host only | Host loader — iterates `gemm_variants[]`, launches each, verifies against CPU reference |
 | `gemm_*.hip` | Device only | Variant instantiations (~12 lines each) — include `gemm_variants.hpp` and `gemm_dev.hpp` |
@@ -218,30 +233,26 @@ Requires C++20 for struct NTTPs and `consteval` validation.
 ./build/kpack_gemm build/gemm.kpack
 ```
 
-Expected output:
+Expected output (on gfx90a — arch-specific and gfx942-only variants are skipped):
 ```
 Opened build/gemm.kpack — architectures: gfx90a, gfx942
 Detected GPU: gfx90a
-gemm_fp32: M=512, N=512, K=256, grid=16x1, block=256
 gemm_fp32: PASSED
-gemm_fp16: M=512, N=512, K=256, grid=16x1, block=256
 gemm_fp16: PASSED
-gemm_bf16: M=512, N=512, K=256, grid=16x1, block=256
 gemm_bf16: PASSED
-gemm_fp16_w32: M=512, N=512, K=256, grid=16x1, block=256
 gemm_fp16_w32: PASSED
-gemm_fp16_add: M=512, N=512, K=256, grid=16x1, block=256
 gemm_fp16_add: PASSED
-gemm_fp16_add_relu: M=512, N=512, K=256, grid=16x1, block=256
 gemm_fp16_add_relu: PASSED
-gemm_fp16_rr: M=512, N=512, K=256, grid=16x1, block=256
 gemm_fp16_rr: PASSED
-gemm_fp16_cr: M=512, N=512, K=256, grid=16x1, block=256
 gemm_fp16_cr: PASSED
-gemm_fp16_cc: M=512, N=512, K=256, grid=16x1, block=256
 gemm_fp16_cc: PASSED
-gemm_fp16_splitk: M=512, N=512, K=256, grid=16x4, block=256
 gemm_fp16_splitk: PASSED
+gemm_fp16_v3: PASSED
+gemm_fp16_add_add: PASSED
+gemm_fp16_batched: PASSED
+gemm_fp16_gfx90a: PASSED
+gemm_fp16_preshuffle: PASSED
+gemm_fp16_memory: PASSED
 ```
 
 ## Design Notes
@@ -270,9 +281,9 @@ must be pre-zeroed. CK Tile's `UniversalGemmKernel` handles this
 automatically — no code changes needed beyond setting the field and
 launching with `grid_z = k_batch`.
 
-**Consteval catches mistakes at compile time.** Invalid warp tile / dtype
-combinations (e.g., fp32 with 32×32×16 warp tile) and bad tile divisibility
-produce compile errors, not runtime crashes. The `is_valid_warp_tile()`
+**Consteval catches mistakes at compile time.** Invalid wave tile / dtype
+combinations (e.g., fp32 with 32×32×16 wave tile) and bad tile divisibility
+produce compile errors, not runtime crashes. The `isValidWaveTile()`
 lookup table mirrors CK Tile's WarpGemmDispatcher specializations.
 
 **Test values kept small.** Input values are `i % 8` (max 7). Worst-case

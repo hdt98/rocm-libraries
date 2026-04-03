@@ -78,7 +78,7 @@ class KpackArchive
         std::printf("\n");
 
         // Detect GPU
-        gpu_arch_ = get_gpu_arch();
+        gpu_arch_ = getGpuArch();
         if(gpu_arch_.empty())
         {
             std::fprintf(stderr, "Failed to detect GPU architecture\n");

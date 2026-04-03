@@ -26,8 +26,13 @@ class TypedBuffer
 {
     public:
     TypedBuffer(DataType dtype, int count)
-        : dtype_(dtype), count_(count), elem_bytes_(data_type_bits(dtype) / 8)
+        : dtype_(dtype), count_(count), elem_bytes_(dataTypeBits(dtype) / 8)
     {
+        if(elem_bytes_ == 0)
+        {
+            std::fprintf(stderr, "TypedBuffer: sub-byte types (< 8 bits) not supported\n");
+            std::abort();
+        }
         HIP_CHECK(hipMalloc(&device_ptr_, static_cast<size_t>(count_) * elem_bytes_));
     }
 
@@ -71,7 +76,7 @@ class TypedBuffer
         size_t buf_size = static_cast<size_t>(count_) * elem_bytes_;
         std::vector<char> host_buf(buf_size);
         for(int i = 0; i < count_; ++i)
-            float_to_typed(dtype_, src[i], host_buf.data() + i * elem_bytes_);
+            floatToTyped(dtype_, src[i], host_buf.data() + i * elem_bytes_);
         HIP_CHECK(hipMemcpy(device_ptr_, host_buf.data(), buf_size, hipMemcpyHostToDevice));
     }
 
@@ -82,7 +87,7 @@ class TypedBuffer
         std::vector<char> host_buf(buf_size);
         HIP_CHECK(hipMemcpy(host_buf.data(), device_ptr_, buf_size, hipMemcpyDeviceToHost));
         for(int i = 0; i < count_; ++i)
-            dst[i] = typed_to_float(dtype_, host_buf.data() + i * elem_bytes_);
+            dst[i] = typedToFloat(dtype_, host_buf.data() + i * elem_bytes_);
     }
 
     /// Zero the device buffer.

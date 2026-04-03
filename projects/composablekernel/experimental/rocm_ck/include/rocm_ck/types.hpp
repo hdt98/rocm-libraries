@@ -37,7 +37,7 @@ enum class GpuTarget
 };
 
 /// Wavefront size for a given GPU target.
-consteval int target_wavefront_size(GpuTarget target)
+consteval int targetWavefrontSize(GpuTarget target)
 {
     switch(target)
     {

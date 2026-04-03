@@ -1,6 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
+// Reference document — active compile-fail tests are in compile_fail/.
 // Expected compilation failure cases for rocm_ck schema types.
 //
 // These cases are documented here for reference. Each is also tested as an
@@ -68,45 +69,45 @@ using namespace rocm_ck;
 // Expected error: "ScaleOp.scale references undeclared Scalar"
 
 // ============================================================================
-// make_spec() — expected failures
+// makeSpec() — expected failures
 // ============================================================================
 
 // First op is not GemmOp:
 //
-//   constexpr auto bad = make_spec(
+//   constexpr auto bad = makeSpec(
 //       Signature{.dtype = DataType::FP16,
 //                 .ops = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}}},
 //       GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 //
-// Expected error: "GEMM make_spec requires GemmOp as first operator"
+// Expected error: "GEMM makeSpec requires GemmOp as first operator"
 
-// Invalid warp tile for dtype:
+// Invalid wave tile for dtype:
 //
-//   constexpr auto bad = make_spec(
+//   constexpr auto bad = makeSpec(
 //       Signature{.dtype = DataType::FP32,
 //                 .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
 //       GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {32, 32, 16}});
 //
-// Expected error: "warp_tile is not a valid instruction shape for this dtype and target"
+// Expected error: "wave_tile is not a valid instruction shape for this dtype and target"
 // (FP32 32x32 only supports k=4 or k=8, not k=16)
 
 // block_waves.k != 1:
 //
-//   constexpr auto bad = make_spec(
+//   constexpr auto bad = makeSpec(
 //       Signature{.dtype = DataType::FP16,
 //                 .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
 //       GemmAlgorithm{{128, 128, 32}, {2, 2, 2}, {16, 16, 16}});
 //
 // Expected error: "block_waves.k must be 1 (CShuffleEpilogue constraint)"
 
-// Block tile not divisible by block_waves * warp_tile:
+// Block tile not divisible by block_waves * wave_tile:
 //
-//   constexpr auto bad = make_spec(
+//   constexpr auto bad = makeSpec(
 //       Signature{.dtype = DataType::FP16,
 //                 .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
 //       GemmAlgorithm{{100, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 //
-// Expected error: "block_tile.m must be divisible by (block_waves.m * warp_tile.m)"
+// Expected error: "block_tile.m must be divisible by (block_waves.m * wave_tile.m)"
 
 // ============================================================================
 // TensorName — expected failures

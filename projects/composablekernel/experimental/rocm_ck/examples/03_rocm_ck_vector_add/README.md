@@ -43,7 +43,7 @@ Signature{.dtype = DataType::FP32,
 `Signature::dtype` sets the default for all tensors. Explicit `Tensor` entries
 override specific tensors by name. For mixed types, `kVectorM` is constrained
 by the wider type (fewer elements per 128-bit register), validated at compile
-time by `make_spec`.
+time by `makeSpec`.
 
 ### Scaled Addition
 
@@ -68,11 +68,11 @@ The algorithm exposes four independent knobs matching CK Tile's `ElementWiseShap
 | Parameter | Field | Description |
 |-----------|-------|-------------|
 | BlockTile | `block_tile` | Elements processed per workgroup |
-| BlockWarps | `block_waves` | Wavefronts per workgroup (must be power of 2) |
-| WarpTile | `wave_tile` | Controls vector load width (`kVectorM`) |
+| BlockWaves | `block_waves` | Wavefronts per workgroup (must be power of 2) |
+| WaveTile | `wave_tile` | Controls vector load width (`kVectorM`) |
 | Pad | `pad` | Enable padding for unaligned problem sizes |
 
-Derived quantities (validated at compile time by `make_spec`):
+Derived quantities (validated at compile time by `makeSpec`):
 - `kVectorM = min(128 / max_type_bits, wave_tile / 64)` — vector elements per work-item
 - `kRepeatM = block_tile / (block_waves × kVectorM × 64)` — iterations per wavefront
 - `workgroup_size = 64 × block_waves` — work-items per workgroup
@@ -88,7 +88,7 @@ shared by both device `.hip` files and the host `main.cpp`:
 
 ## Compiled Variants
 
-| Variant | In | Out | BlockTile | BlockWarps | WarpTile | Threads |
+| Variant | In | Out | BlockTile | BlockWaves | WaveTile | Threads |
 |---------|----|-----|-----------|------------|----------|---------|
 | `fp32_b256` | FP32 | FP32 | 256 | 1 | 256 | 64 |
 | `fp32_b512` | FP32 | FP32 | 512 | 1 | 512 | 64 |
@@ -109,7 +109,7 @@ The `_w8`/`_w2` suffixes indicate multi-wave variants.
 
 | File | Compiled by | Purpose |
 |------|-------------|---------|
-| `elementwise_spec.hpp` | Both (`include/rocm_ck/`) | **Structural types** — `ElementwiseSpec`, `ElementwiseAlgorithm`, `consteval` factory (`make_spec`). No runtime code. |
+| `elementwise_spec.hpp` | Both (`include/rocm_ck/`) | **Structural types** — `ElementwiseSpec`, `ElementwiseAlgorithm`, `consteval` factory (`makeSpec`). No runtime code. |
 | `vector_add_variants.hpp` | Both (g++ and hipcc) | **Variant registry** — constexpr table of all kernel configurations, `consteval vector_add_variant_spec()` lookup, `findVariant()` selection. Single source of truth for device and host code. |
 | `main.cpp` | Host only | Host loader — variant selection demo, verify-all, scaled-add test |
 | `vector_add_*.hip` | Device only | Variant instantiations (~12 lines each) — include `vector_add_variants.hpp` and `elementwise_dev.hpp` |
@@ -194,5 +194,5 @@ but available for tooling that inspects archives.
 
 **Unified Signature.** All operations share the same `Signature` struct. The
 operation type is determined by the operator structs in the `ops` array
-(`AddOp` for elementwise, `GemmOp` for GEMM, etc.). `make_spec()` pattern-
+(`AddOp` for elementwise, `GemmOp` for GEMM, etc.). `makeSpec()` pattern-
 matches the ops to select the appropriate kernel path and validation.

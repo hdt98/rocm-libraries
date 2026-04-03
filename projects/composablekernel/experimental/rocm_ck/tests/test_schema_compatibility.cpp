@@ -5,7 +5,7 @@
 //
 // These tests verify that schema changes (new fields, modified defaults,
 // validation rules) do NOT break existing variants. Each test freezes the
-// exact make_spec() call from a .hip variant file and asserts on the
+// exact makeSpec() call from a .hip variant file and asserts on the
 // full GemmSpec output.
 //
 // If a test fails after a schema change, the change is NOT backwards-
@@ -23,10 +23,10 @@ using namespace rocm_ck;
 
 TEST(SchemaCompat, GemmFP32)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP32, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{
-            .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .warp_tile = {16, 16, 16}});
+            .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .wave_tile = {16, 16, 16}});
 
     EXPECT_EQ(k.num_physical_tensors, 3);
     EXPECT_EQ(slot(k, "A"), 0);
@@ -41,9 +41,9 @@ TEST(SchemaCompat, GemmFP32)
     EXPECT_EQ(k.acc_dtype, DataType::FP32);
     EXPECT_EQ(k.num_epilogue_ops, 0);
     EXPECT_EQ(k.workgroup_size, 256);
-    EXPECT_EQ(k.warp_tile.m, 16);
-    EXPECT_EQ(k.warp_tile.n, 16);
-    EXPECT_EQ(k.warp_tile.k, 16);
+    EXPECT_EQ(k.wave_tile.m, 16);
+    EXPECT_EQ(k.wave_tile.n, 16);
+    EXPECT_EQ(k.wave_tile.k, 16);
 }
 
 // ============================================================================
@@ -52,10 +52,10 @@ TEST(SchemaCompat, GemmFP32)
 
 TEST(SchemaCompat, GemmFP16)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{
-            .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .warp_tile = {16, 16, 16}});
+            .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .wave_tile = {16, 16, 16}});
 
     EXPECT_EQ(k.num_physical_tensors, 3);
     EXPECT_EQ(slot(k, "A"), 0);
@@ -70,9 +70,9 @@ TEST(SchemaCompat, GemmFP16)
     EXPECT_EQ(k.acc_dtype, DataType::FP32);
     EXPECT_EQ(k.num_epilogue_ops, 0);
     EXPECT_EQ(k.workgroup_size, 256);
-    EXPECT_EQ(k.warp_tile.m, 16);
-    EXPECT_EQ(k.warp_tile.n, 16);
-    EXPECT_EQ(k.warp_tile.k, 16);
+    EXPECT_EQ(k.wave_tile.m, 16);
+    EXPECT_EQ(k.wave_tile.n, 16);
+    EXPECT_EQ(k.wave_tile.k, 16);
 }
 
 // ============================================================================
@@ -81,10 +81,10 @@ TEST(SchemaCompat, GemmFP16)
 
 TEST(SchemaCompat, GemmBF16)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::BF16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{
-            .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .warp_tile = {16, 16, 16}});
+            .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .wave_tile = {16, 16, 16}});
 
     EXPECT_EQ(k.num_physical_tensors, 3);
     EXPECT_EQ(slot(k, "A"), 0);
@@ -99,9 +99,9 @@ TEST(SchemaCompat, GemmBF16)
     EXPECT_EQ(k.acc_dtype, DataType::FP32);
     EXPECT_EQ(k.num_epilogue_ops, 0);
     EXPECT_EQ(k.workgroup_size, 256);
-    EXPECT_EQ(k.warp_tile.m, 16);
-    EXPECT_EQ(k.warp_tile.n, 16);
-    EXPECT_EQ(k.warp_tile.k, 16);
+    EXPECT_EQ(k.wave_tile.m, 16);
+    EXPECT_EQ(k.wave_tile.n, 16);
+    EXPECT_EQ(k.wave_tile.k, 16);
 }
 
 // ============================================================================
@@ -110,10 +110,10 @@ TEST(SchemaCompat, GemmBF16)
 
 TEST(SchemaCompat, GemmFP16W32)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{
-            .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .warp_tile = {32, 32, 16}});
+            .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .wave_tile = {32, 32, 16}});
 
     EXPECT_EQ(k.num_physical_tensors, 3);
     EXPECT_EQ(slot(k, "A"), 0);
@@ -128,9 +128,9 @@ TEST(SchemaCompat, GemmFP16W32)
     EXPECT_EQ(k.acc_dtype, DataType::FP32);
     EXPECT_EQ(k.num_epilogue_ops, 0);
     EXPECT_EQ(k.workgroup_size, 256);
-    EXPECT_EQ(k.warp_tile.m, 32);
-    EXPECT_EQ(k.warp_tile.n, 32);
-    EXPECT_EQ(k.warp_tile.k, 16);
+    EXPECT_EQ(k.wave_tile.m, 32);
+    EXPECT_EQ(k.wave_tile.n, 32);
+    EXPECT_EQ(k.wave_tile.k, 16);
 }
 
 // ============================================================================
@@ -139,12 +139,12 @@ TEST(SchemaCompat, GemmFP16W32)
 
 TEST(SchemaCompat, GemmFP16Add)
 {
-    constexpr auto k = make_spec(Signature{.dtype = DataType::FP16,
-                                           .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
-                                 GemmAlgorithm{.block_tile  = {128, 128, 32},
-                                               .block_waves = {2, 2, 1},
-                                               .warp_tile   = {16, 16, 16}});
+    constexpr auto k = makeSpec(Signature{.dtype = DataType::FP16,
+                                          .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                    AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+                                GemmAlgorithm{.block_tile  = {128, 128, 32},
+                                              .block_waves = {2, 2, 1},
+                                              .wave_tile   = {16, 16, 16}});
 
     EXPECT_EQ(k.num_physical_tensors, 4);
     EXPECT_EQ(slot(k, "A"), 0);
@@ -159,11 +159,11 @@ TEST(SchemaCompat, GemmFP16Add)
     EXPECT_EQ(layout(k, "B"), Layout::Col);
     EXPECT_EQ(k.acc_dtype, DataType::FP32);
     EXPECT_EQ(k.num_epilogue_ops, 1);
-    EXPECT_TRUE(k.has_epilogue_op(EpilogueOp::Add));
+    EXPECT_TRUE(k.hasEpilogueOp(EpilogueOp::Add));
     EXPECT_EQ(k.workgroup_size, 256);
-    EXPECT_EQ(k.warp_tile.m, 16);
-    EXPECT_EQ(k.warp_tile.n, 16);
-    EXPECT_EQ(k.warp_tile.k, 16);
+    EXPECT_EQ(k.wave_tile.m, 16);
+    EXPECT_EQ(k.wave_tile.n, 16);
+    EXPECT_EQ(k.wave_tile.k, 16);
 }
 
 // ============================================================================
@@ -172,13 +172,13 @@ TEST(SchemaCompat, GemmFP16Add)
 
 TEST(SchemaCompat, GemmFP16AddRelu)
 {
-    constexpr auto k = make_spec(Signature{.dtype = DataType::FP16,
-                                           .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
-                                                     ReluOp{.in = "D", .out = "E"}}},
-                                 GemmAlgorithm{.block_tile  = {128, 128, 32},
-                                               .block_waves = {2, 2, 1},
-                                               .warp_tile   = {16, 16, 16}});
+    constexpr auto k = makeSpec(Signature{.dtype = DataType::FP16,
+                                          .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                    AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                                                    ReluOp{.in = "D", .out = "E"}}},
+                                GemmAlgorithm{.block_tile  = {128, 128, 32},
+                                              .block_waves = {2, 2, 1},
+                                              .wave_tile   = {16, 16, 16}});
 
     EXPECT_EQ(k.num_physical_tensors, 4);
     EXPECT_EQ(slot(k, "A"), 0);
@@ -193,10 +193,10 @@ TEST(SchemaCompat, GemmFP16AddRelu)
     EXPECT_EQ(layout(k, "B"), Layout::Col);
     EXPECT_EQ(k.acc_dtype, DataType::FP32);
     EXPECT_EQ(k.num_epilogue_ops, 2);
-    EXPECT_TRUE(k.has_epilogue_op(EpilogueOp::Add));
-    EXPECT_TRUE(k.has_epilogue_op(EpilogueOp::Relu));
+    EXPECT_TRUE(k.hasEpilogueOp(EpilogueOp::Add));
+    EXPECT_TRUE(k.hasEpilogueOp(EpilogueOp::Relu));
     EXPECT_EQ(k.workgroup_size, 256);
-    EXPECT_EQ(k.warp_tile.m, 16);
-    EXPECT_EQ(k.warp_tile.n, 16);
-    EXPECT_EQ(k.warp_tile.k, 16);
+    EXPECT_EQ(k.wave_tile.m, 16);
+    EXPECT_EQ(k.wave_tile.n, 16);
+    EXPECT_EQ(k.wave_tile.k, 16);
 }

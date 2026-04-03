@@ -1,11 +1,12 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// ElementwiseSpec — structural NTTP descriptor and consteval factory for
+// Role: meta — ElementwiseSpec structural NTTP descriptor and consteval factory.
+//
 // elementwise template instantiation.
 //
 // SHARED header: compiled in both host and device (--cuda-device-only) passes.
-// Contains structural types and consteval make_spec() factory. No runtime code.
+// Contains structural types and consteval makeSpec() factory. No runtime code.
 //
 // Compilation boundary:
 //   _spec.hpp (this) — schema types + consteval factory (both passes)
@@ -24,7 +25,7 @@
 namespace rocm_ck {
 
 /// Algorithm: describes HOW the kernel executes (tile geometry, pipeline).
-/// Independent of data types — paired with Signature in make_spec().
+/// Independent of data types — paired with Signature in makeSpec().
 struct ElementwiseAlgorithm
 {
     int block_tile;  // Elements processed per workgroup
@@ -67,7 +68,7 @@ struct ElementwiseSpec
 constexpr bool isAligned(ElementwiseSpec k, int n) { return n > 0 && n % k.block_tile == 0; }
 
 // ============================================================================
-// make_spec: operator-centric Signature -> ElementwiseSpec
+// makeSpec: operator-centric Signature -> ElementwiseSpec
 // ============================================================================
 
 /// Resolve and validate a vector add using the operator-centric Signature.
@@ -81,19 +82,21 @@ constexpr bool isAligned(ElementwiseSpec k, int n) { return n > 0 && n % k.block
 ///   - block_waves is power of 2 (CK Tile reduce_on_sequence requirement)
 ///   - wave_tile >= wavefront_size (64)
 ///   - kVectorM >= 1 and block_tile divisibility
-consteval ElementwiseSpec make_spec(Signature sig, ElementwiseAlgorithm algo)
+consteval ElementwiseSpec
+makeSpec(Signature sig, ElementwiseAlgorithm algo, GpuTarget target = GpuTarget::Any)
 {
     ResolvedSignature resolved = resolve(sig);
+    int wf_size                = targetWavefrontSize(target);
 
     // First op must be AddOp
     if(!std::holds_alternative<AddOp>(sig.ops[0]))
-        throw "vector add make_spec requires AddOp as first operator";
+        throw "vector add makeSpec requires AddOp as first operator";
     const AddOp& add = std::get<AddOp>(sig.ops[0]);
 
     // Remaining ops must be empty
     for(int i = 1; i < kMaxOps; ++i)
         if(!std::holds_alternative<std::monostate>(sig.ops[i]))
-            throw "vector add make_spec only supports a single AddOp";
+            throw "vector add makeSpec only supports a single AddOp";
 
     TensorDesc a_td   = resolved.tensor(add.lhs);
     TensorDesc b_td   = resolved.tensor(add.rhs);
@@ -110,20 +113,20 @@ consteval ElementwiseSpec make_spec(Signature sig, ElementwiseAlgorithm algo)
         throw "block_waves must be a power of 2 (CK Tile reduce_on_sequence requirement)";
     if(algo.wave_tile <= 0)
         throw "wave_tile must be positive";
-    if(algo.wave_tile < wavefront_size)
+    if(algo.wave_tile < wf_size)
         throw "wave_tile must be >= wavefront_size";
 
-    int in_bits    = data_type_bits(a_td.dtype);
-    int out_bits   = data_type_bits(out_td.dtype);
+    int in_bits    = dataTypeBits(a_td.dtype);
+    int out_bits   = dataTypeBits(out_td.dtype);
     int max_bits   = in_bits > out_bits ? in_bits : out_bits;
     int kVectorM_a = 128 / max_bits;
-    int kVectorM_b = algo.wave_tile / wavefront_size;
+    int kVectorM_b = algo.wave_tile / wf_size;
     int kVectorM   = kVectorM_a < kVectorM_b ? kVectorM_a : kVectorM_b;
 
     if(kVectorM < 1)
         throw "computed kVectorM must be >= 1 (wave_tile too small for this dtype)";
 
-    int elements_per_iter = algo.block_waves * kVectorM * wavefront_size;
+    int elements_per_iter = algo.block_waves * kVectorM * wf_size;
     if(algo.block_tile % elements_per_iter != 0)
         throw "block_tile must be divisible by (block_waves * kVectorM * wavefront_size)";
 
@@ -140,7 +143,7 @@ consteval ElementwiseSpec make_spec(Signature sig, ElementwiseAlgorithm algo)
     return {3,
             phys,
             algo.block_tile,
-            wavefront_size * algo.block_waves,
+            wf_size * algo.block_waves,
             algo.block_waves,
             algo.wave_tile,
             algo.pad};

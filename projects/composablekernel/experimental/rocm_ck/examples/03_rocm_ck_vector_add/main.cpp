@@ -86,7 +86,7 @@ static bool runVariant(const rocm_ck::ElementwiseVariant& variant,
     std::vector<float> result(num_elements);
     buf_result.download(result.data());
 
-    const float tol = rocm_ck::tolerance_for(out_dtype);
+    const float tol = rocm_ck::toleranceFor(out_dtype);
     bool passed     = true;
     for(int i = 0; i < num_elements; ++i)
     {
@@ -146,7 +146,7 @@ int main(int argc, char** argv)
         const auto* best = rocm_ck::findVariant(dt, dt, NUM_ELEMENTS);
         if(best)
             std::printf("  %s -> %s (tile=%d, waves=%d)\n",
-                        rocm_ck::data_type_name(dt),
+                        rocm_ck::dataTypeName(dt),
                         best->name,
                         best->spec.block_tile,
                         best->spec.block_waves);
@@ -157,7 +157,7 @@ int main(int argc, char** argv)
         const auto* best = rocm_ck::findVariant(in_dt, rocm_ck::DataType::FP32, NUM_ELEMENTS);
         if(best)
             std::printf("  %s->FP32 -> %s (tile=%d)\n",
-                        rocm_ck::data_type_name(in_dt),
+                        rocm_ck::dataTypeName(in_dt),
                         best->name,
                         best->spec.block_tile);
     }

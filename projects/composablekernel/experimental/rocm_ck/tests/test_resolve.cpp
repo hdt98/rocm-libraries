@@ -161,12 +161,12 @@ TEST(Resolve, AssignsSequentialIndicesToChainedOps)
                                                    AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
                                                    ReluOp{.in = "D", .out = "E"}}});
 
-    EXPECT_EQ(r.tensor_index("A"), 0);
-    EXPECT_EQ(r.tensor_index("B"), 1);
-    EXPECT_EQ(r.tensor_index("C"), 2);
-    EXPECT_EQ(r.tensor_index("bias"), 3);
-    EXPECT_EQ(r.tensor_index("D"), 4);
-    EXPECT_EQ(r.tensor_index("E"), 5);
+    EXPECT_EQ(r.tensorIndex("A"), 0);
+    EXPECT_EQ(r.tensorIndex("B"), 1);
+    EXPECT_EQ(r.tensorIndex("C"), 2);
+    EXPECT_EQ(r.tensorIndex("bias"), 3);
+    EXPECT_EQ(r.tensorIndex("D"), 4);
+    EXPECT_EQ(r.tensorIndex("E"), 5);
 }
 
 // ============================================================================
@@ -245,8 +245,8 @@ TEST(Resolve, PreservesScalarNamesAndDtypes)
     EXPECT_EQ(r.num_scalars, 2);
     EXPECT_EQ(r.scalar("alpha").dtype, DataType::FP32);
     EXPECT_EQ(r.scalar("beta").dtype, DataType::FP32);
-    EXPECT_EQ(r.scalar_index("alpha"), 0);
-    EXPECT_EQ(r.scalar_index("beta"), 1);
+    EXPECT_EQ(r.scalarIndex("alpha"), 0);
+    EXPECT_EQ(r.scalarIndex("beta"), 1);
 }
 
 TEST(Resolve, ReportsZeroScalarsWhenNoneDeclared)
@@ -258,7 +258,7 @@ TEST(Resolve, ReportsZeroScalarsWhenNoneDeclared)
 }
 
 // ============================================================================
-// find_tensor / find_scalar (constexpr, not consteval — returns -1 on miss)
+// findTensor / findScalar (constexpr, not consteval — returns -1 on miss)
 // ============================================================================
 
 TEST(Resolve, FindsTensorByName)
@@ -266,8 +266,8 @@ TEST(Resolve, FindsTensorByName)
     constexpr auto r = resolve(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
 
-    EXPECT_EQ(r.find_tensor("A"), 0);
-    EXPECT_EQ(r.find_tensor("C"), 2);
+    EXPECT_EQ(r.findTensor("A"), 0);
+    EXPECT_EQ(r.findTensor("C"), 2);
 }
 
 TEST(Resolve, ReturnsNegativeOneForUnknownTensor)
@@ -275,7 +275,7 @@ TEST(Resolve, ReturnsNegativeOneForUnknownTensor)
     constexpr auto r = resolve(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
 
-    EXPECT_EQ(r.find_tensor("Z"), -1);
+    EXPECT_EQ(r.findTensor("Z"), -1);
 }
 
 TEST(Resolve, ReturnsNegativeOneForUnknownScalar)
@@ -283,7 +283,7 @@ TEST(Resolve, ReturnsNegativeOneForUnknownScalar)
     constexpr auto r = resolve(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
 
-    EXPECT_EQ(r.find_scalar("nonexistent"), -1);
+    EXPECT_EQ(r.findScalar("nonexistent"), -1);
 }
 
 // ============================================================================
@@ -313,7 +313,7 @@ TEST(Concepts, ClassifiesActivationsAsUnaryOpLike)
 TEST(Concepts, ClassifiesGemmOpAsBinaryButNotUnary)
 {
     // GemmOp has lhs/rhs/out AND is special-cased, not generic BinaryOpLike
-    // (it has .lhs, .rhs, .out but is handled separately in register_slots)
+    // (it has .lhs, .rhs, .out but is handled separately in registerSlots)
     EXPECT_TRUE(BinaryOpLike<GemmOp>); // structurally matches, but dispatch special-cases it
     EXPECT_FALSE(UnaryOpLike<GemmOp>);
 }

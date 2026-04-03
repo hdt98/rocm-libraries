@@ -1,6 +1,8 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
+// Role: device — CK Tile elementwise kernel bridge.
+//
 // Device-side kernel for rocm_ck vector add. Uses CK Tile tile primitives
 // directly to compute c = alpha * a + beta * b with mixed input/output types.
 //
@@ -8,7 +10,7 @@
 // This header must NOT be included from host-only .cpp files.
 //
 // Compilation boundary:
-//   _kernel.hpp — schema types + consteval factory (both passes)
+//   _spec.hpp — schema types + consteval factory (both passes)
 //   _api.hpp    — host-only helpers (host pass only, #error on device)
 //   _dev.hpp (this) — CK Tile bridge + __device__ code (device pass only, #error on host)
 
