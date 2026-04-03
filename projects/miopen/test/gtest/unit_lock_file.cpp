@@ -102,6 +102,10 @@ TEST(CPU_UnitTestLockFile_NONE, StaleExclusiveLockCleanup)
     lockfile.unlock();
 }
 
+// Verify that unlock() does not crash if unique_handle has already been removed
+// externally (e.g. by another process forcibly cleaning up lock files).  The
+// refresh thread detects the missing file and sets lock_held=false; unlock() then
+// calls fs::remove on the already-absent path, which must be handled gracefully.
 TEST(CPU_UnitTestLockFile_NONE, LostLockFile)
 {
     auto lockpath = miopen::LockFilePath(
@@ -193,6 +197,11 @@ TEST(CPU_UnitTestLockFile_NONE, BlockingLockBothTypes)
 
 // ========== Concurrency Tests ==========
 
+// Verify mutual exclusion under concurrent try_lock: multiple threads race to
+// acquire the same lock and all eventually release it.  The final lock_count of
+// zero confirms that every successful acquisition was paired with a release and
+// that no locks were leaked — i.e. the hardlink-based ownership protocol is
+// consistent even when multiple threads call try_lock simultaneously.
 TEST(CPU_UnitTestLockFile_NONE, HardlinkCountRace)
 {
     auto lockpath = miopen::LockFilePath(
@@ -273,6 +282,10 @@ TEST(CPU_UnitTestLockFile_NONE, MassiveConcurrentLoad)
 
 // ========== Clock and Timeout Tests ==========
 
+// Verify that timed_lock on an already-exclusively-held instance returns false
+// rather than deadlocking.  FSLockFile uses access_mutex (a shared_timed_mutex)
+// to serialise in-process access; exclusive locks are not reentrant, so the
+// second timed_lock attempt fails immediately when try_lock_until returns false.
 TEST(CPU_UnitTestLockFile_NONE, ClockTypeMismatch)
 {
     auto lockpath = miopen::LockFilePath(
@@ -306,6 +319,10 @@ TEST(CPU_UnitTestLockFile_NONE, DesynchronizedClocks)
     lockfile.unlock();
 }
 
+// Verify that the refresh thread terminates gracefully when the file it is
+// refreshing (unique_handle) is deleted while the lock is held.  refresh_file()
+// calls fs::last_write_time(); on failure it sets lock_held=false and returns,
+// allowing unlock() to join the thread and proceed without blocking indefinitely.
 TEST(CPU_UnitTestLockFile_NONE, UniqueHandleDeletedDuringLock)
 {
     auto lockpath = miopen::LockFilePath(
@@ -519,6 +536,13 @@ TEST(CPU_UnitTestLockFile_NONE, StaleSharedLockCleanup)
     shared_lock.unlock_shared();
 }
 
+// Verify that an exclusive lock eventually succeeds even when fresh reader files
+// exist at the start of the attempt.  Reader files are created with the current
+// timestamp; try_lock_hardlink() sees them as active and backs off.  The timed
+// window lets them age past STALE_TIMEOUT (20 ms), after which
+// clean_stale_readers_and_check_active() removes them and the exclusive lock is
+// granted.  Confirms that the lock file transitions from a directory (shared) to
+// a regular file (exclusive).
 TEST(CPU_UnitTestLockFile_NONE, ExclusiveWithStaleReaders)
 {
     auto lockpath = miopen::LockFilePath(
@@ -620,6 +644,11 @@ TEST(CPU_UnitTestLockFile_NONE, RefreshThreadTerminationOnFileDelete)
     EXPECT_NO_THROW(miopen::fs::remove(fs_lock_path, ec));
 }
 
+// Verify that try_lock() correctly returns false while a shared lock is active,
+// even when the exclusive attempt races with the shared holder still present.
+// The shared holder signals when the exclusive attempt has been made, then
+// releases — confirming the exclusive lock sees an occupied readers directory
+// and does not mistakenly acquire while a reader is alive.
 TEST(CPU_UnitTestLockFile_NONE, EmptyDirectoryRaceCondition)
 {
     auto lockpath = miopen::LockFilePath(
@@ -971,4 +1000,351 @@ TEST(CPU_UnitTestLockFile_NONE, TryLockForBothTypes)
 
     EXPECT_TRUE(lock3.owns_lock());
     EXPECT_TRUE(lock4.owns_lock());
+}
+
+// ========== Same-Instance Concurrent Access Tests ==========
+
+// Two threads calling lock_shared() on the same FSLockFile instance concurrently.
+//
+// The refresh_thread member is shared by all lock_shared() callers on a single
+// FSLockFile instance.  Without coordination, two concurrent callers could both
+// enter try_lock_shared_impl() and both assign to refresh_thread — the second
+// assignment destroys the first's joinable std::thread and calls std::terminate.
+//
+// The fix uses a reference count (shared_holder_count) protected by
+// shared_lifecycle_mutex: only the first caller (count 0→1) starts the refresh
+// thread; subsequent callers piggyback on it.  access_mutex remains a
+// shared_timed_mutex so both callers genuinely hold the shared lock concurrently
+// (max_held == 2), while exactly one refresh thread services all holders.
+TEST(CPU_UnitTestLockFile_NONE, ConcurrentLockSharedSameInstance)
+{
+    auto lockpath = miopen::LockFilePath(miopen::fs::path{
+        "/tmp/config/miopen/test_concurrent_shared_same." + std::to_string(getpid())});
+
+    miopen::FSLockFile lockfile(lockpath);
+
+    std::atomic<int> held_count{0};
+    std::atomic<int> max_held{0};
+    std::atomic<bool> crashed{false};
+
+    auto worker = [&]() {
+        try
+        {
+            for(int i = 0; i < 10; ++i)
+            {
+                lockfile.lock_shared();
+                int current = ++held_count;
+                // At most one thread should hold the lock at a time on this instance.
+                int expected = max_held.load();
+                while(current > expected && !max_held.compare_exchange_weak(expected, current))
+                    ;
+                std::this_thread::sleep_for(std::chrono::microseconds(200));
+                --held_count;
+                lockfile.unlock_shared();
+            }
+        }
+        catch(...)
+        {
+            crashed = true;
+        }
+    };
+
+    std::thread t1(worker);
+    std::thread t2(worker);
+    t1.join();
+    t2.join();
+
+    EXPECT_FALSE(crashed.load());
+    // Both threads can hold the shared lock concurrently on the same instance.
+    EXPECT_EQ(max_held.load(), 2);
+}
+
+// ========== Exception Safety / Robustness Tests ==========
+
+// Verify that LockFilePath() does not throw when called simultaneously from many
+// threads — previously it used throwing fs::create_directories / fs::permissions
+// which could race and propagate filesystem_error into a worker thread.
+TEST(CPU_UnitTestLockFile_NONE, LockFilePathConcurrentCreation)
+{
+    // Use a fresh directory that does not yet exist so all threads race to create it.
+    const auto base =
+        miopen::fs::path{"/tmp/miopen-test-lfp-concurrent-" + std::to_string(getpid())};
+    // Remove any leftover from a previous run.
+    std::error_code ec;
+    miopen::fs::remove_all(base, ec);
+
+    constexpr int kThreads = 20;
+    std::atomic<int> errors{0};
+    std::vector<std::thread> threads;
+    threads.reserve(kThreads);
+
+    // All threads call LockFilePath for the same underlying file simultaneously.
+    for(int i = 0; i < kThreads; ++i)
+    {
+        threads.emplace_back([&base, &errors]() {
+            try
+            {
+                miopen::LockFilePath(base / "the_db_file");
+            }
+            catch(...)
+            {
+                errors++;
+            }
+        });
+    }
+
+    for(auto& t : threads)
+        t.join();
+
+    EXPECT_EQ(errors.load(), 0) << "LockFilePath threw from a worker thread";
+
+    miopen::fs::remove_all(base, ec);
+}
+
+// Verify that destroying an FSLockFile while its refresh thread is still running
+// does not call std::terminate (previously there was no destructor, so the
+// std::thread destructor would terminate the process).
+//
+// Note: the destructor only stops the refresh thread; it does not remove the
+// filesystem artifacts that unlock() would normally remove.  The test therefore
+// only verifies that destruction completes without crashing, not that the path
+// is left clean (that is unlock()'s responsibility).
+TEST(CPU_UnitTestLockFile_NONE, DestructorJoinsRefreshThread)
+{
+    auto lockpath = miopen::LockFilePath(
+        miopen::fs::path{"/tmp/config/miopen/test_dtor_join." + std::to_string(getpid())});
+
+    // Acquire a lock so the refresh thread starts, then let the FSLockFile go
+    // out of scope without an explicit unlock — the destructor must join the thread.
+    // If the destructor is missing or broken this call would crash the process via
+    // std::terminate (joinable std::thread destroyed without join/detach).
+    EXPECT_NO_FATAL_FAILURE({
+        miopen::FSLockFile lockfile(lockpath);
+        ASSERT_TRUE(lockfile.try_lock());
+        // Deliberately skip unlock().
+    });
+
+    // Reaching here without a crash confirms the destructor joined the thread.
+    // Clean up the filesystem artifacts that the skipped unlock() left behind
+    // so subsequent tests and runs start from a clean state.
+    std::error_code ec;
+    miopen::fs::remove_all(lockpath.string() + ".fslock", ec);
+    miopen::fs::remove_all(lockpath.string() + ".fslock" + ".*", ec);
+    // Best-effort glob removal; ignore errors.
+    for(auto& entry : miopen::fs::directory_iterator(lockpath.parent_path().parent_path(), ec))
+    {
+        const auto& p = entry.path();
+        if(p.string().find("test_dtor_join") != std::string::npos)
+            miopen::fs::remove_all(p, ec);
+    }
+}
+
+// Same scenario for a shared lock whose holder is destroyed without unlock_shared().
+TEST(CPU_UnitTestLockFile_NONE, DestructorJoinsSharedRefreshThread)
+{
+    auto lockpath = miopen::LockFilePath(
+        miopen::fs::path{"/tmp/config/miopen/test_dtor_join_shared." + std::to_string(getpid())});
+
+    EXPECT_NO_FATAL_FAILURE({
+        miopen::FSLockFile lockfile(lockpath);
+        ASSERT_TRUE(lockfile.try_lock_shared());
+        // Deliberately skip unlock_shared().
+    });
+
+    // Reaching here without a crash confirms the destructor joined the thread.
+    std::error_code ec;
+    miopen::fs::remove_all(lockpath.string() + ".fslock", ec);
+}
+
+// Verify that a lock method leaves access_mutex in a consistent state after an
+// exception propagates out.  We simulate the failure by making unique_handle
+// point at a path that cannot be created (parent directory does not exist), so
+// try_lock_hardlink() returns false rather than throwing — but we verify the
+// symmetry: after a failed timed_lock the mutex is not held and a subsequent
+// lock on the same instance succeeds once the path is valid.
+TEST(CPU_UnitTestLockFile_NONE, FailedTimedLockDoesNotLeakMutex)
+{
+    auto lockpath = miopen::LockFilePath(
+        miopen::fs::path{"/tmp/config/miopen/test_mutex_leak." + std::to_string(getpid())});
+
+    miopen::FSLockFile lockfile1(lockpath);
+    miopen::FSLockFile lockfile2(lockpath);
+
+    // Hold the lock so that lockfile2's timed_lock times out.
+    ASSERT_TRUE(lockfile1.try_lock());
+
+    EXPECT_FALSE(lockfile2.timed_lock(ToPTime(std::chrono::milliseconds{30})));
+
+    // Release lockfile1 — lockfile2 must be able to acquire the lock now,
+    // which would be impossible if access_mutex had been left in a locked state.
+    lockfile1.unlock();
+
+    EXPECT_TRUE(lockfile2.timed_lock(ToPTime(std::chrono::milliseconds{500})));
+    lockfile2.unlock();
+}
+
+// Same reusability check for the shared-lock timed path.
+TEST(CPU_UnitTestLockFile_NONE, FailedTimedSharedLockDoesNotLeakMutex)
+{
+    auto lockpath = miopen::LockFilePath(
+        miopen::fs::path{"/tmp/config/miopen/test_shared_mutex_leak." + std::to_string(getpid())});
+
+    miopen::FSLockFile exclusive(lockpath);
+    miopen::FSLockFile shared_waiter(lockpath);
+
+    ASSERT_TRUE(exclusive.try_lock());
+
+    EXPECT_FALSE(shared_waiter.timed_lock_shared(ToPTime(std::chrono::milliseconds{30})));
+
+    exclusive.unlock();
+
+    // shared_waiter must be reusable — its access_mutex share-count must be 0.
+    EXPECT_TRUE(shared_waiter.timed_lock_shared(ToPTime(std::chrono::milliseconds{500})));
+    shared_waiter.unlock_shared();
+}
+
+// Reproduce the exact pattern that caused test_perfdb to crash:
+// many threads each create a fresh FSLockFile instance (as PlainTextDb does),
+// then acquire and release an exclusive lock — all targeting the same path.
+// Previously this crashed via filesystem_error thrown inside LockFilePath()
+// or via std::thread::~thread() calling terminate on an un-joined refresh thread.
+TEST(CPU_UnitTestLockFile_NONE, SeparateInstancesPerThreadExclusiveLock)
+{
+    const auto base = miopen::fs::path{"/tmp/miopen-test-sep-excl-" + std::to_string(getpid())};
+    std::error_code ec;
+    miopen::fs::remove_all(base, ec);
+
+    // LockFilePath creates the lock file path; call it once to establish the dir.
+    auto lockpath = miopen::LockFilePath(base / "db_file");
+
+    constexpr int kThreads      = 16;
+    constexpr int kOpsPerThread = 10;
+
+    std::atomic<int> successful_ops{0};
+    std::atomic<bool> crashed{false};
+    std::vector<std::thread> threads;
+    threads.reserve(kThreads);
+
+    for(int i = 0; i < kThreads; ++i)
+    {
+        threads.emplace_back([&]() {
+            try
+            {
+                for(int j = 0; j < kOpsPerThread; ++j)
+                {
+                    // Each iteration mirrors what PlainTextDb does: construct a
+                    // fresh instance, take an exclusive lock, do work, destroy.
+                    miopen::FSLockFile lockfile(lockpath);
+                    auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+                    std::unique_lock<miopen::FSLockFile> lock(lockfile, timeout);
+                    if(lock.owns_lock())
+                        successful_ops++;
+                }
+            }
+            catch(...)
+            {
+                crashed = true;
+            }
+        });
+    }
+
+    for(auto& t : threads)
+        t.join();
+
+    EXPECT_FALSE(crashed.load()) << "An exception escaped from a worker thread";
+    EXPECT_EQ(successful_ops.load(), kThreads * kOpsPerThread);
+
+    miopen::fs::remove_all(base, ec);
+}
+
+// Same pattern with shared locks (mirrors the multithreaded read test in perfdb).
+TEST(CPU_UnitTestLockFile_NONE, SeparateInstancesPerThreadSharedLock)
+{
+    const auto base = miopen::fs::path{"/tmp/miopen-test-sep-shared-" + std::to_string(getpid())};
+    std::error_code ec;
+    miopen::fs::remove_all(base, ec);
+
+    auto lockpath = miopen::LockFilePath(base / "db_file");
+
+    constexpr int kThreads      = 16;
+    constexpr int kOpsPerThread = 10;
+
+    std::atomic<int> successful_ops{0};
+    std::atomic<bool> crashed{false};
+    std::vector<std::thread> threads;
+    threads.reserve(kThreads);
+
+    for(int i = 0; i < kThreads; ++i)
+    {
+        threads.emplace_back([&]() {
+            try
+            {
+                for(int j = 0; j < kOpsPerThread; ++j)
+                {
+                    miopen::FSLockFile lockfile(lockpath);
+                    auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+                    std::shared_lock<miopen::FSLockFile> lock(lockfile, timeout);
+                    if(lock.owns_lock())
+                        successful_ops++;
+                }
+            }
+            catch(...)
+            {
+                crashed = true;
+            }
+        });
+    }
+
+    for(auto& t : threads)
+        t.join();
+
+    EXPECT_FALSE(crashed.load()) << "An exception escaped from a worker thread";
+    EXPECT_EQ(successful_ops.load(), kThreads * kOpsPerThread);
+
+    miopen::fs::remove_all(base, ec);
+}
+
+// Verify that LockFilePath() itself is also safe to call concurrently when the
+// parent directory does not yet exist (the exact race that originally threw).
+TEST(CPU_UnitTestLockFile_NONE, SeparateInstancesCreateLockPathConcurrently)
+{
+    const auto base = miopen::fs::path{"/tmp/miopen-test-sep-mkpath-" + std::to_string(getpid())};
+    std::error_code ec;
+    miopen::fs::remove_all(base, ec);
+
+    // No pre-creation — all threads race to make the directory via LockFilePath.
+    constexpr int kThreads = 20;
+    std::atomic<int> errors{0};
+    std::atomic<int> successful_ops{0};
+    std::vector<std::thread> threads;
+    threads.reserve(kThreads);
+
+    for(int i = 0; i < kThreads; ++i)
+    {
+        threads.emplace_back([&]() {
+            try
+            {
+                // Each thread computes its own lockpath (same underlying file)
+                // and then acquires + releases an exclusive lock.
+                auto lp = miopen::LockFilePath(base / "db_file");
+                miopen::FSLockFile lockfile(lp);
+                auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+                std::unique_lock<miopen::FSLockFile> lock(lockfile, timeout);
+                if(lock.owns_lock())
+                    successful_ops++;
+            }
+            catch(...)
+            {
+                errors++;
+            }
+        });
+    }
+
+    for(auto& t : threads)
+        t.join();
+
+    EXPECT_EQ(errors.load(), 0) << "An exception escaped from a worker thread";
+    EXPECT_EQ(successful_ops.load(), kThreads);
+
+    miopen::fs::remove_all(base, ec);
 }

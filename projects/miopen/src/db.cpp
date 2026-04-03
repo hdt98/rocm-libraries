@@ -260,9 +260,16 @@ bool PlainTextDb::FlushUnsafe(const DbRecord& record, const RecordPositions* pos
         to.close();
 
         // rename atomically deletes and replaces filename
-        fs::rename(temp_name, filename);
-        /// \todo What if rename fails? Thou shalt not loose the original file.
-        fs::permissions(filename, miopen::fs::perms::all);
+        std::error_code rename_ec;
+        fs::rename(temp_name, filename, rename_ec);
+        if(rename_ec)
+        {
+            MIOPEN_LOG_E("Failed to rename temp file to db file: "
+                         << rename_ec.message() << " [" << temp_name << "] [" << filename << "]");
+            fs::remove(temp_name, rename_ec); // best-effort cleanup of temp file
+            return false;
+        }
+        fs::permissions(filename, miopen::fs::perms::all, rename_ec);
     }
     return true;
 }

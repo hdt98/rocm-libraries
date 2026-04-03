@@ -20,29 +20,26 @@ inline void LogFsError(const fs::filesystem_error& ex, const std::string_view fr
 
 fs::path LockFilePath(const fs::path& filename_)
 {
-    try
-    {
-        auto directory = fs::temp_directory_path() / "miopen-lockfiles";
-        if(!filename_.parent_path().empty())
-            directory = filename_.parent_path() / "miopen-lockfiles";
+    auto directory = fs::temp_directory_path() / "miopen-lockfiles";
+    if(!filename_.parent_path().empty())
+        directory = filename_.parent_path() / "miopen-lockfiles";
 
-        if(!fs::exists(directory))
-        {
-            fs::create_directories(directory);
-            fs::permissions(directory, fs::perms::all);
-        }
-        const auto file = directory / (filename_.filename() + ".lock");
-
-        return file;
-    }
-    catch(const fs::filesystem_error& ex)
+    std::error_code ec;
+    fs::create_directories(directory, ec);
+    if(ec && !fs::is_directory(directory))
     {
-        LogFsError(ex, MIOPEN_GET_FN_NAME);
-        throw;
+        MIOPEN_LOG_W("LockFilePath: failed to create directory " << directory << ": "
+                                                                 << ec.message());
     }
+    else
+    {
+        fs::permissions(directory, fs::perms::all, ec);
+    }
+
+    return directory / (filename_.filename() + ".lock");
 }
 
-LockFile::LockFile(const fs::path& path_, PassKey) : path(path_), flock(path.string())
+LockFile::LockFile(const fs::path& path_, PassKey) : path(path_)
 {
     try
     {
@@ -52,6 +49,8 @@ LockFile::LockFile(const fs::path& path_, PassKey) : path(path_), flock(path.str
                 MIOPEN_THROW("Error creating file <" + path + "> for locking.");
             fs::permissions(path, fs::perms::all);
         }
+
+        flock = decltype(flock)(path.string());
     }
     catch(const fs::filesystem_error& ex)
     {
