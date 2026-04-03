@@ -497,8 +497,9 @@ bool ConvHipImplicitGemm3DGroupFwdXdlops::IsValidPerformanceConfig(
     return config.IsValid(problem);
 }
 
-size_t ConvHipImplicitGemm3DGroupFwdXdlops::GetWorkspaceSize(
-    const ExecutionContext&, const ProblemDescription& problem) const
+size_t
+ConvHipImplicitGemm3DGroupFwdXdlops::GetWorkspaceSize(const ExecutionContext&,
+                                                      const ProblemDescription& problem) const
 {
     return GetWorkspaceSizeLayoutTransformConv(problem);
 }
@@ -512,7 +513,7 @@ ConvHipImplicitGemm3DGroupFwdXdlops::Search(const ExecutionContext& ctx,
 }
 
 bool ConvHipImplicitGemm3DGroupFwdXdlops::IsApplicable(const ExecutionContext& ctx,
-                                                        const ProblemDescription& problem) const
+                                                       const ProblemDescription& problem) const
 {
     if(env::disabled(MIOPEN_DEBUG_3D_CONV_IMPLICIT_GEMM_HIP_FWD_XDLOPS))
         return false;
@@ -546,7 +547,7 @@ bool ConvHipImplicitGemm3DGroupFwdXdlops::IsApplicable(const ExecutionContext& c
 }
 
 float ConvHipImplicitGemm3DGroupFwdXdlops::GetWti(const ExecutionContext&,
-                                                   const ProblemDescription& problem) const
+                                                  const ProblemDescription& problem) const
 {
     decltype(auto) xDesc = problem.GetIn();
     decltype(auto) wDesc = problem.GetWeights();

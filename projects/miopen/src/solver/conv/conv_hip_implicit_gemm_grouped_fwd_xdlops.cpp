@@ -160,8 +160,8 @@ bool PerformanceConfigHipImplicitGemmGroupFwdXdlops::RunParameterPredictionModel
     auto data_type = problem.GetInDataType();
     bool try_tf32  = (data_type == miopenFloat) && problem.UseTF32();
 
-    valid_kernels =
-        loader.FillValidKernelsWithTf32Fallback(CKSolverType::GrpConvFwd, problem, data_type, try_tf32);
+    valid_kernels = loader.FillValidKernelsWithTf32Fallback(
+        CKSolverType::GrpConvFwd, problem, data_type, try_tf32);
 
     const auto arch = ctx.GetStream().GetDeviceName();
     if(arch == "gfx90a")
@@ -317,8 +317,8 @@ void PerformanceConfigHipImplicitGemmGroupFwdXdlops::HeuristicInit(
     auto data_type = problem.GetInDataType();
     use_tf32       = (data_type == miopenFloat) && problem.UseTF32();
 
-    valid_kernels =
-        loader.FillValidKernelsWithTf32Fallback(CKSolverType::GrpConvFwd, problem, data_type, use_tf32);
+    valid_kernels = loader.FillValidKernelsWithTf32Fallback(
+        CKSolverType::GrpConvFwd, problem, data_type, use_tf32);
 
     if(!valid_kernels.empty())
     {
@@ -373,7 +373,8 @@ bool PerformanceConfigHipImplicitGemmGroupFwdXdlops::IsValid(
         return false;
 
     auto data_type = problem.GetInDataType();
-    return loader.IsArgsSupported(CKSolverType::GrpConvFwd, problem, kernel_id, data_type, use_tf32);
+    return loader.IsArgsSupported(
+        CKSolverType::GrpConvFwd, problem, kernel_id, data_type, use_tf32);
 }
 
 bool PerformanceConfigHipImplicitGemmGroupFwdXdlops::operator==(

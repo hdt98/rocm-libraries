@@ -166,12 +166,12 @@ private:
 
     struct SolverFns
     {
-        FillValidKernelsFn fill_valid_kernels           = nullptr;
-        IsApplicableFn is_applicable                    = nullptr;
-        IsArgsSupportedFn is_args_supported             = nullptr;
-        GetWorkspaceSizeFn get_workspace_size           = nullptr;
-        GetSolutionFn get_solution                      = nullptr;
-        GetAllKernelTypeStringsFn get_all_kernel_types  = nullptr;
+        FillValidKernelsFn fill_valid_kernels          = nullptr;
+        IsApplicableFn is_applicable                   = nullptr;
+        IsArgsSupportedFn is_args_supported            = nullptr;
+        GetWorkspaceSizeFn get_workspace_size          = nullptr;
+        GetSolutionFn get_solution                     = nullptr;
+        GetAllKernelTypeStringsFn get_all_kernel_types = nullptr;
     };
 
     SolverFns solver_fns_[static_cast<int>(CKSolverType::Count)];

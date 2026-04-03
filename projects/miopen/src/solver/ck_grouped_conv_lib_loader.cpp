@@ -278,7 +278,7 @@ bool CKGroupedConvLibLoader::LoadSymbols()
     LOAD_SYM(solution_free_fn_, ckgrpconv_solution_free);
 
     // Per-direction symbols
-#define LOAD_DIR_SYMS(idx, prefix)                                                       \
+#define LOAD_DIR_SYMS(idx, prefix)                                                          \
     LOAD_SYM(solver_fns_[idx].fill_valid_kernels, ckgrpconv_##prefix##_fill_valid_kernels); \
     LOAD_SYM(solver_fns_[idx].is_applicable, ckgrpconv_##prefix##_is_applicable);           \
     LOAD_SYM(solver_fns_[idx].is_args_supported, ckgrpconv_##prefix##_is_args_supported);   \
@@ -399,13 +399,11 @@ ConvSolution CKGroupedConvLibLoader::GetSolution(CKSolverType solverType,
 {
     if(!IsLoaded())
         return ConvSolution{miopenStatusInternalError};
-    return ExtractSolution(
-        solver_fns_[ToSlotIndex(solverType)].get_solution(
-            &ctx, &problem, kernel_id.c_str(), use_tf32));
+    return ExtractSolution(solver_fns_[ToSlotIndex(solverType)].get_solution(
+        &ctx, &problem, kernel_id.c_str(), use_tf32));
 }
 
-std::vector<std::string>
-CKGroupedConvLibLoader::GetAllKernelTypeStrings(CKSolverType slot) const
+std::vector<std::string> CKGroupedConvLibLoader::GetAllKernelTypeStrings(CKSolverType slot) const
 {
     if(!IsLoaded())
         return {};

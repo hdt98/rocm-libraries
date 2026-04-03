@@ -132,7 +132,7 @@ void PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::HeuristicInit(
     if(!loader.IsLoaded())
         return;
 
-    // 1. AI heuristics (if enabled)
+        // 1. AI heuristics (if enabled)
 #if MIOPEN_ENABLE_AI_KERNEL_TUNING
     if(&ctx != &GetDummyCtx() &&
        !env::disabled(MIOPEN_DEBUG_3D_CONV_IMPLICIT_GEMM_HIP_BWD_XDLOPS_AI_HEUR))
@@ -302,8 +302,9 @@ bool ConvHipImplicitGemm3DGroupBwdXdlops::IsValidPerformanceConfig(
     return config.IsValid(problem);
 }
 
-size_t ConvHipImplicitGemm3DGroupBwdXdlops::GetWorkspaceSize(
-    const ExecutionContext&, const ProblemDescription& problem) const
+size_t
+ConvHipImplicitGemm3DGroupBwdXdlops::GetWorkspaceSize(const ExecutionContext&,
+                                                      const ProblemDescription& problem) const
 {
     return GetWorkspaceSizeLayoutTransformConv(problem);
 }
@@ -317,7 +318,7 @@ ConvHipImplicitGemm3DGroupBwdXdlops::Search(const ExecutionContext& ctx,
 }
 
 bool ConvHipImplicitGemm3DGroupBwdXdlops::IsApplicable(const ExecutionContext& ctx,
-                                                        const ProblemDescription& problem) const
+                                                       const ProblemDescription& problem) const
 {
     if(env::disabled(MIOPEN_DEBUG_3D_CONV_IMPLICIT_GEMM_HIP_BWD_XDLOPS))
         return false;

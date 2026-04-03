@@ -367,16 +367,13 @@ bool CheckIsArgSupportedByAlphaBeta(const ProblemDescription& problem, const std
     {
     case BILINEAR:
         return miopen::solver::IsCKArgsSupported<DeviceOpGBwdBilinearPtrs<DataType, ComputeType>,
-                                                 CKArgs<DataType, ComputeType>>(problem,
-                                                                                kernel_id);
+                                                 CKArgs<DataType, ComputeType>>(problem, kernel_id);
     case SCALE:
         return miopen::solver::IsCKArgsSupported<DeviceOpGBwdScalePtrs<DataType, ComputeType>,
-                                                 CKArgs<DataType, ComputeType>>(problem,
-                                                                                kernel_id);
+                                                 CKArgs<DataType, ComputeType>>(problem, kernel_id);
     default:
         return miopen::solver::IsCKArgsSupported<DeviceOpGBwdDefaultPtrs<DataType, ComputeType>,
-                                                 CKArgs<DataType, ComputeType>>(problem,
-                                                                                kernel_id);
+                                                 CKArgs<DataType, ComputeType>>(problem, kernel_id);
     }
 }
 
@@ -478,8 +475,8 @@ extern "C" CKKernelListHandle* ckgrpconv_3d_bwd_fill_valid_kernels(
 }
 
 extern "C" bool ckgrpconv_3d_bwd_is_applicable(const miopen::conv::ProblemDescription* problem,
-                                                miopenDataType_t data_type,
-                                                bool use_tf32)
+                                               miopenDataType_t data_type,
+                                               bool use_tf32)
 {
     try
     {
@@ -494,9 +491,9 @@ extern "C" bool ckgrpconv_3d_bwd_is_applicable(const miopen::conv::ProblemDescri
 }
 
 extern "C" bool ckgrpconv_3d_bwd_is_args_supported(const miopen::conv::ProblemDescription* problem,
-                                                    const char* kernel_id,
-                                                    miopenDataType_t data_type,
-                                                    bool use_tf32)
+                                                   const char* kernel_id,
+                                                   miopenDataType_t data_type,
+                                                   bool use_tf32)
 {
     try
     {

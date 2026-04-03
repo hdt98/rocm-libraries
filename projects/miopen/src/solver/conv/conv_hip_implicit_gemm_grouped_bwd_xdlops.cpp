@@ -163,8 +163,8 @@ bool PerformanceConfigHipImplicitGemmGroupBwdXdlops::RunParameterPredictionModel
     auto data_type = problem.GetInDataType();
     use_tf32       = (data_type == miopenFloat) && problem.UseTF32();
 
-    valid_kernels =
-        loader.FillValidKernelsWithTf32Fallback(CKSolverType::GrpConvBwd, problem, data_type, use_tf32);
+    valid_kernels = loader.FillValidKernelsWithTf32Fallback(
+        CKSolverType::GrpConvBwd, problem, data_type, use_tf32);
     if(valid_kernels.empty())
         return false;
 
@@ -313,8 +313,8 @@ void PerformanceConfigHipImplicitGemmGroupBwdXdlops::HeuristicInit(
     auto data_type = problem.GetInDataType();
     use_tf32       = (data_type == miopenFloat) && problem.UseTF32();
 
-    valid_kernels =
-        loader.FillValidKernelsWithTf32Fallback(CKSolverType::GrpConvBwd, problem, data_type, use_tf32);
+    valid_kernels = loader.FillValidKernelsWithTf32Fallback(
+        CKSolverType::GrpConvBwd, problem, data_type, use_tf32);
 
     if(!valid_kernels.empty())
     {
@@ -403,7 +403,8 @@ bool PerformanceConfigHipImplicitGemmGroupBwdXdlops::IsValid(
         return false;
 
     auto data_type = problem.GetInDataType();
-    return loader.IsArgsSupported(CKSolverType::GrpConvBwd, problem, kernel_id, data_type, use_tf32);
+    return loader.IsArgsSupported(
+        CKSolverType::GrpConvBwd, problem, kernel_id, data_type, use_tf32);
 }
 
 bool PerformanceConfigHipImplicitGemmGroupBwdXdlops::operator==(

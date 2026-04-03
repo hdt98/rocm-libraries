@@ -188,8 +188,8 @@ bool PerformanceConfigHipImplicitGemmGroupWrwXdlops::RunParameterPredictionModel
     auto data_type = problem.GetInDataType();
     use_tf32       = (data_type == miopenFloat && problem.UseTF32());
 
-    valid_kernels =
-        loader.FillValidKernelsWithTf32Fallback(CKSolverType::GrpConvWrw, problem, data_type, use_tf32);
+    valid_kernels = loader.FillValidKernelsWithTf32Fallback(
+        CKSolverType::GrpConvWrw, problem, data_type, use_tf32);
     if(valid_kernels.empty())
         return false;
 
@@ -344,8 +344,8 @@ void PerformanceConfigHipImplicitGemmGroupWrwXdlops::HeuristicInit(
     auto data_type = problem.GetInDataType();
     use_tf32       = (data_type == miopenFloat && problem.UseTF32());
 
-    valid_kernels =
-        loader.FillValidKernelsWithTf32Fallback(CKSolverType::GrpConvWrw, problem, data_type, use_tf32);
+    valid_kernels = loader.FillValidKernelsWithTf32Fallback(
+        CKSolverType::GrpConvWrw, problem, data_type, use_tf32);
 
     if(!valid_kernels.empty())
     {
