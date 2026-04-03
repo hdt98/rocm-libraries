@@ -37,7 +37,7 @@ struct Dim3 { int m, n, k; };
 struct GemmAlgorithm {
     Dim3 block_tile;   // Elements per workgroup {M, N, K}
     Dim3 block_waves;  // Wavefront layout within workgroup {M, N, K}
-    Dim3 warp_tile;    // MFMA instruction tile {M, N, K}
+    Dim3 warp_tile;    // Warp instruction tile {M, N, K}
     int k_batch = 1;   // Split-K factor (1 = no split)
 };
 ```
@@ -57,7 +57,7 @@ make_spec(
 `make_spec()` performs compile-time validation:
 
 - **Warp tile validity**: Checks against CK Tile's `WarpGemmDispatcher` table
-  via `is_valid_mfma()`. For example, FP32 supports 32×32×{4,8} but not
+  via `is_valid_warp_tile()`. For example, FP32 supports 32×32×{4,8} but not
   32×32×16, while FP16 supports 32×32×{8,16}.
 - **Tile divisibility**: `block_tile.m` must be divisible by
   `block_waves.m × warp_tile.m` (and similarly for N and K).
@@ -157,7 +157,7 @@ entries can override it for mixed-precision epilogues.
 | `gemm_fp16_splitk` | FP16 | FP16 | FP16 | FP32 | — | 128×128×32 | 16×16×16 | 256 | k_batch=4 |
 
 All variants use 128×128×32 block tile with 2×2×1 wavefront layout (4 waves =
-256 work-items). `gemm_fp16_w32` demonstrates a wider 32×32 MFMA tile.
+256 work-items). `gemm_fp16_w32` demonstrates a wider 32×32 warp tile.
 `gemm_fp16_add` demonstrates fused bias addition. `gemm_fp16_add_relu`
 demonstrates composed epilogue (bias + activation). Layout variants
 (`_rr`, `_cr`, `_cc`) override GemmOp's BLAS-convention defaults (A=Row,
@@ -170,7 +170,7 @@ results accumulated via atomic addition.
 
 | File | Compiled by | Purpose |
 |------|-------------|---------|
-| `gemm_spec.hpp` | Both (`include/rocm_ck/`) | **Structural types** — `GemmSpec`, `GemmAlgorithm`, `Dim3`, `EpilogueOp`, `consteval` factories (`make_spec`, `is_valid_mfma`). No runtime code. |
+| `gemm_spec.hpp` | Both (`include/rocm_ck/`) | **Structural types** — `GemmSpec`, `GemmAlgorithm`, `Dim3`, `EpilogueOp`, `consteval` factories (`make_spec`, `is_valid_warp_tile`). No runtime code. |
 | `gemm_variants.hpp` | Both (g++ and hipcc) | **Variant registry** — constexpr table of all kernel configurations, `consteval gemm_variant_spec()` lookup. Single source of truth for device and host code. |
 | `main.cpp` | Host only | Host loader — iterates `gemm_variants[]`, launches each, verifies against CPU reference |
 | `gemm_*.hip` | Device only | Variant instantiations (~12 lines each) — include `gemm_variants.hpp` and `gemm_dev.hpp` |
@@ -270,9 +270,9 @@ must be pre-zeroed. CK Tile's `UniversalGemmKernel` handles this
 automatically — no code changes needed beyond setting the field and
 launching with `grid_z = k_batch`.
 
-**Consteval catches mistakes at compile time.** Invalid MFMA tile / dtype
-combinations (e.g., fp32 with 32×32×16 MFMA tile) and bad tile divisibility
-produce compile errors, not runtime crashes. The `is_valid_mfma()`
+**Consteval catches mistakes at compile time.** Invalid warp tile / dtype
+combinations (e.g., fp32 with 32×32×16 warp tile) and bad tile divisibility
+produce compile errors, not runtime crashes. The `is_valid_warp_tile()`
 lookup table mirrors CK Tile's WarpGemmDispatcher specializations.
 
 **Test values kept small.** Input values are `i % 8` (max 7). Worst-case

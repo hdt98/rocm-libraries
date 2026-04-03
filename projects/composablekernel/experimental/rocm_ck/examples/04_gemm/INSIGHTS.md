@@ -30,7 +30,7 @@ The `Signature` (what to compute) and `GemmAlgorithm` (how to compute it) are in
 
 The same algorithm works across fp32, fp16, and bf16. The same type can use different tile configs (gemm_fp16 vs gemm_fp16_w32). This was proven by having 6 variants that mix types and tile shapes — no coupling between the axes.
 
-> **Implication**: Tuning is purely an algorithm-space search. Given a signature, sweep tile configs and let `make_spec` reject invalid combinations at compile time. The search space is defined by `is_valid_mfma` × divisibility constraints.
+> **Implication**: Tuning is purely an algorithm-space search. Given a signature, sweep tile configs and let `make_spec` reject invalid combinations at compile time. The search space is defined by `is_valid_warp_tile` × divisibility constraints.
 
 ## 3. Dtype Cascade — Uniform Across Operations
 
@@ -71,7 +71,7 @@ GemmAlgorithm{
 
 ## 6. Hardware Constraints Flow Through consteval
 
-The valid set of (dtype, warp_tile) combinations is hardware-specific and non-obvious. `is_valid_mfma` is a consteval lookup table that mirrors CK Tile's `WarpGemmDispatcher` specializations for gfx9 (MFMA):
+The valid set of (dtype, warp_tile) combinations is hardware-specific and non-obvious. `is_valid_warp_tile` is a consteval lookup table that mirrors CK Tile's `WarpGemmDispatcher` specializations for gfx9 (MFMA):
 
 | dtype | 16×16 K values | 32×32 K values |
 |-------|----------------|----------------|
@@ -79,7 +79,7 @@ The valid set of (dtype, warp_tile) combinations is hardware-specific and non-ob
 | FP16  | 16, 32         | 8, 16          |
 | BF16  | 16, 32         | 8, 16          |
 
-`make_spec` checks five constraints in sequence: positive dimensions, `block_waves.k == 1`, MFMA tile validity, tile divisibility, and derives `workgroup_size`. An invalid config throws a readable message at compile time.
+`make_spec` checks five constraints in sequence: positive dimensions, `block_waves.k == 1`, warp tile validity, tile divisibility, and derives `workgroup_size`. An invalid config throws a readable message at compile time.
 
 > **Hard-won lesson**: The initial attempt used 256×256×64 block tile with 32×32×16 warp tile (copied from CK's `gemm_basic_invoker.hpp`). Failed on ALL architectures. Root causes: (1) no WarpGemmDispatcher for fp32 32×32×16, (2) 256×256 block tile requires 128KB LDS, exceeding 64KB limit. The fix — 128×128×32 with 16×16×16 — came from cross-referencing the dispatcher table with CK's own validated configs.
 
@@ -148,7 +148,7 @@ CK Tile's `CShuffleEpilogue` is the universal epilogue for GEMM:
 
 ## 11. What Didn't Generalize
 
-- **Tile validation**: Elementwise validates 1D `kVectorM`; GEMM validates 3D tile divisibility + MFMA dispatch. The validation logic is operation-specific.
+- **Tile validation**: Elementwise validates 1D `kVectorM`; GEMM validates 3D tile divisibility + warp tile dispatch. The validation logic is operation-specific.
 - **Scalar parameters**: Elementwise uses `scalars[0]`/`scalars[1]` for `alpha`/`beta`. GEMM's D-tensor fusion is data-driven (D tensor passed as a pointer in `tensors[3]`). Both fit in the generic Args — different slot types for different use cases.
 - **Grid calculation**: Elementwise uses `ceil(N / block_tile)`; GEMM uses `ceil(M/M_tile) × ceil(N/N_tile)` flattened to 1D via `GemmTile1DPartitioner`. More complex but CK Tile handles it.
 

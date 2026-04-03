@@ -6,7 +6,7 @@
 //
 // SHARED header: compiled in both host and device (--cuda-device-only) passes.
 // Contains structural types, consteval make_spec() factory, named accessors,
-// and MFMA tile validation. No runtime code.
+// and warp tile validation. No runtime code.
 //
 // Compilation boundary:
 //   _spec.hpp (this) — schema types + consteval factory (both passes)
@@ -127,9 +127,9 @@ struct Dim3
 /// Independent of data types — paired with Signature in make_spec().
 struct GemmAlgorithm
 {
-    Dim3 block_tile;                      // Elements per workgroup {M, N, K}
-    Dim3 block_waves;                     // Wavefront layout within workgroup {M, N, K}
-    Dim3 warp_tile;                       // MFMA instruction tile {M, N, K}
+    Dim3 block_tile;  // Elements per workgroup {M, N, K}
+    Dim3 block_waves; // Wavefront layout within workgroup {M, N, K}
+    Dim3 warp_tile;   // Warp instruction tile {M, N, K} (MFMA on CDNA, WMMA on RDNA)
     int k_batch                      = 1; // Split-K factor: partitions K across blockIdx.z
     Pipeline pipeline                = Pipeline::V1;            // Pipeline implementation strategy
     TilePartitioner tile_partitioner = TilePartitioner::Linear; // Tile-to-workgroup distribution
@@ -227,14 +227,22 @@ consteval DataType dtype(GemmSpec k, std::string_view name) { return tensor(k, n
 consteval Layout layout(GemmSpec k, std::string_view name) { return tensor(k, name).layout; }
 
 // ============================================================================
-// MFMA tile validation
+// Warp tile validation
 // ============================================================================
 
-/// Check if (a_dtype, m, n, k) maps to a valid MFMA instruction shape.
-/// Based on CK Tile's WarpGemmDispatcher specializations for gfx9.
-/// Only covers standard symmetric tile shapes.
-consteval bool is_valid_mfma(DataType a_dtype, int m, int n, int k)
+/// Check if (a_dtype, m, n, k) maps to a valid warp instruction shape.
+/// Based on CK Tile's WarpGemmDispatcher specializations.
+///
+/// When target is Any, only tiles valid across all CDNA targets are accepted
+/// (intersection semantics). A specific target accepts its full tile set.
+consteval bool
+is_valid_warp_tile(DataType a_dtype, int m, int n, int k, GpuTarget target = GpuTarget::Any)
 {
+    // RDNA targets use WMMA — not yet populated
+    if(target == GpuTarget::gfx1100 || target == GpuTarget::gfx1200)
+        return false;
+
+    // CDNA MFMA tiles — common across gfx90a, gfx942, gfx950
     if(a_dtype == DataType::FP32)
     {
         if(m == 16 && n == 16 && (k == 4 || k == 8 || k == 16))
@@ -256,14 +264,30 @@ consteval bool is_valid_mfma(DataType a_dtype, int m, int n, int k)
         if(m == 32 && n == 32 && (k == 8 || k == 16))
             return true;
     }
+
+    // FP8/BF8 MFMA — architecture-dependent
     if(a_dtype == DataType::FP8_FNUZ || a_dtype == DataType::BF8_FNUZ)
     {
+        // gfx90a: no FP8 MFMA support
+        if(target == GpuTarget::gfx90a)
+            return false;
+
+        // gfx942 and Any: conservative set (gfx942 baseline)
         // gfx942: 32x32x16, 16x16x32
-        // gfx950: 32x32x{16,32,64}, 16x16x{32,64}
-        if(m == 32 && n == 32 && (k == 16 || k == 32))
+        if(m == 32 && n == 32 && k == 16)
             return true;
-        if(m == 16 && n == 16 && (k == 32 || k == 64))
+        if(m == 16 && n == 16 && k == 32)
             return true;
+
+        // gfx950-only: extended FP8 tiles
+        // gfx950: additionally 32x32x{32,64}, 16x16x64
+        if(target == GpuTarget::gfx950)
+        {
+            if(m == 32 && n == 32 && (k == 32 || k == 64))
+                return true;
+            if(m == 16 && n == 16 && k == 64)
+                return true;
+        }
     }
     return false;
 }
@@ -287,11 +311,11 @@ consteval bool is_valid_mfma(DataType a_dtype, int m, int n, int k)
 /// Validates:
 ///   - All tile dimensions are positive
 ///   - block_waves.k == 1 (CShuffleEpilogue requires waves_m x waves_n layout)
-///   - MFMA tile matches instruction table for the input dtype
+///   - Warp tile matches instruction table for the input dtype
 ///   - Block tile is divisible by (block_waves x warp_tile) in each dimension
 ///
 /// Derives workgroup_size = block_waves.m x block_waves.n x block_waves.k x wavefront_size.
-consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
+consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo, GpuTarget target = GpuTarget::Any)
 {
     ResolvedSignature resolved = resolve(sig);
 
@@ -429,8 +453,9 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
     if(algo.tile_partitioner == TilePartitioner::StreamK && algo.k_batch > 1)
         throw "Stream-K tile partitioning is incompatible with split-K (k_batch > 1)";
 
-    if(!is_valid_mfma(a_td.dtype, algo.warp_tile.m, algo.warp_tile.n, algo.warp_tile.k))
-        throw "warp_tile is not a valid MFMA instruction shape for this dtype";
+    if(!is_valid_warp_tile(
+           a_td.dtype, algo.warp_tile.m, algo.warp_tile.n, algo.warp_tile.k, target))
+        throw "warp_tile is not a valid instruction shape for this dtype and target";
 
     if(algo.block_tile.m % (algo.block_waves.m * algo.warp_tile.m) != 0)
         throw "block_tile.m must be divisible by (block_waves.m * warp_tile.m)";
@@ -439,8 +464,8 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
     if(algo.block_tile.k % (algo.block_waves.k * algo.warp_tile.k) != 0)
         throw "block_tile.k must be divisible by (block_waves.k * warp_tile.k)";
 
-    int workgroup_size =
-        algo.block_waves.m * algo.block_waves.n * algo.block_waves.k * wavefront_size;
+    int wf_size        = target_wavefront_size(target);
+    int workgroup_size = algo.block_waves.m * algo.block_waves.n * algo.block_waves.k * wf_size;
 
     // Build physical tensor table
     int num_phys = 3;
