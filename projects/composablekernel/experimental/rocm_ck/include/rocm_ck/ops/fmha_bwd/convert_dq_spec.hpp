@@ -8,7 +8,7 @@
 // the per-split partial results and type-converts in one pass.
 //
 // SHARED header: compiled in both host and device (--cuda-device-only) passes.
-// Contains structural types, consteval make_spec() factory, and named slot
+// Contains structural types, consteval makeSpec() factory, and named slot
 // constants. No runtime code, no HIP dependency.
 //
 // Compilation boundary:
@@ -109,13 +109,13 @@ constexpr int requiredScalars(FmhaBwdConvertDQSpec /* k */)
 } // namespace fmha_bwd_convert_dq_slots
 
 // ---------------------------------------------------------------------------
-// make_spec -- consteval validation
+// makeSpec -- consteval validation
 // ---------------------------------------------------------------------------
 
 /// Validate config and produce a structural kernel descriptor.
 /// Overload resolution: each kernel family has its own Config type,
-/// so make_spec(FmhaBwdConvertDQConfig) is unambiguous.
-consteval FmhaBwdConvertDQSpec make_spec(FmhaBwdConvertDQConfig cfg)
+/// so makeSpec(FmhaBwdConvertDQConfig) is unambiguous.
+consteval FmhaBwdConvertDQSpec makeSpec(FmhaBwdConvertDQConfig cfg)
 {
     auto sig  = cfg.signature;
     auto algo = cfg.algorithm;
@@ -154,7 +154,7 @@ consteval FmhaBwdConvertDQSpec make_spec(FmhaBwdConvertDQConfig cfg)
 
 // Compile canary: GROUP mode exercises pad_seqlen_q and mode constraints.
 // clang-format off
-static_assert(make_spec(FmhaBwdConvertDQConfig{
+static_assert(makeSpec(FmhaBwdConvertDQConfig{
     .signature = {.dtype = DataType::FP16, .hdim_q = 128,
                   .mode = FmhaMode::GROUP},
     .algorithm = {.pad_seqlen_q = true, .pad_hdim_q = true}

@@ -6,7 +6,7 @@
 // and value gradients via 5 GEMMs.
 //
 // SHARED header: compiled in both host and device (--cuda-device-only) passes.
-// Contains structural types, consteval make_spec() factory, and named slot
+// Contains structural types, consteval makeSpec() factory, and named slot
 // constants. No runtime code, no HIP dependency.
 //
 // Compilation boundary:
@@ -51,7 +51,7 @@ struct FmhaBwdDQDKDVAlgorithm
     // Tuning — padding and occupancy
     int pad_hdim_q   = 0;  // 0 (no pad), 1 (small pad), or 8 (full vec pad)
     int pad_hdim_v   = 0;  // 0, 1, or 8
-    int block_per_cu = -1; // occupancy hint (-1 = auto, resolved in make_spec)
+    int block_per_cu = -1; // occupancy hint (-1 = auto, resolved in makeSpec)
 };
 
 /// Config: user-facing Signature + Algorithm pair.
@@ -150,15 +150,15 @@ constexpr int requiredScalars(FmhaBwdDQDKDVSpec k)
 } // namespace fmha_bwd_dqdkdv_slots
 
 // ---------------------------------------------------------------------------
-// make_spec — consteval validation
+// makeSpec — consteval validation
 // ---------------------------------------------------------------------------
 
 /// Validate config and produce a structural kernel descriptor.
 /// Overload resolution: each kernel family has its own Config type,
-/// so make_spec(FmhaBwdDQDKDVConfig) is unambiguous.
+/// so makeSpec(FmhaBwdDQDKDVConfig) is unambiguous.
 /// All compile-time constraints are checked here; invalid configs produce
 /// a compile error with a descriptive message.
-consteval FmhaBwdDQDKDVSpec make_spec(FmhaBwdDQDKDVConfig cfg)
+consteval FmhaBwdDQDKDVSpec makeSpec(FmhaBwdDQDKDVConfig cfg)
 {
     auto sig  = cfg.signature;
     auto algo = cfg.algorithm;
@@ -234,7 +234,7 @@ consteval FmhaBwdDQDKDVSpec make_spec(FmhaBwdDQDKDVConfig cfg)
 
 // Compile canary: dropout variant exercises bias/dropout/slot count paths.
 // clang-format off
-static_assert(fmha_bwd_dqdkdv_slots::requiredTensors(make_spec(
+static_assert(fmha_bwd_dqdkdv_slots::requiredTensors(makeSpec(
     FmhaBwdDQDKDVConfig{
         .signature = {.dtype = DataType::FP16,
                       .hdim_q = 128, .hdim_v = 128,

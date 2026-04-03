@@ -104,14 +104,18 @@ are nodes, operators are edges. Adding a new operation = new struct + add to var
 ### Operator Structs
 
 ```cpp
-struct GemmOp    { string_view lhs="A", rhs="B", out="C"; DataType acc_dtype=FP32; };
-struct AddOp     { string_view lhs, rhs, out; };
-struct MulOp     { string_view lhs, rhs, out; };
-struct ReluOp    { string_view in, out; };
+struct GemmOp     { string_view lhs, rhs, out; DataType acc_dtype=FP32; };
+struct AddOp      { string_view lhs, rhs, out; };
+struct MulOp      { string_view lhs, rhs, out; };
+struct ReluOp     { string_view in, out; };
 struct FastGeluOp { string_view in, out; };
-struct SoftmaxOp { string_view in, out; };  // reduces last dimension
-struct ScaleOp   { string_view in, out, scale; };  // scale names a Scalar
-// ... plus GeluOp, SiluOp, SigmoidOp
+struct GeluOp     { string_view in, out; };
+struct SiluOp     { string_view in, out; };
+struct SigmoidOp  { string_view in, out; };
+struct SoftmaxOp  { string_view in, out; };   // reduces last dimension
+struct ScaleOp    { string_view in, out, scale; };  // scale names a Scalar
+struct FmhaBwdOp  { string_view q, k, v, lse, do_, d, dq, dk, dv;
+                    DataType acc_dtype=FP32; };  // monolithic backward attention
 ```
 
 ### Compute Graph Examples
@@ -164,7 +168,7 @@ Signature{
             ReluOp{.in = "D", .out = "E"}}}
 ```
 
-`make_spec()` pattern-matches the ops sequence to select the CK Tile kernel
+`makeSpec()` pattern-matches the ops sequence to select the CK Tile kernel
 and epilogue configuration. The mapping is:
 
 | Ops Pattern | Kernel |
@@ -172,7 +176,8 @@ and epilogue configuration. The mapping is:
 | `[GemmOp]` | Plain GEMM |
 | `[GemmOp, AddOp]` | GEMM + CShuffleEpilogue (bias) |
 | `[GemmOp, AddOp, ReluOp]` | GEMM + CShuffleEpilogue (bias + activation) |
-| `[GemmOp, SoftmaxOp, GemmOp]` | FMHA kernel |
+| `[GemmOp, SoftmaxOp, GemmOp]` | FMHA forward (planned) |
+| `[FmhaBwdOp]` | FMHA backward (monolithic dQ/dK/dV) |
 | `[AddOp]` | Elementwise kernel |
 
 This replaces the earlier enum model (`CombineOp`, `Activation`) with a
@@ -195,7 +200,7 @@ produced. This determines:
 - Scalar values (problem sizes, alpha/beta, etc.)
 
 The same compiled binary handles different problem sizes. Validation at compile time
-(`consteval make_spec`) catches configuration errors as compiler diagnostics, not
+(`consteval makeSpec`) catches configuration errors as compiler diagnostics, not
 runtime crashes.
 
 The runtime arguments are a **flat POD struct** with stable ABI — no constructors,
@@ -210,7 +215,7 @@ information in the signature — it enables better validation and clearer code.
 
 **Epilogue composition is general.** Epilogue fusion is expressed as a composable graph
 of typed operators in the signature's `ops` array. Each fusion step is a typed operator
-(`AddOp`, `ReluOp`, etc.) with named tensor slots. `make_spec()` pattern-matches the
+(`AddOp`, `ReluOp`, etc.) with named tensor slots. `makeSpec()` pattern-matches the
 operator sequence to select the CK Tile epilogue configuration. This avoids accumulating
 special cases — adding a new epilogue combination requires no new enum values.
 
@@ -220,5 +225,5 @@ and tuning parameters belong in the algorithm, not the signature. The signature 
 
 **Problem-size constraints live in the algorithm.** Constraints like "K must be a multiple
 of 32" arise from tile geometry choices, not from the mathematical operation. The algorithm
-declares its constraints; `make_spec` cross-validates them against the signature. Runtime
+declares its constraints; `makeSpec` cross-validates them against the signature. Runtime
 argument validation checks actual values against the compiled variant's requirements.

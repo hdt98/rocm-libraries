@@ -5,7 +5,7 @@
 //
 // Common vocabulary type for resolved tensor metadata.
 // Captures dtype, name, rank, and layout — used as the internal intermediate
-// between user-facing Signature structs and make_spec().
+// between user-facing Signature structs and makeSpec().
 
 #pragma once
 

@@ -8,10 +8,10 @@
 
 using namespace rocm_ck;
 
-constexpr auto bad = make_spec(
+constexpr auto bad = makeSpec(
     Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-    GemmAlgorithm{.block_tile  = {128, 128, 32},
-                  .block_waves = {2, 2, 1},
-                  .warp_tile   = {16, 16, 16},
-                  .pipeline    = Pipeline::V1,
-                  .scheduling  = Scheduling::Interwave});
+    GemmAlgorithm{.block_tile         = {128, 128, 32},
+                  .block_waves        = {2, 2, 1},
+                  .wave_tile          = {16, 16, 16},
+                  .pipeline           = Pipeline::V1,
+                  .pipeline_scheduler = PipelineScheduler::Interwave});

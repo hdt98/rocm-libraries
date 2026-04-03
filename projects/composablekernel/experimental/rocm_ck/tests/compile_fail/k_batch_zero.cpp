@@ -7,9 +7,9 @@
 
 using namespace rocm_ck;
 
-constexpr auto k = make_spec(
+constexpr auto k = makeSpec(
     Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     GemmAlgorithm{.block_tile  = {128, 128, 32},
                   .block_waves = {2, 2, 1},
-                  .warp_tile   = {16, 16, 16},
+                  .wave_tile   = {16, 16, 16},
                   .k_batch     = 0});

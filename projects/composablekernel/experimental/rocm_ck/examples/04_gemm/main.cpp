@@ -165,21 +165,21 @@ int main(int argc, char** argv)
         // Fused epilogue references (element-wise on flat buffer — correct for RowMajor output)
         const float* ref = ref_c.data();
         std::vector<float> ref_fused;
-        if(spec.has_epilogue_op(rocm_ck::EpilogueOp::Add) &&
-           spec.has_epilogue_op(rocm_ck::EpilogueOp::Relu))
+        if(spec.hasEpilogueOp(rocm_ck::EpilogueOp::Add) &&
+           spec.hasEpilogueOp(rocm_ck::EpilogueOp::Relu))
         {
             ref_fused.resize(M * N);
             cpu_gemm_add_relu(ref_fused.data(), ref_c.data(), ref_d0.data(), M * N);
             ref = ref_fused.data();
         }
-        else if(spec.has_epilogue_op(rocm_ck::EpilogueOp::Add) && spec.num_physical_tensors > 4)
+        else if(spec.hasEpilogueOp(rocm_ck::EpilogueOp::Add) && spec.num_physical_tensors > 4)
         {
             // Two D tensors: Add+Add (result = gemm + D0 + D1)
             ref_fused.resize(M * N);
             cpu_gemm_add_add(ref_fused.data(), ref_c.data(), ref_d0.data(), ref_d1.data(), M * N);
             ref = ref_fused.data();
         }
-        else if(spec.has_epilogue_op(rocm_ck::EpilogueOp::Add))
+        else if(spec.hasEpilogueOp(rocm_ck::EpilogueOp::Add))
         {
             ref_fused.resize(M * N);
             cpu_gemm_add(ref_fused.data(), ref_c.data(), ref_d0.data(), M * N);
@@ -237,11 +237,11 @@ int main(int argc, char** argv)
         // Build generic Args — layout-aware strides from physical tensor table
         rocm_ck::Args kernel_args{};
         kernel_args.tensors[spec.lhs().args_slot] = {
-            buf_a.ptr(), rocm_ck::make_shape(M, K), rocm_ck::make_strides(a_stride_m, a_stride_k)};
+            buf_a.ptr(), rocm_ck::makeShape(M, K), rocm_ck::makeStrides(a_stride_m, a_stride_k)};
         kernel_args.tensors[spec.rhs().args_slot] = {
-            buf_b.ptr(), rocm_ck::make_shape(K, N), rocm_ck::make_strides(b_stride_k, b_stride_n)};
+            buf_b.ptr(), rocm_ck::makeShape(K, N), rocm_ck::makeStrides(b_stride_k, b_stride_n)};
         kernel_args.tensors[spec.output().args_slot] = {
-            buf_c.ptr(), rocm_ck::make_shape(M, N), rocm_ck::make_strides(c_stride_m, c_stride_n)};
+            buf_c.ptr(), rocm_ck::makeShape(M, N), rocm_ck::makeStrides(c_stride_m, c_stride_n)};
 
         // Batch parameters
         if(is_batched)
@@ -256,16 +256,16 @@ int main(int argc, char** argv)
             auto [d0_stride_m, d0_stride_n]          = layout_strides(spec.d0().layout, M, N);
             kernel_args.tensors[spec.d0().args_slot] = {
                 buf_d0->ptr(),
-                rocm_ck::make_shape(M, N),
-                rocm_ck::make_strides(d0_stride_m, d0_stride_n)};
+                rocm_ck::makeShape(M, N),
+                rocm_ck::makeStrides(d0_stride_m, d0_stride_n)};
         }
         if(has_d1)
         {
             auto [d1_stride_m, d1_stride_n]          = layout_strides(spec.d1().layout, M, N);
             kernel_args.tensors[spec.d1().args_slot] = {
                 buf_d1->ptr(),
-                rocm_ck::make_shape(M, N),
-                rocm_ck::make_strides(d1_stride_m, d1_stride_n)};
+                rocm_ck::makeShape(M, N),
+                rocm_ck::makeStrides(d1_stride_m, d1_stride_n)};
         }
 
         void* args_ptr          = &kernel_args;
@@ -294,7 +294,7 @@ int main(int argc, char** argv)
         buf_c.download(result.data());
 
         auto vr     = rocm_ck::verify(result.data(), ref, M * N, spec.output().dtype);
-        bool passed = rocm_ck::report_verify(variant.name, vr);
+        bool passed = rocm_ck::reportVerify(variant.name, vr);
         if(!passed)
             all_passed = false;
         ++variants_run;

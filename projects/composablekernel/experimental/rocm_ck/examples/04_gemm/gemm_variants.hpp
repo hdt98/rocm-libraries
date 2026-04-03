@@ -23,7 +23,7 @@ struct GemmVariant
 
 consteval GemmVariant make_variant(const char* name, Signature sig, GemmAlgorithm algo)
 {
-    return {name, make_spec(sig, algo)};
+    return {name, makeSpec(sig, algo)};
 }
 
 inline constexpr GemmVariant gemm_variants[] = {
@@ -35,7 +35,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {128, 128, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {16, 16, 16},
+                     .wave_tile   = {16, 16, 16},
                  }),
     make_variant("gemm_fp16",
                  Signature{
@@ -45,7 +45,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {128, 128, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {16, 16, 16},
+                     .wave_tile   = {16, 16, 16},
                  }),
     make_variant("gemm_bf16",
                  Signature{
@@ -55,7 +55,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {128, 128, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {16, 16, 16},
+                     .wave_tile   = {16, 16, 16},
                  }),
     make_variant("gemm_fp16_w32",
                  Signature{
@@ -65,7 +65,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {128, 128, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {32, 32, 16},
+                     .wave_tile   = {32, 32, 16},
                  }),
     make_variant("gemm_fp16_add",
                  Signature{
@@ -76,7 +76,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {128, 128, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {16, 16, 16},
+                     .wave_tile   = {16, 16, 16},
                  }),
     make_variant("gemm_fp16_add_relu",
                  Signature{
@@ -88,7 +88,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {128, 128, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {16, 16, 16},
+                     .wave_tile   = {16, 16, 16},
                  }),
     // --- Layout variants: A×B layout combinations beyond the R×C default ---
     make_variant("gemm_fp16_rr",
@@ -100,7 +100,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {128, 128, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {16, 16, 16},
+                     .wave_tile   = {16, 16, 16},
                  }),
     make_variant("gemm_fp16_cr",
                  Signature{
@@ -112,7 +112,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {128, 128, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {16, 16, 16},
+                     .wave_tile   = {16, 16, 16},
                  }),
     make_variant("gemm_fp16_cc",
                  Signature{
@@ -124,7 +124,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {128, 128, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {16, 16, 16},
+                     .wave_tile   = {16, 16, 16},
                  }),
     // --- Split-K: partition K dimension across blockIdx.z ---
     make_variant("gemm_fp16_splitk",
@@ -135,7 +135,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {128, 128, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {16, 16, 16},
+                     .wave_tile   = {16, 16, 16},
                      .k_batch     = 4,
                  }),
     // --- Pipeline V3: compute-optimized pipeline ---
@@ -147,7 +147,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {128, 128, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {16, 16, 16},
+                     .wave_tile   = {16, 16, 16},
                      .pipeline    = Pipeline::V3,
                  }),
     // --- Multi-D: two D tensors (Add+Add: result = A*B + D0 + D1) ---
@@ -161,7 +161,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {128, 128, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {16, 16, 16},
+                     .wave_tile   = {16, 16, 16},
                  }),
     // --- Batched GEMM: batch dimension via blockIdx.y (runtime, same spec as unbatched) ---
     make_variant("gemm_fp16_batched",
@@ -172,7 +172,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {128, 128, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {16, 16, 16},
+                     .wave_tile   = {16, 16, 16},
                  }),
     // --- Architecture-adaptive: per-arch tile configs (separate variants) ---
     make_variant("gemm_fp16_gfx90a",
@@ -183,7 +183,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {128, 128, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {16, 16, 16},
+                     .wave_tile   = {16, 16, 16},
                  }),
     make_variant("gemm_fp16_gfx942",
                  Signature{
@@ -193,7 +193,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {256, 256, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {32, 32, 16},
+                     .wave_tile   = {32, 32, 16},
                  }),
     // --- Preshuffle: B matrix pre-rearranged for optimal LDS loads ---
     make_variant("gemm_fp16_preshuffle",
@@ -204,7 +204,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {128, 128, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {16, 16, 16},
+                     .wave_tile   = {16, 16, 16},
                      .pipeline    = Pipeline::Preshuffle,
                  }),
     // --- Memory pipeline: LDS-based with Interwave scheduling ---
@@ -214,11 +214,11 @@ inline constexpr GemmVariant gemm_variants[] = {
                      .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}},
                  },
                  GemmAlgorithm{
-                     .block_tile  = {128, 128, 32},
-                     .block_waves = {2, 2, 1},
-                     .warp_tile   = {16, 16, 16},
-                     .pipeline    = Pipeline::Memory,
-                     .scheduling  = Scheduling::Interwave,
+                     .block_tile         = {128, 128, 32},
+                     .block_waves        = {2, 2, 1},
+                     .wave_tile          = {16, 16, 16},
+                     .pipeline           = Pipeline::Memory,
+                     .pipeline_scheduler = PipelineScheduler::Interwave,
                  }),
     // --- FP8: asymmetric dtype (fp8 inputs, fp16 output, gfx942+ only) ---
     make_variant("gemm_fp8_fnuz",
@@ -230,7 +230,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                  GemmAlgorithm{
                      .block_tile  = {128, 128, 32},
                      .block_waves = {2, 2, 1},
-                     .warp_tile   = {32, 32, 16},
+                     .wave_tile   = {32, 32, 16},
                  }),
 };
 

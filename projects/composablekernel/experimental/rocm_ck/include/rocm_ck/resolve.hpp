@@ -12,8 +12,8 @@
 // Op dispatch uses C++20 concepts to classify ops by structural shape:
 //   BinaryOpLike  — has {lhs, rhs, out} string_view members
 //   UnaryOpLike   — has {in, out} string_view members
-// A single visit_op() function is the only place the Op variant type list
-// appears. Adding a new op requires one line in visit_op(); concepts handle
+// A single visitOp() function is the only place the Op variant type list
+// appears. Adding a new op requires one line in visitOp(); concepts handle
 // generic registration and propagation automatically.
 //
 // This header has NO CK Tile dependency.
@@ -53,7 +53,7 @@ concept UnaryOpLike = requires(const T& t) {
 };
 
 // ============================================================================
-// visit_op — single consteval dispatch point for all Op types
+// visitOp — single consteval dispatch point for all Op types
 //
 // This is the ONLY place the Op variant type list is enumerated for dispatch.
 // Adding a new Op alternative requires adding one line here; if the new op
@@ -62,7 +62,7 @@ concept UnaryOpLike = requires(const T& t) {
 // ============================================================================
 
 template <typename F>
-consteval auto visit_op(const Op& op, F&& f)
+consteval auto visitOp(const Op& op, F&& f) // auto required: return type depends on visitor F
 {
     if(std::holds_alternative<GemmOp>(op))
         return f(std::get<GemmOp>(op));
@@ -115,7 +115,7 @@ struct ResolvedSignature
     }
 
     /// Find a resolved tensor's slot index by name. Compile-time error if not found.
-    consteval int tensor_index(std::string_view name) const
+    consteval int tensorIndex(std::string_view name) const
     {
         for(int i = 0; i < num_tensors; ++i)
             if(tensors[i].name == name)
@@ -133,7 +133,7 @@ struct ResolvedSignature
     }
 
     /// Find a resolved scalar's slot index by name. Compile-time error if not found.
-    consteval int scalar_index(std::string_view name) const
+    consteval int scalarIndex(std::string_view name) const
     {
         for(int i = 0; i < num_scalars; ++i)
             if(scalars[i].name == name)
@@ -142,8 +142,8 @@ struct ResolvedSignature
     }
 
     /// Find a tensor slot index by name. Returns -1 if not found.
-    /// Unlike tensor_index() (consteval), callable at both compile time and runtime.
-    constexpr int find_tensor(std::string_view name) const
+    /// Unlike tensorIndex() (consteval), callable at both compile time and runtime.
+    constexpr int findTensor(std::string_view name) const
     {
         for(int i = 0; i < num_tensors; ++i)
             if(tensors[i].name == name)
@@ -152,8 +152,8 @@ struct ResolvedSignature
     }
 
     /// Find a scalar slot index by name. Returns -1 if not found.
-    /// Unlike scalar_index() (consteval), callable at both compile time and runtime.
-    constexpr int find_scalar(std::string_view name) const
+    /// Unlike scalarIndex() (consteval), callable at both compile time and runtime.
+    constexpr int findScalar(std::string_view name) const
     {
         for(int i = 0; i < num_scalars; ++i)
             if(scalars[i].name == name)
@@ -176,9 +176,9 @@ struct ResolvedSignature
 ///
 /// Adding a new BinaryOpLike or UnaryOpLike op requires no changes here.
 consteval std::string_view
-register_slots(const Op& op, const Signature& sig, auto& find_or_add, auto& set_if_unknown)
+registerSlots(const Op& op, const Signature& sig, auto& find_or_add, auto& set_if_unknown)
 {
-    return visit_op(op, [&](const auto& typed_op) -> std::string_view {
+    return visitOp(op, [&](const auto& typed_op) -> std::string_view {
         using T = std::remove_cvref_t<decltype(typed_op)>;
 
         if constexpr(std::is_same_v<T, std::monostate>)
@@ -254,19 +254,19 @@ register_slots(const Op& op, const Signature& sig, auto& find_or_add, auto& set_
 ///
 /// Binary ops propagate from the first slot with known rank/layout to all others.
 /// Unary ops propagate between in and out.
-/// GemmOp is skipped (rank/layout already set by register_slots).
+/// GemmOp is skipped (rank/layout already set by registerSlots).
 ///
 /// Adding a new BinaryOpLike or UnaryOpLike op requires no changes here.
-consteval void propagate_slots(const Op& op, auto& propagate_binary, auto& propagate_unary)
+consteval void propagateSlots(const Op& op, auto& propagate_binary, auto& propagate_unary)
 {
-    visit_op(op, [&](const auto& typed_op) {
+    visitOp(op, [&](const auto& typed_op) {
         using T = std::remove_cvref_t<decltype(typed_op)>;
 
         if constexpr(std::is_same_v<T, std::monostate> || std::is_same_v<T, GemmOp> ||
                      std::is_same_v<T, FmhaBwdOp>)
         {
             // monostate: nothing to do
-            // GemmOp/FmhaBwdOp: rank/layout already set in register_slots
+            // GemmOp/FmhaBwdOp: rank/layout already set in registerSlots
         }
         else if constexpr(BinaryOpLike<T>)
         {
@@ -359,7 +359,7 @@ consteval ResolvedSignature resolve(Signature sig)
 
     for(int i = 0; i < kMaxOps; ++i)
     {
-        std::string_view out_name = register_slots(sig.ops[i], sig, find_or_add, set_if_unknown);
+        std::string_view out_name = registerSlots(sig.ops[i], sig, find_or_add, set_if_unknown);
 
         // SSA uniqueness: each output name may appear at most once
         if(!out_name.empty())
@@ -415,11 +415,11 @@ consteval ResolvedSignature resolve(Signature sig)
 
     // Forward pass: propagate downstream effects
     for(int i = 0; i < kMaxOps; ++i)
-        propagate_slots(sig.ops[i], propagate_binary, propagate_unary);
+        propagateSlots(sig.ops[i], propagate_binary, propagate_unary);
 
     // Backward pass: propagate upstream effects
     for(int i = kMaxOps - 1; i >= 0; --i)
-        propagate_slots(sig.ops[i], propagate_binary, propagate_unary);
+        propagateSlots(sig.ops[i], propagate_binary, propagate_unary);
 
     // ================================================================
     // Phase 3: Merge explicit Tensor entries (override propagation)

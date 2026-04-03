@@ -24,7 +24,7 @@ enum class Layout
 };
 
 /// Returns a short string name for the layout (e.g. "Row").
-constexpr const char* layout_name(Layout ly)
+constexpr const char* layoutName(Layout ly)
 {
     switch(ly)
     {
@@ -33,12 +33,12 @@ constexpr const char* layout_name(Layout ly)
     case Layout::Col: return "Col";
     case Layout::Auto: return "Auto";
     }
-    return "???";
+    return "???"; // unreachable — silences -Wreturn-type
 }
 
 /// Check if a layout is valid for a given tensor rank.
 /// Contiguous is for rank-1, Row/Col are for rank-2.
-consteval bool is_valid_layout_for_rank(Layout layout, int rank)
+consteval bool isValidLayoutForRank(Layout layout, int rank)
 {
     switch(layout)
     {

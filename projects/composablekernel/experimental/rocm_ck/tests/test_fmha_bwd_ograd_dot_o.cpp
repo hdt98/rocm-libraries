@@ -21,12 +21,12 @@ TEST(FmhaBwdOGradDotO, AlgorithmDefaults)
 }
 
 // ============================================================================
-// make_spec happy path
+// makeSpec happy path
 // ============================================================================
 
 TEST(FmhaBwdOGradDotO, MakeSpecFP16Batch)
 {
-    constexpr auto k = make_spec(FmhaBwdOGradDotOConfig{
+    constexpr auto k = makeSpec(FmhaBwdOGradDotOConfig{
         .signature = {.dtype = DataType::FP16, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}});
 
@@ -41,7 +41,7 @@ TEST(FmhaBwdOGradDotO, MakeSpecFP16Batch)
 
 TEST(FmhaBwdOGradDotO, MakeSpecBF16)
 {
-    constexpr auto k = make_spec(FmhaBwdOGradDotOConfig{
+    constexpr auto k = makeSpec(FmhaBwdOGradDotOConfig{
         .signature = {.dtype = DataType::BF16, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}});
     EXPECT_EQ(k.dtype, DataType::BF16);
@@ -49,7 +49,7 @@ TEST(FmhaBwdOGradDotO, MakeSpecBF16)
 
 TEST(FmhaBwdOGradDotO, MakeSpecGroupMode)
 {
-    constexpr auto k = make_spec(FmhaBwdOGradDotOConfig{
+    constexpr auto k = makeSpec(FmhaBwdOGradDotOConfig{
         .signature = {.dtype = DataType::FP16, .hdim_v = 128, .mode = FmhaMode::GROUP},
         .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}});
     EXPECT_EQ(k.mode, FmhaMode::GROUP);
@@ -58,21 +58,21 @@ TEST(FmhaBwdOGradDotO, MakeSpecGroupMode)
 
 TEST(FmhaBwdOGradDotO, MakeSpecAllHdims)
 {
-    // make_spec is consteval — cannot use runtime loop variables.
+    // makeSpec is consteval — cannot use runtime loop variables.
     // Use separate constexpr variables for each hdim value.
-    constexpr auto k32  = make_spec(FmhaBwdOGradDotOConfig{
+    constexpr auto k32  = makeSpec(FmhaBwdOGradDotOConfig{
          .signature = {.dtype = DataType::FP16, .hdim_v = 32, .mode = FmhaMode::BATCH},
          .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}});
-    constexpr auto k64  = make_spec(FmhaBwdOGradDotOConfig{
+    constexpr auto k64  = makeSpec(FmhaBwdOGradDotOConfig{
          .signature = {.dtype = DataType::FP16, .hdim_v = 64, .mode = FmhaMode::BATCH},
          .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}});
-    constexpr auto k96  = make_spec(FmhaBwdOGradDotOConfig{
+    constexpr auto k96  = makeSpec(FmhaBwdOGradDotOConfig{
          .signature = {.dtype = DataType::FP16, .hdim_v = 96, .mode = FmhaMode::BATCH},
          .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}});
-    constexpr auto k128 = make_spec(FmhaBwdOGradDotOConfig{
+    constexpr auto k128 = makeSpec(FmhaBwdOGradDotOConfig{
         .signature = {.dtype = DataType::FP16, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}});
-    constexpr auto k256 = make_spec(FmhaBwdOGradDotOConfig{
+    constexpr auto k256 = makeSpec(FmhaBwdOGradDotOConfig{
         .signature = {.dtype = DataType::FP16, .hdim_v = 256, .mode = FmhaMode::BATCH},
         .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}});
 
@@ -85,7 +85,7 @@ TEST(FmhaBwdOGradDotO, MakeSpecAllHdims)
 
 TEST(FmhaBwdOGradDotO, MakeSpecNoPadBatch)
 {
-    constexpr auto k = make_spec(FmhaBwdOGradDotOConfig{
+    constexpr auto k = makeSpec(FmhaBwdOGradDotOConfig{
         .signature = {.dtype = DataType::FP16, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.pad_seqlen_q = false, .pad_hdim_v = false}});
     EXPECT_FALSE(k.pad_seqlen_q);
@@ -94,7 +94,7 @@ TEST(FmhaBwdOGradDotO, MakeSpecNoPadBatch)
 
 TEST(FmhaBwdOGradDotO, MakeSpecCustomBlockPerCu)
 {
-    constexpr auto k = make_spec(FmhaBwdOGradDotOConfig{
+    constexpr auto k = makeSpec(FmhaBwdOGradDotOConfig{
         .signature = {.dtype = DataType::FP16, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true, .block_per_cu = 4}});
     EXPECT_EQ(k.block_per_cu, 4);
@@ -102,7 +102,7 @@ TEST(FmhaBwdOGradDotO, MakeSpecCustomBlockPerCu)
 
 TEST(FmhaBwdOGradDotO, MakeSpecCustomBlockSize)
 {
-    constexpr auto k = make_spec(FmhaBwdOGradDotOConfig{
+    constexpr auto k = makeSpec(FmhaBwdOGradDotOConfig{
         .signature = {.dtype = DataType::FP16, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true, .block_size = 128}});
     EXPECT_EQ(k.block_size, 128);
@@ -125,7 +125,7 @@ TEST(FmhaBwdOGradDotO, ScalarSlotIndices) { EXPECT_EQ(S::P_UNDROP, 0); }
 
 TEST(FmhaBwdOGradDotO, RequiredTensorsBatch)
 {
-    constexpr auto k = make_spec(FmhaBwdOGradDotOConfig{
+    constexpr auto k = makeSpec(FmhaBwdOGradDotOConfig{
         .signature = {.dtype = DataType::FP16, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}});
     EXPECT_EQ(S::requiredTensors(k), 3);
@@ -133,7 +133,7 @@ TEST(FmhaBwdOGradDotO, RequiredTensorsBatch)
 
 TEST(FmhaBwdOGradDotO, RequiredTensorsGroup)
 {
-    constexpr auto k = make_spec(FmhaBwdOGradDotOConfig{
+    constexpr auto k = makeSpec(FmhaBwdOGradDotOConfig{
         .signature = {.dtype = DataType::FP16, .hdim_v = 128, .mode = FmhaMode::GROUP},
         .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}});
     EXPECT_EQ(S::requiredTensors(k), 5);
@@ -141,10 +141,10 @@ TEST(FmhaBwdOGradDotO, RequiredTensorsGroup)
 
 TEST(FmhaBwdOGradDotO, RequiredScalarsAlways1)
 {
-    constexpr auto k_batch = make_spec(FmhaBwdOGradDotOConfig{
+    constexpr auto k_batch = makeSpec(FmhaBwdOGradDotOConfig{
         .signature = {.dtype = DataType::FP16, .hdim_v = 128, .mode = FmhaMode::BATCH},
         .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}});
-    constexpr auto k_group = make_spec(FmhaBwdOGradDotOConfig{
+    constexpr auto k_group = makeSpec(FmhaBwdOGradDotOConfig{
         .signature = {.dtype = DataType::FP16, .hdim_v = 128, .mode = FmhaMode::GROUP},
         .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}});
     EXPECT_EQ(S::requiredScalars(k_batch), 1);

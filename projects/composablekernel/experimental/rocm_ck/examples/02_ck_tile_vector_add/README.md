@@ -1,6 +1,6 @@
 # CK Tile Vector Add — kpack Example
 
-This example demonstrates how to compile a [CK Tile](https://github.com/ROCm/composable_kernel) kernel into a standalone `.hsaco` code object and load it at runtime via kpack. It builds on the `01_hello_world` example by replacing the hand-written HIP kernel with CK Tile's `ElementWiseKernel`.
+This example demonstrates how to compile a [CK Tile](https://github.com/ROCm/composable_kernel) kernel into a standalone `.hsaco` code object and load it at runtime via kpack. It builds on the `01_hello_world` example by replacing the hand-written HIP kernel with CK Tile's `ElementWiseKernel` (note: CK Tile uses CamelCase `ElementWise`; rocm_ck uses lowercase `Elementwise` in its own types).
 
 ## The Problem
 

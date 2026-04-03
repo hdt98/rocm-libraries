@@ -392,7 +392,7 @@ static bool runOGradDotOBatch(const rocm_ck::FmhaBwdOGradDotOVariant& variant,
                               float p_undrop)
 {
     const auto dtype      = variant.spec.dtype;
-    const int dtype_bytes = rocm_ck::data_type_bits(dtype) / 8;
+    const int dtype_bytes = rocm_ck::dataTypeBits(dtype) / 8;
     const size_t total_el = size_t(batch) * nhead * seqlen_q * hdim_v;
     const size_t total_d  = size_t(batch) * nhead * seqlen_q;
     const size_t buf_size = total_el * dtype_bytes;
@@ -414,8 +414,8 @@ static bool runOGradDotOBatch(const rocm_ck::FmhaBwdOGradDotOVariant& variant,
     std::vector<char> typed_O(buf_size), typed_dO(buf_size);
     for(size_t i = 0; i < total_el; ++i)
     {
-        rocm_ck::float_to_typed(dtype, host_O[i], typed_O.data() + i * dtype_bytes);
-        rocm_ck::float_to_typed(dtype, host_dO[i], typed_dO.data() + i * dtype_bytes);
+        rocm_ck::floatToTyped(dtype, host_O[i], typed_O.data() + i * dtype_bytes);
+        rocm_ck::floatToTyped(dtype, host_dO[i], typed_dO.data() + i * dtype_bytes);
     }
     HIP_CHECK(hipMemcpy(dev_O, typed_O.data(), buf_size, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(dev_dO, typed_dO.data(), buf_size, hipMemcpyHostToDevice));
@@ -460,7 +460,7 @@ static bool runOGradDotOBatch(const rocm_ck::FmhaBwdOGradDotOVariant& variant,
     std::vector<float> got_D(total_d);
     HIP_CHECK(hipMemcpy(got_D.data(), dev_D, d_size, hipMemcpyDeviceToHost));
 
-    const float tol = rocm_ck::tolerance_for(dtype);
+    const float tol = rocm_ck::toleranceFor(dtype);
     bool passed     = true;
     for(size_t i = 0; i < total_d; ++i)
     {
@@ -504,7 +504,7 @@ static bool runOGradDotOGroup(const rocm_ck::FmhaBwdOGradDotOVariant& variant,
                               float p_undrop)
 {
     const auto dtype      = variant.spec.dtype;
-    const int dtype_bytes = rocm_ck::data_type_bits(dtype) / 8;
+    const int dtype_bytes = rocm_ck::dataTypeBits(dtype) / 8;
     const size_t total_el = size_t(batch) * nhead * seqlen_q * hdim_v;
     const size_t total_d  = size_t(batch) * nhead * seqlen_q;
     const size_t buf_size = total_el * dtype_bytes;
@@ -539,8 +539,8 @@ static bool runOGradDotOGroup(const rocm_ck::FmhaBwdOGradDotOVariant& variant,
     std::vector<char> typed_O(buf_size), typed_dO(buf_size);
     for(size_t i = 0; i < total_el; ++i)
     {
-        rocm_ck::float_to_typed(dtype, group_O[i], typed_O.data() + i * dtype_bytes);
-        rocm_ck::float_to_typed(dtype, group_dO[i], typed_dO.data() + i * dtype_bytes);
+        rocm_ck::floatToTyped(dtype, group_O[i], typed_O.data() + i * dtype_bytes);
+        rocm_ck::floatToTyped(dtype, group_dO[i], typed_dO.data() + i * dtype_bytes);
     }
     HIP_CHECK(hipMemcpy(dev_O, typed_O.data(), buf_size, hipMemcpyHostToDevice));
     HIP_CHECK(hipMemcpy(dev_dO, typed_dO.data(), buf_size, hipMemcpyHostToDevice));
@@ -610,7 +610,7 @@ static bool runOGradDotOGroup(const rocm_ck::FmhaBwdOGradDotOVariant& variant,
     std::vector<float> got_D(total_d);
     HIP_CHECK(hipMemcpy(got_D.data(), dev_D, d_size, hipMemcpyDeviceToHost));
 
-    const float tol = rocm_ck::tolerance_for(dtype);
+    const float tol = rocm_ck::toleranceFor(dtype);
     bool passed     = true;
     for(size_t i = 0; i < total_d; ++i)
     {
@@ -664,7 +664,7 @@ static bool runDqDkDvBatchVariant(const rocm_ck::FmhaBwdDQDKDVVariant& variant,
                                   bool verify)
 {
     const auto dtype      = variant.spec.dtype;
-    const int dtype_bytes = rocm_ck::data_type_bits(dtype) / 8;
+    const int dtype_bytes = rocm_ck::dataTypeBits(dtype) / 8;
 
     const size_t q_elems   = size_t(batch) * nhead * seqlen_q * hdim_q;
     const size_t k_elems   = size_t(batch) * nhead * seqlen_k * hdim_q;
@@ -701,7 +701,7 @@ static bool runDqDkDvBatchVariant(const rocm_ck::FmhaBwdDQDKDVVariant& variant,
     auto upload_typed = [&](const std::vector<float>& src, void* dev, size_t count) {
         std::vector<char> buf(count * dtype_bytes);
         for(size_t i = 0; i < count; ++i)
-            rocm_ck::float_to_typed(dtype, src[i], buf.data() + i * dtype_bytes);
+            rocm_ck::floatToTyped(dtype, src[i], buf.data() + i * dtype_bytes);
         HIP_CHECK(hipMemcpy(dev, buf.data(), count * dtype_bytes, hipMemcpyHostToDevice));
     };
 
@@ -834,14 +834,14 @@ static bool runDqDkDvBatchVariant(const rocm_ck::FmhaBwdDQDKDVVariant& variant,
         HIP_CHECK(hipMemcpy(typed_dK.data(), dev_dK, k_elems * dtype_bytes, hipMemcpyDeviceToHost));
         std::vector<float> got_dK(k_elems);
         for(size_t i = 0; i < k_elems; ++i)
-            got_dK[i] = rocm_ck::typed_to_float(dtype, typed_dK.data() + i * dtype_bytes);
+            got_dK[i] = rocm_ck::typedToFloat(dtype, typed_dK.data() + i * dtype_bytes);
 
         // dV (typed -> float)
         std::vector<char> typed_dV(v_elems * dtype_bytes);
         HIP_CHECK(hipMemcpy(typed_dV.data(), dev_dV, v_elems * dtype_bytes, hipMemcpyDeviceToHost));
         std::vector<float> got_dV(v_elems);
         for(size_t i = 0; i < v_elems; ++i)
-            got_dV[i] = rocm_ck::typed_to_float(dtype, typed_dV.data() + i * dtype_bytes);
+            got_dV[i] = rocm_ck::typedToFloat(dtype, typed_dV.data() + i * dtype_bytes);
 
         // Tolerance: FMHA BWD involves multiple GEMMs, so use a
         // more generous tolerance than the simple OGradDotO check.
@@ -965,7 +965,7 @@ int main(int argc, char** argv)
     std::printf("\n");
 
     // --- Detect current GPU architecture ---
-    std::string gpu_arch = rocm_ck::get_gpu_arch();
+    std::string gpu_arch = rocm_ck::getGpuArch();
     if(gpu_arch.empty())
     {
         std::fprintf(stderr, "Failed to detect GPU architecture\n");
@@ -990,7 +990,7 @@ int main(int argc, char** argv)
             .signature = {.dtype = dt, .hdim_v = HDIM_V, .mode = rocm_ck::FmhaMode::BATCH},
             .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}});
         if(best)
-            std::printf("  %s d%d batch -> %s\n", rocm_ck::data_type_name(dt), HDIM_V, best->name);
+            std::printf("  %s d%d batch -> %s\n", rocm_ck::dataTypeName(dt), HDIM_V, best->name);
     }
 
     std::printf("\nRunning OGradDotO variants:\n");
@@ -1157,7 +1157,7 @@ int main(int argc, char** argv)
                 {.dtype = dt, .hdim_q = HDIM_Q, .hdim_v = HDIM_V, .mode = rocm_ck::FmhaMode::BATCH},
             .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
         if(best)
-            std::printf("  %s d%d batch -> %s\n", rocm_ck::data_type_name(dt), HDIM_Q, best->name);
+            std::printf("  %s d%d batch -> %s\n", rocm_ck::dataTypeName(dt), HDIM_Q, best->name);
     }
 
     std::printf("\nRunning DqDkDv variants:\n");

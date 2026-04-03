@@ -47,6 +47,7 @@ set(ROCM_CK_HOST_TESTS
     test_physical_tensor.cpp
     test_schema_compatibility.cpp
     test_validate.cpp
+    test_elementwise_spec.cpp
     test_fmha_bwd_common.cpp
     test_fmha_bwd_ograd_dot_o.cpp
     test_fmha_bwd_dqdkdv.cpp

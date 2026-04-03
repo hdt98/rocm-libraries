@@ -1,7 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// Device-side CK Tile GEMM type wiring for kpack.
+// Role: device — CK Tile GEMM type wiring for kpack.
 //
 // DEVICE ONLY: compiled via --cuda-device-only in .hip files.
 // This header must NOT be included from host-only .cpp files.
@@ -121,11 +121,19 @@ struct EpilogueTypes
     static constexpr int NumDTensors = S.num_physical_tensors - 3;
 
     // D0/D1 types from physical tensor table (indices 3 and 4).
-    // Always resolved — std::conditional_t below selects which go into tuples.
-    using D0Type   = typename CkTypeMap<S.physical_tensors[3].dtype>::type;
-    using D1Type   = typename CkTypeMap<S.physical_tensors[4].dtype>::type;
-    using D0Layout = typename CkLayoutMap<S.physical_tensors[3].layout>::type;
-    using D1Layout = typename CkLayoutMap<S.physical_tensors[4].layout>::type;
+    // Default to float/Row when no D tensors (unused but satisfies template resolution).
+    using D0Type   = std::conditional_t<(NumDTensors >= 1),
+                                        typename CkTypeMap<S.physical_tensors[3].dtype>::type,
+                                        float>;
+    using D1Type   = std::conditional_t<(NumDTensors >= 2),
+                                        typename CkTypeMap<S.physical_tensors[4].dtype>::type,
+                                        float>;
+    using D0Layout = std::conditional_t<(NumDTensors >= 1),
+                                        typename CkLayoutMap<S.physical_tensors[3].layout>::type,
+                                        typename CkLayoutMap<Layout::Row>::type>;
+    using D1Layout = std::conditional_t<(NumDTensors >= 2),
+                                        typename CkLayoutMap<S.physical_tensors[4].layout>::type,
+                                        typename CkLayoutMap<Layout::Row>::type>;
 
     using DsDataType = std::conditional_t<NumDTensors == 0,
                                           ck_tile::tuple<>,
@@ -146,7 +154,7 @@ struct EpilogueTypes
 
 /// Device-side GEMM bridge: Args → CK Tile template stack → ck_tile::GemmKernel.
 ///
-/// Tensor slot mapping comes from K's role-based accessors:
+/// Tensor slot mapping comes from the spec's role-based accessors:
 ///   lhs() = left operand,  rhs() = right operand,  output() = final output,  [3] = D0 (optional)
 ///   lengths[0] = first dim, lengths[1] = second dim
 ///   strides follow dimension order (RowMajor: strides[0]=ld, ColMajor: strides[1]=ld)
@@ -214,19 +222,19 @@ __device__ void run(Args args)
                      i_batch * static_cast<index_t>(args.batch_strides[PT_OUT.args_slot]);
     void* c_ptr = c_typed;
 
-    // --- Step 1: Tile geometry (from GemmSpec, validated by make_spec) ---
+    // --- Step 1: Tile geometry (from GemmSpec, validated by makeSpec) ---
     // --- CK Tile type mapping ---
     // rocm_ck "block_waves" -> CK Tile "BlockWarps" / "MWave"
-    // rocm_ck "warp_tile"   -> CK Tile "WarpTile" / "MPerXdl"
+    // rocm_ck "wave_tile"   -> CK Tile "WarpTile" / "MPerXdl"
     using GemmShape =
         ck_tile::TileGemmShape<ck_tile::sequence<S.block_tile.m, S.block_tile.n, S.block_tile.k>,
                                ck_tile::sequence<S.block_waves.m, S.block_waves.n, S.block_waves.k>,
-                               ck_tile::sequence<S.warp_tile.m, S.warp_tile.n, S.warp_tile.k>>;
+                               ck_tile::sequence<S.wave_tile.m, S.wave_tile.n, S.wave_tile.k>>;
 
-    // --- Step 2-4: Traits, problem, pipeline (selected by S.pipeline + S.scheduling) ---
+    // --- Step 2-4: Traits, problem, pipeline (selected by S.pipeline + S.pipeline_scheduler) ---
 
-    // Map rocm_ck::Scheduling → ck_tile::GemmPipelineScheduler
-    static constexpr auto CkScheduler = S.scheduling == Scheduling::Interwave
+    // Map rocm_ck::PipelineScheduler → ck_tile::GemmPipelineScheduler
+    static constexpr auto CkScheduler = S.pipeline_scheduler == PipelineScheduler::Interwave
                                             ? ck_tile::GemmPipelineScheduler::Interwave
                                             : ck_tile::GemmPipelineScheduler::Intrawave;
 
@@ -299,9 +307,9 @@ __device__ void run(Args args)
                                                                    TilePartitioner::NPerBlock,
                                                                    S.block_waves.m, // MWave
                                                                    S.block_waves.n, // NWave
-                                                                   S.warp_tile.m,   // MPerXdl
-                                                                   S.warp_tile.n,   // NPerXdl
-                                                                   S.warp_tile.k,   // KPerXdl
+                                                                   S.wave_tile.m,   // MPerXdl
+                                                                   S.wave_tile.n,   // NPerXdl
+                                                                   S.wave_tile.k,   // KPerXdl
                                                                    TransposeC>>;
 
     // --- Step 7: Kernel (ties everything together) ---
@@ -366,9 +374,9 @@ __device__ void run(Args args)
             static_cast<index_t>(PT_D1.layout == Layout::Row ? t_d1.strides[0] : t_d1.strides[1]);
 
         // D tensor batch offsets — typed pointer arithmetic (0 stride = broadcast)
-        using D0CkType2    = typename CkTypeMap<PT_D0.dtype>::type;
+        using D0CkType     = typename CkTypeMap<PT_D0.dtype>::type;
         using D1CkType     = typename CkTypeMap<PT_D1.dtype>::type;
-        const void* d0_ptr = static_cast<const D0CkType2*>(t_d0.ptr) +
+        const void* d0_ptr = static_cast<const D0CkType*>(t_d0.ptr) +
                              i_batch * static_cast<index_t>(args.batch_strides[PT_D0.args_slot]);
         const void* d1_ptr = static_cast<const D1CkType*>(t_d1.ptr) +
                              i_batch * static_cast<index_t>(args.batch_strides[PT_D1.args_slot]);

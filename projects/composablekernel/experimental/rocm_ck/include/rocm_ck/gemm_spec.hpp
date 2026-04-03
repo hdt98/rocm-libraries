@@ -1,12 +1,11 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// GemmSpec — structural NTTP descriptor and consteval factory for GEMM
-// template instantiation.
+// Role: meta — GemmSpec structural NTTP descriptor and consteval factory.
 //
 // SHARED header: compiled in both host and device (--cuda-device-only) passes.
-// Contains structural types, consteval make_spec() factory, named accessors,
-// and warp tile validation. No runtime code.
+// Contains structural types, consteval makeSpec() factory, named accessors,
+// and wave tile validation. No runtime code.
 //
 // Compilation boundary:
 //   _spec.hpp (this) — schema types + consteval factory (both passes)
@@ -103,7 +102,7 @@ enum class Pipeline
 ///     synchronization. Only one block_sync_lds() per iteration. Overlaps
 ///     compute from one wave with memory loads from another.
 ///     Only valid with Pipeline::Memory.
-enum class Scheduling
+enum class PipelineScheduler
 {
     Intrawave,
     Interwave
@@ -149,15 +148,16 @@ struct Dim3
 };
 
 /// Algorithm: describes HOW a GEMM executes (tile geometry, partitioning).
-/// Independent of data types — paired with Signature in make_spec().
+/// Independent of data types — paired with Signature in makeSpec().
 struct GemmAlgorithm
 {
-    Dim3 block_tile;  // Elements per workgroup {M, N, K}
-    Dim3 block_waves; // Wavefront layout within workgroup {M, N, K}
-    Dim3 warp_tile;   // Warp instruction tile {M, N, K} (MFMA on CDNA, WMMA on RDNA)
-    int k_batch                      = 1; // Split-K factor: partitions K across blockIdx.z
-    Pipeline pipeline                = Pipeline::V1;            // Pipeline implementation strategy
-    Scheduling scheduling            = Scheduling::Intrawave;   // Instruction scheduling strategy
+    Dim3 block_tile;       // Elements per workgroup {M, N, K}
+    Dim3 block_waves;      // Wavefront layout within workgroup {M, N, K}
+    Dim3 wave_tile;        // Wave instruction tile {M, N, K} (MFMA on CDNA, WMMA on RDNA)
+    int k_batch       = 1; // Split-K factor: partitions K across blockIdx.z
+    Pipeline pipeline = Pipeline::V1; // Pipeline implementation strategy
+    PipelineScheduler pipeline_scheduler =
+        PipelineScheduler::Intrawave;                           // Instruction scheduling strategy
     TilePartitioner tile_partitioner = TilePartitioner::Linear; // Tile-to-workgroup distribution
 };
 
@@ -186,7 +186,7 @@ struct GemmSpec
     // Tile geometry
     Dim3 block_tile;
     Dim3 block_waves;
-    Dim3 warp_tile;
+    Dim3 wave_tile;
     int workgroup_size;
     int k_batch; // Split-K factor (1 = no split)
 
@@ -194,7 +194,7 @@ struct GemmSpec
     Pipeline pipeline;
 
     // Instruction scheduling strategy
-    Scheduling scheduling;
+    PipelineScheduler pipeline_scheduler;
 
     // Tile-to-workgroup distribution strategy
     TilePartitioner tile_partitioner;
@@ -204,7 +204,7 @@ struct GemmSpec
     std::array<EpilogueOp, kMaxEpilogueOps> epilogue_ops;
 
     /// Check if the epilogue chain contains a specific op.
-    constexpr bool has_epilogue_op(EpilogueOp op) const
+    constexpr bool hasEpilogueOp(EpilogueOp op) const
     {
         for(int i = 0; i < num_epilogue_ops; ++i)
             if(epilogue_ops[i] == op)
@@ -236,7 +236,7 @@ struct GemmSpec
 // ============================================================================
 
 /// Lookup a physical tensor by name. consteval — compile-time only.
-/// Used in static_asserts and consteval make_spec() result inspection.
+/// Used in static_asserts and consteval makeSpec() result inspection.
 /// For runtime access, use GemmSpec::output() or physical_tensors[] directly.
 consteval PhysicalTensor tensor(GemmSpec k, std::string_view name)
 {
@@ -256,16 +256,16 @@ consteval DataType dtype(GemmSpec k, std::string_view name) { return tensor(k, n
 consteval Layout layout(GemmSpec k, std::string_view name) { return tensor(k, name).layout; }
 
 // ============================================================================
-// Warp tile validation
+// Wave tile validation
 // ============================================================================
 
-/// Check if (a_dtype, m, n, k) maps to a valid warp instruction shape.
+/// Check if (a_dtype, m, n, k) maps to a valid wave instruction shape.
 /// Based on CK Tile's WarpGemmDispatcher specializations.
 ///
 /// When target is Any, only tiles valid across all CDNA targets are accepted
 /// (intersection semantics). A specific target accepts its full tile set.
 consteval bool
-is_valid_warp_tile(DataType a_dtype, int m, int n, int k, GpuTarget target = GpuTarget::Any)
+isValidWaveTile(DataType a_dtype, int m, int n, int k, GpuTarget target = GpuTarget::Any)
 {
     // RDNA targets use WMMA — not yet populated
     if(target == GpuTarget::gfx1100 || target == GpuTarget::gfx1200)
@@ -318,11 +318,16 @@ is_valid_warp_tile(DataType a_dtype, int m, int n, int k, GpuTarget target = Gpu
                 return true;
         }
     }
+
+    // FP8_OCP/BF8_OCP — not yet supported (CK Tile uses compile-time OCP flag)
+    if(a_dtype == DataType::FP8_OCP || a_dtype == DataType::BF8_OCP)
+        throw "FP8_OCP/BF8_OCP not yet supported in GEMM — use FP8_FNUZ/BF8_FNUZ";
+
     return false;
 }
 
 // ============================================================================
-// make_spec: operator-centric Signature -> GemmSpec
+// makeSpec: operator-centric Signature -> GemmSpec
 // ============================================================================
 
 /// Resolve and validate a GEMM using the operator-centric Signature.
@@ -341,16 +346,16 @@ is_valid_warp_tile(DataType a_dtype, int m, int n, int k, GpuTarget target = Gpu
 ///   - All tile dimensions are positive
 ///   - block_waves.k == 1 (CShuffleEpilogue requires waves_m x waves_n layout)
 ///   - Warp tile matches instruction table for the input dtype
-///   - Block tile is divisible by (block_waves x warp_tile) in each dimension
+///   - Block tile is divisible by (block_waves x wave_tile) in each dimension
 ///
 /// Derives workgroup_size = block_waves.m x block_waves.n x block_waves.k x wavefront_size.
-consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo, GpuTarget target = GpuTarget::Any)
+consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, GpuTarget target = GpuTarget::Any)
 {
     ResolvedSignature resolved = resolve(sig);
 
     // First op must be GemmOp
     if(!std::holds_alternative<GemmOp>(sig.ops[0]))
-        throw "GEMM make_spec requires GemmOp as first operator";
+        throw "GEMM makeSpec requires GemmOp as first operator";
     const GemmOp& gemm = std::get<GemmOp>(sig.ops[0]);
 
     TensorDesc a_td = resolved.tensor(gemm.lhs);
@@ -460,8 +465,8 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo, GpuTarget target
         throw "block_tile dimensions must be positive";
     if(algo.block_waves.m <= 0 || algo.block_waves.n <= 0 || algo.block_waves.k <= 0)
         throw "block_waves dimensions must be positive";
-    if(algo.warp_tile.m <= 0 || algo.warp_tile.n <= 0 || algo.warp_tile.k <= 0)
-        throw "warp_tile dimensions must be positive";
+    if(algo.wave_tile.m <= 0 || algo.wave_tile.n <= 0 || algo.wave_tile.k <= 0)
+        throw "wave_tile dimensions must be positive";
 
     if(algo.k_batch <= 0)
         throw "k_batch must be positive";
@@ -479,33 +484,33 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo, GpuTarget target
     }
 
     // Scheduling constraints
-    if(algo.scheduling == Scheduling::Interwave && algo.pipeline != Pipeline::Memory)
+    if(algo.pipeline_scheduler == PipelineScheduler::Interwave && algo.pipeline != Pipeline::Memory)
         throw "Interwave scheduling requires Pipeline::Memory";
 
     // Tile partitioner constraints
     if(algo.tile_partitioner == TilePartitioner::StreamK && algo.k_batch > 1)
         throw "Stream-K tile partitioning is incompatible with split-K (k_batch > 1)";
 
-    if(!is_valid_warp_tile(
-           a_td.dtype, algo.warp_tile.m, algo.warp_tile.n, algo.warp_tile.k, target))
-        throw "warp_tile is not a valid instruction shape for this dtype and target";
+    if(!isValidWaveTile(a_td.dtype, algo.wave_tile.m, algo.wave_tile.n, algo.wave_tile.k, target))
+        throw "wave_tile is not a valid instruction shape for this dtype and target";
 
-    if(algo.block_tile.m % (algo.block_waves.m * algo.warp_tile.m) != 0)
-        throw "block_tile.m must be divisible by (block_waves.m * warp_tile.m)";
-    if(algo.block_tile.n % (algo.block_waves.n * algo.warp_tile.n) != 0)
-        throw "block_tile.n must be divisible by (block_waves.n * warp_tile.n)";
-    if(algo.block_tile.k % (algo.block_waves.k * algo.warp_tile.k) != 0)
-        throw "block_tile.k must be divisible by (block_waves.k * warp_tile.k)";
+    if(algo.block_tile.m % (algo.block_waves.m * algo.wave_tile.m) != 0)
+        throw "block_tile.m must be divisible by (block_waves.m * wave_tile.m)";
+    if(algo.block_tile.n % (algo.block_waves.n * algo.wave_tile.n) != 0)
+        throw "block_tile.n must be divisible by (block_waves.n * wave_tile.n)";
+    if(algo.block_tile.k % (algo.block_waves.k * algo.wave_tile.k) != 0)
+        throw "block_tile.k must be divisible by (block_waves.k * wave_tile.k)";
 
-    int wf_size        = target_wavefront_size(target);
+    int wf_size        = targetWavefrontSize(target);
     int workgroup_size = algo.block_waves.m * algo.block_waves.n * algo.block_waves.k * wf_size;
 
     // Build physical tensor table
     int num_phys = 3;
     std::array<PhysicalTensor, kMaxPhysicalTensors> phys{};
-    phys[0] = {gemm.lhs, a_td.dtype, a_td.layout, 0};     // A
-    phys[1] = {gemm.rhs, b_td.dtype, b_td.layout, 1};     // B
-    phys[2] = {final_output, c_td.dtype, c_td.layout, 2}; // output (C, D, or E)
+    phys[0]           = {gemm.lhs, a_td.dtype, a_td.layout, 0}; // A
+    phys[1]           = {gemm.rhs, b_td.dtype, b_td.layout, 1}; // B
+    TensorDesc out_td = resolved.tensor(final_output);
+    phys[2]           = {final_output, out_td.dtype, out_td.layout, 2}; // output (C, D, or E)
 
     if(num_d_tensors >= 1)
     {
@@ -523,11 +528,11 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo, GpuTarget target
             acc,
             algo.block_tile,
             algo.block_waves,
-            algo.warp_tile,
+            algo.wave_tile,
             workgroup_size,
             algo.k_batch,
             algo.pipeline,
-            algo.scheduling,
+            algo.pipeline_scheduler,
             algo.tile_partitioner,
             num_epi_ops,
             epi_ops};

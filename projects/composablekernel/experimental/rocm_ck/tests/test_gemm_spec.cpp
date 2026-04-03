@@ -8,61 +8,61 @@
 using namespace rocm_ck;
 
 // ============================================================================
-// is_valid_warp_tile
+// isValidWaveTile
 // ============================================================================
 
-TEST(WarpTileValidation, AcceptsFP32With16x16Tile)
+TEST(WaveTileValidation, AcceptsFP32With16x16Tile)
 {
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP32, 16, 16, 4));
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP32, 16, 16, 8));
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP32, 16, 16, 16));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP32, 16, 16, 4));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP32, 16, 16, 8));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP32, 16, 16, 16));
 }
 
-TEST(WarpTileValidation, AcceptsFP32With32x32OnlyForSmallK)
+TEST(WaveTileValidation, AcceptsFP32With32x32OnlyForSmallK)
 {
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP32, 32, 32, 4));
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP32, 32, 32, 8));
-    EXPECT_FALSE(is_valid_warp_tile(DataType::FP32, 32, 32, 16)); // k=16 invalid at 32x32 for fp32
+    EXPECT_TRUE(isValidWaveTile(DataType::FP32, 32, 32, 4));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP32, 32, 32, 8));
+    EXPECT_FALSE(isValidWaveTile(DataType::FP32, 32, 32, 16)); // k=16 invalid at 32x32 for fp32
 }
 
-TEST(WarpTileValidation, AcceptsFP16With16x16Tile)
+TEST(WaveTileValidation, AcceptsFP16With16x16Tile)
 {
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP16, 16, 16, 16));
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP16, 16, 16, 32));
-    EXPECT_FALSE(is_valid_warp_tile(DataType::FP16, 16, 16, 4));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP16, 16, 16, 16));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP16, 16, 16, 32));
+    EXPECT_FALSE(isValidWaveTile(DataType::FP16, 16, 16, 4));
 }
 
-TEST(WarpTileValidation, AcceptsFP16With32x32Tile)
+TEST(WaveTileValidation, AcceptsFP16With32x32Tile)
 {
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP16, 32, 32, 8));
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP16, 32, 32, 16));
-    EXPECT_FALSE(is_valid_warp_tile(DataType::FP16, 32, 32, 4)); // k=4 invalid at 32x32 for fp16
+    EXPECT_TRUE(isValidWaveTile(DataType::FP16, 32, 32, 8));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP16, 32, 32, 16));
+    EXPECT_FALSE(isValidWaveTile(DataType::FP16, 32, 32, 4)); // k=4 invalid at 32x32 for fp16
 }
 
-TEST(WarpTileValidation, AcceptsSameTilesForBF16AsFP16)
+TEST(WaveTileValidation, AcceptsSameTilesForBF16AsFP16)
 {
-    EXPECT_TRUE(is_valid_warp_tile(DataType::BF16, 16, 16, 16));
-    EXPECT_TRUE(is_valid_warp_tile(DataType::BF16, 32, 32, 16));
-    EXPECT_FALSE(is_valid_warp_tile(DataType::BF16, 32, 32, 4));
+    EXPECT_TRUE(isValidWaveTile(DataType::BF16, 16, 16, 16));
+    EXPECT_TRUE(isValidWaveTile(DataType::BF16, 32, 32, 16));
+    EXPECT_FALSE(isValidWaveTile(DataType::BF16, 32, 32, 4));
 }
 
-TEST(WarpTileValidation, RejectsAsymmetricAndIntegerConfigs)
+TEST(WaveTileValidation, RejectsAsymmetricAndIntegerConfigs)
 {
     // Asymmetric tiles not supported
-    EXPECT_FALSE(is_valid_warp_tile(DataType::FP32, 16, 32, 8));
-    EXPECT_FALSE(is_valid_warp_tile(DataType::FP16, 32, 16, 16));
+    EXPECT_FALSE(isValidWaveTile(DataType::FP32, 16, 32, 8));
+    EXPECT_FALSE(isValidWaveTile(DataType::FP16, 32, 16, 16));
 
-    // Integer types not yet in warp tile validation table
-    EXPECT_FALSE(is_valid_warp_tile(DataType::I32, 16, 16, 4));
+    // Integer types not yet in wave tile validation table
+    EXPECT_FALSE(isValidWaveTile(DataType::I32, 16, 16, 4));
 }
 
 // ============================================================================
-// make_spec: plain GEMM
+// makeSpec: plain GEMM
 // ============================================================================
 
 TEST(MakeSpec, ProducesThreePhysicalTensorsForPlainGemm)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -71,7 +71,7 @@ TEST(MakeSpec, ProducesThreePhysicalTensorsForPlainGemm)
 
 TEST(MakeSpec, MapsGemmTensorsToSequentialSlots)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -82,7 +82,7 @@ TEST(MakeSpec, MapsGemmTensorsToSequentialSlots)
 
 TEST(MakeSpec, PropagatesDtypeToAllGemmTensors)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -91,9 +91,9 @@ TEST(MakeSpec, PropagatesDtypeToAllGemmTensors)
     EXPECT_EQ(dtype(k, "C"), DataType::FP16);
 }
 
-TEST(MakeSpec, ComputesThreadBlockSizeFromWarps)
+TEST(MakeSpec, ComputesThreadBlockSizeFromWaves)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -103,7 +103,7 @@ TEST(MakeSpec, ComputesThreadBlockSizeFromWarps)
 
 TEST(MakeSpec, ReportsZeroEpilogueOpsForPlainGemm)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -111,15 +111,15 @@ TEST(MakeSpec, ReportsZeroEpilogueOpsForPlainGemm)
 }
 
 // ============================================================================
-// make_spec: GEMM + Add
+// makeSpec: GEMM + Add
 // ============================================================================
 
 TEST(MakeSpec, RegistersAddAsEpilogueOp)
 {
-    constexpr auto k = make_spec(Signature{.dtype = DataType::FP16,
-                                           .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
-                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+    constexpr auto k = makeSpec(Signature{.dtype = DataType::FP16,
+                                          .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                    AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+                                GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
     EXPECT_EQ(k.num_epilogue_ops, 1);
     EXPECT_EQ(k.epilogue_ops[0], EpilogueOp::Add);
@@ -128,10 +128,10 @@ TEST(MakeSpec, RegistersAddAsEpilogueOp)
 
 TEST(MakeSpec, PlacesBiasInD0SlotForGemmAdd)
 {
-    constexpr auto k = make_spec(Signature{.dtype = DataType::FP16,
-                                           .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
-                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+    constexpr auto k = makeSpec(Signature{.dtype = DataType::FP16,
+                                          .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                    AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+                                GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
     EXPECT_EQ(slot(k, "D"), 2);    // output slot
     EXPECT_EQ(slot(k, "bias"), 3); // D0 slot
@@ -139,66 +139,66 @@ TEST(MakeSpec, PlacesBiasInD0SlotForGemmAdd)
 
 TEST(MakeSpec, PropagatesDtypeToBiasTensor)
 {
-    constexpr auto k = make_spec(Signature{.dtype = DataType::FP16,
-                                           .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
-                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+    constexpr auto k = makeSpec(Signature{.dtype = DataType::FP16,
+                                          .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                    AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+                                GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
     EXPECT_EQ(dtype(k, "bias"), DataType::FP16);
 }
 
 // ============================================================================
-// make_spec: GEMM + Add + Relu
+// makeSpec: GEMM + Add + Relu
 // ============================================================================
 
 TEST(MakeSpec, RegistersAddAndReluAsEpilogueOps)
 {
-    constexpr auto k = make_spec(Signature{.dtype = DataType::FP16,
-                                           .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
-                                                     ReluOp{.in = "D", .out = "E"}}},
-                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+    constexpr auto k = makeSpec(Signature{.dtype = DataType::FP16,
+                                          .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                    AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                                                    ReluOp{.in = "D", .out = "E"}}},
+                                GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
     EXPECT_EQ(k.num_epilogue_ops, 2);
-    EXPECT_TRUE(k.has_epilogue_op(EpilogueOp::Add));
-    EXPECT_TRUE(k.has_epilogue_op(EpilogueOp::Relu));
+    EXPECT_TRUE(k.hasEpilogueOp(EpilogueOp::Add));
+    EXPECT_TRUE(k.hasEpilogueOp(EpilogueOp::Relu));
 }
 
 TEST(MakeSpec, UsesFinalOutputSlotForGemmAddRelu)
 {
-    constexpr auto k = make_spec(Signature{.dtype = DataType::FP16,
-                                           .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
-                                                     ReluOp{.in = "D", .out = "E"}}},
-                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+    constexpr auto k = makeSpec(Signature{.dtype = DataType::FP16,
+                                          .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                    AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                                                    ReluOp{.in = "D", .out = "E"}}},
+                                GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
     EXPECT_EQ(slot(k, "E"), 2);           // final output in slot 2
     EXPECT_EQ(k.num_physical_tensors, 4); // A, B, E(output), bias(D0)
 }
 
 // ============================================================================
-// make_spec: 32x32 warp tile
+// makeSpec: 32x32 wave tile
 // ============================================================================
 
-TEST(MakeSpec, Accepts32x32WarpTileWithCorrectBlockSize)
+TEST(MakeSpec, Accepts32x32WaveTileWithCorrectBlockSize)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {32, 32, 16}});
 
     EXPECT_EQ(k.workgroup_size, 256);
-    EXPECT_EQ(k.warp_tile.m, 32);
-    EXPECT_EQ(k.warp_tile.n, 32);
-    EXPECT_EQ(k.warp_tile.k, 16);
+    EXPECT_EQ(k.wave_tile.m, 32);
+    EXPECT_EQ(k.wave_tile.n, 32);
+    EXPECT_EQ(k.wave_tile.k, 16);
 }
 
 // ============================================================================
-// make_spec: layout defaults
+// makeSpec: layout defaults
 // ============================================================================
 
 TEST(MakeSpec, AssignsRowColRowLayoutByDefault)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP32, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -209,10 +209,10 @@ TEST(MakeSpec, AssignsRowColRowLayoutByDefault)
 
 TEST(MakeSpec, OverridesBLayoutToRowForRR)
 {
-    constexpr auto k = make_spec(Signature{.dtype   = DataType::FP16,
-                                           .tensors = {Tensor{.name = "B", .layout = Layout::Row}},
-                                           .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+    constexpr auto k = makeSpec(Signature{.dtype   = DataType::FP16,
+                                          .tensors = {Tensor{.name = "B", .layout = Layout::Row}},
+                                          .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                                GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
     EXPECT_EQ(layout(k, "A"), Layout::Row);
     EXPECT_EQ(layout(k, "B"), Layout::Row);
@@ -221,11 +221,11 @@ TEST(MakeSpec, OverridesBLayoutToRowForRR)
 
 TEST(MakeSpec, OverridesBothLayoutsForCC)
 {
-    constexpr auto k = make_spec(Signature{.dtype   = DataType::FP16,
-                                           .tensors = {Tensor{.name = "A", .layout = Layout::Col},
-                                                       Tensor{.name = "B", .layout = Layout::Col}},
-                                           .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+    constexpr auto k = makeSpec(Signature{.dtype   = DataType::FP16,
+                                          .tensors = {Tensor{.name = "A", .layout = Layout::Col},
+                                                      Tensor{.name = "B", .layout = Layout::Col}},
+                                          .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                                GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
     EXPECT_EQ(layout(k, "A"), Layout::Col);
     EXPECT_EQ(layout(k, "B"), Layout::Col);
@@ -234,11 +234,11 @@ TEST(MakeSpec, OverridesBothLayoutsForCC)
 
 TEST(MakeSpec, OverridesALayoutForCR)
 {
-    constexpr auto k = make_spec(Signature{.dtype   = DataType::FP16,
-                                           .tensors = {Tensor{.name = "A", .layout = Layout::Col},
-                                                       Tensor{.name = "B", .layout = Layout::Row}},
-                                           .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+    constexpr auto k = makeSpec(Signature{.dtype   = DataType::FP16,
+                                          .tensors = {Tensor{.name = "A", .layout = Layout::Col},
+                                                      Tensor{.name = "B", .layout = Layout::Row}},
+                                          .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                                GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
     EXPECT_EQ(layout(k, "A"), Layout::Col);
     EXPECT_EQ(layout(k, "B"), Layout::Row);
@@ -247,10 +247,10 @@ TEST(MakeSpec, OverridesALayoutForCR)
 
 TEST(MakeSpec, LayoutOverrideFlowsToPhysicalTensorTable)
 {
-    constexpr auto k = make_spec(Signature{.dtype   = DataType::FP16,
-                                           .tensors = {Tensor{.name = "B", .layout = Layout::Row}},
-                                           .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+    constexpr auto k = makeSpec(Signature{.dtype   = DataType::FP16,
+                                          .tensors = {Tensor{.name = "B", .layout = Layout::Row}},
+                                          .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                                GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
     // Verify the physical tensor table (what the device code sees)
     EXPECT_EQ(k.lhs().layout, Layout::Row);
@@ -264,7 +264,7 @@ TEST(MakeSpec, LayoutOverrideFlowsToPhysicalTensorTable)
 
 TEST(GemmSpec, ProvidesLhsRhsOutputNamedAccessors)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -280,7 +280,7 @@ TEST(GemmSpec, ProvidesLhsRhsOutputNamedAccessors)
 
 TEST(MakeSpec, DefaultsAccDtypeToFP32)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -293,7 +293,7 @@ TEST(MakeSpec, DefaultsAccDtypeToFP32)
 
 TEST(MakeSpec, ProducesFP32GemmWithMatchingAccDtype)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP32, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -303,7 +303,7 @@ TEST(MakeSpec, ProducesFP32GemmWithMatchingAccDtype)
 
 TEST(MakeSpec, ProducesBF16GemmWithCorrectDtype)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::BF16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -316,7 +316,7 @@ TEST(MakeSpec, ProducesBF16GemmWithCorrectDtype)
 
 TEST(MakeSpec, DefaultsKBatchToOne)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -325,11 +325,11 @@ TEST(MakeSpec, DefaultsKBatchToOne)
 
 TEST(MakeSpec, AcceptsExplicitKBatch)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{.block_tile  = {128, 128, 32},
                       .block_waves = {2, 2, 1},
-                      .warp_tile   = {16, 16, 16},
+                      .wave_tile   = {16, 16, 16},
                       .k_batch     = 4});
 
     EXPECT_EQ(k.k_batch, 4);
@@ -337,11 +337,11 @@ TEST(MakeSpec, AcceptsExplicitKBatch)
 
 TEST(MakeSpec, KBatchPreservesOtherFields)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{.block_tile  = {128, 128, 32},
                       .block_waves = {2, 2, 1},
-                      .warp_tile   = {16, 16, 16},
+                      .wave_tile   = {16, 16, 16},
                       .k_batch     = 4});
 
     EXPECT_EQ(k.num_physical_tensors, 3);
@@ -351,86 +351,86 @@ TEST(MakeSpec, KBatchPreservesOtherFields)
 
 TEST(MakeSpec, KBatchWorksWithEpilogueOps)
 {
-    constexpr auto k = make_spec(Signature{.dtype = DataType::FP16,
-                                           .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
-                                 GemmAlgorithm{.block_tile  = {128, 128, 32},
-                                               .block_waves = {2, 2, 1},
-                                               .warp_tile   = {16, 16, 16},
-                                               .k_batch     = 2});
+    constexpr auto k = makeSpec(Signature{.dtype = DataType::FP16,
+                                          .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                    AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+                                GemmAlgorithm{.block_tile  = {128, 128, 32},
+                                              .block_waves = {2, 2, 1},
+                                              .wave_tile   = {16, 16, 16},
+                                              .k_batch     = 2});
 
     EXPECT_EQ(k.k_batch, 2);
     EXPECT_EQ(k.num_epilogue_ops, 1);
-    EXPECT_TRUE(k.has_epilogue_op(EpilogueOp::Add));
+    EXPECT_TRUE(k.hasEpilogueOp(EpilogueOp::Add));
 }
 
 // ============================================================================
-// is_valid_warp_tile: GpuTarget-specific validation
+// isValidWaveTile: GpuTarget-specific validation
 // ============================================================================
 
-TEST(WarpTileValidation, AcceptsFP8TilesForGfx942)
+TEST(WaveTileValidation, AcceptsFP8TilesForGfx942)
 {
     // gfx942 MFMA: 32x32x16, 16x16x32
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 16, GpuTarget::gfx942));
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 16, 16, 32, GpuTarget::gfx942));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP8_FNUZ, 32, 32, 16, GpuTarget::gfx942));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP8_FNUZ, 16, 16, 32, GpuTarget::gfx942));
     // gfx950-only tiles rejected on gfx942
-    EXPECT_FALSE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 32, GpuTarget::gfx942));
-    EXPECT_FALSE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 64, GpuTarget::gfx942));
-    EXPECT_FALSE(is_valid_warp_tile(DataType::FP8_FNUZ, 16, 16, 64, GpuTarget::gfx942));
+    EXPECT_FALSE(isValidWaveTile(DataType::FP8_FNUZ, 32, 32, 32, GpuTarget::gfx942));
+    EXPECT_FALSE(isValidWaveTile(DataType::FP8_FNUZ, 32, 32, 64, GpuTarget::gfx942));
+    EXPECT_FALSE(isValidWaveTile(DataType::FP8_FNUZ, 16, 16, 64, GpuTarget::gfx942));
 }
 
-TEST(WarpTileValidation, AcceptsFP8TilesForGfx950)
+TEST(WaveTileValidation, AcceptsFP8TilesForGfx950)
 {
     // gfx950 MFMA: 32x32x{16,32,64}, 16x16x{32,64}
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 16, GpuTarget::gfx950));
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 32, GpuTarget::gfx950));
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 64, GpuTarget::gfx950));
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 16, 16, 32, GpuTarget::gfx950));
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 16, 16, 64, GpuTarget::gfx950));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP8_FNUZ, 32, 32, 16, GpuTarget::gfx950));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP8_FNUZ, 32, 32, 32, GpuTarget::gfx950));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP8_FNUZ, 32, 32, 64, GpuTarget::gfx950));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP8_FNUZ, 16, 16, 32, GpuTarget::gfx950));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP8_FNUZ, 16, 16, 64, GpuTarget::gfx950));
 }
 
-TEST(WarpTileValidation, AnyTargetRejectsFP8ArchSpecificTiles)
+TEST(WaveTileValidation, AnyTargetRejectsFP8ArchSpecificTiles)
 {
     // Any = intersection: only tiles valid on all CDNA targets
     // 32x32x16 and 16x16x32 are valid on both gfx942 and gfx950
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 16, GpuTarget::Any));
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 16, 16, 32, GpuTarget::Any));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP8_FNUZ, 32, 32, 16, GpuTarget::Any));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP8_FNUZ, 16, 16, 32, GpuTarget::Any));
     // gfx950-only tiles rejected under Any
-    EXPECT_FALSE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 32, GpuTarget::Any));
-    EXPECT_FALSE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 64, GpuTarget::Any));
-    EXPECT_FALSE(is_valid_warp_tile(DataType::FP8_FNUZ, 16, 16, 64, GpuTarget::Any));
+    EXPECT_FALSE(isValidWaveTile(DataType::FP8_FNUZ, 32, 32, 32, GpuTarget::Any));
+    EXPECT_FALSE(isValidWaveTile(DataType::FP8_FNUZ, 32, 32, 64, GpuTarget::Any));
+    EXPECT_FALSE(isValidWaveTile(DataType::FP8_FNUZ, 16, 16, 64, GpuTarget::Any));
 }
 
-TEST(WarpTileValidation, DefaultTargetIsAny)
+TEST(WaveTileValidation, DefaultTargetIsAny)
 {
     // 4-arg overload (no target) behaves like Any
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 16));
-    EXPECT_FALSE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 64));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP8_FNUZ, 32, 32, 16));
+    EXPECT_FALSE(isValidWaveTile(DataType::FP8_FNUZ, 32, 32, 64));
 }
 
-TEST(WarpTileValidation, Gfx90aAcceptsSameTilesAsCDNABaseline)
+TEST(WaveTileValidation, Gfx90aAcceptsSameTilesAsCDNABaseline)
 {
     // gfx90a has same MFMA tile set as the baseline (no FP8)
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP16, 16, 16, 16, GpuTarget::gfx90a));
-    EXPECT_TRUE(is_valid_warp_tile(DataType::FP16, 32, 32, 16, GpuTarget::gfx90a));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP16, 16, 16, 16, GpuTarget::gfx90a));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP16, 32, 32, 16, GpuTarget::gfx90a));
     // gfx90a has no FP8 MFMA support
-    EXPECT_FALSE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 16, GpuTarget::gfx90a));
+    EXPECT_FALSE(isValidWaveTile(DataType::FP8_FNUZ, 32, 32, 16, GpuTarget::gfx90a));
 }
 
-TEST(WarpTileValidation, BF8HasSameTilesAsFP8)
+TEST(WaveTileValidation, BF8HasSameTilesAsFP8)
 {
-    EXPECT_TRUE(is_valid_warp_tile(DataType::BF8_FNUZ, 32, 32, 16, GpuTarget::gfx942));
-    EXPECT_TRUE(is_valid_warp_tile(DataType::BF8_FNUZ, 32, 32, 32, GpuTarget::gfx950));
-    EXPECT_FALSE(is_valid_warp_tile(DataType::BF8_FNUZ, 32, 32, 32, GpuTarget::gfx942));
+    EXPECT_TRUE(isValidWaveTile(DataType::BF8_FNUZ, 32, 32, 16, GpuTarget::gfx942));
+    EXPECT_TRUE(isValidWaveTile(DataType::BF8_FNUZ, 32, 32, 32, GpuTarget::gfx950));
+    EXPECT_FALSE(isValidWaveTile(DataType::BF8_FNUZ, 32, 32, 32, GpuTarget::gfx942));
 }
 
 // ============================================================================
-// make_spec: GpuTarget parameter
+// makeSpec: GpuTarget parameter
 // ============================================================================
 
 TEST(MakeSpec, AcceptsGpuTargetParameter)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
         GpuTarget::gfx942);
@@ -440,8 +440,8 @@ TEST(MakeSpec, AcceptsGpuTargetParameter)
 
 TEST(MakeSpec, DefaultsToGpuTargetAny)
 {
-    // 2-arg make_spec still works (defaults to GpuTarget::Any)
-    constexpr auto k = make_spec(
+    // 2-arg makeSpec still works (defaults to GpuTarget::Any)
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
@@ -449,42 +449,42 @@ TEST(MakeSpec, DefaultsToGpuTargetAny)
 }
 
 // ============================================================================
-// make_spec: Pipeline::Memory + Scheduling
+// makeSpec: Pipeline::Memory + Scheduling
 // ============================================================================
 
 TEST(MakeSpec, AcceptsMemoryPipelineWithIntrawaveScheduling)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-        GemmAlgorithm{.block_tile  = {128, 128, 32},
-                      .block_waves = {2, 2, 1},
-                      .warp_tile   = {16, 16, 16},
-                      .pipeline    = Pipeline::Memory,
-                      .scheduling  = Scheduling::Intrawave});
+        GemmAlgorithm{.block_tile         = {128, 128, 32},
+                      .block_waves        = {2, 2, 1},
+                      .wave_tile          = {16, 16, 16},
+                      .pipeline           = Pipeline::Memory,
+                      .pipeline_scheduler = PipelineScheduler::Intrawave});
 
     EXPECT_EQ(k.pipeline, Pipeline::Memory);
-    EXPECT_EQ(k.scheduling, Scheduling::Intrawave);
+    EXPECT_EQ(k.pipeline_scheduler, PipelineScheduler::Intrawave);
 }
 
 TEST(MakeSpec, AcceptsMemoryPipelineWithInterwaveScheduling)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
-        GemmAlgorithm{.block_tile  = {128, 128, 32},
-                      .block_waves = {2, 2, 1},
-                      .warp_tile   = {16, 16, 16},
-                      .pipeline    = Pipeline::Memory,
-                      .scheduling  = Scheduling::Interwave});
+        GemmAlgorithm{.block_tile         = {128, 128, 32},
+                      .block_waves        = {2, 2, 1},
+                      .wave_tile          = {16, 16, 16},
+                      .pipeline           = Pipeline::Memory,
+                      .pipeline_scheduler = PipelineScheduler::Interwave});
 
     EXPECT_EQ(k.pipeline, Pipeline::Memory);
-    EXPECT_EQ(k.scheduling, Scheduling::Interwave);
+    EXPECT_EQ(k.pipeline_scheduler, PipelineScheduler::Interwave);
 }
 
 TEST(MakeSpec, DefaultsSchedulingToIntrawave)
 {
-    constexpr auto k = make_spec(
+    constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 
-    EXPECT_EQ(k.scheduling, Scheduling::Intrawave);
+    EXPECT_EQ(k.pipeline_scheduler, PipelineScheduler::Intrawave);
 }

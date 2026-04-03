@@ -10,40 +10,40 @@
 using namespace rocm_ck;
 
 // ============================================================================
-// data_type_bits
+// dataTypeBits
 // ============================================================================
 
 TEST(DataType, ReportsCorrectBitsForFloatingPoint)
 {
-    EXPECT_EQ(data_type_bits(DataType::FP64), 64);
-    EXPECT_EQ(data_type_bits(DataType::FP32), 32);
-    EXPECT_EQ(data_type_bits(DataType::FP16), 16);
-    EXPECT_EQ(data_type_bits(DataType::BF16), 16);
+    EXPECT_EQ(dataTypeBits(DataType::FP64), 64);
+    EXPECT_EQ(dataTypeBits(DataType::FP32), 32);
+    EXPECT_EQ(dataTypeBits(DataType::FP16), 16);
+    EXPECT_EQ(dataTypeBits(DataType::BF16), 16);
 }
 
 TEST(DataType, ReportsCorrectBitsForFP8Formats)
 {
-    EXPECT_EQ(data_type_bits(DataType::FP8_FNUZ), 8);
-    EXPECT_EQ(data_type_bits(DataType::BF8_FNUZ), 8);
-    EXPECT_EQ(data_type_bits(DataType::FP8_OCP), 8);
-    EXPECT_EQ(data_type_bits(DataType::BF8_OCP), 8);
+    EXPECT_EQ(dataTypeBits(DataType::FP8_FNUZ), 8);
+    EXPECT_EQ(dataTypeBits(DataType::BF8_FNUZ), 8);
+    EXPECT_EQ(dataTypeBits(DataType::FP8_OCP), 8);
+    EXPECT_EQ(dataTypeBits(DataType::BF8_OCP), 8);
 }
 
 TEST(DataType, ReportsCorrectBitsForIntegers)
 {
-    EXPECT_EQ(data_type_bits(DataType::I4), 4);
-    EXPECT_EQ(data_type_bits(DataType::I8), 8);
-    EXPECT_EQ(data_type_bits(DataType::I16), 16);
-    EXPECT_EQ(data_type_bits(DataType::I32), 32);
-    EXPECT_EQ(data_type_bits(DataType::I64), 64);
-    EXPECT_EQ(data_type_bits(DataType::U8), 8);
-    EXPECT_EQ(data_type_bits(DataType::U16), 16);
-    EXPECT_EQ(data_type_bits(DataType::U32), 32);
-    EXPECT_EQ(data_type_bits(DataType::U64), 64);
+    EXPECT_EQ(dataTypeBits(DataType::I4), 4);
+    EXPECT_EQ(dataTypeBits(DataType::I8), 8);
+    EXPECT_EQ(dataTypeBits(DataType::I16), 16);
+    EXPECT_EQ(dataTypeBits(DataType::I32), 32);
+    EXPECT_EQ(dataTypeBits(DataType::I64), 64);
+    EXPECT_EQ(dataTypeBits(DataType::U8), 8);
+    EXPECT_EQ(dataTypeBits(DataType::U16), 16);
+    EXPECT_EQ(dataTypeBits(DataType::U32), 32);
+    EXPECT_EQ(dataTypeBits(DataType::U64), 64);
 }
 
 // ============================================================================
-// data_type_name
+// dataTypeName
 // ============================================================================
 
 TEST(DataType, MapsEveryVariantToAValidName)
@@ -69,19 +69,19 @@ TEST(DataType, MapsEveryVariantToAValidName)
 
     for(DataType dt : all_types)
     {
-        std::string_view name = data_type_name(dt);
-        EXPECT_NE(name, "???") << "DataType with bits=" << data_type_bits(dt) << " has no name";
+        std::string_view name = dataTypeName(dt);
+        EXPECT_NE(name, "???") << "DataType with bits=" << dataTypeBits(dt) << " has no name";
         EXPECT_FALSE(name.empty());
     }
 }
 
 TEST(DataType, MapsVariantsToExpectedStrings)
 {
-    EXPECT_STREQ(data_type_name(DataType::FP32), "FP32");
-    EXPECT_STREQ(data_type_name(DataType::FP16), "FP16");
-    EXPECT_STREQ(data_type_name(DataType::BF16), "BF16");
-    EXPECT_STREQ(data_type_name(DataType::FP8_FNUZ), "FP8_FNUZ");
-    EXPECT_STREQ(data_type_name(DataType::I4), "I4");
+    EXPECT_STREQ(dataTypeName(DataType::FP32), "FP32");
+    EXPECT_STREQ(dataTypeName(DataType::FP16), "FP16");
+    EXPECT_STREQ(dataTypeName(DataType::BF16), "BF16");
+    EXPECT_STREQ(dataTypeName(DataType::FP8_FNUZ), "FP8_FNUZ");
+    EXPECT_STREQ(dataTypeName(DataType::I4), "I4");
 }
 
 // ============================================================================
@@ -91,9 +91,9 @@ TEST(DataType, MapsVariantsToExpectedStrings)
 TEST(DataType, EvaluatesBitsAndNameAtCompileTime)
 {
     // Verify these functions work at compile time
-    constexpr int fp32_bits = data_type_bits(DataType::FP32);
+    constexpr int fp32_bits = dataTypeBits(DataType::FP32);
     EXPECT_EQ(fp32_bits, 32);
 
-    constexpr const char* fp32_name = data_type_name(DataType::FP32);
+    constexpr const char* fp32_name = dataTypeName(DataType::FP32);
     EXPECT_STREQ(fp32_name, "FP32");
 }

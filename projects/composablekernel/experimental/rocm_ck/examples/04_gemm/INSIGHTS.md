@@ -26,15 +26,15 @@ The 7 CK Tile types (TileGemmShape, TileGemmTraits, PipelineProblem, GemmPipelin
 The `Signature` (what to compute) and `GemmAlgorithm` (how to compute it) are independent:
 
 - **Signature**: data types, layouts, epilogue via operator composition
-- **Algorithm**: `block_tile {M,N,K}`, `block_waves {M,N,K}`, `warp_tile {M,N,K}`
+- **Algorithm**: `block_tile {M,N,K}`, `block_waves {M,N,K}`, `wave_tile {M,N,K}`
 
-The same algorithm works across fp32, fp16, and bf16. The same type can use different tile configs (gemm_fp16 vs gemm_fp16_w32). This was proven by having 6 variants that mix types and tile shapes — no coupling between the axes.
+The same algorithm works across fp32, fp16, and bf16. The same type can use different tile configs (gemm_fp16 vs gemm_fp16_w32). This was proven by having 18 variants that mix types and tile shapes — no coupling between the axes.
 
-> **Implication**: Tuning is purely an algorithm-space search. Given a signature, sweep tile configs and let `make_spec` reject invalid combinations at compile time. The search space is defined by `is_valid_warp_tile` × divisibility constraints.
+> **Implication**: Tuning is purely an algorithm-space search. Given a signature, sweep tile configs and let `makeSpec` reject invalid combinations at compile time. The search space is defined by `isValidWaveTile` × divisibility constraints.
 
 ## 3. Dtype Cascade — Uniform Across Operations
 
-All operations use the same two-level dtype cascade: `Signature::dtype` sets a kernel-level default for all tensors; explicit `Tensor` entries in `sig.tensors[]` override specific tensors by name. After `resolve()` flattens the cascade, `make_spec()` stores each physical tensor's dtype in the `physical_tensors[]` table. `GemmOp::acc_dtype` defaults to FP32 independently.
+All operations use the same two-level dtype cascade: `Signature::dtype` sets a kernel-level default for all tensors; explicit `Tensor` entries in `sig.tensors[]` override specific tensors by name. After `resolve()` flattens the cascade, `makeSpec()` stores each physical tensor's dtype in the `physical_tensors[]` table. `GemmOp::acc_dtype` defaults to FP32 independently.
 
 ```cpp
 // Mixed precision: fp16 compute, fp32 output
@@ -61,7 +61,7 @@ struct Dim3 { int m, n, k; };
 GemmAlgorithm{
     .block_tile  = {128, 128, 32},
     .block_waves = {2, 2, 1},
-    .warp_tile   = {16, 16, 16}
+    .wave_tile   = {16, 16, 16}
 };
 ```
 
@@ -71,7 +71,7 @@ GemmAlgorithm{
 
 ## 6. Hardware Constraints Flow Through consteval
 
-The valid set of (dtype, warp_tile) combinations is hardware-specific and non-obvious. `is_valid_warp_tile` is a consteval lookup table that mirrors CK Tile's `WarpGemmDispatcher` specializations for gfx9 (MFMA):
+The valid set of (dtype, wave_tile) combinations is hardware-specific and non-obvious. `isValidWaveTile` is a consteval lookup table that mirrors CK Tile's `WarpGemmDispatcher` specializations for gfx9 (MFMA):
 
 | dtype | 16×16 K values | 32×32 K values |
 |-------|----------------|----------------|
@@ -79,13 +79,13 @@ The valid set of (dtype, warp_tile) combinations is hardware-specific and non-ob
 | FP16  | 16, 32         | 8, 16          |
 | BF16  | 16, 32         | 8, 16          |
 
-`make_spec` checks five constraints in sequence: positive dimensions, `block_waves.k == 1`, warp tile validity, tile divisibility, and derives `workgroup_size`. An invalid config throws a readable message at compile time.
+`makeSpec` checks five constraints in sequence: positive dimensions, `block_waves.k == 1`, wave tile validity, tile divisibility, and derives `workgroup_size`. An invalid config throws a readable message at compile time.
 
-> **Hard-won lesson**: The initial attempt used 256×256×64 block tile with 32×32×16 warp tile (copied from CK's `gemm_basic_invoker.hpp`). Failed on ALL architectures. Root causes: (1) no WarpGemmDispatcher for fp32 32×32×16, (2) 256×256 block tile requires 128KB LDS, exceeding 64KB limit. The fix — 128×128×32 with 16×16×16 — came from cross-referencing the dispatcher table with CK's own validated configs.
+> **Hard-won lesson**: The initial attempt used 256×256×64 block tile with 32×32×16 wave tile (copied from CK's `gemm_basic_invoker.hpp`). Failed on ALL architectures. Root causes: (1) no WarpGemmDispatcher for fp32 32×32×16, (2) 256×256 block tile requires 128KB LDS, exceeding 64KB limit. The fix — 128×128×32 with 16×16×16 — came from cross-referencing the dispatcher table with CK's own validated configs.
 
 ## 7. Generic Args Replaces Per-Epilogue Structs
 
-All variants now use the generic `Args` struct (1408 bytes) from `include/rocm_ck/args.hpp`. Tensor slots carry their own shape — M, N, K are derivable from tensor lengths rather than redundant scalar fields.
+All variants now use the generic `Args` struct (1552 bytes) from `include/rocm_ck/args.hpp`. Tensor slots carry their own shape — M, N, K are derivable from tensor lengths rather than redundant scalar fields.
 
 | Physical tensor | Args slot | Shape |
 |-----------------|-----------|-------|
@@ -120,7 +120,7 @@ Signature{.dtype = FP16,
                   ReluOp{.in = "D", .out = "E"}}}
 ```
 
-`make_spec` pattern-matches the ops array to build the `epilogue_ops[]` chain in GemmSpec — a composable sequence of `EpilogueOp` values (Add, Mul, Relu, etc.). `ComposedCDEOp<S>` applies the chain with `if constexpr` unrolling, delegating activation math to CK Tile's optimized implementations.
+`makeSpec` pattern-matches the ops array to build the `epilogue_ops[]` chain in GemmSpec — a composable sequence of `EpilogueOp` values (Add, Mul, Relu, etc.). `ComposedCDEOp<S>` applies the chain with `if constexpr` unrolling, delegating activation math to CK Tile's optimized implementations.
 
 > **Why a composable chain**: A fixed `CombineOp × Activation` enum model requires O(N×M) enum combinations. The epilogue_ops array is O(N+M) — add one `EpilogueOp` value and one `apply_op` clause. The representation mirrors the Signature's operator chain, minus the string names (which aren't structural types for NTTP).
 
@@ -141,14 +141,14 @@ CK Tile's `CShuffleEpilogue` is the universal epilogue for GEMM:
 | Dtype cascade | 2 levels (Signature::dtype→Tensor::dtype) | 2 levels (Signature::dtype→Tensor::dtype) | Identical model |
 | `_api` / `_dev` header split | Yes | Yes | Generalizes |
 | `CkTypeMap` enum→type dispatch | Yes | Yes + `CkLayoutMap` | Generalizes (adds layout) |
-| Generic Args struct | 40 bytes (old) | 1408 bytes (shared) | Generalizes — one struct for all ops |
-| consteval validation in `make_spec` | 6 checks | 5 checks | Generalizes (different checks) |
+| Generic Args struct | 40 bytes (old) | 1552 bytes (shared) | Generalizes — one struct for all ops |
+| consteval validation in `makeSpec` | 6 checks | 5 checks | Generalizes (different checks) |
 | One `.hip` file per variant | ~12 lines each | ~12 lines each | Generalizes |
 | `Signature` with operator composition | `AddOp{}` only | `GemmOp` + epilogue ops | Generalizes |
 
 ## 11. What Didn't Generalize
 
-- **Tile validation**: Elementwise validates 1D `kVectorM`; GEMM validates 3D tile divisibility + warp tile dispatch. The validation logic is operation-specific.
+- **Tile validation**: Elementwise validates 1D `kVectorM`; GEMM validates 3D tile divisibility + wave tile dispatch. The validation logic is operation-specific.
 - **Scalar parameters**: Elementwise uses `scalars[0]`/`scalars[1]` for `alpha`/`beta`. GEMM's D-tensor fusion is data-driven (D tensor passed as a pointer in `tensors[3]`). Both fit in the generic Args — different slot types for different use cases.
 - **Grid calculation**: Elementwise uses `ceil(N / block_tile)`; GEMM uses `ceil(M/M_tile) × ceil(N/N_tile)` flattened to 1D via `GemmTile1DPartitioner`. More complex but CK Tile handles it.
 

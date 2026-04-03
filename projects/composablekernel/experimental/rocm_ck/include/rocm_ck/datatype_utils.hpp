@@ -4,7 +4,7 @@
 // Role: types — DataType enum, constexpr queries. No runtime, no CK deps.
 //
 // Pure type definitions for data type metadata. Host-side conversion
-// utilities (float_to_typed, typed_to_float, tolerance_for) are in
+// utilities (floatToTyped, typedToFloat, toleranceFor) are in
 // datatype_convert.hpp.
 
 #pragma once
@@ -48,7 +48,7 @@ enum class DataType
 /// Returns the bit-width of a DataType. Uses bits (not bytes) so future
 /// sub-byte types (fp4, fp6, int4) are clean integers.
 /// No default case — lets -Wswitch catch unhandled enum values.
-constexpr int data_type_bits(DataType dt)
+constexpr int dataTypeBits(DataType dt)
 {
     switch(dt)
     {
@@ -74,7 +74,7 @@ constexpr int data_type_bits(DataType dt)
 }
 
 /// Returns a short string name for the data type (e.g. "FP32").
-constexpr const char* data_type_name(DataType dt)
+constexpr const char* dataTypeName(DataType dt)
 {
     switch(dt)
     {

@@ -45,11 +45,11 @@ inline VerifyResult verify(const float* result, const float* ref, int count, flo
 /// Convenience overload: look up tolerance from the output DataType.
 inline VerifyResult verify(const float* result, const float* ref, int count, DataType output_dtype)
 {
-    return verify(result, ref, count, tolerance_for(output_dtype));
+    return verify(result, ref, count, toleranceFor(output_dtype));
 }
 
 /// Print verification result. Returns whether the test passed.
-inline bool report_verify(const char* name, const VerifyResult& r)
+inline bool reportVerify(const char* name, const VerifyResult& r)
 {
     if(r.passed)
     {
