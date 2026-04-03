@@ -2731,6 +2731,9 @@ struct MIOPEN_INTERNALS_EXPORT ConvHipConv final : ConvSolver
     {
         return 0.5f;
     }
+    size_t GetWorkspaceSize(const ExecutionContext&,
+                            const miopen::conv::ProblemDescription&) const override;
+    bool MayNeedWorkspace() const override { return true; }
     ConvSolution GetSolution(const ExecutionContext&,
                              const miopen::conv::ProblemDescription&) const override;
 };
