@@ -13,7 +13,7 @@
 #include <hip/hip_runtime.h>
 #endif
 
-using miopen::solver::CKConvDirection;
+using miopen::solver::CKSolverType;
 using miopen::solver::GetCurrentDeviceName;
 using miopen::solver::IsDeterministicSplitKValid;
 
@@ -78,7 +78,7 @@ TEST(GPU_CKGroupedConvLoader_FP16, LoaderFillsValidKernels)
         GTEST_SKIP() << "CK grouped conv library not installed for " << device_name;
 
     const auto problem = MakeGroupedConvProblem();
-    const auto kernels = loader.FillValidKernels(CKConvDirection::Fwd, problem, miopenHalf, false);
+    const auto kernels = loader.FillValidKernels(CKSolverType::GrpConvFwd, problem, miopenHalf, false);
 
     EXPECT_FALSE(kernels.empty()) << "Expected at least one valid CK grouped conv kernel for "
                                   << device_name;
@@ -96,7 +96,7 @@ TEST(GPU_CKGroupedConvLoader_FP16, LoaderFillsValidKernelsWithTf32Fallback)
     const auto problem = MakeGroupedConvProblem();
     bool use_tf32      = false;
     const auto kernels = loader.FillValidKernelsWithTf32Fallback(
-        CKConvDirection::Fwd, problem, miopenHalf, use_tf32);
+        CKSolverType::GrpConvFwd, problem, miopenHalf, use_tf32);
 
     EXPECT_FALSE(kernels.empty()) << "Expected at least one valid kernel for " << device_name;
     EXPECT_FALSE(use_tf32) << "use_tf32 should remain false when called with false";
@@ -152,12 +152,12 @@ TEST(CPU_CKGroupedConvLoader_NONE, LoaderReturnsEmptyOnFailure)
     miopen::ExecutionContext ctx;
 
     // All wrappers should return safe defaults when the library is not loaded
-    EXPECT_TRUE(loader.FillValidKernels(CKConvDirection::Fwd, problem, miopenHalf, false).empty());
+    EXPECT_TRUE(loader.FillValidKernels(CKSolverType::GrpConvFwd, problem, miopenHalf, false).empty());
     {
         bool use_tf32 = true;
         EXPECT_TRUE(loader
                         .FillValidKernelsWithTf32Fallback(
-                            CKConvDirection::Fwd, problem, miopenHalf, use_tf32)
+                            CKSolverType::GrpConvFwd, problem, miopenHalf, use_tf32)
                         .empty());
         EXPECT_FALSE(use_tf32) << "use_tf32 should become false when no kernels found";
     }
@@ -165,23 +165,23 @@ TEST(CPU_CKGroupedConvLoader_NONE, LoaderReturnsEmptyOnFailure)
         bool use_tf32 = false;
         EXPECT_TRUE(loader
                         .FillValidKernelsWithTf32Fallback(
-                            CKConvDirection::Fwd, problem, miopenHalf, use_tf32)
+                            CKSolverType::GrpConvFwd, problem, miopenHalf, use_tf32)
                         .empty());
         EXPECT_FALSE(use_tf32) << "use_tf32 should remain false";
     }
-    EXPECT_FALSE(loader.IsApplicable(CKConvDirection::Fwd, problem, miopenHalf, false));
+    EXPECT_FALSE(loader.IsApplicable(CKSolverType::GrpConvFwd, problem, miopenHalf, false));
     EXPECT_FALSE(
-        loader.IsArgsSupported(CKConvDirection::Fwd, problem, "dummy_kernel", miopenHalf, false));
-    EXPECT_EQ(loader.GetWorkspaceSize(CKConvDirection::Fwd, problem, miopenHalf, false), 0u);
-    EXPECT_EQ(loader.GetSolution(CKConvDirection::Fwd, ctx, problem, "dummy", false).status,
+        loader.IsArgsSupported(CKSolverType::GrpConvFwd, problem, "dummy_kernel", miopenHalf, false));
+    EXPECT_EQ(loader.GetWorkspaceSize(CKSolverType::GrpConvFwd, problem, miopenHalf, false), 0u);
+    EXPECT_EQ(loader.GetSolution(CKSolverType::GrpConvFwd, ctx, problem, "dummy", false).status,
               miopenStatusInternalError);
 
-    EXPECT_TRUE(loader.FillValidKernels(CKConvDirection::Bwd, problem, miopenHalf, false).empty());
+    EXPECT_TRUE(loader.FillValidKernels(CKSolverType::GrpConvBwd, problem, miopenHalf, false).empty());
     {
         bool use_tf32 = true;
         EXPECT_TRUE(loader
                         .FillValidKernelsWithTf32Fallback(
-                            CKConvDirection::Bwd, problem, miopenHalf, use_tf32)
+                            CKSolverType::GrpConvBwd, problem, miopenHalf, use_tf32)
                         .empty());
         EXPECT_FALSE(use_tf32) << "use_tf32 should become false when no kernels found";
     }
@@ -189,23 +189,23 @@ TEST(CPU_CKGroupedConvLoader_NONE, LoaderReturnsEmptyOnFailure)
         bool use_tf32 = false;
         EXPECT_TRUE(loader
                         .FillValidKernelsWithTf32Fallback(
-                            CKConvDirection::Bwd, problem, miopenHalf, use_tf32)
+                            CKSolverType::GrpConvBwd, problem, miopenHalf, use_tf32)
                         .empty());
         EXPECT_FALSE(use_tf32) << "use_tf32 should remain false";
     }
-    EXPECT_FALSE(loader.IsApplicable(CKConvDirection::Bwd, problem, miopenHalf, false));
+    EXPECT_FALSE(loader.IsApplicable(CKSolverType::GrpConvBwd, problem, miopenHalf, false));
     EXPECT_FALSE(
-        loader.IsArgsSupported(CKConvDirection::Bwd, problem, "dummy_kernel", miopenHalf, false));
-    EXPECT_EQ(loader.GetWorkspaceSize(CKConvDirection::Bwd, problem, miopenHalf, false), 0u);
-    EXPECT_EQ(loader.GetSolution(CKConvDirection::Bwd, ctx, problem, "dummy", false).status,
+        loader.IsArgsSupported(CKSolverType::GrpConvBwd, problem, "dummy_kernel", miopenHalf, false));
+    EXPECT_EQ(loader.GetWorkspaceSize(CKSolverType::GrpConvBwd, problem, miopenHalf, false), 0u);
+    EXPECT_EQ(loader.GetSolution(CKSolverType::GrpConvBwd, ctx, problem, "dummy", false).status,
               miopenStatusInternalError);
 
-    EXPECT_TRUE(loader.FillValidKernels(CKConvDirection::Wrw, problem, miopenHalf, false).empty());
+    EXPECT_TRUE(loader.FillValidKernels(CKSolverType::GrpConvWrw, problem, miopenHalf, false).empty());
     {
         bool use_tf32 = true;
         EXPECT_TRUE(loader
                         .FillValidKernelsWithTf32Fallback(
-                            CKConvDirection::Wrw, problem, miopenHalf, use_tf32)
+                            CKSolverType::GrpConvWrw, problem, miopenHalf, use_tf32)
                         .empty());
         EXPECT_FALSE(use_tf32) << "use_tf32 should become false when no kernels found";
     }
@@ -213,15 +213,15 @@ TEST(CPU_CKGroupedConvLoader_NONE, LoaderReturnsEmptyOnFailure)
         bool use_tf32 = false;
         EXPECT_TRUE(loader
                         .FillValidKernelsWithTf32Fallback(
-                            CKConvDirection::Wrw, problem, miopenHalf, use_tf32)
+                            CKSolverType::GrpConvWrw, problem, miopenHalf, use_tf32)
                         .empty());
         EXPECT_FALSE(use_tf32) << "use_tf32 should remain false";
     }
-    EXPECT_FALSE(loader.IsApplicable(CKConvDirection::Wrw, problem, miopenHalf, false));
+    EXPECT_FALSE(loader.IsApplicable(CKSolverType::GrpConvWrw, problem, miopenHalf, false));
     EXPECT_FALSE(
-        loader.IsArgsSupported(CKConvDirection::Wrw, problem, "dummy_kernel", miopenHalf, false));
-    EXPECT_EQ(loader.GetWorkspaceSize(CKConvDirection::Wrw, problem, miopenHalf, false), 0u);
-    EXPECT_EQ(loader.GetSolution(CKConvDirection::Wrw, ctx, problem, "dummy", false).status,
+        loader.IsArgsSupported(CKSolverType::GrpConvWrw, problem, "dummy_kernel", miopenHalf, false));
+    EXPECT_EQ(loader.GetWorkspaceSize(CKSolverType::GrpConvWrw, problem, miopenHalf, false), 0u);
+    EXPECT_EQ(loader.GetSolution(CKSolverType::GrpConvWrw, ctx, problem, "dummy", false).status,
               miopenStatusInternalError);
 }
 

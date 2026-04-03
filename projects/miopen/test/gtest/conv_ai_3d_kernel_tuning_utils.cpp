@@ -635,7 +635,7 @@ TEST_F(GPU_Conv3DKernelTuningAI_FP32, MetadataEncodingValidation_AllCKInstances_
     ASSERT_TRUE(loader.IsLoaded());
     ValidateMetadataEncoding(
         "ConvHipImplicitGemm3DGroupFwdXdlops",
-        loader.GetAllKernelTypeStrings(miopen::solver::CKSolverSlot::GrpConv3dFwd),
+        loader.GetAllKernelTypeStrings(miopen::solver::CKSolverType::GrpConv3dFwd),
         device_arch);
 }
 
@@ -645,7 +645,7 @@ TEST_F(GPU_Conv3DKernelTuningAI_FP32, MetadataEncodingValidation_AllCKInstances_
     ASSERT_TRUE(loader.IsLoaded());
     ValidateMetadataEncoding(
         "ConvHipImplicitGemm3DGroupBwdXdlops",
-        loader.GetAllKernelTypeStrings(miopen::solver::CKSolverSlot::GrpConv3dBwd),
+        loader.GetAllKernelTypeStrings(miopen::solver::CKSolverType::GrpConv3dBwd),
         device_arch);
 }
 

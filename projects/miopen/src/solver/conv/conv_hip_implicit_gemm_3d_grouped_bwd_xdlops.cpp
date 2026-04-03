@@ -61,7 +61,7 @@ void PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::InitValidKernels(
     use_tf32       = (data_type == miopenFloat) && problem.UseTF32();
 
     valid_kernels = loader.FillValidKernelsWithTf32Fallback(
-        CKSolverSlot::GrpConv3dBwd, problem, data_type, use_tf32);
+        CKSolverType::GrpConv3dBwd, problem, data_type, use_tf32);
 }
 
 // clang-format off
@@ -155,7 +155,7 @@ void PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::HeuristicInit(
                 [&loader, try_tf32](const ProblemDescription& p) -> std::vector<std::string> {
                 bool tf32 = try_tf32;
                 return loader.FillValidKernelsWithTf32Fallback(
-                    CKSolverSlot::GrpConv3dBwd, p, p.GetInDataType(), tf32);
+                    CKSolverType::GrpConv3dBwd, p, p.GetInDataType(), tf32);
             };
             // Validation lambda for AI-predicted kernel + split_k combinations
             auto is_kernel_split_k_valid = [&](int kernel_index, int split_k_value) -> bool {
@@ -276,7 +276,7 @@ bool PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::IsValid(
 
     auto data_type = problem.GetInDataType();
     return loader.IsArgsSupported(
-        CKSolverSlot::GrpConv3dBwd, problem, kernel_id, data_type, use_tf32);
+        CKSolverType::GrpConv3dBwd, problem, kernel_id, data_type, use_tf32);
 }
 
 bool PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::operator==(
@@ -344,10 +344,10 @@ bool ConvHipImplicitGemm3DGroupBwdXdlops::IsApplicable(const ExecutionContext& c
     auto data_type = problem.GetInDataType();
     bool try_tf32  = (data_type == miopenFloat) && problem.UseTF32();
 
-    if(try_tf32 && loader.IsApplicable(CKSolverSlot::GrpConv3dBwd, problem, data_type, true))
+    if(try_tf32 && loader.IsApplicable(CKSolverType::GrpConv3dBwd, problem, data_type, true))
         return true;
 
-    return loader.IsApplicable(CKSolverSlot::GrpConv3dBwd, problem, data_type, false);
+    return loader.IsApplicable(CKSolverType::GrpConv3dBwd, problem, data_type, false);
 }
 
 ConvSolution ConvHipImplicitGemm3DGroupBwdXdlops::GetSolution(
@@ -360,7 +360,7 @@ ConvSolution ConvHipImplicitGemm3DGroupBwdXdlops::GetSolution(
         return {};
 
     return loader.GetSolution(
-        CKSolverSlot::GrpConv3dBwd, ctx, problem, config.kernel_id, config.UseTF32());
+        CKSolverType::GrpConv3dBwd, ctx, problem, config.kernel_id, config.UseTF32());
 }
 
 } // namespace conv

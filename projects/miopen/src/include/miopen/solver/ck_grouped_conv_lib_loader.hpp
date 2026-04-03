@@ -28,21 +28,15 @@ struct ProblemDescription;
 namespace solver {
 struct ConvSolution;
 
-enum class CKSolverSlot
+enum class CKSolverType
 {
     GrpConvFwd   = 0,
     GrpConvBwd   = 1,
     GrpConvWrw   = 2,
     GrpConv3dFwd = 3,
     GrpConv3dBwd = 4,
-    Count        = 5,
-    // Backward-compatible aliases
-    Fwd = GrpConvFwd,
-    Bwd = GrpConvBwd,
-    Wrw = GrpConvWrw
+    Count        = 5
 };
-
-using CKConvDirection = CKSolverSlot;
 
 /// Query the HIP runtime for the current device's architecture name.
 /// Returns an empty string on failure or when not using the HIP backend.
@@ -72,7 +66,7 @@ public:
 
     // -- Direction-parameterized wrappers -------------------------------------
     MIOPEN_INTERNALS_EXPORT std::vector<std::string>
-    FillValidKernels(CKConvDirection dir,
+    FillValidKernels(CKSolverType solverType,
                      const miopen::conv::ProblemDescription& problem,
                      miopenDataType_t dtype,
                      bool use_tf32) const;
@@ -80,36 +74,36 @@ public:
     /// Try tf32 first (if use_tf32 is true), then fall back to non-tf32.
     /// Updates use_tf32 to reflect whether tf32 was actually used.
     MIOPEN_INTERNALS_EXPORT std::vector<std::string>
-    FillValidKernelsWithTf32Fallback(CKConvDirection dir,
+    FillValidKernelsWithTf32Fallback(CKSolverType solverType,
                                      const miopen::conv::ProblemDescription& problem,
                                      miopenDataType_t dtype,
                                      bool& use_tf32) const;
 
-    MIOPEN_INTERNALS_EXPORT bool IsApplicable(CKConvDirection dir,
+    MIOPEN_INTERNALS_EXPORT bool IsApplicable(CKSolverType solverType,
                                               const miopen::conv::ProblemDescription& problem,
                                               miopenDataType_t dtype,
                                               bool use_tf32) const;
 
-    MIOPEN_INTERNALS_EXPORT bool IsArgsSupported(CKConvDirection dir,
+    MIOPEN_INTERNALS_EXPORT bool IsArgsSupported(CKSolverType solverType,
                                                  const miopen::conv::ProblemDescription& problem,
                                                  const std::string& kernel_id,
                                                  miopenDataType_t dtype,
                                                  bool use_tf32) const;
 
-    MIOPEN_INTERNALS_EXPORT size_t GetWorkspaceSize(CKConvDirection dir,
+    MIOPEN_INTERNALS_EXPORT size_t GetWorkspaceSize(CKSolverType solverType,
                                                     const miopen::conv::ProblemDescription& problem,
                                                     miopenDataType_t dtype,
                                                     bool use_tf32) const;
 
     MIOPEN_INTERNALS_EXPORT ConvSolution
-    GetSolution(CKConvDirection dir,
+    GetSolution(CKSolverType solverType,
                 const ExecutionContext& ctx,
                 const miopen::conv::ProblemDescription& problem,
                 const std::string& kernel_id,
                 bool use_tf32) const;
 
     MIOPEN_INTERNALS_EXPORT std::vector<std::string>
-    GetAllKernelTypeStrings(CKSolverSlot slot) const;
+    GetAllKernelTypeStrings(CKSolverType slot) const;
 
     ~CKGroupedConvLibLoader();
 
@@ -179,7 +173,7 @@ private:
         GetAllKernelTypeStringsFn get_all_kernel_types  = nullptr;
     };
 
-    DirectionFns slot_fns_[static_cast<int>(CKSolverSlot::Count)];
+    DirectionFns slot_fns_[static_cast<int>(CKSolverType::Count)];
 
     // Helper: extract kernel list from handle
     std::vector<std::string> ExtractKernelList(::CKKernelListHandle* handle) const;

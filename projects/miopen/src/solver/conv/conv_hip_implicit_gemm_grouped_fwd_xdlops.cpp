@@ -161,7 +161,7 @@ bool PerformanceConfigHipImplicitGemmGroupFwdXdlops::RunParameterPredictionModel
     bool try_tf32  = (data_type == miopenFloat) && problem.UseTF32();
 
     valid_kernels =
-        loader.FillValidKernelsWithTf32Fallback(CKConvDirection::Fwd, problem, data_type, try_tf32);
+        loader.FillValidKernelsWithTf32Fallback(CKSolverType::GrpConvFwd, problem, data_type, try_tf32);
 
     const auto arch = ctx.GetStream().GetDeviceName();
     if(arch == "gfx90a")
@@ -318,7 +318,7 @@ void PerformanceConfigHipImplicitGemmGroupFwdXdlops::HeuristicInit(
     use_tf32       = (data_type == miopenFloat) && problem.UseTF32();
 
     valid_kernels =
-        loader.FillValidKernelsWithTf32Fallback(CKConvDirection::Fwd, problem, data_type, use_tf32);
+        loader.FillValidKernelsWithTf32Fallback(CKSolverType::GrpConvFwd, problem, data_type, use_tf32);
 
     if(!valid_kernels.empty())
     {
@@ -342,7 +342,7 @@ bool PerformanceConfigHipImplicitGemmGroupFwdXdlops::SetNextValue(const ProblemD
         use_tf32       = (data_type == miopenFloat) && problem.UseTF32();
 
         valid_kernels = loader.FillValidKernelsWithTf32Fallback(
-            CKConvDirection::Fwd, problem, data_type, use_tf32);
+            CKSolverType::GrpConvFwd, problem, data_type, use_tf32);
 
         if(valid_kernels.empty())
             return false;
@@ -373,7 +373,7 @@ bool PerformanceConfigHipImplicitGemmGroupFwdXdlops::IsValid(
         return false;
 
     auto data_type = problem.GetInDataType();
-    return loader.IsArgsSupported(CKConvDirection::Fwd, problem, kernel_id, data_type, use_tf32);
+    return loader.IsArgsSupported(CKSolverType::GrpConvFwd, problem, kernel_id, data_type, use_tf32);
 }
 
 bool PerformanceConfigHipImplicitGemmGroupFwdXdlops::operator==(
@@ -445,10 +445,10 @@ bool ConvHipImplicitGemmGroupFwdXdlops::IsApplicable(const ExecutionContext& ctx
     auto data_type = problem.GetInDataType();
     bool try_tf32  = (data_type == miopenFloat) && problem.UseTF32();
 
-    if(try_tf32 && loader.IsApplicable(CKConvDirection::Fwd, problem, data_type, true))
+    if(try_tf32 && loader.IsApplicable(CKSolverType::GrpConvFwd, problem, data_type, true))
         return true;
 
-    return loader.IsApplicable(CKConvDirection::Fwd, problem, data_type, false);
+    return loader.IsApplicable(CKSolverType::GrpConvFwd, problem, data_type, false);
 }
 
 ConvSolution ConvHipImplicitGemmGroupFwdXdlops::GetSolution(
@@ -461,7 +461,7 @@ ConvSolution ConvHipImplicitGemmGroupFwdXdlops::GetSolution(
         return {};
 
     return loader.GetSolution(
-        CKConvDirection::Fwd, ctx, problem, config.kernel_id, config.UseTF32());
+        CKSolverType::GrpConvFwd, ctx, problem, config.kernel_id, config.UseTF32());
 }
 
 } // namespace conv

@@ -164,7 +164,7 @@ bool PerformanceConfigHipImplicitGemmGroupBwdXdlops::RunParameterPredictionModel
     use_tf32       = (data_type == miopenFloat) && problem.UseTF32();
 
     valid_kernels =
-        loader.FillValidKernelsWithTf32Fallback(CKConvDirection::Bwd, problem, data_type, use_tf32);
+        loader.FillValidKernelsWithTf32Fallback(CKSolverType::GrpConvBwd, problem, data_type, use_tf32);
     if(valid_kernels.empty())
         return false;
 
@@ -314,7 +314,7 @@ void PerformanceConfigHipImplicitGemmGroupBwdXdlops::HeuristicInit(
     use_tf32       = (data_type == miopenFloat) && problem.UseTF32();
 
     valid_kernels =
-        loader.FillValidKernelsWithTf32Fallback(CKConvDirection::Bwd, problem, data_type, use_tf32);
+        loader.FillValidKernelsWithTf32Fallback(CKSolverType::GrpConvBwd, problem, data_type, use_tf32);
 
     if(!valid_kernels.empty())
     {
@@ -342,7 +342,7 @@ bool PerformanceConfigHipImplicitGemmGroupBwdXdlops::SetNextValue(const ProblemD
         use_tf32       = (data_type == miopenFloat) && problem.UseTF32();
 
         valid_kernels = loader.FillValidKernelsWithTf32Fallback(
-            CKConvDirection::Bwd, problem, data_type, use_tf32);
+            CKSolverType::GrpConvBwd, problem, data_type, use_tf32);
 
         if(valid_kernels.empty())
             return false;
@@ -403,7 +403,7 @@ bool PerformanceConfigHipImplicitGemmGroupBwdXdlops::IsValid(
         return false;
 
     auto data_type = problem.GetInDataType();
-    return loader.IsArgsSupported(CKConvDirection::Bwd, problem, kernel_id, data_type, use_tf32);
+    return loader.IsArgsSupported(CKSolverType::GrpConvBwd, problem, kernel_id, data_type, use_tf32);
 }
 
 bool PerformanceConfigHipImplicitGemmGroupBwdXdlops::operator==(
@@ -438,7 +438,7 @@ ConvHipImplicitGemmGroupBwdXdlops::GetCKMaxWorkspaceSize(const ProblemDescriptio
 
     auto data_type = problem.GetInDataType();
     bool use_tf32  = (data_type == miopenFloat) && problem.UseTF32();
-    return loader.GetWorkspaceSize(CKConvDirection::Bwd, problem, data_type, use_tf32);
+    return loader.GetWorkspaceSize(CKSolverType::GrpConvBwd, problem, data_type, use_tf32);
 }
 
 size_t ConvHipImplicitGemmGroupBwdXdlops::GetWorkspaceSize(const ExecutionContext&,
@@ -483,7 +483,7 @@ bool ConvHipImplicitGemmGroupBwdXdlops::IsApplicable(
         return false;
 
     return loader.IsApplicable(
-        CKConvDirection::Bwd, problem, problem.GetInDataType(), problem.UseTF32());
+        CKSolverType::GrpConvBwd, problem, problem.GetInDataType(), problem.UseTF32());
 }
 
 ConvSolution ConvHipImplicitGemmGroupBwdXdlops::GetSolution(
@@ -496,7 +496,7 @@ ConvSolution ConvHipImplicitGemmGroupBwdXdlops::GetSolution(
         return {};
 
     return loader.GetSolution(
-        CKConvDirection::Bwd, ctx, problem, config.kernel_id, config.UseTF32());
+        CKSolverType::GrpConvBwd, ctx, problem, config.kernel_id, config.UseTF32());
 }
 
 } // namespace conv

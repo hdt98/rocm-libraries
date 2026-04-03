@@ -293,9 +293,9 @@ bool CKGroupedConvLibLoader::LoadSymbols()
 #undef LOAD_DIR_SYMS
 
     // Per-slot "get all kernel type strings" symbols (only some slots have them)
-    LOAD_SYM(slot_fns_[static_cast<int>(CKSolverSlot::GrpConv3dFwd)].get_all_kernel_types,
+    LOAD_SYM(slot_fns_[static_cast<int>(CKSolverType::GrpConv3dFwd)].get_all_kernel_types,
              ckgrpconv_3d_fwd_get_all_kernel_type_strings);
-    LOAD_SYM(slot_fns_[static_cast<int>(CKSolverSlot::GrpConv3dBwd)].get_all_kernel_types,
+    LOAD_SYM(slot_fns_[static_cast<int>(CKSolverType::GrpConv3dBwd)].get_all_kernel_types,
              ckgrpconv_3d_bwd_get_all_kernel_type_strings);
 
 #undef LOAD_SYM
@@ -333,7 +333,7 @@ ConvSolution CKGroupedConvLibLoader::ExtractSolution(ConvSolution* ptr) const
 // -- Direction-parameterized wrappers -----------------------------------------
 
 std::vector<std::string>
-CKGroupedConvLibLoader::FillValidKernels(CKConvDirection dir,
+CKGroupedConvLibLoader::FillValidKernels(CKSolverType solverType,
                                          const conv::ProblemDescription& problem,
                                          miopenDataType_t dtype,
                                          bool use_tf32) const
@@ -341,35 +341,35 @@ CKGroupedConvLibLoader::FillValidKernels(CKConvDirection dir,
     if(!IsLoaded())
         return {};
     return ExtractKernelList(
-        slot_fns_[static_cast<int>(dir)].fill_valid_kernels(&problem, dtype, use_tf32));
+        slot_fns_[static_cast<int>(solverType)].fill_valid_kernels(&problem, dtype, use_tf32));
 }
 
 std::vector<std::string>
-CKGroupedConvLibLoader::FillValidKernelsWithTf32Fallback(CKConvDirection dir,
+CKGroupedConvLibLoader::FillValidKernelsWithTf32Fallback(CKSolverType solverType,
                                                          const conv::ProblemDescription& problem,
                                                          miopenDataType_t dtype,
                                                          bool& use_tf32) const
 {
-    auto result = FillValidKernels(dir, problem, dtype, use_tf32);
+    auto result = FillValidKernels(solverType, problem, dtype, use_tf32);
     if(result.empty() && use_tf32)
     {
         use_tf32 = false;
-        result   = FillValidKernels(dir, problem, dtype, false);
+        result   = FillValidKernels(solverType, problem, dtype, false);
     }
     return result;
 }
 
-bool CKGroupedConvLibLoader::IsApplicable(CKConvDirection dir,
+bool CKGroupedConvLibLoader::IsApplicable(CKSolverType solverType,
                                           const conv::ProblemDescription& problem,
                                           miopenDataType_t dtype,
                                           bool use_tf32) const
 {
     if(!IsLoaded())
         return false;
-    return slot_fns_[static_cast<int>(dir)].is_applicable(&problem, dtype, use_tf32);
+    return slot_fns_[static_cast<int>(solverType)].is_applicable(&problem, dtype, use_tf32);
 }
 
-bool CKGroupedConvLibLoader::IsArgsSupported(CKConvDirection dir,
+bool CKGroupedConvLibLoader::IsArgsSupported(CKSolverType solverType,
                                              const conv::ProblemDescription& problem,
                                              const std::string& kernel_id,
                                              miopenDataType_t dtype,
@@ -377,21 +377,21 @@ bool CKGroupedConvLibLoader::IsArgsSupported(CKConvDirection dir,
 {
     if(!IsLoaded())
         return false;
-    return slot_fns_[static_cast<int>(dir)].is_args_supported(
+    return slot_fns_[static_cast<int>(solverType)].is_args_supported(
         &problem, kernel_id.c_str(), dtype, use_tf32);
 }
 
-size_t CKGroupedConvLibLoader::GetWorkspaceSize(CKConvDirection dir,
+size_t CKGroupedConvLibLoader::GetWorkspaceSize(CKSolverType solverType,
                                                 const conv::ProblemDescription& problem,
                                                 miopenDataType_t dtype,
                                                 bool use_tf32) const
 {
     if(!IsLoaded())
         return 0;
-    return slot_fns_[static_cast<int>(dir)].get_workspace_size(&problem, dtype, use_tf32);
+    return slot_fns_[static_cast<int>(solverType)].get_workspace_size(&problem, dtype, use_tf32);
 }
 
-ConvSolution CKGroupedConvLibLoader::GetSolution(CKConvDirection dir,
+ConvSolution CKGroupedConvLibLoader::GetSolution(CKSolverType solverType,
                                                  const ExecutionContext& ctx,
                                                  const conv::ProblemDescription& problem,
                                                  const std::string& kernel_id,
@@ -400,11 +400,12 @@ ConvSolution CKGroupedConvLibLoader::GetSolution(CKConvDirection dir,
     if(!IsLoaded())
         return ConvSolution{miopenStatusInternalError};
     return ExtractSolution(
-        slot_fns_[static_cast<int>(dir)].get_solution(&ctx, &problem, kernel_id.c_str(), use_tf32));
+        slot_fns_[static_cast<int>(solverType)].get_solution(
+            &ctx, &problem, kernel_id.c_str(), use_tf32));
 }
 
 std::vector<std::string>
-CKGroupedConvLibLoader::GetAllKernelTypeStrings(CKSolverSlot slot) const
+CKGroupedConvLibLoader::GetAllKernelTypeStrings(CKSolverType slot) const
 {
     if(!IsLoaded())
         return {};

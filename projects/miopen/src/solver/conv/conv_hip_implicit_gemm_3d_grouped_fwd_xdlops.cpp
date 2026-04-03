@@ -63,7 +63,7 @@ void PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::InitValidKernels(
     use_tf32       = (data_type == miopenFloat) && problem.UseTF32();
 
     valid_kernels = loader.FillValidKernelsWithTf32Fallback(
-        CKSolverSlot::GrpConv3dFwd, problem, data_type, use_tf32);
+        CKSolverType::GrpConv3dFwd, problem, data_type, use_tf32);
 }
 
 // clang-format off
@@ -158,7 +158,7 @@ void PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::HeuristicInit(
         use_tf32       = (data_type == miopenFloat) && problem.UseTF32();
 
         valid_kernels = loader.FillValidKernelsWithTf32Fallback(
-            CKSolverSlot::GrpConv3dFwd, problem, data_type, use_tf32);
+            CKSolverType::GrpConv3dFwd, problem, data_type, use_tf32);
 
         if(idx_override < valid_kernels.size())
         {
@@ -191,7 +191,7 @@ void PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::HeuristicInit(
         use_tf32       = false;
 
         valid_kernels = loader.FillValidKernelsWithTf32Fallback(
-            CKSolverSlot::GrpConv3dFwd, problem, data_type, use_tf32);
+            CKSolverType::GrpConv3dFwd, problem, data_type, use_tf32);
 
         auto find_kernel = [&valid_kernels = std::as_const(valid_kernels)](
                                const std::size_t& expected_index,
@@ -351,7 +351,7 @@ void PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::HeuristicInit(
                 [&loader, try_tf32](const ProblemDescription& p) -> std::vector<std::string> {
                 bool tf32 = try_tf32;
                 return loader.FillValidKernelsWithTf32Fallback(
-                    CKSolverSlot::GrpConv3dFwd, p, p.GetInDataType(), tf32);
+                    CKSolverType::GrpConv3dFwd, p, p.GetInDataType(), tf32);
             };
             // Validation lambda for AI-predicted kernel + split_k combinations
             auto is_kernel_split_k_valid = [&](int kernel_index, int split_k_value) -> bool {
@@ -471,7 +471,7 @@ bool PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::IsValid(
 
     auto data_type = problem.GetInDataType();
     return loader.IsArgsSupported(
-        CKSolverSlot::GrpConv3dFwd, problem, kernel_id, data_type, use_tf32);
+        CKSolverType::GrpConv3dFwd, problem, kernel_id, data_type, use_tf32);
 }
 
 bool PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::operator==(
@@ -539,10 +539,10 @@ bool ConvHipImplicitGemm3DGroupFwdXdlops::IsApplicable(const ExecutionContext& c
     auto data_type = problem.GetInDataType();
     bool try_tf32  = (data_type == miopenFloat) && problem.UseTF32();
 
-    if(try_tf32 && loader.IsApplicable(CKSolverSlot::GrpConv3dFwd, problem, data_type, true))
+    if(try_tf32 && loader.IsApplicable(CKSolverType::GrpConv3dFwd, problem, data_type, true))
         return true;
 
-    return loader.IsApplicable(CKSolverSlot::GrpConv3dFwd, problem, data_type, false);
+    return loader.IsApplicable(CKSolverType::GrpConv3dFwd, problem, data_type, false);
 }
 
 float ConvHipImplicitGemm3DGroupFwdXdlops::GetWti(const ExecutionContext&,
@@ -583,7 +583,7 @@ ConvSolution ConvHipImplicitGemm3DGroupFwdXdlops::GetSolution(
         return {};
 
     return loader.GetSolution(
-        CKSolverSlot::GrpConv3dFwd, ctx, problem, config.kernel_id, config.UseTF32());
+        CKSolverType::GrpConv3dFwd, ctx, problem, config.kernel_id, config.UseTF32());
 }
 
 } // namespace conv
