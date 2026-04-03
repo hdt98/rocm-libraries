@@ -28,7 +28,7 @@ function(ck_impl_base_arch ARCH OUT_VAR)
     set(${OUT_VAR} "${_base}" PARENT_SCOPE)
 endfunction()
 
-foreach(gpu_target IN LISTS GPU_TARGETS)
+foreach(gpu_target IN LISTS MIOPEN_CK_ELIGIBLE_GPU_TARGETS)
     ck_impl_base_arch("${gpu_target}" arch_base)
     miopen_sanitize_arch("${gpu_target}" arch_safe)
 

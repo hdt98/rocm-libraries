@@ -334,7 +334,8 @@ if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_B
         endif()
     endif()
 
-    # Arch name sanitization for CMake target names (used by ck_impl and unbundling)
+    # Convert GPU target strings into CMake-safe target-name fragments.
+    # Example: gfx942:sramecc+:xnack- -> gfx942_srameccp_xnack_
     function(miopen_sanitize_arch ARCH OUT_VAR)
         string(REPLACE ":" "_" _r "${ARCH}")
         string(REPLACE "+" "p" _r "${_r}")
@@ -342,12 +343,26 @@ if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_B
         set(${OUT_VAR} "${_r}" PARENT_SCOPE)
     endfunction()
 
+    # Append VALUE to LIST_VAR only if not already present, preserving order.
+    function(miopen_list_append_unique LIST_VAR VALUE)
+        set(_list "${${LIST_VAR}}")
+        list(FIND _list "${VALUE}" _idx)
+        if(_idx EQUAL -1)
+            list(APPEND _list "${VALUE}")
+        endif()
+        set(${LIST_VAR} "${_list}" PARENT_SCOPE)
+    endfunction()
+
     # --- Per-architecture CK conv library unbundling ---
     if(MIOPEN_USE_COMPOSABLEKERNEL)
+        # Shared archive/arch helpers are reused by the configure-time probe
+        # path below and the build-time unbundle script.
+        include(cmake/ck_archive_common.cmake)
+
         # Unbundle the fat libdevice_conv_operations.a into per-arch .a files
         # so each per-target MIOpen .so can link only the CK code it needs.
 
-        # Find unbundling tools
+        # Required tools for inspecting and rewriting HIP fatbin sections.
         find_program(MIOPEN_OFFLOAD_BUNDLER clang-offload-bundler
             HINTS ${CMAKE_HIP_COMPILER_TOOLKIT_ROOT}/bin
                   ${ROCM_PATH}/llvm/bin
@@ -361,7 +376,9 @@ if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_B
             message(FATAL_ERROR "Per-arch CK unbundling requires clang-offload-bundler and llvm-objcopy")
         endif()
 
-        # Get the fat archive path
+        # Target and path used by the unbundle custom commands.
+        # Keep CK_FAT_ARCHIVE_PATH as a generator expression so build-time picks
+        # the exact artifact for the active configuration.
         if(MIOPEN_BUILD_CK)
             set(CK_FAT_ARCHIVE_TARGET device_conv_operations)
             set(CK_FAT_ARCHIVE_PATH $<TARGET_FILE:device_conv_operations>)
@@ -370,9 +387,198 @@ if( MIOPEN_BACKEND STREQUAL "HIP" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN_B
             set(CK_FAT_ARCHIVE_TARGET composable_kernel::device_conv_operations)
         endif()
 
+        # Derived at configure time:
+        # - eligible: targets that have CK device code and can build per-arch libs
+        # - skipped: requested GPU_TARGETS that do not have matching CK code
+        set(MIOPEN_CK_ELIGIBLE_GPU_TARGETS "")
+        set(MIOPEN_CK_SKIPPED_GPU_TARGETS "")
+
+        if(MIOPEN_BUILD_CK)
+            # Inline CK exposes the compiler-filtered target list directly, so
+            # we can decide at configure time which per-arch CK libraries are valid.
+            if(DEFINED CACHE{SUPPORTED_GPU_TARGETS})
+                set(_miopen_ck_available_gpu_targets "$CACHE{SUPPORTED_GPU_TARGETS}")
+            elseif(DEFINED SUPPORTED_GPU_TARGETS)
+                set(_miopen_ck_available_gpu_targets "${SUPPORTED_GPU_TARGETS}")
+            else()
+                message(WARNING
+                    "Unable to determine CK-supported GPU targets from the inline CK build. "
+                    "Falling back to MIOpen's GPU_TARGETS for per-arch CK libraries.")
+                set(_miopen_ck_available_gpu_targets "${GPU_TARGETS}")
+            endif()
+
+            # Filter requested GPU_TARGETS against CK's supported target list.
+            foreach(arch IN LISTS GPU_TARGETS)
+                set(_miopen_arch_supported FALSE)
+                foreach(available_arch IN LISTS _miopen_ck_available_gpu_targets)
+                    miopen_ck_arch_matches("${arch}" "${available_arch}" _miopen_arch_supported)
+                    if(_miopen_arch_supported)
+                        break()
+                    endif()
+                endforeach()
+
+                if(_miopen_arch_supported)
+                    list(APPEND MIOPEN_CK_ELIGIBLE_GPU_TARGETS "${arch}")
+                else()
+                    miopen_list_append_unique(MIOPEN_CK_SKIPPED_GPU_TARGETS "${arch}")
+                endif()
+            endforeach()
+        else()
+            # External CK may expose different imported archives per build
+            # configuration. Probe each resolved archive and keep only the
+            # targets present in all of them so configure-time eligibility
+            # remains valid for every config that can be built.
+            set(_miopen_ck_probe_archives "")
+
+            # Config-specific imported archives (Debug/Release/etc.).
+            get_target_property(_miopen_ck_imported_configs
+                composable_kernel::device_conv_operations
+                IMPORTED_CONFIGURATIONS)
+            foreach(_miopen_ck_config IN LISTS _miopen_ck_imported_configs)
+                string(TOUPPER "${_miopen_ck_config}" _miopen_ck_config_upper)
+                get_target_property(_miopen_ck_archive_path
+                    composable_kernel::device_conv_operations
+                    "IMPORTED_LOCATION_${_miopen_ck_config_upper}")
+                if(_miopen_ck_archive_path)
+                    miopen_list_append_unique(_miopen_ck_probe_archives
+                        "${_miopen_ck_archive_path}")
+                endif()
+            endforeach()
+
+            # Single-config generators may only set CMAKE_BUILD_TYPE.
+            if(CMAKE_BUILD_TYPE)
+                string(TOUPPER "${CMAKE_BUILD_TYPE}" _miopen_build_type_upper)
+                get_target_property(_miopen_ck_archive_path
+                    composable_kernel::device_conv_operations
+                    "IMPORTED_LOCATION_${_miopen_build_type_upper}")
+                if(_miopen_ck_archive_path)
+                    miopen_list_append_unique(_miopen_ck_probe_archives
+                        "${_miopen_ck_archive_path}")
+                endif()
+            endif()
+
+            # Compatibility fallbacks for packages that only expose one of these.
+            get_target_property(_miopen_ck_archive_path
+                composable_kernel::device_conv_operations
+                IMPORTED_LOCATION_RELEASE)
+            if(_miopen_ck_archive_path)
+                miopen_list_append_unique(_miopen_ck_probe_archives
+                    "${_miopen_ck_archive_path}")
+            endif()
+
+            get_target_property(_miopen_ck_archive_path
+                composable_kernel::device_conv_operations
+                IMPORTED_LOCATION)
+            if(_miopen_ck_archive_path)
+                miopen_list_append_unique(_miopen_ck_probe_archives
+                    "${_miopen_ck_archive_path}")
+            endif()
+
+            if(NOT _miopen_ck_probe_archives)
+                message(FATAL_ERROR
+                    "Unable to resolve libdevice_conv_operations.a for configure-time CK arch probing")
+            endif()
+
+            set(_miopen_ck_probe_dir "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/miopen_ck_probe")
+            file(MAKE_DIRECTORY "${_miopen_ck_probe_dir}")
+
+            # Start with all requested targets and intersect with each archive's
+            # discovered set to keep only targets valid across all probed configs.
+            set(_miopen_ck_probe_arch_intersection "${GPU_TARGETS}")
+            set(_miopen_ck_probe_index 0)
+
+            foreach(_miopen_ck_archive_path IN LISTS _miopen_ck_probe_archives)
+                math(EXPR _miopen_ck_probe_index "${_miopen_ck_probe_index} + 1")
+                set(_miopen_ck_probe_result
+                    "${_miopen_ck_probe_dir}/results_${_miopen_ck_probe_index}.cmake")
+                file(REMOVE "${_miopen_ck_probe_result}")
+
+                # The probe script scans extracted archive members and writes
+                # the subset of requested GPU_TARGETS that have CK device code.
+                execute_process(
+                    COMMAND ${CMAKE_COMMAND}
+                        "-DARCHS=${GPU_TARGETS}"
+                        "-DFAT_ARCHIVE=${_miopen_ck_archive_path}"
+                        "-DRESULT_FILE=${_miopen_ck_probe_result}"
+                        "-DBUNDLER=${MIOPEN_OFFLOAD_BUNDLER}"
+                        "-DAR=${CMAKE_AR}"
+                        "-DLLVM_OBJCOPY=${MIOPEN_LLVM_OBJCOPY}"
+                        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/probe_archive_archs.cmake"
+                    RESULT_VARIABLE _miopen_ck_probe_status
+                    OUTPUT_VARIABLE _miopen_ck_probe_stdout
+                    ERROR_VARIABLE _miopen_ck_probe_stderr)
+
+                if(NOT _miopen_ck_probe_status EQUAL 0)
+                    message(FATAL_ERROR
+                        "Failed to probe CK archive\n"
+                        "  archive: ${_miopen_ck_archive_path}\n"
+                        "  exit code: ${_miopen_ck_probe_status}\n"
+                        "  stderr: ${_miopen_ck_probe_stderr}\n"
+                        "  stdout: ${_miopen_ck_probe_stdout}")
+                endif()
+
+                unset(FOUND_ARCHS)
+                include("${_miopen_ck_probe_result}")
+                set(_miopen_ck_found_archs_for_archive "${FOUND_ARCHS}")
+
+                # Intersect current candidate set with this archive's findings.
+                set(_miopen_ck_next_arch_intersection "")
+                foreach(arch IN LISTS _miopen_ck_probe_arch_intersection)
+                    set(_miopen_arch_supported FALSE)
+                    foreach(found_arch IN LISTS _miopen_ck_found_archs_for_archive)
+                        miopen_ck_arch_matches("${arch}" "${found_arch}" _miopen_arch_supported)
+                        if(_miopen_arch_supported)
+                            break()
+                        endif()
+                    endforeach()
+
+                    if(_miopen_arch_supported)
+                        list(APPEND _miopen_ck_next_arch_intersection "${arch}")
+                    endif()
+                endforeach()
+
+                set(_miopen_ck_probe_arch_intersection
+                    "${_miopen_ck_next_arch_intersection}")
+                if(NOT _miopen_ck_probe_arch_intersection)
+                    break()
+                endif()
+            endforeach()
+
+            # Reuse the same arch classification loop used by the inline CK path.
+            set(FOUND_ARCHS "${_miopen_ck_probe_arch_intersection}")
+
+            foreach(arch IN LISTS GPU_TARGETS)
+                set(_miopen_arch_supported FALSE)
+                foreach(found_arch IN LISTS FOUND_ARCHS)
+                    miopen_ck_arch_matches("${arch}" "${found_arch}" _miopen_arch_supported)
+                    if(_miopen_arch_supported)
+                        break()
+                    endif()
+                endforeach()
+
+                if(_miopen_arch_supported)
+                    list(APPEND MIOPEN_CK_ELIGIBLE_GPU_TARGETS "${arch}")
+                else()
+                    miopen_list_append_unique(MIOPEN_CK_SKIPPED_GPU_TARGETS "${arch}")
+                endif()
+            endforeach()
+        endif()
+
+        # Warn once about filtered targets so missing CK coverage is visible
+        # during configure rather than as per-target build failures later.
+        if(MIOPEN_CK_SKIPPED_GPU_TARGETS)
+            string(REPLACE ";" ", " _miopen_ck_skipped_gpu_targets
+                "${MIOPEN_CK_SKIPPED_GPU_TARGETS}")
+            message(WARNING
+                "Skipping per-arch CK grouped-conv libraries for GPU target(s): "
+                "${_miopen_ck_skipped_gpu_targets}. "
+                "libdevice_conv_operations.a does not contain matching device code. "
+                "Ensure CK was built with those GPU target(s) enabled.")
+        endif()
+
         set(CK_PER_ARCH_DIR "${CMAKE_CURRENT_BINARY_DIR}/lib")
 
-        foreach(arch IN LISTS GPU_TARGETS)
+        foreach(arch IN LISTS MIOPEN_CK_ELIGIBLE_GPU_TARGETS)
             miopen_sanitize_arch("${arch}" arch_safe)
             set(target_name "ck_conv_${arch_safe}")
 

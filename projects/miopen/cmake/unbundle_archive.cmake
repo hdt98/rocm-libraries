@@ -1,9 +1,8 @@
 # unbundle_archive.cmake
 # Extracts single-arch objects from a fat static archive.
 #
-# Handles the new-style HIP compilation model where device code is embedded
-# in .hip_fatbin ELF sections (CCOB format) within regular host objects,
-# rather than the old clang-offload-bundler fat binary format.
+# Handles HIP objects where device bundles are stored in .hip_fatbin sections
+# inside normal host objects (CCOB model).
 #
 # Required -D arguments:
 #   FAT_ARCHIVE   - Path to the fat .a file
@@ -15,108 +14,76 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-get_filename_component(work_dir "${OUTPUT}" DIRECTORY)
-set(work_dir "${work_dir}/_unbundle_${ARCH}")
+# Script entrypoint used via `cmake -P`; helper functions live in
+# ck_archive_common.cmake.
+include("${CMAKE_CURRENT_LIST_DIR}/ck_archive_common.cmake")
 
-# Clean and create work directory
-file(REMOVE_RECURSE "${work_dir}")
-file(MAKE_DIRECTORY "${work_dir}")
+miopen_ck_require(FAT_ARCHIVE "FAT_ARCHIVE is required")
+miopen_ck_require(ARCH "ARCH is required")
+miopen_ck_require(OUTPUT "OUTPUT is required")
+miopen_ck_require(BUNDLER "BUNDLER is required")
+miopen_ck_require(AR "AR is required")
+miopen_ck_require(LLVM_OBJCOPY "LLVM_OBJCOPY is required")
 
-# Strip feature suffixes (e.g., gfx942:sramecc+:xnack- → gfx942)
-string(FIND "${ARCH}" ":" _colon_pos)
-if(_colon_pos GREATER -1)
-    string(SUBSTRING "${ARCH}" 0 ${_colon_pos} BASE_ARCH)
-else()
-    set(BASE_ARCH "${ARCH}")
-endif()
-
-# Extract .o files from fat archive
-execute_process(
-    COMMAND ${AR} x "${FAT_ARCHIVE}"
-    WORKING_DIRECTORY "${work_dir}"
-    OUTPUT_VARIABLE ar_output
-    ERROR_VARIABLE  ar_error
-    RESULT_VARIABLE ar_result)
-if(NOT ar_result EQUAL 0)
-    message(FATAL_ERROR
-        "Failed to extract ${FAT_ARCHIVE}\n"
-        "  exit code: ${ar_result}\n"
-        "  stderr: ${ar_error}\n"
-        "  stdout: ${ar_output}")
-endif()
-
-file(GLOB obj_files "${work_dir}/*.o" "${work_dir}/*.obj")
+miopen_ck_prepare_work_dir("${OUTPUT}" "_unbundle_${ARCH}" work_dir)
+miopen_ck_extract_archive("${FAT_ARCHIVE}" "${AR}" "${work_dir}")
+miopen_ck_collect_objects("${work_dir}" obj_files)
 
 set(thin_objs)
+
 foreach(obj IN LISTS obj_files)
     get_filename_component(obj_name "${obj}" NAME)
-    set(fatbin_file "${work_dir}/${obj_name}.fatbin")
 
-    # Extract .hip_fatbin section using llvm-objcopy (GNU objcopy rewrites the
-    # ELF in-place even for --dump-section, inflating it by ~500KB per object)
-    execute_process(
-        COMMAND ${LLVM_OBJCOPY} --dump-section .hip_fatbin=${fatbin_file} "${obj}"
-        RESULT_VARIABLE extract_result
-        ERROR_QUIET)
+    miopen_ck_list_fatbin_targets(
+        "${obj}"
+        "${work_dir}"
+        "${LLVM_OBJCOPY}"
+        "${BUNDLER}"
+        targets
+        target_list_status
+        target_list_exit_code
+        target_list_error)
 
-    if(NOT extract_result EQUAL 0)
-        # No .hip_fatbin section — not a HIP object, skip
+    # No .hip_fatbin means this archive member is not a HIP object.
+    if(target_list_status STREQUAL "NO_FATBIN")
         continue()
     endif()
 
-    # List targets in the extracted fatbin bundle
-    execute_process(
-        COMMAND ${BUNDLER} --type=o "--input=${fatbin_file}" -list
-        OUTPUT_VARIABLE targets_output
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        RESULT_VARIABLE list_result
-        ERROR_QUIET)
+    # A bundler list failure after successful extraction is a real tool/data
+    # error and should fail the build immediately.
+    if(target_list_status STREQUAL "LIST_FAILED")
+        message(FATAL_ERROR
+            "Failed to list fatbin targets for ${obj_name} (${ARCH})\n"
+            "  object: ${obj}\n"
+            "  bundler: ${BUNDLER}\n"
+            "  exit code: ${target_list_exit_code}\n"
+            "  stderr: ${target_list_error}")
+    endif()
 
-    if(NOT list_result EQUAL 0)
+    if(NOT target_list_status STREQUAL "OK")
+        message(FATAL_ERROR
+            "Unexpected target-listing status '${target_list_status}' for ${obj_name} (${ARCH})")
+    endif()
+
+    # Empty target output is unexpected but harmless; ignore this object.
+    if(NOT targets)
         continue()
     endif()
 
-    # Find the target triple for our architecture and collect all targets
-    string(REPLACE "\n" ";" target_lines "${targets_output}")
-    set(matched_target "")
-    set(host_target "")
-    set(all_targets "")
-    foreach(line IN LISTS target_lines)
-        string(STRIP "${line}" line)
-        if(line STREQUAL "")
-            continue()
-        endif()
-        list(APPEND all_targets "${line}")
-        if(line MATCHES "^host-")
-            set(host_target "${line}")
-        else()
-            # Try full ARCH first (handles archives built with feature qualifiers),
-            # then fall back to base arch without feature suffixes.
-            # Use literal substring match — MATCHES uses regex, and arch
-            # strings like gfx942:sramecc+:xnack- contain regex metacharacters.
-            string(FIND "${line}" "${ARCH}" _arch_pos)
-            if(NOT _arch_pos EQUAL -1)
-                set(matched_target "${line}")
-            elseif(NOT BASE_ARCH STREQUAL ARCH)
-                string(FIND "${line}" "${BASE_ARCH}" _arch_pos)
-                if(NOT _arch_pos EQUAL -1)
-                    set(matched_target "${line}")
-                endif()
-            endif()
-        endif()
-    endforeach()
-
+    miopen_ck_find_targets_for_arch("${targets}" "${ARCH}" matched_target host_target)
+    # This object does not contain device code for the requested arch.
     if(NOT matched_target)
         continue()
     endif()
 
-    # Unbundle: extract all targets into separate files so we can pick just
-    # the ones we need (bundler requires all targets to be listed)
+    # clang-offload-bundler requires every target in the original bundle to be
+    # listed during unbundle, even though the rebundle step keeps only host +
+    # one matched device target.
     set(unbundle_targets "")
     set(unbundle_outputs "")
     set(device_output "")
     set(host_output "")
-    foreach(target IN LISTS all_targets)
+    foreach(target IN LISTS targets)
         string(REPLACE "/" "_" safe_target "${target}")
         set(out_file "${work_dir}/${obj_name}.${safe_target}")
         if(unbundle_targets)
@@ -135,7 +102,7 @@ foreach(obj IN LISTS obj_files)
     execute_process(
         COMMAND ${BUNDLER} --type=o
             "--targets=${unbundle_targets}"
-            "--input=${fatbin_file}"
+            "--input=${work_dir}/${obj_name}.fatbin"
             ${unbundle_outputs}
             --unbundle
         OUTPUT_VARIABLE unbundle_output
@@ -148,10 +115,9 @@ foreach(obj IN LISTS obj_files)
             "  exit code: ${unbundle_result}\n"
             "  stderr: ${unbundle_error}\n"
             "  stdout: ${unbundle_output}")
-        continue()
     endif()
 
-    # Re-bundle with only host + target arch, compressed
+    # Re-bundle to a host+single-device fatbin for this arch.
     set(rebundle_targets "${host_target},${matched_target}")
     set(thin_fatbin "${work_dir}/${obj_name}.thin_fatbin")
     execute_process(
@@ -170,8 +136,9 @@ foreach(obj IN LISTS obj_files)
             "  exit code: ${rebundle_result}\n"
             "  stderr: ${rebundle_error}\n"
             "  stdout: ${rebundle_output}")
-        continue()
     endif()
+
+    set(fatbin_file "${work_dir}/${obj_name}.fatbin")
 
     # Replace the .hip_fatbin section with the single-arch fatbin.
     # --update-section preserves relocations (.hipFatBinSegment references
@@ -179,8 +146,8 @@ foreach(obj IN LISTS obj_files)
     # content to be no larger than the original section.
     # For multi-arch bundles this holds: we removed device code blobs.
     # For single-arch bundles, re-encoding adds overhead that can make the
-    # thin fatbin larger than the original. In that case the object already
-    # contains only our target arch, so use it unchanged.
+    # thin fatbin larger than the original. In that case the object is already
+    # target-specific, so keep the original object unchanged.
     file(SIZE "${fatbin_file}" _orig_fatbin_size)
     file(SIZE "${thin_fatbin}" _thin_fatbin_size)
 
@@ -188,7 +155,7 @@ foreach(obj IN LISTS obj_files)
         # Count device targets (those containing "gfx"). If more than one,
         # the thin fatbin should have been smaller — something is wrong.
         set(_num_device_targets 0)
-        foreach(_t IN LISTS all_targets)
+        foreach(_t IN LISTS targets)
             if(_t MATCHES "gfx")
                 math(EXPR _num_device_targets "${_num_device_targets} + 1")
             endif()
@@ -223,12 +190,11 @@ foreach(obj IN LISTS obj_files)
     endif()
 endforeach()
 
-# Create per-arch archive from patched objects
 if(thin_objs)
     list(LENGTH thin_objs count)
 
-    # Write object list to a response file to avoid command-line length
-    # limits on Windows (~1400 objects can exceed the 32767 char cap).
+    # Use a response file so large CK archives do not overflow command-line
+    # length limits while re-archiving filtered objects.
     set(rsp_file "${work_dir}/thin_objs.rsp")
     file(WRITE "${rsp_file}" "")
     foreach(_obj IN LISTS thin_objs)
@@ -250,20 +216,9 @@ if(thin_objs)
     endif()
     message(STATUS "Created ${OUTPUT} with ${count} objects")
 else()
-    message(WARNING "${ARCH} is included in MIOpen's GPU_TARGETS, but no device code objects were found for ${ARCH} in ${FAT_ARCHIVE}. Did you build CK to include ${ARCH}? Creating empty archive")
-    # Create an empty archive so the build does not fail with a missing output.
-    execute_process(
-        COMMAND ${AR} rcs "${OUTPUT}"
-        OUTPUT_VARIABLE ar_output
-        ERROR_VARIABLE  ar_error
-        RESULT_VARIABLE ar_empty_result)
-    if(NOT ar_empty_result EQUAL 0)
-        message(FATAL_ERROR
-            "Failed to create empty archive ${OUTPUT}\n"
-            "  exit code: ${ar_empty_result}\n"
-            "  stderr: ${ar_error}")
-    endif()
+    message(FATAL_ERROR
+        "No device code objects were found for ${ARCH} in ${FAT_ARCHIVE}. "
+        "Refusing to create ${OUTPUT}. Did you build CK to include ${ARCH}?")
 endif()
 
-# Cleanup
 file(REMOVE_RECURSE "${work_dir}")
