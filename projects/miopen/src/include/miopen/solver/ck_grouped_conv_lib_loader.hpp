@@ -115,6 +115,7 @@ private:
 
     void LoadLibrary(const std::string& device_name);
     bool LoadSymbols();
+    static constexpr int ToSlotIndex(CKSolverType slot) { return static_cast<int>(slot); }
 
     // Singleton cache
     static std::mutex& CacheMutex();
@@ -173,7 +174,7 @@ private:
         GetAllKernelTypeStringsFn get_all_kernel_types  = nullptr;
     };
 
-    DirectionFns slot_fns_[static_cast<int>(CKSolverType::Count)];
+    DirectionFns slot_fns_[ToSlotIndex(CKSolverType::Count)];
 
     // Helper: extract kernel list from handle
     std::vector<std::string> ExtractKernelList(::CKKernelListHandle* handle) const;
