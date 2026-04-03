@@ -332,6 +332,24 @@ VARIANTS = [
         "mfma_k": 16,
         "workgroup_size": 256,
     },
+    # FP8: asymmetric dtype (fp8 inputs, fp16 output, gfx942+ only)
+    {
+        "name": "gemm_fp8_fnuz",
+        "a_dtype": "fp8_fnuz",
+        "b_dtype": "fp8_fnuz",
+        "c_dtype": "fp16",
+        "acc_dtype": "fp32",
+        "block_m": 128,
+        "block_n": 128,
+        "block_k": 32,
+        "waves_m": 2,
+        "waves_n": 2,
+        "waves_k": 1,
+        "mfma_m": 32,
+        "mfma_n": 32,
+        "mfma_k": 16,
+        "workgroup_size": 256,
+    },
 ]
 ARCHITECTURES = ["gfx90a", "gfx942", "gfx950"]
 

@@ -115,6 +115,10 @@ int main(int argc, char** argv)
         if(std::strncmp(variant.name, "gemm_fp16_gfx942", 16) == 0 &&
            std::strstr(gpu_arch, "gfx942") == nullptr)
             continue;
+        // FP8 MFMA requires gfx942+
+        if(std::strncmp(variant.name, "gemm_fp8_fnuz", 13) == 0 &&
+           std::strstr(gpu_arch, "gfx942") == nullptr && std::strstr(gpu_arch, "gfx950") == nullptr)
+            continue;
 
         // Skip preshuffle — requires host-side B matrix rearrangement (not yet wired)
         if(spec.pipeline == rocm_ck::Pipeline::Preshuffle)

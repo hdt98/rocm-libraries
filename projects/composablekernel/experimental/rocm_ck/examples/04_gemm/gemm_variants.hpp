@@ -207,6 +207,18 @@ inline constexpr GemmVariant gemm_variants[] = {
                      .mfma_tile   = {16, 16, 16},
                      .pipeline    = Pipeline::Preshuffle,
                  }),
+    // --- FP8: asymmetric dtype (fp8 inputs, fp16 output, gfx942+ only) ---
+    make_variant("gemm_fp8_fnuz",
+                 Signature{
+                     .dtype   = DataType::FP8_FNUZ,
+                     .tensors = {Tensor{.name = "C", .dtype = DataType::FP16}},
+                     .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 GemmAlgorithm{
+                     .block_tile  = {128, 128, 32},
+                     .block_waves = {2, 2, 1},
+                     .mfma_tile   = {32, 32, 16},
+                 }),
 };
 
 inline constexpr int gemm_variant_count = sizeof(gemm_variants) / sizeof(gemm_variants[0]);
