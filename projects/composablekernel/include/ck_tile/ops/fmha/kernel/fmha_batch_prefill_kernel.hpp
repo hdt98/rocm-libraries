@@ -102,7 +102,6 @@ struct FmhaBatchPrefillWithPagedKVCacheKernel
         const void* k_ptr;
         const void* v_ptr;
         void* o_ptr;
-        const void* sink_ptr;
 
         ck_tile::index_t seqlen_q;
         ck_tile::index_t seqlen_k;
@@ -385,7 +384,6 @@ struct FmhaBatchPrefillWithPagedKVCacheKernel
                      k_ptr,
                      v_ptr,
                      o_ptr,
-                     sink_ptr,
                      seqlen_q,
                      -1,
                      hdim_q,
@@ -556,7 +554,6 @@ struct FmhaBatchPrefillWithPagedKVCacheKernel
                      k_ptr,
                      v_ptr,
                      o_ptr,
-                     sink_ptr,
                      -1, // seqlen will be updated by another pointer
                      -1, //
                      hdim_q,
@@ -783,11 +780,7 @@ struct FmhaBatchPrefillWithPagedKVCacheKernel
         long_index_t batch_offset_randval = 0;
         long_index_t batch_offset_lse     = 0;
         long_index_t batch_offset_o       = 0;
-        const float sink_value =
-            kargs.sink_ptr != nullptr
-                ? (*(static_cast<const float*>(kargs.sink_ptr) + i_nhead)) / kargs.scale_s
-                : -numeric<float>::infinity();
-        const index_t seqlen_k = [&]() {
+        const index_t seqlen_k            = [&]() {
             if constexpr(kKVLookupTable ==
                          BlockAttentionKVCacheLookupTableEnum::SGLANG_PAGE_TABLE_1D)
             {
@@ -801,9 +794,9 @@ struct FmhaBatchPrefillWithPagedKVCacheKernel
                         return kargs.page_table.kv_last_page_lens[i_batch];
                 }();
                 return num_page_blocks > 0
-                           ? static_cast<index_t>((num_page_blocks - 1) * kargs.page_block_size +
+                                      ? static_cast<index_t>((num_page_blocks - 1) * kargs.page_block_size +
                                                   last_page_len)
-                           : 0;
+                                      : 0;
             }
             else // BlockAttentionKVCacheLookupTableEnum::VLLM_BLOCK_TABLE_2D
             {
@@ -1321,8 +1314,7 @@ struct FmhaBatchPrefillWithPagedKVCacheKernel
                     stride_v_for_pipeline,
                     kargs.batch_stride_k,
                     kargs.batch_stride_v,
-                    dropout,
-                    sink_value);
+                    dropout);
             }
             else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::KV_BLOCKSCALE)
             {
@@ -1377,8 +1369,7 @@ struct FmhaBatchPrefillWithPagedKVCacheKernel
                                       stride_v_for_pipeline,
                                       kargs.batch_stride_k,
                                       kargs.batch_stride_v,
-                                      dropout,
-                                      sink_value);
+                                      dropout);
             }
         }();
 

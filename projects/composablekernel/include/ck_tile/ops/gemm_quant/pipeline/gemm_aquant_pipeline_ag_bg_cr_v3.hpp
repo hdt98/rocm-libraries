@@ -233,8 +233,7 @@ struct AQuantGemmPipelineAgBgCrCompV3 : public BaseGemmPipelineAgBgCrCompV3<Prob
             using BDramTileWindowStep  = typename BDramBlockWindowTmp::BottomTensorIndex;
             using AQDramTileWindowStep = typename AQDramBlockWindowTmp::BottomTensorIndex;
 
-            auto&& [a_lds_block, b_lds_block] =
-                Base::template GetABLdsTensorViews<OverrideADataType, BDataType>(p_smem);
+            auto&& [a_lds_block, b_lds_block] = Base::GetABLdsTensorViews(p_smem);
 
             constexpr auto a_lds_load_tile_distr =
                 make_static_tile_distribution(BlockGemm::MakeABlockDistributionEncode());
@@ -251,6 +250,9 @@ struct AQuantGemmPipelineAgBgCrCompV3 : public BaseGemmPipelineAgBgCrCompV3<Prob
             using BBlockTileDistr  = decltype(b_copy_dram_window.get_tile_distribution());
             using AQBlockTileDistr = decltype(aq_copy_dram_window.get_tile_distribution());
 
+            // while ADatatype might not be the same as BDataType at the time of problem
+            // initialization, we can safely use BDataType here because when A would be int4 we will
+            // ensure A is converted to BDataType prior to loading
             using ABlockTile =
                 decltype(make_static_distributed_tensor<OverrideADataType>(ABlockTileDistr{}));
             using BBlockTile =

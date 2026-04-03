@@ -1,6 +1,9 @@
+<<<<<<< HEAD
 // Copyright Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
+=======
+>>>>>>> gfx1310
 #pragma once
 
 #include "gemm.hpp"

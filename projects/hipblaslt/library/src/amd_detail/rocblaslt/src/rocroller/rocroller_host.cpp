@@ -531,7 +531,7 @@ rocblaslt_status
                 continue;  // Skip this solution entirely
             }
         }
-
+        
         auto existingSolution
             = rocroller_handle->cache.getKernel(kernelType, solutionIndexParameter);
         std::shared_ptr<GemmKernel> kernel;
