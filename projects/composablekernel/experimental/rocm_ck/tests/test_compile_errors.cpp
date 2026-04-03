@@ -80,14 +80,14 @@ using namespace rocm_ck;
 //
 // Expected error: "GEMM make_spec requires GemmOp as first operator"
 
-// Invalid MFMA tile for dtype:
+// Invalid warp tile for dtype:
 //
 //   constexpr auto bad = make_spec(
 //       Signature{.dtype = DataType::FP32,
 //                 .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
 //       GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {32, 32, 16}});
 //
-// Expected error: "warp_tile is not a valid MFMA instruction shape for this dtype"
+// Expected error: "warp_tile is not a valid instruction shape for this dtype and target"
 // (FP32 32x32 only supports k=4 or k=8, not k=16)
 
 // block_waves.k != 1:

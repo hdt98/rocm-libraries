@@ -8,52 +8,52 @@
 using namespace rocm_ck;
 
 // ============================================================================
-// is_valid_mfma
+// is_valid_warp_tile
 // ============================================================================
 
-TEST(MfmaValidation, AcceptsFP32With16x16Tile)
+TEST(WarpTileValidation, AcceptsFP32With16x16Tile)
 {
-    EXPECT_TRUE(is_valid_mfma(DataType::FP32, 16, 16, 4));
-    EXPECT_TRUE(is_valid_mfma(DataType::FP32, 16, 16, 8));
-    EXPECT_TRUE(is_valid_mfma(DataType::FP32, 16, 16, 16));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP32, 16, 16, 4));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP32, 16, 16, 8));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP32, 16, 16, 16));
 }
 
-TEST(MfmaValidation, AcceptsFP32With32x32OnlyForSmallK)
+TEST(WarpTileValidation, AcceptsFP32With32x32OnlyForSmallK)
 {
-    EXPECT_TRUE(is_valid_mfma(DataType::FP32, 32, 32, 4));
-    EXPECT_TRUE(is_valid_mfma(DataType::FP32, 32, 32, 8));
-    EXPECT_FALSE(is_valid_mfma(DataType::FP32, 32, 32, 16)); // k=16 invalid at 32x32 for fp32
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP32, 32, 32, 4));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP32, 32, 32, 8));
+    EXPECT_FALSE(is_valid_warp_tile(DataType::FP32, 32, 32, 16)); // k=16 invalid at 32x32 for fp32
 }
 
-TEST(MfmaValidation, AcceptsFP16With16x16Tile)
+TEST(WarpTileValidation, AcceptsFP16With16x16Tile)
 {
-    EXPECT_TRUE(is_valid_mfma(DataType::FP16, 16, 16, 16));
-    EXPECT_TRUE(is_valid_mfma(DataType::FP16, 16, 16, 32));
-    EXPECT_FALSE(is_valid_mfma(DataType::FP16, 16, 16, 4));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP16, 16, 16, 16));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP16, 16, 16, 32));
+    EXPECT_FALSE(is_valid_warp_tile(DataType::FP16, 16, 16, 4));
 }
 
-TEST(MfmaValidation, AcceptsFP16With32x32Tile)
+TEST(WarpTileValidation, AcceptsFP16With32x32Tile)
 {
-    EXPECT_TRUE(is_valid_mfma(DataType::FP16, 32, 32, 8));
-    EXPECT_TRUE(is_valid_mfma(DataType::FP16, 32, 32, 16));
-    EXPECT_FALSE(is_valid_mfma(DataType::FP16, 32, 32, 4)); // k=4 invalid at 32x32 for fp16
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP16, 32, 32, 8));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP16, 32, 32, 16));
+    EXPECT_FALSE(is_valid_warp_tile(DataType::FP16, 32, 32, 4)); // k=4 invalid at 32x32 for fp16
 }
 
-TEST(MfmaValidation, AcceptsSameTilesForBF16AsFP16)
+TEST(WarpTileValidation, AcceptsSameTilesForBF16AsFP16)
 {
-    EXPECT_TRUE(is_valid_mfma(DataType::BF16, 16, 16, 16));
-    EXPECT_TRUE(is_valid_mfma(DataType::BF16, 32, 32, 16));
-    EXPECT_FALSE(is_valid_mfma(DataType::BF16, 32, 32, 4));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::BF16, 16, 16, 16));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::BF16, 32, 32, 16));
+    EXPECT_FALSE(is_valid_warp_tile(DataType::BF16, 32, 32, 4));
 }
 
-TEST(MfmaValidation, RejectsAsymmetricAndIntegerConfigs)
+TEST(WarpTileValidation, RejectsAsymmetricAndIntegerConfigs)
 {
     // Asymmetric tiles not supported
-    EXPECT_FALSE(is_valid_mfma(DataType::FP32, 16, 32, 8));
-    EXPECT_FALSE(is_valid_mfma(DataType::FP16, 32, 16, 16));
+    EXPECT_FALSE(is_valid_warp_tile(DataType::FP32, 16, 32, 8));
+    EXPECT_FALSE(is_valid_warp_tile(DataType::FP16, 32, 16, 16));
 
-    // Integer types not supported in MFMA validation
-    EXPECT_FALSE(is_valid_mfma(DataType::I32, 16, 16, 4));
+    // Integer types not yet in warp tile validation table
+    EXPECT_FALSE(is_valid_warp_tile(DataType::I32, 16, 16, 4));
 }
 
 // ============================================================================
@@ -177,7 +177,7 @@ TEST(MakeSpec, UsesFinalOutputSlotForGemmAddRelu)
 }
 
 // ============================================================================
-// make_spec: 32x32 MFMA tile
+// make_spec: 32x32 warp tile
 // ============================================================================
 
 TEST(MakeSpec, Accepts32x32WarpTileWithCorrectBlockSize)
@@ -362,4 +362,88 @@ TEST(MakeSpec, KBatchWorksWithEpilogueOps)
     EXPECT_EQ(k.k_batch, 2);
     EXPECT_EQ(k.num_epilogue_ops, 1);
     EXPECT_TRUE(k.has_epilogue_op(EpilogueOp::Add));
+}
+
+// ============================================================================
+// is_valid_warp_tile: GpuTarget-specific validation
+// ============================================================================
+
+TEST(WarpTileValidation, AcceptsFP8TilesForGfx942)
+{
+    // gfx942 MFMA: 32x32x16, 16x16x32
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 16, GpuTarget::gfx942));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 16, 16, 32, GpuTarget::gfx942));
+    // gfx950-only tiles rejected on gfx942
+    EXPECT_FALSE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 32, GpuTarget::gfx942));
+    EXPECT_FALSE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 64, GpuTarget::gfx942));
+    EXPECT_FALSE(is_valid_warp_tile(DataType::FP8_FNUZ, 16, 16, 64, GpuTarget::gfx942));
+}
+
+TEST(WarpTileValidation, AcceptsFP8TilesForGfx950)
+{
+    // gfx950 MFMA: 32x32x{16,32,64}, 16x16x{32,64}
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 16, GpuTarget::gfx950));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 32, GpuTarget::gfx950));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 64, GpuTarget::gfx950));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 16, 16, 32, GpuTarget::gfx950));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 16, 16, 64, GpuTarget::gfx950));
+}
+
+TEST(WarpTileValidation, AnyTargetRejectsFP8ArchSpecificTiles)
+{
+    // Any = intersection: only tiles valid on all CDNA targets
+    // 32x32x16 and 16x16x32 are valid on both gfx942 and gfx950
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 16, GpuTarget::Any));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 16, 16, 32, GpuTarget::Any));
+    // gfx950-only tiles rejected under Any
+    EXPECT_FALSE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 32, GpuTarget::Any));
+    EXPECT_FALSE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 64, GpuTarget::Any));
+    EXPECT_FALSE(is_valid_warp_tile(DataType::FP8_FNUZ, 16, 16, 64, GpuTarget::Any));
+}
+
+TEST(WarpTileValidation, DefaultTargetIsAny)
+{
+    // 4-arg overload (no target) behaves like Any
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 16));
+    EXPECT_FALSE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 64));
+}
+
+TEST(WarpTileValidation, Gfx90aAcceptsSameTilesAsCDNABaseline)
+{
+    // gfx90a has same MFMA tile set as the baseline (no FP8)
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP16, 16, 16, 16, GpuTarget::gfx90a));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::FP16, 32, 32, 16, GpuTarget::gfx90a));
+    // gfx90a has no FP8 MFMA support
+    EXPECT_FALSE(is_valid_warp_tile(DataType::FP8_FNUZ, 32, 32, 16, GpuTarget::gfx90a));
+}
+
+TEST(WarpTileValidation, BF8HasSameTilesAsFP8)
+{
+    EXPECT_TRUE(is_valid_warp_tile(DataType::BF8_FNUZ, 32, 32, 16, GpuTarget::gfx942));
+    EXPECT_TRUE(is_valid_warp_tile(DataType::BF8_FNUZ, 32, 32, 32, GpuTarget::gfx950));
+    EXPECT_FALSE(is_valid_warp_tile(DataType::BF8_FNUZ, 32, 32, 32, GpuTarget::gfx942));
+}
+
+// ============================================================================
+// make_spec: GpuTarget parameter
+// ============================================================================
+
+TEST(MakeSpec, AcceptsGpuTargetParameter)
+{
+    constexpr auto k = make_spec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
+        GpuTarget::gfx942);
+
+    EXPECT_EQ(k.workgroup_size, 256);
+}
+
+TEST(MakeSpec, DefaultsToGpuTargetAny)
+{
+    // 2-arg make_spec still works (defaults to GpuTarget::Any)
+    constexpr auto k = make_spec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+
+    EXPECT_EQ(k.workgroup_size, 256);
 }
