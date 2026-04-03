@@ -320,6 +320,7 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
 
 #if CK_TILE_FMHA_FWD_FAST_EXP2
     static constexpr auto R_LOG2E = 1.0 / log2e_v<SaccDataType>;
+    static constexpr auto LOG2E   = log2e_v<SaccDataType>;
 #endif
 
     static constexpr index_t kBlockPerCu = []() {
@@ -525,8 +526,24 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
         auto l     = MLBlockTileType{};
 
         clear_tile(o_acc);
-        set_tile(m, -numeric<SMPLComputeDataType>::infinity());
-        clear_tile(l);
+        if(__builtin_isinf_sign(sink_v) >= 0)
+        {
+#if CK_TILE_FMHA_FWD_FAST_EXP2
+            if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
+                         BiasEnum == BlockAttentionBiasEnum::ALIBI)
+                set_tile(m, sink_v * LOG2E * scale_s);
+            else
+                set_tile(m, sink_v * LOG2E);
+#else
+            set_tile(m, sink_v);
+#endif
+            set_tile(l, SMPLComputeDataType{1.0f});
+        }
+        else
+        {
+            set_tile(m, -numeric<SMPLComputeDataType>::infinity());
+            clear_tile(l);
+        }
 
         __builtin_amdgcn_sched_barrier(0);
         const auto q_origin = q_dram_window.get_window_origin();
@@ -1531,7 +1548,8 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
                const index_t stride_v,
                const index_t page_stride_k,
                const index_t page_stride_v,
-               DropoutType& dropout) const
+               DropoutType& dropout,
+               float sink_v) const
     {
         return operator()(q_dram_block_window_tmp,
                           identity{},
@@ -1559,7 +1577,8 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
                           stride_v,
                           page_stride_k,
                           page_stride_v,
-                          dropout);
+                          dropout,
+                          sink_v);
     }
 
     // Overload for KV_BLOCKSCALE: K/V descale is per-page
