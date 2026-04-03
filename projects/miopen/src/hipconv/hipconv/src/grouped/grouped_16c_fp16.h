@@ -7,7 +7,8 @@
 #include "mathutil.h"
 #include "launch_params.h"
 #include "kernel_variant.h"
-#include "transpose_16x16.h"
+#include "transpose_lds_layout.h"
+#include "memory.h"
 #include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
 
@@ -125,6 +126,7 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     using namespace grouped_16c;
     using OperandLayout = MatrixLayout<16, 16, 1, __half>;
     using ResultLayout  = MatrixLayout<16, 16, 1, float>;
+    using int16x4_t     = __attribute__((ext_vector_type(4))) short;
 
     constexpr int GROUP_SIZE_8 = cfg.group_size / 8;
     constexpr int GROUP_SIZE_4 = cfg.group_size / 4;
@@ -241,18 +243,26 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
                 weight_rsrc, &lds_buf[j], 16, voffset_base + j * sizeof(uint4), 0, 0, 0);
         }
 
-        asm volatile("s_waitcnt vmcnt(0)\n");
+        wait_vmcnt<0>();
         __syncthreads();
 
         if constexpr(cfg.direction == hipconv::Direction::Dgrad)
         {
-            const int row_stride = cfg.kh * cfg.kw * cfg.group_size;
-            const __half* wei_lds =
-                reinterpret_cast<const __half*>(lds_buf) + wave_group * cfg.group_size * row_stride;
+            const int k_stride = cfg.kh * cfg.kw * cfg.group_size;
+            auto* wei_grp_base =
+                reinterpret_cast<__half*>(lds_buf) + wave_group * cfg.group_size * k_stride;
+
+            using TransposeLayout = TransposeLDSLayout<16, 16>;
+            const int k           = TransposeLayout::row(lane);
+            const int c           = TransposeLayout::col(lane);
+
             for(int khw = 0; khw < cfg.kh * cfg.kw; khw++)
             {
-                auto& w = reinterpret_cast<uint2&>(weights_reg[khw]);
-                load_16x16_transposed(wei_lds + khw * cfg.group_size, row_stride, w.x, w.y);
+                auto* addr = reinterpret_cast<int16x4_t*>(wei_grp_base + k * k_stride +
+                                                          khw * cfg.group_size + c);
+
+                int16x4_t r      = __builtin_amdgcn_ds_read_tr16_b64_v4i16(addr);
+                weights_reg[khw] = __builtin_bit_cast(fp16x4_t, r);
             }
         }
         else
@@ -333,7 +343,7 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
         static_for<cfg.kh>(
             [&]<int Y_LOCAL>()
             {
-                asm volatile("s_waitcnt vmcnt(0)\n");
+                wait_vmcnt<0>();
                 __syncthreads();
 
                 int y = y_base + Y_LOCAL;
@@ -420,7 +430,7 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
                     return;
                 int y = y_rem_base + Y_LOCAL;
 
-                asm volatile("s_waitcnt vmcnt(0)\n");
+                wait_vmcnt<0>();
                 __syncthreads();
 
                 if(load_active && (y + 1) < hi)
@@ -627,6 +637,7 @@ inline void launch(int config_idx,
                    const void* in,
                    const void* wei,
                    void* out,
+                   void* /*workspace*/,
                    hipStream_t stream)
 {
     launch_dispatch(
@@ -668,9 +679,10 @@ constexpr KernelVariant make_variant()
         },
         .config_is_compatible = [](const hipconv::Conv2dParams& par, int idx)
         { return is_valid_config(par, configs[idx]); },
-        .get_launch_params = &get_launch_params,
-        .launch            = &launch,
-        .num_configs       = NUM_CONFIGS,
+        .get_launch_params  = &get_launch_params,
+        .launch             = &launch,
+        .get_workspace_size = [](int, const hipconv::Conv2dParams&) -> size_t { return 0; },
+        .num_configs        = NUM_CONFIGS,
     };
 }
 

@@ -20,7 +20,11 @@ void launch(AlgoConfig cfg,
             const void* in,
             const void* wei,
             void* out,
+            void* workspace,
             hipStream_t stream = nullptr);
+
+// Returns workspace size in bytes (0 if no workspace needed).
+size_t get_workspace_size(AlgoConfig cfg, const hipconv::Conv2dParams& par);
 
 // Get the expected numeric accuracy of the kernel.
 void get_tolerance(AlgoConfig cfg, const hipconv::Conv2dParams& par, float& atol, float& rtol);
@@ -28,6 +32,7 @@ void get_tolerance(AlgoConfig cfg, const hipconv::Conv2dParams& par, float& atol
 inline constexpr AlgorithmEntry algo_entry = {hipconv::Algorithm::Grouped,
                                               get_valid_configs,
                                               launch,
+                                              get_workspace_size,
                                               get_tolerance};
 
 } // namespace grouped

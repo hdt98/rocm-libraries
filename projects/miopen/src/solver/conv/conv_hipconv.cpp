@@ -1,10 +1,12 @@
 #include <miopen/conv/solvers.hpp>
 #include <miopen/conv/data_invoke_params.hpp>
+#include <miopen/conv/wrw_invoke_params.hpp>
 #include <miopen/env.hpp>
 #include <miopen/handle.hpp>
 #include <miopen/hipoc_kernel.hpp>
 #include <miopen/stringutils.hpp>
 #include <miopen/solver/problem_description_interpreter.hpp>
+#include <miopen/tensor_ops.hpp>
 
 #include <hipconv/hipconv.hpp>
 
@@ -59,6 +61,10 @@ static hipconv::Conv2dParams ToHipconvParams(const ProblemDescription& problem)
         par.out_type = hipconv::DataType::bf16;
     }
 
+    // The wgrad kernel outputs fp32.
+    if(par.direction == hipconv::Direction::Wgrad)
+        par.out_type = hipconv::DataType::fp32;
+
     if(problem.IsLayoutNHWC())
         par.order = hipconv::TensorOrder::NHWC;
     else
@@ -75,10 +81,11 @@ bool ConvHipConv::IsApplicable(const ExecutionContext& ctx, const ProblemDescrip
         return false;
     if(!problem.Is2d())
         return false;
-    // Wgrad is not yet supported by hipconv.
-    if(problem.IsDirectionBackwardWrW())
-        return false;
     if(!StartsWith(ctx.GetStream().GetDeviceName(), "gfx95"))
+        return false;
+
+    // The wgrad kernel uses atomicAdd and is non-deterministic.
+    if(problem.IsDirectionBackwardWrW() && problem.GetConv().attribute.deterministic)
         return false;
 
     // Initially only fp16 is supported.
@@ -90,7 +97,24 @@ bool ConvHipConv::IsApplicable(const ExecutionContext& ctx, const ProblemDescrip
     return cfg.has_value();
 }
 
-ConvSolution ConvHipConv::GetSolution(const ExecutionContext&,
+size_t ConvHipConv::GetWorkspaceSize(const ExecutionContext&,
+                                     const ProblemDescription& problem) const
+{
+    if(!problem.IsDirectionBackwardWrW())
+        return 0;
+
+    // The wgrad kernel outputs fp32, but MIOpen expects dw in the same type as the weights (fp16).
+    // We need a fp32 workspace to hold the kernel output, then cast to fp16.
+    const auto k            = ProblemInterpreter::GetOutputChannelK(problem);
+    const auto c            = ProblemInterpreter::GetInputChannelC(problem);
+    const auto y            = ProblemInterpreter::GetFilterHeightY(problem);
+    const auto x            = ProblemInterpreter::GetFilterWidthX(problem);
+    const auto group        = ProblemInterpreter::GetGroupCountG(problem);
+    const auto c_per_group  = c / group;
+    return static_cast<size_t>(k) * y * x * c_per_group * sizeof(float);
+}
+
+ConvSolution ConvHipConv::GetSolution(const ExecutionContext& ctx,
                                       const ProblemDescription& problem) const
 {
     ConvSolution result;
@@ -98,17 +122,65 @@ ConvSolution ConvHipConv::GetSolution(const ExecutionContext&,
     const auto par = ToHipconvParams(problem);
     const auto cfg = hipconv::find_config(par).value();
 
-    result.invoker_factory = [=](const std::vector<Kernel>&) {
-        return [=](const Handle& handle, const AnyInvokeParams& primitive_parameters) {
-            decltype(auto) data_ctx = primitive_parameters.CastTo<miopen::conv::DataInvokeParams>();
-            const auto& tensors     = data_ctx.tensors;
+    if(problem.IsDirectionBackwardWrW())
+    {
+        const auto workspace_size = GetWorkspaceSize(ctx, problem);
+        result.workspace_sz       = workspace_size;
 
-            {
-                const HipEventProfiler profiler(handle);
-                hipconv::launch(cfg, par, tensors.in, tensors.w, tensors.out, handle.GetStream());
-            }
+        const auto lowp_quant = problem.GetConv().lowp_quant;
+
+        // Build a TensorDescriptor for the fp32 intermediate buffer (same shape as weights).
+        const TensorDescriptor cast_desc(
+            miopenFloat, problem.GetWeights().GetLengths(), problem.GetWeights().GetStrides());
+
+        result.invoker_factory = [=](const std::vector<Kernel>&) {
+            return [=](const Handle& handle, const AnyInvokeParams& primitive_parameters) {
+                decltype(auto) wrw_ctx =
+                    primitive_parameters.CastTo<miopen::conv::WrWInvokeParams>();
+                const auto& tensors       = wrw_ctx.tensors;
+                const auto& workSpace     = wrw_ctx.workSpace;
+                const auto& workSpaceSize = wrw_ctx.workSpaceSize;
+
+                if(workSpace == nullptr || workSpaceSize < workspace_size)
+                    MIOPEN_THROW("Not enough workspace for ConvHipConv wgrad.");
+
+                {
+                    const HipEventProfiler profiler(handle);
+
+                    // Launch the hipconv wgrad kernel writing fp32 into workspace.
+                    hipconv::launch(
+                        cfg, par, tensors.x, tensors.dy, workSpace, nullptr, handle.GetStream());
+
+                    // Cast fp32 workspace -> fp16 dw.
+                    CastTensor(handle,
+                               &lowp_quant,
+                               false,
+                               cast_desc,
+                               workSpace,
+                               tensors.dwDesc,
+                               tensors.dw,
+                               0,
+                               0);
+                }
+            };
         };
-    };
+    }
+    else
+    {
+        result.invoker_factory = [=](const std::vector<Kernel>&) {
+            return [=](const Handle& handle, const AnyInvokeParams& primitive_parameters) {
+                decltype(auto) data_ctx =
+                    primitive_parameters.CastTo<miopen::conv::DataInvokeParams>();
+                const auto& tensors = data_ctx.tensors;
+
+                {
+                    const HipEventProfiler profiler(handle);
+                    hipconv::launch(
+                        cfg, par, tensors.in, tensors.w, tensors.out, nullptr, handle.GetStream());
+                }
+            };
+        };
+    }
 
     return result;
 }

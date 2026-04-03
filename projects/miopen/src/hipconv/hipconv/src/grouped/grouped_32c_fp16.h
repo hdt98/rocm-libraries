@@ -7,7 +7,8 @@
 #include "mathutil.h"
 #include "launch_params.h"
 #include "kernel_variant.h"
-#include "transpose_16x16.h"
+#include "transpose_lds_layout.h"
+#include "memory.h"
 #include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
 
@@ -116,6 +117,8 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     using OperandLayout = MatrixLayout<16, 32, 1, __half>;
     using ResultLayout  = MatrixLayout<16, 16, 1, float>;
     using fp16x8_t      = __attribute__((ext_vector_type(8))) _Float16;
+    using int16x4_t     = __attribute__((ext_vector_type(4))) short;
+    using int16x8_t     = __attribute__((ext_vector_type(8))) short;
 
     constexpr int GROUP_SIZE_8 = cfg.group_size / 8; // 4
     constexpr int GROUP_SIZE_4 = cfg.group_size / 4; // 8
@@ -233,28 +236,38 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
                 weight_rsrc, &lds_buf[j], 16, voffset_base + j * sizeof(uint4), 0, 0, 0);
         }
 
-        asm volatile("s_waitcnt vmcnt(0)\n");
+        wait_vmcnt<0>();
         __syncthreads();
 
         if constexpr(cfg.direction == hipconv::Direction::Dgrad)
         {
-            // Dgrad: need W^T (32x32 transpose per filter position).
-            // Each lane reads 8 elements via scalar LDS reads.
-            // wave_half selects which 16-channel half this wave handles.
-            const int c      = lane % 16 + wave_half * 16;
-            const int k_base = (lane / 16) * 8; // 8 consecutive output channels
+            // Dgrad: load transposed weights using DS_READ_B64_TR_B16.
+            // Two calls per filter position load a complete 16×32 MFMA B operand.
+            //
+            // LDS layout is [k_all][kh*kw][c] (straight copy from global).
+            // k_stride = kh * kw * group_size (in halves) between output channels.
+            const int k_stride = cfg.kh * cfg.kw * cfg.group_size;
+            auto* wei_grp_base =
+                reinterpret_cast<__half*>(lds_buf) + wave_group * cfg.group_size * k_stride;
 
-            const int row_stride = cfg.kh * cfg.kw * cfg.group_size;
-            const __half* wei_lds =
-                reinterpret_cast<const __half*>(lds_buf) + wave_group * cfg.group_size * row_stride;
+            using TransposeLayout = TransposeLDSLayout<16, 32>;
+            const int k_0         = TransposeLayout::row(lane, 0);
+            const int k_1         = TransposeLayout::row(lane, 1);
+            const int c           = wave_half * 16 + TransposeLayout::col(lane);
 
             for(int khw = 0; khw < cfg.kh * cfg.kw; khw++)
             {
-                for(int j = 0; j < 8; j++)
-                {
-                    weights_reg[khw][j] =
-                        wei_lds[(k_base + j) * row_stride + khw * cfg.group_size + c];
-                }
+                // Address in [k][kh*kw][c] layout: k * k_stride + khw * group_size + c
+                auto* addr0 = reinterpret_cast<int16x4_t*>(wei_grp_base + k_0 * k_stride +
+                                                           khw * cfg.group_size + c);
+                auto* addr1 = reinterpret_cast<int16x4_t*>(wei_grp_base + k_1 * k_stride +
+                                                           khw * cfg.group_size + c);
+
+                int16x4_t r0 = __builtin_amdgcn_ds_read_tr16_b64_v4i16(addr0);
+                int16x4_t r1 = __builtin_amdgcn_ds_read_tr16_b64_v4i16(addr1);
+
+                weights_reg[khw] = __builtin_bit_cast(
+                    fp16x8_t, (int16x8_t){r0[0], r0[1], r0[2], r0[3], r1[0], r1[1], r1[2], r1[3]});
             }
         }
         else
@@ -343,7 +356,7 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
         static_for<cfg.kh>(
             [&]<int Y_LOCAL>()
             {
-                asm volatile("s_waitcnt vmcnt(0)\n");
+                wait_vmcnt<0>();
                 __syncthreads();
 
                 int y = y_base + Y_LOCAL;
@@ -425,7 +438,7 @@ __device__ void conv2d_grouped_32c_fp16_cdna4_nhwc_impl(const _Float16* __restri
                     return;
                 int y = y_rem_base + Y_LOCAL;
 
-                asm volatile("s_waitcnt vmcnt(0)\n");
+                wait_vmcnt<0>();
                 __syncthreads();
 
                 if((y + 1) < hi)
@@ -627,6 +640,7 @@ inline void launch(int config_idx,
                    const void* in,
                    const void* wei,
                    void* out,
+                   void* /*workspace*/,
                    hipStream_t stream)
 {
     launch_dispatch(
@@ -668,9 +682,10 @@ constexpr KernelVariant make_variant()
         },
         .config_is_compatible = [](const hipconv::Conv2dParams& par, int idx)
         { return is_valid_config(par, configs[idx]); },
-        .get_launch_params = &get_launch_params,
-        .launch            = &launch,
-        .num_configs       = NUM_CONFIGS,
+        .get_launch_params  = &get_launch_params,
+        .launch             = &launch,
+        .get_workspace_size = [](int, const hipconv::Conv2dParams&) -> size_t { return 0; },
+        .num_configs        = NUM_CONFIGS,
     };
 }
 

@@ -38,11 +38,14 @@ HIPCONV_API std::vector<KernelConfig> get_valid_configs(const Conv2dParams& par,
 // Best config, or nullopt if unsupported.
 HIPCONV_API std::optional<KernelConfig> find_config(const Conv2dParams& par);
 
+HIPCONV_API size_t get_workspace_size(KernelConfig cfg, const Conv2dParams& par);
+
 HIPCONV_API void launch(KernelConfig cfg,
                         const Conv2dParams& par,
                         const void* in,
                         const void* wei,
                         void* out,
+                        void* workspace    = nullptr,
                         hipStream_t stream = nullptr);
 
 HIPCONV_API void get_tolerance(KernelConfig cfg, const Conv2dParams& par, float& atol, float& rtol);
