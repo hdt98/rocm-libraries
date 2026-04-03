@@ -250,7 +250,7 @@ if(thin_objs)
     endif()
     message(STATUS "Created ${OUTPUT} with ${count} objects")
 else()
-    message(FATAL_ERROR "No objects found for ${ARCH} in ${FAT_ARCHIVE}, creating empty archive")
+    message(WARNING "${ARCH} is included in MIOpen's GPU_TARGETS, but no device code objects were found for ${ARCH} in ${FAT_ARCHIVE}. Did you build CK to include ${ARCH}? Creating empty archive")
     # Create an empty archive so the build does not fail with a missing output.
     execute_process(
         COMMAND ${AR} rcs "${OUTPUT}"
