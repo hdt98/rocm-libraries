@@ -174,7 +174,7 @@ private:
         GetAllKernelTypeStringsFn get_all_kernel_types  = nullptr;
     };
 
-    SolverFns solver_fns_[ToSlotIndex(CKSolverType::Count)];
+    SolverFns solver_fns_[static_cast<int>(CKSolverType::Count)];
 
     // Helper: extract kernel list from handle
     std::vector<std::string> ExtractKernelList(::CKKernelListHandle* handle) const;
