@@ -1,618 +1,287 @@
-# Host-Level Pipeline: Orchestrating Block-Level GEMM
+# Host-Level Pipeline: GridGemm
 
-This document explains the **host-level pipeline** (`PracticeGemmHostPipeline`), which orchestrates the distribution of work across thread blocks and manages the high-level flow of the GEMM computation.
+This document explains `GridGemm` (in `host_level/grid_gemm.hpp`), which orchestrates the
+distribution of work across thread blocks and manages the high-level flow of the GEMM computation.
 
 ## Overview
 
-The host-level pipeline is responsible for:
-1. **Calculating tile coverage**: How many tiles are needed to cover matrices A, B, and C
-2. **Block-to-tile mapping**: Assigning each thread block to a specific tile
-3. **Creating tile windows**: Establishing sliding windows over tensor views
-4. **Delegating computation**: Calling the block-level pipeline to perform actual GEMM
-5. **Storing results**: Writing computed tiles from registers (VGPRs) back to DRAM
+`GridGemm` runs on the GPU (one instance per thread block). It is responsible for:
+1. **Extracting problem dimensions** from tensor descriptors at runtime
+2. **Block-to-tile mapping**: Converting a linear block ID to a 2D tile coordinate `(iM, iN)`
+3. **Creating tile windows**: Establishing initial windows over A and B in DRAM
+4. **Delegating computation**: Calling the block-level pipeline
+5. **Epilogue + store**: Casting accumulator, applying `CElementFunction`, writing C to DRAM
 
 ```cpp
-template <typename Problem_, typename Policy_ = PracticeGemmHostPolicy>
-struct PracticeGemmHostPipeline
+template <typename Problem, typename Policy>
+struct GridGemm
 {
-    template <typename ADRAMTensorView, typename BDRAMTensorView, typename CDRAMTensorView>
-    CK_TILE_DEVICE void operator()(const ADRAMTensorView& a_dram,
-                                   const BDRAMTensorView& b_dram,
-                                   CDRAMTensorView& c_dram) const
-    {
-        // 1. Calculate problem dimensions and tile coverage
-        // 2. Map thread block to tile coordinates
-        // 3. Create tile windows over A and B
-        // 4. Call block-level pipeline to compute
-        // 5. Store result to C
-    }
+    template <typename AGridTensorView, typename BGridTensorView, typename CGridTensorView>
+    CK_TILE_DEVICE void operator()(const AGridTensorView& a_grid,
+                                   const BGridTensorView& b_grid,
+                                   CGridTensorView& c_grid,
+                                   const CElementFunction& c_element_func) const
+    { ... }
 };
 ```
 
 ---
 
-## Step 1: Calculate Problem Dimensions and Tile Coverage
+## Step 1: Extract Problem Dimensions
 
 ```cpp
-// Size of the entire problem
-const auto M = a_dram.get_tensor_descriptor().get_length(number<0>{}); // M x K
-const auto N = c_dram.get_tensor_descriptor().get_length(number<1>{}); // M x N
-const auto K = a_dram.get_tensor_descriptor().get_length(number<1>{}); // M x K
-
-// Size of the block tile
-const auto MPerBlock = BlockTile::at(number<0>{});  // 256
-const auto NPerBlock = BlockTile::at(number<1>{});  // 128
-const auto KPerBlock = BlockTile::at(number<2>{});  // 32
-
-// Number of block tiles needed to cover C matrix
-const auto num_tile_n = integer_divide_ceil(N, NPerBlock);  // ceil(256/128) = 2
-const auto num_tile_m = integer_divide_ceil(M, MPerBlock);  // ceil(512/256) = 2
+// Extract M, N, K from the tensor descriptors at runtime.
+// These are runtime values (M, N, K were passed as kernel arguments and baked into the descriptors).
+const auto M = a_grid.get_tensor_descriptor().get_length(number<0>{});  // rows of A
+const auto N = c_grid.get_tensor_descriptor().get_length(number<1>{});  // cols of C
+const auto K = a_grid.get_tensor_descriptor().get_length(number<1>{});  // cols of A
 ```
 
-### What's Happening:
-
-1. **Extract problem dimensions** from tensor descriptors:
-   - `M = 512`: Rows in A and C
-   - `N = 256`: Columns in B and C
-   - `K = 64`: Inner dimension (columns of A, rows of B)
-
-2. **Get block tile sizes** from the `BlockTile` configuration:
-   - `MPerBlock = 256`: Each block processes 256 rows
-   - `NPerBlock = 128`: Each block processes 128 columns
-   - `KPerBlock = 32`: Each block processes 32 elements in K dimension per iteration
-
-3. **Calculate tile coverage**:
-   - `num_tile_m = ceil(M / MPerBlock) = ceil(512/256) = 2` tiles in M direction
-   - `num_tile_n = ceil(N / NPerBlock) = ceil(256/128) = 2` tiles in N direction
-   - **Total tiles = 2 × 2 = 4 tiles** → We need **4 thread blocks**!
-
-### Visual Representation:
-
-```
-Matrix C (512 × 256):
-┌──────────────────────┬──────────────────────┐
-│   Tile (0,0)         │   Tile (0,1)         │  ← num_tile_n = 2
-│   256×128            │   256×128            │
-│   Block 0            │   Block 1            │
-│                      │                      │
-├──────────────────────┼──────────────────────┤
-│   Tile (1,0)         │   Tile (1,1)         │
-│   256×128            │   256×128            │
-│   Block 2            │   Block 3            │
-│                      │                      │
-└──────────────────────┴──────────────────────┘
-         ↑
-    num_tile_m = 2
-
-Total blocks needed = 2 × 2 = 4 blocks
-
-Each block computes one 256×128 tile of the output matrix C.
-```
-
-### How Blocks Cover Matrices A and B:
-
-```
-Matrix A (512 × 64):                Matrix B (256 × 64):
-┌─────────────┬──────┐             ┌─────────────┬──────┐
-│ Block 0,2   │  K   │             │ Block 0,1   │  K   │
-│ uses rows   │  →   │             │ uses rows   │  →   │
-│ 0-255       │      │             │ 0-127       │      │
-├─────────────┼──────┤             ├─────────────┼──────┤
-│ Block 1,3   │  K   │             │ Block 2,3   │  K   │
-│ uses rows   │  →   │             │ uses rows   │  →   │
-│ 256-511     │      │             │ 128-255     │      │
-└─────────────┴──────┘             └─────────────┴──────┘
-   256 rows    64 cols                128 rows    64 cols
-   
-Each block needs to iterate over K dimension (64/32 = 2 iterations)
-```
+The tensor descriptors created in `Gemm::operator()` (the kernel entry point) carry the
+runtime values M, N, K. Extracting them here via `get_length()` avoids passing them as
+additional function arguments through the hierarchy.
 
 ---
 
 ## Step 2: Map Thread Block to Tile Coordinates
 
 ```cpp
-// Get block id (0 to total_blocks - 1)
+// get_block_id(): AMD GPU intrinsic equivalent to blockIdx.x in CUDA.
+// The grid is 1D (kGridSize blocks total), so block IDs run from 0 to kGridSize-1.
 const auto id_block = get_block_id();
 
-// Map block id to 2D tile coordinates
-const auto block2tile = Policy::MakeBlock2TileMap(num_tile_m, num_tile_n);
-const auto tile_id = block2tile(id_block);
+// Number of tiles needed to cover M and N.
+// integer_divide_ceil(x, y) = (x + y - 1) / y — handles non-divisible sizes.
+const auto num_tile_m = integer_divide_ceil(M, kMPerBlock);
+const auto num_tile_n = integer_divide_ceil(N, kNPerBlock);
 
-const auto tile_id_m = tile_id.at(number<0>{});  // M coordinate
-const auto tile_id_n = tile_id.at(number<1>{});  // N coordinate
+// MakeBlock2TileMap returns a lambda: block_id → (m_tile_idx, n_tile_idx).
+const auto block2tile = Policy::template MakeBlock2TileMap<Problem>(num_tile_m, num_tile_n);
+const auto id_tile    = block2tile(id_block);
 ```
 
-### What's Happening:
+### N-First Tile Ordering
 
-Each thread block needs to know **which tile of the output matrix C it should compute**. The `MakeBlock2TileMap` function creates a mapping from linear block ID to 2D tile coordinates.
-
-### The `MakeBlock2TileMap` Function:
-
-```cpp
-CK_TILE_HOST_DEVICE static constexpr auto MakeBlock2TileMap(index_t M0, index_t N0)
-{
-    // Create a merge transform: (N0, M0) → linear index
-    const auto unmerge = make_merge_transform(make_tuple(N0, M0));
-
-    return [unmerge](index_t block_id) {
-        multi_index<2> unmerged;
-        // Convert linear block_id back to 2D coordinates
-        unmerge.calculate_lower_index(unmerged, make_multi_index(block_id));
-
-        // Return (m_idx, n_idx) - note the swap!
-        return make_multi_index(unmerged.at(number<1>{}), unmerged.at(number<0>{}));
-    };
-}
+`MakeBlock2TileMap` uses N as the fast (inner) dimension:
+```
+block_id 0 → (m=0, n=0)
+block_id 1 → (m=0, n=1)
+block_id 2 → (m=0, n=2)
+...
+block_id num_tile_n     → (m=1, n=0)
+block_id num_tile_n + 1 → (m=1, n=1)
+...
 ```
 
-### In Our Example (2×2 Grid):
+Consecutive block IDs map to adjacent N tiles **within the same M row**. This is N-first
+(row-major in tile space) ordering.
 
-```cpp
-// Block 0:
-id_block = 0
-tile_id = block2tile(0) = (0, 0)  // Top-left tile
-tile_id_m = 0, tile_id_n = 0
+**Why N-first?** Adjacent blocks in the same M row all read the **same A rows** but
+different B rows. Since A data (same M strip) stays in L2 cache while N tiles are processed,
+N-first ordering maximizes L2 reuse for A. B is read once per block and not reused.
 
-// Block 1:
-id_block = 1
-tile_id = block2tile(1) = (1, 0)  // Bottom-left tile
-tile_id_m = 1, tile_id_n = 0
-
-// Block 2:
-id_block = 2
-tile_id = block2tile(2) = (0, 1)  // Top-right tile
-tile_id_m = 0, tile_id_n = 1
-
-// Block 3:
-id_block = 3
-tile_id = block2tile(3) = (1, 1)  // Bottom-right tile
-tile_id_m = 1, tile_id_n = 1
-```
-
-**Key Point**: Each of the 4 blocks knows exactly which 256×128 tile of C it's responsible for computing!
+**Example for default problem (M=3328, N=4096, kMPerBlock=256, kNPerBlock=128):**
+- `num_tile_m = ceil(3328/256) = 13`
+- `num_tile_n = ceil(4096/128) = 32`
+- Blocks 0–31 all cover M rows 0–255 (same A strip), N cols 0–4095 (all of N)
+- Block 32 begins the next M strip (rows 256–511)
 
 ---
 
-## Step 3: Calculate Tile Origin and Create Tile Windows
+## Step 3: Promote Tile Origin to SGPRs
 
 ```cpp
-// Calculate the starting position of this tile in the global matrix
-const auto tile_origin_m = tile_id_m * MPerBlock;  // e.g., Block 1: 1 * 256 = 256
-const auto tile_origin_n = tile_id_n * NPerBlock;  // e.g., Block 2: 1 * 128 = 128
-
-// Create tile windows over A and B tensor views
-const auto a_block_window = make_tile_window(
-    a_dram,                                      // Tensor view over A
-    make_tuple(number<MPerBlock>{}, number<KPerBlock>{}),  // Window size: 256×32
-    {tile_origin_m, 0}                          // Origin: varies by block
-);
-
-const auto b_block_window = make_tile_window(
-    b_dram,                                      // Tensor view over B
-    make_tuple(number<NPerBlock>{}, number<KPerBlock>{}),  // Window size: 128×32
-    {tile_origin_n, 0}                          // Origin: varies by block
-);
+// __builtin_amdgcn_readfirstlane: broadcasts a VGPR value from lane 0 to all lanes,
+// making the compiler treat iM/iN as SGPRs rather than VGPRs.
+//
+// Why? The tile origin (iM, iN) is the same for every thread in the block — it's a
+// uniform, block-level value. Keeping it in VGPRs wastes 64 VGPR slots (one per lane).
+// Promoting to SGPR reduces VGPR pressure significantly and allows scalar address
+// arithmetic for window origins.
+const auto iM = __builtin_amdgcn_readfirstlane(id_tile.template at<0>() * kMPerBlock);
+const auto iN = __builtin_amdgcn_readfirstlane(id_tile.template at<1>() * kNPerBlock);
 ```
 
-### Tile Origins for Each Block:
-
-```cpp
-// Block 0 (Tile 0,0):
-tile_origin_m = 0 * 256 = 0
-tile_origin_n = 0 * 128 = 0
-a_block_window origin: (0, 0)    → covers A rows 0-255
-b_block_window origin: (0, 0)    → covers B rows 0-127
-
-// Block 1 (Tile 1,0):
-tile_origin_m = 1 * 256 = 256
-tile_origin_n = 0 * 128 = 0
-a_block_window origin: (256, 0)  → covers A rows 256-511
-b_block_window origin: (0, 0)    → covers B rows 0-127
-
-// Block 2 (Tile 0,1):
-tile_origin_m = 0 * 256 = 0
-tile_origin_n = 1 * 128 = 128
-a_block_window origin: (0, 0)    → covers A rows 0-255
-b_block_window origin: (128, 0)  → covers B rows 128-255
-
-// Block 3 (Tile 1,1):
-tile_origin_m = 1 * 256 = 256
-tile_origin_n = 1 * 128 = 128
-a_block_window origin: (256, 0)  → covers A rows 256-511
-b_block_window origin: (128, 0)  → covers B rows 128-255
-```
-
-### What are Tile Windows?
-
-A **tile window** is a **sliding window** over a larger tensor view. It:
-- Defines a **rectangular region** within the tensor
-- Has a **fixed size** (e.g., 256×32 for A)
-- Has an **origin** (starting position)
-- Can be **moved** to access different regions
-### Visual Representation (Block 0 Example):
-
-```
-Matrix A (512 × 64):                    Matrix B (256 × 64):
-┌─────────────┬─────────────┐          ┌─────────────┬─────────────┐
-│ ┏━━━━━━━━━┓ │             │          │ ┏━━━━━━━━━┓ │             │
-│ ┃ Window  ┃ │             │          │ ┃ Window  ┃ │             │
-│ ┃ 256×32  ┃ │             │          │ ┃ 128×32  ┃ │             │
-│ ┃ K=0-31  ┃ │             │          │ ┃ K=0-31  ┃ │             │
-│ ┗━━━━━━━━━┛ │             │          │ ┗━━━━━━━━━┛ │             │
-│             │             │          ├─────────────┼─────────────┤
-├─────────────┼─────────────┤          │             │             │
-│             │             │          │             │             │
-│             │             │          │             │             │
-│             │             │          │             │             │
-└─────────────┴─────────────┘          └─────────────┴─────────────┘
-  Origin: (0, 0)                         Origin: (0, 0)
-  Covers rows 0-255                      Covers rows 0-127
-  Covers cols 0-31 (first K iteration)   Covers cols 0-31 (first K iteration)
-```
-
-**Note**: The window initially covers K columns 0-31. It will move to cover K columns 32-63 in the next iteration.
-
-### Tile Window Properties:
-
-```cpp
-// Tile window structure (conceptual):
-struct tile_window {
-    TensorView& tensor_view;     // Reference to underlying tensor
-    Tuple window_lengths;         // Size of the window (256, 32)
-    MultiIndex window_origin;     // Starting position (0, 0)
-    
-    // Can move the window:
-    void move(MultiIndex step);   // Shift window by step
-    
-    // Access data through the window:
-    auto load();                  // Load data from windowed region
-};
-```
-
-
-### Tile Window Movement: Iterating Over K Dimension
-
-In our example, **K=64** but **KPerBlock=32**, so we need **2 iterations** over the K dimension:
-
-```
-Matrix A (512 × 64) - Block 0's view:
-┌─────────────┬─────────────┐
-│ ┏━━━━━━━━━┓ │ ╔═══════════╗ │
-│ ┃ Iter 0  ┃ │ ║  Iter 1   ║ │  ← Window slides along K
-│ ┃ 256×32  ┃ │ ║  256×32   ║ │
-│ ┃ K=0-31  ┃ │ ║  K=32-63  ║ │
-│ ┗━━━━━━━━━┛ │ ╚═══════════╝ │
-├─────────────┼─────────────┤
-│             │             │
-│  Block 1's  │             │
-│  region     │             │
-└─────────────┴─────────────┘
-
-Matrix B (256 × 64) - Block 0's view:
-┌─────────────┬─────────────┐
-│ ┏━━━━━━━━━┓ │ ╔═══════════╗ │
-│ ┃ Iter 0  ┃ │ ║  Iter 1   ║ │
-│ ┃ 128×32  ┃ │ ║  128×32   ║ │
-│ ┃ K=0-31  ┃ │ ║  K=32-63  ║ │
-│ ┗━━━━━━━━━┛ │ ╚═══════════╝ │
-├─────────────┼─────────────┤
-│  Block 2's  │             │
-│  region     │             │
-└─────────────┴─────────────┘
-```
-
-### How Windows Move (Conceptual - handled by block pipeline):
-
-```cpp
-// Iteration 0:
-a_block_window origin: (tile_origin_m, 0)     // K columns 0-31
-b_block_window origin: (tile_origin_n, 0)     // K columns 0-31
-// Compute: C_partial_0 = A[:, 0:31] × B[:, 0:31]
-
-// Move windows to next K position:
-move_tile_window(a_block_window, {0, 32});
-move_tile_window(b_block_window, {0, 32});
-
-// Iteration 1:
-a_block_window origin: (tile_origin_m, 32)    // K columns 32-63
-b_block_window origin: (tile_origin_n, 32)    // K columns 32-63
-// Compute: C_partial_1 = A[:, 32:63] × B[:, 32:63]
-
-// Final result:
-// C_tile = C_partial_0 + C_partial_1
-```
-
-**Key Insight**: The tile windows **slide along the K dimension** to cover the full inner product. Each block accumulates partial results across K iterations to compute its final tile of C.
+This is an AMD GCN/CDNA-specific optimization: `readfirstlane` reads the value from lane 0
+and broadcasts it to all 64 lanes as a scalar register. Since `id_tile` is the same for all
+threads in a block (derived only from `get_block_id()`), this is always safe.
 
 ---
 
-## Step 4: Delegate to Block-Level Pipeline
+## Step 4: Create Block Windows over A and B
 
 ```cpp
-// Get the block-level pipeline from policy
-constexpr auto block_gemm_pipeline =
-    Policy::template GetPracticeGemmBlockPipeline<Problem>();
+// A block window: covers rows [iM, iM+kMPerBlock) and K cols [0, kKPerBlock) initially.
+// The block pipeline will slide this window along K in each loop iteration.
+auto a_block_window = make_tile_window(
+    a_grid,
+    make_tuple(number<kMPerBlock>{}, number<kKPerBlock>{}),
+    {iM, 0});   // origin: row iM, K column 0
 
-// Calculate number of K iterations needed
-int num_loops_k = integer_divide_ceil(K, KPerBlock);  // ceil(64/32) = 2
-
-// Allocate shared memory (LDS) for block-level computation
-__shared__ char p_smem_char[block_gemm_pipeline.GetStaticLDSSize()];
-
-// Call block-level pipeline to compute C tile
-const auto c_block_tile =
-    block_gemm_pipeline(a_block_window, b_block_window, num_loops_k, p_smem_char);
+// B block window: covers rows [iN, iN+kNPerBlock) and K cols [0, kKPerBlock).
+// B is stored as [N, K] (N as leading dimension, K contiguous), so this window
+// selects the N-strip [iN, iN+kNPerBlock) and the first K slice.
+auto b_block_window = make_tile_window(
+    b_grid,
+    make_tuple(number<kNPerBlock>{}, number<kKPerBlock>{}),
+    {iN, 0});   // origin: N-row iN, K column 0
 ```
 
-### What's Happening:
+Both windows start at K column 0. The block pipeline's inner loop advances the K origin
+by `kKPerBlock` each iteration using `move_tile_window`.
 
-1. **Retrieve block pipeline**: The policy provides the block-level GEMM implementation
-2. **Calculate K iterations**: How many times to iterate over the K dimension
-   - In our example: `K=64, KPerBlock=32` → **2 iterations**
-   - Each iteration processes 32 elements of the K dimension
-   - Results are accumulated across iterations
-
-3. **Allocate shared memory**: 
-   - `__shared__` declares memory shared by all threads in the block
-   - `GetStaticLDSSize()` returns the required size in bytes
-   - This memory is used for:
-     - Staging data from DRAM → LDS
-     - Cooperative loading by threads
-     - Fast access during computation
-
-4. **Execute block pipeline**:
-   - Takes A and B tile windows as input
-   - Performs the GEMM computation: `C_tile = A_tile × B_tile`
-   - Returns result in `c_block_tile` (stored in VGPRs - registers)
-
-### Memory Hierarchy During Computation:
-
+**Tile windows for the default problem (block 0, tile (0,0)):**
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ DRAM (Global Memory) - Slowest, Largest                     │
-│ ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│ │   A matrix  │  │   B matrix  │  │   C matrix  │         │
-│ └─────────────┘  └─────────────┘  └─────────────┘         │
-└─────────────────────────────────────────────────────────────┘
-         ↓ load                ↓ load              ↑ store
-┌─────────────────────────────────────────────────────────────┐
-│ LDS (Shared Memory) - Fast, Limited Size (~64KB)           │
-│ ┌─────────────┐  ┌─────────────┐                           │
-│ │  A_tile     │  │  B_tile     │  ← Staged here            │
-│ │  (p_smem)   │  │  (p_smem)   │                           │
-│ └─────────────┘  └─────────────┘                           │
-└─────────────────────────────────────────────────────────────┘
-         ↓ load                ↓ load
-┌─────────────────────────────────────────────────────────────┐
-│ VGPRs (Registers) - Fastest, Smallest (~256 regs/thread)   │
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │  c_block_tile (accumulated result)                      │ │
-│ │  Computation happens here using MFMA instructions       │ │
-│ └─────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+Matrix A (3328 × 4096):            Matrix B (4096 × 4096, stored [N,K]):
+┌─────────────────────────────┐    ┌──────────────────────────────┐
+│ ┏━━━━━━━━━━━━━━━┓            │    │ ┏━━━━━━━━━━━━━┓              │
+│ ┃ a_block_window┃            │    │ ┃b_block_window┃             │
+│ ┃ 256×32        ┃ → slides → │    │ ┃ 128×32       ┃ → slides →  │
+│ ┃ K=0:31        ┃            │    │ ┃ K=0:31       ┃             │
+│ ┗━━━━━━━━━━━━━━━┛            │    │ ┗━━━━━━━━━━━━━┛              │
+│   (rows 0–255)               │    │  (N-rows 0–127)              │
+└─────────────────────────────┘    └──────────────────────────────┘
 ```
-
-### Block Pipeline Responsibilities:
-
-The block pipeline (called here) will:
-1. Load A and B tiles from DRAM → LDS (cooperative loading)
-2. Distribute work among warps
-3. Each warp loads its portion from LDS → VGPRs
-4. Perform MFMA operations: `C += A × B`
-5. Accumulate results in VGPRs
-6. Return final `c_block_tile` in registers
 
 ---
 
-## Step 5: Store Results to DRAM
+## Step 5: Allocate LDS and Call Block Pipeline
 
 ```cpp
-// Create a tile window over C for writing results
+// GetStaticLdsSize(): compile-time constant — the compiler allocates exactly this many
+// bytes as __shared__ memory for the block. No runtime allocation, no memory management.
+// The LDS size = A_tile (16KB, rounded to 16B) + B_tile (8KB) = 24KB for default params.
+constexpr auto block_gemm_pipeline = Policy::template GetBlockGemmPipeline<Problem>();
+__shared__ char p_smem_char[block_gemm_pipeline.GetStaticLdsSize()];
+
+// Run the block pipeline: iterates K/kKPerBlock times, loading A and B from DRAM
+// into LDS each iteration, computing MFMA, and accumulating into acc_block_tile.
+// acc_block_tile is in AccDataType (float) precision, held in VGPRs.
+const auto acc_block_tile =
+    block_gemm_pipeline(a_block_window, b_block_window, K / kKPerBlock, p_smem_char);
+```
+
+`block_gemm_pipeline` is a compile-time constant — it's just a type tag, not a runtime
+object. The actual pipeline is `BlockGemmPipelineAGmemBGmemCReg`, the non-prefetch pipeline.
+
+`K / kKPerBlock` assumes K is divisible by `kKPerBlock` (a precondition of this tutorial kernel).
+For production kernels handling arbitrary K, `integer_divide_ceil` would be used with boundary
+handling.
+
+---
+
+## Step 6: Epilogue + Store C to DRAM
+
+```cpp
+// Cast accumulator tile from AccDataType (float) to CDataType (half_t), apply epilogue.
+// tile_elementwise_in applies the lambda element-wise over the distributed tile,
+// producing a new tile of the output type.
+// type_convert<CDataType>(acc): FP32 → FP16 conversion (round-to-nearest-even).
+// c_element_func(x): apply CElementFunction (identity in this tutorial).
+const auto c_block_tile = tile_elementwise_in(
+    [&](const auto& acc) { return c_element_func(type_convert<CDataType>(acc)); },
+    acc_block_tile);
+
+// Create the C tile window at this block's output position.
+// store_tile uses the C tile's distribution to scatter per-thread register data
+// back to the correct global memory addresses using vectorized stores.
 auto c_window = make_tile_window(
-    c_dram,                                      // Tensor view over C
-    make_tuple(number<MPerBlock>{}, number<NPerBlock>{}),  // Window size: 256×128
-    {tile_origin_m, tile_origin_n}              // Origin: varies by block
-);
+    c_grid,
+    make_tuple(number<kMPerBlock>{}, number<kNPerBlock>{}),
+    {iM, iN});  // origin: block's assigned output tile
 
-// Store computed tile from VGPRs to DRAM
 store_tile(c_window, c_block_tile);
 ```
 
-### C Window Origins for Each Block:
+### What `store_tile` does
 
-```cpp
-// Block 0: Writes to top-left tile
-c_window origin: (0, 0)      → writes to C[0:255, 0:127]
+`store_tile` is the inverse of `load_tile`: it reads each thread's register slice from
+`c_block_tile`, computes the corresponding DRAM address using the C tile's distribution,
+and issues vectorized stores (`global_store_dwordx4`). Adjacent threads in a warp write to
+adjacent memory locations — coalesced stores with zero wasted bandwidth.
 
-// Block 1: Writes to bottom-left tile
-c_window origin: (256, 0)    → writes to C[256:511, 0:127]
-
-// Block 2: Writes to top-right tile
-c_window origin: (0, 128)    → writes to C[0:255, 128:255]
-
-// Block 3: Writes to bottom-right tile
-c_window origin: (256, 128)  → writes to C[256:511, 128:255]
-```
-
-### What's Happening:
-
-1. **Create C tile window**: 
-   - Size: 256×128 (matches our block tile size)
-   - Origin: Varies by block - each block writes to its assigned region
-   - This window defines **where** to write the results
-
-2. **Store tile to DRAM**:
-   - `c_block_tile`: Computed results in VGPRs (registers)
-   - `c_window`: Destination window in DRAM
-   - `store_tile()`: Efficiently writes data from registers → DRAM
-
-### The `store_tile` Function:
-
-Recall from our earlier discussion, `store_tile` does:
-
-```cpp
-template <typename TileWindow, typename DistributedTensor>
-void store_tile(TileWindow& tile_window_tmp,
-                const DistributedTensor& dstr_tensor)
-{
-    // 1. Extract tile distribution from distributed tensor
-    using TileDstr = typename DistributedTensor::TileDistribution;
-    
-    // 2. Upgrade simple tile window to one with distribution
-    auto tile_window = make_tile_window(
-        tile_window_tmp.get_bottom_tensor_view(),
-        tile_window_tmp.get_window_lengths(),
-        tile_window_tmp.get_window_origin(),
-        TileDstr{}  // Add distribution info
-    );
-    
-    // 3. Store using vectorized writes
-    tile_window.store(dstr_tensor);
-}
-```
-
-### Memory Flow:
-
-```
-VGPRs (Registers)                    DRAM (Global Memory)
-┌─────────────────────┐              ┌─────────────────────┐
-│  c_block_tile       │              │  C matrix           │
-│  ┌───┬───┬───┬───┐  │              │  ┌───────────────┐  │
-│  │W0 │W1 │W2 │W3 │  │  store_tile  │  │               │  │
-│  ├───┼───┼───┼───┤  │  ==========> │  │  c_window     │  │
-│  │...│...│...│...│  │  vectorized  │  │  (256×128)    │  │
-│  └───┴───┴───┴───┘  │              │  │               │  │
-│  Distributed across  │              │  └───────────────┘  │
-│  threads/warps       │              │  Origin: (0, 0)     │
-└─────────────────────┘              └─────────────────────┘
-
-Each thread writes its portion using vector stores (e.g., float4)
-```
-
-### Store Optimization:
-
-The `store_tile` function:
-- Uses **vectorized stores** (write multiple elements at once)
-- Ensures **coalesced memory access** (adjacent threads write adjacent memory)
-- Respects **tile distribution** (each thread knows what data it owns)
-- Handles **out-of-bounds** checking (for partial tiles at boundaries)
+The C tile window has **no explicit distribution** when created here; `store_tile` extracts
+it from `c_block_tile`'s tile distribution internally.
 
 ---
 
-## Complete Flow Visualization
-
-Let's trace the complete flow for **Block 0** (other blocks follow the same pattern):
+## Complete Flow for Block 0 (default sizes)
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ Step 1: Calculate Tile Coverage                                │
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ M=512, N=256, K=64                                          │ │
-│ │ MPerBlock=256, NPerBlock=128, KPerBlock=32                  │ │
-│ │ num_tile_m = ceil(512/256) = 2                              │ │
-│ │ num_tile_n = ceil(256/128) = 2                              │ │
-│ │ Total blocks needed = 2 × 2 = 4 blocks                     │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│ Step 2: Map Block to Tile (Block 0 example)                   │
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ Block ID: 0                                                 │ │
-│ │ Tile coordinates: (0, 0) - top-left tile                   │ │
-│ │ Tile origin: (0, 0)                                         │ │
-│ │                                                             │ │
-│ │ (Blocks 1,2,3 get different tile coordinates)              │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│ Step 3: Create Tile Windows                                    │
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ a_block_window: 256×32 starting at (0,0) over A            │ │
-│ │ b_block_window: 128×32 starting at (0,0) over B            │ │
-│ │ Windows initially cover K columns 0-31                      │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│ Step 4: Execute Block Pipeline (2 K iterations)                │
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ Allocate shared memory (LDS)                                │ │
-│ │ Call block_gemm_pipeline(a_window, b_window, 2, p_smem)    │ │
-│ │                                                             │ │
-│ │ K Iteration 0 (K=0-31):                                     │ │
-│ │   ├─ Load A tile: DRAM → LDS → VGPRs                       │ │
-│ │   ├─ Load B tile: DRAM → LDS → VGPRs                       │ │
-│ │   ├─ Compute: C_partial_0 = A[:, 0:31] × B[:, 0:31]        │ │
-│ │   └─ Move windows: {0, 32}                                  │ │
-│ │                                                             │ │
-│ │ K Iteration 1 (K=32-63):                                    │ │
-│ │   ├─ Load A tile: DRAM → LDS → VGPRs                       │ │
-│ │   ├─ Load B tile: DRAM → LDS → VGPRs                       │ │
-│ │   ├─ Compute: C_partial_1 = A[:, 32:63] × B[:, 32:63]      │ │
-│ │   └─ Accumulate: C_tile = C_partial_0 + C_partial_1        │ │
-│ │                                                             │ │
-│ │ Return c_block_tile in VGPRs (256×128 accumulated result)  │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────────┐
-│ Step 5: Store Results                                          │
-│ ┌─────────────────────────────────────────────────────────────┐ │
-│ │ Create c_window: 256×128 starting at (0,0) over C          │ │
-│ │ store_tile(c_window, c_block_tile)                          │ │
-│ │   └─ Write from VGPRs → DRAM (vectorized stores)            │ │
-│ │                                                             │ │
-│ │ Block 0 writes to C[0:255, 0:127]                          │ │
-│ │ (Other blocks write to their respective regions)           │ │
-│ └─────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-
-All 4 blocks execute in parallel, each computing its assigned 256×128 tile!
+1. id_block = 0
+2. num_tile_m = 13, num_tile_n = 32
+3. id_tile = block2tile(0) = (m=0, n=0)
+4. iM = 0, iN = 0  (promoted to SGPRs)
+5. a_block_window: rows 0–255, K=0–31 initially
+   b_block_window: N-rows 0–127, K=0–31 initially
+6. Allocate __shared__ char p_smem_char[24576]
+7. Call block_gemm_pipeline(a_window, b_window, 128, p_smem_char)
+   → 128 K-iterations (K=4096, kKPerBlock=32 → 128 slices)
+   → Each iteration: DRAM→VGPRs→LDS→sync→MFMA→sync
+   → Returns acc_block_tile (256×128 in FP32 VGPRs)
+8. tile_elementwise_in: FP32→FP16, apply CElementFunction (identity)
+9. c_window at (0, 0), size 256×128
+10. store_tile: write c_block_tile from VGPRs to C[0:255, 0:127]
 ```
+
+All 416 blocks execute steps 1–10 in parallel, each computing its assigned 256×128 tile.
+
+---
+
+## Block-to-Tile Mapping Example
+
+For `num_tile_m=13, num_tile_n=32` (416 blocks total, N-first ordering):
+
+```
+Block ID → (M tile, N tile) → C region written
+       0 → (0,  0) → C[0:255,     0:127]
+       1 → (0,  1) → C[0:255,   128:255]
+       2 → (0,  2) → C[0:255,   256:383]
+      ...
+      31 → (0, 31) → C[0:255,  3968:4095]
+      32 → (1,  0) → C[256:511,   0:127]
+      33 → (1,  1) → C[256:511, 128:255]
+      ...
+     415 → (12, 31) → C[3072:3327, 3968:4095]
+```
+
+N-first: blocks 0–31 all share the same A rows (rows 0–255), so A data stays in L2 cache
+while the kernel sweeps through all 32 N tiles.
 
 ---
 
 ## Key Concepts Summary
 
-### 1. **Tile Coverage**
-- Determines how many thread blocks are needed
-- Each block processes one tile of the output matrix C
-- Calculated as `ceil(dimension / tile_size)`
+### 1. Grid-Level Tile Coverage
 
-### 2. **Block-to-Tile Mapping**
-- Maps linear block ID to 2D tile coordinates
-- Uses column-major ordering for better memory coalescing
-- Each block knows which tile it's responsible for
+`GridGemm` partitions the M×N output matrix C into `num_tile_m × num_tile_n` tiles.
+Each of the `kGridSize` blocks computes exactly one tile of C.
 
-### 3. **Tile Windows**
-- **Sliding windows** over larger tensor views
-- Define a rectangular region with fixed size and movable origin
-- Provide efficient, structured access to tensor data
-- Can be moved to access different regions (e.g., for K iterations)
+### 2. Block-to-Tile Mapping (N-first)
 
-### 4. **Memory Hierarchy**
-- **DRAM (Global)**: Largest, slowest - stores full matrices
-- **LDS (Shared)**: Medium, fast - stages tiles for cooperative access
-- **VGPRs (Registers)**: Smallest, fastest - performs computation
+`MakeBlock2TileMap` produces N-first (row-major in tile space) ordering. This is an L2
+cache optimization: all blocks in the same M-strip share the same A rows.
 
-### 5. **Data Flow**
-```
-DRAM → Tile Windows → LDS → VGPRs → Computation → VGPRs → DRAM
-  ↑                                                           ↓
-  A, B matrices                                         C matrix
-```
+### 3. SGPR Promotion via `readfirstlane`
 
----
+Converting uniform (block-wide) values from VGPRs to SGPRs saves 64 VGPR slots per value
+and enables scalar address arithmetic for window origins.
 
-## Next Steps
+### 4. Tile Windows
 
-The host-level pipeline has set up the work and delegated to the block-level pipeline. Next, we'll explore:
-- **Block-level pipeline**: How tiles are loaded, distributed to warps, and computed
-- **Warp-level pipeline**: How warps perform MFMA operations
-- **Memory optimization**: LDS usage, bank conflicts, coalescing
+Windows carry: underlying tensor view + window size (compile-time) + origin (runtime). They
+slide along K inside the block pipeline via `move_tile_window`. The C window is write-only
+and created only after the block pipeline completes.
 
-The host level provides the **orchestration**, while the block and warp levels provide the **execution**!
+### 5. Epilogue Chain
 
+The accumulator (FP32) is converted to C's element type (FP16) and passed through
+`CElementFunction` in a single `tile_elementwise_in` call before storing to DRAM. This
+separation of accumulation from output formatting is what makes the epilogue extensible:
+any per-element transformation (bias add, activation, scaling) can be plugged in as
+`CElementFunction` without modifying the GEMM core.
+
+### 6. LDS Size is Compile-Time
+
+`GetStaticLdsSize()` is `constexpr` — the `__shared__` array size is a compile-time constant.
+The compiler can verify it fits within the 64KB LDS limit and allocate it statically.

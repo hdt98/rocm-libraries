@@ -1,39 +1,38 @@
-# Block-Level Pipeline: PracticeGemmBlockPipelineAGmemBGmemCreg
+# Block-Level Pipeline: BlockGemmPipelineAGmemBGmemCReg
 
 ## Overview
 
-The **Block-Level Pipeline** is where the actual GEMM computation happens for one block tile. It orchestrates:
-1. **Data movement** from DRAM → Registers → LDS
-2. **GEMM computation** using data in LDS
-3. **Iteration** over the K dimension when needed
+The **Block-Level Pipeline** (`BlockGemmPipelineAGmemBGmemCReg`) is where the actual GEMM
+computation happens for one block tile. It orchestrates:
+1. **Data movement** from DRAM → per-thread VGPRs → LDS
+2. **GEMM computation** using MFMA instructions on data in LDS
+3. **Iteration** over the K dimension in slices of `kKPerBlock`
 
-This pipeline is called by the host-level pipeline for each block tile that covers a portion of the output matrix C.
+This pipeline is called by `GridGemm` after it has mapped the current block to its `(iM, iN)`
+tile and created `a_block_window` and `b_block_window` over DRAM.
 
 ---
 
 ## Architecture: Problem and Policy
 
-Like other components in CK Tile, the block pipeline follows the **Problem/Policy** pattern:
+Like all components in CK Tile, the block pipeline follows the **Problem/Policy** pattern:
 
-### Problem: `PracticeGemmBlockPipelineProblem`
+### Problem: `BlockGemmPipelineProblem`
 Contains:
-- **Data types**: `ADataType`, `BDataType`, `CDataType`, `AccDataType`
-- **Shape information**: `BlockTile` and `WaveTile` dimensions
+- **Data types**: `ADataType`, `BDataType`, `CDataType`
+- **Block size**: `kBlockSize` — used to derive DRAM tile distributions
+- **Block GEMM shape**: `BlockGemmShape` with `kM`, `kN`, `kK`
 
-### Policy: `PracticeGemmBlockPolicy`
+Note: `AccDataType` and `CElementFunction` are not in `BlockGemmPipelineProblem` — they are
+applied at the grid level (`GridGemm`) after the pipeline returns `c_block_tile`.
+
+### Policy: `BlockGemmPipelineAGmemBGmemCRegPolicy`
 Contains strategies for:
-1. **Tile Distribution** (`MakeADramTileDistribution`, `MakeBDramTileDistribution`)
-   - Defines how 256 threads in a block map to elements of a block tile
-   - Each thread knows which elements to load/store from DRAM to its registers
-   - We'll cover tile distribution construction in detail later
-
-2. **LDS Layout** (`MakeALdsBlockDescriptor`, `MakeBLdsBlockDescriptor`)
-   - Describes how data is logically organized in Local Data Share (LDS)
-   - Optimizes for bank conflict avoidance and efficient access patterns
-   - We'll cover LDS descriptor construction in detail later
-
-3. **Warp Pipeline** (`GetPracticeWaveGemmPipeline`)
-   - Returns the warp-level GEMM implementation
+1. **DRAM tile distributions** (`MakeADramTileDistribution`, `MakeBDramTileDistribution`)
+   — Defines how 256 threads map to elements of a block tile for parallel vectorized loads
+2. **LDS layout descriptors** (`MakeALdsBlockDescriptor`, `MakeBLdsBlockDescriptor`)
+   — Describes how data is laid out in LDS for `ds_write_b128` / MFMA compatibility
+3. **Block GEMM** (`GetBlockGemm`) — Returns `BlockGemmASmemBSmemCReg`, the warp-level MFMA coordinator
 
 ---
 
@@ -41,20 +40,20 @@ Contains strategies for:
 
 ```cpp
 template <typename ADramBlockWindowTmp, typename BDramBlockWindowTmp>
-CK_TILE_DEVICE auto operator()(const ADramBlockWindowTmp& a_dram_block_window_tmp,
-                                const BDramBlockWindowTmp& b_dram_block_window_tmp,
-                                index_t num_loop,
-                                void* p_smem) const
+CK_TILE_HOST_DEVICE auto operator()(
+    const ADramBlockWindowTmp& a_dram_block_window_tmp,   // window over A in DRAM (MPerBlock × KPerBlock)
+    const BDramBlockWindowTmp& b_dram_block_window_tmp,   // window over B in DRAM (NPerBlock × KPerBlock)
+    index_t num_loop,                                      // K / kKPerBlock iterations
+    void* p_smem) const                                   // pointer to block's shared memory (LDS)
 ```
 
-### Inputs:
-- `a_dram_block_window_tmp`: Tile window over A in DRAM (size: MPerBlock × KPerBlock)
-- `b_dram_block_window_tmp`: Tile window over B in DRAM (size: NPerBlock × KPerBlock)
-- `num_loop`: Number of iterations along K dimension
-- `p_smem`: Pointer to shared memory (LDS)
+The `[[maybe_unused]]` attribute on the window parameters in `BlockGemmASmemBSmemCReg::operator()`
+(the warp-level layer below) suppresses compiler warnings when the parameters are only used for
+their type information at compile time — the warp layer builds its own windows from the tensor view.
 
 ### Output:
-- `c_block_tile`: A `static_distributed_tensor` containing the computed C tile in registers (VGPRs)
+- Returns `c_block_tile`: a `static_distributed_tensor` containing the accumulated C tile
+  in `CDataType` (here `AccDataType=float`) distributed across per-thread VGPRs.
 
 ---
 
@@ -63,527 +62,264 @@ CK_TILE_DEVICE auto operator()(const ADramBlockWindowTmp& a_dram_block_window_tm
 ### Step 1: Create LDS Tensor Views
 
 ```cpp
-// A tile in LDS
+// A region in shared memory
 ADataType* p_a_lds = static_cast<ADataType*>(p_smem);
 constexpr auto a_lds_block_desc = Policy::template MakeALdsBlockDescriptor<Problem>();
 auto a_lds_block = make_tensor_view<address_space_enum::lds>(p_a_lds, a_lds_block_desc);
 
-// B tile in LDS (placed after A in shared memory)
+// a_lds_block_space_size_aligned: A's LDS region rounded up to 16 bytes.
+// B is placed immediately after, so B's pointer is 16-byte aligned —
+// satisfying ds_write_b128 alignment requirements.
+constexpr index_t a_lds_block_space_size_aligned =
+    integer_divide_ceil(sizeof(ADataType) * a_lds_block_desc.get_element_space_size(), 16) * 16;
+
+// B region: placed after A's aligned region
 BDataType* p_b_lds = static_cast<BDataType*>(
     static_cast<void*>(static_cast<char*>(p_smem) + a_lds_block_space_size_aligned));
 constexpr auto b_lds_block_desc = Policy::template MakeBLdsBlockDescriptor<Problem>();
 auto b_lds_block = make_tensor_view<address_space_enum::lds>(p_b_lds, b_lds_block_desc);
 ```
 
-**What's happening:**
-- We partition the shared memory (`p_smem`) into two regions: one for A, one for B
-- We create **tensor views** over these LDS regions using descriptors from the policy
-- `a_lds_block` and `b_lds_block` are logical views over raw LDS memory
-
-**Memory Layout:**
+**Memory Layout in LDS:**
 ```
 Shared Memory (LDS):
-┌─────────────────────┬─────────────────────┐
-│   A Block Tile      │   B Block Tile      │
-│   (256×32 fp16)     │   (128×32 fp16)     │
-└─────────────────────┴─────────────────────┘
-↑                     ↑
-p_a_lds               p_b_lds
+┌──────────────────────────────┬────────────────────┐
+│   A Block Tile               │   B Block Tile      │
+│   (256×32 fp16 = 16 KB)      │   (128×32 fp16 = 8 KB)│
+│   16-byte aligned            │                    │
+└──────────────────────────────┴────────────────────┘
+↑ p_a_lds                      ↑ p_b_lds (16-byte aligned)
+```
+
+`GetStaticLdsSize()` (called by `GridGemm` before allocating `__shared__`) computes this
+at compile time:
+```cpp
+sizeof(A_lds) rounded up to 16 + sizeof(B_lds)
+= integer_divide_ceil(2 * 256 * 32, 16) * 16 + 2 * 128 * 32
+= 16384 + 8192 = 24576 bytes
 ```
 
 ---
 
 ### Step 2: Create Tile Windows for Data Movement
 
-We create **6 tile windows** for different purposes:
+We create **6 tile windows** serving different purposes:
 
-#### 2a. DRAM → Registers (Load from DRAM)
+#### 2a. A DRAM → Registers (load distribution)
 
 ```cpp
 auto a_copy_dram_window = make_tile_window(
     a_dram_block_window_tmp.get_bottom_tensor_view(),
-    make_tuple(number<MPerBlock>{}, number<KPerBlock>{}),  // 256×32
+    make_tuple(number<kMPerBlock>{}, number<kKPerBlock>{}),
     a_dram_block_window_tmp.get_window_origin(),
-    Policy::template MakeADramTileDistribution<Problem>());  // ← Tile distribution!
+    Policy::template MakeADramTileDistribution<Problem>());  // ← tile distribution
 ```
 
-**Key Points:**
-- `a_copy_dram_window` is a `tile_window_with_static_distribution`
-- The **tile distribution** tells each thread which elements to load from DRAM
-- This window will **slide along the K dimension** in the loop
+The **tile distribution** tells each of the 256 threads which elements of the 256×32 A tile
+to load. Thread T does not load a contiguous row; instead it loads M0=4 groups of K1=8
+elements (see `TILE_DISTRIBUTION.md` for the derivation). Each group is one 128-bit vector
+load, so Thread T issues 4 × 128-bit `global_load_dwordx4` instructions total.
 
-#### 2b. Registers → LDS (Store to LDS)
+#### 2b. A Registers → LDS (store window; same distribution)
 
 ```cpp
 auto a_copy_lds_window = make_tile_window(
     a_lds_block,
-    make_tuple(number<MPerBlock>{}, number<KPerBlock>{}),  // 256×32
-    {0, 0},  // Origin at (0, 0) in LDS
-    a_copy_dram_window.get_tile_distribution());  // ← Same distribution as DRAM!
+    make_tuple(number<kMPerBlock>{}, number<kKPerBlock>{}),
+    {0, 0},
+    a_copy_dram_window.get_tile_distribution());  // ← same distribution as DRAM
 ```
 
-**Key Points:**
-- Uses the **same tile distribution** as `a_copy_dram_window`
-- This ensures each thread stores to LDS in the same pattern it loaded from DRAM
-- Origin is always `{0, 0}` because LDS is reused for each K iteration
+Using the **same distribution** for the LDS store as the DRAM load is critical: it guarantees
+that Thread T stores the elements it just loaded from DRAM to the same logical positions in LDS.
+A mismatch between load and store distributions would silently corrupt the LDS layout and
+produce wrong MFMA results.
 
-#### 2c. LDS → Registers (GEMM Input)
+#### 2c. A LDS → MFMA (no distribution)
 
 ```cpp
 auto a_lds_gemm_window = make_tile_window(
     a_lds_block,
-    make_tuple(number<MPerBlock>{}, number<KPerBlock>{}),
-    {0, 0});  // No tile distribution!
+    make_tuple(number<kMPerBlock>{}, number<kKPerBlock>{}),
+    {0, 0});  // no tile distribution
 ```
 
-**Key Points:**
-- This is a `tile_window_with_static_lengths` (no explicit distribution)
-- Used as input to the warp-level GEMM
-- The warp GEMM will handle its own thread mapping internally
+This window has **no explicit tile distribution**. The warp-level GEMM (`BlockGemmASmemBSmemCReg`)
+applies its own warp-level distribution internally when creating warp sub-windows. The GEMM
+layer does not need the DRAM distribution here.
 
-**Similar windows are created for B:**
-- `b_copy_dram_window`: Load B from DRAM
-- `b_copy_lds_window`: Store B to LDS
-- `b_lds_gemm_window`: Read B from LDS for GEMM
+**Similarly for B:**
+- `b_copy_dram_window`: Load B from DRAM (with distribution)
+- `b_copy_lds_window`: Store B to LDS (same distribution as DRAM)
+- `b_lds_gemm_window`: Read B from LDS for GEMM (no distribution)
 
 ---
 
-### Step 3: Create Distributed Tensors (VGPRs)
+### Step 3: Create Distributed Tensors (per-thread VGPRs)
 
 ```cpp
+// Types derived from distributions at compile time
 using ABlockTileDistr = decltype(a_copy_dram_window.get_tile_distribution());
 using BBlockTileDistr = decltype(b_copy_dram_window.get_tile_distribution());
 
 using ABlockTile = decltype(make_static_distributed_tensor<ADataType>(ABlockTileDistr{}));
 using BBlockTile = decltype(make_static_distributed_tensor<BDataType>(BBlockTileDistr{}));
 
-ABlockTile a_block_tile;  // Per-thread registers for A
-BBlockTile b_block_tile;  // Per-thread registers for B
+ABlockTile a_block_tile;  // Per-thread register buffer for A (lives in VGPRs)
+BBlockTile b_block_tile;  // Per-thread register buffer for B (lives in VGPRs)
 ```
 
-#### What is `make_static_distributed_tensor`?
+`make_static_distributed_tensor` creates a **compile-time distributed register buffer**:
+- Each thread holds a different slice of the tile in its own VGPRs
+- Buffer size = M0 × K1 = 4 × 8 = 32 fp16 elements per thread for A
+- No two threads share the same element
 
-**`make_static_distributed_tensor`** creates a **`static_distributed_tensor`**, which is a compile-time abstraction for **distributed per-thread register storage**.
-
-**Key Properties:**
-1. **Per-thread VGPRs**: Each thread owns a **different slice** of the tile in its registers
-2. **Compile-time sized**: Buffer size determined by tile distribution at compile time
-3. **Zero-overhead**: All indexing and layout transformations happen at compile time
-
-**How it works:**
+Collectively, all 256 threads hold the entire 256×32 tile (8192 elements), each thread owning
+its 32-element slice.
 
 ```cpp
-template <typename DataType_, typename StaticTileDistribution_>
-struct static_distributed_tensor
-{
-    using DataType = remove_cvref_t<DataType_>;
-    using StaticTileDistribution = remove_cvref_t<StaticTileDistribution_>;
-    
-    // Calculate per-thread storage size from tile distribution
-    using ThreadTensorDesc = 
-        remove_cvref_t<decltype(StaticTileDistribution{}.get_ys_to_d_descriptor())>;
-    
-    static constexpr index_t kThreadElementSpaceSize = 
-        ThreadTensorDesc{}.get_element_space_size();
-    
-    // Per-thread register array (VGPRs)
-    thread_buffer<DataType, get_thread_buffer_size()> thread_buf_;
-};
+// c_block_tile: type inferred from the init form of BlockGemm's operator().
+// This avoids having to spell out the C distribution encoding explicitly here.
+auto c_block_tile = decltype(block_gemm(a_lds_gemm_window, b_lds_gemm_window)){};
 ```
 
-**The tile distribution defines:**
-- **Which elements each thread owns** in the tile
-- **How many elements** each thread stores (buffer size)
-- **How elements are laid out** in each thread's registers
-
-**Concrete Example for 256×32 tile with 256 threads:**
-
-```
-Thread 0:  a_block_tile.thread_buf_ = [A[0,0], A[0,1], ..., A[0,31]]   (32 fp16 values)
-Thread 1:  a_block_tile.thread_buf_ = [A[1,0], A[1,1], ..., A[1,31]]   (32 fp16 values)
-Thread 2:  a_block_tile.thread_buf_ = [A[2,0], A[2,1], ..., A[2,31]]   (32 fp16 values)
-...
-Thread 255: a_block_tile.thread_buf_ = [A[255,0], A[255,1], ..., A[255,31]] (32 fp16 values)
-```
-
-**Collectively:**
-- All 256 threads together hold the **entire 256×32 tile** (8192 elements)
-- Each thread's buffer lives in its **own VGPRs**
-- No two threads own the same element
-
-**Distributed Ownership Analogy:**
-Think of a tile as a **jigsaw puzzle**:
-- The **tile distribution** is the cutting pattern
-- Each **thread** gets one puzzle piece (its slice)
-- Each **`static_distributed_tensor`** is a box holding all pieces
-- Each thread's **`thread_buf_`** is its individual piece in its own registers
+The C block tile type is derived using `decltype` applied to the block GEMM's return type —
+a useful trick that lets the compiler deduce the complex C distribution type automatically.
 
 ---
 
-### Step 4: The GEMM Loop
+### Step 4: The GEMM Loop (Non-Prefetch Pipeline)
 
 ```cpp
-// Initialize C accumulator to zero
-auto c_block_tile = decltype(block_gemm(a_lds_gemm_window, b_lds_gemm_window)){};
+// Initialize C accumulator to zero before the K loop
 tile_elementwise_inout([](auto& c) { c = 0; }, c_block_tile);
 
-index_t iCounter = num_loop;  // Number of K iterations
+index_t iCounter = num_loop;  // num_loop = K / kKPerBlock
 
 while(iCounter > 0)
 {
-    // 1. Load from DRAM to registers
-    a_block_tile = load_tile(a_copy_dram_window);  // DRAM → VGPRs
-    b_block_tile = load_tile(b_copy_dram_window);  // DRAM → VGPRs
-    
-    // 2. Move windows for next iteration
-    move_tile_window(a_copy_dram_window, a_dram_tile_window_step);  // Step by (0, 32)
-    move_tile_window(b_copy_dram_window, b_dram_tile_window_step);  // Step by (0, 32)
-    
-    // 3. Store from registers to LDS
-    store_tile(a_copy_lds_window, a_block_tile);  // VGPRs → LDS
-    store_tile(b_copy_lds_window, b_block_tile);  // VGPRs → LDS
-    
-    // 4. Synchronize threads (ensure all data is in LDS)
+    // Step 1: Load A and B tiles from DRAM into per-thread registers (VGPRs).
+    // Each thread loads its assigned elements using vectorized global loads.
+    a_block_tile = load_tile(a_copy_dram_window);
+    b_block_tile = load_tile(b_copy_dram_window);
+
+    // Step 2: Advance DRAM windows to the next K slice.
+    // Done before the LDS store so the compiler can schedule address computation
+    // while the stores are in flight.
+    move_tile_window(a_copy_dram_window, a_dram_tile_window_step);  // {0, kKPerBlock}
+    move_tile_window(b_copy_dram_window, b_dram_tile_window_step);  // {0, kKPerBlock}
+
+    // Step 3: Store A and B tiles from VGPRs to LDS.
+    // Thread T stores exactly the elements it loaded — same distribution → correct layout.
+    store_tile(a_copy_lds_window, a_block_tile);
+    store_tile(b_copy_lds_window, b_block_tile);
+
+    // Step 4: Barrier 1 — wait for ALL threads to finish writing to LDS.
+    // Without this, a thread that finishes early could start reading LDS for MFMA
+    // while another thread is still writing — producing stale data.
     block_sync_lds();
-    
-    // 5. Compute GEMM using data in LDS
+
+    // Step 5: Block GEMM: c_block_tile += A_lds × B_lds using MFMA instructions.
+    // The warp-level GEMM reads A and B from LDS via warp sub-windows and
+    // accumulates into c_block_tile (in FP32 VGPRs).
     block_gemm(c_block_tile, a_lds_gemm_window, b_lds_gemm_window);
-    
-    // 6. Synchronize threads (before overwriting LDS in next iteration)
+
+    // Step 6: Barrier 2 — wait for ALL threads to finish reading LDS (MFMA complete).
+    // Without this, the next iteration's LDS store could overwrite data that another
+    // thread is still consuming for MFMA.
     block_sync_lds();
-    
+
     iCounter--;
 }
 
-return c_block_tile;  // Return accumulated result in registers
+return c_block_tile;  // FP32 VGPRs returned to GridGemm for cast + epilogue + store
 ```
 
----
-
-## Detailed Loop Breakdown
-
-### Phase 1: Load (DRAM → VGPRs)
-
-```cpp
-a_block_tile = load_tile(a_copy_dram_window);
-```
-
-**What happens:**
-1. Each thread reads **its assigned elements** from DRAM (determined by tile distribution)
-2. Data is loaded into **per-thread registers** (VGPRs)
-3. Uses **vectorized loads** for efficiency (e.g., loading 8 fp16 values at once)
-
-**Example for Thread 0:**
-```
-Thread 0 loads:
-  A[0,0:7]   (8 fp16 values, one vector load)
-  A[1,0:7]   (8 fp16 values, one vector load)
-  ...
-```
-
-### Phase 2: Move Windows
-
-```cpp
-constexpr ADramTileWindowStep a_dram_tile_window_step = make_array(0, KPerBlock);
-move_tile_window(a_copy_dram_window, a_dram_tile_window_step);
-```
-
-**What happens:**
-- The tile window **slides along the K dimension** by `KPerBlock` (32 in our example)
-- This prepares for the next K iteration
-- The window origin moves from `(0, 0)` → `(0, 32)` → `(0, 64)` → ...
-
-**Visualization for Problem Size 512×256×64:**
-```
-Matrix A (512×64):
-┌─────────────────────────────────────┐
-│ Block 0: rows 0-255                 │
-│ ┌──────────┬──────────┐             │
-│ │ K=0:31   │ K=32:63  │             │  ← Window slides right
-│ │ Iter 0   │ Iter 1   │             │
-│ └──────────┴──────────┘             │
-└─────────────────────────────────────┘
-```
-
-### Phase 3: Store (VGPRs → LDS)
-
-```cpp
-store_tile(a_copy_lds_window, a_block_tile);
-```
-
-**What happens:**
-1. Each thread writes **its elements** from registers to LDS
-2. Uses the **same distribution** as the DRAM load
-3. Data is now in **shared memory**, accessible to all threads in the block
-
-**Why this step?**
-- GEMM computation needs **all threads** to access **all data**
-- Registers are per-thread; LDS is shared across the block
-- LDS acts as a "staging area" for collaborative computation
-
-### Phase 4: Synchronize
-
-```cpp
-block_sync_lds();
-```
-
-**What happens:**
-- All threads in the block **wait** until everyone has finished storing to LDS
-- Ensures no thread starts reading from LDS before all writes are complete
-- Critical for correctness!
-
-### Phase 5: GEMM Computation
-
-```cpp
-block_gemm(c_block_tile, a_lds_gemm_window, b_lds_gemm_window);
-```
-
-**What happens:**
-1. The warp-level GEMM reads data from LDS
-2. Performs matrix multiplication using MFMA instructions
-3. Accumulates results into `c_block_tile` (in registers)
-
-**Note:** `c_block_tile` stays in registers throughout all K iterations, accumulating results.
-
-### Phase 6: Synchronize Again
-
-```cpp
-block_sync_lds();
-```
-
-**What happens:**
-- Ensures all threads have finished reading from LDS
-- Safe to overwrite LDS in the next iteration
+This is the **non-prefetch pipeline**: each iteration fully serializes load → store → sync →
+MFMA → sync. No double-buffering, no overlap between data movement and computation. This is
+the simplest correct pipeline — hence "naive".
 
 ---
 
 ## Memory Flow Diagram
 
 ```
-Iteration 0 (K=0:31):
-┌─────────┐   load_tile   ┌──────────┐   store_tile   ┌─────────┐
-│  DRAM   │ ────────────> │  VGPRs   │ ─────────────> │   LDS   │
-│ A[0:255,│               │ (per-    │                │ A_block │
-│   0:31] │               │  thread) │                │         │
-└─────────┘               └──────────┘                └─────────┘
-                                                            │
-                                                            │ block_gemm
-                                                            ↓
-                                                      ┌──────────┐
-                                                      │ c_block_ │
-                                                      │   tile   │
-                                                      │ (VGPRs)  │
-                                                      └──────────┘
+Iteration i (K slice i):
 
-Iteration 1 (K=32:63):
-┌─────────┐   load_tile   ┌──────────┐   store_tile   ┌─────────┐
-│  DRAM   │ ────────────> │  VGPRs   │ ─────────────> │   LDS   │
-│ A[0:255,│               │ (per-    │                │ A_block │
-│  32:63] │               │  thread) │                │ (reused)│
-└─────────┘               └──────────┘                └─────────┘
-                                                            │
-                                                            │ block_gemm
-                                                            ↓
-                                                      ┌──────────┐
-                                                      │ c_block_ │
-                                                      │   tile   │
-                                                      │ (accum.) │
-                                                      └──────────┘
+DRAM A[iM:iM+256, i*32:(i+1)*32]
+         │
+         │ load_tile (parallel, vectorized)
+         ↓
+  VGPRs: a_block_tile (per-thread, M0×K1=32 fp16 elements each)
+         │
+         │ store_tile
+         ↓
+  LDS A region (256×32 fp16, shared by all 256 threads)
+         │
+         │ block_sync_lds() ← Barrier 1
+         │
+         ↓
+  BlockGemmASmemBSmemCReg
+    reads A from LDS via a_lds_gemm_window (warp sub-tiles)
+    reads B from LDS via b_lds_gemm_window (warp sub-tiles)
+    c_block_tile += A_warp × B_warp  (MFMA instructions, FP32 accumulation)
+         │
+         │ block_sync_lds() ← Barrier 2
+         │
+         ↓
+  c_block_tile in VGPRs (FP32, accumulates across all K iterations)
 ```
 
 ---
 
-## Example: Problem Size 512×256×64
+## Thread Ownership Example (for A tile load)
 
-### Block 0 Computation
+With the DRAM tile distribution (M0=4, M1=4, M2=16, K0=4, K1=8):
 
-**Input:**
-- `a_dram_block_window_tmp`: Covers A[0:255, 0:31] initially
-- `b_dram_block_window_tmp`: Covers B[0:127, 0:31] initially (B is transposed)
-- `num_loop`: 2 (since K=64, KPerBlock=32)
+Thread T (warp W, lane L within warp):
+- `M2` position within warp: `L / K0 = L / 4`
+- `K0` position within warp: `L % K0 = L % 4`
+- `M1` position: warp index W
+- Each thread loads M0=4 separate K1=8 element chunks (one per M0 repetition)
 
-**Iteration 0:**
-1. Load A[0:255, 0:31] and B[0:127, 0:31] from DRAM to VGPRs
-2. Move windows: A → [0:255, 32:63], B → [0:127, 32:63]
-3. Store to LDS
-4. Compute: `C[0:255, 0:127] += A[0:255, 0:31] × B[0:127, 0:31]^T`
+Concretely, Thread 0 (warp 0, lane 0):
+- M2=0, K0=0 → loads rows {0, 64, 128, 192} (one per M0 iteration), columns 0–7 each
+- Issues 4 × `global_load_dwordx4` instructions, loading A[0,0:7], A[64,0:7], A[128,0:7], A[192,0:7]
 
-**Iteration 1:**
-1. Load A[0:255, 32:63] and B[0:127, 32:63] from DRAM to VGPRs
-2. Move windows: A → [0:255, 64:95], B → [0:127, 64:95] (out of bounds, but loop ends)
-3. Store to LDS
-4. Compute: `C[0:255, 0:127] += A[0:255, 32:63] × B[0:127, 32:63]^T`
-
-**Output:**
-- `c_block_tile`: Contains C[0:255, 0:127] in distributed registers
+This is not a single row — each thread loads a strided pattern covering multiple M rows
+and a fixed K group, designed so all 64 threads in the warp together cover the same set of
+K columns with perfectly coalesced (contiguous, cache-line aligned) accesses.
 
 ---
 
 ## Key Concepts Summary
 
 ### 1. Tile Distribution
-- **Maps threads to data elements** for load/store operations
-- Each thread knows exactly which elements it's responsible for
-- Enables **parallel, vectorized** memory access
-- **Same distribution** used for DRAM load and LDS store
+- Maps each of the 256 threads to specific elements in the 256×32 tile
+- Enables **parallel, vectorized** DRAM loads (128-bit per call, 4 calls per thread)
+- The **same distribution** governs both the DRAM load and the LDS store
 
-### 2. Static Distributed Tensor
-- **Per-thread register storage** (VGPRs)
-- Each thread owns a **different slice** of the tile
-- **Compile-time sized** for zero-overhead abstraction
-- Used for: `a_block_tile`, `b_block_tile`, `c_block_tile`
+### 2. Static Distributed Tensor (per-thread VGPRs)
+- `a_block_tile`, `b_block_tile`: staging area between DRAM and LDS
+- Each thread owns a different, non-overlapping slice of the tile
+- All indexing resolved at compile time — zero runtime overhead
 
 ### 3. Tile Window Movement
-- Windows **slide** over larger tensors
-- Enables iteration over the K dimension
-- `move_tile_window(window, step)` updates the origin
+- Windows slide along the K dimension via `move_tile_window(window, {0, kKPerBlock})`
+- The `a_copy_lds_window` and `b_copy_lds_window` do NOT move — LDS is reused each iteration
 
 ### 4. LDS as Staging Area
-- **Shared memory** accessible to all threads in a block
-- Required because GEMM needs all threads to access all data
-- **Reused** across K iterations (same LDS buffer)
+- Shared memory accessible to all 256 threads in the block
+- Required because MFMA needs all threads in a warp to access sub-tiles of A and B
+- Reused across K iterations (same physical LDS buffer, overwritten each iteration)
 
-### 5. Synchronization
-- `block_sync_lds()` ensures memory consistency
-- **Before GEMM**: All stores to LDS are complete
-- **After GEMM**: All reads from LDS are complete
+### 5. Two-Barrier Pattern
+- **Barrier 1** (`block_sync_lds()` after store): Ensures all LDS writes complete before MFMA reads
+- **Barrier 2** (`block_sync_lds()` after MFMA): Ensures all MFMA reads complete before next iteration overwrites LDS
+- Both barriers are necessary for correctness; removing either causes data races
 
----
-
-## Deep Dive: `static_distributed_tensor` Mechanics
-
-### How Tile Distribution Creates Per-Thread Storage
-
-When you call:
-```cpp
-using ABlockTile = decltype(make_static_distributed_tensor<fp16_t>(ABlockTileDistr{}));
-ABlockTile a_block_tile;
-```
-
-**Step 1: Extract Thread Tensor Descriptor**
-
-The tile distribution contains a `ys_to_d_descriptor` that maps:
-- **Y dimensions** (logical tile coordinates, e.g., M, K)
-- **D dimension** (per-thread register index, linearized)
-
-```cpp
-using ThreadTensorDesc = 
-    decltype(StaticTileDistribution{}.get_ys_to_d_descriptor());
-```
-
-**Step 2: Calculate Per-Thread Buffer Size**
-
-```cpp
-static constexpr index_t kThreadElementSpaceSize = 
-    ThreadTensorDesc{}.get_element_space_size();
-
-static constexpr index_t get_thread_buffer_size()
-{
-    return kThreadElementSpaceSize / PackedSize;
-}
-```
-
-**Example:**
-- 256×32 tile distributed across 256 threads
-- Each thread owns 32 elements (one row)
-- `thread_buffer_size = 32` (for PackedSize=1)
-
-**Step 3: Allocate Thread Buffer**
-
-```cpp
-thread_buffer<DataType, get_thread_buffer_size()> thread_buf_;
-```
-
-This is essentially:
-```cpp
-fp16_t data[32];  // Per-thread register array (VGPRs)
-```
-
-### Usage in Load/Store Operations
-
-**Load from DRAM:**
-```cpp
-a_block_tile = load_tile(a_copy_dram_window);
-```
-
-What happens internally:
-1. Each thread queries the tile distribution: "Which elements do I own?"
-2. Thread 0 learns it owns A[0,0:31]
-3. Thread 0 loads those elements from DRAM into `a_block_tile.thread_buf_[0:31]`
-4. All 256 threads do this **in parallel**
-
-**Store to LDS:**
-```cpp
-store_tile(a_copy_lds_window, a_block_tile);
-```
-
-What happens internally:
-1. Each thread reads from its `a_block_tile.thread_buf_`
-2. Thread 0 writes A[0,0:31] from its registers to LDS
-3. All 256 threads do this **in parallel**
-4. After `block_sync_lds()`, the entire tile is in shared LDS
-
-### Distributed Indexing
-
-The `static_distributed_tensor` supports compile-time indexing:
-
-```cpp
-// Access using distributed indices
-auto value = a_block_tile(tile_distributed_index<i, j>{});
-```
-
-Internally:
-1. Convert distributed index → Y index (logical tile coordinates)
-2. Calculate buffer offset using `ThreadTensorDesc`
-3. Access `thread_buf_[offset]`
-
-All of this happens **at compile time** with zero runtime overhead!
-
-### Why This Design?
-
-**Benefits:**
-1. **Parallel Memory Access**: All threads load/store simultaneously
-2. **Vectorization**: Each thread can use vector loads (e.g., 8×fp16 at once)
-3. **Zero Overhead**: All indexing resolved at compile time
-4. **Type Safety**: Distribution mismatch caught at compile time
-5. **Register Pressure**: Compiler knows exact VGPR usage
-
-**Trade-offs:**
-- Requires compile-time tile sizes
-- Distribution must be static
-- More complex type system
-
-### Memory Hierarchy Summary
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         DRAM (Global Memory)                 │
-│                    Full matrices A, B, C                     │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              │ load_tile (parallel, vectorized)
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
-│                    VGPRs (Per-Thread Registers)              │
-│  Thread 0: a_block_tile.thread_buf_ = [A[0,0:31]]          │
-│  Thread 1: a_block_tile.thread_buf_ = [A[1,0:31]]          │
-│  ...                                                         │
-│  Thread 255: a_block_tile.thread_buf_ = [A[255,0:31]]      │
-│                                                              │
-│  ← static_distributed_tensor manages this distribution      │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              │ store_tile (parallel, vectorized)
-                              ↓
-┌─────────────────────────────────────────────────────────────┐
-│                    LDS (Shared Memory)                       │
-│              Entire block tile (256×32)                      │
-│           Accessible to all threads in block                 │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Key Insight:**
-`static_distributed_tensor` is the abstraction that enables efficient, parallel data movement between DRAM and LDS through per-thread VGPRs, with all coordination happening at compile time.
-
-
-
+### 6. Non-Prefetch vs. Prefetch Pipelines
+This is the **non-prefetch** (naive) pipeline: the DRAM load for iteration `i+1` only begins
+after iteration `i`'s barriers and MFMA complete. A prefetch pipeline would overlap the
+iteration `i+1` load with iteration `i`'s MFMA using double-buffering in LDS. That
+optimization is a natural next step from this baseline.

@@ -1,45 +1,56 @@
-# PracticeGemmKernel: Understanding the Kernel Entry Point
+# Gemm: Understanding the Kernel Entry Point
 
-This document explains the `PracticeGemmKernel` structure, which serves as the **entry point** for our GEMM GPU kernel. We'll dive deep into how raw memory is transformed into structured tensor views.
+This document explains the `Gemm` struct, which serves as the **top-level kernel functor** for
+our GEMM GPU kernel. We'll dive deep into how raw memory pointers are transformed into structured
+tensor views and how the computation is dispatched through the hierarchy.
 
 ## Overview
 
-The `PracticeGemmKernel` is a templated struct that:
+The `Gemm` struct (defined in `practice_gemm.hpp`) is a templated kernel functor that:
 1. Takes raw device memory pointers for matrices A, B, and C
-2. Wraps them into **tensor views** - logical, structured views over physical memory
-3. Dispatches to the host-level pipeline for computation
+2. Wraps them into **tensor views** — logical, structured views over physical memory
+3. Maps thread blocks to output tiles and dispatches to `GridGemm` for computation
 
 ```cpp
-template <typename Problem_, typename Policy_>
-struct PracticeGemmKernel
+template <typename ADataType,
+          typename BDataType,
+          typename AccDataType,
+          typename CDataType,
+          typename CElementFunction,
+          index_t kAAlignment,
+          index_t kBAlignment,
+          index_t kCAlignment,
+          index_t kBlockSize_,
+          index_t kMPerBlock_,
+          index_t kNPerBlock_,
+          index_t kKPerBlock_>
+struct Gemm
 {
-    using Problem = remove_cvref_t<Problem_>;
-    using Policy  = remove_cvref_t<Policy_>;
+    // ... nested GridGemmPolicy ...
 
-    static constexpr index_t kBlockSize = 256;
-
-    CK_TILE_DEVICE void operator()(const typename Problem::ADataType* p_a,
-                                   const typename Problem::BDataType* p_b,
-                                   typename Problem::CDataType* p_c,
+    CK_TILE_DEVICE void operator()(const ADataType* p_a,
+                                   const BDataType* p_b,
+                                   CDataType* p_c,
                                    const index_t M,
                                    const index_t N,
                                    const index_t K,
-                                   const index_t stride_a,
-                                   const index_t stride_b,
-                                   const index_t stride_c) const
+                                   const index_t Lda,
+                                   const index_t Ldb,
+                                   const index_t Ldc,
+                                   const CElementFunction& c_element_func) const
     {
         // Step 1: Create tensor views over raw memory
-        auto a_dram = make_naive_tensor_view<address_space_enum::global>(
-            p_a, make_tuple(M, K), make_tuple(stride_a, 1), number<8>{}, number<1>{});
+        auto a_grid = make_naive_tensor_view<address_space_enum::global>(
+            p_a, make_tuple(M, K), make_tuple(Lda, 1), number<kAAlignment>{}, number<1>{});
 
-        auto b_dram = make_naive_tensor_view<address_space_enum::global>(
-            p_b, make_tuple(N, K), make_tuple(stride_b, 1), number<8>{}, number<1>{});
+        auto b_grid = make_naive_tensor_view<address_space_enum::global>(
+            p_b, make_tuple(N, K), make_tuple(Ldb, 1), number<kBAlignment>{}, number<1>{});
 
-        const auto c_dram = make_naive_tensor_view<address_space_enum::global>(
-            p_c, make_tuple(M, N), make_tuple(stride_c, 1), number<8>{}, number<1>{});
+        auto c_grid = make_naive_tensor_view<address_space_enum::global>(
+            p_c, make_tuple(M, N), make_tuple(Ldc, 1), number<kCAlignment>{}, number<1>{});
 
-        // Step 2: Dispatch to host-level pipeline
-        PracticeGemmHostPipeline<Problem, Policy>{}(a_dram, b_dram, c_dram);
+        // Step 2: Dispatch to GridGemm
+        GridGemm<GridGemmProblem_, GridGemmPolicy>{}(a_grid, b_grid, c_grid, c_element_func);
     }
 };
 ```
@@ -48,16 +59,18 @@ struct PracticeGemmKernel
 
 ## What are Tensor Views?
 
-A **tensor view** is a **logical, structured view over raw physical memory**. It doesn't own or allocate memory—it simply provides a way to interpret and access existing memory as a multi-dimensional tensor.
+A **tensor view** is a **logical, structured view over raw physical memory**. It doesn't own or
+allocate memory — it provides a way to interpret and access existing memory as a
+multi-dimensional tensor, carrying shape, strides, and vectorization guarantees.
 
 ### Key Components of a Tensor View:
 
-1. **Memory Type**: Where the data lives (global/DRAM, LDS/shared, registers)
-2. **Raw Pointer**: Points to the actual data in memory
-3. **Shape**: Dimensions of the tensor (e.g., M×K for matrix A)
+1. **Address space**: Where the data lives (`global`/DRAM, `lds`/shared, `vgpr`/registers)
+2. **Raw pointer**: Points to the actual data in memory
+3. **Shape (lengths)**: Dimensions of the tensor (e.g., M×K for matrix A)
 4. **Strides**: How to navigate through memory to access elements
-5. **Guaranteed Vector Length**: How many consecutive elements can be loaded in one vector instruction
-6. **Guaranteed Vector Stride**: The stride of those vectorizable elements
+5. **Guaranteed vector length**: How many consecutive elements fit in one vector instruction
+6. **Guaranteed vector stride**: The stride of those vectorizable elements
 
 ---
 
@@ -70,30 +83,26 @@ CK Tile uses a three-layer abstraction to go from raw memory to structured tenso
 │ Layer 3: TENSOR VIEW                                        │
 │ ┌─────────────────────────────────────────────────────────┐ │
 │ │ • Logical multi-dimensional structure                   │ │
-│ │ • Shape: (M, K) = (256, 32)                            │ │
-│ │ • Strides: (32, 1) for row-major layout                │ │
-│ │ • Provides: operator[], coordinate-based access         │ │
+│ │ • Shape: (M, K)                                         │ │
+│ │ • Strides: (Lda, 1) for row-major layout               │ │
+│ │ • Provides: coordinate-based access, tile windows       │ │
 │ │ • Knows: How to map (i,j) → linear offset              │ │
 │ └─────────────────────────────────────────────────────────┘ │
 │                           ↓ wraps                            │
 │ ┌─────────────────────────────────────────────────────────┐ │
 │ │ Layer 2: BUFFER VIEW                                    │ │
-│ │ ┌─────────────────────────────────────────────────────┐ │ │
-│ │ │ • Linear view of memory                             │ │ │
-│ │ │ • Pointer: p_data_ → device memory                  │ │ │
-│ │ │ • Size: Total number of elements                    │ │ │
-│ │ │ • Address space: global/LDS/generic                 │ │ │
-│ │ │ • Provides: Vectorized loads/stores, bounds checking│ │ │
-│ │ └─────────────────────────────────────────────────────┘ │ │
+│ │ • Linear view of memory                                 │ │
+│ │ • Pointer: p_data_ → device memory                      │ │
+│ │ • Size: total number of elements                        │ │
+│ │ • Address space: global / lds / generic                 │ │
+│ │ • Provides: vectorized loads/stores, bounds checking    │ │
 │ └─────────────────────────────────────────────────────────┘ │
 │                           ↓ wraps                            │
 │ ┌─────────────────────────────────────────────────────────┐ │
 │ │ Layer 1: RAW PHYSICAL MEMORY                            │ │
-│ │ ┌─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┬─────┐ │ │
-│ │ │ 0.0 │ 1.0 │ 2.0 │ 3.0 │ 4.0 │ 5.0 │ 6.0 │ 7.0 │ ... │ │ │
-│ │ └─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┴─────┘ │ │
-│ │   ↑                                                       │ │
-│ │   p_a (raw pointer from hipMalloc)                       │ │
+│ │ [e₀][e₁][e₂]...[eN]    ← contiguous bytes in DRAM      │ │
+│ │  ↑                                                      │ │
+│ │  p_a (raw pointer from hipMalloc)                       │ │
 │ └─────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -105,360 +114,222 @@ CK Tile uses a three-layer abstraction to go from raw memory to structured tenso
 Let's break down the function call for matrix A:
 
 ```cpp
-auto a_dram = make_naive_tensor_view<address_space_enum::global>(
-    p_a,                    // Raw pointer to device memory
-    make_tuple(M, K),       // Shape: (256, 32)
-    make_tuple(stride_a, 1), // Strides: (32, 1) - row-major
-    number<8>{},            // Guaranteed vector length
-    number<1>{}             // Guaranteed vector stride
+auto a_grid = make_naive_tensor_view<address_space_enum::global>(
+    p_a,                         // Raw pointer to device memory
+    make_tuple(M, K),            // Shape: M rows, K cols
+    make_tuple(Lda, 1),          // Strides: Lda elements to the next row, 1 between cols
+    number<kAAlignment>{},       // Guaranteed vector length (8 fp16 = 128 bits)
+    number<1>{}                  // Guaranteed vector stride (cols are contiguous)
 );
 ```
 
-### Function Signature:
+### Parameter Breakdown:
 
-```cpp
-template <address_space_enum BufferAddressSpace = address_space_enum::generic,
-          memory_operation_enum DstInMemOp      = memory_operation_enum::set,
-          amd_buffer_coherence_enum Coherence   = amd_buffer_coherence_enum::coherence_default,
-          typename DataType,
-          typename... Lengths,
-          typename... Strides,
-          index_t GuaranteedLastDimensionVectorLength = -1,
-          index_t GuaranteedLastDimensionVectorStride = -1>
-CK_TILE_HOST_DEVICE constexpr auto
-make_naive_tensor_view(DataType* __restrict__ p,
-                       const tuple<Lengths...>& lengths,
-                       const tuple<Strides...>& strides,
-                       number<GuaranteedLastDimensionVectorLength> = number<-1>{},
-                       number<GuaranteedLastDimensionVectorStride> = number<-1>{})
-{
-    // Step 1: Create tensor descriptor (shape + stride information)
-    auto desc = make_naive_tensor_descriptor(lengths,
-                                             strides,
-                                             number<GuaranteedLastDimensionVectorLength>{},
-                                             number<GuaranteedLastDimensionVectorStride>{});
-
-    // Step 2: Create buffer view (pointer + size + address space)
-    auto buffer_view =
-        make_buffer_view<BufferAddressSpace, Coherence>(p, desc.get_element_space_size());
-
-    // Step 3: Combine into tensor view
-    return tensor_view<decltype(buffer_view), decltype(desc), DstInMemOp>{buffer_view, desc};
-}
-```
-
----
-
-## Parameter Breakdown
-
-### 1. **Template Parameter: `address_space_enum::global`**
+**1. `address_space_enum::global`**
 
 Specifies where the memory lives:
-- `global`: GPU global memory (DRAM) - slowest but largest
-- `lds`: Local Data Share (shared memory) - fast, limited size
-- `generic`: Generic address space
-- `vgpr`: Vector General Purpose Registers - fastest, smallest
+- `global`: GPU global memory (DRAM) — slowest, largest
+- `lds`: Local Data Share (LDS / shared memory) — fast, limited (~64KB per block)
+- `vgpr`: Vector General Purpose Registers — fastest, smallest
 
-In our case, `global` means the data is in GPU DRAM.
+**2. `p_a` — Raw Pointer**
 
-### 2. **`p_a` - Raw Pointer**
+The raw device memory pointer (from `hipMalloc` via `DeviceMem`). Points to the start of the
+matrix data.
 
-The raw device memory pointer returned by `hipMalloc`. Points to the start of the matrix data.
+**3. `make_tuple(M, K)` — Shape**
 
-### 3. **`make_tuple(M, K)` - Shape/Lengths**
+Defines the logical dimensions: M rows, K columns. This is the logical view, independent
+of physical layout.
 
-Defines the logical dimensions of the tensor:
-- For matrix A: `(256, 32)` means 256 rows, 32 columns
-- This is the **logical view**, independent of how data is physically laid out
-
-### 4. **`make_tuple(stride_a, 1)` - Strides**
+**4. `make_tuple(Lda, 1)` — Strides**
 
 Defines how to navigate through memory:
-- **Stride for dimension 0 (rows)**: `stride_a = K = 32`
-  - To move to the next row, skip 32 elements
-- **Stride for dimension 1 (columns)**: `1`
-  - To move to the next column, skip 1 element
+- **Dim 0 (rows)**: stride = `Lda` = K — to move to the next row, skip K elements
+- **Dim 1 (cols)**: stride = `1` — consecutive columns are contiguous
 
-**Row-major layout example:**
-```
-Memory:  [a₀₀, a₀₁, a₀₂, ..., a₀₃₁, a₁₀, a₁₁, a₁₂, ..., a₁₃₁, ...]
-          ↑                         ↑
-          Row 0 starts here         Row 1 starts here (offset = 32)
+For B (stored as `[N, K]`): shape is `(N, K)`, strides are `(Ldb, 1)`. N is the leading
+dimension, K is contiguous — exactly matching B's `[N, K]` memory layout.
 
-To access element A[i][j]:
-    offset = i * stride_a + j * 1
-           = i * 32 + j
-```
+**5. `number<kAAlignment>{}` — Guaranteed Vector Length**
 
-### 5. **`number<8>{}` - Guaranteed Last Dimension Vector Length**
+`kAAlignment = 8` tells the system: "The last dimension (K) is guaranteed to have at least 8
+consecutive fp16 elements aligned in memory — safe to issue one `global_load_dwordx4`."
 
-This tells the tensor view: **"The last dimension (K) is guaranteed to have at least 8 consecutive elements that can be loaded together in a single vector instruction."**
-
-#### Why is this important?
-
-Modern GPUs can load multiple elements in one instruction (vectorized loads):
-- `float4`: Load 4 floats at once
-- `float8`: Load 8 floats at once (if supported)
-
-By specifying `number<8>{}`, we're telling the system:
-- "You can safely use vector loads of up to 8 elements"
-- "The memory alignment and layout support this"
-
-**Example:**
+This enables the compiler to emit vectorized loads without runtime alignment checks:
 ```cpp
-// Without vectorization (slow):
-for (int j = 0; j < 8; j++) {
-    data[j] = memory[offset + j];  // 8 separate loads
-}
-
-// With vectorization (fast):
-float8 vec = *reinterpret_cast<float8*>(&memory[offset]);  // 1 load!
+// What the compiler produces:
+buffer_load_dwordx4 v[0:3], ...   // loads 8 fp16 = 128 bits in one instruction
 ```
 
-### 6. **`number<1>{}` - Guaranteed Last Dimension Vector Stride**
+**6. `number<1>{}` — Guaranteed Vector Stride**
 
-This specifies the **stride between consecutive vectorizable elements** in the last dimension.
-
-- `number<1>{}` means: "Consecutive elements in the last dimension are contiguous in memory (stride = 1)"
-- This confirms that elements `A[i][0], A[i][1], A[i][2], ..., A[i][7]` are stored consecutively
-
-**Why does this matter?**
-
-For efficient vectorized loads, elements must be:
-1. **Contiguous** (stride = 1) ✓
-2. **Aligned** properly in memory
-3. **Within the same cache line** (ideally)
-
-If the stride were `2`, it would mean:
-```
-A[i][0] is at offset 0
-A[i][1] is at offset 2  (not 1!)
-A[i][2] is at offset 4
-```
-This would prevent efficient vectorization.
+Confirms that consecutive elements in the K dimension have stride 1 (contiguous in memory).
+A stride > 1 would prevent vectorization.
 
 ---
 
-## What is a Buffer View?
+## B's `[N, K]` Tensor View
 
-A **buffer view** is the middle layer between raw memory and tensor view. It provides:
-
-### Core Responsibilities:
-
-1. **Memory Management**
-   - Holds the raw pointer: `T* p_data_`
-   - Tracks buffer size: `BufferSizeType buffer_size_`
-   - Knows the address space: `global`, `lds`, etc.
-
-2. **Vectorized Access**
-   ```cpp
-   template <typename VectorType>
-   CK_TILE_DEVICE VectorType get(index_t offset);
-   ```
-   - Provides efficient vector loads/stores
-   - Handles alignment requirements
-
-3. **Bounds Checking** (optional)
-   ```cpp
-   template <bool oob_conditional_check = true>
-   CK_TILE_DEVICE auto get(index_t i, index_t linear_offset);
-   ```
-   - Can optionally check if access is within bounds
-   - Returns invalid value (default 0) for out-of-bounds access
-
-4. **Address Space Awareness**
-   - Uses different load/store instructions based on address space
-   - Global memory: `global_load`, `global_store`
-   - LDS: `ds_read`, `ds_write`
-
-### Buffer View Structure:
+Matrix B is stored in `[N, K]` layout (not `[K, N]`):
 
 ```cpp
-template <address_space_enum BufferAddressSpace,
-          typename T,
-          typename BufferSizeType,
-          bool InvalidElementUseNumericalZeroValue,
-          amd_buffer_coherence_enum Coherence>
-struct buffer_view
-{
-    T* p_data_;                              // Raw pointer
-    BufferSizeType buffer_size_;             // Total elements
-    remove_cvref_t<T> invalid_element_value_; // Value for OOB access
+auto b_grid = make_naive_tensor_view<address_space_enum::global>(
+    p_b,
+    make_tuple(N, K),    // N rows, K cols  ← N is leading dimension
+    make_tuple(Ldb, 1),  // stride between N rows = Ldb = K; K cols are contiguous
+    number<kBAlignment>{},
+    number<1>{});
+```
 
-    // Access operators
-    const T& operator[](index_t i) const;    // Read
-    T& operator()(index_t i);                // Write
-    
-    // Vectorized access
-    template <typename VectorType>
-    VectorType get(index_t offset);
+This layout means "row i of B in memory" = the K-vector `B[i, 0:K-1]`. When the kernel
+creates a tile window `{iN, 0}` of size `(kNPerBlock, kKPerBlock)`, it reads `kNPerBlock`
+consecutive rows of B, each being a K-slice — the coalesced pattern the kernel relies on.
+
+---
+
+## `GridGemmProblem_`: The Type-Tag Pattern
+
+```cpp
+// Inside Gemm:
+using GridGemmProblem_ =
+    GridGemmProblem<ADataType, BDataType, AccDataType, CDataType, CElementFunction>;
+```
+
+`GridGemmProblem` is an **empty struct with type aliases** — a type-tag. No data, no
+member functions. Its sole purpose is to carry all data-type information as a single
+template parameter through the hierarchy:
+
+```
+Gemm<ADataType, BDataType, AccDataType, CDataType, CElementFunction, ...>
+    → GridGemmProblem_  (type tag bundles all data types)
+        → GridGemm<GridGemmProblem_, GridGemmPolicy>
+            → BlockGemmPipelineAGmemBGmemCReg<BlockGemmPipelineProblem_>
+                → BlockGemmASmemBSmemCReg<Problem>
+```
+
+Without this pattern, every level of the hierarchy would need to carry `ADataType, BDataType,
+AccDataType, CDataType, CElementFunction` as separate template parameters — much more verbose.
+
+---
+
+## `GridGemmPolicy`: Nested Policy Struct
+
+```cpp
+struct GridGemmPolicy
+{
+    static constexpr index_t kBlockSize = kBlockSize_;
+    static constexpr index_t kMPerBlock = kMPerBlock_;
+    static constexpr index_t kNPerBlock = kNPerBlock_;
+    static constexpr index_t kKPerBlock = kKPerBlock_;
+
+    template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto MakeBlock2TileMap(index_t M0, index_t N0);
+
+    template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto GetBlockGemmPipeline();
 };
 ```
+
+`GridGemmPolicy` is a **nested struct** inside `Gemm`. It captures the tile dimensions
+(`kMPerBlock`, `kNPerBlock`, `kKPerBlock`) that were passed as template parameters to `Gemm`,
+making them accessible to `GridGemm` via the Policy type.
+
+**Problem vs. Policy:**
+- `Problem` = **what**: data types, shapes — describes the mathematical problem
+- `Policy` = **how**: tile mapping, pipeline selection — describes how to partition and execute
+
+Separating these allows swapping execution strategies (different LDS layouts, different
+pipeline types) without changing the Problem definition.
+
+---
+
+## Dispatch to GridGemm
+
+```cpp
+GridGemm<GridGemmProblem_, GridGemmPolicy>{}(a_grid, b_grid, c_grid, c_element_func);
+```
+
+`GridGemm` (in `host_level/grid_gemm.hpp`) is the device-side dispatcher that:
+1. Extracts M, N, K from the tensor descriptors
+2. Converts the linear `block_id` to a 2D tile coordinate `(iM, iN)` using `GridGemmPolicy::MakeBlock2TileMap`
+3. Creates `a_block_window` at origin `(iM, 0)` and `b_block_window` at origin `(iN, 0)`
+4. Calls `BlockGemmPipelineAGmemBGmemCReg` to compute the C tile
+5. Applies `CElementFunction` and stores to C
 
 ---
 
 ## Visual Example: Matrix A Memory Layout
 
-Let's visualize how matrix A (256×32, fp16) is organized:
+Let's visualize how matrix A (M×K = 3328×4096, fp16) is organized:
 
 ### Raw Physical Memory (Linear):
 ```
-GPU DRAM Address Space:
-┌─────────────────────────────────────────────────────────────────┐
-│ Byte 0                                                          │
-│ ↓                                                               │
-│ [a₀₀][a₀₁][a₀₂]...[a₀₃₁][a₁₀][a₁₁][a₁₂]...[a₁₃₁][a₂₀]...     │
-│  ↑                        ↑                                     │
-│  Row 0 (32 elements)      Row 1 (32 elements)                  │
-│                                                                 │
-│  Total: 256 rows × 32 cols × 2 bytes/element = 16,384 bytes   │
-└─────────────────────────────────────────────────────────────────┘
-         ↑
-         p_a (raw pointer)
-```
+GPU DRAM:
+│ a[0,0] │ a[0,1] │ ... │ a[0,4095] │ a[1,0] │ a[1,1] │ ... │ a[3327,4095] │
+↑                                    ↑
+Row 0 (K=4096 elements)             Row 1 (K=4096 elements)
 
-### Buffer View Layer:
-```
-buffer_view<address_space_enum::global, fp16_t, ...>
-┌─────────────────────────────────────────────────────────────────┐
-│ p_data_ = p_a                                                   │
-│ buffer_size_ = 256 × 32 = 8,192 elements                       │
-│ address_space = global (DRAM)                                   │
-│                                                                 │
-│ Provides:                                                       │
-│ • Linear indexing: buffer_view[i] → element at offset i        │
-│ • Vectorized loads: get<float4>(offset) → load 4 fp16s at once│
-│ • Bounds checking: is offset < buffer_size_?                   │
-└─────────────────────────────────────────────────────────────────┘
+Total: 3328 × 4096 × 2 bytes/fp16 = ~27 MB
 ```
 
 ### Tensor View Layer:
 ```
-tensor_view<buffer_view, tensor_descriptor>
-┌─────────────────────────────────────────────────────────────────┐
-│ Shape: (256, 32)                                                │
-│ Strides: (32, 1)                                                │
-│ Guaranteed vector length: 8                                     │
-│ Guaranteed vector stride: 1                                     │
-│                                                                 │
-│ Logical 2D View:                                                │
-│     Col:  0    1    2   ...  31                                │
-│   Row 0: [a₀₀][a₀₁][a₀₂] ... [a₀₃₁]  ← Can vector load 8 at once│
-│   Row 1: [a₁₀][a₁₁][a₁₂] ... [a₁₃₁]                           │
-│   Row 2: [a₂₀][a₂₁][a₂₂] ... [a₂₃₁]                           │
-│   ...                                                           │
-│   Row 255: [a₂₅₅,₀] ... [a₂₅₅,₃₁]                             │
-│                                                                 │
-│ Provides:                                                       │
-│ • Multi-dimensional indexing: A[i][j]                          │
-│ • Coordinate transformation: (i,j) → linear offset = i*32 + j  │
-│ • Tile window creation: Extract sub-tensors                    │
-└─────────────────────────────────────────────────────────────────┘
+tensor_view: shape=(3328, 4096), strides=(4096, 1), vec_len=8
+┌──────────────────────────────────────────────────┐
+│ Logical 2D View:                                  │
+│   Col: 0  1  2 ... 4095                          │
+│ R0: [a₀₀][a₀₁]...[a₀,₄₀₉₅] ← can load 8 at once │
+│ R1: [a₁₀][a₁₁]...[a₁,₄₀₉₅]                       │
+│ ...                                               │
+│ R3327: [...]                                      │
+│                                                   │
+│ Provides: make_tile_window(), vectorized loads    │
+└──────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Complete Flow: Raw Memory → Tensor View
+## Complete Transformation: Raw Memory → Tensor View
 
-Let's trace the complete transformation for matrix A:
-
-### Step 1: Kernel Launch (Host Side)
-```cpp
-// On host: Allocate device memory
-hipMalloc(&p_a, M * K * sizeof(fp16_t));  // Returns raw pointer
-
-// Launch kernel
-kernel<<<grid, block>>>(p_a, p_b, p_c, M, N, K, ...);
 ```
+Step 1: Kernel launch (host side)
+    hipMalloc → raw pointer p_a
 
-### Step 2: Inside Kernel (Device Side)
-```cpp
-// Receive raw pointer
-const fp16_t* p_a;  // Points to GPU DRAM
+Step 2: Inside kernel (device side)
+    make_naive_tensor_view →
+        make_naive_tensor_descriptor(shape, strides, vec_len, vec_stride)
+        + make_buffer_view<global>(p_a, element_space_size)
+        = tensor_view{buffer_view, descriptor}
 
-// Step 2a: Create tensor descriptor
-auto desc = make_naive_tensor_descriptor(
-    make_tuple(256, 32),    // Shape
-    make_tuple(32, 1),      // Strides
-    number<8>{},            // Vector length
-    number<1>{}             // Vector stride
-);
-// desc now knows: "This is a 256×32 tensor, row-major, vectorizable by 8"
+Step 3: Using the tensor view in GridGemm
+    make_tile_window(a_grid, (kMPerBlock, kKPerBlock), {iM, 0})
+    → a_block_window covering rows [iM, iM+kMPerBlock), K columns [0, kKPerBlock)
 
-// Step 2b: Create buffer view
-auto buffer_view = make_buffer_view<address_space_enum::global>(
-    p_a,                    // Raw pointer
-    256 * 32                // Total elements
-);
-// buffer_view now wraps p_a with size and address space info
-
-// Step 2c: Create tensor view
-auto a_dram = tensor_view{buffer_view, desc};
-// a_dram now provides structured, multi-dimensional access to p_a
-```
-
-### Step 3: Using the Tensor View
-```cpp
-// Access element A[i][j]
-auto value = a_dram[make_tuple(i, j)];
-
-// Create a tile window (sub-tensor)
-auto tile = make_tile_window(
-    a_dram,
-    make_tuple(16, 16),  // 16×16 tile
-    make_tuple(0, 0)     // Starting at origin
-);
-
-// Load tile into registers with vectorization
-auto tile_data = load_tile(tile);  // Uses vector loads internally!
-```
-
----
-
-## Why This Abstraction?
-
-### Benefits:
-
-1. **Type Safety**: Can't accidentally access wrong dimensions
-2. **Performance**: Compiler knows about vectorization opportunities
-3. **Flexibility**: Same code works for different memory spaces (DRAM, LDS, registers)
-4. **Maintainability**: Logical structure separate from physical layout
-5. **Optimization**: Guaranteed vector properties enable aggressive optimizations
-
-### Example: Without Tensor Views (Manual Indexing)
-```cpp
-// Ugly, error-prone, hard to optimize:
-for (int i = 0; i < 16; i++) {
-    for (int j = 0; j < 16; j++) {
-        float val = p_a[tile_offset_i * stride_a + tile_offset_j + i * stride_a + j];
-        // Hope the compiler vectorizes this? 🤞
-    }
-}
-```
-
-### Example: With Tensor Views (Clean, Optimized)
-```cpp
-// Clean, safe, automatically vectorized:
-auto tile = make_tile_window(a_dram, make_tuple(16, 16), origin);
-auto tile_data = load_tile(tile);  // Vectorized loads guaranteed!
+Step 4: In the block pipeline
+    load_tile(a_copy_dram_window)  → vectorized loads, each thread loads K1=8 fp16 per call
+    store_tile(a_copy_lds_window, a_block_tile) → writes to LDS
+    a_lds_gemm_window → feeds MFMA
 ```
 
 ---
 
 ## Summary
 
-The `PracticeGemmKernel` entry point transforms raw GPU memory into structured, multi-dimensional tensors through a three-layer abstraction:
+The `Gemm` entry point transforms raw GPU memory into structured, multi-dimensional tensors
+through a three-layer abstraction:
 
 1. **Raw Memory**: Linear array of bytes in GPU DRAM
-2. **Buffer View**: Adds size, address space, and vectorized access
+2. **Buffer View**: Adds size, address space, and vectorized access methods
 3. **Tensor View**: Adds shape, strides, and multi-dimensional indexing
 
 This abstraction enables:
-- ✅ Clean, readable code
-- ✅ Type-safe multi-dimensional access
-- ✅ Automatic vectorization
-- ✅ Flexible memory space handling
-- ✅ Efficient tile-based computation
+- Clean, readable code with compile-time shape information
+- Type-safe multi-dimensional access
+- Automatic vectorization via `number<kAlignment>{}` guarantees
+- Flexible memory space handling (global → LDS → registers)
+- Efficient tile-based computation via `make_tile_window`
 
-The tensor views created here are then passed to the host-level pipeline, which orchestrates the block-level GEMM computation!
-
+The tensor views created here are passed to `GridGemm`, which orchestrates the block-level
+GEMM computation through the three-level hierarchy:
+`GridGemm → BlockGemmPipelineAGmemBGmemCReg → BlockGemmASmemBSmemCReg (MFMA)`.

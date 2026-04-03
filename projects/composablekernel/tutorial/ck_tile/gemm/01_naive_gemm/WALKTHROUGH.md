@@ -1,61 +1,66 @@
-# Practice GEMM: Step-by-Step Code Walkthrough
+# Naive GEMM: Step-by-Step Code Walkthrough
 
-This document provides a detailed walkthrough of `practice_gemm.cpp`, explaining each step of implementing a GEMM (General Matrix Multiplication) kernel using the CK Tile API.
+This document provides a detailed walkthrough of `practice_gemm.cpp`, explaining each step of
+implementing a GEMM (General Matrix Multiplication) kernel using the CK Tile API.
 
 ## Overview
 
-We'll implement `C = A × B` where:
+We implement `C = A × B` where:
 - `A` is an `M × K` matrix
-- `B` is an `N × K` matrix (note: transposed layout)
+- `B` is an `N × K` matrix (B is stored in `[N, K]` layout — N as the leading dimension, K contiguous)
 - `C` is an `M × N` matrix
 
 The implementation uses a hierarchical tiling strategy with two levels:
-1. **Block Tiles**: Processed by thread blocks
-2. **Wave Tiles**: Processed by warps (wavefronts) within blocks
+1. **Block Tiles**: Processed by one thread block (256 threads)
+2. **Warp Tiles**: Processed by warps (wavefronts) within blocks using MFMA instructions
 
 ---
 
 ## Step 1: Define Data Types
 
 ```cpp
-using ADataType   = ck_tile::half_t;
-using BDataType   = ck_tile::half_t;
-using CDataType   = float;
-using AccDataType = float;
+using ADataType   = ck_tile::half_t;   // FP16 input
+using BDataType   = ck_tile::half_t;   // FP16 input
+using AccDataType = float;              // FP32 accumulation (numerical precision)
+using CDataType   = ck_tile::half_t;   // FP16 output (cast from FP32 accumulator)
 ```
 
 **What's happening:**
-- We use `half_t` (FP16) for input matrices A and B.
-- We use `float` (FP32) for output matrix C and accumulation for numerical accuracy
-- In typical CK examples, this information is part of a `GemmConfig` struct, but here we define it directly for simplicity
+- We use `half_t` (FP16) for input matrices A and B — efficient memory bandwidth and high MFMA throughput.
+- The accumulator uses `float` (FP32) to prevent precision loss from repeated FP16 additions.
+- The output matrix C uses `half_t`: the FP32 accumulator is cast to FP16 via `type_convert<CDataType>` in `grid_gemm.hpp`.
+
+Note: Unlike simplified examples that use `float` for C, the production kernel uses `half_t` for C to match typical ML workload requirements.
+
 ---
 
 ## Step 2: Define Problem Size
 
 ```cpp
-ck_tile::index_t M = 512;
-ck_tile::index_t N = 256;
-ck_tile::index_t K = 64;
-ck_tile::index_t verification = 1;
-
-ck_tile::index_t stride_a = K;
-ck_tile::index_t stride_b = K;
-ck_tile::index_t stride_c = N;
+ck_tile::index_t M = 3328;   // Number of rows in A and C (default)
+ck_tile::index_t N = 4096;   // Number of columns in B and C (default)
+ck_tile::index_t K = 4096;   // Inner dimension: cols of A, rows of B (default)
 ```
 
-**What's happening:**
-- `M = 512`: Number of rows in A and C
-- `N = 256`: Number of columns in B and C
-- `K = 64`: Inner dimension (columns of A, rows of B)
-- Strides define memory layout (row-major for A and C, transposed for B)
+These defaults are representative of large language model (LLM) shapes. The binary accepts optional
+command-line arguments to override them:
 
-**Memory Layout:**
+```bash
+./tile_tutorial_naive_gemm                      # use defaults M=3328, N=4096, K=4096
+./tile_tutorial_naive_gemm 1                    # enable verification, keep defaults
+./tile_tutorial_naive_gemm 1 512 256 64         # enable verification, custom M N K
 ```
-Matrix A (M×K):        Matrix B (N×K):        Matrix C (M×N):
-[512 rows]             [256 rows]             [512 rows]
-[64 cols]              [64 cols]              [256 cols]
-stride = K             stride = K             stride = N
+
+**Memory layout:**
 ```
+Matrix A [M, K]:        Matrix B [N, K]:        Matrix C [M, N]:
+stride_a = K            stride_b = K            stride_c = N
+(row-major)             (N is leading dim)       (row-major)
+```
+
+B is intentionally stored in `[N, K]` (B-transposed) layout. Each row of B in memory is a
+full K-vector, so loading "rows" of B produces the K-aligned vectors that MFMA expects —
+enabling both coalesced and vectorized global loads without any in-kernel transposition.
 
 ---
 
@@ -63,230 +68,139 @@ stride = K             stride = K             stride = N
 
 ```cpp
 auto a_lengths = std::array<ck_tile::index_t, 2>{M, K};
-auto b_lengths = std::array<ck_tile::index_t, 2>{N, K};
+auto b_lengths = std::array<ck_tile::index_t, 2>{N, K};   // N×K, not K×N
 auto c_lengths = std::array<ck_tile::index_t, 2>{M, N};
 
-auto a_strides = std::array<ck_tile::index_t, 2>{stride_a, 1};
-auto b_strides = std::array<ck_tile::index_t, 2>{stride_b, 1};
-auto c_strides = std::array<ck_tile::index_t, 2>{stride_c, 1};
+auto a_strides = std::array<ck_tile::index_t, 2>{stride_a, 1};  // row-major
+auto b_strides = std::array<ck_tile::index_t, 2>{stride_b, 1};  // N-major (B transposed)
+auto c_strides = std::array<ck_tile::index_t, 2>{stride_c, 1};  // row-major
 
 ck_tile::HostTensor<ADataType> a_host(a_lengths, a_strides);
 ck_tile::HostTensor<BDataType> b_host(b_lengths, b_strides);
-ck_tile::HostTensor<CDataType> c_host(c_lengths, c_strides);
+ck_tile::HostTensor<CDataType> c_host_dev(c_lengths, c_strides);  // will receive GPU results
 ```
 
-**What's happening:**
-- We create three tensors on the host (CPU) memory
-- Each tensor is defined by its shape (`lengths`) and memory layout (`strides`)
-- `HostTensor` is a CK Tile utility class that manages CPU memory
-
-**Stride explanation:**
-- For A: `stride_a = K` means moving to the next row requires skipping K elements
-- For B: `stride_b = K` means B is stored in transposed format
-- For C: `stride_c = N` means row-major layout
+`HostTensor` is a CK Tile utility that manages CPU memory. Each tensor is defined by its shape
+(`lengths`) and memory strides (`strides`). Stride `1` for the last dimension means elements
+in that dimension are contiguous — the precondition for vectorized loads.
 
 ---
 
 ## Step 4: Initialize Tensors with Random Data
 
 ```cpp
-ck_tile::FillUniformDistribution<ADataType>{-5.f, 5.f}(a_host);
-ck_tile::FillUniformDistribution<BDataType>{-5.f, 5.f}(b_host);
-c_host.SetZero();
+ck_tile::FillUniformDistributionIntegerValue<ADataType>{-5.f, 5.f}(a_host);
+ck_tile::FillUniformDistributionIntegerValue<BDataType>{-5.f, 5.f}(b_host);
 ```
 
-**What's happening:**
-- A and B are filled with random values in the range [-5.0, 5.0]
-- C is initialized to zero (will store the output)
-
-**Optional: Print Tensor Contents**
-```cpp
-// Commented out in the code, but available for debugging:
-// a_host.print_first_n(10);  // Print first 10 elements of A
-```
-
-The `print_first_n()` helper function can display tensor contents for debugging purposes.
+`FillUniformDistributionIntegerValue` fills with random **integer-valued** data in `[-5, 5]`
+(stored as FP16). Using integer values avoids FP16 rounding noise during verification —
+the CPU reference computation in FP32 and the GPU computation with FP32 accumulation will
+agree exactly for integer-valued inputs within this range.
 
 ---
 
 ## Step 5: Allocate Device Memory and Transfer Data
 
 ```cpp
-ck_tile::DeviceMem a_device(a_host);
-ck_tile::DeviceMem b_device(b_host);
-ck_tile::DeviceMem c_device(c_host);
+// Two-step pattern: explicit size allocation + explicit transfer
+ck_tile::DeviceMem a_buf(a_host.get_element_space_size_in_bytes());
+a_buf.ToDevice(a_host.mData.data());
+
+ck_tile::DeviceMem b_buf(b_host.get_element_space_size_in_bytes());
+b_buf.ToDevice(b_host.mData.data());
+
+ck_tile::DeviceMem c_buf(c_host_dev.get_element_space_size_in_bytes());
 ```
 
-**What's happening:**
-- `DeviceMem` allocates GPU memory matching the size of host tensors
-- The constructor **automatically transfers data from host to device**
-- This is a convenience wrapper around `hipMalloc` and `hipMemcpy`
+The two-step pattern (allocate then transfer) is explicit: `DeviceMem(size)` calls `hipMalloc`,
+and `ToDevice(ptr)` calls `hipMemcpy`. This is in contrast to one-shot constructors; the
+explicit pattern makes the allocation and transfer steps visible and independently verifiable.
 
-**Memory Flow:**
+Note: `c_buf` is allocated but **not** initialized before the kernel launch — the kernel
+writes all of C from scratch.
+
+**Memory flow:**
 ```
-CPU (Host)              GPU (Device)
-┌─────────┐            ┌─────────┐
-│ a_host  │ ────────>  │a_device │
-│ b_host  │ ────────>  │b_device │
-│ c_host  │ ────────>  │c_device │
-└─────────┘            └─────────┘
+CPU (Host)             GPU (Device)
+┌─────────┐           ┌─────────┐
+│ a_host  │ ToDevice> │  a_buf  │
+│ b_host  │ ToDevice> │  b_buf  │
+│         │           │  c_buf  │  ← kernel writes here
+└─────────┘           └─────────┘
 ```
 
 ---
 
-## Step 6: Configure Hierarchical Tiling
+## Step 6: Configure Block Tile Shape
 
 ```cpp
-using BlockTile = ck_tile::sequence<256, 128, 32>;
-using WaveTile  = ck_tile::sequence<16, 16, 16>;
+// Block tile: the region of C each thread block computes in a single kernel launch
+constexpr ck_tile::index_t kGemmMPerBlock = 256;  // M dimension per block
+constexpr ck_tile::index_t kGemmNPerBlock = 128;  // N dimension per block
+constexpr ck_tile::index_t kGemmKPerBlock = 32;   // K slice per loop iteration
+
+// Alignment = 8 means 8 fp16 elements per load = 128 bits = one global_load_dwordx4
+constexpr ck_tile::index_t kAAlignment = 8;
+constexpr ck_tile::index_t kBAlignment = 8;
+constexpr ck_tile::index_t kCAlignment = 8;
+
+// 2 blocks per CU: 4 SIMDs/CU × 2 warps/SIMD → 8 warps/CU, then /4 warps/block = 2 blocks/CU
+constexpr ck_tile::index_t kWarpPerCu   = 8;
+constexpr ck_tile::index_t kBlockPerCu  = kWarpPerCu / (kBlockSize / warp_size);  // = 2
 ```
 
-**What's happening:**
-- We define a two-level tiling hierarchy for the GEMM computation
+Each thread block (256 threads = 4 warps) computes a 256×128 tile of C, iterating over K
+in slices of 32 elements. The total number of blocks launched equals the number of tiles
+needed to cover C:
 
-### Block Tile (256 × 128 × 32)
-- **256**: M dimension per block (rows of A and C)
-- **128**: N dimension per block (columns of B and C)
-- **32**: K dimension per block (inner dimension)
-- Each block tile is processed by one **thread block** (256 threads)
-
-### Wave Tile (16 × 16 × 16)
-- **16 × 16**: Output tile dimensions (M × N) per warp iteration
-- **16**: K dimension per warp iteration
-- Each wave tile is processed by one **warp** (64 threads on AMD GPUs)
-
-**Important:** The WaveTile (16×16×16) is NOT the same as the MFMA instruction size (32×32×8). The WaveTile represents the work done per warp per iteration, while MFMA is the underlying hardware instruction. Multiple MFMA operations may be needed to compute one wave tile
-
-**Important Note:**
-In this example, the problem size (256 × 128 × 32) is **identical** to the block tile size, so only **one thread block** is needed to compute the entire problem.
-
-### Tiling Visualization:
-
-#### Matrix A (M × K = 256 × 32):
 ```
-┌─────────────────────────────────────┐
-│  One Block Tile (256 × 32)          │
-│  ┌────┬────┐                        │
-│  │16×│16× │  ← Wave tiles (16×16)   │
-│  │ 16│ 16 │     in M×K space        │
-│  ├────┼────┤                        │
-│  │    │    │                        │
-│  ├────┼────┤                        │
-│  │ .. │ .. │  16 tiles in M         │
-│  ├────┼────┤  2 tiles in K          │
-│  │    │    │                        │
-│  └────┴────┘                        │
-│                                     │
-└─────────────────────────────────────┘
+kGridSize = ceil(M / kGemmMPerBlock) * ceil(N / kGemmNPerBlock)
+          = ceil(3328 / 256) * ceil(4096 / 128)
+          = 13 * 32
+          = 416 blocks
 ```
 
-#### Matrix B (N × K = 128 × 32):
-```
-┌──────────────────────────────┐
-│  One Block Tile (128 × 32)   │
-│  ┌────┬────┐                 │
-│  │16×│16× │  ← Wave tiles    │
-│  │ 16│ 16 │     (16×16)      │
-│  ├────┼────┤                 │
-│  │    │    │                 │
-│  ├────┼────┤  8 tiles in N   │
-│  │ .. │ .. │  2 tiles in K   │
-│  ├────┼────┤                 │
-│  │    │    │                 │
-│  └────┴────┘                 │
-└──────────────────────────────┘
-```
+### About the MFMA instruction used
 
-#### Matrix C (M × N = 256 × 128) - Output:
-```
-┌─────────────────────────────────────────────────┐
-│  One Block Tile (256 × 128)                     │
-│                                                  │
-│  ┌────┬────┬────┬────┬────┬────┬────┬────┐     │
-│  │16× │    │    │    │    │    │    │    │     │
-│  │ 16 │    │    │    │    │    │    │    │     │
-│  ├────┼────┼────┼────┼────┼────┼────┼────┤     │
-│  │    │    │    │    │    │    │    │    │     │
-│  ├────┼────┼────┼────┼────┼────┼────┼────┤     │
-│  │    │    │    │    │    │    │    │    │     │
-│  ├────┼────┼────┼────┼────┼────┼────┼────┤     │
-│  │ .. │ .. │ .. │ .. │ .. │ .. │ .. │ .. │     │
-│  ├────┼────┼────┼────┼────┼────┼────┼────┤     │
-│  │    │    │    │    │    │    │    │    │     │
-│  └────┴────┴────┴────┴────┴────┴────┴────┘     │
-│                                                  │
-│  16 wave tiles in M direction                   │
-│  8 wave tiles in N direction                    │
-│  Total: 128 wave tiles (16×16 each)             │
-└─────────────────────────────────────────────────┘
-```
+The actual hardware MFMA instruction is **v_mfma_f32_32x32x8f16**:
+- Output: 32×32 matrix (kM=32, kN=32)
+- K reduction width: 8 fp16 elements per call (kK=8)
+- 64 threads per warp, each owning a slice of the 32×32 output
 
-#### How Wave Tiles Combine (C = A × B):
-```
-Matrix A          Matrix B (stored transposed N×K)          Matrix C
-(256×32)          (128×32)                                  (256×128)
+The block tile (256×128×32) is divided among 4 warps (MWarp=4, NWarp=1):
+- `MIterPerWarp = 256 / (4 * 32) = 2` — each warp covers 2 M-tiles of size 32
+- `NIterPerWarp = 128 / (1 * 32) = 4` — each warp covers 4 N-tiles of size 32
+- `KIterPerWarp = 32  / 8        = 4` — each K-slice needs 4 MFMA calls
 
-Row of A tiles:   Row of B tiles:                One wave tile in C:
-┌────┬────┐      ┌────┬────┐                    ┌────┐
-│ A₀ │ A₁ │  ×   │ B₀ │ B₁ │                =   │ C  │ (16×16)
-└────┴────┘      └────┴────┘                    └────┘
-  16×16 each       16×16 each
-
-Computation: C = A₀×B₀ᵀ + A₁×B₁ᵀ
-             ↑             ↑
-          K=0..15      K=16..31
-          
-Each wave tile in C is computed by:
-- Taking one row of wave tiles from A (2 tiles along K)
-- Taking one row of wave tiles from B (2 tiles along K)
-  Note: B is stored transposed (N×K), so a "row" in storage corresponds 
-  to a "column" in the logical B^T matrix used in computation
-- Performing dot product: Σ(A_k × B_k^T) for k=0,1
-```
-
-**Key Insight:**
-- Each **wave tile in C** (16×16) requires a **dot product** of 2 wave tiles from A and 2 wave tiles from B
-- Since B is stored transposed (N×K layout), we access **rows** of B tiles in memory
-- This is the fundamental operation repeated across all 128 wave tiles in C
-- Each warp computes one wave tile using MFMA instructions
+Total MFMA calls per warp: 2 × 4 × 4 = 32. Total per block: 128.
 
 ---
 
-## Step 7: Create Shape, Problem, and Policy Structs
+## Step 7: Construct the Kernel Type
 
 ```cpp
-using PracticeGemmShape = ck_tile::PracticeGemmShape<BlockTile, WaveTile>;
-std::cout << "PracticeGemmShape: " << PracticeGemmShape::GetName() << std::endl;
-
-using PracticeGemmHostProblem = ck_tile::
-    PracticeGemmHostProblem<ADataType, BDataType, CDataType, AccDataType, PracticeGemmShape>;
-
-using PracticeGemmHostPolicy = ck_tile::PracticeGemmHostPolicy;
+// Gemm struct bundles all configuration at compile time.
+// All template parameters are resolved here; the kernel itself has no runtime decisions.
+using gemm_kernel = ck_tile::Gemm<ADataType,
+                                   BDataType,
+                                   AccDataType,
+                                   CDataType,
+                                   CElementFunction,
+                                   kAAlignment,
+                                   kBAlignment,
+                                   kCAlignment,
+                                   kBlockSize,
+                                   kGemmMPerBlock,
+                                   kGemmNPerBlock,
+                                   kGemmKPerBlock>;
 ```
 
-**What's happening:**
+`Gemm` is the top-level functor defined in `practice_gemm.hpp`. It wraps a `GridGemm` (host-level
+dispatcher) and a `GridGemmPolicy` (policy struct) plus a `BlockGemmPipelineAGmemBGmemCReg`
+(block pipeline). All these types are resolved at compile time by the single `Gemm` instantiation.
 
-### 1. **Shape Struct**
-Encapsulates all tile shape information (BlockTile and WaveTile dimensions).
-
-### 2. **Problem Struct**
-Holds complete problem description:
-- Data types (ADataType, BDataType, CDataType, AccDataType)
-- Shape information (BlockTile, WaveTile)
-
-In more complex examples, this would also include:
-- Data layouts (row-major, column-major)
-- Mathematical operations (e.g., transposed GEMM)
-
-### 3. **Policy Struct**
-Describes data movement and thread-to-data mapping:
-- Currently contains `MakeBlock2TileMap()`: Maps thread block IDs to tile positions
-- In more complex kernels, includes:
-  - DRAM access patterns
-  - LDS (Local Data Share) usage strategies
-  - Thread distribution within blocks
-
-**CK Tile Design Pattern:**
+**CK Tile design pattern:**
 ```
 Kernel = Problem + Policy + Epilogue
          ↑         ↑        ↑
@@ -295,179 +209,117 @@ Kernel = Problem + Policy + Epilogue
 
 ---
 
-## Step 8: Calculate Grid and Block Dimensions
+## Step 8: Calculate Grid/Block Dimensions
 
 ```cpp
-ck_tile::index_t kGridSize = ck_tile::integer_divide_ceil(M, PracticeGemmShape::BlockTile_M) *
-                             ck_tile::integer_divide_ceil(N, PracticeGemmShape::BlockTile_N);
+ck_tile::index_t kGridSize = ck_tile::integer_divide_ceil(M, kGemmMPerBlock) *
+                              ck_tile::integer_divide_ceil(N, kGemmNPerBlock);
 
-std::cout << "kGridSize: " << kGridSize << std::endl;
-
-constexpr ck_tile::index_t kBlockSize = 256;
-constexpr ck_tile::index_t kBlockPerCU = 1;
+constexpr ck_tile::index_t kBlockSize = 256;  // 4 warps of 64 threads each
 ```
 
-**What's happening:**
-
-### Grid Size Calculation
-```cpp
-kGridSize = ceil(M / BlockTile_M) × ceil(N / BlockTile_N)
-          = ceil(512 / 256) × ceil(256 / 128)
-          = 2 × 2
-          = 4 thread blocks
-```
-
-Our problem requires **4 thread blocks** to cover the entire output matrix C (2 blocks in M direction, 2 blocks in N direction).
-
-### Block Configuration
-- `kBlockSize = 256`: Each thread block has 256 threads
-  - 256 threads / 64 threads per warp = **4 warps per block**
-- `kBlockPerCU = 1`: Launch 1 block per Compute Unit (for simplicity)
-
-**Thread Hierarchy:**
-```
-GPU
-└── 1 Thread Block (Grid)
-    └── 256 Threads
-        ├── Warp 0 (threads 0-63)
-        ├── Warp 1 (threads 64-127)
-        ├── Warp 2 (threads 128-191)
-        └── Warp 3 (threads 192-255)
-```
+- `kGridSize`: Total number of thread blocks = total C tiles to compute
+- `kBlockSize`: Fixed at 256 threads — 4 warps × 64 threads/warp (AMD CDNA)
+- `kBlockPerCu = 2`: Occupancy hint. With 4 SIMDs/CU and 2 warps/SIMD (8 warps/CU total)
+  and 4 warps/block, this places 2 blocks per CU simultaneously.
 
 ---
 
-## Step 9: Create and Launch the Kernel
+## Step 9: Launch the Kernel
 
 ```cpp
-using gemm_kernel =
-    ck_tile::PracticeGemmKernel<PracticeGemmHostProblem, PracticeGemmHostPolicy>;
-
 float ave_time = ck_tile::launch_kernel(
-    ck_tile::stream_config{nullptr, true, 0, 0, 1},
-    ck_tile::make_kernel<kBlockPerCU>(gemm_kernel{},
-                                      kGridSize,
-                                      kBlockSize,
-                                      0,
-                                      static_cast<ADataType*>(a_device.GetDeviceBuffer()),
-                                      static_cast<BDataType*>(b_device.GetDeviceBuffer()),
-                                      static_cast<CDataType*>(c_device.GetDeviceBuffer()),
-                                      M,
-                                      N,
-                                      K,
-                                      stride_a,
-                                      stride_b,
-                                      stride_c));
+    ck_tile::stream_config{nullptr, true, 0, 5, 1000},
+    //                     ↑       ↑     ↑  ↑  ↑
+    //                     stream  time  log warmup repeat
+    ck_tile::make_kernel<kBlockPerCu>(gemm_kernel{},
+        kGridSize, kBlockSize, 0,
+        a_buf, b_buf, c_buf, M, N, K, Lda, Ldb, Ldc, CElementFunction{}));
 ```
 
-**What's happening:**
+**`stream_config` parameters:**
+- `nullptr`: Use the default HIP stream
+- `true`: Enable timing (measure kernel execution time)
+- `0`: Log level (0 = minimal output)
+- `5`: Warm-up iterations (run kernel 5 times before timing)
+- `1000`: Timed iterations (average over 1000 runs for stable measurement)
 
-### 1. Kernel Composition
-```cpp
-using gemm_kernel = ck_tile::PracticeGemmKernel<Problem, Policy>;
+**`make_kernel<kBlockPerCu>`**: Wraps the kernel functor with the occupancy hint.
+`kBlockPerCu=2` tells the runtime to schedule 2 blocks per CU at a time.
+
+**Kernel arguments**: Raw device buffer pointers (not typed) and the problem dimensions
+(`M, N, K, Lda, Ldb, Ldc`) plus the epilogue functor `CElementFunction{}`.
+
+### Kernel execution flow
+
 ```
-The kernel is composed from Problem and Policy structs, following the CK Tile design pattern.
-
-### 2. Kernel Launch
-`launch_kernel()` is a CK Tile utility that:
-- Launches the GPU kernel using HIP runtime
-- Measures execution time
-- Returns average execution time in milliseconds
-
-### 3. Launch Parameters
-- **Stream config**: `{nullptr, true, 0, 0, 1}` - default stream, timing enabled
-- **Grid size**: `kGridSize = 1` - number of thread blocks
-- **Block size**: `kBlockSize = 256` - threads per block
-- **Shared memory**: `0` - no dynamic shared memory in this example
-- **Kernel arguments**: Device pointers and problem dimensions
-
-### 4. Kernel Execution Flow
-```
-launch_kernel() calls gemm_kernel.operator()()
+launch_kernel() → gemm_kernel::operator()()
     ↓
-PracticeGemmKernel::operator()
+Gemm::operator() calls GridGemm<Problem, Policy>::operator()
     ↓
-Creates tensor views over device memory
+map block_id → 2D tile (iM, iN)
+create a_block_window, b_block_window
+allocate __shared__ p_smem
     ↓
-Calls block-level pipeline
+BlockGemmPipelineAGmemBGmemCReg::operator()
     ↓
-Block pipeline calls warp-level pipeline
+for each K slice:
+    load A,B from DRAM → VGPRs
+    store A,B from VGPRs → LDS
+    block_sync_lds()
+    BlockGemmASmemBSmemCReg (MFMA)
+    block_sync_lds()
     ↓
-Warp pipeline calls MFMA instructions
-    ↓
-Results written back to C matrix
+tile_elementwise_in: type_convert(acc) → CDataType, apply CElementFunction
+store_tile: VGPRs → DRAM (C matrix)
 ```
 
 ---
 
-## Step 10: Verify Results
+## Step 10: Verify Results (Optional)
 
 ```cpp
-auto pass = true;
-
 if(verification)
 {
-    // Reference gemm on CPU
+    // CPU reference (ground truth)
     ck_tile::HostTensor<CDataType> c_host_ref(c_lengths, c_strides);
-    reference_basic_gemm<ADataType, BDataType, AccDataType, CDataType>(
+    reference_basic_gemm<ADataType, ADataType, AccDataType, CDataType>(
         a_host, b_host, c_host_ref);
-    
+    //                  ↑ note: second arg is ADataType not BDataType (both are half_t here)
+
     // Copy GPU results back to host
-    ck_tile::HostTensor<CDataType> c_host_dev(c_lengths, c_strides);
-    c_device.FromDevice(c_host_dev.mData.data());
-    
-    // Compare results
-    pass &= ck_tile::check_err(c_host_dev, c_host_ref, "Error: Incorrect results!", 1e-3, 1e-3);
-    std::cout << "valid:" << (pass ? "y" : "n") << std::endl;
+    c_buf.FromDevice(c_host_dev.mData.data());
+
+    // Compare element-wise
+    bool pass = ck_tile::check_err(c_host_dev, c_host_ref);
+    std::cout << "valid: " << (pass ? "y" : "n") << std::endl;
 }
 ```
 
-**What's happening:**
+`reference_basic_gemm` performs the same GEMM on CPU using FP32 accumulation. The GPU
+results (cast back from FP16 to be compared) should match the reference within FP16
+rounding tolerance. Using integer-valued inputs (Step 4) ensures exact agreement.
 
-### 1. CPU Reference Implementation
-```cpp
-reference_basic_gemm<...>(a_host, b_host, c_host_ref);
+**Verification flow:**
 ```
-Computes GEMM on CPU using a simple nested loop implementation (ground truth).
-
-### 2. Copy GPU Results to Host
-```cpp
-c_device.FromDevice(c_host_dev.mData.data());
-```
-Transfers the computed result from GPU memory back to CPU for comparison.
-
-### 3. Error Checking
-```cpp
-ck_tile::check_err(c_host_dev, c_host_ref, "Error: Incorrect results!", 1e-3, 1e-3);
-```
-Compares GPU and CPU results element-wise with tolerance:
-- **Relative error**: 1e-3 (0.1%)
-- **Absolute error**: 1e-3
-
-**Verification Flow:**
-```
-CPU                     GPU
-┌─────────┐            ┌─────────┐
-│ a_host  │ ────────>  │a_device │
-│ b_host  │ ────────>  │b_device │
-└─────────┘            └─────────┘
-     │                      │
-     ↓                      ↓
-reference_gemm()       GPU kernel
-     │                      │
-     ↓                      ↓
-┌──────────┐          ┌──────────┐
-│c_host_ref│          │c_device  │
-└──────────┘          └──────────┘
-     │                      │
-     │                      ↓
-     │                 FromDevice()
-     │                      │
-     ↓                      ↓
-     └────> check_err() <───┘
-                 │
-                 ↓
-            Pass/Fail
+CPU                      GPU
+┌─────────┐             ┌─────────┐
+│ a_host  │ ToDevice >  │  a_buf  │
+│ b_host  │ ToDevice >  │  b_buf  │
+└─────────┘             └─────────┘
+     │                       │
+     ↓                       ↓
+reference_gemm()        kernel launch
+     │                       │
+     ↓                       ↓
+┌──────────┐           ┌──────────┐
+│c_host_ref│           │  c_buf   │
+└──────────┘           └──────────┘
+     │                       │ FromDevice()
+     │                       ↓
+     │                 ┌──────────┐
+     └──── check_err ──│c_host_dev│
+                       └──────────┘
 ```
 
 ---
@@ -475,32 +327,15 @@ reference_gemm()       GPU kernel
 ## Complete Execution Flow Summary
 
 ```
-1. Define data types (FP16 inputs, FP32 output)
-   ↓
-2. Set problem size (M=256, N=128, K=32)
-   ↓
-3. Create host tensors and initialize with random data
-   ↓
-4. Allocate device memory and transfer data (CPU → GPU)
-   ↓
-5. Configure hierarchical tiling (BlockTile, WaveTile)
-   ↓
-6. Create Shape, Problem, and Policy structs
-   ↓
-7. Calculate grid/block dimensions (1 block, 256 threads)
-   ↓
-8. Compose and launch kernel (Problem + Policy)
-   ↓
-9. Execute GEMM on GPU
-   │  ├─ Block-level pipeline
-   │  ├─ Warp-level pipeline
-   │  └─ MFMA instructions
-   ↓
-10. Verify results (compare GPU vs CPU reference)
-    ↓
-11. Calculate and print performance metrics
-    ↓
-12. Return success/failure
+1. Define data types (ADataType=FP16, BDataType=FP16, AccDataType=FP32, CDataType=FP16)
+2. Set problem size (M=3328, N=4096, K=4096 by default)
+3. Create host tensors and initialize with random integer-valued data
+4. Allocate device memory and transfer data (CPU → GPU) via two-step DeviceMem pattern
+5. Configure block tile (kGemmMPerBlock=256, kGemmNPerBlock=128, kGemmKPerBlock=32)
+6. Construct gemm_kernel type (fully specialized at compile time via Gemm<...>)
+7. Launch kernel (416 blocks for default sizes, 256 threads/block, 2 blocks/CU)
+8. Execute GEMM on GPU (DRAM→LDS→MFMA per K slice, accumulate in FP32 VGPRs)
+9. Cast FP32 accumulator to FP16, apply CElementFunction, store C to DRAM
+10. (Optional) Verify results: compare GPU vs CPU reference
+11. Print performance metrics (TFlops, GB/s)
 ```
-
----
