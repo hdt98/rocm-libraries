@@ -36,7 +36,11 @@ endif()
 # --- Kernel variants: types, warp tiles, fused epilogues, layout combinations ---
 set(KERNEL_VARIANTS gemm_fp32 gemm_fp16 gemm_bf16 gemm_fp16_w32 gemm_fp16_add gemm_fp16_add_relu
     gemm_fp16_rr gemm_fp16_cr gemm_fp16_cc gemm_fp16_splitk gemm_fp16_v3 gemm_fp16_add_add
-    gemm_fp16_batched gemm_fp16_gfx90a gemm_fp16_gfx942 gemm_fp16_preshuffle)
+    gemm_fp16_batched gemm_fp16_gfx90a gemm_fp16_gfx942 gemm_fp16_preshuffle gemm_fp8_fnuz)
+
+# --- Per-variant architecture restrictions ---
+# FP8 MFMA instructions require gfx942+. Set <variant>_GPU_TARGETS to restrict.
+set(gemm_fp8_fnuz_GPU_TARGETS "gfx942;gfx950")
 
 # rocm_ck headers for device code (DataType, Layout enums used by gemm_api.hpp)
 set(ROCM_CK_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
@@ -60,7 +64,13 @@ endforeach()
 # -std=c++20 is required for CK Tile headers and GemmSpec schema (consteval, structural NTTPs).
 set(HSACO_FILES "")
 foreach(variant IN LISTS KERNEL_VARIANTS)
-    foreach(arch IN LISTS GPU_TARGETS)
+    # Per-variant arch override: use ${variant}_GPU_TARGETS if defined, else GPU_TARGETS
+    if(DEFINED ${variant}_GPU_TARGETS)
+        set(variant_targets "${${variant}_GPU_TARGETS}")
+    else()
+        set(variant_targets "${GPU_TARGETS}")
+    endif()
+    foreach(arch IN LISTS variant_targets)
         set(hsaco_output "${CMAKE_CURRENT_BINARY_DIR}/${variant}_${arch}.hsaco")
         add_custom_command(
             OUTPUT ${hsaco_output}

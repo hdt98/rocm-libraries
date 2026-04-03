@@ -256,6 +256,15 @@ consteval bool is_valid_mfma(DataType a_dtype, int m, int n, int k)
         if(m == 32 && n == 32 && (k == 8 || k == 16))
             return true;
     }
+    if(a_dtype == DataType::FP8_FNUZ || a_dtype == DataType::BF8_FNUZ)
+    {
+        // gfx942: 32x32x16, 16x16x32
+        // gfx950: 32x32x{16,32,64}, 16x16x{32,64}
+        if(m == 32 && n == 32 && (k == 16 || k == 32))
+            return true;
+        if(m == 16 && n == 16 && (k == 32 || k == 64))
+            return true;
+    }
     return false;
 }
 
