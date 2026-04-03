@@ -6,6 +6,9 @@
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
 
+#include <unordered_map>
+#include <unordered_set>
+
 namespace rocRoller
 {
     namespace AddLDSBarriersDetail
@@ -15,6 +18,106 @@ namespace rocRoller
         using RWTracer       = KernelGraph::ControlFlowRWTracer;
         using RWTraceRecords = std::vector<KernelGraph::ControlFlowRWTracer::ReadWriteRecord>;
         using KernelGraph    = KernelGraph::KernelGraph;
+
+        inline bool IsLoopNode(KernelGraph const& graph, int tag)
+        {
+            return graph.control.get<ForLoopOp>(tag).has_value()
+                   || graph.control.get<DoWhileOp>(tag).has_value();
+        }
+        struct LoopContainmentInfo
+        {
+            std::optional<int>      immediateParentLoop;
+            std::unordered_set<int> containingLoops;
+        };
+        class LoopContainmentCache
+        {
+        public:
+            LoopContainmentInfo const& get(KernelGraph const& graph, int node)
+            {
+                auto it = m_cache.find(node);
+                if(it != m_cache.end())
+                    return it->second;
+                computeWithPathCompression(graph, node);
+                return m_cache.at(node);
+            }
+            std::optional<int> immediateParentLoop(KernelGraph const& graph, int node)
+            {
+                return get(graph, node).immediateParentLoop;
+            }
+            bool isContainedBy(KernelGraph const& graph, int node, int loopTag)
+            {
+                auto const& info = get(graph, node);
+                return info.containingLoops.contains(loopTag);
+            }
+
+        private:
+            struct ParentStep
+            {
+                int  parent;
+                bool isContainingEdge;
+            };
+            std::optional<ParentStep>
+                nextParentStep(rocRoller::KernelGraph::ControlGraph::ControlGraph const& control,
+                               int                                                       node) const
+            {
+                auto neighbours = control.getNeighbours<Graph::Direction::Upstream>(node);
+                if(neighbours.empty())
+                    return std::nullopt;
+                auto edge    = neighbours.front();
+                auto parents = control.getNeighbours<Graph::Direction::Upstream>(edge);
+                AssertFatal(!parents.empty(), "Edge does not connect two nodes!");
+                return ParentStep{parents.front(),
+                                  !std::holds_alternative<Sequence>(control.getEdge(edge))};
+            }
+            void computeWithPathCompression(KernelGraph const& graph, int startNode)
+            {
+                struct PathEntry
+                {
+                    int  node;
+                    int  parent;
+                    bool isContainingEdge;
+                };
+                std::vector<PathEntry>  path;
+                std::unordered_set<int> visitedNodes = {startNode};
+                int                     current      = startNode;
+                LoopContainmentInfo     suffixInfo;
+                while(true)
+                {
+                    auto step = nextParentStep(graph.control, current);
+                    if(!step.has_value())
+                    {
+                        if(path.empty())
+                        {
+                            m_cache[startNode] = LoopContainmentInfo{};
+                            return;
+                        }
+                        suffixInfo = LoopContainmentInfo{};
+                        break;
+                    }
+                    AssertFatal(!visitedNodes.contains(step->parent), "Graph contains cycle!");
+                    path.push_back(PathEntry{current, step->parent, step->isContainingEdge});
+                    auto cachedParent = m_cache.find(step->parent);
+                    if(cachedParent != m_cache.end())
+                    {
+                        suffixInfo = cachedParent->second;
+                        break;
+                    }
+                    visitedNodes.insert(step->parent);
+                    current = step->parent;
+                }
+                LoopContainmentInfo running = suffixInfo;
+                for(auto it = path.rbegin(); it != path.rend(); ++it)
+                {
+                    if(it->isContainingEdge && IsLoopNode(graph, it->parent))
+                    {
+                        running.immediateParentLoop = it->parent;
+                        running.containingLoops.insert(it->parent);
+                    }
+                    m_cache[it->node] = running;
+                }
+            }
+            std::unordered_map<int, LoopContainmentInfo> m_cache;
+        };
 
         /**
           * @brief Check if a Barrier is connected to an LDS coordinate via mapper connections.
@@ -138,52 +241,11 @@ namespace rocRoller
           * @param opTag Tag of the operation
           * @return The tag of the immediate parent loop of opTag, or std::nullopt if not in any loop
           */
-        inline std::optional<int> FindImmediateParentLoop(KernelGraph const& graph, int opTag)
+        inline std::optional<int> FindImmediateParentLoop(KernelGraph const&    graph,
+                                                          int                   opTag,
+                                                          LoopContainmentCache& cache)
         {
-            // Collect all loops containing the operation
-            std::vector<int> containingLoops;
-            for(const auto node : graph.control.nodesContaining(opTag))
-            {
-                if(graph.control.get<ForLoopOp>(node) || graph.control.get<DoWhileOp>(node))
-                {
-                    containingLoops.push_back(node);
-                }
-            }
-
-            if(containingLoops.empty())
-            {
-                return std::nullopt;
-            }
-
-            auto isInnermostLoop = [&](int candidateLoop) {
-                for(const auto otherLoop : containingLoops)
-                {
-                    if(otherLoop == candidateLoop)
-                    {
-                        continue;
-                    }
-
-                    // If candidateLoop is in the set of nodes containing otherLoop,
-                    // then candidateLoop contains otherLoop, so it's not innermost.
-                    auto nodesContainingOther
-                        = graph.control.nodesContaining(otherLoop).to<std::set>();
-                    if(nodesContainingOther.contains(candidateLoop))
-                    {
-                        return false;
-                    }
-                }
-                return true;
-            };
-
-            auto it = std::find_if(containingLoops.begin(), containingLoops.end(), isInnermostLoop);
-
-            AssertFatal(it != containingLoops.end(),
-                        "Operation is contained by loop(s) but innermost loop could "
-                        "be found.",
-                        ShowValue(opTag),
-                        ShowValue(containingLoops));
-
-            return *it;
+            return cache.immediateParentLoop(graph, opTag);
         }
 
         /**
@@ -199,18 +261,17 @@ namespace rocRoller
           * @param opTag Tag of the operation to check
           * @return true if both are in the body of the same loop (or both outside any loop)
           */
-        inline bool AreInSameLoopBody(KernelGraph const& graph, int barrierTag, int opTag)
+        inline bool AreInSameLoopBody(KernelGraph const&    graph,
+                                      int                   barrierTag,
+                                      int                   opTag,
+                                      LoopContainmentCache& cache)
         {
-            auto barrierLoop = FindImmediateParentLoop(graph, barrierTag);
-            auto opLoop      = FindImmediateParentLoop(graph, opTag);
-
-            // Both must be in the same loop (or both not in any loop)
+            auto barrierLoop = FindImmediateParentLoop(graph, barrierTag, cache);
+            auto opLoop      = FindImmediateParentLoop(graph, opTag, cache);
             if(barrierLoop.has_value() && opLoop.has_value())
             {
                 return *barrierLoop == *opLoop;
             }
-
-            // If neither is in a loop, they're in the same kernel body
             return !barrierLoop.has_value() && !opLoop.has_value();
         }
 
@@ -224,31 +285,20 @@ namespace rocRoller
           * @param opB Second operation tag
           * @return The tag of the closest common ancestor loop, or std::nullopt if none exists
           */
-        inline std::optional<int> FindCommonAncestorLoop(KernelGraph const& graph, int opA, int opB)
+        inline std::optional<int> FindCommonAncestorLoop(KernelGraph const&    graph,
+                                                         int                   opA,
+                                                         int                   opB,
+                                                         LoopContainmentCache& cache)
         {
-            // Get all nodes containing opA (ancestors)
-            const auto tagOfimmediateParentLoopOfA = FindImmediateParentLoop(graph, opA);
-
-            if(not tagOfimmediateParentLoopOfA.has_value())
+            const auto immediateParentLoopOfA = FindImmediateParentLoop(graph, opA, cache);
+            if(!immediateParentLoopOfA.has_value())
             {
-                // opA is not in any loop, so no common ancestor loop exists
                 return std::nullopt;
             }
-
-            // Iterate through ancestors of opB to find a common loop ancestor
-            for(const auto node : graph.control.nodesContaining(opB))
+            if(cache.isContainedBy(graph, opB, *immediateParentLoopOfA))
             {
-                // Check if it's a loop operation and is also one of the
-                // loops that contains opA and opB, then it is the
-                // closest common ancestor loop.
-                const auto isLoop
-                    = graph.control.get<ForLoopOp>(node) || graph.control.get<DoWhileOp>(node);
-                if(isLoop && node == tagOfimmediateParentLoopOfA.value())
-                {
-                    return {node};
-                }
+                return immediateParentLoopOfA;
             }
-
             return {};
         }
 
@@ -267,25 +317,24 @@ namespace rocRoller
                                                      RWTraceRecords const& allRecords,
                                                      int                   ldsCoord,
                                                      size_t                firstOpRecordIndex,
-                                                     size_t                secondOpRecordIndex)
+                                                     size_t                secondOpRecordIndex,
+                                                     LoopContainmentCache& cache)
         {
             const auto startPos = firstOpRecordIndex + 1;
             const auto endPos   = secondOpRecordIndex - 1;
-
             AssertFatal(startPos >= 0 && endPos < allRecords.size() && startPos <= endPos,
                         "Invalid positions for firstOp and secondOp in trace.",
                         ShowValue(startPos),
                         ShowValue(endPos),
                         ShowValue(firstOpRecordIndex),
                         ShowValue(secondOpRecordIndex));
-
-            // Look for Barrier nodes between firstOp and secondOp in trace order
             for(auto i = startPos; i <= endPos; ++i)
             {
                 int ctrl            = allRecords[i].control;
                 int barrierLdsCoord = allRecords[i].coordinate;
                 if(graph.control.get<Barrier>(ctrl) and IsBarrierForLDS(graph, ctrl)
-                   and AreInSameLoopBody(graph, ctrl, allRecords[secondOpRecordIndex].control)
+                   and AreInSameLoopBody(
+                       graph, ctrl, allRecords[secondOpRecordIndex].control, cache)
                    and barrierLdsCoord == ldsCoord)
                 {
                     auto foundWritesAfterBarrier
@@ -297,14 +346,12 @@ namespace rocRoller
                                                  and record.coordinate == ldsCoord
                                                  and not graph.control.get<Barrier>(record.control);
                                       });
-                    // Found a Barrier connected to a LDS coordinate in same loop as secondOp
                     if(not foundWritesAfterBarrier)
                     {
                         return {ctrl};
                     }
                 }
             }
-
             return std::nullopt;
         }
 
@@ -327,10 +374,11 @@ namespace rocRoller
                                       int                   firstOpTag,
                                       int                   secondOpTag,
                                       size_t                firstOpRecordIndex,
-                                      size_t                secondOpRecordIndex)
+                                      size_t                secondOpRecordIndex,
+                                      LoopContainmentCache& cache)
         {
             auto barrier = FindBarrierBetween(
-                graph, allRecords, ldsCoord, firstOpRecordIndex, secondOpRecordIndex);
+                graph, allRecords, ldsCoord, firstOpRecordIndex, secondOpRecordIndex, cache);
             if(barrier.has_value())
             {
                 Log::debug(fmt::format("FORWARD: Found LDS Barrier({}) between index "
@@ -365,25 +413,13 @@ namespace rocRoller
                                                             int                   ldsCoord,
                                                             int    commonAncestorLoopTag,
                                                             size_t firstOpRecordIndex,
-                                                            size_t secondOpRecordIndex)
+                                                            size_t secondOpRecordIndex,
+                                                            LoopContainmentCache& cache)
         {
             const auto afterSecondOpPos = secondOpRecordIndex + 1;
-
             AssertFatal(afterSecondOpPos < allRecords.size(),
                         "Invalid position for secondOp in trace.",
                         ShowValue(secondOpRecordIndex));
-
-            // For loop-carried dependencies, we need to check if there's a barrier
-            // that breaks the dependency from iteration N's secondOp to iteration N+1's firstOp.
-            //
-            // This means we need a barrier either:
-            // 1. After secondOp but still within the loop body (before loop end)
-            // 2. Before firstOp but after the loop body start
-            //
-            // In trace order, the loop body executes once. A barrier anywhere
-            // after secondOp or before firstOp (but within the loop) suffices.
-
-            // Check for Barrier nodes before firstOp (in common loop body)
             for(size_t i = 0; i < firstOpRecordIndex; ++i)
             {
                 int ctrl            = allRecords[i].control;
@@ -400,17 +436,13 @@ namespace rocRoller
                                                  and record.coordinate == ldsCoord
                                                  and not graph.control.get<Barrier>(record.control);
                                       });
-                    // Verify the barrier is inside the common ancestor loop
-                    auto containingNodes = graph.control.nodesContaining(ctrl).to<std::set>();
                     if(not foundWritesAfterBarrier
-                       and containingNodes.contains(commonAncestorLoopTag))
+                       && cache.isContainedBy(graph, ctrl, commonAncestorLoopTag))
                     {
                         return {ctrl};
                     }
                 }
             }
-
-            // Check for Barrier nodes after secondOp (in common loop body)
             for(auto i = afterSecondOpPos; i < allRecords.size(); ++i)
             {
                 int ctrl            = allRecords[i].control;
@@ -427,16 +459,13 @@ namespace rocRoller
                                                  and record.coordinate == ldsCoord
                                                  and not graph.control.get<Barrier>(record.control);
                                       });
-                    // Verify the barrier is inside the common ancestor loop
-                    auto containingNodes = graph.control.nodesContaining(ctrl).to<std::set>();
                     if(not foundWritesAfterBarrier
-                       and containingNodes.contains(commonAncestorLoopTag))
+                       && cache.isContainedBy(graph, ctrl, commonAncestorLoopTag))
                     {
                         return {ctrl};
                     }
                 }
             }
-
             return std::nullopt;
         }
 
@@ -464,14 +493,16 @@ namespace rocRoller
                                                              int    firstOpTag,
                                                              int    secondOpTag,
                                                              size_t firstOpRecordIndex,
-                                                             size_t secondOpRecordIndex)
+                                                             size_t secondOpRecordIndex,
+                                                             LoopContainmentCache& cache)
         {
             auto barrier = FindBarrierForLoopCarried(graph,
                                                      allRecords,
                                                      ldsCoord,
                                                      commonAncestorLoopTag,
                                                      firstOpRecordIndex,
-                                                     secondOpRecordIndex);
+                                                     secondOpRecordIndex,
+                                                     cache);
             if(barrier.has_value())
             {
                 Log::debug(fmt::format("LOOP-CARRIED: Found LDS Barrier({}) in loop {} "
@@ -486,5 +517,6 @@ namespace rocRoller
             }
             return false;
         }
+
     } // namespace AddLDSBarriersDetail
 } // namespace rocRoller

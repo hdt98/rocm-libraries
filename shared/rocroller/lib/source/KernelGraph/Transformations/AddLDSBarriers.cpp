@@ -40,6 +40,8 @@ namespace rocRoller
                 // Collect all LDS coordinates that are accessed
                 const auto ldsCoordinates = CollectAllLDSCoordinatesInRWTrace(graph, allRecords);
 
+                LoopContainmentCache cache;
+
                 // This loop is here for debugging purposes: log all barriers found in the trace
                 for(auto recordIndex = 0; recordIndex < allRecords.size(); ++recordIndex)
                 {
@@ -96,7 +98,7 @@ namespace rocRoller
 
                             // Find common ancestor loop (if any)
                             const auto commonAncestorLoop
-                                = FindCommonAncestorLoop(graph, firstOpTag, secondOpTag);
+                                = FindCommonAncestorLoop(graph, firstOpTag, secondOpTag, cache);
 
                             // Possible cases:
                             //   1. The operations have a common ancestor loop. This case
@@ -126,7 +128,8 @@ namespace rocRoller
                                                                                     firstOpTag,
                                                                                     secondOpTag,
                                                                                     firstOpIndex,
-                                                                                    secondOpIndex);
+                                                                                    secondOpIndex,
+                                                                                    cache);
 
                             if(not hasBarrierForForwardDependency)
                             {
@@ -159,7 +162,8 @@ namespace rocRoller
                                         firstOpTag,
                                         secondOpTag,
                                         firstOpIndex,
-                                        secondOpIndex);
+                                        secondOpIndex,
+                                        cache);
 
                                 if(not hasBarrierForLoopCarriedDependency)
                                 {
@@ -209,6 +213,8 @@ namespace rocRoller
                 return graph;
             }
 
+            LoopContainmentCache cache;
+
             // For each LDS coordinate, find dependent operations and ensure barriers exist
             for(int ldsCoord : ldsCoordinates)
             {
@@ -237,11 +243,11 @@ namespace rocRoller
 
                         // Find common ancestor loop (if any)
                         const auto commonAncestorLoop
-                            = FindCommonAncestorLoop(graph, firstOpTag, secondOpTag);
+                            = FindCommonAncestorLoop(graph, firstOpTag, secondOpTag, cache);
 
                         // === Handle forward dependency ===
                         const auto existingBarrier = FindBarrierBetween(
-                            graph, allRecords, ldsCoord, firstOpIndex, secondOpIndex);
+                            graph, allRecords, ldsCoord, firstOpIndex, secondOpIndex, cache);
                         if(not existingBarrier.has_value())
                         {
                             // Insert new barrier before secondOp
@@ -296,7 +302,8 @@ namespace rocRoller
                                                             ldsCoord,
                                                             commonAncestorLoop.value(),
                                                             firstOpIndex,
-                                                            secondOpIndex);
+                                                            secondOpIndex,
+                                                            cache);
 
                             if(not existingBarrier.has_value())
                             {
