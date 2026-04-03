@@ -848,6 +848,9 @@ int ConvDriver<Tgpu, Tref>::GetandSetData()
         miopenSetConvolutionGroupCount(warmupConvDesc, group_count);
         miopenSetConvolutionAttribute(
             warmupConvDesc, MIOPEN_CONVOLUTION_ATTRIB_MATH_TYPE, inflags.GetValueInt("math_type"));
+        miopenSetConvolutionAttribute(warmupConvDesc,
+                                      MIOPEN_CONVOLUTION_ATTRIB_DETERMINISTIC,
+                                      inflags.GetValueInt("conv_deterministic"));
 
         int warmup_out_len_size = miopen::deref(warmupInputTensor).GetNumDims();
         std::vector<int> warmup_out_len(warmup_out_len_size);
@@ -1004,6 +1007,11 @@ int ConvDriver<Tgpu, Tref>::AddCmdLineArgs()
                          "int");
     // TODO:(LYM) change back to 0 when TF32 is fully supported
     inflags.AddInputFlag("math_type", 'M', "1", "math type of compute (Default=1)", "int");
+    inflags.AddInputFlag("conv_deterministic",
+                         'K',
+                         "0",
+                         "Restrict convolutions to deterministic kernels (Default=0)",
+                         "int");
 
     return 0;
 }
@@ -1214,6 +1222,21 @@ int ConvDriver<Tgpu, Tref>::SetConvDescriptorFromCmdLineArgs()
         exit(0); // NOLINT (concurrency-mt-unsafe)
     }
     miopenSetConvolutionAttribute(convDesc, MIOPEN_CONVOLUTION_ATTRIB_MATH_TYPE, math_type_);
+
+    auto conv_deterministic_ = inflags.GetValueInt("conv_deterministic");
+    if(conv_deterministic_ != 0 && conv_deterministic_ != 1)
+    {
+        std::cout << "Invalid conv_deterministic value: " << conv_deterministic_
+                  << " (must be 0 or 1)" << std::endl;
+        exit(1); // NOLINT (concurrency-mt-unsafe)
+    }
+    if(conv_deterministic_ == 1)
+    {
+        MIOPEN_LOG_I("Restricting convolution to deterministic kernels.");
+    }
+
+    miopenSetConvolutionAttribute(
+        convDesc, MIOPEN_CONVOLUTION_ATTRIB_DETERMINISTIC, conv_deterministic_);
 
     return miopenStatusSuccess;
 }
