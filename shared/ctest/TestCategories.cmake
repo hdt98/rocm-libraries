@@ -58,7 +58,7 @@ function(apply_test_category_labels target_name yaml_file working_dir)
     endif()
 
     # Write the generated CMake code to a file and include it
-    set(CATEGORY_CMAKE "${CMAKE_CURRENT_BINARY_DIR}/test_categories.cmake")
+    set(CATEGORY_CMAKE "${CMAKE_CURRENT_BINARY_DIR}/test_categories_${target_name}.cmake")
     file(WRITE "${CATEGORY_CMAKE}" "${CMAKE_CATEGORY_CODE}")
 
     message(STATUS "Generated test category configuration: ${CATEGORY_CMAKE}")

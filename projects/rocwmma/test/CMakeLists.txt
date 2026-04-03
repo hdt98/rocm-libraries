@@ -207,6 +207,115 @@ if(ROCWMMA_BUILD_REGRESSION_TESTS)
     add_subdirectory(regression)
 endif()
 
+# =========================================================================
+# YAML-based CTest test categorization for TheRock CI
+# =========================================================================
+# Integrates with the shared test categorization framework from
+# rocm-libraries/shared/ctest/ to provide standardized test filtering
+# via CTest labels (quick, standard, comprehensive, full).
+#
+# Usage:
+#   ctest -L quick -LE ex_gpu          # Run quick (smoke) tests
+#   ctest -L standard -LE ex_gpu       # Run standard (smoke + regression) tests
+#   ctest -L comprehensive -LE ex_gpu  # Run comprehensive (all GPU) tests
+#   ctest -L full -LE ex_gpu           # Run all tests
+# =========================================================================
+
+# Set ROCM_LIBRARIES_ROOT if not already defined (for standalone builds)
+if(NOT DEFINED ROCM_LIBRARIES_ROOT)
+    set(ROCM_LIBRARIES_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../..")
+endif()
+
+set(ROCWMMA_TEST_CATEGORIES_YAML "${CMAKE_CURRENT_SOURCE_DIR}/test_categories.yaml")
+
+if(EXISTS "${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake"
+   AND EXISTS "${ROCWMMA_TEST_CATEGORIES_YAML}")
+
+    include(${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake)
+
+    # Create install-time test file for TheRock
+    set(INSTALL_CATEGORY_TEST_FILE "${CMAKE_CURRENT_BINARY_DIR}/install_category_CTestTestfile.cmake")
+    file(WRITE "${INSTALL_CATEGORY_TEST_FILE}"
+[=[
+# Generated test definitions for install-time execution using test categories.
+# Tests use relative paths to the test binary.
+]=]
+    )
+
+    # All test targets that should have category labels applied.
+    # Uses if(TARGET ...) to handle conditional builds gracefully.
+    set(ROCWMMA_CATEGORY_TEST_TARGETS
+        # GEMM validation tests
+        gemm_PGR0_LB0_MP0_SB_NC-validate
+        gemm_PGR0_LB0_MP0_MB_NC-validate
+        gemm_PGR1_LB2_MP0_MB_CP_WV-validate
+        gemm_PGR1_LB2_MP0_MB_CP_WG-validate
+        gemm_PGR1_LB2_MP0_MB_CP_BLK-validate
+        gemm_PGR0_LB0_MP0_SB_NC_ad_hoc-validate
+        gemm_PGR0_LB0_MP0_MB_NC_ad_hoc-validate
+        gemm_PGR1_LB2_MP0_MB_CP_ad_hoc-validate
+        # GEMM benchmark tests
+        gemm_PGR0_LB0_MP0_SB_NC-bench
+        gemm_PGR0_LB0_MP0_MB_NC-bench
+        gemm_PGR1_LB2_MP0_MB_CP_WV-bench
+        gemm_PGR1_LB2_MP0_MB_CP_WG-bench
+        gemm_PGR1_LB2_MP0_MB_CP_BLK-bench
+        gemm_PGR0_LB0_MP0_SB_NC_ad_hoc-bench
+        gemm_PGR0_LB0_MP0_MB_NC_ad_hoc-bench
+        gemm_PGR1_LB2_MP0_MB_CP_ad_hoc-bench
+        # DLRM validation tests
+        dlrm_dot_test-validate
+        dlrm_dot_lds_test-validate
+        # DLRM benchmark tests
+        dlrm_dot_test-bench
+        dlrm_dot_lds_test-bench
+        # Unit tests
+        contamination_test
+        cross_lane_ops_test
+        fill_fragment_test
+        float_test
+        io_shape_test
+        io_traits_test
+        layout_test
+        layout_traits_test
+        load_store_matrix_coop_sync_test
+        load_store_matrix_sync_test
+        map_util_test
+        pack_util_test
+        transforms_test
+        tuple_test
+        unpack_util_test
+        vector_iterator_test
+        vector_test
+        vector_util_test
+        # Regression tests (uses GTest::gtest_main, no emulation framework)
+        rocwmma_regression_tests
+    )
+
+    foreach(_target IN LISTS ROCWMMA_CATEGORY_TEST_TARGETS)
+        if(TARGET ${_target})
+            apply_test_category_labels(
+                ${_target}
+                "${ROCWMMA_TEST_CATEGORIES_YAML}"
+                "${PROJECT_BINARY_DIR}"
+                "${INSTALL_CATEGORY_TEST_FILE}"
+            )
+        endif()
+    endforeach()
+
+    # Install the category-based CTestTestfile.cmake
+    rocm_install(
+        FILES "${INSTALL_CATEGORY_TEST_FILE}"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}/${PROJECT_NAME}/categories"
+        COMPONENT tests
+        RENAME "CTestTestfile.cmake"
+    )
+
+    message(STATUS "rocWMMA: Test category labels applied (quick, standard, comprehensive, full)")
+else()
+    message(STATUS "rocWMMA: Test categorization skipped (shared/ctest/ framework not found)")
+endif()
+
 rocm_install(
     FILES "${INSTALL_TEST_FILE}"
     DESTINATION "${CMAKE_INSTALL_BINDIR}/${PROJECT_NAME}"
