@@ -44,8 +44,6 @@ namespace rocRoller::KernelGraph::ControlGraph
             return "Partial";
         case CacheStatus::Valid:
             return "Valid";
-        case CacheStatus::Frozen:
-            return "Frozen";
         default:
             break;
         }
