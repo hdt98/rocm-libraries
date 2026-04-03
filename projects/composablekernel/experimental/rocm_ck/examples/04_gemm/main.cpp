@@ -22,6 +22,7 @@
 #include <rocm_ck/hip_check.hpp>
 #include <rocm_ck/kpack_module.hpp>
 #include <rocm_ck/typed_buffer.hpp>
+#include <rocm_ck/verify.hpp>
 
 #include <hip/hip_runtime.h>
 
@@ -288,27 +289,8 @@ int main(int argc, char** argv)
         std::vector<float> result(M * N * buf_batch);
         buf_c.download(result.data());
 
-        float tolerance = rocm_ck::tolerance_for(spec.output().dtype);
-        bool passed     = true;
-        for(int i = 0; i < M * N; ++i)
-        {
-            if(std::fabs(result[i] - ref[i]) > tolerance * std::fabs(ref[i]) + tolerance)
-            {
-                int row = i / N;
-                int col = i % N;
-                std::fprintf(stderr,
-                             "  MISMATCH at (%d,%d): got %f, expected %f (diff=%e)\n",
-                             row,
-                             col,
-                             result[i],
-                             ref[i],
-                             result[i] - ref[i]);
-                passed = false;
-                break;
-            }
-        }
-
-        std::printf("%s: %s\n", variant.name, passed ? "PASSED" : "FAILED");
+        auto vr     = rocm_ck::verify(result.data(), ref, M * N, spec.output().dtype);
+        bool passed = rocm_ck::report_verify(variant.name, vr);
         if(!passed)
             all_passed = false;
         ++variants_run;
