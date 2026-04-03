@@ -375,21 +375,16 @@ struct BlockwiseGemmXdlops_pipeline_v4<BlockGemmPipelineScheduler::Intrawave,
                         vector_type<ComputeDataTypeBuf, KPack> a_thread_vec;
                         vector_type<ComputeDataTypeBuf, KPack> b_thread_vec;
 
-                        // Precompute offsets at compile time, access at runtime
-                        constexpr auto a_offsets = make_offset_array<KPack>([](auto ik) {
-                            return a_thread_desc_.CalculateOffset(make_tuple(m0, I0, k0, ik));
-                        });
-                        constexpr auto b_offsets = make_offset_array<KPack>([](auto ik) {
-                            return b_thread_desc_.CalculateOffset(make_tuple(n0, I0, k0, ik));
-                        });
-
-                        #pragma unroll
-                        for(index_t ik = 0; ik < KPack; ++ik) {
-                            a_thread_vec.template AsType<ComputeDataTypeBuf>().At(ik) =
-                                a_thread_bufs[mfma_reg_buf].At(a_offsets[ik]);
-                            b_thread_vec.template AsType<ComputeDataTypeBuf>().At(ik) =
-                                b_thread_bufs[mfma_reg_buf].At(b_offsets[ik]);
-                        }
+                        // Direct fold expression - eliminates static_for/applier infrastructure
+                        [&]<index_t... Is>(std::index_sequence<Is...>) {
+                            ((a_thread_vec.template AsType<ComputeDataTypeBuf>()(Number<Is>{}) =
+                                  a_thread_bufs[mfma_reg_buf][Number<a_thread_desc_.CalculateOffset(
+                                      make_tuple(m0, I0, k0, Number<Is>{}))>{}],
+                              b_thread_vec.template AsType<ComputeDataTypeBuf>()(Number<Is>{}) =
+                                  b_thread_bufs[mfma_reg_buf][Number<b_thread_desc_.CalculateOffset(
+                                      make_tuple(n0, I0, k0, Number<Is>{}))>{}]),
+                             ...);
+                        }(std::make_index_sequence<KPack>{});
 
                         using mfma_input_type =
                             typename vector_type<ComputeDataTypeBuf, xdlops_gemm.K1PerXdlops>::type;
@@ -920,21 +915,16 @@ struct BlockwiseGemmXdlopsDirectLoad_pipeline_v4<BlockGemmPipelineScheduler::Int
                         vector_type<ComputeDataTypeBuf, KPack> a_thread_vec;
                         vector_type<ComputeDataTypeBuf, KPack> b_thread_vec;
 
-                        // Precompute offsets at compile time, access at runtime
-                        constexpr auto a_offsets = make_offset_array<KPack>([](auto ik) {
-                            return a_thread_desc_.CalculateOffset(make_tuple(m0, I0, k0, ik));
-                        });
-                        constexpr auto b_offsets = make_offset_array<KPack>([](auto ik) {
-                            return b_thread_desc_.CalculateOffset(make_tuple(n0, I0, k0, ik));
-                        });
-
-                        #pragma unroll
-                        for(index_t ik = 0; ik < KPack; ++ik) {
-                            a_thread_vec.template AsType<ComputeDataTypeBuf>().At(ik) =
-                                a_thread_bufs[mfma_reg_buf].At(a_offsets[ik]);
-                            b_thread_vec.template AsType<ComputeDataTypeBuf>().At(ik) =
-                                b_thread_bufs[mfma_reg_buf].At(b_offsets[ik]);
-                        }
+                        // Direct fold expression - eliminates static_for/applier infrastructure
+                        [&]<index_t... Is>(std::index_sequence<Is...>) {
+                            ((a_thread_vec.template AsType<ComputeDataTypeBuf>()(Number<Is>{}) =
+                                  a_thread_bufs[mfma_reg_buf][Number<a_thread_desc_.CalculateOffset(
+                                      make_tuple(m0, I0, k0, Number<Is>{}))>{}],
+                              b_thread_vec.template AsType<ComputeDataTypeBuf>()(Number<Is>{}) =
+                                  b_thread_bufs[mfma_reg_buf][Number<b_thread_desc_.CalculateOffset(
+                                      make_tuple(n0, I0, k0, Number<Is>{}))>{}]),
+                             ...);
+                        }(std::make_index_sequence<KPack>{});
 
                         using mfma_input_type =
                             typename vector_type<ComputeDataTypeBuf, xdlops_gemm.K1PerXdlops>::type;
@@ -1051,21 +1041,16 @@ struct BlockwiseGemmXdlopsDirectLoad_pipeline_v4<BlockGemmPipelineScheduler::Int
                 vector_type<ComputeDataTypeBuf, KPack> a_thread_vec;
                 vector_type<ComputeDataTypeBuf, KPack> b_thread_vec;
 
-                // Precompute offsets at compile time, access at runtime
-                constexpr auto a_offsets = make_offset_array<KPack>([](auto ik) {
-                    return a_thread_desc_.CalculateOffset(make_tuple(m0, I0, k0, ik));
-                });
-                constexpr auto b_offsets = make_offset_array<KPack>([](auto ik) {
-                    return b_thread_desc_.CalculateOffset(make_tuple(n0, I0, k0, ik));
-                });
-
-                #pragma unroll
-                for(index_t ik = 0; ik < KPack; ++ik) {
-                    a_thread_vec.template AsType<ComputeDataTypeBuf>().At(ik) =
-                        a_thread_bufs[mfma_reg_buf].At(a_offsets[ik]);
-                    b_thread_vec.template AsType<ComputeDataTypeBuf>().At(ik) =
-                        b_thread_bufs[mfma_reg_buf].At(b_offsets[ik]);
-                }
+                // Direct fold expression - eliminates static_for/applier infrastructure
+                [&]<index_t... Is>(std::index_sequence<Is...>) {
+                    ((a_thread_vec.template AsType<ComputeDataTypeBuf>()(Number<Is>{}) =
+                          a_thread_bufs[mfma_reg_buf][Number<a_thread_desc_.CalculateOffset(
+                              make_tuple(m0, I0, k0, Number<Is>{}))>{}],
+                      b_thread_vec.template AsType<ComputeDataTypeBuf>()(Number<Is>{}) =
+                          b_thread_bufs[mfma_reg_buf][Number<b_thread_desc_.CalculateOffset(
+                              make_tuple(n0, I0, k0, Number<Is>{}))>{}]),
+                     ...);
+                }(std::make_index_sequence<KPack>{});
 
                 using mfma_input_type =
                     typename vector_type<ComputeDataTypeBuf, xdlops_gemm.K1PerXdlops>::type;
@@ -1088,21 +1073,16 @@ struct BlockwiseGemmXdlopsDirectLoad_pipeline_v4<BlockGemmPipelineScheduler::Int
                 vector_type<ComputeDataTypeBuf, KPack> a_thread_vec;
                 vector_type<ComputeDataTypeBuf, KPack> b_thread_vec;
 
-                // Precompute offsets at compile time, access at runtime
-                constexpr auto a_offsets = make_offset_array<KPack>([](auto ik) {
-                    return a_thread_desc_.CalculateOffset(make_tuple(m0, I0, k0, ik));
-                });
-                constexpr auto b_offsets = make_offset_array<KPack>([](auto ik) {
-                    return b_thread_desc_.CalculateOffset(make_tuple(n0, I0, k0, ik));
-                });
-
-                #pragma unroll
-                for(index_t ik = 0; ik < KPack; ++ik) {
-                    a_thread_vec.template AsType<ComputeDataTypeBuf>().At(ik) =
-                        a_thread_bufs[mfma_reg_buf].At(a_offsets[ik]);
-                    b_thread_vec.template AsType<ComputeDataTypeBuf>().At(ik) =
-                        b_thread_bufs[mfma_reg_buf].At(b_offsets[ik]);
-                }
+                // Direct fold expression - eliminates static_for/applier infrastructure
+                [&]<index_t... Is>(std::index_sequence<Is...>) {
+                    ((a_thread_vec.template AsType<ComputeDataTypeBuf>()(Number<Is>{}) =
+                          a_thread_bufs[mfma_reg_buf][Number<a_thread_desc_.CalculateOffset(
+                              make_tuple(m0, I0, k0, Number<Is>{}))>{}],
+                      b_thread_vec.template AsType<ComputeDataTypeBuf>()(Number<Is>{}) =
+                          b_thread_bufs[mfma_reg_buf][Number<b_thread_desc_.CalculateOffset(
+                              make_tuple(n0, I0, k0, Number<Is>{}))>{}]),
+                     ...);
+                }(std::make_index_sequence<KPack>{});
 
                 using mfma_input_type =
                     typename vector_type<ComputeDataTypeBuf, xdlops_gemm.K1PerXdlops>::type;
