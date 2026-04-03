@@ -28,12 +28,21 @@ struct ProblemDescription;
 namespace solver {
 struct ConvSolution;
 
-enum class CKConvDirection
+enum class CKSolverSlot
 {
-    Fwd = 0,
-    Bwd = 1,
-    Wrw = 2
+    GrpConvFwd   = 0,
+    GrpConvBwd   = 1,
+    GrpConvWrw   = 2,
+    GrpConv3dFwd = 3,
+    GrpConv3dBwd = 4,
+    Count        = 5,
+    // Backward-compatible aliases
+    Fwd = GrpConvFwd,
+    Bwd = GrpConvBwd,
+    Wrw = GrpConvWrw
 };
+
+using CKConvDirection = CKSolverSlot;
 
 /// Query the HIP runtime for the current device's architecture name.
 /// Returns an empty string on failure or when not using the HIP backend.
@@ -46,7 +55,7 @@ inline std::string GetCurrentDeviceName()
     hipDeviceProp_t props{};
     if(hipGetDeviceProperties(&props, device) != hipSuccess)
         return {};
-    return {props.gcnArchName};
+    return std::string(props.gcnArchName);
 #else
     return {};
 #endif
@@ -99,6 +108,9 @@ public:
                 const std::string& kernel_id,
                 bool use_tf32) const;
 
+    MIOPEN_INTERNALS_EXPORT std::vector<std::string>
+    GetAllKernelTypeStrings(CKSolverSlot slot) const;
+
     ~CKGroupedConvLibLoader();
 
     CKGroupedConvLibLoader(const CKGroupedConvLibLoader&)            = delete;
@@ -128,8 +140,6 @@ private:
 
     using SolutionFreeFn = void (*)(ConvSolution*);
 
-    // cppcheck cannot parse function-pointer aliases with globally-qualified return types
-    // cppcheck-suppress internalAstError
     using FillValidKernelsFn = ::CKKernelListHandle* (*)(const miopen::conv::ProblemDescription*,
                                                          miopenDataType_t,
                                                          bool);
@@ -157,16 +167,19 @@ private:
 
     SolutionFreeFn solution_free_fn_ = nullptr;
 
+    using GetAllKernelTypeStringsFn = CKKernelListHandle* (*)();
+
     struct DirectionFns
     {
-        FillValidKernelsFn fill_valid_kernels = nullptr;
-        IsApplicableFn is_applicable          = nullptr;
-        IsArgsSupportedFn is_args_supported   = nullptr;
-        GetWorkspaceSizeFn get_workspace_size = nullptr;
-        GetSolutionFn get_solution            = nullptr;
+        FillValidKernelsFn fill_valid_kernels           = nullptr;
+        IsApplicableFn is_applicable                    = nullptr;
+        IsArgsSupportedFn is_args_supported             = nullptr;
+        GetWorkspaceSizeFn get_workspace_size           = nullptr;
+        GetSolutionFn get_solution                      = nullptr;
+        GetAllKernelTypeStringsFn get_all_kernel_types  = nullptr;
     };
 
-    DirectionFns dir_fns_[3]; // indexed by static_cast<int>(CKConvDirection)
+    DirectionFns slot_fns_[static_cast<int>(CKSolverSlot::Count)];
 
     // Helper: extract kernel list from handle
     std::vector<std::string> ExtractKernelList(::CKKernelListHandle* handle) const;
