@@ -129,7 +129,7 @@ struct GemmAlgorithm
 {
     Dim3 block_tile;                      // Elements per workgroup {M, N, K}
     Dim3 block_waves;                     // Wavefront layout within workgroup {M, N, K}
-    Dim3 mfma_tile;                       // MFMA instruction tile {M, N, K}
+    Dim3 warp_tile;                       // MFMA instruction tile {M, N, K}
     int k_batch                      = 1; // Split-K factor: partitions K across blockIdx.z
     Pipeline pipeline                = Pipeline::V1;            // Pipeline implementation strategy
     TilePartitioner tile_partitioner = TilePartitioner::Linear; // Tile-to-workgroup distribution
@@ -160,7 +160,7 @@ struct GemmSpec
     // Tile geometry
     Dim3 block_tile;
     Dim3 block_waves;
-    Dim3 mfma_tile;
+    Dim3 warp_tile;
     int workgroup_size;
     int k_batch; // Split-K factor (1 = no split)
 
@@ -288,7 +288,7 @@ consteval bool is_valid_mfma(DataType a_dtype, int m, int n, int k)
 ///   - All tile dimensions are positive
 ///   - block_waves.k == 1 (CShuffleEpilogue requires waves_m x waves_n layout)
 ///   - MFMA tile matches instruction table for the input dtype
-///   - Block tile is divisible by (block_waves x mfma_tile) in each dimension
+///   - Block tile is divisible by (block_waves x warp_tile) in each dimension
 ///
 /// Derives workgroup_size = block_waves.m x block_waves.n x block_waves.k x wavefront_size.
 consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
@@ -407,8 +407,8 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
         throw "block_tile dimensions must be positive";
     if(algo.block_waves.m <= 0 || algo.block_waves.n <= 0 || algo.block_waves.k <= 0)
         throw "block_waves dimensions must be positive";
-    if(algo.mfma_tile.m <= 0 || algo.mfma_tile.n <= 0 || algo.mfma_tile.k <= 0)
-        throw "mfma_tile dimensions must be positive";
+    if(algo.warp_tile.m <= 0 || algo.warp_tile.n <= 0 || algo.warp_tile.k <= 0)
+        throw "warp_tile dimensions must be positive";
 
     if(algo.k_batch <= 0)
         throw "k_batch must be positive";
@@ -429,15 +429,15 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
     if(algo.tile_partitioner == TilePartitioner::StreamK && algo.k_batch > 1)
         throw "Stream-K tile partitioning is incompatible with split-K (k_batch > 1)";
 
-    if(!is_valid_mfma(a_td.dtype, algo.mfma_tile.m, algo.mfma_tile.n, algo.mfma_tile.k))
-        throw "mfma_tile is not a valid MFMA instruction shape for this dtype";
+    if(!is_valid_mfma(a_td.dtype, algo.warp_tile.m, algo.warp_tile.n, algo.warp_tile.k))
+        throw "warp_tile is not a valid MFMA instruction shape for this dtype";
 
-    if(algo.block_tile.m % (algo.block_waves.m * algo.mfma_tile.m) != 0)
-        throw "block_tile.m must be divisible by (block_waves.m * mfma_tile.m)";
-    if(algo.block_tile.n % (algo.block_waves.n * algo.mfma_tile.n) != 0)
-        throw "block_tile.n must be divisible by (block_waves.n * mfma_tile.n)";
-    if(algo.block_tile.k % (algo.block_waves.k * algo.mfma_tile.k) != 0)
-        throw "block_tile.k must be divisible by (block_waves.k * mfma_tile.k)";
+    if(algo.block_tile.m % (algo.block_waves.m * algo.warp_tile.m) != 0)
+        throw "block_tile.m must be divisible by (block_waves.m * warp_tile.m)";
+    if(algo.block_tile.n % (algo.block_waves.n * algo.warp_tile.n) != 0)
+        throw "block_tile.n must be divisible by (block_waves.n * warp_tile.n)";
+    if(algo.block_tile.k % (algo.block_waves.k * algo.warp_tile.k) != 0)
+        throw "block_tile.k must be divisible by (block_waves.k * warp_tile.k)";
 
     int workgroup_size =
         algo.block_waves.m * algo.block_waves.n * algo.block_waves.k * wavefront_size;
@@ -465,7 +465,7 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo)
             acc,
             algo.block_tile,
             algo.block_waves,
-            algo.mfma_tile,
+            algo.warp_tile,
             workgroup_size,
             algo.k_batch,
             algo.pipeline,

@@ -37,7 +37,7 @@ struct Dim3 { int m, n, k; };
 struct GemmAlgorithm {
     Dim3 block_tile;   // Elements per workgroup {M, N, K}
     Dim3 block_waves;  // Wavefront layout within workgroup {M, N, K}
-    Dim3 mfma_tile;    // MFMA instruction tile {M, N, K}
+    Dim3 warp_tile;    // MFMA instruction tile {M, N, K}
     int k_batch = 1;   // Split-K factor (1 = no split)
 };
 ```
@@ -49,7 +49,7 @@ make_spec(
     Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     GemmAlgorithm{.block_tile  = {128, 128, 32},
                   .block_waves = {2, 2, 1},
-                  .mfma_tile   = {32, 32, 16}})
+                  .warp_tile   = {32, 32, 16}})
 ```
 
 ### Consteval Validation
@@ -60,7 +60,7 @@ make_spec(
   via `is_valid_mfma()`. For example, FP32 supports 32×32×{4,8} but not
   32×32×16, while FP16 supports 32×32×{8,16}.
 - **Tile divisibility**: `block_tile.m` must be divisible by
-  `block_waves.m × mfma_tile.m` (and similarly for N and K).
+  `block_waves.m × warp_tile.m` (and similarly for N and K).
 - **CShuffleEpilogue constraint**: `block_waves.k` must be 1.
 - **Workgroup size**: Derived as `block_waves.m × block_waves.n × wavefront_size`.
 
@@ -77,7 +77,7 @@ aggregates), so `GemmSpec` works as a C++20 non-type template parameter.
 `CkTypeMap` and `CkLayoutMap` map our schema enums to CK Tile's C++ types and
 layout tags. `run<S>` wires the 7-type CK Tile GEMM stack (shape, traits,
 problem, pipeline, partitioner, epilogue, kernel) from a `GemmSpec` NTTP.
-Tile geometry flows from `S.block_tile`, `S.block_waves`, and `S.mfma_tile`.
+Tile geometry flows from `S.block_tile`, `S.block_waves`, and `S.warp_tile`.
 
 ### Variant Table (gemm_variants.hpp)
 

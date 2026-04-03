@@ -217,11 +217,11 @@ __device__ void run(Args args)
     // --- Step 1: Tile geometry (from GemmSpec, validated by make_spec) ---
     // --- CK Tile type mapping ---
     // rocm_ck "block_waves" -> CK Tile "BlockWarps" / "MWave"
-    // rocm_ck "mfma_tile"   -> CK Tile "WarpTile" / "MPerXdl"
+    // rocm_ck "warp_tile"   -> CK Tile "WarpTile" / "MPerXdl"
     using GemmShape =
         ck_tile::TileGemmShape<ck_tile::sequence<S.block_tile.m, S.block_tile.n, S.block_tile.k>,
                                ck_tile::sequence<S.block_waves.m, S.block_waves.n, S.block_waves.k>,
-                               ck_tile::sequence<S.mfma_tile.m, S.mfma_tile.n, S.mfma_tile.k>>;
+                               ck_tile::sequence<S.warp_tile.m, S.warp_tile.n, S.warp_tile.k>>;
 
     // --- Step 2-4: Traits, problem, pipeline (selected by S.pipeline) ---
     //
@@ -281,9 +281,9 @@ __device__ void run(Args args)
                                                                    TilePartitioner::NPerBlock,
                                                                    S.block_waves.m, // MWave
                                                                    S.block_waves.n, // NWave
-                                                                   S.mfma_tile.m,   // MPerXdl
-                                                                   S.mfma_tile.n,   // NPerXdl
-                                                                   S.mfma_tile.k,   // KPerXdl
+                                                                   S.warp_tile.m,   // MPerXdl
+                                                                   S.warp_tile.n,   // NPerXdl
+                                                                   S.warp_tile.k,   // KPerXdl
                                                                    TransposeC>>;
 
     // --- Step 7: Kernel (ties everything together) ---

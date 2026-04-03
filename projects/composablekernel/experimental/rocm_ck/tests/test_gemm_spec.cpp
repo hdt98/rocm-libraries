@@ -187,9 +187,9 @@ TEST(MakeSpec, Accepts32x32WarpTileWithCorrectBlockSize)
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {32, 32, 16}});
 
     EXPECT_EQ(k.workgroup_size, 256);
-    EXPECT_EQ(k.mfma_tile.m, 32);
-    EXPECT_EQ(k.mfma_tile.n, 32);
-    EXPECT_EQ(k.mfma_tile.k, 16);
+    EXPECT_EQ(k.warp_tile.m, 32);
+    EXPECT_EQ(k.warp_tile.n, 32);
+    EXPECT_EQ(k.warp_tile.k, 16);
 }
 
 // ============================================================================
@@ -329,7 +329,7 @@ TEST(MakeSpec, AcceptsExplicitKBatch)
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{.block_tile  = {128, 128, 32},
                       .block_waves = {2, 2, 1},
-                      .mfma_tile   = {16, 16, 16},
+                      .warp_tile   = {16, 16, 16},
                       .k_batch     = 4});
 
     EXPECT_EQ(k.k_batch, 4);
@@ -341,7 +341,7 @@ TEST(MakeSpec, KBatchPreservesOtherFields)
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{.block_tile  = {128, 128, 32},
                       .block_waves = {2, 2, 1},
-                      .mfma_tile   = {16, 16, 16},
+                      .warp_tile   = {16, 16, 16},
                       .k_batch     = 4});
 
     EXPECT_EQ(k.num_physical_tensors, 3);
@@ -356,7 +356,7 @@ TEST(MakeSpec, KBatchWorksWithEpilogueOps)
                                                      AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
                                  GemmAlgorithm{.block_tile  = {128, 128, 32},
                                                .block_waves = {2, 2, 1},
-                                               .mfma_tile   = {16, 16, 16},
+                                               .warp_tile   = {16, 16, 16},
                                                .k_batch     = 2});
 
     EXPECT_EQ(k.k_batch, 2);
