@@ -1,8 +1,8 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// Must fail: block_tile.m (100) not divisible by block_waves.m * mfma_tile.m (2*16=32).
-// Expected error: "block_tile.m must be divisible by (block_waves.m * mfma_tile.m)"
+// Must fail: block_tile.m (100) not divisible by block_waves.m * warp_tile.m (2*16=32).
+// Expected error: "block_tile.m must be divisible by (block_waves.m * warp_tile.m)"
 
 #include <rocm_ck/gemm_spec.hpp>
 

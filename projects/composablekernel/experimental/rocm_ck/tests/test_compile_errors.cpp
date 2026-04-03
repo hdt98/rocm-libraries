@@ -87,7 +87,7 @@ using namespace rocm_ck;
 //                 .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
 //       GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {32, 32, 16}});
 //
-// Expected error: "mfma_tile is not a valid MFMA instruction shape for this dtype"
+// Expected error: "warp_tile is not a valid MFMA instruction shape for this dtype"
 // (FP32 32x32 only supports k=4 or k=8, not k=16)
 
 // block_waves.k != 1:
@@ -99,14 +99,14 @@ using namespace rocm_ck;
 //
 // Expected error: "block_waves.k must be 1 (CShuffleEpilogue constraint)"
 
-// Block tile not divisible by block_waves * mfma_tile:
+// Block tile not divisible by block_waves * warp_tile:
 //
 //   constexpr auto bad = make_spec(
 //       Signature{.dtype = DataType::FP16,
 //                 .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
 //       GemmAlgorithm{{100, 128, 32}, {2, 2, 1}, {16, 16, 16}});
 //
-// Expected error: "block_tile.m must be divisible by (block_waves.m * mfma_tile.m)"
+// Expected error: "block_tile.m must be divisible by (block_waves.m * warp_tile.m)"
 
 // ============================================================================
 // TensorName — expected failures

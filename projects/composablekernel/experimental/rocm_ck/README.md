@@ -43,7 +43,7 @@ static constexpr rocm_ck::GemmSpec spec = rocm_ck::make_spec(
                 rocm_ck::ReluOp{.in = "D", .out = "E"}}},
     rocm_ck::GemmAlgorithm{.block_tile  = {128, 128, 32},
                             .block_waves = {2, 2, 1},
-                            .mfma_tile   = {16, 16, 16}});
+                            .warp_tile   = {16, 16, 16}});
 
 extern "C" __global__ void gemm_fp16_add_relu(rocm_ck::Args args)
 {

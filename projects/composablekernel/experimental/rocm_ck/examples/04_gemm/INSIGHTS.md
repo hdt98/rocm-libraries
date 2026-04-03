@@ -26,7 +26,7 @@ The 7 CK Tile types (TileGemmShape, TileGemmTraits, PipelineProblem, GemmPipelin
 The `Signature` (what to compute) and `GemmAlgorithm` (how to compute it) are independent:
 
 - **Signature**: data types, layouts, epilogue via operator composition
-- **Algorithm**: `block_tile {M,N,K}`, `block_waves {M,N,K}`, `mfma_tile {M,N,K}`
+- **Algorithm**: `block_tile {M,N,K}`, `block_waves {M,N,K}`, `warp_tile {M,N,K}`
 
 The same algorithm works across fp32, fp16, and bf16. The same type can use different tile configs (gemm_fp16 vs gemm_fp16_w32). This was proven by having 6 variants that mix types and tile shapes — no coupling between the axes.
 
@@ -61,7 +61,7 @@ struct Dim3 { int m, n, k; };
 GemmAlgorithm{
     .block_tile  = {128, 128, 32},
     .block_waves = {2, 2, 1},
-    .mfma_tile   = {16, 16, 16}
+    .warp_tile   = {16, 16, 16}
 };
 ```
 
@@ -71,7 +71,7 @@ GemmAlgorithm{
 
 ## 6. Hardware Constraints Flow Through consteval
 
-The valid set of (dtype, mfma_tile) combinations is hardware-specific and non-obvious. `is_valid_mfma` is a consteval lookup table that mirrors CK Tile's `WarpGemmDispatcher` specializations for gfx9 (MFMA):
+The valid set of (dtype, warp_tile) combinations is hardware-specific and non-obvious. `is_valid_mfma` is a consteval lookup table that mirrors CK Tile's `WarpGemmDispatcher` specializations for gfx9 (MFMA):
 
 | dtype | 16×16 K values | 32×32 K values |
 |-------|----------------|----------------|

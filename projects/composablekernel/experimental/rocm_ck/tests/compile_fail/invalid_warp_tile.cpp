@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //
 // Must fail: FP32 with 32x32x16 MFMA tile (k=16 invalid for FP32 at 32x32).
-// Expected error: "mfma_tile is not a valid MFMA instruction shape for this dtype"
+// Expected error: "warp_tile is not a valid MFMA instruction shape for this dtype"
 
 #include <rocm_ck/gemm_spec.hpp>
 
