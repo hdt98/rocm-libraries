@@ -207,6 +207,19 @@ inline constexpr GemmVariant gemm_variants[] = {
                      .warp_tile   = {16, 16, 16},
                      .pipeline    = Pipeline::Preshuffle,
                  }),
+    // --- Memory pipeline: LDS-based with Interwave scheduling ---
+    make_variant("gemm_fp16_memory",
+                 Signature{
+                     .dtype = DataType::FP16,
+                     .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 GemmAlgorithm{
+                     .block_tile  = {128, 128, 32},
+                     .block_waves = {2, 2, 1},
+                     .warp_tile   = {16, 16, 16},
+                     .pipeline    = Pipeline::Memory,
+                     .scheduling  = Scheduling::Interwave,
+                 }),
     // --- FP8: asymmetric dtype (fp8 inputs, fp16 output, gfx942+ only) ---
     make_variant("gemm_fp8_fnuz",
                  Signature{

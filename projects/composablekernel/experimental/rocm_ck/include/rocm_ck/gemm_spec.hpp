@@ -73,6 +73,10 @@ inline constexpr int kMaxEpilogueOps = 4;
 ///     Uses UniversalGemmPipelineProblem + GemmPipelineAgBgCrCompV3.
 ///     Better compute utilization through overlapped memory/compute.
 ///
+/// Memory: Memory-optimized pipeline — A/B from global memory through LDS.
+///     Uses UniversalGemmPipelineProblem + GemmPipelineAgBgCrMem.
+///     Supports both Intrawave and Interwave scheduling.
+///
 /// Preshuffle: Weight preshuffle pipeline — B matrix pre-rearranged for
 ///     optimal LDS loads. Uses WeightPreshufflePipelineAGmemBGmemCRegV2.
 ///     Requires A=RowMajor, B=ColumnMajor. Host must call preshuffle on B
@@ -81,7 +85,28 @@ enum class Pipeline
 {
     V1,
     V3,
+    Memory,
     Preshuffle
+};
+
+/// Instruction scheduling strategy within a wavefront.
+///
+/// Controls how MFMA/WMMA instructions are scheduled relative to memory
+/// operations within each wave. This is instruction-level scheduling,
+/// not spatial decomposition (which is TilePartitioner's concern).
+///
+/// Intrawave: Synchronous — all waves in a workgroup synchronize after each
+///     k-iteration. Memory loads and compute are interleaved within a single wave.
+///     Two block_sync_lds() calls per iteration.
+///
+/// Interwave: Asynchronous — waves proceed independently with minimal
+///     synchronization. Only one block_sync_lds() per iteration. Overlaps
+///     compute from one wave with memory loads from another.
+///     Only valid with Pipeline::Memory.
+enum class Scheduling
+{
+    Intrawave,
+    Interwave
 };
 
 /// Tile-to-workgroup distribution strategy.
@@ -132,6 +157,7 @@ struct GemmAlgorithm
     Dim3 warp_tile;   // Warp instruction tile {M, N, K} (MFMA on CDNA, WMMA on RDNA)
     int k_batch                      = 1; // Split-K factor: partitions K across blockIdx.z
     Pipeline pipeline                = Pipeline::V1;            // Pipeline implementation strategy
+    Scheduling scheduling            = Scheduling::Intrawave;   // Instruction scheduling strategy
     TilePartitioner tile_partitioner = TilePartitioner::Linear; // Tile-to-workgroup distribution
 };
 
@@ -166,6 +192,9 @@ struct GemmSpec
 
     // Pipeline implementation strategy
     Pipeline pipeline;
+
+    // Instruction scheduling strategy
+    Scheduling scheduling;
 
     // Tile-to-workgroup distribution strategy
     TilePartitioner tile_partitioner;
@@ -449,6 +478,10 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo, GpuTarget target
             throw "Preshuffle pipeline requires B layout = Col";
     }
 
+    // Scheduling constraints
+    if(algo.scheduling == Scheduling::Interwave && algo.pipeline != Pipeline::Memory)
+        throw "Interwave scheduling requires Pipeline::Memory";
+
     // Tile partitioner constraints
     if(algo.tile_partitioner == TilePartitioner::StreamK && algo.k_batch > 1)
         throw "Stream-K tile partitioning is incompatible with split-K (k_batch > 1)";
@@ -494,6 +527,7 @@ consteval GemmSpec make_spec(Signature sig, GemmAlgorithm algo, GpuTarget target
             workgroup_size,
             algo.k_batch,
             algo.pipeline,
+            algo.scheduling,
             algo.tile_partitioner,
             num_epi_ops,
             epi_ops};

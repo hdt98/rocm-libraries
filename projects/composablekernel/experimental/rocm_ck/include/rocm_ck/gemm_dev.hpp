@@ -11,7 +11,7 @@
 // with a specific constexpr GemmSpec.
 //
 // Supports:
-//   - Pipeline selection: V1, V3, Preshuffle
+//   - Pipeline selection: V1, V3, Memory, Preshuffle
 //   - Tile partitioning: Linear (standard), StreamK (work-balanced)
 //   - Batched GEMM: batch dimension via blockIdx.y (runtime, in Args)
 //
@@ -152,8 +152,8 @@ struct EpilogueTypes
 ///   strides follow dimension order (RowMajor: strides[0]=ld, ColMajor: strides[1]=ld)
 ///
 /// Supports batched GEMM (batch dimension via blockIdx.y when batch_count > 0),
-/// multiple pipeline strategies (V1, V3, Preshuffle), and scheduled variants
-/// (Linear, StreamK).
+/// multiple pipeline strategies (V1, V3, Memory, Preshuffle), scheduling
+/// modes (Intrawave, Interwave), and tile partitioners (Linear, StreamK).
 template <GemmSpec S>
 __device__ void run(Args args)
 {
@@ -223,8 +223,13 @@ __device__ void run(Args args)
                                ck_tile::sequence<S.block_waves.m, S.block_waves.n, S.block_waves.k>,
                                ck_tile::sequence<S.warp_tile.m, S.warp_tile.n, S.warp_tile.k>>;
 
-    // --- Step 2-4: Traits, problem, pipeline (selected by S.pipeline) ---
-    //
+    // --- Step 2-4: Traits, problem, pipeline (selected by S.pipeline + S.scheduling) ---
+
+    // Map rocm_ck::Scheduling → ck_tile::GemmPipelineScheduler
+    static constexpr auto CkScheduler = S.scheduling == Scheduling::Interwave
+                                            ? ck_tile::GemmPipelineScheduler::Interwave
+                                            : ck_tile::GemmPipelineScheduler::Intrawave;
+
     // V1: simple pipeline (A/B from global, C in registers)
     using V1Pipeline = ck_tile::GemmPipelineAGmemBGmemCRegV1<ck_tile::GemmPipelineProblem<
         AType,
@@ -241,6 +246,15 @@ __device__ void run(Args args)
         GemmShape,
         ck_tile::TileGemmUniversalTraits<false, false, false, true, ALayout, BLayout, CLayout>>>;
 
+    // Memory: memory-optimized pipeline (A/B through LDS, supports Intrawave/Interwave)
+    using MemoryPipeline = ck_tile::GemmPipelineAgBgCrMem<ck_tile::UniversalGemmPipelineProblem<
+        AType,
+        BType,
+        AccType,
+        GemmShape,
+        ck_tile::TileGemmUniversalTraits<false, false, false, true, ALayout, BLayout, CLayout>,
+        CkScheduler>>;
+
     // Preshuffle: weight preshuffle pipeline (A=Row, B=Col, DoubleSmemBuffer=true, Preshuffle=true)
     using PreshufflePipeline =
         ck_tile::WeightPreshufflePipelineAGmemBGmemCRegV2<ck_tile::UniversalGemmPipelineProblem<
@@ -251,10 +265,14 @@ __device__ void run(Args args)
             ck_tile::
                 TileGemmUniversalTraits<false, false, false, true, ALayout, BLayout, CLayout>>>;
 
-    using GemmPipeline = std::conditional_t<
-        S.pipeline == Pipeline::V1,
-        V1Pipeline,
-        std::conditional_t<S.pipeline == Pipeline::V3, V3Pipeline, PreshufflePipeline>>;
+    using GemmPipeline =
+        std::conditional_t<S.pipeline == Pipeline::V1,
+                           V1Pipeline,
+                           std::conditional_t<S.pipeline == Pipeline::V3,
+                                              V3Pipeline,
+                                              std::conditional_t<S.pipeline == Pipeline::Memory,
+                                                                 MemoryPipeline,
+                                                                 PreshufflePipeline>>>;
 
     // --- Step 5: Partitioner (1D blockIdx → 2D tile coordinates) ---
     using TilePartitioner = ck_tile::GemmTile1DPartitioner<GemmShape>;

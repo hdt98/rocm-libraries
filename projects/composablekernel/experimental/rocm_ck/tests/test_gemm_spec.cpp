@@ -447,3 +447,44 @@ TEST(MakeSpec, DefaultsToGpuTargetAny)
 
     EXPECT_EQ(k.workgroup_size, 256);
 }
+
+// ============================================================================
+// make_spec: Pipeline::Memory + Scheduling
+// ============================================================================
+
+TEST(MakeSpec, AcceptsMemoryPipelineWithIntrawaveScheduling)
+{
+    constexpr auto k = make_spec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{.block_tile  = {128, 128, 32},
+                      .block_waves = {2, 2, 1},
+                      .warp_tile   = {16, 16, 16},
+                      .pipeline    = Pipeline::Memory,
+                      .scheduling  = Scheduling::Intrawave});
+
+    EXPECT_EQ(k.pipeline, Pipeline::Memory);
+    EXPECT_EQ(k.scheduling, Scheduling::Intrawave);
+}
+
+TEST(MakeSpec, AcceptsMemoryPipelineWithInterwaveScheduling)
+{
+    constexpr auto k = make_spec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{.block_tile  = {128, 128, 32},
+                      .block_waves = {2, 2, 1},
+                      .warp_tile   = {16, 16, 16},
+                      .pipeline    = Pipeline::Memory,
+                      .scheduling  = Scheduling::Interwave});
+
+    EXPECT_EQ(k.pipeline, Pipeline::Memory);
+    EXPECT_EQ(k.scheduling, Scheduling::Interwave);
+}
+
+TEST(MakeSpec, DefaultsSchedulingToIntrawave)
+{
+    constexpr auto k = make_spec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}});
+
+    EXPECT_EQ(k.scheduling, Scheduling::Intrawave);
+}
