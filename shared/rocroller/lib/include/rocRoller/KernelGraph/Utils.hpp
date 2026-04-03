@@ -661,7 +661,8 @@ namespace rocRoller
                                  std::array<unsigned int, 3> const& workgroupSizes,
                                  std::vector<unsigned int> const&   jammedTiles,
                                  bool                               rightmostFastest,
-                                 bool                               isGlobalToLDS = false);
+                                 bool                               isGlobalToLDS = false,
+                                 bool                               ldsSwizzle    = false);
 
         /**
          * @brief Create an internal tile backed by a ThreadTile.

@@ -1071,7 +1071,7 @@ namespace rocRoller
             // GR swizzle for Direct2LDS MATRIX_B: permute K-column
             // (nThrX, dim 0) based on N-row (nThrY).
             auto grSwizzleNThrX = nThrX;
-            if(ldsSwizzle && isGlobalToLDS && macTile.layoutType == LayoutType::MATRIX_B)
+            if(ldsSwizzle && macTile.layoutType == LayoutType::MATRIX_B)
             {
                 auto numColumns = thrTile.wsizes.at(0);
                 auto params     = LDSSwizzleParams::fromColumnCount(numColumns);
@@ -1104,7 +1104,8 @@ namespace rocRoller
                             Tile(), {iMacX}, {jammedWavetileX, grSwizzleNThrX, iThrX});
                 }
                 else
-                    graph.coordinates.addElement(Tile(), {iMacX}, {jammedWavetileX, nThrX, iThrX});
+                    graph.coordinates.addElement(
+                        Tile(), {iMacX}, {jammedWavetileX, grSwizzleNThrX, iThrX});
             }
             else
             {
@@ -1116,13 +1117,13 @@ namespace rocRoller
                         graph.coordinates.addElement(Tile(), {iMacX}, {grSwizzleNThrX, iThrX});
                 }
                 else
-                    graph.coordinates.addElement(Tile(), {iMacX}, {nThrX, iThrX});
+                    graph.coordinates.addElement(Tile(), {iMacX}, {grSwizzleNThrX, iThrX});
             }
 
             // GR swizzle for Direct2LDS MATRIX_A: permute K-column
             // (nThrY, dim 1) based on M-row (nThrX).
             auto grSwizzleNThrY = nThrY;
-            if(ldsSwizzle && isGlobalToLDS && macTile.layoutType == LayoutType::MATRIX_A)
+            if(ldsSwizzle && macTile.layoutType == LayoutType::MATRIX_A)
             {
                 auto numColumns = thrTile.wsizes.at(1);
                 auto params     = LDSSwizzleParams::fromColumnCount(numColumns);
@@ -1160,7 +1161,8 @@ namespace rocRoller
                             Tile(), {iMacY}, {jammedWavetileY, iThrY, grSwizzleNThrY});
                 }
                 else
-                    graph.coordinates.addElement(Tile(), {iMacY}, {jammedWavetileY, nThrY, iThrY});
+                    graph.coordinates.addElement(
+                        Tile(), {iMacY}, {jammedWavetileY, grSwizzleNThrY, iThrY});
             }
             else
             {
@@ -1172,7 +1174,7 @@ namespace rocRoller
                         graph.coordinates.addElement(Tile(), {iMacY}, {iThrY, grSwizzleNThrY});
                 }
                 else
-                    graph.coordinates.addElement(Tile(), {iMacY}, {nThrY, iThrY});
+                    graph.coordinates.addElement(Tile(), {iMacY}, {grSwizzleNThrY, iThrY});
             }
         }
 
@@ -2175,9 +2177,23 @@ namespace rocRoller
                 switch(tile.memoryType)
                 {
                 case MemoryType::VGPR:
-                    loadMacroTile_VGPR(
-                        graph, connections, userTag, tileTag, sdims, {1, 1}, m_params, m_context);
-                    break;
+                {
+                    bool vgprSwizzle
+                        = isLDSSwizzleActive(m_context->kernelOptions()->ldsSwizzleMode,
+                                             tile.layoutType,
+                                             varType.dataType);
+                    loadMacroTile_VGPR(graph,
+                                       connections,
+                                       userTag,
+                                       tileTag,
+                                       sdims,
+                                       {1, 1},
+                                       m_params,
+                                       m_context,
+                                       /*isGlobalToLDS=*/vgprSwizzle,
+                                       /*ldsSwizzle=*/vgprSwizzle);
+                }
+                break;
                 case MemoryType::WAVE:
                 case MemoryType::WAVE_FROM_GLOBAL:
                     loadMacroTile_WAVE(graph,
@@ -2521,7 +2537,10 @@ namespace rocRoller
 
                 if(tile.memoryType == MemoryType::VGPR)
                 {
-                    // We are storing entire workgroup tiles
+                    // We are storing entire workgroup tiles.
+                    // When LDS swizzle is active, use isGlobalToLDS=true so the
+                    // store coordinate decomposition matches the load side,
+                    // producing the same LDS layout as D2LDS.
                     std::vector<uint> jammedTiles = {1, 1};
                     addStoreThreadTileCT(graph,
                                          connections,
@@ -2531,7 +2550,7 @@ namespace rocRoller
                                          workgroupSizes,
                                          jammedTiles,
                                          rightmostFastest,
-                                         /*isGlobalToLDS=*/false,
+                                         /*isGlobalToLDS=*/ldsSwizzle,
                                          ldsSwizzle);
                 }
                 else if(tile.memoryType == MemoryType::WAVE_Direct2LDS)

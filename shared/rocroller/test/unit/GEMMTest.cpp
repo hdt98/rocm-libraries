@@ -637,6 +637,17 @@ namespace GEMMTests
         EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 0);
     }
 
+    TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MI16x16x128_MT64x64x256_LDSSwizzle_ViaVGPR)
+    {
+        REQUIRE_ARCH_CAP(GPUCapability::HasMFMA_f8f6f4);
+        auto gemm           = GEMMProblemF8F6F4{16, 16, 128};
+        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDSViaVGPR;
+        gemm.ldsSwizzleMode = LDSBankSwizzleMode::Swizzle;
+
+        basicGEMM<FP4, FP4, float>(gemm);
+    }
+
     TEST_P(GEMMTestSuite, GPU_GEMM_DataType_FP16_AllLDS)
     {
         REQUIRE_ARCH_CAP(GPUCapability::HasMFMA);
