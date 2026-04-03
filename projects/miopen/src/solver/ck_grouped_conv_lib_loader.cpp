@@ -279,11 +279,11 @@ bool CKGroupedConvLibLoader::LoadSymbols()
 
     // Per-direction symbols
 #define LOAD_DIR_SYMS(idx, prefix)                                                       \
-    LOAD_SYM(slot_fns_[idx].fill_valid_kernels, ckgrpconv_##prefix##_fill_valid_kernels); \
-    LOAD_SYM(slot_fns_[idx].is_applicable, ckgrpconv_##prefix##_is_applicable);           \
-    LOAD_SYM(slot_fns_[idx].is_args_supported, ckgrpconv_##prefix##_is_args_supported);   \
-    LOAD_SYM(slot_fns_[idx].get_workspace_size, ckgrpconv_##prefix##_get_workspace_size); \
-    LOAD_SYM(slot_fns_[idx].get_solution, ckgrpconv_##prefix##_get_solution)
+    LOAD_SYM(solver_fns_[idx].fill_valid_kernels, ckgrpconv_##prefix##_fill_valid_kernels); \
+    LOAD_SYM(solver_fns_[idx].is_applicable, ckgrpconv_##prefix##_is_applicable);           \
+    LOAD_SYM(solver_fns_[idx].is_args_supported, ckgrpconv_##prefix##_is_args_supported);   \
+    LOAD_SYM(solver_fns_[idx].get_workspace_size, ckgrpconv_##prefix##_get_workspace_size); \
+    LOAD_SYM(solver_fns_[idx].get_solution, ckgrpconv_##prefix##_get_solution)
 
     LOAD_DIR_SYMS(ToSlotIndex(CKSolverType::GrpConvFwd), fwd);
     LOAD_DIR_SYMS(ToSlotIndex(CKSolverType::GrpConvBwd), bwd);
@@ -293,9 +293,9 @@ bool CKGroupedConvLibLoader::LoadSymbols()
 #undef LOAD_DIR_SYMS
 
     // Per-slot "get all kernel type strings" symbols (only some slots have them)
-    LOAD_SYM(slot_fns_[ToSlotIndex(CKSolverType::GrpConv3dFwd)].get_all_kernel_types,
+    LOAD_SYM(solver_fns_[ToSlotIndex(CKSolverType::GrpConv3dFwd)].get_all_kernel_types,
              ckgrpconv_3d_fwd_get_all_kernel_type_strings);
-    LOAD_SYM(slot_fns_[ToSlotIndex(CKSolverType::GrpConv3dBwd)].get_all_kernel_types,
+    LOAD_SYM(solver_fns_[ToSlotIndex(CKSolverType::GrpConv3dBwd)].get_all_kernel_types,
              ckgrpconv_3d_bwd_get_all_kernel_type_strings);
 
 #undef LOAD_SYM
@@ -341,7 +341,7 @@ CKGroupedConvLibLoader::FillValidKernels(CKSolverType solverType,
     if(!IsLoaded())
         return {};
     return ExtractKernelList(
-        slot_fns_[ToSlotIndex(solverType)].fill_valid_kernels(&problem, dtype, use_tf32));
+        solver_fns_[ToSlotIndex(solverType)].fill_valid_kernels(&problem, dtype, use_tf32));
 }
 
 std::vector<std::string>
@@ -366,7 +366,7 @@ bool CKGroupedConvLibLoader::IsApplicable(CKSolverType solverType,
 {
     if(!IsLoaded())
         return false;
-    return slot_fns_[ToSlotIndex(solverType)].is_applicable(&problem, dtype, use_tf32);
+    return solver_fns_[ToSlotIndex(solverType)].is_applicable(&problem, dtype, use_tf32);
 }
 
 bool CKGroupedConvLibLoader::IsArgsSupported(CKSolverType solverType,
@@ -377,7 +377,7 @@ bool CKGroupedConvLibLoader::IsArgsSupported(CKSolverType solverType,
 {
     if(!IsLoaded())
         return false;
-    return slot_fns_[ToSlotIndex(solverType)].is_args_supported(
+    return solver_fns_[ToSlotIndex(solverType)].is_args_supported(
         &problem, kernel_id.c_str(), dtype, use_tf32);
 }
 
@@ -388,7 +388,7 @@ size_t CKGroupedConvLibLoader::GetWorkspaceSize(CKSolverType solverType,
 {
     if(!IsLoaded())
         return 0;
-    return slot_fns_[ToSlotIndex(solverType)].get_workspace_size(&problem, dtype, use_tf32);
+    return solver_fns_[ToSlotIndex(solverType)].get_workspace_size(&problem, dtype, use_tf32);
 }
 
 ConvSolution CKGroupedConvLibLoader::GetSolution(CKSolverType solverType,
@@ -400,7 +400,7 @@ ConvSolution CKGroupedConvLibLoader::GetSolution(CKSolverType solverType,
     if(!IsLoaded())
         return ConvSolution{miopenStatusInternalError};
     return ExtractSolution(
-        slot_fns_[ToSlotIndex(solverType)].get_solution(
+        solver_fns_[ToSlotIndex(solverType)].get_solution(
             &ctx, &problem, kernel_id.c_str(), use_tf32));
 }
 
@@ -409,7 +409,7 @@ CKGroupedConvLibLoader::GetAllKernelTypeStrings(CKSolverType slot) const
 {
     if(!IsLoaded())
         return {};
-    auto fn = slot_fns_[ToSlotIndex(slot)].get_all_kernel_types;
+    auto fn = solver_fns_[ToSlotIndex(slot)].get_all_kernel_types;
     if(fn == nullptr)
         return {};
     return ExtractKernelList(fn());

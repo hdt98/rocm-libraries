@@ -164,7 +164,7 @@ private:
 
     using GetAllKernelTypeStringsFn = CKKernelListHandle* (*)();
 
-    struct DirectionFns
+    struct SolverFns
     {
         FillValidKernelsFn fill_valid_kernels           = nullptr;
         IsApplicableFn is_applicable                    = nullptr;
@@ -174,7 +174,7 @@ private:
         GetAllKernelTypeStringsFn get_all_kernel_types  = nullptr;
     };
 
-    DirectionFns slot_fns_[ToSlotIndex(CKSolverType::Count)];
+    SolverFns solver_fns_[ToSlotIndex(CKSolverType::Count)];
 
     // Helper: extract kernel list from handle
     std::vector<std::string> ExtractKernelList(::CKKernelListHandle* handle) const;
