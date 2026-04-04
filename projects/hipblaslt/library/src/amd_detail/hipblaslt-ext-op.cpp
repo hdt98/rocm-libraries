@@ -142,7 +142,23 @@ namespace
         if(hipGetDevice(&deviceId) == hipSuccess
            && hipGetDeviceProperties(&props, deviceId) == hipSuccess)
         {
-            const std::string archName = trimArchName(props.gcnArchName);
+            const std::string gcnArchName = props.gcnArchName;
+            const std::string archName    = trimArchName(gcnArchName);
+
+            // Probe most-specific to least-specific:
+            //   1. library/<arch>-<xnack>/  – split single-xnack-variant shard
+            //   2. library/<arch>/          – combined xnack or single-arch shard
+            if(gcnArchName.find(':') != std::string::npos)
+            {
+                // Replace ':' with '-' to form a filesystem-safe xnack suffix (e.g. "gfx90a-xnack-").
+                std::string archXnack = gcnArchName;
+                std::replace(archXnack.begin(), archXnack.end(), ':', '-');
+                auto xnackPath = rocblaslt_find_library_relative_path(
+                    std::filesystem::path(archXnack) / "hipblasltExtOpLibrary.dat");
+                if(xnackPath)
+                    return xnackPath->string();
+            }
+
             auto perArchPath = rocblaslt_find_library_relative_path(
                 std::filesystem::path(archName) / "hipblasltExtOpLibrary.dat");
             if(perArchPath)

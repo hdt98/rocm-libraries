@@ -2150,12 +2150,40 @@ namespace
                 // Only use the subdir if a Tensile mapping file is actually present there;
                 // otherwise the directory may have been created by ExtOp/Transform installs
                 // without a corresponding Tensile library (multi-arch non-TheRock builds).
+                // Probe most-specific to least-specific:
+                //   1. library/<arch>-<xnack>/  – split single-xnack-variant shard
+                //   2. library/<arch>/          – combined xnack or single-arch shard
                 {
-                    auto processor_path  = path / processor;
-                    auto mapping_msgpack = processor_path / ("TensileLibrary_lazy_" + processor + ".dat");
-                    auto mapping_yaml    = processor_path / ("TensileLibrary_lazy_" + processor + ".yaml");
-                    if(std::filesystem::exists(mapping_msgpack) || std::filesystem::exists(mapping_yaml))
-                        path = std::move(processor_path);
+                    int             xnackDeviceId{};
+                    hipDeviceProp_t xnackProps{};
+                    bool            found_subdir = false;
+                    if(hipGetDevice(&xnackDeviceId) == hipSuccess
+                       && hipGetDeviceProperties(&xnackProps, xnackDeviceId) == hipSuccess)
+                    {
+                        std::string gcnFull = xnackProps.gcnArchName;
+                        if(gcnFull.find(':') != std::string::npos)
+                        {
+                            // Replace ':' with '-' (e.g. "gfx90a:xnack-" → "gfx90a-xnack-").
+                            std::string processor_xnack = gcnFull;
+                            std::replace(processor_xnack.begin(), processor_xnack.end(), ':', '-');
+                            auto xnack_path     = path / processor_xnack;
+                            auto xnack_msgpack  = xnack_path / ("TensileLibrary_lazy_" + processor_xnack + ".dat");
+                            auto xnack_yaml     = xnack_path / ("TensileLibrary_lazy_" + processor_xnack + ".yaml");
+                            if(std::filesystem::exists(xnack_msgpack) || std::filesystem::exists(xnack_yaml))
+                            {
+                                path        = std::move(xnack_path);
+                                found_subdir = true;
+                            }
+                        }
+                    }
+                    if(!found_subdir)
+                    {
+                        auto processor_path  = path / processor;
+                        auto mapping_msgpack = processor_path / ("TensileLibrary_lazy_" + processor + ".dat");
+                        auto mapping_yaml    = processor_path / ("TensileLibrary_lazy_" + processor + ".yaml");
+                        if(std::filesystem::exists(mapping_msgpack) || std::filesystem::exists(mapping_yaml))
+                            path = std::move(processor_path);
+                    }
                 }
 
                 if(get_logger_layer_mode() & rocblaslt_layer_mode_log_info)

@@ -85,14 +85,25 @@ from .ParseArguments import parseArguments
 def libraryDir(outputPath: Union[str, Path], archs: Collection[str]) -> Path:
     """Return the library output/input directory for the given target archs.
 
-    Single arch  → <outputPath>/library/<arch>/   (TheRock shard overlay safe)
-    Zero or multiple archs → <outputPath>/library/ (flat)
+    Accepts archs in either colon-form ("gfx90a:xnack-") or dash-form ("gfx90a-xnack-");
+    colons are normalized to dashes internally before path construction.
+
+    Single base arch, single xnack variant  → library/<arch>/     e.g. library/gfx90a-xnack-/
+    Single base arch, multiple xnack variants → library/<base>/   e.g. library/gfx90a/
+    Multiple distinct base archs (or zero) → library/             (flat, multi-arch build)
     """
     path = Path(outputPath)
-    archs = list(archs)
+    # Normalize colon-form ("gfx90a:xnack-") to dash-form ("gfx90a-xnack-") for path safety.
+    archs = [a.replace(":", "-") for a in archs]
+    if not archs:
+        return path / "library"
+    base_archs = {a.split("-xnack")[0] for a in archs}
+    if len(base_archs) > 1:
+        return path / "library"
+    base_arch = next(iter(base_archs))
     if len(archs) == 1:
         return path / "library" / archs[0]
-    return path / "library"
+    return path / "library" / base_arch
 
 
 class KernelCodeGenResult(NamedTuple):

@@ -58,10 +58,25 @@ namespace
         if(hipGetDevice(&deviceId) == hipSuccess
            && hipGetDeviceProperties(&props, deviceId) == hipSuccess)
         {
-            std::string archName = props.gcnArchName;
-            auto        colonPos = archName.find(':');
+            std::string gcnArchName = props.gcnArchName;
+            auto        colonPos    = gcnArchName.find(':');
+            std::string archName    = (colonPos != std::string::npos)
+                                         ? gcnArchName.substr(0, colonPos)
+                                         : gcnArchName;
+
+            // Probe most-specific to least-specific:
+            //   1. library/<arch>-<xnack>/  – split single-xnack-variant shard
+            //   2. library/<arch>/          – combined xnack or single-arch shard
             if(colonPos != std::string::npos)
-                archName = archName.substr(0, colonPos);
+            {
+                // Replace ':' with '-' to form a filesystem-safe xnack suffix (e.g. "gfx90a-xnack-").
+                std::string archXnack = gcnArchName;
+                std::replace(archXnack.begin(), archXnack.end(), ':', '-');
+                auto xnackPath = rocblaslt_find_library_relative_path(
+                    std::filesystem::path(archXnack) / "hipblasltTransform.hsaco");
+                if(xnackPath)
+                    return *xnackPath;
+            }
 
             auto perArchPath = rocblaslt_find_library_relative_path(
                 std::filesystem::path(archName) / "hipblasltTransform.hsaco");
