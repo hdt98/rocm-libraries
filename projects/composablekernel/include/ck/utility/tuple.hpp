@@ -71,6 +71,19 @@ __host__ __device__ constexpr Data get_tuple_element_data(const TupleElementKeyD
     return ck::forward(x.mData);
 }
 
+// Helper to check if all types in a parameter pack are the same
+template <typename... Ts>
+struct all_same;
+
+template <typename T, typename... Ts>
+struct all_same<T, Ts...> : std::conjunction<std::is_same<T, Ts>...> {};
+
+template <typename T>
+struct all_same<T> : std::true_type {};
+
+template <>
+struct all_same<> : std::true_type {};
+
 template <typename Indices, typename... Xs>
 struct TupleImpl;
 
@@ -167,6 +180,42 @@ struct Tuple : detail::TupleImpl<typename arithmetic_sequence_gen<0, sizeof...(X
     {
         return At(i);
     }
+
+    // Runtime indexing for homogeneous tuples (enables constexpr for loops)
+    // Only available when all types Xs... are the same
+    __host__ __device__ constexpr auto& At(index_t i) [[clang::lifetimebound]]
+        requires detail::all_same<Xs...>::value
+    {
+        using T = typename std::tuple_element<0, std::tuple<Xs...>>::type;
+        return At_runtime_impl<T>(i, std::make_index_sequence<sizeof...(Xs)>{});
+    }
+
+    __host__ __device__ constexpr const auto& At(index_t i) const
+        requires detail::all_same<Xs...>::value
+    {
+        using T = typename std::tuple_element<0, std::tuple<Xs...>>::type;
+        return At_runtime_impl<T>(i, std::make_index_sequence<sizeof...(Xs)>{});
+    }
+
+private:
+    // Runtime dispatch helper using fold expression
+    template <typename T, index_t... Is>
+    __host__ __device__ constexpr T& At_runtime_impl(index_t i, std::index_sequence<Is...>) [[clang::lifetimebound]]
+    {
+        T* result = nullptr;
+        ((i == Is ? (result = &At(Number<Is>{}), true) : false) || ...);
+        return *result;
+    }
+
+    template <typename T, index_t... Is>
+    __host__ __device__ constexpr const T& At_runtime_impl(index_t i, std::index_sequence<Is...>) const
+    {
+        const T* result = nullptr;
+        ((i == Is ? (result = &At(Number<Is>{}), true) : false) || ...);
+        return *result;
+    }
+
+public:
 
     template <typename T>
     __host__ __device__ constexpr auto operator=(const T& a)
