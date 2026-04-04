@@ -19,31 +19,30 @@ namespace rocRoller
         using RWTraceRecords = std::vector<KernelGraph::ControlFlowRWTracer::ReadWriteRecord>;
         using KernelGraph    = KernelGraph::KernelGraph;
 
-        inline bool IsLoopNode(KernelGraph const& graph, int tag)
-        {
-            return graph.control.get<ForLoopOp>(tag).has_value()
-                   || graph.control.get<DoWhileOp>(tag).has_value();
-        }
         struct LoopContainmentInfo
         {
             std::optional<int>      immediateParentLoop;
             std::unordered_set<int> containingLoops;
         };
+
         class LoopContainmentCache
         {
+
         public:
             LoopContainmentInfo const& get(KernelGraph const& graph, int node)
             {
                 auto it = m_cache.find(node);
                 if(it != m_cache.end())
                     return it->second;
-                computeWithPathCompression(graph, node);
+                compute(graph, node);
                 return m_cache.at(node);
             }
+
             std::optional<int> immediateParentLoop(KernelGraph const& graph, int node)
             {
                 return get(graph, node).immediateParentLoop;
             }
+
             bool isContainedBy(KernelGraph const& graph, int node, int loopTag)
             {
                 auto const& info = get(graph, node);
@@ -51,25 +50,35 @@ namespace rocRoller
             }
 
         private:
-            struct ParentStep
+            struct ParentInfo
             {
                 int  parent;
                 bool isContainingEdge;
             };
-            std::optional<ParentStep>
-                nextParentStep(rocRoller::KernelGraph::ControlGraph::ControlGraph const& control,
-                               int                                                       node) const
+
+            /**
+            * @brief Get the immediate parent node and edge info
+            */
+            std::optional<ParentInfo>
+                nextParent(rocRoller::KernelGraph::ControlGraph::ControlGraph const& control,
+                           int                                                       node) const
             {
                 auto neighbours = control.getNeighbours<Graph::Direction::Upstream>(node);
                 if(neighbours.empty())
                     return std::nullopt;
+
                 auto edge    = neighbours.front();
                 auto parents = control.getNeighbours<Graph::Direction::Upstream>(edge);
-                AssertFatal(!parents.empty(), "Edge does not connect two nodes!");
-                return ParentStep{parents.front(),
+                AssertFatal(not parents.empty(), "Edge does not connect two nodes (dangling)!");
+
+                return ParentInfo{parents.front(),
                                   !std::holds_alternative<Sequence>(control.getEdge(edge))};
             }
-            void computeWithPathCompression(KernelGraph const& graph, int startNode)
+
+            /**
+            * @brief Compute all containing parents of a node
+            */
+            void compute(KernelGraph const& graph, int startNode)
             {
                 struct PathEntry
                 {
@@ -77,25 +86,32 @@ namespace rocRoller
                     int  parent;
                     bool isContainingEdge;
                 };
+
                 std::vector<PathEntry>  path;
                 std::unordered_set<int> visitedNodes = {startNode};
                 int                     current      = startNode;
                 LoopContainmentInfo     suffixInfo;
+
                 while(true)
                 {
-                    auto step = nextParentStep(graph.control, current);
+                    auto step = nextParent(graph.control, current);
                     if(!step.has_value())
                     {
                         if(path.empty())
                         {
+                            // No contained loops
                             m_cache[startNode] = LoopContainmentInfo{};
                             return;
                         }
+
                         suffixInfo = LoopContainmentInfo{};
                         break;
                     }
+
                     AssertFatal(!visitedNodes.contains(step->parent), "Graph contains cycle!");
-                    path.push_back(PathEntry{current, step->parent, step->isContainingEdge});
+
+                    path.push_back({current, step->parent, step->isContainingEdge});
+
                     auto cachedParent = m_cache.find(step->parent);
                     if(cachedParent != m_cache.end())
                     {
@@ -105,17 +121,25 @@ namespace rocRoller
                     visitedNodes.insert(step->parent);
                     current = step->parent;
                 }
+
+                auto const IsLoopNode = [](KernelGraph const& graph, int const tag) {
+                    return graph.control.get<ForLoopOp>(tag).has_value()
+                           or graph.control.get<DoWhileOp>(tag).has_value();
+                };
+
                 LoopContainmentInfo running = suffixInfo;
-                for(auto it = path.rbegin(); it != path.rend(); ++it)
+
+                for(auto const& [node, parent, isContainingEdge] : std::ranges::reverse_view{path})
                 {
-                    if(it->isContainingEdge && IsLoopNode(graph, it->parent))
+                    if(isContainingEdge && IsLoopNode(graph, parent))
                     {
-                        running.immediateParentLoop = it->parent;
-                        running.containingLoops.insert(it->parent);
+                        running.immediateParentLoop = parent;
+                        running.containingLoops.insert(parent);
                     }
-                    m_cache[it->node] = running;
+                    m_cache[node] = running;
                 }
             }
+
             std::unordered_map<int, LoopContainmentInfo> m_cache;
         };
 
@@ -420,6 +444,17 @@ namespace rocRoller
             AssertFatal(afterSecondOpPos < allRecords.size(),
                         "Invalid position for secondOp in trace.",
                         ShowValue(secondOpRecordIndex));
+            // For loop-carried dependencies, we need to check if there's a barrier
+            // that breaks the dependency from iteration N's secondOp to iteration N+1's firstOp.
+            //
+            // This means we need a barrier either:
+            // 1. After secondOp but still within the loop body (before loop end)
+            // 2. Before firstOp but after the loop body start
+            //
+            // In trace order, the loop body executes once. A barrier anywhere
+            // after secondOp or before firstOp (but within the loop) suffices.
+
+            // Check for Barrier nodes before firstOp (in common loop body)
             for(size_t i = 0; i < firstOpRecordIndex; ++i)
             {
                 int ctrl            = allRecords[i].control;
