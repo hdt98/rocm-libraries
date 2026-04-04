@@ -50,6 +50,7 @@ add_executable(
     TestIncompatibleBackendWrapper.cpp
     TestINode.cpp
     TestKnob.cpp
+    TestKnobUnpacker.cpp
     TestLayernormAttributes.cpp
     TestLayerNormNode.cpp
     TestMatmulAttributes.cpp
@@ -62,9 +63,12 @@ add_executable(
     TestSdpaFpropNode.cpp
     TestPointwiseAttributes.cpp
     TestPointwiseNode.cpp
+    TestReductionAttributes.cpp
+    TestReductionNode.cpp
     TestRMSNormAttributes.cpp
     TestRMSNormNode.cpp
     TestScopedHipdnnBackendDescriptor.cpp
+    TestSetEnginePluginPaths.cpp
     TestTensorAttributes.cpp
     TestTensorValueAttributes.cpp
     TestTypes.cpp

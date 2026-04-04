@@ -25,8 +25,13 @@ add_executable(
     utilities/TestCpuFpReferenceMiopenRmsValidation.cpp
     utilities/TestCpuFpReferenceUtilities.cpp
     utilities/TestCpuFpReferenceValidation.cpp
+    utilities/TestCpuTypeUtilities.cpp
     utilities/TestCpuReferencePointwise.cpp
-    utilities/TestDynamicTolerances.cpp
+    utilities/TestDynamicTolerancesCommon.cpp
+    utilities/TestDynamicTolerancesConv.cpp
+    utilities/TestDynamicTolerancesMatmul.cpp
+    utilities/TestDynamicTolerancesPointwise.cpp
+    utilities/TestDynamicTolerancesRMSNorm.cpp
     utilities/TestFlatbufferDatatypeMapping.cpp
     utilities/TestFlatbufferTensorAttributesUtils.cpp
     utilities/TestLoadGraphAndTensors.cpp
@@ -35,6 +40,7 @@ add_executable(
     utilities/TestScopedDirectory.cpp
     utilities/TestScopedEnvironmentVariableSetter.cpp
     utilities/TestSeeds.cpp
+    utilities/TestTensorDiff.cpp
     utilities/TestVectorLoggingUtils.cpp
     utilities/cpu_graph_executor/TestBatchnormBwdPlan.cpp
     utilities/cpu_graph_executor/TestBatchnormBwdSignatureKey.cpp
