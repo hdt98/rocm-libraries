@@ -130,15 +130,15 @@ namespace rocRoller
                 return getEdgeType(element) == EdgeType::CoordinateTransform;
             };
 
-            auto partial = path<Dir>(starts, ends, edgeSelector).template to<std::unordered_set>();
+            std::unordered_set<int> remaining(ends.begin(), ends.end());
 
-            for(auto end : ends)
+            for(auto elemId : path<Dir>(starts, ends, edgeSelector))
             {
-                if(!partial.contains(end))
-                    return false;
+                remaining.erase(elemId);
+                if(remaining.empty())
+                    return true;
             }
-
-            return true;
+            return remaining.empty();
         }
 
         inline EdgeType CoordinateGraph::getEdgeType(int index) const

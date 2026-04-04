@@ -232,6 +232,13 @@ namespace rocRoller
 
         bool identical(ExpressionPtr const& a, ExpressionPtr const& b)
         {
+            if(a == nullptr)
+                return b == nullptr;
+            if(b == nullptr)
+                return false;
+            if(a->index() != b->index())
+                return false;
+
             auto visitor = ExpressionIdenticalVisitor();
             return visitor.call(a, b);
         }
@@ -467,6 +474,13 @@ namespace rocRoller
                         ExpressionPtr const& b,
                         AlgebraicProperties  properties)
         {
+            if(a == nullptr)
+                return b == nullptr;
+            if(b == nullptr)
+                return false;
+            if(a->index() != b->index())
+                return false;
+
             auto visitor = ExpressionEquivalentVisitor(properties);
             return visitor.call(a, b);
         }
