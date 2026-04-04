@@ -335,6 +335,7 @@ namespace rocRoller
             std::make_shared<KernelGraph::AddLDSPadding>(m_context, m_commandParameters));
         transforms.push_back(std::make_shared<KernelGraph::ConstantPropagation>());
         transforms.push_back(std::make_shared<KernelGraph::FuseExpressions>());
+        transforms.push_back(std::make_shared<KernelGraph::CrossOperationCSE>());
 
         if(m_commandParameters->workgroupMappingDim.has_value())
         {

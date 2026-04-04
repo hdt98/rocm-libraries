@@ -50,4 +50,5 @@ target_sources(rocroller
         "${CMAKE_CURRENT_SOURCE_DIR}/UnrollLoops.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/UpdateParameters.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/WorkgroupRemapXCC.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Cross.cpp"
 )
