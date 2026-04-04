@@ -60,7 +60,11 @@ foreach(obj IN LISTS obj_files)
         ERROR_QUIET)
 
     if(NOT extract_result EQUAL 0)
-        # No .hip_fatbin section — not a HIP object, skip
+        # No .hip_fatbin section — pure host code (e.g. sharded instantiation
+        # callers).  Include as-is since it contains no device code to unbundle.
+        set(thin_obj "${work_dir}/thin_${obj_name}")
+        file(COPY_FILE "${obj}" "${thin_obj}")
+        list(APPEND thin_objs "${thin_obj}")
         continue()
     endif()
 
