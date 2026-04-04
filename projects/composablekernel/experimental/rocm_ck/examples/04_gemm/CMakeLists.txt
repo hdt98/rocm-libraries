@@ -37,11 +37,12 @@ endif()
 set(KERNEL_VARIANTS gemm_fp32 gemm_fp16 gemm_bf16 gemm_fp16_w32 gemm_fp16_add gemm_fp16_add_relu
     gemm_fp16_rr gemm_fp16_cr gemm_fp16_cc gemm_fp16_splitk gemm_fp16_v3 gemm_fp16_add_add
     gemm_fp16_batched gemm_fp16_gfx90a gemm_fp16_gfx942 gemm_fp16_preshuffle gemm_fp16_memory
-    gemm_fp8_fnuz gemm_fp16_v4 gemm_fp16_padded)
+    gemm_fp8_fnuz gemm_fp16_v4 gemm_fp16_padded gemm_i8 gemm_fp16_direct2d)
 
 # --- Per-variant architecture restrictions ---
-# FP8 MFMA instructions require gfx942+. Set <variant>_GPU_TARGETS to restrict.
+# FP8 and INT8 MFMA instructions require gfx942+. Set <variant>_GPU_TARGETS to restrict.
 set(gemm_fp8_fnuz_GPU_TARGETS "gfx942;gfx950")
+set(gemm_i8_GPU_TARGETS "gfx942;gfx950")
 
 # rocm_ck headers for device code (DataType, Layout enums used by gemm_api.hpp)
 set(ROCM_CK_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
