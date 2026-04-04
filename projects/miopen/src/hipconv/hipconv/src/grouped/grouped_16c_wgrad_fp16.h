@@ -1,6 +1,7 @@
 #pragma once
 
 #include "matrix_layout.h"
+#include "swizzle.h"
 #include "detail.h"
 #include "types.h"
 #include "mathutil.h"
@@ -13,28 +14,26 @@
 namespace grouped_16c_wgrad
 {
 constexpr int WAVE_SIZE = 64;
-constexpr int BLOCK_Q   = 16;
 
 struct Config
 {
     int waves_per_wg;
-    int wave_q16 = 1;
+    int wave_q32 = 1;
 
     int kh = 3;
     int kw = 3;
 
     int group_size = 16;
 
-    int block_p = 0; // 0 = all rows (no H tiling)
-
     hipconv::Direction direction = hipconv::Direction::Wgrad;
 
     constexpr int block_c() const { return waves_per_wg * group_size; }
+    constexpr int block_q() const { return wave_q32 * 32; }
     constexpr int block_size() const { return waves_per_wg * WAVE_SIZE; }
 };
 
 constexpr Config configs[] = {
-    {.waves_per_wg = 4, .wave_q16 = 4},
+    {.waves_per_wg = 4, .wave_q32 = 2},
     {.waves_per_wg = 4},
     {.waves_per_wg = 3},
     {.waves_per_wg = 2},
@@ -49,8 +48,9 @@ inline bool is_valid_config(const hipconv::Conv2dParams& par, const Config& cfg)
         return false;
     if((par.groups % cfg.waves_per_wg) != 0)
         return false;
-    // Wider waves mean fewer reductions in global memory.
-    // TODO: Choose the narrowest (wave_q16) config that is at least as wide as the input tensor.
+    // Reject wider Q tiling when the selected block width would be at least twice par.q.
+    if(cfg.wave_q32 > 1 && cfg.block_q() >= 2 * par.q)
+        return false;
     return true;
 }
 
@@ -58,12 +58,11 @@ inline LaunchParams get_launch_params(int config_idx, const hipconv::Conv2dParam
 {
     const auto& cfg = configs[config_idx];
 
-    auto blocks_q = divup(par.q, cfg.wave_q16 * BLOCK_Q);
-    auto blocks_p = (cfg.block_p > 0) ? divup(par.p, cfg.block_p) : 1;
+    auto blocks_q = divup(par.q, cfg.block_q());
     auto blocks_c = divup(par.groups, cfg.waves_per_wg);
 
     LaunchParams launch;
-    launch.grid       = dim3(blocks_c, blocks_q * blocks_p, par.n);
+    launch.grid       = dim3(blocks_c, blocks_q, par.n);
     launch.block_size = dim3(cfg.block_size(), 1, 1);
     return launch;
 }
@@ -96,22 +95,26 @@ __device__ void conv2d_grouped_16c_wgrad_fp16_cdna4_nhwc_impl(const _Float16* __
 {
     using namespace grouped_16c_wgrad;
     using ResultLayout    = MatrixLayout<16, 16, 1, float>;
-    using TransposeLayout = TransposeLDSLayout<16, 16>;
+    using TransposeLayout = TransposeLDSLayout<16, 32>;
     using int16x4_t       = __attribute__((ext_vector_type(4))) short;
+    using fp16x8_t        = __attribute__((ext_vector_type(8))) _Float16;
+    using int16x8_t       = __attribute__((ext_vector_type(8))) short;
+    using Sw              = SwizzleT<cfg.block_c()>;
 
     constexpr int GROUP_SIZE = cfg.group_size;
     constexpr int BLOCK_C    = cfg.block_c();
     constexpr int BLOCK_C8   = BLOCK_C / 8;
 
-    constexpr int BLOCK_Q_TOTAL = cfg.wave_q16 * BLOCK_Q;
+    constexpr int BLOCK_Q_TOTAL = cfg.wave_q32 * 32;
     constexpr int BLOCK_W_TOTAL = BLOCK_Q_TOTAL + (cfg.kw - 1);
 
     constexpr int NUM_INPUT_LDS_BUFFERS    = 2;
+    constexpr int NUM_DELTA_LDS_BUFFERS    = 2;
     constexpr int INPUT_LDS_BUFFER_SIZE_C8 = BLOCK_C8 * BLOCK_W_TOTAL;
     constexpr int DELTA_LDS_BUFFER_SIZE_C8 = BLOCK_C8 * BLOCK_Q_TOTAL;
 
-    constexpr int COMPUTE_LDS_SIZE =
-        NUM_INPUT_LDS_BUFFERS * INPUT_LDS_BUFFER_SIZE_C8 + DELTA_LDS_BUFFER_SIZE_C8;
+    constexpr int COMPUTE_LDS_SIZE  = NUM_INPUT_LDS_BUFFERS * INPUT_LDS_BUFFER_SIZE_C8 +
+                                      NUM_DELTA_LDS_BUFFERS * DELTA_LDS_BUFFER_SIZE_C8;
     constexpr int COMPUTE_LDS_BYTES = (int)sizeof(uint4) * COMPUTE_LDS_SIZE;
 
     constexpr int WEIGHTS_PER_WG    = cfg.waves_per_wg * GROUP_SIZE * cfg.kh * cfg.kw * GROUP_SIZE;
@@ -130,23 +133,10 @@ __device__ void conv2d_grouped_16c_wgrad_fp16_cdna4_nhwc_impl(const _Float16* __
     // Wave mapping: each wave computes one group, all kw positions.
     const int wave_group = wave;
 
-    // Distribute groups across different XCD so that reductions hit L2 cache.
     const int block_group_idx = blockIdx.x;
-    const int block_x_idx     = blockIdx.y;
-    const int blocks_q        = divup(wo, BLOCK_Q_TOTAL);
-    const int block_q_idx     = block_x_idx % blocks_q;
-    const int block_p_idx     = block_x_idx / blocks_q;
-    const int block_q         = block_q_idx * BLOCK_Q_TOTAL;
+    const int block_q         = static_cast<int>(blockIdx.y) * BLOCK_Q_TOTAL;
     const int block_group     = block_group_idx * cfg.waves_per_wg;
-
-    // Output row range for this block.
-    const int p_first = (cfg.block_p > 0) ? block_p_idx * cfg.block_p : 0;
-    const int p_last  = (cfg.block_p > 0) ? min(p_first + cfg.block_p, ho) : ho;
-
-    // Input row range: output row p uses input rows p-py .. p-py+kh-1.
-    const int y_first  = max(0, p_first - py);
-    const int y_last   = min(hi, p_last - py + cfg.kh - 1);
-    const int block_c8 = block_group * (GROUP_SIZE / 8);
+    const int block_c8        = block_group * (GROUP_SIZE / 8);
 
     const int C  = groups * GROUP_SIZE;
     const int C8 = C / 8;
@@ -157,8 +147,8 @@ __device__ void conv2d_grouped_16c_wgrad_fp16_cdna4_nhwc_impl(const _Float16* __
     for(int i = 0; i < cfg.kh * cfg.kw; i++)
         acc[i] = Zero;
 
-    // Delta register circular buffer: kh rows × wave_q16 Q-tiles.
-    fp16x4_t delta_regs[cfg.kh][cfg.wave_q16];
+    // Delta register circular buffer: kh rows × wave_q32 Q-tiles.
+    fp16x8_t delta_regs[cfg.kh][cfg.wave_q32];
 
     constexpr int rsrc_data_format = 1 << 15;
 
@@ -174,25 +164,49 @@ __device__ void conv2d_grouped_16c_wgrad_fp16_cdna4_nhwc_impl(const _Float16* __
     constexpr int INPUT_LOAD_PASSES = divup(BLOCK_W_TOTAL * BLOCK_C8, cfg.block_size());
     constexpr int DELTA_LOAD_PASSES = divup(BLOCK_Q_TOTAL * BLOCK_C8, cfg.block_size());
 
-    const int tr_row = TransposeLayout::row(lane);
-    const int tr_col = TransposeLayout::col(lane);
+    const int lane_row0 = TransposeLayout::row(lane, 0);
+    const int lane_row1 = TransposeLayout::row(lane, 1);
+    const int lane_col  = TransposeLayout::col(lane);
 
-    // ds_read_tr helper: read from delta_lds at Q-tile qt.
-    auto read_delta_tr = [&](int qt) -> fp16x4_t
+    // Pre-compute swizzled c4 index for transpose reads (lane-constant).
+    constexpr int GROUP_SIZE_C4 = GROUP_SIZE / 4;
+    const int lane_c4           = wave_group * GROUP_SIZE_C4 + lane_col / 4;
+
+    // Load one tile of delta from LDS to registers.
+    // buf: the tic/toc index
+    // q32: the column-tile index
+    auto load_delta_q32_lds = [&](int buf, int q32) -> fp16x8_t
     {
-        auto* base =
-            reinterpret_cast<__half*>(delta_lds) + qt * BLOCK_Q * BLOCK_C + wave_group * GROUP_SIZE;
-        auto* addr = reinterpret_cast<int16x4_t*>(base + tr_row * BLOCK_C + tr_col);
-        return __builtin_bit_cast(fp16x4_t, __builtin_amdgcn_ds_read_tr16_b64_v4i16(addr));
+        // Recomputing swizzle is preferable to storing it due to register pressure.
+        auto* base   = reinterpret_cast<int16x4_t*>(delta_lds + buf * DELTA_LDS_BUFFER_SIZE_C8);
+        int off0     = Sw::offset_uint2(q32 * 32 + lane_row0, lane_c4);
+        int off1     = Sw::offset_uint2(q32 * 32 + lane_row1, lane_c4);
+        int16x4_t r0 = __builtin_amdgcn_ds_read_tr16_b64_v4i16(&base[off0]);
+        int16x4_t r1 = __builtin_amdgcn_ds_read_tr16_b64_v4i16(&base[off1]);
+        return __builtin_bit_cast(
+            fp16x8_t, (int16x8_t){r0[0], r0[1], r0[2], r0[3], r1[0], r1[1], r1[2], r1[3]});
     };
 
-    // ds_read_tr helper: read input at column s from input_lds buffer buf.
-    auto read_input_tr = [&](int buf, int s) -> fp16x4_t
+    // Load one delta row from LDS to registers.
+    auto load_delta_lds = [&](int buf, int slot)
     {
-        auto* base = reinterpret_cast<__half*>(input_lds) + buf * (INPUT_LDS_BUFFER_SIZE_C8 * 8) +
-                     s * BLOCK_C + wave_group * GROUP_SIZE;
-        auto* addr = reinterpret_cast<int16x4_t*>(base + tr_row * BLOCK_C + tr_col);
-        return __builtin_bit_cast(fp16x4_t, __builtin_amdgcn_ds_read_tr16_b64_v4i16(addr));
+        static_for<cfg.wave_q32>([&]<int Q32>()
+                                 { delta_regs[slot][Q32] = load_delta_q32_lds(buf, Q32); });
+    };
+
+    // Load one input row from LDS to registers.
+    // buf: tic/toc index
+    // s: the horizontal shift
+    auto load_input_lds = [&](int buf, int s) -> fp16x8_t
+    {
+        // Recomputing swizzle is preferable to storing it due to register pressure.
+        auto* base   = reinterpret_cast<int16x4_t*>(input_lds + buf * INPUT_LDS_BUFFER_SIZE_C8);
+        int off0     = Sw::offset_uint2(s + lane_row0, lane_c4);
+        int off1     = Sw::offset_uint2(s + lane_row1, lane_c4);
+        int16x4_t r0 = __builtin_amdgcn_ds_read_tr16_b64_v4i16(&base[off0]);
+        int16x4_t r1 = __builtin_amdgcn_ds_read_tr16_b64_v4i16(&base[off1]);
+        return __builtin_bit_cast(
+            fp16x8_t, (int16x8_t){r0[0], r0[1], r0[2], r0[3], r1[0], r1[1], r1[2], r1[3]});
     };
 
     const int block_n = blockIdx.z;
@@ -201,111 +215,118 @@ __device__ void conv2d_grouped_16c_wgrad_fp16_cdna4_nhwc_impl(const _Float16* __
         const size_t delta_n_offset = (size_t)block_n * ho * wo * C8;
 
         // Precompute per-pass load info (invariant across rows).
-        uint32_t input_voffsets[INPUT_LOAD_PASSES];
+        uint32_t input_global_offsets[INPUT_LOAD_PASSES];
         bool input_active[INPUT_LOAD_PASSES];
-        uint4* input_lds_addrs[INPUT_LOAD_PASSES];
+        uint4* input_store_lds_addrs[INPUT_LOAD_PASSES];
         for(int pass = 0; pass < INPUT_LOAD_PASSES; pass++)
         {
-            int lds_idx           = tid + pass * cfg.block_size();
-            input_active[pass]    = (lds_idx < BLOCK_W_TOTAL * BLOCK_C8);
-            input_lds_addrs[pass] = &input_lds[lds_idx];
+            int lds_idx                 = tid + pass * cfg.block_size();
+            input_active[pass]          = (lds_idx < BLOCK_W_TOTAL * BLOCK_C8);
+            input_store_lds_addrs[pass] = &input_lds[lds_idx];
             if(input_active[pass])
             {
-                int col        = lds_idx / BLOCK_C8;
-                int c8_idx     = lds_idx % BLOCK_C8;
+                int col        = Sw::x(lds_idx);
+                int c8_idx     = Sw::c8(lds_idx);
                 int global_col = (block_q - px) + col;
                 if(global_col >= 0 && global_col < wi)
-                    input_voffsets[pass] =
+                    input_global_offsets[pass] =
                         sizeof(uint4) *
                         (input_n_offset + (size_t)global_col * C8 + block_c8 + c8_idx);
                 else
-                    input_voffsets[pass] = input_bytes;
+                    input_global_offsets[pass] = input_bytes;
             }
         }
 
-        uint32_t delta_voffsets[DELTA_LOAD_PASSES];
+        uint32_t delta_global_offsets[DELTA_LOAD_PASSES];
         bool delta_active[DELTA_LOAD_PASSES];
-        uint4* delta_lds_addrs[DELTA_LOAD_PASSES];
+        uint4* delta_store_lds_addrs[DELTA_LOAD_PASSES];
         for(int pass = 0; pass < DELTA_LOAD_PASSES; pass++)
         {
-            int lds_idx           = tid + pass * cfg.block_size();
-            delta_active[pass]    = (lds_idx < BLOCK_Q_TOTAL * BLOCK_C8);
-            delta_lds_addrs[pass] = &delta_lds[lds_idx];
+            int lds_idx                 = tid + pass * cfg.block_size();
+            delta_active[pass]          = (lds_idx < BLOCK_Q_TOTAL * BLOCK_C8);
+            delta_store_lds_addrs[pass] = &delta_lds[lds_idx];
             if(delta_active[pass])
             {
-                int col      = lds_idx / BLOCK_C8;
-                int c8_idx   = lds_idx % BLOCK_C8;
+                int col      = Sw::x(lds_idx);
+                int c8_idx   = Sw::c8(lds_idx);
                 int global_q = block_q + col;
                 if(global_q >= 0 && global_q < wo)
-                    delta_voffsets[pass] = sizeof(uint4) * (delta_n_offset + (size_t)global_q * C8 +
-                                                            block_c8 + c8_idx);
+                    delta_global_offsets[pass] =
+                        sizeof(uint4) *
+                        (delta_n_offset + (size_t)global_q * C8 + block_c8 + c8_idx);
                 else
-                    delta_voffsets[pass] = delta_bytes;
+                    delta_global_offsets[pass] = delta_bytes;
             }
         }
 
         const size_t input_row_stride = (size_t)wi * C8 * sizeof(uint4);
         const size_t delta_row_stride = (size_t)wo * C8 * sizeof(uint4);
 
-        // Helper lambdas for multi-pass loads.
-        auto load_input = [&](int buf, int y)
+        // Load one input row asynchronously from global memory to LDS.
+        auto load_input_global = [&](int buf, int y)
         {
             for(int pass = 0; pass < INPUT_LOAD_PASSES; pass++)
             {
                 if(input_active[pass])
-                    __builtin_amdgcn_raw_ptr_buffer_load_lds(
-                        input_rsrc,
-                        input_lds_addrs[pass] + buf * INPUT_LDS_BUFFER_SIZE_C8,
-                        16,
-                        input_voffsets[pass] + y * input_row_stride,
-                        0,
-                        0,
-                        0);
+                {
+                    uint32_t global_offset = (y >= 0 && y < hi)
+                                                 ? input_global_offsets[pass] + y * input_row_stride
+                                                 : static_cast<uint32_t>(input_bytes);
+                    __builtin_amdgcn_raw_ptr_buffer_load_lds(input_rsrc,
+                                                             input_store_lds_addrs[pass] +
+                                                                 buf * INPUT_LDS_BUFFER_SIZE_C8,
+                                                             16,
+                                                             global_offset,
+                                                             0,
+                                                             0,
+                                                             0);
+                }
             }
         };
 
-        auto load_delta = [&](int p)
+        // Load one delta row asynchronously from global memory to LDS.
+        auto load_delta_global = [&](int buf, int p)
         {
             for(int pass = 0; pass < DELTA_LOAD_PASSES; pass++)
             {
                 if(delta_active[pass])
                 {
-                    uint32_t voff = (p >= 0 && p < ho) ? delta_voffsets[pass] + p * delta_row_stride
-                                                       : static_cast<uint32_t>(delta_bytes);
-                    __builtin_amdgcn_raw_ptr_buffer_load_lds(
-                        delta_rsrc, delta_lds_addrs[pass], 16, voff, 0, 0, 0);
+                    uint32_t global_offset = (p >= 0 && p < ho)
+                                                 ? delta_global_offsets[pass] + p * delta_row_stride
+                                                 : static_cast<uint32_t>(delta_bytes);
+                    __builtin_amdgcn_raw_ptr_buffer_load_lds(delta_rsrc,
+                                                             delta_store_lds_addrs[pass] +
+                                                                 buf * DELTA_LDS_BUFFER_SIZE_C8,
+                                                             16,
+                                                             global_offset,
+                                                             0,
+                                                             0,
+                                                             0);
                 }
             }
         };
 
-        auto read_all_delta_tr = [&](int slot)
-        { static_for<cfg.wave_q16>([&]<int QT>() { delta_regs[slot][QT] = read_delta_tr(QT); }); };
-
         // Prologue: pre-fill delta circular buffer with rows before main loop.
         for(int r = 0; r < cfg.kh - 1; r++)
         {
-            int p = y_first + py - (cfg.kh - 1) + r;
-            load_delta(p);
+            int p = py - (cfg.kh - 1) + r;
+            load_delta_global(0, p);
             wait_vmcnt<0>();
             __syncthreads();
-            read_all_delta_tr(r);
+            load_delta_lds(0, r);
             __syncthreads();
         }
 
         // Issue first input row load and first main-loop delta load (both async).
-        if(y_first < y_last)
-            load_input(0, y_first);
-
-        {
-            int p_new = y_first + py;
-            load_delta(p_new);
-        }
+        load_input_global(0, 0);
+        load_delta_global(0, py);
 
         int tic = 1;
         int toc = 0;
 
-        // Main loop: iterate over input rows, unrolled by kh.
-        for(int y_base = y_first; y_base + cfg.kh <= y_last; y_base += cfg.kh)
+        // Process a full kh-block of rows. Out-of-bounds input/delta loads
+        // produce zeros (via OOB buffer offset), so no per-MFMA guard needed.
+        auto process_kh_block = [&](int y_base)
         {
             static_for<cfg.kh>(
                 [&]<int Y_LOCAL>()
@@ -315,105 +336,91 @@ __device__ void conv2d_grouped_16c_wgrad_fp16_cdna4_nhwc_impl(const _Float16* __
                     wait_vmcnt<0>();
                     __syncthreads();
 
-                    constexpr int DELTA_SLOT = (cfg.kh - 1 + Y_LOCAL) % cfg.kh;
-                    read_all_delta_tr(DELTA_SLOT);
-
-                    __syncthreads();
-
-                    // Issue async loads for NEXT iteration.
-                    if((y + 1) < y_last)
+                    if((y + 1) < hi)
                     {
-                        load_input(tic, y + 1);
-                        int p_next = (y + 1) + py;
-                        load_delta(p_next);
+                        load_input_global(tic, y + 1);
+                        load_delta_global(tic, y + 1 + py);
                     }
+
+                    constexpr int DELTA_SLOT = (cfg.kh - 1 + Y_LOCAL) % cfg.kh;
+                    load_delta_lds(toc, DELTA_SLOT);
 
                     static_for<cfg.kw>(
                         [&]<int S>()
                         {
-                            static_for<cfg.kh>(
-                                [&]<int KR>()
+                            static_for<cfg.wave_q32>(
+                                [&]<int Q32>()
                                 {
-                                    int p = y - KR + py;
-                                    if(p >= p_first && p < p_last)
-                                    {
-                                        constexpr int SLOT =
-                                            (cfg.kh - 1 + Y_LOCAL - KR + cfg.kh) % cfg.kh;
-                                        static_for<cfg.wave_q16>(
-                                            [&]<int QT>()
-                                            {
-                                                fp16x4_t input_reg =
-                                                    read_input_tr(toc, QT * BLOCK_Q + S);
-                                                acc[KR * cfg.kw + S] =
-                                                    __builtin_amdgcn_mfma_f32_16x16x16f16(
-                                                        input_reg,
-                                                        delta_regs[SLOT][QT],
-                                                        acc[KR * cfg.kw + S],
-                                                        0,
-                                                        0,
-                                                        0);
-                                            });
-                                    }
+                                    fp16x8_t input_reg = load_input_lds(toc, Q32 * 32 + S);
+                                    static_for<cfg.kh>(
+                                        [&]<int R>()
+                                        {
+                                            constexpr int SLOT =
+                                                (cfg.kh - 1 + Y_LOCAL - R + cfg.kh) % cfg.kh;
+                                            acc[R * cfg.kw + S] =
+                                                __builtin_amdgcn_mfma_f32_16x16x32_f16(
+                                                    input_reg,
+                                                    delta_regs[SLOT][Q32],
+                                                    acc[R * cfg.kw + S],
+                                                    0,
+                                                    0,
+                                                    0);
+                                        });
                                 });
                         });
 
                     tic ^= 1;
                     toc ^= 1;
                 });
-        }
+        };
 
-        // Remainder: hi % kh leftover rows.
+        int y_base = 0;
+        for(; y_base + cfg.kh <= hi; y_base += cfg.kh)
+            process_kh_block(y_base);
+
+        // Remainder: leftover rows that don't fill a full kh-block.
         {
-            int num_rows   = y_last - y_first;
-            int y_rem_base = y_first + (num_rows / cfg.kh) * cfg.kh;
+            int num_remainder = hi - y_base;
             static_for<cfg.kh>(
                 [&]<int Y_LOCAL>()
                 {
-                    if(Y_LOCAL >= num_rows % cfg.kh)
+                    if(Y_LOCAL >= num_remainder)
                         return;
-                    int y = y_rem_base + Y_LOCAL;
+                    int y = y_base + Y_LOCAL;
 
                     wait_vmcnt<0>();
                     __syncthreads();
 
-                    constexpr int DELTA_SLOT = (cfg.kh - 1 + Y_LOCAL) % cfg.kh;
-                    read_all_delta_tr(DELTA_SLOT);
-
-                    __syncthreads();
-
-                    if((y + 1) < y_last)
+                    if((y + 1) < hi)
                     {
-                        load_input(tic, y + 1);
-                        int p_next = (y + 1) + py;
-                        load_delta(p_next);
+                        load_input_global(tic, y + 1);
+                        load_delta_global(tic, y + 1 + py);
                     }
+
+                    constexpr int DELTA_SLOT = (cfg.kh - 1 + Y_LOCAL) % cfg.kh;
+                    load_delta_lds(toc, DELTA_SLOT);
 
                     static_for<cfg.kw>(
                         [&]<int S>()
                         {
-                            static_for<cfg.kh>(
-                                [&]<int KR>()
+                            static_for<cfg.wave_q32>(
+                                [&]<int Q32>()
                                 {
-                                    int p = y - KR + py;
-                                    if(p >= p_first && p < p_last)
-                                    {
-                                        constexpr int SLOT =
-                                            (cfg.kh - 1 + Y_LOCAL - KR + cfg.kh) % cfg.kh;
-                                        static_for<cfg.wave_q16>(
-                                            [&]<int QT>()
-                                            {
-                                                fp16x4_t input_reg =
-                                                    read_input_tr(toc, QT * BLOCK_Q + S);
-                                                acc[KR * cfg.kw + S] =
-                                                    __builtin_amdgcn_mfma_f32_16x16x16f16(
-                                                        input_reg,
-                                                        delta_regs[SLOT][QT],
-                                                        acc[KR * cfg.kw + S],
-                                                        0,
-                                                        0,
-                                                        0);
-                                            });
-                                    }
+                                    fp16x8_t input_reg = load_input_lds(toc, Q32 * 32 + S);
+                                    static_for<cfg.kh>(
+                                        [&]<int R>()
+                                        {
+                                            constexpr int SLOT =
+                                                (cfg.kh - 1 + Y_LOCAL - R + cfg.kh) % cfg.kh;
+                                            acc[R * cfg.kw + S] =
+                                                __builtin_amdgcn_mfma_f32_16x16x32_f16(
+                                                    input_reg,
+                                                    delta_regs[SLOT][Q32],
+                                                    acc[R * cfg.kw + S],
+                                                    0,
+                                                    0,
+                                                    0);
+                                        });
                                 });
                         });
 
