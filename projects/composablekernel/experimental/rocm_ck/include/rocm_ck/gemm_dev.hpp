@@ -11,7 +11,7 @@
 // with a specific constexpr GemmSpec.
 //
 // Supports:
-//   - Pipeline selection: V1, V3, Memory, Preshuffle
+//   - Pipeline selection: V1, V3, V4, Memory, Preshuffle
 //   - Tile partitioning: Linear (standard), StreamK (work-balanced)
 //   - Batched GEMM: batch dimension via blockIdx.y (runtime, in Args)
 //
@@ -244,7 +244,7 @@ __device__ void run(Args args)
         BType,
         AccType,
         GemmShape,
-        ck_tile::TileGemmTraits<false, false, false, ALayout, BLayout, CLayout>>>;
+        ck_tile::TileGemmTraits<S.pad_m, S.pad_n, false, ALayout, BLayout, CLayout>>>;
 
     // V3: compute-optimized (software-pipelined loads, double LDS buffer)
     using V3Pipeline = ck_tile::GemmPipelineAgBgCrCompV3<ck_tile::UniversalGemmPipelineProblem<
@@ -252,7 +252,17 @@ __device__ void run(Args args)
         BType,
         AccType,
         GemmShape,
-        ck_tile::TileGemmUniversalTraits<false, false, false, true, ALayout, BLayout, CLayout>>>;
+        ck_tile::
+            TileGemmUniversalTraits<S.pad_m, S.pad_n, false, true, ALayout, BLayout, CLayout>>>;
+
+    // V4: compute double-buffer (ping-pong LDS layout)
+    using V4Pipeline = ck_tile::GemmPipelineAgBgCrCompV4<ck_tile::UniversalGemmPipelineProblem<
+        AType,
+        BType,
+        AccType,
+        GemmShape,
+        ck_tile::
+            TileGemmUniversalTraits<S.pad_m, S.pad_n, false, true, ALayout, BLayout, CLayout>>>;
 
     // Memory: memory-optimized pipeline (A/B through LDS, supports Intrawave/Interwave)
     using MemoryPipeline = ck_tile::GemmPipelineAgBgCrMem<ck_tile::UniversalGemmPipelineProblem<
@@ -260,7 +270,7 @@ __device__ void run(Args args)
         BType,
         AccType,
         GemmShape,
-        ck_tile::TileGemmUniversalTraits<false, false, false, true, ALayout, BLayout, CLayout>,
+        ck_tile::TileGemmUniversalTraits<S.pad_m, S.pad_n, false, true, ALayout, BLayout, CLayout>,
         CkScheduler>>;
 
     // Preshuffle: weight preshuffle pipeline (A=Row, B=Col, DoubleSmemBuffer=true, Preshuffle=true)
@@ -271,16 +281,18 @@ __device__ void run(Args args)
             AccType,
             GemmShape,
             ck_tile::
-                TileGemmUniversalTraits<false, false, false, true, ALayout, BLayout, CLayout>>>;
+                TileGemmUniversalTraits<S.pad_m, S.pad_n, false, true, ALayout, BLayout, CLayout>>>;
 
-    using GemmPipeline =
-        std::conditional_t<S.pipeline == Pipeline::V1,
-                           V1Pipeline,
-                           std::conditional_t<S.pipeline == Pipeline::V3,
-                                              V3Pipeline,
+    using GemmPipeline = std::conditional_t<
+        S.pipeline == Pipeline::V1,
+        V1Pipeline,
+        std::conditional_t<S.pipeline == Pipeline::V3,
+                           V3Pipeline,
+                           std::conditional_t<S.pipeline == Pipeline::V4,
+                                              V4Pipeline,
                                               std::conditional_t<S.pipeline == Pipeline::Memory,
                                                                  MemoryPipeline,
-                                                                 PreshufflePipeline>>>;
+                                                                 PreshufflePipeline>>>>;
 
     // --- Step 5: Partitioner (1D blockIdx → 2D tile coordinates) ---
     using TilePartitioner = ck_tile::GemmTile1DPartitioner<GemmShape>;
@@ -293,8 +305,8 @@ __device__ void run(Args args)
     // TransposeC: true when output is column-major (matches CK Tile convention)
     static constexpr bool TransposeC = (PT_OUT.layout == Layout::Col);
 
-    // --- Step 6: Epilogue (shuffle accumulator through LDS, store to global) ---
-    using GemmEpilogue =
+    // --- Step 6: Epilogue ---
+    using CShuffleEpi =
         ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<AType,
                                                                    BType,
                                                                    DsDataType,
@@ -311,6 +323,11 @@ __device__ void run(Args args)
                                                                    S.wave_tile.n,   // NPerXdl
                                                                    S.wave_tile.k,   // KPerXdl
                                                                    TransposeC>>;
+
+    // Note: Direct2D epilogue (EpilogueStrategy::Direct2D) is not yet wired.
+    // Default2DEpilogue lacks DsDataType/DsLayout/GetVectorSizeC that UniversalGemmKernel
+    // requires. Needs upstream CK Tile support or a compatible adapter.
+    using GemmEpilogue = CShuffleEpi;
 
     // --- Step 7: Kernel (ties everything together) ---
     using CkKernel   = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;

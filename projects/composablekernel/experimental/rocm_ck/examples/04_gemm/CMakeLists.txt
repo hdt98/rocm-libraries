@@ -37,7 +37,7 @@ endif()
 set(KERNEL_VARIANTS gemm_fp32 gemm_fp16 gemm_bf16 gemm_fp16_w32 gemm_fp16_add gemm_fp16_add_relu
     gemm_fp16_rr gemm_fp16_cr gemm_fp16_cc gemm_fp16_splitk gemm_fp16_v3 gemm_fp16_add_add
     gemm_fp16_batched gemm_fp16_gfx90a gemm_fp16_gfx942 gemm_fp16_preshuffle gemm_fp16_memory
-    gemm_fp8_fnuz)
+    gemm_fp8_fnuz gemm_fp16_v4 gemm_fp16_padded)
 
 # --- Per-variant architecture restrictions ---
 # FP8 MFMA instructions require gfx942+. Set <variant>_GPU_TARGETS to restrict.

@@ -370,6 +370,45 @@ VARIANTS = [
         "mfma_k": 16,
         "workgroup_size": 256,
     },
+    # Pipeline V4: compute double-buffer (ping-pong LDS)
+    {
+        "name": "gemm_fp16_v4",
+        "a_dtype": "fp16",
+        "b_dtype": "fp16",
+        "c_dtype": "fp16",
+        "acc_dtype": "fp32",
+        "pipeline": "V4",
+        "block_m": 128,
+        "block_n": 128,
+        "block_k": 32,
+        "waves_m": 2,
+        "waves_n": 2,
+        "waves_k": 1,
+        "mfma_m": 16,
+        "mfma_n": 16,
+        "mfma_k": 16,
+        "workgroup_size": 256,
+    },
+    # Padding: non-aligned M/N dimensions with boundary checks
+    {
+        "name": "gemm_fp16_padded",
+        "a_dtype": "fp16",
+        "b_dtype": "fp16",
+        "c_dtype": "fp16",
+        "acc_dtype": "fp32",
+        "pad_m": True,
+        "pad_n": True,
+        "block_m": 128,
+        "block_n": 128,
+        "block_k": 32,
+        "waves_m": 2,
+        "waves_n": 2,
+        "waves_k": 1,
+        "mfma_m": 16,
+        "mfma_n": 16,
+        "mfma_k": 16,
+        "workgroup_size": 256,
+    },
 ]
 ARCHITECTURES = ["gfx90a", "gfx942", "gfx950"]
 
@@ -469,6 +508,12 @@ def main() -> None:
                     meta["tile_partitioner"] = v["tile_partitioner"]
                 if "scheduling" in v:
                     meta["scheduling"] = v["scheduling"]
+                if "epilogue" in v:
+                    meta["epilogue"] = v["epilogue"]
+                if "pad_m" in v:
+                    meta["pad_m"] = v["pad_m"]
+                if "pad_n" in v:
+                    meta["pad_n"] = v["pad_n"]
                 variant_metadata[v["name"]] = meta
 
         toc = {

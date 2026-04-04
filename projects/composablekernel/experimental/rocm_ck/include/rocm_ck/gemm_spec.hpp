@@ -72,6 +72,10 @@ inline constexpr int kMaxEpilogueOps = 4;
 ///     Uses UniversalGemmPipelineProblem + GemmPipelineAgBgCrCompV3.
 ///     Better compute utilization through overlapped memory/compute.
 ///
+/// V4: Compute double-buffer — ping-pong LDS layout.
+///     Uses UniversalGemmPipelineProblem + GemmPipelineAgBgCrCompV4.
+///     Better compute/memory overlap through dual LDS buffers.
+///
 /// Memory: Memory-optimized pipeline — A/B from global memory through LDS.
 ///     Uses UniversalGemmPipelineProblem + GemmPipelineAgBgCrMem.
 ///     Supports both Intrawave and Interwave scheduling.
@@ -84,6 +88,7 @@ enum class Pipeline
 {
     V1,
     V3,
+    V4,
     Memory,
     Preshuffle
 };
@@ -141,6 +146,21 @@ enum class TilePartitioner
     StreamK
 };
 
+/// Epilogue implementation strategy for storing GEMM results to global memory.
+///
+/// CShuffle: Cross-wavefront shuffle through LDS for coalesced writes (default).
+///     Supports all fused ops (Add, Mul, Relu) and D tensors.
+///     Constraint: requires block_waves.k == 1.
+///
+/// Direct2D: Direct 2D thread-to-memory store without LDS shuffle.
+///     Lower LDS pressure, simpler instruction pattern.
+///     Limitation: no D tensor support yet (fused bias/scale).
+enum class EpilogueStrategy
+{
+    CShuffle,
+    Direct2D
+};
+
 /// M x N x K dimension triple for tile geometry specification.
 struct Dim3
 {
@@ -159,6 +179,19 @@ struct GemmAlgorithm
     PipelineScheduler pipeline_scheduler =
         PipelineScheduler::Intrawave;                           // Instruction scheduling strategy
     TilePartitioner tile_partitioner = TilePartitioner::Linear; // Tile-to-workgroup distribution
+    EpilogueStrategy epilogue = EpilogueStrategy::CShuffle;     // Epilogue implementation strategy
+
+    /// Padding flags control boundary handling for misaligned output dimensions.
+    ///   pad_m: allow M not divisible by block_tile.m (masks A row / C row boundaries)
+    ///   pad_n: allow N not divisible by block_tile.n (masks B col / C col boundaries)
+    /// When false (default), kernel assumes aligned sizes for maximum performance.
+    /// When true, kernel handles boundaries with bounds checks.
+    ///
+    /// Note: K must always be divisible by block_tile.k. CK Tile's kPadK flag only
+    /// controls vector load width (scalar vs vectorized) — it does NOT mask the K-tail.
+    /// Passing non-aligned K produces silently wrong results.
+    bool pad_m = false;
+    bool pad_n = false;
 };
 
 // ============================================================================
@@ -202,6 +235,13 @@ struct GemmSpec
     // Epilogue: composable op chain applied after matmul
     int num_epilogue_ops;
     std::array<EpilogueOp, kMaxEpilogueOps> epilogue_ops;
+
+    // Epilogue implementation strategy
+    EpilogueStrategy epilogue;
+
+    // Padding flags (boundary handling for misaligned output dimensions)
+    bool pad_m;
+    bool pad_n;
 
     /// Check if the epilogue chain contains a specific op.
     constexpr bool hasEpilogueOp(EpilogueOp op) const
@@ -294,6 +334,16 @@ isValidWaveTile(DataType a_dtype, int m, int n, int k, GpuTarget target = GpuTar
             return true;
     }
 
+    // INT8 MFMA — int8×int8→int32 accumulation
+    if(a_dtype == DataType::I8)
+    {
+        // gfx90a/gfx942/gfx950: same I8 tiles
+        if(m == 32 && n == 32 && k == 16)
+            return true;
+        if(m == 16 && n == 16 && k == 32)
+            return true;
+    }
+
     // FP8/BF8 MFMA — architecture-dependent
     if(a_dtype == DataType::FP8_FNUZ || a_dtype == DataType::BF8_FNUZ)
     {
@@ -362,6 +412,9 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, GpuTarget target 
     TensorDesc b_td = resolved.tensor(gemm.rhs);
     TensorDesc c_td = resolved.tensor(gemm.out);
     DataType acc    = gemm.acc_dtype;
+
+    if(a_td.dtype == DataType::I8 && acc != DataType::I32)
+        throw "INT8 GEMM requires I32 accumulator — set GemmOp::acc_dtype = DataType::I32";
 
     // Build epilogue op chain from remaining ops after GemmOp.
     // Track the final output name (varies by epilogue chain) and D tensor names.
@@ -460,6 +513,10 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, GpuTarget target 
         if(!std::holds_alternative<std::monostate>(sig.ops[i]))
             throw "unexpected operator after GEMM epilogue chain";
 
+    // Direct2D epilogue does not support D tensors
+    if(algo.epilogue == EpilogueStrategy::Direct2D && num_d_tensors > 0)
+        throw "Direct2D epilogue does not support D tensors — use CShuffle or remove epilogue ops";
+
     // Tile validation
     if(algo.block_tile.m <= 0 || algo.block_tile.n <= 0 || algo.block_tile.k <= 0)
         throw "block_tile dimensions must be positive";
@@ -471,8 +528,8 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, GpuTarget target 
     if(algo.k_batch <= 0)
         throw "k_batch must be positive";
 
-    if(algo.block_waves.k != 1)
-        throw "block_waves.k must be 1 (CShuffleEpilogue constraint)";
+    if(algo.epilogue == EpilogueStrategy::CShuffle && algo.block_waves.k != 1)
+        throw "CShuffle epilogue requires block_waves.k == 1 (waves_m x waves_n layout)";
 
     // Pipeline-specific constraints
     if(algo.pipeline == Pipeline::Preshuffle)
@@ -535,7 +592,10 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, GpuTarget target 
             algo.pipeline_scheduler,
             algo.tile_partitioner,
             num_epi_ops,
-            epi_ops};
+            epi_ops,
+            algo.epilogue,
+            algo.pad_m,
+            algo.pad_n};
 }
 
 } // namespace rocm_ck
