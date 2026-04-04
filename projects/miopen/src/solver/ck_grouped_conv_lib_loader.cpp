@@ -12,6 +12,7 @@
 #include <miopen/filesystem.hpp>
 
 #include <cstdlib>
+#include <type_traits>
 
 #ifdef _WIN32
 // clang-format off
@@ -241,65 +242,109 @@ void CKGroupedConvLibLoader::LoadLibrary(const std::string& device_name)
 
 // -- Symbol resolution --------------------------------------------------------
 
+void* CKGroupedConvLibLoader::ResolveRawSymbol(const char* symbol_name) const
+{
+    if(lib_handle_ == nullptr)
+        return nullptr;
+#ifdef _WIN32
+    return reinterpret_cast<void*>(
+        GetProcAddress(static_cast<HMODULE>(lib_handle_), symbol_name));
+#else
+    dlerror(); // NOLINT(concurrency-mt-unsafe)
+    return dlsym(lib_handle_, symbol_name); // NOLINT(concurrency-mt-unsafe)
+#endif
+}
+
+void CKGroupedConvLibLoader::BindRequiredCommonSymbols(std::vector<std::string>& missing)
+{
+    auto bind_symbol = [this, &missing](auto& member, const char* symbol_name) {
+        using FnPtr = std::remove_reference_t<decltype(member)>;
+        member      = reinterpret_cast<FnPtr>(ResolveRawSymbol(symbol_name));
+        if(member == nullptr)
+            missing.emplace_back(symbol_name);
+    };
+
+    bind_symbol(get_api_version_fn_, "ckgrpconv_get_api_version");
+    bind_symbol(kernel_list_size_fn_, "ckgrpconv_kernel_list_size");
+    bind_symbol(kernel_list_get_fn_, "ckgrpconv_kernel_list_get");
+    bind_symbol(kernel_list_free_fn_, "ckgrpconv_kernel_list_free");
+    bind_symbol(solution_free_fn_, "ckgrpconv_solution_free");
+}
+
+void CKGroupedConvLibLoader::BindSolverSymbols(CKSolverType solver,
+                                               const char* prefix,
+                                               std::vector<std::string>& missing)
+{
+    auto bind_symbol = [this, &missing](auto& member, const char* symbol_name) {
+        using FnPtr = std::remove_reference_t<decltype(member)>;
+        member      = reinterpret_cast<FnPtr>(ResolveRawSymbol(symbol_name));
+        if(member == nullptr)
+            missing.emplace_back(symbol_name);
+    };
+
+    auto& fns             = solver_fns_[ToSolverIndex(solver)];
+    const std::string sym = std::string("ckgrpconv_") + prefix + "_";
+    bind_symbol(fns.fill_valid_kernels, (sym + "fill_valid_kernels").c_str());
+    bind_symbol(fns.is_applicable, (sym + "is_applicable").c_str());
+    bind_symbol(fns.is_args_supported, (sym + "is_args_supported").c_str());
+    bind_symbol(fns.get_workspace_size, (sym + "get_workspace_size").c_str());
+    bind_symbol(fns.get_solution, (sym + "get_solution").c_str());
+}
+
+void CKGroupedConvLibLoader::BindOptionalKernelTypeSymbols(std::vector<std::string>& missing)
+{
+    auto bind_symbol = [this, &missing](auto& member, const char* symbol_name) {
+        using FnPtr = std::remove_reference_t<decltype(member)>;
+        member      = reinterpret_cast<FnPtr>(ResolveRawSymbol(symbol_name));
+        if(member == nullptr)
+            missing.emplace_back(symbol_name);
+    };
+
+    bind_symbol(solver_fns_[ToSolverIndex(CKSolverType::GrpConv3dFwd)].get_all_kernel_types,
+                "ckgrpconv_3d_fwd_get_all_kernel_type_strings");
+    bind_symbol(solver_fns_[ToSolverIndex(CKSolverType::GrpConv3dBwd)].get_all_kernel_types,
+                "ckgrpconv_3d_bwd_get_all_kernel_type_strings");
+}
+
 bool CKGroupedConvLibLoader::LoadSymbols()
 {
-// Helper macro: resolve a symbol or return false on failure.
-#ifdef _WIN32
-#define LOAD_SYM(member, name)                                                             \
-    do                                                                                     \
-    {                                                                                      \
-        member = reinterpret_cast<decltype(member)>(                                       \
-            GetProcAddress(static_cast<HMODULE>(lib_handle_), #name));                     \
-        if(member == nullptr)                                                              \
-        {                                                                                  \
-            MIOPEN_LOG_W("GetProcAddress failed for " #name ": error " << GetLastError()); \
-            return false;                                                                  \
-        }                                                                                  \
-    } while(false)
-#else
-#define LOAD_SYM(member, name)                                                  \
-    do                                                                          \
-    {                                                                           \
-        member = reinterpret_cast<decltype(member)>(dlsym(lib_handle_, #name)); \
-        if(member == nullptr)                                                   \
-        {                                                                       \
-            MIOPEN_LOG_W("dlsym failed for " #name ": "                         \
-                         << dlerror()); /* NOLINT(concurrency-mt-unsafe) */     \
-            return false;                                                       \
-        }                                                                       \
-    } while(false)
-#endif
+    std::vector<std::string> missing;
+    missing.reserve(32);
 
-    // Common
-    LOAD_SYM(get_api_version_fn_, ckgrpconv_get_api_version);
-    LOAD_SYM(kernel_list_size_fn_, ckgrpconv_kernel_list_size);
-    LOAD_SYM(kernel_list_get_fn_, ckgrpconv_kernel_list_get);
-    LOAD_SYM(kernel_list_free_fn_, ckgrpconv_kernel_list_free);
-    LOAD_SYM(solution_free_fn_, ckgrpconv_solution_free);
+    BindRequiredCommonSymbols(missing);
 
-    // Per-direction symbols
-#define LOAD_DIR_SYMS(idx, prefix)                                                          \
-    LOAD_SYM(solver_fns_[idx].fill_valid_kernels, ckgrpconv_##prefix##_fill_valid_kernels); \
-    LOAD_SYM(solver_fns_[idx].is_applicable, ckgrpconv_##prefix##_is_applicable);           \
-    LOAD_SYM(solver_fns_[idx].is_args_supported, ckgrpconv_##prefix##_is_args_supported);   \
-    LOAD_SYM(solver_fns_[idx].get_workspace_size, ckgrpconv_##prefix##_get_workspace_size); \
-    LOAD_SYM(solver_fns_[idx].get_solution, ckgrpconv_##prefix##_get_solution)
+    struct SolverSymbolBinding
+    {
+        CKSolverType solver;
+        const char* prefix;
+    };
 
-    LOAD_DIR_SYMS(ToSlotIndex(CKSolverType::GrpConvFwd), fwd);
-    LOAD_DIR_SYMS(ToSlotIndex(CKSolverType::GrpConvBwd), bwd);
-    LOAD_DIR_SYMS(ToSlotIndex(CKSolverType::GrpConvWrw), wrw);
-    LOAD_DIR_SYMS(ToSlotIndex(CKSolverType::GrpConv3dFwd), 3d_fwd);
-    LOAD_DIR_SYMS(ToSlotIndex(CKSolverType::GrpConv3dBwd), 3d_bwd);
-#undef LOAD_DIR_SYMS
+    static constexpr SolverSymbolBinding solver_bindings[] = {
+        {CKSolverType::GrpConvFwd, "fwd"},
+        {CKSolverType::GrpConvBwd, "bwd"},
+        {CKSolverType::GrpConvWrw, "wrw"},
+        {CKSolverType::GrpConv3dFwd, "3d_fwd"},
+        {CKSolverType::GrpConv3dBwd, "3d_bwd"}};
 
-    // Per-slot "get all kernel type strings" symbols (only some slots have them)
-    LOAD_SYM(solver_fns_[ToSlotIndex(CKSolverType::GrpConv3dFwd)].get_all_kernel_types,
-             ckgrpconv_3d_fwd_get_all_kernel_type_strings);
-    LOAD_SYM(solver_fns_[ToSlotIndex(CKSolverType::GrpConv3dBwd)].get_all_kernel_types,
-             ckgrpconv_3d_bwd_get_all_kernel_type_strings);
+    for(const auto& binding : solver_bindings)
+        BindSolverSymbols(binding.solver, binding.prefix, missing);
 
-#undef LOAD_SYM
-    return true;
+    BindOptionalKernelTypeSymbols(missing);
+
+    if(missing.empty())
+        return true;
+
+    std::ostringstream msg;
+    for(std::size_t i = 0; i < missing.size(); ++i)
+    {
+        if(i != 0)
+            msg << ", ";
+        msg << missing[i];
+    }
+
+    MIOPEN_LOG_W("Failed to resolve CK grouped conv symbols (" << missing.size()
+                                                               << " missing): " << msg.str());
+    return false;
 }
 
 // -- Helpers ------------------------------------------------------------------
@@ -330,10 +375,10 @@ ConvSolution CKGroupedConvLibLoader::ExtractSolution(ConvSolution* ptr) const
     return result;
 }
 
-// -- Direction-parameterized wrappers -----------------------------------------
+// -- Solver-parameterized wrappers --------------------------------------------
 
 std::vector<std::string>
-CKGroupedConvLibLoader::FillValidKernels(CKSolverType solverType,
+CKGroupedConvLibLoader::FillValidKernels(CKSolverType solver,
                                          const conv::ProblemDescription& problem,
                                          miopenDataType_t dtype,
                                          bool use_tf32) const
@@ -341,35 +386,35 @@ CKGroupedConvLibLoader::FillValidKernels(CKSolverType solverType,
     if(!IsLoaded())
         return {};
     return ExtractKernelList(
-        solver_fns_[ToSlotIndex(solverType)].fill_valid_kernels(&problem, dtype, use_tf32));
+        solver_fns_[ToSolverIndex(solver)].fill_valid_kernels(&problem, dtype, use_tf32));
 }
 
 std::vector<std::string>
-CKGroupedConvLibLoader::FillValidKernelsWithTf32Fallback(CKSolverType solverType,
+CKGroupedConvLibLoader::FillValidKernelsWithTf32Fallback(CKSolverType solver,
                                                          const conv::ProblemDescription& problem,
                                                          miopenDataType_t dtype,
                                                          bool& use_tf32) const
 {
-    auto result = FillValidKernels(solverType, problem, dtype, use_tf32);
+    auto result = FillValidKernels(solver, problem, dtype, use_tf32);
     if(result.empty() && use_tf32)
     {
         use_tf32 = false;
-        result   = FillValidKernels(solverType, problem, dtype, false);
+        result   = FillValidKernels(solver, problem, dtype, false);
     }
     return result;
 }
 
-bool CKGroupedConvLibLoader::IsApplicable(CKSolverType solverType,
+bool CKGroupedConvLibLoader::IsApplicable(CKSolverType solver,
                                           const conv::ProblemDescription& problem,
                                           miopenDataType_t dtype,
                                           bool use_tf32) const
 {
     if(!IsLoaded())
         return false;
-    return solver_fns_[ToSlotIndex(solverType)].is_applicable(&problem, dtype, use_tf32);
+    return solver_fns_[ToSolverIndex(solver)].is_applicable(&problem, dtype, use_tf32);
 }
 
-bool CKGroupedConvLibLoader::IsArgsSupported(CKSolverType solverType,
+bool CKGroupedConvLibLoader::IsArgsSupported(CKSolverType solver,
                                              const conv::ProblemDescription& problem,
                                              const std::string& kernel_id,
                                              miopenDataType_t dtype,
@@ -377,21 +422,21 @@ bool CKGroupedConvLibLoader::IsArgsSupported(CKSolverType solverType,
 {
     if(!IsLoaded())
         return false;
-    return solver_fns_[ToSlotIndex(solverType)].is_args_supported(
+    return solver_fns_[ToSolverIndex(solver)].is_args_supported(
         &problem, kernel_id.c_str(), dtype, use_tf32);
 }
 
-size_t CKGroupedConvLibLoader::GetWorkspaceSize(CKSolverType solverType,
+size_t CKGroupedConvLibLoader::GetWorkspaceSize(CKSolverType solver,
                                                 const conv::ProblemDescription& problem,
                                                 miopenDataType_t dtype,
                                                 bool use_tf32) const
 {
     if(!IsLoaded())
         return 0;
-    return solver_fns_[ToSlotIndex(solverType)].get_workspace_size(&problem, dtype, use_tf32);
+    return solver_fns_[ToSolverIndex(solver)].get_workspace_size(&problem, dtype, use_tf32);
 }
 
-ConvSolution CKGroupedConvLibLoader::GetSolution(CKSolverType solverType,
+ConvSolution CKGroupedConvLibLoader::GetSolution(CKSolverType solver,
                                                  const ExecutionContext& ctx,
                                                  const conv::ProblemDescription& problem,
                                                  const std::string& kernel_id,
@@ -399,15 +444,15 @@ ConvSolution CKGroupedConvLibLoader::GetSolution(CKSolverType solverType,
 {
     if(!IsLoaded())
         return ConvSolution{miopenStatusInternalError};
-    return ExtractSolution(solver_fns_[ToSlotIndex(solverType)].get_solution(
+    return ExtractSolution(solver_fns_[ToSolverIndex(solver)].get_solution(
         &ctx, &problem, kernel_id.c_str(), use_tf32));
 }
 
-std::vector<std::string> CKGroupedConvLibLoader::GetAllKernelTypeStrings(CKSolverType slot) const
+std::vector<std::string> CKGroupedConvLibLoader::GetAllKernelTypeStrings(CKSolverType solver) const
 {
     if(!IsLoaded())
         return {};
-    auto fn = solver_fns_[ToSlotIndex(slot)].get_all_kernel_types;
+    auto fn = solver_fns_[ToSolverIndex(solver)].get_all_kernel_types;
     if(fn == nullptr)
         return {};
     return ExtractKernelList(fn());

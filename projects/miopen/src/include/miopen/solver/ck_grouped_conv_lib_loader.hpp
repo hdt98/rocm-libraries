@@ -64,9 +64,9 @@ public:
 
     MIOPEN_INTERNALS_EXPORT bool IsLoaded() const { return loaded_; }
 
-    // -- Direction-parameterized wrappers -------------------------------------
+    // -- Solver-parameterized wrappers ----------------------------------------
     MIOPEN_INTERNALS_EXPORT std::vector<std::string>
-    FillValidKernels(CKSolverType solverType,
+    FillValidKernels(CKSolverType solver,
                      const miopen::conv::ProblemDescription& problem,
                      miopenDataType_t dtype,
                      bool use_tf32) const;
@@ -74,36 +74,36 @@ public:
     /// Try tf32 first (if use_tf32 is true), then fall back to non-tf32.
     /// Updates use_tf32 to reflect whether tf32 was actually used.
     MIOPEN_INTERNALS_EXPORT std::vector<std::string>
-    FillValidKernelsWithTf32Fallback(CKSolverType solverType,
+    FillValidKernelsWithTf32Fallback(CKSolverType solver,
                                      const miopen::conv::ProblemDescription& problem,
                                      miopenDataType_t dtype,
                                      bool& use_tf32) const;
 
-    MIOPEN_INTERNALS_EXPORT bool IsApplicable(CKSolverType solverType,
+    MIOPEN_INTERNALS_EXPORT bool IsApplicable(CKSolverType solver,
                                               const miopen::conv::ProblemDescription& problem,
                                               miopenDataType_t dtype,
                                               bool use_tf32) const;
 
-    MIOPEN_INTERNALS_EXPORT bool IsArgsSupported(CKSolverType solverType,
+    MIOPEN_INTERNALS_EXPORT bool IsArgsSupported(CKSolverType solver,
                                                  const miopen::conv::ProblemDescription& problem,
                                                  const std::string& kernel_id,
                                                  miopenDataType_t dtype,
                                                  bool use_tf32) const;
 
-    MIOPEN_INTERNALS_EXPORT size_t GetWorkspaceSize(CKSolverType solverType,
+    MIOPEN_INTERNALS_EXPORT size_t GetWorkspaceSize(CKSolverType solver,
                                                     const miopen::conv::ProblemDescription& problem,
                                                     miopenDataType_t dtype,
                                                     bool use_tf32) const;
 
     MIOPEN_INTERNALS_EXPORT ConvSolution
-    GetSolution(CKSolverType solverType,
+    GetSolution(CKSolverType solver,
                 const ExecutionContext& ctx,
                 const miopen::conv::ProblemDescription& problem,
                 const std::string& kernel_id,
                 bool use_tf32) const;
 
     MIOPEN_INTERNALS_EXPORT std::vector<std::string>
-    GetAllKernelTypeStrings(CKSolverType slot) const;
+    GetAllKernelTypeStrings(CKSolverType solver) const;
 
     ~CKGroupedConvLibLoader();
 
@@ -115,7 +115,13 @@ private:
 
     void LoadLibrary(const std::string& device_name);
     bool LoadSymbols();
-    static constexpr int ToSlotIndex(CKSolverType slot) { return static_cast<int>(slot); }
+    void* ResolveRawSymbol(const char* symbol_name) const;
+    void BindRequiredCommonSymbols(std::vector<std::string>& missing);
+    void BindSolverSymbols(CKSolverType solver,
+                           const char* prefix,
+                           std::vector<std::string>& missing);
+    void BindOptionalKernelTypeSymbols(std::vector<std::string>& missing);
+    static constexpr int ToSolverIndex(CKSolverType solver) { return static_cast<int>(solver); }
 
     // Singleton cache
     static std::mutex& CacheMutex();
