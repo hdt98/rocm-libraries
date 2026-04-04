@@ -416,6 +416,10 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, GpuTarget target 
     if(a_td.dtype == DataType::I8 && acc != DataType::I32)
         throw "INT8 GEMM requires I32 accumulator — set GemmOp::acc_dtype = DataType::I32";
 
+    if(a_td.dtype == DataType::I8 && target == GpuTarget::gfx90a)
+        throw "INT8 GEMM requires gfx942+ — gfx90a emulates int8 MFMA with float MFMA, "
+              "producing corrupted output";
+
     // Build epilogue op chain from remaining ops after GemmOp.
     // Track the final output name (varies by epilogue chain) and D tensor names.
     int num_epi_ops = 0;
