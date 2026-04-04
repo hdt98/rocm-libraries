@@ -67,15 +67,8 @@ foreach(gpu_target IN LISTS GPU_TARGETS)
         target_compile_definitions(${lib_name} PRIVATE CK_USE_GFX95)
     endif()
 
-    # CK link resolution: prefer per-arch unbundled .a, fallback to fat lib.
-    # Unbundle targets use the sanitized name (ck_conv_<arch_safe>).
-    if(TARGET ck_conv_${arch_safe})
-        target_link_libraries(${lib_name} PRIVATE ck_conv_${arch_safe})
-    elseif(MIOPEN_BUILD_CK)
-        target_link_libraries(${lib_name} PRIVATE device_conv_operations)
-    else()
-        target_link_libraries(${lib_name} PRIVATE composable_kernel::device_conv_operations)
-    endif()
+    # Link against per-arch unbundled CK library
+    target_link_libraries(${lib_name} PRIVATE ck_conv_${arch_safe})
 
     # CK include directories
     if(MIOPEN_BUILD_CK)
@@ -84,6 +77,8 @@ foreach(gpu_target IN LISTS GPU_TARGETS)
             ${MIOPEN_CK_BUILD_INCLUDE_DIR}
             ${MIOPEN_CK_LIBRARY_INCLUDE_DIR}
         )
+    else()
+        target_link_libraries(${lib_name} PRIVATE composable_kernel::device_conv_operations)
     endif()
 
     # MIOpen internal headers (for ProblemDescription, ConvSolution, etc.)
