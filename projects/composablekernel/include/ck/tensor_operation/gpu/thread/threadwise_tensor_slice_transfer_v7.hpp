@@ -87,18 +87,22 @@ struct ThreadwiseTensorSliceTransfer_v7
     __device__ void SetSrcSliceOrigins(const SrcDescs& src_descs,
                                        const Indices& src_slice_origin_idxs)
     {
-        static_for<0, nSrc, 1>{}([&](auto i) {
-            src_coords_(i) = make_tensor_coordinate(src_descs[i], src_slice_origin_idxs[i]);
-        });
+        // Use plain int for array indexing, Number<> only for Tuple
+        [&]<index_t... Is>(std::index_sequence<Is...>) {
+            ((src_coords_(Number<Is>{}) = make_tensor_coordinate(
+                 src_descs.At(Is), src_slice_origin_idxs.At(Is))), ...);
+        }(std::make_index_sequence<nSrc>{});
     }
 
     template <typename Indices, enable_if_t<DstDescs::Size() == Indices::Size(), bool> = false>
     __device__ void SetDstSliceOrigins(const DstDescs& dst_descs,
                                        const Indices& dst_slice_origin_idxs)
     {
-        static_for<0, nDst, 1>{}([&](auto i) {
-            dst_coords_(i) = make_tensor_coordinate(dst_descs[i], dst_slice_origin_idxs[i]);
-        });
+        // Use plain int for array indexing, Number<> only for Tuple
+        [&]<index_t... Is>(std::index_sequence<Is...>) {
+            ((dst_coords_(Number<Is>{}) = make_tensor_coordinate(
+                 dst_descs.At(Is), dst_slice_origin_idxs.At(Is))), ...);
+        }(std::make_index_sequence<nDst>{});
     }
 
     // SrcDescs: Tuple<const SrcDesc0&, const SrcDesc1&, ...>

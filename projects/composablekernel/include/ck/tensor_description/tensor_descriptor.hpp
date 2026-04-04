@@ -82,24 +82,21 @@ struct TensorDescriptor
 
         constexpr index_t idim_hidden = VisibleDimensionIds::At(idim_visible);
 
-        index_t itran_found   = 0;
-        index_t idim_up_found = 0;
-        bool found            = false;
+        // Use constexpr for loops instead of static_for - eliminates lambda instantiations
+        constexpr auto result = []() constexpr {
+            for(index_t itran = 0; itran < ntransform_; ++itran) {
+                auto up_dim_ids = UpperDimensionIdss{}.At(itran);
 
-        static_for<0, ntransform_, 1>{}([&](auto itran) {
-            constexpr auto up_dim_ids = UpperDimensionIdss{}[itran];
-
-            static_for<0, up_dim_ids.Size(), 1>{}([&](auto idim_up) {
-                if constexpr(up_dim_ids[idim_up] == idim_hidden)
-                {
-                    itran_found   = itran;
-                    idim_up_found = idim_up;
-                    found         = true;
+                for(index_t idim_up = 0; idim_up < up_dim_ids.Size(); ++idim_up) {
+                    if(up_dim_ids.At(idim_up) == idim_hidden) {
+                        return make_tuple(itran, idim_up, true);
+                    }
                 }
-            });
-        });
+            }
+            return make_tuple(index_t{0}, index_t{0}, false);
+        }();
 
-        return make_tuple(itran_found, idim_up_found, found);
+        return result;
     }
 
     constexpr static index_t ntransform_   = GetNumOfTransform();
@@ -512,8 +509,10 @@ __host__ __device__ constexpr auto make_tensor_coordinate_step(const TensorDesc&
 
         do_transforms(itran) = idx_diff_up_has_non_zero;
 
-        static_for<0, dims_low.Size(), 1>{}(
-            [&](auto i) { non_zero_diff_pick_low(i) = idx_diff_up_has_non_zero; });
+        // Use fold expression instead of static_for - eliminates lambda instantiations
+        [&]<index_t... Is>(std::index_sequence<Is...>) {
+            ((non_zero_diff_pick_low(Number<Is>{}) = idx_diff_up_has_non_zero), ...);
+        }(std::make_index_sequence<dims_low.Size()>{});
 
         set_container_subset(is_non_zero_diff, dims_low, non_zero_diff_pick_low);
     });
