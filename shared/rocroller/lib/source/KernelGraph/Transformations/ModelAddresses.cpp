@@ -165,8 +165,10 @@ namespace rocRoller::KernelGraph
         constexpr bool isLoad    = std::is_same_v<Op, LoadLDSTile>;
         constexpr auto direction = isLoad ? LDSDirection::Load : LDSDirection::Store;
 
+        // Note: graphPtr references to the given graph, and the LoadStoreTileGenerator below
+        // should NOT call any functions that would modify the graph.
+        auto graphPtr = std::shared_ptr<KernelGraph>(&graph, [](KernelGraph*) {});
         // Use nullptr context to avoid modifying the real tag manager during modeling.
-        auto                   graphPtr = std::make_shared<KernelGraph>(graph);
         LoadStoreTileGenerator tileGenerator(
             graphPtr, nullptr, m_context->kernel()->max_flat_workgroup_size());
 
