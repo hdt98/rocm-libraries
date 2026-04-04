@@ -625,8 +625,12 @@ TEST_F(GPU_Conv3DKernelTuningAI_FP32, RunParameterPredictionModel_Fallback_Test)
 
 TEST_F(GPU_Conv3DKernelTuningAI_FP32, MetadataEncodingValidation_AllCKInstances_Wrw_Test)
 {
+    const auto& loader = miopen::solver::CKGroupedConvLibLoader::Get(device_arch);
+    ASSERT_TRUE(loader.IsLoaded());
     ValidateMetadataEncoding(
-        "ConvHipImplicitGemm3DGroupWrwXdlops", GetAllWrwKernelTypeStrings(), device_arch);
+        "ConvHipImplicitGemm3DGroupWrwXdlops",
+        loader.GetAllKernelTypeStrings(miopen::solver::CKSolverType::GrpConv3dWrw),
+        device_arch);
 }
 
 TEST_F(GPU_Conv3DKernelTuningAI_FP32, MetadataEncodingValidation_AllCKInstances_Fwd_Test)

@@ -4436,10 +4436,6 @@ struct PerformanceConfigHipImplicitGemm3DGroupFwdXdlops
     bool UseTF32() const { return use_tf32; }
 
 private:
-    template <typename DataType, typename ComputeType = DataType>
-    bool Init(const miopen::conv::ProblemDescription&);
-    template <typename DataType, typename ComputeType = DataType>
-    bool CheckIsSupportCKArgs(const miopen::conv::ProblemDescription&) const;
     void InitValidKernels(const miopen::conv::ProblemDescription& problem);
     mutable bool use_tf32 = false;
 };
@@ -4558,11 +4554,6 @@ struct MIOPEN_INTERNALS_EXPORT ConvHipImplicitGemm3DGroupWrwXdlops final
     bool MayNeedWorkspace() const override { return true; }
 
 private:
-    template <typename DataType, typename ComputeType = DataType>
-    bool CheckCKApplicability(const miopen::conv::ProblemDescription&) const;
-
-    template <typename DataType, typename ComputeType = DataType>
-    std::size_t GetCKMaxWorkspaceSize(const miopen::conv::ProblemDescription&) const;
     size_t GetCKMaxWorkspaceSize(const miopen::conv::ProblemDescription& problem) const;
 };
 
@@ -5116,7 +5107,6 @@ extern template struct TransposedConvMPBidirectWinograd_xdlops<6, 3>;
 // These functions return all CK kernel TypeStrings without problem-based filtering
 // Declared here but implemented in the respective solver .cpp files
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
-MIOPEN_INTERNALS_EXPORT std::vector<std::string> GetAllWrwKernelTypeStrings();
 #endif
 
 } // namespace conv

@@ -184,9 +184,33 @@ ckgrpconv_3d_bwd_get_solution(const miopen::ExecutionContext* ctx,
                               const char* kernel_id,
                               bool use_tf32);
 
+// -- 3D grouped WRW (S8) ---------------------------------------------------
+
+CK_GROUPED_CONV_API CKKernelListHandle* ckgrpconv_3d_wrw_fill_valid_kernels(
+    const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
+
+CK_GROUPED_CONV_API bool ckgrpconv_3d_wrw_is_applicable(
+    const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
+
+CK_GROUPED_CONV_API bool
+ckgrpconv_3d_wrw_is_args_supported(const miopen::conv::ProblemDescription* problem,
+                                   const char* kernel_id,
+                                   miopenDataType_t data_type,
+                                   bool use_tf32);
+
+CK_GROUPED_CONV_API size_t ckgrpconv_3d_wrw_get_workspace_size(
+    const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
+
+CK_GROUPED_CONV_API miopen::solver::ConvSolution*
+ckgrpconv_3d_wrw_get_solution(const miopen::ExecutionContext* ctx,
+                              const miopen::conv::ProblemDescription* problem,
+                              const char* kernel_id,
+                              bool use_tf32);
+
 // -- Get all kernel type strings (for test/metadata validation) -----------------
 
 CK_GROUPED_CONV_API CKKernelListHandle* ckgrpconv_3d_fwd_get_all_kernel_type_strings();
 CK_GROUPED_CONV_API CKKernelListHandle* ckgrpconv_3d_bwd_get_all_kernel_type_strings();
+CK_GROUPED_CONV_API CKKernelListHandle* ckgrpconv_3d_wrw_get_all_kernel_type_strings();
 
 } // extern "C"

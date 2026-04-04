@@ -247,10 +247,9 @@ void* CKGroupedConvLibLoader::ResolveRawSymbol(const char* symbol_name) const
     if(lib_handle_ == nullptr)
         return nullptr;
 #ifdef _WIN32
-    return reinterpret_cast<void*>(
-        GetProcAddress(static_cast<HMODULE>(lib_handle_), symbol_name));
+    return reinterpret_cast<void*>(GetProcAddress(static_cast<HMODULE>(lib_handle_), symbol_name));
 #else
-    dlerror(); // NOLINT(concurrency-mt-unsafe)
+    dlerror();                              // NOLINT(concurrency-mt-unsafe)
     return dlsym(lib_handle_, symbol_name); // NOLINT(concurrency-mt-unsafe)
 #endif
 }
@@ -304,6 +303,8 @@ void CKGroupedConvLibLoader::BindOptionalKernelTypeSymbols(std::vector<std::stri
                 "ckgrpconv_3d_fwd_get_all_kernel_type_strings");
     bind_symbol(solver_fns_[ToSolverIndex(CKSolverType::GrpConv3dBwd)].get_all_kernel_types,
                 "ckgrpconv_3d_bwd_get_all_kernel_type_strings");
+    bind_symbol(solver_fns_[ToSolverIndex(CKSolverType::GrpConv3dWrw)].get_all_kernel_types,
+                "ckgrpconv_3d_wrw_get_all_kernel_type_strings");
 }
 
 bool CKGroupedConvLibLoader::LoadSymbols()
@@ -324,7 +325,8 @@ bool CKGroupedConvLibLoader::LoadSymbols()
         {CKSolverType::GrpConvBwd, "bwd"},
         {CKSolverType::GrpConvWrw, "wrw"},
         {CKSolverType::GrpConv3dFwd, "3d_fwd"},
-        {CKSolverType::GrpConv3dBwd, "3d_bwd"}};
+        {CKSolverType::GrpConv3dBwd, "3d_bwd"},
+        {CKSolverType::GrpConv3dWrw, "3d_wrw"}};
 
     for(const auto& binding : solver_bindings)
         BindSolverSymbols(binding.solver, binding.prefix, missing);

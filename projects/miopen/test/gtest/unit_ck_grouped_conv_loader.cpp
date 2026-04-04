@@ -227,6 +227,31 @@ TEST(CPU_CKGroupedConvLoader_NONE, LoaderReturnsEmptyOnFailure)
     EXPECT_EQ(loader.GetWorkspaceSize(CKSolverType::GrpConvWrw, problem, miopenHalf, false), 0u);
     EXPECT_EQ(loader.GetSolution(CKSolverType::GrpConvWrw, ctx, problem, "dummy", false).status,
               miopenStatusInternalError);
+
+    EXPECT_TRUE(
+        loader.FillValidKernels(CKSolverType::GrpConv3dWrw, problem, miopenHalf, false).empty());
+    {
+        bool use_tf32 = true;
+        EXPECT_TRUE(loader
+                        .FillValidKernelsWithTf32Fallback(
+                            CKSolverType::GrpConv3dWrw, problem, miopenHalf, use_tf32)
+                        .empty());
+        EXPECT_FALSE(use_tf32) << "use_tf32 should become false when no kernels found";
+    }
+    {
+        bool use_tf32 = false;
+        EXPECT_TRUE(loader
+                        .FillValidKernelsWithTf32Fallback(
+                            CKSolverType::GrpConv3dWrw, problem, miopenHalf, use_tf32)
+                        .empty());
+        EXPECT_FALSE(use_tf32) << "use_tf32 should remain false";
+    }
+    EXPECT_FALSE(loader.IsApplicable(CKSolverType::GrpConv3dWrw, problem, miopenHalf, false));
+    EXPECT_FALSE(loader.IsArgsSupported(
+        CKSolverType::GrpConv3dWrw, problem, "dummy_kernel", miopenHalf, false));
+    EXPECT_EQ(loader.GetWorkspaceSize(CKSolverType::GrpConv3dWrw, problem, miopenHalf, false), 0u);
+    EXPECT_EQ(loader.GetSolution(CKSolverType::GrpConv3dWrw, ctx, problem, "dummy", false).status,
+              miopenStatusInternalError);
 }
 
 TEST(CPU_CKGroupedConvLoader_NONE, IsDeterministicSplitKValid)

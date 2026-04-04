@@ -35,7 +35,8 @@ enum class CKSolverType
     GrpConvWrw   = 2,
     GrpConv3dFwd = 3,
     GrpConv3dBwd = 4,
-    Count        = 5
+    GrpConv3dWrw = 5,
+    Count        = 6
 };
 
 /// Query the HIP runtime for the current device's architecture name.
@@ -117,9 +118,8 @@ private:
     bool LoadSymbols();
     void* ResolveRawSymbol(const char* symbol_name) const;
     void BindRequiredCommonSymbols(std::vector<std::string>& missing);
-    void BindSolverSymbols(CKSolverType solver,
-                           const char* prefix,
-                           std::vector<std::string>& missing);
+    void
+    BindSolverSymbols(CKSolverType solver, const char* prefix, std::vector<std::string>& missing);
     void BindOptionalKernelTypeSymbols(std::vector<std::string>& missing);
     static constexpr int ToSolverIndex(CKSolverType solver) { return static_cast<int>(solver); }
 
