@@ -27,6 +27,8 @@
 #include "DataInitialization.hpp"
 #include "TensorDataManipulation.hpp"
 #include "Utility.hpp"
+
+#include <mxDataGenerator/PreSwizzle.hpp>
 // #include "DataInitializationTyped.hpp"
 
 #include <Tensile/Utils.hpp>
@@ -196,6 +198,12 @@ namespace TensileLite
                 return "TrigIndAbsSin";
             case InitMode::TrigIndAbsCos:
                 return "TrigIndAbsCos";
+            case InitMode::MXScaleBlockSerial:
+                return "MXScaleBlockSerial";
+            case InitMode::MXScaleSparseBlock:
+                return "MXScaleSparseBlock";
+            case InitMode::MXScaleSparseBlockRandom:
+                return "MXScaleSparseBlockRandom";
 
             case InitMode::Count:
                 break;
@@ -267,6 +275,12 @@ namespace TensileLite
                 mode = InitMode::TrigIndAbsSin;
             else if(strValue == ToString(InitMode::TrigIndAbsCos))
                 mode = InitMode::TrigIndAbsCos;
+            else if(strValue == ToString(InitMode::MXScaleBlockSerial))
+                mode = InitMode::MXScaleBlockSerial;
+            else if(strValue == ToString(InitMode::MXScaleSparseBlock))
+                mode = InitMode::MXScaleSparseBlock;
+            else if(strValue == ToString(InitMode::MXScaleSparseBlockRandom))
+                mode = InitMode::MXScaleSparseBlockRandom;
             else if(std::all_of(strValue.begin(), strValue.end(), isdigit))
             {
                 int value = atoi(strValue.c_str());
@@ -890,6 +904,15 @@ namespace TensileLite
             , m_mxScaleFormat(args["mx-scale-format"].as<int>())
 
         {
+            m_mxScaleBlockI = args["mx-scale-block-i"].as<int>();
+            m_mxScaleBlockJ = args["mx-scale-block-j"].as<int>();
+
+            // Allow env-var override: MXSCALE_BLOCK_I / MXSCALE_BLOCK_J
+            if(auto* envI = std::getenv("MXSCALE_BLOCK_I"))
+                m_mxScaleBlockI = std::atoi(envI);
+            if(auto* envJ = std::getenv("MXSCALE_BLOCK_J"))
+                m_mxScaleBlockJ = std::atoi(envJ);
+
             m_rotatingBuffer
                 = args["rotating-buffer-size"].as<int32_t>() * 1024 * 1024; // Change to bytes
             m_rotatingMode   = args["rotating-buffer-mode"].as<int32_t>();
@@ -1772,7 +1795,24 @@ namespace TensileLite
             }
         }
 
-        static std::string_view initModeToMXMethod(InitMode mode)
+        // Map TensileLite InitMode to mxDataGenerator scale init method string
+        static std::string_view InitModeToMXScaleInitMethod(InitMode mode)
+        {
+            switch(mode)
+            {
+            case InitMode::MXScaleBlockSerial:
+                return "MXScaleBlockSerial";
+            case InitMode::MXScaleSparseBlock:
+                return "MXScaleSparseBlock";
+            case InitMode::MXScaleSparseBlockRandom:
+                return "MXScaleSparseBlockRandom";
+            default:
+                return "";
+            }
+        }
+
+        // Map TensileLite InitMode to mxDataGenerator init method string
+        static std::string_view InitModeToMXInitMethod(InitMode mode)
         {
             switch(mode)
             {
@@ -1846,7 +1886,12 @@ namespace TensileLite
                 auto& pristineMXScaleA
                     = m_vdata[ContractionProblemGemm::TENSOR::MXSA].pristine[problem.mxsa().dataType()];
 
-                auto initA = m_vdata[ContractionProblemGemm::TENSOR::A].init;
+                auto initMethodA = InitModeToMXInitMethod(
+                    m_vdata[ContractionProblemGemm::TENSOR::A].init);
+
+                auto mxsaInit = m_vdata[ContractionProblemGemm::TENSOR::MXSA].init;
+                auto scaleInitMethodA = InitModeToMXScaleInitMethod(mxsaInit);
+
                 generateMXInput((hipDataType)HIP_R_4F_E2M1,
                                 pristineA.cpuInput.valid.get(),
                                 pristineMXScaleA.cpuInput.valid.get(),
@@ -1859,9 +1904,36 @@ namespace TensileLite
                                 problem.mxBlockA(),
                                 1,
                                 true,
-                                initModeToMXMethod(initA),
+                                initMethodA,
                                 -1.0f,
-                                1.0f);
+                                1.0f,
+                                scaleInitMethodA,
+                                m_mxScaleBlockI,
+                                m_mxScaleBlockJ);
+
+                if(scaleInitMethodA.empty())
+                {
+                    // For non-custom scale modes, overwrite scale buffer with
+                    // user-specified init mode (e.g. One, Random, etc.)
+                    initArray(problem.mxsa().dataType(),
+                              mxsaInit,
+                              pristineMXScaleA.cpuInput.valid.get(),
+                              problem.mxsa());
+
+                    // Re-apply pre-swizzle to the overwritten scale buffer
+                    if(preSwizzleA.size() == 3)
+                    {
+                        size_t scaleRows = rows / problem.mxBlockA();
+                        size_t scaleCols = cols;
+                        size_t scaleSize = problem.mxsa().totalAllocatedElements();
+                        auto*  scalePtr
+                            = static_cast<uint8_t*>(pristineMXScaleA.cpuInput.valid.get());
+                        std::vector<uint8_t> scaleVec(scalePtr, scalePtr + scaleSize);
+                        scaleVec
+                            = DGen::preSwizzleScalesGFX950(scaleVec, {scaleCols, scaleRows});
+                        std::memcpy(scalePtr, scaleVec.data(), scaleVec.size());
+                    }
+                }
             }
 
             if(isMXFP4Tensor(problem.b(), problem.mxBlockB()))
@@ -1876,7 +1948,12 @@ namespace TensileLite
                 auto& pristineMXScaleB
                     = m_vdata[ContractionProblemGemm::TENSOR::MXSB].pristine[problem.mxsb().dataType()];
 
-                auto initB = m_vdata[ContractionProblemGemm::TENSOR::B].init;
+                auto initMethodB = InitModeToMXInitMethod(
+                    m_vdata[ContractionProblemGemm::TENSOR::B].init);
+
+                auto mxsbInit = m_vdata[ContractionProblemGemm::TENSOR::MXSB].init;
+                auto scaleInitMethodB = InitModeToMXScaleInitMethod(mxsbInit);
+
                 generateMXInput((hipDataType)HIP_R_4F_E2M1,
                                 pristineB.cpuInput.valid.get(),
                                 pristineMXScaleB.cpuInput.valid.get(),
@@ -1889,9 +1966,36 @@ namespace TensileLite
                                 problem.mxBlockB(),
                                 1,
                                 false,
-                                initModeToMXMethod(initB),
+                                initMethodB,
                                 -1.0f,
-                                1.0f);
+                                1.0f,
+                                scaleInitMethodB,
+                                m_mxScaleBlockI,
+                                m_mxScaleBlockJ);
+
+                if(scaleInitMethodB.empty())
+                {
+                    // For non-custom scale modes, overwrite scale buffer with
+                    // user-specified init mode (e.g. One, Random, etc.)
+                    initArray(problem.mxsb().dataType(),
+                              mxsbInit,
+                              pristineMXScaleB.cpuInput.valid.get(),
+                              problem.mxsb());
+
+                    // Re-apply pre-swizzle to the overwritten scale buffer
+                    if(preSwizzleB.size() == 3)
+                    {
+                        size_t scaleRows = rows / problem.mxBlockB();
+                        size_t scaleCols = cols;
+                        size_t scaleSize = problem.mxsb().totalAllocatedElements();
+                        auto*  scalePtr
+                            = static_cast<uint8_t*>(pristineMXScaleB.cpuInput.valid.get());
+                        std::vector<uint8_t> scaleVec(scalePtr, scalePtr + scaleSize);
+                        scaleVec
+                            = DGen::preSwizzleScalesGFX950(scaleVec, {scaleCols, scaleRows});
+                        std::memcpy(scalePtr, scaleVec.data(), scaleVec.size());
+                    }
+                }
             }
         }
 
