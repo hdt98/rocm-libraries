@@ -232,6 +232,31 @@ inline constexpr GemmVariant gemm_variants[] = {
                      .block_waves = {2, 2, 1},
                      .wave_tile   = {32, 32, 16},
                  }),
+    // --- Pipeline V4: compute double-buffer (ping-pong LDS) ---
+    make_variant("gemm_fp16_v4",
+                 Signature{
+                     .dtype = DataType::FP16,
+                     .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 GemmAlgorithm{
+                     .block_tile  = {128, 128, 32},
+                     .block_waves = {2, 2, 1},
+                     .wave_tile   = {16, 16, 16},
+                     .pipeline    = Pipeline::V4,
+                 }),
+    // --- Padding: non-aligned M/N dimensions with boundary checks ---
+    make_variant("gemm_fp16_padded",
+                 Signature{
+                     .dtype = DataType::FP16,
+                     .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 GemmAlgorithm{
+                     .block_tile  = {128, 128, 32},
+                     .block_waves = {2, 2, 1},
+                     .wave_tile   = {16, 16, 16},
+                     .pad_m       = true,
+                     .pad_n       = true,
+                 }),
 };
 
 inline constexpr int gemm_variant_count = sizeof(gemm_variants) / sizeof(gemm_variants[0]);
