@@ -54,12 +54,11 @@ struct BQuantKernelTraits
 {
     std::string pipeline;  // compv3
     std::string scheduler; // intrawave
-    std::string epilogue;  // default
+    std::string epilogue;  // default, cshuffle
     bool pad_m;
     bool pad_n;
     bool pad_k;
     bool b_preshuffle_quant;
-    bool preshuffle_b;
 
     BQuantKernelTraits()
         : pipeline("compv3"),
@@ -67,9 +66,8 @@ struct BQuantKernelTraits
           epilogue("default"),
           pad_m(false),
           pad_n(false),
-          pad_k(true),
-          b_preshuffle_quant(false),
-          preshuffle_b(false)
+          pad_k(false),
+          b_preshuffle_quant(false)
     {
     }
 };

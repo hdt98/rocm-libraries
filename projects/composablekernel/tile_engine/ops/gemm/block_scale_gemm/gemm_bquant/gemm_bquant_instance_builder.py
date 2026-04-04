@@ -4,8 +4,6 @@
 import os
 import argparse
 import importlib.util
-import itertools
-import logging
 import multiprocessing
 import concurrent.futures
 
@@ -25,45 +23,7 @@ def _import_gemm_kernel_builder():
     return gemm_builder_module.GemmKernelBuilder
 
 
-def _import_validation_utils():
-    """Import validation utilities from the gemm directory."""
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    gemm_dir = os.path.dirname(os.path.dirname(current_dir))
-
-    spec = importlib.util.spec_from_file_location(
-        "validation_utils",
-        os.path.join(gemm_dir, "gemm_validation_utils.py"),
-    )
-    validation_utils = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(validation_utils)
-
-    return validation_utils
-
-
 GemmKernelBuilder = _import_gemm_kernel_builder()
-_validation_utils = _import_validation_utils()
-is_tile_config_valid = _validation_utils.is_tile_config_valid
-get_abc_layouts = _validation_utils.get_abc_layouts
-get_dtype_string = _validation_utils.get_dtype_string
-
-# BQuant only supports compv3 pipeline with intrawave scheduler
-BQUANT_TRAIT_UNSUPPORTED_COMBINATIONS = {
-    ("mem", "default", "intrawave"),
-    ("mem", "default", "interwave"),
-    ("compv3", "default", "interwave"),
-}
-
-
-def is_bquant_trait_combination_valid(pipeline, epilogue, scheduler):
-    """Check if a BQuant trait combination is valid.
-
-    Rules:
-    - Only compv3 pipeline with intrawave scheduler is supported
-    """
-    if (pipeline, epilogue, scheduler) in BQUANT_TRAIT_UNSUPPORTED_COMBINATIONS:
-        return False
-
-    return True
 
 
 class GemmBQuantKernelBuilder(GemmKernelBuilder):
@@ -81,498 +41,8 @@ class GemmBQuantKernelBuilder(GemmKernelBuilder):
         )
         self.group_size_k = self.config.get("group_size_k", 128)
 
-    def _get_tile_configs(self):
-        """Get tile configurations for the current datatype and layout."""
-        tile_config = self.config["tile_config"]
-
-        # Generate values in the config if default range is given
-        for dim in ["tile_m", "tile_n", "tile_k"]:
-            if tile_config.get(dim).get("values") is None:
-                tile_config.get(dim)["values"] = self._generate_values(
-                    tile_config.get(dim).get("min"),
-                    tile_config.get(dim).get("max"),
-                    tile_config.get(dim).get("step"),
-                )
-
-        tile_m_values = tile_config.get("tile_m").get("values")
-        tile_n_values = tile_config.get("tile_n").get("values")
-        tile_k_values = tile_config.get("tile_k").get("values")
-        warp_m_values = tile_config.get("warp_m").get("values")
-        warp_n_values = tile_config.get("warp_n").get("values")
-        warp_k_values = tile_config.get("warp_k").get("values")
-        warp_tile_m_values = tile_config.get("warp_tile_m").get("values")
-        warp_tile_n_values = tile_config.get("warp_tile_n").get("values")
-        warp_tile_k_values = tile_config.get("warp_tile_k").get("values")
-
-        # For BQuant, pipeline is compv3
-        default_pipeline = "compv3"
-
-        configs = []
-        for combo in itertools.product(
-            tile_m_values,
-            tile_n_values,
-            tile_k_values,
-            warp_m_values,
-            warp_n_values,
-            warp_k_values,
-            warp_tile_m_values,
-            warp_tile_n_values,
-            warp_tile_k_values,
-        ):
-            (
-                tile_m,
-                tile_n,
-                tile_k,
-                warp_m,
-                warp_n,
-                warp_k,
-                warp_tile_m,
-                warp_tile_n,
-                warp_tile_k,
-            ) = combo
-
-            if self._validate_tile_config(
-                tile_m,
-                tile_n,
-                tile_k,
-                warp_m,
-                warp_n,
-                warp_k,
-                warp_tile_m,
-                warp_tile_n,
-                warp_tile_k,
-                default_pipeline,
-            ):
-                configs.append(
-                    {
-                        "tile_m": tile_m,
-                        "tile_n": tile_n,
-                        "tile_k": tile_k,
-                        "warp_m": warp_m,
-                        "warp_n": warp_n,
-                        "warp_k": warp_k,
-                        "warp_tile_m": warp_tile_m,
-                        "warp_tile_n": warp_tile_n,
-                        "warp_tile_k": warp_tile_k,
-                    }
-                )
-        return configs
-
-    def _validate_tile_config(
-        self,
-        tile_m,
-        tile_n,
-        tile_k,
-        warp_m,
-        warp_n,
-        warp_k,
-        warp_tile_m,
-        warp_tile_n,
-        warp_tile_k,
-        pipeline,
-    ):
-        """Validate tile configuration for BQuant GEMM."""
-        a_datatype = self.datatype
-        b_datatype = self.datatype
-        c_datatype = "fp16" if self.datatype in ["fp8", "bf8"] else self.datatype
-
-        # BQuant-specific: tile_k must be a multiple of group_size_k
-        if tile_k % self.group_size_k != 0 or tile_k < self.group_size_k:
-            return False
-
-        # BQuant-specific: group_size_k must be divisible by warp_tile_k
-        if self.group_size_k % warp_tile_k != 0:
-            return False
-
-        # BQuant-specific: enforce warp_tile_m == warp_tile_n (MFMA requirement)
-        if warp_tile_m != warp_tile_n:
-            return False
-
-        # BQuant-specific: enforce warp_tile_m <-> warp_tile_k coupling
-        if self.datatype in ["fp8", "bf8"]:
-            if self.gpu_target == "gfx950":
-                expected_k = 64 if warp_tile_m == 32 else 128
-            else:
-                expected_k = 32 if warp_tile_m == 32 else 64
-            if warp_tile_k != expected_k:
-                return False
-
-        if not is_tile_config_valid(
-            tile_m,
-            tile_n,
-            tile_k,
-            warp_m,
-            warp_n,
-            warp_k,
-            warp_tile_m,
-            warp_tile_n,
-            warp_tile_k,
-            a_datatype,
-            b_datatype,
-            c_datatype,
-            pipeline,
-            self.layout,
-            self.gpu_target,
-        ):
-            return False
-
-        return True
-
-    def _generate_trait_combinations(self):
-        """Generate valid BQuant trait combinations.
-
-        Trait tuple: (pipeline, epilogue, scheduler, pad_m, pad_n, pad_k,
-                      b_preshuffle_quant, preshuffle_b)
-        """
-        trait_config = self.config["trait_config"]
-
-        pipelines = trait_config.get("pipeline").get("values")
-        epilogues = trait_config.get("epilogue").get("values")
-        schedulers = trait_config.get("scheduler").get("values")
-        pad_m_values = trait_config.get("pad_m").get("values")
-        pad_n_values = trait_config.get("pad_n").get("values")
-        pad_k_values = trait_config.get("pad_k").get("values")
-        b_preshuffle_values = trait_config.get("b_preshuffle_quant").get("values")
-        preshuffle_b_values = trait_config.get("preshuffle_b").get("values")
-
-        all_combinations = list(
-            itertools.product(
-                pipelines,
-                epilogues,
-                schedulers,
-                pad_m_values,
-                pad_n_values,
-                pad_k_values,
-                b_preshuffle_values,
-                preshuffle_b_values,
-            )
-        )
-
-        combinations = []
-        for combo in all_combinations:
-            pipeline, epilogue, scheduler = combo[:3]
-            b_preshuffle_quant = combo[6]
-            preshuffle_b = combo[7]
-            if not is_bquant_trait_combination_valid(pipeline, epilogue, scheduler):
-                logging.debug(
-                    f"Skipping unsupported BQuant trait: "
-                    f"{pipeline}-{epilogue}-{scheduler}-bpreshuffle={b_preshuffle_quant}"
-                    f"-preshuffleb={preshuffle_b}"
-                )
-                continue
-
-            # PreshuffleQuant with BQuantGrouped only supports ColumnMajor BQ layout.
-            # BQ layout follows B layout, so skip when B is RowMajor (layout[1] == 'r').
-            layout_code = self.layout.lower()
-            if b_preshuffle_quant in [True, "true"] and layout_code[1] == "r":
-                logging.debug(
-                    f"Skipping b_preshuffle_quant=True for layout {layout_code}: "
-                    f"BQ layout would be RowMajor, but PreshuffleQuant requires ColumnMajor"
-                )
-                continue
-
-            combinations.append(combo)
-        return combinations
-
-    def _list_kernels(self):
-        """Write kernel list to file for CMake to read."""
-        tile_configs = self._get_tile_configs()
-        trait_combos = self._generate_trait_combinations()
-
-        kernel_list = []
-        for tile_config in tile_configs:
-            for trait_combo in trait_combos:
-                (
-                    pipeline,
-                    epilogue,
-                    scheduler,
-                    pad_m,
-                    pad_n,
-                    pad_k,
-                    b_preshuffle_quant,
-                    preshuffle_b,
-                ) = trait_combo
-
-                kernel_name = (
-                    f"{self.kernel_name_prefix}_{self.datatype}_{self.layout}"
-                    f"_{pipeline}_{epilogue}_{scheduler}"
-                    f"_{str(pad_m).capitalize()}_{str(pad_n).capitalize()}"
-                    f"_{str(pad_k).capitalize()}"
-                    f"_{str(b_preshuffle_quant).capitalize()}"
-                    f"_{str(preshuffle_b).capitalize()}"
-                )
-
-                tile_str = (
-                    f"{tile_config['tile_m']}x{tile_config['tile_n']}x{tile_config['tile_k']}_"
-                    f"{tile_config['warp_m']}x{tile_config['warp_n']}x{tile_config['warp_k']}_"
-                    f"{tile_config['warp_tile_m']}x{tile_config['warp_tile_n']}"
-                    f"x{tile_config['warp_tile_k']}"
-                )
-                kernel_name += f"_{tile_str}"
-
-                kernel_list.append(
-                    {
-                        "name": kernel_name,
-                        "tile_config": tile_config,
-                        "trait_combo": trait_combo,
-                    }
-                )
-
-        # Write kernel count
-        count_file = self.working_path / f"{self.kernel_name_prefix}_kernel_count.txt"
-        with open(count_file, "w") as f:
-            f.write(str(len(kernel_list)))
-
-        # Write kernel list
-        list_file = self.working_path / f"{self.kernel_name_prefix}_kernel_list.txt"
-        with open(list_file, "w") as f:
-            for kernel in kernel_list:
-                tile_config = kernel["tile_config"]
-                trait_combo = kernel["trait_combo"]
-
-                tile_str = (
-                    f"{tile_config['tile_m']}x{tile_config['tile_n']}x{tile_config['tile_k']}_"
-                    f"{tile_config['warp_m']}x{tile_config['warp_n']}x{tile_config['warp_k']}_"
-                    f"{tile_config['warp_tile_m']}x{tile_config['warp_tile_n']}"
-                    f"x{tile_config['warp_tile_k']}"
-                )
-                trait_str = (
-                    f"{trait_combo[0]}_{trait_combo[1]}_{trait_combo[2]}_"
-                    + "_".join(str(x) for x in trait_combo[3:])
-                )
-                f.write(f"{kernel['name']}|{tile_str}|{trait_str}\n")
-
-        print(f"Listed {len(kernel_list)} kernel configurations")
-
-    def _generate_kernel_instance(self, tile_config, trait_combo):
-        """Generate a single BQuant kernel instance header."""
-        k_block_per_cu = self.config.get("k_block_per_cu", 1)
-
-        (
-            pipeline,
-            epilogue,
-            scheduler,
-            pad_m,
-            pad_n,
-            pad_k,
-            b_preshuffle_quant,
-            preshuffle_b,
-        ) = trait_combo
-
-        # Build kernel name
-        kernel_name = (
-            f"{self.kernel_name_prefix}_{self.datatype}_{self.layout}"
-            f"_{pipeline}_{epilogue}_{scheduler}"
-            f"_{str(pad_m).capitalize()}_{str(pad_n).capitalize()}"
-            f"_{str(pad_k).capitalize()}"
-            f"_{str(b_preshuffle_quant).capitalize()}"
-            f"_{str(preshuffle_b).capitalize()}"
-        )
-        tile_str = (
-            f"{tile_config['tile_m']}x{tile_config['tile_n']}x{tile_config['tile_k']}_"
-            f"{tile_config['warp_m']}x{tile_config['warp_n']}x{tile_config['warp_k']}_"
-            f"{tile_config['warp_tile_m']}x{tile_config['warp_tile_n']}"
-            f"x{tile_config['warp_tile_k']}"
-        )
-        kernel_name += f"_{tile_str}"
-
-        # Determine output type
-        c_type = "fp16" if self.datatype in ["fp8", "bf8"] else self.datatype
-
-        # Layouts
-        a_layout, b_layout, c_layout = get_abc_layouts(self.layout)
-
-        # BQ layout: follows BLayout (ColumnMajor for RCR, RowMajor for RRR, etc.)
-        bq_layout = b_layout
-
-        # Pipeline mapping - BQuant only uses CompV3
-        pipeline_impl_map = {
-            "compv3": "ck_tile::BQuantGemmPipelineAgBgCrCompV3",
-        }
-        base_pipeline_map = {
-            "compv3": "ck_tile::BaseGemmPipelineAgBgCrCompV3",
-        }
-        scheduler_type_map = {
-            "intrawave": "ck_tile::GemmPipelineScheduler::Intrawave",
-            "interwave": "ck_tile::GemmPipelineScheduler::Interwave",
-        }
-
-        is_pad_m = "true" if pad_m in [True, "true"] else "false"
-        is_pad_n = "true" if pad_n in [True, "true"] else "false"
-        is_pad_k = "true" if pad_k in [True, "true"] else "false"
-        is_b_preshuffle = "true" if b_preshuffle_quant in [True, "true"] else "false"
-        is_preshuffle_b = "true" if preshuffle_b in [True, "true"] else "false"
-
-        instance_code = f"""// Generated BQuant kernel instance for {kernel_name}
-#pragma once
-
-#include <cstdint>
-#include <utility>
-#include <tuple>
-#include "ck_tile/core.hpp"
-#include "ck_tile/host/kernel_launch.hpp"
-#include "ck_tile/ops/gemm.hpp"
-#include "ck_tile/ops/gemm_quant.hpp"
-#include "ck_tile/ops/gemm_quant/kernel/gemm_quant_kernel.hpp"
-#include "ck_tile/ops/common/tensor_layout.hpp"
-#include "ck_tile/ops/epilogue/default_2d_epilogue.hpp"
-
-using ADataType = {get_dtype_string(self.datatype)};
-using BDataType = {get_dtype_string(self.datatype)};
-using BQDataType = float;
-using AccDataType = float;
-using CDataType = {get_dtype_string(c_type)};
-
-using ALayout = {a_layout};
-using BLayout = {b_layout};
-using CLayout = {c_layout};
-using BQLayout = {bq_layout};
-
-// Kernel name for display
-constexpr const char* KERNEL_NAME = "{kernel_name}";
-
-// Wrapper for simplified launch interface
-struct SelectedKernel {{
-    // Tile configuration (BlockSize = WarpPerBlock_M * WarpPerBlock_N * WarpPerBlock_K * warpSize)
-    static constexpr ck_tile::index_t BlockSize = {tile_config["warp_m"] * tile_config["warp_n"] * tile_config["warp_k"] * 64};
-    static constexpr ck_tile::index_t TileM = {tile_config["tile_m"]};
-    static constexpr ck_tile::index_t TileN = {tile_config["tile_n"]};
-    static constexpr ck_tile::index_t TileK = {tile_config["tile_k"]};
-    static constexpr ck_tile::index_t WarpPerBlock_M = {tile_config["warp_m"]};
-    static constexpr ck_tile::index_t WarpPerBlock_N = {tile_config["warp_n"]};
-    static constexpr ck_tile::index_t WarpPerBlock_K = {tile_config["warp_k"]};
-    static constexpr ck_tile::index_t WarpTileM = {tile_config["warp_tile_m"]};
-    static constexpr ck_tile::index_t WarpTileN = {tile_config["warp_tile_n"]};
-    static constexpr ck_tile::index_t WarpTileK = {tile_config["warp_tile_k"]};
-
-    // BQuant traits
-    static constexpr bool kPadM = {is_pad_m};
-    static constexpr bool kPadN = {is_pad_n};
-    static constexpr bool kPadK = {is_pad_k};
-    static constexpr bool TransposeC = false;
-    static constexpr bool APreshuffleQuant = false;
-    static constexpr bool BPreshuffleQuant = {is_b_preshuffle};
-    static constexpr bool PreshuffleB = {is_preshuffle_b};
-    static constexpr bool DoubleSmemBuffer = false;
-    static constexpr ck_tile::index_t GroupSizeK = {self.group_size_k};
-
-    // Tile shape
-    using TileShape = ck_tile::TileGemmShape<
-        ck_tile::sequence<TileM, TileN, TileK>,
-        ck_tile::sequence<WarpPerBlock_M, WarpPerBlock_N, WarpPerBlock_K>,
-        ck_tile::sequence<WarpTileM, WarpTileN, WarpTileK>>;
-
-    // Tile partitioner
-    using TilePartitioner = ck_tile::GemmSpatiallyLocalTilePartitioner<TileShape, 8, 4>;
-
-    // Quantization group size: BQuant uses (1, 1, GroupSizeK)
-    using QuantGroupSize = ck_tile::QuantGroupShape<ck_tile::sequence<1, 1, GroupSizeK>>;
-
-    // Traits
-    using Traits = ck_tile::TileGemmQuantTraits<
-        kPadM, kPadN, kPadK,
-        APreshuffleQuant,
-        BPreshuffleQuant,
-        PreshuffleB,
-        ALayout, BLayout, CLayout,
-        ck_tile::QuantType::BQuantGrouped,
-        void, // no AQLayout for BQuant
-        BQLayout>;
-
-    // Pipeline problem
-    using GemmPipelineProblem = ck_tile::GemmBQuantPipelineProblem<
-        ADataType,
-        BDataType,
-        BQDataType,
-        AccDataType,
-        TileShape,
-        Traits,
-        QuantGroupSize,
-        BDataType,
-        {scheduler_type_map.get(scheduler)}>;
-
-    // Base pipeline for hot loop detection
-    using BaseGemmPipeline = {base_pipeline_map.get(pipeline)}<GemmPipelineProblem>;
-
-    // Launch function
-    static float launch(const ck_tile::QuantGemmHostArgs& args,
-                        const ck_tile::stream_config& stream) {{
-
-        using _GemmPipelineProblem = SelectedKernel::GemmPipelineProblem;
-        using GemmPipeline = {pipeline_impl_map.get(pipeline)}<_GemmPipelineProblem>;
-
-        // Epilogue
-        using EpilogueProblem = ck_tile::DefaultGemm2DEpilogueProblem<
-            ADataType,
-            BDataType,
-            ck_tile::tuple<>,
-            AccDataType,
-            CDataType,
-            ck_tile::tuple<>,
-            CLayout,
-            ck_tile::element_wise::PassThrough,
-            SelectedKernel::TileM,
-            SelectedKernel::TileN,
-            SelectedKernel::kPadM,
-            SelectedKernel::kPadN,
-            SelectedKernel::WarpTileM,
-            SelectedKernel::WarpTileN,
-            SelectedKernel::WarpTileK,
-            SelectedKernel::TransposeC>;
-
-        using GemmEpilogue = ck_tile::DefaultGemm2DEpilogue<EpilogueProblem>;
-
-        // Kernel type
-        using Kernel = ck_tile::QuantGemmKernel<
-            SelectedKernel::TilePartitioner, GemmPipeline, GemmEpilogue,
-            ck_tile::QuantType::BQuantGrouped>;
-
-        // Kernel arguments
-        auto kargs = Kernel::MakeKernelArgs(args);
-
-        if (!Kernel::IsSupportedArgument(kargs)) {{
-            throw std::runtime_error("Wrong! Arguments not supported! Skipping gemm!");
-        }}
-
-        // Get grid and block sizes
-        const dim3 grids = Kernel::GridSize(args.M, args.N, args.k_batch);
-        const dim3 blocks = Kernel::BlockSize();
-
-        if(stream.log_level_ > 0) {{
-            std::cout << "Launching kernel: " << Kernel::GetName() << '\\n'
-                      << "grid: {{" << grids.x << ", " << grids.y << ", " << grids.z << "}}"
-                      << ", blocks: {{" << blocks.x << ", " << blocks.y << ", " << blocks.z << "}}"
-                      << std::endl;
-        }}
-
-        // Launch kernel
-        constexpr int kBlockPerCu = {k_block_per_cu};
-        float ave_time = ck_tile::launch_kernel(
-            stream,
-            ck_tile::make_kernel<kBlockPerCu>(Kernel{{}}, grids, blocks, 0, kargs));
-
-        return ave_time;
-    }}
-}};
-"""
-
-        # Write the header file
-        simplified_name = kernel_name
-        if simplified_name.startswith(f"{self.kernel_name_prefix}_"):
-            simplified_name = simplified_name[len(self.kernel_name_prefix) + 1 :]
-
-        header_file = (
-            self.working_path
-            / f"{self.kernel_name_prefix}_single_{simplified_name}.hpp"
-        )
-        with open(header_file, "w") as f:
-            f.write(instance_code)
-
-        print(f"Generated {header_file}")
-        return kernel_name, instance_code
-
     def _generate_all_individual(self, num_workers=None):
-        """Generate individual kernel files with parallel processing."""
+        """Generate individual kernel files for separate compilation with parallel processing"""
         if num_workers is None:
             num_workers = min(multiprocessing.cpu_count(), 8)
 
@@ -594,13 +64,18 @@ struct SelectedKernel {{
                         self.config_json,
                     )
                 )
-
         print(
-            f"Generating {len(work_items)} individual kernel files "
-            f"using {num_workers} workers..."
+            f"Generating {len(work_items)} individual kernel files using {num_workers} workers..."
         )
         print(f"  Tile configs: {len(tile_configs)}")
         print(f"  Trait combinations: {len(trait_combos)}")
+        print(f"  Total kernels: {len(work_items)}")
+
+        if work_items:
+            print("  First work item example:")
+            tile_config, trait_combo = work_items[0][:2]
+            print(f"    Tile config: {tile_config}")
+            print(f"    Trait combo: {trait_combo[:3]}")
 
         kernel_list = []
         completed = 0
@@ -608,13 +83,16 @@ struct SelectedKernel {{
         with concurrent.futures.ProcessPoolExecutor(
             max_workers=num_workers
         ) as executor:
+            print(f"  Submitting {len(work_items)} tasks to executor...")
             future_to_item = {
                 executor.submit(_generate_single_kernel_individual, item): item
                 for item in work_items
             }
+            print("  All tasks submitted, waiting for completion...")
+
             for future in concurrent.futures.as_completed(future_to_item):
                 completed += 1
-                if completed % 50 == 0 or completed == len(work_items):
+                if completed % 100 == 0 or completed == len(work_items):
                     print(
                         f"  Progress: {completed}/{len(work_items)} kernels generated"
                     )
@@ -628,13 +106,14 @@ struct SelectedKernel {{
 
         kernel_list.sort(key=lambda x: x[0])
         self._generate_cmake_individual_targets(kernel_list)
+
         print(
             f"Generated {len(kernel_list)} individual kernel files in {self.working_path}"
         )
 
 
 def _generate_single_kernel_individual(work_item):
-    """Worker function to generate a single individual BQuant kernel file."""
+    """Worker function to generate a single individual kernel file"""
     (
         tile_config,
         trait_combo,
@@ -651,9 +130,17 @@ def _generate_single_kernel_individual(work_item):
     )
 
     try:
-        # _generate_kernel_instance() already writes the header file to disk,
-        # so no need to write again here.
-        kernel_name, _ = builder._generate_kernel_instance(tile_config, trait_combo)
+        kernel_name, instance_code = builder._generate_kernel_instance(
+            tile_config, trait_combo
+        )
+
+        simplified_name = kernel_name
+        if simplified_name.startswith("gemm_bquant_"):
+            simplified_name = simplified_name[len(kernel_name_prefix) + 1 :]
+
+        header_file = working_path / f"gemm_bquant_single_{simplified_name}.hpp"
+        with open(header_file, "w") as f:
+            f.write(instance_code)
 
         return (kernel_name, trait_combo, tile_config)
     except Exception as e:
@@ -700,6 +187,21 @@ def main():
 
     args = parser.parse_args()
 
+    assert args.datatype in ["fp16", "bf16", "fp8", "bf8"], (
+        f"Invalid datatype string: {args.datatype} (supported datatypes are [fp16, bf16, fp8, and bf8])"
+    )
+
+    layout_parts = args.layout.lower()
+    assert len(layout_parts) == 3, (
+        f"Invalid layout string: {args.layout} (must be 3 characters like 'rcr')"
+    )
+    assert layout_parts[0] in ["r", "c"] and layout_parts[1] in ["r", "c"], (
+        f"Invalid matrix_a layout: {layout_parts[0]} or matrix_b layout: {layout_parts[1]}"
+    )
+    assert layout_parts[2] == "r", (
+        f"Invalid matrix_c layout: {layout_parts[2]} (must be 'r' for row major)"
+    )
+
     kernel_name_prefix = "gemm_bquant"
     builder = GemmBQuantKernelBuilder(
         kernel_name_prefix,
@@ -737,7 +239,7 @@ def main():
         }
 
         # Parse trait combo:
-        # pipeline_epilogue_scheduler_padM_padN_padK_bPreshuffleQuant_preshuffleB
+        # pipeline_epilogue_scheduler_padM_padN_padK_bPreshuffle
         trait_parts = args.trait_combo.split("_")
         trait_combo = (
             trait_parts[0],  # pipeline
@@ -747,7 +249,6 @@ def main():
             trait_parts[4] == "True",  # pad_n
             trait_parts[5] == "True",  # pad_k
             trait_parts[6] == "True",  # b_preshuffle_quant
-            trait_parts[7] == "True",  # preshuffle_b
         )
 
         builder._generate_kernel_instance(tile_config, trait_combo)

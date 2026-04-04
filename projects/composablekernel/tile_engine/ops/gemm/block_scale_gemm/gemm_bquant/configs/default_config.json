@@ -1,45 +1,32 @@
 {
     "tile_config": {
         "tile_m": {
-            "values": [
-                16,
-                32,
-                64,
-                128,
-                192,
-                256
-            ]
+            "max": 256,
+            "min": 64,
+            "step": 64
         },
         "tile_n": {
-            "values": [
-                32,
-                64,
-                128,
-                192,
-                256
-            ]
+            "max": 256,
+            "min": 64,
+            "step": 64
         },
         "tile_k": {
-            "values": [
-                64,
-                128,
-                192,
-                256,
-                512
-            ]
+            "max": 256,
+            "min": 64,
+            "step": 64
         },
         "warp_m": {
             "values": [
-                1,
+                4,
                 2,
-                4
+                1
             ]
         },
         "warp_n": {
             "values": [
-                1,
+                4,
                 2,
-                4
+                1
             ]
         },
         "warp_k": {
@@ -49,6 +36,7 @@
         },
         "warp_tile_m": {
             "values": [
+                4,
                 16,
                 32
             ]
@@ -56,7 +44,8 @@
         "warp_tile_n": {
             "values": [
                 16,
-                32
+                32,
+                64
             ]
         },
         "warp_tile_k": {
@@ -82,6 +71,7 @@
         },
         "epilogue": {
             "values": [
+                "cshuffle",
                 "default"
             ]
         },
@@ -97,16 +87,10 @@
         },
         "pad_k": {
             "values": [
-                true
+                false
             ]
         },
         "b_preshuffle_quant": {
-            "values": [
-                false,
-                true
-            ]
-        },
-        "preshuffle_b": {
             "values": [
                 false,
                 true

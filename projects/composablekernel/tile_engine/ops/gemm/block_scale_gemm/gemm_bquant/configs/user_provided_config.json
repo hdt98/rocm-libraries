@@ -2,17 +2,17 @@
     "tile_config": {
         "tile_m": {
             "values": [
-                128
+                16
             ]
         },
         "tile_n": {
             "values": [
-                128
+                64
             ]
         },
         "tile_k": {
             "values": [
-                128
+                256
             ]
         },
         "warp_m": {
@@ -42,7 +42,7 @@
         },
         "warp_tile_k": {
             "values": [
-                64
+                128
             ]
         }
     },
@@ -74,18 +74,12 @@
         },
         "pad_k": {
             "values": [
-                true
+                false
             ]
         },
         "b_preshuffle_quant": {
             "values": [
                 false
-            ]
-        },
-        "preshuffle_b": {
-            "values": [
-                false,
-                true
             ]
         }
     },

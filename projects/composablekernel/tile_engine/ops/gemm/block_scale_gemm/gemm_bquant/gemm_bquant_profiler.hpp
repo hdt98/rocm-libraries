@@ -13,6 +13,7 @@
 #include <stdexcept>
 
 #include "ck_tile/host/device_prop.hpp"
+#include "ck_tile/host/tensor_shuffle_utils.hpp"
 #include "ck_tile/ops/gemm_quant.hpp"
 #include "gemm_bquant_benchmark.hpp"
 
@@ -111,7 +112,19 @@ class BQuantGemmProfiler
 
         a_m_k_dev_buf.ToDevice(a_m_k.data());
         b_k_n_dev_buf.ToDevice(b_k_n.data());
-        bq_dev_buf.ToDevice(bq_qk_n.data());
+
+        // Shuffle BQ data if preshuffle is enabled
+        if constexpr(SelectedKernel::BPreshuffleQuant)
+        {
+            constexpr int block_bq_k = SelectedKernel::TileK / SelectedKernel::GroupSizeK;
+            ck_tile::HostTensor<BQDataType> bq_shuffled = ck_tile::shuffle_bq(&bq_qk_n, block_bq_k);
+            bq_dev_buf.ToDevice(bq_shuffled.data());
+        }
+        else
+        {
+            bq_dev_buf.ToDevice(bq_qk_n.data());
+        }
+
         c_m_n_dev_buf.SetZero();
         c_m_n_dev_result.SetZero();
 
