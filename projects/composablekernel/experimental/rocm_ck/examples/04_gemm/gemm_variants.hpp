@@ -257,6 +257,35 @@ inline constexpr GemmVariant gemm_variants[] = {
                      .pad_m       = true,
                      .pad_n       = true,
                  }),
+    // --- INT8 GEMM: int8×int8→int32 with integer accumulation ---
+    // V3 pipeline required — V1 does not support int8.
+    // gfx942+ only — gfx90a emulates int8 MFMA with float MFMA (wrong bit pattern).
+    make_variant(
+        "gemm_i8",
+        Signature{
+            .dtype   = DataType::I8,
+            .tensors = {Tensor{.name = "C", .dtype = DataType::I32}},
+            .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C", .acc_dtype = DataType::I32}},
+        },
+        GemmAlgorithm{
+            .block_tile  = {128, 128, 64},
+            .block_waves = {2, 2, 1},
+            .wave_tile   = {32, 32, 16},
+            .pipeline    = Pipeline::V3,
+        }),
+    // --- Direct2D epilogue: no LDS shuffle, direct 2D store ---
+    // No D tensor support (fused bias/scale requires CShuffle epilogue).
+    make_variant("gemm_fp16_direct2d",
+                 Signature{
+                     .dtype = DataType::FP16,
+                     .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 GemmAlgorithm{
+                     .block_tile  = {128, 128, 32},
+                     .block_waves = {2, 2, 1},
+                     .wave_tile   = {16, 16, 16},
+                     .epilogue    = EpilogueStrategy::Direct2D,
+                 }),
 };
 
 inline constexpr int gemm_variant_count = sizeof(gemm_variants) / sizeof(gemm_variants[0]);

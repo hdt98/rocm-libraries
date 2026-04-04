@@ -115,7 +115,11 @@ struct ComposedCDEOp
 template <GemmSpec S>
 struct EpilogueTypes
 {
-    using Op = ComposedCDEOp<S>;
+    // PassThrough for no epilogue ops (avoids float round-trip that corrupts integer types).
+    // ComposedCDEOp for epilogue chains (Add, Relu, etc.) — operates in float.
+    using Op = std::conditional_t<S.num_epilogue_ops == 0,
+                                  ck_tile::element_wise::PassThrough,
+                                  ComposedCDEOp<S>>;
 
     // D tensor count: physical tensors beyond lhs(0), rhs(1), output(2)
     static constexpr int NumDTensors = S.num_physical_tensors - 3;
@@ -324,10 +328,28 @@ __device__ void run(Args args)
                                                                    S.wave_tile.k,   // KPerXdl
                                                                    TransposeC>>;
 
-    // Note: Direct2D epilogue (EpilogueStrategy::Direct2D) is not yet wired.
-    // Default2DEpilogue lacks DsDataType/DsLayout/GetVectorSizeC that UniversalGemmKernel
-    // requires. Needs upstream CK Tile support or a compatible adapter.
-    using GemmEpilogue = CShuffleEpi;
+    // Direct2D: no LDS shuffle, direct 2D store. Uses DefaultGemm2DEpilogue
+    // (not Default2DEpilogue — that one lacks the UniversalGemmKernel interface).
+    using Direct2DEpi = ck_tile::DefaultGemm2DEpilogue<
+        ck_tile::DefaultGemm2DEpilogueProblem<AType,
+                                              BType,
+                                              DsDataType,
+                                              AccType,
+                                              OType,
+                                              DsLayout,
+                                              CLayout,
+                                              EpiOp,
+                                              TilePartitioner::MPerBlock,
+                                              TilePartitioner::NPerBlock,
+                                              S.pad_m,
+                                              S.pad_n,
+                                              S.wave_tile.m,
+                                              S.wave_tile.n,
+                                              S.wave_tile.k,
+                                              TransposeC>>;
+
+    using GemmEpilogue =
+        std::conditional_t<S.epilogue == EpilogueStrategy::Direct2D, Direct2DEpi, CShuffleEpi>;
 
     // --- Step 7: Kernel (ties everything together) ---
     using CkKernel   = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;

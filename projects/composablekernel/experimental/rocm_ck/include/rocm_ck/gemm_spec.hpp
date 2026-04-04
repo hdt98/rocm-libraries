@@ -532,6 +532,9 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, GpuTarget target 
         throw "CShuffle epilogue requires block_waves.k == 1 (waves_m x waves_n layout)";
 
     // Pipeline-specific constraints
+    if(a_td.dtype == DataType::I8 && algo.pipeline == Pipeline::V1)
+        throw "INT8 GEMM requires V3/V4/Memory pipeline — V1 does not support int8";
+
     if(algo.pipeline == Pipeline::Preshuffle)
     {
         if(a_td.layout != Layout::Row)
