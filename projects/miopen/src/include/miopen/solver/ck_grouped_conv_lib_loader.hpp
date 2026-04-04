@@ -49,7 +49,7 @@ inline std::string GetCurrentDeviceName()
     hipDeviceProp_t props{};
     if(hipGetDeviceProperties(&props, device) != hipSuccess)
         return {};
-    return std::string(props.gcnArchName);
+    return {props.gcnArchName};
 #else
     return {};
 #endif
