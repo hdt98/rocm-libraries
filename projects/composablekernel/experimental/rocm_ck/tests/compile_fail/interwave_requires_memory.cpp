@@ -5,6 +5,7 @@
 // Expected error: "Interwave scheduling requires Pipeline::Memory"
 
 #include <rocm_ck/gemm_spec.hpp>
+using rocm_ck::TargetSet;
 
 using namespace rocm_ck;
 
@@ -14,4 +15,5 @@ constexpr auto bad = makeSpec(
                   .block_waves        = {2, 2, 1},
                   .wave_tile          = {16, 16, 16},
                   .pipeline           = Pipeline::V1,
-                  .pipeline_scheduler = PipelineScheduler::Interwave});
+                  .pipeline_scheduler = PipelineScheduler::Interwave},
+    TargetSet::cdna());

@@ -5,6 +5,7 @@
 // Expected error: "block_tile.m must be divisible by (block_waves.m * wave_tile.m)"
 
 #include <rocm_ck/gemm_spec.hpp>
+using rocm_ck::TargetSet;
 
 using namespace rocm_ck;
 

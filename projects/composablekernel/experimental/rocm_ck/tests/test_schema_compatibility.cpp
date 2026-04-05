@@ -26,7 +26,8 @@ TEST(SchemaCompat, GemmFP32)
     constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP32, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{
-            .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .wave_tile = {16, 16, 16}});
+            .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .wave_tile = {16, 16, 16}},
+        TargetSet::cdna());
 
     EXPECT_EQ(k.num_physical_tensors, 3);
     EXPECT_EQ(slot(k, "A"), 0);
@@ -55,7 +56,8 @@ TEST(SchemaCompat, GemmFP16)
     constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{
-            .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .wave_tile = {16, 16, 16}});
+            .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .wave_tile = {16, 16, 16}},
+        TargetSet::cdna());
 
     EXPECT_EQ(k.num_physical_tensors, 3);
     EXPECT_EQ(slot(k, "A"), 0);
@@ -84,7 +86,8 @@ TEST(SchemaCompat, GemmBF16)
     constexpr auto k = makeSpec(
         Signature{.dtype = DataType::BF16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{
-            .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .wave_tile = {16, 16, 16}});
+            .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .wave_tile = {16, 16, 16}},
+        TargetSet::cdna());
 
     EXPECT_EQ(k.num_physical_tensors, 3);
     EXPECT_EQ(slot(k, "A"), 0);
@@ -113,7 +116,8 @@ TEST(SchemaCompat, GemmFP16W32)
     constexpr auto k = makeSpec(
         Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
         GemmAlgorithm{
-            .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .wave_tile = {32, 32, 16}});
+            .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .wave_tile = {32, 32, 16}},
+        TargetSet::cdna());
 
     EXPECT_EQ(k.num_physical_tensors, 3);
     EXPECT_EQ(slot(k, "A"), 0);
@@ -144,7 +148,8 @@ TEST(SchemaCompat, GemmFP16Add)
                                                     AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
                                 GemmAlgorithm{.block_tile  = {128, 128, 32},
                                               .block_waves = {2, 2, 1},
-                                              .wave_tile   = {16, 16, 16}});
+                                              .wave_tile   = {16, 16, 16}},
+                                TargetSet::cdna());
 
     EXPECT_EQ(k.num_physical_tensors, 4);
     EXPECT_EQ(slot(k, "A"), 0);
@@ -178,7 +183,8 @@ TEST(SchemaCompat, GemmFP16AddRelu)
                                                     ReluOp{.in = "D", .out = "E"}}},
                                 GemmAlgorithm{.block_tile  = {128, 128, 32},
                                               .block_waves = {2, 2, 1},
-                                              .wave_tile   = {16, 16, 16}});
+                                              .wave_tile   = {16, 16, 16}},
+                                TargetSet::cdna());
 
     EXPECT_EQ(k.num_physical_tensors, 4);
     EXPECT_EQ(slot(k, "A"), 0);

@@ -27,95 +27,101 @@ make_variant(const char* name, Signature sig, ElementwiseAlgorithm algo, GpuTarg
     return {name, makeSpec(sig, algo, target)};
 }
 
+consteval ElementwiseVariant
+make_variant(const char* name, Signature sig, ElementwiseAlgorithm algo, TargetSet targets)
+{
+    return {name, makeSpec(sig, algo, targets)};
+}
+
 inline constexpr ElementwiseVariant vector_add_variants[] = {
-    {"vector_add_fp32_b256",
-     makeSpec(
-         Signature{
-             .dtype = DataType::FP32,
-             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
-         },
-         ElementwiseAlgorithm{256, 1, 256, true})},
-    {"vector_add_fp32_b512",
-     makeSpec(
-         Signature{
-             .dtype = DataType::FP32,
-             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
-         },
-         ElementwiseAlgorithm{512, 1, 512, true})},
-    {"vector_add_fp32_b1024",
-     makeSpec(
-         Signature{
-             .dtype = DataType::FP32,
-             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
-         },
-         ElementwiseAlgorithm{1024, 1, 1024, true})},
-    {"vector_add_fp16_b512",
-     makeSpec(
-         Signature{
-             .dtype = DataType::FP16,
-             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
-         },
-         ElementwiseAlgorithm{512, 1, 512, true})},
-    {"vector_add_fp16_b1024",
-     makeSpec(
-         Signature{
-             .dtype = DataType::FP16,
-             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
-         },
-         ElementwiseAlgorithm{1024, 1, 1024, true})},
-    {"vector_add_bf16_b512",
-     makeSpec(
-         Signature{
-             .dtype = DataType::BF16,
-             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
-         },
-         ElementwiseAlgorithm{512, 1, 512, true})},
-    {"vector_add_bf16_b1024",
-     makeSpec(
-         Signature{
-             .dtype = DataType::BF16,
-             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
-         },
-         ElementwiseAlgorithm{1024, 1, 1024, true})},
-    {"vector_add_fp32_b2048_w8",
-     makeSpec(
-         Signature{
-             .dtype = DataType::FP32,
-             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
-         },
-         ElementwiseAlgorithm{2048, 8, 64, true})},
-    {"vector_add_fp16_b1024_w2",
-     makeSpec(
-         Signature{
-             .dtype = DataType::FP16,
-             .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
-         },
-         ElementwiseAlgorithm{1024, 2, 512, true})},
+    make_variant("vector_add_fp32_b256",
+                 Signature{
+                     .dtype = DataType::FP32,
+                     .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 ElementwiseAlgorithm{256, 1, 256, true},
+                 TargetSet::cdna()),
+    make_variant("vector_add_fp32_b512",
+                 Signature{
+                     .dtype = DataType::FP32,
+                     .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 ElementwiseAlgorithm{512, 1, 512, true},
+                 TargetSet::cdna()),
+    make_variant("vector_add_fp32_b1024",
+                 Signature{
+                     .dtype = DataType::FP32,
+                     .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 ElementwiseAlgorithm{1024, 1, 1024, true},
+                 TargetSet::cdna()),
+    make_variant("vector_add_fp16_b512",
+                 Signature{
+                     .dtype = DataType::FP16,
+                     .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 ElementwiseAlgorithm{512, 1, 512, true},
+                 TargetSet::cdna()),
+    make_variant("vector_add_fp16_b1024",
+                 Signature{
+                     .dtype = DataType::FP16,
+                     .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 ElementwiseAlgorithm{1024, 1, 1024, true},
+                 TargetSet::cdna()),
+    make_variant("vector_add_bf16_b512",
+                 Signature{
+                     .dtype = DataType::BF16,
+                     .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 ElementwiseAlgorithm{512, 1, 512, true},
+                 TargetSet::cdna()),
+    make_variant("vector_add_bf16_b1024",
+                 Signature{
+                     .dtype = DataType::BF16,
+                     .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 ElementwiseAlgorithm{1024, 1, 1024, true},
+                 TargetSet::cdna()),
+    make_variant("vector_add_fp32_b2048_w8",
+                 Signature{
+                     .dtype = DataType::FP32,
+                     .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 ElementwiseAlgorithm{2048, 8, 64, true},
+                 TargetSet::cdna()),
+    make_variant("vector_add_fp16_b1024_w2",
+                 Signature{
+                     .dtype = DataType::FP16,
+                     .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 ElementwiseAlgorithm{1024, 2, 512, true},
+                 TargetSet::cdna()),
     // Mixed-type variants
-    {"vector_add_fp16_fp32_b1024",
-     makeSpec(
-         Signature{
-             .dtype   = DataType::FP16,
-             .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
-             .ops     = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
-         },
-         ElementwiseAlgorithm{1024, 1, 1024, true})},
-    {"vector_add_fp32_fp16_b1024",
-     makeSpec(
-         Signature{
-             .dtype   = DataType::FP32,
-             .tensors = {Tensor{.name = "C", .dtype = DataType::FP16}},
-             .ops     = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
-         },
-         ElementwiseAlgorithm{1024, 1, 1024, true})},
-    {"vector_add_bf16_fp32_b1024",
-     makeSpec(
-         Signature{
-             .dtype   = DataType::BF16,
-             .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
-             .ops     = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
-         },
-         ElementwiseAlgorithm{1024, 1, 1024, true})},
+    make_variant("vector_add_fp16_fp32_b1024",
+                 Signature{
+                     .dtype   = DataType::FP16,
+                     .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
+                     .ops     = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 ElementwiseAlgorithm{1024, 1, 1024, true},
+                 TargetSet::cdna()),
+    make_variant("vector_add_fp32_fp16_b1024",
+                 Signature{
+                     .dtype   = DataType::FP32,
+                     .tensors = {Tensor{.name = "C", .dtype = DataType::FP16}},
+                     .ops     = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 ElementwiseAlgorithm{1024, 1, 1024, true},
+                 TargetSet::cdna()),
+    make_variant("vector_add_bf16_fp32_b1024",
+                 Signature{
+                     .dtype   = DataType::BF16,
+                     .tensors = {Tensor{.name = "C", .dtype = DataType::FP32}},
+                     .ops     = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 ElementwiseAlgorithm{1024, 1, 1024, true},
+                 TargetSet::cdna()),
     // --- gfx1151 (RDNA 3.5, wave32) ---
     // Same algorithms but validated with wave32 workgroup_size.
     // CK Tile's ElementWiseShape uses get_warp_size() at compile time,

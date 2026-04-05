@@ -12,15 +12,17 @@ using namespace rocm_ck;
 static constexpr auto test_spec = makeSpec(
     Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
     GemmAlgorithm{
-        .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .wave_tile = {16, 16, 16}});
+        .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .wave_tile = {16, 16, 16}},
+    TargetSet::cdna());
 
 // A GemmSpec with a D0 tensor (4 physical tensors: A, B, D, C).
-static constexpr auto test_spec_d0 = makeSpec(
-    Signature{.dtype = DataType::FP16,
-              .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
-                        AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
-    GemmAlgorithm{
-        .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .wave_tile = {16, 16, 16}});
+static constexpr auto test_spec_d0 =
+    makeSpec(Signature{.dtype = DataType::FP16,
+                       .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                 AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+             GemmAlgorithm{
+                 .block_tile = {128, 128, 32}, .block_waves = {2, 2, 1}, .wave_tile = {16, 16, 16}},
+             TargetSet::cdna());
 
 // ============================================================================
 // validate() — passes when all tensors are filled

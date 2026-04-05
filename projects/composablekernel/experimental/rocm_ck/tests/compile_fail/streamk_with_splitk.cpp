@@ -5,6 +5,7 @@
 // Expected error: "Stream-K tile partitioning is incompatible with split-K"
 
 #include <rocm_ck/gemm_spec.hpp>
+using rocm_ck::TargetSet;
 
 using namespace rocm_ck;
 
@@ -14,4 +15,5 @@ constexpr auto bad = makeSpec(
                   .block_waves      = {2, 2, 1},
                   .wave_tile        = {16, 16, 16},
                   .k_batch          = 4,
-                  .tile_partitioner = TilePartitioner::StreamK});
+                  .tile_partitioner = TilePartitioner::StreamK},
+    TargetSet::cdna());

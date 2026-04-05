@@ -195,7 +195,7 @@ experimental/rocm_ck/
 │   ├── CMakeLists.txt              # INTERFACE library target "rocm_ck"
 │   └── rocm_ck/
 │       │ # Types — pure definitions, no runtime, no CK deps
-│       ├── types.hpp               # index_t, wavefront_size
+│       ├── types.hpp               # index_t, GpuTarget
 │       ├── datatype_utils.hpp      # DataType enum, dataTypeBits(), dataTypeName()
 │       ├── layout.hpp              # Layout enum (Row, Col, Contiguous, Auto)
 │       ├── tensor_desc.hpp         # TensorDesc: name, dtype, rank, layout
