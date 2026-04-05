@@ -49,7 +49,7 @@ struct ElementwiseSpec
 
     // Tile geometry
     int block_tile;     // Elements per workgroup (for grid calculation)
-    int workgroup_size; // Work-items per workgroup (= wavefront_size * block_waves)
+    int workgroup_size; // Work-items per workgroup (= targetWavefrontSize(target) * block_waves)
     int block_waves;    // Wavefronts per workgroup
     int wave_tile;      // Elements per wavefront
     bool pad;           // Padding enabled
@@ -80,7 +80,7 @@ constexpr bool isAligned(ElementwiseSpec k, int n) { return n > 0 && n % k.block
 ///   - Input types match (a_dtype == b_dtype)
 ///   - block_tile, block_waves, wave_tile are positive
 ///   - block_waves is power of 2 (CK Tile reduce_on_sequence requirement)
-///   - wave_tile >= wavefront_size (64)
+///   - wave_tile >= targetWavefrontSize(target)
 ///   - kVectorM >= 1 and block_tile divisibility
 consteval ElementwiseSpec
 makeSpec(Signature sig, ElementwiseAlgorithm algo, GpuTarget target = GpuTarget::Any)

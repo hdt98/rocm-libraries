@@ -148,8 +148,36 @@ VARIANTS = [
         "wave_tile": 1024,
         "pad": True,
     },
+    # gfx1151 (RDNA 3.5, wave32) variants
+    {
+        "name": "vector_add_fp32_b1024_gfx1151",
+        "in_dtype": "fp32",
+        "out_dtype": "fp32",
+        "block_tile": 1024,
+        "block_waves": 1,
+        "wave_tile": 1024,
+        "pad": True,
+    },
+    {
+        "name": "vector_add_fp16_b1024_gfx1151",
+        "in_dtype": "fp16",
+        "out_dtype": "fp16",
+        "block_tile": 1024,
+        "block_waves": 1,
+        "wave_tile": 1024,
+        "pad": True,
+    },
+    {
+        "name": "vector_add_bf16_b1024_gfx1151",
+        "in_dtype": "bf16",
+        "out_dtype": "bf16",
+        "block_tile": 1024,
+        "block_waves": 1,
+        "wave_tile": 1024,
+        "pad": True,
+    },
 ]
-ARCHITECTURES = ["gfx90a", "gfx942", "gfx950"]
+ARCHITECTURES = ["gfx90a", "gfx942", "gfx950", "gfx1151"]
 
 
 def main() -> None:
