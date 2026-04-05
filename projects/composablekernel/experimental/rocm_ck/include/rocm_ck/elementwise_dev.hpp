@@ -11,14 +11,12 @@
 //
 // Compilation boundary:
 //   _spec.hpp — schema types + consteval factory (both passes)
-//   _api.hpp    — host-only helpers (host pass only, #error on device)
 //   _dev.hpp (this) — CK Tile bridge + __device__ code (device pass only, #error on host)
 
 #pragma once
 
 #ifndef __HIP_DEVICE_COMPILE__
-#error \
-    "elementwise_dev.hpp requires device compilation. Host code should include the example's api header."
+#error "elementwise_dev.hpp requires device compilation (--cuda-device-only)."
 #endif
 
 #include <rocm_ck/elementwise_spec.hpp>

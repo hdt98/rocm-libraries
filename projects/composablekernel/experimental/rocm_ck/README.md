@@ -55,16 +55,18 @@ Every architectural concept is visible: Signature declares the compute graph, Al
 
 ## Compilation Boundary
 
-Examples 03 and 04 use a three-file pattern that enforces clean separation
-between metaprogramming, host runtime, and device code:
+Examples 03 and 04 enforce clean separation between metaprogramming, device
+code, and host runtime:
 
 ```text
-                  _spec.hpp (metaprogramming)
-                 /            \
-        _api.hpp               _dev.hpp
-       (host only)            (device only)
-           |                       |
-       main.cpp               *.hip files
+include/rocm_ck/
+    *_spec.hpp       (metaprogramming — consteval, no runtime, both passes)
+    *_dev.hpp        (device-only — CK Tile bridge, guarded)
+
+examples/0X_name/
+    *_variants.hpp   (variant table — constexpr data, both passes)
+    *.hip            (device kernels — --cuda-device-only)
+    main.cpp         (host runtime — plain C++ with HIP)
 ```
 
 **`_spec.hpp`** is pure metaprogramming. It contains `consteval` factories
@@ -74,15 +76,14 @@ The compiler evaluates everything at compile time — no runtime code is generat
 on either side. Both host (g++) and device (hipcc `--cuda-device-only`) passes
 include this header.
 
-**`_api.hpp`** is host-only. It contains runtime code that uses the standard
-library freely: arg assembly (`make_args`), launch wrappers, runtime validation
-with rich error messages. Guarded with `#ifdef __HIP_DEVICE_COMPILE__` / `#error`
-to prevent accidental inclusion from `.hip` files.
-
 **`_dev.hpp`** is device-only. It contains the CK Tile bridge — `__device__`
 functions that wire structural NTTP descriptors to the CK Tile template stack.
 Guarded with `#ifndef __HIP_DEVICE_COMPILE__` / `#error` to prevent inclusion
 from host `.cpp` files.
+
+**`_variants.hpp`** defines the variant table — a `constexpr` array of named
+specs that both sides include. Device `.hip` files look up their spec by name
+at compile time; `main.cpp` iterates the table for registry and dispatch.
 
 The `.hip` files are compiled with `--cuda-device-only` (device pass only), so
 `__HIP_DEVICE_COMPILE__` is always defined. `main.cpp` is compiled as plain C++
@@ -163,13 +164,11 @@ See the [example 04 README](examples/04_gemm/README.md) for full details.
 
 ## Design for Integration
 
-The schema is designed to map cleanly into dispatcher and tooling systems:
+The schema's structural properties make it straightforward to integrate with dispatchers and tooling:
 
-- **Signature** is a `constexpr` aggregate struct with no pointers or heap allocation. Its fields (dtypes, operators, tensor names) are a superset of a dispatcher's `KernelKey`. Serialization to JSON or Python dataclasses is mechanical.
-- **Algorithm** maps to a dispatcher's `KernelInstance` — tile geometry, pipeline strategy, padding. Each field has a concrete numeric value.
-- **Args** is trivially-copyable, standard-layout POD with `static_assert`-verified layout. Any language or runtime that can fill a 1552-byte buffer can launch a kernel.
-
-Integration is intentionally deferred until the schema stabilizes. See `dispatcher-integration-strategy.md` for the planned approach.
+- **Signature** is a `constexpr` aggregate struct with no pointers or heap allocation. Its fields (dtypes, operators, tensor names) can be serialized to JSON or mapped to Python dataclasses mechanically.
+- **Algorithm** contains only concrete numeric values — tile geometry, pipeline strategy, padding. No opaque types or hidden state.
+- **Args** is trivially-copyable, standard-layout POD with `static_assert`-verified layout. Any language or runtime that can fill a byte buffer can launch a kernel.
 
 ## Pipeline
 

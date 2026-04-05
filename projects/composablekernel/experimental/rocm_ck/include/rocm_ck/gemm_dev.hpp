@@ -17,13 +17,12 @@
 //
 // Compilation boundary:
 //   _spec.hpp — schema types + consteval factory (both passes)
-//   _api.hpp    — host-only helpers (host pass only, #error on device)
 //   _dev.hpp (this) — CK Tile bridge + __device__ code (device pass only, #error on host)
 
 #pragma once
 
 #ifndef __HIP_DEVICE_COMPILE__
-#error "gemm_dev.hpp requires device compilation. Host code should include gemm_api.hpp."
+#error "gemm_dev.hpp requires device compilation (--cuda-device-only)."
 #endif
 
 #include <rocm_ck/gemm_spec.hpp>

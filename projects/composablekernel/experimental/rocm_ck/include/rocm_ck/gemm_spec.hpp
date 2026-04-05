@@ -9,7 +9,6 @@
 //
 // Compilation boundary:
 //   _spec.hpp (this) — schema types + consteval factory (both passes)
-//   _api.hpp           — host-only helpers (host pass only, #error on device)
 //   _dev.hpp           — CK Tile bridge + __device__ code (device pass only, #error on host)
 
 #pragma once
