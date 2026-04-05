@@ -29,11 +29,10 @@ constexpr int wavefront_size = 64;
 enum class GpuTarget
 {
     Any,     // Portable — only configs valid on all targets
-    gfx90a,  // CDNA 2 (MI210)
-    gfx942,  // CDNA 3 (MI300X)
+    gfx90a,  // CDNA 2
+    gfx942,  // CDNA 3
     gfx950,  // CDNA 4
-    gfx1100, // RDNA 3 (Navi 31)
-    gfx1200, // RDNA 4
+    gfx1151, // RDNA 3.5
 };
 
 /// Wavefront size for a given GPU target.
@@ -41,8 +40,7 @@ consteval int targetWavefrontSize(GpuTarget target)
 {
     switch(target)
     {
-    case GpuTarget::gfx1100:
-    case GpuTarget::gfx1200: return 32;
+    case GpuTarget::gfx1151: return 32;
     default: return 64;
     }
 }

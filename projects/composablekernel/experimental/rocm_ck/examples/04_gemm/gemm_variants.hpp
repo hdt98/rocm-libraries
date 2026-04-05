@@ -26,6 +26,12 @@ consteval GemmVariant make_variant(const char* name, Signature sig, GemmAlgorith
     return {name, makeSpec(sig, algo)};
 }
 
+consteval GemmVariant
+make_variant(const char* name, Signature sig, GemmAlgorithm algo, GpuTarget target)
+{
+    return {name, makeSpec(sig, algo, target)};
+}
+
 inline constexpr GemmVariant gemm_variants[] = {
     make_variant("gemm_fp32",
                  Signature{
@@ -286,6 +292,22 @@ inline constexpr GemmVariant gemm_variants[] = {
                      .wave_tile   = {16, 16, 16},
                      .epilogue    = EpilogueStrategy::Direct2D,
                  }),
+    // --- WMMA: gfx1151 (RDNA 3.5) with 16×16×16 wave tiles, wave32 ---
+    // CK Tile's WarpGemmDispatcher selects WMMA for __gfx11__/__gfx12__ targets.
+    // rocm_ck validates gfx1151 only — other RDNA targets need isValidWaveTile()
+    // entries and hardware testing before use. Fixed 16×16×16 tile shape.
+    // block_waves = {4,2,1} × wave32 = 256 threads (same workgroup size as CDNA).
+    make_variant("gemm_fp16_wmma",
+                 Signature{
+                     .dtype = DataType::FP16,
+                     .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 GemmAlgorithm{
+                     .block_tile  = {128, 128, 32},
+                     .block_waves = {4, 2, 1},
+                     .wave_tile   = {16, 16, 16},
+                 },
+                 GpuTarget::gfx1151),
 };
 
 inline constexpr int gemm_variant_count = sizeof(gemm_variants) / sizeof(gemm_variants[0]);

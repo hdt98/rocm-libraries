@@ -65,7 +65,7 @@ makeSpec(
 - **Tile divisibility**: `block_tile.m` must be divisible by
   `block_waves.m × wave_tile.m` (and similarly for N and K).
 - **CShuffleEpilogue constraint**: `block_waves.k` must be 1.
-- **Workgroup size**: Derived as `block_waves.m × block_waves.n × wavefront_size`.
+- **Workgroup size**: Derived as `block_waves.m × block_waves.n × targetWavefrontSize()`.
 
 Invalid configurations produce compile errors — no runtime surprises.
 
@@ -162,24 +162,32 @@ entries can override it for mixed-precision epilogues.
 | `gemm_fp16_add_add` | FP16 | FP16 | FP16 | `+D0+D1` | 128×128×32 | 16×16×16 | V1 | Two D tensors |
 | `gemm_fp16_batched` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | V1 | Batched (blockIdx.y) |
 | `gemm_fp16_gfx90a` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | V1 | gfx90a only |
-| `gemm_fp16_gfx942` | FP16 | FP16 | FP16 | — | 256×256×32 | 16×16×16 | V1 | gfx942 only, large tile |
+| `gemm_fp16_gfx942` | FP16 | FP16 | FP16 | — | 256×256×32 | 32×32×16 | V1 | gfx942 only, large tile |
 | `gemm_fp16_preshuffle` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | Preshuffle | B pre-rearranged |
 | `gemm_fp16_memory` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | Memory | Interwave scheduling |
-| `gemm_fp8_fnuz` | FP8 | FP8 | FP16 | — | 128×128×64 | 16×16×32 | V1 | gfx942+, mixed output |
+| `gemm_fp8_fnuz` | FP8 | FP8 | FP16 | — | 128×128×32 | 32×32×16 | V1 | gfx942+, mixed output |
+| `gemm_fp16_v4` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | V4 | Ping-pong LDS |
+| `gemm_fp16_padded` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | V1 | pad_m/pad_n=true |
+| `gemm_i8` | I8 | I8 | I32 | — | 128×128×64 | 32×32×16 | V3 | gfx942+, int32 accumulator |
+| `gemm_fp16_direct2d` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | V1 | Direct2D epilogue |
+| `gemm_fp16_wmma` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | V1 | gfx1151, WMMA wave32 |
 
-Most variants use 128×128×32 block tile with 2×2×1 wavefront layout (4 waves =
-256 work-items). `gemm_fp16_w32` demonstrates a wider 32×32 wave tile.
-`gemm_fp16_add` demonstrates fused bias addition. `gemm_fp16_add_relu`
-demonstrates composed epilogue (bias + activation). Layout variants
-(`_rr`, `_cr`, `_cc`) override GemmOp's BLAS-convention defaults (A=Row,
-B=Col) via explicit `Tensor` entries — R = RowMajor, C = ColumnMajor.
-`gemm_fp16_splitk` demonstrates Split-K tile partitioning — the K dimension is
-partitioned across `k_batch` workgroups (blockIdx.z), with partial
-results accumulated via atomic addition.
-`gemm_fp16_v3` uses the V3 pipeline for software-pipelined loads.
-`gemm_fp16_memory` uses the Memory pipeline with Interwave scheduling.
-`gemm_fp16_preshuffle` uses weight preshuffling for optimized LDS loads.
-`gemm_fp8_fnuz` demonstrates FP8 FNUZ input with FP16 output (gfx942+ only).
+Most CDNA variants use 128×128×32 block tile with 2×2×1 wavefront layout
+(4 waves × wave64 = 256 work-items). The WMMA variant uses 4×2×1 wavefront
+layout (8 waves × wave32 = 256 work-items).
+
+Notable variants:
+- `gemm_fp16_w32` — wider 32×32 MFMA wave tile
+- `gemm_fp16_add`, `gemm_fp16_add_relu` — fused epilogue (bias, bias+activation)
+- `_rr`, `_cr`, `_cc` — layout overrides (R=RowMajor, C=ColumnMajor)
+- `gemm_fp16_splitk` — K dimension partitioned across blockIdx.z
+- `gemm_fp16_v3`, `gemm_fp16_v4` — compute-optimized pipelines
+- `gemm_fp16_memory` — Memory pipeline with Interwave scheduling
+- `gemm_fp16_preshuffle` — weight preshuffling for optimized LDS loads
+- `gemm_fp8_fnuz` — FP8 FNUZ input with FP16 output (gfx942+)
+- `gemm_i8` — INT8 with INT32 accumulator (gfx942+)
+- `gemm_fp16_direct2d` — Direct2D epilogue (no LDS shuffle)
+- `gemm_fp16_wmma` — WMMA on RDNA 3.5 (gfx1151), wave32
 
 ## File Roles
 
@@ -233,9 +241,9 @@ Requires C++20 for struct NTTPs and `consteval` validation.
 ./build/kpack_gemm build/gemm.kpack
 ```
 
-Expected output (on gfx90a — arch-specific and gfx942-only variants are skipped):
+Expected output on gfx90a (arch-restricted variants skipped):
 ```
-Opened build/gemm.kpack — architectures: gfx90a, gfx942
+Opened build/gemm.kpack — architectures: gfx1151, gfx90a, gfx942, gfx950
 Detected GPU: gfx90a
 gemm_fp32: PASSED
 gemm_fp16: PASSED
@@ -251,8 +259,17 @@ gemm_fp16_v3: PASSED
 gemm_fp16_add_add: PASSED
 gemm_fp16_batched: PASSED
 gemm_fp16_gfx90a: PASSED
-gemm_fp16_preshuffle: PASSED
+gemm_fp16_preshuffle: SKIPPED (requires host-side preshuffle)
 gemm_fp16_memory: PASSED
+gemm_fp16_v4: PASSED
+gemm_fp16_padded: PASSED
+gemm_fp16_direct2d: PASSED
+```
+
+Expected output on gfx1151 (only WMMA variant has an hsaco):
+```
+Detected GPU: gfx1151
+gemm_fp16_wmma: PASSED
 ```
 
 ## Design Notes
@@ -269,10 +286,11 @@ switches B to RowMajor. No schema changes needed — the same resolve() override
 mechanism used for dtypes handles layouts.
 
 **Signature and Algorithm are independent.** The same tile geometry works
-across fp32, fp16, and bf16 (with appropriate MFMA tiles). Separating "what
-types" from "how to tile" lets each vary independently — different types can
-share tile configs, and the same type can use different tile configs
-(`gemm_fp16` vs `gemm_fp16_w32`).
+across fp32, fp16, and bf16 (with appropriate MFMA/WMMA tiles). Separating
+"what types" from "how to tile" lets each vary independently — different
+types can share tile configs, and the same type can use different tile
+configs (`gemm_fp16` vs `gemm_fp16_w32`) or different architectures
+(`gemm_fp16` on CDNA vs `gemm_fp16_wmma` on RDNA).
 
 **Split-K via k_batch.** When `k_batch > 1`, the K dimension is partitioned
 across `blockIdx.z`. Each Z-slice computes a partial sum over `K/k_batch`
@@ -288,4 +306,4 @@ lookup table mirrors CK Tile's WarpGemmDispatcher specializations.
 
 **Test values kept small.** Input values are `i % 8` (max 7). Worst-case
 accumulation: 256 × (7 × 7) = 12544, within fp16's exact integer range.
-This ensures the fp32 CPU reference matches GPU output for all four variants.
+This ensures the fp32 CPU reference matches GPU output for all variants.
