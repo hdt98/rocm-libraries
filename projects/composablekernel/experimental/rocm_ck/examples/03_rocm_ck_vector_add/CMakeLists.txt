@@ -45,14 +45,31 @@ set(KERNEL_VARIANTS
     vector_add_fp16_fp32_b1024
     vector_add_fp32_fp16_b1024
     vector_add_bf16_fp32_b1024
+    # gfx1151 (RDNA 3.5, wave32) variants
+    vector_add_fp32_b1024_gfx1151
+    vector_add_fp16_b1024_gfx1151
+    vector_add_bf16_b1024_gfx1151
 )
+
+# --- Per-variant architecture restrictions ---
+# Set <variant>_GPU_TARGETS to override the default GPU_TARGETS for a variant.
+# RDNA variants must opt in — they are NOT included in the CDNA default.
+set(vector_add_fp32_b1024_gfx1151_GPU_TARGETS "gfx1151")
+set(vector_add_fp16_b1024_gfx1151_GPU_TARGETS "gfx1151")
+set(vector_add_bf16_b1024_gfx1151_GPU_TARGETS "gfx1151")
 
 # --- Compile each variant × architecture into .hsaco code objects ---
 # Uses --cuda-device-only to produce raw code objects without host stubs.
 # -std=c++20 is required for struct NTTPs and consteval.
 set(HSACO_FILES "")
 foreach(variant IN LISTS KERNEL_VARIANTS)
-    foreach(arch IN LISTS GPU_TARGETS)
+    # Per-variant arch override: use ${variant}_GPU_TARGETS if defined, else GPU_TARGETS
+    if(DEFINED ${variant}_GPU_TARGETS)
+        set(variant_targets "${${variant}_GPU_TARGETS}")
+    else()
+        set(variant_targets "${GPU_TARGETS}")
+    endif()
+    foreach(arch IN LISTS variant_targets)
         set(hsaco_output "${CMAKE_CURRENT_BINARY_DIR}/${variant}_${arch}.hsaco")
         add_custom_command(
             OUTPUT ${hsaco_output}
