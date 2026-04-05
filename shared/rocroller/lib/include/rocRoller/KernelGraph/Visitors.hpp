@@ -399,10 +399,10 @@ namespace rocRoller
 
                 for(auto const& index : original.coordinates.topologicalSort())
                 {
-                    auto element = original.coordinates.getElement(index);
+                    auto const& element = original.coordinates.getElement(index);
                     if(std::holds_alternative<CTEdge>(element))
                     {
-                        auto edge = std::get<CTEdge>(element);
+                        auto const& edge = std::get<CTEdge>(element);
                         std::visit(
                             [&](auto&& arg) {
                                 visitor.visitEdge(graph, original, reindexer, index, arg);
@@ -428,10 +428,10 @@ namespace rocRoller
                                         ? original.control.topologicalSort()
                                         : original.control.reverseTopologicalSort())
             {
-                auto element = original.control.getElement(index);
+                auto const& element = original.control.getElement(index);
                 if(std::holds_alternative<ControlGraph::Operation>(element))
                 {
-                    auto node = std::get<ControlGraph::Operation>(element);
+                    auto const& node = std::get<ControlGraph::Operation>(element);
                     if(std::holds_alternative<ControlGraph::Kernel>(node))
                         continue;
                     std::visit(

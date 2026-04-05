@@ -344,7 +344,7 @@ namespace rocRoller::KernelGraph
         AssertFatal(std::holds_alternative<Operation>(element),
                     concatenate("Expected Operation but got Edge", ShowValue(srcOpTag)));
 
-        const auto op = std::get<Operation>(element);
+        const auto& op = std::get<Operation>(element);
         AssertFatal(std::holds_alternative<SrcOpType>(op),
                     fmt::format("Expected {} but got {}", typeName<SrcOpType>(), toString(op)));
 
@@ -359,7 +359,7 @@ namespace rocRoller::KernelGraph
             AssertFatal(std::holds_alternative<Operation>(element),
                         concatenate("Expected Operation but got Edge", ShowValue(dstOpTag)));
 
-            const auto op = std::get<Operation>(element);
+            const auto& op = std::get<Operation>(element);
             if(std::holds_alternative<DstOpType>(op))
             {
                 rv.push_back(dstOpTag);

@@ -168,7 +168,7 @@ namespace rocRoller
             {
                 if(std::holds_alternative<Edge>(x))
                 {
-                    auto y = std::get<Edge>(x);
+                    auto const& y = std::get<Edge>(x);
                     if constexpr(std::constructible_from<DataFlowEdge, T>)
                     {
                         if(std::holds_alternative<DataFlowEdge>(y))
