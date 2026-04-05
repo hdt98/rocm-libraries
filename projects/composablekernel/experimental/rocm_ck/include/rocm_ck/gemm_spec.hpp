@@ -4,8 +4,10 @@
 // Role: meta — GemmSpec structural NTTP descriptor and consteval factory.
 //
 // SHARED header: compiled in both host and device (--cuda-device-only) passes.
-// Contains structural types, consteval makeSpec() factory, named accessors,
-// and wave tile validation. No runtime code.
+// Contains structural types, consteval makeSpec() factory, and named accessors.
+// No runtime code.
+//
+// Wave tile validation and target properties live in arch_properties.hpp.
 //
 // Compilation boundary:
 //   _spec.hpp (this) — schema types + consteval factory (both passes)
@@ -18,6 +20,7 @@
 #include <rocm_ck/physical_tensor.hpp>
 #include <rocm_ck/resolve.hpp>
 #include <rocm_ck/tensor_desc.hpp>
+#include <rocm_ck/arch_properties.hpp>
 #include <rocm_ck/types.hpp>
 
 #include <string_view>
@@ -295,96 +298,6 @@ consteval DataType dtype(GemmSpec k, std::string_view name) { return tensor(k, n
 consteval Layout layout(GemmSpec k, std::string_view name) { return tensor(k, name).layout; }
 
 // ============================================================================
-// Wave tile validation
-// ============================================================================
-
-/// Check if (a_dtype, m, n, k) maps to a valid wave instruction shape.
-/// Based on CK Tile's WarpGemmDispatcher specializations.
-///
-/// When target is Any, only tiles valid across all CDNA targets are accepted
-/// (intersection semantics). A specific target accepts its full tile set.
-consteval bool
-isValidWaveTile(DataType a_dtype, int m, int n, int k, GpuTarget target = GpuTarget::Any)
-{
-    // RDNA targets: WMMA — fixed 16×16×16 tile shape
-    if(target == GpuTarget::gfx1151)
-    {
-        if(m != 16 || n != 16 || k != 16)
-            return false;
-        // gfx1151 WMMA: fp16, bf16, int8
-        if(a_dtype == DataType::FP16 || a_dtype == DataType::BF16)
-            return true;
-        if(a_dtype == DataType::I8)
-            return true;
-        return false;
-    }
-
-    // CDNA MFMA tiles — common across gfx90a, gfx942, gfx950
-    if(a_dtype == DataType::FP32)
-    {
-        if(m == 16 && n == 16 && (k == 4 || k == 8 || k == 16))
-            return true;
-        if(m == 32 && n == 32 && (k == 4 || k == 8))
-            return true;
-    }
-    if(a_dtype == DataType::FP16)
-    {
-        if(m == 16 && n == 16 && (k == 16 || k == 32))
-            return true;
-        if(m == 32 && n == 32 && (k == 8 || k == 16))
-            return true;
-    }
-    if(a_dtype == DataType::BF16)
-    {
-        if(m == 16 && n == 16 && (k == 16 || k == 32))
-            return true;
-        if(m == 32 && n == 32 && (k == 8 || k == 16))
-            return true;
-    }
-
-    // INT8 MFMA — int8×int8→int32 accumulation
-    if(a_dtype == DataType::I8)
-    {
-        // gfx90a/gfx942/gfx950: same I8 tiles
-        if(m == 32 && n == 32 && k == 16)
-            return true;
-        if(m == 16 && n == 16 && k == 32)
-            return true;
-    }
-
-    // FP8/BF8 MFMA — architecture-dependent
-    if(a_dtype == DataType::FP8_FNUZ || a_dtype == DataType::BF8_FNUZ)
-    {
-        // gfx90a: no FP8 MFMA support
-        if(target == GpuTarget::gfx90a)
-            return false;
-
-        // gfx942 and Any: conservative set (gfx942 baseline)
-        // gfx942: 32x32x16, 16x16x32
-        if(m == 32 && n == 32 && k == 16)
-            return true;
-        if(m == 16 && n == 16 && k == 32)
-            return true;
-
-        // gfx950-only: extended FP8 tiles
-        // gfx950: additionally 32x32x{32,64}, 16x16x64
-        if(target == GpuTarget::gfx950)
-        {
-            if(m == 32 && n == 32 && (k == 32 || k == 64))
-                return true;
-            if(m == 16 && n == 16 && k == 64)
-                return true;
-        }
-    }
-
-    // FP8_OCP/BF8_OCP — not yet supported (CK Tile uses compile-time OCP flag)
-    if(a_dtype == DataType::FP8_OCP || a_dtype == DataType::BF8_OCP)
-        throw "FP8_OCP/BF8_OCP not yet supported in GEMM — use FP8_FNUZ/BF8_FNUZ";
-
-    return false;
-}
-
-// ============================================================================
 // makeSpec: operator-centric Signature -> GemmSpec
 // ============================================================================
 
@@ -406,8 +319,8 @@ isValidWaveTile(DataType a_dtype, int m, int n, int k, GpuTarget target = GpuTar
 ///   - Warp tile matches instruction table for the input dtype
 ///   - Block tile is divisible by (block_waves x wave_tile) in each dimension
 ///
-/// Derives workgroup_size = block_waves.m x block_waves.n x block_waves.k x targetWavefrontSize().
-consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, GpuTarget target = GpuTarget::Any)
+/// Derives workgroup_size = block_waves.m x block_waves.n x block_waves.k x wavefront_size.
+consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, TargetSet targets)
 {
     ResolvedSignature resolved = resolve(sig);
 
@@ -424,9 +337,9 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, GpuTarget target 
     if(a_td.dtype == DataType::I8 && acc != DataType::I32)
         throw "INT8 GEMM requires I32 accumulator — set GemmOp::acc_dtype = DataType::I32";
 
-    if(a_td.dtype == DataType::I8 && target == GpuTarget::gfx90a)
+    if(a_td.dtype == DataType::I8 && targets.contains(GpuTarget::gfx90a))
         throw "INT8 GEMM requires gfx942+ — gfx90a emulates int8 MFMA with float MFMA, "
-              "producing corrupted output";
+              "producing corrupted output. Use TargetSet::family_gfx94() or exclude gfx90a.";
 
     // Build epilogue op chain from remaining ops after GemmOp.
     // Track the final output name (varies by epilogue chain) and D tensor names.
@@ -563,8 +476,8 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, GpuTarget target 
     if(algo.tile_partitioner == TilePartitioner::StreamK && algo.k_batch > 1)
         throw "Stream-K tile partitioning is incompatible with split-K (k_batch > 1)";
 
-    if(!isValidWaveTile(a_td.dtype, algo.wave_tile.m, algo.wave_tile.n, algo.wave_tile.k, target))
-        throw "wave_tile is not a valid instruction shape for this dtype and target";
+    if(!isValidWaveTile(a_td.dtype, algo.wave_tile.m, algo.wave_tile.n, algo.wave_tile.k, targets))
+        throw "wave_tile is not a valid instruction shape for this dtype and target set";
 
     if(algo.block_tile.m % (algo.block_waves.m * algo.wave_tile.m) != 0)
         throw "block_tile.m must be divisible by (block_waves.m * wave_tile.m)";
@@ -573,7 +486,7 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, GpuTarget target 
     if(algo.block_tile.k % (algo.block_waves.k * algo.wave_tile.k) != 0)
         throw "block_tile.k must be divisible by (block_waves.k * wave_tile.k)";
 
-    int wf_size        = targetWavefrontSize(target);
+    int wf_size        = targets.wavefront_size();
     int workgroup_size = algo.block_waves.m * algo.block_waves.n * algo.block_waves.k * wf_size;
 
     // Build physical tensor table

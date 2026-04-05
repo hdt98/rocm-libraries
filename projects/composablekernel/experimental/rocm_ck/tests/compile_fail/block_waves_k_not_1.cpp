@@ -5,6 +5,7 @@
 // Expected error: "block_waves.k must be 1 (CShuffleEpilogue constraint)"
 
 #include <rocm_ck/gemm_spec.hpp>
+using rocm_ck::TargetSet;
 
 using namespace rocm_ck;
 

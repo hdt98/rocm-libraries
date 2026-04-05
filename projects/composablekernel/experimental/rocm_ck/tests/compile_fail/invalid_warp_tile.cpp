@@ -5,6 +5,7 @@
 // Expected error: "wave_tile is not a valid instruction shape for this dtype and target"
 
 #include <rocm_ck/gemm_spec.hpp>
+using rocm_ck::TargetSet;
 
 using namespace rocm_ck;
 

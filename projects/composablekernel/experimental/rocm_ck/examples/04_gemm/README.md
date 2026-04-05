@@ -65,7 +65,7 @@ makeSpec(
 - **Tile divisibility**: `block_tile.m` must be divisible by
   `block_waves.m × wave_tile.m` (and similarly for N and K).
 - **CShuffleEpilogue constraint**: `block_waves.k` must be 1.
-- **Workgroup size**: Derived as `block_waves.m × block_waves.n × targetWavefrontSize()`.
+- **Workgroup size**: Derived as `block_waves.m × block_waves.n × targets.wavefront_size()`.
 
 Invalid configurations produce compile errors — no runtime surprises.
 

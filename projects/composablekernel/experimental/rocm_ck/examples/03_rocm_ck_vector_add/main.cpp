@@ -26,23 +26,30 @@
 using rocm_ck::vector_add_variant_count;
 using rocm_ck::vector_add_variants;
 
+enum class VariantResult
+{
+    Passed,
+    Failed,
+    Skipped // kernel not available for this GPU architecture
+};
+
 /// Run a single variant: load from archive, launch kernel, verify results.
-/// Returns true if the variant passed verification.
-static bool runVariant(const rocm_ck::ElementwiseVariant& variant,
-                       const rocm_ck::KpackArchive& archive,
-                       const std::vector<float>& host_a,
-                       const std::vector<float>& host_b,
-                       float alpha,
-                       float beta)
+/// Returns Skipped if the kernel isn't available for this GPU, Passed/Failed otherwise.
+static VariantResult runVariant(const rocm_ck::ElementwiseVariant& variant,
+                                const rocm_ck::KpackArchive& archive,
+                                const std::vector<float>& host_a,
+                                const std::vector<float>& host_b,
+                                float alpha,
+                                float beta)
 {
     const int num_elements = static_cast<int>(host_a.size());
     const auto in_dtype    = variant.spec.lhs().dtype;
     const auto out_dtype   = variant.spec.output().dtype;
 
-    // Load kernel
+    // Load kernel — not found means this variant isn't built for the current GPU
     rocm_ck::KpackKernel kernel;
     if(!kernel.load(archive, variant.name))
-        return false;
+        return VariantResult::Skipped;
 
     // Allocate typed device buffers
     rocm_ck::TypedBuffer buf_a(in_dtype, num_elements);
@@ -110,7 +117,7 @@ static bool runVariant(const rocm_ck::ElementwiseVariant& variant,
                 block_size,
                 passed ? "PASSED" : "FAILED");
 
-    return passed;
+    return passed ? VariantResult::Passed : VariantResult::Failed;
 }
 
 int main(int argc, char** argv)
@@ -164,22 +171,43 @@ int main(int argc, char** argv)
 
     // --- Verify all variants with plain add (alpha=1, beta=1) ---
     std::printf("\nRunning all %d variants (alpha=1, beta=1):\n", vector_add_variant_count);
-    bool all_passed = true;
+    bool all_passed  = true;
+    int variants_run = 0;
+    int skipped      = 0;
 
     for(const auto& variant : vector_add_variants)
     {
-        if(!runVariant(variant, archive, host_a, host_b, 1.0f, 1.0f))
+        auto result = runVariant(variant, archive, host_a, host_b, 1.0f, 1.0f);
+        if(result == VariantResult::Failed)
             all_passed = false;
+        if(result == VariantResult::Skipped)
+            ++skipped;
+        else
+            ++variants_run;
     }
 
     // --- Scaled-add test (alpha=2, beta=0.5) ---
+    // findVariant is not arch-aware, so the selected variant may not be loadable.
+    // Try it; if skipped, that's fine — scaled-add isn't critical.
     std::printf("\nScaled-add test (alpha=2, beta=0.5):\n");
     const auto* scaled_variant =
         rocm_ck::findVariant(rocm_ck::DataType::FP32, rocm_ck::DataType::FP32, NUM_ELEMENTS);
     if(scaled_variant)
     {
-        if(!runVariant(*scaled_variant, archive, host_a, host_b, 2.0f, 0.5f))
+        auto result = runVariant(*scaled_variant, archive, host_a, host_b, 2.0f, 0.5f);
+        if(result == VariantResult::Failed)
             all_passed = false;
+        else if(result == VariantResult::Passed)
+            ++variants_run;
+    }
+
+    std::printf(
+        "\nSummary: %d passed, %d skipped (no kernel for this GPU)\n", variants_run, skipped);
+
+    if(variants_run == 0)
+    {
+        std::fprintf(stderr, "No variants ran successfully\n");
+        return 1;
     }
 
     return all_passed ? 0 : 1;
