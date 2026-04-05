@@ -307,9 +307,18 @@ consteval Layout layout(GemmSpec k, std::string_view name) { return tensor(k, na
 consteval bool
 isValidWaveTile(DataType a_dtype, int m, int n, int k, GpuTarget target = GpuTarget::Any)
 {
-    // RDNA targets use WMMA — not yet populated
-    if(target == GpuTarget::gfx1100 || target == GpuTarget::gfx1200)
+    // RDNA targets: WMMA — fixed 16×16×16 tile shape
+    if(target == GpuTarget::gfx1151)
+    {
+        if(m != 16 || n != 16 || k != 16)
+            return false;
+        // gfx1151 WMMA: fp16, bf16, int8
+        if(a_dtype == DataType::FP16 || a_dtype == DataType::BF16)
+            return true;
+        if(a_dtype == DataType::I8)
+            return true;
         return false;
+    }
 
     // CDNA MFMA tiles — common across gfx90a, gfx942, gfx950
     if(a_dtype == DataType::FP32)
@@ -398,7 +407,7 @@ isValidWaveTile(DataType a_dtype, int m, int n, int k, GpuTarget target = GpuTar
 ///   - Warp tile matches instruction table for the input dtype
 ///   - Block tile is divisible by (block_waves x wave_tile) in each dimension
 ///
-/// Derives workgroup_size = block_waves.m x block_waves.n x block_waves.k x wavefront_size.
+/// Derives workgroup_size = block_waves.m x block_waves.n x block_waves.k x targetWavefrontSize().
 consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, GpuTarget target = GpuTarget::Any)
 {
     ResolvedSignature resolved = resolve(sig);
