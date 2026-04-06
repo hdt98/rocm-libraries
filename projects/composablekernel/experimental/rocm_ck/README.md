@@ -127,7 +127,7 @@ Progressive examples, each building on the last:
 |---------|---------------------|
 | [01_hello_world](examples/01_hello_world/) | Multiarch pipeline baseline — hand-written HIP kernel, one binary per arch |
 | [02_ck_tile_vector_add](examples/02_ck_tile_vector_add/) | Bridge pattern — `extern "C"` wrapper around CK Tile's `ElementWiseKernel` |
-| [03_rocm_ck_vector_add](examples/03_rocm_ck_vector_add/) | Full schema — Signature/Algorithm split, `makeSpec` validation, 12 compiled variants, registry-based selection |
+| [03_rocm_ck_vector_add](examples/03_rocm_ck_vector_add/) | Full schema — Signature/Algorithm split, `makeSpec` validation, 15 compiled variants, registry-based selection |
 | [04_gemm](examples/04_gemm/) | Composed operators — multi-type GEMM (fp32/fp16/bf16), fused epilogue, mixed-precision accumulation |
 
 ### Example 01: Hello World
@@ -143,7 +143,7 @@ Proves that CK Tile kernels can be compiled into standalone `.hsaco` code object
 Production-ready pattern with:
 
 - **Signature/Algorithm separation** — *what* (operator graph + data types) vs *how* (tile geometry, wavefront count, vector width, padding)
-- **12 compiled variants** across FP32, FP16, BF16 with different block sizes, multi-wave, and mixed-precision
+- **15 compiled variants** across FP32, FP16, BF16 with different block sizes, multi-wave, mixed-precision, and RDNA (gfx1151)
 - **Constexpr validation** via `makeSpec` that catches invalid configurations at compile time
 - **Variant registry** with `find_variant(DataType, problem_size)` for automatic kernel selection
 - **Archive metadata** — tuning parameters stored in the kpack TOC for tooling
@@ -210,11 +210,13 @@ experimental/rocm_ck/
 │       ├── resolve.hpp             # consteval resolve(): dtype cascade, rank/layout propagation
 │       ├── gemm_spec.hpp           # GemmSpec NTTP descriptor + consteval makeSpec()
 │       ├── elementwise_spec.hpp    # ElementwiseSpec NTTP descriptor + consteval makeSpec()
+│       ├── arch_properties.hpp     # TargetSet, TargetProperties, isValidWaveTile()
 │       ├── validate.hpp            # validate(): debug-time Args-vs-spec checking
 │       │
 │       │ # Host-only — requires HIP runtime or C++ runtime features
 │       ├── hip_check.hpp           # HIP_CHECK error-checking macro
 │       ├── gpu_arch.hpp            # getGpuArch() — GPU architecture detection
+│       ├── grid_dim.hpp            # Grid dimension helpers (1D/2D/3D grid sizing)
 │       ├── typed_buffer.hpp        # TypedBuffer: RAII device memory with type conversion
 │       ├── datatype_convert.hpp    # float ↔ typed conversions, verification tolerances
 │       ├── verify.hpp              # verify(): result-vs-reference comparison
@@ -254,13 +256,13 @@ experimental/rocm_ck/
     ├── 03_rocm_ck_vector_add/      # Full tuning surface: variants + registry
     │   ├── CMakeLists.txt
     │   ├── vector_add_variants.hpp     # Variant table + consteval lookup + findVariant
-    │   ├── vector_add_*.hip            # 12 variant instantiations (~12 lines each)
+    │   ├── vector_add_*.hip            # 15 variant instantiations (~12 lines each)
     │   ├── pack.py                     # Variant-aware packer with metadata
     │   └── main.cpp                    # Variant selection demo + verify-all mode
     └── 04_gemm/                     # GEMM: multi-type via operator-centric Signature
         ├── CMakeLists.txt
         ├── gemm_variants.hpp           # Variant table + consteval lookup
-        ├── gemm_*.hip                  # 18 variant instantiations (~12 lines each)
+        ├── gemm_*.hip                  # 23 variant instantiations (~12 lines each)
         ├── cpu_ref.hpp                 # CPU reference GEMM implementation
         ├── cpu_ref.cpp                 # CPU reference implementation
         ├── pack.py                     # Variant-aware packer with dtype metadata

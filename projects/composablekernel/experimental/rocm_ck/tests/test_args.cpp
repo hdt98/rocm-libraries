@@ -103,3 +103,38 @@ TEST(ScalarValue, StoresAndRetrievesDouble)
     sv.f64 = 2.718281828;
     EXPECT_DOUBLE_EQ(sv.f64, 2.718281828);
 }
+
+TEST(ScalarValue, StoresAndRetrievesUInt32)
+{
+    ScalarValue sv{};
+    sv.u32 = 0xDEADBEEF;
+    EXPECT_EQ(sv.u32, 0xDEADBEEF);
+}
+
+// ============================================================================
+// Args field coverage — batch_strides and workspace_ptr
+// ============================================================================
+
+TEST(Args, BatchStridesFieldExists)
+{
+    Args args{};
+    args.batch_strides[0]               = 12345;
+    args.batch_strides[kMaxTensors - 1] = -99;
+    EXPECT_EQ(args.batch_strides[0], 12345);
+    EXPECT_EQ(args.batch_strides[kMaxTensors - 1], -99);
+}
+
+TEST(Args, WorkspacePtrFieldExists)
+{
+    Args args{};
+    int dummy          = 42;
+    args.workspace_ptr = &dummy;
+    EXPECT_EQ(args.workspace_ptr, &dummy);
+}
+
+TEST(Args, BatchCountFieldExists)
+{
+    Args args{};
+    args.batch_count = 8;
+    EXPECT_EQ(args.batch_count, 8);
+}

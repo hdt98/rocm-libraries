@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <rocm_ck/datatype_utils.hpp>
 #include <rocm_ck/types.hpp>
 
 #include <cstdint>

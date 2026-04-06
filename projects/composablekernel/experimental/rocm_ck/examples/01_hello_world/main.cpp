@@ -63,7 +63,7 @@ int main(int argc, char** argv)
     void* kernel_code_object       = nullptr;
     size_t kernel_code_object_size = 0;
     kerr                           = kpack_get_kernel(archive,
-                            "vector_add_kernel",
+                            "vector_add_kernel", // Binary name in pack.py (archive key)
                             gpu_arch.c_str(),
                             &kernel_code_object,
                             &kernel_code_object_size);
@@ -81,10 +81,12 @@ int main(int argc, char** argv)
     hipModule_t module            = nullptr;
     hipFunction_t kernel_function = nullptr;
     HIP_CHECK(hipModuleLoadData(&module, kernel_code_object));
-    HIP_CHECK(hipModuleGetFunction(&kernel_function, module, "vectorAdd"));
+    HIP_CHECK(hipModuleGetFunction(&kernel_function,
+                                   module,
+                                   "vectorAdd")); // Must match extern "C" symbol in vector_add.hip
 
     // --- Allocate memory and run the kernel ---
-    const int NUM_ELEMENTS = 1024;
+    const int NUM_ELEMENTS = 1024; // Test size: 4 blocks of 256 threads
     std::printf("Running vectorAdd (N=%d)...\n", NUM_ELEMENTS);
 
     std::vector<float> host_a(NUM_ELEMENTS);
@@ -124,7 +126,7 @@ int main(int argc, char** argv)
                                &kernel_args_size,
                                HIP_LAUNCH_PARAM_END};
 
-    int block_size = 256;
+    int block_size = 256; // Must match blockDim.x assumed in vector_add.hip
     int grid_size  = (NUM_ELEMENTS + block_size - 1) / block_size;
     HIP_CHECK(hipModuleLaunchKernel(
         kernel_function, grid_size, 1, 1, block_size, 1, 1, 0, nullptr, nullptr, launch_config));

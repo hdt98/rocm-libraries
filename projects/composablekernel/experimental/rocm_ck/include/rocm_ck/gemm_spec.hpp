@@ -23,8 +23,6 @@
 #include <rocm_ck/arch_properties.hpp>
 #include <rocm_ck/types.hpp>
 
-#include <string_view>
-
 namespace rocm_ck {
 
 // ============================================================================

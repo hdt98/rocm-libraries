@@ -71,5 +71,6 @@ add_custom_target(ck_tile_vector_add_kpack_archive ALL DEPENDS ${CMAKE_CURRENT_B
 # Links against hip::host (host-only HIP runtime) and rocm_kpack (archive reader).
 # Device code is loaded at runtime via hipModuleLoadData, not compiled into this binary.
 add_executable(kpack_ck_tile_vector_add main.cpp)
+target_compile_features(kpack_ck_tile_vector_add PRIVATE cxx_std_20)
 target_link_libraries(kpack_ck_tile_vector_add PRIVATE rocm_ck rocm_kpack hip::host)
 add_dependencies(kpack_ck_tile_vector_add ck_tile_vector_add_kpack_archive)

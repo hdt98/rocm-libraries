@@ -28,7 +28,7 @@ The `Signature` (what to compute) and `GemmAlgorithm` (how to compute it) are in
 - **Signature**: data types, layouts, epilogue via operator composition
 - **Algorithm**: `block_tile {M,N,K}`, `block_waves {M,N,K}`, `wave_tile {M,N,K}`
 
-The same algorithm works across fp32, fp16, and bf16. The same type can use different tile configs (gemm_fp16 vs gemm_fp16_w32). This was proven by having 18 variants that mix types and tile shapes — no coupling between the axes.
+The same algorithm works across fp32, fp16, and bf16. The same type can use different tile configs (gemm_fp16 vs gemm_fp16_w32). This was proven by having 25 variants that mix types and tile shapes — no coupling between the axes.
 
 > **Implication**: Tuning is purely an algorithm-space search. Given a signature, sweep tile configs and let `makeSpec` reject invalid combinations at compile time. The search space is defined by `isValidWaveTile` × divisibility constraints.
 
@@ -185,4 +185,5 @@ The default `k_batch = 1` preserves backward compatibility — all existing vari
 2. **Composed activations** — CK Tile doesn't have built-in Add+GELU composition. Current model requires custom functors for each combination.
 3. **Broadcast D tensors** — 1×N bias via stride=0 works at the tensor descriptor level but is untested in CK Tile examples.
 4. **Architecture-dependent tile configs** — Optimal configs differ across gfx90a/gfx942/gfx950. kpack archives can include multiple variants per arch, but the selection mechanism isn't defined yet.
-5. **Pipeline selection** — All variants use `GemmPipelineAGmemBGmemCRegV1` (simplest). Production needs `GemmPipelineAGmemBGmemCRegV3` (prefetching) and possibly async pipelines. This is a future `GemmAlgorithm` field.
+
+*Resolved: Pipeline selection is now a `GemmAlgorithm` field. V1, V3, V4, Memory, and Preshuffle pipelines are supported with Intrawave/Interwave scheduling.*
