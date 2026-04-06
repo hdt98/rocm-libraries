@@ -342,27 +342,41 @@ namespace rocRoller
                                                      int                   ldsCoord,
                                                      size_t                firstOpRecordIndex,
                                                      size_t                secondOpRecordIndex,
-                                                     LoopContainmentCache& cache)
+                                                     LoopContainmentCache& cache,
+                                                     std::span<const int>  barrierRecordIndices)
         {
-            const auto startPos = firstOpRecordIndex + 1;
-            const auto endPos   = secondOpRecordIndex - 1;
+            auto startPos = firstOpRecordIndex + 1;
+            auto endPos   = secondOpRecordIndex - 1;
             AssertFatal(startPos >= 0 && endPos < allRecords.size() && startPos <= endPos,
                         "Invalid positions for firstOp and secondOp in trace.",
                         ShowValue(startPos),
                         ShowValue(endPos),
                         ShowValue(firstOpRecordIndex),
                         ShowValue(secondOpRecordIndex));
+
+            if(not barrierRecordIndices.empty())
+            {
+                auto itL = std::ranges::lower_bound(barrierRecordIndices, startPos);
+                auto itR = std::ranges::upper_bound(barrierRecordIndices, endPos);
+                if(itL == barrierRecordIndices.end() or itL >= itR)
+                    return std::nullopt;
+
+                startPos = std::ranges::distance(barrierRecordIndices.begin(), itL);
+                endPos   = std::ranges::distance(barrierRecordIndices.begin(), itR) - 1;
+            }
+
             for(auto i = startPos; i <= endPos; ++i)
             {
-                int ctrl            = allRecords[i].control;
-                int barrierLdsCoord = allRecords[i].coordinate;
+                int index           = barrierRecordIndices.empty() ? i : barrierRecordIndices[i];
+                int ctrl            = allRecords[index].control;
+                int barrierLdsCoord = allRecords[index].coordinate;
                 if(graph.control.get<Barrier>(ctrl) and IsBarrierForLDS(graph, ctrl)
                    and AreInSameLoopBody(
                        graph, ctrl, allRecords[secondOpRecordIndex].control, cache)
                    and barrierLdsCoord == ldsCoord)
                 {
                     auto foundWritesAfterBarrier
-                        = std::any_of(allRecords.begin() + i,
+                        = std::any_of(allRecords.begin() + index,
                                       allRecords.begin() + endPos,
                                       [ldsCoord, &graph](const RWTracer::ReadWriteRecord& record) {
                                           return (record.rw == RWTracer::READWRITE
@@ -399,10 +413,16 @@ namespace rocRoller
                                       int                   secondOpTag,
                                       size_t                firstOpRecordIndex,
                                       size_t                secondOpRecordIndex,
-                                      LoopContainmentCache& cache)
+                                      LoopContainmentCache& cache,
+                                      std::span<const int>  barrierRecordIndices)
         {
-            auto barrier = FindBarrierBetween(
-                graph, allRecords, ldsCoord, firstOpRecordIndex, secondOpRecordIndex, cache);
+            auto barrier = FindBarrierBetween(graph,
+                                              allRecords,
+                                              ldsCoord,
+                                              firstOpRecordIndex,
+                                              secondOpRecordIndex,
+                                              cache,
+                                              barrierRecordIndices);
             if(barrier.has_value())
             {
                 Log::debug(fmt::format("FORWARD: Found LDS Barrier({}) between index "

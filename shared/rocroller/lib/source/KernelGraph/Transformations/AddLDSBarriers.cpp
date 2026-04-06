@@ -37,6 +37,16 @@ namespace rocRoller
                 // Get all trace records from the tracer
                 auto allRecords = tracer.coordinatesReadWrite();
 
+                std::vector<int> barrierRecordIndices;
+                for(int i = 0; i < allRecords.size(); i++)
+                {
+                    int ctrl = allRecords[i].control;
+                    if(graph.control.get<Barrier>(ctrl) and IsBarrierForLDS(graph, ctrl))
+                    {
+                        barrierRecordIndices.push_back(i);
+                    }
+                }
+
                 // Collect all LDS coordinates that are accessed
                 const auto ldsCoordinates = CollectAllLDSCoordinatesInRWTrace(graph, allRecords);
 
@@ -122,14 +132,16 @@ namespace rocRoller
                             //      first and second operations.
 
                             // Check for barrier between firstOp & secondOp (forward dependency)
-                            bool hasBarrierForForwardDependency = HasBarrierBetween(graph,
-                                                                                    allRecords,
-                                                                                    ldsCoord,
-                                                                                    firstOpTag,
-                                                                                    secondOpTag,
-                                                                                    firstOpIndex,
-                                                                                    secondOpIndex,
-                                                                                    cache);
+                            bool hasBarrierForForwardDependency
+                                = HasBarrierBetween(graph,
+                                                    allRecords,
+                                                    ldsCoord,
+                                                    firstOpTag,
+                                                    secondOpTag,
+                                                    firstOpIndex,
+                                                    secondOpIndex,
+                                                    cache,
+                                                    barrierRecordIndices);
 
                             if(not hasBarrierForForwardDependency)
                             {
@@ -247,7 +259,7 @@ namespace rocRoller
 
                         // === Handle forward dependency ===
                         const auto existingBarrier = FindBarrierBetween(
-                            graph, allRecords, ldsCoord, firstOpIndex, secondOpIndex, cache);
+                            graph, allRecords, ldsCoord, firstOpIndex, secondOpIndex, cache, {});
                         if(not existingBarrier.has_value())
                         {
                             // Insert new barrier before secondOp
