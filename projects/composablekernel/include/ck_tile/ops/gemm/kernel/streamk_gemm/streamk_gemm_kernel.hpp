@@ -82,6 +82,13 @@ struct StreamKKernel
         TilePartitioner::PERSISTENT == PersistentDP,
         "Persistent flag from TilePartitioner must match Persistent flag from UniversalGemm.");
 
+    struct is_stream_k
+    {
+        template <typename T>
+        using has_reduction_strategy = decltype(T::ReductionStrategy);
+        static constexpr bool value  = is_detected<has_reduction_strategy, TilePartitioner>{};
+    };
+    static constexpr bool IsStreamK = is_stream_k::value;
     /**
      * @brief  Specify the layout configurations for A, B, and C
      */
@@ -213,17 +220,19 @@ struct StreamKKernel
     }
 
     template <bool UseDefaultScheduler = true>
-    CK_TILE_DEVICE static void
-    RunGemm(const std::array<const ADataType*, UniversalGemmKernel::NumATensor>& as_ptr,
-            const std::array<const BDataType*, UniversalGemmKernel::NumBTensor>& bs_ptr,
-            const std::array<const void*, UniversalGemmKernel::NumDTensor>& ds_ptr,
-            CDataType* c_ptr,
-            void* smem_ptr_0,
-            const typename UniversalGemmKernel::KernelArgs& kargs,
-            const index_t num_loop,
-            const index_t block_idx_m,
-            const index_t block_idx_n,
-            const index_t k_size)
+    CK_TILE_DEVICE static void RunGemm(
+        const std::array<const ADataType*, UniversalGemmKernel::UniversalGemmKernel::NumATensor>&
+            as_ptr,
+        const std::array<const BDataType*, UniversalGemmKernel::UniversalGemmKernel::NumBTensor>&
+            bs_ptr,
+        const std::array<const void*, UniversalGemmKernel::NumDTensor>& ds_ptr,
+        CDataType* c_ptr,
+        void* smem_ptr_0,
+        const typename UniversalGemmKernel::KernelArgs& kargs,
+        const index_t num_loop,
+        const index_t block_idx_m,
+        const index_t block_idx_n,
+        const index_t k_size)
     {
         // Create block windows using specialized methods
         const auto& as_block_window =
@@ -279,39 +288,6 @@ struct StreamKKernel
     CK_TILE_HOST static void SetWorkSpacePointer(StreamKKernelArgs& kargs, void* workspace_ptr)
     {
         kargs.workspace_ptr = workspace_ptr;
-    }
-
-    /**
-     * @brief Computes offsets into A, B, and C tensors then runs the GEMM pipeline and epilogue.
-     * @param kargs Stream-K kernel arguments.
-     * @param tile_idx The 1D tile index in the C tensor for this workgroup.
-     * @param num_loop The number of iterations (at the macro tile level) in the K dimension this
-     * workgroup will perform in the C tile.
-     * @param i_k_a The K offset in the A tensor.
-     * @param i_k_b The K offset in the B tensor.
-     * @param k_size The portion of the K dimension this workgroup processes in the assigned
-     * `tile_idx`.
-     * @param smem_ptr_0 Pointer to LDS.
-     */
-    CK_TILE_DEVICE void BaseGemm(StreamKKernelArgs& kargs,
-                                 index_t tile_idx,
-                                 index_t num_loop,
-                                 index_t i_k_a,
-                                 index_t i_k_b,
-                                 index_t k_size,
-                                 void* smem_ptr_0) const
-    {
-        const auto c_macro_tile_idx = kargs.tile_partitioner.get_output_tile_index(tile_idx);
-        index_t i_m = c_macro_tile_idx[UniversalGemmKernel::I0] * TilePartitioner::MPerBlock;
-        index_t i_n = c_macro_tile_idx[UniversalGemmKernel::I1] * TilePartitioner::NPerBlock;
-
-        const ADataType* a_ptr = static_cast<const ADataType*>(kargs.as_ptr[0]) + i_k_a;
-        const BDataType* b_ptr = static_cast<const BDataType*>(kargs.bs_ptr[0]) + i_k_b;
-        CDataType* c_ptr       = static_cast<CDataType*>(kargs.e_ptr);
-
-        // Run the GEMM pipeline and Epilogue.
-        RunGemm(
-            {a_ptr}, {b_ptr}, {/*ds_ptr*/}, c_ptr, smem_ptr_0, kargs, num_loop, i_m, i_n, k_size);
     }
 
     /**
@@ -585,7 +561,23 @@ struct StreamKKernel
 
             if constexpr(TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Atomic)
             {
-                BaseGemm(kargs, tile_idx, num_loop_sk, i_k_a, i_k_b, k_size, smem_ptr_0);
+                const auto c_macro_tile_idx =
+                    kargs.tile_partitioner.get_output_tile_index(tile_idx);
+                const index_t i_m =
+                    c_macro_tile_idx[UniversalGemmKernel::I0] * TilePartitioner::MPerBlock;
+                const index_t i_n =
+                    c_macro_tile_idx[UniversalGemmKernel::I1] * TilePartitioner::NPerBlock;
+
+                RunGemm({static_cast<const ADataType*>(kargs.as_ptr[0]) + i_k_a},
+                        {static_cast<const BDataType*>(kargs.bs_ptr[0]) + i_k_b},
+                        {/*ds_ptr*/},
+                        static_cast<CDataType*>(kargs.e_ptr),
+                        smem_ptr_0,
+                        kargs,
+                        num_loop_sk,
+                        i_m,
+                        i_n,
+                        k_size);
             }
             else if(TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Linear ||
                     TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Tree)
@@ -738,6 +730,45 @@ struct StreamKKernel
         }
     }
 
+    // Non-persistent kernel entry point
+    template <bool U = !PersistentDP && !IsStreamK, typename = std::enable_if_t<U>>
+    CK_TILE_DEVICE void operator()(KernelArgs kargs) const
+    {
+        const auto blockId  = amd_wave_read_first_lane(blockIdx.x);
+        const auto [iM, iN] = TilePartitioner{kargs.M, kargs.N}.GetOutputTileIndex(blockId);
+        const index_t i_m   = amd_wave_read_first_lane(iM * TilePartitioner::MPerBlock);
+        const index_t i_n   = amd_wave_read_first_lane(iN * TilePartitioner::NPerBlock);
+
+        const typename UniversalGemmKernel::SplitKBatchOffset splitk_batch_offset(kargs);
+
+        // options
+        std::array<const ADataType*, UniversalGemmKernel::NumATensor> as_ptr;
+        static_for<0, UniversalGemmKernel::NumATensor, 1>{}([&](auto i) {
+            as_ptr[i] = static_cast<const ADataType*>(kargs.as_ptr[i]) +
+                        splitk_batch_offset.as_k_split_offset[i];
+        });
+
+        std::array<const BDataType*, UniversalGemmKernel::NumBTensor> bs_ptr;
+        static_for<0, UniversalGemmKernel::NumBTensor, 1>{}([&](auto i) {
+            bs_ptr[i] = static_cast<const BDataType*>(kargs.bs_ptr[i]) +
+                        splitk_batch_offset.bs_k_split_offset[i];
+        });
+
+        // Calculate output offset from tile partitioner and apply to output pointer
+        CDataType* e_ptr = static_cast<UniversalGemmKernel::EDataType*>(kargs.e_ptr);
+        if constexpr(UniversalGemmKernel::has_tile_partitioner_output_offset)
+        {
+            const index_t output_offset = TilePartitioner::GetOutputOffset(kargs, blockIdx.z);
+            e_ptr += output_offset;
+        }
+
+        // allocate LDS
+        __shared__ char smem_ptr[UniversalGemmKernel::GetSmemSize()];
+
+        RunGemm(
+            as_ptr, bs_ptr, kargs.ds_ptr, e_ptr, smem_ptr, kargs, splitk_batch_offset, i_m, i_n);
+    }
+
     /**
      * @brief Entry point for the Stream-K Kernel with non-persistent DP.
      *
@@ -747,7 +778,7 @@ struct StreamKKernel
      *     The Stream-K workgroups will do their assigned work by calling
      *     `StreamKGemm()`, which calls `BaseGemm()` in the Stream-K loop.
      */
-    template <bool U = PersistentDP>
+    template <bool U = PersistentDP && IsStreamK>
     CK_TILE_DEVICE typename std::enable_if_t<!U> operator()(StreamKKernelArgs kargs) const
     {
         // Allocate LDS
@@ -761,12 +792,126 @@ struct StreamKKernel
         // Check if at the data parallel section
         if(is_dp_ctas)
         {
-            BaseGemm(kargs, block_idx, dp_num_loop, 0, 0, kargs.K, smem_ptr_0);
+            const auto c_macro_tile_idx = kargs.tile_partitioner.get_output_tile_index(block_idx);
+            const index_t i_m =
+                c_macro_tile_idx[UniversalGemmKernel::I0] * TilePartitioner::MPerBlock;
+            const index_t i_n =
+                c_macro_tile_idx[UniversalGemmKernel::I1] * TilePartitioner::NPerBlock;
+
+            RunGemm({static_cast<const ADataType*>(kargs.as_ptr[0])},
+                    {static_cast<const BDataType*>(kargs.bs_ptr[0])},
+                    {/*ds_ptr*/},
+                    static_cast<CDataType*>(kargs.e_ptr),
+                    smem_ptr_0,
+                    kargs,
+                    dp_num_loop,
+                    i_m,
+                    i_n,
+                    kargs.K);
         }
         else
         {
             // Stream-K
             StreamKGemm(kargs, block_idx - dp_ctas, smem_ptr_0);
+        }
+    }
+
+    // Persistent kernel entry point
+    template <bool U = PersistentDP && !IsStreamK, typename = std::enable_if_t<U>, typename = void>
+    CK_TILE_DEVICE void operator()(KernelArgs kargs) const
+    {
+        const auto grid_size = amd_wave_read_first_lane(get_grid_size());
+        const auto num_tiles =
+            amd_wave_read_first_lane(TilePartitioner::GridSize(kargs.M, kargs.N));
+        const auto num_work = amd_wave_read_first_lane(num_tiles * kargs.k_batch);
+        auto block_id       = amd_wave_read_first_lane(get_block_id());
+
+        while(block_id < num_work)
+        {
+            s_waitcnt_barrier();
+            const auto tile_idx = amd_wave_read_first_lane(block_id % num_tiles);
+            const auto [iM, iN] = TilePartitioner{kargs.M, kargs.N}.GetOutputTileIndex(tile_idx);
+            // Apply pivot to M tile index first, then use the same pivoted index
+            // for both data-tile selection and chunk-signal wait.
+            auto iM_eff = amd_wave_read_first_lane(iM);
+
+            if(kargs.async_input_scheduler.chunk_signals != nullptr)
+            {
+                const auto tile_idx_pivot =
+                    amd_wave_read_first_lane(kargs.async_input_scheduler.tile_idx_pivot_m);
+                const auto tiles_m = amd_wave_read_first_lane(
+                    integer_divide_ceil(kargs.M, TilePartitioner::MPerBlock));
+                if(tiles_m > 0)
+                {
+                    iM_eff = amd_wave_read_first_lane((iM_eff + tile_idx_pivot) % tiles_m);
+                }
+            }
+
+            const index_t i_m = amd_wave_read_first_lane(iM_eff * TilePartitioner::MPerBlock);
+            const index_t i_n = amd_wave_read_first_lane(iN * TilePartitioner::NPerBlock);
+
+            // Synchronize with producer to ensure input data is ready before processing tile
+            if(kargs.async_input_scheduler.chunk_signals != nullptr)
+            {
+                const auto tiles_per_chunk =
+                    amd_wave_read_first_lane(kargs.async_input_scheduler.tiles_per_chunk_m);
+                const auto num_chunks =
+                    amd_wave_read_first_lane(kargs.async_input_scheduler.num_chunks);
+                if(tiles_per_chunk > 0 && num_chunks > 0)
+                {
+                    // Pivot allows rotating chunk assignments for load balancing
+                    const auto chunk_idx =
+                        amd_wave_read_first_lane((iM_eff / tiles_per_chunk) % num_chunks);
+                    workgroup_barrier chunk_barrier(kargs.async_input_scheduler.chunk_signals);
+                    chunk_barrier.wait_eq_wave(/*value=*/1, /*offset=*/chunk_idx);
+                }
+            }
+
+            // Get the SplitK offset for this block
+            const auto k_batch = amd_wave_read_first_lane(block_id / num_tiles);
+            const typename UniversalGemmKernel::SplitKBatchOffset splitk_batch_offset(kargs,
+                                                                                      k_batch);
+
+            std::array<const ADataType*, UniversalGemmKernel::NumATensor> as_ptr;
+            static_for<0, UniversalGemmKernel::NumATensor, 1>{}([&](auto i) {
+                as_ptr[i] = static_cast<const ADataType*>(kargs.as_ptr[i]) +
+                            splitk_batch_offset.as_k_split_offset[i];
+            });
+
+            std::array<const BDataType*, UniversalGemmKernel::NumBTensor> bs_ptr;
+            static_for<0, UniversalGemmKernel::NumBTensor, 1>{}([&](auto i) {
+                bs_ptr[i] = static_cast<const BDataType*>(kargs.bs_ptr[i]) +
+                            splitk_batch_offset.bs_k_split_offset[i];
+            });
+
+            // Calculate output offset from tile partitioner and apply to output pointer
+            CDataType* e_ptr = static_cast<UniversalGemmKernel::EDataType*>(kargs.e_ptr);
+            if constexpr(UniversalGemmKernel::has_tile_partitioner_output_offset)
+            {
+                const index_t output_offset = TilePartitioner::GetOutputOffset(kargs, k_batch);
+                e_ptr += output_offset;
+            }
+
+            // allocate LDS
+            __shared__ char smem_ptr[UniversalGemmKernel::GetSmemSize()];
+            // Run the GEMM
+
+            RunGemm(as_ptr,
+                    bs_ptr,
+                    kargs.ds_ptr,
+                    e_ptr,
+                    smem_ptr,
+                    kargs,
+                    splitk_batch_offset,
+                    i_m,
+                    i_n);
+
+            // Advance to the next work item
+            block_id += grid_size;
+            if(block_id >= num_work)
+            {
+                break;
+            }
         }
     }
 
@@ -780,7 +925,7 @@ struct StreamKKernel
      *     Stream-K portion by calling `StreamKGemm()`, which calls `BaseGemm()`
      *     in the Stream-K loop.
      */
-    template <bool U = PersistentDP>
+    template <bool U = PersistentDP && IsStreamK>
     CK_TILE_DEVICE typename std::enable_if_t<U> operator()(StreamKKernelArgs kargs) const
     {
         // Allocate LDS
@@ -793,7 +938,22 @@ struct StreamKKernel
         for(index_t tile_idx = block_idx; tile_idx < kargs.tile_partitioner.get_dp_tiles();
             tile_idx += kargs.tile_partitioner.get_max_active_wgs())
         {
-            BaseGemm(kargs, tile_idx, dp_num_loop, 0, 0, kargs.K, smem_ptr_0);
+            const auto c_macro_tile_idx = kargs.tile_partitioner.get_output_tile_index(tile_idx);
+            const index_t i_m =
+                c_macro_tile_idx[UniversalGemmKernel::I0] * TilePartitioner::MPerBlock;
+            const index_t i_n =
+                c_macro_tile_idx[UniversalGemmKernel::I1] * TilePartitioner::NPerBlock;
+
+            RunGemm({static_cast<const ADataType*>(kargs.as_ptr[0])},
+                    {static_cast<const BDataType*>(kargs.bs_ptr[0])},
+                    {/*ds_ptr*/},
+                    static_cast<CDataType*>(kargs.e_ptr),
+                    smem_ptr_0,
+                    kargs,
+                    dp_num_loop,
+                    i_m,
+                    i_n,
+                    kargs.K);
             block_sync_lds();
         }
 
