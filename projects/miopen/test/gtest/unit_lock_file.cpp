@@ -1236,6 +1236,7 @@ TEST(CPU_UnitTestLockFile_NONE, SeparateInstancesPerThreadExclusiveLock)
                     // fresh instance, take an exclusive lock, do work, destroy.
                     miopen::FSLockFile lockfile(lockpath);
                     auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+                    // cppcheck-suppress localMutex
                     std::unique_lock<miopen::FSLockFile> lock(lockfile, timeout);
                     if(lock.owns_lock())
                         successful_ops++;
@@ -1283,6 +1284,7 @@ TEST(CPU_UnitTestLockFile_NONE, SeparateInstancesPerThreadSharedLock)
                 {
                     miopen::FSLockFile lockfile(lockpath);
                     auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+                    // cppcheck-suppress localMutex
                     std::shared_lock<miopen::FSLockFile> lock(lockfile, timeout);
                     if(lock.owns_lock())
                         successful_ops++;
@@ -1329,6 +1331,7 @@ TEST(CPU_UnitTestLockFile_NONE, SeparateInstancesCreateLockPathConcurrently)
                 auto lp = miopen::LockFilePath(base / "db_file");
                 miopen::FSLockFile lockfile(lp);
                 auto timeout = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+                // cppcheck-suppress localMutex
                 std::unique_lock<miopen::FSLockFile> lock(lockfile, timeout);
                 if(lock.owns_lock())
                     successful_ops++;
