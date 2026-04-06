@@ -30,9 +30,6 @@ CK_TILE_HOST void reference_pool2d(const HostTensor<InDataType>& input,
     const ck_tile::index_t W = kargs.input_shape.at(ck_tile::number<2>{});
     const ck_tile::index_t C = kargs.input_shape.at(ck_tile::number<3>{});
 
-    const ck_tile::index_t Ho = kargs.output_shape.at(ck_tile::number<1>{});
-    const ck_tile::index_t Wo = kargs.output_shape.at(ck_tile::number<2>{});
-
     const ck_tile::index_t Y = kargs.window_lengths.at(ck_tile::number<0>{});
     const ck_tile::index_t X = kargs.window_lengths.at(ck_tile::number<1>{});
 
@@ -44,6 +41,13 @@ CK_TILE_HOST void reference_pool2d(const HostTensor<InDataType>& input,
 
     const ck_tile::index_t LeftPy = kargs.input_left_pads.at(ck_tile::number<0>{});
     const ck_tile::index_t LeftPx = kargs.input_left_pads.at(ck_tile::number<1>{});
+
+    const ck_tile::index_t Ho =
+        (H + LeftPy + kargs.input_right_pads.at(ck_tile::number<0>{}) - ((Y - 1) * Dy + 1)) / Sy +
+        1;
+    const ck_tile::index_t Wo =
+        (W + LeftPx + kargs.input_right_pads.at(ck_tile::number<1>{}) - ((X - 1) * Dx + 1)) / Sx +
+        1;
     // Right padding is handled implicitly by bounds checking
 
     auto f = [&](auto n, auto ho, auto wo, auto c) {
