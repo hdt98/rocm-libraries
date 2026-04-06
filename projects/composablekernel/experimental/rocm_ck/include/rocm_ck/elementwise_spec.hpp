@@ -97,9 +97,9 @@ consteval ElementwiseSpec makeSpec(Signature sig, ElementwiseAlgorithm algo, Tar
         if(!std::holds_alternative<std::monostate>(sig.ops[i]))
             throw "vector add makeSpec only supports a single AddOp";
 
-    TensorDesc a_td   = resolved.tensor(add.lhs);
-    TensorDesc b_td   = resolved.tensor(add.rhs);
-    TensorDesc out_td = resolved.tensor(add.out);
+    ResolvedTensor a_td   = resolved.tensor(add.lhs);
+    ResolvedTensor b_td   = resolved.tensor(add.rhs);
+    ResolvedTensor out_td = resolved.tensor(add.out);
 
     if(a_td.dtype != b_td.dtype)
         throw "vector add requires matching input dtypes";

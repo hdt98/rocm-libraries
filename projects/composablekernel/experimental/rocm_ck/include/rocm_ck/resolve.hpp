@@ -104,14 +104,14 @@ consteval auto visitOp(const Op& op, F&& f) // auto required: return type depend
 /// operation type does not specify them (e.g., standalone AddOp).
 struct ResolvedSignature
 {
-    int num_tensors                             = 0;
-    std::array<TensorDesc, kMaxTensors> tensors = {};
+    int num_tensors                                 = 0;
+    std::array<ResolvedTensor, kMaxTensors> tensors = {};
 
     int num_scalars                         = 0;
     std::array<Scalar, kMaxScalars> scalars = {};
 
     /// Find a resolved tensor by name. Compile-time error if not found.
-    consteval TensorDesc tensor(std::string_view name) const
+    consteval ResolvedTensor tensor(std::string_view name) const
     {
         for(int i = 0; i < num_tensors; ++i)
             if(tensors[i].name == name)
@@ -490,7 +490,7 @@ consteval ResolvedSignature resolve(Signature sig)
     for(int i = 0; i < num; ++i)
     {
         result.tensors[i] =
-            TensorDesc{infos[i].name, infos[i].dtype, infos[i].rank, infos[i].layout};
+            ResolvedTensor{infos[i].name, infos[i].dtype, infos[i].rank, infos[i].layout};
         if(infos[i].has_quantize)
             result.tensors[i].quantize = ResolvedQuantization{infos[i].quantize_info.scale_name,
                                                               infos[i].quantize_info.scale_dtype,

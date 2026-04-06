@@ -343,7 +343,7 @@ TEST(Resolve, QuantizedTensorKeepsOwnDtype)
     EXPECT_EQ(r.tensor("A").dtype, DataType::FP16); // cascade still works
 }
 
-TEST(Resolve, QuantizedTensorDescCarriesQuantizeInfo)
+TEST(Resolve, QuantizedResolvedTensorCarriesQuantizeInfo)
 {
     constexpr auto r =
         resolve(Signature{.dtype   = DataType::FP16,

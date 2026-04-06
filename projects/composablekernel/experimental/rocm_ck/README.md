@@ -198,7 +198,7 @@ experimental/rocm_ck/
 │       ├── types.hpp               # index_t, GpuTarget
 │       ├── datatype_utils.hpp      # DataType enum, dataTypeBits(), dataTypeName()
 │       ├── layout.hpp              # Layout enum (Row, Col, Contiguous, Auto)
-│       ├── tensor_desc.hpp         # TensorDesc: name, dtype, rank, layout
+│       ├── tensor_desc.hpp         # ResolvedTensor: name, dtype, rank, layout
 │       ├── physical_tensor.hpp     # TensorName, PhysicalTensor (consteval, NTTP-safe)
 │       │
 │       │ # ABI — shared host/device interface

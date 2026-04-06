@@ -100,13 +100,13 @@ struct ComposedCDEOp
     {
         float result = ck_tile::type_convert<float>(c);
         if constexpr(S.num_epilogue_ops > 0)
-            apply_op<S.store_strategy_ops[0]>(result, ds...);
+            apply_op<S.epilogue_ops[0]>(result, ds...);
         if constexpr(S.num_epilogue_ops > 1)
-            apply_op<S.store_strategy_ops[1]>(result, ds...);
+            apply_op<S.epilogue_ops[1]>(result, ds...);
         if constexpr(S.num_epilogue_ops > 2)
-            apply_op<S.store_strategy_ops[2]>(result, ds...);
+            apply_op<S.epilogue_ops[2]>(result, ds...);
         if constexpr(S.num_epilogue_ops > 3)
-            apply_op<S.store_strategy_ops[3]>(result, ds...);
+            apply_op<S.epilogue_ops[3]>(result, ds...);
         e = ck_tile::type_convert<E>(result);
     }
 
