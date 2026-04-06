@@ -428,6 +428,25 @@ VARIANTS = [
         "wave_k": 16,
         "workgroup_size": 256,
     },
+    # INT4 block-quantized GEMM: fp8 × int4 with per-group fp8 scales → float
+    {
+        "name": "gemm_i4_bquant",
+        "a_dtype": "fp8_fnuz",
+        "b_dtype": "i4",
+        "c_dtype": "fp32",
+        "acc_dtype": "fp32",
+        "pipeline": "V3",
+        "block_m": 128,
+        "block_n": 128,
+        "block_k": 128,
+        "waves_m": 2,
+        "waves_n": 2,
+        "waves_k": 1,
+        "wave_m": 32,
+        "wave_n": 32,
+        "wave_k": 16,
+        "workgroup_size": 256,
+    },
     # Direct2D epilogue: no LDS shuffle, direct 2D store
     {
         "name": "gemm_fp16_direct2d",

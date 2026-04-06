@@ -281,9 +281,10 @@ __device__ void run(Args args)
         using BQuantPipeline = ck_tile::BQuantGemmPipelineAgBgCrCompV3<BQuantProblem>;
 
         // Epilogue: CShuffle with PassThrough (no D tensors)
+        // BQuant dequantizes B to compute type (AType), so epilogue sees AType for both A and B.
         using BQuantEpilogue = ck_tile::CShuffleEpilogue<
             ck_tile::CShuffleEpilogueProblem<AType,
-                                             BType,
+                                             AType,
                                              ck_tile::tuple<>,
                                              AccType,
                                              OType,

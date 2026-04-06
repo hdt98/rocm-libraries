@@ -37,7 +37,7 @@ endif()
 set(KERNEL_VARIANTS gemm_fp32 gemm_fp16 gemm_bf16 gemm_fp16_w32 gemm_fp16_add gemm_fp16_add_relu
     gemm_fp16_rr gemm_fp16_cr gemm_fp16_cc gemm_fp16_splitk gemm_fp16_v3 gemm_fp16_add_add
     gemm_fp16_batched gemm_fp16_gfx90a gemm_fp16_gfx942 gemm_fp16_preshuffle gemm_fp16_memory
-    gemm_fp8_fnuz gemm_fp16_v4 gemm_fp16_padded gemm_i8 gemm_fp16_direct2d gemm_fp16_wmma)
+    gemm_fp8_fnuz gemm_fp16_v4 gemm_fp16_padded gemm_i8 gemm_i4_bquant gemm_fp16_direct2d gemm_fp16_wmma)
 
 # --- Per-variant architecture restrictions ---
 # Set <variant>_GPU_TARGETS to override the default GPU_TARGETS for a variant.
@@ -45,6 +45,7 @@ set(KERNEL_VARIANTS gemm_fp32 gemm_fp16 gemm_bf16 gemm_fp16_w32 gemm_fp16_add ge
 # RDNA variants must opt in — they are NOT included in the CDNA default.
 set(gemm_fp8_fnuz_GPU_TARGETS "gfx942;gfx950")
 set(gemm_i8_GPU_TARGETS "gfx942;gfx950")
+set(gemm_i4_bquant_GPU_TARGETS "gfx942;gfx950")
 set(gemm_fp16_wmma_GPU_TARGETS "gfx1151")
 
 # rocm_ck headers for device code (DataType, Layout enums used by gemm_api.hpp)

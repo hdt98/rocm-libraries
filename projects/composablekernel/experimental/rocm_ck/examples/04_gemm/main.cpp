@@ -123,6 +123,13 @@ int main(int argc, char** argv)
            std::strstr(gpu_arch, "gfx942") == nullptr && std::strstr(gpu_arch, "gfx950") == nullptr)
             continue;
 
+        // Skip INT4 BQuant — host-side INT4 packing not yet implemented
+        if(std::strncmp(variant.name, "gemm_i4_bquant", 14) == 0)
+        {
+            std::printf("%s: SKIPPED (requires host-side INT4 packing)\n", variant.name);
+            continue;
+        }
+
         // Skip preshuffle — requires host-side B matrix rearrangement (not yet wired)
         if(spec.pipeline == rocm_ck::Pipeline::Preshuffle)
         {
