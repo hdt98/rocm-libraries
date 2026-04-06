@@ -100,8 +100,8 @@ namespace rocRoller::KernelGraph
                 // Align the start of the manually-loaded block to enable
                 // the widest possible scalar load instructions (s_load_dwordx16).
                 constexpr int kMaxScalarLoadBytes = 64;
-                manualOffset = RoundUpToMultiple(
-                    static_cast<int>(kernel->argumentSize()), kMaxScalarLoadBytes);
+                manualOffset = RoundUpToMultiple(static_cast<int>(kernel->argumentSize()),
+                                                 kMaxScalarLoadBytes);
             }
 
             if(!arg.getPreloaded())

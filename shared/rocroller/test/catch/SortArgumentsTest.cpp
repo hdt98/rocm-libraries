@@ -147,8 +147,8 @@ TEST_CASE("SortArguments transform works as expected", "[kernel-graph][SortArgum
 
         // Verify first non-preloaded arg offset is 64-byte aligned
         // and all manual args are packed contiguously.
-        bool   foundManual      = false;
-        int    expectedOffset   = 0;
+        bool foundManual    = false;
+        int  expectedOffset = 0;
         for(auto const& arg : args)
         {
             if(!arg.getPreloaded() && !foundManual)
