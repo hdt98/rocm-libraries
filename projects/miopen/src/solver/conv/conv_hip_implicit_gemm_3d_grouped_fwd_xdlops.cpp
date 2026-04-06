@@ -65,6 +65,12 @@ void PerformanceConfigHipImplicitGemm3DGroupFwdXdlops::InitValidKernels(
 
     valid_kernels = loader.FillValidKernelsWithTf32Fallback(
         CKSolverType::GrpConv3dFwd, problem, data_type, use_tf32);
+
+    if(!valid_kernels.empty())
+    {
+        index     = 0;
+        kernel_id = valid_kernels[index];
+    }
 }
 
 // clang-format off

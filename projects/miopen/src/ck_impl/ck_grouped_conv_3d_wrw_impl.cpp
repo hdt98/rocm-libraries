@@ -389,8 +389,8 @@ bool CheckIsArgSupported(const ProblemDescription& problem,
 {
     if constexpr(std::is_same_v<DataType, float>)
     {
-        if(use_tf32 && CheckIsArgSupportedByAlphaBeta<DataType, ck::tf32_t>(problem, kernel_id))
-            return true;
+        if(use_tf32)
+            return CheckIsArgSupportedByAlphaBeta<DataType, ck::tf32_t>(problem, kernel_id);
     }
     return CheckIsArgSupportedByAlphaBeta<DataType, DataType>(problem, kernel_id);
 }

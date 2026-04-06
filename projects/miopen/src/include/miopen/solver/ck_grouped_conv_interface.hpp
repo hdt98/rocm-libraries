@@ -153,7 +153,7 @@ ckgrpconv_3d_fwd_is_args_supported(const miopen::conv::ProblemDescription* probl
                                    bool use_tf32);
 
 CK_GROUPED_CONV_API size_t ckgrpconv_3d_fwd_get_workspace_size(
-    const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type);
+    const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
 
 CK_GROUPED_CONV_API miopen::solver::ConvSolution*
 ckgrpconv_3d_fwd_get_solution(const miopen::ExecutionContext* ctx,
@@ -176,7 +176,7 @@ ckgrpconv_3d_bwd_is_args_supported(const miopen::conv::ProblemDescription* probl
                                    bool use_tf32);
 
 CK_GROUPED_CONV_API size_t ckgrpconv_3d_bwd_get_workspace_size(
-    const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type);
+    const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32);
 
 CK_GROUPED_CONV_API miopen::solver::ConvSolution*
 ckgrpconv_3d_bwd_get_solution(const miopen::ExecutionContext* ctx,

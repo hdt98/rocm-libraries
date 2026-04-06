@@ -410,8 +410,8 @@ bool CheckIsArgSupported(const ProblemDescription& problem,
 {
     if constexpr(std::is_same_v<DataType, float>)
     {
-        if(use_tf32 && CheckIsArgSupportedByAlphaBeta<DataType, ck::tf32_t>(problem, kernel_id))
-            return true;
+        if(use_tf32)
+            return CheckIsArgSupportedByAlphaBeta<DataType, ck::tf32_t>(problem, kernel_id);
     }
     return CheckIsArgSupportedByAlphaBeta<DataType, DataType>(problem, kernel_id);
 }
@@ -512,7 +512,8 @@ extern "C" bool ckgrpconv_3d_bwd_is_args_supported(const miopen::conv::ProblemDe
 
 extern "C" size_t
 ckgrpconv_3d_bwd_get_workspace_size(const miopen::conv::ProblemDescription* /*problem*/,
-                                    miopenDataType_t /*data_type*/)
+                                    miopenDataType_t /*data_type*/,
+                                    bool /*use_tf32*/)
 {
     // 3D BWD grouped convolution CK kernels do not use split-k and never
     // require CK-level workspace.  Layout transform workspace (NCHW to NHWC)
