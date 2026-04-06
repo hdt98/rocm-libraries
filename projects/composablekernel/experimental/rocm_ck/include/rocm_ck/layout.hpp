@@ -7,6 +7,9 @@
 
 #pragma once
 
+#include <array>
+#include <cstddef>
+
 namespace rocm_ck {
 
 /// Memory layout for tensor operands.
@@ -48,6 +51,15 @@ consteval bool isValidLayoutForRank(Layout layout, int rank)
     case Layout::Auto: return false; // Auto is unresolved, never valid for concrete tensors
     }
     return false;
+}
+
+/// Leading dimension stride for a 2D tensor.
+///   Row-major: strides[0] (stride across columns)
+///   Col-major: strides[1] (stride across rows)
+template <typename T, std::size_t N>
+constexpr T leadingDimStride(Layout layout, const std::array<T, N>& strides)
+{
+    return layout == Layout::Row ? strides[0] : strides[1];
 }
 
 } // namespace rocm_ck

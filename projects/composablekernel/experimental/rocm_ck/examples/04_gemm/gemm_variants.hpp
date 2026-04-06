@@ -19,19 +19,20 @@ struct GemmVariant
 {
     const char* name;
     GemmSpec spec;
+    TargetSet targets; // GPU targets this variant supports (for host-side filtering)
 };
 
 consteval GemmVariant
 make_variant(const char* name, Signature sig, GemmAlgorithm algo, TargetSet targets)
 {
-    return {name, makeSpec(sig, algo, targets)};
+    return {name, makeSpec(sig, algo, targets), targets};
 }
 
 /// Convenience: single GpuTarget wraps to TargetSet::only(target).
 consteval GemmVariant
 make_variant(const char* name, Signature sig, GemmAlgorithm algo, GpuTarget target)
 {
-    return {name, makeSpec(sig, algo, TargetSet{target})};
+    return {name, makeSpec(sig, algo, TargetSet{target}), TargetSet{target}};
 }
 
 inline constexpr GemmVariant gemm_variants[] = {
