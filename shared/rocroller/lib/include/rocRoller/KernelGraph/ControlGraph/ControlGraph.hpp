@@ -86,6 +86,12 @@ namespace rocRoller
 
         struct NodeOrders
         {
+            //
+            // These are bit vectors. Bit vector where the bit at
+            // index i indicates whether the i-th node is after,
+            // before, inBody or containing the current node.
+            // These bit vectors are set up inside populateOrderCache.
+            //
             std::vector<uint64_t> after;
             std::vector<uint64_t> before;
             std::vector<uint64_t> inBody;
