@@ -73,7 +73,7 @@ void larft_checkBadArgs(const rocblas_handle handle,
     // quick return with invalid pointers
     // TODO: add quick return check, add test for dTau and dT as nullptr
     EXPECT_ROCBLAS_STATUS(
-        rocsolver_larft(handle, direct, storev, 0, k, (T) nullptr, ldv, dTau, dT, ldt),
+        rocsolver_larft(handle, direct, storev, I(0), k, (T) nullptr, ldv, dTau, dT, ldt),
         rocblas_status_success);
 }
 
