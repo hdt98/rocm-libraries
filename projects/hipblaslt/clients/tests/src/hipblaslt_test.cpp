@@ -145,12 +145,20 @@ static thread_local struct
     volatile sig_atomic_t signal;
 } t_handler;
 
-// Configuration: whether to continue tests on timeout or abort entire run
-static const bool timeout_continue_tests = [] {
-    // If set, timeout will fail the individual test and continue to next test
-    // instead of aborting the entire test run.
-    const char* env = getenv("HIPBLASLT_TEST_TIMEOUT_CONTINUE");
-    return env != nullptr;
+// Test timeout configuration - initialized from environment variables
+static const struct
+{
+    unsigned seconds;        // Timeout duration in seconds (from HIPBLASLT_TEST_TIMEOUT)
+    bool     continue_tests; // Continue to next test on timeout vs abort (from HIPBLASLT_TEST_TIMEOUT_CONTINUE)
+} test_timeout_config = [] {
+    constexpr unsigned DEFAULT_TIMEOUT = 600;
+    const char*        timeout_env      = getenv("HIPBLASLT_TEST_TIMEOUT");
+    unsigned           timeout_val;
+
+    return decltype(test_timeout_config){
+        (timeout_env && sscanf(timeout_env, "%u", &timeout_val) == 1) ? timeout_val
+                                                                        : DEFAULT_TIMEOUT,
+        getenv("HIPBLASLT_TEST_TIMEOUT_CONTINUE") != nullptr};
 }();
 
 // Signal handler (must have external "C" linkage)
@@ -173,7 +181,7 @@ extern "C" void hipblaslt_test_signal_handler(int sig)
     // If this is an alarm timeout, check if we should abort or continue
     if(sig == SIGALRM)
     {
-        if(!timeout_continue_tests)
+        if(!test_timeout_config.continue_tests)
         {
             // Original behavior: abort entire test run on timeout
             static constexpr char msg[]
@@ -185,7 +193,7 @@ extern "C" void hipblaslt_test_signal_handler(int sig)
             write(STDERR_FILENO, msg, sizeof(msg) - 1);
             hipblaslt_abort();
         }
-        // If timeout_continue_tests is true, fall through to treat like other signals
+        // If continue_tests is true, fall through to treat like other signals
     }
 #endif
 
@@ -219,14 +227,6 @@ void hipblaslt_test_sigaction()
 #endif
 }
 
-static const unsigned test_timeout = [] {
-    // Number of seconds each test is allowed to take before all testing is killed.
-    constexpr unsigned TEST_TIMEOUT = 600;
-    unsigned           timeout;
-    const char*        env = getenv("HIPBLASLT_TEST_TIMEOUT");
-    return env && sscanf(env, "%u", &timeout) == 1 ? timeout : TEST_TIMEOUT;
-}();
-
 // Lambda wrapper which detects signals and exceptions in an invokable function
 void catch_signals_and_exceptions_as_failures(std::function<void()> test, bool set_alarm)
 {
@@ -240,7 +240,7 @@ void catch_signals_and_exceptions_as_failures(std::function<void()> test, bool s
         // Provide clear message for timeout vs other signals
         if(t_handler.signal == SIGALRM)
         {
-            FAIL() << "Test exceeded timeout of " << test_timeout << " seconds";
+            FAIL() << "Test exceeded timeout of " << test_timeout_config.seconds << " seconds";
         }
         else
         {
@@ -262,7 +262,7 @@ void catch_signals_and_exceptions_as_failures(std::function<void()> test, bool s
 #ifndef _WIN32
         // Alarm to detect deadlocks or hangs
         if(set_alarm)
-            alarm(test_timeout);
+            alarm(test_timeout_config.seconds);
 #endif
         // Enable the signal handler
         t_handler.enabled = true;
