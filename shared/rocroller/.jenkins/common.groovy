@@ -382,7 +382,7 @@ def runPerformanceCommand (platform, project)
                         --repo github.com/ROCm/rocm-libraries \\
                         --branch ${env.BRANCH_NAME} \\
                         --comment "rocroller CI automatic insertion" \\
-                        --commit ${env.GIT_COMMIT} \\
+                        --commit ${env.GIT_COMMIT?.take(10)} \\
                         --machine ${env.NODE_NAME} \\
                         --library_size 0 \\
                         --streamk 0
@@ -600,7 +600,7 @@ def runPerformanceCommand (platform, project)
                         --repo github.com/ROCm/rocm-libraries \\
                         --branch develop \\
                         --comment "rocroller CI automatic insertion" \\
-                        --commit ${env.GIT_COMMIT} \\
+                        --commit ${env.GIT_COMMIT?.take(10)} \\
                         --machine ${env.NODE_NAME} \\
                         --library_size 0 \\
                         --streamk 0
