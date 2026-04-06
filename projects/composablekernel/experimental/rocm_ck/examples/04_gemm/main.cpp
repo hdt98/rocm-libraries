@@ -123,10 +123,142 @@ int main(int argc, char** argv)
            std::strstr(gpu_arch, "gfx942") == nullptr && std::strstr(gpu_arch, "gfx950") == nullptr)
             continue;
 
-        // Skip INT4 BQuant — host-side INT4 packing not yet implemented
-        if(std::strncmp(variant.name, "gemm_i4_bquant", 14) == 0)
+        // INT4 BQuant: separate data preparation path (INT4 packing + scale tensor)
+        if(spec.group_size > 0)
         {
-            std::printf("%s: SKIPPED (requires host-side INT4 packing)\n", variant.name);
+            if(std::strstr(gpu_arch, "gfx942") == nullptr &&
+               std::strstr(gpu_arch, "gfx950") == nullptr)
+                continue;
+
+            rocm_ck::KpackKernel kernel;
+            if(!kernel.load(archive, variant.name))
+                continue;
+
+            // BQuant uses small values exact in FP8 E4M3 and INT4
+            std::vector<float> bq_a(M * K);
+            std::vector<float> bq_b(K * N);
+            for(int i = 0; i < M * K; ++i)
+                bq_a[i] = static_cast<float>(i % 4); // [0, 3]
+            for(int i = 0; i < K * N; ++i)
+                bq_b[i] = static_cast<float>(i % 7 - 3); // [-3, 3]
+
+            int group_size = spec.group_size;
+            int scale_rows = K / group_size;
+            std::vector<float> bq_scale(scale_rows * N, 1.0f);
+
+            // CPU reference
+            ref_c.resize(M * N);
+            cpu_gemm_bquant(
+                bq_a.data(), bq_b.data(), bq_scale.data(), ref_c.data(), M, N, K, group_size);
+
+            // Pack INT4 weights: Col-major, K contiguous, pairs along K share a byte
+            // Each pk_int4_t = lo nibble (even k) + hi nibble (odd k), biased by +8
+            int buf_b_bytes = K * N / 2;
+            std::vector<std::uint8_t> packed_b(buf_b_bytes);
+            for(int n = 0; n < N; ++n)
+            {
+                for(int k = 0; k < K; k += 2)
+                {
+                    int v0 = std::clamp(static_cast<int>(bq_b[k * N + n]), -8, 7);
+                    int v1 = std::clamp(static_cast<int>(bq_b[(k + 1) * N + n]), -8, 7);
+                    packed_b[n * (K / 2) + k / 2] =
+                        static_cast<std::uint8_t>(((v1 + 8) << 4) | ((v0 + 8) & 0xF));
+                }
+            }
+
+            // Apply i4x4 permutation: groups of 4 bytes, 0x76543210 → 0x75316420
+            for(int i = 0; i + 3 < buf_b_bytes; i += 4)
+            {
+                std::uint8_t b0 = packed_b[i], b1 = packed_b[i + 1];
+                std::uint8_t b2 = packed_b[i + 2], b3 = packed_b[i + 3];
+                int n0 = b0 & 0xF, n1 = (b0 >> 4) & 0xF;
+                int n2 = b1 & 0xF, n3 = (b1 >> 4) & 0xF;
+                int n4 = b2 & 0xF, n5 = (b2 >> 4) & 0xF;
+                int n6 = b3 & 0xF, n7 = (b3 >> 4) & 0xF;
+                packed_b[i]     = static_cast<std::uint8_t>((n2 << 4) | n0);
+                packed_b[i + 1] = static_cast<std::uint8_t>((n6 << 4) | n4);
+                packed_b[i + 2] = static_cast<std::uint8_t>((n3 << 4) | n1);
+                packed_b[i + 3] = static_cast<std::uint8_t>((n7 << 4) | n5);
+            }
+
+            // Upload A (FP8), packed B (raw bytes), scale (FP8), allocate C (FP32)
+            rocm_ck::TypedBuffer buf_a(spec.lhs().dtype, M * K);
+            buf_a.upload(bq_a.data());
+
+            void* dev_b = nullptr;
+            HIP_CHECK(hipMalloc(&dev_b, buf_b_bytes));
+            HIP_CHECK(hipMemcpy(dev_b, packed_b.data(), buf_b_bytes, hipMemcpyHostToDevice));
+
+            rocm_ck::TypedBuffer buf_scale(spec.scale().dtype, scale_rows * N);
+            buf_scale.upload(bq_scale.data());
+
+            rocm_ck::TypedBuffer buf_c(spec.output().dtype, M * N);
+            buf_c.zero();
+
+            // Grid
+            int grid_m    = (M + spec.block_tile.m - 1) / spec.block_tile.m;
+            int grid_n    = (N + spec.block_tile.n - 1) / spec.block_tile.n;
+            int grid_size = grid_m * grid_n;
+
+            std::printf("%s: M=%d, N=%d, K=%d, grid=%dx1x%d, block=%d\n",
+                        variant.name,
+                        M,
+                        N,
+                        K,
+                        grid_size,
+                        spec.k_batch,
+                        spec.workgroup_size);
+
+            // Args: A, B, C, scale
+            auto [a_stride_m, a_stride_k] = layout_strides(spec.lhs().layout, M, K);
+            auto [b_stride_k, b_stride_n] = layout_strides(spec.rhs().layout, K, N);
+            auto [c_stride_m, c_stride_n] = layout_strides(spec.output().layout, M, N);
+
+            rocm_ck::Args kernel_args{};
+            kernel_args.tensors[spec.lhs().args_slot] = {
+                buf_a.ptr(),
+                rocm_ck::makeShape(M, K),
+                rocm_ck::makeStrides(a_stride_m, a_stride_k)};
+            kernel_args.tensors[spec.rhs().args_slot] = {
+                dev_b, rocm_ck::makeShape(K, N), rocm_ck::makeStrides(b_stride_k, b_stride_n)};
+            kernel_args.tensors[spec.output().args_slot] = {
+                buf_c.ptr(),
+                rocm_ck::makeShape(M, N),
+                rocm_ck::makeStrides(c_stride_m, c_stride_n)};
+            kernel_args.tensors[spec.scale().args_slot] = {
+                buf_scale.ptr(), rocm_ck::makeShape(scale_rows, N), rocm_ck::makeStrides(N, 1)};
+
+            void* args_ptr        = &kernel_args;
+            size_t args_size      = sizeof(kernel_args);
+            void* launch_config[] = {HIP_LAUNCH_PARAM_BUFFER_POINTER,
+                                     args_ptr,
+                                     HIP_LAUNCH_PARAM_BUFFER_SIZE,
+                                     &args_size,
+                                     HIP_LAUNCH_PARAM_END};
+
+            HIP_CHECK(hipModuleLaunchKernel(kernel.function(),
+                                            grid_size,
+                                            1,
+                                            spec.k_batch,
+                                            spec.workgroup_size,
+                                            1,
+                                            1,
+                                            0,
+                                            nullptr,
+                                            nullptr,
+                                            launch_config));
+            HIP_CHECK(hipDeviceSynchronize());
+
+            std::vector<float> result(M * N);
+            buf_c.download(result.data());
+
+            auto vr     = rocm_ck::verify(result.data(), ref_c.data(), M * N, spec.output().dtype);
+            bool passed = rocm_ck::reportVerify(variant.name, vr);
+            if(!passed)
+                all_passed = false;
+            ++variants_run;
+
+            HIP_CHECK(hipFree(dev_b));
             continue;
         }
 
