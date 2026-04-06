@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 #include <gtest/gtest.h>
+#include <miopen/env.hpp>
+#include <miopen/filesystem.hpp>
 #include <miopen/solver/ck_grouped_conv_lib_loader.hpp>
 #include <miopen/conv/problem_description.hpp>
 #include <miopen/conv_solution.hpp>
@@ -17,7 +19,42 @@ using miopen::solver::CKSolverType;
 using miopen::solver::GetCurrentDeviceName;
 using miopen::solver::IsDeterministicSplitKValid;
 
+MIOPEN_DECLARE_ENV_VAR_STR(MIOPEN_CK_LIB_PATH)
+
 namespace {
+
+class ScopedCKLibraryPath
+{
+public:
+    explicit ScopedCKLibraryPath(std::string value)
+        : had_previous_value(static_cast<bool>(MIOPEN_CK_LIB_PATH))
+    {
+        if(had_previous_value)
+            previous_value = miopen::env::value(MIOPEN_CK_LIB_PATH);
+        miopen::env::update(MIOPEN_CK_LIB_PATH, std::move(value));
+    }
+
+    ~ScopedCKLibraryPath()
+    {
+        if(had_previous_value)
+            miopen::env::update(MIOPEN_CK_LIB_PATH, previous_value);
+        else
+            miopen::env::clear(MIOPEN_CK_LIB_PATH);
+    }
+
+    ScopedCKLibraryPath(const ScopedCKLibraryPath&)            = delete;
+    ScopedCKLibraryPath& operator=(const ScopedCKLibraryPath&) = delete;
+
+private:
+    bool had_previous_value = false;
+    std::string previous_value;
+};
+
+miopen::fs::path MakeMissingDirectory(const std::string& tag)
+{
+    return miopen::fs::temp_directory_path() / "miopen_ck_grouped_conv_loader_missing" / tag /
+           "not_created";
+}
 
 /// Build a minimal grouped-conv forward ProblemDescription suitable for
 /// querying the CK loader.  Uses group=4, NHWC, FP16, small spatial dims.
@@ -142,6 +179,34 @@ TEST(CPU_CKGroupedConvLoader_NONE, LoaderFailsGracefullyForUnknownDevice)
 {
     const auto& loader = miopen::solver::CKGroupedConvLibLoader::Get("gfx_nonexistent");
     EXPECT_FALSE(loader.IsLoaded());
+}
+
+TEST(CPU_CKGroupedConvLoader_NONE, LoaderStripsDeviceSuffixWithoutGpu)
+{
+    const auto base_arch = std::string{"gfx_ck_loader_suffix_unit_test"};
+    const auto suffixed  = base_arch + ":sramecc+:xnack-";
+
+    const auto& loader1 = miopen::solver::CKGroupedConvLibLoader::Get(suffixed);
+    const auto& loader2 = miopen::solver::CKGroupedConvLibLoader::Get(base_arch);
+
+    EXPECT_EQ(&loader1, &loader2)
+        << "Suffixed and bare device names should resolve to the same cached loader";
+    EXPECT_FALSE(loader1.IsLoaded());
+}
+
+TEST(CPU_CKGroupedConvLoader_NONE, LoaderFailsGracefullyWithInvalidEnvPath)
+{
+    const auto missing_dir = MakeMissingDirectory("invalid_env_path");
+    ASSERT_FALSE(miopen::fs::exists(missing_dir));
+
+    const ScopedCKLibraryPath scoped_ck_lib_path{missing_dir.string()};
+    const auto& loader = miopen::solver::CKGroupedConvLibLoader::Get("gfx_ck_loader_invalid_env");
+
+    EXPECT_FALSE(loader.IsLoaded());
+    EXPECT_TRUE(
+        loader
+            .FillValidKernels(CKSolverType::GrpConvFwd, MakeGroupedConvProblem(), miopenHalf, false)
+            .empty());
 }
 
 TEST(CPU_CKGroupedConvLoader_NONE, LoaderReturnsEmptyOnFailure)

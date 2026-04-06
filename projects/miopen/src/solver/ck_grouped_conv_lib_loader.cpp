@@ -18,8 +18,6 @@
 // clang-format off
 #include <windows.h>
 // clang-format on
-// <windows.h> defines LoadLibrary as a macro, which collides with our member function name.
-#undef LoadLibrary
 #else
 #include <dlfcn.h>
 #endif
@@ -48,41 +46,102 @@ std::string MakeLibraryFilename(const std::string& device_name)
            StripDeviceSuffix(device_name) + std::string(miopen::dynamic_library_postfix);
 }
 
-/// Resolve the directory containing the MIOpen shared library.
-/// On Linux uses dladdr + realpath; on Windows uses GetModuleHandleExA +
-/// GetModuleFileNameA.  Canonicalizes symlinks so per-arch CK libraries
-/// are found even when MIOpen is accessed through a symlink.
-std::string GetMIOpenLibDir()
+/// Resolve the directory containing the loaded MIOpen shared library.
+/// Canonicalizes symlinks so per-arch CK libraries are found even when
+/// MIOpen is accessed through a symlink.
+miopen::fs::path GetOwningModuleDirectory()
 {
 #ifdef _WIN32
     HMODULE hmod = nullptr;
-    if(GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+    if(GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
                               GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-                          reinterpret_cast<LPCSTR>(miopenCreate),
+                          reinterpret_cast<LPCWSTR>(miopenCreate),
                           &hmod) != 0)
     {
-        char buf[MAX_PATH];
-        DWORD len = GetModuleFileNameA(hmod, buf, MAX_PATH);
-        if(len > 0 && len < MAX_PATH)
+        std::wstring module_path(MAX_PATH, L'\0');
+        while(true)
         {
-            std::string path(buf, len);
-            auto slash = path.find_last_of("\\/");
-            if(slash != std::string::npos)
-                return path.substr(0, slash);
+            const auto len = GetModuleFileNameW(
+                hmod, module_path.data(), static_cast<DWORD>(module_path.size()));
+            if(len == 0)
+                break;
+            if(len < module_path.size())
+            {
+                module_path.resize(len);
+                return miopen::weakly_canonical(miopen::fs::path{module_path}).parent_path();
+            }
+            module_path.resize(module_path.size() * 2);
         }
     }
 #else
     Dl_info info;
-    if(dladdr(reinterpret_cast<void*>(miopenCreate), &info) != 0)
+    if(dladdr(reinterpret_cast<void*>(miopenCreate), &info) != 0 && info.dli_fname != nullptr &&
+       info.dli_fname[0] != '\0')
     {
-        std::unique_ptr<char, decltype(&free)> real(realpath(info.dli_fname, nullptr), free);
-        std::string path(real != nullptr ? real.get() : info.dli_fname);
-        auto slash = path.rfind('/');
-        if(slash != std::string::npos)
-            return path.substr(0, slash);
+        return miopen::weakly_canonical(miopen::fs::path{info.dli_fname}).parent_path();
     }
 #endif
     return {};
+}
+
+void* OpenDynamicLibrary(const miopen::fs::path& library_path)
+{
+#ifdef _WIN32
+    const auto native_path = library_path.wstring();
+    return static_cast<void*>(LoadLibraryW(native_path.c_str()));
+#else
+    // Keep symbols local to avoid accidental global symbol collisions and
+    // preserve RTLD_NODELETE to match the existing unload behavior.
+    constexpr int flags    = RTLD_NOW | RTLD_LOCAL | RTLD_NODELETE;
+    const auto native_path = library_path.string();
+    return dlopen(native_path.c_str(), flags);
+#endif
+}
+
+void CloseDynamicLibrary(void* handle)
+{
+#ifdef _WIN32
+    FreeLibrary(static_cast<HMODULE>(handle));
+#else
+    // RTLD_NODELETE keeps the library mapped, so dlclose only decrements the
+    // reference count without unmapping. We still call it for correctness.
+    dlclose(handle);
+#endif
+}
+
+std::string GetDynamicLoadError()
+{
+#ifdef _WIN32
+    const DWORD err = GetLastError();
+    char* msg       = nullptr;
+    FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+                       FORMAT_MESSAGE_IGNORE_INSERTS,
+                   nullptr,
+                   err,
+                   0,
+                   reinterpret_cast<LPSTR>(&msg),
+                   0,
+                   nullptr);
+    std::string result = msg ? msg : "unknown error";
+    LocalFree(msg);
+    return result;
+#else
+    // NOLINTNEXTLINE(concurrency-mt-unsafe)
+    const char* err = dlerror();
+    return err ? err : "unknown error";
+#endif
+}
+
+void* ResolveDynamicSymbol(void* handle, const char* symbol_name)
+{
+    if(handle == nullptr)
+        return nullptr;
+#ifdef _WIN32
+    return reinterpret_cast<void*>(GetProcAddress(static_cast<HMODULE>(handle), symbol_name));
+#else
+    dlerror();                         // NOLINT(concurrency-mt-unsafe)
+    return dlsym(handle, symbol_name); // NOLINT(concurrency-mt-unsafe)
+#endif
 }
 
 } // namespace
@@ -121,82 +180,45 @@ const CKGroupedConvLibLoader& CKGroupedConvLibLoader::Get(const std::string& dev
 
 CKGroupedConvLibLoader::CKGroupedConvLibLoader(const std::string& device_name)
 {
-    LoadLibrary(device_name);
+    OpenRuntimeLibraryForDevice(device_name);
 }
 
 CKGroupedConvLibLoader::~CKGroupedConvLibLoader()
 {
     if(lib_handle_ != nullptr)
-    {
-#ifdef _WIN32
-        FreeLibrary(static_cast<HMODULE>(lib_handle_));
-#else
-        // RTLD_NODELETE keeps the library mapped, so dlclose only decrements the
-        // reference count without unmapping.  We still call it for correctness.
-        dlclose(lib_handle_);
-#endif
-    }
+        CloseDynamicLibrary(lib_handle_);
 }
 
 // -- Library loading ----------------------------------------------------------
 
-void CKGroupedConvLibLoader::LoadLibrary(const std::string& device_name)
+void CKGroupedConvLibLoader::OpenRuntimeLibraryForDevice(const std::string& device_name)
 {
-    const auto filename = MakeLibraryFilename(device_name);
-
-    // Platform-specific load and error helpers
-#ifdef _WIN32
-    auto try_load = [](const std::string& path) -> void* {
-        return static_cast<void*>(LoadLibraryA(path.c_str()));
-    };
-    auto get_load_error = []() -> std::string {
-        DWORD err = GetLastError();
-        char* msg = nullptr;
-        FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
-                           FORMAT_MESSAGE_IGNORE_INSERTS,
-                       nullptr,
-                       err,
-                       0,
-                       reinterpret_cast<LPSTR>(&msg),
-                       0,
-                       nullptr);
-        std::string result = msg ? msg : "unknown error";
-        LocalFree(msg);
-        return result;
-    };
-#else
-    constexpr int flags = RTLD_NOW | RTLD_NODELETE;
-    auto try_load = [](const std::string& path) -> void* { return dlopen(path.c_str(), flags); };
-    auto get_load_error = []() -> std::string {
-        // NOLINTNEXTLINE(concurrency-mt-unsafe)
-        const char* err = dlerror();
-        return err ? err : "unknown error";
-    };
-#endif
+    const miopen::fs::path filename{MakeLibraryFilename(device_name)};
 
     // 1. Try MIOPEN_CK_LIB_PATH environment variable
     const auto env_path = env::value(MIOPEN_CK_LIB_PATH);
     if(!env_path.empty())
     {
-        auto full_path = env_path + "/" + filename;
-        lib_handle_    = try_load(full_path);
+        const auto full_path = miopen::fs::path{env_path} / filename;
+        lib_handle_          = OpenDynamicLibrary(full_path);
         if(lib_handle_ != nullptr)
         {
-            MIOPEN_LOG_I2("Loaded CK grouped conv library from env path: " << full_path);
+            MIOPEN_LOG_I2("Loaded CK grouped conv library from env path: " << full_path.string());
         }
     }
 
     // 2. Try the directory containing the MIOpen shared library
     if(lib_handle_ == nullptr)
     {
-        auto lib_dir = GetMIOpenLibDir();
+        const auto lib_dir = GetOwningModuleDirectory();
         if(!lib_dir.empty())
         {
-            auto full_path = lib_dir + "/" + filename;
-            lib_handle_    = try_load(full_path);
+            const auto full_path = lib_dir / filename;
+            lib_handle_          = OpenDynamicLibrary(full_path);
             if(lib_handle_ != nullptr)
             {
-                MIOPEN_LOG_I2("Loaded CK grouped conv library from lib dir: " << full_path);
+                MIOPEN_LOG_I2(
+                    "Loaded CK grouped conv library from lib dir: " << full_path.string());
             }
         }
     }
@@ -204,17 +226,18 @@ void CKGroupedConvLibLoader::LoadLibrary(const std::string& device_name)
     // 3. Fall back to default search path
     if(lib_handle_ == nullptr)
     {
-        lib_handle_ = try_load(filename);
+        lib_handle_ = OpenDynamicLibrary(filename);
         if(lib_handle_ != nullptr)
         {
-            MIOPEN_LOG_I2("Loaded CK grouped conv library from default path: " << filename);
+            MIOPEN_LOG_I2(
+                "Loaded CK grouped conv library from default path: " << filename.string());
         }
     }
 
     if(lib_handle_ == nullptr)
     {
         MIOPEN_LOG_W("CK grouped conv library not found for device "
-                     << StripDeviceSuffix(device_name) << ": " << get_load_error());
+                     << StripDeviceSuffix(device_name) << ": " << GetDynamicLoadError());
         return;
     }
 
@@ -244,14 +267,7 @@ void CKGroupedConvLibLoader::LoadLibrary(const std::string& device_name)
 
 void* CKGroupedConvLibLoader::ResolveRawSymbol(const char* symbol_name) const
 {
-    if(lib_handle_ == nullptr)
-        return nullptr;
-#ifdef _WIN32
-    return reinterpret_cast<void*>(GetProcAddress(static_cast<HMODULE>(lib_handle_), symbol_name));
-#else
-    dlerror();                              // NOLINT(concurrency-mt-unsafe)
-    return dlsym(lib_handle_, symbol_name); // NOLINT(concurrency-mt-unsafe)
-#endif
+    return ResolveDynamicSymbol(lib_handle_, symbol_name);
 }
 
 void CKGroupedConvLibLoader::BindRequiredCommonSymbols(std::vector<std::string>& missing)

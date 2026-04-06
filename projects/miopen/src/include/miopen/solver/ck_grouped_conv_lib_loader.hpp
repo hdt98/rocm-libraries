@@ -114,7 +114,7 @@ public:
 private:
     explicit CKGroupedConvLibLoader(const std::string& device_name);
 
-    void LoadLibrary(const std::string& device_name);
+    void OpenRuntimeLibraryForDevice(const std::string& device_name);
     bool LoadSymbols();
     void* ResolveRawSymbol(const char* symbol_name) const;
     void BindRequiredCommonSymbols(std::vector<std::string>& missing);
