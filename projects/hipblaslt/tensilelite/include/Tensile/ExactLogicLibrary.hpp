@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -28,8 +28,10 @@
 
 #include <atomic>
 
+#include <Tensile/AMDGPU.hpp>
 #include <Tensile/ContractionProblemPredicates.hpp>
 #include <Tensile/Debug.hpp>
+#include <Tensile/PredicateDebugger.hpp>
 #include <Tensile/Predicates.hpp>
 #include <Tensile/SolutionLibrary.hpp>
 #include <type_traits>
@@ -117,7 +119,14 @@ namespace TensileLite
                         rv->tag = MySolution::MatchingTag::Equal;
 
                     if(rv)
+                    {
+                        if(Debug::Instance().printDeviceSelection())
+                        {
+                            std::cout << "  Solution found: " << rv->name()
+                                      << " [MatchingTag: " << rv->matchingTag() << "]" << std::endl;
+                        }
                         return rv;
+                    }
                 }
             }
 
@@ -131,14 +140,24 @@ namespace TensileLite
                              = SolutionLibrarySearchType::DEFAULT) const override
         {
             SolutionSet<MySolution> rv;
-            const bool              streamK = Debug::Instance().useExperimentalSelection() == 2;
+            const bool              debug       = Debug::Instance().printPropertyEvaluation();
+            const bool              streamK     = Debug::Instance().useExperimentalSelection() == 2;
             const auto&             excludedLib = Debug::Instance().excludedLibFromGetAll();
+
+            auto amdGPU             = static_cast<AMDGPU const*>(&hardware);
+            bool isStandardCUDevice = amdGPU->isStandardCU();
 
             for(auto const& row : rows)
             {
-                // we want to exclude this lib from getAll
-                if(excludedLib.count(row.first.value->type()))
-                    continue;
+                // we want to exclude this lib from getAll. If the Set is not empty,
+                // it means we want to skip searched GridBased, Prediction.
+                // But if this is a non-standard-CU GPU, we still need to search all for CU-Fallback solutions.
+                // In this case, we don't skip the excludedLib.
+                if(!excludedLib.empty() && isStandardCUDevice)
+                {
+                    if(excludedLib.count(row.first.value->type()))
+                        continue;
+                }
 
                 if(row.first.value->type() == "ExperimentalStreamK" && !streamK)
                     continue;
@@ -148,32 +167,41 @@ namespace TensileLite
 
                 auto rowSolutions = row.second->findAllSolutions(problem, hardware, searchType);
 
+                // hipblaslt_ext::matmulIsTuned() -> rocblaslt_matmul_is_tuned() needs this Equal test
                 if(dynamic_cast<Predicates::Contraction::EqualityMatching*>(row.first.value.get()))
                 {
                     for(auto& sol : rowSolutions)
                         sol->tag = MySolution::MatchingTag::Equal;
                 }
-                else if(dynamic_cast<Predicates::Contraction::GridBasedMatching*>(row.first.value.get()))
+                // except for Equal, we test others only when debug mode.
+                else if(debug)
                 {
-                    for(auto& sol : rowSolutions)
-                        sol->tag = MySolution::MatchingTag::GridBased;
+                    if(dynamic_cast<Predicates::Contraction::GridBasedMatching*>(
+                           row.first.value.get()))
+                    {
+                        for(auto& sol : rowSolutions)
+                            sol->tag = MySolution::MatchingTag::GridBased;
+                    }
+                    else if(dynamic_cast<Predicates::Contraction::RangeMatching*>(
+                                row.first.value.get()))
+                    {
+                        for(auto& sol : rowSolutions)
+                            sol->tag = MySolution::MatchingTag::Range;
+                    }
+                    else if(dynamic_cast<Predicates::Contraction::FreeSizeMatching*>(
+                                row.first.value.get()))
+                    {
+                        for(auto& sol : rowSolutions)
+                            sol->tag = MySolution::MatchingTag::FreeSize;
+                    }
+                    else if(dynamic_cast<Predicates::Contraction::PredictionMatching*>(
+                                row.first.value.get()))
+                    {
+                        for(auto& sol : rowSolutions)
+                            sol->tag = MySolution::MatchingTag::Prediction;
+                    }
+                    // TODO- Experimental?
                 }
-                else if(dynamic_cast<Predicates::Contraction::RangeMatching*>(row.first.value.get()))
-                {
-                    for(auto& sol : rowSolutions)
-                        sol->tag = MySolution::MatchingTag::Range;
-                }
-                else if(dynamic_cast<Predicates::Contraction::FreeSizeMatching*>(row.first.value.get()))
-                {
-                    for(auto& sol : rowSolutions)
-                        sol->tag = MySolution::MatchingTag::FreeSize;
-                }
-                else if(dynamic_cast<Predicates::Contraction::PredictionMatching*>(row.first.value.get()))
-                {
-                    for(auto& sol : rowSolutions)
-                        sol->tag = MySolution::MatchingTag::Prediction;
-                }
-                // TODO- Experimental?
 
                 rv.insert(rowSolutions.begin(), rowSolutions.end());
             }
@@ -212,6 +240,7 @@ namespace TensileLite
                                                             int numSolutions) const override
         {
             SolutionVector<MySolution> rv, solutions;
+            const bool                 debug   = Debug::Instance().printPropertyEvaluation();
             const bool                 streamK = Debug::Instance().useExperimentalSelection() == 2;
             const bool                 predictionLib = Debug::Instance().usePredictionLibrary();
 
@@ -223,8 +252,9 @@ namespace TensileLite
                 if(row.first.value->type() == "ExperimentalStreamK" && !streamK)
                     continue;
 
-                if(predictionLib && ((row.first.value->type() == "EqualityMatching")
-                                     || (row.first.value->type() == "RangeMatching")))
+                if(predictionLib
+                   && ((row.first.value->type() == "EqualityMatching")
+                       || (row.first.value->type() == "RangeMatching")))
                     continue;
 
                 if(row.first(problem, hardware))
@@ -232,32 +262,42 @@ namespace TensileLite
                     solutions
                         = row.second->findTopSolutions(problem, hardware, numSolutions - rv.size());
 
-                    if(dynamic_cast<Predicates::Contraction::EqualityMatching*>(row.first.value.get()))
+                    // hipblaslt_ext::matmulIsTuned() -> rocblaslt_matmul_is_tuned() needs this Equal test
+                    if(dynamic_cast<Predicates::Contraction::EqualityMatching*>(
+                           row.first.value.get()))
                     {
                         for(auto& sol : solutions)
                             sol->tag = MySolution::MatchingTag::Equal;
                     }
-                    else if(dynamic_cast<Predicates::Contraction::GridBasedMatching*>(row.first.value.get()))
+                    // except for Equal, we test others only when debug mode.
+                    else if(debug)
                     {
-                        for(auto& sol : solutions)
-                            sol->tag = MySolution::MatchingTag::GridBased;
+                        if(dynamic_cast<Predicates::Contraction::GridBasedMatching*>(
+                               row.first.value.get()))
+                        {
+                            for(auto& sol : solutions)
+                                sol->tag = MySolution::MatchingTag::GridBased;
+                        }
+                        else if(dynamic_cast<Predicates::Contraction::RangeMatching*>(
+                                    row.first.value.get()))
+                        {
+                            for(auto& sol : solutions)
+                                sol->tag = MySolution::MatchingTag::Range;
+                        }
+                        else if(dynamic_cast<Predicates::Contraction::FreeSizeMatching*>(
+                                    row.first.value.get()))
+                        {
+                            for(auto& sol : solutions)
+                                sol->tag = MySolution::MatchingTag::FreeSize;
+                        }
+                        else if(dynamic_cast<Predicates::Contraction::PredictionMatching*>(
+                                    row.first.value.get()))
+                        {
+                            for(auto& sol : solutions)
+                                sol->tag = MySolution::MatchingTag::Prediction;
+                        }
+                        // TODO- Experimental
                     }
-                    else if(dynamic_cast<Predicates::Contraction::RangeMatching*>(row.first.value.get()))
-                    {
-                        for(auto& sol : solutions)
-                            sol->tag = MySolution::MatchingTag::Range;
-                    }
-                    else if(dynamic_cast<Predicates::Contraction::FreeSizeMatching*>(row.first.value.get()))
-                    {
-                        for(auto& sol : solutions)
-                            sol->tag = MySolution::MatchingTag::FreeSize;
-                    }
-                    else if(dynamic_cast<Predicates::Contraction::PredictionMatching*>(row.first.value.get()))
-                    {
-                        for(auto& sol : solutions)
-                            sol->tag = MySolution::MatchingTag::Prediction;
-                    }
-                    // TODO- Experimental
 
                     rv.insert(std::end(rv), std::begin(solutions), std::end(solutions));
                     if(rv.size() == numSolutions)
@@ -312,14 +352,16 @@ namespace TensileLite
         bool operator()(Any const& problem, Hardware const& hardware) const
         {
             bool debug = Debug::Instance().printDeviceSelection();
+            bool rv    = (*value)(hardware);
 
             if(debug)
             {
+                PredicateDebugger::printHeader(std::cout, "ExactLogic: Hardware");
                 value->debugEval(hardware, std::cout);
-                std::cout << std::endl;
+                PredicateDebugger::printFooter(std::cout, rv);
             }
 
-            return (*value)(hardware);
+            return rv;
         }
     };
 
@@ -364,14 +406,16 @@ namespace TensileLite
         bool operator()(MyProblem const& problem, Hardware const& hardware) const
         {
             bool debug = Debug::Instance().printPredicateEvaluation();
+            bool rv    = (*value)(problem);
 
             if(debug)
             {
+                PredicateDebugger::printHeader(std::cout, "ExactLogic: Problem");
                 value->debugEval(problem, std::cout);
-                std::cout << std::endl;
+                PredicateDebugger::printFooter(std::cout, rv);
             }
 
-            return (*value)(problem);
+            return rv;
         }
     };
 

@@ -125,8 +125,9 @@ inline bool is_gfx101_supported()
 inline bool is_gfx103_supported()
 {
     return ck::get_device_name() == "gfx1030" || ck::get_device_name() == "gfx1031" ||
-           ck::get_device_name() == "gfx1032" || ck::get_device_name() == "gfx1034" ||
-           ck::get_device_name() == "gfx1035" || ck::get_device_name() == "gfx1036";
+           ck::get_device_name() == "gfx1032" || ck::get_device_name() == "gfx1033" ||
+           ck::get_device_name() == "gfx1034" || ck::get_device_name() == "gfx1035" ||
+           ck::get_device_name() == "gfx1036";
 }
 
 inline bool is_wmma_supported()
@@ -137,6 +138,23 @@ inline bool is_wmma_supported()
 inline bool is_tf32_supported()
 {
     return ck::get_device_name() == "gfx942" || ck::get_device_name() == "gfx950";
+}
+
+inline int __host__ get_lds_size()
+{
+    int device  = 0;
+    int result  = 0;
+    auto status = hipGetDevice(&device);
+    if(status == hipSuccess)
+    {
+        status = hipDeviceGetAttribute(&result, hipDeviceAttributeMaxSharedMemoryPerBlock, device);
+        if(status == hipSuccess)
+        {
+            return result;
+        }
+    }
+
+    return 64 * 1024;
 }
 
 } // namespace ck

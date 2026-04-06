@@ -11,7 +11,7 @@
 
 #include "engines/plans/MiopenBatchnormApplicabilityChecks.hpp"
 
-using namespace miopen_legacy_plugin;
+using namespace miopen_plugin;
 
 namespace
 {
@@ -112,6 +112,20 @@ inline std::string generateName(const std::vector<int64_t>& dims, const TensorLa
 // Shape collections (layout-independent)
 namespace shapes
 {
+// 3D shapes for inference/backward (NCL format: N=batch, C=channels, L=length)
+inline const std::vector<std::vector<int64_t>> INFERENCE_3D = {
+    {1, 3, 224},
+    {2, 16, 512},
+    {1, 64, 1024},
+};
+
+// 3D shapes for training (sufficient spatial: B×L > 1)
+inline const std::vector<std::vector<int64_t>> TRAINING_3D = {
+    {1, 3, 14},
+    {2, 16, 28},
+    {4, 8, 56},
+};
+
 // 4D shapes for inference/backward (larger spatial dimensions)
 inline const std::vector<std::vector<int64_t>> INFERENCE_4D = {
     {1, 3, 56, 56},
@@ -142,12 +156,17 @@ inline const std::vector<std::vector<int64_t>> TRAINING_5D = {
 };
 
 // Edge case shapes for specific test scenarios
+inline const std::vector<int64_t> DEGENERATE_3D = {1, 1, 1};
 inline const std::vector<int64_t> DEGENERATE_4D = {1, 1, 1, 1};
+inline const std::vector<int64_t> INSUFFICIENT_SPATIAL_3D = {1, 3, 1};
 inline const std::vector<int64_t> INSUFFICIENT_SPATIAL_4D = {1, 3, 1, 1};
+inline const std::vector<int64_t> DIFFERENT_CHANNELS_3D = {1, 5, 224};
 inline const std::vector<int64_t> DIFFERENT_CHANNELS_4D = {1, 5, 224, 224};
 } // namespace shapes
 
 // Test-specific: iteration arrays (use struct pointers or references)
+inline const std::vector<const TensorLayout*> LAYOUTS_3D = {&TensorLayout::NCL, &TensorLayout::NLC};
+
 inline const std::vector<const TensorLayout*> LAYOUTS_4D
     = {&TensorLayout::NCHW, &TensorLayout::NHWC};
 
@@ -162,23 +181,33 @@ using DT = hipdnn_data_sdk::data_objects::DataType;
 // Documents what type combinations are NOT supported by MIOpen
 inline const std::vector<BnTensorTypes> INVALID_ALL = {
     // Invalid IO type (IO must be FLOAT/HALF/BFLOAT16)
-    {DT::UINT8, DT::FLOAT, DT::FLOAT}, // IO=UINT8 (unsupported)
+    {DT::UINT8, DT::FLOAT, DT::FLOAT, DT::FLOAT}, // IO=UINT8 (unsupported)
 
     // Invalid affine types (scale/bias must be FLOAT)
-    {DT::HALF, DT::HALF, DT::FLOAT}, // IO=HALF, Affine=HALF
-    {DT::BFLOAT16, DT::HALF, DT::FLOAT}, // IO=BFLOAT16, Affine=HALF
-    {DT::BFLOAT16, DT::BFLOAT16, DT::FLOAT}, // IO=BFLOAT16, Affine=BFLOAT16
+    {DT::HALF, DT::HALF, DT::FLOAT, DT::FLOAT}, // IO=HALF, Affine=HALF
+    {DT::BFLOAT16, DT::HALF, DT::FLOAT, DT::FLOAT}, // IO=BFLOAT16, Affine=HALF
+    {DT::BFLOAT16, DT::BFLOAT16, DT::FLOAT, DT::FLOAT}, // IO=BFLOAT16, Affine=BFLOAT16
 
     // Invalid stat types (mean/variance must be FLOAT)
-    {DT::HALF, DT::FLOAT, DT::HALF}, // IO=HALF, Stat=HALF
-    {DT::BFLOAT16, DT::FLOAT, DT::HALF}, // IO=BFLOAT16, Stat=HALF
-    {DT::BFLOAT16, DT::FLOAT, DT::BFLOAT16}, // IO=BFLOAT16, Stat=BFLOAT16
+    {DT::HALF, DT::FLOAT, DT::HALF, DT::FLOAT}, // IO=HALF, Stat=HALF
+    {DT::BFLOAT16, DT::FLOAT, DT::HALF, DT::FLOAT}, // IO=BFLOAT16, Stat=HALF
+    {DT::BFLOAT16, DT::FLOAT, DT::BFLOAT16, DT::FLOAT}, // IO=BFLOAT16, Stat=BFLOAT16
 
     // Both affine and stat invalid (must be FLOAT)
-    {DT::HALF, DT::HALF, DT::HALF}, // All HALF
-    {DT::BFLOAT16, DT::BFLOAT16, DT::BFLOAT16}, // All BFLOAT16
-    {DT::BFLOAT16, DT::HALF, DT::HALF}, // Mixed invalid
+    {DT::HALF, DT::HALF, DT::HALF, DT::FLOAT}, // All HALF
+    {DT::BFLOAT16, DT::BFLOAT16, DT::BFLOAT16, DT::FLOAT}, // All BFLOAT16
+    {DT::BFLOAT16, DT::HALF, DT::HALF, DT::FLOAT}, // Mixed invalid
 };
+
+// Invalid configs for fused operations (intermediate tensor data type errors)
+inline const std::vector<BnTensorTypes> INVALID_FUSED_ALL = []() {
+    auto configs = INVALID_ALL;
+    configs.push_back({DT::FLOAT, DT::FLOAT, DT::FLOAT, DT::HALF});
+    configs.push_back({DT::HALF, DT::FLOAT, DT::FLOAT, DT::HALF});
+    configs.push_back({DT::FLOAT, DT::FLOAT, DT::FLOAT, DT::BFLOAT16});
+    return configs;
+}();
+
 } // namespace type_configs
 
 } // namespace canonical_layouts
@@ -472,9 +501,10 @@ inline std::vector<TensorConfig> createBatchnormFusedBackwardTensors(
         createAffineTensor(UIDs::DBIAS, "dbias", types.affine, derivedDims, derivedStrides));
 
     // Virtual tensors (BN_Y, DX_drelu)
-    configs.push_back(createIoTensor(UIDs::BN_Y_VIRTUAL, "BN_Y", types.io, dims, strides, true));
     configs.push_back(
-        createIoTensor(UIDs::DX_DRELU_VIRTUAL, "DX_drelu", types.io, dims, strides, true));
+        createIoTensor(UIDs::BN_Y_VIRTUAL, "BN_Y", types.intermediate, dims, strides, true));
+    configs.push_back(createIoTensor(
+        UIDs::DX_DRELU_VIRTUAL, "DX_drelu", types.intermediate, dims, strides, true));
 
     return configs;
 }
@@ -652,6 +682,7 @@ struct TensorDataTypesComponentTestCase
     std::vector<int64_t> ioTensorIds;
     std::vector<int64_t> affineTensorIds;
     std::vector<int64_t> statTensorIds;
+    std::vector<int64_t> intermediateTensorIds;
 
     friend std::ostream& operator<<(std::ostream& os, const TensorDataTypesComponentTestCase& tc)
     {
@@ -1270,26 +1301,30 @@ inline flatbuffers::FlatBufferBuilder buildBatchnormInferenceWithVarianceFusedGr
 
 // --- Test Data Providers: Layer 1 (Atomic Validators) ---
 
-// Only 4D and 5D tensors work with batchnorm
+// 3D, 4D and 5D tensors work with batchnorm
 inline std::vector<DimensionCountTestCase> getValidateDimensionCountTestCases()
 {
     return {
         // Happy paths - supported dimensions
+        {"Accepts3D", true, 3},
         {"Accepts4D", true, 4},
         {"Accepts5D", true, 5},
 
         // Unhappy paths - unsupported dimensions
-        {"Rejects3D", false, 3},
         {"Rejects6D", false, 6},
         {"Rejects2D", false, 2},
         {"Rejects1D", false, 1},
     };
 }
 
-// Only NCHW/NHWC (4D) and NCDHW/NDHWC (5D) layouts are supported
+// NCL/NLC (3D), NCHW/NHWC (4D) and NCDHW/NDHWC (5D) layouts are supported
 inline std::vector<SupportedLayoutTestCase> getValidateSupportedLayoutTestCases()
 {
     return {
+        // Happy paths - 3D supported layouts
+        {"AcceptsNcl3D", true, {2, 1, 0}, 3}, // NCL stride order
+        {"AcceptsNlc3D", true, {2, 0, 1}, 3}, // NLC stride order
+
         // Happy paths - 4D supported layouts
         {"AcceptsNchw4D", true, {3, 2, 1, 0}, 4}, // NCHW stride order
         {"AcceptsNhwc4D", true, {3, 0, 2, 1}, 4}, // NHWC stride order
@@ -1297,6 +1332,10 @@ inline std::vector<SupportedLayoutTestCase> getValidateSupportedLayoutTestCases(
         // Happy paths - 5D supported layouts
         {"AcceptsNcdhw5D", true, {4, 3, 2, 1, 0}, 5}, // NCDHW stride order
         {"AcceptsNdhwc5D", true, {4, 0, 3, 2, 1}, 5}, // NDHWC stride order
+
+        // Unhappy paths - unsupported 3D layouts
+        {"RejectsInvalid3D_AllReversed", false, {0, 1, 2}, 3},
+        {"RejectsInvalid3D_Random", false, {1, 0, 2}, 3},
 
         // Unhappy paths - unsupported 4D layouts
         {"RejectsInvalid4D_AllReversed", false, {0, 1, 2, 3}, 4},
@@ -1313,8 +1352,11 @@ inline std::vector<TensorDescriptorListTestCase> getValidateConsistentDimensions
 {
     using namespace canonical_layouts;
 
+    auto dims3D = shapes::INFERENCE_3D[0]; // {1, 3, 224}
     auto dims4D = shapes::INFERENCE_4D[2]; // {1, 3, 224, 224}
     auto dims5D = shapes::INFERENCE_5D[0]; // {1, 3, 16, 224, 224}
+    auto strides3D
+        = hipdnn_data_sdk::utilities::generateStrides(dims3D, TensorLayout::NCL.strideOrder);
     auto strides4D
         = hipdnn_data_sdk::utilities::generateStrides(dims4D, TensorLayout::NCHW.strideOrder);
     auto strides5D
@@ -1322,6 +1364,7 @@ inline std::vector<TensorDescriptorListTestCase> getValidateConsistentDimensions
 
     return {
         // Happy paths - consistent dimensions
+        {"AcceptsSame3D_TwoTensors", true, {dims3D, dims3D}, {strides3D, strides3D}},
         {"AcceptsSame4D_TwoTensors", true, {dims4D, dims4D}, {strides4D, strides4D}},
         {"AcceptsSame5D_ThreeTensors",
          true,
@@ -1331,6 +1374,7 @@ inline std::vector<TensorDescriptorListTestCase> getValidateConsistentDimensions
         {"AcceptsSingleTensor", true, {dims4D}, {strides4D}},
 
         // Unhappy paths - inconsistent dimensions
+        {"RejectsMixed3D4D", false, {dims3D, dims4D}, {strides3D, strides4D}},
         {"RejectsMixed4D5D", false, {dims4D, dims5D}, {strides4D, strides5D}},
         {"RejectsMixed5D4D", false, {dims5D, dims4D}, {strides5D, strides4D}},
     };
@@ -1341,8 +1385,13 @@ inline std::vector<TensorDescriptorListTestCase> getValidatePackedTensorsTestCas
 {
     using namespace canonical_layouts;
 
+    auto dims3D = shapes::INFERENCE_3D[0]; // {1, 3, 224}
     auto dims4D = shapes::INFERENCE_4D[2]; // {1, 3, 224, 224}
     auto dims5D = shapes::INFERENCE_5D[0]; // {1, 3, 16, 224, 224}
+    auto nclStrides
+        = hipdnn_data_sdk::utilities::generateStrides(dims3D, TensorLayout::NCL.strideOrder);
+    auto nlcStrides
+        = hipdnn_data_sdk::utilities::generateStrides(dims3D, TensorLayout::NLC.strideOrder);
     auto nchwStrides
         = hipdnn_data_sdk::utilities::generateStrides(dims4D, TensorLayout::NCHW.strideOrder);
     auto nhwcStrides
@@ -1352,12 +1401,15 @@ inline std::vector<TensorDescriptorListTestCase> getValidatePackedTensorsTestCas
 
     return {
         // Happy paths - packed tensors
+        {"AcceptsPacked3D_NCL", true, {dims3D}, {nclStrides}},
+        {"AcceptsPacked3D_NLC", true, {dims3D}, {nlcStrides}},
         {"AcceptsPacked4D_NCHW", true, {dims4D}, {nchwStrides}},
         {"AcceptsPacked4D_NHWC", true, {dims4D}, {nhwcStrides}},
         {"AcceptsPacked5D_NCDHW", true, {dims5D}, {ncdhwStrides}},
         {"AcceptsMultiplePacked", true, {dims4D, dims4D}, {nchwStrides, nhwcStrides}},
 
         // Unhappy paths - non-packed tensors
+        {"RejectsNonPacked3D_ExtraStride", false, {dims3D}, {{1000, 250, 1}}},
         {"RejectsNonPacked_ExtraStride", false, {dims4D}, {{200000, 60000, 250, 1}}},
         {"RejectsNonPacked_Gaps", false, {dims4D}, {{151000, 50200, 225, 1}}},
         {"RejectsOneNonPacked", false, {dims4D, dims4D}, {nchwStrides, {200000, 60000, 250, 1}}},
@@ -1369,8 +1421,13 @@ inline std::vector<TensorDescriptorListTestCase> getValidateConsistentLayoutsTes
 {
     using namespace canonical_layouts;
 
+    auto dims3D = shapes::INFERENCE_3D[0]; // {1, 3, 224}
     auto dims4D = shapes::INFERENCE_4D[2]; // {1, 3, 224, 224}
     auto dims5D = shapes::INFERENCE_5D[0]; // {1, 3, 16, 224, 224}
+    auto nclStrides
+        = hipdnn_data_sdk::utilities::generateStrides(dims3D, TensorLayout::NCL.strideOrder);
+    auto nlcStrides
+        = hipdnn_data_sdk::utilities::generateStrides(dims3D, TensorLayout::NLC.strideOrder);
     auto nchwStrides
         = hipdnn_data_sdk::utilities::generateStrides(dims4D, TensorLayout::NCHW.strideOrder);
     auto nhwcStrides
@@ -1384,6 +1441,8 @@ inline std::vector<TensorDescriptorListTestCase> getValidateConsistentLayoutsTes
 
     return {
         // Happy paths - consistent layouts
+        {"AcceptsSameNcl", true, {dims3D, dims3D}, {nclStrides, nclStrides}},
+        {"AcceptsSameNlc", true, {dims3D, dims3D}, {nlcStrides, nlcStrides}},
         {"AcceptsSameNchw", true, {dims4D, dims4D}, {nchwStrides, nchwStrides}},
         {"AcceptsSameNhwc", true, {dims4D, dims4D}, {nhwcStrides, nhwcStrides}},
         {"AcceptsSameNcdhw", true, {dims5D, dims5D}, {ncdhwStrides, ncdhwStrides}},
@@ -1393,6 +1452,7 @@ inline std::vector<TensorDescriptorListTestCase> getValidateConsistentLayoutsTes
          {nchwStrides, degenerateStrides}},
 
         // Unhappy paths - inconsistent layouts
+        {"RejectsMixedNclNlc", false, {dims3D, dims3D}, {nclStrides, nlcStrides}},
         {"RejectsMixedNchwNhwc", false, {dims4D, dims4D}, {nchwStrides, nhwcStrides}},
         {"RejectsMixedNcdhwNdhwc", false, {dims5D, dims5D}, {ncdhwStrides, ndhwcStrides}},
     };
@@ -1421,20 +1481,36 @@ inline std::vector<SpatialDimensionsTestCase> getValidateSpatialDimensionsTestCa
     using namespace canonical_layouts;
 
     return {
-        // Happy paths - sufficient spatial dimensions (B × S > 1)
+        // Happy paths - sufficient spatial dimensions for 3D (B × L > 1)
+        {"AcceptsSufficientSpatial3D_LargeSpatial", true, shapes::INFERENCE_3D[0]}, // {1, 3, 224}
+        {"AcceptsSufficientSpatial3D_LargeBatch", true, {2, 3, 1}}, // B=2, L=1 → B×L=2 > 1
+        {"AcceptsSufficientSpatial3D_LargeLength", true, {1, 3, 512}}, // B=1, L=512 → B×L=512 > 1
+
+        // Happy paths - sufficient spatial dimensions for 4D (B × H × W > 1)
         {"AcceptsSufficientSpatial4D_LargeBatch",
          true,
          shapes::INFERENCE_4D[3]}, // {2, 3, 224, 224}
-        {"AcceptsSufficientSpatial5D", true, shapes::INFERENCE_5D[0]}, // {1, 3, 16, 224, 224}
         {"AcceptsBatch2Spatial1", true, {2, 3, 1, 1}}, // B=2, S=1 → B×S=2 > 1
         {"AcceptsBatch1Spatial2", true, {1, 3, 2, 1}}, // B=1, S=2 → B×S=2 > 1
         {"AcceptsLargeSpatial", true, {1, 3, 512, 512}},
 
-        // Unhappy paths - insufficient spatial dimensions (B × S ≤ 1)
+        // Happy paths - sufficient spatial dimensions for 5D (B × D × H × W > 1)
+        {"AcceptsSufficientSpatial5D", true, shapes::INFERENCE_5D[0]}, // {1, 3, 16, 224, 224}
+
+        // Unhappy paths - insufficient spatial dimensions for 3D (B × L ≤ 1)
+        {"RejectsBatch1Spatial1_3D", false, shapes::INSUFFICIENT_SPATIAL_3D}, // {1, 3, 1}
+        {"RejectsBatch1Length1_3D", false, {1, 64, 1}}, // B=1, L=1 → B×L=1 ≤ 1
+
+        // Unhappy paths - insufficient spatial dimensions for 4D (B × S ≤ 1)
         {"RejectsBatch1Spatial1_4D", false, shapes::INSUFFICIENT_SPATIAL_4D}, // {1, 3, 1, 1}
+
+        // Unhappy paths - insufficient spatial dimensions for 5D
         {"RejectsBatch1Spatial1_5D", false, {1, 3, 1, 1, 1}}, // B=1, S=1 → B×S=1 ≤ 1
+
+        // Unhappy paths - zero dimensions
         {"RejectsZeroBatch", false, {0, 3, 224, 224}}, // B=0 → B×S=0 ≤ 1
         {"RejectsZeroSpatial", false, {2, 3, 0, 0}}, // S=0 → B×S=0 ≤ 1
+        {"RejectsZeroLength3D", false, {1, 3, 0}}, // B=1, L=0 → B×L=0 ≤ 1
     };
 }
 
@@ -1599,8 +1675,13 @@ inline std::vector<TensorLayoutsAndDimsTestCase> getCheckTensorLayoutsAndDimsSup
     using namespace canonical_layouts;
     using DT = hipdnn_data_sdk::data_objects::DataType;
 
+    auto dims3D = shapes::INFERENCE_3D[0]; // {1, 3, 224}
     auto dims4D = shapes::INFERENCE_4D[2]; // {1, 3, 224, 224}
     auto dims5D = shapes::INFERENCE_5D[0]; // {1, 3, 16, 224, 224}
+    auto nclStrides
+        = hipdnn_data_sdk::utilities::generateStrides(dims3D, TensorLayout::NCL.strideOrder);
+    auto nlcStrides
+        = hipdnn_data_sdk::utilities::generateStrides(dims3D, TensorLayout::NLC.strideOrder);
     auto nchwStrides
         = hipdnn_data_sdk::utilities::generateStrides(dims4D, TensorLayout::NCHW.strideOrder);
     auto nhwcStrides
@@ -1612,25 +1693,36 @@ inline std::vector<TensorLayoutsAndDimsTestCase> getCheckTensorLayoutsAndDimsSup
 
     return {
         // Happy paths - valid layouts and dimensions
+        {"AcceptsNcl3D", true, {{1, "x", DT::FLOAT, dims3D, nclStrides, ""}}},
+        {"AcceptsNlc3D", true, {{1, "x", DT::FLOAT, dims3D, nlcStrides, ""}}},
         {"AcceptsNchw4D", true, {{1, "x", DT::FLOAT, dims4D, nchwStrides, ""}}},
         {"AcceptsNhwc4D", true, {{1, "x", DT::FLOAT, dims4D, nhwcStrides, ""}}},
         {"AcceptsNcdhw5D", true, {{1, "x", DT::FLOAT, dims5D, ncdhwStrides, ""}}},
         {"AcceptsNdhwc5D", true, {{1, "x", DT::FLOAT, dims5D, ndhwcStrides, ""}}},
 
         // Unhappy paths - mixed layouts
+        {"RejectsMixedNclNlc",
+         false,
+         {{1, "x1", DT::FLOAT, dims3D, nclStrides, ""},
+          {2, "x2", DT::FLOAT, dims3D, nlcStrides, ""}}},
         {"RejectsMixedNchwNhwc",
          false,
          {{1, "x1", DT::FLOAT, dims4D, nchwStrides, ""},
           {2, "x2", DT::FLOAT, dims4D, nhwcStrides, ""}}},
 
         // Unhappy paths - mixed dimensions
+        {"RejectsMixed3D4D",
+         false,
+         {{1, "x1", DT::FLOAT, dims3D, nclStrides, ""},
+          {2, "x2", DT::FLOAT, dims4D, nchwStrides, ""}}},
         {"RejectsMixed4D5D",
          false,
          {{1, "x1", DT::FLOAT, dims4D, nchwStrides, ""},
           {2, "x2", DT::FLOAT, dims5D, ncdhwStrides, ""}}},
 
         // Unhappy paths - non-packed tensors
-        {"RejectsNonPacked", false, {{1, "x", DT::FLOAT, dims4D, {200000, 60000, 250, 1}, ""}}},
+        {"RejectsNonPacked3D", false, {{1, "x", DT::FLOAT, dims3D, {1000, 250, 1}, ""}}},
+        {"RejectsNonPacked4D", false, {{1, "x", DT::FLOAT, dims4D, {200000, 60000, 250, 1}, ""}}},
     };
 }
 
@@ -1654,46 +1746,70 @@ inline std::vector<TensorDataTypesComponentTestCase> getCheckTensorDataTypesSupp
          {{1, "x", DT::FLOAT, ioDims, ioStrides, ""},
           {2, "y", DT::FLOAT, ioDims, ioStrides, ""},
           {3, "scale", DT::FLOAT, derivedDims, derivedStrides, ""},
-          {4, "bias", DT::FLOAT, derivedDims, derivedStrides, ""}},
-         {1, 2},
+          {4, "bias", DT::FLOAT, derivedDims, derivedStrides, ""},
+          {5, "activ_out", DT::FLOAT, ioDims, ioStrides, ""}},
+         {1, 5},
          {3, 4},
-         {}},
+         {},
+         {2}},
         {"AcceptsHalf_IO",
          true,
          {{1, "x", DT::HALF, ioDims, ioStrides, ""},
-          {2, "y", DT::HALF, ioDims, ioStrides, ""},
+          {2, "y", DT::FLOAT, ioDims, ioStrides, ""},
           {3, "scale", DT::FLOAT, derivedDims, derivedStrides, ""},
-          {4, "bias", DT::FLOAT, derivedDims, derivedStrides, ""}},
-         {1, 2},
+          {4, "bias", DT::FLOAT, derivedDims, derivedStrides, ""},
+          {5, "activ_out", DT::HALF, ioDims, ioStrides, ""}},
+         {1, 5},
          {3, 4},
-         {}},
+         {},
+         {2}},
         {"AcceptsBfloat16_IO",
          true,
          {{1, "x", DT::BFLOAT16, ioDims, ioStrides, ""},
-          {2, "y", DT::BFLOAT16, ioDims, ioStrides, ""},
+          {2, "y", DT::FLOAT, ioDims, ioStrides, ""},
           {3, "scale", DT::FLOAT, derivedDims, derivedStrides, ""},
-          {4, "bias", DT::FLOAT, derivedDims, derivedStrides, ""}},
-         {1, 2},
+          {4, "bias", DT::FLOAT, derivedDims, derivedStrides, ""},
+          {5, "activ_out", DT::BFLOAT16, ioDims, ioStrides, ""}},
+         {1, 5},
          {3, 4},
-         {}},
+         {},
+         {2}},
 
-        // Unhappy paths - invalid IO data type
-        {"RejectsInvalidIoDataType",
+        // Unhappy paths - invalid data types
+        {"RejectsInvalidInputDataType",
          false,
-         {{1, "x", DT::UINT8, ioDims, ioStrides, ""},
-          {3, "scale", DT::FLOAT, derivedDims, derivedStrides, ""}},
-         {1},
-         {3},
-         {}},
+         {{1, "x", DT::UINT8, ioDims, ioStrides, ""}, // Invalid
+          {2, "y", DT::FLOAT, ioDims, ioStrides, ""},
+          {3, "scale", DT::FLOAT, derivedDims, derivedStrides, ""},
+          {4, "bias", DT::FLOAT, derivedDims, derivedStrides, ""},
+          {5, "activ_out", DT::HALF, ioDims, ioStrides, ""}},
+         {1, 5},
+         {3, 4},
+         {},
+         {2}},
 
-        // Unhappy paths - invalid affine data type (must be FLOAT)
-        {"RejectsInvalidAffineDataType",
+        {"RejectsInvalidAffineType",
          false,
-         {{1, "x", DT::FLOAT, ioDims, ioStrides, ""},
-          {3, "scale", DT::HALF, derivedDims, derivedStrides, ""}},
-         {1},
-         {3},
-         {}},
+         {{1, "x", DT::HALF, ioDims, ioStrides, ""},
+          {2, "y", DT::FLOAT, ioDims, ioStrides, ""},
+          {3, "scale", DT::HALF, derivedDims, derivedStrides, ""}, // Invalid
+          {4, "bias", DT::HALF, derivedDims, derivedStrides, ""}, // Invalid
+          {5, "activ_out", DT::HALF, ioDims, ioStrides, ""}},
+         {1, 5},
+         {3, 4},
+         {},
+         {2}},
+        {"RejectsInvalidIntermediateDataType",
+         false,
+         {{1, "x", DT::HALF, ioDims, ioStrides, ""},
+          {2, "y", DT::HALF, ioDims, ioStrides, ""}, // Invalid
+          {3, "scale", DT::FLOAT, derivedDims, derivedStrides, ""},
+          {4, "bias", DT::FLOAT, derivedDims, derivedStrides, ""},
+          {5, "activ_out", DT::HALF, ioDims, ioStrides, ""}},
+         {1, 5},
+         {3, 4},
+         {},
+         {2}},
     };
 }
 
@@ -1797,6 +1913,27 @@ inline std::vector<BatchnormInferenceConfigTestCase>
     using UIDs = BnCommonTensorIds;
 
     std::vector<BatchnormInferenceConfigTestCase> cases;
+
+    // Happy paths - 3D shapes × 3D layouts × all valid type configurations
+    for(const auto& dims : shapes::INFERENCE_3D)
+    {
+        for(const auto* layout : LAYOUTS_3D)
+        {
+            for(const auto& typeConfig : bn_type_configs::VALID)
+            {
+                cases.push_back(
+                    {"AcceptsInference_" + generateName(dims, *layout) + "_" + toString(typeConfig),
+                     true,
+                     createBatchnormInferenceTensors(typeConfig, dims, *layout),
+                     UIDs::X,
+                     UIDs::Y,
+                     UIDs::SCALE,
+                     UIDs::BIAS,
+                     UIDs::MEAN,
+                     UIDs::INV_VARIANCE});
+            }
+        }
+    }
 
     // Happy paths - all shapes × all 4D layouts × all valid type configurations
     for(const auto& dims : shapes::INFERENCE_4D)
@@ -1903,7 +2040,44 @@ inline std::vector<BatchnormTrainingConfigTestCase>
     // Happy Paths: Valid Type Configurations from bn_type_configs::VALID
     // ========================================================================
 
-    // All training shapes × all layouts × all valid type configs × 2 variants
+    // 3D training shapes × all 3D layouts × all valid type configs × 2 variants
+    for(const auto& typeConfig : bn_type_configs::VALID)
+    {
+        for(const auto& dims : shapes::TRAINING_3D)
+        {
+            for(const auto* layout : LAYOUTS_3D)
+            {
+                // With mean/variance
+                cases.push_back(
+                    {"AcceptsTraining_" + generateName(dims, *layout) + "_" + toString(typeConfig)
+                         + "_WithMeanVar",
+                     true,
+                     createBatchnormTrainingTensors(typeConfig, dims, *layout, true, true),
+                     UIDs::X,
+                     UIDs::Y,
+                     UIDs::SCALE,
+                     UIDs::BIAS,
+                     UIDs::EPSILON,
+                     flatbuffers::Optional<int64_t>(UIDs::MEAN),
+                     flatbuffers::Optional<int64_t>(UIDs::INV_VARIANCE)});
+                // Without mean/variance
+                cases.push_back(
+                    {"AcceptsTraining_" + generateName(dims, *layout) + "_" + toString(typeConfig)
+                         + "_WithoutMeanVar",
+                     true,
+                     createBatchnormTrainingTensors(typeConfig, dims, *layout, false, false),
+                     UIDs::X,
+                     UIDs::Y,
+                     UIDs::SCALE,
+                     UIDs::BIAS,
+                     UIDs::EPSILON,
+                     flatbuffers::nullopt,
+                     flatbuffers::nullopt});
+            }
+        }
+    }
+
+    // All training shapes × all 4D layouts × all valid type configs × 2 variants
     for(const auto& typeConfig : bn_type_configs::VALID)
     {
         for(const auto& dims : shapes::TRAINING_4D)
@@ -2129,6 +2303,45 @@ inline std::vector<BatchnormBackwardConfigTestCase>
     using UIDs = BnBackwardTensorIds;
 
     std::vector<BatchnormBackwardConfigTestCase> cases;
+
+    // Happy paths - 3D inference shapes × 3D layouts × all valid type configs × 2 variants
+    for(const auto& dims : shapes::INFERENCE_3D)
+    {
+        for(const auto* layout : LAYOUTS_3D)
+        {
+            for(const auto& typeConfig : bn_type_configs::VALID)
+            {
+                // With optionals
+                cases.push_back(
+                    {"AcceptsBackward_" + generateName(dims, *layout) + "_" + toString(typeConfig)
+                         + "_WithOptionals",
+                     true,
+                     createBatchnormBackwardTensors(typeConfig, dims, *layout, true, true),
+                     UIDs::X,
+                     UIDs::DY,
+                     UIDs::DX,
+                     UIDs::SCALE,
+                     UIDs::DSCALE,
+                     UIDs::DBIAS,
+                     flatbuffers::Optional<int64_t>(UIDs::MEAN),
+                     flatbuffers::Optional<int64_t>(UIDs::INV_VARIANCE)});
+                // Without optionals
+                cases.push_back(
+                    {"AcceptsBackward_" + generateName(dims, *layout) + "_" + toString(typeConfig)
+                         + "_WithoutOptionals",
+                     true,
+                     createBatchnormBackwardTensors(typeConfig, dims, *layout, false, false),
+                     UIDs::X,
+                     UIDs::DY,
+                     UIDs::DX,
+                     UIDs::SCALE,
+                     UIDs::DSCALE,
+                     UIDs::DBIAS,
+                     flatbuffers::nullopt,
+                     flatbuffers::nullopt});
+            }
+        }
+    }
 
     // Happy paths - all inference shapes × all 4D layouts × all valid type configs × 2 variants
     for(const auto& dims : shapes::INFERENCE_4D)
@@ -2381,7 +2594,7 @@ inline std::vector<BatchnormFusedBackwardConfigTestCase>
 
     // Unhappy paths - all invalid type configurations
     auto sampleDims = shapes::INFERENCE_4D[0];
-    for(const auto& invalidConfig : type_configs::INVALID_ALL)
+    for(const auto& invalidConfig : type_configs::INVALID_FUSED_ALL)
     {
         cases.push_back(
             {"RejectsFused_" + toString(invalidConfig),
@@ -2986,16 +3199,22 @@ TEST_P(TestCheckTensorDataTypesSupported, ValidatesCorrectly)
     if(tc.shouldPass)
     {
         EXPECT_NO_THROW({
-            checkTensorDataTypesSupported(
-                tc.ioTensorIds, tc.affineTensorIds, tc.statTensorIds, tensorMap);
+            checkTensorDataTypesSupported(tc.ioTensorIds,
+                                          tc.affineTensorIds,
+                                          tc.statTensorIds,
+                                          tc.intermediateTensorIds,
+                                          tensorMap);
         });
     }
     else
     {
         EXPECT_THROW(
             {
-                checkTensorDataTypesSupported(
-                    tc.ioTensorIds, tc.affineTensorIds, tc.statTensorIds, tensorMap);
+                checkTensorDataTypesSupported(tc.ioTensorIds,
+                                              tc.affineTensorIds,
+                                              tc.statTensorIds,
+                                              tc.intermediateTensorIds,
+                                              tensorMap);
             },
             hipdnn_plugin_sdk::HipdnnPluginException);
     }
@@ -3050,7 +3269,8 @@ TEST_P(TestCheckBatchnormInferenceConfigSupported, ValidatesCorrectly)
 
     auto builder = buildBatchnormInferenceGraph(
         tc.tensorConfigs, tc.xUid, tc.yUid, tc.scaleUid, tc.biasUid, tc.meanUid, tc.invVarianceUid);
-    hipdnn_plugin_sdk::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
 
     const auto& node = graph.getNode(0);
     auto* attrs = node.attributes_as_BatchnormInferenceAttributes();
@@ -3058,12 +3278,13 @@ TEST_P(TestCheckBatchnormInferenceConfigSupported, ValidatesCorrectly)
 
     if(tc.shouldPass)
     {
-        EXPECT_NO_THROW({ checkBatchnormTensorConfigSupported(*attrs, graph.getTensorMap()); });
+        EXPECT_NO_THROW(
+            { checkBatchnormInferenceTensorConfigSupported(*attrs, graph.getTensorMap()); });
     }
     else
     {
         EXPECT_THROW(
-            { checkBatchnormTensorConfigSupported(*attrs, graph.getTensorMap()); },
+            { checkBatchnormInferenceTensorConfigSupported(*attrs, graph.getTensorMap()); },
             hipdnn_plugin_sdk::HipdnnPluginException);
     }
 }
@@ -3089,7 +3310,8 @@ TEST_P(TestCheckBatchnormTrainingConfigSupported, ValidatesCorrectly)
                                                tc.epsilonUid,
                                                tc.meanUid,
                                                tc.invVarianceUid);
-    hipdnn_plugin_sdk::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
 
     const auto& node = graph.getNode(0);
     auto* attrs = node.attributes_as_BatchnormAttributes();
@@ -3097,12 +3319,13 @@ TEST_P(TestCheckBatchnormTrainingConfigSupported, ValidatesCorrectly)
 
     if(tc.shouldPass)
     {
-        EXPECT_NO_THROW({ checkBatchnormTensorConfigSupported(*attrs, graph.getTensorMap()); });
+        EXPECT_NO_THROW(
+            { checkBatchnormFwdTrainingTensorConfigSupported(*attrs, graph.getTensorMap()); });
     }
     else
     {
         EXPECT_THROW(
-            { checkBatchnormTensorConfigSupported(*attrs, graph.getTensorMap()); },
+            { checkBatchnormFwdTrainingTensorConfigSupported(*attrs, graph.getTensorMap()); },
             hipdnn_plugin_sdk::HipdnnPluginException);
     }
 }
@@ -3129,7 +3352,8 @@ TEST_P(TestCheckBatchnormBackwardConfigSupported, ValidatesCorrectly)
                                                tc.dbiasUid,
                                                tc.meanUid,
                                                tc.invVarianceUid);
-    hipdnn_plugin_sdk::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
 
     const auto& node = graph.getNode(0);
     auto* attrs = node.attributes_as_BatchnormBackwardAttributes();
@@ -3137,12 +3361,13 @@ TEST_P(TestCheckBatchnormBackwardConfigSupported, ValidatesCorrectly)
 
     if(tc.shouldPass)
     {
-        EXPECT_NO_THROW({ checkBatchnormTensorConfigSupported(*attrs, graph.getTensorMap()); });
+        EXPECT_NO_THROW(
+            { checkBatchnormBackwardTensorConfigSupported(*attrs, graph.getTensorMap()); });
     }
     else
     {
         EXPECT_THROW(
-            { checkBatchnormTensorConfigSupported(*attrs, graph.getTensorMap()); },
+            { checkBatchnormBackwardTensorConfigSupported(*attrs, graph.getTensorMap()); },
             hipdnn_plugin_sdk::HipdnnPluginException);
     }
 }
@@ -3173,7 +3398,8 @@ TEST_P(TestCheckBatchnormFusedBackwardConfigSupported, ValidatesCorrectly)
                                                     tc.bnYVirtualUid,
                                                     tc.dxDreluVirtualUid,
                                                     tc.activationMode);
-    hipdnn_plugin_sdk::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
 
     const auto& bnInfNode = graph.getNode(0);
     const auto& actNode = graph.getNode(1);
@@ -3190,7 +3416,7 @@ TEST_P(TestCheckBatchnormFusedBackwardConfigSupported, ValidatesCorrectly)
     if(tc.shouldPass)
     {
         EXPECT_NO_THROW({
-            checkBatchnormTensorConfigSupported(
+            checkBatchnormInferenceActivationBackwardTensorConfigSupported(
                 *bnInfAttrs, *actAttrs, *bnBwdAttrs, graph.getTensorMap());
         });
     }
@@ -3198,7 +3424,7 @@ TEST_P(TestCheckBatchnormFusedBackwardConfigSupported, ValidatesCorrectly)
     {
         EXPECT_THROW(
             {
-                checkBatchnormTensorConfigSupported(
+                checkBatchnormInferenceActivationBackwardTensorConfigSupported(
                     *bnInfAttrs, *actAttrs, *bnBwdAttrs, graph.getTensorMap());
             },
             hipdnn_plugin_sdk::HipdnnPluginException);
@@ -3373,14 +3599,15 @@ TEST(TestBatchnormApplicabilityChecks, RejectsBatchnormFwdTrainingWithPeerStats)
 
     builder.Finish(graphOffset);
 
-    hipdnn_plugin_sdk::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
     const auto& node = graph.getNode(0);
     auto* attrs = node.attributes_as_BatchnormAttributes();
     ASSERT_NE(attrs, nullptr);
 
     // Should throw because peer_stats is populated
     EXPECT_THROW(
-        { checkBatchnormTensorConfigSupported(*attrs, graph.getTensorMap()); },
+        { checkBatchnormFwdTrainingTensorConfigSupported(*attrs, graph.getTensorMap()); },
         hipdnn_plugin_sdk::HipdnnPluginException);
 }
 
@@ -3596,8 +3823,8 @@ inline std::vector<BatchnormInferenceVarianceExtFusedConfigTestCase>
                 // Add virtual tensor for fusion
                 auto strides
                     = hipdnn_data_sdk::utilities::generateStrides(dims, layout->strideOrder);
-                configs.push_back(
-                    createIoTensor(bnYVirtualUid, "bn_y", typeConfig.io, dims, strides, true));
+                configs.push_back(createIoTensor(
+                    bnYVirtualUid, "bn_y", typeConfig.intermediate, dims, strides, true));
 
                 cases.push_back({"AcceptsInferenceVarExtFused_" + generateName(dims, *layout) + "_"
                                      + toString(typeConfig),
@@ -3615,25 +3842,54 @@ inline std::vector<BatchnormInferenceVarianceExtFusedConfigTestCase>
         }
     }
 
-    // Unhappy paths - unsupported activation mode
-    const auto& sampleDims = shapes::INFERENCE_4D[0];
-    auto configs = createBatchnormInferenceWithVarianceTensors(
-        bn_type_configs::ALL_FLOAT, sampleDims, TensorLayout::NCHW);
-    auto strides
-        = hipdnn_data_sdk::utilities::generateStrides(sampleDims, TensorLayout::NCHW.strideOrder);
-    configs.push_back(createIoTensor(bnYVirtualUid, "bn_y", DT::FLOAT, sampleDims, strides, true));
+    // Unhappy paths - all invalid type configurations
+    for(const auto& invalidTypeConfig : type_configs::INVALID_FUSED_ALL)
+    {
+        const auto& dims = shapes::INFERENCE_4D[0];
+        auto layout = LAYOUTS_4D[0];
+        auto configs
+            = createBatchnormInferenceWithVarianceTensors(invalidTypeConfig, dims, *layout);
+        // Add virtual tensor for fusion
+        auto strides = hipdnn_data_sdk::utilities::generateStrides(dims, layout->strideOrder);
+        configs.push_back(createIoTensor(
+            bnYVirtualUid, "bn_y", invalidTypeConfig.intermediate, dims, strides, true));
 
-    cases.push_back({"RejectsInferenceVarExtFused_UnsupportedActivation",
-                     false,
-                     configs,
-                     UIDs::X,
-                     UIDs::Y,
-                     UIDs::SCALE,
-                     UIDs::BIAS,
-                     UIDs::EPSILON,
-                     UIDs::MEAN,
-                     UIDs::VARIANCE,
-                     PM::SIGMOID_FWD});
+        cases.push_back({"RejectsInferenceVarExtFused_" + generateName(dims, *layout) + "_"
+                             + toString(invalidTypeConfig),
+                         false,
+                         configs,
+                         UIDs::X,
+                         UIDs::Y,
+                         UIDs::SCALE,
+                         UIDs::BIAS,
+                         UIDs::EPSILON,
+                         UIDs::MEAN,
+                         UIDs::VARIANCE,
+                         PM::RELU_FWD});
+    }
+
+    {
+        // Unhappy paths - unsupported activation mode
+        const auto& sampleDims = shapes::INFERENCE_4D[0];
+        auto configs = createBatchnormInferenceWithVarianceTensors(
+            bn_type_configs::ALL_FLOAT, sampleDims, TensorLayout::NCHW);
+        auto strides = hipdnn_data_sdk::utilities::generateStrides(sampleDims,
+                                                                   TensorLayout::NCHW.strideOrder);
+        configs.push_back(
+            createIoTensor(bnYVirtualUid, "bn_y", DT::FLOAT, sampleDims, strides, true));
+
+        cases.push_back({"RejectsInferenceVarExtFused_UnsupportedActivation",
+                         false,
+                         configs,
+                         UIDs::X,
+                         UIDs::Y,
+                         UIDs::SCALE,
+                         UIDs::BIAS,
+                         UIDs::EPSILON,
+                         UIDs::MEAN,
+                         UIDs::VARIANCE,
+                         PM::SIGMOID_FWD});
+    }
 
     return cases;
 }
@@ -3655,7 +3911,8 @@ TEST_P(TestCheckBatchnormInferenceWithVarianceConfigSupported, ValidatesCorrectl
                                                             tc.epsilonUid,
                                                             tc.meanUid,
                                                             tc.varianceUid);
-    hipdnn_plugin_sdk::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
 
     const auto& node = graph.getNode(0);
     auto* attrs = node.attributes_as_BatchnormInferenceAttributesVarianceExt();
@@ -3663,12 +3920,17 @@ TEST_P(TestCheckBatchnormInferenceWithVarianceConfigSupported, ValidatesCorrectl
 
     if(tc.shouldPass)
     {
-        EXPECT_NO_THROW({ checkBatchnormTensorConfigSupported(*attrs, graph.getTensorMap()); });
+        EXPECT_NO_THROW({
+            checkBatchnormInferenceVarianceExtTensorConfigSupported(*attrs, graph.getTensorMap());
+        });
     }
     else
     {
         EXPECT_THROW(
-            { checkBatchnormTensorConfigSupported(*attrs, graph.getTensorMap()); },
+            {
+                checkBatchnormInferenceVarianceExtTensorConfigSupported(*attrs,
+                                                                        graph.getTensorMap());
+            },
             hipdnn_plugin_sdk::HipdnnPluginException);
     }
 }
@@ -3698,7 +3960,8 @@ TEST_P(TestCheckBatchnormInferenceWithVarianceFusedConfigSupported, ValidatesCor
                                                                  tc.varianceUid,
                                                                  bnYVirtualUid,
                                                                  tc.activationMode);
-    hipdnn_plugin_sdk::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
 
     const auto& bnNode = graph.getNode(0);
     const auto& actNode = graph.getNode(1);
@@ -3711,13 +3974,18 @@ TEST_P(TestCheckBatchnormInferenceWithVarianceFusedConfigSupported, ValidatesCor
 
     if(tc.shouldPass)
     {
-        EXPECT_NO_THROW(
-            { checkBatchnormTensorConfigSupported(*bnAttrs, *actAttrs, graph.getTensorMap()); });
+        EXPECT_NO_THROW({
+            checkBatchnormInferenceVarianceExtActivationTensorConfigSupported(
+                *bnAttrs, *actAttrs, graph.getTensorMap());
+        });
     }
     else
     {
         EXPECT_THROW(
-            { checkBatchnormTensorConfigSupported(*bnAttrs, *actAttrs, graph.getTensorMap()); },
+            {
+                checkBatchnormInferenceVarianceExtActivationTensorConfigSupported(
+                    *bnAttrs, *actAttrs, graph.getTensorMap());
+            },
             hipdnn_plugin_sdk::HipdnnPluginException);
     }
 }
@@ -3790,14 +4058,15 @@ TEST(TestBatchnormApplicabilityChecks, RejectsBatchnormBackwardWithPeerStats)
 
     builder.Finish(graphOffset);
 
-    hipdnn_plugin_sdk::GraphWrapper graph(builder.GetBufferPointer(), builder.GetSize());
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
     const auto& node = graph.getNode(0);
     auto* attrs = node.attributes_as_BatchnormBackwardAttributes();
     ASSERT_NE(attrs, nullptr);
 
     // Should throw because peer_stats is populated
     EXPECT_THROW(
-        { checkBatchnormTensorConfigSupported(*attrs, graph.getTensorMap()); },
+        { checkBatchnormBackwardTensorConfigSupported(*attrs, graph.getTensorMap()); },
         hipdnn_plugin_sdk::HipdnnPluginException);
 }
 
