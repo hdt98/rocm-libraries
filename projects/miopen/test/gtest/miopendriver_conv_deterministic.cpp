@@ -25,7 +25,7 @@ GetTestCasePairs(const std::string& mode, const std::string& shape, int forw_fla
 {
     const std::string dir  = " -F " + std::to_string(forw_flag);
     const std::string base = mode + " " + shape + dir;
-    return {{base, base + " --conv_deterministic 1"}};
+    return {{base, base + " --deterministic 1"}};
 }
 
 miopen::ProcessEnvironmentMap MakeEnv(const std::string& tmp_dir)
@@ -53,7 +53,7 @@ class GPU_MIOpenDriverConvDeterministicTest_Reproducible_FP32
 };
 
 // ----------------------------------------------------------------------------
-// Test 1: Without --conv_deterministic being set, log must not mention
+// Test 1: Without --deterministic being set, log must not mention
 // "Restricting convolution to deterministic kernels."
 // ----------------------------------------------------------------------------
 TEST_P(GPU_MIOpenDriverConvDeterministicTest_NoFlag_FP32, NoDeterministicLog)
@@ -72,7 +72,7 @@ TEST_P(GPU_MIOpenDriverConvDeterministicTest_NoFlag_FP32, NoDeterministicLog)
 }
 
 // ----------------------------------------------------------------------------
-// Test 2: With --conv_deterministic 1 the log mentions
+// Test 2: With --deterministic 1 the log mentions
 // "Restricting convolution to deterministic kernels."
 // ----------------------------------------------------------------------------
 TEST_P(GPU_MIOpenDriverConvDeterministicTest_Enabled_FP32, RunsSuccessfullyAndLogsOverride)
@@ -90,7 +90,7 @@ TEST_P(GPU_MIOpenDriverConvDeterministicTest_Enabled_FP32, RunsSuccessfullyAndLo
 }
 
 // ----------------------------------------------------------------------------
-// Test 3: Invalid --conv_deterministic value causes non-zero exit
+// Test 3: Invalid --deterministic value causes non-zero exit
 // ----------------------------------------------------------------------------
 TEST(GPU_MIOpenDriverConvDeterministicTest_InvalidValue_FP32, ExitsOnInvalidValue)
 {
@@ -98,20 +98,20 @@ TEST(GPU_MIOpenDriverConvDeterministicTest_InvalidValue_FP32, ExitsOnInvalidValu
     miopen::fs::remove_all(tmp_dir);
 
     const std::string bad_args =
-        miopendriver::basearg::conv::Half + " " + shape_3d + " -F 4 --conv_deterministic 2";
+        miopendriver::basearg::conv::Half + " " + shape_3d + " -F 4 --deterministic 2";
 
     int result = 0;
     miopen::Process p{MIOpenDriverExePath().string()};
     std::stringstream ss;
     EXPECT_NO_THROW(result = p(bad_args, "", &ss, MakeEnv(tmp_dir)));
-    EXPECT_NE(result, 0) << "Should exit with a non-zero code on invalid conv_deterministic value";
-    EXPECT_THAT(ss.str(), testing::HasSubstr("Invalid conv_deterministic value"));
+    EXPECT_NE(result, 0) << "Should exit with a non-zero code on invalid deterministic value";
+    EXPECT_THAT(ss.str(), testing::HasSubstr("Invalid deterministic value"));
 
     miopen::fs::remove_all(tmp_dir);
 }
 
 // ----------------------------------------------------------------------------
-// Test 4: Reproducibility - two runs with --conv_deterministic 1 produce
+// Test 4: Reproducibility - two runs with --deterministic 1 produce
 //         identical output files (--dump_output)
 // ----------------------------------------------------------------------------
 TEST_P(GPU_MIOpenDriverConvDeterministicTest_Reproducible_FP32, BitExactAcrossRuns)
