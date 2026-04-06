@@ -65,5 +65,10 @@ struct CkTypeMap<DataType::I32>
 {
     using type = int32_t;
 };
+template <>
+struct CkTypeMap<DataType::I4>
+{
+    using type = ck_tile::pk_int4_t;
+};
 
 } // namespace rocm_ck

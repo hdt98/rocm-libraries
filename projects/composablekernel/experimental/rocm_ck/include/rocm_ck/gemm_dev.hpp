@@ -120,8 +120,8 @@ struct EpilogueTypes
                                   ck_tile::element_wise::PassThrough,
                                   ComposedCDEOp<S>>;
 
-    // D tensor count: physical tensors beyond lhs(0), rhs(1), output(2)
-    static constexpr int NumDTensors = S.num_physical_tensors - 3;
+    // D tensor count: auxiliary tensors (bias, etc.) — excludes scale tensor
+    static constexpr int NumDTensors = S.num_d_tensors;
 
     // D0/D1 types from physical tensor table (indices 3 and 4).
     // Default to float/Row when no D tensors (unused but satisfies template resolution).
