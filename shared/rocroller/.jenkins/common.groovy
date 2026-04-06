@@ -396,9 +396,9 @@ def runPerformanceCommand (platform, project)
             try {
                 withCredentials([
                     usernamePassword(credentialsId: 'mathtlibs-rocrollerCI-userpass', usernameVariable: 'DB_USER', passwordVariable: 'DB_PASS'),
-                    string(credentialsId: 'mathtlibs-rocrollerCI-host', variable: 'hostPWD'),
-                    string(credentialsId: 'mathtlibs-rocrollerCI-port', variable: 'portPWD'),
-                    string(credentialsId: 'mathtlibs-rocrollerCI-name', variable: 'namePWD')
+                    usernamePassword(credentialsId: 'mathtlibs-rocrollerCI-host', usernameVariable: 'hostPWD_UNUSED', passwordVariable: 'hostPWD'),
+                    usernamePassword(credentialsId: 'mathtlibs-rocrollerCI-port', usernameVariable: 'portPWD_UNUSED', passwordVariable: 'portPWD'),
+                    usernamePassword(credentialsId: 'mathtlibs-rocrollerCI-name', usernameVariable: 'namePWD_UNUSED', passwordVariable: 'namePWD')
                 ]) {
                     platform.runCommand(this, dbInsertCommand)
                 }
@@ -615,9 +615,9 @@ def runPerformanceCommand (platform, project)
             try {
                 withCredentials([
                     usernamePassword(credentialsId: 'mathtlibs-rocrollerCI-userpass', usernameVariable: 'DB_USER', passwordVariable: 'DB_PASS'),
-                    string(credentialsId: 'mathtlibs-rocrollerCI-host', variable: 'hostPWD'),
-                    string(credentialsId: 'mathtlibs-rocrollerCI-port', variable: 'portPWD'),
-                    string(credentialsId: 'mathtlibs-rocrollerCI-name', variable: 'namePWD')
+                    usernamePassword(credentialsId: 'mathtlibs-rocrollerCI-host', usernameVariable: 'hostPWD_UNUSED', passwordVariable: 'hostPWD'),
+                    usernamePassword(credentialsId: 'mathtlibs-rocrollerCI-port', usernameVariable: 'portPWD_UNUSED', passwordVariable: 'portPWD'),
+                    usernamePassword(credentialsId: 'mathtlibs-rocrollerCI-name', usernameVariable: 'namePWD_UNUSED', passwordVariable: 'namePWD')
                 ]) {
                     platform.runCommand(this, dbInsertCommand)
                 }
