@@ -149,7 +149,7 @@ enum class TilePartitioner
     StreamK
 };
 
-/// Epilogue implementation strategy for storing GEMM results to global memory.
+/// Store strategy for writing GEMM results to global memory.
 ///
 /// CShuffle: Cross-wavefront shuffle through LDS for coalesced writes (default).
 ///     Supports all fused ops (Add, Mul, Relu) and D tensors.
@@ -158,7 +158,7 @@ enum class TilePartitioner
 /// Direct2D: Direct 2D thread-to-memory store without LDS shuffle.
 ///     Lower LDS pressure, simpler instruction pattern.
 ///     Limitation: no D tensor support yet (fused bias/scale).
-enum class EpilogueStrategy
+enum class StoreStrategy
 {
     CShuffle,
     Direct2D
@@ -182,7 +182,8 @@ struct GemmAlgorithm
     PipelineScheduler pipeline_scheduler =
         PipelineScheduler::Intrawave;                           // Instruction scheduling strategy
     TilePartitioner tile_partitioner = TilePartitioner::Linear; // Tile-to-workgroup distribution
-    EpilogueStrategy epilogue = EpilogueStrategy::CShuffle;     // Epilogue implementation strategy
+    StoreStrategy store_strategy =
+        StoreStrategy::CShuffle; // How results are written to global memory
 
     /// Padding flags control boundary handling for misaligned output dimensions.
     ///   pad_m: allow M not divisible by block_tile.m (masks A row / C row boundaries)
@@ -242,8 +243,8 @@ struct GemmSpec
     int num_epilogue_ops;
     std::array<EpilogueOp, kMaxEpilogueOps> epilogue_ops;
 
-    // Epilogue implementation strategy
-    EpilogueStrategy epilogue;
+    // Store strategy (how results are written to global memory)
+    StoreStrategy store_strategy;
 
     // Padding flags (boundary handling for misaligned output dimensions)
     bool pad_m;
@@ -465,7 +466,7 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, TargetSet targets
             throw "unexpected operator after GEMM epilogue chain";
 
     // Direct2D epilogue does not support D tensors
-    if(algo.epilogue == EpilogueStrategy::Direct2D && num_d_tensors > 0)
+    if(algo.store_strategy == StoreStrategy::Direct2D && num_d_tensors > 0)
         throw "Direct2D epilogue does not support D tensors — use CShuffle or remove epilogue ops";
 
     // Tile validation
@@ -479,7 +480,7 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, TargetSet targets
     if(algo.k_batch <= 0)
         throw "k_batch must be positive";
 
-    if(algo.epilogue == EpilogueStrategy::CShuffle && algo.block_waves.k != 1)
+    if(algo.store_strategy == StoreStrategy::CShuffle && algo.block_waves.k != 1)
         throw "CShuffle epilogue requires block_waves.k == 1 (waves_m x waves_n layout)";
 
     // Pipeline-specific constraints
@@ -558,7 +559,7 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, TargetSet targets
             algo.tile_partitioner,
             num_epi_ops,
             epi_ops,
-            algo.epilogue,
+            algo.store_strategy,
             algo.pad_m,
             algo.pad_n,
             group_size};
