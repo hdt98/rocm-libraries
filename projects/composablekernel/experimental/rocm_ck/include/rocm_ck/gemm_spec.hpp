@@ -375,10 +375,10 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, TargetSet targets
         throw "GEMM makeSpec requires GemmOp as first operator";
     const GemmOp& gemm = std::get<GemmOp>(sig.ops[0]);
 
-    TensorDesc a_td = resolved.tensor(gemm.lhs);
-    TensorDesc b_td = resolved.tensor(gemm.rhs);
-    TensorDesc c_td = resolved.tensor(gemm.out);
-    DataType acc    = gemm.acc_dtype;
+    ResolvedTensor a_td = resolved.tensor(gemm.lhs);
+    ResolvedTensor b_td = resolved.tensor(gemm.rhs);
+    ResolvedTensor c_td = resolved.tensor(gemm.out);
+    DataType acc        = gemm.acc_dtype;
 
     if(a_td.dtype == DataType::I8 && acc != DataType::I32)
         throw "INT8 GEMM requires I32 accumulator — set GemmOp::acc_dtype = DataType::I32";
@@ -414,7 +414,7 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, TargetSet targets
         epi_ops[num_epi_ops++] = EpilogueOp::Add;
         num_d_tensors          = 1;
         d0_name                = add.rhs;
-        TensorDesc d0_td       = resolved.tensor(d0_name);
+        ResolvedTensor d0_td   = resolved.tensor(d0_name);
         d0_dtype               = d0_td.dtype;
         d0_layout              = d0_td.layout != Layout::Auto ? d0_td.layout : Layout::Row;
         final_output           = add.out;
@@ -426,13 +426,13 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, TargetSet targets
         // Two consecutive AddOps with one EpilogueOp::Add gives correct behavior.
         if(next_op < kMaxOps && std::holds_alternative<AddOp>(sig.ops[next_op]))
         {
-            const AddOp& add2 = std::get<AddOp>(sig.ops[next_op]);
-            num_d_tensors     = 2;
-            d1_name           = add2.rhs;
-            TensorDesc d1_td  = resolved.tensor(d1_name);
-            d1_dtype          = d1_td.dtype;
-            d1_layout         = d1_td.layout != Layout::Auto ? d1_td.layout : Layout::Row;
-            final_output      = add2.out;
+            const AddOp& add2    = std::get<AddOp>(sig.ops[next_op]);
+            num_d_tensors        = 2;
+            d1_name              = add2.rhs;
+            ResolvedTensor d1_td = resolved.tensor(d1_name);
+            d1_dtype             = d1_td.dtype;
+            d1_layout            = d1_td.layout != Layout::Auto ? d1_td.layout : Layout::Row;
+            final_output         = add2.out;
             next_op++;
         }
     }
@@ -442,7 +442,7 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, TargetSet targets
         epi_ops[num_epi_ops++] = EpilogueOp::Mul;
         num_d_tensors          = 1;
         d0_name                = mul.rhs;
-        TensorDesc d0_td       = resolved.tensor(d0_name);
+        ResolvedTensor d0_td   = resolved.tensor(d0_name);
         d0_dtype               = d0_td.dtype;
         d0_layout              = d0_td.layout != Layout::Auto ? d0_td.layout : Layout::Row;
         final_output           = mul.out;
@@ -519,10 +519,10 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, TargetSet targets
     // Build physical tensor table
     int num_phys = 3;
     std::array<PhysicalTensor, kMaxPhysicalTensors> phys{};
-    phys[0]           = {gemm.lhs, a_td.dtype, a_td.layout, 0}; // A
-    phys[1]           = {gemm.rhs, b_td.dtype, b_td.layout, 1}; // B
-    TensorDesc out_td = resolved.tensor(final_output);
-    phys[2]           = {final_output, out_td.dtype, out_td.layout, 2}; // output (C, D, or E)
+    phys[0]               = {gemm.lhs, a_td.dtype, a_td.layout, 0}; // A
+    phys[1]               = {gemm.rhs, b_td.dtype, b_td.layout, 1}; // B
+    ResolvedTensor out_td = resolved.tensor(final_output);
+    phys[2]               = {final_output, out_td.dtype, out_td.layout, 2}; // output (C, D, or E)
 
     if(num_d_tensors >= 1)
     {
@@ -539,9 +539,9 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, TargetSet targets
     int group_size = 0;
     if(b_td.quantize.has_value())
     {
-        const auto& q       = *b_td.quantize;
-        TensorDesc scale_td = resolved.tensor(q.scale_name);
-        phys[num_phys]      = {q.scale_name, scale_td.dtype, scale_td.layout, num_phys};
+        const auto& q           = *b_td.quantize;
+        ResolvedTensor scale_td = resolved.tensor(q.scale_name);
+        phys[num_phys]          = {q.scale_name, scale_td.dtype, scale_td.layout, num_phys};
         num_phys++;
         group_size = q.group_size;
     }
