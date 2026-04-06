@@ -40,17 +40,17 @@ miopen::ProcessEnvironmentMap MakeEnv(const std::string& tmp_dir)
 using e_mask = enabled<Gpu::gfx94X>;
 using d_mask = disabled<Gpu::gfx900, Gpu::gfx906, Gpu::gfx908, Gpu::gfx103X>;
 
-class GPU_MIOpenDriverConvDeterministicTest_NoFlag
+class GPU_MIOpenDriverConvDeterministicTest_NoFlag_FP32
     : public testing::TestWithParam<std::pair<std::string, std::string>>
 {
 };
 
-class GPU_MIOpenDriverConvDeterministicTest_Enabled
+class GPU_MIOpenDriverConvDeterministicTest_Enabled_FP32
     : public testing::TestWithParam<std::pair<std::string, std::string>>
 {
 };
 
-class GPU_MIOpenDriverConvDeterministicTest_Reproducible
+class GPU_MIOpenDriverConvDeterministicTest_Reproducible_FP32
     : public testing::TestWithParam<std::pair<std::string, std::string>>
 {
 };
@@ -59,7 +59,7 @@ class GPU_MIOpenDriverConvDeterministicTest_Reproducible
 // Test 1: Without --conv_deterministic being set, log must not mention
 // "Restricting convolution to deterministic kernels."
 // ----------------------------------------------------------------------------
-TEST_P(GPU_MIOpenDriverConvDeterministicTest_NoFlag, NoDeterministicLog)
+TEST_P(GPU_MIOpenDriverConvDeterministicTest_NoFlag_FP32, NoDeterministicLog)
 {
     if(!ShouldRunMIOpenDriverTest<d_mask, e_mask>())
         GTEST_SKIP();
@@ -81,7 +81,7 @@ TEST_P(GPU_MIOpenDriverConvDeterministicTest_NoFlag, NoDeterministicLog)
 // Test 2: With --conv_deterministic 1 the log mentions
 // "Restricting convolution to deterministic kernels."
 // ----------------------------------------------------------------------------
-TEST_P(GPU_MIOpenDriverConvDeterministicTest_Enabled, RunsSuccessfullyAndLogsOverride)
+TEST_P(GPU_MIOpenDriverConvDeterministicTest_Enabled_FP32, RunsSuccessfullyAndLogsOverride)
 {
     if(!ShouldRunMIOpenDriverTest<d_mask, e_mask>())
         GTEST_SKIP();
@@ -101,7 +101,7 @@ TEST_P(GPU_MIOpenDriverConvDeterministicTest_Enabled, RunsSuccessfullyAndLogsOve
 // ----------------------------------------------------------------------------
 // Test 3: Invalid --conv_deterministic value causes non-zero exit
 // ----------------------------------------------------------------------------
-TEST(GPU_MIOpenDriverConvDeterministicTest_InvalidValue, ExitsOnInvalidValue)
+TEST(GPU_MIOpenDriverConvDeterministicTest_InvalidValue_FP32, ExitsOnInvalidValue)
 {
     if(!ShouldRunMIOpenDriverTest<d_mask, e_mask>())
         GTEST_SKIP();
@@ -126,7 +126,7 @@ TEST(GPU_MIOpenDriverConvDeterministicTest_InvalidValue, ExitsOnInvalidValue)
 // Test 4: Reproducibility - two runs with --conv_deterministic 1 produce
 //         identical output files (--dump_output)
 // ----------------------------------------------------------------------------
-TEST_P(GPU_MIOpenDriverConvDeterministicTest_Reproducible, BitExactAcrossRuns)
+TEST_P(GPU_MIOpenDriverConvDeterministicTest_Reproducible_FP32, BitExactAcrossRuns)
 {
     if(!ShouldRunMIOpenDriverTest<d_mask, e_mask>())
         GTEST_SKIP();
@@ -202,17 +202,17 @@ TEST_P(GPU_MIOpenDriverConvDeterministicTest_Reproducible, BitExactAcrossRuns)
 // 3D WRW
 INSTANTIATE_TEST_SUITE_P(
     Full,
-    GPU_MIOpenDriverConvDeterministicTest_NoFlag,
+    GPU_MIOpenDriverConvDeterministicTest_NoFlag_FP32,
     testing::ValuesIn(GetTestCasePairs(miopendriver::basearg::conv::Float, shape_3d, 4)));
 
 INSTANTIATE_TEST_SUITE_P(
     Full,
-    GPU_MIOpenDriverConvDeterministicTest_Enabled,
+    GPU_MIOpenDriverConvDeterministicTest_Enabled_FP32,
     testing::ValuesIn(GetTestCasePairs(miopendriver::basearg::conv::Float, shape_3d, 4)));
 
 INSTANTIATE_TEST_SUITE_P(
     Full,
-    GPU_MIOpenDriverConvDeterministicTest_Reproducible,
+    GPU_MIOpenDriverConvDeterministicTest_Reproducible_FP32,
     testing::ValuesIn(GetTestCasePairs(miopendriver::basearg::conv::Float, shape_3d, 4)));
 
 } // namespace miopen_conv_deterministic
