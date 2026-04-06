@@ -898,6 +898,9 @@ namespace TensileLite
                 return rejectFast("layout");
             }
 
+            // Timing only for accepted fast-path work (not for FAST_PATH_REJECT cases above).
+            ScopedTimer solveCpuFastF32Timer("solve_cpu_fast_f32");
+
             size_t indexND  = problem.freeIndices()[1].d;
             size_t strideND = problem.d().strides()[indexND];
             size_t strideNC = problem.c().strides()[indexND];
@@ -2252,7 +2255,6 @@ namespace TensileLite
 
             if(tryFastPath && isDenseEnoughForFastPath)
             {
-                ScopedTimer timer("solve_cpu_fast_f32");
                 if(solveCPUFastInF32(problem, inputs))
                 {
                     return;
