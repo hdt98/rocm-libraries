@@ -371,9 +371,9 @@ def runPerformanceCommand (platform, project)
                     # Try to insert into database, but don't fail if it doesn't work
                     set +e
                     python gemmaiperf/playground/rocblas-bench_scripts/db_insert.py \\
-                        --host \$DB_HOST \\
-                        --port \$DB_PORT \\
-                        --name \$DB_NAME \\
+                        --host \$hostPWD \\
+                        --port \$portPWD \\
+                        --name \$namePWD \\
                         --user \$DB_USER \\
                         --pass \$DB_PASS \\
                         --label \$DB_LABEL \\
@@ -396,9 +396,9 @@ def runPerformanceCommand (platform, project)
             try {
                 withCredentials([
                     usernamePassword(credentialsId: 'mathtlibs-rocrollerCI-userpass', usernameVariable: 'DB_USER', passwordVariable: 'DB_PASS'),
-                    string(credentialsId: 'mathtlibs-rocrollerCI-host', variable: 'DB_HOST'),
-                    string(credentialsId: 'mathtlibs-rocrollerCI-port', variable: 'DB_PORT'),
-                    string(credentialsId: 'mathtlibs-rocrollerCI-dbname', variable: 'DB_NAME')
+                    string(credentialsId: 'mathtlibs-rocrollerCI-host', variable: 'hostPWD'),
+                    string(credentialsId: 'mathtlibs-rocrollerCI-port', variable: 'portPWD'),
+                    string(credentialsId: 'mathtlibs-rocrollerCI-name', variable: 'namePWD')
                 ]) {
                     platform.runCommand(this, dbInsertCommand)
                 }
@@ -587,9 +587,9 @@ def runPerformanceCommand (platform, project)
                     # Try to insert into database, but don't fail if it doesn't work
                     set +e
                     python gemmaiperf/playground/rocblas-bench_scripts/db_insert.py \\
-                        --host \$DB_HOST \\
-                        --port \$DB_PORT \\
-                        --name \$DB_NAME \\
+                        --host \$hostPWD \\
+                        --port \$portPWD \\
+                        --name \$namePWD \\
                         --user \$DB_USER \\
                         --pass \$DB_PASS \\
                         --label \$DB_LABEL \\
@@ -615,9 +615,9 @@ def runPerformanceCommand (platform, project)
             try {
                 withCredentials([
                     usernamePassword(credentialsId: 'mathtlibs-rocrollerCI-userpass', usernameVariable: 'DB_USER', passwordVariable: 'DB_PASS'),
-                    string(credentialsId: 'mathtlibs-rocrollerCI-host', variable: 'DB_HOST'),
-                    string(credentialsId: 'mathtlibs-rocrollerCI-port', variable: 'DB_PORT'),
-                    string(credentialsId: 'mathtlibs-rocrollerCI-dbname', variable: 'DB_NAME')
+                    string(credentialsId: 'mathtlibs-rocrollerCI-host', variable: 'hostPWD'),
+                    string(credentialsId: 'mathtlibs-rocrollerCI-port', variable: 'portPWD'),
+                    string(credentialsId: 'mathtlibs-rocrollerCI-name', variable: 'namePWD')
                 ]) {
                     platform.runCommand(this, dbInsertCommand)
                 }
