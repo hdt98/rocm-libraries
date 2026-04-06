@@ -246,6 +246,9 @@ struct GemmSpec
     // Quantization group size (0 = not quantized, >0 = elements per group along K)
     int group_size;
 
+    // Number of auxiliary D tensors (bias, etc.) — excludes scale tensor
+    int num_d_tensors;
+
     /// Check if the epilogue chain contains a specific op.
     constexpr bool hasEpilogueOp(EpilogueOp op) const
     {
@@ -545,7 +548,8 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, TargetSet targets
             algo.epilogue,
             algo.pad_m,
             algo.pad_n,
-            group_size};
+            group_size,
+            num_d_tensors};
 }
 
 } // namespace rocm_ck

@@ -646,3 +646,61 @@ TEST(MakeSpec, RhsDtypeIsI4InQuantizedGemm)
     EXPECT_EQ(k.rhs().dtype, DataType::I4);
     EXPECT_EQ(k.lhs().dtype, DataType::FP16);
 }
+
+// ============================================================================
+// makeSpec: num_d_tensors tracking
+// ============================================================================
+
+TEST(MakeSpec, PlainGemmHasZeroDTensors)
+{
+    constexpr auto k = makeSpec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
+        TargetSet::cdna());
+
+    EXPECT_EQ(k.num_d_tensors, 0);
+}
+
+TEST(MakeSpec, GemmAddHasOneDTensor)
+{
+    constexpr auto k = makeSpec(Signature{.dtype = DataType::FP16,
+                                          .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                                    AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+                                GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
+                                TargetSet::cdna());
+
+    EXPECT_EQ(k.num_d_tensors, 1);
+}
+
+TEST(MakeSpec, QuantizedGemmHasZeroDTensors)
+{
+    constexpr auto k =
+        makeSpec(Signature{.dtype   = DataType::FP16,
+                           .tensors = {Tensor{.name     = "B",
+                                              .dtype    = DataType::I4,
+                                              .quantize = Quantization{.scale_name = "scale"}}},
+                           .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
+                 TargetSet::cdna());
+
+    // Scale is NOT a D tensor — num_d_tensors excludes it
+    EXPECT_EQ(k.num_d_tensors, 0);
+    EXPECT_EQ(k.num_physical_tensors, 4); // A, B, C, scale
+}
+
+TEST(MakeSpec, QuantizedGemmAddHasOneDTensor)
+{
+    constexpr auto k =
+        makeSpec(Signature{.dtype   = DataType::FP16,
+                           .tensors = {Tensor{.name     = "B",
+                                              .dtype    = DataType::I4,
+                                              .quantize = Quantization{.scale_name = "scale"}}},
+                           .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
+                 TargetSet::cdna());
+
+    // bias is D0, scale is separate — num_d_tensors counts only bias
+    EXPECT_EQ(k.num_d_tensors, 1);
+    EXPECT_EQ(k.num_physical_tensors, 5); // A, B, D, bias, scale
+}
