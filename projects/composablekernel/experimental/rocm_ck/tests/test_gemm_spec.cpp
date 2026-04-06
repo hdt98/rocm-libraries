@@ -534,3 +534,115 @@ TEST(MakeSpec, DefaultsSchedulingToIntrawave)
 
     EXPECT_EQ(k.pipeline_scheduler, PipelineScheduler::Intrawave);
 }
+
+// ============================================================================
+// makeSpec: quantized GEMM (INT4 weight with scale tensor)
+// ============================================================================
+
+TEST(MakeSpec, PlainGemmHasGroupSizeZero)
+{
+    constexpr auto k = makeSpec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
+        TargetSet::cdna());
+
+    EXPECT_EQ(k.group_size, 0);
+}
+
+TEST(MakeSpec, QuantizedBAddsScaleTensorToPhysicalTable)
+{
+    constexpr auto k = makeSpec(
+        Signature{.dtype   = DataType::FP16,
+                  .tensors = {Tensor{.name     = "B",
+                                     .dtype    = DataType::I4,
+                                     .quantize = Quantization{.scale_name  = "scale",
+                                                              .scale_dtype = DataType::FP32,
+                                                              .group_size  = 128}}},
+                  .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
+        TargetSet::cdna());
+
+    EXPECT_EQ(k.num_physical_tensors, 4); // A, B, C, scale
+}
+
+TEST(MakeSpec, ScaleTensorGetsCorrectSlotAndDtype)
+{
+    constexpr auto k = makeSpec(
+        Signature{.dtype   = DataType::FP16,
+                  .tensors = {Tensor{.name     = "B",
+                                     .dtype    = DataType::I4,
+                                     .quantize = Quantization{.scale_name  = "scale",
+                                                              .scale_dtype = DataType::FP32,
+                                                              .group_size  = 128}}},
+                  .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
+        TargetSet::cdna());
+
+    EXPECT_EQ(slot(k, "scale"), 3);
+    EXPECT_EQ(dtype(k, "scale"), DataType::FP32);
+    EXPECT_EQ(layout(k, "scale"), Layout::Row);
+}
+
+TEST(MakeSpec, GroupSizeMatchesQuantizationConfig)
+{
+    constexpr auto k = makeSpec(
+        Signature{
+            .dtype   = DataType::FP16,
+            .tensors = {Tensor{.name     = "B",
+                               .dtype    = DataType::I4,
+                               .quantize = Quantization{.scale_name = "scale", .group_size = 64}}},
+            .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
+        TargetSet::cdna());
+
+    EXPECT_EQ(k.group_size, 64);
+}
+
+TEST(MakeSpec, ScaleAccessorReturnsScaleTensor)
+{
+    constexpr auto k = makeSpec(
+        Signature{.dtype   = DataType::FP16,
+                  .tensors = {Tensor{.name     = "B",
+                                     .dtype    = DataType::I4,
+                                     .quantize = Quantization{.scale_name  = "scale",
+                                                              .scale_dtype = DataType::FP32}}},
+                  .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
+        TargetSet::cdna());
+
+    EXPECT_EQ(k.scale().dtype, DataType::FP32);
+    EXPECT_EQ(k.scale().args_slot, 3);
+}
+
+TEST(MakeSpec, QuantizedGemmWithEpiloguePutsScaleAfterD0)
+{
+    constexpr auto k =
+        makeSpec(Signature{.dtype   = DataType::FP16,
+                           .tensors = {Tensor{.name     = "B",
+                                              .dtype    = DataType::I4,
+                                              .quantize = Quantization{.scale_name = "scale"}}},
+                           .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"}}},
+                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
+                 TargetSet::cdna());
+
+    // A, B, D(output), bias(D0), scale = 5
+    EXPECT_EQ(k.num_physical_tensors, 5);
+    EXPECT_EQ(slot(k, "bias"), 3);  // D0
+    EXPECT_EQ(slot(k, "scale"), 4); // scale after D0
+}
+
+TEST(MakeSpec, RhsDtypeIsI4InQuantizedGemm)
+{
+    constexpr auto k =
+        makeSpec(Signature{.dtype   = DataType::FP16,
+                           .tensors = {Tensor{.name     = "B",
+                                              .dtype    = DataType::I4,
+                                              .quantize = Quantization{.scale_name = "scale"}}},
+                           .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
+                 TargetSet::cdna());
+
+    EXPECT_EQ(k.rhs().dtype, DataType::I4);
+    EXPECT_EQ(k.lhs().dtype, DataType::FP16);
+}

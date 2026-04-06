@@ -243,6 +243,9 @@ struct GemmSpec
     bool pad_m;
     bool pad_n;
 
+    // Quantization group size (0 = not quantized, >0 = elements per group along K)
+    int group_size;
+
     /// Check if the epilogue chain contains a specific op.
     constexpr bool hasEpilogueOp(EpilogueOp op) const
     {
@@ -269,6 +272,10 @@ struct GemmSpec
     /// Second auxiliary tensor D1 (position 4 — e.g., second bias/scale).
     /// Only valid when num_physical_tensors > 4.
     constexpr PhysicalTensor d1() const { return physical_tensors[4]; }
+
+    /// Quantization scale tensor (last physical tensor when group_size > 0).
+    /// Only valid when group_size > 0.
+    constexpr PhysicalTensor scale() const { return physical_tensors[num_physical_tensors - 1]; }
 };
 
 // ============================================================================
@@ -338,6 +345,11 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, TargetSet targets
     if(a_td.dtype == DataType::I8 && targets.contains(GpuTarget::gfx90a))
         throw "INT8 GEMM requires gfx942+ — gfx90a emulates int8 MFMA with float MFMA, "
               "producing corrupted output. Use TargetSet::family_gfx94() or exclude gfx90a.";
+
+    // INT4 rhs requires .quantize (no unquantized INT4 path exists in CK Tile)
+    if(b_td.dtype == DataType::I4 && !b_td.quantize.has_value())
+        throw "rhs dtype is I4 but Tensor.quantize is not set — "
+              "INT4 requires quantization metadata (scale tensor and group_size)";
 
     // Build epilogue op chain from remaining ops after GemmOp.
     // Track the final output name (varies by epilogue chain) and D tensor names.
@@ -506,6 +518,17 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, TargetSet targets
         num_phys++;
     }
 
+    // Quantization: add scale tensor if rhs has .quantize
+    int group_size = 0;
+    if(b_td.quantize.has_value())
+    {
+        const auto& q       = *b_td.quantize;
+        TensorDesc scale_td = resolved.tensor(q.scale_name);
+        phys[num_phys]      = {q.scale_name, scale_td.dtype, scale_td.layout, num_phys};
+        num_phys++;
+        group_size = q.group_size;
+    }
+
     return {num_phys,
             phys,
             acc,
@@ -521,7 +544,8 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, TargetSet targets
             epi_ops,
             algo.epilogue,
             algo.pad_m,
-            algo.pad_n};
+            algo.pad_n,
+            group_size};
 }
 
 } // namespace rocm_ck
