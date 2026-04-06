@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "ck_tile/core/arch/arch.hpp"
 #include "ck_tile/core/numeric/float8.hpp"
 #include "ck_tile/core/numeric/pk_fp4.hpp"
 // #include "ck_tile/core/numeric/pk_fp6.hpp"
@@ -11,6 +10,7 @@
 #include <cstdint>
 #if CK_TILE_CONCEPTS && CK_TILE_CONCEPTS_HEADER
 #include <concepts>
+#include <type_traits>
 #endif // CK_TILE_CONCEPTS && CK_TILE_CONCEPTS_HEADER
 
 namespace ck_tile::core::arch::mma {
