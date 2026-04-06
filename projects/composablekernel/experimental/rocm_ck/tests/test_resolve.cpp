@@ -287,6 +287,109 @@ TEST(Resolve, ReturnsNegativeOneForUnknownScalar)
 }
 
 // ============================================================================
+// Quantized tensors
+// ============================================================================
+
+TEST(Resolve, QuantizedBAutoRegistersScaleTensor)
+{
+    constexpr auto r =
+        resolve(Signature{.dtype   = DataType::FP16,
+                          .tensors = {Tensor{.name     = "B",
+                                             .dtype    = DataType::I4,
+                                             .quantize = Quantization{.scale_name  = "scale",
+                                                                      .scale_dtype = DataType::FP32,
+                                                                      .group_size  = 128}}},
+                          .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    // A, B, C from GemmOp + scale auto-registered = 4 tensors
+    EXPECT_EQ(r.num_tensors, 4);
+}
+
+TEST(Resolve, ScaleTensorGetsDtypeFromQuantization)
+{
+    constexpr auto r = resolve(
+        Signature{.dtype   = DataType::FP16,
+                  .tensors = {Tensor{.name     = "B",
+                                     .dtype    = DataType::I4,
+                                     .quantize = Quantization{.scale_name  = "scale",
+                                                              .scale_dtype = DataType::FP32}}},
+                  .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    // Scale tensor dtype comes from Quantization, not the signature cascade
+    EXPECT_EQ(r.tensor("scale").dtype, DataType::FP32);
+}
+
+TEST(Resolve, ScaleTensorGetsRank2RowLayout)
+{
+    constexpr auto r = resolve(Signature{
+        .dtype   = DataType::FP16,
+        .tensors = {Tensor{
+            .name = "B", .dtype = DataType::I4, .quantize = Quantization{.scale_name = "scale"}}},
+        .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.tensor("scale").rank, 2);
+    EXPECT_EQ(r.tensor("scale").layout, Layout::Row);
+}
+
+TEST(Resolve, QuantizedTensorKeepsOwnDtype)
+{
+    constexpr auto r = resolve(Signature{
+        .dtype   = DataType::FP16,
+        .tensors = {Tensor{
+            .name = "B", .dtype = DataType::I4, .quantize = Quantization{.scale_name = "scale"}}},
+        .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_EQ(r.tensor("B").dtype, DataType::I4);
+    EXPECT_EQ(r.tensor("A").dtype, DataType::FP16); // cascade still works
+}
+
+TEST(Resolve, QuantizedTensorDescCarriesQuantizeInfo)
+{
+    constexpr auto r =
+        resolve(Signature{.dtype   = DataType::FP16,
+                          .tensors = {Tensor{.name     = "B",
+                                             .dtype    = DataType::I4,
+                                             .quantize = Quantization{.scale_name  = "scale",
+                                                                      .scale_dtype = DataType::FP32,
+                                                                      .group_size  = 64}}},
+                          .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_TRUE(r.tensor("B").quantize.has_value());
+    EXPECT_EQ(r.tensor("B").quantize->scale_name, "scale");
+    EXPECT_EQ(r.tensor("B").quantize->scale_dtype, DataType::FP32);
+    EXPECT_EQ(r.tensor("B").quantize->group_size, 64);
+}
+
+TEST(Resolve, NonQuantizedTensorHasNoQuantizeInfo)
+{
+    constexpr auto r = resolve(Signature{
+        .dtype   = DataType::FP16,
+        .tensors = {Tensor{
+            .name = "B", .dtype = DataType::I4, .quantize = Quantization{.scale_name = "scale"}}},
+        .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}});
+
+    EXPECT_FALSE(r.tensor("A").quantize.has_value());
+    EXPECT_FALSE(r.tensor("C").quantize.has_value());
+    EXPECT_FALSE(r.tensor("scale").quantize.has_value());
+}
+
+TEST(Resolve, QuantizedGemmWithEpiloguePreservesScaleTensor)
+{
+    constexpr auto r = resolve(Signature{
+        .dtype   = DataType::FP16,
+        .tensors = {Tensor{
+            .name = "B", .dtype = DataType::I4, .quantize = Quantization{.scale_name = "scale"}}},
+        .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                    AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                    ReluOp{.in = "D", .out = "E"}}});
+
+    // A, B, C, bias, D, E from ops + scale auto-registered = 7
+    EXPECT_EQ(r.num_tensors, 7);
+    EXPECT_EQ(r.tensor("scale").dtype, DataType::FP32);
+    EXPECT_TRUE(r.tensor("B").quantize.has_value());
+}
+
+// ============================================================================
 // C++20 concepts
 // ============================================================================
 

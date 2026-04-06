@@ -111,6 +111,45 @@ TEST(GemmOp, DefaultsAccDtypeToFP32)
 }
 
 // ============================================================================
+// Quantization
+// ============================================================================
+
+TEST(Quantization, DefaultsToFP32ScaleAndGroupSize128)
+{
+    constexpr Quantization q{.scale_name = "scale"};
+    EXPECT_EQ(q.scale_name, "scale");
+    EXPECT_EQ(q.scale_dtype, DataType::FP32);
+    EXPECT_EQ(q.group_size, 128);
+}
+
+TEST(Quantization, StoresExplicitFields)
+{
+    constexpr Quantization q{.scale_name = "bq", .scale_dtype = DataType::FP16, .group_size = 64};
+    EXPECT_EQ(q.scale_name, "bq");
+    EXPECT_EQ(q.scale_dtype, DataType::FP16);
+    EXPECT_EQ(q.group_size, 64);
+}
+
+TEST(Tensor, DefaultsToNoQuantize)
+{
+    constexpr Tensor t{.name = "B"};
+    EXPECT_FALSE(t.quantize.has_value());
+}
+
+TEST(Tensor, StoresQuantizeMetadata)
+{
+    constexpr Tensor t{
+        .name  = "B",
+        .dtype = DataType::I4,
+        .quantize =
+            Quantization{.scale_name = "scale", .scale_dtype = DataType::FP32, .group_size = 128}};
+    EXPECT_TRUE(t.quantize.has_value());
+    EXPECT_EQ(t.quantize->scale_name, "scale");
+    EXPECT_EQ(t.quantize->scale_dtype, DataType::FP32);
+    EXPECT_EQ(t.quantize->group_size, 128);
+}
+
+// ============================================================================
 // Capacity constants
 // ============================================================================
 
