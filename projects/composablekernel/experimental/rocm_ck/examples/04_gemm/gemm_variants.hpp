@@ -302,6 +302,27 @@ inline constexpr GemmVariant gemm_variants[] = {
             .pipeline    = Pipeline::V3,
         },
         TargetSet::family_gfx94()),
+    // --- INT4 block-quantized GEMM: fp8 × int4 with per-group fp8 scales → float ---
+    // CK Tile BQuant pipeline requires fp8/bf8 compute type and float output.
+    make_variant("gemm_i4_bquant",
+                 Signature{
+                     .dtype   = DataType::FP8_FNUZ,
+                     .tensors = {Tensor{.name     = "B",
+                                        .dtype    = DataType::I4,
+                                        .layout   = Layout::Row,
+                                        .quantize = Quantization{.scale_name  = "scale",
+                                                                 .scale_dtype = DataType::FP8_FNUZ,
+                                                                 .group_size  = 128}},
+                                 Tensor{.name = "C", .dtype = DataType::FP32}},
+                     .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}},
+                 },
+                 GemmAlgorithm{
+                     .block_tile  = {128, 128, 128},
+                     .block_waves = {2, 2, 1},
+                     .wave_tile   = {32, 32, 16},
+                     .pipeline    = Pipeline::V3,
+                 },
+                 TargetSet::family_gfx94()),
     // --- Direct2D epilogue: no LDS shuffle, direct 2D store ---
     // No D tensor support (fused bias/scale requires CShuffle epilogue).
     make_variant("gemm_fp16_direct2d",
