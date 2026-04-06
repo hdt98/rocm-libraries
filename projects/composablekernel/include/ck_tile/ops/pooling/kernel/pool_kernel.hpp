@@ -58,6 +58,8 @@ struct PoolHostArgs
 };
 
 /// @brief Kernel arguments for pooling operations
+/// output_shape and output_strides are omitted — they are derived from input_shape
+/// and window params at kernel entry to reduce SGPR pressure.
 template <typename TensorShape, typename WindowShape>
 struct PoolKernelArgs
 {
@@ -65,9 +67,7 @@ struct PoolKernelArgs
     void* output_ptr;
     void* output_index_ptr;
     TensorShape input_shape;
-    TensorShape output_shape;
     TensorShape input_strides;
-    TensorShape output_strides;
     WindowShape window_lengths;
     WindowShape window_strides;
     WindowShape window_dilations;
@@ -102,16 +102,11 @@ struct PoolKernel
         static_assert(TensorShape::size() == 4, "2D pooling requires 4D input tensor (N,H,W,C)");
         static_assert(WindowShape::size() == 2, "2D pooling requires 2D window shape (Y,X)");
 
-        // Extract dimension values
+        // Extract input dimension values
         const index_t N = kargs.input_shape.at(number<0>{});
         const index_t H = kargs.input_shape.at(number<1>{});
         const index_t W = kargs.input_shape.at(number<2>{});
         const index_t C = kargs.input_shape.at(number<3>{});
-
-        const index_t No = kargs.output_shape.at(number<0>{});
-        const index_t Ho = kargs.output_shape.at(number<1>{});
-        const index_t Wo = kargs.output_shape.at(number<2>{});
-        const index_t Co = kargs.output_shape.at(number<3>{});
 
         const index_t Y = kargs.window_lengths.at(number<0>{});
         const index_t X = kargs.window_lengths.at(number<1>{});
@@ -127,6 +122,14 @@ struct PoolKernel
 
         const index_t InRightPadH = kargs.input_right_pads.at(number<0>{});
         const index_t InRightPadW = kargs.input_right_pads.at(number<1>{});
+
+        // Compute output spatial dims (output_shape removed from kargs to reduce SGPR pressure)
+        const index_t No = N;
+        const index_t Co = C;
+        const index_t Ho =
+            (H + InLeftPadH + InRightPadH - ((Y - 1) * WindowDilationH + 1)) / WindowStrideH + 1;
+        const index_t Wo =
+            (W + InLeftPadW + InRightPadW - ((X - 1) * WindowDilationW + 1)) / WindowStrideW + 1;
 
         const index_t MRaw = N * Ho * Wo * C;
         const index_t KRaw = Y * X;
@@ -173,8 +176,11 @@ struct PoolKernel
             make_tuple(sequence<0>{}, sequence<1>{}),
             make_tuple(sequence<0>{}, sequence<1>{}));
 
-        // Create output descriptor with transformations
-        auto out_desc = make_naive_tensor_descriptor(kargs.output_shape, kargs.output_strides);
+        // Create output descriptor with transformations (contiguous NHWC layout)
+        const auto output_shape_computed   = make_tuple(No, Ho, Wo, Co);
+        const auto output_strides_computed = make_tuple(Ho * Wo * Co, Wo * Co, Co, index_t(1));
+        auto out_desc =
+            make_naive_tensor_descriptor(output_shape_computed, output_strides_computed);
 
         const auto merged_out_desc = transform_tensor_descriptor(
             out_desc,
@@ -238,18 +244,12 @@ struct PoolKernel
         static_assert(TensorShape::size() == 5, "3D pooling requires 5D input tensor (N,D,H,W,C)");
         static_assert(WindowShape::size() == 3, "3D pooling requires 3D window shape (Z,Y,X)");
 
-        // Extract dimension values
+        // Extract input dimension values
         const index_t N = kargs.input_shape.at(number<0>{});
         const index_t D = kargs.input_shape.at(number<1>{});
         const index_t H = kargs.input_shape.at(number<2>{});
         const index_t W = kargs.input_shape.at(number<3>{});
         const index_t C = kargs.input_shape.at(number<4>{});
-
-        const index_t No = kargs.output_shape.at(number<0>{});
-        const index_t Do = kargs.output_shape.at(number<1>{});
-        const index_t Ho = kargs.output_shape.at(number<2>{});
-        const index_t Wo = kargs.output_shape.at(number<3>{});
-        const index_t Co = kargs.output_shape.at(number<4>{});
 
         const index_t Z = kargs.window_lengths.at(number<0>{});
         const index_t Y = kargs.window_lengths.at(number<1>{});
@@ -270,6 +270,16 @@ struct PoolKernel
         const index_t InRightPadD = kargs.input_right_pads.at(number<0>{});
         const index_t InRightPadH = kargs.input_right_pads.at(number<1>{});
         const index_t InRightPadW = kargs.input_right_pads.at(number<2>{});
+
+        // Compute output spatial dims (output_shape removed from kargs to reduce SGPR pressure)
+        const index_t No = N;
+        const index_t Co = C;
+        const index_t Do =
+            (D + InLeftPadD + InRightPadD - ((Z - 1) * WindowDilationD + 1)) / WindowStrideD + 1;
+        const index_t Ho =
+            (H + InLeftPadH + InRightPadH - ((Y - 1) * WindowDilationH + 1)) / WindowStrideH + 1;
+        const index_t Wo =
+            (W + InLeftPadW + InRightPadW - ((X - 1) * WindowDilationW + 1)) / WindowStrideW + 1;
 
         const index_t MRaw = N * Do * Ho * Wo * C;
         const index_t KRaw = Z * Y * X;
@@ -322,8 +332,12 @@ struct PoolKernel
             make_tuple(sequence<0>{}, sequence<1>{}),
             make_tuple(sequence<0>{}, sequence<1>{}));
 
-        // Create output descriptor with transformations
-        auto out_desc = make_naive_tensor_descriptor(kargs.output_shape, kargs.output_strides);
+        // Create output descriptor with transformations (contiguous NDHWC layout)
+        const auto output_shape_computed = make_tuple(No, Do, Ho, Wo, Co);
+        const auto output_strides_computed =
+            make_tuple(Do * Ho * Wo * Co, Ho * Wo * Co, Wo * Co, Co, index_t(1));
+        auto out_desc =
+            make_naive_tensor_descriptor(output_shape_computed, output_strides_computed);
 
         const auto merged_out_desc = transform_tensor_descriptor(
             out_desc,
@@ -493,7 +507,6 @@ struct PoolKernel
     CK_TILE_HOST static bool IsSupportedArgument(PoolKernelArgs<TensorShape, WindowShape> kargs)
     {
         constexpr index_t InputRank  = TensorShape::size();
-        constexpr index_t OutputRank = TensorShape::size(); // Same as input rank
         constexpr index_t WindowRank = WindowShape::size();
 
         // Validate window dimensions (only 2D and 3D supported)
@@ -526,15 +539,6 @@ struct PoolKernel
             return false;
         }
 
-        if(kargs.output_strides.at(number<OutputRank - 1>{}) != 1)
-        {
-            if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
-            {
-                CK_TILE_ERROR("Output tensor's channel dimension must have stride 1!");
-            }
-            return false;
-        }
-
         return true;
     }
 
@@ -546,11 +550,65 @@ struct PoolKernel
     {
         using S = typename Problem::BlockShape;
 
-        // Calculate total output elements (M dimension)
-        index_t M = 1;
-        static_for<0, TensorShape::size(), 1>{}([&](auto i) { M *= kargs.output_shape.at(i); });
+        // Compute output spatial dims from input params (output_shape removed from kargs)
+        const auto compute_out_dim = [](index_t in,
+                                        index_t lpad,
+                                        index_t rpad,
+                                        index_t len,
+                                        index_t stride,
+                                        index_t dilation) {
+            return (in + lpad + rpad - ((len - 1) * dilation + 1)) / stride + 1;
+        };
 
-        // Calculate grid size: ceil(M / Block_M)
+        index_t M;
+        if constexpr(WindowShape::size() == 2)
+        {
+            const index_t N  = kargs.input_shape.at(number<0>{});
+            const index_t H  = kargs.input_shape.at(number<1>{});
+            const index_t W  = kargs.input_shape.at(number<2>{});
+            const index_t C  = kargs.input_shape.at(number<3>{});
+            const index_t Ho = compute_out_dim(H,
+                                               kargs.input_left_pads.at(number<0>{}),
+                                               kargs.input_right_pads.at(number<0>{}),
+                                               kargs.window_lengths.at(number<0>{}),
+                                               kargs.window_strides.at(number<0>{}),
+                                               kargs.window_dilations.at(number<0>{}));
+            const index_t Wo = compute_out_dim(W,
+                                               kargs.input_left_pads.at(number<1>{}),
+                                               kargs.input_right_pads.at(number<1>{}),
+                                               kargs.window_lengths.at(number<1>{}),
+                                               kargs.window_strides.at(number<1>{}),
+                                               kargs.window_dilations.at(number<1>{}));
+            M                = N * Ho * Wo * C;
+        }
+        else
+        {
+            const index_t N  = kargs.input_shape.at(number<0>{});
+            const index_t D  = kargs.input_shape.at(number<1>{});
+            const index_t H  = kargs.input_shape.at(number<2>{});
+            const index_t W  = kargs.input_shape.at(number<3>{});
+            const index_t C  = kargs.input_shape.at(number<4>{});
+            const index_t Do = compute_out_dim(D,
+                                               kargs.input_left_pads.at(number<0>{}),
+                                               kargs.input_right_pads.at(number<0>{}),
+                                               kargs.window_lengths.at(number<0>{}),
+                                               kargs.window_strides.at(number<0>{}),
+                                               kargs.window_dilations.at(number<0>{}));
+            const index_t Ho = compute_out_dim(H,
+                                               kargs.input_left_pads.at(number<1>{}),
+                                               kargs.input_right_pads.at(number<1>{}),
+                                               kargs.window_lengths.at(number<1>{}),
+                                               kargs.window_strides.at(number<1>{}),
+                                               kargs.window_dilations.at(number<1>{}));
+            const index_t Wo = compute_out_dim(W,
+                                               kargs.input_left_pads.at(number<2>{}),
+                                               kargs.input_right_pads.at(number<2>{}),
+                                               kargs.window_lengths.at(number<2>{}),
+                                               kargs.window_strides.at(number<2>{}),
+                                               kargs.window_dilations.at(number<2>{}));
+            M                = N * Do * Ho * Wo * C;
+        }
+
         return (M + S::Block_M - 1) / S::Block_M;
     }
 
@@ -563,9 +621,7 @@ struct PoolKernel
                                                         host_args.output_ptr,
                                                         host_args.output_index_ptr,
                                                         host_args.input_shape,
-                                                        host_args.output_shape,
                                                         host_args.input_strides,
-                                                        host_args.output_strides,
                                                         host_args.window_lengths,
                                                         host_args.window_strides,
                                                         host_args.window_dilations,

@@ -116,9 +116,24 @@ CK_TILE_HOST void reference_pool3d(const HostTensor<InDataType>& input,
     const ck_tile::index_t W = kargs.input_shape.at(ck_tile::number<3>{});
     const ck_tile::index_t C = kargs.input_shape.at(ck_tile::number<4>{});
 
-    const ck_tile::index_t Do = kargs.output_shape.at(ck_tile::number<1>{});
-    const ck_tile::index_t Ho = kargs.output_shape.at(ck_tile::number<2>{});
-    const ck_tile::index_t Wo = kargs.output_shape.at(ck_tile::number<3>{});
+    const ck_tile::index_t Z_ = kargs.window_lengths.at(ck_tile::number<0>{});
+    const ck_tile::index_t Y_ = kargs.window_lengths.at(ck_tile::number<1>{});
+    const ck_tile::index_t X_ = kargs.window_lengths.at(ck_tile::number<2>{});
+    const ck_tile::index_t Do = (D + kargs.input_left_pads.at(ck_tile::number<0>{}) +
+                                 kargs.input_right_pads.at(ck_tile::number<0>{}) -
+                                 ((Z_ - 1) * kargs.window_dilations.at(ck_tile::number<0>{}) + 1)) /
+                                    kargs.window_strides.at(ck_tile::number<0>{}) +
+                                1;
+    const ck_tile::index_t Ho = (H + kargs.input_left_pads.at(ck_tile::number<1>{}) +
+                                 kargs.input_right_pads.at(ck_tile::number<1>{}) -
+                                 ((Y_ - 1) * kargs.window_dilations.at(ck_tile::number<1>{}) + 1)) /
+                                    kargs.window_strides.at(ck_tile::number<1>{}) +
+                                1;
+    const ck_tile::index_t Wo = (W + kargs.input_left_pads.at(ck_tile::number<2>{}) +
+                                 kargs.input_right_pads.at(ck_tile::number<2>{}) -
+                                 ((X_ - 1) * kargs.window_dilations.at(ck_tile::number<2>{}) + 1)) /
+                                    kargs.window_strides.at(ck_tile::number<2>{}) +
+                                1;
 
     const ck_tile::index_t Z = kargs.window_lengths.at(ck_tile::number<0>{});
     const ck_tile::index_t Y = kargs.window_lengths.at(ck_tile::number<1>{});
