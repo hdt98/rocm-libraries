@@ -5,7 +5,12 @@
 
 #include <gtest/gtest.h>
 
-using namespace rocm_ck;
+using ::rocm_ck::ArchFamily;
+using ::rocm_ck::DataType;
+using ::rocm_ck::GpuTarget;
+using ::rocm_ck::isValidWaveTile;
+using ::rocm_ck::TargetProperties;
+using ::rocm_ck::TargetSet;
 
 // ============================================================================
 // TargetProperties
@@ -152,6 +157,9 @@ TEST(TargetSet, OnlyWithThreeTargets)
     EXPECT_EQ(ts.count(), 3);
 }
 
+// Note: OnlyWithOneTarget, OnlyWithTwoTargets, OnlyWithThreeTargets test the
+// variadic arity of TargetSet::only() overloads (1, 2, 3 parameters).
+
 // ============================================================================
 // TargetSet — set operations
 // ============================================================================
@@ -188,6 +196,20 @@ TEST(TargetSet, MinusRemovesTargets)
     constexpr auto all  = TargetSet::all();
     constexpr auto rdna = TargetSet::rdna();
     EXPECT_EQ(all.minus(rdna), TargetSet::cdna());
+}
+
+TEST(TargetSet, MinusWithEmptySetIsIdentity)
+{
+    constexpr TargetSet empty{};
+    constexpr auto cdna = TargetSet::cdna();
+    EXPECT_EQ(cdna.minus(empty), cdna);
+}
+
+TEST(TargetSet, EmptyMinusAnythingIsEmpty)
+{
+    constexpr TargetSet empty{};
+    constexpr auto cdna = TargetSet::cdna();
+    EXPECT_TRUE(empty.minus(cdna).is_empty());
 }
 
 TEST(TargetSet, EmptyUnionIsIdentity)
@@ -262,6 +284,23 @@ TEST(TargetSet, IsSingleTargetFalseForEmpty) { EXPECT_FALSE(TargetSet{}.is_singl
 TEST(TargetSet, WavefrontSizeUniformForCDNA) { EXPECT_EQ(TargetSet::cdna().wavefront_size(), 64); }
 
 TEST(TargetSet, WavefrontSizeUniformForRDNA) { EXPECT_EQ(TargetSet::rdna().wavefront_size(), 32); }
+
+TEST(TargetSet, WavefrontSizeThrowsOnMixedCDNAAndRDNA)
+{
+    constexpr auto mixed = TargetSet::all();
+    // wavefront_size() should throw when set mixes wave64 (CDNA) and wave32 (RDNA)
+    bool caught = false;
+    try
+    {
+        int wf = mixed.wavefront_size();
+        (void)wf; // suppress unused warning if exception is not thrown
+    }
+    catch(...)
+    {
+        caught = true;
+    }
+    EXPECT_TRUE(caught);
+}
 
 TEST(TargetSet, IsAllCdnaPredicateWorks)
 {

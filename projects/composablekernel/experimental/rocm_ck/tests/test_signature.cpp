@@ -5,7 +5,22 @@
 
 #include <gtest/gtest.h>
 
-using namespace rocm_ck;
+using ::rocm_ck::AddOp;
+using ::rocm_ck::DataType;
+using ::rocm_ck::FastGeluOp;
+using ::rocm_ck::GemmOp;
+using ::rocm_ck::kMaxOps;
+using ::rocm_ck::kMaxScalars;
+using ::rocm_ck::kMaxTensors;
+using ::rocm_ck::Layout;
+using ::rocm_ck::MulOp;
+using ::rocm_ck::Op;
+using ::rocm_ck::Quantization;
+using ::rocm_ck::ReluOp;
+using ::rocm_ck::Scalar;
+using ::rocm_ck::SigmoidOp;
+using ::rocm_ck::Signature;
+using ::rocm_ck::Tensor;
 
 // ============================================================================
 // Signature construction

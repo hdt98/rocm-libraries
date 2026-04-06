@@ -5,7 +5,11 @@
 
 #include <gtest/gtest.h>
 
-using namespace rocm_ck;
+using ::rocm_ck::DataType;
+using ::rocm_ck::kMaxPhysicalTensors;
+using ::rocm_ck::Layout;
+using ::rocm_ck::PhysicalTensor;
+using ::rocm_ck::TensorName;
 
 // TensorName has consteval constructor and operators — all comparisons must
 // happen at compile time. We use constexpr variables and EXPECT_TRUE to
@@ -86,3 +90,48 @@ TEST(PhysicalTensor, StoresAllFieldsFromConstruction)
 // ============================================================================
 
 TEST(PhysicalTensor, LimitsCapacityTo8) { EXPECT_EQ(kMaxPhysicalTensors, 8); }
+
+// ============================================================================
+// TensorName edge cases
+// ============================================================================
+
+TEST(TensorName, EmptyStringDoesNotMatchNonEmpty)
+{
+    constexpr TensorName empty("");
+    constexpr bool no_match = empty == "A";
+    EXPECT_FALSE(no_match);
+}
+
+TEST(TensorName, EmptyStringMatchesEmpty)
+{
+    constexpr TensorName empty1("");
+    constexpr TensorName empty2("");
+    constexpr bool match = empty1 == "";
+    constexpr bool eq    = (empty1 <=> empty2) == 0;
+    EXPECT_TRUE(match);
+    EXPECT_TRUE(eq);
+}
+
+TEST(TensorName, HandlesMaxLengthBoundary)
+{
+    // Exactly 15 characters (max length)
+    constexpr TensorName max_len("012345678901234");
+    EXPECT_EQ(max_len.len, 15);
+    constexpr bool match = max_len == "012345678901234";
+    EXPECT_TRUE(match);
+}
+
+TEST(TensorName, OrderingIsConsistent)
+{
+    constexpr TensorName a("A");
+    constexpr TensorName b("B");
+    constexpr TensorName z("Z");
+
+    constexpr bool a_lt_b = (a <=> b) < 0;
+    constexpr bool b_lt_z = (b <=> z) < 0;
+    constexpr bool a_lt_z = (a <=> z) < 0;
+
+    EXPECT_TRUE(a_lt_b);
+    EXPECT_TRUE(b_lt_z);
+    EXPECT_TRUE(a_lt_z);
+}

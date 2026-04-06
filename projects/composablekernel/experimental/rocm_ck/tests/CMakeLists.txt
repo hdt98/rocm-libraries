@@ -38,21 +38,23 @@ endif()
 # =============================================================================
 
 set(ROCM_CK_HOST_TESTS
-    test_datatype.cpp
-    test_layout.cpp
-    test_signature.cpp
-    test_resolve.cpp
-    test_gemm_spec.cpp
-    test_args.cpp
-    test_physical_tensor.cpp
-    test_schema_compatibility.cpp
-    test_validate.cpp
-    test_elementwise_spec.cpp
     test_arch_properties.cpp
+    test_args.cpp
+    test_datatype.cpp
+    test_datatype_convert.cpp
+    test_elementwise_spec.cpp
     test_fmha_bwd_common.cpp
-    test_fmha_bwd_ograd_dot_o.cpp
-    test_fmha_bwd_dqdkdv.cpp
     test_fmha_bwd_convert_dq.cpp
+    test_fmha_bwd_dqdkdv.cpp
+    test_fmha_bwd_ograd_dot_o.cpp
+    test_gemm_spec.cpp
+    test_layout.cpp
+    test_physical_tensor.cpp
+    test_resolve.cpp
+    test_schema_compatibility.cpp
+    test_signature.cpp
+    test_validate.cpp
+    test_verify.cpp
 )
 
 # Convenience target: `ninja rocm_ck_tests` builds all host tests

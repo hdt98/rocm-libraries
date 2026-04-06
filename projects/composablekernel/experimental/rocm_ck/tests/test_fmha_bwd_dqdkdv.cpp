@@ -6,8 +6,14 @@
 
 #include <gtest/gtest.h>
 
-using namespace rocm_ck;
-namespace S = fmha_bwd_dqdkdv_slots;
+using ::rocm_ck::DataType;
+using ::rocm_ck::dqdkdv_grid_size;
+using ::rocm_ck::FmhaBiasType;
+using ::rocm_ck::FmhaBwdDQDKDVAlgorithm;
+using ::rocm_ck::FmhaBwdDQDKDVConfig;
+using ::rocm_ck::FmhaMode;
+using ::rocm_ck::makeSpec;
+namespace S = ::rocm_ck::fmha_bwd_dqdkdv_slots;
 
 // ============================================================================
 // Algorithm defaults
@@ -68,6 +74,8 @@ TEST(FmhaBwdDqDkDv, MakeSpecBF16)
 
 TEST(FmhaBwdDqDkDv, MakeSpecAllHdimsQ)
 {
+    // Test all supported hdim_q values. Each must be a separate constexpr
+    // variable because makeSpec is consteval — cannot use a runtime loop.
     constexpr auto k32 =
         makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
                                                    .hdim_q = 32,
@@ -108,6 +116,8 @@ TEST(FmhaBwdDqDkDv, MakeSpecAllHdimsQ)
 
 TEST(FmhaBwdDqDkDv, MakeSpecAllHdimsV)
 {
+    // Test all supported hdim_v values. Each must be a separate constexpr
+    // variable because makeSpec is consteval — cannot use a runtime loop.
     constexpr auto k32 =
         makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
                                                    .hdim_q = 128,
@@ -411,7 +421,8 @@ TEST(FmhaBwdDqDkDv, RequiredTensorsGroupSameAsBatch)
 
 TEST(FmhaBwdDqDkDv, GridSizeBasic)
 {
-    constexpr auto g = dqdkdv_grid_size(2, 8, 256, 128);
+    constexpr auto g =
+        dqdkdv_grid_size(/*batch=*/2, /*nhead=*/8, /*seqlen_q=*/256, /*block_n0=*/128);
     EXPECT_EQ(g.x, 2u);
     EXPECT_EQ(g.y, 8u);
     EXPECT_EQ(g.z, 2u);
@@ -419,7 +430,8 @@ TEST(FmhaBwdDqDkDv, GridSizeBasic)
 
 TEST(FmhaBwdDqDkDv, GridSizeCeil)
 {
-    constexpr auto g = dqdkdv_grid_size(1, 1, 129, 128);
+    constexpr auto g =
+        dqdkdv_grid_size(/*batch=*/1, /*nhead=*/1, /*seqlen_q=*/129, /*block_n0=*/128);
     EXPECT_EQ(g.x, 2u);
     EXPECT_EQ(g.y, 1u);
     EXPECT_EQ(g.z, 1u);

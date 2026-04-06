@@ -6,7 +6,9 @@
 
 #include <gtest/gtest.h>
 
-using namespace rocm_ck;
+using ::rocm_ck::FmhaBiasType;
+using ::rocm_ck::FmhaMode;
+using ::rocm_ck::GridDim;
 
 // ============================================================================
 // FmhaMode

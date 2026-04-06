@@ -24,7 +24,17 @@
 
 #include <cstring>
 
-using namespace rocm_ck;
+using ::rocm_ck::ALL_CONVERT_DQ_VARIANTS_COUNT;
+using ::rocm_ck::ALL_DQDKDV_VARIANTS_COUNT;
+using ::rocm_ck::ALL_OGRAD_DOT_O_VARIANTS_COUNT;
+using ::rocm_ck::DataType;
+using ::rocm_ck::findVariant;
+using ::rocm_ck::FmhaBiasType;
+using ::rocm_ck::FmhaBwdConvertDQConfig;
+using ::rocm_ck::FmhaBwdDQDKDVConfig;
+using ::rocm_ck::FmhaBwdOGradDotOConfig;
+using ::rocm_ck::FmhaMode;
+using ::rocm_ck::makeSpec;
 
 // ============================================================================
 // OGradDotO frozen baselines

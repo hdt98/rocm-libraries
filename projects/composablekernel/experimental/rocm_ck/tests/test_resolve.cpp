@@ -5,7 +5,26 @@
 
 #include <gtest/gtest.h>
 
-using namespace rocm_ck;
+using ::rocm_ck::AddOp;
+using ::rocm_ck::BinaryOpLike;
+using ::rocm_ck::DataType;
+using ::rocm_ck::FastGeluOp;
+using ::rocm_ck::GeluOp;
+using ::rocm_ck::GemmOp;
+using ::rocm_ck::kMaxTensors;
+using ::rocm_ck::Layout;
+using ::rocm_ck::MulOp;
+using ::rocm_ck::Quantization;
+using ::rocm_ck::ReluOp;
+using ::rocm_ck::resolve;
+using ::rocm_ck::Scalar;
+using ::rocm_ck::ScaleOp;
+using ::rocm_ck::SigmoidOp;
+using ::rocm_ck::Signature;
+using ::rocm_ck::SiluOp;
+using ::rocm_ck::SoftmaxOp;
+using ::rocm_ck::Tensor;
+using ::rocm_ck::UnaryOpLike;
 
 // ============================================================================
 // Simple GemmOp resolution
@@ -425,4 +444,57 @@ TEST(Concepts, ClassifiesScaleOpAsUnaryNotBinary)
 {
     EXPECT_TRUE(UnaryOpLike<ScaleOp>);
     EXPECT_FALSE(BinaryOpLike<ScaleOp>);
+}
+
+// ============================================================================
+// ScaleOp with explicit Scalar
+// ============================================================================
+
+TEST(Resolve, ScaleOpReferencesExplicitScalar)
+{
+    constexpr auto r =
+        resolve(Signature{.dtype   = DataType::FP16,
+                          .scalars = {Scalar{.name = "alpha", .dtype = DataType::FP32}},
+                          .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                      ScaleOp{.in = "C", .out = "D", .scale = "alpha"}}});
+
+    EXPECT_EQ(r.num_tensors, 4); // A, B, C, D
+    EXPECT_EQ(r.num_scalars, 1);
+    EXPECT_EQ(r.scalar("alpha").dtype, DataType::FP32);
+    EXPECT_EQ(r.scalarIndex("alpha"), 0);
+}
+
+TEST(Resolve, ScaleOpPreservesScalarDtype)
+{
+    constexpr auto r =
+        resolve(Signature{.dtype   = DataType::FP16,
+                          .scalars = {Scalar{.name = "scale_factor", .dtype = DataType::FP16}},
+                          .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                      ScaleOp{.in = "C", .out = "D", .scale = "scale_factor"}}});
+
+    EXPECT_EQ(r.scalar("scale_factor").dtype, DataType::FP16);
+}
+
+// ============================================================================
+// Boundary: signature at kMaxTensors
+// ============================================================================
+
+TEST(Resolve, HandlesSignatureWithManyTensors)
+{
+    // Create a chain of AddOps to generate many tensors (close to kMaxTensors).
+    // Each AddOp creates 3 tensors (lhs, rhs, out). We'll create a chain that
+    // approaches the limit.
+    // kMaxTensors is 16, so a signature with 3 GEMMs (each with 3 tensors = 9)
+    // plus some adds should get close.
+    constexpr auto r = resolve(Signature{.dtype = DataType::FP16,
+                                         .ops   = {GemmOp{.lhs = "A1", .rhs = "B1", .out = "C1"},
+                                                   GemmOp{.lhs = "A2", .rhs = "B2", .out = "C2"},
+                                                   GemmOp{.lhs = "A3", .rhs = "B3", .out = "C3"},
+                                                   AddOp{.lhs = "C1", .rhs = "C2", .out = "D1"},
+                                                   AddOp{.lhs = "D1", .rhs = "C3", .out = "D2"}}});
+
+    // A1, B1, C1, A2, B2, C2, A3, B3, C3, D1, D2 = 11 tensors
+    EXPECT_EQ(r.num_tensors, 11);
+    EXPECT_EQ(r.tensor("A1").dtype, DataType::FP16);
+    EXPECT_EQ(r.tensor("D2").dtype, DataType::FP16);
 }

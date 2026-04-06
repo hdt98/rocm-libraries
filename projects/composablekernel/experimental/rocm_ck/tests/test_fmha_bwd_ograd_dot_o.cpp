@@ -6,8 +6,13 @@
 
 #include <gtest/gtest.h>
 
-using namespace rocm_ck;
-namespace S = fmha_bwd_ograd_dot_o_slots;
+using ::rocm_ck::DataType;
+using ::rocm_ck::FmhaBwdOGradDotOAlgorithm;
+using ::rocm_ck::FmhaBwdOGradDotOConfig;
+using ::rocm_ck::FmhaMode;
+using ::rocm_ck::makeSpec;
+using ::rocm_ck::ograd_dot_o_grid_size;
+namespace S = ::rocm_ck::fmha_bwd_ograd_dot_o_slots;
 
 // ============================================================================
 // Algorithm defaults
@@ -58,8 +63,8 @@ TEST(FmhaBwdOGradDotO, MakeSpecGroupMode)
 
 TEST(FmhaBwdOGradDotO, MakeSpecAllHdims)
 {
-    // makeSpec is consteval — cannot use runtime loop variables.
-    // Use separate constexpr variables for each hdim value.
+    // Test all supported hdim_v values. Each must be a separate constexpr
+    // variable because makeSpec is consteval — cannot use a runtime loop.
     constexpr auto k32  = makeSpec(FmhaBwdOGradDotOConfig{
          .signature = {.dtype = DataType::FP16, .hdim_v = 32, .mode = FmhaMode::BATCH},
          .algorithm = {.pad_seqlen_q = true, .pad_hdim_v = true}});
@@ -157,7 +162,8 @@ TEST(FmhaBwdOGradDotO, RequiredScalarsAlways1)
 
 TEST(FmhaBwdOGradDotO, GridSizeBasic)
 {
-    constexpr auto g = ograd_dot_o_grid_size(2, 8, 256, 64);
+    constexpr auto g =
+        ograd_dot_o_grid_size(/*batch=*/2, /*nhead=*/8, /*seqlen_q=*/256, /*tile_m0=*/64);
     EXPECT_EQ(g.x, 4u);
     EXPECT_EQ(g.y, 8u);
     EXPECT_EQ(g.z, 2u);
@@ -165,7 +171,8 @@ TEST(FmhaBwdOGradDotO, GridSizeBasic)
 
 TEST(FmhaBwdOGradDotO, GridSizeCeil)
 {
-    constexpr auto g = ograd_dot_o_grid_size(1, 1, 65, 64);
+    constexpr auto g =
+        ograd_dot_o_grid_size(/*batch=*/1, /*nhead=*/1, /*seqlen_q=*/65, /*tile_m0=*/64);
     EXPECT_EQ(g.x, 2u);
     EXPECT_EQ(g.y, 1u);
     EXPECT_EQ(g.z, 1u);
@@ -173,7 +180,8 @@ TEST(FmhaBwdOGradDotO, GridSizeCeil)
 
 TEST(FmhaBwdOGradDotO, GridSizeExact)
 {
-    constexpr auto g = ograd_dot_o_grid_size(1, 1, 64, 64);
+    constexpr auto g =
+        ograd_dot_o_grid_size(/*batch=*/1, /*nhead=*/1, /*seqlen_q=*/64, /*tile_m0=*/64);
     EXPECT_EQ(g.x, 1u);
     EXPECT_EQ(g.y, 1u);
     EXPECT_EQ(g.z, 1u);

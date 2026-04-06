@@ -6,8 +6,13 @@
 
 #include <gtest/gtest.h>
 
-using namespace rocm_ck;
-namespace S = fmha_bwd_convert_dq_slots;
+using ::rocm_ck::convert_dq_grid_size;
+using ::rocm_ck::DataType;
+using ::rocm_ck::FmhaBwdConvertDQAlgorithm;
+using ::rocm_ck::FmhaBwdConvertDQConfig;
+using ::rocm_ck::FmhaMode;
+using ::rocm_ck::makeSpec;
+namespace S = ::rocm_ck::fmha_bwd_convert_dq_slots;
 
 // ============================================================================
 // Algorithm defaults
@@ -61,6 +66,8 @@ TEST(FmhaBwdConvertDQ, MakeSpecGroupMode)
 
 TEST(FmhaBwdConvertDQ, MakeSpecAllHdims)
 {
+    // Test all supported hdim_q values. Each must be a separate constexpr
+    // variable because makeSpec is consteval — cannot use a runtime loop.
     constexpr auto k32  = makeSpec(FmhaBwdConvertDQConfig{
          .signature = {.dtype = DataType::FP16, .hdim_q = 32, .mode = FmhaMode::BATCH},
          .algorithm = {}});
@@ -161,7 +168,8 @@ TEST(FmhaBwdConvertDQ, RequiredScalarsAlways0)
 
 TEST(FmhaBwdConvertDQ, GridSizeBasic)
 {
-    constexpr auto g = convert_dq_grid_size(2, 8, 256, 64);
+    constexpr auto g =
+        convert_dq_grid_size(/*batch=*/2, /*nhead=*/8, /*seqlen_q=*/256, /*tile_m0=*/64);
     EXPECT_EQ(g.x, 4u);
     EXPECT_EQ(g.y, 8u);
     EXPECT_EQ(g.z, 2u);
@@ -170,6 +178,6 @@ TEST(FmhaBwdConvertDQ, GridSizeBasic)
 TEST(FmhaBwdConvertDQ, GridSizeDefaultTileM0)
 {
     // Default tile_m0 = 64
-    constexpr auto g = convert_dq_grid_size(1, 1, 128);
+    constexpr auto g = convert_dq_grid_size(/*batch=*/1, /*nhead=*/1, /*seqlen_q=*/128);
     EXPECT_EQ(g.x, 2u);
 }

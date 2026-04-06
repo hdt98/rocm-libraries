@@ -5,7 +5,13 @@
 
 #include <gtest/gtest.h>
 
-using namespace rocm_ck;
+using ::rocm_ck::AddOp;
+using ::rocm_ck::DataType;
+using ::rocm_ck::ElementwiseAlgorithm;
+using ::rocm_ck::makeSpec;
+using ::rocm_ck::Signature;
+using ::rocm_ck::TargetSet;
+using ::rocm_ck::Tensor;
 
 // ============================================================================
 // Valid specs

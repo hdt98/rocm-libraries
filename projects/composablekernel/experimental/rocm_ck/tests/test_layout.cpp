@@ -5,7 +5,9 @@
 
 #include <gtest/gtest.h>
 
-using namespace rocm_ck;
+using ::rocm_ck::isValidLayoutForRank;
+using ::rocm_ck::Layout;
+using ::rocm_ck::layoutName;
 
 // ============================================================================
 // layoutName
@@ -54,4 +56,36 @@ TEST(Layout, RejectsAutoForAllRanks)
     EXPECT_FALSE(auto_r0);
     EXPECT_FALSE(auto_r1);
     EXPECT_FALSE(auto_r2);
+}
+
+// ============================================================================
+// Edge cases: high ranks
+// ============================================================================
+
+TEST(Layout, RejectsRowAndColForRankGreaterThan2)
+{
+    constexpr bool row_r3 = isValidLayoutForRank(Layout::Row, 3);
+    constexpr bool row_r4 = isValidLayoutForRank(Layout::Row, 4);
+    constexpr bool row_r6 = isValidLayoutForRank(Layout::Row, 6);
+    constexpr bool col_r3 = isValidLayoutForRank(Layout::Col, 3);
+    constexpr bool col_r4 = isValidLayoutForRank(Layout::Col, 4);
+    constexpr bool col_r6 = isValidLayoutForRank(Layout::Col, 6);
+
+    EXPECT_FALSE(row_r3);
+    EXPECT_FALSE(row_r4);
+    EXPECT_FALSE(row_r6);
+    EXPECT_FALSE(col_r3);
+    EXPECT_FALSE(col_r4);
+    EXPECT_FALSE(col_r6);
+}
+
+TEST(Layout, RejectsContiguousForRankGreaterThan1)
+{
+    constexpr bool contig_r3 = isValidLayoutForRank(Layout::Contiguous, 3);
+    constexpr bool contig_r4 = isValidLayoutForRank(Layout::Contiguous, 4);
+    constexpr bool contig_r6 = isValidLayoutForRank(Layout::Contiguous, 6);
+
+    EXPECT_FALSE(contig_r3);
+    EXPECT_FALSE(contig_r4);
+    EXPECT_FALSE(contig_r6);
 }
