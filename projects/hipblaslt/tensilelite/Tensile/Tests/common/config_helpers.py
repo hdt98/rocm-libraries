@@ -40,6 +40,13 @@ from Tensile.Common.DataType import DataType
 # Root of Tensile/Tests — used for stable relative path computation.
 _TESTS_ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
 
+try:
+    DEFAULT_YAML_LOADER = yaml.CSafeLoader
+except:
+    print('CSafeLoader is not installed.')
+    DEFAULT_YAML_LOADER = yaml.SafeLoader
+
+
 
 def get_rocm_version_or_none():
     """Gets the ROCm version from the version file."""
@@ -107,7 +114,7 @@ def configMarks(filepath, rootDir, availableArchs):
 
     try:
         with open(filepath) as f:
-            doc = yaml.load(f, yaml.SafeLoader)
+            doc = yaml.load(f, DEFAULT_YAML_LOADER)
     except yaml.parser.ParserError:
         marks.append(pytest.mark.syntax_error)
         return marks
