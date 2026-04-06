@@ -337,8 +337,7 @@ namespace rocRoller::KernelGraph
     std::vector<RequiredCoordinateInfo> getRequiredCoordinatesInfo(int                op,
                                                                    int                location,
                                                                    KernelGraph const& graph,
-                                                                   bool isStorePartOfGlobalToLDSOp,
-                                                                   int  swizzleKUnrollCoord = -1)
+                                                                   bool isStorePartOfGlobalToLDSOp)
     {
         auto [target, direction] = getOperationTarget(op, graph, isStorePartOfGlobalToLDSOp);
         auto [required, path]    = findRequiredCoordinates(target, direction, graph);
@@ -578,11 +577,8 @@ namespace rocRoller::KernelGraph
         std::vector<int>                strideCoords;
 
         int  locationForCoordInfo = (spec.forLoop > 0) ? spec.forLoop : spec.location;
-        auto requiredCoords       = getRequiredCoordinatesInfo(op,
-                                                         locationForCoordInfo,
-                                                         graph,
-                                                         spec.isStorePartOfGlobalToLDSOp,
-                                                         spec.swizzleKUnrollCoord);
+        auto requiredCoords       = getRequiredCoordinatesInfo(
+            op, locationForCoordInfo, graph, spec.isStorePartOfGlobalToLDSOp);
 
         for(auto const& info : requiredCoords)
         {
@@ -1174,8 +1170,8 @@ namespace rocRoller::KernelGraph
         {
             // Build coordinate list for deduplication key
             std::vector<int> specCoords;
-            for(auto const& info : getRequiredCoordinatesInfo(
-                    candidate, location, graph, isStorePartOfGlobalToLDSOp, swizzleKUnrollCoord))
+            for(auto const& info :
+                getRequiredCoordinatesInfo(candidate, location, graph, isStorePartOfGlobalToLDSOp))
             {
                 specCoords.push_back(info.coord);
             }
