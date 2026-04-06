@@ -744,6 +744,10 @@ class KernelWriterAssembly(KernelWriter):
     # MFMA case
     if kernel["UseMFMAF32XEmulation"]:
       self.moduleVgprMacroValuB_T.add(RegSet("v", "IdentityMatrix", self.states.startVgprIdentityMatrix, 0))
+    # TF32 Inf Support
+    if self.states.useTF32EmuInfSupport:
+      self.moduleVgprMacroValuB_T.add(RegSet("v", "InfCheck", self.states.startVgprInfCheck, 0))
+      self.moduleVgprMacroValuB_T.add(RegSet("v", "InfTmp", self.states.startVgprInfTmp, 0))
 
   def macroAndSet(self, kernel, tPA, tPB) -> Module:
     module = Module("MacroNSet")
@@ -14890,6 +14894,57 @@ class KernelWriterAssembly(KernelWriter):
     module.addComment2("Unrolled Loop - End%s"%(endStr))
     module.add(loopLabelEnd)
 
+    return module
+
+  ##############################################################################
+  # Creates a negative identity matrix for 4x4x4_16b MFMA
+  # Each 4x4 block is set to this:
+  # -1  0  0
+  #  0 -1  0
+  #  0  0 -1
+  ##############################################################################
+  def createNegIdentityMatrix(self, kernel):
+    module = Module("NegIdentityMatrix")
+    tmp = self.vgprPool.checkOut(1)
+    lane4 = self.vgprPool.checkOut(1)
+    mfmaHigh = vgpr(self.states.startVgprIdentityMatrix)
+    mfmaLow = vgpr(self.states.startVgprIdentityMatrix+1)
+
+    module.addComment0("Create a negative identity matrix used by TF32 MFMA emulation.")
+    module.add(VAndB32(dst=vgpr(lane4),src0=3, src1=vgpr("Serial"), comment="lane % 4"))
+    module.add(VMovB64(dst=vgpr(self.states.startVgprIdentityMatrix,2),src=0))
+    module.add(VMovB32(dst=vgpr(tmp), src="0xbf80", comment=""))
+
+    module.add(VCmpEQU32(dst=VCC(), src0=0, src1=vgpr(lane4), comment="Lane %4 == 0 ?"))
+    module.add(SNop(1, comment=""))
+    module.add(VCndMaskB32(dst=mfmaHigh, src0=mfmaHigh, src1=vgpr(tmp), src2= VCC(), comment=""))
+
+    module.add(VCmpEQU32(dst=VCC(), src0=2, src1=vgpr(lane4), comment="Lane %4 == 2 ?"))
+    module.add(SNop(1, comment=""))
+    module.add(VCndMaskB32(dst=mfmaLow, src0=mfmaLow, src1=vgpr(tmp), src2= VCC(), comment=""))
+
+    module.add(VMovB32(dst=vgpr(tmp), src="0xbf800000", comment=""))
+
+    module.add(VCmpEQU32(dst=VCC(), src0=1, src1=vgpr(lane4), comment="Lane %4 == 1 ?"))
+    module.add(SNop(1, comment=""))
+    module.add(VCndMaskB32(dst=mfmaHigh, src0=mfmaHigh, src1=vgpr(tmp), src2= VCC(), comment=""))
+
+    module.add(VCmpEQU32(dst=VCC(), src0=3, src1=vgpr(lane4), comment="Lane %4 == 3 ?"))
+    module.add(SNop(1, comment=""))
+    module.add(VCndMaskB32(dst=mfmaLow, src0=mfmaLow, src1=vgpr(tmp), src2= VCC(), comment=""))
+
+    self.vgprPool.checkIn(tmp)
+    self.vgprPool.checkIn(lane4)
+    return module
+
+  ##############################################################################
+  # Create a Src vreg value for TF32 Inf check (v_cmp_class_f32)
+  ##############################################################################
+  def createTF32ClassSrc(self, kernel):
+    module = Module("TF32InfClassSrc")
+    module.addComment0("Create a Src vreg value for TF32 Inf check")
+    module.add(VMovB32(vgpr(self.states.startVgprInfCheck), "0x204", comment="inf check for cmp_class"))
+    #module.add(SMovB32(sgpr("InfCheck"), "0x204", comment="inf check for cmp_class"))
     return module
 
   ##############################################################################

@@ -584,6 +584,9 @@ class Solution(collections.abc.Mapping):
       # (2) UseDot2F32XEmulation = True (set (1) to False)
       # (3) cvt + sub  (set both (1) and (2) False)
       state["UseMFMAF32XEmulation"] = True # enable MFMA version by default
+      # TF32 Emu Inf support
+      # set True by default
+      state["_UseTF32EmuInfSupport"] = True
 
     state["MfmaInitCVgprs"] = False
 
@@ -1746,6 +1749,12 @@ class Solution(collections.abc.Mapping):
       #   Cijk_Ailk_Bjlk_S_MX_B_Bias_HA_S_SAV_UserArgs_MT16x16x512_MI16x16x1
       if (state["MacroTile0"] == 16 and state["MacroTile1"] == 16 and state["DepthU"] == 512):
         state["UseDirect32XEmulation"] = False
+
+    # workadound for TF32 Emu Inf support
+    # disable CMS for now (need to add Inf code scheduling)
+    # TODO: re-enable CMS
+    if state["UseF32XEmulation"] and state["_UseTF32EmuInfSupport"]:
+      state["UseCustomMainLoopSchedule"] = 0
 
     # backup UsePLRPack from yaml before calling hasCustomSchedule
     backup_UsePLRPack = state["UsePLRPack"] 

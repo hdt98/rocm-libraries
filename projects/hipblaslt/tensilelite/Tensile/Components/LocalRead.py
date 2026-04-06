@@ -23,11 +23,12 @@
 ################################################################################
 
 from rocisa.code import Module
-from rocisa.container import DSModifiers, vgpr, sgpr, SDWAModifiers, VOP3PModifiers, ContinuousRegister
+from rocisa.container import DSModifiers, vgpr, sgpr, SDWAModifiers, VOP3PModifiers, ContinuousRegister, VCC
 from rocisa.enum import SelectBit, InstType
 from rocisa.instruction import SMovB32, SWaitCnt, VOrB32, VPermB32, VLShiftLeftOrB32, \
                             VMovB32, VMovB64,VLShiftRightB32, VCvtPkFP8toF32, VCvtF32toF16, VCvtFP8toF32,VCvtScaleFP8toF16,VCvtScalePkFP8toF16, \
-                            VCvtPkF32toBF16, VCvtBF16toFP32, PVCvtBF16toFP32, VDot2CF32BF16, SNop, VSubF32, VSwapB32, MFMAInstruction
+                            VCvtPkF32toBF16, VCvtBF16toFP32, PVCvtBF16toFP32, VDot2CF32BF16, SNop, VSubF32, VSwapB32, MFMAInstruction, \
+                            VCmpClassF32, VCndMaskB32
 
 from ..Component import LocalRead
 
@@ -445,19 +446,24 @@ class LocalReadMFMA(LocalRead):
         dstValOffset = baseValuiIdx + index // 2
         v0, v1, v2, v3 = self.get4VgprForEmu(writer, kernel, tct, bufferIdx, valOffset, iui, lrvwTile, dst=False)
         dst0, dst1 = self.get2VgprForEmu(writer, kernel, tct, bufferIdx, dstValOffset, iui, lrvwTile, dst=True)
-        module.add(VCvtPkF32toBF16(dst=dst0, src0=v0, src1=v1))
+        def pack2HiBits(dstPk, v0, v1, comment=""):
+            srcPk0 = v0
+            srcPk1 = v1
+            if writer.states.useTF32EmuInfSupport:
+                # TF32 Inf support
+                # convert the value from Inf to 0 for high bits
+                srcPk0 = vgpr(writer.states.startVgprInfTmp)
+                srcPk0 = dstPk # reuse dst0 to reduce vgpr usage
+                module.add(VCmpClassF32(dst=VCC(), src0=v0, src1=vgpr(writer.states.startVgprInfCheck), comment="Check if high bits are Inf"))
+                module.add(VCndMaskB32(dst=srcPk0, src0=v0, src1=0, src2=VCC(), comment="if input was inf, set low bits to 0 to avoid nan"))
+                module.add(VCmpClassF32(dst=VCC(), src0=v1, src1=vgpr(writer.states.startVgprInfCheck), comment="Check if high bits are Inf"))
+                module.add(VCndMaskB32(dst=srcPk1, src0=v1, src1=0, src2=VCC(), comment="if input was inf, set low bits to 0 to avoid nan"))
+            module.add(VCvtPkF32toBF16(dst=dstPk, src0=srcPk0, src1=srcPk1, comment=comment))
+        # pack v0,v1
+        pack2HiBits(dst0,v0,v1)
         commentStr = commentForSchedule1
-        # do not put comment for scheduling in the following cases
-        # - UseMFMAF32XEmulation
-        #   Delay the comment to the 2nd mfma
-        # - index % 8 == 0
-        #   we need to put schedule comment at index % 8 == 4
-        # - not useDirect32XEmulation
-        #   tmp vreg case, tmp vreg can be same between A and B
-        #   put schedule comment only at final pack
-        #if kernel["UseMFMAF32XEmulation"] or (index % 8 == 0) or (not useDirect32XEmulation):
-        #    commentStr = ""
-        module.add(VCvtPkF32toBF16(dst=dst1, src0=v2, src1=v3, comment=commentStr))
+        # pack v2,v3
+        pack2HiBits(dst1,v2,v3,comment=commentStr)
 
     def pack4LowBitsStep1(self, kernel, writer, tc, valuiIdx, bufferIdx, iui, packCodeT, lrvwTile, tmpvgprFP32, commentForSchedule1, useDirect32XEmulation):
         baseValuiIdx = valuiIdx - valuiIdx % 8

@@ -238,6 +238,8 @@ class StateValues:
   startVgprAlphaTmp: int                 = -1
   startVgprSerial: int                   = -1
   startVgprIdentityMatrix: int           = -1 
+  startVgprInfTmp: int                   = -1
+  startVgprInfCheck: int                 = -1
 
   numSgprSizesSum: int                   = 0
   numSgprSizesFree: int                  = 0
@@ -317,6 +319,7 @@ class StateValues:
   doPackPreSchedulingThisLoop: bool      = False
   doPackPreSchedulingNextLoop: bool      = False
   doFullPackCodePrefetch: bool           = False
+  useTF32EmuInfSupport: bool             = False
 
   # Epilogue states
   preloadScaleA = False
@@ -3394,47 +3397,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     return module
 
   ##############################################################################
-  # Creates a negative identity matrix for 4x4x4_16b MFMA
-  # Each 4x4 block is set to this:
-  # -1  0  0
-  #  0 -1  0
-  #  0  0 -1
-  ##############################################################################
-  def createNegIdentityMatrix(self, kernel):
-    module = Module("NegIdentityMatrix")
-    tmp = self.vgprPool.checkOut(1)
-    lane4 = self.vgprPool.checkOut(1)
-    mfmaHigh = vgpr(self.states.startVgprIdentityMatrix)
-    mfmaLow = vgpr(self.states.startVgprIdentityMatrix+1)
-
-    module.addComment0("Create a negative identity matrix used by TF32 MFMA emulation.")
-    module.add(VAndB32(dst=vgpr(lane4),src0=3, src1=vgpr("Serial"), comment="lane % 4"))
-    module.add(VMovB64(dst=vgpr(self.states.startVgprIdentityMatrix,2),src=0))
-    module.add(VMovB32(dst=vgpr(tmp), src="0xbf80", comment=""))
-
-    module.add(VCmpEQU32(dst=VCC(), src0=0, src1=vgpr(lane4), comment="Lane %4 == 0 ?"))
-    module.add(SNop(1, comment=""))
-    module.add(VCndMaskB32(dst=mfmaHigh, src0=mfmaHigh, src1=vgpr(tmp), src2= VCC(), comment=""))
-
-    module.add(VCmpEQU32(dst=VCC(), src0=2, src1=vgpr(lane4), comment="Lane %4 == 2 ?"))
-    module.add(SNop(1, comment=""))
-    module.add(VCndMaskB32(dst=mfmaLow, src0=mfmaLow, src1=vgpr(tmp), src2= VCC(), comment=""))
-
-    module.add(VMovB32(dst=vgpr(tmp), src="0xbf800000", comment=""))
-
-    module.add(VCmpEQU32(dst=VCC(), src0=1, src1=vgpr(lane4), comment="Lane %4 == 1 ?"))
-    module.add(SNop(1, comment=""))
-    module.add(VCndMaskB32(dst=mfmaHigh, src0=mfmaHigh, src1=vgpr(tmp), src2= VCC(), comment=""))
-
-    module.add(VCmpEQU32(dst=VCC(), src0=3, src1=vgpr(lane4), comment="Lane %4 == 3 ?"))
-    module.add(SNop(1, comment=""))
-    module.add(VCndMaskB32(dst=mfmaLow, src0=mfmaLow, src1=vgpr(tmp), src2= VCC(), comment=""))
-
-    self.vgprPool.checkIn(tmp)
-    self.vgprPool.checkIn(lane4)
-    return module
-
-  ##############################################################################
   # Kernel Body
   ##############################################################################
   def kernelBody( self, kernel, tensorParametersA, tensorParametersB ):
@@ -3464,6 +3426,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # MFMA F32XEmulation negative identity matrix
     if kernel["UseMFMAF32XEmulation"]:
       module.add(self.createNegIdentityMatrix(kernel))
+    if self.states.useTF32EmuInfSupport:
+      # TF32 Emu Inf support
+      module.add(self.createTF32ClassSrc(kernel))
 
     # Open persistent loop
     loopComponent = Component.PersistentLoop.find(self)
@@ -5602,6 +5567,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
     #         Wider local read case, we need TransposeCode=True
     #   False: Does not use interleave layout
     #         ider local read + index transpose case, this needs to be False
+
+    # TF32 Inf support
+    self.states.useTF32EmuInfSupport = kernel["UseF32XEmulation"] and kernel["_UseTF32EmuInfSupport"]
+
     def initTF32Emu():
       # for UseF32XEmulation only
       if not kernel["UseF32XEmulation"]:
@@ -5733,6 +5702,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
         kernel["UseDot2F32XEmulation"] = True
 
     # vreg allocation for UseMFMAF32XEmulation
+    if self.states.useTF32EmuInfSupport:
+      # TF32 Emu Inf support
+      # assign 1 vreg for TF32 Inf check for v_cmp_class_f32
+      self.states.startVgprInfCheck = vgprIdx
+      vgprIdx+=1
+      # assign 1 tmp vreg for TF32 Inf check
+      self.states.startVgprInfTmp = vgprIdx
+      vgprIdx+=1
     if kernel["UseMFMAF32XEmulation"]:
       vgprIdx = ((vgprIdx+1)//2)*2 #align 64 bit
       self.states.startVgprIdentityMatrix = vgprIdx
@@ -6841,6 +6818,20 @@ class KernelWriter(metaclass=abc.ABCMeta):
   ##############################################################################
   @abc.abstractmethod
   def simdSpecDispatch(self, kernel, numCodePath):
+    return ""
+
+  ##############################################################################
+  # Creates a negative identity matrix for 4x4x4_16b MFMA
+  ##############################################################################
+  @abc.abstractmethod
+  def createNegIdentityMatrix(self, kernel):
+    return ""
+
+  ##############################################################################
+  # Create a Src vreg value for TF32 Inf check (v_cmp_class_f32)
+  ##############################################################################
+  @abc.abstractmethod
+  def createTF32ClassSrc(self, kernel):
     return ""
 
   ##############################################################################

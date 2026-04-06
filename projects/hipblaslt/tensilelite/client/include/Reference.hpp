@@ -115,6 +115,10 @@ namespace TensileLite
         template <>
         inline bool AlmostEqual(float a, float b, double threshold)
         {
+            if ((std::isinf(a) && std::isinf(b)) && (std::signbit(a) == std::signbit(b)))
+                return true;
+            if ((std::isnan(a) && std::isnan(b)))
+                return true;
             float tol     = (threshold > 0.0) ? static_cast<float>(threshold) : AlmostEqualTolerance_Float;
             float absDiff = std::fabs(a - b);
             return a == b
