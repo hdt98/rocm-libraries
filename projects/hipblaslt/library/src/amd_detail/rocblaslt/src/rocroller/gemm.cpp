@@ -1,28 +1,5 @@
-/* ************************************************************************
- *
- * MIT License
- *
- * Copyright (C) 2025 Advanced Micro Devices, Inc.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- * ************************************************************************ */
+// Copyright Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
 
 #include "gemm.hpp"
 #include "runtime_args_selection.hpp"
@@ -32,6 +9,10 @@
 #include <rocRoller/KernelOptions_detail.hpp>
 
 using namespace rocRoller;
+
+const int SHUFFLE_M = 16;
+const int SHUFFLE_N = 16;
+const int SHUFFLE_K = 32;
 
 /**
  * @brief Set the required conditions in order to run a provided kernel
@@ -201,13 +182,37 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
     std::vector<size_t> oneStridesN = std::vector<size_t>({(size_t)1});
     std::vector<size_t> oneStridesT = std::vector<size_t>({(size_t)0, (size_t)1});
 
+    auto stridesA = gemm->kernelType.swizzleA ? std::vector<size_t>{}
+                                             : gemm->kernelType.transA ? oneStridesT : oneStridesN;
+    
     auto tagTensorA = command->addOperation(rocRoller::Operations::Tensor(
-        2, dataTypeA, {}, gemm->kernelType.transA ? oneStridesT : oneStridesN)); // A
-    auto tagLoadA   = command->addOperation(rocRoller::Operations::T_Load_Tiled(tagTensorA));
+        2, dataTypeA, {}, stridesA)); // A
+
+    auto loadInputA = tagTensorA;
+
+    if(gemm->kernelType.swizzleA)
+    {
+        loadInputA = command->addOperation(Operations::SubTileTranspose(
+            loadInputA, {SHUFFLE_M, SHUFFLE_K}, gemm->kernelType.transA));
+    }
+    
+    auto tagLoadA   = command->addOperation(rocRoller::Operations::T_Load_Tiled(loadInputA));
+
+    auto stridesB = gemm->kernelType.swizzleB ? std::vector<size_t>{}
+                                             : gemm->kernelType.transB ? oneStridesT : oneStridesN;
 
     auto tagTensorB = command->addOperation(rocRoller::Operations::Tensor(
-        2, dataTypeB, {}, gemm->kernelType.transB ? oneStridesT : oneStridesN)); // B
-    auto tagLoadB   = command->addOperation(rocRoller::Operations::T_Load_Tiled(tagTensorB));
+        2, dataTypeB, {}, stridesB)); // B
+    
+    auto loadInputB = tagTensorB;
+
+    if(gemm->kernelType.swizzleB)
+    {
+        loadInputB = command->addOperation(Operations::SubTileTranspose(
+            loadInputB, {SHUFFLE_K, SHUFFLE_N}, gemm->kernelType.transB));
+    }
+
+    auto tagLoadB   = command->addOperation(rocRoller::Operations::T_Load_Tiled(loadInputB));
 
     auto mulInputA = tagLoadA;
     auto mulInputB = tagLoadB;
@@ -612,10 +617,12 @@ std::shared_ptr<GemmKernel> genGemmKernel(std::shared_ptr<SolutionParameters> ge
     // Create CommandKernel
 
     std::string kernelName = genKernelName(gemm);
-    auto        context    = Context::ForDefaultHipDevice(
+    auto context = Context::ForDefaultHipDevice(
         kernelName,
-        {{.scaleSkipPermlane = gemm->kernelType.scaleTypeA.preSwizzleTile.size() == 3
-                                         && gemm->kernelType.scaleTypeB.preSwizzleTile.size() == 3}});
+        {{.scaleSkipPermlane = (gemm->kernelType.scaleTypeA.preSwizzleTile.size() == 3
+                                && gemm->kernelType.scaleTypeB.preSwizzleTile.size() == 3)
+                                   ? ScaleSkipPermlaneMode::PreSwizzleScaleGFX950
+                                   : ScaleSkipPermlaneMode::None}});
     auto commandKernel = std::make_shared<CommandKernel>(command, kernelName);
     commandKernel->setContext(context);
     commandKernel->setCommandParameters(params);
@@ -720,6 +727,22 @@ CommandArguments createCommandArguments(std::shared_ptr<GemmKernel>        gemm,
         gemm->params->kernelType.typeA, {M, K}, gemm->params->kernelType.transA ? "T" : "N");
     TensorDescriptor descB(
         gemm->params->kernelType.typeB, {K, N}, gemm->params->kernelType.transB ? "T" : "N");
+
+    if(gemm->params->kernelType.swizzleA)
+    {
+        descA = TensorDescriptor(gemm->params->kernelType.typeA,
+                                 {M, K},
+                                 {static_cast<size_t>((K / SHUFFLE_K) * SHUFFLE_M * SHUFFLE_K),
+                                  static_cast<size_t>(SHUFFLE_M * SHUFFLE_K)});
+    }
+
+    if(gemm->params->kernelType.swizzleB)
+    {
+        descB = TensorDescriptor(gemm->params->kernelType.typeB,
+                                {K, N},
+                                {static_cast<size_t>(SHUFFLE_K * SHUFFLE_N),
+                                static_cast<size_t>((K / SHUFFLE_K) * SHUFFLE_K * SHUFFLE_N)});
+    }
 
     // TODO: Have to typecast void* pointer to something that CommandArgumentValue accepts
     setCommandTensorArg(commandArgs, gemm->tagTensorA, descA, (float*)nullptr);
