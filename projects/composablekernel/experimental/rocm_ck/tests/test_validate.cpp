@@ -6,7 +6,18 @@
 
 #include <gtest/gtest.h>
 
-using namespace rocm_ck;
+using ::rocm_ck::AddOp;
+using ::rocm_ck::Args;
+using ::rocm_ck::DataType;
+using ::rocm_ck::GemmAlgorithm;
+using ::rocm_ck::GemmOp;
+using ::rocm_ck::GemmSpec;
+using ::rocm_ck::makeShape;
+using ::rocm_ck::makeSpec;
+using ::rocm_ck::makeStrides;
+using ::rocm_ck::Signature;
+using ::rocm_ck::TargetSet;
+using ::rocm_ck::validate;
 
 // A minimal GemmSpec for testing: 3 physical tensors (A, B, C).
 static constexpr auto test_spec = makeSpec(

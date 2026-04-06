@@ -5,7 +5,25 @@
 
 #include <gtest/gtest.h>
 
-using namespace rocm_ck;
+using ::rocm_ck::AddOp;
+using ::rocm_ck::DataType;
+using ::rocm_ck::EpilogueOp;
+using ::rocm_ck::GemmAlgorithm;
+using ::rocm_ck::GemmOp;
+using ::rocm_ck::GemmSpec;
+using ::rocm_ck::GpuTarget;
+using ::rocm_ck::isValidWaveTile;
+using ::rocm_ck::Layout;
+using ::rocm_ck::makeSpec;
+using ::rocm_ck::Pipeline;
+using ::rocm_ck::PipelineScheduler;
+using ::rocm_ck::Quantization;
+using ::rocm_ck::ReluOp;
+using ::rocm_ck::Signature;
+using ::rocm_ck::StoreStrategy;
+using ::rocm_ck::TargetSet;
+using ::rocm_ck::Tensor;
+using ::rocm_ck::TilePartitioner;
 
 // ============================================================================
 // isValidWaveTile
@@ -703,4 +721,219 @@ TEST(MakeSpec, QuantizedGemmAddHasOneDTensor)
     // bias is D0, scale is separate — num_d_tensors counts only bias
     EXPECT_EQ(k.numDTensors(), 1);
     EXPECT_EQ(k.num_physical_tensors, 5); // A, B, D, bias, scale
+}
+
+// ============================================================================
+// GemmAlgorithm padding flags
+// ============================================================================
+
+TEST(GemmAlgorithm, PaddingFlagsDefaultToFalse)
+{
+    constexpr auto k = makeSpec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
+        TargetSet::cdna());
+
+    EXPECT_FALSE(k.pad_m);
+    EXPECT_FALSE(k.pad_n);
+}
+
+TEST(GemmAlgorithm, PadMCanBeSetToTrue)
+{
+    constexpr auto k = makeSpec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{.block_tile  = {128, 128, 32},
+                      .block_waves = {2, 2, 1},
+                      .wave_tile   = {16, 16, 16},
+                      .pad_m       = true},
+        TargetSet::cdna());
+
+    EXPECT_TRUE(k.pad_m);
+    EXPECT_FALSE(k.pad_n);
+}
+
+TEST(GemmAlgorithm, PadNCanBeSetToTrue)
+{
+    constexpr auto k = makeSpec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{.block_tile  = {128, 128, 32},
+                      .block_waves = {2, 2, 1},
+                      .wave_tile   = {16, 16, 16},
+                      .pad_n       = true},
+        TargetSet::cdna());
+
+    EXPECT_FALSE(k.pad_m);
+    EXPECT_TRUE(k.pad_n);
+}
+
+TEST(GemmAlgorithm, BothPaddingFlagsCanBeEnabled)
+{
+    constexpr auto k = makeSpec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{.block_tile  = {128, 128, 32},
+                      .block_waves = {2, 2, 1},
+                      .wave_tile   = {16, 16, 16},
+                      .pad_m       = true,
+                      .pad_n       = true},
+        TargetSet::cdna());
+
+    EXPECT_TRUE(k.pad_m);
+    EXPECT_TRUE(k.pad_n);
+}
+
+// ============================================================================
+// Pipeline enum variants
+// ============================================================================
+
+TEST(MakeSpec, AcceptsPipelineV3)
+{
+    constexpr auto k = makeSpec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{.block_tile  = {128, 128, 32},
+                      .block_waves = {2, 2, 1},
+                      .wave_tile   = {16, 16, 16},
+                      .pipeline    = Pipeline::V3},
+        TargetSet::cdna());
+
+    EXPECT_EQ(k.pipeline, Pipeline::V3);
+}
+
+TEST(MakeSpec, AcceptsPipelineV4)
+{
+    constexpr auto k = makeSpec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{.block_tile  = {128, 128, 32},
+                      .block_waves = {2, 2, 1},
+                      .wave_tile   = {16, 16, 16},
+                      .pipeline    = Pipeline::V4},
+        TargetSet::cdna());
+
+    EXPECT_EQ(k.pipeline, Pipeline::V4);
+}
+
+TEST(MakeSpec, AcceptsPipelinePreshuffle)
+{
+    constexpr auto k = makeSpec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{.block_tile  = {128, 128, 32},
+                      .block_waves = {2, 2, 1},
+                      .wave_tile   = {16, 16, 16},
+                      .pipeline    = Pipeline::Preshuffle},
+        TargetSet::cdna());
+
+    EXPECT_EQ(k.pipeline, Pipeline::Preshuffle);
+}
+
+// ============================================================================
+// TilePartitioner enum variants
+// ============================================================================
+
+TEST(MakeSpec, AcceptsTilePartitionerDirect)
+{
+    constexpr auto k = makeSpec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{.block_tile       = {128, 128, 32},
+                      .block_waves      = {2, 2, 1},
+                      .wave_tile        = {16, 16, 16},
+                      .tile_partitioner = TilePartitioner::Direct},
+        TargetSet::cdna());
+
+    EXPECT_EQ(k.tile_partitioner, TilePartitioner::Direct);
+}
+
+TEST(MakeSpec, AcceptsTilePartitionerStreamK)
+{
+    constexpr auto k = makeSpec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{.block_tile       = {128, 128, 32},
+                      .block_waves      = {2, 2, 1},
+                      .wave_tile        = {16, 16, 16},
+                      .tile_partitioner = TilePartitioner::StreamK},
+        TargetSet::cdna());
+
+    EXPECT_EQ(k.tile_partitioner, TilePartitioner::StreamK);
+}
+
+// ============================================================================
+// StoreStrategy enum variants
+// ============================================================================
+
+TEST(MakeSpec, AcceptsStoreStrategyDirect2D)
+{
+    constexpr auto k = makeSpec(
+        Signature{.dtype = DataType::FP16, .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}}},
+        GemmAlgorithm{.block_tile     = {128, 128, 32},
+                      .block_waves    = {2, 2, 1},
+                      .wave_tile      = {16, 16, 16},
+                      .store_strategy = StoreStrategy::Direct2D},
+        TargetSet::cdna());
+
+    EXPECT_EQ(k.store_strategy, StoreStrategy::Direct2D);
+}
+
+// ============================================================================
+// Explicit acc_dtype override
+// ============================================================================
+
+TEST(MakeSpec, ExplicitAccDtypeIsPreserved)
+{
+    constexpr auto k = makeSpec(
+        Signature{.dtype = DataType::FP16,
+                  .ops = {GemmOp{.lhs = "A", .rhs = "B", .out = "C", .acc_dtype = DataType::FP16}}},
+        GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
+        TargetSet::cdna());
+
+    EXPECT_EQ(k.acc_dtype, DataType::FP16);
+}
+
+// ============================================================================
+// isValidWaveTile with unsupported dtypes
+// ============================================================================
+
+TEST(WaveTileValidation, RejectsI64)
+{
+    EXPECT_FALSE(isValidWaveTile(DataType::I64, 16, 16, 16, TargetSet::cdna()));
+    EXPECT_FALSE(isValidWaveTile(DataType::I64, 32, 32, 16, TargetSet::cdna()));
+}
+
+TEST(WaveTileValidation, RejectsFP64)
+{
+    EXPECT_FALSE(isValidWaveTile(DataType::FP64, 16, 16, 4, TargetSet::cdna()));
+    EXPECT_FALSE(isValidWaveTile(DataType::FP64, 32, 32, 8, TargetSet::cdna()));
+}
+
+// ============================================================================
+// Quantized GEMM + multiple epilogue ops
+// ============================================================================
+
+TEST(MakeSpec, QuantizedGemmWithMultipleEpilogueOps)
+{
+    constexpr auto k =
+        makeSpec(Signature{.dtype   = DataType::FP16,
+                           .tensors = {Tensor{.name     = "B",
+                                              .dtype    = DataType::I4,
+                                              .quantize = Quantization{.scale_name = "scale"}}},
+                           .ops     = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"},
+                                       AddOp{.lhs = "C", .rhs = "bias", .out = "D"},
+                                       ReluOp{.in = "D", .out = "E"}}},
+                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
+                 TargetSet::cdna());
+
+    // Physical tensors: A, B, E(output), bias(D0), scale
+    EXPECT_EQ(k.num_physical_tensors, 5);
+    EXPECT_EQ(slot(k, "A"), 0);
+    EXPECT_EQ(slot(k, "B"), 1);
+    EXPECT_EQ(slot(k, "E"), 2);     // final output
+    EXPECT_EQ(slot(k, "bias"), 3);  // D0
+    EXPECT_EQ(slot(k, "scale"), 4); // scale tensor
+
+    // Verify epilogue ops
+    EXPECT_EQ(k.num_epilogue_ops, 2);
+    EXPECT_TRUE(k.hasEpilogueOp(EpilogueOp::Add));
+    EXPECT_TRUE(k.hasEpilogueOp(EpilogueOp::Relu));
+
+    // Verify dtypes
+    EXPECT_EQ(dtype(k, "B"), DataType::I4);
+    EXPECT_EQ(dtype(k, "scale"), DataType::FP32);
+    EXPECT_EQ(dtype(k, "bias"), DataType::FP16);
 }

@@ -7,7 +7,9 @@
 
 #include <string_view>
 
-using namespace rocm_ck;
+using ::rocm_ck::DataType;
+using ::rocm_ck::dataTypeBits;
+using ::rocm_ck::dataTypeName;
 
 // ============================================================================
 // dataTypeBits

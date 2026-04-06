@@ -8,7 +8,12 @@
 #include <cstddef>
 #include <type_traits>
 
-using namespace rocm_ck;
+using ::rocm_ck::Args;
+using ::rocm_ck::kMaxRank;
+using ::rocm_ck::kMaxScalars;
+using ::rocm_ck::kMaxTensors;
+using ::rocm_ck::ScalarValue;
+using ::rocm_ck::TensorArg;
 
 // ============================================================================
 // TensorArg ABI
@@ -137,4 +142,34 @@ TEST(Args, BatchCountFieldExists)
     Args args{};
     args.batch_count = 8;
     EXPECT_EQ(args.batch_count, 8);
+}
+
+// ============================================================================
+// Boundary access tests
+// ============================================================================
+
+TEST(Args, BoundaryAccessToTensors)
+{
+    Args args{};
+    // Access last tensor slot (kMaxTensors - 1 = 15)
+    args.tensors[kMaxTensors - 1].ptr = nullptr;
+    EXPECT_EQ(args.tensors[kMaxTensors - 1].ptr, nullptr);
+}
+
+TEST(Args, BoundaryAccessToScalars)
+{
+    Args args{};
+    // Access last scalar slot (kMaxScalars - 1 = 15)
+    args.scalars[kMaxScalars - 1].f32 = 1.0f;
+    EXPECT_FLOAT_EQ(args.scalars[kMaxScalars - 1].f32, 1.0f);
+}
+
+TEST(TensorArg, BoundaryAccessToLengthsAndStrides)
+{
+    TensorArg ta{};
+    // Access last rank dimension (kMaxRank - 1 = 5)
+    ta.lengths[kMaxRank - 1] = 42;
+    ta.strides[kMaxRank - 1] = 99;
+    EXPECT_EQ(ta.lengths[kMaxRank - 1], 42);
+    EXPECT_EQ(ta.strides[kMaxRank - 1], 99);
 }

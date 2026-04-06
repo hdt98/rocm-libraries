@@ -15,7 +15,23 @@
 
 #include <gtest/gtest.h>
 
-using namespace rocm_ck;
+using ::rocm_ck::AddOp;
+using ::rocm_ck::DataType;
+using ::rocm_ck::EpilogueOp;
+using ::rocm_ck::GemmAlgorithm;
+using ::rocm_ck::GemmOp;
+using ::rocm_ck::GemmSpec;
+using ::rocm_ck::Layout;
+using ::rocm_ck::makeSpec;
+using ::rocm_ck::ReluOp;
+using ::rocm_ck::Signature;
+using ::rocm_ck::TargetSet;
+
+// Frozen baseline tests: these assert ALL fields of each spec variant.
+// This is intentionally brittle — adding a new field to GemmSpec will
+// break these tests, forcing explicit review of the change's impact on
+// existing variants. Update the expected values when making intentional
+// schema changes.
 
 // ============================================================================
 // gemm_fp32: FP32 plain GEMM, 16x16x16 MFMA tile
