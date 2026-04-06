@@ -486,7 +486,18 @@ namespace TensileLite
                     std::cout << "Validating tensor " << tensor.getName() << ", cpu pointer "
                               << refPtr << ", gpu pointer " << resPtr
                               << ", size = " << result.maxElements[i] << std::endl;
-                
+
+                // Skip validation if pointers are null or maxElements is 0
+                // (e.g., when UseBeta=false, tensor C may not be allocated)
+                if(resPtr == nullptr || refPtr == nullptr || result.maxElements[i] == 0)
+                {
+                    if(Debug::Instance().printTensorInfo())
+                        std::cout << "Skipping validation for tensor " << tensor.getName()
+                                  << " (resPtr=" << resPtr << ", refPtr=" << refPtr
+                                  << ", maxElements=" << result.maxElements[i] << ")" << std::endl;
+                    continue;
+                }
+
                 rv &= checkResults(
                     tensor, refPtr, resPtr, result.maxElements[i], result.gpu, validationStride, threshold);
             }
@@ -495,13 +506,15 @@ namespace TensileLite
 
         void ReferenceValidator::allocateResultBuffer(size_t bytes)
         {
-            if(m_cpuResultBufferSize == bytes)
+            // Only skip reallocation if size matches AND buffer is valid
+            if(m_cpuResultBufferSize == bytes && m_cpuResultBuffer.get() != nullptr)
                 return;
+
             m_cpuResultBuffer.reset();
 
             uint8_t* buffer;
-            HIP_CHECK_EXC(hipHostMalloc(&buffer, bytes, 0));
-            m_cpuResultBuffer.reset(buffer, hipFree);
+            HIP_CHECK_EXC(hipHostMalloc((void**)&buffer, bytes, 0));
+            m_cpuResultBuffer.reset(buffer, [](uint8_t* p) { (void)hipFree(p); });
             m_cpuResultBufferSize = bytes;
         }
 
@@ -684,11 +697,18 @@ namespace TensileLite
             size_t elementsAfterData    = 0;
 
             BoundsCheckMode boundsCheck = m_dataInit->getCurBoundsCheck();
-            if(boundsCheck == BoundsCheckMode::NaN)
+            // For output tensors, don't use maxElement with padding since the kernel only writes actual data
+            // Only input tensors have bounds checking padding in their buffers
+            if(boundsCheck == BoundsCheckMode::NaN && !tensor.isOutput())
                 elementsToCopy = maxElement;
             size_t bytesToCopy = elementsToCopy * sizeof(ValidType);
 
-            if(m_cpuResultBufferSize < bytesToCopy)
+            // Skip validation if pointers are null or no bytes to copy
+            // (e.g., when UseBeta=false, tensor C may not be allocated)
+            if(result == nullptr || reference == nullptr || bytesToCopy == 0 || maxElement == 0)
+                return true;
+
+            if(m_cpuResultBufferSize < bytesToCopy || m_cpuResultBuffer.get() == nullptr)
                 allocateResultBuffer(bytesToCopy);
 
             auto copykind = isgpu ? hipMemcpyDeviceToHost : hipMemcpyHostToHost;
@@ -698,7 +718,8 @@ namespace TensileLite
                 HIP_CHECK_EXC(hipMemcpy(m_cpuResultBuffer.get(), result, bytesToCopy, copykind));
             }
 
-            if(boundsCheck == BoundsCheckMode::NaN)
+            // Only check bounds for input tensors (output tensors don't have padding buffers)
+            if(boundsCheck == BoundsCheckMode::NaN && !tensor.isOutput())
             {
                 ptrdiff_t bPadding = maxElement - tensor.totalAllocatedElements();
                 elementsBeforeData = bPadding / 2;

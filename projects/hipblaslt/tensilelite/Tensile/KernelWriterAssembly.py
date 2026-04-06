@@ -2149,9 +2149,13 @@ class KernelWriterAssembly(KernelWriter):
           moduleExternalArgs.addModuleAsFlatItems(self.externalArgLoader.loadAllKernArg(sgprStart, "KernArgAddress", load, 4))
           offset = self.externalArgLoader.getOffset() + self.states.bpr * (self.states.userArgsInfo.alphaMaxRegisterSize - self.states.numSgprAlpha)
           self.externalArgLoader.setOffset(offset)
-          moduleExternalArgs.addComment("Read Beta")
-          moduleExternalArgs.addModuleAsFlatItems(self.externalArgLoader.loadAllKernArg(self.sgprs["Beta"], "KernArgAddress", self.states.numSgprBeta))
-          offset = self.externalArgLoader.getOffset() + self.states.bpr * (self.states.userArgsInfo.betaMaxRegisterSize - self.states.numSgprBeta)
+          if kernel["ProblemType"]["UseBeta"]:
+            moduleExternalArgs.addComment("Read Beta")
+            moduleExternalArgs.addModuleAsFlatItems(self.externalArgLoader.loadAllKernArg(self.sgprs["Beta"], "KernArgAddress", self.states.numSgprBeta))
+            offset = self.externalArgLoader.getOffset() + self.states.bpr * (self.states.userArgsInfo.betaMaxRegisterSize - self.states.numSgprBeta)
+          else:
+            # Even when not using Beta, we need to skip over the Beta argument space
+            offset = self.externalArgLoader.getOffset() + self.states.bpr * self.states.userArgsInfo.betaMaxRegisterSize
           if kernel["ProblemType"]["UseScaleAB"] == "Scalar":
             sgprOffset = self.externalArgLoader.getOffset()
             for preloadScale, name in zip([self.states.preloadScaleA, self.states.preloadScaleB], ['A','B']):
