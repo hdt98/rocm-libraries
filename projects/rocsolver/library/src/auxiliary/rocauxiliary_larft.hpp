@@ -598,7 +598,7 @@ rocblas_status rocsolver_larft_template(rocblas_handle handle,
                             F, ldf, strideF, direct, storev, use_gemm);
     ROCSOLVER_LAUNCH_KERNEL((set_tau<T, I>),
                             dim3(static_cast<uint32_t>(blocks), static_cast<uint32_t>(batch_count)),
-                            dim3(32, 1), 0, stream, k, tau, strideT);
+                            dim3(BS2, 1), 0, stream, k, tau, strideT);
 
     const hipDeviceProp_t* props = rocblas_internal_get_device_prop(handle);
     size_t lmemsize = sizeof(T) * (k + 1) * k;
