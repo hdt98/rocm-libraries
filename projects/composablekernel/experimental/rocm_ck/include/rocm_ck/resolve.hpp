@@ -303,10 +303,12 @@ consteval ResolvedSignature resolve(Signature sig)
     struct Info
     {
         std::string_view name;
-        bool dtype_set = false;
-        DataType dtype = DataType::FP32;
-        int rank       = 0;
-        Layout layout  = Layout::Auto;
+        bool dtype_set    = false;
+        DataType dtype    = DataType::FP32;
+        int rank          = 0;
+        Layout layout     = Layout::Auto;
+        bool has_quantize = false;
+        Quantization quantize_info{}; // only valid when has_quantize == true
     };
 
     Info infos[kMaxTensors] = {};
@@ -430,7 +432,7 @@ consteval ResolvedSignature resolve(Signature sig)
         {
             // Catch entries with metadata but no name (likely a mistake)
             if(sig.tensors[i].dtype.has_value() || sig.tensors[i].rank != 0 ||
-               sig.tensors[i].layout != Layout::Auto)
+               sig.tensors[i].layout != Layout::Auto || sig.tensors[i].quantize.has_value())
                 throw "Tensor entry has metadata but no name";
             continue;
         }
@@ -444,6 +446,20 @@ consteval ResolvedSignature resolve(Signature sig)
             infos[idx].rank = sig.tensors[i].rank;
         if(sig.tensors[i].layout != Layout::Auto)
             infos[idx].layout = sig.tensors[i].layout;
+        if(sig.tensors[i].quantize.has_value())
+        {
+            const auto& q = *sig.tensors[i].quantize;
+            if(q.scale_name.empty())
+                throw "Tensor .quantize has empty scale_name";
+            // Auto-register the scale tensor
+            int scale_idx              = find_or_add(q.scale_name);
+            infos[scale_idx].dtype_set = true;
+            infos[scale_idx].dtype     = q.scale_dtype;
+            set_if_unknown(scale_idx, 2, Layout::Row);
+            // Track quantization on this tensor
+            infos[idx].has_quantize  = true;
+            infos[idx].quantize_info = q;
+        }
     }
 
     // ================================================================
@@ -469,6 +485,10 @@ consteval ResolvedSignature resolve(Signature sig)
     {
         result.tensors[i] =
             TensorDesc{infos[i].name, infos[i].dtype, infos[i].rank, infos[i].layout};
+        if(infos[i].has_quantize)
+            result.tensors[i].quantize = ResolvedQuantization{infos[i].quantize_info.scale_name,
+                                                              infos[i].quantize_info.scale_dtype,
+                                                              infos[i].quantize_info.group_size};
     }
 
     // Collect declared scalars (pass-through — no inference needed)

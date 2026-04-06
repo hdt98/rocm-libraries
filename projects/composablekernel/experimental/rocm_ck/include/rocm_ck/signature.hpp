@@ -25,18 +25,32 @@
 
 namespace rocm_ck {
 
+/// Quantization metadata for a tensor stored in a packed/quantized format.
+///
+/// Describes how a quantized tensor (e.g., INT4 weights) is encoded.
+/// The scale tensor is a separate physical tensor with per-group factors;
+/// group_size is the number of consecutive elements sharing one scale along K.
+struct Quantization
+{
+    std::string_view scale_name;           // name of the scale tensor (e.g., "scale")
+    DataType scale_dtype = DataType::FP32; // element type of the scale tensor
+    int group_size       = 128;            // elements per quantization group
+};
+
 /// A tensor node in the signature's compute graph.
 ///
 /// Default values mean "inherit from the operator slot":
-///   dtype  = nullopt  -> inherit from Signature::dtype cascade
-///   rank   = 0        -> inherit from operator (e.g., GemmOp implies rank 2)
-///   layout = Auto     -> inherit from operator (e.g., GemmOp::lhs implies Row)
+///   dtype    = nullopt  -> inherit from Signature::dtype cascade
+///   rank     = 0        -> inherit from operator (e.g., GemmOp implies rank 2)
+///   layout   = Auto     -> inherit from operator (e.g., GemmOp::lhs implies Row)
+///   quantize = nullopt  -> not quantized
 struct Tensor
 {
     std::string_view name;
-    std::optional<DataType> dtype = std::nullopt;
-    int rank                      = 0;
-    Layout layout                 = Layout::Auto;
+    std::optional<DataType> dtype        = std::nullopt;
+    int rank                             = 0;
+    Layout layout                        = Layout::Auto;
+    std::optional<Quantization> quantize = std::nullopt;
 };
 
 /// A named scalar parameter (e.g., alpha, beta, scale).
