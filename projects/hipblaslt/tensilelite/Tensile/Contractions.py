@@ -211,7 +211,7 @@ class ProblemType:
         rv.setConstStrideBias = []
 
         if 'UseBias' in d:
-            rv.useBias = d['UseBias']
+            rv.useBias = int(d['UseBias'])
             if 'BiasDataTypeList' in d:
                 d["BiasDataTypeList"].sort()  # Sort to make sure names are unique
                 rv.biasDataTypeWhiteList = d['BiasDataTypeList']
@@ -244,7 +244,7 @@ class ProblemType:
 
         rv.useScaleAlphaVec = 0
         if 'UseScaleAlphaVec' in d:
-            rv.useScaleAlphaVec = d['UseScaleAlphaVec']
+            rv.useScaleAlphaVec = int(d['UseScaleAlphaVec'])
 
         rv.batched = d['Batched']
 

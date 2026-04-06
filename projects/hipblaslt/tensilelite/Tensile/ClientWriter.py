@@ -549,6 +549,10 @@ def writeClientConfigIni(forBenchmark, problemSizes, biasTypeArgs, factorDimArgs
 
     with open(parametersFilePath, "w") as f:
         def param(key, value):
+            # Convert Python booleans to integers (1/0) for C++ compatibility
+            # The C++ parser expects integers for most boolean-like fields
+            if isinstance(value, bool):
+                value = 1 if value else 0
             f.write("{}={}\n".format(key, value))
 
         if libraryFile is None:
