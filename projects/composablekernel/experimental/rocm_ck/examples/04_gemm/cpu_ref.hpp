@@ -37,3 +37,17 @@ void cpu_gemm_add_add(float* e, const float* c, const float* d0, const float* d1
 
 /// Fused epilogue reference: e[i] = max(0, c[i] + d0[i])
 void cpu_gemm_add_relu(float* e, const float* c, const float* d0, int count);
+
+/// BQuant GEMM reference: C = (A × dequant(B)) with per-group scales.
+/// C[m][n] = Σ_g (Σ_{k∈group_g} A[m][k] × B[k][n]) × scale[g][n]
+///
+/// A [M × K] row-major, B [K × N] row-major (float, pre-dequantized),
+/// scale [K/group_size × N] row-major, C [M × N] row-major.
+void cpu_gemm_bquant(const float* a,
+                     const float* b,
+                     const float* scale,
+                     float* c,
+                     int M,
+                     int N,
+                     int K,
+                     int group_size);

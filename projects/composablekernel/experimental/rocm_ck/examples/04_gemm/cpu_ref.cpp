@@ -50,3 +50,30 @@ void cpu_gemm_add_relu(float* e, const float* c, const float* d0, int count)
         e[i]      = val > 0.f ? val : 0.f;
     }
 }
+
+void cpu_gemm_bquant(const float* a,
+                     const float* b,
+                     const float* scale,
+                     float* c,
+                     int M,
+                     int N,
+                     int K,
+                     int group_size)
+{
+    for(int m = 0; m < M; ++m)
+    {
+        for(int n = 0; n < N; ++n)
+        {
+            float acc = 0.0f;
+            for(int g = 0; g < K / group_size; ++g)
+            {
+                float block_acc = 0.0f;
+                int k_begin     = g * group_size;
+                for(int k = k_begin; k < k_begin + group_size; ++k)
+                    block_acc += a[m * K + k] * b[k * N + n];
+                acc += block_acc * scale[g * N + n];
+            }
+            c[m * N + n] = acc;
+        }
+    }
+}

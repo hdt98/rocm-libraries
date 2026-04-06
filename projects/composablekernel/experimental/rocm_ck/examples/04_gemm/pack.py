@@ -436,6 +436,7 @@ VARIANTS = [
         "c_dtype": "fp32",
         "acc_dtype": "fp32",
         "pipeline": "V3",
+        "b_layout": "col",
         "block_m": 128,
         "block_n": 128,
         "block_k": 128,

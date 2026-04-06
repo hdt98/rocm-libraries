@@ -309,7 +309,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                      .dtype   = DataType::FP8_FNUZ,
                      .tensors = {Tensor{.name     = "B",
                                         .dtype    = DataType::I4,
-                                        .layout   = Layout::Row,
+                                        .layout   = Layout::Col,
                                         .quantize = Quantization{.scale_name  = "scale",
                                                                  .scale_dtype = DataType::FP8_FNUZ,
                                                                  .group_size  = 128}},
