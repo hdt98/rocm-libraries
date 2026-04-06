@@ -332,10 +332,10 @@ inline constexpr GemmVariant gemm_variants[] = {
                      .ops   = {GemmOp{.lhs = "A", .rhs = "B", .out = "C"}},
                  },
                  GemmAlgorithm{
-                     .block_tile  = {128, 128, 32},
-                     .block_waves = {2, 2, 1},
-                     .wave_tile   = {16, 16, 16},
-                     .epilogue    = EpilogueStrategy::Direct2D,
+                     .block_tile     = {128, 128, 32},
+                     .block_waves    = {2, 2, 1},
+                     .wave_tile      = {16, 16, 16},
+                     .store_strategy = StoreStrategy::Direct2D,
                  },
                  TargetSet::cdna()),
     // --- WMMA: gfx1151 (RDNA 3.5) with 16×16×16 wave tiles, wave32 ---
