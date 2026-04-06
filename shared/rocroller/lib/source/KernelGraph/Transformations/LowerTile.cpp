@@ -117,79 +117,76 @@ namespace rocRoller
         /**
          * Build the GR (Global Read) swizzle ExpressionTransform.
          *
-         * Swap-then-rotate permutation on K-column chunk index.
-         *   $0 = input K-column chunk index
-         *   $1 = tile row coordinate (used to derive bankRowIdx)
-         *
-         * The group splitting (columnInGroup/groupIndex) is required
-         * so that the Tile edge can algebraically invert the expression.
+         *   $0 = tile col (in dwordx4 chunks)
+         *   $1 = tile row
+         *   returns swizzled col (in dwordx4 chunks)
          */
         ExpressionTransform buildGRSwizzleTransform(LDSSwizzleParams const& params)
         {
-            auto numCol    = literal(params.numColumns);
-            auto logNumCol = literal(static_cast<unsigned int>(__builtin_ctz(params.numColumns)));
+            auto colChunk = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
+            auto row      = positionalArgument(1, Register::Type::Vector, DataType::UInt32);
+
+            auto numCol  = literal(params.numColumns);
             auto logRows = literal(static_cast<unsigned int>(__builtin_ctz(params.rowsPerBankRow)));
 
-            auto rowRef = positionalArgument(1, Register::Type::Vector, DataType::UInt32);
+            // Convert tile row to LDS bank row index
+            auto bankRowIdx = row >> logRows;
 
-            // $0 = input column index
-            auto inputCol = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
-
-            // Swap adjacent columns on even bank rows (bit is 1 on even, 0 on odd)
-            auto bankRowIdx    = rowRef >> logRows;
+            // On even lds bank rows, swap adjacent column pairs (0<->1, 2<->3, etc):
             auto swapOnEvenRow = (bankRowIdx ^ literal(1u)) & literal(1u);
-            auto swappedCol    = inputCol ^ swapOnEvenRow;
+            colChunk           = colChunk ^ swapOnEvenRow;
 
-            // Rotate columns within numColumns by (bankRowIdx / 2) * 2
-            auto rotation    = numCol - ((bankRowIdx >> literal(1u)) << literal(1u));
-            auto swizzledCol = (swappedCol + rotation) & (numCol - literal(1u));
+            // Every two rows, rotate columns backwards by increasing larger amounts
+            // rotation = numCol - (bankRowIdx / 2) * 2.
+            auto rotation = numCol - ((bankRowIdx >> literal(1u)) << literal(1u));
 
-            // Forward is identity pass-through
+            // Mod num cols
+            colChunk = (colChunk + rotation) & (numCol - literal(1u));
+
             auto forwardArg = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
-            return ExpressionTransform{{forwardArg}, {swizzledCol}};
+            return ExpressionTransform{{forwardArg}, {colChunk}};
         }
 
         /**
          * Build the LR (LDS Read) swizzle ExpressionTransform.
          *
-         * Inverse of the GR permutation (un-rotate then un-swap).
-         * Input is an element index, decomposed into dwordx4 chunk
-         * and sub-element; only the chunk's within-group bits are
-         * swizzled, then reassembled.
-         *   $0 = element index within the K dimension
-         *   $1 = tile row coordinate (used to derive bankRowIdx)
+         *   $0 = tile col (in elements)
+         *   $1 = tile row
+         *   returns swizzled col (in elements)
          */
         ExpressionTransform buildLRSwizzleTransform(LDSSwizzleParams const& params)
         {
-            auto numCol    = literal(params.numColumns);
-            auto logNumCol = literal(static_cast<unsigned int>(__builtin_ctz(params.numColumns)));
+            auto col = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
+            auto row = positionalArgument(1, Register::Type::Vector, DataType::UInt32);
+
+            auto numCol = literal(params.numColumns);
             auto logElems
                 = literal(static_cast<unsigned int>(__builtin_ctz(params.elementsPerChunk)));
+            auto elementsPerChunk = literal(params.elementsPerChunk);
             auto logRows = literal(static_cast<unsigned int>(__builtin_ctz(params.rowsPerBankRow)));
-            auto elemsLit = literal(params.elementsPerChunk);
 
-            auto rowRef = positionalArgument(1, Register::Type::Vector, DataType::UInt32);
+            // Decompose element index into chunk (dwordx4) index and element-within-chunk offset
+            auto colChunk       = col >> logElems;
+            auto elementInChunk = col & (elementsPerChunk - literal(1u));
 
-            // $0 = element index within the K dimension
-            auto inputElemIdx = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
+            // Convert tile row to LDS bank row index
+            auto bankRowIdx = row >> logRows;
 
-            // Decompose into chunk index and sub-element offset
-            auto chunkIdx   = inputElemIdx >> logElems;
-            auto subElement = inputElemIdx & (elemsLit - literal(1u));
+            // Every two rows, rotate columns forwards by increasing larger amounts
+            // invRotation = (bankRowIdx / 2) * 2
+            auto invRotation = (bankRowIdx >> literal(1u)) << literal(1u);
 
-            // Inverse permutation: un-rotate first, then un-swap
-            auto bankRowIdx     = rowRef >> logRows;
-            auto swapOnEvenRow  = (bankRowIdx ^ literal(1u)) & literal(1u);
-            auto invRotation    = (bankRowIdx >> literal(1u)) << literal(1u);
-            auto unrotatedChunk = (chunkIdx + invRotation) & (numCol - literal(1u));
-            auto swizzledChunk  = unrotatedChunk ^ swapOnEvenRow;
+            // Mod num cols
+            colChunk = (colChunk + invRotation) & (numCol - literal(1u));
 
-            // Reassemble: swizzledChunk * elementsPerChunk + subElement
-            auto swizzledCol = swizzledChunk * elemsLit + subElement;
+            // On even lds bank rows, swap adjacent column pairs (0<->1, 2<->3, etc):
+            auto swapOnEvenRow = (bankRowIdx ^ literal(1u)) & literal(1u);
+            colChunk           = colChunk ^ swapOnEvenRow;
 
-            // Forward is identity pass-through
+            auto unswizzledCol = colChunk * elementsPerChunk + elementInChunk;
+
             auto forwardArg = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
-            return ExpressionTransform{{forwardArg}, {swizzledCol}};
+            return ExpressionTransform{{forwardArg}, {unswizzledCol}};
         }
 
         ConstraintStatus NoConstructDestructMT(const KernelGraph& k)
