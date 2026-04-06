@@ -37,8 +37,8 @@ miopen::ProcessEnvironmentMap MakeEnv(const std::string& tmp_dir)
     return envs;
 }
 
-using e_mask = enabled<Gpu::gfx94X>;
-using d_mask = disabled<Gpu::gfx900, Gpu::gfx906, Gpu::gfx908, Gpu::gfx103X>;
+using e_mask = enabled<Gpu::All>;
+using d_mask = disabled<Gpu::None>;
 
 class GPU_MIOpenDriverConvDeterministicTest_NoFlag_FP32
     : public testing::TestWithParam<std::pair<std::string, std::string>>
