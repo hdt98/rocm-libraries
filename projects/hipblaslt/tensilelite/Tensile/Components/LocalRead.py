@@ -453,7 +453,7 @@ class LocalReadMFMA(LocalRead):
                 # TF32 Inf support
                 # convert the value from Inf to 0 for high bits
                 srcPk0 = vgpr(writer.states.startVgprInfTmp)
-                srcPk0 = dstPk # reuse dst0 to reduce vgpr usage
+                srcPk1 = dstPk # reuse dst0 to reduce vgpr usage
                 module.add(VCmpClassF32(dst=VCC(), src0=v0, src1=vgpr(writer.states.startVgprInfCheck), comment="Check if high bits are Inf"))
                 module.add(VCndMaskB32(dst=srcPk0, src0=v0, src1=0, src2=VCC(), comment="if input was inf, set low bits to 0 to avoid nan"))
                 module.add(VCmpClassF32(dst=VCC(), src0=v1, src1=vgpr(writer.states.startVgprInfCheck), comment="Check if high bits are Inf"))
