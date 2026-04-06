@@ -241,6 +241,12 @@ def main():
         # Parse trait combo:
         # pipeline_epilogue_scheduler_padM_padN_padK_bPreshuffle
         trait_parts = args.trait_combo.split("_")
+        if len(trait_parts) < 7:
+            parser.error(
+                f"--trait_combo must have 7 underscore-separated fields "
+                f"(e.g. 'compv3_default_intrawave_True_True_True_False'), "
+                f"got {len(trait_parts)} field(s): '{args.trait_combo}'"
+            )
         trait_combo = (
             trait_parts[0],  # pipeline
             trait_parts[1],  # epilogue

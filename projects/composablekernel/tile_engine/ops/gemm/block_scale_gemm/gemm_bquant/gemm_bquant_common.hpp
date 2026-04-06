@@ -4,6 +4,7 @@
 #pragma once
 
 #include <string>
+#include <type_traits>
 #include "ck_tile/core.hpp"
 #include "ck_tile/host.hpp"
 #include "ck_tile/core/numeric/integer.hpp"

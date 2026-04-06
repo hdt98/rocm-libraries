@@ -62,6 +62,8 @@ class BQuantGemmProfiler
             problem.m_, problem.n_, problem.stride_c_, is_row_major(layout_c));
 
         // Compute BQ scale tensor dimensions: [K / group_size_k, N]
+        if(problem.k_ % problem.group_size_k_ != 0)
+            throw std::runtime_error("k_ must be divisible by group_size_k_");
         const ck_tile::index_t QK_B = problem.k_ / problem.group_size_k_;
         problem.stride_bq_          = ck_tile::get_default_stride(
             QK_B, problem.n_, problem.stride_bq_, is_row_major(layout_bq));
@@ -204,10 +206,13 @@ class BQuantGemmProfiler
         }
 
         // Verify result
-        c_m_n_dev_buf.FromDevice(c_m_n_dev_result.data());
-        bool verified_correct =
-            !setting_.verify_ ||
-            compare_bquant(name, problem.k_, problem.split_k_, c_m_n_dev_result, c_m_n_host_result);
+        bool verified_correct = true;
+        if(setting_.verify_)
+        {
+            c_m_n_dev_buf.FromDevice(c_m_n_dev_result.data());
+            verified_correct = compare_bquant(
+                name, problem.k_, problem.split_k_, c_m_n_dev_result, c_m_n_host_result);
+        }
 
         if(verified_correct)
         {

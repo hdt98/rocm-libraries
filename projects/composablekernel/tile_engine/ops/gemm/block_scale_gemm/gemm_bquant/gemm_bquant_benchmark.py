@@ -301,7 +301,7 @@ class BQuantGemmBenchmark:
         self,
         problem_sizes: List[Tuple[int, int, int]],
         group_size_k: int = 128,
-        split_k_values: List[int] = [1],
+        split_k_values: Optional[List[int]] = None,
         verify: bool = False,
         warmup: int = 50,
         repeat: int = 100,
@@ -309,6 +309,8 @@ class BQuantGemmBenchmark:
         rotating_count: int = 1000,
     ) -> Dict:
         """Run comprehensive benchmark sweep."""
+        if split_k_values is None:
+            split_k_values = [1]
         kernels = self.discover_kernels()
         if not kernels:
             print("No kernels found!")
