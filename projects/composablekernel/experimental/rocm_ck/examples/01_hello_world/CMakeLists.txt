@@ -65,5 +65,6 @@ add_custom_target(hello_world_kpack_archive ALL DEPENDS ${CMAKE_CURRENT_BINARY_D
 # Links against hip::host (host-only HIP runtime) and rocm_kpack (archive reader).
 # Device code is loaded at runtime via hipModuleLoadData, not compiled into this binary.
 add_executable(kpack_hello_world main.cpp)
+target_compile_features(kpack_hello_world PRIVATE cxx_std_20)
 target_link_libraries(kpack_hello_world PRIVATE rocm_ck rocm_kpack hip::host)
 add_dependencies(kpack_hello_world hello_world_kpack_archive)
