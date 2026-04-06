@@ -62,22 +62,15 @@ namespace rocRoller
 
             std::vector<Expression::ExpressionPtr> operator()(ExpressionTransform const& e)
             {
-                Throw<FatalError>(
-                    "Forward traversal through ExpressionTransform is currently unused");
-
-                if constexpr(false)
-                {
-                    AssertFatal(e.forward.size() == dsts.size(),
-                                "ExpressionTransform forward size mismatch",
-                                ShowValue(e.forward.size()),
-                                ShowValue(dsts.size()));
-                    std::vector<Expression::ExpressionPtr> rv;
-                    rv.reserve(e.forward.size());
-                    for(size_t i = 0; i < e.forward.size(); ++i)
-                        rv.push_back(positionalArgumentPropagation(e.forward[i], indexes));
-                    return rv;
-                }
-                return {};
+                AssertFatal(e.forward.size() == dsts.size(),
+                            "ExpressionTransform forward size mismatch",
+                            ShowValue(e.forward.size()),
+                            ShowValue(dsts.size()));
+                std::vector<Expression::ExpressionPtr> rv;
+                rv.reserve(e.forward.size());
+                for(size_t i = 0; i < e.forward.size(); ++i)
+                    rv.push_back(positionalArgumentPropagation(e.forward[i], indexes));
+                return rv;
             }
 
             std::vector<Expression::ExpressionPtr> operator()(PiecewiseAffineJoin const& e)
