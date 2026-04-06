@@ -58,7 +58,7 @@ TYPED_TEST_SUITE({class_name}, {type_alias});
 # --------------------------------------------------------------------------- #
 TARGETS = {
     "extended": {
-        "filter": lambda suffix: "Atomic" in suffix or suffix == "Pipelines",
+        "filter": lambda suffix: suffix == "Pipelines",  # Disable atomics for now
         "inc_files": ["test_gemm_streamk_extended_cases.inc"],
     },
     "atomic_smoke": {

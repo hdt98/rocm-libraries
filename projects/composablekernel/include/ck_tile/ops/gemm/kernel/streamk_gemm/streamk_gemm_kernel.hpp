@@ -19,29 +19,32 @@ namespace ck_tile {
  *      arguments and launch the kernel on GPU. This structure defines the GEMM problem
  *      configuration by stating all required information like M,N,K sizes and respective strides.
  */
-struct StreamKHostArgs : public ck_tile::UniversalGemmHostArgs<>
+template <index_t NumATensor, index_t NumBTensor, index_t NumDTensor>
+struct StreamKHostArgs : public ck_tile::UniversalGemmHostArgs<NumATensor, NumBTensor, NumDTensor>
 {
-    CK_TILE_HOST explicit StreamKHostArgs(const void* a_ptr_,
-                                          const void* b_ptr_,
+    CK_TILE_HOST explicit StreamKHostArgs(const std::array<const void*, NumATensor>& as_ptr_,
+                                          const std::array<const void*, NumBTensor>& bs_ptr_,
+                                          const std::array<const void*, NumDTensor>& ds_ptr_,
                                           void* c_ptr_,
                                           index_t M_,
                                           index_t N_,
                                           index_t K_,
-                                          index_t stride_A_,
-                                          index_t stride_B_,
+                                          const std::array<index_t, NumATensor>& stride_As_,
+                                          const std::array<index_t, NumBTensor>& stride_Bs_,
+                                          const std::array<index_t, NumDTensor>& stride_Ds_,
                                           index_t stride_C_)
-        : UniversalGemmHostArgs<>({a_ptr_},
-                                  {b_ptr_},
-                                  {/*ds_ptr*/},
-                                  c_ptr_,
-                                  /*k_batch_ =*/1,
-                                  M_,
-                                  N_,
-                                  K_,
-                                  {stride_A_},
-                                  {stride_B_},
-                                  {/*stride_Ds_*/},
-                                  stride_C_)
+        : UniversalGemmHostArgs<NumATensor, NumBTensor, NumDTensor>(as_ptr_,
+                                                                    bs_ptr_,
+                                                                    ds_ptr_,
+                                                                    c_ptr_,
+                                                                    /*k_batch_ =*/1,
+                                                                    M_,
+                                                                    N_,
+                                                                    K_,
+                                                                    stride_As_,
+                                                                    stride_Bs_,
+                                                                    stride_Ds_,
+                                                                    stride_C_)
     {
     }
 };
@@ -83,33 +86,48 @@ struct StreamKKernel
         "Persistent flag from TilePartitioner must match Persistent flag from UniversalGemm.");
 
     /**
-     * @brief  Specify the layout configurations for A, B, and C
+     * @brief  Specify the layout configurations for A, B, C and D
      */
-    using ALayout = typename GemmPipeline::ALayout;
-    using BLayout = typename GemmPipeline::BLayout;
-    using CLayout = typename GemmPipeline::CLayout;
+    using AsLayout = remove_cvref_t<typename GemmPipeline::AsLayout>;
+    using BsLayout = remove_cvref_t<typename GemmPipeline::BsLayout>;
+    using CLayout  = remove_cvref_t<typename GemmPipeline::CLayout>;
+    using DsLayout = remove_cvref_t<typename EpiloguePipeline::DsLayout>;
 
     /**
-     * @brief  Specify the data type configurations for A, B, and C
+     * @brief  Specify the data type configurations for A, B, C and D
      */
-    using ADataType   = typename GemmPipeline::ADataType;
-    using BDataType   = typename GemmPipeline::BDataType;
-    using CDataType   = typename EpiloguePipeline::ODataType;
+    using AsDataType  = remove_cvref_t<typename GemmPipeline::AsDataType>;
+    using BsDataType  = remove_cvref_t<typename GemmPipeline::BsDataType>;
+    using CDataType   = remove_cvref_t<typename EpiloguePipeline::ODataType>;
+    using DsDataType  = remove_cvref_t<typename EpiloguePipeline::DsDataType>;
     using AccDataType = typename EpiloguePipeline::AccDataType;
+
+    /**
+     * @brief  Specify the element-wise operation types for A and B
+     */
+    using AElementWise = remove_cvref_t<typename GemmPipeline::AElementWise>;
+    using BElementWise = remove_cvref_t<typename GemmPipeline::BElementWise>;
+
+    /**
+     * @brief The sizes of NumATensor, NumBTensor and NumDTensor is set by the user.
+     */
+    static constexpr index_t NumATensor = AsDataType::size();
+    static constexpr index_t NumBTensor = BsDataType::size();
+    static constexpr index_t NumDTensor = DsDataType::size();
 
     template <typename T>
     static constexpr bool is_tuple_v = is_detected<is_tuple, T>::value;
     /**
-     *@brief ALayout and ADataType are expected to be scalars, not a tuple.
+     *@brief AsLayout and AsDataType are expected to be tuples, not scalars.
      */
-    static_assert(!is_tuple_v<ALayout> && !is_tuple_v<ADataType>,
-                  "ALayout and ADataType must be scalars.");
+    static_assert(is_tuple_v<AsLayout> && is_tuple_v<AsDataType>,
+                  "AsLayout and AsDataType must be tuples.");
 
     /**
-     *@brief BLayout and BDataType are expected to be scalars, not a tuple.
+     *@brief BsLayout and BsDataType are expected to be tuples, not scalars.
      */
-    static_assert(!is_tuple_v<BLayout> && !is_tuple_v<BDataType>,
-                  "BLayout and BDataType must be scalars.");
+    static_assert(is_tuple_v<BsLayout> && is_tuple_v<BsDataType>,
+                  "BsLayout and BsDataType must be tuples.");
 
     /**
      *@brief CLayout and CDataType are expected to be scalars, not a tuple.
@@ -117,21 +135,33 @@ struct StreamKKernel
     static_assert(!is_tuple_v<CLayout> && !is_tuple_v<CDataType>,
                   "CLayout and CDataType must be scalars.");
 
-    struct StreamKKernelArgs : ck_tile::UniversalGemmKernelArgs<>
+    /**
+     *@brief DsLayout and DsDataType are expected to be tuples, not scalars.
+     */
+    static_assert(is_tuple_v<DsLayout> && is_tuple_v<DsDataType> &&
+                      DsLayout::size() == DsDataType::size() && DsLayout::size() > 0,
+                  "DsLayout and DsDataType must be tuples and must have the same size.");
+
+    using ADataType = remove_cvref_t<std::tuple_element_t<0, AsDataType>>;
+    using BDataType = remove_cvref_t<std::tuple_element_t<0, BsDataType>>;
+    using DDataType = remove_cvref_t<std::tuple_element_t<0, DsDataType>>;
+
+    struct StreamKKernelArgs : ck_tile::UniversalGemmKernelArgs<NumATensor, NumBTensor, NumDTensor>
     {
-        StreamKKernelArgs(const StreamKHostArgs& host_args, index_t max_active_wgs)
-            : UniversalGemmKernelArgs{host_args.as_ptr,
-                                      host_args.bs_ptr,
-                                      host_args.ds_ptr,
-                                      host_args.e_ptr,
-                                      host_args.M,
-                                      host_args.N,
-                                      host_args.K,
-                                      host_args.stride_As,
-                                      host_args.stride_Bs,
-                                      host_args.stride_Ds,
-                                      host_args.stride_E,
-                                      host_args.k_batch},
+        StreamKKernelArgs(const StreamKHostArgs<NumATensor, NumBTensor, NumDTensor>& host_args,
+                          index_t max_active_wgs)
+            : UniversalGemmKernelArgs<NumATensor, NumBTensor, NumDTensor>{host_args.as_ptr,
+                                                                          host_args.bs_ptr,
+                                                                          host_args.ds_ptr,
+                                                                          host_args.e_ptr,
+                                                                          host_args.M,
+                                                                          host_args.N,
+                                                                          host_args.K,
+                                                                          host_args.stride_As,
+                                                                          host_args.stride_Bs,
+                                                                          host_args.stride_Ds,
+                                                                          host_args.stride_E,
+                                                                          host_args.k_batch},
               // The workspace pointer is set to nullptr because we must first
               // instantiate the TilePartitioner to get the necessary size
               workspace_ptr{nullptr},
@@ -204,9 +234,10 @@ struct StreamKKernel
      * select their own to assist with test reproducibility, etc.
      * @return The kernel arguments for Stream-K.
      */
-    CK_TILE_HOST static StreamKKernelArgs MakeKernelArgs(const StreamKHostArgs& host_args,
-                                                         int num_cu    = NumCU(),
-                                                         int occupancy = Occupancy())
+    CK_TILE_HOST static StreamKKernelArgs
+    MakeKernelArgs(const StreamKHostArgs<NumATensor, NumBTensor, NumDTensor>& host_args,
+                   int num_cu    = NumCU(),
+                   int occupancy = Occupancy())
     {
         const index_t max_active_wgs = num_cu * occupancy;
 
@@ -238,16 +269,14 @@ struct StreamKKernel
         // has_hot_loop and tail_num here. This is a similar pattern used by grouped GEMM. In this
         // case, we call the GemmPipeline's operator() function that takes both has_hot_loop and
         // tail_num.
-        const bool has_hot_loop   = GemmPipeline::BlockHasHotloop(num_loop);
-        const TailNumber tail_num = GemmPipeline::GetBlockLoopTailNum(num_loop);
+        // const bool has_hot_loop   = GemmPipeline::BlockHasHotloop(num_loop);
+        // const TailNumber tail_num = GemmPipeline::GetBlockLoopTailNum(num_loop);
 
         // Run GEMM cooperatively by whole workgroup.
-        const auto& c_block_tile = GemmPipeline{}(as_block_window[UniversalGemmKernel::I0],
-                                                  bs_block_window[UniversalGemmKernel::I0],
-                                                  num_loop,
-                                                  has_hot_loop,
-                                                  tail_num,
-                                                  smem_ptr_0);
+        // Pass the full as_block_window and bs_block_window arrays along with element-wise functors
+        // to support multi-ABD operations
+        const auto& c_block_tile = GemmPipeline{}.template operator()(
+            as_block_window, AElementWise{}, bs_block_window, BElementWise{}, num_loop, smem_ptr_0);
 
         if(UseDefaultScheduler || (get_warp_id() == 0))
         {
@@ -288,8 +317,8 @@ struct StreamKKernel
      * @param tile_idx The 1D tile index in the C tensor for this workgroup.
      * @param num_loop The number of iterations (at the macro tile level) in the K dimension this
      * workgroup will perform in the C tile.
-     * @param i_k_a The K offset in the A tensor.
-     * @param i_k_b The K offset in the B tensor.
+     * @param i_k_as The K offsets in the A tensors.
+     * @param i_k_bs The K offsets in the B tensors.
      * @param k_size The portion of the K dimension this workgroup processes in the assigned
      * `tile_idx`.
      * @param smem_ptr_0 Pointer to LDS.
@@ -297,8 +326,8 @@ struct StreamKKernel
     CK_TILE_DEVICE void BaseGemm(StreamKKernelArgs& kargs,
                                  index_t tile_idx,
                                  index_t num_loop,
-                                 index_t i_k_a,
-                                 index_t i_k_b,
+                                 const std::array<index_t, NumATensor>& i_k_as,
+                                 const std::array<index_t, NumBTensor>& i_k_bs,
                                  index_t k_size,
                                  void* smem_ptr_0) const
     {
@@ -306,13 +335,20 @@ struct StreamKKernel
         index_t i_m = c_macro_tile_idx[UniversalGemmKernel::I0] * TilePartitioner::MPerBlock;
         index_t i_n = c_macro_tile_idx[UniversalGemmKernel::I1] * TilePartitioner::NPerBlock;
 
-        const ADataType* a_ptr = static_cast<const ADataType*>(kargs.as_ptr[0]) + i_k_a;
-        const BDataType* b_ptr = static_cast<const BDataType*>(kargs.bs_ptr[0]) + i_k_b;
-        CDataType* c_ptr       = static_cast<CDataType*>(kargs.e_ptr);
+        std::array<const ADataType*, NumATensor> as_ptr;
+        static_for<0, NumATensor, 1>{}([&](auto i) {
+            as_ptr[i] = static_cast<const ADataType*>(kargs.as_ptr[i]) + i_k_as[i];
+        });
+
+        std::array<const BDataType*, NumBTensor> bs_ptr;
+        static_for<0, NumBTensor, 1>{}([&](auto i) {
+            bs_ptr[i] = static_cast<const BDataType*>(kargs.bs_ptr[i]) + i_k_bs[i];
+        });
+
+        CDataType* c_ptr = static_cast<CDataType*>(kargs.e_ptr);
 
         // Run the GEMM pipeline and Epilogue.
-        RunGemm(
-            {a_ptr}, {b_ptr}, {/*ds_ptr*/}, c_ptr, smem_ptr_0, kargs, num_loop, i_m, i_n, k_size);
+        RunGemm(as_ptr, bs_ptr, kargs.ds_ptr, c_ptr, smem_ptr_0, kargs, num_loop, i_m, i_n, k_size);
     }
 
     /**
@@ -357,12 +393,12 @@ struct StreamKKernel
             index_t k_size = num_loop_sk * TilePartitioner::KPerBlock;
 
             // Get the K offsets for the A and B tensors
-            auto [i_k_a, i_k_b] = GetKOffsets<ALayout, BLayout>(
-                local_iter_start, kargs.stride_As[0], kargs.stride_Bs[0]);
+            auto [i_k_as, i_k_bs] =
+                GetKOffsets<AsLayout, BsLayout>(local_iter_start, kargs.stride_As, kargs.stride_Bs);
 
             if constexpr(TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Atomic)
             {
-                BaseGemm(kargs, tile_idx, num_loop_sk, i_k_a, i_k_b, k_size, smem_ptr_0);
+                BaseGemm(kargs, tile_idx, num_loop_sk, i_k_as, i_k_bs, k_size, smem_ptr_0);
             }
             else if(TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Linear ||
                     TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Tree)
@@ -374,32 +410,49 @@ struct StreamKKernel
                 index_t i_n =
                     c_macro_tile_idx[UniversalGemmKernel::I1] * TilePartitioner::NPerBlock;
 
-                const ADataType* a_ptr = static_cast<const ADataType*>(kargs.as_ptr[0]) + i_k_a;
-                const BDataType* b_ptr = static_cast<const BDataType*>(kargs.bs_ptr[0]) + i_k_b;
-                CDataType* c_ptr       = static_cast<CDataType*>(kargs.e_ptr);
+                std::array<const ADataType*, NumATensor> as_ptr;
+                static_for<0, NumATensor, 1>{}([&](auto i) {
+                    as_ptr[i] = static_cast<const ADataType*>(kargs.as_ptr[i]) + i_k_as[i];
+                });
+
+                std::array<const BDataType*, NumBTensor> bs_ptr;
+                static_for<0, NumBTensor, 1>{}([&](auto i) {
+                    bs_ptr[i] = static_cast<const BDataType*>(kargs.bs_ptr[i]) + i_k_bs[i];
+                });
+                CDataType* c_ptr = static_cast<CDataType*>(kargs.e_ptr);
 
                 // Create block windows using specialized methods
                 const auto& as_block_window =
-                    UniversalGemmKernel::MakeABlockWindows({a_ptr}, kargs, k_size, i_m);
+                    UniversalGemmKernel::MakeABlockWindows(as_ptr, kargs, k_size, i_m);
                 const auto& bs_block_window =
-                    UniversalGemmKernel::MakeBBlockWindows({b_ptr}, kargs, k_size, i_n);
-                const auto& ds_block_window =
-                    UniversalGemmKernel::MakeDBlockWindows({/*ds_ptr*/}, kargs, i_m, i_n);
+                    UniversalGemmKernel::MakeBBlockWindows(bs_ptr, kargs, k_size, i_n);
+                const auto& ds_block_window = UniversalGemmKernel::MakeDBlockWindows(
+                    kargs.ds_ptr,
+                    static_cast<const typename UniversalGemmKernel::KernelArgs&>(kargs),
+                    i_m,
+                    i_n);
 
                 // Since num_loop can vary per WG and per iteration of the Stream-K while loop,
                 // we compute has_hot_loop and tail_num here. This is a similar pattern used by
                 // grouped GEMM. In this case, we call the GemmPipeline's operator() function
                 // that takes both has_hot_loop and tail_num.
-                const bool has_hot_loop   = GemmPipeline::BlockHasHotloop(num_loop_sk);
-                const TailNumber tail_num = GemmPipeline::GetBlockLoopTailNum(num_loop_sk);
+                // const bool has_hot_loop   = GemmPipeline::BlockHasHotloop(num_loop_sk);
+                // const TailNumber tail_num = GemmPipeline::GetBlockLoopTailNum(num_loop_sk);
 
                 // Run GEMM cooperatively by whole workgroup.
-                const auto& c_block_tile = GemmPipeline{}(as_block_window[UniversalGemmKernel::I0],
-                                                          bs_block_window[UniversalGemmKernel::I0],
-                                                          num_loop_sk,
-                                                          has_hot_loop,
-                                                          tail_num,
-                                                          smem_ptr_0);
+                const auto& c_block_tile = GemmPipeline{}.template operator()(as_block_window,
+                                                                              AElementWise{},
+                                                                              bs_block_window,
+                                                                              BElementWise{},
+                                                                              num_loop_sk,
+                                                                              smem_ptr_0);
+                // const auto& c_block_tile =
+                // GemmPipeline{}(as_block_window[UniversalGemmKernel::I0],
+                //                                           bs_block_window[UniversalGemmKernel::I0],
+                //                                           num_loop_sk,
+                //                                           has_hot_loop,
+                //                                           tail_num,
+                //                                           smem_ptr_0);
 
                 auto tile_started = iter_start == tile_iter_start;
                 auto tile_ended   = iter_end >= tile_iter_end;
@@ -534,7 +587,7 @@ struct StreamKKernel
         StreamKDispatch(
             kargs.tile_partitioner,
             [&](index_t tile_idx) {
-                BaseGemm(kargs, tile_idx, dp_num_loop, 0, 0, kargs.K, smem_ptr_0);
+                BaseGemm(kargs, tile_idx, dp_num_loop, {0}, {0}, kargs.K, smem_ptr_0);
             },
             [&](index_t sk_cta_idx) { StreamKGemm(kargs, sk_cta_idx, smem_ptr_0); });
     }
@@ -548,33 +601,48 @@ struct StreamKKernel
      * @note The default case is that A is assumed to be row major and B is assumed to be column
      * major.
      */
-    template <typename ALayout, typename BLayout>
-    CK_TILE_DEVICE static tuple<index_t, index_t>
-    GetKOffsets(index_t iter_offset, index_t stride_a, index_t stride_b)
+    template <typename AsLayout, typename BsLayout>
+    CK_TILE_DEVICE static tuple<std::array<index_t, NumATensor>, std::array<index_t, NumBTensor>>
+    GetKOffsets(index_t iter_offset,
+                const std::array<index_t, NumATensor>& stride_as,
+                const std::array<index_t, NumBTensor>& stride_bs)
     {
-        index_t stride_offset_a;
-        index_t stride_offset_b;
-        if constexpr(std::is_same_v<ALayout, ck_tile::tensor_layout::gemm::ColumnMajor>)
-        {
-            stride_offset_a = stride_a;
-        }
-        else
-        {
-            stride_offset_a = 1;
-        }
 
-        if constexpr(std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::RowMajor>)
-        {
-            stride_offset_b = stride_b;
-        }
-        else
-        {
-            stride_offset_b = 1;
-        }
+        std::array<index_t, NumATensor> a_k_offsets;
+        std::array<index_t, NumBTensor> b_k_offsets;
 
         index_t base_offset = iter_offset * TilePartitioner::KPerBlock;
 
-        return make_tuple(base_offset * stride_offset_a, base_offset * stride_offset_b);
+        static_for<0, NumATensor, 1>{}([&](auto i) {
+            using AiLayout = std::tuple_element_t<i.value, AsLayout>;
+            index_t stride_offset_a;
+            if constexpr(std::is_same_v<AiLayout, ck_tile::tensor_layout::gemm::ColumnMajor>)
+            {
+                stride_offset_a = stride_as[i];
+            }
+            else
+            {
+                stride_offset_a = 1;
+            }
+            a_k_offsets[i] = base_offset * stride_offset_a;
+        });
+
+        static_for<0, NumBTensor, 1>{}([&](auto i) {
+            using BiLayout = std::tuple_element_t<i.value, BsLayout>;
+            index_t stride_offset_b;
+            if constexpr(std::is_same_v<BiLayout, ck_tile::tensor_layout::gemm::RowMajor>)
+            {
+                stride_offset_b = stride_bs[i];
+            }
+            else
+            {
+                stride_offset_b = 1;
+            }
+
+            b_k_offsets[i] = base_offset * stride_offset_b;
+        });
+
+        return ck_tile::make_tuple(a_k_offsets, b_k_offsets);
     }
 
     CK_TILE_HOST static int NumCU()

@@ -10,6 +10,7 @@
 #include "ck_tile/host.hpp"
 #include "ck_tile/ops/epilogue.hpp"
 #include "ck_tile/ops/gemm.hpp"
+#include "ck_tile/ops/elementwise/unary_element_wise_operation.hpp"
 
 enum struct GemmPipelineType
 {
@@ -39,13 +40,20 @@ struct GemmPipelineTypeSelector<GemmPipelineType::CompV4, Problem>
     using pipeline = ck_tile::GemmPipelineAgBgCrCompV4<Problem>;
 };
 
-template <typename ADataType, typename BDataType, typename AccDataType, typename CDataType>
+template <typename A0DataType,
+          typename B0DataType,
+          typename D0DataType,
+          typename AccDataType,
+          typename CDataType>
 auto calculate_rtol_atol(const ck_tile::index_t K,
                          const ck_tile::index_t kbatch,
                          const float max_accumulated_value)
 {
+    using ComputeTypeAB =
+        std::conditional_t<sizeof(A0DataType) < sizeof(B0DataType), A0DataType, B0DataType>;
+
     using ComputeType =
-        std::conditional_t<sizeof(ADataType) < sizeof(BDataType), ADataType, BDataType>;
+        std::conditional_t<sizeof(ComputeTypeAB) < sizeof(D0DataType), ComputeTypeAB, D0DataType>;
     // Calculate thresholds
     const auto rtol = ck_tile::get_relative_threshold<ComputeType, CDataType, AccDataType>(
         ck_tile::integer_divide_ceil(K, kbatch));
@@ -71,33 +79,53 @@ template <typename Tuple>
 class TestCkTileStreamK : public ::testing::Test
 {
     protected:
-    using ALayout                                 = std::tuple_element_t<0, Tuple>;
-    using BLayout                                 = std::tuple_element_t<1, Tuple>;
+    // Original elements from develop (positions 0-15)
+    using A0Layout                                = std::tuple_element_t<0, Tuple>; // ALayout
+    using B0Layout                                = std::tuple_element_t<1, Tuple>; // BLayout
     using CLayout                                 = std::tuple_element_t<2, Tuple>;
-    using ADataType                               = std::tuple_element_t<3, Tuple>;
-    using BDataType                               = std::tuple_element_t<4, Tuple>;
+    using A0DataType                              = std::tuple_element_t<3, Tuple>; // ADataType
+    using B0DataType                              = std::tuple_element_t<4, Tuple>; // BDataType
     using AccDataType                             = std::tuple_element_t<5, Tuple>;
     using CDataType                               = std::tuple_element_t<6, Tuple>;
-    using DsLayout                                = ck_tile::tuple<>;
-    using DsDataType                              = ck_tile::tuple<>;
     static constexpr ck_tile::index_t M_Tile      = std::tuple_element_t<7, Tuple>::value;
     static constexpr ck_tile::index_t N_Tile      = std::tuple_element_t<8, Tuple>::value;
     static constexpr ck_tile::index_t K_Tile      = std::tuple_element_t<9, Tuple>::value;
     static constexpr ck_tile::index_t M_Warp_Tile = std::tuple_element_t<10, Tuple>::value;
     static constexpr ck_tile::index_t N_Warp_Tile = std::tuple_element_t<11, Tuple>::value;
     static constexpr ck_tile::index_t K_Warp_Tile = std::tuple_element_t<12, Tuple>::value;
+    static constexpr bool Persistent              = std::tuple_element_t<13, Tuple>::value;
+    static constexpr auto PipelineType            = std::tuple_element_t<14, Tuple>::value;
+    static constexpr auto ReductionStrategy       = std::tuple_element_t<15, Tuple>::value;
 
-    static constexpr bool Persistent        = std::tuple_element_t<13, Tuple>::value;
-    static constexpr auto PipelineType      = std::tuple_element_t<14, Tuple>::value;
-    static constexpr auto ReductionStrategy = std::tuple_element_t<15, Tuple>::value;
+    // Multi-ABD elements (positions 16-26)
+    using A1Layout        = std::tuple_element_t<16, Tuple>;
+    using A1DataType      = std::tuple_element_t<17, Tuple>;
+    using B1Layout        = std::tuple_element_t<18, Tuple>;
+    using B1DataType      = std::tuple_element_t<19, Tuple>;
+    using D0Layout        = std::tuple_element_t<20, Tuple>;
+    using D0DataType      = std::tuple_element_t<21, Tuple>;
+    using D1Layout        = std::tuple_element_t<22, Tuple>;
+    using D1DataType      = std::tuple_element_t<23, Tuple>;
+    using AElementWiseFn  = std::tuple_element_t<24, Tuple>;
+    using BElementWiseFn  = std::tuple_element_t<25, Tuple>;
+    using CDElementWiseFn = std::tuple_element_t<26, Tuple>;
+
+    using AsLayout   = ck_tile::tuple<A0Layout, A1Layout>;
+    using AsDataType = ck_tile::tuple<A0DataType, A1DataType>;
+    using BsLayout   = ck_tile::tuple<B0Layout, B1Layout>;
+    using BsDataType = ck_tile::tuple<B0DataType, B1DataType>;
+    using DsLayout   = ck_tile::tuple<D0Layout, D1Layout>;
+    using DsDataType = ck_tile::tuple<D0DataType, D1DataType>;
 
     template <bool PadM       = true,
               bool PadN       = true,
               bool PadK       = true,
               bool Preshuffle = false,
               bool TransposeC = false>
-    ck_tile::index_t invoke_streamk(const ck_tile::StreamKHostArgs& args,
-                                    const ck_tile::stream_config& s)
+    ck_tile::index_t invoke_streamk(
+        const ck_tile::StreamKHostArgs<AsDataType::size(), BsDataType::size(), DsDataType::size()>&
+            args,
+        const ck_tile::stream_config& s)
     {
         constexpr ck_tile::index_t M_Warp = 2;
         constexpr ck_tile::index_t N_Warp = 2;
@@ -125,8 +153,8 @@ class TestCkTileStreamK : public ::testing::Test
                                                                      kPadN,
                                                                      kPadK,
                                                                      DoubleSmemBuffer,
-                                                                     ALayout,
-                                                                     BLayout,
+                                                                     AsLayout,
+                                                                     BsLayout,
                                                                      CLayout,
                                                                      TransposeC,
                                                                      StructuredSparsity,
@@ -140,24 +168,26 @@ class TestCkTileStreamK : public ::testing::Test
         // This is because num_loop can vary (a) per WG and (b) per iteration of the Stream-K
         // while loop. Instead, has_hot_loop and tail_num are determined in the Stream-K
         // Kernel's RunGemm function. This is a similar pattern used by grouped GEMM.
-        using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<ADataType,
-                                                                           BDataType,
+        using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<AsDataType,
+                                                                           BsDataType,
                                                                            AccDataType,
                                                                            GemmShape,
                                                                            GemmUniversalTraits,
-                                                                           scheduler>;
+                                                                           scheduler,
+                                                                           AElementWiseFn,
+                                                                           BElementWiseFn>;
 
         using GemmPipeline = GemmPipelineTypeSelector<PipelineType, UniversalGemmProblem>::pipeline;
 
         using GemmEpilogue = ck_tile::CShuffleEpilogue<
-            ck_tile::CShuffleEpilogueProblem<ADataType,
-                                             BDataType,
-                                             ck_tile::tuple<>,
+            ck_tile::CShuffleEpilogueProblem<AsDataType,
+                                             BsDataType,
+                                             DsDataType,
                                              AccDataType,
                                              CDataType,
-                                             ck_tile::tuple<>,
+                                             DsLayout,
                                              CLayout,
-                                             ck_tile::element_wise::PassThrough,
+                                             CDElementWiseFn,
                                              TilePartitioner::MPerBlock,
                                              TilePartitioner::NPerBlock,
                                              M_Warp,
@@ -195,9 +225,13 @@ class TestCkTileStreamK : public ::testing::Test
     void Run(ck_tile::index_t M,
              ck_tile::index_t N,
              ck_tile::index_t K,
-             ck_tile::index_t stride_A = 0,
-             ck_tile::index_t stride_B = 0,
-             ck_tile::index_t stride_C = 0)
+             ck_tile::index_t stride_A0 = 0,
+             ck_tile::index_t stride_A1 = 0,
+             ck_tile::index_t stride_B0 = 0,
+             ck_tile::index_t stride_B1 = 0,
+             ck_tile::index_t stride_D0 = 0,
+             ck_tile::index_t stride_D1 = 0,
+             ck_tile::index_t stride_C  = 0)
     {
         // Since M, N, and K will vary depending on the number of CUs, we print it here to
         // facilitate test output readability.
@@ -237,76 +271,116 @@ class TestCkTileStreamK : public ::testing::Test
                     return stride;
             };
 
-        stride_A = f_get_default_stride(M, K, stride_A, ALayout{});
-        stride_B = f_get_default_stride(K, N, stride_B, BLayout{});
-        stride_C = f_get_default_stride(M, N, stride_C, CLayout{});
+        stride_A0 = f_get_default_stride(M, K, stride_A0, A0Layout{});
+        stride_A1 = f_get_default_stride(M, K, stride_A1, A1Layout{});
+        stride_B0 = f_get_default_stride(K, N, stride_B0, B0Layout{});
+        stride_B1 = f_get_default_stride(K, N, stride_B1, B1Layout{});
+        stride_D0 = f_get_default_stride(M, N, stride_D0, D0Layout{});
+        stride_D1 = f_get_default_stride(M, N, stride_D1, D1Layout{});
+        stride_C  = f_get_default_stride(M, N, stride_C, CLayout{});
 
-        ck_tile::HostTensor<ADataType> a_m_k(f_host_tensor_descriptor(M, K, stride_A, ALayout{}));
-        ck_tile::HostTensor<BDataType> b_k_n(f_host_tensor_descriptor(K, N, stride_B, BLayout{}));
+        ck_tile::HostTensor<A0DataType> a0_m_k(
+            f_host_tensor_descriptor(M, K, stride_A0, A0Layout{}));
+        ck_tile::HostTensor<A1DataType> a1_m_k(
+            f_host_tensor_descriptor(M, K, stride_A1, A1Layout{}));
+        ck_tile::HostTensor<B0DataType> b0_k_n(
+            f_host_tensor_descriptor(K, N, stride_B0, B0Layout{}));
+        ck_tile::HostTensor<B1DataType> b1_k_n(
+            f_host_tensor_descriptor(K, N, stride_B1, B1Layout{}));
+        ck_tile::HostTensor<D0DataType> d0_m_n(
+            f_host_tensor_descriptor(M, N, stride_D0, D0Layout{}));
+        ck_tile::HostTensor<D1DataType> d1_m_n(
+            f_host_tensor_descriptor(M, N, stride_D1, D1Layout{}));
         ck_tile::HostTensor<CDataType> c_m_n_dev_result(
             f_host_tensor_descriptor(M, N, stride_C, CLayout{}));
 
-        ck_tile::FillUniformDistributionIntegerValue<ADataType>{-5, 5, /*seed*/ 11939}(a_m_k);
-        ck_tile::FillUniformDistributionIntegerValue<BDataType>{-5, 5, /*seed*/ 11940}(b_k_n);
+        ck_tile::FillUniformDistribution<A0DataType>{-1.f, 1.f}(a0_m_k);
+        ck_tile::FillUniformDistribution<A1DataType>{-1.f, 1.f}(a1_m_k);
+        ck_tile::FillUniformDistribution<B0DataType>{-1.f, 1.f}(b0_k_n);
+        ck_tile::FillUniformDistribution<B1DataType>{-1.f, 1.f}(b1_k_n);
+        ck_tile::FillUniformDistribution<D0DataType>{-1.f, 1.f}(d0_m_n);
+        ck_tile::FillUniformDistribution<D1DataType>{-1.f, 1.f}(d1_m_n);
 
-        ck_tile::DeviceMem a_m_k_dev_buf(a_m_k.get_element_space_size_in_bytes());
-        ck_tile::DeviceMem b_k_n_dev_buf(b_k_n.get_element_space_size_in_bytes());
+        ck_tile::DeviceMem a0_m_k_dev_buf(a0_m_k.get_element_space_size_in_bytes());
+        ck_tile::DeviceMem a1_m_k_dev_buf(a1_m_k.get_element_space_size_in_bytes());
+        ck_tile::DeviceMem b0_k_n_dev_buf(b0_k_n.get_element_space_size_in_bytes());
+        ck_tile::DeviceMem b1_k_n_dev_buf(b1_k_n.get_element_space_size_in_bytes());
+        ck_tile::DeviceMem d0_m_n_dev_buf(d0_m_n.get_element_space_size_in_bytes());
+        ck_tile::DeviceMem d1_m_n_dev_buf(d1_m_n.get_element_space_size_in_bytes());
         ck_tile::DeviceMem c_m_n_dev_buf(c_m_n_dev_result.get_element_space_size_in_bytes());
 
-        a_m_k_dev_buf.ToDevice(a_m_k.data());
-        b_k_n_dev_buf.ToDevice(b_k_n.data());
+        a0_m_k_dev_buf.ToDevice(a0_m_k.data());
+        a1_m_k_dev_buf.ToDevice(a1_m_k.data());
+        b0_k_n_dev_buf.ToDevice(b0_k_n.data());
+        b1_k_n_dev_buf.ToDevice(b1_k_n.data());
+        d0_m_n_dev_buf.ToDevice(d0_m_n.data());
+        d1_m_n_dev_buf.ToDevice(d1_m_n.data());
         c_m_n_dev_buf.SetZero();
         c_m_n_dev_result.SetZero();
 
-        ck_tile::StreamKHostArgs args{a_m_k_dev_buf.GetDeviceBuffer(),
-                                      b_k_n_dev_buf.GetDeviceBuffer(),
-                                      c_m_n_dev_buf.GetDeviceBuffer(),
-                                      M,
-                                      N,
-                                      K,
-                                      stride_A,
-                                      stride_B,
-                                      stride_C};
+        std::array<const void*, AsDataType::size()> as_ptr = {a0_m_k_dev_buf.GetDeviceBuffer(),
+                                                              a1_m_k_dev_buf.GetDeviceBuffer()};
+        std::array<const void*, BsDataType::size()> bs_ptr = {b0_k_n_dev_buf.GetDeviceBuffer(),
+                                                              b1_k_n_dev_buf.GetDeviceBuffer()};
+        std::array<const void*, DsDataType::size()> ds_ptr = {d0_m_n_dev_buf.GetDeviceBuffer(),
+                                                              d1_m_n_dev_buf.GetDeviceBuffer()};
+        std::array<ck_tile::index_t, AsDataType::size()> stride_As = {stride_A0, stride_A1};
+        std::array<ck_tile::index_t, BsDataType::size()> stride_Bs = {stride_B0, stride_B1};
+        std::array<ck_tile::index_t, DsDataType::size()> stride_Ds = {stride_D0, stride_D1};
+
+        ck_tile::StreamKHostArgs<AsDataType::size(), BsDataType::size(), DsDataType::size()> args{
+            as_ptr,
+            bs_ptr,
+            ds_ptr,
+            c_m_n_dev_buf.GetDeviceBuffer(),
+            M,
+            N,
+            K,
+            stride_As,
+            stride_Bs,
+            stride_Ds,
+            stride_C};
 
         ck_tile::index_t num_accumulations_per_tile =
             invoke_streamk<>(args, ck_tile::stream_config{nullptr, false, 0, 0, 1});
 
         c_m_n_dev_buf.FromDevice(c_m_n_dev_result.data());
 
-        // Calculate reference GEMM on the GPU
-        ck_tile::HostTensor<CDataType> c_m_n_dev_ref(
+        // Calculate reference GEMM on the host
+        ck_tile::HostTensor<A0DataType> a_m_k_host_ref_element_result(
+            f_host_tensor_descriptor(M, K, stride_A0, A0Layout{}));
+        ck_tile::HostTensor<B0DataType> b_k_n_host_ref_element_result(
+            f_host_tensor_descriptor(K, N, stride_B0, B0Layout{}));
+        ck_tile::HostTensor<CDataType> c_m_n_host_ref(
             f_host_tensor_descriptor(M, N, stride_C, CLayout{}));
-        ck_tile::DeviceMem ref_c_m_n_dev_buf(c_m_n_dev_ref.get_element_space_size_in_bytes());
-        ref_c_m_n_dev_buf.SetZero();
 
-        ADataType* a_m_k_dev_ref_ptr = static_cast<ADataType*>(a_m_k_dev_buf.GetDeviceBuffer());
-        BDataType* b_k_n_dev_ref_ptr = static_cast<BDataType*>(b_k_n_dev_buf.GetDeviceBuffer());
-        CDataType* c_m_n_dev_ref_ptr = static_cast<CDataType*>(ref_c_m_n_dev_buf.GetDeviceBuffer());
-        ck_tile::reference_gemm_gpu<ADataType,
-                                    BDataType,
-                                    AccDataType,
-                                    CDataType,
-                                    ALayout,
-                                    BLayout,
-                                    CLayout>(a_m_k_dev_ref_ptr,
-                                             b_k_n_dev_ref_ptr,
-                                             c_m_n_dev_ref_ptr,
-                                             M,
-                                             N,
-                                             K,
-                                             stride_A,
-                                             stride_B,
-                                             stride_C);
-        ref_c_m_n_dev_buf.FromDevice(c_m_n_dev_ref.data());
+        a_m_k_host_ref_element_result.SetZero();
+        b_k_n_host_ref_element_result.SetZero();
+        c_m_n_host_ref.SetZero();
+
+        ck_tile::reference_gemm_multiple_abd<AsDataType,
+                                             BsDataType,
+                                             DsDataType,
+                                             AccDataType,
+                                             CDataType,
+                                             AElementWiseFn,
+                                             BElementWiseFn,
+                                             CDElementWiseFn>({a0_m_k, a1_m_k},
+                                                              {b0_k_n, b1_k_n},
+                                                              {d0_m_n, d1_m_n},
+                                                              a_m_k_host_ref_element_result,
+                                                              b_k_n_host_ref_element_result,
+                                                              c_m_n_host_ref);
 
         const float max_accumulated_value =
-            *std::max_element(c_m_n_dev_ref.mData.begin(), c_m_n_dev_ref.mData.end());
+            *std::max_element(c_m_n_host_ref.mData.begin(), c_m_n_host_ref.mData.end());
 
-        const auto rtol_atol = calculate_rtol_atol<ADataType, BDataType, AccDataType, CDataType>(
-            K, num_accumulations_per_tile, max_accumulated_value);
+        const auto rtol_atol =
+            calculate_rtol_atol<A0DataType, B0DataType, D0DataType, AccDataType, CDataType>(
+                K, num_accumulations_per_tile, max_accumulated_value);
 
         bool pass = ck_tile::check_err(c_m_n_dev_result,
-                                       c_m_n_dev_ref,
+                                       c_m_n_host_ref,
                                        "Error: Incorrect results!",
                                        rtol_atol.at(ck_tile::number<0>{}),
                                        rtol_atol.at(ck_tile::number<1>{}));

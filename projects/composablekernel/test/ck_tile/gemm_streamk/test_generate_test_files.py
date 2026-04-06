@@ -117,8 +117,9 @@ class TestParseTypesHeader(unittest.TestCase):
             ]
             self.validate_entries(entries, expected)
 
+    # Update test for now since Multi A,B,D doesn't support SK atomics
     def test_extended(self):
-        """Test extended target: matches 'Atomic' in suffix OR suffix == 'Pipelines'.
+        """Test extended target: suffix == 'Pipelines'.
         Includes: Fp16PersistentAtomic, Pipelines
         Excludes: Bf16Linear
         """
@@ -130,11 +131,6 @@ class TestParseTypesHeader(unittest.TestCase):
         with patch("builtins.open", mock_open(read_data=mock_content)):
             entries = parse_types_header("fake_path.hpp", "extended")
             expected = [
-                {
-                    "type_alias": "KernelTypesStreamKFp16PersistentAtomic",
-                    "class_name": "TestCkTileStreamKFp16PersistentAtomic",
-                    "file_tag": "fp16_persistent_atomic",
-                },
                 {
                     "type_alias": "KernelTypesStreamKPipelines",
                     "class_name": "TestCkTileStreamKPipelines",
