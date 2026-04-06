@@ -37,9 +37,6 @@ miopen::ProcessEnvironmentMap MakeEnv(const std::string& tmp_dir)
     return envs;
 }
 
-using e_mask = enabled<Gpu::All>;
-using d_mask = disabled<Gpu::None>;
-
 class GPU_MIOpenDriverConvDeterministicTest_NoFlag_FP32
     : public testing::TestWithParam<std::pair<std::string, std::string>>
 {
@@ -61,9 +58,6 @@ class GPU_MIOpenDriverConvDeterministicTest_Reproducible_FP32
 // ----------------------------------------------------------------------------
 TEST_P(GPU_MIOpenDriverConvDeterministicTest_NoFlag_FP32, NoDeterministicLog)
 {
-    if(!ShouldRunMIOpenDriverTest<d_mask, e_mask>())
-        GTEST_SKIP();
-
     const auto tmp_dir = std::string{"/tmp/miopen_det_test_noflag"};
     miopen::fs::remove_all(tmp_dir);
 
@@ -83,9 +77,6 @@ TEST_P(GPU_MIOpenDriverConvDeterministicTest_NoFlag_FP32, NoDeterministicLog)
 // ----------------------------------------------------------------------------
 TEST_P(GPU_MIOpenDriverConvDeterministicTest_Enabled_FP32, RunsSuccessfullyAndLogsOverride)
 {
-    if(!ShouldRunMIOpenDriverTest<d_mask, e_mask>())
-        GTEST_SKIP();
-
     const auto tmp_dir = std::string{"/tmp/miopen_det_test_enabled"};
     miopen::fs::remove_all(tmp_dir);
 
@@ -103,9 +94,6 @@ TEST_P(GPU_MIOpenDriverConvDeterministicTest_Enabled_FP32, RunsSuccessfullyAndLo
 // ----------------------------------------------------------------------------
 TEST(GPU_MIOpenDriverConvDeterministicTest_InvalidValue_FP32, ExitsOnInvalidValue)
 {
-    if(!ShouldRunMIOpenDriverTest<d_mask, e_mask>())
-        GTEST_SKIP();
-
     const auto tmp_dir = std::string{"/tmp/miopen_det_test_invalid"};
     miopen::fs::remove_all(tmp_dir);
 
@@ -128,9 +116,6 @@ TEST(GPU_MIOpenDriverConvDeterministicTest_InvalidValue_FP32, ExitsOnInvalidValu
 // ----------------------------------------------------------------------------
 TEST_P(GPU_MIOpenDriverConvDeterministicTest_Reproducible_FP32, BitExactAcrossRuns)
 {
-    if(!ShouldRunMIOpenDriverTest<d_mask, e_mask>())
-        GTEST_SKIP();
-
     const auto run1_dir = std::string{"/tmp/miopen_det_repro_run1"};
     const auto run2_dir = std::string{"/tmp/miopen_det_repro_run2"};
     miopen::fs::remove_all(run1_dir);
