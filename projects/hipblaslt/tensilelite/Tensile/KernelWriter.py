@@ -5877,7 +5877,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.defineSgpr("OrigLoopCounter", 1)
 
     if self.debugConfig.debugKernel:
-      self.defineSgpr("AddressDbg", self.states.numSgprAddressDbg)
+      self.defineSgpr("AddressDbg", self.states.numSgprAddressDbg, self.states.numSgprAddressDbg)
       self.defineSgpr("DebugKernelItems", 1)
 
     # the sgprs overlap with wg ids
@@ -5922,15 +5922,15 @@ class KernelWriter(metaclass=abc.ABCMeta):
         break
       SgprSlot.append(tempSgpr)
     self.defineSgpr("SizesSum", self.states.numSgprSizesSum)
-    self.defineSgpr("AddressD", numSgprAddressD)
-    self.defineSgpr("AddressC", numSgprAddressC)
-    self.defineSgpr("AddressA", numSgprAddressA)
-    self.defineSgpr("AddressB", numSgprAddressB)
+    self.defineSgpr("AddressD", numSgprAddressD, numSgprAddressD)
+    self.defineSgpr("AddressC", numSgprAddressC, numSgprAddressC)
+    self.defineSgpr("AddressA", numSgprAddressA, numSgprAddressA)
+    self.defineSgpr("AddressB", numSgprAddressB, numSgprAddressB)
     if kernel["ProblemType"]["Sparse"]:
-      self.defineSgpr("AddressMetadata", numSgprAddressMetadata)
+      self.defineSgpr("AddressMetadata", numSgprAddressMetadata, numSgprAddressMetadata)
     if kernel["StreamK"] > 0 and kernel["StreamKAtomic"] == 0:
-      self.defineSgpr("AddressWS", numSgprAddressWS)
-      self.defineSgpr("AddressFlags", numSgprAddressFlags)
+      self.defineSgpr("AddressWS", numSgprAddressWS, numSgprAddressWS)
+      self.defineSgpr("AddressFlags", numSgprAddressFlags, numSgprAddressFlags)
       self.states.numSgprStreamK += numSgprAddressWS + numSgprAddressFlags
 
     #asm input interface depen
@@ -5951,10 +5951,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("MagicNumberSize%s"%idxChar, 1)
       self.defineSgpr("MagicShiftSize%s"%idxChar, 1)
 
-    self.defineSgpr("Alpha", numSgprAlpha, numSgprAlpha)
+    # Alpha and Beta need at least 2-alignment because packed operations (VMulPKF32)
+    # may use them as 64-bit register pairs even when numSgprAlpha/Beta is 1
+    self.defineSgpr("Alpha", numSgprAlpha, max(2, numSgprAlpha))
     self.states.numSgprAlpha = numSgprAlpha
     if kernel["ProblemType"]["UseBeta"]:
-      self.defineSgpr("Beta", numSgprBeta, numSgprBeta)
+      self.defineSgpr("Beta", numSgprBeta, max(2, numSgprBeta))
       self.states.numSgprBeta = numSgprBeta
 
     if kernel["StreamK"]:
