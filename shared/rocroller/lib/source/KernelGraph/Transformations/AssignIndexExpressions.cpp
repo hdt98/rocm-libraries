@@ -20,7 +20,6 @@
 #include <rocRoller/KernelGraph/Transforms/LowerTile_details.hpp>
 #include <rocRoller/KernelGraph/Transforms/Simplify.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
-#include <rocRoller/KernelOptions_detail.hpp>
 #include <rocRoller/Utilities/Error.hpp>
 
 namespace rocRoller::KernelGraph
@@ -1259,12 +1258,9 @@ namespace rocRoller::KernelGraph
          * the literal value set by the enclosing SetCoordinate.
          * Returns (-1, -1) if not a swizzled LDS load.
          */
-        std::pair<int, int> getSwizzleKUnrollInfo(KernelGraph const& kgraph, int candidate) const
+        std::pair<int, int> getNonConstantKUnrollInfo(KernelGraph const& kgraph,
+                                                      int                candidate) const
         {
-            auto swzMode = m_context->kernelOptions()->ldsSwizzleMode;
-            if(swzMode == LDSBankSwizzleMode::None)
-                return {-1, -1};
-
             if(!kgraph.control.get<LoadLDSTile>(candidate))
                 return {-1, -1};
 
@@ -1275,19 +1271,16 @@ namespace rocRoller::KernelGraph
             if(isScaleType(dataType))
                 return {-1, -1};
 
-            bool isA = (swzMode == LDSBankSwizzleMode::Swizzle
-                        || swzMode == LDSBankSwizzleMode::SwizzleA)
-                       && macTile.layoutType == LayoutType::MATRIX_A;
-            bool isB = (swzMode == LDSBankSwizzleMode::Swizzle
-                        || swzMode == LDSBankSwizzleMode::SwizzleB)
-                       && macTile.layoutType == LayoutType::MATRIX_B;
-            if(!isA && !isB)
+            // K subdimension: dim 1 for MATRIX_A, dim 0 for MATRIX_B
+            int kSubdim = -1;
+            if(macTile.layoutType == LayoutType::MATRIX_A)
+                kSubdim = 1;
+            else if(macTile.layoutType == LayoutType::MATRIX_B)
+                kSubdim = 0;
+            else
                 return {-1, -1};
 
-            // K subdimension: dim 1 for MATRIX_A, dim 0 for MATRIX_B
-            int kSubdim = isA ? 1 : 0;
-
-            // Find the K Unroll coordinate and its value from upstream SetCoordinate
+            // Find the K Unroll coordinate
             auto [target, direction]
                 = getOperationTarget(candidate, kgraph, /*isStorePartOfGlobalToLDSOp=*/false);
             auto [required, path] = findRequiredCoordinates(target, direction, kgraph);
@@ -1305,6 +1298,29 @@ namespace rocRoller::KernelGraph
             }
 
             if(kUnrollCoord < 0)
+                return {-1, -1};
+
+            // Check if any node in the transform path has an
+            // ExpressionTransform edge (e.g. LDS swizzle).
+            // `path` contains coordinate node tags; getNeighbours
+            // returns incident edge tags in the hypergraph.
+            bool hasExpressionTransform = false;
+            for(auto nodeTag : path)
+            {
+                for(auto edgeTag :
+                    kgraph.coordinates.getNeighbours(nodeTag, Graph::opposite(direction)))
+                {
+                    if(kgraph.coordinates.get<ExpressionTransform>(edgeTag).has_value())
+                    {
+                        hasExpressionTransform = true;
+                        break;
+                    }
+                }
+                if(hasExpressionTransform)
+                    break;
+            }
+
+            if(!hasExpressionTransform)
                 return {-1, -1};
 
             // Walk upstream via Body edges to find the SetCoordinate that sets
@@ -1357,7 +1373,7 @@ namespace rocRoller::KernelGraph
             // Detect swizzled LDS load and extract K Unroll info for chain separation
             auto [swizzleKUnrollCoord, swizzleKUnrollValue]
                 = isStorePartOfGlobalToLDSOp ? std::pair{-1, -1}
-                                             : getSwizzleKUnrollInfo(kgraph, candidate);
+                                             : getNonConstantKUnrollInfo(kgraph, candidate);
 
             // Gather loop context information
             auto maybeForLoop  = findContainingOperation<ForLoopOp>(candidate, kgraph);
