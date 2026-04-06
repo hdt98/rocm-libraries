@@ -65,7 +65,8 @@ bool IsArgsSupportedForMode(const CKGroupedConvLibLoader& loader,
                             miopenDataType_t data_type,
                             bool use_tf32)
 {
-    return loader.IsArgsSupported(CKSolverType::GrpConv3dWrw, problem, kernel_id, data_type, use_tf32);
+    return loader.IsArgsSupported(
+        CKSolverType::GrpConv3dWrw, problem, kernel_id, data_type, use_tf32);
 }
 
 } // namespace
@@ -198,13 +199,12 @@ void PerformanceConfigHipImplicitGemm3DGroupWrwXdlops::HeuristicInit(
         if(!loader.IsLoaded())
             return;
         auto run_ai_heuristics = [&](auto CKDataType, auto CKComputeType) {
-            using T = decltype(CKDataType);
+            using T        = decltype(CKDataType);
             using TCompute = decltype(CKComputeType);
             constexpr bool mode_use_tf32 =
                 std::is_same_v<T, float> && std::is_same_v<TCompute, ck::tf32_t>;
             auto fill_valid_kernels =
-                [&loader](
-                    const ::miopen::conv::ProblemDescription& p) -> std::vector<std::string> {
+                [&loader](const ::miopen::conv::ProblemDescription& p) -> std::vector<std::string> {
                 return loader.FillValidKernels(
                     CKSolverType::GrpConv3dWrw, p, p.GetInDataType(), mode_use_tf32);
             };
@@ -219,15 +219,16 @@ void PerformanceConfigHipImplicitGemm3DGroupWrwXdlops::HeuristicInit(
                 return IsArgsSupportedForMode(
                     loader, problem, test_kernel_id, problem.GetInDataType(), mode_use_tf32);
             };
-            auto ai_result = miopen::solver::conv::RunParameterPredictionModel<T>(ctx,
-                                                                                   problem,
-                                                                                   valid_kernels,
-                                                                                   index,
-                                                                                   split_k,
-                                                                                   kernel_id,
-                                                                                   fill_valid_kernels,
-                                                                                   solver_name,
-                                                                                   is_kernel_split_k_valid);
+            auto ai_result =
+                miopen::solver::conv::RunParameterPredictionModel<T>(ctx,
+                                                                     problem,
+                                                                     valid_kernels,
+                                                                     index,
+                                                                     split_k,
+                                                                     kernel_id,
+                                                                     fill_valid_kernels,
+                                                                     solver_name,
+                                                                     is_kernel_split_k_valid);
             if(ai_result.first && !ai_result.second.IsEmpty())
                 use_tf32 = mode_use_tf32;
             return ai_result;
@@ -385,7 +386,8 @@ bool PerformanceConfigHipImplicitGemm3DGroupWrwXdlops::IsValid(
             CKSolverType::GrpConv3dWrw, problem, kernel_id, miopenHalf, false);
     case miopenFloat:
         if(problem.UseTF32() &&
-           loader.IsArgsSupported(CKSolverType::GrpConv3dWrw, problem, kernel_id, miopenFloat, true))
+           loader.IsArgsSupported(
+               CKSolverType::GrpConv3dWrw, problem, kernel_id, miopenFloat, true))
         {
             use_tf32 = true;
             return true;
