@@ -64,6 +64,11 @@ concept UnaryOpLike = requires(const T& t) {
 template <typename F>
 consteval auto visitOp(const Op& op, F&& f) // auto required: return type depends on visitor F
 {
+    // Ensure all Op alternatives are dispatched. If you add a new Op to the variant
+    // in ops.hpp, add a corresponding branch below.
+    static_assert(std::variant_size_v<Op> == 12,
+                  "Op variant size changed — update visitOp() branches to match");
+
     if(std::holds_alternative<GemmOp>(op))
         return f(std::get<GemmOp>(op));
     if(std::holds_alternative<AddOp>(op))
@@ -368,7 +373,8 @@ consteval ResolvedSignature resolve(Signature sig)
         {
             for(int j = 0; j < num_outputs; ++j)
                 if(output_names[j] == out_name)
-                    throw "SSA violation: tensor produced by multiple operators";
+                    throw "tensor name produced by multiple operators "
+                          "(each output name must be unique)";
             output_names[num_outputs++] = out_name;
         }
     }

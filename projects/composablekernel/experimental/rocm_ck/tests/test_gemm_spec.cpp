@@ -648,7 +648,7 @@ TEST(MakeSpec, RhsDtypeIsI4InQuantizedGemm)
 }
 
 // ============================================================================
-// makeSpec: num_d_tensors tracking
+// makeSpec: numDTensors() derivation
 // ============================================================================
 
 TEST(MakeSpec, PlainGemmHasZeroDTensors)
@@ -658,7 +658,7 @@ TEST(MakeSpec, PlainGemmHasZeroDTensors)
         GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
         TargetSet::cdna());
 
-    EXPECT_EQ(k.num_d_tensors, 0);
+    EXPECT_EQ(k.numDTensors(), 0);
 }
 
 TEST(MakeSpec, GemmAddHasOneDTensor)
@@ -669,7 +669,7 @@ TEST(MakeSpec, GemmAddHasOneDTensor)
                                 GemmAlgorithm{{128, 128, 32}, {2, 2, 1}, {16, 16, 16}},
                                 TargetSet::cdna());
 
-    EXPECT_EQ(k.num_d_tensors, 1);
+    EXPECT_EQ(k.numDTensors(), 1);
 }
 
 TEST(MakeSpec, QuantizedGemmHasZeroDTensors)
@@ -684,7 +684,7 @@ TEST(MakeSpec, QuantizedGemmHasZeroDTensors)
                  TargetSet::cdna());
 
     // Scale is NOT a D tensor — num_d_tensors excludes it
-    EXPECT_EQ(k.num_d_tensors, 0);
+    EXPECT_EQ(k.numDTensors(), 0);
     EXPECT_EQ(k.num_physical_tensors, 4); // A, B, C, scale
 }
 
@@ -701,6 +701,6 @@ TEST(MakeSpec, QuantizedGemmAddHasOneDTensor)
                  TargetSet::cdna());
 
     // bias is D0, scale is separate — num_d_tensors counts only bias
-    EXPECT_EQ(k.num_d_tensors, 1);
+    EXPECT_EQ(k.numDTensors(), 1);
     EXPECT_EQ(k.num_physical_tensors, 5); // A, B, D, bias, scale
 }

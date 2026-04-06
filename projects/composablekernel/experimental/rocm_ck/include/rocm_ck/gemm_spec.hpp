@@ -23,6 +23,9 @@
 #include <rocm_ck/arch_properties.hpp>
 #include <rocm_ck/types.hpp>
 
+#include <optional>
+#include <utility>
+
 namespace rocm_ck {
 
 // ============================================================================
@@ -205,8 +208,11 @@ struct GemmAlgorithm
 ///   [0] = lhs (GEMM left operand — name is user-chosen, e.g., "A", "Q")
 ///   [1] = rhs (GEMM right operand — name is user-chosen, e.g., "B", "K")
 ///   [2] = output (final output — name varies by epilogue chain)
-///   [3] = D0 (optional — first auxiliary tensor, e.g., "bias")
-///   [4] = D1 (optional — second auxiliary tensor)
+///   [3] = D0 (optional — first auxiliary epilogue tensor, e.g., "bias")
+///   [4] = D1 (optional — second auxiliary epilogue tensor)
+///
+/// "D tensor" is CK Tile's convention for auxiliary tensors that participate
+/// in the epilogue (bias, scale, residual) but are not GEMM operands.
 struct GemmSpec
 {
     // Physical tensor table — the kernel's view of Args::tensors[]
@@ -246,8 +252,12 @@ struct GemmSpec
     // Quantization group size (0 = not quantized, >0 = elements per group along K)
     int group_size;
 
-    // Number of auxiliary D tensors (bias, etc.) — excludes scale tensor
-    int num_d_tensors;
+    /// Number of auxiliary D tensors (bias, etc.) — excludes scale tensor.
+    /// Derived from the physical tensor table: total slots minus lhs/rhs/output minus scale.
+    constexpr int numDTensors() const
+    {
+        return num_physical_tensors - 3 - (group_size > 0 ? 1 : 0);
+    }
 
     /// Check if the epilogue chain contains a specific op.
     constexpr bool hasEpilogueOp(EpilogueOp op) const
@@ -304,6 +314,33 @@ consteval DataType dtype(GemmSpec k, std::string_view name) { return tensor(k, n
 
 /// Layout lookup by name. consteval — compile-time only.
 consteval Layout layout(GemmSpec k, std::string_view name) { return tensor(k, name).layout; }
+
+// ============================================================================
+// Epilogue op helpers
+// ============================================================================
+
+/// Parse a unary epilogue activation from an Op. Returns {EpilogueOp, output_name}
+/// or nullopt if the op is not a unary activation.
+/// Adding a new activation requires one line here + one EpilogueOp enum value.
+consteval std::optional<std::pair<EpilogueOp, std::string_view>> parseUnaryEpilogueOp(const Op& op)
+{
+    return visitOp(
+        op, [](const auto& typed_op) -> std::optional<std::pair<EpilogueOp, std::string_view>> {
+            using T = std::remove_cvref_t<decltype(typed_op)>;
+            if constexpr(std::is_same_v<T, ReluOp>)
+                return {{EpilogueOp::Relu, typed_op.out}};
+            else if constexpr(std::is_same_v<T, FastGeluOp>)
+                return {{EpilogueOp::FastGelu, typed_op.out}};
+            else if constexpr(std::is_same_v<T, GeluOp>)
+                return {{EpilogueOp::Gelu, typed_op.out}};
+            else if constexpr(std::is_same_v<T, SiluOp>)
+                return {{EpilogueOp::Silu, typed_op.out}};
+            else if constexpr(std::is_same_v<T, SigmoidOp>)
+                return {{EpilogueOp::Sigmoid, typed_op.out}};
+            else
+                return std::nullopt;
+        });
+}
 
 // ============================================================================
 // makeSpec: operator-centric Signature -> GemmSpec
@@ -414,34 +451,10 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, TargetSet targets
     // Unary ops: activations applied after binary combine
     if(next_op < kMaxOps)
     {
-        if(std::holds_alternative<ReluOp>(sig.ops[next_op]))
+        if(auto epi = parseUnaryEpilogueOp(sig.ops[next_op]); epi.has_value())
         {
-            final_output           = std::get<ReluOp>(sig.ops[next_op]).out;
-            epi_ops[num_epi_ops++] = EpilogueOp::Relu;
-            next_op++;
-        }
-        else if(std::holds_alternative<FastGeluOp>(sig.ops[next_op]))
-        {
-            final_output           = std::get<FastGeluOp>(sig.ops[next_op]).out;
-            epi_ops[num_epi_ops++] = EpilogueOp::FastGelu;
-            next_op++;
-        }
-        else if(std::holds_alternative<GeluOp>(sig.ops[next_op]))
-        {
-            final_output           = std::get<GeluOp>(sig.ops[next_op]).out;
-            epi_ops[num_epi_ops++] = EpilogueOp::Gelu;
-            next_op++;
-        }
-        else if(std::holds_alternative<SiluOp>(sig.ops[next_op]))
-        {
-            final_output           = std::get<SiluOp>(sig.ops[next_op]).out;
-            epi_ops[num_epi_ops++] = EpilogueOp::Silu;
-            next_op++;
-        }
-        else if(std::holds_alternative<SigmoidOp>(sig.ops[next_op]))
-        {
-            final_output           = std::get<SigmoidOp>(sig.ops[next_op]).out;
-            epi_ops[num_epi_ops++] = EpilogueOp::Sigmoid;
+            epi_ops[num_epi_ops++] = epi->first;
+            final_output           = epi->second;
             next_op++;
         }
     }
@@ -548,8 +561,7 @@ consteval GemmSpec makeSpec(Signature sig, GemmAlgorithm algo, TargetSet targets
             algo.epilogue,
             algo.pad_m,
             algo.pad_n,
-            group_size,
-            num_d_tensors};
+            group_size};
 }
 
 } // namespace rocm_ck

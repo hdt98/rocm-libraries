@@ -15,6 +15,12 @@
 //   - Tile partitioning: Linear (standard), StreamK (work-balanced)
 //   - Batched GEMM: batch dimension via blockIdx.y (runtime, in Args)
 //
+// Terminology mapping: rocm_ck → CK Tile
+//   block_waves    → BlockWarps (sequence<MWarp, NWarp, KWarp>)
+//   wave_tile      → WarpTile (sequence<MPerXdl, NPerXdl, KPerXdl>)
+//   block_tile     → BlockTile (sequence<MPerBlock, NPerBlock, KPerBlock>)
+//   workgroup_size → BlockSize (product of BlockWarps × wavefront_size)
+//
 // Compilation boundary:
 //   _spec.hpp — schema types + consteval factory (both passes)
 //   _dev.hpp (this) — CK Tile bridge + __device__ code (device pass only, #error on host)
@@ -56,6 +62,23 @@ struct CkLayoutMap<Layout::Col>
 {
     using type = ck_tile::tensor_layout::gemm::ColumnMajor;
 };
+
+// ============================================================================
+// unpackDTensor: extract a D tensor's pointer and stride from Args
+// ============================================================================
+
+/// Unpack a D tensor from Args: typed pointer (with batch offset) and leading-dim stride.
+/// Centralizes the per-D-tensor boilerplate that was previously duplicated per NumDTensors branch.
+template <PhysicalTensor PT>
+__device__ auto unpackDTensor(const Args& args, index_t i_batch) -> std::pair<const void*, index_t>
+{
+    using DType        = typename CkTypeMap<PT.dtype>::type;
+    const TensorArg& t = args.tensors[PT.args_slot];
+    index_t stride     = static_cast<index_t>(leadingDimStride(PT.layout, t.strides));
+    const void* ptr    = static_cast<const DType*>(t.ptr) +
+                      i_batch * static_cast<index_t>(args.batch_strides[PT.args_slot]);
+    return {ptr, stride};
+}
 
 // ============================================================================
 // ComposedCDEOp: epilogue op chain → single CK Tile elementwise functor
@@ -122,21 +145,19 @@ struct EpilogueTypes
                                   ComposedCDEOp<S>>;
 
     // D tensor count: auxiliary tensors (bias, etc.) — excludes scale tensor
-    static constexpr int NumDTensors = S.num_d_tensors;
+    static constexpr int NumDTensors = S.numDTensors();
 
-    // D0/D1 types from physical tensor table (indices 3 and 4).
+    // D0/D1 types from physical tensor table via named accessors.
     // Default to float/Row when no D tensors (unused but satisfies template resolution).
-    using D0Type   = std::conditional_t<(NumDTensors >= 1),
-                                        typename CkTypeMap<S.physical_tensors[3].dtype>::type,
-                                        float>;
-    using D1Type   = std::conditional_t<(NumDTensors >= 2),
-                                        typename CkTypeMap<S.physical_tensors[4].dtype>::type,
-                                        float>;
+    using D0Type =
+        std::conditional_t<(NumDTensors >= 1), typename CkTypeMap<S.d0().dtype>::type, float>;
+    using D1Type =
+        std::conditional_t<(NumDTensors >= 2), typename CkTypeMap<S.d1().dtype>::type, float>;
     using D0Layout = std::conditional_t<(NumDTensors >= 1),
-                                        typename CkLayoutMap<S.physical_tensors[3].layout>::type,
+                                        typename CkLayoutMap<S.d0().layout>::type,
                                         typename CkLayoutMap<Layout::Row>::type>;
     using D1Layout = std::conditional_t<(NumDTensors >= 2),
-                                        typename CkLayoutMap<S.physical_tensors[4].layout>::type,
+                                        typename CkLayoutMap<S.d1().layout>::type,
                                         typename CkLayoutMap<Layout::Row>::type>;
 
     using DsDataType = std::conditional_t<NumDTensors == 0,
@@ -159,9 +180,8 @@ struct EpilogueTypes
 /// Device-side GEMM bridge: Args → CK Tile template stack → ck_tile::GemmKernel.
 ///
 /// Tensor slot mapping comes from the spec's role-based accessors:
-///   lhs() = left operand,  rhs() = right operand,  output() = final output,  [3] = D0 (optional)
+///   lhs() = left operand,  rhs() = right operand,  output() = final output
 ///   lengths[0] = first dim, lengths[1] = second dim
-///   strides follow dimension order (RowMajor: strides[0]=ld, ColMajor: strides[1]=ld)
 ///
 /// Supports batched GEMM (batch dimension via blockIdx.y when batch_count > 0),
 /// multiple pipeline strategies (V1, V3, V4, Memory, Preshuffle), scheduling
@@ -180,7 +200,7 @@ __device__ void run(Args args)
                   "only Linear tile partitioning supported in run<S>(); "
                   "Stream-K requires a separate entry point");
 
-    // Physical tensor table: role-based access (compile-time constants)
+    // --- Physical tensor table: role-based access (compile-time constants) ---
     static constexpr auto PT_LHS = S.lhs();    // GEMM left operand
     static constexpr auto PT_RHS = S.rhs();    // GEMM right operand
     static constexpr auto PT_OUT = S.output(); // final output
@@ -196,22 +216,17 @@ __device__ void run(Args args)
     using CLayout = typename CkLayoutMap<PT_OUT.layout>::type;
 
     // --- Unpack generic Args — compiler generates s_load at fixed offsets ---
-    const TensorArg& t_a = args.tensors[PT_LHS.args_slot];
-    const TensorArg& t_b = args.tensors[PT_RHS.args_slot];
-    const TensorArg& t_c = args.tensors[PT_OUT.args_slot];
+    const TensorArg& t_lhs = args.tensors[PT_LHS.args_slot];
+    const TensorArg& t_rhs = args.tensors[PT_RHS.args_slot];
+    const TensorArg& t_out = args.tensors[PT_OUT.args_slot];
 
-    index_t M     = t_a.lengths[0];
-    index_t N     = t_b.lengths[1];
-    index_t K_dim = t_a.lengths[1];
+    index_t M     = t_lhs.lengths[0];
+    index_t N     = t_rhs.lengths[1];
+    index_t K_dim = t_lhs.lengths[1];
 
-    // Leading dimension stride depends on layout:
-    //   RowMajor → strides[0],  ColMajor → strides[1]
-    index_t stride_A =
-        static_cast<index_t>(PT_LHS.layout == Layout::Row ? t_a.strides[0] : t_a.strides[1]);
-    index_t stride_B =
-        static_cast<index_t>(PT_RHS.layout == Layout::Row ? t_b.strides[0] : t_b.strides[1]);
-    index_t stride_C =
-        static_cast<index_t>(PT_OUT.layout == Layout::Row ? t_c.strides[0] : t_c.strides[1]);
+    index_t stride_lhs = static_cast<index_t>(leadingDimStride(PT_LHS.layout, t_lhs.strides));
+    index_t stride_rhs = static_cast<index_t>(leadingDimStride(PT_RHS.layout, t_rhs.strides));
+    index_t stride_out = static_cast<index_t>(leadingDimStride(PT_OUT.layout, t_out.strides));
 
     // --- Batch offset (runtime) ---
     // When batch_count > 0, blockIdx.y indexes into the batch dimension.
@@ -219,18 +234,15 @@ __device__ void run(Args args)
     // When batch_count == 0 (unbatched), i_batch is 0 and offsets are zero.
     const index_t i_batch = args.batch_count > 0 ? static_cast<index_t>(blockIdx.y) : 0;
 
-    const AType* a_ptr = static_cast<const AType*>(t_a.ptr) +
-                         i_batch * static_cast<index_t>(args.batch_strides[PT_LHS.args_slot]);
-    const BType* b_ptr = static_cast<const BType*>(t_b.ptr) +
-                         i_batch * static_cast<index_t>(args.batch_strides[PT_RHS.args_slot]);
-    OType* c_typed = static_cast<OType*>(const_cast<void*>(t_c.ptr)) +
-                     i_batch * static_cast<index_t>(args.batch_strides[PT_OUT.args_slot]);
-    void* c_ptr = c_typed;
+    const AType* lhs_ptr = static_cast<const AType*>(t_lhs.ptr) +
+                           i_batch * static_cast<index_t>(args.batch_strides[PT_LHS.args_slot]);
+    const BType* rhs_ptr = static_cast<const BType*>(t_rhs.ptr) +
+                           i_batch * static_cast<index_t>(args.batch_strides[PT_RHS.args_slot]);
+    OType* out_typed = static_cast<OType*>(const_cast<void*>(t_out.ptr)) +
+                       i_batch * static_cast<index_t>(args.batch_strides[PT_OUT.args_slot]);
+    void* out_ptr = out_typed;
 
-    // --- Step 1: Tile geometry (from GemmSpec, validated by makeSpec) ---
-    // --- CK Tile type mapping ---
-    // rocm_ck "block_waves" -> CK Tile "BlockWarps" / "MWave"
-    // rocm_ck "wave_tile"   -> CK Tile "WarpTile" / "MPerXdl"
+    // --- Tile geometry (from GemmSpec, validated by makeSpec) ---
     using GemmShape =
         ck_tile::TileGemmShape<ck_tile::sequence<S.block_tile.m, S.block_tile.n, S.block_tile.k>,
                                ck_tile::sequence<S.block_waves.m, S.block_waves.n, S.block_waves.k>,
@@ -239,15 +251,15 @@ __device__ void run(Args args)
     // TransposeC: true when output is column-major (matches CK Tile convention)
     static constexpr bool TransposeC = (PT_OUT.layout == Layout::Col);
 
-    // --- Step 5: Partitioner (1D blockIdx → 2D tile coordinates) ---
-    using TilePartitioner = ck_tile::GemmTile1DPartitioner<GemmShape>;
+    // --- Partitioner (1D blockIdx → 2D tile coordinates) ---
+    using Partitioner = ck_tile::GemmTile1DPartitioner<GemmShape>;
 
     // =========================================================================
     // BQuant path: block-quantized GEMM (INT4 weight with per-group scales)
     // =========================================================================
     if constexpr(S.group_size > 0)
     {
-        static_assert(S.num_d_tensors == 0,
+        static_assert(S.numDTensors() == 0,
                       "BQuant GEMM with epilogue D tensors not yet supported");
 
         // Scale tensor from physical tensor table
@@ -291,8 +303,8 @@ __device__ void run(Args args)
                                              ck_tile::tuple<>,
                                              CLayout,
                                              ck_tile::element_wise::PassThrough,
-                                             TilePartitioner::MPerBlock,
-                                             TilePartitioner::NPerBlock,
+                                             Partitioner::MPerBlock,
+                                             Partitioner::NPerBlock,
                                              S.block_waves.m,
                                              S.block_waves.n,
                                              S.wave_tile.m,
@@ -300,34 +312,34 @@ __device__ void run(Args args)
                                              S.wave_tile.k,
                                              TransposeC>>;
 
-        using BQuantKernel = ck_tile::QuantGemmKernel<TilePartitioner,
+        using BQuantKernel = ck_tile::QuantGemmKernel<Partitioner,
                                                       BQuantPipeline,
                                                       BQuantEpilogue,
                                                       ck_tile::QuantType::BQuantGrouped>;
 
         // Extract scale tensor
-        const TensorArg& t_bq = args.tensors[PT_SCALE.args_slot];
-        const BQType* bq_ptr  = static_cast<const BQType*>(t_bq.ptr);
-        index_t stride_BQ     = static_cast<index_t>(t_bq.strides[0]); // Row-major scale tensor
-        index_t QK_B          = t_bq.lengths[0];                       // K / group_size
+        const TensorArg& t_scale = args.tensors[PT_SCALE.args_slot];
+        const BQType* scale_ptr  = static_cast<const BQType*>(t_scale.ptr);
+        index_t stride_scale = static_cast<index_t>(leadingDimStride(Layout::Row, t_scale.strides));
+        index_t QK_B         = t_scale.lengths[0]; // K / group_size
 
         const ck_tile::QuantGemmKernelArgs kargs{
-            a_ptr,     // a_ptr
-            b_ptr,     // b_ptr
-            nullptr,   // aq_ptr (unused for B-only quantization)
-            bq_ptr,    // bq_ptr (scale tensor)
-            c_ptr,     // c_ptr
-            M,         // M
-            N,         // N
-            K_dim,     // K
-            0,         // QK_A (unused)
-            QK_B,      // QK_B = K / group_size
-            stride_A,  // stride_A
-            stride_B,  // stride_B
-            stride_C,  // stride_C
-            0,         // stride_AQ (unused)
-            stride_BQ, // stride_BQ
-            S.k_batch  // k_batch
+            lhs_ptr,      // a_ptr
+            rhs_ptr,      // b_ptr
+            nullptr,      // aq_ptr (unused for B-only quantization)
+            scale_ptr,    // bq_ptr (scale tensor)
+            out_ptr,      // c_ptr
+            M,            // M
+            N,            // N
+            K_dim,        // K
+            0,            // QK_A (unused)
+            QK_B,         // QK_B = K / group_size
+            stride_lhs,   // stride_A
+            stride_rhs,   // stride_B
+            stride_out,   // stride_C
+            0,            // stride_AQ (unused)
+            stride_scale, // stride_BQ
+            S.k_batch     // k_batch
         };
         BQuantKernel{}(kargs);
     }
@@ -337,8 +349,7 @@ __device__ void run(Args args)
     else
     {
 
-        // --- Step 2-4: Traits, problem, pipeline (selected by S.pipeline + S.pipeline_scheduler)
-        // ---
+        // --- Pipeline selection (S.pipeline + S.pipeline_scheduler) ---
 
         // Map rocm_ck::PipelineScheduler → ck_tile::GemmPipelineScheduler
         static constexpr auto CkScheduler = S.pipeline_scheduler == PipelineScheduler::Interwave
@@ -396,23 +407,25 @@ __device__ void run(Args args)
                                                                                    BLayout,
                                                                                    CLayout>>>;
 
+        // Pipeline dispatch (one line per variant, reads as a flat table):
         using GemmPipeline = std::conditional_t<
             S.pipeline == Pipeline::V1,
             V1Pipeline,
-            std::conditional_t<S.pipeline == Pipeline::V3,
-                               V3Pipeline,
-                               std::conditional_t<S.pipeline == Pipeline::V4,
-                                                  V4Pipeline,
-                                                  std::conditional_t<S.pipeline == Pipeline::Memory,
-                                                                     MemoryPipeline,
-                                                                     PreshufflePipeline>>>>;
+            std::conditional_t<
+                S.pipeline == Pipeline::V3,
+                V3Pipeline,
+                std::conditional_t<S.pipeline == Pipeline::V4,
+                                   V4Pipeline,
+                                   std::conditional_t<S.pipeline == Pipeline::Memory,
+                                                      MemoryPipeline,
+                                                      /* Preshuffle */ PreshufflePipeline>>>>;
 
         // --- Epilogue types from kernel descriptor ---
         using EpiOp      = typename EpilogueTypes<S>::Op;
         using DsDataType = typename EpilogueTypes<S>::DsDataType;
         using DsLayout   = typename EpilogueTypes<S>::DsLayout;
 
-        // --- Step 6: Epilogue ---
+        // --- Epilogue strategy ---
         using CShuffleEpi =
             ck_tile::CShuffleEpilogue<ck_tile::CShuffleEpilogueProblem<AType,
                                                                        BType,
@@ -422,8 +435,8 @@ __device__ void run(Args args)
                                                                        DsLayout,
                                                                        CLayout,
                                                                        EpiOp,
-                                                                       TilePartitioner::MPerBlock,
-                                                                       TilePartitioner::NPerBlock,
+                                                                       Partitioner::MPerBlock,
+                                                                       Partitioner::NPerBlock,
                                                                        S.block_waves.m, // MWave
                                                                        S.block_waves.n, // NWave
                                                                        S.wave_tile.m,   // MPerXdl
@@ -442,8 +455,8 @@ __device__ void run(Args args)
                                                   DsLayout,
                                                   CLayout,
                                                   EpiOp,
-                                                  TilePartitioner::MPerBlock,
-                                                  TilePartitioner::NPerBlock,
+                                                  Partitioner::MPerBlock,
+                                                  Partitioner::NPerBlock,
                                                   S.pad_m,
                                                   S.pad_n,
                                                   S.wave_tile.m,
@@ -454,90 +467,63 @@ __device__ void run(Args args)
         using GemmEpilogue =
             std::conditional_t<S.epilogue == EpilogueStrategy::Direct2D, Direct2DEpi, CShuffleEpi>;
 
-        // --- Step 7: Kernel (ties everything together) ---
-        using CkKernel   = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
+        // --- Kernel assembly + launch ---
+        using CkKernel   = ck_tile::GemmKernel<Partitioner, GemmPipeline, GemmEpilogue>;
         using KernelArgs = typename CkKernel::UniversalGemmKernel::KernelArgs;
 
         // Convert generic Args to CK Tile's internal args.
-        // Branch on D tensor count to construct the right KernelArgs initializer.
+        // Branch on D tensor count for the right tuple-sized initializer.
         static constexpr int NumDTensors = EpilogueTypes<S>::NumDTensors;
 
         if constexpr(NumDTensors == 0)
         {
-            const KernelArgs kargs{{a_ptr},    // as_ptr
-                                   {b_ptr},    // bs_ptr
-                                   {},         // ds_ptr  (empty — no D tensors)
-                                   c_ptr,      // e_ptr
-                                   M,          // M
-                                   N,          // N
-                                   K_dim,      // K
-                                   {stride_A}, // stride_As
-                                   {stride_B}, // stride_Bs
-                                   {},         // stride_Ds (empty)
-                                   stride_C,   // stride_E
-                                   S.k_batch}; // k_batch (split-K factor)
+            const KernelArgs kargs{{lhs_ptr},
+                                   {rhs_ptr},
+                                   {},
+                                   out_ptr,
+                                   M,
+                                   N,
+                                   K_dim,
+                                   {stride_lhs},
+                                   {stride_rhs},
+                                   {},
+                                   stride_out,
+                                   S.k_batch};
             CkKernel{}(kargs);
         }
         else if constexpr(NumDTensors == 1)
         {
-            static constexpr auto PT_D0 = S.physical_tensors[3];
-            const TensorArg& t_d0       = args.tensors[PT_D0.args_slot];
-            index_t stride_D0 = static_cast<index_t>(PT_D0.layout == Layout::Row ? t_d0.strides[0]
-                                                                                 : t_d0.strides[1]);
-
-            // D tensor batch offset — typed pointer arithmetic (0 stride = broadcast)
-            using D0CkType = typename CkTypeMap<PT_D0.dtype>::type;
-            const void* d0_ptr =
-                static_cast<const D0CkType*>(t_d0.ptr) +
-                i_batch * static_cast<index_t>(args.batch_strides[PT_D0.args_slot]);
-
-            const KernelArgs kargs{{a_ptr},     // as_ptr
-                                   {b_ptr},     // bs_ptr
-                                   {d0_ptr},    // ds_ptr (1 D tensor)
-                                   c_ptr,       // e_ptr
-                                   M,           // M
-                                   N,           // N
-                                   K_dim,       // K
-                                   {stride_A},  // stride_As
-                                   {stride_B},  // stride_Bs
-                                   {stride_D0}, // stride_Ds (1 stride)
-                                   stride_C,    // stride_E
-                                   S.k_batch};  // k_batch (split-K factor)
+            auto [d0_ptr, stride_d0] = unpackDTensor<S.d0()>(args, i_batch);
+            const KernelArgs kargs{{lhs_ptr},
+                                   {rhs_ptr},
+                                   {d0_ptr},
+                                   out_ptr,
+                                   M,
+                                   N,
+                                   K_dim,
+                                   {stride_lhs},
+                                   {stride_rhs},
+                                   {stride_d0},
+                                   stride_out,
+                                   S.k_batch};
             CkKernel{}(kargs);
         }
         else if constexpr(NumDTensors == 2)
         {
-            static constexpr auto PT_D0 = S.physical_tensors[3];
-            static constexpr auto PT_D1 = S.physical_tensors[4];
-            const TensorArg& t_d0       = args.tensors[PT_D0.args_slot];
-            const TensorArg& t_d1       = args.tensors[PT_D1.args_slot];
-            index_t stride_D0 = static_cast<index_t>(PT_D0.layout == Layout::Row ? t_d0.strides[0]
-                                                                                 : t_d0.strides[1]);
-            index_t stride_D1 = static_cast<index_t>(PT_D1.layout == Layout::Row ? t_d1.strides[0]
-                                                                                 : t_d1.strides[1]);
-
-            // D tensor batch offsets — typed pointer arithmetic (0 stride = broadcast)
-            using D0CkType = typename CkTypeMap<PT_D0.dtype>::type;
-            using D1CkType = typename CkTypeMap<PT_D1.dtype>::type;
-            const void* d0_ptr =
-                static_cast<const D0CkType*>(t_d0.ptr) +
-                i_batch * static_cast<index_t>(args.batch_strides[PT_D0.args_slot]);
-            const void* d1_ptr =
-                static_cast<const D1CkType*>(t_d1.ptr) +
-                i_batch * static_cast<index_t>(args.batch_strides[PT_D1.args_slot]);
-
-            const KernelArgs kargs{{a_ptr},                // as_ptr
-                                   {b_ptr},                // bs_ptr
-                                   {d0_ptr, d1_ptr},       // ds_ptr (2 D tensors)
-                                   c_ptr,                  // e_ptr
-                                   M,                      // M
-                                   N,                      // N
-                                   K_dim,                  // K
-                                   {stride_A},             // stride_As
-                                   {stride_B},             // stride_Bs
-                                   {stride_D0, stride_D1}, // stride_Ds (2 strides)
-                                   stride_C,               // stride_E
-                                   S.k_batch};             // k_batch (split-K factor)
+            auto [d0_ptr, stride_d0] = unpackDTensor<S.d0()>(args, i_batch);
+            auto [d1_ptr, stride_d1] = unpackDTensor<S.d1()>(args, i_batch);
+            const KernelArgs kargs{{lhs_ptr},
+                                   {rhs_ptr},
+                                   {d0_ptr, d1_ptr},
+                                   out_ptr,
+                                   M,
+                                   N,
+                                   K_dim,
+                                   {stride_lhs},
+                                   {stride_rhs},
+                                   {stride_d0, stride_d1},
+                                   stride_out,
+                                   S.k_batch};
             CkKernel{}(kargs);
         }
 
