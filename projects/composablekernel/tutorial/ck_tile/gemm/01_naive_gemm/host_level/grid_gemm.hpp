@@ -49,9 +49,9 @@ struct GridGemm
 
         // MakeBlock2TileMap returns a lambda that converts a linear block_id to a 2D tile index.
         // N-first ordering: adjacent block IDs map to adjacent N tiles (same M row).
-        // Rationale: adjacent blocks read the same A rows but different B rows. Since B is
-        // accessed more times (shared across M tiles), keeping adjacent blocks on the same B row
-        // improves L2 cache reuse for B.
+        // Rationale: adjacent blocks in the same M strip reuse the same A rows, while B is read
+        // once per block for different N tiles. Keeping adjacent blocks on the same M row can
+        // therefore improve L2 cache reuse for A.
         const auto block2tile = Policy::template MakeBlock2TileMap<Problem>(num_tile_m, num_tile_n);
 
         const auto id_tile = block2tile(id_block);
