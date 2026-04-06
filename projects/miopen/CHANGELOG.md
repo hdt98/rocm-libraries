@@ -7,6 +7,7 @@ Full documentation for MIOpen is available [here](https://rocm.docs.amd.com/proj
 ### Added
 * Added `MIOPEN_LOG_BUFFER_SIZE` option: when set to non-zero, dumps recent MIOpen logs to file on error.
 ### Removed
+* Removed MLIR compilation backend (`MIOPEN_USE_MLIR`) and all MLIR-based solvers
 * Removed GraphAPI experimental feature and related code
 
 ## MIOpen 3.5.1 for ROCm 7.12.0
