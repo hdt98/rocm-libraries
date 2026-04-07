@@ -9,10 +9,12 @@
 #include <hipdnn_frontend/Graph.hpp>
 #include <hipdnn_frontend/Utilities.hpp>
 #include <hipdnn_frontend/attributes/TensorAttributes.hpp>
+#include <hipdnn_frontend/knob/Knob.hpp>
 #include <hipdnn_frontend/node/Node.hpp>
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceMiopenRmsValidation.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
+#include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
 #include <hipdnn_test_sdk/utilities/VectorLoggingUtils.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/CpuReferenceGraphExecutor.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/GraphTensorBundle.hpp>
@@ -29,6 +31,7 @@ class IntegrationGraphVerificationHarness : public ::testing::TestWithParam<Test
 protected:
     static constexpr float DEFAULT_MIN = -1.0f;
     static constexpr float DEFAULT_MAX = 1.0f;
+    static constexpr unsigned int DEFAULT_SMOKE_TEST_SEED = 42;
 
     void SetUp() override
     {
@@ -65,20 +68,70 @@ protected:
         }
     }
 
-    virtual void runGraphTest(DataType tolerance,
-                              const hipdnn_data_sdk::utilities::TensorLayout& layout
-                              = hipdnn_data_sdk::utilities::TensorLayout::NCHW)
-        = 0;
+protected:
+    /// Execute graph with knob settings (for smoke tests without CPU validation)
+    void executeGraphWithKnobs(hipdnn_frontend::graph::Graph& graph,
+                               std::vector<hipdnn_frontend::KnobSetting> knobSettings)
+    {
+        hipdnn_test_sdk::utilities::GraphTensorBundle gpuBundle;
+
+        auto result = graph.validate();
+        ASSERT_EQ(result.code, hipdnn_frontend::ErrorCode::OK) << result.err_msg;
+
+        result = graph.build_operation_graph(_handle);
+        ASSERT_EQ(result.code, hipdnn_frontend::ErrorCode::OK) << result.err_msg;
+
+        std::vector<int64_t> rankedEngineIds;
+        result = graph.get_ranked_engine_ids(rankedEngineIds);
+        ASSERT_EQ(result.code, hipdnn_frontend::ErrorCode::OK) << result.err_msg;
+        ASSERT_GT(rankedEngineIds.size(), 0) << "No engines available";
+
+        result = graph.create_execution_plan_ext(rankedEngineIds[0], knobSettings);
+        ASSERT_EQ(result.code, hipdnn_frontend::ErrorCode::OK) << result.err_msg;
+
+        result = graph.build_plans();
+        ASSERT_EQ(result.code, hipdnn_frontend::ErrorCode::OK) << result.err_msg;
+
+        // Generate tensor bundle
+        graph.visit([&](const hipdnn_frontend::graph::INode& node) {
+            for(const auto& tensorAttr : node.getNodeOutputTensorAttributes())
+            {
+                tryAddTensorToBundle(tensorAttr, gpuBundle);
+            }
+            for(const auto& tensorAttr : node.getNodeInputTensorAttributes())
+            {
+                tryAddTensorToBundle(tensorAttr, gpuBundle);
+            }
+        });
+
+        // Initialize with zeros
+        for(auto& tensorPair : gpuBundle.tensors)
+        {
+            gpuBundle.randomizeTensor(tensorPair.first, 0.0f, 0.1f, DEFAULT_SMOKE_TEST_SEED);
+        }
+
+        // Execute
+        int64_t workspaceSize;
+        result = graph.get_workspace_size(workspaceSize);
+        ASSERT_EQ(result.code, hipdnn_frontend::ErrorCode::OK) << result.err_msg;
+        ASSERT_GE(workspaceSize, 0);
+        hipdnn_data_sdk::utilities::Workspace workspace(static_cast<size_t>(workspaceSize));
+
+        auto variantPack = gpuBundle.toDeviceVariantPack();
+        result = graph.execute(_handle, variantPack, workspace.get());
+        ASSERT_EQ(result.code, hipdnn_frontend::ErrorCode::OK) << result.err_msg;
+
+        ASSERT_EQ(hipStreamSynchronize(_stream), hipSuccess);
+    }
 
     void verifyGraph(hipdnn_frontend::graph::Graph& graph, unsigned int seed)
     {
         hipdnn_test_sdk::utilities::GraphTensorBundle gpuBundle, cpuBundle;
-        std::vector<int64_t> outputTensorIds;
 
         auto result = graph.build(_handle);
         ASSERT_EQ(result.code, hipdnn_frontend::ErrorCode::OK) << result.err_msg;
 
-        generateBundles(graph, cpuBundle, gpuBundle, outputTensorIds);
+        generateBundles(graph, cpuBundle, gpuBundle);
 
         initializeBundle(graph, gpuBundle, seed);
         initializeBundle(graph, cpuBundle, seed);
@@ -86,11 +139,12 @@ protected:
         ASSERT_NO_FATAL_FAILURE(executeGpuGraph(_handle, graph, gpuBundle));
         executeCpuGraph(graph, cpuBundle);
 
-        ASSERT_GE(outputTensorIds.size(), 1)
+        ASSERT_GE(gpuBundle.outputTensorIds.size(), 1)
             << "At least one output tensor id must be specified for "
                "validation.";
 
-        HIPDNN_PLUGIN_LOG_INFO("Validating {} output tensors", outputTensorIds.size());
+        HIPDNN_PLUGIN_LOG_INFO("Validating " << gpuBundle.outputTensorIds.size()
+                                             << " output tensors");
 
         // Lazily register validators after graph execution since tensor Ids and types may be inferred during graph finalization
         for(const auto& registerValidator : _deferredValidators)
@@ -98,7 +152,7 @@ protected:
             registerValidator();
         }
 
-        for(const auto& tensorId : outputTensorIds)
+        for(const auto& tensorId : gpuBundle.outputTensorIds)
         {
             auto& cpuTensor = cpuBundle.tensors.at(tensorId);
             auto& gpuTensor = gpuBundle.tensors.at(tensorId);
@@ -155,15 +209,16 @@ protected:
 
     virtual void generateBundles(hipdnn_frontend::graph::Graph& graph,
                                  hipdnn_test_sdk::utilities::GraphTensorBundle& cpuBundle,
-                                 hipdnn_test_sdk::utilities::GraphTensorBundle& gpuBundle,
-                                 std::vector<int64_t>& outputTensorIds)
+                                 hipdnn_test_sdk::utilities::GraphTensorBundle& gpuBundle)
     {
         graph.visit([&](const hipdnn_frontend::graph::INode& node) {
             for(const auto& tensorAttr : node.getNodeOutputTensorAttributes())
             {
                 if(tryAddTensorToBundles(tensorAttr, cpuBundle, gpuBundle))
                 {
-                    outputTensorIds.push_back(tensorAttr->get_uid());
+                    auto uid = tensorAttr->get_uid();
+                    cpuBundle.outputTensorIds.insert(uid);
+                    gpuBundle.outputTensorIds.insert(uid);
                 }
             }
             for(const auto& tensorAttr : node.getNodeInputTensorAttributes())
@@ -177,9 +232,14 @@ protected:
                                   hipdnn_test_sdk::utilities::GraphTensorBundle& bundle,
                                   unsigned int seed)
     {
+        bundle.sentinelFillOutputTensors();
+
         for(auto& tensorPair : bundle.tensors)
         {
-            bundle.randomizeTensor(tensorPair.first, DEFAULT_MIN, DEFAULT_MAX, seed);
+            if(!bundle.isOutput(tensorPair.first))
+            {
+                bundle.randomizeTensor(tensorPair.first, DEFAULT_MIN, DEFAULT_MAX, seed);
+            }
         }
     }
 
@@ -213,6 +273,21 @@ private:
         return _tensorIdToNameMap.at(tensorId);
     }
 
+    bool tryAddTensorToBundle(
+        const std::shared_ptr<hipdnn_frontend::graph::TensorAttributes>& tensorAttr,
+        hipdnn_test_sdk::utilities::GraphTensorBundle& bundle)
+    {
+        int64_t tensorId = tensorAttr->get_uid();
+
+        if(tensorAttr->get_is_virtual() || bundle.tensors.find(tensorId) != bundle.tensors.end())
+        {
+            return false;
+        }
+
+        bundle.tensors.insert({tensorId, createTensorFromAttribute(*tensorAttr)});
+        return true;
+    }
+
     bool tryAddTensorToBundles(
         const std::shared_ptr<hipdnn_frontend::graph::TensorAttributes>& tensorAttr,
         hipdnn_test_sdk::utilities::GraphTensorBundle& cpuBundle,
@@ -226,8 +301,10 @@ private:
             return false;
         }
 
-        cpuBundle.tensors.insert({tensorId, createTensorFromAttribute(*tensorAttr)});
-        gpuBundle.tensors.insert({tensorId, createTensorFromAttribute(*tensorAttr)});
+        cpuBundle.tensors.insert(
+            {tensorId, hipdnn_frontend::graph::createTensorFromAttribute(*tensorAttr)});
+        gpuBundle.tensors.insert(
+            {tensorId, hipdnn_frontend::graph::createTensorFromAttribute(*tensorAttr)});
         _tensorIdToNameMap.insert({tensorId, tensorAttr->get_name()});
 
         return true;
@@ -244,4 +321,4 @@ private:
 
 // NOLINTEND (portability-template-virtual-member-function)
 
-} // namespace hipdnn_test_sdk::utilities
+} // namespace miopen_plugin::test_utilities

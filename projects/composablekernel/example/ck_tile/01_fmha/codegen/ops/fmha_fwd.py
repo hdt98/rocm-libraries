@@ -38,6 +38,8 @@ DTYPE_BITS = {
     "fp8bf16": 8,
     "fp8fp32": 8,
     "bf8": 8,
+    "mxfp8": 8,
+    "mxfp4": 4,
 }
 
 K0_MAX_SUBMAX_MAP = {
@@ -204,22 +206,14 @@ float {F_func_name}([[maybe_unused]] fmha_fwd_traits t, [[maybe_unused]] fmha_fw
 """
 FMHA_FWD_API_FOOTER_TEMPLATE = """
 float fmha_fwd(fmha_fwd_traits traits, fmha_fwd_args args, const ck_tile::stream_config& config) {{
-    const std::string device_name = ck_tile::get_device_name();
-
-    const bool is_swa = (traits.mask_type != mask_enum::no_mask) and
-                        ((0 < args.window_size_left) or (0 < args.window_size_right));
-    const bool can_dispatch_v3 =
-        (device_name.compare(0, 6, "gfx950") == 0) and
-        (traits.data_type.compare("fp16") == 0 or traits.data_type.compare("bf16") == 0) and
-        traits.is_v_rowmajor and (traits.bias_type == bias_enum::no_bias) and
-        (not traits.has_lse) and (not traits.has_dropout) and
-        (traits.qscale_type == quant_scale_enum::no_scale) and (not is_swa) and
-        (args.nhead_q % args.nhead_k == 0) and (args.hdim_q == 128) and (args.hdim_v == 128);
-    if ({F_is_v3_enabled} and can_dispatch_v3) {{
-        return fmha_fwd_v3(traits, args, config);
-    }} else {{
-        return fmha_fwd_v2(traits, args, config);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunreachable-code"
+    if ({F_is_v3_enabled}) {{
+        float r = fmha_fwd_v3(traits, args, config);
+        if (r >= 0) return r;
     }}
+#pragma clang diagnostic pop
+    return fmha_fwd_v2(traits, args, config);
 }}
 """
 
@@ -806,7 +800,7 @@ class CompatibilityRuleFactory:
                     kernel_ctx.pipeline.F_bias != "no"
                     or kernel_ctx.pipeline.F_dropout == "t"
                 ):
-                    False
+                    return False
             return True
 
         def check_feature(
@@ -836,7 +830,8 @@ class CompatibilityRuleFactoryGfx9(CompatibilityRuleFactory):
         def check_hdim_tile(
             problem_ctx: ProblemContext, kernel_ctx: KernelContext
         ) -> bool:
-            if problem_ctx.dtype != "fp32":
+            # FIX: too confusing that it has to know about mx types
+            if problem_ctx.dtype not in ("fp32", "mxfp8", "mxfp4"):
                 # TODO: update if >=gfx11 archs get qr_async and qr_async_trload support
                 if kernel_ctx.pipeline.tag in cls._AVAILABLE_PIPELINES and (
                     (
@@ -966,8 +961,6 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
             return {
                 (128, 128) : [FmhaFwdTileSize(128, 128,  32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  32, 32, 32,  32, 32, 32,  -1)],
             }  # fmt: skip
-        else:
-            raise ValueError(f"unsupported dtype={dtype}")
 
     # TODO: we don't support tuning yet, so pick up one value for vlayout/pipeline/pad
     #       support this in future
@@ -1035,9 +1028,6 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                 else:
                     pipelines.append(FmhaFwdPipeline("qr_async", "row", "t", "f", "t", "t", logits, bias, "f", "f", qscale, mask, "f", "f", sink))  # fmt: skip
                     pipelines.append(FmhaFwdPipeline("qr_async", "row", "t", "t", "t", "t", logits, bias, "f", "f", qscale, mask, "f", "f", sink))  # fmt: skip
-        elif dtype in ["fp8", "fp8fp16", "bf8"]:
-            # TODO
-            pass
         return pipelines
 
 
@@ -1046,14 +1036,42 @@ class KernelComponentFactoryGfx950(
 ):
     arch = ArchTrait("gfx950")
 
+    _DT_MXFP8 = ("mxfp8",)
+    _DT_MXFP4 = ("mxfp4",)
+
+    @classmethod
+    def supported_dtypes(cls) -> Tuple[str]:
+        return (
+            KernelComponentFactoryGfx9.supported_dtypes()
+            + cls._DT_MXFP8
+            + cls._DT_MXFP4
+        )
+
     @classmethod
     def get_hdim_tile_size_dict(cls, dtype: str) -> Optional[dict]:
         result = KernelComponentFactoryGfx9.get_hdim_tile_size_dict(dtype)
         if dtype in cls._DT_FP16_BF16:
-            # add tile for qr_async_trload_v3
+            # # add tile for qr_async_trload_v3 (bf16/fp16 V3 not ready)
+            # if (128, 128) in result.keys():
+            #     result[(128, 128)].append(
+            #         FmhaFwdTileSize(256, 32, 128, 128, 32, 128,  8, 1, 1,  8, 1, 1,  32, 32, 16,  32, 32, 16,  -1))  # fmt: skip
+            pass
+        elif dtype in cls._DT_MXFP8:
+            return {
+                #                             bm0, bn0, bk0, bn1, bk1,
+                (128, 128) : [FmhaFwdTileSize(128, 128,  64, 128,  64, 128,  4, 1, 1,  4, 1, 1,  32, 32,  64,  32, 32,  64,  -1)],
+                (256, 256) : [FmhaFwdTileSize(128, 128, 128, 256, 128, 256,  4, 1, 1,  4, 1, 1,  16, 16, 128,  16, 16, 128,  -1)],
+            }  # fmt: skip
+        elif dtype in cls._DT_MXFP4:
+            return {
+                #                             bm0, bn0, bk0, bn1, bk1,
+                (128, 128) : [FmhaFwdTileSize(128, 128,  64, 128,  64, 128,  4, 1, 1,  4, 1, 1,  32, 32,  64,  32, 32,  64,  -1)],
+                (256, 256) : [FmhaFwdTileSize(128, 128, 128, 256, 128, 256,  4, 1, 1,  4, 1, 1,  16, 16, 128,  16, 16, 128,  -1)],
+            }  # fmt: skip
+        elif dtype in cls._DT_FP8BF16:
             if (128, 128) in result.keys():
                 result[(128, 128)].append(
-                    FmhaFwdTileSize(256, 32, 128, 128, 32, 128,  8, 1, 1,  8, 1, 1,  32, 32, 16,  32, 32, 16,  -1))  # fmt: skip
+                    FmhaFwdTileSize(256, 64, 128, 128, 64, 128,  8, 1, 1,  8, 1, 1,  32, 32, 32,  32, 32, 32,  -1))  # fmt: skip
         return result
 
     @classmethod
@@ -1084,14 +1102,97 @@ class KernelComponentFactoryGfx950(
                     pipelines.append(FmhaFwdPipeline("qr_async_trload", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "t", sink))  # fmt: skip
                     pipelines.append(FmhaFwdPipeline("qr_async_trload", "row", "f", "f", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "t", sink))  # fmt: skip
 
-            # qr_async_trload_v3 only supports hdim=hdim_v=128 for now
-            if (hdim, hdim_v) == (128, 128):
-                # qr_async_trload_v3 only supports (generic) causal mask
-                for logits, mask in itertools.product(["t", "f"], ["no", "causal"]):
-                    pipelines.append(FmhaFwdPipeline("qr_async_trload_v3", "row", "t", "t", "f", "f",
-                        F_logits=logits, F_bias="no", F_lse="f", F_dropout="f", F_qscale=qscale, F_mask=mask, F_skip="f", F_trload="t", F_sink="f"))  # fmt: skip
+            # # qr_async_trload_v3 bf16/fp16 not ready
+            # if (hdim, hdim_v) == (128, 128):
+            #     for logits, mask in itertools.product(["t", "f"], ["no", "causal"]):
+            #         pipelines.append(FmhaFwdPipeline("qr_async_trload_v3", "row", "t", "t", "f", "f",
+            #             F_logits=logits, F_bias="no", F_lse="f", F_dropout="f", F_qscale=qscale, F_mask=mask, F_skip="f", F_trload="t", F_sink="f"))  # fmt: skip
+        elif dtype in cls._DT_FP8BF16:
+            # qr_async_trload_v3 only supports (generic) causal mask
+            for logits, qscale, mask in itertools.product(
+                ["t", "f"],
+                ["no", "pertensor"],
+                ["no", "causal"],
+            ):
+                pipelines.append(FmhaFwdPipeline("qr_async_trload_v3", "row", "t", "t", "f", "f", F_logits=logits, F_bias="no", F_lse="f", F_dropout="f", F_qscale=qscale, F_mask=mask, F_skip="f", F_trload="t", F_sink="f"))  # fmt: skip
 
+        elif dtype in cls._DT_MXFP8 or dtype in cls._DT_MXFP4:
+            # no need dropout kernels
+            lse = "t"
+            dropout = "f"
+            for logits, qscale, mask, bias, sink in itertools.product(
+                ["f"],
+                ["mx"],
+                get_mask_map(mask_impl).keys(),
+                ["no"],
+                ["f", "t"],
+            ):
+                pipelines.append(FmhaFwdPipeline("qr", "col", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, "f", "f", sink))  # fmt: skip
+                pipelines.append(FmhaFwdPipeline("qr", "col", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, "f", "f", sink))  # fmt: skip
         return pipelines
+
+
+class KernelComponentFactoryGfx11(CompatibilityRuleFactory):
+    arch = ArchTrait(
+        "gfx11",
+        preprocessor_check="defined(__gfx11__) && !defined(__gfx115__)",
+    )
+
+    _DT_FP16_BF16 = ("fp16", "bf16")
+
+    @classmethod
+    def supported_dtypes(cls) -> Tuple[str]:
+        return cls._DT_FP16_BF16
+
+    @classmethod
+    def get_hdim_tile_size_dict(cls, dtype: str) -> Optional[dict]:
+        if dtype in cls._DT_FP16_BF16:
+            return {
+                #                             bm0, bn0, bk0, bn1, bk1,
+                ( 32,  32) : [FmhaFwdTileSize( 64,  64,  16,  32,  32,   32,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
+                ( 64,  64) : [FmhaFwdTileSize( 64,  64,  32,  64,  32,   64,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, CppConstraint("a.max_seqlen_q < 4096")),
+                              FmhaFwdTileSize(128,  64,  32,  64,  32,   64,  8, 1, 1,  8, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
+                (128, 128) : [FmhaFwdTileSize( 64,  64,  32, 128,  32,  128,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, CppConstraint("a.max_seqlen_q < 4096")),
+                              FmhaFwdTileSize(128,  64,  32, 128,  32,  128,  8, 1, 1,  8, 1, 1,  16, 16, 16,  16, 16, 16,   6)],
+                (192, 128) : [FmhaFwdTileSize( 64,  64,  32, 128,  32,  256,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
+                (256, 256) : [FmhaFwdTileSize(128,  64,  32, 256,  32,  256,  8, 1, 1,  8, 1, 1,  16, 16, 16,  16, 16, 16,   6)]
+            }  # fmt: skip
+        else:
+            raise ValueError(f"unsupported dtype={dtype}")
+
+    @classmethod
+    def get_pipelines(
+        cls, dtype, hdim, hdim_v, receipt, mask_impl
+    ) -> List[FmhaFwdPipeline]:
+        pipelines = []
+        if dtype in cls._DT_FP16_BF16:
+            qscale = "no"
+            for logits, mask, bias, lse, dropout, skip, sink in itertools.product(
+                ["t", "f"],
+                get_mask_map(mask_impl).keys(),
+                BIAS_MAP.keys(),
+                ["t", "f"],
+                ["t", "f"],
+                ["t", "f"],
+                ["t", "f"],
+            ):
+                # Keep only ttff/tttt for gfx11: ffff path is often similar or worse
+                # pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
+                pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
+                pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
+        return pipelines
+
+
+class KernelComponentFactoryGfx115(KernelComponentFactoryGfx11):
+    arch = ArchTrait("gfx115")
+
+    @classmethod
+    def get_hdim_tile_size_dict(cls, dtype: str) -> Optional[dict]:
+        result = super().get_hdim_tile_size_dict(dtype)
+        if dtype in cls._DT_FP16_BF16:
+            result[(64, 64)] = [FmhaFwdTileSize( 64,  64,  32,  64,  32,   64,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)]  # fmt: skip
+            result[(256, 256)] = [FmhaFwdTileSize(128,  64,  32, 256,  32,  256,  8, 1, 1,  8, 1, 1,  16, 16, 16,  16, 16, 16,  -1)]  # fmt: skip
+        return result
 
 
 class KernelComponentFactoryGfx12(CompatibilityRuleFactory):
@@ -1112,7 +1213,8 @@ class KernelComponentFactoryGfx12(CompatibilityRuleFactory):
                 #                             bm0, bn0, bk0, bn1, bk1,
                 ( 32,  32) : [FmhaFwdTileSize( 64,  64,  16,  32,  32,   32,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
                 ( 64,  64) : [FmhaFwdTileSize( 64,  64,  32,  64,  32,   64,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
-                (128, 128) : [FmhaFwdTileSize( 64,  64,  32, 128,  32,  128,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
+                (128, 128) : [FmhaFwdTileSize( 64,  64,  32, 128,  32,  128,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, CppConstraint("a.max_seqlen_q <= 8192")),
+                              FmhaFwdTileSize(128,  64,  32, 128,  32,  128,  8, 1, 1,  8, 1, 1,  16, 16, 16,  16, 16, 16,   6)],
                 (192, 128) : [FmhaFwdTileSize( 64,  64,  32, 128,  32,  256,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
                 (256, 256) : [FmhaFwdTileSize( 64,  64,  32, 256,  32,  256,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
             }  # fmt: skip
@@ -1147,7 +1249,8 @@ class KernelComponentFactoryGfx12(CompatibilityRuleFactory):
                 ["t", "f"],
                 ["t", "f"],
             ):
-                pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
+                # pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
+                pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
                 pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
         elif dtype in cls._DT_FP8_FP8BF16 or dtype in cls._DT_FP8FP32:
             # no need lse/dropout kernels
@@ -1158,6 +1261,7 @@ class KernelComponentFactoryGfx12(CompatibilityRuleFactory):
                 ["no"],
             ):
                 pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, "f", "f", qscale, mask, "f", "f", "f"))  # fmt: skip
+                pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "f", "f", logits, bias, "f", "f", qscale, mask, "f", "f", "f"))  # fmt: skip
                 pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, "f", "f", qscale, mask, "f", "f", "f"))  # fmt: skip
         return pipelines
 
@@ -1183,6 +1287,10 @@ def get_factory(target: str):
     if target.startswith("gfx9"):
         return KernelComponentFactoryGfx9
 
+    if target.startswith("gfx115"):
+        return KernelComponentFactoryGfx115
+    if target.startswith("gfx11"):
+        return KernelComponentFactoryGfx11
     if target.startswith("gfx12"):
         return KernelComponentFactoryGfx12
 
@@ -1200,7 +1308,7 @@ class Product:
 
 def get_product(receipt: int) -> Product:
     # Flash attention integration
-    if receipt in (2, 3):
+    if receipt == 2:
 
         def fit(problem_ctx: ProblemContext, kernel_ctx: KernelContext) -> bool:
             cond = problem_ctx.dtype in ["fp16", "bf16"]
@@ -1208,6 +1316,23 @@ def get_product(receipt: int) -> Product:
             cond &= kernel_ctx.pipeline.F_bias in ["no", "alibi"]
             cond &= kernel_ctx.pipeline.F_qscale == "no"
             cond &= kernel_ctx.pipeline.F_skip == "f"
+            cond &= kernel_ctx.pipeline.F_sink == "f"
+            # FlashAttention direct fwd wrappers always use softcap disabled and LSE enabled.
+            cond &= kernel_ctx.pipeline.F_logits == "f"
+            cond &= kernel_ctx.pipeline.F_lse == "t"
+            return cond
+
+        return Product(name="Flash attention integration", rule=fit)
+    # Receipt 3 forward coverage used by CK library / smoke tests
+    elif receipt == 3:
+
+        def fit(problem_ctx: ProblemContext, kernel_ctx: KernelContext) -> bool:
+            cond = problem_ctx.dtype in ["fp16", "bf16"]
+            cond &= kernel_ctx.pipeline.F_vlayout == "row"
+            cond &= kernel_ctx.pipeline.F_bias in ["no", "alibi"]
+            cond &= kernel_ctx.pipeline.F_qscale == "no"
+            cond &= kernel_ctx.pipeline.F_skip == "f"
+            cond &= kernel_ctx.pipeline.F_sink == "f"
             return cond
 
         return Product(name="Flash attention integration", rule=fit)
@@ -1219,7 +1344,6 @@ def get_product(receipt: int) -> Product:
             cond &= kernel_ctx.pipeline.F_vlayout == "row"
             cond &= kernel_ctx.pipeline.F_bias in ["no", "bias"]
             cond &= kernel_ctx.pipeline.F_qscale == "no"
-            cond &= problem_ctx.mode == "batch"
             cond &= kernel_ctx.pipeline.F_skip == "f"
             cond &= kernel_ctx.pipeline.F_logits == "f"
             return cond
@@ -1374,8 +1498,8 @@ def write_fwd_api(
             FMHA_FWD_API_FOOTER_TEMPLATE.format(
                 F_is_v3_enabled=BOOL_MAP[
                     # NOTE: enable v3 pipelines when ready
-                    # 0 < api_pool.get_num_traits(filter_fn=accept_only_v3)
-                    False
+                    0 < api_pool.get_num_traits(filter_fn=accept_only_v3)
+                    # False
                 ]
             ),
         ]
@@ -1412,5 +1536,5 @@ def list_blobs(
             targets, kernel_filter, receipt, optdim_list, mask_impl
         )
         for kernel in kernels:
-            f.write(str(file_path.parent / GEN_DIR / kernel.filename) + "\n")
-        f.write(str(file_path.parent / GEN_DIR / FMHA_FWD_API_FILENAME) + "\n")
+            f.write((file_path.parent / GEN_DIR / kernel.filename).as_posix() + "\n")
+        f.write((file_path.parent / GEN_DIR / FMHA_FWD_API_FILENAME).as_posix() + "\n")

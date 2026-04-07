@@ -84,6 +84,7 @@ bool isSwizzleSupported(hipDataType datatype)
     case HIP_R_16BF:
     case HIP_R_16F:
     case HIP_R_8F_E4M3_FNUZ:
+    case HIP_R_4F_E2M1_EXT:
         return true;
     default:
         return false;
@@ -99,6 +100,8 @@ hipblasLtOrder_t orderForDatatype(hipDataType datatype)
         return HIPBLASLT_ORDER_COL16_4R8;
     case HIP_R_8F_E4M3_FNUZ:
         return HIPBLASLT_ORDER_COL16_4R16;
+    case HIP_R_4F_E2M1_EXT:
+        return HIPBLASLT_ORDER_COL16_4R32;
     default:
         throw std::runtime_error("unsupported datatype in orderForDatatype");
     }
@@ -136,6 +139,12 @@ void calculateKforSwizzling(
     case HIP_R_8F_E4M3:
     case HIP_R_8F_E5M2:
         MiK  = 32;
+        MiKv = 8;
+        break;
+    case HIP_R_4F_E2M1_EXT:
+        // For fp4 viewed as uint8: matches shuffle_weight with layout=(16,16)
+        // BK=32 bytes, K=16 bytes, BK/K=2
+        MiK  = 16;  // K inner block = 16 bytes
         MiKv = 8;
         break;
     default:
@@ -250,6 +259,11 @@ void swizzle_tensor_type(HipHostBuffer&       dst,
     case HIP_R_8F_E5M2:
         swizzle_tensor<hipblaslt_bf8>(
             dst.as<hipblaslt_bf8>(), src.as<hipblaslt_bf8>(), datatype, arg, b, m_n, k, ld, colMaj);
+        return;
+    case HIP_R_4F_E2M1_EXT:
+        // fp4: 2 elements per byte, so k_bytes = k/2, ld_bytes = ld/2
+        swizzle_tensor<uint8_t>(
+            dst.as<uint8_t>(), src.as<uint8_t>(), datatype, arg, b, m_n, k/2, ld/2, colMaj);
         return;
     default:
         hipblaslt_cerr << "Error type in swizzle_tensor_type()" << std::endl;
@@ -712,6 +726,10 @@ auto _relu = [](auto in, auto /*arg1*/, auto /*arg2*/) -> decltype(in) {
     return static_cast<decltype(in)>(std::max(static_cast<decltype(in)>(0), in));
 };
 
+auto _drelu = [](auto in, auto /*arg1*/, auto /*arg2*/) -> decltype(in) {
+    return static_cast<decltype(in)>(in > static_cast<decltype(in)>(0) ? 1 : 0);
+};
+
 auto _gelu = [](auto in, auto /*arg1*/, auto /*arg2*/) -> decltype(in) {
     using Tc = float;
 
@@ -815,7 +833,7 @@ void copy_gemm_to_host(hipStream_t                   stream,
     CHECK_HIP_ERROR(hipStreamSynchronize(stream));
     for(int gemmIdx = 0; gemmIdx < gemm_count; gemmIdx++)
     {
-        CHECK_HIP_ERROR(synchronize(hDst[gemmIdx], dSrc[gemmIdx]));
+        CHECK_HIP_ERROR(synchronize(hDst[gemmIdx], dSrc[gemmIdx], 0, 0, 0, 0, 1, false, stream));
     }
 }
 
@@ -858,16 +876,16 @@ void check(hipStream_t                   stream,
     {
         if(!arg.gradient && arg.use_e)
         {
-            CHECK_HIP_ERROR(synchronize(hE[gemmIdx], dE[gemmIdx]));
+            CHECK_HIP_ERROR(synchronize(hE[gemmIdx], dE[gemmIdx], 0, 0, 0, 0, 1, false, stream));
         }
 
         if(arg.amaxD)
         {
-            CHECK_HIP_ERROR(synchronize(hAmaxD[gemmIdx], dAmaxD[gemmIdx]));
+            CHECK_HIP_ERROR(synchronize(hAmaxD[gemmIdx], dAmaxD[gemmIdx], 0, 0, 0, 0, 1, false, stream));
         }
         if(arg.gradient && arg.bias_vector)
         {
-            CHECK_HIP_ERROR(synchronize(hBias[gemmIdx], dBias[gemmIdx]));
+            CHECK_HIP_ERROR(synchronize(hBias[gemmIdx], dBias[gemmIdx], 0, 0, 0, 0, 1, false, stream));
         }
         if(arg.unit_check)
         {
@@ -1230,6 +1248,82 @@ void testing_matmul(const Arguments& arg)
     hipblasltSetColdIterationsValue(arg.cold_iters);
     hipblasltSetHotIterationsValue(arg.iters);
 
+    // integer_exact: skip gfx11 only for 16-bit A (fp16/bf16)—GPU vs CPU exact match unreliable there;
+    // f32/f64 (and TF32x1 f32 path) still run on Navi.
+    if(arg.initialization == hipblaslt_initialization::integer_exact)
+    {
+        const bool is_16bit = (tiA == HIP_R_16F || tiA == HIP_R_16BF);
+        if(hipblaslt_get_arch_major() == 11 && is_16bit)
+        {
+            hipblaslt_cout << "Skipping integer_exact on gfx11 for 16-bit float (fp16/bf16 A)"
+                           << std::endl;
+            return;
+        }
+        if(is_16bit)
+        {
+            // alpha=2: |2*dot|<=8K; beta=-2 adds 2*C. fp16 exact int ~2048 => K<=256 for both betas used
+            const int32_t k_limit
+                = (arg.alpha == 2.0f && (arg.beta == 0.0f || arg.beta == -2.0f)) ? 256 : 512;
+            const int32_t gemm_count = std::max(1, arg.grouped_gemm);
+            for(int32_t i = 0; i < gemm_count; i++)
+            {
+                if(arg.K[i] > k_limit)
+                {
+                    hipblaslt_cout << "Skipping integer_exact: 16-bit format with K=" << arg.K[i]
+                                   << " > " << k_limit << " (exact representability limit)" << std::endl;
+                    return;
+                }
+            }
+        }
+    }
+
+    // FP16 full-matrix accumulator probe (see hipblaslt_init_device fp16_accumulator_probe).
+    if(arg.initialization == hipblaslt_initialization::fp16_accumulator_probe)
+    {
+        if(tiA != HIP_R_16F || tiB != HIP_R_16F || to != HIP_R_16F || arg.d_type != HIP_R_16F
+           || arg.compute_type != HIPBLAS_COMPUTE_32F)
+        {
+            hipblaslt_cout << "Skipping fp16_accumulator_probe: requires f16 A/B/C/D and HIPBLAS_COMPUTE_32F"
+                           << std::endl;
+            return;
+        }
+        if(arg.transA != 'N' || arg.transB != 'N')
+        {
+            hipblaslt_cout << "Skipping fp16_accumulator_probe: only NN transposes supported" << std::endl;
+            return;
+        }
+        if(arg.grouped_gemm > 0)
+        {
+            hipblaslt_cout << "Skipping fp16_accumulator_probe: grouped_gemm not supported" << std::endl;
+            return;
+        }
+        if(arg.bias_vector || arg.activation_type != hipblaslt_activation_type::none || arg.use_e
+           || arg.gradient || arg.scaleA != hipblaslt_scaling_format::none
+           || arg.scaleB != hipblaslt_scaling_format::none || arg.scaleC || arg.scaleD || arg.scaleE
+           || arg.scaleAlpha_vector || arg.amaxScaleA || arg.amaxScaleB || arg.amaxD)
+        {
+            hipblaslt_cout << "Skipping fp16_accumulator_probe: requires default epilogue (no bias, "
+                              "activation, aux, or scaling)"
+                           << std::endl;
+            return;
+        }
+        if(arg.beta != 0.0f)
+        {
+            hipblaslt_cout << "Skipping fp16_accumulator_probe: requires beta == 0" << std::endl;
+            return;
+        }
+        const int32_t gemm_count_pe = std::max(1, arg.grouped_gemm);
+        for(int32_t i = 0; i < gemm_count_pe; i++)
+        {
+            if((arg.K[i] & 1) != 0)
+            {
+                hipblaslt_cout << "Skipping fp16_accumulator_probe: odd K not supported (K=" << arg.K[i]
+                               << ")" << std::endl;
+                return;
+            }
+        }
+    }
+
     // for all f8/bf8 cases including mix mode
     if((realDataTypeSize(tiA) == 1 || realDataTypeSize(tiB) == 1) && tc != HIP_R_32I)
     {
@@ -1469,7 +1563,7 @@ void testing_matmul_with_bias(const Arguments& arg,
         else if(arg.scaleA == hipblaslt_scaling_format::Vector)
             size_scaleAVec[i] = M[i];
         else if(isBlockScaling(arg.scaleA))
-            size_scaleAVec[i] = (M[i] * K[i]) / blockSize(arg.scaleA);
+            size_scaleAVec[i] = scaleBufferSize(A_row[i], A_col[i], arg.scaleA);
         else
             size_scaleAVec[i] = 0;
         if(arg.scaleB == hipblaslt_scaling_format::Scalar)
@@ -1477,7 +1571,7 @@ void testing_matmul_with_bias(const Arguments& arg,
         else if(arg.scaleB == hipblaslt_scaling_format::Vector)
             size_scaleBVec[i] = N[i];
         else if(isBlockScaling(arg.scaleB))
-            size_scaleBVec[i] = (K[i] * N[i]) / blockSize(arg.scaleB);
+            size_scaleBVec[i] = scaleBufferSize(B_row[i], B_col[i], arg.scaleB);
         else
             size_scaleBVec[i] = 0;
         if(arg.bias_vector)
@@ -1685,6 +1779,14 @@ void testing_matmul_with_bias(const Arguments& arg,
                 CHECK_SUCCESS(arg.use_e && "Must enable use e if gradient is enabled with gelu.");
                 epilogue[i] = HIPBLASLT_EPILOGUE_DGELU_BGRAD;
                 break;
+            case HIPBLASLT_EPILOGUE_RELU:
+                CHECK_SUCCESS(arg.use_e && "Must enable use e if gradient is enabled with relu.");
+                epilogue[i] = HIPBLASLT_EPILOGUE_DRELU;
+                break;
+            case HIPBLASLT_EPILOGUE_RELU_BIAS:
+                CHECK_SUCCESS(arg.use_e && "Must enable use e if gradient is enabled with relu.");
+                epilogue[i] = HIPBLASLT_EPILOGUE_DRELU_BGRAD;
+                break;
             default:
                 break;
             }
@@ -1714,6 +1816,10 @@ void testing_matmul_with_bias(const Arguments& arg,
             case HIPBLASLT_EPILOGUE_DGELU:
             case HIPBLASLT_EPILOGUE_DGELU_BGRAD:
                 // DGELU_AUX and DGELU_AUX_BGRAD already use E
+                break;
+            case HIPBLASLT_EPILOGUE_DRELU:
+            case HIPBLASLT_EPILOGUE_DRELU_BGRAD:
+                // DRELU_AUX and DRELU_AUX_BGRAD already use E
                 break;
             default:
                 hipblaslt_cerr << "The activation type " << epilogue[i]
@@ -2010,16 +2116,19 @@ void testing_matmul_with_bias(const Arguments& arg,
                                         A_col[i],
                                         lda[i],
                                         realDataTypeSize(TiA),
-                                        do_swizzle_a));
+                                        do_swizzle_a,
+                                        stream));
+            // B is always stored as K×N in memory; use (K, N, ldb) not (B_row, B_col) to avoid row > lda when transB=T
             CHECK_HIP_ERROR(synchronize(hB[i],
                                         dB[i],
                                         num_batches[i],
-                                        B_row[i],
-                                        B_col[i],
+                                        K[i],
+                                        N[i],
                                         ldb[i],
                                         realDataTypeSize(TiB),
-                                        do_swizzle_b));
-            CHECK_HIP_ERROR(synchronize(hC[i], dC[i]));
+                                        do_swizzle_b,
+                                        stream));
+            CHECK_HIP_ERROR(synchronize(hC[i], dC[i], 0, 0, 0, 0, 1, false, stream));
 
             if(arg.dump_matrix)
             {
@@ -3354,15 +3463,30 @@ void testing_matmul_with_bias(const Arguments& arg,
                         }
                         break;
                     case hipblaslt_activation_type::relu:
-                        epilogue_func(epilogue_param,
-                                      hBias_buf,
-                                      Tbias,
-                                      arg.activation_arg1,
-                                      arg.activation_arg2,
-                                      ::_relu,
-                                      arg.gradient,
-                                      To,
-                                      Talpha);
+                        if(arg.gradient)
+                        {
+                            epilogue_func(epilogue_param,
+                                          hBias_buf,
+                                          Tbias,
+                                          arg.activation_arg1,
+                                          arg.activation_arg2,
+                                          ::_drelu,
+                                          true,
+                                          To,
+                                          Talpha);
+                        }
+                        else
+                        {
+                            epilogue_func(epilogue_param,
+                                          hBias_buf,
+                                          Tbias,
+                                          arg.activation_arg1,
+                                          arg.activation_arg2,
+                                          ::_relu,
+                                          false,
+                                          To,
+                                          Talpha);
+                        }
                         break;
                     case hipblaslt_activation_type::swish:
                         epilogue_func(epilogue_param,
@@ -3607,6 +3731,16 @@ void testing_matmul_with_bias(const Arguments& arg,
                 {
                     tol[gemmIdx] = K[gemmIdx] * sum_error_tolerance_for_gfx11_type(Tc, TiA, To);
                 }
+            }
+            if(arg.initialization == hipblaslt_initialization::integer_exact)
+            {
+                for(int gemmIdx = 0; gemmIdx < gemm_count; gemmIdx++)
+                    tol[gemmIdx] = 0;
+            }
+            else if(arg.initialization == hipblaslt_initialization::fp16_accumulator_probe)
+            {
+                for(int gemmIdx = 0; gemmIdx < gemm_count; gemmIdx++)
+                    tol[gemmIdx] = 1e-2;
             }
 
             if(arg.unit_check || arg.norm_check || arg.allclose_check)
@@ -4024,6 +4158,16 @@ void testing_matmul_with_bias(const Arguments& arg,
                     tol[gemmIdx] = K[gemmIdx] * sum_error_tolerance_for_gfx11_type(Tc, TiA, To);
                 }
             }
+            if(arg.initialization == hipblaslt_initialization::integer_exact)
+            {
+                for(int gemmIdx = 0; gemmIdx < gemm_count; gemmIdx++)
+                    tol[gemmIdx] = 0;
+            }
+            else if(arg.initialization == hipblaslt_initialization::fp16_accumulator_probe)
+            {
+                for(int gemmIdx = 0; gemmIdx < gemm_count; gemmIdx++)
+                    tol[gemmIdx] = 1e-2;
+            }
             if(arg.unit_check || arg.norm_check || arg.allclose_check)
             {
                 if(arg.dump_matrix)
@@ -4215,6 +4359,25 @@ void testing_matmul_with_bias(const Arguments& arg,
         CHECK_HIP_ERROR(hipFree(userArgs));
     if(d_userArgs != nullptr)
         CHECK_HIP_ERROR(hipFree(d_userArgs));
+
+    // Explicitly destroy opaque handles to avoid leaks.
+    for(auto& h : matA)
+        if(h)
+            (void)hipblasLtMatrixLayoutDestroy(h);
+    for(auto& h : matB)
+        if(h)
+            (void)hipblasLtMatrixLayoutDestroy(h);
+    for(auto& h : matC)
+        if(h)
+            (void)hipblasLtMatrixLayoutDestroy(h);
+    for(auto& h : matD)
+        if(h)
+            (void)hipblasLtMatrixLayoutDestroy(h);
+
+    for(auto& block : matmul)
+        for(auto& h : block)
+            if(h)
+                (void)hipblasLtMatmulDescDestroy(h);
 
     CHECK_HIP_ERROR(hipStreamDestroy(stream));
     CHECK_HIP_ERROR(hipEventDestroy(event_gpu_time_start));
