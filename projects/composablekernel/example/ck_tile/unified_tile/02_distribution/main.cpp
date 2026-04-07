@@ -3,6 +3,8 @@
 
 #include "unified_tile/distribution/distribution.hpp"
 
+#include "ck_tile/host/device_memory.hpp"
+#include "ck_tile/host/hip_check_error.hpp"
 #include <hip/hip_runtime.h>
 #include <cstdio>
 
@@ -63,17 +65,15 @@ __global__ void distribution_test_kernel(int* results)
 int main()
 {
     constexpr int kNumTests = 8;
-    int* d_results = nullptr;
     int h_results[kNumTests] = {};
 
-    hipMalloc(&d_results, kNumTests * sizeof(int));
-    hipMemset(d_results, 0, kNumTests * sizeof(int));
+    ck_tile::DeviceMem result_buf(kNumTests * sizeof(int));
+    result_buf.SetZero();
 
-    distribution_test_kernel<<<1, kBlockSize>>>(d_results);
-    hipDeviceSynchronize();
-    hipMemcpy(h_results, d_results, kNumTests * sizeof(int),
-              hipMemcpyDeviceToHost);
-    hipFree(d_results);
+    distribution_test_kernel<<<1, kBlockSize>>>(
+        reinterpret_cast<int*>(result_buf.GetDeviceBuffer()));
+    HIP_CHECK_ERROR(hipDeviceSynchronize());
+    result_buf.FromDevice(h_results);
 
     const char* test_names[] = {
         "A distribution: elements_per_thread == 32",

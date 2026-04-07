@@ -7,9 +7,12 @@
 #include "unified_tile/tensor/window.hpp"
 #include "unified_tile/ops/load.hpp"
 
+#include "ck_tile/host/device_memory.hpp"
+#include "ck_tile/host/hip_check_error.hpp"
 #include <gtest/gtest.h>
 #include <hip/hip_runtime.h>
 #include <cmath>
+#include <vector>
 
 using DataType = _Float16;
 
@@ -96,38 +99,29 @@ class TestUnifiedTileLoad : public ::testing::Test
     void SetUp() override
     {
         // Fill source: a[r][c] = (r + 1)
-        DataType* h_a = new DataType[kM * kK];
+        std::vector<DataType> h_a(kM * kK);
         for(int r = 0; r < kM; ++r)
             for(int c = 0; c < kK; ++c)
                 h_a[r * kK + c] =
                     static_cast<DataType>(static_cast<float>(r + 1));
 
-        hipMalloc(&d_a_, kM * kK * sizeof(DataType));
-        hipMemcpy(d_a_, h_a, kM * kK * sizeof(DataType),
-                  hipMemcpyHostToDevice);
-        delete[] h_a;
+        ck_tile::DeviceMem a_buf(kM * kK * sizeof(DataType));
+        a_buf.ToDevice(h_a.data());
 
-        hipMalloc(&d_results_, kTotalResults * sizeof(float));
-        hipMemset(d_results_, 0, kTotalResults * sizeof(float));
+        ck_tile::DeviceMem result_buf(kTotalResults * sizeof(float));
+        result_buf.SetZero();
 
-        load_test_kernel<<<1, kBlockSize>>>(d_a_, kM, kK, d_results_);
-        hipDeviceSynchronize();
+        load_test_kernel<<<1, kBlockSize>>>(
+            reinterpret_cast<const DataType*>(a_buf.GetDeviceBuffer()),
+            kM, kK,
+            reinterpret_cast<float*>(result_buf.GetDeviceBuffer()));
+        HIP_CHECK_ERROR(hipDeviceSynchronize());
 
-        h_results_ = new float[kTotalResults];
-        hipMemcpy(h_results_, d_results_, kTotalResults * sizeof(float),
-                  hipMemcpyDeviceToHost);
+        h_results_.resize(kTotalResults);
+        result_buf.FromDevice(h_results_.data());
     }
 
-    void TearDown() override
-    {
-        hipFree(d_a_);
-        hipFree(d_results_);
-        delete[] h_results_;
-    }
-
-    DataType* d_a_ = nullptr;
-    float* d_results_ = nullptr;
-    float* h_results_ = nullptr;
+    std::vector<float> h_results_;
 };
 
 TEST_F(TestUnifiedTileLoad, AllValuesInRange)

@@ -225,4 +225,49 @@ if(GPU_TARGETS MATCHES "gfx94|gfx95|gfx90a")
         LABELS "SMOKE_TEST"
     )
 
+    # ============================================================================
+    # Store tests
+    # ============================================================================
+
+    # CK_Tile backend
+    add_executable(test_unified_tile_store_ck test_store.cpp)
+    set_source_files_properties(test_store.cpp PROPERTIES LANGUAGE HIP)
+    target_link_libraries(test_unified_tile_store_ck PRIVATE
+        gtest_main hip::device
+    )
+    target_compile_options(test_unified_tile_store_ck PRIVATE
+        -DUNIFIED_TILE_BACKEND_CK_TILE
+        -Wno-error
+    )
+    add_test(
+        NAME test_unified_tile_store_ck
+        COMMAND test_unified_tile_store_ck
+    )
+    set_tests_properties(test_unified_tile_store_ck PROPERTIES
+        LABELS "SMOKE_TEST"
+    )
+
+    # MINT backend
+    add_executable(test_unified_tile_store_mint test_store.cpp)
+    set_source_files_properties(test_store.cpp PROPERTIES LANGUAGE HIP)
+    target_link_libraries(test_unified_tile_store_mint PRIVATE
+        gtest_main hip::device
+    )
+    target_compile_options(test_unified_tile_store_mint PRIVATE
+        -DUNIFIED_TILE_BACKEND_MINT
+        -DMINT_BACKEND_ROCM
+        -fgpu-rdc
+        -Wno-error
+    )
+    target_link_options(test_unified_tile_store_mint PRIVATE
+        -fgpu-rdc
+    )
+    add_test(
+        NAME test_unified_tile_store_mint
+        COMMAND test_unified_tile_store_mint
+    )
+    set_tests_properties(test_unified_tile_store_mint PROPERTIES
+        LABELS "SMOKE_TEST"
+    )
+
 endif()

@@ -6,9 +6,10 @@
 #include "unified_tile/distribution/distribution.hpp"
 #include "unified_tile/tensor/window.hpp"
 
+#include "ck_tile/host/device_memory.hpp"
+#include "ck_tile/host/hip_check_error.hpp"
 #include <hip/hip_runtime.h>
 #include <cstdio>
-#include <cstdlib>
 
 using DataType = _Float16;
 
@@ -88,22 +89,20 @@ int main()
     constexpr int K = 128;
 
     // Allocate device memory
-    DataType* d_a = nullptr;
-    int* d_results = nullptr;
     int h_results[kNumTests] = {};
 
-    hipMalloc(&d_a, M * K * sizeof(DataType));
-    hipMalloc(&d_results, kNumTests * sizeof(int));
-    hipMemset(d_a, 0, M * K * sizeof(DataType));
-    hipMemset(d_results, 0, kNumTests * sizeof(int));
+    ck_tile::DeviceMem tensor_buf(M * K * sizeof(DataType));
+    tensor_buf.SetZero();
 
-    window_test_kernel<<<1, kBlockSize>>>(d_a, M, K, d_results);
-    hipDeviceSynchronize();
-    hipMemcpy(h_results, d_results, kNumTests * sizeof(int),
-              hipMemcpyDeviceToHost);
+    ck_tile::DeviceMem result_buf(kNumTests * sizeof(int));
+    result_buf.SetZero();
 
-    hipFree(d_a);
-    hipFree(d_results);
+    window_test_kernel<<<1, kBlockSize>>>(
+        reinterpret_cast<const DataType*>(tensor_buf.GetDeviceBuffer()),
+        M, K,
+        reinterpret_cast<int*>(result_buf.GetDeviceBuffer()));
+    HIP_CHECK_ERROR(hipDeviceSynchronize());
+    result_buf.FromDevice(h_results);
 
     const char* test_names[] = {
         "Window creation (view + distribution + origin)",

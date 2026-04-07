@@ -7,10 +7,11 @@
 #include "unified_tile/tensor/window.hpp"
 #include "unified_tile/ops/load.hpp"
 
+#include "ck_tile/host/device_memory.hpp"
+#include "ck_tile/host/hip_check_error.hpp"
 #include <hip/hip_runtime.h>
 #include <cstdio>
-#include <cstdlib>
-#include <cmath>
+#include <vector>
 
 using DataType = _Float16;
 
@@ -107,39 +108,35 @@ int main()
     constexpr int total = M * K;
 
     // Fill with row pattern: a[r][c] = (r + 1)
-    DataType* h_a = new DataType[total];
+    std::vector<DataType> h_a(total);
     for(int r = 0; r < M; ++r)
         for(int c = 0; c < K; ++c)
             h_a[r * K + c] = static_cast<DataType>(static_cast<float>(r + 1));
 
-    DataType* d_a = nullptr;
-    float* d_sums = nullptr;
-    int* d_valid = nullptr;
-    int* d_zeros = nullptr;
-    hipMalloc(&d_a, total * sizeof(DataType));
-    hipMalloc(&d_sums, kBlockSize * sizeof(float));
-    hipMalloc(&d_valid, kBlockSize * sizeof(int));
-    hipMalloc(&d_zeros, kBlockSize * sizeof(int));
-    hipMemcpy(d_a, h_a, total * sizeof(DataType), hipMemcpyHostToDevice);
-    hipMemset(d_sums, 0, kBlockSize * sizeof(float));
-    hipMemset(d_valid, 0, kBlockSize * sizeof(int));
-    hipMemset(d_zeros, 0, kBlockSize * sizeof(int));
+    ck_tile::DeviceMem a_buf(total * sizeof(DataType));
+    ck_tile::DeviceMem sum_buf(kBlockSize * sizeof(float));
+    ck_tile::DeviceMem valid_buf(kBlockSize * sizeof(int));
+    ck_tile::DeviceMem zero_buf(kBlockSize * sizeof(int));
 
-    load_test_kernel<<<1, kBlockSize>>>(d_a, M, K, d_sums, d_valid, d_zeros);
-    hipDeviceSynchronize();
+    a_buf.ToDevice(h_a.data());
+    sum_buf.SetZero();
+    valid_buf.SetZero();
+    zero_buf.SetZero();
 
-    float* h_sums = new float[kBlockSize];
-    int* h_valid = new int[kBlockSize];
-    int* h_zeros = new int[kBlockSize];
-    hipMemcpy(h_sums, d_sums, kBlockSize * sizeof(float), hipMemcpyDeviceToHost);
-    hipMemcpy(h_valid, d_valid, kBlockSize * sizeof(int), hipMemcpyDeviceToHost);
-    hipMemcpy(h_zeros, d_zeros, kBlockSize * sizeof(int), hipMemcpyDeviceToHost);
+    load_test_kernel<<<1, kBlockSize>>>(
+        reinterpret_cast<const DataType*>(a_buf.GetDeviceBuffer()),
+        M, K,
+        reinterpret_cast<float*>(sum_buf.GetDeviceBuffer()),
+        reinterpret_cast<int*>(valid_buf.GetDeviceBuffer()),
+        reinterpret_cast<int*>(zero_buf.GetDeviceBuffer()));
+    HIP_CHECK_ERROR(hipDeviceSynchronize());
 
-    hipFree(d_a);
-    hipFree(d_sums);
-    hipFree(d_valid);
-    hipFree(d_zeros);
-    delete[] h_a;
+    std::vector<float> h_sums(kBlockSize);
+    std::vector<int> h_valid(kBlockSize);
+    std::vector<int> h_zeros(kBlockSize);
+    sum_buf.FromDevice(h_sums.data());
+    valid_buf.FromDevice(h_valid.data());
+    zero_buf.FromDevice(h_zeros.data());
 
     // Test 0: Every thread loaded exactly kElemsPerThread valid values [1,128]
     int valid_pass = 0;
@@ -182,8 +179,5 @@ int main()
                      (test2 ? 1 : 0) + (test3 ? 1 : 0);
     printf("\n%d/4 tests passed.\n", total_pass);
 
-    delete[] h_sums;
-    delete[] h_valid;
-    delete[] h_zeros;
     return (total_pass == 4) ? 0 : 1;
 }

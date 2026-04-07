@@ -80,9 +80,7 @@ CK_TILE_HOST_DEVICE constexpr auto make_tensor_view(
 
 /// @brief Apply padding to a tensor view (CK_Tile)
 /// Pads dimensions where DoPads is true to be multiples of tile_lengths.
-/// @param tensor_view The tensor view to pad
-/// @param tile_lengths Tile size per dimension
-/// @param do_pads sequence<bool,...> indicating which dims to pad
+/// @tparam DoPads sequence<bool,...> indicating which dims to pad
 template <typename TensorView, typename TileLengths, typename DoPads>
 CK_TILE_HOST_DEVICE constexpr auto pad_view(const TensorView& tensor_view,
                                              const TileLengths& tile_lengths,

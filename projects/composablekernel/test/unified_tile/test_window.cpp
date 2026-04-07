@@ -6,6 +6,8 @@
 #include "unified_tile/distribution/distribution.hpp"
 #include "unified_tile/tensor/window.hpp"
 
+#include "ck_tile/host/device_memory.hpp"
+#include "ck_tile/host/hip_check_error.hpp"
 #include <gtest/gtest.h>
 #include <hip/hip_runtime.h>
 
@@ -125,26 +127,19 @@ class TestUnifiedTileWindow : public ::testing::Test
     protected:
     void SetUp() override
     {
-        hipMalloc(&d_a_, 256 * 256 * sizeof(DataType));
-        hipMemset(d_a_, 0, 256 * 256 * sizeof(DataType));
-        hipMalloc(&d_results_, kNumResults * sizeof(int));
-        hipMemset(d_results_, 0, kNumResults * sizeof(int));
-        window_test_kernel<<<1, 256>>>(d_a_, 256, 256, d_results_);
-        hipDeviceSynchronize();
-        hipMemcpy(h_results_,
-                  d_results_,
-                  kNumResults * sizeof(int),
-                  hipMemcpyDeviceToHost);
+        ck_tile::DeviceMem tensor_buf(256 * 256 * sizeof(DataType));
+        tensor_buf.SetZero();
+        ck_tile::DeviceMem result_buf(kNumResults * sizeof(int));
+        result_buf.SetZero();
+
+        window_test_kernel<<<1, 256>>>(
+            reinterpret_cast<const DataType*>(tensor_buf.GetDeviceBuffer()),
+            256, 256,
+            reinterpret_cast<int*>(result_buf.GetDeviceBuffer()));
+        HIP_CHECK_ERROR(hipDeviceSynchronize());
+        result_buf.FromDevice(h_results_);
     }
 
-    void TearDown() override
-    {
-        hipFree(d_a_);
-        hipFree(d_results_);
-    }
-
-    DataType* d_a_ = nullptr;
-    int* d_results_ = nullptr;
     int h_results_[kNumResults] = {};
 };
 
