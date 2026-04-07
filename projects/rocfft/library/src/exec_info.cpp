@@ -21,18 +21,17 @@
 #include "exec_info.h"
 #include "../../shared/rocfft_hip.h"
 #include "logging.h"
+#include "plan.h"
 
 rocfft_execution_info_t::rocfft_execution_info_t()
 {
-    int deviceCount = 0;
-    if(hipGetDeviceCount(&deviceCount) != hipSuccess)
-        throw std::runtime_error("failed to get device count");
+    int deviceCount = rocfft_scoped_device::device_count();
     workBuffers.resize(deviceCount);
     rocfft_streams.resize(deviceCount);
 }
 
 rocfft_execution_info_internal::rocfft_execution_info_internal(
-    const rocfft_execution_info_t* user_info)
+    const rocfft_execution_info_t* user_info, const rocfft_plan_t& plan)
     : user_info(user_info)
 {
     if(user_info)
@@ -46,6 +45,8 @@ rocfft_execution_info_internal::rocfft_execution_info_internal(
             throw std::runtime_error("failed to get device count");
         execWorkBuffers.resize(deviceCount);
     }
+
+    plan.AssignConcreteTempBuffers(*this);
 }
 
 void rocfft_execution_info_internal::ensure_work_buffer_size(

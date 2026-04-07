@@ -41,6 +41,7 @@
 #include "compute_scheme.h"
 #include "data_layout.h"
 #include "enum_printer.h"
+#include "exec_info.h"
 #include "function_map_key.h"
 #include "function_pool.h"
 #include "kargs.h"
@@ -177,23 +178,68 @@ class TreeNode;
 class LeafNode;
 class function_pool;
 
+// Identifier for a location that a buffer lives on, or that a kernel
+// will execute on.  this specifies a multi-process rank as well as a
+// device ID.
+struct rocfft_location_t
+{
+    rocfft_location_t() = default;
+    rocfft_location_t(int _comm_rank, int _device)
+        : comm_rank(_comm_rank)
+        , device(_device)
+    {
+    }
+
+    // return a location for the current device on comm rank 0
+    static rocfft_location_t rank0_current_device()
+    {
+        rocfft_location_t id;
+        if(hipGetDevice(&id.device) != hipSuccess)
+            throw std::runtime_error("hipGetDevice failed");
+        return id;
+    }
+
+    // allow locations to be sorted
+    bool operator<(const rocfft_location_t& other) const
+    {
+        if(comm_rank != other.comm_rank)
+            return comm_rank < other.comm_rank;
+        return device < other.device;
+    }
+
+    bool operator==(const rocfft_location_t& other) const
+    {
+        return comm_rank == other.comm_rank && device == other.device;
+    }
+
+    std::string str() const
+    {
+        std::string ret = "comm rank ";
+        ret += std::to_string(comm_rank);
+        ret += " device ";
+        ret += std::to_string(device);
+        return ret;
+    }
+
+    int comm_rank = 0;
+    int device    = 0;
+};
+
 // Internally-allocated temporary buffers (as opposed to
 // user-provided work/in/out buffers)
 class InternalTempBuffer
 {
 public:
-    InternalTempBuffer(int comm_rank)
-        : comm_rank(comm_rank)
+    InternalTempBuffer(rocfft_location_t _location)
+        : location(_location)
     {
     }
     InternalTempBuffer(const InternalTempBuffer&) = delete;
     InternalTempBuffer& operator=(const InternalTempBuffer&) = delete;
     ~InternalTempBuffer()                                    = default;
 
-    void set_size_bytes(size_t in)
+    void ensure_size_bytes(size_t in)
     {
-        if(buf)
-            throw std::runtime_error("cannot set internal buffer size after allocation");
         if(in > size_bytes)
             size_bytes = in;
     }
@@ -203,27 +249,14 @@ public:
         return size_bytes;
     }
 
-    void alloc(int deviceID)
+    const rocfft_location_t& get_location() const
     {
-        rocfft_scoped_device device(deviceID);
-        if(buf.alloc(size_bytes) != hipSuccess)
-            throw std::runtime_error("internal temp buffer allocation failure");
-    }
-
-    void* data()
-    {
-        return buf.data();
-    }
-
-    int get_comm_rank() const
-    {
-        return comm_rank;
+        return location;
     }
 
 private:
-    int    comm_rank  = 0;
-    size_t size_bytes = 0;
-    gpubuf buf;
+    rocfft_location_t location;
+    size_t            size_bytes = 0;
 };
 
 // Class representing a buffer in a multi-plan item.
@@ -273,14 +306,17 @@ public:
         BufferPtr ret;
         ret.type      = PTR_TEMP;
         ret.temp_ptr  = ptr;
-        ret.comm_rank = ptr->get_comm_rank();
+        ret.comm_rank = ptr->get_location().comm_rank;
         return ret;
     }
 
     // Get a pointer to the buffer.  The buffer might be an
     // user-provided input or output buffer that's only known at
     // execute time.
-    void* get(void* in_buffer[], void* out_buffer[], int local_comm_rank) const
+    void* get(void*                                 in_buffer[],
+              void*                                 out_buffer[],
+              int                                   local_comm_rank,
+              const rocfft_execution_info_internal& info) const
     {
         if(comm_rank != local_comm_rank)
             return nullptr;
@@ -293,7 +329,7 @@ public:
         case PTR_USER_OUT:
             return out_buffer[idx];
         case PTR_TEMP:
-            return temp_ptr->data();
+            return info.tempBufferPtrs.find(temp_ptr.get())->second;
         }
     }
 
@@ -318,9 +354,9 @@ public:
         case PTR_TEMP:
         {
             std::stringstream ss;
-            ss << "temp buffer on rank " << comm_rank << " ";
             if(temp_ptr)
-                ss << temp_ptr->data();
+                ss << "temp buffer handle " << temp_ptr.get() << " size "
+                   << temp_ptr->get_size_bytes() << " on rank " << comm_rank;
             else
                 ss << "(null)";
             return ss.str();
@@ -1029,53 +1065,6 @@ public:
     }
 };
 
-// Identifier for a location that a buffer lives on, or that a kernel
-// will execute on.  this specifies a multi-process rank as well as a
-// device ID.
-struct rocfft_location_t
-{
-    rocfft_location_t() = default;
-    rocfft_location_t(int _comm_rank, int _device)
-        : comm_rank(_comm_rank)
-        , device(_device)
-    {
-    }
-
-    // return a location for the current device on comm rank 0
-    static rocfft_location_t rank0_current_device()
-    {
-        rocfft_location_t id;
-        if(hipGetDevice(&id.device) != hipSuccess)
-            throw std::runtime_error("hipGetDevice failed");
-        return id;
-    }
-
-    // allow locations to be sorted
-    bool operator<(const rocfft_location_t& other) const
-    {
-        if(comm_rank != other.comm_rank)
-            return comm_rank < other.comm_rank;
-        return device < other.device;
-    }
-
-    bool operator==(const rocfft_location_t& other) const
-    {
-        return comm_rank == other.comm_rank && device == other.device;
-    }
-
-    std::string str() const
-    {
-        std::string ret = "comm rank ";
-        ret += std::to_string(comm_rank);
-        ret += " device ";
-        ret += std::to_string(device);
-        return ret;
-    }
-
-    int comm_rank = 0;
-    int device    = 0;
-};
-
 struct rocfft_mp_request_t;
 
 // Abstract base class for all items in a multi-node/device plan
@@ -1106,13 +1095,6 @@ struct MultiPlanItem
 
     // wait for outstanding communication requests to finish
     void WaitCommRequests();
-
-    // Get work buffer requirements for this item.  Only ExecPlans
-    // should need this, as data movement shouldn't need temp buffers.
-    virtual void WorkBufBytesPerDevice(size_t               base_type_size,
-                                       std::vector<size_t>& workBufBytes) const
-    {
-    }
 
     // Print a description of this item to the plan log
     virtual void Print(rocfft_ostream& os, const int indent) const = 0;
@@ -1569,6 +1551,7 @@ struct ExecPlan : public MultiPlanItem
     // are pointers to those temp buffers.
     BufferPtr inputPtr;
     BufferPtr outputPtr;
+    BufferPtr workPtr;
 
     void ExecuteAsync(const rocfft_plan                       plan,
                       void*                                   in_buffer[],
@@ -1629,15 +1612,6 @@ struct ExecPlan : public MultiPlanItem
 
     // OB_IN refers to iStride, OB_OUT refers to oStride
     std::map<OperatingBuffer, bool> isUnitStride;
-
-    void WorkBufBytesPerDevice(size_t               base_type_size,
-                               std::vector<size_t>& workBufBytes) const override
-    {
-        // base type is the size of one real, work buf counts in
-        // complex numbers
-        workBufBytes[location.device]
-            = std::max(workBufSize * 2 * base_type_size, workBufBytes[location.device]);
-    }
 
     // for callbacks, work out which nodes of the plan are loading data
     // from global memory, and storing data to global memory

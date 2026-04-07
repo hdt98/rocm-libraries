@@ -24,6 +24,7 @@
 #include "../../../shared/gpubuf.h"
 #include <cstddef>
 #include <hip/hip_runtime_api.h>
+#include <map>
 #include <vector>
 
 // User-specified execution info, to store details that the user can
@@ -51,6 +52,9 @@ struct rocfft_execution_info_t
     size_t store_cb_lds_bytes = 0;
 };
 
+class InternalTempBuffer;
+struct rocfft_plan_t;
+
 // Internal execution info that we create after we know which plan we
 // are executing.  Stores additional details that are only knowable
 // by that time, and which the user can't directly specify.
@@ -58,7 +62,8 @@ struct rocfft_execution_info_internal
 {
     // construct from a user-specified info, which must live longer
     // than this struct if specified
-    rocfft_execution_info_internal(const rocfft_execution_info_t* user_info);
+    rocfft_execution_info_internal(const rocfft_execution_info_t* user_info,
+                                   const rocfft_plan_t&           plan);
 
     // Ensure that we have a work buffer of the specified size for
     // the specified device.  If the user specified one that's big
@@ -78,6 +83,10 @@ struct rocfft_execution_info_internal
     size_t get_store_cb_lds_bytes() const;
     // get user-specified stream
     hipStream_t get_user_stream(int device) const;
+
+    // map InternalTempBuffers from a plan to actual pointers - this
+    // map is set during rocfft_execute.
+    std::map<InternalTempBuffer*, void*> tempBufferPtrs;
 
 private:
     // pointer to user-specified info - may be null if user never specified one

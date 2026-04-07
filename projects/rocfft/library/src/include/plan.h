@@ -352,10 +352,11 @@ struct rocfft_plan_t
     // log field layout at plan level
     static void LogFields(const char* description, const std::vector<rocfft_field_t>& fields);
 
-    // During plan creation, InternalTempBuffer remembers how much
-    // space will be needed but doesn't allocate.  Allocate the buffers
-    // after the space requirements are finalized.
-    void AllocateInternalTempBuffers();
+    // Assign concrete pointers to temp memory - this is tracked in the
+    // internal execution info so that we can point to work memory
+    // allocated by users.  If users did not provide work memory then
+    // we will allocate it here.
+    void AssignConcreteTempBuffers(rocfft_execution_info_internal& info) const;
 
     /**
      * @return The lengths provided by the user at creation of this object
@@ -370,6 +371,11 @@ struct rocfft_plan_t
      * input-gathering and output-scattering execution items are also created.
      */
     void MakeSingleDevPlanWithGatherScatterIfNeeded();
+    // Determine the amount of memory that we will ask users to
+    // allocate for work buffers on each device - we ask them for one
+    // at most alloc per device, but the plan internally can want
+    // multiple separate buffers that can be glued together.
+    void DetermineTempBufferUserAllocs();
 
 private:
     // Multi-node or multi-GPU plan is built up from a vector of plan
@@ -400,6 +406,11 @@ private:
     // plans are remembered here.  Mapped per-location.  Individual
     // plan items can have void*'s that point to these buffers.
     std::multimap<rocfft_location_t, std::shared_ptr<InternalTempBuffer>> tempBuffers;
+
+    // Per-device temp buffer size that we'll ask users to allocate - we
+    // roll up all of the individual allocations into a single number
+    // per device that's big enough.
+    std::vector<size_t> tempBufferUserAllocs;
 
     /**
      * @brief Creates the plan items required to gather the input data buffer(s) of a
@@ -499,6 +510,22 @@ private:
                   const std::vector<size_t>&     inputAntecedents,
                   std::vector<size_t>&           outputItems);
 
+    size_t C2CBrickOneDimension(size_t                         dimIdx,
+                                rocfft_location_t              location,
+                                const std::vector<size_t>&     lengths,
+                                const std::vector<size_t>&     stride,
+                                BufferPtr                      input,
+                                BufferPtr                      output,
+                                const std::optional<LoadOps>&  loadOps,
+                                const std::optional<StoreOps>& storeOps,
+                                const std::vector<size_t>&     antecedents);
+
+    std::unique_ptr<ExecPlan> BuildSingleDevicePlan(NodeMetaData&                  rootPlanData,
+                                                    rocfft_location_t              location,
+                                                    const std::optional<LoadOps>&  loadOps,
+                                                    const std::optional<StoreOps>& storeOps,
+                                                    bool                           partOfMultiPlan);
+
     // RAII struct to 'lease' a temp buffer from a multimap of per-device
     // buffers.  When this struct is destroyed, the buffer is returned to
     // the map for reuse.
@@ -517,7 +544,7 @@ private:
             {
                 // instead allocate a placeholder that remembers which
                 // rank this was for, to aid debugging
-                buf = std::make_shared<InternalTempBuffer>(location.comm_rank);
+                buf = std::make_shared<InternalTempBuffer>(location);
                 return;
             }
 
@@ -526,7 +553,7 @@ private:
             if(i != tempBuffers->upper_bound(location))
             {
                 // found a buffer, ensure it's big enough
-                i->second->set_size_bytes(byte_size);
+                i->second->ensure_size_bytes(byte_size);
 
                 // leasing out this temp buffer, remove it from the map
                 buf = i->second;
@@ -534,8 +561,8 @@ private:
                 return;
             }
             // no buffer was found, allocate a new one
-            buf = std::make_shared<InternalTempBuffer>(local_comm_rank);
-            buf->set_size_bytes(byte_size);
+            buf = std::make_shared<InternalTempBuffer>(location);
+            buf->ensure_size_bytes(byte_size);
         }
         ~TempBufferLease()
         {
