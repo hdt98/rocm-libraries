@@ -31,8 +31,12 @@ namespace rocRoller
         AssertFatal(rhs != nullptr);
         AssertFatal(shiftAmount != nullptr);
 
+        bool rhsIsInlineConstant = rhs->regType() != Register::Type::Literal
+                                   || m_context->targetArchitecture().isSupportedConstantValue(rhs);
+
         if(dest->regType() == Register::Type::Vector
-           && (dest->variableType() == DataType::UInt32 || dest->variableType() == DataType::Int32))
+           && (dest->variableType() == DataType::UInt32 || dest->variableType() == DataType::Int32)
+           && rhsIsInlineConstant)
         {
             auto toShift = shiftAmount->regType() == Register::Type::Literal
                                ? shiftAmount
