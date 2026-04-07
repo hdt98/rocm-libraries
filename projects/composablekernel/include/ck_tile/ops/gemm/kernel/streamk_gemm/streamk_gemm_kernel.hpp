@@ -159,8 +159,11 @@ struct StreamKKernel
         TilePartitioner tile_partitioner;
     };
 
-    using KernelArgs = StreamKKernelArgs;
-    using Kernel     = StreamKKernel<TilePartitioner, GemmPipeline, EpiloguePipeline>;
+    using KernelArgs = std::conditional_t<
+        IsStreamK,
+        StreamKKernelArgs,
+        UniversalGemmKernelArgs<AsLayout::size(), BsLayout::size(), DsLayout::size()>>;
+    using Kernel = StreamKKernel<TilePartitioner, GemmPipeline, EpiloguePipeline>;
 
     [[nodiscard]] CK_TILE_HOST static const std::string GetName()
     {
@@ -210,13 +213,34 @@ struct StreamKKernel
      * select their own to assist with test reproducibility, etc.
      * @return The kernel arguments for Stream-K.
      */
-    CK_TILE_HOST static StreamKKernelArgs MakeKernelArgs(const StreamKHostArgs& host_args,
-                                                         int num_cu    = NumCU(),
-                                                         int occupancy = Occupancy())
+    CK_TILE_HOST static KernelArgs
+    MakeKernelArgs(const UniversalGemmHostArgs<UniversalGemmKernel::NumATensor,
+                                               UniversalGemmKernel::NumBTensor,
+                                               UniversalGemmKernel::NumDTensor>& hostArgs,
+                   int num_cu    = NumCU(),
+                   int occupancy = Occupancy())
     {
-        const index_t max_active_wgs = num_cu * occupancy;
-
-        return StreamKKernelArgs{host_args, max_active_wgs};
+        if constexpr(!IsStreamK)
+        {
+            return KernelArgs{hostArgs.as_ptr,
+                              hostArgs.bs_ptr,
+                              hostArgs.ds_ptr,
+                              hostArgs.e_ptr,
+                              hostArgs.M,
+                              hostArgs.N,
+                              hostArgs.K,
+                              hostArgs.stride_As,
+                              hostArgs.stride_Bs,
+                              hostArgs.stride_Ds,
+                              hostArgs.stride_E,
+                              hostArgs.k_batch,
+                              hostArgs.async_input_scheduler};
+        }
+        else
+        {
+            const index_t max_active_wgs = num_cu * occupancy;
+            return KernelArgs{hostArgs, max_active_wgs};
+        }
     }
 
     template <bool UseDefaultScheduler = true>
