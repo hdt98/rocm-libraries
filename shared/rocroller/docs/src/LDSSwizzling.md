@@ -98,8 +98,8 @@ all tile rows sharing a bank row.
 
 ## Implementation in rocRoller
 
-Gated by `LDSBankSwizzleMode` kernel option (None, Swizzle, SwizzleA,
-SwizzleB). Both GR and LR transforms are expressed as `ExpressionTransform`
+Gated by `LDSBankSwizzleMode` kernel option (None, Swizzle). Both GR
+and LR transforms are expressed as `ExpressionTransform`
 edges in the coordinate graph. No new instruction emission or cross-lane
 operations needed.
 

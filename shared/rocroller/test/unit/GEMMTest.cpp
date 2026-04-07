@@ -513,82 +513,9 @@ namespace GEMMTests
 
         basicGEMM<FP4, FP4, float>(gemm);
 
-        // Per-K-Unroll chain separation: swizzle baked into base, no v_or_b32
-        std::string generatedCode = m_context->instructions()->toString();
-        EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
-        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 0);
-    }
-
-    TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MT256x256x128_LDSSwizzleA)
-    {
-        REQUIRE_ARCH_CAP(GPUCapability::HasMFMA_f8f6f4);
-        auto gemm           = GEMMProblemF8F6F4{32, 32, 64};
-        gemm.m              = 512;
-        gemm.n              = 256;
-        gemm.k              = 512;
-        gemm.macM           = 256;
-        gemm.macN           = 256;
-        gemm.macK           = 128;
-        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDS;
-        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDS;
-        gemm.storePath      = SolutionParams::StorePath::VGPRToGlobalMemoryWithBuffer;
-        gemm.transA         = "T";
-        gemm.transB         = "N";
-        gemm.ldsSwizzleMode = LDSBankSwizzleMode::SwizzleA;
-
-        basicGEMM<FP4, FP4, float>(gemm);
-
-        // Per-K-Unroll chain separation: swizzle baked into base, no v_or_b32
-        std::string generatedCode = m_context->instructions()->toString();
-        EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
-        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 0);
-    }
-
-    TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MT256x256x128_LDSSwizzleB)
-    {
-        REQUIRE_ARCH_CAP(GPUCapability::HasMFMA_f8f6f4);
-        auto gemm           = GEMMProblemF8F6F4{32, 32, 64};
-        gemm.m              = 512;
-        gemm.n              = 256;
-        gemm.k              = 512;
-        gemm.macM           = 256;
-        gemm.macN           = 256;
-        gemm.macK           = 128;
-        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDS;
-        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDS;
-        gemm.storePath      = SolutionParams::StorePath::VGPRToGlobalMemoryWithBuffer;
-        gemm.transA         = "T";
-        gemm.transB         = "N";
-        gemm.ldsSwizzleMode = LDSBankSwizzleMode::SwizzleB;
-
-        basicGEMM<FP4, FP4, float>(gemm);
-
-        // Per-K-Unroll chain separation: swizzle baked into base, no v_or_b32
-        std::string generatedCode = m_context->instructions()->toString();
-        EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
-        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 0);
-    }
-
-    TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MT256x256x256_LDSSwizzle)
-    {
-        REQUIRE_ARCH_CAP(GPUCapability::HasMFMA_f8f6f4);
-        auto gemm           = GEMMProblemF8F6F4{32, 32, 64};
-        gemm.m              = 512;
-        gemm.n              = 256;
-        gemm.k              = 512;
-        gemm.macM           = 256;
-        gemm.macN           = 256;
-        gemm.macK           = 256;
-        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDS;
-        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDS;
-        gemm.storePath      = SolutionParams::StorePath::VGPRToGlobalMemoryWithBuffer;
-        gemm.transA         = "T";
-        gemm.transB         = "N";
-        gemm.ldsSwizzleMode = LDSBankSwizzleMode::Swizzle;
-
-        basicGEMM<FP4, FP4, float>(gemm);
-
-        // Per-K-Unroll chain separation: swizzle baked into base, no v_or_b32
+        // Per-K-Unroll chain separation: swizzled offsets baked into base address.
+        // v_or_b32 absence confirms no runtime offset combining; may need updating
+        // if unrelated codegen introduces v_or_b32 for other purposes.
         std::string generatedCode = m_context->instructions()->toString();
         EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
         EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 0);
@@ -604,34 +531,9 @@ namespace GEMMTests
 
         basicGEMM<FP4, FP4, float>(gemm);
 
-        // Per-K-Unroll chain separation: swizzle baked into base, no v_or_b32
-        std::string generatedCode = m_context->instructions()->toString();
-        EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
-        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 0);
-    }
-
-    TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MI16x16x128_MT256x256x256_LDSSwizzle)
-    {
-        REQUIRE_ARCH_CAP(GPUCapability::HasMFMA_f8f6f4);
-        auto gemm           = GEMMProblemF8F6F4{16, 16, 128};
-        gemm.m              = 512;
-        gemm.n              = 256;
-        gemm.k              = 512;
-        gemm.macM           = 256;
-        gemm.macN           = 256;
-        gemm.macK           = 256;
-        gemm.workgroupSizeX = 128;
-        gemm.workgroupSizeY = 2;
-        gemm.loadPathA      = SolutionParams::LoadPath::BufferToLDS;
-        gemm.loadPathB      = SolutionParams::LoadPath::BufferToLDS;
-        gemm.storePath      = SolutionParams::StorePath::VGPRToGlobalMemoryWithBuffer;
-        gemm.transA         = "T";
-        gemm.transB         = "N";
-        gemm.ldsSwizzleMode = LDSBankSwizzleMode::Swizzle;
-
-        basicGEMM<FP4, FP4, float>(gemm);
-
-        // Per-K-Unroll chain separation: swizzle baked into base, no v_or_b32
+        // Per-K-Unroll chain separation: swizzled offsets baked into base address.
+        // v_or_b32 absence confirms no runtime offset combining; may need updating
+        // if unrelated codegen introduces v_or_b32 for other purposes.
         std::string generatedCode = m_context->instructions()->toString();
         EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
         EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 0);

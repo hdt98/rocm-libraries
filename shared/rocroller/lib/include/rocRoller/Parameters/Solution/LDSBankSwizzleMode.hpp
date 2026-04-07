@@ -12,8 +12,6 @@ namespace rocRoller
     {
         None,
         Swizzle,
-        SwizzleA,
-        SwizzleB,
         Count,
     };
 

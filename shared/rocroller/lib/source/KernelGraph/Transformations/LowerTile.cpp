@@ -117,13 +117,8 @@ namespace rocRoller
             if(isScaleType(dataType))
                 return false;
 
-            bool isA = (swizzleMode == LDSBankSwizzleMode::Swizzle
-                        || swizzleMode == LDSBankSwizzleMode::SwizzleA)
-                       && layoutType == LayoutType::MATRIX_A;
-            bool isB = (swizzleMode == LDSBankSwizzleMode::Swizzle
-                        || swizzleMode == LDSBankSwizzleMode::SwizzleB)
-                       && layoutType == LayoutType::MATRIX_B;
-            return isA || isB;
+            return swizzleMode == LDSBankSwizzleMode::Swizzle
+                   && (layoutType == LayoutType::MATRIX_A || layoutType == LayoutType::MATRIX_B);
         }
 
         /**

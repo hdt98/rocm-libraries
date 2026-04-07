@@ -1767,8 +1767,7 @@ int main(int argc, const char* argv[])
     app.add_option(SN(&SP::streamK),
                    "StreamK mode (None, Standard, TwoTile, TwoTileDPFirst). Default: None")
         ->check(CLI::IsMember(rocRoller::enumStrings<StreamKMode>()));
-    app.add_option(SN(&SP::ldsBankSwizzle),
-                   "LDS bank swizzle mode (None, Swizzle, SwizzleA, SwizzleB). Default: None")
+    app.add_option(SN(&SP::ldsBankSwizzle), "LDS bank swizzle mode (None, Swizzle). Default: None")
         ->check(CLI::IsMember(rocRoller::enumStrings<LDSBankSwizzleMode>()));
 
     app.add_option(SN(&SP::loadPathAScale),
