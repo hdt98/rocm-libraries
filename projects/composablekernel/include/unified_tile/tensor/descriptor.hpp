@@ -62,51 +62,34 @@ struct tensor_descriptor_traits<backend_type::ck_tile>
 
 #ifdef UNIFIED_TILE_BACKEND_MINT
 
-namespace detail {
-
-template <mint::index_t N, mint::index_t... Is>
-constexpr auto
-make_top_dim_aliases_impl(mint::index_sequence<Is...>)
-{
-    return mint::sequence<mint::index_t, (Is + 1)...>{};
-}
-
-template <mint::index_t N>
-constexpr auto make_top_dim_aliases()
-{
-    return make_top_dim_aliases_impl<N>(mint::make_index_sequence<N>{});
-}
-
-template <mint::index_t BottomAlias = 0>
-constexpr auto make_bottom_dim_alias()
-{
-    return mint::integral_constant<mint::index_t, BottomAlias>{};
-}
-
-} // namespace detail
-
 template <>
 struct tensor_descriptor_traits<backend_type::mint>
 {
-    template <mint::index_t N>
+    /// @brief Create packed descriptor with string aliases.
+    /// @tparam kAliases  String aliases for each dimension (e.g., "M", "K")
+    template <mint::alias_t... kAliases>
     MINT_HOST_DEVICE static constexpr auto
-    make_naive_packed(const mint::nd_index<N>& lengths)
+    make_naive_packed(mint::sequence<mint::alias_t, kAliases...>,
+                      const mint::nd_index<sizeof...(kAliases)>& lengths)
     {
-        constexpr auto dim_seq    = detail::make_top_dim_aliases<N>();
-        constexpr auto offset_alias = detail::make_bottom_dim_alias<0>();
         return mint::tensor::make_aliased_naive_packed_tensor_descriptor(
-            dim_seq, offset_alias, lengths);
+            mint::sequence<mint::alias_t, kAliases...>{},
+            mint::integral_constant<mint::alias_t, "Offset">{},
+            lengths);
     }
 
-    template <mint::index_t N>
+    /// @brief Create strided descriptor with string aliases.
+    template <mint::alias_t... kAliases>
     MINT_HOST_DEVICE static constexpr auto
-    make_naive(const mint::nd_index<N>& lengths,
-               const mint::nd_index<N>& strides)
+    make_naive(mint::sequence<mint::alias_t, kAliases...>,
+               const mint::nd_index<sizeof...(kAliases)>& lengths,
+               const mint::nd_index<sizeof...(kAliases)>& strides)
     {
-        constexpr auto dim_seq    = detail::make_top_dim_aliases<N>();
-        constexpr auto offset_alias = detail::make_bottom_dim_alias<0>();
         return mint::tensor::make_aliased_naive_tensor_descriptor(
-            dim_seq, offset_alias, lengths, strides);
+            mint::sequence<mint::alias_t, kAliases...>{},
+            mint::integral_constant<mint::alias_t, "Offset">{},
+            lengths,
+            strides);
     }
 };
 #endif
@@ -166,42 +149,74 @@ CK_TILE_HOST_DEVICE constexpr auto make_descriptor_with_strides(
 
 #else // UNIFIED_TILE_BACKEND_MINT
 
-/// @brief Create tensor descriptor with lengths and strides (MINT)
-template <mint::index_t N>
-MINT_HOST_DEVICE constexpr auto make_strided_descriptor(
-    const mint::nd_index<N>& lengths,
-    const mint::nd_index<N>& strides)
+/// @brief Create packed descriptor with explicit string aliases (MINT).
+/// This is the primary API for MINT - aliases must match distribution aliases.
+/// Example: make_aliased_descriptor<"M", "K">(m_size, k_size)
+template <mint::alias_t... kAliases, typename... Dims>
+MINT_HOST_DEVICE constexpr auto make_aliased_descriptor(Dims... dims)
 {
-    return tensor_descriptor_traits<backend_type::mint>::make_naive(
-        lengths, strides);
-}
-
-/// @brief Create packed tensor descriptor (MINT)
-template <mint::index_t N>
-MINT_HOST_DEVICE constexpr auto
-make_packed_descriptor(const mint::nd_index<N>& lengths)
-{
+    static_assert(sizeof...(kAliases) == sizeof...(Dims),
+                  "Number of aliases must match number of dimensions");
     return tensor_descriptor_traits<backend_type::mint>::make_naive_packed(
-        lengths);
-}
-
-/// @brief Create packed descriptor (convenience, variadic)
-template <typename... Dims>
-MINT_HOST_DEVICE constexpr auto make_descriptor(Dims... dims)
-{
-    return tensor_descriptor_traits<backend_type::mint>::make_naive_packed(
+        mint::sequence<mint::alias_t, kAliases...>{},
         mint::nd_index<sizeof...(Dims)>{
             static_cast<mint::index_t>(dims)...});
 }
 
-/// @brief Create descriptor with strides (convenience)
+/// @brief Create strided descriptor with explicit string aliases (MINT).
+template <mint::alias_t... kAliases>
+MINT_HOST_DEVICE constexpr auto make_aliased_strided_descriptor(
+    const mint::nd_index<sizeof...(kAliases)>& lengths,
+    const mint::nd_index<sizeof...(kAliases)>& strides)
+{
+    return tensor_descriptor_traits<backend_type::mint>::make_naive(
+        mint::sequence<mint::alias_t, kAliases...>{},
+        lengths,
+        strides);
+}
+
+/// @brief Create packed descriptor with default aliases "D0","D1",... (MINT).
+/// Use make_aliased_descriptor<"M","K"> when aliases must match a distribution.
+template <typename... Dims>
+MINT_HOST_DEVICE constexpr auto make_descriptor(Dims... dims)
+{
+    if constexpr(sizeof...(Dims) == 1)
+    {
+        return make_aliased_descriptor<"D0">(dims...);
+    }
+    else if constexpr(sizeof...(Dims) == 2)
+    {
+        return make_aliased_descriptor<"D0", "D1">(dims...);
+    }
+    else if constexpr(sizeof...(Dims) == 3)
+    {
+        return make_aliased_descriptor<"D0", "D1", "D2">(dims...);
+    }
+    else if constexpr(sizeof...(Dims) == 4)
+    {
+        return make_aliased_descriptor<"D0", "D1", "D2", "D3">(dims...);
+    }
+}
+
+/// @brief Create strided descriptor with default aliases (MINT).
 template <mint::index_t N>
 MINT_HOST_DEVICE constexpr auto make_descriptor_with_strides(
     const mint::nd_index<N>& lengths,
     const mint::nd_index<N>& strides)
 {
-    return tensor_descriptor_traits<backend_type::mint>::make_naive(
-        lengths, strides);
+    if constexpr(N == 1)
+    {
+        return make_aliased_strided_descriptor<"D0">(lengths, strides);
+    }
+    else if constexpr(N == 2)
+    {
+        return make_aliased_strided_descriptor<"D0", "D1">(lengths, strides);
+    }
+    else if constexpr(N == 3)
+    {
+        return make_aliased_strided_descriptor<"D0", "D1", "D2">(
+            lengths, strides);
+    }
 }
 
 #endif // UNIFIED_TILE_BACKEND

@@ -24,8 +24,12 @@ __global__ void window_test_kernel(const DataType* p_a,
 {
     using namespace unified_tile;
 
-    // Step 1: Create descriptor
+    // Step 1: Create descriptor (aliases must match distribution for MINT)
+#ifdef UNIFIED_TILE_BACKEND_CK_TILE
     auto desc = descriptor::make_descriptor(m_size, k_size);
+#else
+    auto desc = descriptor::make_aliased_descriptor<"M", "K">(m_size, k_size);
+#endif
 
     // Step 2: Create tensor view
     auto a_view =
