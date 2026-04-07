@@ -143,8 +143,21 @@ namespace rocRoller
          *
          * @param tag The tag the of the register
          * @param value The register value to be added
+         * @param attrs Optional stride expression attributes to associate with the register
          */
-        void addRegister(int tag, Register::ValuePtr value);
+        void addRegister(int                                         tag,
+                         Register::ValuePtr                          value,
+                         std::optional<RegisterExpressionAttributes> attrs = std::nullopt);
+
+        /**
+         * @brief Get the RegisterExpressionAttributes associated with a register tag.
+         *
+         * Returns nullopt if no attributes were stored with this tag.
+         *
+         * @param tag
+         * @return std::optional<RegisterExpressionAttributes>
+         */
+        std::optional<RegisterExpressionAttributes> getRegisterAttributes(int tag) const;
 
         /**
          * @brief Add an expression to the RegisterTagManager with the provided tag.
@@ -209,8 +222,9 @@ namespace rocRoller
         std::optional<std::pair<int, int>> getSegment(int tag) const;
 
     private:
-        std::weak_ptr<Context>            m_context;
-        std::map<int, Register::ValuePtr> m_registers;
+        std::weak_ptr<Context>                      m_context;
+        std::map<int, Register::ValuePtr>           m_registers;
+        std::map<int, RegisterExpressionAttributes> m_registerAttributes;
         std::map<int, std::pair<Expression::ExpressionPtr, RegisterExpressionAttributes>>
             m_expressions;
 

@@ -395,11 +395,12 @@ namespace rocRoller::KernelGraph
      */
     DataType getOffsetDataType(int op, KernelGraph const& graph, bool isStorePartOfGGlobalToLDSOp)
     {
-        DataType rv = DataType::UInt64;
-        auto     s  = graph.control.get<StoreTiled>(op);
-        auto     l  = graph.control.get<LoadTiled>(op);
-        auto     ll = graph.control.get<LoadLDSTile>(op);
-        auto     sl = graph.control.get<StoreLDSTile>(op);
+        DataType rv  = DataType::UInt64;
+        auto     s   = graph.control.get<StoreTiled>(op);
+        auto     l   = graph.control.get<LoadTiled>(op);
+        auto     ll  = graph.control.get<LoadLDSTile>(op);
+        auto     sl  = graph.control.get<StoreLDSTile>(op);
+        auto     d2l = graph.control.get<LoadTileDirect2LDS>(op);
 
         auto isGlobalLoad = false;
         if(l)
@@ -411,7 +412,7 @@ namespace rocRoller::KernelGraph
             }
         }
 
-        if(s || (l and not isGlobalLoad) || ll || sl || isStorePartOfGGlobalToLDSOp)
+        if(s || (l and not isGlobalLoad) || ll || sl || d2l || isStorePartOfGGlobalToLDSOp)
         {
             rv = DataType::UInt32;
         }
@@ -518,13 +519,17 @@ namespace rocRoller::KernelGraph
     /**
      * @brief Create the update (increment) operation for a ForLoop.
      */
-    int createUpdateOperation(
-        KernelGraph& graph, int offset, int stride, DataType offsetDataType, ExpressionPtr step)
+    int createUpdateOperation(KernelGraph&  graph,
+                              int           offset,
+                              int           stride,
+                              DataType      offsetDataType,
+                              DataType      strideDataType,
+                              ExpressionPtr step)
     {
         auto offsetExpr = std::make_shared<Expression::Expression>(
             Expression::DataFlowTag{offset, Register::Type::Vector, offsetDataType});
         auto strideExpr = std::make_shared<Expression::Expression>(
-            Expression::DataFlowTag{stride, Register::Type::Scalar, DataType::UInt64});
+            Expression::DataFlowTag{stride, Register::Type::Vector, strideDataType});
 
         auto incrementExpr
             = (step == nullptr) ? offsetExpr + strideExpr : offsetExpr + step * strideExpr;
@@ -586,7 +591,8 @@ namespace rocRoller::KernelGraph
             // For future: choose type based on buffer or non-buffer
             // Determine data types
             auto offsetDataType = getOffsetDataType(op, graph, spec.isStorePartOfGlobalToLDSOp);
-            auto strideDataType = DataType::UInt64;
+            auto strideDataType
+                = (offsetDataType == DataType::UInt32) ? DataType::UInt32 : DataType::UInt64;
             if(info.isUnroll)
             {
                 offsetDataType = DataType::Int64;
@@ -629,7 +635,7 @@ namespace rocRoller::KernelGraph
             // Create update operation if this dimension needs loop increment
             if(info.needsUpdate)
                 update = createUpdateOperation(
-                    graph, edges.offset, edges.stride, offsetDataType, step);
+                    graph, edges.offset, edges.stride, offsetDataType, strideDataType, step);
         }
 
         addUnrollStrideConnection(
@@ -1028,15 +1034,19 @@ namespace rocRoller::KernelGraph
             }
 
             // Create the Assign node with stride attributes
-            auto assignNode         = Assign{Register::Type::Vector,
-                                     ToBytes(indexExpr, params.valueType) + indexExprPaddingBytes};
+            auto toStrideType = [&](ExpressionPtr e) { return convert(params.strideType, e); };
+            auto assignNode   = Assign{
+                Register::Type::Vector,
+                toStrideType(ToBytes(indexExpr, params.valueType) + indexExprPaddingBytes)};
             assignNode.variableType = params.strideType;
             assignNode.strideExpressionAttributes
                 = {params.strideType,
                    unitStride,
                    elementBlockSize,
-                   ToBytes(elementBlockStride, params.valueType) + elementBlockStridePaddingBytes,
-                   ToBytes(trLoadPairStride, params.valueType) + trLoadPairStridePaddingBytes};
+                   toStrideType(ToBytes(elementBlockStride, params.valueType)
+                                + elementBlockStridePaddingBytes),
+                   toStrideType(ToBytes(trLoadPairStride, params.valueType)
+                                + trLoadPairStridePaddingBytes)};
 
             auto assignTag = graph.control.addElement(assignNode);
             graph.mapper.connect(assignTag, stride, NaryArgument::DEST);

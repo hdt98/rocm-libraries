@@ -641,12 +641,27 @@ namespace rocRoller
 
                 if(assign.strideExpressionAttributes)
                 {
-                    co_yield Instruction::Comment("Assign stride expression");
-                    m_context->registerTagManager()->addExpression(
-                        dimTag,
-                        m_fastArith(assign.expression),
-                        assign.strideExpressionAttributes.value());
+                    auto const& attrs = assign.strideExpressionAttributes.value();
                     scope->addRegister(dimTag);
+
+                    auto strideExpr = m_fastArith(assign.expression);
+
+                    if(Expression::evaluationTimes(strideExpr)[Expression::EvaluationTime::Translate])
+                    {
+                        // Compile-time constant stride: store as expression (no register needed).
+                        co_yield Instruction::Comment("Assign stride expression (constant)");
+                        m_context->registerTagManager()->addExpression(dimTag, strideExpr, attrs);
+                    }
+                    else
+                    {
+                        // Runtime stride: pre-compute into a register now.
+                        co_yield Instruction::Comment("Assign stride register");
+                        auto dest = Register::Value::Placeholder(
+                            m_context, assign.regType, attrs.dataType, 1);
+                        dest->setName(concatenate("Stride", dimTag));
+                        co_yield Expression::generate(dest, strideExpr, m_context);
+                        m_context->registerTagManager()->addRegister(dimTag, dest, attrs);
+                    }
                 }
                 else
                 {

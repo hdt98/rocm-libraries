@@ -152,7 +152,9 @@ namespace rocRoller
         return m_registers.at(tag);
     }
 
-    inline void RegisterTagManager::addRegister(int tag, Register::ValuePtr value)
+    inline void RegisterTagManager::addRegister(int                                         tag,
+                                                Register::ValuePtr                          value,
+                                                std::optional<RegisterExpressionAttributes> attrs)
     {
         AssertFatal(tag > 0, ShowValue(tag));
         AssertFatal(!hasExpression(tag), "Tag already associated with an expression");
@@ -177,6 +179,17 @@ namespace rocRoller
         }
 
         m_registers.emplace(tag, value);
+        if(attrs)
+            m_registerAttributes.emplace(tag, *attrs);
+    }
+
+    inline std::optional<RegisterExpressionAttributes>
+        RegisterTagManager::getRegisterAttributes(int tag) const
+    {
+        auto iter = m_registerAttributes.find(tag);
+        if(iter != m_registerAttributes.end())
+            return iter->second;
+        return std::nullopt;
     }
 
     inline void RegisterTagManager::addExpression(int                          tag,
@@ -251,6 +264,7 @@ namespace rocRoller
         AssertFatal(!isBorrowed(tag), "Tag ", tag, " has been borrowed.");
 
         m_registers.erase(tag);
+        m_registerAttributes.erase(tag);
         m_expressions.erase(tag);
 
         auto alias = getAlias(tag);

@@ -154,8 +154,18 @@ namespace rocRoller
                 if(strideTag == -1)
                     continue;
 
-                auto [strideExpr, strideAttrs]
-                    = m_context->registerTagManager()->getExpression(strideTag);
+                auto tagManager = m_context->registerTagManager();
+
+                ExpressionPtr strideExpr;
+                if(tagManager->hasRegister(strideTag))
+                {
+                    strideExpr = tagManager->getRegister(strideTag)->expression();
+                }
+                else
+                {
+                    auto [expr, strideAttrs] = tagManager->getExpression(strideTag);
+                    strideExpr               = expr;
+                }
 
                 Log::debug(
                     "  unroll coord {} value: {}", unroll, toString(coords.getCoordinate(unroll)));
@@ -170,11 +180,12 @@ namespace rocRoller
                                             KernelGraph const& graph,
                                             bool               isStorePartOfGlobalToLDSOp)
         {
-            DataType rv = DataType::UInt64;
-            auto     s  = graph.control.get<StoreTiled>(op);
-            auto     l  = graph.control.get<LoadTiled>(op);
-            auto     ll = graph.control.get<LoadLDSTile>(op);
-            auto     sl = graph.control.get<StoreLDSTile>(op);
+            DataType rv  = DataType::UInt64;
+            auto     s   = graph.control.get<StoreTiled>(op);
+            auto     l   = graph.control.get<LoadTiled>(op);
+            auto     ll  = graph.control.get<LoadLDSTile>(op);
+            auto     sl  = graph.control.get<StoreLDSTile>(op);
+            auto     d2l = graph.control.get<LoadTileDirect2LDS>(op);
 
             auto isGlobalLoad = false;
             if(l)
@@ -186,7 +197,7 @@ namespace rocRoller
                 }
             }
 
-            if(s || (l and not isGlobalLoad) || ll || sl || isStorePartOfGlobalToLDSOp)
+            if(s || (l and not isGlobalLoad) || ll || sl || d2l || isStorePartOfGlobalToLDSOp)
             {
                 rv = DataType::UInt32;
             }
@@ -312,23 +323,35 @@ namespace rocRoller
             auto strideTag = m_graph->mapper.get<Stride>(tag, dimension);
             if(strideTag >= 0)
             {
-                auto [strideExpr, strideAttributes]
-                    = m_context->registerTagManager()->getExpression(strideTag);
+                auto tagManager = m_context->registerTagManager();
 
-                attrs = strideAttributes;
-
-                if(!Expression::evaluationTimes(strideExpr)[EvaluationTime::Translate])
+                if(tagManager->hasRegister(strideTag))
                 {
-                    stride = Register::Value::Placeholder(
-                        m_context, Register::Type::Vector, strideAttributes.dataType, 1);
-                    stride->setName(concatenate("Stride", strideTag));
+                    // Pre-computed stride: use the already-allocated register directly.
+                    stride = tagManager->getRegister(strideTag);
+                    if(auto maybeAttrs = tagManager->getRegisterAttributes(strideTag))
+                        attrs = *maybeAttrs;
                 }
                 else
                 {
-                    stride = nullptr;
-                }
+                    // Constant stride stored as expression: evaluate at use site.
+                    auto [strideExpr, strideAttributes] = tagManager->getExpression(strideTag);
 
-                co_yield generate(stride, strideExpr);
+                    attrs = strideAttributes;
+
+                    if(!Expression::evaluationTimes(strideExpr)[EvaluationTime::Translate])
+                    {
+                        stride = Register::Value::Placeholder(
+                            m_context, Register::Type::Vector, strideAttributes.dataType, 1);
+                        stride->setName(concatenate("Stride", strideTag));
+                    }
+                    else
+                    {
+                        stride = nullptr;
+                    }
+
+                    co_yield generate(stride, strideExpr);
+                }
             }
         }
 
