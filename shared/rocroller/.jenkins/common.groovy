@@ -349,6 +349,10 @@ def runPerformanceCommand (platform, project)
 
                 ${sshBlock}
 
+                # Get branch name and commit hash from git
+                GIT_BRANCH_NAME=\$(git rev-parse --abbrev-ref HEAD)
+                GIT_COMMIT_HASH=\$(git rev-parse --short=10 HEAD)
+
                 # Ensure gemmaiperf is available
                 if [ ! -d "gemmaiperf" ]; then
                     echo "=== gemmaiperf not found, cloning ==="
@@ -380,9 +384,9 @@ def runPerformanceCommand (platform, project)
                         --csv \$CSV_FILE \\
                         --arch ${platform.gpu} \\
                         --repo github.com/ROCm/rocm-libraries \\
-                        --branch ${env.BRANCH_NAME} \\
+                        --branch \$GIT_BRANCH_NAME \\
                         --comment "rocroller CI automatic insertion" \\
-                        --commit ${env.GIT_COMMIT?.take(10)} \\
+                        --commit \$GIT_COMMIT_HASH \\
                         --machine ${env.NODE_NAME} \\
                         --library_size 0 \\
                         --streamk 0
@@ -567,6 +571,10 @@ def runPerformanceCommand (platform, project)
 
                 ${sshBlock}
 
+                # Get branch name and commit hash from git
+                GIT_BRANCH_NAME=\$(git rev-parse --abbrev-ref HEAD)
+                GIT_COMMIT_HASH=\$(git rev-parse --short=10 HEAD)
+
                 # Ensure gemmaiperf is available
                 if [ ! -d "gemmaiperf" ]; then
                     echo "=== gemmaiperf not found, cloning ==="
@@ -600,7 +608,7 @@ def runPerformanceCommand (platform, project)
                         --repo github.com/ROCm/rocm-libraries \\
                         --branch develop \\
                         --comment "rocroller CI automatic insertion" \\
-                        --commit ${env.GIT_COMMIT?.take(10)} \\
+                        --commit \$GIT_COMMIT_HASH \\
                         --machine ${env.NODE_NAME} \\
                         --library_size 0 \\
                         --streamk 0
