@@ -23,10 +23,7 @@ void add_device_grouped_conv2d_bwd_data_xdl_gnhwk_gkyxc_gnhwc_f16_instances(
                                                                   PassThrough,
                                                                   PassThrough>>>& instances)
 {
-    // [COMMENTED OUT — CShuffle instances win 0/579 cases, NoShuffle wins 100%]
-    // Uncomment for final full-search verification after tuning is complete.
-#if 0
-    // 1. Default (16x16 XDL, small tiles)
+    // 1. Default
     add_device_operation_instances(
         instances,
         device_grouped_conv_bwd_data_xdl_f16_16_16_instances<2,
@@ -35,7 +32,7 @@ void add_device_grouped_conv2d_bwd_data_xdl_gnhwk_gkyxc_gnhwc_f16_instances(
                                                              Empty_Tuple,
                                                              GNHWC,
                                                              ConvBwdDataDefault>{});
-    // 2. Filter1x1Stride1Pad0 (16x16 XDL, small tiles)
+    // 2. Filter1x1Stride1Pad0
     add_device_operation_instances(
         instances,
         device_grouped_conv_bwd_data_xdl_f16_16_16_instances<2,
@@ -44,7 +41,7 @@ void add_device_grouped_conv2d_bwd_data_xdl_gnhwk_gkyxc_gnhwc_f16_instances(
                                                              Empty_Tuple,
                                                              GNHWC,
                                                              ConvBwdDataFilter1x1Stride1Pad0>{});
-    // 3. Default (32x32 XDL, large tiles)
+    // 3. Default
     add_device_operation_instances(
         instances,
         device_grouped_conv_bwd_data_xdl_f16_instances<2,
@@ -53,7 +50,7 @@ void add_device_grouped_conv2d_bwd_data_xdl_gnhwk_gkyxc_gnhwc_f16_instances(
                                                        Empty_Tuple,
                                                        GNHWC,
                                                        ConvBwdDataDefault>{});
-    // 4. Filter1x1Stride1Pad0 (32x32 XDL, large tiles)
+    // 4. Filter1x1Stride1Pad0
     add_device_operation_instances(
         instances,
         device_grouped_conv_bwd_data_xdl_f16_instances<2,
@@ -62,8 +59,7 @@ void add_device_grouped_conv2d_bwd_data_xdl_gnhwk_gkyxc_gnhwc_f16_instances(
                                                        Empty_Tuple,
                                                        GNHWC,
                                                        ConvBwdDataFilter1x1Stride1Pad0>{});
-#endif
-    // 5. Default — noshuffle epilogue (ScalarPerVector=1)
+    // 5. Default — noshuffle epilogue
     add_device_operation_instances(
         instances,
         device_grouped_conv_bwd_data_xdl_f16_noshuffle_instances<2,
@@ -72,7 +68,7 @@ void add_device_grouped_conv2d_bwd_data_xdl_gnhwk_gkyxc_gnhwc_f16_instances(
                                                                   Empty_Tuple,
                                                                   GNHWC,
                                                                   ConvBwdDataDefault>{});
-    // 6. Filter1x1Stride1Pad0 — noshuffle epilogue (ScalarPerVector=1)
+    // 6. Filter1x1Stride1Pad0 — noshuffle epilogue
     add_device_operation_instances(
         instances,
         device_grouped_conv_bwd_data_xdl_f16_noshuffle_instances<2,
@@ -81,7 +77,7 @@ void add_device_grouped_conv2d_bwd_data_xdl_gnhwk_gkyxc_gnhwc_f16_instances(
                                                                   Empty_Tuple,
                                                                   GNHWC,
                                                                   ConvBwdDataFilter1x1Stride1Pad0>{});
-    // 7. Default — BBlockTransfer matching non-grouped kernel (NoShuffle, SPV=1,1)
+    // 7. Default — nongrouped_match instances
     add_device_operation_instances(
         instances,
         device_grouped_conv_bwd_data_xdl_f16_nongrouped_match_instances<2,
@@ -90,7 +86,7 @@ void add_device_grouped_conv2d_bwd_data_xdl_gnhwk_gkyxc_gnhwc_f16_instances(
                                                                          Empty_Tuple,
                                                                          GNHWC,
                                                                          ConvBwdDataDefault>{});
-    // 8. Filter1x1Stride1Pad0 — BBlockTransfer matching non-grouped kernel (NoShuffle, SPV=1,1)
+    // 8. Filter1x1Stride1Pad0 — nongrouped_match instances
     add_device_operation_instances(
         instances,
         device_grouped_conv_bwd_data_xdl_f16_nongrouped_match_instances<2,
