@@ -28,16 +28,45 @@ COMMON_ARGS='-v=1 -warmup=0 -repeat=1'
 
 TEST_SPLITKV=0
 TEST_APPENDKV=0
-# options:
-#    -s: run splitkv tests
-#    -a: run appendkv tests
-while getopts ":sa" opt; do
+TEST_STREAM_SINK=0
+TEST_GPTOSS_SINK=0
+# Usage:
+#   bash smoke_test_fwd.sh [options]
+#
+# Options:
+#   -s  run splitkv tests
+#   -a  run appendkv tests
+#   -m  run StreamLLM sliding-window sink mask tests
+#       requires the binary to be built with FMHA_FWD_SINK_MODES containing "stream", e.g.:
+#         cmake -DFMHA_FWD_SINK_MODES="none,stream" ...
+#         cmake --build . --target tile_example_fmha_fwd
+#         bash smoke_test_fwd.sh -m
+#   -g  run GPT-OSS sink (init_sink) tests
+#       requires the binary to be built with FMHA_FWD_SINK_MODES containing "gptoss", e.g.:
+#         cmake -DFMHA_FWD_SINK_MODES="none,gptoss" ...
+#         cmake --build . --target tile_example_fmha_fwd
+#         bash smoke_test_fwd.sh -g
+#
+# Examples:
+#   bash smoke_test_fwd.sh              # default: base tests only
+#   bash smoke_test_fwd.sh -s           # also run splitkv tests
+#   bash smoke_test_fwd.sh -a           # also run appendkv tests
+#   bash smoke_test_fwd.sh -m           # also run StreamLLM sink tests
+#   bash smoke_test_fwd.sh -g           # also run GPT-OSS sink tests
+#   bash smoke_test_fwd.sh -s -a -m -g  # run all tests
+while getopts ":samg" opt; do
     case "${opt}" in
         s)
             TEST_SPLITKV=1
             ;;
         a)
             TEST_APPENDKV=1
+            ;;
+        m)
+            TEST_STREAM_SINK=1
+            ;;
+        g)
+            TEST_GPTOSS_SINK=1
             ;;
         *)
             ;;
@@ -300,8 +329,14 @@ run_padding_smoke_tests
 run_padding_basic_boundary_tests
 run_fp8bf16_tests
 run_fp8fp32_tests
-run_sink_mask_tests
-run_sink_init_tests
+
+if [ $TEST_STREAM_SINK -eq 1 ] ; then
+    run_sink_mask_tests
+fi
+
+if [ $TEST_GPTOSS_SINK -eq 1 ] ; then
+    run_sink_init_tests
+fi
 
 if [ $TEST_APPENDKV -eq 1 ] ; then
     run_fp16_appendkv_tests
