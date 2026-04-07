@@ -276,9 +276,9 @@ __device__ void conv2d_grouped_4c_fp16_cdna4_nhwc_impl(const _Float16* __restric
     }
 
     {
-        // Wait for the filters to load from global to LDS ..
-        // but allow the first chunk of inputs to still be flight.
-        wait_vmcnt<1>();
+        // Wait for all buffer_load_lds operations (weights + first input chunk)
+        // to complete before reading from LDS.
+        wait_vmcnt<0>();
         __syncthreads();
 
         if constexpr(cfg.direction == hipconv::Direction::Dgrad)
@@ -508,10 +508,9 @@ __device__ void conv2d_grouped_4c_fp16_cdna4_nhwc_impl(const _Float16* __restric
     // An output row p_out is last touched at input row y = p_out + kh-1 - py; it needs
     // flushing when that y >= hi, i.e. p_out >= hi - kh + 1 + py.
     //
-    // Synchronize output LDS buffer access.
-    __syncthreads();
     for(int p_out = hi - cfg.kh + 1 + py; p_out < ho; p_out++)
     {
+        __syncthreads(); // separate prior LDS reads from this iteration's writes
         int p_idx = (p_out - py + cfg.kh) % cfg.kh;
         fp32x4_t slot;
         dispatch<cfg.kh>(p_idx,
