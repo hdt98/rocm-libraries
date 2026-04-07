@@ -242,24 +242,6 @@ class TestGroupedConvndBwdWeight : public ::testing::Test
 
         RunReference(conv_param, in, wei_host, out, d);
 
-        using DeviceOp = ck::tensor_operation::device::DeviceGroupedConvBwdWeightMultipleD<
-            NDimSpatial,
-            InLayout,
-            WeiLayout,
-            OutLayout,
-            ck::Tuple<WeiLayout>,
-            InDataType,
-            WeiDataType,
-            OutDataType,
-            ck::Tuple<WeiDataType>,
-            InElementOp,
-            WeiElementOp,
-            OutElementOp>;
-
-        // get device op instances
-        const auto op_ptrs = ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
-            DeviceOp>::GetInstances();
-        std::cout << "found " << op_ptrs.size() << " instances" << std::endl;
         int num_kernel = 0;
 
         for(std::size_t i = 0; i < op_ptrs.size(); ++i)

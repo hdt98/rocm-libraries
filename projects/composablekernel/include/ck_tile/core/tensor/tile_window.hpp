@@ -714,13 +714,12 @@ struct tile_window_with_static_distribution
                         return coord_ys_offset.get_offset();
                     }();
 
-                    this->get_bottom_tensor_view()
-                        .template async_get_vectorized_elements<vector_t>(
-                            smem,
-                            bottom_tensor_thread_coord,
-                            offset + dram_ys_offset,
-                            number<lds_access_offset>{},
-                            bool_constant<oob_conditional_check>{});
+                    this->get_bottom_tensor_view().template async_get_vectorized_elements<vector_t>(
+                        smem,
+                        bottom_tensor_thread_coord,
+                        offset + dram_ys_offset,
+                        number<lds_access_offset>{},
+                        bool_constant<oob_conditional_check>{});
 
                     // Move thread coordinate if not last access
                     if constexpr(iCoordAccess != (NumAccessPerCoord - 1))

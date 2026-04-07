@@ -394,9 +394,13 @@ struct BlockGemmARegBRegCRegV1
 
                                 // warp GEMM with MX scaling
                                 // Cast e8m0_t to int32_t, use OpSel=0 (least significant byte)
-                                //constexpr index_t kOpSel = 0; // Always use OpSel=0
+                                // constexpr index_t kOpSel = 0; // Always use OpSel=0
                                 WarpGemm{}.template operator()<OpSelA<kOpSelA>, OpSelB<kOpSelB>>(
-                                    c_warp_tensor, a_warp_tensor, b_warp_tensor, a_scale_packed, b_scale_packed);
+                                    c_warp_tensor,
+                                    a_warp_tensor,
+                                    b_warp_tensor,
+                                    a_scale_packed,
+                                    b_scale_packed);
 
                                 // write C warp tensor into C block tensor
                                 c_block_tensor.set_y_sliced_thread_data(

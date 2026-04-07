@@ -138,6 +138,7 @@ struct GemmPipelineTypeSelector<GemmPipelineType::CompAsyncEightWaves, Problem>
     static constexpr auto GetName() { return "GemmPipelineAgBgCrCompAsyncEightWaves"; }
 };
 
+template <typename Problem>
 struct GemmPipelineTypeSelector<GemmPipelineType::CompTDMV1, Problem>
 {
     using base_pipeline = ck_tile::BaseGemmPipelineAgBgCrCompTDM<Problem>;

@@ -294,7 +294,6 @@ bool profile_grouped_conv_fwd_impl(int do_verification,
     index_t num_kernel          = 0;
     index_t valid_instances     = 0;
     index_t best_instance_index = 0;
-    int valids                  = 0;
 
     // profile device op instances
     bool pass = true;

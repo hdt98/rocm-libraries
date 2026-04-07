@@ -1779,9 +1779,8 @@ struct WarpGemmAttributeMfmaImpl_f32_32x32x64_f8f6f4
 
     // c_vec += a_vec * b_vec
     template <typename... Params>
-    CK_TILE_DEVICE void operator()(CVecType& c_vec,
-                                   const AVecType& a_vec,
-                                   const BVecType& b_vec) const
+    CK_TILE_DEVICE void
+    operator()(CVecType& c_vec, const AVecType& a_vec, const BVecType& b_vec) const
     {
         operator()<Params...>(c_vec, a_vec, 0, b_vec, 0);
     }

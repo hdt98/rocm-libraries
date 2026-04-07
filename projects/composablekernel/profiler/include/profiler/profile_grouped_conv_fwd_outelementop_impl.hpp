@@ -362,27 +362,6 @@ bool profile_grouped_conv_fwd_outelementop_impl(int do_verification,
         }
     };
 
-    using DeviceOp = ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD<NDimSpatial,
-                                                                                   InLayout,
-                                                                                   WeiLayout,
-                                                                                   ck::Tuple<>,
-                                                                                   OutLayout,
-                                                                                   InDataType,
-                                                                                   WeiDataType,
-                                                                                   ck::Tuple<>,
-                                                                                   OutDataType,
-                                                                                   InElementOp,
-                                                                                   WeiElementOp,
-                                                                                   OutElementOp,
-                                                                                   AComputeType,
-                                                                                   BComputeType>;
-
-    // get device op instances
-    const auto op_ptrs = ck::tensor_operation::device::instance::DeviceOperationInstanceFactory<
-        DeviceOp>::GetInstances();
-
-    std::cout << "ckProfiler found " << op_ptrs.size() << " instances" << std::endl;
-
     for(size_t i = 0; i < op_ptrs.size(); i++)
     {
         if((instance_index != -1) && (instance_index != static_cast<int>(i)))
