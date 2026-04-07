@@ -1,2 +1,4 @@
 add_subdirectory(00_descriptor)
 add_subdirectory(01_view)
+add_subdirectory(02_distribution)
+add_subdirectory(03_window)
