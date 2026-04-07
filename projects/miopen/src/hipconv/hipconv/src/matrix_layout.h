@@ -17,15 +17,15 @@ struct MatrixLayout
 {
     __host__ __device__ static constexpr int items_per_register()
     {
-        if constexpr (sizeof(T) == 1)
+        if constexpr(sizeof(T) == 1)
         {
             return 4;
         }
-        else if constexpr (sizeof(T) == 2)
+        else if constexpr(sizeof(T) == 2)
         {
             return 2;
         }
-        else if constexpr (sizeof(T) == 4 || sizeof(T) == 8)
+        else if constexpr(sizeof(T) == 4 || sizeof(T) == 8)
         {
             return 1;
         }
@@ -44,7 +44,8 @@ struct MatrixLayout
 
     // Returns the inner-product (K-reduction) dimension index for a given lane and register index.
     // For result matrices C/D (first template arg = N), this gives the M-row instead.
-    __host__ __device__ static int inner(int lane, int idx = 0) { return idx * items_per_register() + (lane / (M * B)) * K_L; }
+    __host__ __device__ static int inner(int lane, int idx = 0)
+    { return idx * items_per_register() + (lane / (M * B)) * K_L; }
 
     // Returns the batch index corresponding to a given lane.
     __host__ __device__ static int batch(int lane) { return (lane / M) % B; }
