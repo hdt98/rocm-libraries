@@ -782,13 +782,14 @@ struct tile_scatter_gather
                 const auto lds_coord =
                     make_tensor_coordinate(tensor_descriptor, lds_bottom_tensor_thread_idx);
 
-                // Calculate SMEM address using base pointer
-                // Use byte arithmetic for dwordx3 padding (12-byte elements use 16-byte LDS stride)
+                // Calculate SMEM address using typed pointer arithmetic
+                auto* padded_base =
+                    reinterpret_cast<CK_TILE_LDS_ADDR lds_padded_element<LdsDataType>*>(
+                        lds_base_ptr);
                 CK_TILE_LDS_ADDR LdsDataType* smem =
                     reinterpret_cast<CK_TILE_LDS_ADDR LdsDataType*>(
-                        reinterpret_cast<CK_TILE_LDS_ADDR char*>(lds_base_ptr) +
-                        (lds_coord.get_offset() + lds_ys_offset) / Traits::PackedSize *
-                            lds_padded_sizeof<LdsDataType>());
+                        &padded_base[(lds_coord.get_offset() + lds_ys_offset) /
+                                     Traits::PackedSize]);
 
                 const auto dram_ys_offset = [&]() {
                     if constexpr(static_move_ys)
