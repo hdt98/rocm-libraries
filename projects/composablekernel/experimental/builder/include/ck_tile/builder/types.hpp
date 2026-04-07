@@ -202,8 +202,7 @@ enum class ConvSpecialization
     FILTER_1X1_PAD0,
     FILTER_1X1_STRIDE1_PAD0,
     FILTER_3x3,
-    ODD_C,
-    FILTER_3X3_STRIDE1_PAD0,
+    ODD_C
 };
 
 // Enums for the Gemm padding.
@@ -382,7 +381,6 @@ inline std::string_view to_string(ConvSpecialization spec)
     case FILTER_1X1_STRIDE1_PAD0: return "FILTER_1X1_STRIDE1_PAD0";
     case FILTER_3x3: return "FILTER_3x3";
     case ODD_C: return "ODD_C";
-    case FILTER_3X3_STRIDE1_PAD0: return "FILTER_3X3_STRIDE1_PAD0";
     default: return "Unknown";
     }
 }

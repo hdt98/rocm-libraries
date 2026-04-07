@@ -25,8 +25,6 @@
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_multiple_d_xdl_cshuffle.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_multiple_abd_xdl_cshuffle.hpp"
 #include "ck/tensor_operation/gpu/device/impl/device_grouped_conv_utils.hpp"
-#include "ck/tensor_operation/gpu/device/impl/split_k_arg.hpp"
-#include "ck/tensor_operation/gpu/device/impl/split_k_utils.hpp"
 #include "ck/host_utility/device_prop.hpp"
 #include "ck/host_utility/kernel_launch.hpp"
 #include "ck/host_utility/io.hpp"
@@ -85,8 +83,7 @@ template <typename GridwiseGemm,
           bool isMultiA,
           bool isMultiB,
           bool CTranspose,
-          bool DoubleBuffer     = false,
-          bool UseAtomicAdd      = false>
+          bool DoubleBuffer = false>
 __global__ void
 #if CK_USE_LAUNCH_BOUNDS
 __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
@@ -107,18 +104,14 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
             e_grid_desc_mblock_mperblock_nblock_nperblock_,
         const Block2ETileMap block_2_ctile_map,
         const ComputePtrOffsetOfG compute_ptr_offset_of_groups,
-        const ComputePtrOffsetOfN compute_ptr_offset_of_n,
-        const index_t k_batch = 1)
+        const ComputePtrOffsetOfN compute_ptr_offset_of_n)
 {
 #if defined(__gfx9__) || defined(__gfx11__) || defined(__gfx12__)
     if constexpr(GridwiseGemm::template IsValidCompilationParameter<>())
     {
         // offset base pointer for each work-group
         const index_t g_idx = __builtin_amdgcn_readfirstlane(blockIdx.y);
-        // For split-K: blockIdx.z encodes both N-split index and k-batch index.
-        // When k_batch==1 (no split-K), n_idx==blockIdx.z and k_idx==0 as before.
-        const index_t n_idx = __builtin_amdgcn_readfirstlane(blockIdx.z / k_batch);
-        const index_t k_idx = __builtin_amdgcn_readfirstlane(blockIdx.z % k_batch);
+        const index_t n_idx = __builtin_amdgcn_readfirstlane(blockIdx.z);
 
         const long_index_t e_group_offset =
             amd_wave_read_first_lane(compute_ptr_offset_of_groups.GetEPtrOffset(g_idx));
@@ -211,47 +204,26 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
                 CTranspose ? 0
                            : amd_wave_read_first_lane(compute_ptr_offset_of_n.GetAPtrOffset(n_idx));
 
-            if constexpr(UseAtomicAdd)
-            {
-                GridwiseGemm::template Run<HasMainKBlockLoop,
-                                           InMemoryDataOperationEnum::AtomicAdd>(
-                    p_as_grid + a_group_offset + a_n_offset,
-                    p_bs_grid + b_group_offset + b_n_offset,
-                    p_ds_grid_grp,
-                    p_e_grid + e_group_offset + e_n_offset,
-                    p_shared_0,
-                    a_element_op,
-                    b_element_op,
-                    cde_element_op,
-                    a_grid_desc_k0_m_k1,
-                    b_grid_desc_k0_n_k1,
-                    ds_grid_desc_mblock_mperblock_nblock_nperblock,
-                    e_grid_desc_mblock_mperblock_nblock_nperblock_,
-                    block_2_ctile_map,
-                    k_batch,
-                    k_idx,
-                    p_shared_1);
-            }
-            else
-            {
-                GridwiseGemm::template Run<HasMainKBlockLoop, InMemoryDataOperationEnum::Set>(
-                    p_as_grid + a_group_offset + a_n_offset,
-                    p_bs_grid + b_group_offset + b_n_offset,
-                    p_ds_grid_grp,
-                    p_e_grid + e_group_offset + e_n_offset,
-                    p_shared_0,
-                    a_element_op,
-                    b_element_op,
-                    cde_element_op,
-                    a_grid_desc_k0_m_k1,
-                    b_grid_desc_k0_n_k1,
-                    ds_grid_desc_mblock_mperblock_nblock_nperblock,
-                    e_grid_desc_mblock_mperblock_nblock_nperblock_,
-                    block_2_ctile_map,
-                    k_batch,
-                    k_idx,
-                    p_shared_1);
-            }
+            constexpr index_t k_batch = 1;
+            constexpr index_t k_idx   = 0;
+
+            GridwiseGemm::template Run<HasMainKBlockLoop, InMemoryDataOperationEnum::Set>(
+                p_as_grid + a_group_offset + a_n_offset,
+                p_bs_grid + b_group_offset + b_n_offset,
+                p_ds_grid_grp,
+                p_e_grid + e_group_offset + e_n_offset,
+                p_shared_0,
+                a_element_op,
+                b_element_op,
+                cde_element_op,
+                a_grid_desc_k0_m_k1,
+                b_grid_desc_k0_n_k1,
+                ds_grid_desc_mblock_mperblock_nblock_nperblock,
+                e_grid_desc_mblock_mperblock_nblock_nperblock_,
+                block_2_ctile_map,
+                k_batch,
+                k_idx,
+                p_shared_1);
         }
     }
 #else
@@ -269,7 +241,6 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
     ignore = compute_ptr_offset_of_groups;
     ignore = compute_ptr_offset_of_n;
     ignore = block_2_ctile_map;
-    ignore = k_batch;
 #endif
 }
 
@@ -352,11 +323,7 @@ template <index_t NDimSpatial,
           typename BComputeDataType = AComputeDataType,
           LoopScheduler LoopSched   = make_default_loop_scheduler(),
           index_t NumGroupsToMerge  = 1,
-          bool DoubleBuffer         = false,
-          // SplitKFactor: 1 = no split-K (default, existing behavior)
-          //               -1 = auto-deduce k_batch at runtime based on occupancy
-          //               >1 = use this fixed k_batch value
-          index_t SplitKFactor = 1>
+          bool DoubleBuffer         = false>
 struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
     : public DeviceGroupedConvFwdMultipleABD<NDimSpatial,
                                              ALayout,
@@ -374,13 +341,6 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                                              BComputeDataType>
 {
     using DeviceOp = DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle;
-
-    // Split-K: use AtomicAdd when split-K is enabled (SplitKFactor != 1).
-    // When SplitKFactor==1 (default), behavior is identical to the original (direct Set).
-    // Do not allow split-K larger than 128 because of potential accuracy issue with fp16/bf16 accumulation.
-    static constexpr bool UseAtomicAdd = (SplitKFactor != 1);
-    static_assert(SplitKFactor <= 128, "SplitKFactor too large and may inaccurate results due to atomic add.");
-
     GET_MXDL_PER_WAVE_IMPL
     // Force usage of 16x16 instruction for WMMA
     static constexpr bool Wave32Force16MNPerXDL =
@@ -749,7 +709,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                             I1>;
 
     // Argument
-    struct Argument : public BaseArgument, public ArgumentSplitK
+    struct Argument : public BaseArgument
     {
         template <typename GridwiseGemm, typename GridwiseGemmCTranspose>
         void InitGridDesc()
@@ -1031,60 +991,6 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 elementwise_block_2_ctile_map_transpose_e_ = Block2TileMapElementwise{
                     e_in_transpose_desc_.GetLength(I0), e_in_transpose_desc_.GetLength(I1)};
             }
-
-            // Split-K: compute k_batch_
-            if constexpr(SplitKFactor != 1)
-            {
-                if constexpr(SplitKFactor > 0)
-                {
-                    k_batch_ = SplitKFactor;
-                }
-                else
-                {
-                    // Auto-deduce k_batch based on grid size and CU occupancy.
-                    // Use a target occupancy of 4 blocks per CU as a reasonable default.
-                    // (A proper hipOccupancyMaxActiveBlocksPerMultiprocessor query
-                    //  can replace this heuristic for more accurate results.)
-                    static constexpr int target_occupancy = 4;
-                    const auto mn_grid_size =
-                        block_2_etile_map_.CalculateGridSize(e_grid_desc_m_n_) *
-                        (num_group_ / NumGroupsToMerge);
-                    k_batch_ = get_best_occupancy_k_batch_value(target_occupancy, mn_grid_size);
-                    k_batch_ = std::min(k_batch_, index_t{128});
-                }
-
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "Split-K: k_batch_ = " << k_batch_ << " (before enforcing AK0/AK1 limits)" << std::endl;
-                }
-
-                // Correctness constraints on k_batch:
-                //
-                // 1. k_batch must evenly divide AK0 (= K_gemm / AK1), so every split covers
-                //    exactly AK0/k_batch K0-blocks and no K0-blocks are skipped.
-                //
-                // 2. num_ak0_per_block (= AK0/k_batch) must be divisible by KPerBlock/AK1.
-                //    This ensures each split's K-range is an exact multiple of KPerBlock:
-                //    the pipeline prefetch in the main loop reads ahead by one full KPerBlock,
-                //    which would cross the split boundary if there is a K-tail within the split.
-                //    With no tail (all iterations are full KPerBlock), reads stay within bounds.
-                //
-                // Both constraints together mean k_batch must divide AK0/(KPerBlock/AK1)
-                // = K_gemm/KPerBlock.
-                const index_t ak0                 = a_grid_desc_ak0_m_ak1_.GetLength(I0);
-                const index_t k0_per_k_block      = KPerBlock / AK1; // K0-blocks per loop iter
-                const index_t k0_per_k_block_full = ak0 / k0_per_k_block; // = K/KPerBlock
-                k_batch_                          = std::min(k_batch_, k0_per_k_block_full);
-                while(k_batch_ > 1 && k0_per_k_block_full % k_batch_ != 0)
-                {
-                        k_batch_--;
-                }
-
-                if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
-                {
-                    std::cout << "Split-K: k_batch_ = " << k_batch_ << " (after enforcing AK0/AK1 limits)" << std::endl;
-                }
-            }
         }
 
         std::size_t GetWorkspaceATensorSizeBytes() const
@@ -1234,41 +1140,10 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
             const index_t gdx = arg.block_2_etile_map_.CalculateGridSize(arg.e_grid_desc_m_n_);
             const index_t gdy = arg.num_group_ / NumGroupsToMerge;
-            // Embed k_batch in gdz: each N-split workgroup is replicated k_batch times.
-            // Inside the kernel, n_idx = blockIdx.z / k_batch, k_idx = blockIdx.z % k_batch.
-            const index_t gdz = num_workgroups_per_Conv_N * arg.k_batch_;
+            const index_t gdz = num_workgroups_per_Conv_N;
 
             const auto K =
                 arg.a_grid_desc_ak0_m_ak1_.GetLength(I0) * arg.a_grid_desc_ak0_m_ak1_.GetLength(I2);
-
-            // For split-K: compute the output tensor size in bytes (needed for zeroing).
-            // The output must be zeroed before each timed kernel run so AtomicAdd is correct.
-            const long_index_t e_output_size_bytes = [&]() -> long_index_t {
-                if constexpr(UseAtomicAdd)
-                {
-                    return ck::accumulate_n<long_index_t>(arg.e_g_n_k_wos_lengths_.begin(),
-                                                          NDimSpatial + 3,
-                                                          1,
-                                                          std::multiplies<>()) *
-                           sizeof(EDataType);
-                }
-                else
-                    return 0;
-            }();
-
-            // Lambda that zeros the output; used as preprocess before each timed kernel run.
-            const auto clear_output = [&]() {
-                if constexpr(UseAtomicAdd)
-                {
-                    if(arg.k_batch_ > 1)
-                    {
-                        hip_check_error(hipMemsetAsync(
-                            arg.p_e_grid_, 0, e_output_size_bytes, stream_config.stream_id_));
-                    }
-                }
-            };
-            // Always zero once before the timed loop starts.
-            clear_output();
 
             auto launch_kernel = [&](auto has_main_k_block_loop) {
                 constexpr bool has_main_loop = has_main_k_block_loop.value;
@@ -1401,8 +1276,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                             isMultiA,
                             isMultiB,
                             CTranspose,
-                            DoubleBuffer,
-                            false>; // CTranspose path: no split-K (UseAtomicAdd=false)
+                            DoubleBuffer>;
 
 
                         if(stream_config.flush_cache)
@@ -1426,8 +1300,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                                 arg.e_grid_desc_mblock_mperblock_nblock_nperblock_,
                                 arg.block_2_etile_map_,
                                 arg.compute_ptr_offset_of_groups_,
-                                arg.compute_ptr_offset_of_n_,
-                                index_t{1}); // CTranspose: no split-K, k_batch=1
+                                arg.compute_ptr_offset_of_n_);
                         }
                         else
                         {
@@ -1450,8 +1323,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                                 arg.e_grid_desc_mblock_mperblock_nblock_nperblock_,
                                 arg.block_2_etile_map_,
                                 arg.compute_ptr_offset_of_groups_,
-                                arg.compute_ptr_offset_of_n_,
-                                index_t{1}); // CTranspose: no split-K, k_batch=1
+                                arg.compute_ptr_offset_of_n_);
                         }
                     }
                     else
@@ -1476,119 +1348,59 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                             isMultiA,
                             isMultiB,
                             CTranspose,
-                            DoubleBuffer,
-                            UseAtomicAdd>; // pass split-K flag
+                            DoubleBuffer>;
 
                         if(stream_config.flush_cache)
                         {
-                            // Use preprocess variant: zeros output before each timed launch.
-                            if constexpr(UseAtomicAdd)
-                            {
-                                return launch_and_time_kernel_with_preprocess_flush_cache(
-                                    stream_config,
-                                    clear_output,
-                                    kernel,
-                                    dim3(gdx, gdy, gdz),
-                                    dim3(BlockSize),
-                                    0,
-                                    p_a_grid,
-                                    p_b_grid,
-                                    arg.p_ds_grid_,
-                                    p_e_grid,
-                                    arg.a_element_op_,
-                                    arg.b_element_op_,
-                                    arg.cde_element_op_,
-                                    arg.a_grid_desc_ak0_m_ak1_,
-                                    arg.b_grid_desc_bk0_n_bk1_,
-                                    arg.ds_grid_desc_mblock_mperblock_nblock_nperblock_,
-                                    arg.e_grid_desc_mblock_mperblock_nblock_nperblock_,
-                                    arg.block_2_etile_map_,
-                                    arg.compute_ptr_offset_of_groups_,
-                                    arg.compute_ptr_offset_of_n_,
-                                    arg.k_batch_);
-                            }
-                            else
-                            {
-                                return launch_and_time_kernel_flush_cache(
-                                    stream_config,
-                                    kernel,
-                                    dim3(gdx, gdy, gdz),
-                                    dim3(BlockSize),
-                                    0,
-                                    p_a_grid,
-                                    p_b_grid,
-                                    arg.p_ds_grid_,
-                                    p_e_grid,
-                                    arg.a_element_op_,
-                                    arg.b_element_op_,
-                                    arg.cde_element_op_,
-                                    arg.a_grid_desc_ak0_m_ak1_,
-                                    arg.b_grid_desc_bk0_n_bk1_,
-                                    arg.ds_grid_desc_mblock_mperblock_nblock_nperblock_,
-                                    arg.e_grid_desc_mblock_mperblock_nblock_nperblock_,
-                                    arg.block_2_etile_map_,
-                                    arg.compute_ptr_offset_of_groups_,
-                                    arg.compute_ptr_offset_of_n_,
-                                    arg.k_batch_);
-                            }
+                            return launch_and_time_kernel_flush_cache(
+                                stream_config,
+                                kernel,
+                                dim3(gdx, gdy, gdz),
+                                dim3(BlockSize),
+                                0,
+                                p_a_grid,
+                                p_b_grid,
+                                arg.p_ds_grid_,
+                                p_e_grid,
+                                arg.a_element_op_,
+                                arg.b_element_op_,
+                                arg.cde_element_op_,
+                                arg.a_grid_desc_ak0_m_ak1_,
+                                arg.b_grid_desc_bk0_n_bk1_,
+                                arg.ds_grid_desc_mblock_mperblock_nblock_nperblock_,
+                                arg.e_grid_desc_mblock_mperblock_nblock_nperblock_,
+                                arg.block_2_etile_map_,
+                                arg.compute_ptr_offset_of_groups_,
+                                arg.compute_ptr_offset_of_n_);
                         }
                         else
                         {
-                            if constexpr(UseAtomicAdd)
-                            {
-                                return launch_and_time_kernel_with_preprocess(
-                                    stream_config,
-                                    clear_output,
-                                    kernel,
-                                    dim3(gdx, gdy, gdz),
-                                    dim3(BlockSize),
-                                    0,
-                                    p_a_grid,
-                                    p_b_grid,
-                                    arg.p_ds_grid_,
-                                    p_e_grid,
-                                    arg.a_element_op_,
-                                    arg.b_element_op_,
-                                    arg.cde_element_op_,
-                                    arg.a_grid_desc_ak0_m_ak1_,
-                                    arg.b_grid_desc_bk0_n_bk1_,
-                                    arg.ds_grid_desc_mblock_mperblock_nblock_nperblock_,
-                                    arg.e_grid_desc_mblock_mperblock_nblock_nperblock_,
-                                    arg.block_2_etile_map_,
-                                    arg.compute_ptr_offset_of_groups_,
-                                    arg.compute_ptr_offset_of_n_,
-                                    arg.k_batch_);
-                            }
-                            else
-                            {
-                                return launch_and_time_kernel(
-                                    stream_config,
-                                    kernel,
-                                    dim3(gdx, gdy, gdz),
-                                    dim3(BlockSize),
-                                    0,
-                                    p_a_grid,
-                                    p_b_grid,
-                                    arg.p_ds_grid_,
-                                    p_e_grid,
-                                    arg.a_element_op_,
-                                    arg.b_element_op_,
-                                    arg.cde_element_op_,
-                                    arg.a_grid_desc_ak0_m_ak1_,
-                                    arg.b_grid_desc_bk0_n_bk1_,
-                                    arg.ds_grid_desc_mblock_mperblock_nblock_nperblock_,
-                                    arg.e_grid_desc_mblock_mperblock_nblock_nperblock_,
-                                    arg.block_2_etile_map_,
-                                    arg.compute_ptr_offset_of_groups_,
-                                    arg.compute_ptr_offset_of_n_,
-                                    arg.k_batch_);
-                            }
+                            return launch_and_time_kernel(
+                                stream_config,
+                                kernel,
+                                dim3(gdx, gdy, gdz),
+                                dim3(BlockSize),
+                                0,
+                                p_a_grid,
+                                p_b_grid,
+                                arg.p_ds_grid_,
+                                p_e_grid,
+                                arg.a_element_op_,
+                                arg.b_element_op_,
+                                arg.cde_element_op_,
+                                arg.a_grid_desc_ak0_m_ak1_,
+                                arg.b_grid_desc_bk0_n_bk1_,
+                                arg.ds_grid_desc_mblock_mperblock_nblock_nperblock_,
+                                arg.e_grid_desc_mblock_mperblock_nblock_nperblock_,
+                                arg.block_2_etile_map_,
+                                arg.compute_ptr_offset_of_groups_,
+                                arg.compute_ptr_offset_of_n_);
                         }
                     }
                 }
             };
 
-            if(GridwiseGemm::CalculateHasMainKBlockLoop(K, arg.k_batch_))
+            if(GridwiseGemm::CalculateHasMainKBlockLoop(K))
             {
                 return launch_kernel(integral_constant<bool, true>{});
             }
