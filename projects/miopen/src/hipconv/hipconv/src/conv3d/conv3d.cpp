@@ -1,5 +1,6 @@
 #include "conv3d.hpp"
 #include "conv3d_96c_fp16.h"
+#include "conv3d_3c96k_fp16.h"
 #include "../kernel_variant.h"
 #include "../launch_params.h"
 #include "hipconv/conv3d_params.hpp"
@@ -13,15 +14,14 @@
 namespace
 {
 
-// Applicability check: only supports the specific configuration for which
-// the kernel was written (c=k=96, groups=1, fp16, 3x3x3, pad_d=0).
-bool is_applicable(const hipconv::Conv3dParams& par)
+// Common checks shared by all 3D variants.
+bool common_checks(const hipconv::Conv3dParams& par)
 {
-    if(par.c != 96 || par.k != 96)
-        return false;
     if(par.kd != 3 || par.kh != 3 || par.kw != 3)
         return false;
-    if(par.pad_d != 0 || par.pad_h != 1 || par.pad_w != 1)
+    if(par.pad_d != 0)
+        return false;
+    if((par.pad_h != 0 && par.pad_h != 1) || (par.pad_w != 0 && par.pad_w != 1))
         return false;
     if(par.stride_d != 1 || par.stride_h != 1 || par.stride_w != 1)
         return false;
@@ -32,10 +32,8 @@ bool is_applicable(const hipconv::Conv3dParams& par)
     return true;
 }
 
-// KernelVariant-style wrappers for conv3d_96c that match the 3D param types.
-// (A separate 3D KernelVariant struct is used here instead of the 2D KernelVariant
-// to avoid coupling the 3D path to Conv2dParams.)
-
+// KernelVariant-style wrappers for 3D kernels.
+// (A separate struct avoids coupling the 3D path to Conv2dParams.)
 struct KernelVariant3d
 {
     bool (*is_applicable)(const hipconv::Conv3dParams&);
@@ -51,10 +49,14 @@ struct KernelVariant3d
     int num_configs;
 };
 
-// Helper wrappers delegating to conv3d_96c namespace.
+// ---- Variant 0: C=K=96, pad_h/pad_w in {0,1}, groups=1 ----
 bool conv3d_96c_is_applicable(const hipconv::Conv3dParams& par)
 {
-    return is_applicable(par);
+    if(!common_checks(par))
+        return false;
+    if(par.c != 96 || par.k != 96)
+        return false;
+    return true;
 }
 
 bool conv3d_96c_config_compatible(const hipconv::Conv3dParams& par, int idx)
@@ -78,6 +80,40 @@ void conv3d_96c_launch(int config_idx,
     conv3d_96c::launch(config_idx, lp, par, in, wei, out, stream);
 }
 
+// ---- Variant 1: C=3, K=96, pad_h/pad_w in {0,1}, groups=1 ----
+bool conv3d_3c96k_is_applicable(const hipconv::Conv3dParams& par)
+{
+    if(!common_checks(par))
+        return false;
+    if(par.c != 3 || par.k != 96)
+        return false;
+    return true;
+}
+
+bool conv3d_3c96k_config_compatible(const hipconv::Conv3dParams& par, int idx)
+{
+    return conv3d_3c96k::is_valid_config(par, conv3d_3c96k::configs[idx]);
+}
+
+LaunchParams conv3d_3c96k_get_launch_params(int idx, const hipconv::Conv3dParams& par)
+{
+    return conv3d_3c96k::get_launch_params(idx, par);
+}
+
+void conv3d_3c96k_launch(int config_idx,
+                          const LaunchParams& lp,
+                          const hipconv::Conv3dParams& par,
+                          const void* in,
+                          const void* wei,
+                          void* out,
+                          hipStream_t stream)
+{
+    conv3d_3c96k::launch(config_idx, lp, par, in, wei, out, stream);
+}
+
+// -----------------------------------------------------------------------
+// Variant table (order = preference; first applicable wins).
+// -----------------------------------------------------------------------
 constexpr KernelVariant3d variants[] = {
     {
         conv3d_96c_is_applicable,
@@ -85,6 +121,13 @@ constexpr KernelVariant3d variants[] = {
         conv3d_96c_get_launch_params,
         conv3d_96c_launch,
         conv3d_96c::NUM_CONFIGS,
+    },
+    {
+        conv3d_3c96k_is_applicable,
+        conv3d_3c96k_config_compatible,
+        conv3d_3c96k_get_launch_params,
+        conv3d_3c96k_launch,
+        conv3d_3c96k::NUM_CONFIGS,
     },
 };
 constexpr int NUM_VARIANTS = sizeof(variants) / sizeof(variants[0]);
