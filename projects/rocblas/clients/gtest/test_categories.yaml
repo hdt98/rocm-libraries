@@ -47,6 +47,15 @@ test_categories:
       - "stress"
       - "weekly"
 
+  multi_gpu:
+    description: "Multi-GPU tests - requires at least 2 GPUs"
+    test_patterns:
+      - "*multi_gpu*"
+    exclude:
+      - "*known_bug*"
+    labels:
+      - "multi_gpu"
+
 # GPU-specific exclusions can be added here when needed (see shared/ctest/README.md).
 # exclude_gpu:
 #   exclude_gpu_gfxXXXX:
@@ -64,3 +73,4 @@ execution_settings:
     standard: 7200    # ~2 hours (standard can take over an hour)
     comprehensive: 28800   # 8 hours
     full: 86400       # 24 hours
+    multi_gpu: 5400   # 90 min (multi-GPU tests)
