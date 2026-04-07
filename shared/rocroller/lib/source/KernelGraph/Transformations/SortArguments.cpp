@@ -92,10 +92,19 @@ namespace rocRoller::KernelGraph
 
         kernel->resetArguments();
 
+        // At this point, arguments are sorted so that preloaded arguments
+        // come first, followed by a block of manually-loaded arguments.
         int manualOffset = -1;
         for(auto& arg : arguments)
         {
-            if(!arg.getPreloaded() && manualOffset < 0)
+            if(arg.getPreloaded())
+            {
+                arg.setOffset(-1);
+                m_context->kernel()->addArgument(arg);
+                continue;
+            }
+
+            if(manualOffset < 0)
             {
                 // Align the start of the manually-loaded block to enable
                 // the widest possible scalar load instructions (s_load_dwordx16).
@@ -104,17 +113,10 @@ namespace rocRoller::KernelGraph
                                                  kMaxScalarLoadBytes);
             }
 
-            if(!arg.getPreloaded())
-            {
-                // Pack manually-loaded args contiguously to maximize
-                // scalar load width (up to s_load_dwordx16).
-                arg.setOffset(manualOffset);
-                manualOffset += arg.getSize();
-            }
-            else
-            {
-                arg.setOffset(-1);
-            }
+            // Pack manually-loaded args contiguously to maximize
+            // scalar load width (up to s_load_dwordx16).
+            arg.setOffset(manualOffset);
+            manualOffset += arg.getSize();
             m_context->kernel()->addArgument(arg);
         }
 

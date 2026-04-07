@@ -193,10 +193,11 @@ namespace rocRoller
         m_data.insert(m_data.end(), padding, 0);
     }
 
-    inline void KernelArguments::padTo(size_t offset)
+    inline void KernelArguments::padTo(int offset)
     {
-        if(offset > m_data.size())
-            m_data.insert(m_data.end(), offset - m_data.size(), 0);
+        AssertFatal(offset >= 0, "padTo offset must not be negative", ShowValue(offset));
+        if(static_cast<size_t>(offset) > m_data.size())
+            m_data.insert(m_data.end(), static_cast<size_t>(offset) - m_data.size(), 0);
     }
 
     inline void KernelArguments::appendRecord(std::string const&   argName,

@@ -19,7 +19,7 @@ namespace rocRoller
         explicit KernelArguments(bool log = true, size_t bytes = 0);
 
         void reserve(size_t bytes, size_t count);
-        void padTo(size_t offset);
+        void padTo(int offset);
 
         template <CScaleType T>
         void writeValue(size_t offset, T value);
