@@ -353,7 +353,7 @@ namespace rocRoller
             }
 
             // Skip scale buffers for LDS padding in FP4 for correctness
-            if(maybeLayoutTypeAndDataType->second == DataType::E8M0)
+            if(isScaleType(maybeLayoutTypeAndDataType->second))
             {
                 Log::debug("KernelGraph::AddLDSPadding: skipping LDS tag {} (E8M0 scale buffer)",
                            ldsTag);
