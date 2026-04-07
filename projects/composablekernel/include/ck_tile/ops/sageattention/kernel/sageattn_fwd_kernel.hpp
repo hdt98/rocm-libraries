@@ -10,7 +10,6 @@
 #include "ck_tile/ops/fmha/block/block_position_encoding.hpp"
 #include "ck_tile/ops/fmha/block/variants.hpp"
 
-#include <string>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -58,73 +57,6 @@ struct SageAttnFwdKernel
     static constexpr bool kHasMask = FmhaMask::IsMasking;
 
     static constexpr bool kUseAsyncCopy = SageAttnPipeline::Policy::AsyncCopy;
-
-    static constexpr bool kIsAvailable              = true;
-    static constexpr std::string_view kPipelineName = SageAttnPipeline::name;
-
-    // clang-format off
-    template <typename> struct t2s;
-    template <> struct t2s<float> { static constexpr const char * name = "fp32"; };
-    template <> struct t2s<ck_tile::fp16_t> { static constexpr const char * name = "fp16"; };
-    template <> struct t2s<ck_tile::bf16_t> { static constexpr const char * name = "bf16"; };
-    template <> struct t2s<ck_tile::fp8_t> { static constexpr const char * name = "fp8"; };
-    template <> struct t2s<ck_tile::bf8_t> { static constexpr const char * name = "bf8"; };
-    // clang-format on
-
-    CK_TILE_HOST static std::string GetName()
-    {
-        // sync with codegen/ops/sageattn_fwd.py
-        // clang-format off
-        using bss  = typename SageAttnPipeline::BlockSageAttnShape;
-        using gbr0 = typename bss::Gemm0BlockWarps;
-        using gbr1 = typename bss::Gemm1BlockWarps;
-        using gwt0 = typename bss::Gemm0WarpTile;
-        using gwt1 = typename bss::Gemm1WarpTile;
-        
-        #define _SS_  std::string
-        #define _TS_  std::to_string
-        
-        auto pn = [&] () {
-            std::string n;
-            if (kPadSeqLenQ) n += "s";
-            if (kPadSeqLenK) n += "sk";
-            if (kPadHeadDimQ) n += "d";
-            if (kPadHeadDimV) n += "dv";
-            return n.empty() ? n : std::string("p") + n;
-        }();
-        
-        std::string pipeline_str = std::string(kPipelineName);
-        
-        auto name = 
-            _SS_("sageattn_fwd_d") + _TS_(bss::kQKHeaddim) + "_" + _SS_(t2s<QDataType>::name) + "_" +
-            (kIsGroupMode ? "group" : "batch") + "_" +
-            "b" + _TS_(bss::kM0) + "x" + _TS_(bss::kN0) + "x" + _TS_(bss::kK0) + "x" +
-                  _TS_(bss::kN1) + "x" + _TS_(bss::kK1) + "x" + _TS_(bss::kQKHeaddim) + "_" +
-            "r" + _TS_(gbr0::at(ck_tile::number<0>{})) + "x" + 
-                  _TS_(gbr0::at(ck_tile::number<1>{})) + "x" + 
-                  _TS_(gbr0::at(ck_tile::number<2>{})) + "_" +
-            "r" + _TS_(gbr1::at(ck_tile::number<0>{})) + "x" + 
-                  _TS_(gbr1::at(ck_tile::number<1>{})) + "x" + 
-                  _TS_(gbr1::at(ck_tile::number<2>{})) + "_" +
-            "w" + _TS_(gwt0::at(ck_tile::number<0>{})) + "x" + 
-                  _TS_(gwt0::at(ck_tile::number<1>{})) + "x" + 
-                  _TS_(gwt0::at(ck_tile::number<2>{})) + "_" +
-            "w" + _TS_(gwt1::at(ck_tile::number<0>{})) + "x" + 
-                  _TS_(gwt1::at(ck_tile::number<1>{})) + "x" + 
-                  _TS_(gwt1::at(ck_tile::number<2>{})) + "_" +
-            pipeline_str + "_" +
-            "v" + (std::is_same_v<VLayout, ck_tile::tensor_layout::gemm::RowMajor> ? "r" : "c") + 
-            (pn.empty() ? "" : "_" + pn) +
-            "_nbias" +
-            (kHasMask ? "_mask" : "_nmask") +
-            (kSkipMinSeqlenQ ? "_skip" : "_nskip") +
-            (QScaleEnum == BlockSageAttentionQuantScaleEnum::NO_SCALE ? "_nqscale" : "_pertensor");
-        
-        #undef _SS_
-        #undef _TS_
-        // clang-format on
-        return name;
-    }
 
     template <ck_tile::index_t I> // to avoid duplicated base class prblem, introduce an template
                                   // arg
@@ -268,49 +200,49 @@ struct SageAttnFwdKernel
 
     template <bool Cond = !kIsGroupMode>
     CK_TILE_HOST static constexpr std::enable_if_t<Cond, Kargs>
-    MakeKargsImpl(const void* q_ptr,
-                  const void* k_ptr,
-                  const void* v_ptr,
-                  const void* /*bias_ptr*/,
-                  const void* q_descale_ptr,
-                  const void* k_descale_ptr,
-                  const void* v_descale_ptr,
-                  void* o_ptr,
-                  ck_tile::index_t seqlen_q,
-                  ck_tile::index_t seqlen_k,
-                  ck_tile::index_t hdim_q,
-                  ck_tile::index_t hdim_v,
-                  ck_tile::index_t num_head_q,
-                  ck_tile::index_t nhead_ratio_qk,
-                  float scale_s,
-                  ck_tile::index_t stride_q,
-                  ck_tile::index_t stride_k,
-                  ck_tile::index_t stride_v,
-                  ck_tile::index_t /*stride_bias*/,
-                  ck_tile::index_t stride_o,
-                  ck_tile::index_t nhead_stride_q,
-                  ck_tile::index_t nhead_stride_k,
-                  ck_tile::index_t nhead_stride_v,
-                  ck_tile::index_t /*nhead_stride_bias*/,
-                  ck_tile::index_t nhead_stride_o,
-                  ck_tile::index_t nhead_stride_q_descale,
-                  ck_tile::index_t nhead_stride_k_descale,
-                  ck_tile::index_t nhead_stride_v_descale,
-                  ck_tile::index_t batch_stride_q,
-                  ck_tile::index_t batch_stride_k,
-                  ck_tile::index_t batch_stride_v,
-                  ck_tile::index_t /*batch_stride_bias*/,
-                  ck_tile::index_t batch_stride_o,
-                  ck_tile::index_t batch_stride_q_descale,
-                  ck_tile::index_t batch_stride_k_descale,
-                  ck_tile::index_t batch_stride_v_descale,
-                  ck_tile::index_t block_scale_size_q,
-                  ck_tile::index_t block_scale_size_k,
-                  ck_tile::index_t window_size_left,
-                  ck_tile::index_t window_size_right,
-                  ck_tile::index_t mask_type,
-                  const void* cu_seqlen_q_ptr = nullptr,
-                  const void* cu_seqlen_k_ptr = nullptr)
+    MakeKargs(const void* q_ptr,
+              const void* k_ptr,
+              const void* v_ptr,
+              const void* /*bias_ptr*/,
+              const void* q_descale_ptr,
+              const void* k_descale_ptr,
+              const void* v_descale_ptr,
+              void* o_ptr,
+              ck_tile::index_t seqlen_q,
+              ck_tile::index_t seqlen_k,
+              ck_tile::index_t hdim_q,
+              ck_tile::index_t hdim_v,
+              ck_tile::index_t num_head_q,
+              ck_tile::index_t nhead_ratio_qk,
+              float scale_s,
+              ck_tile::index_t stride_q,
+              ck_tile::index_t stride_k,
+              ck_tile::index_t stride_v,
+              ck_tile::index_t /*stride_bias*/,
+              ck_tile::index_t stride_o,
+              ck_tile::index_t nhead_stride_q,
+              ck_tile::index_t nhead_stride_k,
+              ck_tile::index_t nhead_stride_v,
+              ck_tile::index_t /*nhead_stride_bias*/,
+              ck_tile::index_t nhead_stride_o,
+              ck_tile::index_t nhead_stride_q_descale,
+              ck_tile::index_t nhead_stride_k_descale,
+              ck_tile::index_t nhead_stride_v_descale,
+              ck_tile::index_t batch_stride_q,
+              ck_tile::index_t batch_stride_k,
+              ck_tile::index_t batch_stride_v,
+              ck_tile::index_t /*batch_stride_bias*/,
+              ck_tile::index_t batch_stride_o,
+              ck_tile::index_t batch_stride_q_descale,
+              ck_tile::index_t batch_stride_k_descale,
+              ck_tile::index_t batch_stride_v_descale,
+              ck_tile::index_t block_scale_size_q,
+              ck_tile::index_t block_scale_size_k,
+              ck_tile::index_t window_size_left,
+              ck_tile::index_t window_size_right,
+              ck_tile::index_t mask_type,
+              const void* cu_seqlen_q_ptr = nullptr,
+              const void* cu_seqlen_k_ptr = nullptr)
     {
         Kargs kargs{{q_ptr,
                      k_ptr,
@@ -377,8 +309,7 @@ struct SageAttnFwdKernel
         return kargs;
     }
 
-    // std::variant<> can't take in a list initializer, overload for backward compatibility
-    template <bool Cond = !kIsGroupMode>
+    template <bool Cond = kIsGroupMode>
     CK_TILE_HOST static constexpr std::enable_if_t<Cond, Kargs>
     MakeKargs(const void* q_ptr,
               const void* k_ptr,
@@ -388,8 +319,10 @@ struct SageAttnFwdKernel
               const void* k_descale_ptr,
               const void* v_descale_ptr,
               void* o_ptr,
-              ck_tile::index_t seqlen_q,
-              ck_tile::index_t seqlen_k,
+              const void* seqstart_q_ptr,
+              const void* seqstart_k_ptr,
+              const void* seqlen_q_ptr,
+              const void* seqlen_k_ptr,
               ck_tile::index_t hdim_q,
               ck_tile::index_t hdim_v,
               ck_tile::index_t num_head_q,
@@ -405,194 +338,20 @@ struct SageAttnFwdKernel
               ck_tile::index_t nhead_stride_v,
               ck_tile::index_t /*nhead_stride_bias*/,
               ck_tile::index_t nhead_stride_o,
-              ck_tile::index_t batch_stride_q,
-              ck_tile::index_t batch_stride_k,
-              ck_tile::index_t batch_stride_v,
-              ck_tile::index_t /*batch_stride_bias*/,
-              ck_tile::index_t batch_stride_o,
+              ck_tile::index_t nhead_stride_q_descale,
+              ck_tile::index_t nhead_stride_k_descale,
+              ck_tile::index_t nhead_stride_v_descale,
+              ck_tile::index_t batch_stride_v_descale,
+              ck_tile::index_t block_scale_size_q,
+              ck_tile::index_t block_scale_size_k,
+              const void* block_scale_seqstart_q_ptr,
+              const void* block_scale_seqstart_k_ptr,
               ck_tile::index_t window_size_left,
               ck_tile::index_t window_size_right,
               ck_tile::index_t mask_type,
+              ck_tile::index_t min_seqlen_q,
               const void* cu_seqlen_q_ptr = nullptr,
               const void* cu_seqlen_k_ptr = nullptr)
-    {
-        return MakeKargsImpl(q_ptr,
-                             k_ptr,
-                             v_ptr,
-                             nullptr,
-                             q_descale_ptr,
-                             k_descale_ptr,
-                             v_descale_ptr,
-                             o_ptr,
-                             seqlen_q,
-                             seqlen_k,
-                             hdim_q,
-                             hdim_v,
-                             num_head_q,
-                             nhead_ratio_qk,
-                             scale_s,
-                             stride_q,
-                             stride_k,
-                             stride_v,
-                             nullptr,
-                             stride_o,
-                             nhead_stride_q,
-                             nhead_stride_k,
-                             nhead_stride_v,
-                             nullptr,
-                             nhead_stride_o,
-                             batch_stride_q,
-                             batch_stride_k,
-                             batch_stride_v,
-                             nullptr,
-                             batch_stride_o,
-                             window_size_left,
-                             window_size_right,
-                             mask_type,
-                             cu_seqlen_q_ptr,
-                             cu_seqlen_k_ptr);
-    }
-
-    // std::variant<> can't take in a list initializer, overload for backward compatibility
-    template <bool Cond = !kIsGroupMode>
-    CK_TILE_HOST static constexpr std::enable_if_t<Cond, Kargs>
-    MakeKargs(const void* q_ptr,
-              const void* k_ptr,
-              const void* v_ptr,
-              const void* /*bias_ptr*/,
-              const void* q_descale_ptr,
-              const void* k_descale_ptr,
-              const void* v_descale_ptr,
-              void* rand_val_ptr,
-              void* lse_ptr,
-              void* o_ptr,
-              ck_tile::index_t seqlen_q,
-              ck_tile::index_t seqlen_k,
-              ck_tile::index_t hdim_q,
-              ck_tile::index_t hdim_v,
-              ck_tile::index_t num_head_q,
-              ck_tile::index_t nhead_ratio_qk,
-              float scale_s,
-              ck_tile::index_t stride_q,
-              ck_tile::index_t stride_k,
-              ck_tile::index_t stride_v,
-              ck_tile::index_t stride_bias,
-              ck_tile::index_t stride_randval,
-              ck_tile::index_t stride_o,
-              ck_tile::index_t nhead_stride_q,
-              ck_tile::index_t nhead_stride_k,
-              ck_tile::index_t nhead_stride_v,
-              ck_tile::index_t nhead_stride_bias,
-              ck_tile::index_t nhead_stride_randval,
-              ck_tile::index_t nhead_stride_lse,
-              ck_tile::index_t nhead_stride_o,
-              ck_tile::index_t batch_stride_q,
-              ck_tile::index_t batch_stride_k,
-              ck_tile::index_t batch_stride_v,
-              ck_tile::index_t batch_stride_bias,
-              ck_tile::index_t batch_stride_randval,
-              ck_tile::index_t batch_stride_lse,
-              ck_tile::index_t batch_stride_o,
-              ck_tile::index_t window_size_left,
-              ck_tile::index_t window_size_right,
-              ck_tile::index_t mask_type,
-              float p_drop,
-              bool s_randval,
-              const std::tuple<const void*, const void*>& drop_seed_offset,
-              const void* cu_seqlen_q_ptr = nullptr,
-              const void* cu_seqlen_k_ptr = nullptr)
-    {
-        return MakeKargsImpl(
-            q_ptr,
-            k_ptr,
-            v_ptr,
-            nullptr,
-            q_descale_ptr,
-            k_descale_ptr,
-            v_descale_ptr,
-            rand_val_ptr,
-            lse_ptr,
-            o_ptr,
-            seqlen_q,
-            seqlen_k,
-            hdim_q,
-            hdim_v,
-            num_head_q,
-            nhead_ratio_qk,
-            scale_s,
-            stride_q,
-            stride_k,
-            stride_v,
-            stride_bias,
-            stride_randval,
-            stride_o,
-            nhead_stride_q,
-            nhead_stride_k,
-            nhead_stride_v,
-            nhead_stride_bias,
-            nhead_stride_randval,
-            nhead_stride_lse,
-            nhead_stride_o,
-            batch_stride_q,
-            batch_stride_k,
-            batch_stride_v,
-            batch_stride_bias,
-            batch_stride_randval,
-            batch_stride_lse,
-            batch_stride_o,
-            window_size_left,
-            window_size_right,
-            mask_type,
-            p_drop,
-            s_randval,
-            std::make_pair(std::get<0>(drop_seed_offset), std::get<1>(drop_seed_offset)),
-            cu_seqlen_q_ptr,
-            cu_seqlen_k_ptr);
-    }
-
-    template <bool Cond = kIsGroupMode>
-    CK_TILE_HOST static constexpr std::enable_if_t<Cond, Kargs>
-    MakeKargsImpl(const void* q_ptr,
-                  const void* k_ptr,
-                  const void* v_ptr,
-                  const void* /*bias_ptr*/,
-                  const void* q_descale_ptr,
-                  const void* k_descale_ptr,
-                  const void* v_descale_ptr,
-                  void* o_ptr,
-                  const void* seqstart_q_ptr,
-                  const void* seqstart_k_ptr,
-                  const void* seqlen_q_ptr,
-                  const void* seqlen_k_ptr,
-                  ck_tile::index_t hdim_q,
-                  ck_tile::index_t hdim_v,
-                  ck_tile::index_t num_head_q,
-                  ck_tile::index_t nhead_ratio_qk,
-                  float scale_s,
-                  ck_tile::index_t stride_q,
-                  ck_tile::index_t stride_k,
-                  ck_tile::index_t stride_v,
-                  ck_tile::index_t /*stride_bias*/,
-                  ck_tile::index_t stride_o,
-                  ck_tile::index_t nhead_stride_q,
-                  ck_tile::index_t nhead_stride_k,
-                  ck_tile::index_t nhead_stride_v,
-                  ck_tile::index_t /*nhead_stride_bias*/,
-                  ck_tile::index_t nhead_stride_o,
-                  ck_tile::index_t nhead_stride_q_descale,
-                  ck_tile::index_t nhead_stride_k_descale,
-                  ck_tile::index_t nhead_stride_v_descale,
-                  ck_tile::index_t batch_stride_v_descale,
-                  ck_tile::index_t block_scale_size_q,
-                  ck_tile::index_t block_scale_size_k,
-                  const void* block_scale_seqstart_q_ptr,
-                  const void* block_scale_seqstart_k_ptr,
-                  ck_tile::index_t window_size_left,
-                  ck_tile::index_t window_size_right,
-                  ck_tile::index_t mask_type,
-                  ck_tile::index_t min_seqlen_q,
-                  const void* cu_seqlen_q_ptr = nullptr,
-                  const void* cu_seqlen_k_ptr = nullptr)
     {
         Kargs kargs{{q_ptr,
                      k_ptr,
@@ -665,184 +424,6 @@ struct SageAttnFwdKernel
         kargs.cu_seqlen_q_ptr = reinterpret_cast<const int32_t*>(cu_seqlen_q_ptr);
         kargs.cu_seqlen_k_ptr = reinterpret_cast<const int32_t*>(cu_seqlen_k_ptr);
         return kargs;
-    }
-
-    // std::variant<> can't take in a list initializer, overload for backward compatibility
-    template <bool Cond = kIsGroupMode>
-    CK_TILE_HOST static constexpr std::enable_if_t<Cond, Kargs>
-    MakeKargs(const void* q_ptr,
-              const void* k_ptr,
-              const void* v_ptr,
-              const void* /*bias_ptr*/,
-              const void* q_descale_ptr,
-              const void* k_descale_ptr,
-              const void* v_descale_ptr,
-              void* rand_val_ptr,
-              void* lse_ptr,
-              void* o_ptr,
-              const void* seqstart_q_ptr,
-              const void* seqstart_k_ptr,
-              const void* seqlen_q_ptr,
-              const void* seqlen_k_ptr,
-              ck_tile::index_t hdim_q,
-              ck_tile::index_t hdim_v,
-              ck_tile::index_t num_head_q,
-              ck_tile::index_t nhead_ratio_qk,
-              float scale_s,
-              ck_tile::index_t stride_q,
-              ck_tile::index_t stride_k,
-              ck_tile::index_t stride_v,
-              ck_tile::index_t stride_bias,
-              ck_tile::index_t stride_randval,
-              ck_tile::index_t stride_o,
-              ck_tile::index_t nhead_stride_q,
-              ck_tile::index_t nhead_stride_k,
-              ck_tile::index_t nhead_stride_v,
-              ck_tile::index_t nhead_stride_bias,
-              ck_tile::index_t nhead_stride_randval,
-              ck_tile::index_t nhead_stride_lse,
-              ck_tile::index_t nhead_stride_o,
-              ck_tile::index_t window_size_left,
-              ck_tile::index_t window_size_right,
-              ck_tile::index_t mask_type,
-              ck_tile::index_t min_seqlen_q,
-              float p_drop,
-              bool s_randval,
-              const std::tuple<uint64_t, uint64_t>& drop_seed_offset,
-              const void* cu_seqlen_q_ptr = nullptr,
-              const void* cu_seqlen_k_ptr = nullptr)
-    {
-        return MakeKargsImpl(
-            q_ptr,
-            k_ptr,
-            v_ptr,
-            nullptr,
-            q_descale_ptr,
-            k_descale_ptr,
-            v_descale_ptr,
-            rand_val_ptr,
-            lse_ptr,
-            o_ptr,
-            seqstart_q_ptr,
-            seqstart_k_ptr,
-            seqlen_q_ptr,
-            seqlen_k_ptr,
-            hdim_q,
-            hdim_v,
-            num_head_q,
-            nhead_ratio_qk,
-            scale_s,
-            stride_q,
-            stride_k,
-            stride_v,
-            stride_bias,
-            stride_randval,
-            stride_o,
-            nhead_stride_q,
-            nhead_stride_k,
-            nhead_stride_v,
-            nhead_stride_bias,
-            nhead_stride_randval,
-            nhead_stride_lse,
-            nhead_stride_o,
-            window_size_left,
-            window_size_right,
-            mask_type,
-            min_seqlen_q,
-            p_drop,
-            s_randval,
-            std::make_pair(std::get<0>(drop_seed_offset), std::get<1>(drop_seed_offset)),
-            cu_seqlen_q_ptr,
-            cu_seqlen_k_ptr);
-    }
-
-    // std::variant<> can't take in a list initializer, overload for backward compatibility
-    template <bool Cond = kIsGroupMode>
-    CK_TILE_HOST static constexpr std::enable_if_t<Cond, Kargs>
-    MakeKargs(const void* q_ptr,
-              const void* k_ptr,
-              const void* v_ptr,
-              const void* /*bias_ptr*/,
-              const void* q_descale_ptr,
-              const void* k_descale_ptr,
-              const void* v_descale_ptr,
-              void* rand_val_ptr,
-              void* lse_ptr,
-              void* o_ptr,
-              const void* seqstart_q_ptr,
-              const void* seqstart_k_ptr,
-              const void* seqlen_q_ptr,
-              const void* seqlen_k_ptr,
-              ck_tile::index_t hdim_q,
-              ck_tile::index_t hdim_v,
-              ck_tile::index_t num_head_q,
-              ck_tile::index_t nhead_ratio_qk,
-              float scale_s,
-              ck_tile::index_t stride_q,
-              ck_tile::index_t stride_k,
-              ck_tile::index_t stride_v,
-              ck_tile::index_t stride_bias,
-              ck_tile::index_t stride_randval,
-              ck_tile::index_t stride_o,
-              ck_tile::index_t nhead_stride_q,
-              ck_tile::index_t nhead_stride_k,
-              ck_tile::index_t nhead_stride_v,
-              ck_tile::index_t nhead_stride_bias,
-              ck_tile::index_t nhead_stride_randval,
-              ck_tile::index_t nhead_stride_lse,
-              ck_tile::index_t nhead_stride_o,
-              ck_tile::index_t window_size_left,
-              ck_tile::index_t window_size_right,
-              ck_tile::index_t mask_type,
-              ck_tile::index_t min_seqlen_q,
-              float p_drop,
-              bool s_randval,
-              const std::tuple<const void*, const void*>& drop_seed_offset,
-              const void* cu_seqlen_q_ptr = nullptr,
-              const void* cu_seqlen_k_ptr = nullptr)
-    {
-        return MakeKargsImpl(
-            q_ptr,
-            k_ptr,
-            v_ptr,
-            nullptr,
-            q_descale_ptr,
-            k_descale_ptr,
-            v_descale_ptr,
-            rand_val_ptr,
-            lse_ptr,
-            o_ptr,
-            seqstart_q_ptr,
-            seqstart_k_ptr,
-            seqlen_q_ptr,
-            seqlen_k_ptr,
-            hdim_q,
-            hdim_v,
-            num_head_q,
-            nhead_ratio_qk,
-            scale_s,
-            stride_q,
-            stride_k,
-            stride_v,
-            stride_bias,
-            stride_randval,
-            stride_o,
-            nhead_stride_q,
-            nhead_stride_k,
-            nhead_stride_v,
-            nhead_stride_bias,
-            nhead_stride_randval,
-            nhead_stride_lse,
-            nhead_stride_o,
-            window_size_left,
-            window_size_right,
-            mask_type,
-            min_seqlen_q,
-            p_drop,
-            s_randval,
-            std::make_pair(std::get<0>(drop_seed_offset), std::get<1>(drop_seed_offset)),
-            cu_seqlen_q_ptr,
-            cu_seqlen_k_ptr);
     }
 
     CK_TILE_HOST static constexpr auto GridSize(ck_tile::index_t batch_size_,
@@ -953,12 +534,6 @@ struct SageAttnFwdKernel
     }
 
     CK_TILE_DEVICE void operator()(Kargs kargs) const
-    {
-        if constexpr(kIsAvailable)
-            run_(std::move(kargs));
-    }
-
-    CK_TILE_DEVICE void run_(Kargs kargs) const
     {
         // allocate LDS
         __shared__ char smem_ptr[GetSmemSize()];

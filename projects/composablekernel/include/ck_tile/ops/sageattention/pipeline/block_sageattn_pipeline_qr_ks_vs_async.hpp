@@ -282,7 +282,7 @@ struct BlockSageAttentionPipelineQRKSVSAsync
         auto v_dram_window =
             make_tile_window(v_dram_block_window_tmp.get_bottom_tensor_view(),
                              v_dram_block_window_tmp.get_window_lengths(),
-                             {0, 0}, // TODO: hdim split?
+                             {0, 0},
                              Policy::template MakeVDramTileDistribution<Problem>());
 
         // prefetch K tile

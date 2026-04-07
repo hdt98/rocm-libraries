@@ -274,7 +274,7 @@ auto sageattn_fwd_create_kargs_and_grids(sageattn_fwd_args args)
         // create group mode kernel arguments
         if constexpr(SageAttnKernel::kIsGroupMode)
         {
-            return SageAttnKernel::MakeKargsImpl(args.q_ptr,
+            return SageAttnKernel::MakeKargs(args.q_ptr,
                                                  args.k_ptr,
                                                  args.v_ptr,
                                                  args.bias_ptr,
@@ -318,7 +318,7 @@ auto sageattn_fwd_create_kargs_and_grids(sageattn_fwd_args args)
         }
         else
         { // create batch mode kernel arguments
-            return SageAttnKernel::MakeKargsImpl(args.q_ptr,
+            return SageAttnKernel::MakeKargs(args.q_ptr,
                                                  args.k_ptr,
                                                  args.v_ptr,
                                                  args.bias_ptr,
