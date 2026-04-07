@@ -379,7 +379,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
     // When SplitKFactor==1 (default), behavior is identical to the original (direct Set).
     // Do not allow split-K larger than 128 because of potential accuracy issue with fp16/bf16 accumulation.
     static constexpr bool UseAtomicAdd = (SplitKFactor != 1);
-    static_assert(SplitKFactor <= 128, "SplitKFactor too large and may inaccurate results due to atomic add.");
+    static_assert(SplitKFactor <= 128, "SplitKFactor too large and may lead to inaccurate results due to atomic add.");
 
     GET_MXDL_PER_WAVE_IMPL
     // Force usage of 16x16 instruction for WMMA
@@ -745,6 +745,111 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                             I0,
                             I1>;
 
+    struct ActiveWorkgroupsPerCU
+    {
+        template <typename GridwiseGemm>
+        static int GetMaxOccupancy()
+        {
+            constexpr int dynamic_smem_size = 0;
+            int max_occupancy               = 0;
+
+            if constexpr(isMultiA || isMultiB)
+            {
+                hip_check_error(hipOccupancyMaxActiveBlocksPerMultiprocessor(
+                    &max_occupancy,
+                    kernel_grouped_conv_fwd_multiple_abd_xdl_cshuffle<
+                        GridwiseGemm,
+                        AGridPointer,
+                        BGridPointer,
+                        typename GridwiseGemm::DsGridPointer,
+                        EDataType,
+                        AElementwiseOperation,
+                        BElementwiseOperation,
+                        CDEElementwiseOperation,
+                        remove_reference_t<DeviceOp::AGridDesc_AK0_M_AK1>,
+                        remove_reference_t<DeviceOp::BGridDesc_BK0_N_BK1>,
+                        remove_reference_t<DeviceOp::DsGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                        remove_reference_t<DeviceOp::EGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                        remove_reference_t<DeviceOp::Block2ETileMap>,
+                        ComputePtrOffsetOfStridedBatch<NumATensor, NumBTensor, NumDTensor>,
+                        ComputePtrOffsetOfStridedBatch<NumATensor, I1, NumDTensor>,
+                        false,  // HasMainKBlockLoop - both true/false give the same occupancy
+                        isMultiA,
+                        isMultiB,
+                        CTranspose,
+                        DoubleBuffer,
+                        true>,  // UseAtomicAdd - true since we have split-K. 
+                    BlockSize,
+                    dynamic_smem_size));
+            }
+            else 
+            {
+                hip_check_error(hipOccupancyMaxActiveBlocksPerMultiprocessor(
+                        &max_occupancy,
+                        kernel_grouped_conv_fwd_multiple_abd_xdl_cshuffle<
+                            GridwiseGemm,
+                            const ADataType*,
+                            const BDataType*,
+                            typename GridwiseGemm::DsGridPointer,
+                            EDataType,
+                            AElementwiseOperation,
+                            BElementwiseOperation,
+                            CDEElementwiseOperation,
+                            remove_reference_t<DeviceOp::AGridDesc_AK0_M_AK1>,
+                            remove_reference_t<DeviceOp::BGridDesc_BK0_N_BK1>,
+                            remove_reference_t<DeviceOp::DsGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                            remove_reference_t<DeviceOp::EGridDesc_MBlock_MPerBlock_NBlock_NPerBlock>,
+                            remove_reference_t<DeviceOp::Block2ETileMap>,
+                            ComputePtrOffsetOfStridedBatch<NumATensor, NumBTensor, NumDTensor>,
+                            ComputePtrOffsetOfStridedBatch<NumATensor, I1, NumDTensor>,
+                            false,  // HasMainKBlockLoop - both true/false give the same occupancy
+                            isMultiA,
+                            isMultiB,
+                            CTranspose,
+                            DoubleBuffer,
+                            true>,  // UseAtomicAdd - true since we have split-K. 
+                        BlockSize,
+                        dynamic_smem_size));
+            }
+            
+            return std::max(1, max_occupancy);
+        }
+        ActiveWorkgroupsPerCU()
+        {
+            max_occupancy_ = 1;
+            if(get_warp_size() == 64)
+            {
+                if constexpr(MXdlPerWave64 > 0)
+                {
+                    if constexpr(CTranspose)
+                    {
+                        max_occupancy_ = GetMaxOccupancy<GridwiseGemmCTranspose64>();
+                    }
+                    else
+                    {
+                        max_occupancy_ = GetMaxOccupancy<GridwiseGemm64>();   
+                    }
+                }
+            }
+            else
+            {
+                if constexpr(MXdlPerWave32 > 0)
+                {
+                    //max_occupancy_ = GetMaxOccupancy<GridwiseGemm32>();
+                    if constexpr (CTranspose)
+                    {
+                        max_occupancy_ = GetMaxOccupancy<GridwiseGemmCTranspose32>();
+                    }
+                    else
+                    {
+                        max_occupancy_ = GetMaxOccupancy<GridwiseGemm32>();   
+                    }
+                }
+            }
+        }
+        int max_occupancy_;
+    };
+
     // Argument
     struct Argument : public BaseArgument, public ArgumentSplitK
     {
@@ -883,6 +988,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
               b_element_op_{b_element_op},
               cde_element_op_{cde_element_op}
         {
+            static ActiveWorkgroupsPerCU active_workgroups_per_cu;
+
             // A/B/E Batch Stride
             if constexpr(isMultiA || isMultiB)
             {
@@ -1038,15 +1145,10 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                 }
                 else
                 {
-                    // Auto-deduce k_batch based on grid size and CU occupancy.
-                    // Use a target occupancy of 4 blocks per CU as a reasonable default.
-                    // (A proper hipOccupancyMaxActiveBlocksPerMultiprocessor query
-                    //  can replace this heuristic for more accurate results.)
-                    static constexpr int target_occupancy = 4;
                     const auto mn_grid_size =
                         block_2_etile_map_.CalculateGridSize(e_grid_desc_m_n_) *
                         (num_group_ / NumGroupsToMerge);
-                    k_batch_ = get_best_occupancy_k_batch_value(target_occupancy, mn_grid_size);
+                    k_batch_ = get_best_occupancy_k_batch_value(active_workgroups_per_cu.max_occupancy_, mn_grid_size);
                     k_batch_ = std::min(k_batch_, index_t{128});
                 }
 
@@ -1399,7 +1501,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                             isMultiB,
                             CTranspose,
                             DoubleBuffer,
-                            false>; // CTranspose path: no split-K (UseAtomicAdd=false)
+                            UseAtomicAdd>;
 
 
                         if(stream_config.flush_cache)
@@ -1474,7 +1576,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
                             isMultiB,
                             CTranspose,
                             DoubleBuffer,
-                            UseAtomicAdd>; // pass split-K flag
+                            UseAtomicAdd>;
 
                         if(stream_config.flush_cache)
                         {
