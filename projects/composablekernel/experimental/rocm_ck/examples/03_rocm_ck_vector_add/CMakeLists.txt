@@ -45,18 +45,18 @@ set(KERNEL_VARIANTS
     vector_add_fp16_fp32_b1024
     vector_add_fp32_fp16_b1024
     vector_add_bf16_fp32_b1024
-    # gfx1151 (RDNA 3.5, wave32) variants
-    vector_add_fp32_b1024_gfx1151
-    vector_add_fp16_b1024_gfx1151
-    vector_add_bf16_b1024_gfx1151
+    # RDNA (wave32) variants
+    vector_add_fp32_b1024_rdna
+    vector_add_fp16_b1024_rdna
+    vector_add_bf16_b1024_rdna
 )
 
 # --- Per-variant architecture restrictions ---
 # Set <variant>_GPU_TARGETS to override the default GPU_TARGETS for a variant.
 # RDNA variants must opt in — they are NOT included in the CDNA default.
-set(vector_add_fp32_b1024_gfx1151_GPU_TARGETS "gfx1151")
-set(vector_add_fp16_b1024_gfx1151_GPU_TARGETS "gfx1151")
-set(vector_add_bf16_b1024_gfx1151_GPU_TARGETS "gfx1151")
+set(vector_add_fp32_b1024_rdna_GPU_TARGETS "gfx1100;gfx1101;gfx1102;gfx1150;gfx1151")
+set(vector_add_fp16_b1024_rdna_GPU_TARGETS "gfx1100;gfx1101;gfx1102;gfx1150;gfx1151")
+set(vector_add_bf16_b1024_rdna_GPU_TARGETS "gfx1100;gfx1101;gfx1102;gfx1150;gfx1151")
 
 # --- Compile each variant × architecture into .hsaco code objects ---
 # Uses --cuda-device-only to produce raw code objects without host stubs.

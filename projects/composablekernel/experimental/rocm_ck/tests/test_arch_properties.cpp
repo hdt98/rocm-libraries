@@ -25,6 +25,10 @@ TEST(TargetProperties, ReturnsWave64ForCDNA)
 
 TEST(TargetProperties, ReturnsWave32ForRDNA)
 {
+    EXPECT_EQ(properties(GpuTarget::gfx1100).wavefront_size, 32);
+    EXPECT_EQ(properties(GpuTarget::gfx1101).wavefront_size, 32);
+    EXPECT_EQ(properties(GpuTarget::gfx1102).wavefront_size, 32);
+    EXPECT_EQ(properties(GpuTarget::gfx1150).wavefront_size, 32);
     EXPECT_EQ(properties(GpuTarget::gfx1151).wavefront_size, 32);
 }
 
@@ -37,6 +41,10 @@ TEST(TargetProperties, CDNAArchFamily)
 
 TEST(TargetProperties, RDNAArchFamily)
 {
+    EXPECT_EQ(properties(GpuTarget::gfx1100).arch_family, ArchFamily::RDNA);
+    EXPECT_EQ(properties(GpuTarget::gfx1101).arch_family, ArchFamily::RDNA);
+    EXPECT_EQ(properties(GpuTarget::gfx1102).arch_family, ArchFamily::RDNA);
+    EXPECT_EQ(properties(GpuTarget::gfx1150).arch_family, ArchFamily::RDNA);
     EXPECT_EQ(properties(GpuTarget::gfx1151).arch_family, ArchFamily::RDNA);
 }
 
@@ -49,11 +57,19 @@ TEST(ArchFamily, IsCDNAForAllCDNATargets)
     EXPECT_TRUE(isCDNA(GpuTarget::gfx90a));
     EXPECT_TRUE(isCDNA(GpuTarget::gfx942));
     EXPECT_TRUE(isCDNA(GpuTarget::gfx950));
+    EXPECT_FALSE(isCDNA(GpuTarget::gfx1100));
+    EXPECT_FALSE(isCDNA(GpuTarget::gfx1101));
+    EXPECT_FALSE(isCDNA(GpuTarget::gfx1102));
+    EXPECT_FALSE(isCDNA(GpuTarget::gfx1150));
     EXPECT_FALSE(isCDNA(GpuTarget::gfx1151));
 }
 
 TEST(ArchFamily, IsRDNAForAllRDNATargets)
 {
+    EXPECT_TRUE(isRDNA(GpuTarget::gfx1100));
+    EXPECT_TRUE(isRDNA(GpuTarget::gfx1101));
+    EXPECT_TRUE(isRDNA(GpuTarget::gfx1102));
+    EXPECT_TRUE(isRDNA(GpuTarget::gfx1150));
     EXPECT_TRUE(isRDNA(GpuTarget::gfx1151));
     EXPECT_FALSE(isRDNA(GpuTarget::gfx90a));
     EXPECT_FALSE(isRDNA(GpuTarget::gfx942));
@@ -69,6 +85,10 @@ TEST(WavefrontSize, MatchesTargetProperties)
     EXPECT_EQ(wavefrontSize(GpuTarget::gfx90a), 64);
     EXPECT_EQ(wavefrontSize(GpuTarget::gfx942), 64);
     EXPECT_EQ(wavefrontSize(GpuTarget::gfx950), 64);
+    EXPECT_EQ(wavefrontSize(GpuTarget::gfx1100), 32);
+    EXPECT_EQ(wavefrontSize(GpuTarget::gfx1101), 32);
+    EXPECT_EQ(wavefrontSize(GpuTarget::gfx1102), 32);
+    EXPECT_EQ(wavefrontSize(GpuTarget::gfx1150), 32);
     EXPECT_EQ(wavefrontSize(GpuTarget::gfx1151), 32);
 }
 
@@ -98,10 +118,14 @@ TEST(TargetSet, ImplicitConversionFromSingleTarget)
 TEST(TargetSet, AllContainsEveryTarget)
 {
     constexpr auto ts = TargetSet::all();
-    EXPECT_EQ(ts.count(), 4);
+    EXPECT_EQ(ts.count(), 8);
     EXPECT_TRUE(ts.contains(GpuTarget::gfx90a));
     EXPECT_TRUE(ts.contains(GpuTarget::gfx942));
     EXPECT_TRUE(ts.contains(GpuTarget::gfx950));
+    EXPECT_TRUE(ts.contains(GpuTarget::gfx1100));
+    EXPECT_TRUE(ts.contains(GpuTarget::gfx1101));
+    EXPECT_TRUE(ts.contains(GpuTarget::gfx1102));
+    EXPECT_TRUE(ts.contains(GpuTarget::gfx1150));
     EXPECT_TRUE(ts.contains(GpuTarget::gfx1151));
 }
 
@@ -112,13 +136,21 @@ TEST(TargetSet, CdnaContainsOnlyCDNATargets)
     EXPECT_TRUE(ts.contains(GpuTarget::gfx90a));
     EXPECT_TRUE(ts.contains(GpuTarget::gfx942));
     EXPECT_TRUE(ts.contains(GpuTarget::gfx950));
+    EXPECT_FALSE(ts.contains(GpuTarget::gfx1100));
+    EXPECT_FALSE(ts.contains(GpuTarget::gfx1101));
+    EXPECT_FALSE(ts.contains(GpuTarget::gfx1102));
+    EXPECT_FALSE(ts.contains(GpuTarget::gfx1150));
     EXPECT_FALSE(ts.contains(GpuTarget::gfx1151));
 }
 
 TEST(TargetSet, RdnaContainsOnlyRDNATargets)
 {
     constexpr auto ts = TargetSet::rdna();
-    EXPECT_EQ(ts.count(), 1);
+    EXPECT_EQ(ts.count(), 5);
+    EXPECT_TRUE(ts.contains(GpuTarget::gfx1100));
+    EXPECT_TRUE(ts.contains(GpuTarget::gfx1101));
+    EXPECT_TRUE(ts.contains(GpuTarget::gfx1102));
+    EXPECT_TRUE(ts.contains(GpuTarget::gfx1150));
     EXPECT_TRUE(ts.contains(GpuTarget::gfx1151));
     EXPECT_FALSE(ts.contains(GpuTarget::gfx90a));
 }
@@ -135,6 +167,17 @@ TEST(TargetSet, FamilyGfx94ExcludesGfx90a)
 }
 
 TEST(TargetSet, FamilyGfx11MatchesRdna) { EXPECT_EQ(TargetSet::family_gfx11(), TargetSet::rdna()); }
+
+TEST(TargetSet, FamilyGfx115ContainsRDNA35Only)
+{
+    constexpr auto ts = TargetSet::family_gfx115();
+    EXPECT_EQ(ts.count(), 2);
+    EXPECT_TRUE(ts.contains(GpuTarget::gfx1150));
+    EXPECT_TRUE(ts.contains(GpuTarget::gfx1151));
+    EXPECT_FALSE(ts.contains(GpuTarget::gfx1100));
+    EXPECT_FALSE(ts.contains(GpuTarget::gfx1101));
+    EXPECT_FALSE(ts.contains(GpuTarget::gfx1102));
+}
 
 TEST(TargetSet, OnlyWithOneTarget)
 {
@@ -397,6 +440,13 @@ TEST(IsValidWaveTile, FP8FNUZExtendedTilesOnGfx950)
 
 TEST(IsValidWaveTile, WMMATilesOnRDNA)
 {
+    // All RDNA targets share identical WMMA: 16×16×16 for FP16, BF16, INT8
+    EXPECT_TRUE(isValidWaveTile(DataType::FP16, 16, 16, 16, GpuTarget::gfx1100));
+    EXPECT_TRUE(isValidWaveTile(DataType::BF16, 16, 16, 16, GpuTarget::gfx1100));
+    EXPECT_TRUE(isValidWaveTile(DataType::I8, 16, 16, 16, GpuTarget::gfx1100));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP16, 16, 16, 16, GpuTarget::gfx1101));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP16, 16, 16, 16, GpuTarget::gfx1102));
+    EXPECT_TRUE(isValidWaveTile(DataType::FP16, 16, 16, 16, GpuTarget::gfx1150));
     EXPECT_TRUE(isValidWaveTile(DataType::FP16, 16, 16, 16, GpuTarget::gfx1151));
     EXPECT_TRUE(isValidWaveTile(DataType::BF16, 16, 16, 16, GpuTarget::gfx1151));
     EXPECT_TRUE(isValidWaveTile(DataType::I8, 16, 16, 16, GpuTarget::gfx1151));
@@ -404,12 +454,13 @@ TEST(IsValidWaveTile, WMMATilesOnRDNA)
 
 TEST(IsValidWaveTile, WMMARejectsNon16x16x16)
 {
-    EXPECT_FALSE(isValidWaveTile(DataType::FP16, 32, 32, 8, GpuTarget::gfx1151));
+    EXPECT_FALSE(isValidWaveTile(DataType::FP16, 32, 32, 8, GpuTarget::gfx1100));
     EXPECT_FALSE(isValidWaveTile(DataType::FP16, 16, 16, 32, GpuTarget::gfx1151));
 }
 
 TEST(IsValidWaveTile, WMMARejectsFP32)
 {
+    EXPECT_FALSE(isValidWaveTile(DataType::FP32, 16, 16, 16, GpuTarget::gfx1100));
     EXPECT_FALSE(isValidWaveTile(DataType::FP32, 16, 16, 16, GpuTarget::gfx1151));
 }
 

@@ -467,7 +467,7 @@ VARIANTS = [
         "wave_k": 16,
         "workgroup_size": 256,
     },
-    # WMMA: RDNA (gfx1151) with 16×16×16 wave tiles, wave32
+    # WMMA: RDNA (gfx11xx) with 16×16×16 wave tiles, wave32
     {
         "name": "gemm_fp16_wmma",
         "a_dtype": "fp16",
@@ -486,7 +486,16 @@ VARIANTS = [
         "workgroup_size": 256,
     },
 ]
-ARCHITECTURES = ["gfx90a", "gfx942", "gfx950", "gfx1151"]
+ARCHITECTURES = [
+    "gfx90a",
+    "gfx942",
+    "gfx950",
+    "gfx1100",
+    "gfx1101",
+    "gfx1102",
+    "gfx1150",
+    "gfx1151",
+]
 
 
 def main() -> None:

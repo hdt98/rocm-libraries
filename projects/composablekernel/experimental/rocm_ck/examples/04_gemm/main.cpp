@@ -464,6 +464,14 @@ int main(int argc, char** argv)
         detected_target = rocm_ck::GpuTarget::gfx942;
     else if(std::strstr(gpu_arch, "gfx950") != nullptr)
         detected_target = rocm_ck::GpuTarget::gfx950;
+    else if(std::strstr(gpu_arch, "gfx1100") != nullptr)
+        detected_target = rocm_ck::GpuTarget::gfx1100;
+    else if(std::strstr(gpu_arch, "gfx1101") != nullptr)
+        detected_target = rocm_ck::GpuTarget::gfx1101;
+    else if(std::strstr(gpu_arch, "gfx1102") != nullptr)
+        detected_target = rocm_ck::GpuTarget::gfx1102;
+    else if(std::strstr(gpu_arch, "gfx1150") != nullptr)
+        detected_target = rocm_ck::GpuTarget::gfx1150;
     else if(std::strstr(gpu_arch, "gfx1151") != nullptr)
         detected_target = rocm_ck::GpuTarget::gfx1151;
     else
