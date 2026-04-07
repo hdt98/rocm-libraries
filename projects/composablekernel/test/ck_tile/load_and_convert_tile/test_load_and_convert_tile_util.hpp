@@ -32,21 +32,20 @@ class TestLoadAndConvert : public ::testing::Test
     {
         constexpr ck_tile::index_t M = 256;
         constexpr ck_tile::index_t N = 256;
-        constexpr ck_tile::index_t K = 64;
 
-        ck_tile::HostTensor<XDataType> h_a({M, K});
-        ck_tile::HostTensor<YDataType> h_c({M, K});
+        ck_tile::HostTensor<XDataType> h_a({M, N});
+        ck_tile::HostTensor<YDataType> h_c({M, N});
 
         if constexpr(matrix_type == TestMatrixType::MonotonicSequence)
         {
-            ck_tile::HostTensor<float> h_a_tmp({M, K});
+            ck_tile::HostTensor<float> h_a_tmp({M, N});
             ck_tile::FillMonotonicSeq<float>{0.0, 0.1}(h_a_tmp);
             ck_tile::reference_unary_elementwise<float, XDataType, float>(
                 h_a_tmp, h_a, [](const auto& x) { return x; });
         }
         else if constexpr(matrix_type == TestMatrixType::Identity)
         {
-            ck_tile::FillIdentity<XDataType>{M, K}(h_a);
+            ck_tile::FillIdentity<XDataType>{M, N}(h_a);
         }
         else
         {
@@ -58,33 +57,33 @@ class TestLoadAndConvert : public ::testing::Test
 
         d_a.ToDevice(h_a.data());
 
-        using BlockWarps = ck_tile::sequence<1, 1, 1>;
-        using BlockTile  = ck_tile::sequence<32, 32, 16>;
-        using WarpTile   = ck_tile::sequence<32, 32, 16>;
+        using BlockWarps = ck_tile::sequence<4, 4>;
+        using BlockTile  = ck_tile::sequence<512, 32>;
+        using WarpTile   = ck_tile::sequence<64, 8>;
         using Vector     = ck_tile::sequence<1, 8>;
 
         using Shape   = ck_tile::LoadAndConvertShape<BlockWarps, BlockTile, WarpTile, Vector>;
         using Problem = ck_tile::LoadAndConvertProblem<XDataType, YDataType, Shape, LoadTranspose>;
-        using Kernel  = ck_tile::LoadAndConvertKernel<Problem>;
+        using Policy  = ck_tile::LoadAndConvertPolicy<Problem>;
+        using Kernel  = ck_tile::LoadAndConvertKernel<Problem, Policy>;
 
-        constexpr ck_tile::index_t block_size = Kernel::kBlockSize;
-        const ck_tile::index_t grid_size      = ck_tile::integer_divide_ceil(M, Shape::Block_M) *
+        const ck_tile::index_t block_size = Kernel::BlockSize();
+        const ck_tile::index_t grid_size  = ck_tile::integer_divide_ceil(M, Shape::Block_M) *
                                            ck_tile::integer_divide_ceil(N, Shape::Block_N);
 
         launch_kernel(ck_tile::stream_config{nullptr, true},
-                      make_kernel<block_size>(Kernel{},
-                                              dim3(grid_size),
-                                              dim3(block_size),
-                                              0,
-                                              static_cast<const XDataType*>(d_a.GetDeviceBuffer()),
-                                              static_cast<YDataType*>(d_c.GetDeviceBuffer()),
-                                              M,
-                                              N,
-                                              K));
+                      make_kernel<1>(Kernel{},
+                                     dim3(grid_size),
+                                     dim3(block_size),
+                                     0,
+                                     static_cast<const XDataType*>(d_a.GetDeviceBuffer()),
+                                     static_cast<YDataType*>(d_c.GetDeviceBuffer()),
+                                     M,
+                                     N));
 
         ck_tile::hip_check_error(hipDeviceSynchronize());
         d_c.FromDevice(h_c.data());
-        ck_tile::HostTensor<YDataType> h_a_ref({M, K});
+        ck_tile::HostTensor<YDataType> h_a_ref({M, N});
         ck_tile::reference_unary_elementwise<XDataType, YDataType, float>(
             h_a, h_a_ref, [](const auto& x) { return x; });
         bool pass = ck_tile::check_err(h_c, h_a_ref);

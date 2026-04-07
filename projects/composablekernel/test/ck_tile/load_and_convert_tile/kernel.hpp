@@ -15,21 +15,17 @@ struct LoadAndConvertShape
 {
     static constexpr index_t Block_M = BlockTile::at(number<0>{});
     static constexpr index_t Block_N = BlockTile::at(number<1>{});
-    static constexpr index_t Block_K = BlockTile::at(number<2>{});
 
     static constexpr index_t Warp_M = WarpTile::at(number<0>{});
     static constexpr index_t Warp_N = WarpTile::at(number<1>{});
-    static constexpr index_t Warp_K = WarpTile::at(number<2>{});
 
     static constexpr index_t Vector_N = Vector::at(number<1>{});
 
     static constexpr index_t WarpPerBlock_M = BlockWarps::at(number<0>{});
     static constexpr index_t WarpPerBlock_N = BlockWarps::at(number<1>{});
-    static constexpr index_t WarpPerBlock_K = BlockWarps::at(number<2>{});
 
     static constexpr index_t Repeat_M = Block_M / (WarpPerBlock_M * Warp_M);
     static constexpr index_t Repeat_N = Block_N / (WarpPerBlock_N * Warp_N);
-    static constexpr index_t Repeat_K = Block_K / (WarpPerBlock_K * Warp_K);
 
     static constexpr index_t BlockSize =
         ck_tile::get_warp_size() * reduce_on_sequence(BlockWarps{}, multiplies<>{}, number<1>{});
@@ -45,35 +41,36 @@ struct LoadAndConvertProblem
 };
 
 template <typename Problem_>
-struct LoadAndConvertKernel
+struct LoadAndConvertPolicy
 {
     using Problem       = ck_tile::remove_cvref_t<Problem_>;
     using XDataType     = ck_tile::remove_cvref_t<typename Problem::XDataType>;
     using YDataType     = ck_tile::remove_cvref_t<typename Problem::YDataType>;
     using LoadTranspose = ck_tile::remove_cvref_t<typename Problem::LoadTranspose>;
 
-    static constexpr index_t kBlockSize = Problem::BlockShape::BlockSize;
-
-    template <index_t NumAccess>
-    static constexpr auto get_warp_dstr_encoding()
+    template <index_t NumAccess, typename Problem>
+    CK_TILE_DEVICE static constexpr auto get_warp_dstr_encoding()
     {
         using S = typename Problem::BlockShape;
 
         if constexpr(NumAccess == 1)
-            return tile_distribution_encoding<sequence<>,
-                                              tuple<sequence<S::Block_N>, sequence<2, S::Vector_N>>,
-                                              tuple<sequence<2, 1>>,
-                                              tuple<sequence<0, 0>>,
-                                              sequence<2>,
-                                              sequence<1>>{};
+            return tile_distribution_encoding<
+                sequence<1>,
+                tuple<sequence<get_warp_size() * S::Vector_N / S::Block_N>,
+                      sequence<S::Block_N / S::Vector_N, S::Vector_N>>,
+                tuple<sequence<2, 1>>,
+                tuple<sequence<0, 0>>,
+                sequence<2>,
+                sequence<1>>{};
         else
             return tile_distribution_encoding<
-                sequence<>,
-                tuple<sequence<S::Block_N>, sequence<NumAccess, 2, S::Vector_N / NumAccess>>,
+                sequence<1>,
+                tuple<sequence<get_warp_size() * S::Vector_N / S::Block_N>,
+                      sequence<S::Block_N / S::Vector_N, NumAccess, S::Vector_N / NumAccess>>,
                 tuple<sequence<2, 1>>,
-                tuple<sequence<1, 0>>,
+                tuple<sequence<0, 0>>,
                 sequence<2, 2>,
-                sequence<0, 2>>{};
+                sequence<1, 2>>{};
     }
 
     template <typename DataType>
@@ -82,150 +79,133 @@ struct LoadAndConvertKernel
         return DS_READ_TR_SIZE() / sizeof(DataType);
     }
 
-    template <typename DataType>
+    template <typename Problem, typename DataType>
     CK_TILE_DEVICE static constexpr auto MakeDRAMDistribution()
     {
-        using S                           = typename Problem::BlockShape;
-        constexpr index_t thread_elements = S::Warp_N * S::Warp_K / get_warp_size();
+        using S = typename Problem::BlockShape;
+
+        constexpr index_t thread_elements = S::Warp_M * S::Warp_N / get_warp_size();
         constexpr index_t NumAccess =
             LoadTranspose::value ? thread_elements / GetVectorSize<DataType>() : 1;
 
         constexpr auto a_block_outer_dstr_encode = tile_distribution_encoding<
-            sequence<S::WarpPerBlock_N>,
-            tuple<sequence<S::Repeat_M, S::WarpPerBlock_M>, sequence<S::Repeat_K>>,
-            tuple<sequence<0, 1>>,
-            tuple<sequence<0, 1>>,
-            sequence<1, 2>,
-            sequence<0, 0>>{};
+            sequence<>,
+            tuple<sequence<S::Block_M / S::WarpPerBlock_M * S::Block_N / S::WarpPerBlock_N /
+                               get_warp_size() / S::Vector_N,
+                           S::WarpPerBlock_M * S::WarpPerBlock_N>,
+                  sequence<>>,
+            tuple<sequence<1>>,
+            tuple<sequence<1>>,
+            sequence<1>,
+            sequence<0>>{};
 
         constexpr auto a_block_dstr_encode = detail::make_embed_tile_distribution_encoding(
-            a_block_outer_dstr_encode, get_warp_dstr_encoding<NumAccess>());
+            a_block_outer_dstr_encode, get_warp_dstr_encoding<NumAccess, Problem>());
 
         return make_static_tile_distribution(a_block_dstr_encode);
     }
 
-    template <typename DataType>
+    template <typename Problem, typename DataType>
     CK_TILE_DEVICE static constexpr auto MakeDRAMTransposedDistribution()
     {
         return make_static_tile_distribution(
             typename InputTileDistributionTraits<
-                typename decltype(MakeDRAMDistribution<DataType>())::DstrEncode,
+                typename decltype(MakeDRAMDistribution<Problem, DataType>())::DstrEncode,
                 DataType>::TransposedDstrEncode{});
     }
+};
 
-    CK_TILE_DEVICE void
-    operator()(const XDataType* a, YDataType* c, index_t M, index_t N, index_t K) const
+template <typename Problem_, typename Policy_>
+struct LoadAndConvertKernel
+{
+    using Problem       = ck_tile::remove_cvref_t<Problem_>;
+    using XDataType     = ck_tile::remove_cvref_t<typename Problem::XDataType>;
+    using YDataType     = ck_tile::remove_cvref_t<typename Problem::YDataType>;
+    using Policy        = ck_tile::remove_cvref_t<Policy_>;
+    using LoadTranspose = ck_tile::remove_cvref_t<typename Problem::LoadTranspose>;
+
+    static constexpr index_t kBlockSize = Problem::BlockShape::BlockSize;
+
+    CK_TILE_HOST static auto BlockSize()
+    {
+        if(ck_tile::is_wave32())
+        {
+            return kBlockSize / 2;
+        }
+        else
+        {
+            return kBlockSize;
+        }
+    }
+
+    CK_TILE_DEVICE void operator()(const XDataType* a, YDataType* c, index_t M, index_t N) const
     {
         using S = typename Problem::BlockShape;
 
-        const index_t kMPerBlock = S::WarpPerBlock_M * S::Repeat_M * S::Block_M;
-        const index_t kNPerBlock = S::WarpPerBlock_N * S::Repeat_N * S::Block_N;
+        constexpr auto block_dims    = make_tuple(S::Block_M, S::Block_N);
+        constexpr auto block_strides = make_tuple(1, S::Block_M);
 
-        constexpr auto block_dims    = make_tuple(number<kMPerBlock>{}, number<S::Block_K>{});
-        constexpr auto block_strides = make_tuple(number<1>{}, number<kMPerBlock>{});
-        const index_t num_blocks_n   = N / kNPerBlock;
-        const index_t block_m        = get_block_id() / num_blocks_n;
-
-        const index_t m_block_base = block_m * kMPerBlock;
+        const index_t m_block_base = get_block_id() * S::Block_M;
 
         // LDS buffer
-        __shared__ XDataType a_lds[kMPerBlock * S::Block_K];
+        __shared__ XDataType a_lds[S::Block_M * S::Block_N];
 
-        auto a_lds_write_view = make_naive_tensor_view<address_space_enum::lds>(
+        auto a_lds_view = make_naive_tensor_view<address_space_enum::lds>(
             a_lds, block_dims, block_strides, number<1>{}, number<1>{});
 
-        auto a_block_lds_write_window = make_tile_window(a_lds_write_view, block_dims, {0, 0});
+        auto a_block_lds_write_window = make_tile_window(a_lds_view, block_dims, {0, 0});
 
         auto a_block_lds_read_window = [&] {
             if constexpr(LoadTranspose::value)
             {
-                constexpr auto block_dims_t =
-                    make_tuple(number<S::Block_K>{}, number<kMPerBlock>{});
-                constexpr auto block_strides_t = make_tuple(number<kMPerBlock>{}, number<1>{});
+                constexpr auto block_dims_t    = make_tuple(S::Block_N, S::Block_M);
+                constexpr auto block_strides_t = make_tuple(S::Block_M, 1);
 
                 auto view = make_naive_tensor_view<address_space_enum::lds>(
                     a_lds,
                     block_dims_t,
                     block_strides_t,
-                    number<GetVectorSize<XDataType>()>{},
+                    number<Policy::template GetVectorSize<XDataType>()>{},
                     number<1>{});
 
                 return make_tile_window(
-                    view, block_dims_t, {0, 0}, MakeDRAMTransposedDistribution<XDataType>());
+                    view,
+                    block_dims_t,
+                    {0, 0},
+                    Policy::template MakeDRAMTransposedDistribution<Problem, XDataType>());
             }
             else
             {
-                auto view = make_naive_tensor_view<address_space_enum::lds>(
-                    a_lds, block_dims, block_strides, number<1>{}, number<1>{});
-
                 return make_tile_window(
-                    view, block_dims, {0, 0}, MakeDRAMDistribution<XDataType>());
+                    a_lds_view,
+                    block_dims,
+                    {0, 0},
+                    Policy::template MakeDRAMDistribution<Problem, XDataType>());
             }
         }();
 
         // Input tensor
-        const auto a_tensor = [&]() {
-            if constexpr(LoadTranspose::value && !std::is_same_v<XDataType, YDataType>)
-            {
-                // Similar to QuantGemmKernel with PermuteB: reinterpret the output logical layout
-                // via descriptor transform so YDataType distribution can be used without row-group
-                // permutation artifacts in mixed-precision transpose loads.
-                using TransposeGroupType = std::
-                    conditional_t<(sizeof(XDataType) >= sizeof(YDataType)), XDataType, YDataType>;
-                constexpr index_t thread_elements = S::Warp_N * S::Warp_K / get_warp_size();
-                constexpr index_t n_group_0 = thread_elements / GetVectorSize<TransposeGroupType>();
-                constexpr index_t n_group_1 = 2;
-                constexpr index_t n_group_2 = S::Vector_N / n_group_0;
-                constexpr index_t n_perm_group = n_group_0 * n_group_1 * n_group_2;
+        const auto a_tensor = make_naive_tensor_view<address_space_enum::global>(
+            a, make_tuple(M, N), make_tuple(1, M), number<1>{}, number<1>{});
 
-                static_assert(n_group_0 > 0, "Invalid derived transpose grouping factor");
-                static_assert(S::Vector_N % n_group_0 == 0,
-                              "Vector_N must be divisible by derived grouping factor");
-
-                const auto a_m_n_desc = make_naive_tensor_descriptor(
-                    make_tuple(M, N), make_tuple(1, M), number<1>{}, number<1>{});
-
-                const auto a_m_n0_b0_b1_n4_desc = transform_tensor_descriptor(
-                    a_m_n_desc,
-                    make_tuple(make_pass_through_transform(M),
-                               make_unmerge_transform(make_tuple(N / n_perm_group,
-                                                                 number<n_group_0>{},
-                                                                 number<n_group_1>{},
-                                                                 number<n_group_2>{}))),
-                    make_tuple(sequence<0>{}, sequence<1>{}),
-                    make_tuple(sequence<0>{}, sequence<1, 2, 3, 4>{}));
-
-                const auto a_perm_m_n_desc = transform_tensor_descriptor(
-                    a_m_n0_b0_b1_n4_desc,
-                    make_tuple(make_pass_through_transform(M),
-                               make_merge_transform(make_tuple(N / n_perm_group,
-                                                               number<n_group_0>{},
-                                                               number<n_group_1>{},
-                                                               number<n_group_2>{}))),
-                    make_tuple(sequence<0>{}, sequence<1, 3, 2, 4>{}),
-                    make_tuple(sequence<0>{}, sequence<1>{}));
-
-                return make_tensor_view<address_space_enum::global>(a, a_perm_m_n_desc);
-            }
-            else
-            {
-                return make_naive_tensor_view<address_space_enum::global>(
-                    a, make_tuple(M, N), make_tuple(1, M), number<1>{}, number<1>{});
-            }
-        }();
-
-        auto a_block_window = make_tile_window(
-            a_tensor, block_dims, {m_block_base, 0}, MakeDRAMDistribution<XDataType>());
+        auto a_block_window =
+            make_tile_window(a_tensor,
+                             block_dims,
+                             {m_block_base, 0},
+                             Policy::template MakeDRAMDistribution<Problem, XDataType>());
 
         // Output tensor
-        auto c_tensor = make_naive_tensor_view<address_space_enum::global>(
-            c, make_tuple(M, K), make_tuple(1, M), number<1>{}, number<1>{});
+        const auto c_tensor = make_naive_tensor_view<address_space_enum::global>(
+            c, make_tuple(M, N), make_tuple(1, M), number<1>{}, number<1>{});
 
-        auto c_block_window = make_tile_window(
-            c_tensor, block_dims, {m_block_base, 0}, MakeDRAMDistribution<YDataType>());
+        auto c_block_window =
+            make_tile_window(c_tensor,
+                             block_dims,
+                             {m_block_base, 0},
+                             Policy::template MakeDRAMDistribution<Problem, YDataType>());
 
-        const index_t num_k_loops = K / S::Block_K;
-        for(index_t k_iter = 0; k_iter < num_k_loops; ++k_iter)
+        const index_t num_n_loops = N / S::Block_N;
+        for(index_t n_iter = 0; n_iter < num_n_loops; ++n_iter)
         {
             auto dram_tile = load_tile(a_block_window);
             store_tile(a_block_lds_write_window, dram_tile);
@@ -235,10 +215,10 @@ struct LoadAndConvertKernel
             load_and_convert_tile<8, LoadTranspose::value>(c_tile, a_block_lds_read_window);
             store_tile(c_block_window, c_tile);
 
-            if(k_iter < num_k_loops - 1)
+            if(n_iter < num_n_loops - 1)
             {
-                move_tile_window(a_block_window, {0, S::Block_K});
-                move_tile_window(c_block_window, {0, S::Block_K});
+                move_tile_window(a_block_window, {0, S::Block_N});
+                move_tile_window(c_block_window, {0, S::Block_N});
             }
         }
     }

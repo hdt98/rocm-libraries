@@ -1,3 +1,6 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
+
 #include "test_load_and_convert_tile_util.hpp"
 
 using TestTypes = ::testing::Types<std::tuple<ck_tile::half_t, ck_tile::half_t, std::false_type>,
