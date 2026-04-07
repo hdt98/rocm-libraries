@@ -224,6 +224,14 @@ struct UniversalGemmKernel
     };
     static constexpr bool PersistentKernel = has_persistent_kernel::value;
 
+    struct is_stream_k
+    {
+        template <typename T>
+        using has_reduction_strategy = decltype(T::ReductionStrategy);
+        static constexpr bool value  = is_detected<has_reduction_strategy, TilePartitioner>{};
+    };
+    static constexpr bool IsStreamK = is_stream_k::value;
+
     // Detect custom output offset support for advanced partitioning schemes
     struct has_tile_partitioner_output_offset_impl
     {
@@ -264,8 +272,48 @@ struct UniversalGemmKernel
 
     static_assert(!GemmPipeline::BlockGemmShape::PermuteA, "Not implemented!");
 
-    using KernelArgs =
-        UniversalGemmKernelArgs<AsLayout::size(), BsLayout::size(), DsLayout::size()>;
+    struct StreamKKernelArgs : ck_tile::UniversalGemmKernelArgs<>
+    {
+        StreamKKernelArgs(
+            const UniversalGemmHostArgs<NumATensor, NumBTensor, NumDTensor>& host_args,
+            index_t max_active_wgs)
+            : UniversalGemmKernelArgs{host_args.as_ptr,
+                                      host_args.bs_ptr,
+                                      host_args.ds_ptr,
+                                      host_args.e_ptr,
+                                      host_args.M,
+                                      host_args.N,
+                                      host_args.K,
+                                      host_args.stride_As,
+                                      host_args.stride_Bs,
+                                      host_args.stride_Ds,
+                                      host_args.stride_E,
+                                      host_args.k_batch},
+              // The workspace pointer is set to nullptr because we must first
+              // instantiate the TilePartitioner to get the necessary size
+              workspace_ptr{nullptr},
+              tile_partitioner{
+                  TilePartitioner{host_args.M, host_args.N, host_args.K, max_active_wgs}}
+
+        {
+        }
+        /**
+         * @brief  A pointer to a buffer in device memory for accumulating partial via reduction
+         * strategy.
+         */
+        void* workspace_ptr;
+        /**
+         * @brief  An instance of the TilePartioner class for assisting with mapping workgroups to
+         * the C tensor.
+         */
+        TilePartitioner tile_partitioner;
+    };
+
+    using KernelArgs = std::conditional_t<
+        IsStreamK,
+        StreamKKernelArgs,
+        UniversalGemmKernelArgs<AsLayout::size(), BsLayout::size(), DsLayout::size()>>;
+    using Kernel = UniversalGemmKernel<TilePartitioner, GemmPipeline, EpiloguePipeline>;
 
     [[nodiscard]] CK_TILE_HOST static const std::string GetName()
     {
@@ -287,7 +335,6 @@ struct UniversalGemmKernel
      */
     CK_TILE_HOST static auto MaxOccupancyGridSize(const stream_config& s) -> dim3
     {
-        using Kernel      = UniversalGemmKernel<TilePartitioner, GemmPipeline, EpiloguePipeline>;
         const auto kernel = kentry<1, Kernel, KernelArgs>;
         int occupancy;
         ck_tile::hip_check_error(
@@ -309,22 +356,32 @@ struct UniversalGemmKernel
         }
     }
 
-    CK_TILE_HOST static constexpr KernelArgs
-    MakeKernelArgs(const UniversalGemmHostArgs<NumATensor, NumBTensor, NumDTensor>& hostArgs)
+    CK_TILE_HOST static KernelArgs
+    MakeKernelArgs(const UniversalGemmHostArgs<NumATensor, NumBTensor, NumDTensor>& hostArgs,
+                   int num_cu    = NumCU(),
+                   int occupancy = Occupancy<Kernel, KernelArgs, kBlockSize>())
     {
-        return KernelArgs{hostArgs.as_ptr,
-                          hostArgs.bs_ptr,
-                          hostArgs.ds_ptr,
-                          hostArgs.e_ptr,
-                          hostArgs.M,
-                          hostArgs.N,
-                          hostArgs.K,
-                          hostArgs.stride_As,
-                          hostArgs.stride_Bs,
-                          hostArgs.stride_Ds,
-                          hostArgs.stride_E,
-                          hostArgs.k_batch,
-                          hostArgs.async_input_scheduler};
+        if constexpr(!IsStreamK)
+        {
+            return KernelArgs{hostArgs.as_ptr,
+                              hostArgs.bs_ptr,
+                              hostArgs.ds_ptr,
+                              hostArgs.e_ptr,
+                              hostArgs.M,
+                              hostArgs.N,
+                              hostArgs.K,
+                              hostArgs.stride_As,
+                              hostArgs.stride_Bs,
+                              hostArgs.stride_Ds,
+                              hostArgs.stride_E,
+                              hostArgs.k_batch,
+                              hostArgs.async_input_scheduler};
+        }
+        else
+        {
+            const index_t max_active_wgs = num_cu * occupancy;
+            return KernelArgs{hostArgs, max_active_wgs};
+        }
     }
 
     CK_TILE_HOST_DEVICE static constexpr index_t GetSmemSize()
