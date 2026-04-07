@@ -279,13 +279,16 @@ namespace rocRoller
                 co_return;
             }
 
+            if(rowOffsetExpr)
+                rocRoller::Log::getLogger()->debug("  rowOffsetExpr: {}", toString(rowOffsetExpr));
+
             if(rowOffsetExpr
                && Expression::evaluationTimes(rowOffsetExpr)[EvaluationTime::Translate]
                && info.offset->regType() == Register::Type::Literal)
             {
-                auto rowOffsetVal = getUnsignedInt(evaluate(rowOffsetExpr));
-                auto prevOffset   = getUnsignedInt(info.offset->getLiteralValue());
-                info.offset       = Register::Value::Literal(rowOffsetVal + prevOffset);
+                info.offset
+                    = Register::Value::Literal(getUnsignedInt(evaluate(rowOffsetExpr))
+                                               + getUnsignedInt(info.offset->getLiteralValue()));
                 rowOffsetExpr.reset();
             }
 
