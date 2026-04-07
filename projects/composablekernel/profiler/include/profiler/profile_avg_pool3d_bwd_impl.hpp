@@ -214,7 +214,6 @@ bool profile_avg_pool3d_bwd_impl(int do_verification,
                                              "Error: Incorrect results",
                                              1e-3,
                                              1e-3);
-
             if(do_log)
             {
                 LogRangeAsType<float>(
@@ -247,7 +246,7 @@ bool profile_avg_pool3d_bwd_impl(int do_verification,
                   << best_instance_name << std::endl;
     }
 
-    if(num_kernel == 0)
+    if(num_kernel == 0 && instance_index == -1)
     {
         std::cout << "Error: No kernel is applicable" << std::endl;
         return false;

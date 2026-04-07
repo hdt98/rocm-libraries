@@ -637,6 +637,12 @@ inline void permute_b_pk_i4(Tensor<ck::pk_i4_t>& b_k_n_permute,
         }
     }
 
+    bool skip_permute = ck::is_gfx13_supported();
+    if(skip_permute)
+    {
+        return;
+    }
+
     // vector pk_i4x4 permute
     for(int i = 0; i < N; i++)
     {
@@ -708,6 +714,12 @@ inline void permute_a_pk_i4(Tensor<ck::pk_i4_t>& a_m_k_permute,
             a_m_k_f32(m, k)      = (((i4 & 0x0f) >> 0) - 8.f);
             a_m_k_gfx9_f32(m, k) = i4_to_f32_gfx9(i4);
         }
+    }
+
+    bool skip_permute = ck::is_gfx13_supported();
+    if(skip_permute)
+    {
+        return;
     }
 
     // vector pk_i4x4 permute

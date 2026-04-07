@@ -231,7 +231,7 @@ function(add_example_executable_no_testing EXAMPLE_NAME FILE_NAME)
             list(REMOVE_ITEM FILE_NAME "${source}")
         endif()
         #Do not build any XDL examples if gfx9 targets are not on the list
-        if(NOT EX_TARGETS MATCHES "gfx9" AND NOT EX_TARGETS MATCHES "gfx11" AND NOT EX_TARGETS MATCHES "gfx12" AND source_name MATCHES "_xdl")
+        if(NOT EX_TARGETS MATCHES "gfx9" AND NOT EX_TARGETS MATCHES "gfx11" AND NOT EX_TARGETS MATCHES "gfx12" AND NOT EX_TARGETS MATCHES "gfx13" AND source_name MATCHES "_xdl")
             message(DEBUG "removing xdl example ${source} ")
             list(REMOVE_ITEM FILE_NAME "${source}")
         endif()

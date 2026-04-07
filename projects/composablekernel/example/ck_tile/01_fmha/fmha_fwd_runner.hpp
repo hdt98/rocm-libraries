@@ -2228,7 +2228,6 @@ fwd_result fmha_fwd_run(mode_enum mode,
                               << "\tseqstart_k: " << seqstart_k_host << std::endl;
                 }
             }
-
             if(p_drop > 0)
             {
                 ck_tile::HostTensor<RandValOutputDataType> randval_host_ref(

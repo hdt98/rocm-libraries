@@ -88,7 +88,11 @@ float grouped_flatmm(const KernelArguments& args, const ck_tile::stream_config& 
                                            BLayout,
                                            ELayout,
                                            FlatmmConfig::NumWaveGroups>;
-
+    // clamp vector load size of gfx12 & gfx13
+    constexpr ck_tile::index_t VectorLoadSize = ck_tile::min(
+        static_cast<ck_tile::index_t>(FlatmmConfig::M_Warp_Tile * FlatmmConfig::K_Warp_Tile *
+                                      sizeof(ADataType) / 32),
+        16);
     using CodegenGemmTraits = ck_tile::TileGemmUniversalTraits<FlatmmConfig::kPadM,
                                                                FlatmmConfig::kPadN,
                                                                FlatmmConfig::kPadK,
@@ -100,7 +104,8 @@ float grouped_flatmm(const KernelArguments& args, const ck_tile::stream_config& 
                                                                FlatmmConfig::UseStructuredSparsity,
                                                                persistent,
                                                                FlatmmConfig::NumWaveGroups,
-                                                               true>;
+                                                               true,
+                                                               VectorLoadSize>;
 
     using GemmPipelineProblem =
         ck_tile::GemmPipelineProblem<ADataType, BDataType, AccDataType, CodegenFlatmmShape, Traits>;

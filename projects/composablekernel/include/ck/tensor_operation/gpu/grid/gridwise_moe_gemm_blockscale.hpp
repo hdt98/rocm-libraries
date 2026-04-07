@@ -1545,8 +1545,11 @@ struct GridwiseMoeGemmBlockScale
         static_assert(M0 * M1 * M2 == MPerBlock);
         static_assert(N4 == 4 || N4 == 8);
         const index_t m1 = get_warp_local_1d_id() / NWave;
+#if defined(__gfx13__)
+        const index_t m2 = (threadIdx.x % get_warp_size()) >> 1;
+#else
         const index_t m2 = threadIdx.x % get_warp_size() % M2;
-
+#endif
         float topk_weight;
         static_for<0, MXdlPerWave, 1>{}([&](auto m0) { // MXDLPerWave
             static_for<0, NXdlPerWave, 1>{}([&](auto n0) {
@@ -2054,8 +2057,11 @@ struct GridwiseMoeGemmBlockScale
         static_assert(M0 * M1 * M2 == MPerBlock);
         static_assert(N4 == 4 || N4 == 8);
         const index_t m1 = get_warp_local_1d_id() / NWave;
+#if defined(__gfx13__)
+        const index_t m2 = (threadIdx.x % get_warp_size()) >> 1;
+#else
         const index_t m2 = threadIdx.x % get_warp_size() % M2;
-
+#endif
         float topk_weight;
         static_for<0, MXdlPerWave, 1>{}([&](auto m0) { // MXDLPerWave
             static_for<0, NXdlPerWave, 1>{}([&](auto n0) {

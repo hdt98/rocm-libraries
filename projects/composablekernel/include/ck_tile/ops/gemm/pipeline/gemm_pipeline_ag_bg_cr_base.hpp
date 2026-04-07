@@ -56,45 +56,9 @@ struct GemmPipelineAgBgCrImplBase
     static constexpr index_t NPerBlock = BlockGemmShape::kN;
     static constexpr index_t KPerBlock = BlockGemmShape::kK;
 
-#if defined(__gfx950__) || defined(__gfx125__)
-
-    // The combination of pk_int4_t and transposed loading causes numerical errors.
-    // Therefore do not use transposed loading in this case.
-    // Also, transpose load (ds_read_tr) requires specific tile distribution patterns
-    // that only work for certain K warp tile sizes based on data type size:
-    // - For 1-byte types (fp8/bf8): K warp tile <= 64
-    // - For 2-byte types (fp16/bf16): K warp tile <= 32
-    static constexpr bool is_a_load_tr = []() {
-        using WarpTile                  = typename BlockGemmShape::WarpTile;
-        constexpr index_t kKWarpTile    = WarpTile::at(number<2>{});
-        constexpr index_t kMaxKWarpTile = (sizeof(ADataType) == 1) ? 64 : 32;
-        if constexpr(std::is_same_v<ADataType, float>)
-            return false;
-        else if constexpr(std::is_same_v<BDataType, pk_int4_t>)
-            return false;
-        else if constexpr(kKWarpTile > kMaxKWarpTile)
-            return false;
-        else
-            return std::is_same_v<ALayout, tensor_layout::gemm::ColumnMajor>;
-    }();
-
-    static constexpr bool is_b_load_tr = []() {
-        using WarpTile                  = typename BlockGemmShape::WarpTile;
-        constexpr index_t kKWarpTile    = WarpTile::at(number<2>{});
-        constexpr index_t kMaxKWarpTile = (sizeof(BDataType) == 1) ? 64 : 32;
-        if constexpr(std::is_same_v<BDataType, float>)
-            return false;
-        else if constexpr(std::is_same_v<BDataType, pk_int4_t>)
-            return false;
-        else if constexpr(kKWarpTile > kMaxKWarpTile)
-            return false;
-        else
-            return std::is_same_v<BLayout, tensor_layout::gemm::RowMajor>;
-    }();
-#else
-    static constexpr bool is_a_load_tr = false;
-    static constexpr bool is_b_load_tr = false;
-#endif
+    // Delegate to Policy's single definition to avoid duplication
+    static constexpr bool is_a_load_tr = Policy::template is_a_load_tr<Problem>;
+    static constexpr bool is_b_load_tr = Policy::template is_b_load_tr<Problem>;
 
     CK_TILE_HOST_DEVICE static constexpr auto TransposeC() { return Problem::TransposeC; }
 

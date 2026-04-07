@@ -87,6 +87,22 @@ template <bool kTransC = false>
 using WarpGemmWmma_f16_16x16x64_bf8_f8 =
     WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f16_16x16x64_bf8_f8, kTransC>>;
 
+template <typename AType, typename BType, bool kTransC>
+using WarpGemmWmma_f16_16x16x64 = WarpGemmImpl<
+    WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f16_16x16x64<AType, BType>, kTransC>>;
+
+template <typename AType, typename BType, bool kTransC>
+using WarpGemmWmma_f16_16x16x32 = WarpGemmImpl<
+    WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f16_16x16x32<AType, BType>, kTransC>>;
+
+template <typename AType, typename BType, bool kTransC>
+using WarpGemmWmma_f32_16x16x32 = WarpGemmImpl<
+    WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f32_16x16x32<AType, BType>, kTransC>>;
+
+template <typename AType, typename BType, bool kTransC>
+using WarpGemmWmma_i32_16x16x32 = WarpGemmImpl<
+    WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_i32_16x16x32<AType, BType>, kTransC>>;
+
 template <bool kTransC = false>
 using WarpGemmWmma_f32_16x16x128_f8_f8 =
     WarpGemmImpl<WarpGemmAttributeWmma<WarpGemmAttributeWmmaImpl_f32_16x16x128_f8_f8, kTransC>>;

@@ -183,13 +183,14 @@ CK_TILE_DEVICE bf16x4_t i4_to_bhalf4(int q)
  *
  * @note `int q` contains 4 bytes, each byte represents 2 int4.
  * @note This function assumes pk_int4_t has a bias of 8, meaning 0b0000 is converted to fp8(-8)
- * @note The output ordering differs from input ordering. For example, when input is 0x76543210,
- *       the output sequence will be fp8(7, 3, 6, 2, 5, 1, 4, 0). Therefore, the input tensor
- *       must be preprocessed with permute_vectors_i4x4_b on the host side before using this
- * function.
+ * @note The output ordering differs from input ordering. if IsInputPermuated is true. For example,
+ *       when input is 0x76543210, the output sequence will be fp8(7, 3, 6, 2, 5, 1, 4, 0).
+ *       Therefore, the input tensor must be preprocessed with permute_vectors_i4x4_b on the host
+ * side before using this function.
  *
  * @see permute_vectors_i4x4_b
  */
+template <bool IsInputPermuted>
 CK_TILE_DEVICE fp8x8_t amd_assembly_i4_to_fp8x8(int a)
 {
 #if CK_TILE_USE_OCP_FP8
@@ -236,14 +237,25 @@ CK_TILE_DEVICE fp8x8_t amd_assembly_i4_to_fp8x8(int a)
     sign      = a >> 1;
     final_sel = (sign & 0x04040404) | 0x03020100;
 
-    tmp_pos           = __builtin_amdgcn_perm(reg1, reg0, dict_sel);
-    tmp_neg           = __builtin_amdgcn_perm(reg3, reg2, dict_sel);
-    tmp_res_odd       = __builtin_amdgcn_perm(tmp_neg, tmp_pos, final_sel);
-    auto tmp_res_low  = __builtin_amdgcn_perm(tmp_res_odd, tmp_res_even, 0x06040200);
-    auto tmp_res_high = __builtin_amdgcn_perm(tmp_res_odd, tmp_res_even, 0x07050301);
+    tmp_pos     = __builtin_amdgcn_perm(reg1, reg0, dict_sel);
+    tmp_neg     = __builtin_amdgcn_perm(reg3, reg2, dict_sel);
+    tmp_res_odd = __builtin_amdgcn_perm(tmp_neg, tmp_pos, final_sel);
 
-    return bit_cast<fp8x8_t>((static_cast<uint64_t>(tmp_res_high) << 32) | tmp_res_low);
+    if constexpr(IsInputPermuted)
+    {
+        auto tmp_res_low  = __builtin_amdgcn_perm(tmp_res_odd, tmp_res_even, 0x06040200);
+        auto tmp_res_high = __builtin_amdgcn_perm(tmp_res_odd, tmp_res_even, 0x07050301);
+        return bit_cast<fp8x8_t>((static_cast<uint64_t>(tmp_res_high) << 32) | tmp_res_low);
+    }
+    else
+    {
+        static_assert(CK_TILE_USE_PK4_LAYOUT_SHUFFLE);
+        auto tmp_res_low  = __builtin_amdgcn_perm(tmp_res_odd, tmp_res_even, 0x01050004);
+        auto tmp_res_high = __builtin_amdgcn_perm(tmp_res_odd, tmp_res_even, 0x03070206);
+        return bit_cast<fp8x8_t>((static_cast<uint64_t>(tmp_res_high) << 32) | tmp_res_low);
+    }
 }
+
 #else
 CK_TILE_DEVICE fp8x4_t i4_to_fp8x4(int q)
 {
@@ -280,13 +292,14 @@ CK_TILE_DEVICE float amd_assembly_bf8_to_fp32(uint32_t src)
  *
  * @note `int q` contains 4 bytes, each byte represents 2 int4.
  * @note This function assumes pk_int4_t has a bias of 8, meaning 0b0000 is converted to bf8(-8)
- * @note The output ordering differs from input ordering. For example, when input is 0x76543210,
- *       the output sequence will be bf8(7, 3, 6, 2, 5, 1, 4, 0). Therefore, the input tensor
- *       must be preprocessed with permute_vectors_i4x4_b on the host side before using this
- * function.
+ * @note The output ordering differs from input ordering. if IsInputPermuated is true. For example,
+ *       when input is 0x76543210, the output sequence will be fp8(7, 3, 6, 2, 5, 1, 4, 0).
+ *       Therefore, the input tensor must be preprocessed with permute_vectors_i4x4_b on the host
+ * side before using this function.
  *
  * @see permute_vectors_i4x4_b
  */
+template <bool IsInputPermuted>
 CK_TILE_DEVICE bf8x8_t amd_assembly_i4_to_bf8x8(uint32_t a)
 {
 #if CK_TILE_USE_OCP_FP8
@@ -335,13 +348,22 @@ CK_TILE_DEVICE bf8x8_t amd_assembly_i4_to_bf8x8(uint32_t a)
     sign      = a >> 1;
     final_sel = (sign & 0x04040404) | 0x03020100;
 
-    tmp_pos           = __builtin_amdgcn_perm(reg1, reg0, dict_sel);
-    tmp_neg           = __builtin_amdgcn_perm(reg3, reg2, dict_sel);
-    tmp_res_odd       = __builtin_amdgcn_perm(tmp_neg, tmp_pos, final_sel);
-    auto tmp_res_low  = __builtin_amdgcn_perm(tmp_res_odd, tmp_res_even, 0x06040200);
-    auto tmp_res_high = __builtin_amdgcn_perm(tmp_res_odd, tmp_res_even, 0x07050301);
-
-    return bit_cast<bf8x8_t>((static_cast<uint64_t>(tmp_res_high) << 32) | tmp_res_low);
+    tmp_pos     = __builtin_amdgcn_perm(reg1, reg0, dict_sel);
+    tmp_neg     = __builtin_amdgcn_perm(reg3, reg2, dict_sel);
+    tmp_res_odd = __builtin_amdgcn_perm(tmp_neg, tmp_pos, final_sel);
+    if constexpr(IsInputPermuted)
+    {
+        auto tmp_res_low  = __builtin_amdgcn_perm(tmp_res_odd, tmp_res_even, 0x06040200);
+        auto tmp_res_high = __builtin_amdgcn_perm(tmp_res_odd, tmp_res_even, 0x07050301);
+        return bit_cast<bf8x8_t>((static_cast<uint64_t>(tmp_res_high) << 32) | tmp_res_low);
+    }
+    else
+    {
+        static_assert(CK_TILE_USE_PK4_LAYOUT_SHUFFLE);
+        auto tmp_res_low  = __builtin_amdgcn_perm(tmp_res_odd, tmp_res_even, 0x01050004);
+        auto tmp_res_high = __builtin_amdgcn_perm(tmp_res_odd, tmp_res_even, 0x03070206);
+        return bit_cast<bf8x8_t>((static_cast<uint64_t>(tmp_res_high) << 32) | tmp_res_low);
+    }
 }
 #else
 CK_TILE_DEVICE bf8x4_t i4_to_bf8x4(int q)
@@ -616,26 +638,69 @@ CK_TILE_HOST_DEVICE fp16x8_t fp4x4_to_fp16x8_scale(const pk_fp4x4_t& src, const 
 struct PassThroughPack8
 {
     static constexpr const char* name = "PassThroughPack8";
-
+#if defined(__gfx13__)
+    static constexpr bool IsInputPermuted = false;
+#else
+    static constexpr bool IsInputPermuted = true;
+#endif
     template <typename Y, typename X>
     CK_TILE_HOST_DEVICE void operator()(Y& y, const X& x) const;
 
-    CK_TILE_HOST_DEVICE constexpr void operator()(fp16x8_t& y, const pk_int4x4_t& x) const
+    CK_TILE_HOST_DEVICE void operator()(fp16x8_t& y, const pk_int4x4_t& x) const
     {
-        y.lo = i4_to_half4(bit_cast<int>(x));
-        y.hi = i4_to_half4(bit_cast<int>(x) >> 8);
+        if constexpr(IsInputPermuted)
+        {
+            y.lo = i4_to_half4(bit_cast<int>(x));
+            y.hi = i4_to_half4(bit_cast<int>(x) >> 8);
+        }
+        else
+        {
+            // TODO: fma_from_tensor has better perforamnce but it requires special permute in host.
+            static_assert(CK_TILE_USE_PK4_LAYOUT_SHUFFLE);
+            auto lo = i4_to_half4(bit_cast<int>(x));
+            auto hi = i4_to_half4(bit_cast<int>(x) >> 8);
+
+            int32x4_t ret;
+            ret[0] = __builtin_amdgcn_perm(
+                bit_cast<uint32_t>(lo.lo), bit_cast<uint32_t>(lo.hi), 0x05040100);
+            ret[1] = __builtin_amdgcn_perm(
+                bit_cast<uint32_t>(hi.lo), bit_cast<uint32_t>(hi.hi), 0x05040100);
+            ret[2] = __builtin_amdgcn_perm(
+                bit_cast<uint32_t>(lo.lo), bit_cast<uint32_t>(lo.hi), 0x07060302);
+            ret[3] = __builtin_amdgcn_perm(
+                bit_cast<uint32_t>(hi.lo), bit_cast<uint32_t>(hi.hi), 0x07060302);
+            y = bit_cast<fp16x8_t>(ret);
+        }
     }
 
-    CK_TILE_HOST_DEVICE constexpr void operator()(bf16x8_t& y, const pk_int4x4_t& x) const
+    CK_TILE_HOST_DEVICE void operator()(bf16x8_t& y, const pk_int4x4_t& x) const
     {
-        y.lo = i4_to_bhalf4(bit_cast<int>(x));
-        y.hi = i4_to_bhalf4(bit_cast<int>(x) >> 8);
+        if constexpr(IsInputPermuted)
+        {
+            y.lo = i4_to_bhalf4(bit_cast<int>(x));
+            y.hi = i4_to_bhalf4(bit_cast<int>(x) >> 8);
+        }
+        else
+        {
+            auto lo = i4_to_bhalf4(bit_cast<int>(x));
+            auto hi = i4_to_bhalf4(bit_cast<int>(x) >> 8);
+            int32x4_t ret;
+            ret[0] = __builtin_amdgcn_perm(
+                bit_cast<uint32_t>(lo.lo), bit_cast<uint32_t>(lo.hi), 0x05040100);
+            ret[1] = __builtin_amdgcn_perm(
+                bit_cast<uint32_t>(hi.lo), bit_cast<uint32_t>(hi.hi), 0x05040100);
+            ret[2] = __builtin_amdgcn_perm(
+                bit_cast<uint32_t>(lo.lo), bit_cast<uint32_t>(lo.hi), 0x07060302);
+            ret[3] = __builtin_amdgcn_perm(
+                bit_cast<uint32_t>(hi.lo), bit_cast<uint32_t>(hi.hi), 0x07060302);
+            y = bit_cast<bf16x8_t>(ret);
+        }
     }
 
     CK_TILE_HOST_DEVICE constexpr void operator()(fp8x8_t& y, const pk_int4x4_t& x) const
     {
 #if !CONSTEXPR_LOOKUP_TABLE_FOR_FP8
-        y = amd_assembly_i4_to_fp8x8(bit_cast<uint32_t>(x));
+        y = amd_assembly_i4_to_fp8x8<IsInputPermuted>(bit_cast<uint32_t>(x));
 #else
         y.lo = i4_to_fp8x4(bit_cast<int>(x));
         y.hi = i4_to_fp8x4(bit_cast<int>(x) >> 8);
@@ -645,7 +710,7 @@ struct PassThroughPack8
     CK_TILE_HOST_DEVICE constexpr void operator()(bf8x8_t& y, const pk_int4x4_t& x) const
     {
 #if !CONSTEXPR_LOOKUP_TABLE_FOR_BF8
-        y = amd_assembly_i4_to_bf8x8(bit_cast<uint32_t>(x));
+        y = amd_assembly_i4_to_bf8x8<IsInputPermuted>(bit_cast<uint32_t>(x));
 #else
         y.lo = i4_to_bf8x4(bit_cast<int>(x));
         y.hi = i4_to_bf8x4(bit_cast<int>(x) >> 8);

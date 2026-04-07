@@ -786,17 +786,33 @@ struct WmmaTraits<gfx125_t, AType, BType, float, 32, 32, 128>
 };
 
 // fp8/bf8 specialization - GFX13
-template <>
-struct WmmaTraits<gfx13_t, fp8_t, fp8_t, float, 16, 16, 16>
-    : WmmaTraitsBase<gfx13_t, fp8_t, fp8_t, float, 16>
+template <index_t K>
+struct WmmaTraits<gfx13_t, fp8_t, fp8_t, float, 16, 16, K>
+    : WmmaTraitsBase<gfx13_t, fp8_t, fp8_t, float, K>
 {
+    using Base     = WmmaTraitsBase<gfx13_t, fp8_t, fp8_t, float, K>;
+    using AVecType = typename Base::AVecType;
+    using BVecType = typename Base::BVecType;
+    using CVecType = typename Base::CVecType;
     template <typename... Params>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
     {
 #ifdef __gfx13__
         using P = WarpGemmParamsParser<Params...>;
-        return __builtin_amdgcn_wmma_f32_16x16x16_fp8_fp8_clamp(a_vec, b_vec, c_vec, P::clamp);
+        if constexpr(K == 16)
+        {
+            return __builtin_amdgcn_wmma_f32_16x16x16_fp8_fp8_clamp(a_vec, b_vec, c_vec, P::clamp);
+        }
+        else if constexpr(K == 32)
+        {
+            return __builtin_amdgcn_wmma_f32_16x16x32_fp8_fp8_clamp(a_vec, b_vec, c_vec, P::clamp);
+        }
+        else
+        {
+            static_assert(K == 16 || K == 32, "Unsupported K for fp8x2 specialization");
+            return CVecType{0};
+        }
 #else
         ck_tile::ignore = a_vec;
         ck_tile::ignore = b_vec;
@@ -806,17 +822,32 @@ struct WmmaTraits<gfx13_t, fp8_t, fp8_t, float, 16, 16, 16>
     }
 };
 
-template <>
-struct WmmaTraits<gfx13_t, bf8_t, bf8_t, float, 16, 16, 16>
-    : WmmaTraitsBase<gfx13_t, bf8_t, bf8_t, float, 16>
+template <index_t K>
+struct WmmaTraits<gfx13_t, bf8_t, bf8_t, float, 16, 16, K>
+    : WmmaTraitsBase<gfx13_t, bf8_t, bf8_t, float, K>
 {
+    using Base     = WmmaTraitsBase<gfx13_t, bf8_t, bf8_t, float, K>;
+    using AVecType = typename Base::AVecType;
+    using BVecType = typename Base::BVecType;
+    using CVecType = typename Base::CVecType;
     template <typename... Params>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
     {
 #ifdef __gfx13__
         using P = WarpGemmParamsParser<Params...>;
-        return __builtin_amdgcn_wmma_f32_16x16x16_bf8_bf8_clamp(a_vec, b_vec, c_vec, P::clamp);
+        if constexpr(K == 16)
+        {
+            return __builtin_amdgcn_wmma_f32_16x16x16_bf8_bf8_clamp(a_vec, b_vec, c_vec, P::clamp);
+        }
+        else if constexpr(K == 32)
+        {
+            return __builtin_amdgcn_wmma_f32_16x16x32_bf8_bf8_clamp(a_vec, b_vec, c_vec, P::clamp);
+        }
+        else
+        {
+            static_assert(K == 16 || K == 32, "Unsupported K for bf8x2 specialization");
+        }
 #else
         ck_tile::ignore = a_vec;
         ck_tile::ignore = b_vec;
@@ -826,17 +857,33 @@ struct WmmaTraits<gfx13_t, bf8_t, bf8_t, float, 16, 16, 16>
     }
 };
 
-template <>
-struct WmmaTraits<gfx13_t, fp8_t, bf8_t, float, 16, 16, 16>
-    : WmmaTraitsBase<gfx13_t, fp8_t, bf8_t, float, 16>
+template <index_t K>
+struct WmmaTraits<gfx13_t, fp8_t, bf8_t, float, 16, 16, K>
+    : WmmaTraitsBase<gfx13_t, fp8_t, bf8_t, float, K>
 {
+    using Base     = WmmaTraitsBase<gfx13_t, fp8_t, bf8_t, float, K>;
+    using AVecType = typename Base::AVecType;
+    using BVecType = typename Base::BVecType;
+    using CVecType = typename Base::CVecType;
     template <typename... Params>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
     {
 #ifdef __gfx13__
-        using P = WarpGemmParamsParser<Params...>;
-        return __builtin_amdgcn_wmma_f32_16x16x16_fp8_bf8_clamp(a_vec, b_vec, c_vec, P::clamp);
+        if constexpr(K == 16)
+        {
+            using P = WarpGemmParamsParser<Params...>;
+            return __builtin_amdgcn_wmma_f32_16x16x16_fp8_bf8_clamp(a_vec, b_vec, c_vec, P::clamp);
+        }
+        else if constexpr(K == 32)
+        {
+            using P = WarpGemmParamsParser<Params...>;
+            return __builtin_amdgcn_wmma_f32_16x16x32_fp8_bf8_clamp(a_vec, b_vec, c_vec, P::clamp);
+        }
+        else
+        {
+            static_assert(K == 16 || K == 32, "Unsupported K for fp8x2 specialization");
+        }
 #else
         ck_tile::ignore = a_vec;
         ck_tile::ignore = b_vec;
@@ -846,17 +893,34 @@ struct WmmaTraits<gfx13_t, fp8_t, bf8_t, float, 16, 16, 16>
     }
 };
 
-template <>
-struct WmmaTraits<gfx13_t, bf8_t, fp8_t, float, 16, 16, 16>
-    : WmmaTraitsBase<gfx13_t, bf8_t, fp8_t, float, 16>
+template <index_t K>
+struct WmmaTraits<gfx13_t, bf8_t, fp8_t, float, 16, 16, K>
+    : WmmaTraitsBase<gfx13_t, bf8_t, fp8_t, float, K>
 {
+    using Base     = WmmaTraitsBase<gfx13_t, bf8_t, fp8_t, float, K>;
+    using AVecType = typename Base::AVecType;
+    using BVecType = typename Base::BVecType;
+    using CVecType = typename Base::CVecType;
+
     template <typename... Params>
     CK_TILE_DEVICE static CVecType
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
     {
 #ifdef __gfx13__
-        using P = WarpGemmParamsParser<Params...>;
-        return __builtin_amdgcn_wmma_f32_16x16x16_bf8_fp8_clamp(a_vec, b_vec, c_vec, P::clamp);
+        if constexpr(K == 16)
+        {
+            using P = WarpGemmParamsParser<Params...>;
+            return __builtin_amdgcn_wmma_f32_16x16x16_bf8_fp8_clamp(a_vec, b_vec, c_vec, P::clamp);
+        }
+        else if constexpr(K == 32)
+        {
+            using P = WarpGemmParamsParser<Params...>;
+            return __builtin_amdgcn_wmma_f32_16x16x32_bf8_fp8_clamp(a_vec, b_vec, c_vec, P::clamp);
+        }
+        else
+        {
+            static_assert(K == 16 || K == 32, "Unsupported K for bf8x2 specialization");
+        }
 #else
         ck_tile::ignore = a_vec;
         ck_tile::ignore = b_vec;
@@ -867,10 +931,15 @@ struct WmmaTraits<gfx13_t, bf8_t, fp8_t, float, 16, 16, 16>
 };
 
 // int8 specialization - GFX13
-template <>
-struct WmmaTraits<gfx13_t, int8_t, int8_t, int32_t, 16, 16, 16>
-    : WmmaTraitsBase<gfx13_t, int8_t, int8_t, int32_t, 16>
+template <index_t K>
+struct WmmaTraits<gfx13_t, int8_t, int8_t, int32_t, 16, 16, K>
+    : WmmaTraitsBase<gfx13_t, int8_t, int8_t, int32_t, K>
 {
+    using Base     = WmmaTraitsBase<gfx13_t, int8_t, int8_t, int32_t, K>;
+    using AVecType = typename Base::AVecType;
+    using BVecType = typename Base::BVecType;
+    using CVecType = typename Base::CVecType;
+
     using ArchType = gfx13_t;
 
     template <typename... Params>
@@ -878,13 +947,30 @@ struct WmmaTraits<gfx13_t, int8_t, int8_t, int32_t, 16, 16, 16>
     wmma_intrinsic(const AVecType& a_vec, const BVecType& b_vec, const CVecType& c_vec)
     {
 #ifdef __gfx13__
-        using P = WarpGemmParamsParser<Params...>;
-        return __builtin_amdgcn_wmma_i32_16x16x16_iu8_clamp(true,
-                                                            bit_cast<int32x2_t>(a_vec),
-                                                            true,
-                                                            bit_cast<int32x2_t>(b_vec),
-                                                            bit_cast<int32x8_t>(c_vec),
-                                                            P::clamp);
+        if constexpr(K == 16)
+        {
+            using P = WarpGemmParamsParser<Params...>;
+            return __builtin_amdgcn_wmma_i32_16x16x16_iu8_clamp(true,
+                                                                bit_cast<int32x2_t>(a_vec),
+                                                                true,
+                                                                bit_cast<int32x2_t>(b_vec),
+                                                                bit_cast<int32x8_t>(c_vec),
+                                                                P::clamp);
+        }
+        else if constexpr(K == 32)
+        {
+            using P = WarpGemmParamsParser<Params...>;
+            return __builtin_amdgcn_wmma_i32_16x16x32_iu8_clamp(true,
+                                                                bit_cast<int32x4_t>(a_vec),
+                                                                true,
+                                                                bit_cast<int32x4_t>(b_vec),
+                                                                bit_cast<int32x8_t>(c_vec),
+                                                                P::clamp);
+        }
+        else
+        {
+            static_assert(K == 16 || K == 32, "Unsupported K for int8 specialization");
+        }
 #else
         ck_tile::ignore = a_vec;
         ck_tile::ignore = b_vec;

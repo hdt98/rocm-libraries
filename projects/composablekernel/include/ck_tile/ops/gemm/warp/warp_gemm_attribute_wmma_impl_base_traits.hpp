@@ -212,13 +212,14 @@ struct WmmaTraitsBase<gfx13_t, ADType, BDType, CDType, K, MixPrec, M, N>
     using BDataType = BDType;
     using CDataType = CDType;
 
-    using AVecType = ext_vector_t<ADataType, 8>;
-    using BVecType = ext_vector_t<BDataType, 8>;
-    using CVecType = ext_vector_t<CDataType, 8>;
-
-    static constexpr index_t kM = 16;
-    static constexpr index_t kN = 16;
-    static constexpr index_t kK = 16;
+    static constexpr index_t kM       = 16;
+    static constexpr index_t kN       = 16;
+    static constexpr index_t kK       = K;
+    static constexpr index_t kABKLane = 2;
+    static constexpr index_t kCMLane  = 2;
+    using AVecType                    = ext_vector_t<ADataType, kK / kABKLane>;
+    using BVecType                    = ext_vector_t<BDataType, kK / kABKLane>;
+    using CVecType                    = ext_vector_t<CDataType, kM / kCMLane>;
 
     static constexpr index_t kAMBlock = 1;
     static constexpr index_t kBNBlock = 1;
@@ -231,16 +232,14 @@ struct WmmaTraitsBase<gfx13_t, ADType, BDType, CDType, K, MixPrec, M, N>
     static constexpr index_t kBNLane = 16;
 
     static constexpr index_t K1PerLane   = sizeof(ADataType) == 2 ? 2 : 4;
-    static constexpr index_t kABKLane    = 2;
     static constexpr index_t kAK0PerLane = kK / kABKLane / K1PerLane;
     static constexpr index_t kBK0PerLane = kK / kABKLane / K1PerLane;
     static constexpr index_t kAK1PerLane = K1PerLane;
     static constexpr index_t kBK1PerLane = K1PerLane;
 
-    static constexpr index_t kCMLane     = 2;
     static constexpr index_t kCNLane     = 16;
-    static constexpr index_t kCM0PerLane = kK / kABKLane / K1PerLane;
     static constexpr index_t kCM1PerLane = K1PerLane;
+    static constexpr index_t kCM0PerLane = kM / kCMLane / kCM1PerLane;
 
     using kABPs2RHssMajor = sequence<1, 2>;
     using kABPs2RHssMinor = sequence<1, 1>;

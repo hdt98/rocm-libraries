@@ -593,7 +593,7 @@ struct DeviceGemm_Xdl_CkTileWrap : public
 #if CK_TILE_USE_WMMA
 #if defined(CK_USE_GFX1250)
     using DeviceArch = gfx125_t;
-#elif defined(CK_EXTENSION_MX_TYPE)
+#elif defined(CK_USE_GFX13)
     using DeviceArch = gfx13_t;
 #else
     using DeviceArch = gfx120_t;
