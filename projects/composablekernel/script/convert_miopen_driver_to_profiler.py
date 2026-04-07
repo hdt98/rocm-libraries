@@ -199,7 +199,11 @@ def run_ck_grouped_conv_fwd(args, capture_output=False):
     # use int32 by default
     args.index_type = 0
 
-    cmd = [str(args.ck_profiler_cmd), str(args.ck_profier_op)]
+    profiler_path = args.profiler_path
+    if profiler_path is None:
+        profiler_path = str(args.ck_profiler_cmd)
+
+    cmd = [profiler_path, str(args.ck_profier_op)]
     cmd += [str(args.data_type), str(args.layout), str(args.index_type)]
     cmd += [str(args.verify), str(args.init_method)]
     cmd += [str(args.log_value), str(args.time)]
@@ -821,6 +825,11 @@ if __name__ == "__main__":
     else:
         # Single command mode (original behavior)
         args, unknown = parser.parse_known_args()
+
+        profiler_path = args.profiler_path
+        if profiler_path:
+            print(f"Using profiler: '{profiler_path}'")
+
         init_const_args(args)
         process_miopen_driver_name(args, unknown)
         print("Ignored args:")
