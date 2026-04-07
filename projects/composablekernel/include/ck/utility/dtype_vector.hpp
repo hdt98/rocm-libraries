@@ -13,6 +13,8 @@
 namespace ck {
 
 __device__ int static err = 0;
+
+#if 0
 template <typename T>
 struct vector_type<T, 2, typename ck::enable_if_t<is_native_type<T>()>>
 {
@@ -2326,6 +2328,7 @@ struct vector_type<T, 9, typename ck::enable_if_t<is_native_type<T>()>>
         }
     }
 };
+#endif
 
 template <typename T, index_t N, typename Enable = void>
 struct non_native_vector_base;
@@ -2940,6 +2943,7 @@ __host__ __device__ constexpr auto make_vector_type(Number<N>)
     return typename vector_type_maker<T, N>::type{};
 }
 
+#if 0
 template <typename T>
 struct vector_type<T, 128, typename ck::enable_if_t<!is_native_type<T>()>>
 {
@@ -4452,7 +4456,7 @@ struct vector_type<T, 9, typename ck::enable_if_t<!is_native_type<T>()>>
         }
     }
 };
-
+#endif
 // fp32
 using float2_t  = typename vector_type<float, 2>::type;
 using float4_t  = typename vector_type<float, 4>::type;

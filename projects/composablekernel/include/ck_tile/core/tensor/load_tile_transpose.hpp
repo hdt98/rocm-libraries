@@ -50,10 +50,10 @@ constexpr bool is_sequence_suffix_v = is_sequence_suffix<Suffix, Sequence>::valu
 template <typename DataType>
 struct DefaultTranspose
 {
+#if defined(__gfx950__)
     template <index_t LaneGroupSize, index_t NumBitType>
     struct Quad
     {
-#if defined(__gfx950__)
         static_assert(LaneGroupSize == 64 || LaneGroupSize == 32 || LaneGroupSize == 16,
                       "LaneGroupSize must be 64, 32, or 16");
 

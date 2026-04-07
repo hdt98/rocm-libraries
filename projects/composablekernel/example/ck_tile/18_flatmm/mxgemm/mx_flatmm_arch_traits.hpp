@@ -187,7 +187,7 @@ struct MXFlatmmArchTraits
 
         size_t MNXdlPack   = 2;
         size_t KXdlPack    = 2;
-        size_t XdlMNThread = Config::N_Warp_Tile; // 16
+        size_t XdlMNThread = Config::N_Warp_Tile;       // 16
         size_t XdlMNThread = FlatmmConfig::N_Warp_Tile; // 16
         size_t XdlKThread  = ck_tile::get_warp_size() / XdlMNThread;
 

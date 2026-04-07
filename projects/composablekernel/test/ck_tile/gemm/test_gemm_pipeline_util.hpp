@@ -76,7 +76,7 @@ enum struct GemmPipelineType
     CompV4,
     CompV6,
     CompAsync,
-    CompAsyncEightWaves
+    CompAsyncEightWaves,
     CompTDMV1,
     CompTDMV2
 };
@@ -136,6 +136,8 @@ struct GemmPipelineTypeSelector<GemmPipelineType::CompAsyncEightWaves, Problem>
     using pipeline      = ck_tile::GemmPipelineAgBgCrCompAsyncEightWaves<Problem>;
 
     static constexpr auto GetName() { return "GemmPipelineAgBgCrCompAsyncEightWaves"; }
+};
+
 struct GemmPipelineTypeSelector<GemmPipelineType::CompTDMV1, Problem>
 {
     using base_pipeline = ck_tile::BaseGemmPipelineAgBgCrCompTDM<Problem>;
