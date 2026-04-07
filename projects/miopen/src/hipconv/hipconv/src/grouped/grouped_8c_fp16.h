@@ -473,9 +473,9 @@ __device__ void conv2d_grouped_8c_fp16_cdna4_nhwc_impl(const _Float16* __restric
     }
 
     // Flush output rows whose last input contribution would land at y >= hi.
-    __syncthreads();
     for(int p_out = hi - cfg.kh + 1 + py; p_out < ho; p_out++)
     {
+        __syncthreads(); // separate prior LDS reads from this iteration's writes
         int p_idx = (p_out - py + cfg.kh) % cfg.kh;
         fp32x4_t slot;
         dispatch<cfg.kh>(p_idx,

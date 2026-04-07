@@ -577,6 +577,8 @@ constexpr KernelVariant make_variant()
                 return false;
             if(par.direction != hipconv::Direction::Wgrad)
                 return false;
+            if(par.order != hipconv::TensorOrder::NHWC)
+                return false;
             if(par.out_type != hipconv::DataType::fp32)
                 return false;
             if(par.kh != 3 || par.kw != 3)
