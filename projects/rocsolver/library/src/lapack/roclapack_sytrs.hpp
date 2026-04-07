@@ -132,6 +132,7 @@ __device__ static T reduce_sum_shfl_wsize(I const wsize, T val)
 //
 // nrhs_arg  columns of matrix B is spread across nbx thread blocks
 // ------------------------------------------------
+
 template <typename T, typename I, typename Istride, typename UA, typename UB>
 ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const use_upper,
 
@@ -419,7 +420,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
         T* const A_bid = load_ptr_batch<T>(AA, bid, shiftA, strideA);
         I* const ipiv_bid = ipivA + (bid * strideP);
 
-        T* const B_bid = load_ptr_batch<T>(BB, bid, shiftB, strideB) + offsetB;
+        T* const B_bid = offsetB + load_ptr_batch<T>(BB, bid, shiftB, strideB);
 
         // --------------------
         // try to hold B in LDS
@@ -468,6 +469,86 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
 
         auto ipiv = [=](auto i) -> I& { return (ipiv_bid[(i - 1)]); };
 
+        // simple heuristic
+        bool use_reduce_sync = (nrhs > warpSize);
+
+        //   -------------------------------------------------------------------------------------
+        //   Matrix-vector multiply to update a row of matrix B
+        //
+        //   B( krow, j) += alpha * transpose( B( kstart:(kstart+m-1), j  ) ) * x( 1:m )
+        //
+        //   where j=1:nrhs
+        //   -------------------------------------------------------------------------------------
+        auto sytrs_gemv_reduce_sync = [=](I const m, I const kstart, T const* const x, I const incx,
+                                          I const krow) {
+            T const alpha = -one;
+
+            for(I j = 1 + ij_start; j <= nrhs; j += ij_inc)
+            {
+                T dsum = 0;
+                for(I i = 1; i <= m; i++)
+                {
+                    auto const ix = (incx == 1) ? (i - 1) : (i - 1) * static_cast<int64_t>(incx);
+                    T const xi = x[ix];
+                    dsum += B((kstart - 1) + i, j) * xi;
+                }
+
+                B(krow, j) += alpha * dsum;
+            }
+        };
+
+        // ------------------------------------------------------------
+        // rank-1 update to m by n sub-matrix of B
+        //
+        // B(krow:(krow+m-1), 1:nrhs)  += alpha * x(1:m) * y(1:nrhs)^t
+        // ------------------------------------------------------------
+        auto sytrs_geru_reduce_sync = [=](
+
+                                          I const m,
+
+                                          T const* const x, I const incx,
+
+                                          I const row_y,
+
+                                          I const krow) {
+            T const alpha = -one;
+            for(I j = 1 + ij_start; j <= nrhs; j += ij_inc)
+            {
+                auto const yj = B(row_y, j);
+
+                for(I i = 1; i <= m; i++)
+                {
+                    auto const ix = (incx == 1) ? (i - 1) : (i - 1) * static_cast<int64_t>(incx);
+                    auto const xi = x[ix];
+
+                    B((krow - 1) + i, j) += xi * (yj * alpha);
+                }
+            }
+        };
+        // -----------------------------------------
+        // swap row B(k,1:nrhs) and row B(kp,1:nrhs)
+        // -----------------------------------------
+        auto sytrs_swap_rows = [=](I const k, I const kp) {
+            for(I j = 1 + ij_start; j <= nrhs; j += ij_inc)
+            {
+                auto const temp = B(k, j);
+                B(k, j) = B(kp, j);
+                B(kp, j) = temp;
+            }
+        };
+
+        // -----------------------
+        // scale row krow of matrix B
+        //
+        // B(krow, 1:nrhs) *= alpha
+        // -----------------------
+        auto sytrs_scal_row = [=](T const alpha, I const krow) {
+            for(I j = 1 + ij_start; j <= nrhs; j += ij_inc)
+            {
+                B(krow, j) *= alpha;
+            }
+        };
+
         if(use_upper)
         {
             //        Solve A*X = B, where A = U*D*U**T.
@@ -491,7 +572,14 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                     I const kp = ipiv(k);
                     if(kp != k)
                     {
-                        sytrs_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
+                        if(use_reduce_sync)
+                        {
+                            sytrs_swap_rows(k, kp);
+                        }
+                        else
+                        {
+                            sytrs_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
+                        }
                     }
                     // --------------------------------
                     //
@@ -500,18 +588,47 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                     //           stored in column K of A.
                     //
                     // --------------------------------
-                    sytrs_geru(k - 1, nrhs, -one,
 
-                               &(A(1, k)), 1,
+                    if(use_reduce_sync)
+                    {
+                        I m{};
+                        I krow{};
+                        I row_y{};
 
-                               &(B(k, 1)), ldb,
+                        sytrs_geru_reduce_sync(
 
-                               &(B(1, 1)), ldb);
+                            m = k - 1,
+
+                            &(A(1, k)), 1,
+
+                            row_y = k,
+
+                            krow = 1);
+                    }
+                    else
+                    {
+                        sytrs_geru(k - 1, nrhs, -one,
+
+                                   &(A(1, k)), 1,
+
+                                   &(B(k, 1)), ldb,
+
+                                   &(B(1, 1)), ldb);
+                    }
+
                     // --------------------------------
                     //    Multiply by the inverse of the diagonal block.
                     // --------------------------------
 
-                    sytrs_scal(nrhs, one / A(k, k), &(B(k, 1)), ldb);
+                    if(use_reduce_sync)
+                    {
+                        auto const alpha = one / A(k, k);
+                        sytrs_scal_row(alpha, k);
+                    }
+                    else
+                    {
+                        sytrs_scal(nrhs, one / A(k, k), &(B(k, 1)), ldb);
+                    }
 
                     k = k - 1;
                 }
@@ -527,11 +644,18 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                     I const kp = -ipiv(k);
                     if(kp != (k - 1))
                     {
-                        sytrs_swap(nrhs,
+                        if(use_reduce_sync)
+                        {
+                            sytrs_swap_rows(k - 1, kp);
+                        }
+                        else
+                        {
+                            sytrs_swap(nrhs,
 
-                                   &(B(k - 1, 1)), ldb,
+                                       &(B(k - 1, 1)), ldb,
 
-                                   &(B(kp, 1)), ldb);
+                                       &(B(kp, 1)), ldb);
+                        }
                     }
                     // --------------------------------
                     //
@@ -540,21 +664,60 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                     //      stored in columns K-1 and K of A.
                     //
                     // --------------------------------
-                    sytrs_geru(k - 2, nrhs, -one,
 
-                               &(A(1, k)), 1,
+                    if(use_reduce_sync)
+                    {
+                        I m{};
+                        I krow{};
+                        I row_y{};
 
-                               &(B(k, 1)), ldb,
+                        sytrs_geru_reduce_sync(
 
-                               &(B(1, 1)), ldb);
+                            m = k - 2,
 
-                    sytrs_geru(k - 2, nrhs, -one,
+                            &(A(1, k)), 1,
 
-                               &(A(1, k - 1)), 1,
+                            row_y = k,
 
-                               &(B(k - 1, 1)), ldb,
+                            krow = 1);
+                    }
+                    else
+                    {
+                        sytrs_geru(k - 2, nrhs, -one,
 
-                               &(B(1, 1)), ldb);
+                                   &(A(1, k)), 1,
+
+                                   &(B(k, 1)), ldb,
+
+                                   &(B(1, 1)), ldb);
+                    }
+
+                    if(use_reduce_sync)
+                    {
+                        I m{};
+                        I krow{};
+                        I row_y{};
+
+                        sytrs_geru_reduce_sync(
+
+                            m = k - 2,
+
+                            &(A(1, k - 1)), 1,
+
+                            row_y = k - 1,
+
+                            krow = 1);
+                    }
+                    else
+                    {
+                        sytrs_geru(k - 2, nrhs, -one,
+
+                                   &(A(1, k - 1)), 1,
+
+                                   &(B(k - 1, 1)), ldb,
+
+                                   &(B(1, 1)), ldb);
+                    }
                     // --------------------------------
                     //           Multiply by the inverse of the diagonal block.
                     // --------------------------------
@@ -563,19 +726,20 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                         auto const akm1 = A(k - 1, k - 1) / akm1k;
                         auto const ak = A(k, k) / akm1k;
                         auto const denom = akm1 * ak - one;
-                        for(auto j = 1 + ij_start; j <= nrhs; j += ij_inc)
+                        for(I j = 1 + ij_start; j <= nrhs; j += ij_inc)
                         {
                             auto const bkm1 = B(k - 1, j) / akm1k;
                             auto const bk = B(k, j) / akm1k;
                             B(k - 1, j) = (ak * bkm1 - bk) / denom;
                             B(k, j) = (akm1 * bk - bkm1) / denom;
                         }
-                        __syncthreads();
                     }
 
                     k = k - 2;
                 }
             } // end while
+
+            __syncthreads();
 
             // --------------------------------
             //        Next solve U**T *X = B, overwriting B with X.
@@ -595,22 +759,50 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                     //      where U(K) is the transformation
                     //      stored in column K of A.
                     // --------------------------------
-                    sytrs_gemv('t', k - 1, nrhs, -one,
 
-                               &(B(1, 1)), ldb,
+                    if(use_reduce_sync)
+                    {
+                        I m{};
+                        I kstart{};
+                        I krow{};
 
-                               &(A(1, k)), 1,
+                        sytrs_gemv_reduce_sync(
 
-                               one,
+                            m = k - 1,
 
-                               &(B(k, 1)), ldb);
+                            kstart = 1,
+
+                            &(A(1, k)), 1,
+
+                            krow = k);
+                    }
+                    else
+                    {
+                        sytrs_gemv('t', k - 1, nrhs, -one,
+
+                                   &(B(1, 1)), ldb,
+
+                                   &(A(1, k)), 1,
+
+                                   one,
+
+                                   &(B(k, 1)), ldb);
+                    }
+
                     // --------------------------------
                     //           Interchange rows K and IPIV(K).
                     // --------------------------------
                     I const kp = ipiv(k);
                     if(kp != k)
                     {
-                        sytrs_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
+                        if(use_reduce_sync)
+                        {
+                            sytrs_swap_rows(k, kp);
+                        }
+                        else
+                        {
+                            sytrs_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
+                        }
                     }
                     k = k + 1;
                 }
@@ -623,32 +815,78 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                     //      where U(K+1) is the transformation
                     //      stored in columns K and K+1 of A.
                     // --------------------------------
-                    sytrs_gemv('t', k - 1, nrhs, -one,
 
-                               &(B(1, 1)), ldb,
+                    if(use_reduce_sync)
+                    {
+                        I m{};
+                        I kstart{};
+                        I krow{};
 
-                               &(A(1, k)), 1,
+                        sytrs_gemv_reduce_sync(
 
-                               one,
+                            m = k - 1,
 
-                               &(B(k, 1)), ldb);
+                            kstart = 1,
 
-                    sytrs_gemv('t', k - 1, nrhs, -one,
+                            &(A(1, k)), 1,
 
-                               &(B(1, 1)), ldb,
+                            krow = k);
+                    }
+                    else
+                    {
+                        sytrs_gemv('t', k - 1, nrhs, -one,
 
-                               &(A(1, k + 1)), 1,
+                                   &(B(1, 1)), ldb,
 
-                               one,
+                                   &(A(1, k)), 1,
 
-                               &(B(k + 1, 1)), ldb);
+                                   one,
+
+                                   &(B(k, 1)), ldb);
+                    }
+
+                    if(use_reduce_sync)
+                    {
+                        I m{};
+                        I kstart{};
+                        I krow{};
+
+                        sytrs_gemv_reduce_sync(
+
+                            m = k - 1,
+
+                            kstart = 1,
+
+                            &(A(1, k + 1)), 1,
+
+                            krow = k + 1);
+                    }
+                    else
+                    {
+                        sytrs_gemv('t', k - 1, nrhs, -one,
+
+                                   &(B(1, 1)), ldb,
+
+                                   &(A(1, k + 1)), 1,
+
+                                   one,
+
+                                   &(B(k + 1, 1)), ldb);
+                    }
                     // --------------------------------
                     //           Interchange rows K and -IPIV(K).
                     // --------------------------------
                     I const kp = -ipiv(k);
                     if(kp != k)
                     {
-                        sytrs_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
+                        if(use_reduce_sync)
+                        {
+                            sytrs_swap_rows(k, kp);
+                        }
+                        else
+                        {
+                            sytrs_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
+                        }
                     }
                     k = k + 2;
                 }
@@ -678,7 +916,14 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                     I const kp = ipiv(k);
                     if(kp != k)
                     {
-                        sytrs_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
+                        if(use_reduce_sync)
+                        {
+                            sytrs_swap_rows(k, kp);
+                        }
+                        else
+                        {
+                            sytrs_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
+                        }
                     }
 
                     //  -----------------------------------
@@ -687,20 +932,46 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                     //  -----------------------------------
                     if(k < n)
                     {
-                        sytrs_geru(n - k, nrhs, -one,
+                        if(use_reduce_sync)
+                        {
+                            I m{};
+                            I krow{};
+                            I row_y{};
 
-                                   &(A(k + 1, k)), 1,
+                            sytrs_geru_reduce_sync(
 
-                                   &(B(k, 1)), ldb,
+                                m = n - k,
 
-                                   &(B(k + 1, 1)), ldb);
+                                &(A(k + 1, k)), 1,
+
+                                row_y = k,
+
+                                krow = k + 1);
+                        }
+                        else
+                        {
+                            sytrs_geru(n - k, nrhs, -one,
+
+                                       &(A(k + 1, k)), 1,
+
+                                       &(B(k, 1)), ldb,
+
+                                       &(B(k + 1, 1)), ldb);
+                        }
                     }
 
                     //  -----------------------------------
                     //           Multiply by the inverse of the diagonal block.
                     //  -----------------------------------
 
-                    sytrs_scal(nrhs, one / A(k, k), &(B(k, 1)), ldb);
+                    if(use_reduce_sync)
+                    {
+                        sytrs_scal_row(one / A(k, k), k);
+                    }
+                    else
+                    {
+                        sytrs_scal(nrhs, one / A(k, k), &(B(k, 1)), ldb);
+                    }
 
                     k = k + 1;
                 }
@@ -714,7 +985,14 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                     I const kp = -ipiv(k);
                     if(kp != (k + 1))
                     {
-                        sytrs_swap(nrhs, &(B(k + 1, 1)), ldb, &(B(kp, 1)), ldb);
+                        if(use_reduce_sync)
+                        {
+                            sytrs_swap_rows(k + 1, kp);
+                        }
+                        else
+                        {
+                            sytrs_swap(nrhs, &(B(k + 1, 1)), ldb, &(B(kp, 1)), ldb);
+                        }
                     }
                     //  -----------------------------------
                     //           Multiply by inv(L(K)), where L(K) is the transformation
@@ -722,21 +1000,59 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                     //  -----------------------------------
                     if(k < (n - 1))
                     {
-                        sytrs_geru(n - k - 1, nrhs, -one,
+                        if(use_reduce_sync)
+                        {
+                            I m{};
+                            I krow{};
+                            I row_y{};
 
-                                   &(A(k + 2, k)), 1,
+                            sytrs_geru_reduce_sync(
 
-                                   &(B(k, 1)), ldb,
+                                m = n - k - 1,
 
-                                   &(B(k + 2, 1)), ldb);
+                                &(A(k + 2, k)), 1,
 
-                        sytrs_geru(n - k - 1, nrhs, -one,
+                                row_y = k,
 
-                                   &(A(k + 2, k + 1)), 1,
+                                krow = k + 2);
+                        }
+                        else
+                        {
+                            sytrs_geru(n - k - 1, nrhs, -one,
 
-                                   &(B(k + 1, 1)), ldb,
+                                       &(A(k + 2, k)), 1,
 
-                                   &(B(k + 2, 1)), ldb);
+                                       &(B(k, 1)), ldb,
+
+                                       &(B(k + 2, 1)), ldb);
+                        }
+
+                        if(use_reduce_sync)
+                        {
+                            I m{};
+                            I krow{};
+                            I row_y{};
+
+                            sytrs_geru_reduce_sync(
+
+                                m = n - k - 1,
+
+                                &(A(k + 2, k + 1)), 1,
+
+                                row_y = k + 1,
+
+                                krow = k + 2);
+                        }
+                        else
+                        {
+                            sytrs_geru(n - k - 1, nrhs, -one,
+
+                                       &(A(k + 2, k + 1)), 1,
+
+                                       &(B(k + 1, 1)), ldb,
+
+                                       &(B(k + 2, 1)), ldb);
+                        }
                     }
                     //  -----------------------------------
                     //           Multiply by the inverse of the diagonal block.
@@ -746,18 +1062,19 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                         auto const akm1 = A(k, k) / akm1k;
                         auto const ak = A(k + 1, k + 1) / akm1k;
                         auto const denom = akm1 * ak - one;
-                        for(I j = 1 + j_start; j <= nrhs; j += j_inc)
+                        for(I j = 1 + ij_start; j <= nrhs; j += ij_inc)
                         {
                             auto const bkm1 = B(k, j) / akm1k;
                             auto const bk = B(k + 1, j) / akm1k;
                             B(k, j) = (ak * bkm1 - bk) / denom;
                             B(k + 1, j) = (akm1 * bk - bkm1) / denom;
                         }
-                        __syncthreads();
                     }
                     k = k + 2;
                 }
             } // end while
+
+            __syncthreads();
 
             //  -----------------------------------
             //        Next solve L**T *X = B, overwriting B with X.
@@ -779,15 +1096,34 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                     //  -----------------------------------
                     if(k < n)
                     {
-                        sytrs_gemv('t', n - k, nrhs, -one,
+                        if(use_reduce_sync)
+                        {
+                            I m{};
+                            I kstart{};
+                            I krow{};
 
-                                   &(B(k + 1, 1)), ldb,
+                            sytrs_gemv_reduce_sync(
 
-                                   &(A(k + 1, k)), 1,
+                                m = n - k,
 
-                                   one,
+                                kstart = k + 1,
 
-                                   &(B(k, 1)), ldb);
+                                &(A(k + 1, k)), 1,
+
+                                krow = k);
+                        }
+                        else
+                        {
+                            sytrs_gemv('t', n - k, nrhs, -one,
+
+                                       &(B(k + 1, 1)), ldb,
+
+                                       &(A(k + 1, k)), 1,
+
+                                       one,
+
+                                       &(B(k, 1)), ldb);
+                        }
                     }
                     //  -----------------------------------
                     //           Interchange rows K and IPIV(K).
@@ -795,7 +1131,14 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                     I const kp = ipiv(k);
                     if(kp != k)
                     {
-                        sytrs_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
+                        if(use_reduce_sync)
+                        {
+                            sytrs_swap_rows(k, kp);
+                        }
+                        else
+                        {
+                            sytrs_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
+                        }
                     }
                     k = k - 1;
                 }
@@ -809,25 +1152,63 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                     //  -----------------------------------
                     if(k < n)
                     {
-                        sytrs_gemv('t', n - k, nrhs, -one,
+                        if(use_reduce_sync)
+                        {
+                            I m{};
+                            I kstart{};
+                            I krow{};
 
-                                   &(B(k + 1, 1)), ldb,
+                            sytrs_gemv_reduce_sync(
 
-                                   &(A(k + 1, k)), 1,
+                                m = n - k,
 
-                                   one,
+                                kstart = k + 1,
 
-                                   &(B(k, 1)), ldb);
+                                &(A(k + 1, k)), 1,
 
-                        sytrs_gemv('t', n - k, nrhs, -one,
+                                krow = k);
+                        }
+                        else
+                        {
+                            sytrs_gemv('t', n - k, nrhs, -one,
 
-                                   &(B(k + 1, 1)), ldb,
+                                       &(B(k + 1, 1)), ldb,
 
-                                   &(A(k + 1, k - 1)), 1,
+                                       &(A(k + 1, k)), 1,
 
-                                   one,
+                                       one,
 
-                                   &(B(k - 1, 1)), ldb);
+                                       &(B(k, 1)), ldb);
+                        }
+
+                        if(use_reduce_sync)
+                        {
+                            I m{};
+                            I kstart{};
+                            I krow{};
+
+                            sytrs_gemv_reduce_sync(
+
+                                m = n - k,
+
+                                kstart = k + 1,
+
+                                &(A(k + 1, k - 1)), 1,
+
+                                krow = k - 1);
+                        }
+                        else
+                        {
+                            sytrs_gemv('t', n - k, nrhs, -one,
+
+                                       &(B(k + 1, 1)), ldb,
+
+                                       &(A(k + 1, k - 1)), 1,
+
+                                       one,
+
+                                       &(B(k - 1, 1)), ldb);
+                        }
                     }
                     //  -----------------------------------
                     //           Interchange rows K and -IPIV(K).
@@ -835,7 +1216,14 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
                     I const kp = -ipiv(k);
                     if(kp != k)
                     {
-                        sytrs_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
+                        if(use_reduce_sync)
+                        {
+                            sytrs_swap_rows(k, kp);
+                        }
+                        else
+                        {
+                            sytrs_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
+                        }
                     }
                     k = k - 2;
                 }
@@ -855,6 +1243,9 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
 
             if(nrhs == 1)
             {
+                // --------------------------------
+                // use all threads in row dimension
+                // --------------------------------
                 jj_start = 0;
                 jj_inc = 1;
 
@@ -878,7 +1269,6 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
 
     } // end for (bid)
 }
-
 template <typename UA, typename UB, typename I>
 rocblas_status rocsolver_sytrs_argCheck(rocblas_handle handle,
                                         rocblas_fill const uplo,
@@ -904,7 +1294,9 @@ rocblas_status rocsolver_sytrs_argCheck(rocblas_handle handle,
 
     // 2. invalid size
     if(n < 0 || nrhs < 0 || lda < n || ldb < n || batch_count < 0)
+    {
         return rocblas_status_invalid_size;
+    }
 
     // skip pointer check if querying memory size
     if(rocblas_is_device_memory_size_query(handle))
