@@ -67,17 +67,10 @@ except ImportError:
     printWarning("CSafeLoader not installed. Fallback to SafeLoader.")
 
 try:
-    from yaml import CSafeDumper as yamlDumperBase
+    from yaml import CSafeDumper as yamlDumper
 except ImportError:
-    from yaml import SafeDumper as yamlDumperBase
+    from yaml import SafeDumper as yamlDumper
     printWarning("CSafeDumper not installed. Fallback to SafeDumper.")
-
-# Custom dumper that disables YAML anchors/aliases (C++ parser doesn't support them)
-class NoAliasDumper(yamlDumperBase):
-    def ignore_aliases(self, data):
-        return True
-
-yamlDumper = NoAliasDumper
 
 try:
     import msgpack
