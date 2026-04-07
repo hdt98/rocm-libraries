@@ -858,10 +858,8 @@ struct buffer_view<address_space_enum::lds,
             {
                 using buf_t = ext_vector_t<typename vector_traits<remove_cvref_t<T>>::scalar_type,
                                            scalar_per_t_vector * scalar_per_x_vector>;
-                const auto* padded =
-                    reinterpret_cast<const lds_padded_element<T>*>(p_data_);
-                auto rtn =
-                    *c_style_pointer_cast<const buf_t*>(&padded[i + linear_offset]);
+                const auto* padded = reinterpret_cast<const lds_padded_element<T>*>(p_data_);
+                auto rtn = *c_style_pointer_cast<const buf_t*>(&padded[i + linear_offset]);
                 return bit_cast<X>(rtn);
             }
 #endif
@@ -1133,8 +1131,8 @@ struct buffer_view<address_space_enum::lds,
 
                 __builtin_memcpy(&(p_data_[i]), &tmp, sizeof(X));
 #else
-                using buf_t = ext_vector_t<typename vector_traits<remove_cvref_t<T>>::scalar_type,
-                                           scalar_per_t_vector * scalar_per_x_vector>;
+                using buf_t  = ext_vector_t<typename vector_traits<remove_cvref_t<T>>::scalar_type,
+                                            scalar_per_t_vector * scalar_per_x_vector>;
                 auto* padded = reinterpret_cast<lds_padded_element<T>*>(p_data_);
                 *c_style_pointer_cast<buf_t*>(&padded[i]) = reinterpret_cast<const buf_t&>(x);
 #endif
