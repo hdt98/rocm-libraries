@@ -77,7 +77,6 @@ using fmha_traits = ck_tile::TileSageAttnTraits<{F_spad},
                                             {F_skpad},
                                             {F_dpad},
                                             {F_dvpad},
-                                            false,
                                         {F_qscale},
                                         {F_occupancy},
                                         {F_skip}>;
@@ -263,7 +262,7 @@ class SageAttnFwdApiTrait:
     @property
     def name(self) -> str:
         return (
-            f"{self.hdim}-{self.dtype}-{self.mode}-{self.bm0}-{self.bn0}-{self.bk0}-{self.bn0}-{self.bk1}-{self.bk0max}-"
+            f"{self.hdim}-{self.dtype}-{self.mode}-{self.bm0}-{self.bn0}-{self.bk0}-{self.bn1}-{self.bk1}-{self.bk0max}-"
             + f"{self.vlayout}-{self.mask}-{self.qscale}-{self.spad}-{self.skpad}-{self.dpad}-{self.dvpad}-{self.skip}"
         )
 

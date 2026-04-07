@@ -170,7 +170,7 @@ struct BlockSageAttnPipelineQRKSVSCustomPolicy : BlockSageAttnPipelineQRCustomPo
     static constexpr bool AsyncCopy = AsyncCopy_;
 
     static constexpr index_t NumPrefetchK = NumPrefetchK_;
-    static constexpr index_t NumPrefetchV = NumPrefetchK_;
+    static constexpr index_t NumPrefetchV = NumPrefetchV_;
 
     static constexpr index_t NumKVLdsBuffers = max(NumPrefetchK, NumPrefetchV);
 
@@ -338,7 +338,7 @@ struct BlockSageAttnPipelineQRKSVSCustomPolicy : BlockSageAttnPipelineQRCustomPo
             else
             {
                 constexpr index_t kNPerBlock = Problem::BlockSageAttnShape::kN0;
-                constexpr index_t kKPerBlock = Problem::BlockSageAttnShape::kK1;
+                constexpr index_t kKPerBlock = Problem::BlockSageAttnShape::kK0;
                 constexpr index_t NumWarps   = Problem::BlockSageAttnShape::NumWarps;
                 constexpr index_t WarpSize   = ck_tile::get_warp_size();
 
@@ -360,7 +360,7 @@ struct BlockSageAttnPipelineQRKSVSCustomPolicy : BlockSageAttnPipelineQRCustomPo
             using VDataType                = remove_cvref_t<typename Problem::VDataType>;
             constexpr index_t Banks        = get_n_lds_banks();
             constexpr index_t PixelsPerRow = Banks * 4 / sizeof(VDataType);
-            constexpr index_t kKPack       = GetSmemKPackK<Problem>();
+            constexpr index_t kKPack       = GetSmemKPackV<Problem>();
             static_assert(PixelsPerRow % kKPack == 0);
             constexpr index_t NPerRow    = PixelsPerRow / kKPack;
             constexpr index_t kNPerBlock = Problem::BlockSageAttnShape::kN1;
@@ -405,7 +405,7 @@ struct BlockSageAttnPipelineQRKSVSCustomPolicy : BlockSageAttnPipelineQRCustomPo
     {
         // K is always k-major, we use async-copy to load into LDS
         constexpr index_t kNPerBlock = Problem::BlockSageAttnShape::kN0;
-        constexpr index_t kKPerBlock = Problem::BlockSageAttnShape::kK1;
+        constexpr index_t kKPerBlock = Problem::BlockSageAttnShape::kK0;
         constexpr index_t kBlockSize = Problem::kBlockSize;
         constexpr index_t NumWarps   = Problem::BlockSageAttnShape::NumWarps;
         constexpr index_t WarpSize   = ck_tile::get_warp_size();
@@ -458,7 +458,7 @@ struct BlockSageAttnPipelineQRKSVSCustomPolicy : BlockSageAttnPipelineQRCustomPo
     {
         // K is always k-major, we use async-copy to load into LDS
         constexpr index_t kNPerBlock = Problem::BlockSageAttnShape::kN0;
-        constexpr index_t kKPerBlock = Problem::BlockSageAttnShape::kK1;
+        constexpr index_t kKPerBlock = Problem::BlockSageAttnShape::kK0;
         constexpr index_t kBlockSize = Problem::kBlockSize;
         constexpr index_t NumWarps   = Problem::BlockSageAttnShape::NumWarps;
         constexpr index_t WarpSize   = ck_tile::get_warp_size();
@@ -598,7 +598,7 @@ struct BlockSageAttnPipelineQRKSVSCustomPolicy : BlockSageAttnPipelineQRCustomPo
         else
         {
             constexpr index_t kNPerBlock = Problem::BlockSageAttnShape::kN0;
-            constexpr index_t kKPerBlock = Problem::BlockSageAttnShape::kK1;
+            constexpr index_t kKPerBlock = Problem::BlockSageAttnShape::kK0;
             constexpr index_t kBlockSize = Problem::kBlockSize;
             constexpr index_t NumWarps   = Problem::BlockSageAttnShape::NumWarps;
             constexpr index_t WarpSize   = ck_tile::get_warp_size();

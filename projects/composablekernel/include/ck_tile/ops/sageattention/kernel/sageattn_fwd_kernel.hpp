@@ -75,11 +75,11 @@ struct SageAttnFwdKernel
     {
         // sync with codegen/ops/sageattn_fwd.py
         // clang-format off
-        using bfs  = typename SageAttnPipeline::BlockFmhaShape;
-        using gbr0 = typename bfs::Gemm0BlockWarps;
-        using gbr1 = typename bfs::Gemm1BlockWarps;
-        using gwt0 = typename bfs::Gemm0WarpTile;
-        using gwt1 = typename bfs::Gemm1WarpTile;
+        using bss  = typename SageAttnPipeline::BlockSageAttnShape;
+        using gbr0 = typename bss::Gemm0BlockWarps;
+        using gbr1 = typename bss::Gemm1BlockWarps;
+        using gwt0 = typename bss::Gemm0WarpTile;
+        using gwt1 = typename bss::Gemm1WarpTile;
         
         #define _SS_  std::string
         #define _TS_  std::to_string
@@ -96,10 +96,10 @@ struct SageAttnFwdKernel
         std::string pipeline_str = std::string(kPipelineName);
         
         auto name = 
-            _SS_("sageattn_fwd_d") + _TS_(bfs::kQKHeaddim) + "_" + _SS_(t2s<QDataType>::name) + "_" +
+            _SS_("sageattn_fwd_d") + _TS_(bss::kQKHeaddim) + "_" + _SS_(t2s<QDataType>::name) + "_" +
             (kIsGroupMode ? "group" : "batch") + "_" +
-            "b" + _TS_(bfs::kM0) + "x" + _TS_(bfs::kN0) + "x" + _TS_(bfs::kK0) + "x" +
-                  _TS_(bfs::kN1) + "x" + _TS_(bfs::kK1) + "x" + _TS_(bfs::kK0BlockMax) + "_" +
+            "b" + _TS_(bss::kM0) + "x" + _TS_(bss::kN0) + "x" + _TS_(bss::kK0) + "x" +
+                  _TS_(bss::kN1) + "x" + _TS_(bss::kK1) + "x" + _TS_(bss::kQKHeaddim) + "_" +
             "r" + _TS_(gbr0::at(ck_tile::number<0>{})) + "x" + 
                   _TS_(gbr0::at(ck_tile::number<1>{})) + "x" + 
                   _TS_(gbr0::at(ck_tile::number<2>{})) + "_" +

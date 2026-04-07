@@ -67,8 +67,6 @@ struct BlockSageAttentionPipelineQRKSVSAsync
             return kPadSeqLenK ? 1 : Policy::template GetAlignmentV<Problem>();
     }();
     static constexpr index_t kAlignmentO = Policy::template GetAlignmentO<Problem>();
-    static constexpr index_t kAlignmentRandVal =
-        kPadSeqLenK ? 1 : Policy::template GetAlignmentRandVal<Problem>();
 
     static constexpr auto R_LOG2E = 1.0 / log2e_v<SaccDataType>;
     static constexpr auto LOG2E   = log2e_v<SaccDataType>;
