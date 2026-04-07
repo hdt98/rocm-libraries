@@ -1745,6 +1745,10 @@ class Solution(collections.abc.Mapping):
       else:
         return findSparseVectorWidth(steps-1, optVW_new)
 
+    # Save whether VW was auto-derived (-1) for TDM VW fallback in depthUIteration
+    state.setdefault("_inputVWA_was_auto", state["VectorWidthA"] == -1)
+    state.setdefault("_inputVWB_was_auto", state["VectorWidthB"] == -1)
+
     if state["VectorWidthA"] == -1:
       if state["EnableMatrixInstruction"]:
         regPerElem = state["ProblemType"]["MacDataTypeA"].numRegisters()
@@ -2066,9 +2070,17 @@ class Solution(collections.abc.Mapping):
         backupValues.append([key, value])
     # Skip this check for subtile impl?
     # TODO: Add this check back
+    
+    # Save auto-derived VW for restoration across DepthU loop iterations.
+    # TDM VW fallback in depthUIteration may reduce VW for a specific DepthU;
+    # each DepthU attempt should start from the original auto-derived VW.
+    _savedVWA = state["VectorWidthA"]
+    _savedVWB = state["VectorWidthB"]
     while True:
       for backup in backupValues:
         state[backup[0]] = backup[1]
+      state["VectorWidthA"] = _savedVWA
+      state["VectorWidthB"] = _savedVWB
       state["ValidDepthU"] = True
       state["DepthU"]      = depthuList[index[0]]
       Solution.depthUIteration(
@@ -2315,6 +2327,41 @@ class Solution(collections.abc.Mapping):
         state["_DepthUMXSB"] = depthUB // state["ProblemType"]["MXBlockB"]
       state["_DepthUMetadata"] = depthUM# internal
 
+      # When VectorWidth was auto-derived (-1) and TDM is enabled,
+      # proactively reduce VW if it would cause the auto-derived
+      # LdsBlockSizePerPad to exceed the TDM pad_interval limit
+      # (max 7, i.e. LdsBlockSizePerPad <= 1024 bytes).
+      # Only the UnrollMajorLDS path uses VW in the LdsBlockSizePerPad
+      # formula: roundUp(DepthU * bpe * VW, multiple).
+      if state["TDMInst"] and state["EnableMatrixInstruction"] and not state["ProblemType"]["Sparse"]:
+        multiple = 256
+        for tc in ["A", "B"]:
+          if not state.get("_inputVW%s_was_auto" % tc, False):
+            continue
+          if not state["UnrollMajorLDS%s" % tc]:
+            continue
+          vw = state["VectorWidth%s" % tc]
+          if vw <= 1:
+            continue
+          tmpBpe = state["ProblemType"]["MacDataType%s" % tc].numBytes()
+          depthU_tc = state["_DepthU%s" % tc]
+          origVw = vw
+          if tmpBpe == 0.75:
+              continue # FP6 not yet supported; skip this tc, still process the other
+          while vw > 1:
+            candidate = roundUpToNearestMultiple(int(depthU_tc * tmpBpe * vw), multiple)
+            dwords = candidate // 4
+            if dwords > 0 and (dwords & (dwords - 1)) == 0:
+              pad_interval = int(math.log2(dwords)) - 1
+              if pad_interval <= 7:
+                break  # this VW produces a valid LdsBlockSizePerPad
+            vw //= 2
+          if vw != origVw:
+            state["VectorWidth%s" % tc] = vw
+            # Update derived values that were set from VW before depthUIteration
+            if state["ProblemType"].get("MXBlock%s" % tc) and not state.get("DirectToVgpr%s" % tc):
+              state["VectorWidthMXS%s" % tc] = vw
+
       Solution.checkAndAssignWaveSeparateGlobalRead(state, 'A', printRejectionReason)
       Solution.checkAndAssignWaveSeparateGlobalRead(state, 'B', printRejectionReason)
       if state["ProblemType"]["Sparse"]:
@@ -2498,7 +2545,9 @@ class Solution(collections.abc.Mapping):
               return
             pad_interval = TensorDataMoverLoad.calPadInterval(val)
             if pad_interval > 7:
-              reject(state, printRejectionReason, f"pad_interval=(log2(LdsBlockSizePerPad//4)-1)={pad_interval} should be smaller than or equal to 7 for ldsBlockSizePerPad{tc}={val}")
+              # MXSA/MXSB share the host A/B operand's VectorWidth.
+              vwName = "VectorWidthA" if tc.endswith("A") else "VectorWidthB"
+              reject(state, printRejectionReason, f"pad_interval=(log2(LdsBlockSizePerPad//4)-1)={pad_interval} should be smaller than or equal to 7 for ldsBlockSizePerPad{tc}={val}. Please reduce DepthU or {vwName}")
 
       def calcMXSLdsBlockSizePerPad(tc: str, lrvw: int) -> int:
         LdsBlockSizePerPad = state["LdsBlockSizePerPad%s"%tc]
