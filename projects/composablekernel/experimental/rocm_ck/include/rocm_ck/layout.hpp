@@ -9,6 +9,7 @@
 
 #include <array>
 #include <cstddef>
+#include <utility>
 
 namespace rocm_ck {
 
@@ -60,6 +61,17 @@ template <typename T, std::size_t N>
 constexpr T leadingDimStride(Layout layout, const std::array<T, N>& strides)
 {
     return layout == Layout::Row ? strides[0] : strides[1];
+}
+
+/// Returns {row_stride, col_stride} for a matrix of size rows x cols.
+///   Row: row_stride = cols, col_stride = 1
+///   Col: row_stride = 1,   col_stride = rows
+constexpr std::pair<int, int> layoutStrides(Layout ly, int rows, int cols)
+{
+    if(ly == Layout::Row)
+        return {cols, 1};
+    else
+        return {1, rows};
 }
 
 } // namespace rocm_ck

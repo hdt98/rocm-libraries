@@ -19,6 +19,7 @@
 #include <rocm_ck/args.hpp>
 #include <rocm_ck/datatype_convert.hpp>
 #include <rocm_ck/datatype_utils.hpp>
+#include <rocm_ck/gpu_arch.hpp>
 #include <rocm_ck/hip_check.hpp>
 #include <rocm_ck/kpack_module.hpp>
 #include <rocm_ck/typed_buffer.hpp>
@@ -32,23 +33,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
-#include <utility>
 #include <vector>
-
-// ============================================================================
-// Layout-aware stride helpers
-// ============================================================================
-
-/// Returns {row_stride, col_stride} for a matrix of size rows x cols.
-///   RowMajor: row_stride = cols, col_stride = 1
-///   ColMajor: row_stride = 1,    col_stride = rows
-std::pair<int, int> layout_strides(rocm_ck::Layout ly, int rows, int cols)
-{
-    if(ly == rocm_ck::Layout::Row)
-        return {cols, 1};
-    else
-        return {1, rows};
-}
 
 // ============================================================================
 // BQuant variant runner
@@ -139,9 +124,9 @@ bool runBQuantVariant(
                 spec.workgroup_size);
 
     // Args: A, B, C, scale
-    auto [a_stride_m, a_stride_k] = layout_strides(spec.lhs().layout, M, K);
-    auto [b_stride_k, b_stride_n] = layout_strides(spec.rhs().layout, K, N);
-    auto [c_stride_m, c_stride_n] = layout_strides(spec.output().layout, M, N);
+    auto [a_stride_m, a_stride_k] = rocm_ck::layoutStrides(spec.lhs().layout, M, K);
+    auto [b_stride_k, b_stride_n] = rocm_ck::layoutStrides(spec.rhs().layout, K, N);
+    auto [c_stride_m, c_stride_n] = rocm_ck::layoutStrides(spec.output().layout, M, N);
 
     rocm_ck::Args kernel_args{};
     kernel_args.tensors[spec.lhs().args_slot] = {
@@ -226,9 +211,9 @@ bool runStandardVariant(const rocm_ck::GemmVariant& variant,
         return true; // skip, not a failure
 
     // --- Layout-aware strides from physical tensor table ---
-    auto [a_stride_m, a_stride_k] = layout_strides(spec.lhs().layout, cur_M, cur_K);
-    auto [b_stride_k, b_stride_n] = layout_strides(spec.rhs().layout, cur_K, cur_N);
-    auto [c_stride_m, c_stride_n] = layout_strides(spec.output().layout, cur_M, cur_N);
+    auto [a_stride_m, a_stride_k] = rocm_ck::layoutStrides(spec.lhs().layout, cur_M, cur_K);
+    auto [b_stride_k, b_stride_n] = rocm_ck::layoutStrides(spec.rhs().layout, cur_K, cur_N);
+    auto [c_stride_m, c_stride_n] = rocm_ck::layoutStrides(spec.output().layout, cur_M, cur_N);
 
     // --- Per-variant input data (padded variants need different buffer sizes) ---
     std::vector<float> pad_a, pad_b, pad_d0, pad_d1;
@@ -365,14 +350,14 @@ bool runStandardVariant(const rocm_ck::GemmVariant& variant,
     }
     if(has_d0)
     {
-        auto [d0_stride_m, d0_stride_n]          = layout_strides(spec.d0().layout, cur_M, cur_N);
+        auto [d0_stride_m, d0_stride_n] = rocm_ck::layoutStrides(spec.d0().layout, cur_M, cur_N);
         kernel_args.tensors[spec.d0().args_slot] = {buf_d0->ptr(),
                                                     rocm_ck::makeShape(cur_M, cur_N),
                                                     rocm_ck::makeStrides(d0_stride_m, d0_stride_n)};
     }
     if(has_d1)
     {
-        auto [d1_stride_m, d1_stride_n]          = layout_strides(spec.d1().layout, cur_M, cur_N);
+        auto [d1_stride_m, d1_stride_n] = rocm_ck::layoutStrides(spec.d1().layout, cur_M, cur_N);
         kernel_args.tensors[spec.d1().args_slot] = {buf_d1->ptr(),
                                                     rocm_ck::makeShape(cur_M, cur_N),
                                                     rocm_ck::makeStrides(d1_stride_m, d1_stride_n)};
@@ -452,31 +437,10 @@ int main(int argc, char** argv)
     int variants_run = 0;
 
     // Detect GPU target for variant filtering
-    hipDeviceProp_t dev_props;
-    HIP_CHECK(hipGetDeviceProperties(&dev_props, 0));
-    const char* gpu_arch = dev_props.gcnArchName;
-
-    // Map HIP arch string (e.g. "gfx942:sramecc+:xnack-") to GpuTarget
-    rocm_ck::GpuTarget detected_target{};
-    if(std::strstr(gpu_arch, "gfx90a") != nullptr)
-        detected_target = rocm_ck::GpuTarget::gfx90a;
-    else if(std::strstr(gpu_arch, "gfx942") != nullptr)
-        detected_target = rocm_ck::GpuTarget::gfx942;
-    else if(std::strstr(gpu_arch, "gfx950") != nullptr)
-        detected_target = rocm_ck::GpuTarget::gfx950;
-    else if(std::strstr(gpu_arch, "gfx1100") != nullptr)
-        detected_target = rocm_ck::GpuTarget::gfx1100;
-    else if(std::strstr(gpu_arch, "gfx1101") != nullptr)
-        detected_target = rocm_ck::GpuTarget::gfx1101;
-    else if(std::strstr(gpu_arch, "gfx1102") != nullptr)
-        detected_target = rocm_ck::GpuTarget::gfx1102;
-    else if(std::strstr(gpu_arch, "gfx1150") != nullptr)
-        detected_target = rocm_ck::GpuTarget::gfx1150;
-    else if(std::strstr(gpu_arch, "gfx1151") != nullptr)
-        detected_target = rocm_ck::GpuTarget::gfx1151;
-    else
+    auto detected_target = rocm_ck::detectGpuTarget();
+    if(!detected_target)
     {
-        std::fprintf(stderr, "Unsupported GPU: %s\n", gpu_arch);
+        std::fprintf(stderr, "Unsupported GPU\n");
         return 1;
     }
     // Batch count for the batched variant
@@ -487,7 +451,7 @@ int main(int argc, char** argv)
         const rocm_ck::GemmSpec& spec = variant.spec;
 
         // Skip variants that don't target this GPU
-        if(!variant.targets.contains(detected_target))
+        if(!variant.targets.contains(*detected_target))
             continue;
 
         // BQuant: separate data preparation path (INT4 packing + scale tensor)
