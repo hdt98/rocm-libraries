@@ -2282,6 +2282,10 @@ auto rocsolver_latrd_forsytrd_getWorkItems(rocblas_handle handle,
     rocsolver_latrd_forsytrd_getMemorySize<false, T>(n, k, batch_count, &size_scalars, &size_work,
                                                      &size_norms, &size_workArr);
 
+    std::size_t size_A = n * lda;
+    std::size_t size_W = k * ldw;
+    std::size_t buffer = n * n;
+    size_work = std::max(size_work, size_A + size_W + buffer);
     auto work_items = create_work_item({"latrd_scalars", size_scalars})
         + create_work_item({"latrd_workArr", size_workArr})
         + create_work_item({"latrd_work", size_work}) + create_work_item({"latrd_norms", size_norms});
@@ -2683,6 +2687,344 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
     }
 }
 
+template <int MAX_THDS, typename T, typename I, typename S, typename U>
+ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
+    latrd_lower_kernel_naive(const I n,
+                             const rocblas_int nb,
+                             U AA,
+                             const rocblas_stride shiftA,
+                             const I lda,
+                             const rocblas_stride strideA,
+                             S* EE,
+                             const rocblas_stride strideE,
+                             T* tauA,
+                             const rocblas_stride strideP,
+                             T* WW,
+                             const rocblas_int shiftW,
+                             const rocblas_int ldw,
+                             const rocblas_stride strideW,
+                             T* work)
+{
+    constexpr bool is_complex_t = rocblas_is_complex<T>;
+
+    I batch_id = blockIdx.z;
+    I bid = blockIdx.x;
+    I tid = threadIdx.x;
+
+    // Select batch instance
+    T* A = load_ptr_batch<T>(AA, batch_id, shiftA, strideA);
+    S* E = load_ptr_batch<S>(EE, batch_id, 0, strideE);
+    T* tau = load_ptr_batch<T>(tauA, batch_id, 0, strideP);
+    T* W = load_ptr_batch<T>(WW, batch_id, 0, strideW);
+    T* Atmp = nullptr;
+    T* Wtmp = nullptr;
+
+    // Shared variables
+    extern __shared__ double lmem[];
+    T* tau_j = reinterpret_cast<T*>(lmem);
+    /* T* As = reinterpret_cast<T*>(tau_j + 1); */
+    T* As = work;
+    /* T* Ws = reinterpret_cast<T*>(As + n * n); */
+    T* Ws = work + n * n;
+    /* T* v = reinterpret_cast<T*>(Ws + n * nb); */
+    T* v = reinterpret_cast<T*>(lmem + 1);
+    T* w = reinterpret_cast<T*>(v + n); // this piece of LDS is left unused for the time being
+    T* smem = reinterpret_cast<T*>(w + n);
+
+    // Load A into LDS
+    for(I ii = tid % (MAX_THDS / 2); ii < n; ii += (MAX_THDS / 2))
+    {
+        const auto tidy = tid / (MAX_THDS / 2);
+        for(I jj = tidy; jj < n; jj += 2)
+        {
+            As[ii + jj * n] = A[ii + jj * lda];
+        }
+    }
+    __syncthreads();
+
+    // Remove later if not necessary
+    for(I ii = tid % (MAX_THDS / 2); ii < n; ii += (MAX_THDS / 2))
+    {
+        const auto tidy = tid / (MAX_THDS / 2);
+        for(I jj = tidy; jj < n; jj += 2)
+        {
+            // Ignore imaginary part of the diagonal
+            if(ii == jj)
+            {
+                As[ii + jj * n] = std::real(As[ii + jj * n]);
+            }
+            // Copy lower triangular part to upper triangle
+            if(ii < jj)
+            {
+                As[ii + jj * n] = conj(As[jj + ii * n]);
+            }
+        }
+    }
+
+    // Zero W
+    for(I ii = tid % (MAX_THDS / 2); ii < n; ii += (MAX_THDS / 2))
+    {
+        const auto tidy = tid / (MAX_THDS / 2);
+        for(I jj = tidy; jj < nb; jj += 2)
+        {
+            Ws[ii + jj * n] = T(0);
+        }
+    }
+    __syncthreads();
+
+    // Reduce the lower part of A: main loop running forwards (for each column)
+    I nj{};
+    T temp{};
+    for(rocblas_int j = 0; j < nb; ++j)
+    {
+        nj = n - j - 1;
+        w = Ws + j * n;
+
+        //
+        // Update A(j:n-1, j) with previously computed reflectors and Ws.
+        // (Notice that the triangle below the diagonal of A(:, 0:j-1) holds
+        // previously computed Householder reflectors.)
+        //
+        if(j > 0)
+        {
+            // Step 1: A(j:n-1, j) = -A(j:n-1, 0:j-1) * W(j, 0:1-j)^H + A(j:n-1, j)
+            //
+            Atmp = As + j + j * n;
+            for(I ii = tid; ii < nj + 1; ii += MAX_THDS)
+            {
+                temp = T(0);
+                for(I jj = 0; jj < j; jj++)
+                {
+                    temp += As[j + ii + jj * n] * Ws[j + jj * n];
+                }
+                Atmp[ii] -= temp;
+            }
+            __syncthreads();
+
+            // Step 2: A(j:n-1, j) = -W(j:n-1, 0:j-1) * A(j, 0:j-1)^H + A(j:n-1, j)
+            //
+            Atmp = As + j + j * n;
+            for(I ii = tid; ii < nj + 1; ii += MAX_THDS)
+            {
+                temp = T(0);
+                for(I jj = 0; jj < j; jj++)
+                {
+                    temp += Ws[j + ii + jj * n] * As[j + jj * n];
+                }
+                Atmp[ii] -= temp;
+            }
+            __syncthreads();
+
+            // grid.sync()
+            //
+            // Note: since
+            //
+            //     z1 = A(j:n-1, 0:j-1) * W(j, 0:1-j)^H (computed in Step 1), and
+            //     z2 = W(j:n-1, 0:j-1) * A(j, 0:j-1)^H (computed in Step 2)
+            //
+            // are independent, these two GEMVs above can be fused to compute:
+            //
+            //     A(j:n-1, j) -= z1 + z2
+            //
+            // in a single pass.
+            //
+            // Work has to be synchronized here because A(j:n-1, j) is used to compute a
+            // Householder reflector in Step 3.
+        }
+
+        //
+        // Step 3: Generate Householder reflector to annihilate A(j+2:n-1,j)
+        // and copy off-diagonal element to E[j]
+        //
+
+        // Load A(j+1:n-1,j) into v
+        for(I i = tid; i < nj; i += MAX_THDS)
+        {
+            v[i] = As[i + (j + 1) + j * n];
+        }
+
+        // LARFG
+        temp = T(0);
+        for(I i = tid; i < nj - 1; i += MAX_THDS)
+        {
+            temp += v[i + 1] * conj(v[i + 1]);
+        }
+        reduce_block_sum(temp, smem);
+
+        if(tid == 0)
+        {
+            // set tau, beta, and put scaling factor into smem[0]
+            run_set_taubeta<T>(tau_j, &temp, v, E + j);
+
+            tau[j] = tau_j[0];
+            smem[0] = temp;
+        }
+        __syncthreads();
+
+        // Scale v
+        T scal = smem[0];
+        for(I i = tid; i < nj - 1; i += MAX_THDS)
+        {
+            v[i + 1] *= scal;
+        }
+        __syncthreads();
+
+        // grid.sync()
+        //
+        // Note: both v and tau_j are required for the next steps.
+
+        // Copy v back to A(j+1:n-1,j)
+        // This data will only be used on the next iteration,
+        // provided that j < nb - 1.
+        for(I ii = tid; ii < nj; ii += MAX_THDS)
+        {
+            As[(ii + j + 1) + j * n] = v[ii];
+        }
+
+        //
+        // Compute w = tau_j*A*v - 1/2*tau_j^2*(v'*A*v)*v
+        //
+
+        // SYMV
+        //
+        // Step 4: w_0 = A(j+1:n-1, j+1:n-1) * v(0:n-1-j)
+        //
+        Atmp = As + (j + 1) + (j + 1) * n;
+        for(I ii = tid; ii < nj; ii += MAX_THDS)
+        {
+            temp = T(0);
+            for(I jj = 0; jj < nj; jj++)
+            {
+                temp += Atmp[ii + jj * n] * v[jj];
+            }
+            w[ii + j + 1] = temp;
+        }
+        __syncthreads();
+
+        // Step 5: w(0:j-1) = W(j+1:n-1, 0:j-1)^H * v(0:n-1-j)
+        //
+        Wtmp = Ws + (j + 1);
+        for(I jj = tid; jj < j; jj += MAX_THDS)
+        {
+            temp = T(0);
+            for(I ii = 0; ii < nj; ++ii)
+            {
+                temp += conj(Wtmp[ii + jj * n]) * v[ii];
+            }
+            /* reduce_block_sum(temp, smem); */
+            /* Ws[jj + j * n] = smem[0]; */
+            w[jj] = temp;
+        }
+        __syncthreads();
+
+        // Step 6: w(j+1:n-1) = -A(j+1:n-1, 0:j-1) * w(0:j-1) + w(j+1:n-1)
+        //
+        Atmp = As + (j + 1);
+        for(I ii = tid; ii < nj; ii += MAX_THDS)
+        {
+            temp = T(0);
+            for(I jj = 0; jj < j; ++jj)
+            {
+                temp -= Atmp[ii + jj * n] * w[jj];
+            }
+            w[j + 1 + ii] += temp;
+        }
+        __syncthreads();
+
+        // grid.sync()
+        //
+        // Note: notice that Steps 4, 5 and 7 are functionally independent
+        // and can be computed without synchronization.
+
+        // Step 7: w(0:j-1) = A(j+1:n-1, 0:j-1)^H * v(0:n - 1 -j);
+        //
+        Atmp = As + (j + 1);
+        for(I jj = tid; jj < j; jj += MAX_THDS)
+        {
+            temp = T(0);
+            for(I ii = 0; ii < nj; ++ii)
+            {
+                temp += conj(Atmp[ii + jj * n]) * v[ii];
+            }
+            /* reduce_block_sum(temp, smem); */
+            /* Ws[jj + j * n] = smem[0]; */
+            w[jj] = temp;
+        }
+        __syncthreads();
+
+        // Step 8: w(j+1:n-1) = -W(j+1:n, 0:j-1) * w(0:j-1) + W(j+1:n-1)
+        //
+        Wtmp = Ws + (j + 1);
+        for(I ii = tid; ii < nj; ii += MAX_THDS)
+        {
+            temp = T(0);
+            for(I jj = 0; jj < j; ++jj)
+            {
+                temp -= Wtmp[ii + jj * n] * w[jj];
+            }
+            w[j + 1 + ii] += temp;
+        }
+        __syncthreads();
+
+        // grid.sync()
+        //
+        // Note: Steps 6 and 8 can be fused.
+
+        // Step 9: w(j+1:n-1) = alpha * v(0:n-j-1) + tauj * w(j+1:n-1)
+        //
+        // alpha = -0.5 * tauj^2 * <v, w>
+        //
+        // Dot product <v, w>
+        temp = 0;
+        for(I ii = tid; ii < nj; ii += MAX_THDS)
+        {
+            temp += v[ii] * conj(w[ii + j + 1]);
+        }
+        reduce_block_sum(temp, smem);
+
+        if(tid == 0)
+        {
+            // alpha = - 1/2 * tauj^2 * <v, w>
+            smem[0] = -0.5 * tau_j[0] * tau_j[0] * temp;
+        }
+        __syncthreads();
+
+        // AXPY
+        for(I ii = tid; ii < nj; ii += MAX_THDS)
+        {
+            w[ii + j + 1] = smem[0] * v[ii] + tau_j[0] * w[ii + j + 1];
+        }
+        __syncthreads();
+
+        // grid.sync()
+        //
+        // Note: the result of the AXPY is required for Steps 1 and 2.
+    }
+
+    // Write LDS back to A
+    for(I i = tid % (MAX_THDS / 2); i < n; i += (MAX_THDS / 2))
+    {
+        const auto tidy = tid / (MAX_THDS / 2);
+        for(I j = tidy; j < n; j += 2)
+        {
+            if(i >= j)
+            {
+                A[i + j * lda] = As[i + j * n];
+            }
+        }
+    }
+
+    // Write LDS back to W
+    for(I i = tid % (MAX_THDS / 2); i < n; i += (MAX_THDS / 2))
+    {
+        const auto tidy = tid / (MAX_THDS / 2);
+        for(I j = tidy; j < nb; j += 2)
+        {
+            W[i + j * lda] = Ws[i + j * n];
+        }
+    }
+}
+
 template <typename T, typename S, typename U, bool COMPLEX = rocblas_is_complex<T>>
 rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                                                  const rocblas_fill uplo,
@@ -2754,21 +3096,45 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
         const hipDeviceProp_t* props = rocblas_internal_get_device_prop(handle);
         const rocblas_int nn = n;
         std::size_t size_W = sizeof(T) * ldw * k * batch_count;
-        const size_t lmemsize = ((256 / props->warpSize) + 2 * nn + 1 + nn * nn + nn * k) * sizeof(T);
-        if(!latrd_forsytrd_multi_kernel && lmemsize <= props->sharedMemPerBlock)
+
+        const size_t lmemsize_small
+            = ((256 / props->warpSize) + 2 * nn + 1 + nn * nn + nn * k) * sizeof(T);
+        constexpr size_t small_switch_size = 128;
+        bool use_small_kernel
+            = false && (n < small_switch_size) && (lmemsize_small <= props->sharedMemPerBlock);
+
+        const size_t lmemsize_fused = ((256 / props->warpSize) + 1 + 3 * k + 2 * k * k) * sizeof(T);
+        bool use_fused_kernel = (lmemsize_fused <= props->sharedMemPerBlock);
+
+        if(!latrd_forsytrd_multi_kernel && use_small_kernel)
         {
             if(print_debug_messages_latrd_forsytrd)
             {
                 std::cout << "Using latrd's small kernel, lmemsize = "
-                          << std::to_string(lmemsize / 1024.0) << "KB" << std::endl;
+                          << std::to_string(lmemsize_small / 1024.0) << "KB" << std::endl;
             }
 
             HIP_CHECK(hipMemsetAsync((void*)W, 0, size_W, stream));
             rocblas_int j = 0;
             ROCSOLVER_LAUNCH_KERNEL((latrd_lower_kernel_small<256, T>), dim3(1, 1, batch_count),
-                                    dim3(256), lmemsize, stream, n, k, A, shiftA + idx2D(j, j, lda),
-                                    lda, strideA, E + j, strideE, tau + j, strideP, W, shiftW, ldw,
-                                    strideW);
+                                    dim3(256), lmemsize_small, stream, n, k, A,
+                                    shiftA + idx2D(j, j, lda), lda, strideA, E + j, strideE,
+                                    tau + j, strideP, W, shiftW, ldw, strideW);
+        }
+        if(!latrd_forsytrd_multi_kernel && use_fused_kernel)
+        {
+            if(print_debug_messages_latrd_forsytrd)
+            {
+                std::cout << "Using latrd's small kernel, lmemsize = "
+                          << std::to_string(lmemsize_fused / 1024.0) << "KB" << std::endl;
+            }
+
+            HIP_CHECK(hipMemsetAsync((void*)W, 0, size_W, stream));
+            rocblas_int j = 0;
+            ROCSOLVER_LAUNCH_KERNEL((latrd_lower_kernel_naive<256, T>), dim3(1, 1, batch_count),
+                                    dim3(256), lmemsize_fused, stream, n, k, A,
+                                    shiftA + idx2D(j, j, lda), lda, strideA, E + j, strideE,
+                                    tau + j, strideP, W, shiftW, ldw, strideW, work);
         }
         else
         {
