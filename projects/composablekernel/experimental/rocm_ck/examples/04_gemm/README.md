@@ -170,7 +170,8 @@ entries can override it for mixed-precision epilogues.
 | `gemm_fp16_padded` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | V1 | pad_m/pad_n=true |
 | `gemm_i8` | I8 | I8 | I32 | — | 128×128×64 | 32×32×16 | V3 | gfx942+, int32 accumulator |
 | `gemm_fp16_direct2d` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | V1 | Direct2D epilogue |
-| `gemm_fp16_wmma` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | V1 | gfx1151, WMMA wave32 |
+| `gemm_i4_bquant` | FP8 | I4 | FP32 | — | 128×128×128 | 32×32×16 | V3 | gfx942+, block-quantized weights |
+| `gemm_fp16_wmma` | FP16 | FP16 | FP16 | — | 128×128×32 | 16×16×16 | V1 | RDNA (gfx11XX), WMMA wave32 |
 
 Most CDNA variants use 128×128×32 block tile with 2×2×1 wavefront layout
 (4 waves × wave64 = 256 work-items). The WMMA variant uses 4×2×1 wavefront
@@ -187,7 +188,8 @@ Notable variants:
 - `gemm_fp8_fnuz` — FP8 FNUZ input with FP16 output (gfx942+)
 - `gemm_i8` — INT8 with INT32 accumulator (gfx942+)
 - `gemm_fp16_direct2d` — Direct2D epilogue (no LDS shuffle)
-- `gemm_fp16_wmma` — WMMA on RDNA 3.5 (gfx1151), wave32
+- `gemm_i4_bquant` — INT4 block-quantized with FP8 scales (gfx942+)
+- `gemm_fp16_wmma` — WMMA on RDNA (gfx11XX), wave32
 
 ## File Roles
 

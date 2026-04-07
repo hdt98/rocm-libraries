@@ -92,7 +92,7 @@ the correct boundaries at the preprocessor level.
 
 ## What This Changes
 
-CK Tile is a powerful template metaprogramming library. Using it directly means wiring ~7 internal type layers (`TileGemmShape`, `TileGemmTraits`, `GemmPipelineProblem`, pipeline type, partitioner, epilogue, kernel) with dozens of positional template parameters. See [`gemm_dev.hpp`](examples/04_gemm/gemm_dev.hpp) for what that looks like — it's the device-side bridge that rocm_ck hides behind 7 named fields.
+CK Tile is a powerful template metaprogramming library. Using it directly means wiring ~7 internal type layers (`TileGemmShape`, `TileGemmTraits`, `GemmPipelineProblem`, pipeline type, partitioner, epilogue, kernel) with dozens of positional template parameters. See [`gemm_dev.hpp`](include/rocm_ck/gemm_dev.hpp) for what that looks like — it's the device-side bridge that rocm_ck hides behind 7 named fields.
 
 rocm_ck doesn't replace CK Tile — it provides a structured front-end. The same CK Tile kernels run underneath, but the user-facing API is pure data with compile-time validation.
 
@@ -143,7 +143,7 @@ Proves that CK Tile kernels can be compiled into standalone `.hsaco` code object
 Production-ready pattern with:
 
 - **Signature/Algorithm separation** — *what* (operator graph + data types) vs *how* (tile geometry, wavefront count, vector width, padding)
-- **15 compiled variants** across FP32, FP16, BF16 with different block sizes, multi-wave, mixed-precision, and RDNA (gfx1151)
+- **15 compiled variants** across FP32, FP16, BF16 with different block sizes, multi-wave, mixed-precision, and RDNA (gfx11XX)
 - **Constexpr validation** via `makeSpec` that catches invalid configurations at compile time
 - **Variant registry** with `find_variant(DataType, problem_size)` for automatic kernel selection
 - **Archive metadata** — tuning parameters stored in the kpack TOC for tooling
@@ -262,7 +262,7 @@ experimental/rocm_ck/
     └── 04_gemm/                     # GEMM: multi-type via operator-centric Signature
         ├── CMakeLists.txt
         ├── gemm_variants.hpp           # Variant table + consteval lookup
-        ├── gemm_*.hip                  # 23 variant instantiations (~12 lines each)
+        ├── gemm_*.hip                  # 24 variant instantiations (~12 lines each)
         ├── cpu_ref.hpp                 # CPU reference GEMM implementation
         ├── cpu_ref.cpp                 # CPU reference implementation
         ├── pack.py                     # Variant-aware packer with dtype metadata

@@ -58,6 +58,7 @@ constexpr TargetProperties properties(GpuTarget target)
     case GpuTarget::gfx1102: return {32, ArchFamily::RDNA};
     case GpuTarget::gfx1150: return {32, ArchFamily::RDNA};
     case GpuTarget::gfx1151: return {32, ArchFamily::RDNA};
+    default: throw "invalid GpuTarget in properties";
     }
 }
 
@@ -124,6 +125,7 @@ struct TargetSet
         case GpuTarget::gfx1101: return 5;
         case GpuTarget::gfx1102: return 6;
         case GpuTarget::gfx1150: return 7;
+        default: throw "invalid GpuTarget in bitIndex";
         }
     }
 
