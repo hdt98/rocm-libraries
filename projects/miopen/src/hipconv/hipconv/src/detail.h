@@ -5,17 +5,17 @@ template <int N, typename F>
 __device__ __forceinline__ void static_for(F f)
 {
     [&]<int... Is>(std::integer_sequence<int, Is...>)
-    {
-        (f.template operator()<Is>(), ...);
-    }(std::make_integer_sequence<int, N>{});
+    { (f.template operator()<Is>(), ...); }(std::make_integer_sequence<int, N>{});
 }
 
 // Call f<I>() for the unique I that matches the runtime idx.
 template <int N, typename F>
 __device__ __forceinline__ void dispatch(int idx, F f)
 {
-    static_for<N>([&]<int I>()
-                  {
-        if (idx == I)
-            f.template operator()<I>(); });
+    static_for<N>(
+        [&]<int I>()
+        {
+            if(idx == I)
+                f.template operator()<I>();
+        });
 }
