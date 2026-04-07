@@ -70,6 +70,8 @@ namespace rocRoller
             unsigned int elementsPerChunk; ///< elements per dwordx4 chunk = 128 / elementBits
 
             /// 16 = dwordx4 columns per bank row on GFX950 (64 LDS banks).
+            /// Other architectures (32-bank, 128-byte bank rows) use 8. The
+            /// LowerTileVisitor constructor asserts GFX950 when swizzle is enabled.
             static constexpr unsigned int columnsPerBankRow = 16u;
 
             /// Compute from tile K dimension and element size.
@@ -77,14 +79,24 @@ namespace rocRoller
             /// an entire bank row and swizzle is unnecessary.
             static LDSSwizzleParams compute(unsigned int tileK, unsigned int elementBits)
             {
+                AssertFatal(elementBits > 0 && tileK > 0,
+                            "LDSSwizzleParams::compute requires non-zero tileK and elementBits",
+                            ShowValue(tileK),
+                            ShowValue(elementBits));
                 auto elems = 128u / elementBits; // elements per dwordx4
                 auto cols  = tileK / elems; // dwordx4 chunks per tile row
+                AssertFatal(cols > 0 && (cols & (cols - 1)) == 0,
+                            "LDS swizzle requires power-of-2 numColumns",
+                            ShowValue(cols));
                 return {cols, columnsPerBankRow / cols, elems};
             }
 
             /// Compute from a pre-computed column count (GR path).
             static LDSSwizzleParams fromColumnCount(unsigned int numCols)
             {
+                AssertFatal(numCols > 0 && (numCols & (numCols - 1)) == 0,
+                            "LDS swizzle requires power-of-2 numColumns",
+                            ShowValue(numCols));
                 return {numCols, columnsPerBankRow / numCols, 0u};
             }
 
@@ -123,6 +135,8 @@ namespace rocRoller
          */
         ExpressionTransform buildGRSwizzleTransform(LDSSwizzleParams const& params)
         {
+            AssertFatal(params.rowsPerBankRow > 0,
+                        "buildGRSwizzleTransform: rowsPerBankRow must be > 0");
             auto colChunk = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
             auto row      = positionalArgument(1, Register::Type::Vector, DataType::UInt32);
 
@@ -156,6 +170,8 @@ namespace rocRoller
          */
         ExpressionTransform buildLRSwizzleTransform(LDSSwizzleParams const& params)
         {
+            AssertFatal(params.rowsPerBankRow > 0 && params.elementsPerChunk > 0,
+                        "buildLRSwizzleTransform: rowsPerBankRow and elementsPerChunk must be > 0");
             auto col = positionalArgument(0, Register::Type::Vector, DataType::UInt32);
             auto row = positionalArgument(1, Register::Type::Vector, DataType::UInt32);
 
@@ -1081,7 +1097,7 @@ namespace rocRoller
                         = graph.coordinates.addElement(ThreadTileNumber(0, literal(numColumns)));
                     graph.coordinates.addElement(grSwizzle, {grSwizzleNThrX}, {nThrX, nThrY});
 
-                    Log::getLogger()->info(
+                    Log::getLogger()->debug(
                         "GR swizzle B: K={} R={}", params.numColumns, params.rowsPerBankRow);
                 }
             }
@@ -1133,7 +1149,7 @@ namespace rocRoller
                         = graph.coordinates.addElement(ThreadTileNumber(1, literal(numColumns)));
                     graph.coordinates.addElement(grSwizzle, {grSwizzleNThrY}, {nThrY, nThrX});
 
-                    Log::getLogger()->info(
+                    Log::getLogger()->debug(
                         "GR swizzle (load): nThrY={} nThrX={} grSwizzleNThrY={} K={} R={}",
                         nThrY,
                         nThrX,
@@ -2013,6 +2029,12 @@ namespace rocRoller
                 , m_params(params)
                 , m_kernel(context->kernel())
             {
+                // LDS bank swizzle assumes 64 LDS banks (GFX950).
+                auto swzMode = context->kernelOptions()->ldsSwizzleMode;
+                AssertFatal(swzMode == LDSBankSwizzleMode::None
+                                || context->targetArchitecture().target().isCDNA4GPU(),
+                            "LDS bank swizzle is only supported on GFX950 (CDNA4)",
+                            ShowValue(swzMode));
             }
 
             virtual void visitEdge(KernelGraph&              graph,
@@ -2216,14 +2238,9 @@ namespace rocRoller
                     break;
                 case MemoryType::WAVE_Direct2LDS:
                 {
-                    auto swzMode    = m_context->kernelOptions()->ldsSwizzleMode;
-                    bool d2lSwizzle = !isScaleType(varType.dataType)
-                                      && (((swzMode == LDSBankSwizzleMode::Swizzle
-                                            || swzMode == LDSBankSwizzleMode::SwizzleA)
-                                           && tile.layoutType == LayoutType::MATRIX_A)
-                                          || ((swzMode == LDSBankSwizzleMode::Swizzle
-                                               || swzMode == LDSBankSwizzleMode::SwizzleB)
-                                              && tile.layoutType == LayoutType::MATRIX_B));
+                    bool d2lSwizzle = isLDSSwizzleActive(m_context->kernelOptions()->ldsSwizzleMode,
+                                                         tile.layoutType,
+                                                         varType.dataType);
                     loadMacroTile_VGPR(graph,
                                        connections,
                                        userTag,
@@ -2363,11 +2380,11 @@ namespace rocRoller
                                 tileIMacX = rawCol;
                         }
 
-                        logger->info("LR swizzle {}: K={} E={} R={}",
-                                     toString(tile.layoutType),
-                                     params.numColumns,
-                                     params.elementsPerChunk,
-                                     params.rowsPerBankRow);
+                        logger->debug("LR swizzle {}: K={} E={} R={}",
+                                      toString(tile.layoutType),
+                                      params.numColumns,
+                                      params.elementsPerChunk,
+                                      params.rowsPerBankRow);
                     }
                 }
 
@@ -2524,13 +2541,13 @@ namespace rocRoller
                                                      tile.layoutType,
                                                      ostore.varType.dataType);
 
-                logger->info("StoreLDSTile: tag={} tileTag={} memoryType={} layoutType={} "
-                             "ldsSwizzle={}",
-                             tag,
-                             tileTag,
-                             toString(tile.memoryType),
-                             toString(tile.layoutType),
-                             ldsSwizzle);
+                logger->debug("StoreLDSTile: tag={} tileTag={} memoryType={} layoutType={} "
+                              "ldsSwizzle={}",
+                              tag,
+                              tileTag,
+                              toString(tile.memoryType),
+                              toString(tile.layoutType),
+                              ldsSwizzle);
 
                 if(tile.memoryType == MemoryType::VGPR)
                 {
