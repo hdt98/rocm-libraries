@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: MIT
 
 # Per-GPU-target shared libraries for CK grouped convolution operations.
-# Each library contains the extern "C" implementations that link against
-# CK device code for a single GPU architecture.
+# Libraries keep per-arch naming for runtime selection while supporting
+# two CK linkage modes:
+#   - MIOPEN_CK_UNBUNDLE_PER_ARCH=ON: link per-arch unbundled CK archives.
+#   - MIOPEN_CK_UNBUNDLE_PER_ARCH=OFF: link full CK device archive/target.
 
 if(NOT MIOPEN_USE_COMPOSABLEKERNEL)
     return()
@@ -30,7 +32,9 @@ endfunction()
 
 foreach(gpu_target IN LISTS GPU_TARGETS)
     ck_impl_base_arch("${gpu_target}" arch_base)
-    miopen_sanitize_arch("${gpu_target}" arch_safe)
+    if(MIOPEN_CK_UNBUNDLE_PER_ARCH)
+        miopen_sanitize_arch("${gpu_target}" arch_safe)
+    endif()
 
     set(lib_name "MIOpenCKGroupedConv_${arch_base}")
 
@@ -64,8 +68,16 @@ foreach(gpu_target IN LISTS GPU_TARGETS)
         target_compile_definitions(${lib_name} PRIVATE CK_USE_GFX95)
     endif()
 
-    # Link against per-arch unbundled CK library
-    target_link_libraries(${lib_name} PRIVATE ck_conv_${arch_safe})
+    # Choose CK linkage mode:
+    #   - Per-arch unbundled archive
+    #   - Full CK device_conv_operations archive/target
+    if(MIOPEN_CK_UNBUNDLE_PER_ARCH)
+        target_link_libraries(${lib_name} PRIVATE ck_conv_${arch_safe})
+    elseif(MIOPEN_BUILD_CK)
+        target_link_libraries(${lib_name} PRIVATE device_conv_operations)
+    else()
+        target_link_libraries(${lib_name} PRIVATE composable_kernel::device_conv_operations)
+    endif()
 
     # CK include directories
     if(MIOPEN_BUILD_CK)
@@ -74,8 +86,6 @@ foreach(gpu_target IN LISTS GPU_TARGETS)
             ${MIOPEN_CK_BUILD_INCLUDE_DIR}
             ${MIOPEN_CK_LIBRARY_INCLUDE_DIR}
         )
-    else()
-        target_link_libraries(${lib_name} PRIVATE composable_kernel::device_conv_operations)
     endif()
 
     # MIOpen internal headers (for ProblemDescription, ConvSolution, etc.)
