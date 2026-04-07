@@ -68,8 +68,8 @@ rocblas_status rocsolver_sytrs_batched_impl(rocblas_handle handle,
     // working with unshifted arrays
     Istride shiftA = 0;
     Istride shiftB = 0;
-    Istride strideA = 0;
-    Istride strideB = 0;
+    Istride strideA = Istride(lda) * n;
+    Istride strideB = Istride(ldb) * nrhs;
 
     // ----------------------
     // memory workspace sizes:
