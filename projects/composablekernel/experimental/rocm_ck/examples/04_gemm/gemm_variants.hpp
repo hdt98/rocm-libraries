@@ -338,10 +338,9 @@ inline constexpr GemmVariant gemm_variants[] = {
                      .store_strategy = StoreStrategy::Direct2D,
                  },
                  TargetSet::cdna()),
-    // --- WMMA: gfx1151 (RDNA 3.5) with 16×16×16 wave tiles, wave32 ---
+    // --- WMMA: RDNA (gfx11xx) with 16×16×16 wave tiles, wave32 ---
     // CK Tile's WarpGemmDispatcher selects WMMA for __gfx11__/__gfx12__ targets.
-    // rocm_ck validates gfx1151 only — other RDNA targets need isValidWaveTile()
-    // entries and hardware testing before use. Fixed 16×16×16 tile shape.
+    // All RDNA targets share identical WMMA: fixed 16×16×16 tile shape.
     // block_waves = {4,2,1} × wave32 = 256 threads (same workgroup size as CDNA).
     make_variant("gemm_fp16_wmma",
                  Signature{
@@ -353,7 +352,7 @@ inline constexpr GemmVariant gemm_variants[] = {
                      .block_waves = {4, 2, 1},
                      .wave_tile   = {16, 16, 16},
                  },
-                 GpuTarget::gfx1151),
+                 TargetSet::rdna()),
 };
 
 inline constexpr int gemm_variant_count = sizeof(gemm_variants) / sizeof(gemm_variants[0]);

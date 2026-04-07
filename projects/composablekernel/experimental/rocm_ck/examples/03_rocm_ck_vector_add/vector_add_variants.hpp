@@ -122,31 +122,31 @@ inline constexpr ElementwiseVariant vector_add_variants[] = {
                  },
                  ElementwiseAlgorithm{1024, 1, 1024, true},
                  TargetSet::cdna()),
-    // --- gfx1151 (RDNA 3.5, wave32) ---
+    // --- RDNA (wave32) ---
     // Same algorithms but validated with wave32 workgroup_size.
     // CK Tile's ElementWiseShape uses get_warp_size() at compile time,
     // so workgroup_size must match the target's wavefront size.
-    make_variant("vector_add_fp32_b1024_gfx1151",
+    make_variant("vector_add_fp32_b1024_rdna",
                  Signature{
                      .dtype = DataType::FP32,
                      .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
                  },
                  ElementwiseAlgorithm{1024, 1, 1024, true},
-                 GpuTarget::gfx1151),
-    make_variant("vector_add_fp16_b1024_gfx1151",
+                 TargetSet::rdna()),
+    make_variant("vector_add_fp16_b1024_rdna",
                  Signature{
                      .dtype = DataType::FP16,
                      .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
                  },
                  ElementwiseAlgorithm{1024, 1, 1024, true},
-                 GpuTarget::gfx1151),
-    make_variant("vector_add_bf16_b1024_gfx1151",
+                 TargetSet::rdna()),
+    make_variant("vector_add_bf16_b1024_rdna",
                  Signature{
                      .dtype = DataType::BF16,
                      .ops   = {AddOp{.lhs = "A", .rhs = "B", .out = "C"}},
                  },
                  ElementwiseAlgorithm{1024, 1, 1024, true},
-                 GpuTarget::gfx1151),
+                 TargetSet::rdna()),
 };
 
 inline constexpr int vector_add_variant_count =

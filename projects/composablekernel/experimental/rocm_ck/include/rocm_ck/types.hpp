@@ -32,6 +32,10 @@ enum class GpuTarget
     gfx90a,  // CDNA 2
     gfx942,  // CDNA 3
     gfx950,  // CDNA 4
+    gfx1100, // RDNA 3
+    gfx1101, // RDNA 3
+    gfx1102, // RDNA 3
+    gfx1150, // RDNA 3.5
     gfx1151, // RDNA 3.5
 };
 
