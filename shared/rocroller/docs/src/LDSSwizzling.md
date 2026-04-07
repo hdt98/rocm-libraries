@@ -4,9 +4,8 @@ Intra-wave column rotation + pair-swap to eliminate 4x LDS bank conflict
 serialization during Local Read (`ds_read_b128`). Only column indices
 are permuted; row assignments are unchanged.
 
-Reference: Tensile's `SubtileBasedKernel.py` functions `_grSwizzleColIds` (GR)
-and `lraTileAssignment` (LR). See the LDS swizzling presentation for background
-on bank conflicts, `ds_read_b128` phases, and correctness proofs.
+See the LDS swizzling presentation for background on bank conflicts,
+`ds_read_b128` phases, and correctness proofs.
 
 ## Hardware Background (GFX950)
 
@@ -192,12 +191,10 @@ needed on the GR side:
 wave_rotation = (waveId & 1) * (2 * numRowsPerBankRow)
 col = (col + intra_rotation - wave_rotation) % numColumns
 ```
-
-This applies when `loadRatioGR != 0.5` in Tensile's terminology. For the primary
-target (256x256x256 with 4x1 wave group, `loadRatioGR = 0.5`), intra-wave
+This applies when the GR load ratio is not 0.5 (i.e., when each wave
+does not load exactly half of the tile rows). For the primary target
+(256x256x256 with 4x1 wave group, load ratio = 0.5), intra-wave
 rotation alone is sufficient.
-
-Reference: `_grSwizzleColIds` in `SubtileBasedKernel.py` lines 778-812.
 
 ### Follow-up: Non-FP4 data types
 

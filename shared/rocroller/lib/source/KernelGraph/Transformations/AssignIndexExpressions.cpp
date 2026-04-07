@@ -1333,6 +1333,11 @@ namespace rocRoller::KernelGraph
                 if(parents.empty())
                     break;
 
+                AssertFatal(parents.size() == 1,
+                            "getInlineUnrollInfo: expected single Body parent",
+                            ShowValue(current),
+                            ShowValue(parents.size()));
+
                 current            = parents[0];
                 auto maybeSetCoord = kgraph.control.get<SetCoordinate>(current);
                 if(!maybeSetCoord)

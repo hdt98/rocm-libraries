@@ -1509,8 +1509,7 @@ namespace rocRoller
                                   std::array<unsigned int, 3> const& workgroupSizes,
                                   std::vector<unsigned int> const&   jammedTiles,
                                   bool                               rightmostFastest,
-                                  bool                               isGlobalToLDS,
-                                  bool                               ldsSwizzle)
+                                  bool                               isGlobalToLDS)
         {
             auto macTile = graph.coordinates.getNode<MacroTile>(macTileTag);
 
@@ -2559,8 +2558,7 @@ namespace rocRoller
                                          workgroupSizes,
                                          jammedTiles,
                                          rightmostFastest,
-                                         /*isGlobalToLDS=*/ldsSwizzle,
-                                         ldsSwizzle);
+                                         /*isGlobalToLDS=*/ldsSwizzle);
                 }
                 else if(tile.memoryType == MemoryType::WAVE_Direct2LDS)
                 {
@@ -2575,8 +2573,7 @@ namespace rocRoller
                                          workgroupSizes,
                                          jammedTiles,
                                          rightmostFastest,
-                                         /*isGlobalToLDS=*/true,
-                                         ldsSwizzle);
+                                         /*isGlobalToLDS=*/true);
                 }
                 else
                 {

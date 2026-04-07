@@ -394,22 +394,6 @@ namespace rocRoller
             {
                 Throw<FatalError>(
                     "Forward diff traversal through ExpressionTransform is currently unused");
-
-                if constexpr(false)
-                {
-                    AssertFatal(e.forward.size() == dsts.size(),
-                                "ExpressionTransform forward size mismatch",
-                                ShowValue(e.forward.size()),
-                                ShowValue(dsts.size()));
-                    auto delta = getDelta(srcTags[0]);
-                    for(size_t i = 0; i < dsts.size(); ++i)
-                        deltas.emplace(dstTags[i], delta);
-                    std::vector<Expression::ExpressionPtr> rv;
-                    rv.reserve(dsts.size());
-                    for(size_t i = 0; i < dsts.size(); ++i)
-                        rv.push_back(indexes[0]);
-                    return rv;
-                }
                 return {};
             }
 
@@ -558,9 +542,12 @@ namespace rocRoller
 
             std::vector<Expression::ExpressionPtr> operator()(ExpressionTransform const& e)
             {
-                // ExpressionTransform carries non-affine per-lane expressions.
-                // Pass through the first dst's delta unchanged; the actual
-                // transform only matters at codegen time (reverse propagation).
+                // Passing the delta through unchanged is safe only because
+                // per-K-unroll chain separation (AssignIndexExpressions) bakes
+                // the unroll value into the base address, so the stride path
+                // never traverses this edge with a varying coordinate. If a
+                // future change routes a stride through here, the non-affine
+                // transform would produce incorrect results.
                 AssertFatal(e.reverse.size() == srcs.size(),
                             "ExpressionTransform reverse size mismatch",
                             ShowValue(e.reverse.size()),
