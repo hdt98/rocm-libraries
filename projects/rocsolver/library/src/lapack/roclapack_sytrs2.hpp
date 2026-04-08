@@ -38,228 +38,6 @@
 #include "roclapack_syconv.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
-#define USE_ROCBLAS_TEMPLATE
-
-#ifdef USE_ROCBLAS_TEMPLATE
-#else
-#include "rocblas/rocblas.h"
-
-static inline rocblas_status rocblas_trsm_batched(rocblas_handle handle,
-                                                  rocblas_side side,
-                                                  rocblas_fill uplo,
-                                                  rocblas_operation trans,
-                                                  rocblas_diagonal diag,
-                                                  rocblas_int n,
-                                                  rocblas_int nrhs,
-                                                  const double* alpha,
-
-                                                  const double* const A[],
-                                                  rocblas_int lda,
-
-                                                  double* const B[],
-                                                  rocblas_int ldb,
-
-                                                  rocblas_int batch_count)
-{
-    return (rocblas_dtrsm_batched(handle, side, uplo, trans, diag, n, nrhs, alpha,
-
-                                  A, lda,
-
-                                  B, ldb,
-
-                                  batch_count));
-}
-
-static inline rocblas_status rocblas_trsm_batched(rocblas_handle handle,
-                                                  rocblas_side side,
-                                                  rocblas_fill uplo,
-                                                  rocblas_operation trans,
-                                                  rocblas_diagonal diag,
-                                                  rocblas_int n,
-                                                  rocblas_int nrhs,
-                                                  const float* alpha,
-
-                                                  const float* const A[],
-                                                  rocblas_int lda,
-
-                                                  float* const B[],
-                                                  rocblas_int ldb,
-
-                                                  rocblas_int batch_count)
-{
-    return (rocblas_strsm_batched(handle, side, uplo, trans, diag, n, nrhs, alpha,
-
-                                  A, lda,
-
-                                  B, ldb,
-
-                                  batch_count));
-}
-
-static inline rocblas_status rocblas_trsm_batched(rocblas_handle handle,
-                                                  rocblas_side side,
-                                                  rocblas_fill uplo,
-                                                  rocblas_operation trans,
-                                                  rocblas_diagonal diag,
-                                                  rocblas_int n,
-                                                  rocblas_int nrhs,
-                                                  const rocblas_float_complex* alpha,
-
-                                                  const rocblas_float_complex* const A[],
-                                                  rocblas_int lda,
-
-                                                  rocblas_float_complex* const B[],
-                                                  rocblas_int ldb,
-
-                                                  rocblas_int batch_count)
-{
-    return (rocblas_ctrsm_batched(handle, side, uplo, trans, diag, n, nrhs, alpha,
-
-                                  A, lda,
-
-                                  B, ldb,
-
-                                  batch_count));
-}
-
-static inline rocblas_status rocblas_trsm_batched(rocblas_handle handle,
-                                                  rocblas_side side,
-                                                  rocblas_fill uplo,
-                                                  rocblas_operation trans,
-                                                  rocblas_diagonal diag,
-                                                  rocblas_int n,
-                                                  rocblas_int nrhs,
-                                                  const rocblas_double_complex* alpha,
-
-                                                  const rocblas_double_complex* const A[],
-                                                  rocblas_int lda,
-
-                                                  rocblas_double_complex* const B[],
-                                                  rocblas_int ldb,
-
-                                                  rocblas_int batch_count)
-{
-    return (rocblas_ztrsm_batched(handle, side, uplo, trans, diag, n, nrhs, alpha,
-
-                                  A, lda,
-
-                                  B, ldb,
-
-                                  batch_count));
-}
-
-static inline rocblas_status rocblas_trsm_strided_batched(rocblas_handle handle,
-                                                          rocblas_side side,
-                                                          rocblas_fill uplo,
-                                                          rocblas_operation trans,
-                                                          rocblas_diagonal diag,
-                                                          rocblas_int n,
-                                                          rocblas_int nrhs,
-                                                          const double* alpha,
-
-                                                          const double* A,
-                                                          rocblas_int lda,
-                                                          rocblas_stride strideA,
-
-                                                          double* B,
-                                                          rocblas_int ldb,
-                                                          rocblas_stride strideB,
-
-                                                          rocblas_int batch_count)
-{
-    return (rocblas_dtrsm_strided_batched(handle, side, uplo, trans, diag, n, nrhs, alpha,
-
-                                          A, lda, strideA,
-
-                                          B, ldb, strideB,
-
-                                          batch_count));
-}
-
-static inline rocblas_status rocblas_trsm_strided_batched(rocblas_handle handle,
-                                                          rocblas_side side,
-                                                          rocblas_fill uplo,
-                                                          rocblas_operation trans,
-                                                          rocblas_diagonal diag,
-                                                          rocblas_int n,
-                                                          rocblas_int nrhs,
-                                                          const float* alpha,
-
-                                                          const float* A,
-                                                          rocblas_int lda,
-                                                          rocblas_stride strideA,
-
-                                                          float* B,
-                                                          rocblas_int ldb,
-                                                          rocblas_stride strideB,
-
-                                                          rocblas_int batch_count)
-{
-    return (rocblas_strsm_strided_batched(handle, side, uplo, trans, diag, n, nrhs, alpha,
-
-                                          A, lda, strideA,
-
-                                          B, ldb, strideB,
-
-                                          batch_count));
-}
-
-static inline rocblas_status rocblas_trsm_strided_batched(rocblas_handle handle,
-                                                          rocblas_side side,
-                                                          rocblas_fill uplo,
-                                                          rocblas_operation trans,
-                                                          rocblas_diagonal diag,
-                                                          rocblas_int n,
-                                                          rocblas_int nrhs,
-                                                          const rocblas_float_complex* alpha,
-
-                                                          const rocblas_float_complex* A,
-                                                          rocblas_int lda,
-                                                          rocblas_stride strideA,
-
-                                                          rocblas_float_complex* B,
-                                                          rocblas_int ldb,
-                                                          rocblas_stride strideB,
-
-                                                          rocblas_int batch_count)
-{
-    return (rocblas_ctrsm_strided_batched(handle, side, uplo, trans, diag, n, nrhs, alpha,
-
-                                          A, lda, strideA,
-
-                                          B, ldb, strideB,
-
-                                          batch_count));
-}
-
-static inline rocblas_status rocblas_trsm_strided_batched(rocblas_handle handle,
-                                                          rocblas_side side,
-                                                          rocblas_fill uplo,
-                                                          rocblas_operation trans,
-                                                          rocblas_diagonal diag,
-                                                          rocblas_int n,
-                                                          rocblas_int nrhs,
-                                                          const rocblas_double_complex* alpha,
-
-                                                          const rocblas_double_complex* A,
-                                                          rocblas_int lda,
-                                                          rocblas_stride strideA,
-
-                                                          rocblas_double_complex* B,
-                                                          rocblas_int ldb,
-                                                          rocblas_stride strideB,
-
-                                                          rocblas_int batch_count)
-{
-    return (rocblas_ztrsm_strided_batched(handle, side, uplo, trans, diag, n, nrhs, alpha,
-
-                                          A, lda, strideA,
-
-                                          B, ldb, strideB,
-
-                                          batch_count));
-}
-#endif
 
 #ifndef SYTRS1_MAX_THDS
 #define SYTRS1_MAX_THDS 256
@@ -1137,11 +915,7 @@ static rocblas_status sytrs1_template(rocblas_handle handle,
     rocblas_get_pointer_mode(handle, &old_mode);
     rocblas_set_pointer_mode(handle, rocblas_pointer_mode_host);
 
-#ifdef USE_ROCBLAS_TEMPLATE
     auto call_trsm = [=, &pfree](
-#else
-    auto call_trsm = [=](
-#endif
 
                          rocblas_side const side, rocblas_fill const uplo,
 
@@ -1163,7 +937,7 @@ static rocblas_status sytrs1_template(rocblas_handle handle,
             = std::is_pointer_v<std::remove_reference_t<
                   decltype(A_arg[0])>> || std::is_array_v<std::remove_reference_t<decltype(A_arg[0])>>;
         bool constexpr STRIDED = !BATCHED;
-#ifdef USE_ROCBLAS_TEMPLATE
+
         auto const pfree_saved = pfree;
 
         bool const is_upper = (uplo == rocblas_fill_upper);
@@ -1229,43 +1003,6 @@ static rocblas_status sytrs1_template(rocblas_handle handle,
 
         pfree = pfree_saved;
 
-#else
-        assert(shiftA == 0);
-        assert(shiftB == 0);
-
-        T lalpha = alpha;
-        rocblas_status istat = rocblas_status_success;
-        if constexpr(STRIDED)
-        {
-            istat = rocblas_trsm_strided_batched(handle, side, uplo, trans, diag, n, nrhs,
-
-                                                 &lalpha,
-
-                                                 A_arg, lda, strideA,
-
-                                                 B_arg, ldb, strideB,
-
-                                                 batch_count);
-        }
-        else
-        {
-            istat = rocblas_trsm_batched(handle, side, uplo, trans, diag, n, nrhs,
-
-                                         &lalpha,
-
-                                         A_arg, lda,
-
-                                         B_arg, ldb,
-
-                                         batch_count);
-        }
-
-        if(istat != rocblas_status_success)
-        {
-            return (istat);
-        }
-
-#endif
         return (rocblas_status_success);
     }; // end call_trsm
 
