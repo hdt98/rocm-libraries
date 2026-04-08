@@ -7,6 +7,7 @@
 #include "ck/tensor_description/tensor_adaptor.hpp"
 #include "ck/tensor_operation/gpu/thread/threadwise_tensor_slice_transfer.hpp"
 #include "ck/tensor_operation/gpu/warp/dpp_gemm.hpp"
+#include "ck/utility/thread_buf_to_vec_loader.hpp"
 
 namespace ck {
 
