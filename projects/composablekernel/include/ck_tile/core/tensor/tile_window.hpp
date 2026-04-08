@@ -17,6 +17,7 @@
 #include "ck_tile/core/tensor/tile_window_base.hpp"
 #include "ck_tile/core/utility/functional.hpp"
 #include "ck_tile/core/utility/type_traits.hpp"
+#include "ck_tile/core/tensor/lds_padding.hpp"
 
 namespace ck_tile {
 
@@ -634,9 +635,9 @@ struct tile_window_with_static_distribution
                     reinterpret_cast<CK_TILE_LDS_ADDR lds_padded_element<LdsDataType>*>(
                         lds_base_ptr);
                 CK_TILE_LDS_ADDR LdsDataType* smem =
-                    reinterpret_cast<CK_TILE_LDS_ADDR LdsDataType*>(
-                        &padded_base[(lds_coord.get_offset() + lds_ys_offset) /
-                                     Traits::PackedSize]);
+                    &padded_base[(lds_coord.get_offset() + lds_ys_offset) /
+                                 Traits::PackedSize]
+                         .value;
 
                 const auto dram_ys_offset = [&]() {
                     if constexpr(static_move_ys)

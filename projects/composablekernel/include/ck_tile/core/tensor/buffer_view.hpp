@@ -16,26 +16,9 @@
 #include "ck_tile/core/numeric/bfloat16.hpp"
 #include "ck_tile/core/utility/type_traits.hpp"
 #include "ck_tile/core/utility/ignore.hpp"
+#include "ck_tile/core/tensor/lds_padding.hpp"
 
 namespace ck_tile {
-
-// buffer_load_dwordx3 to LDS uses a fixed 16-byte per-thread stride,
-// padding each 12-byte element to 16 bytes in LDS.
-template <typename T>
-CK_TILE_HOST_DEVICE constexpr index_t lds_padded_sizeof()
-{
-    return (sizeof(T) == 12) ? 16 : sizeof(T);
-}
-
-// Typed wrapper whose sizeof() == lds_padded_sizeof<T>().
-// Using this for pointer arithmetic instead of raw char* keeps LLVM's
-// typed GEP intact, preserving alias analysis and load coalescing.
-template <typename T>
-struct alignas(lds_padded_sizeof<T>()) lds_padded_element
-{
-    static_assert(sizeof(T) <= lds_padded_sizeof<T>());
-    T value;
-};
 
 // T may be scalar or vector
 // X may be scalar or vector
@@ -859,7 +842,7 @@ struct buffer_view<address_space_enum::lds,
                 using buf_t = ext_vector_t<typename vector_traits<remove_cvref_t<T>>::scalar_type,
                                            scalar_per_t_vector * scalar_per_x_vector>;
                 const auto* padded = reinterpret_cast<const lds_padded_element<T>*>(p_data_);
-                auto rtn = *c_style_pointer_cast<const buf_t*>(&padded[i + linear_offset]);
+                auto rtn = *c_style_pointer_cast<const buf_t*>(&padded[i + linear_offset].value);
                 return bit_cast<X>(rtn);
             }
 #endif
@@ -1134,7 +1117,7 @@ struct buffer_view<address_space_enum::lds,
                 using buf_t  = ext_vector_t<typename vector_traits<remove_cvref_t<T>>::scalar_type,
                                             scalar_per_t_vector * scalar_per_x_vector>;
                 auto* padded = reinterpret_cast<lds_padded_element<T>*>(p_data_);
-                *c_style_pointer_cast<buf_t*>(&padded[i]) = reinterpret_cast<const buf_t&>(x);
+                *c_style_pointer_cast<buf_t*>(&padded[i].value) = reinterpret_cast<const buf_t&>(x);
 #endif
             }
         }
