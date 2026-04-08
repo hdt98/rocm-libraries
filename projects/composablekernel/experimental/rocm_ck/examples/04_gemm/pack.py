@@ -17,8 +17,10 @@ Archive format:
     [toc_offset]  TOC        variable  MessagePack table of contents
 """
 
+import argparse
 import json
 import struct
+import subprocess
 import sys
 from pathlib import Path
 
@@ -37,10 +39,33 @@ KPACK_VERSION = 1
 HEADER_SIZE = 16  # 4 (magic) + 4 (version) + 8 (toc_offset)
 
 
+def _zstd_compress(data: bytes) -> bytes:
+    """Compress a single buffer using the zstd CLI."""
+    result = subprocess.run(
+        ["zstd", "-c", "--no-progress"],
+        input=data,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        print(
+            f"Error: zstd compression failed: {result.stderr.decode()}", file=sys.stderr
+        )
+        sys.exit(1)
+    return result.stdout
+
+
 def main() -> None:
-    # Accept an optional build directory argument (used by CMake).
+    parser = argparse.ArgumentParser(
+        description="Pack .hsaco files into a kpack archive"
+    )
+    parser.add_argument("build_dir", nargs="?", default=None, help="Build directory")
+    parser.add_argument(
+        "--zstd", action="store_true", help="Use zstd-per-kernel compression"
+    )
+    args = parser.parse_args()
+
     build_dir = (
-        Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).parent / "build"
+        Path(args.build_dir) if args.build_dir else Path(__file__).parent / "build"
     )
     output_path = build_dir / "gemm.kpack"
 
@@ -95,21 +120,14 @@ def main() -> None:
     sorted_arches = sorted(found_arches)
 
     # --- Write the archive ---
+    use_zstd = args.zstd
+    total_size = sum(len(b) for b in blobs)
+
     with output_path.open("wb") as out:
         # Header (toc_offset patched after writing blobs)
         out.write(KPACK_MAGIC)
         out.write(struct.pack("<I", KPACK_VERSION))
         out.write(struct.pack("<Q", 0))  # toc_offset placeholder
-
-        # Concatenate blobs, recording offsets
-        blob_infos: list[dict] = []
-        for blob in blobs:
-            offset = out.tell()
-            out.write(blob)
-            blob_infos.append({"offset": offset, "size": len(blob)})
-
-        # Build and write the MessagePack TOC
-        toc_offset = out.tell()
 
         # Structured variant specs (the new self-describing metadata)
         variant_specs = {}
@@ -121,34 +139,78 @@ def main() -> None:
                     "spec": variant["spec"],
                 }
 
-        toc = {
-            "compression_scheme": "none",
-            "gfx_arches": sorted_arches,
-            "blobs": blob_infos,
-            "variant_specs": variant_specs,
-            "toc": {
-                variant_name: {
-                    arch: {
-                        "ordinal": ordinal,
-                        "original_size": len(blobs[ordinal]),
-                        "type": "hsaco",
-                    }
-                    for arch, ordinal in arch_entries.items()
+        # Kernel TOC entries (shared between both schemes)
+        kernel_toc = {
+            variant_name: {
+                arch: {
+                    "ordinal": ordinal,
+                    "original_size": len(blobs[ordinal]),
+                    "type": "hsaco",
                 }
-                for variant_name, arch_entries in variant_map.items()
-            },
+                for arch, ordinal in arch_entries.items()
+            }
+            for variant_name, arch_entries in variant_map.items()
         }
+
+        if use_zstd:
+            # Write zstd blob: [num_kernels:u32] [frame_size:u32 frame_data]...
+            zstd_offset = out.tell()
+            out.write(struct.pack("<I", len(blobs)))
+
+            compressed_total = 0
+            for i, blob in enumerate(blobs):
+                compressed = _zstd_compress(blob)
+                out.write(struct.pack("<I", len(compressed)))
+                out.write(compressed)
+                compressed_total += len(compressed)
+                print(
+                    f"  Compressed blob {i}: {len(blob)} -> {len(compressed)} "
+                    f"({len(compressed) / len(blob) * 100:.1f}%)"
+                )
+
+            zstd_size = out.tell() - zstd_offset
+
+            toc_offset = out.tell()
+            toc = {
+                "compression_scheme": "zstd-per-kernel",
+                "gfx_arches": sorted_arches,
+                "zstd_offset": zstd_offset,
+                "zstd_size": zstd_size,
+                "variant_specs": variant_specs,
+                "toc": kernel_toc,
+            }
+        else:
+            # Write raw blobs
+            blob_infos: list[dict] = []
+            for blob in blobs:
+                offset = out.tell()
+                out.write(blob)
+                blob_infos.append({"offset": offset, "size": len(blob)})
+
+            toc_offset = out.tell()
+            toc = {
+                "compression_scheme": "none",
+                "gfx_arches": sorted_arches,
+                "blobs": blob_infos,
+                "variant_specs": variant_specs,
+                "toc": kernel_toc,
+            }
+
         out.write(msgpack.packb(toc, use_bin_type=True))
 
         # Patch header with actual toc_offset
         out.seek(8)
         out.write(struct.pack("<Q", toc_offset))
 
-    total_size = sum(len(b) for b in blobs)
     print(f"\nCreated {output_path}")
     print(f"  Architectures: {', '.join(sorted_arches)}")
     print(f"  Variants: {', '.join(variant_map.keys())}")
     print(f"  Total kernel data: {total_size} bytes")
+    if use_zstd:
+        file_size = output_path.stat().st_size
+        print(
+            f"  Compressed size: {file_size} bytes ({file_size / total_size * 100:.1f}%)"
+        )
 
 
 if __name__ == "__main__":

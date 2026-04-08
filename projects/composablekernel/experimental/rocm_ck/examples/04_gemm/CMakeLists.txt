@@ -123,7 +123,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/gemm.kpack
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/pack.py ${CMAKE_CURRENT_BINARY_DIR}
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/pack.py ${CMAKE_CURRENT_BINARY_DIR} --zstd
     DEPENDS ${HSACO_FILES} ${SPEC_JSON_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/pack.py
     COMMENT "Creating gemm.kpack archive"
 )
