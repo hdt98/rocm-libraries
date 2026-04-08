@@ -52,29 +52,31 @@ $ kpack list gemm.kpack
 
 ### `kpack spec` — Show variant specs
 
-Shows the full specification for each kernel variant: tensors, tile geometry, compute config, pipeline, and epilogue operations.
-
-```
-$ kpack spec gemm.kpack gemm_fp16
-  gemm_fp16  GemmSpec
-  targets: gfx90a gfx942 gfx950
-  tensors: A(FP16,R,slot=0) B(FP16,C,slot=1) C(FP16,R,slot=2)
-  tile:    block=128x128x32  waves=2x2x1  wave_tile=16x16x16
-  compute: wg_size=256  acc=FP32  k_batch=1
-  pipeline: V1/Intrawave  partitioner=Linear  store=CShuffle
-```
-
-With epilogue operations:
+Shows the full spec for a kernel variant — every field from the kpack TOC, pretty-printed.
 
 ```
 $ kpack spec gemm.kpack gemm_fp16_add
   gemm_fp16_add  GemmSpec
-  targets: gfx90a gfx942 gfx950
-  tensors: A(FP16,R,slot=0) B(FP16,C,slot=1) D(FP16,R,slot=2) bias(FP16,R,slot=3)
-  tile:    block=128x128x32  waves=2x2x1  wave_tile=16x16x16
-  compute: wg_size=256  acc=FP32  k_batch=1
-  pipeline: V1/Intrawave  partitioner=Linear  store=CShuffle
-  options: epilogue=[Add]
+  targets:                 gfx90a gfx942 gfx950
+  physical_tensors:
+                            - {name=A, dtype=FP16, layout=Row, args_slot=0}
+                            - {name=B, dtype=FP16, layout=Col, args_slot=1}
+                            - {name=D, dtype=FP16, layout=Row, args_slot=2}
+                            - {name=bias, dtype=FP16, layout=Row, args_slot=3}
+  acc_dtype:               FP32
+  block_tile:              {m=128, n=128, k=32}
+  block_waves:             {m=2, n=2, k=1}
+  wave_tile:               {m=16, n=16, k=16}
+  workgroup_size:          256
+  k_batch:                 1
+  pipeline:                V1
+  pipeline_scheduler:      Intrawave
+  tile_partitioner:        Linear
+  epilogue_ops:            [Add]
+  store_strategy:          CShuffle
+  pad_m:                   false
+  pad_n:                   false
+  group_size:              0
 ```
 
 Omit the variant name to show all specs.

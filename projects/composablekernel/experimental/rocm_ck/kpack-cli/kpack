@@ -98,10 +98,6 @@ def _arch_badge(arch: str) -> str:
         return f"{YELLOW}{arch}{RESET}"
 
 
-def _dim3_str(d: dict) -> str:
-    return f"{d.get('m', '?')}x{d.get('n', '?')}x{d.get('k', '?')}"
-
-
 # -- commands -----------------------------------------------------------------
 
 
@@ -196,6 +192,46 @@ def cmd_spec(kp: dict, name: str | None) -> None:
             print()
 
 
+def _format_value(v, indent: int = 0) -> str:
+    """Pretty-format a value with color."""
+    if isinstance(v, bool):
+        return f"{GREEN}true{RESET}" if v else f"{RED}false{RESET}"
+    elif isinstance(v, int):
+        return f"{YELLOW}{v}{RESET}"
+    elif isinstance(v, str):
+        return f"{CYAN}{v}{RESET}"
+    elif isinstance(v, list):
+        if not v:
+            return f"{DIM}[]{RESET}"
+        # Short scalar lists inline
+        if all(isinstance(x, (str, int, bool)) for x in v):
+            parts = [_format_value(x) for x in v]
+            return f"[{', '.join(parts)}]"
+        # List of dicts (e.g. physical_tensors) — one per line
+        lines = []
+        for item in v:
+            lines.append(
+                _format_dict_inline(item)
+                if isinstance(item, dict)
+                else _format_value(item)
+            )
+        pad = " " * indent
+        return "\n".join(f"{pad}  - {line}" for line in lines)
+    elif isinstance(v, dict):
+        # Short dicts inline (e.g. block_tile {m: 128, n: 128, k: 32})
+        return _format_dict_inline(v)
+    else:
+        return str(v)
+
+
+def _format_dict_inline(d: dict) -> str:
+    """Format a small dict as key=value pairs on one line."""
+    parts = []
+    for k, v in d.items():
+        parts.append(f"{k}={_format_value(v)}")
+    return f"{{{', '.join(parts)}}}"
+
+
 def _print_spec(name: str, entry: dict) -> None:
     spec_type = entry.get("spec_type", "?")
     targets = entry.get("targets", [])
@@ -203,82 +239,16 @@ def _print_spec(name: str, entry: dict) -> None:
 
     color = MAGENTA if spec_type == "GemmSpec" else CYAN
     print(f"  {BOLD}{name}{RESET}  {color}{spec_type}{RESET}")
-    print(f"  targets: {' '.join(_arch_badge(t) for t in targets)}")
+    print(f"  {'targets:':<24} {' '.join(_arch_badge(t) for t in targets)}")
 
-    if spec_type == "GemmSpec":
-        _print_gemm_spec(spec)
-    elif spec_type == "ElementwiseSpec":
-        _print_eltwise_spec(spec)
-
-
-def _print_gemm_spec(s: dict) -> None:
-    # Tensors
-    tensors = s.get("physical_tensors", [])
-    if tensors:
-        parts = []
-        for t in tensors:
-            n = t.get("name", "?")
-            d = t.get("dtype", "?")
-            lay = t.get("layout", "?")
-            slot = t.get("args_slot", "?")
-            parts.append(f"{BOLD}{n}{RESET}({d},{lay[0]},slot={slot})")
-        print(f"  tensors: {' '.join(parts)}")
-
-    # Tile geometry
-    bt = s.get("block_tile", {})
-    bw = s.get("block_waves", {})
-    wt = s.get("wave_tile", {})
-    print(
-        f"  tile:    block={YELLOW}{_dim3_str(bt)}{RESET}"
-        f"  waves={_dim3_str(bw)}"
-        f"  wave_tile={_dim3_str(wt)}"
-    )
-
-    # Compute
-    wg = s.get("workgroup_size", "?")
-    acc = s.get("acc_dtype", "?")
-    kb = s.get("k_batch", 1)
-    print(f"  compute: wg_size={BOLD}{wg}{RESET}  acc={acc}  k_batch={kb}")
-
-    # Pipeline
-    pipe = s.get("pipeline", "?")
-    sched = s.get("pipeline_scheduler", "?")
-    part = s.get("tile_partitioner", "?")
-    store = s.get("store_strategy", "?")
-    print(f"  pipeline: {CYAN}{pipe}{RESET}/{sched}  partitioner={part}  store={store}")
-
-    # Epilogue
-    epi = s.get("epilogue_ops", [])
-    pad_m = s.get("pad_m", False)
-    pad_n = s.get("pad_n", False)
-    gs = s.get("group_size", 0)
-    extras = []
-    if epi:
-        extras.append(f"epilogue=[{','.join(epi)}]")
-    if pad_m or pad_n:
-        extras.append(f"pad={'M' if pad_m else ''}{'N' if pad_n else ''}")
-    if gs:
-        extras.append(f"group_size={gs}")
-    if extras:
-        print(f"  options: {' '.join(extras)}")
-
-
-def _print_eltwise_spec(s: dict) -> None:
-    tensors = s.get("physical_tensors", [])
-    if tensors:
-        parts = []
-        for t in tensors:
-            n = t.get("name", "?")
-            d = t.get("dtype", "?")
-            parts.append(f"{BOLD}{n}{RESET}({d})")
-        print(f"  tensors: {' '.join(parts)}")
-
-    bt = s.get("block_tile", "?")
-    wg = s.get("workgroup_size", "?")
-    bw = s.get("block_waves", "?")
-    wt = s.get("wave_tile", "?")
-    pad = s.get("pad", False)
-    print(f"  tile: block={bt}  waves={bw}  wave_tile={wt}  wg_size={wg}  pad={pad}")
+    for key, val in spec.items():
+        formatted = _format_value(val, indent=26)
+        if "\n" in formatted:
+            # Multi-line (e.g. tensor list): label then indented items
+            print(f"  {key + ':':<24}")
+            print(formatted)
+        else:
+            print(f"  {key + ':':<24} {formatted}")
 
 
 def cmd_blobs(kp: dict) -> None:
