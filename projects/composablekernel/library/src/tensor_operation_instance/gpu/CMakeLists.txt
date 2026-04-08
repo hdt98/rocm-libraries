@@ -237,6 +237,39 @@ set(CK_DEVICE_CONV_INSTANCES)
 set(CK_DEVICE_MHA_INSTANCES)
 set(CK_DEVICE_CONTRACTION_INSTANCES)
 set(CK_DEVICE_REDUCTION_INSTANCES)
+
+# Track convolution operations that are now split by layout
+set(layout_split_ops
+    "grouped_conv1d_fwd"
+    "grouped_conv1d_bwd_weight"
+    "grouped_conv2d_fwd"
+    "grouped_conv2d_bwd_data"
+    "grouped_conv2d_bwd_weight"
+    "grouped_conv2d_fwd_clamp"
+    "grouped_conv2d_fwd_bias_clamp"
+    "grouped_conv2d_fwd_bias_bnorm_clamp"
+    "grouped_conv2d_fwd_dynamic_op"
+    "grouped_conv3d_fwd"
+    "grouped_conv3d_bwd_data"
+    "grouped_conv3d_bwd_weight"
+    "grouped_conv3d_fwd_scale"
+    "grouped_conv3d_fwd_clamp"
+    "grouped_conv3d_fwd_bias_clamp"
+    "grouped_conv3d_fwd_bias_bnorm_clamp"
+    "grouped_conv3d_fwd_bilinear"
+    "grouped_conv3d_fwd_convscale"
+    "grouped_conv3d_fwd_convscale_add"
+    "grouped_conv3d_fwd_convscale_relu"
+    "grouped_conv3d_fwd_convinvscale"
+    "grouped_conv3d_fwd_dynamic_op"
+    "grouped_conv3d_fwd_scaleadd_ab"
+    "grouped_conv3d_fwd_scaleadd_scaleadd_relu"
+    "grouped_conv3d_bwd_data_bilinear"
+    "grouped_conv3d_bwd_data_scale"
+    "grouped_conv3d_bwd_weight_bilinear"
+    "grouped_conv3d_bwd_weight_scale"
+)
+
 FOREACH(subdir_path ${dir_list})
     set(target_dir)
     IF(IS_DIRECTORY "${subdir_path}")
@@ -372,39 +405,6 @@ FOREACH(subdir_path ${dir_list})
         if((add_inst EQUAL 1))
             get_filename_component(target_dir ${subdir_path} NAME)
 
-            # Skip convolution operations that are now split by layout
-            # These are handled explicitly below
-            set(layout_split_ops
-                "grouped_conv1d_fwd"
-                "grouped_conv1d_bwd_weight"
-                "grouped_conv2d_fwd"
-                "grouped_conv2d_bwd_data"
-                "grouped_conv2d_bwd_weight"
-                "grouped_conv2d_fwd_clamp"
-                "grouped_conv2d_fwd_bias_clamp"
-                "grouped_conv2d_fwd_bias_bnorm_clamp"
-                "grouped_conv2d_fwd_dynamic_op"
-                "grouped_conv3d_fwd"
-                "grouped_conv3d_bwd_data"
-                "grouped_conv3d_bwd_weight"
-                "grouped_conv3d_fwd_scale"
-                "grouped_conv3d_fwd_clamp"
-                "grouped_conv3d_fwd_bias_clamp"
-                "grouped_conv3d_fwd_bias_bnorm_clamp"
-                "grouped_conv3d_fwd_bilinear"
-                "grouped_conv3d_fwd_convscale"
-                "grouped_conv3d_fwd_convscale_add"
-                "grouped_conv3d_fwd_convscale_relu"
-                "grouped_conv3d_fwd_convinvscale"
-                "grouped_conv3d_fwd_dynamic_op"
-                "grouped_conv3d_fwd_scaleadd_ab"
-                "grouped_conv3d_fwd_scaleadd_scaleadd_relu"
-                "grouped_conv3d_bwd_data_bilinear"
-                "grouped_conv3d_bwd_data_scale"
-                "grouped_conv3d_bwd_weight_bilinear"
-                "grouped_conv3d_bwd_weight_scale"
-            )
-
             if(NOT target_dir IN_LIST layout_split_ops)
                 add_subdirectory(${target_dir})
                 if (TARGET device_${target_dir}_instance)
@@ -484,7 +484,7 @@ if(NOT HIPTENSOR_REQ_LIBS_ONLY OR MIOPEN_REQ_LIBS_ONLY)
     message(DEBUG "Collecting layout-specific convolution instances...")
 
     # 1D convolutions
-    ADD_CONV_LAYOUT_INSTANCES(grouped_conv1d_fwd gnwc nwgc)
+    ADD_CONV_LAYOUT_INSTANCES(grouped_conv1d_fwd gnwc)
     ADD_CONV_LAYOUT_INSTANCES(grouped_conv1d_bwd_weight gnwc nwgc)
 
     # 2D convolutions - core operations

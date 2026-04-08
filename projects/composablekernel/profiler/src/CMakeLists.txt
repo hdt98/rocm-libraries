@@ -236,7 +236,6 @@ if(SUPPORTED_GPU_TARGETS MATCHES "gfx9|gfx1[12]")
   list(APPEND DEVICE_INSTANCES device_batched_gemm_b_scale_instance)
   # 1D convolutions
   list(APPEND DEVICE_INSTANCES device_grouped_conv1d_fwd_gnwc_instance)
-  list(APPEND DEVICE_INSTANCES device_grouped_conv1d_fwd_nwgc_instance)
   # 2D convolutions - core operations
   list(APPEND DEVICE_INSTANCES device_grouped_conv2d_fwd_nhwgc_instance)
   list(APPEND DEVICE_INSTANCES device_grouped_conv2d_fwd_gnhwc_instance)
