@@ -105,12 +105,12 @@ size_t ConvHipConv::GetWorkspaceSize(const ExecutionContext&,
 
     // The wgrad kernel outputs fp32, but MIOpen expects dw in the same type as the weights (fp16).
     // We need a fp32 workspace to hold the kernel output, then cast to fp16.
-    const auto k            = ProblemInterpreter::GetOutputChannelK(problem);
-    const auto c            = ProblemInterpreter::GetInputChannelC(problem);
-    const auto y            = ProblemInterpreter::GetFilterHeightY(problem);
-    const auto x            = ProblemInterpreter::GetFilterWidthX(problem);
-    const auto group        = ProblemInterpreter::GetGroupCountG(problem);
-    const auto c_per_group  = c / group;
+    const auto k           = ProblemInterpreter::GetOutputChannelK(problem);
+    const auto c           = ProblemInterpreter::GetInputChannelC(problem);
+    const auto y           = ProblemInterpreter::GetFilterHeightY(problem);
+    const auto x           = ProblemInterpreter::GetFilterWidthX(problem);
+    const auto group       = ProblemInterpreter::GetGroupCountG(problem);
+    const auto c_per_group = c / group;
     return static_cast<size_t>(k) * y * x * c_per_group * sizeof(float);
 }
 
