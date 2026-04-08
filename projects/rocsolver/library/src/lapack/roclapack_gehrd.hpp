@@ -821,6 +821,12 @@ static rocblas_status blocked_gehrd_gpu(rocblas_handle handle,
     T* dT_gpu = dV + sz_dV;
     T* dwork = dT_gpu + sz_dT;
 
+    // Ensure handle uses the caller's stream so that rocBLAS GEMM/GEMV ops
+    // are ordered with respect to hipMemcpy*Async calls on the same stream.
+    // Without this, the batched pipelining path (which passes a per-batch
+    // stream different from the handle's default) would race.
+    rocblas_set_stream(handle, stream);
+
     // Set pointer mode to host for BLAS scalars
     rocblas_pointer_mode orig_mode;
     rocblas_get_pointer_mode(handle, &orig_mode);

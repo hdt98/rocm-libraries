@@ -348,7 +348,31 @@ void geev_getError(const rocblas_handle handle,
                 }
                 else
                 {
-                    // complex conjugate pair: skip
+                    // Complex conjugate pair: check A*v = lambda*v where
+                    // v = VR(:,j) + i*VR(:,j+1), lambda = wr + i*wi
+                    S wr_val = hWr[b][j];
+                    S wi_val = hWi[b][j];
+                    S vn = 0, r = 0;
+                    for(rocblas_int i = 0; i < n; ++i)
+                    {
+                        S Avr_i = 0, Avi_i = 0;
+                        for(rocblas_int k = 0; k < n; ++k)
+                        {
+                            Avr_i += A[i + (size_t)k * lda] * hVR[b][k + (size_t)j * ldvr];
+                            Avi_i += A[i + (size_t)k * lda] * hVR[b][k + (size_t)(j + 1) * ldvr];
+                        }
+                        S vr_i = hVR[b][i + (size_t)j * ldvr];
+                        S vi_i = hVR[b][i + (size_t)(j + 1) * ldvr];
+                        vn += vr_i * vr_i + vi_i * vi_i;
+                        S dr = Avr_i - wr_val * vr_i + wi_val * vi_i;
+                        S di = Avi_i - wi_val * vr_i - wr_val * vi_i;
+                        r += dr * dr + di * di;
+                    }
+                    vn = std::sqrt(vn);
+                    if(vn == S(0))
+                        vn = S(1);
+                    double err = std::sqrt((double)r) / ((double)anorm * (double)vn);
+                    *max_err = std::max(*max_err, err);
                     j += 2;
                 }
             }

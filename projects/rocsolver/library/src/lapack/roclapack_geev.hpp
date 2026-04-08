@@ -1945,6 +1945,12 @@ rocblas_status rocsolver_geev_template(rocblas_handle handle,
             if(wantvr) dVR_ptr = reinterpret_cast<T*>(VR) + shiftVR;
         }
 
+        // Bind the handle to this batch's stream so all rocBLAS BLAS ops
+        // (GEMM/GEMV in GEHRD, ORGHR, HSEQR, TREVC) are ordered correctly
+        // with hipMemcpy*Async calls on local_stream.
+        if(use_gpu_gehrd_allowed)
+            rocblas_set_stream(handle, local_stream);
+
         GEEV_HIP_CHECK(hipMemcpyAsync(hA_local.data(), dA_ptr, a_bytes,
                                        hipMemcpyDeviceToHost, local_stream));
         GEEV_HIP_CHECK(hipStreamSynchronize(local_stream));

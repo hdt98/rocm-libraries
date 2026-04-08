@@ -59,7 +59,8 @@ const vector<vector<int>> size_range = {
 
 // for daily_lapack tests
 const vector<vector<int>> large_size_range
-    = {{64, 64, 64, 64}, {128, 128, 128, 128}, {256, 256, 256, 256}, {512, 512, 512, 512}};
+    = {{64, 64, 64, 64}, {128, 128, 128, 128}, {256, 256, 256, 256}, {512, 512, 512, 512},
+       {1024, 1024, 1024, 1024}, {2048, 2048, 2048, 2048}, {4096, 4096, 4096, 4096}};
 
 // {jobvl, jobvr}
 const vector<vector<printable_char>> op_range = {{'N', 'N'}, {'N', 'V'}, {'V', 'N'}, {'V', 'V'}};
