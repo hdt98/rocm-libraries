@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: MIT
 #
 # Build for the kpack GEMM example. Compiles fp32/fp16/bf16 GEMM kernel variants
-# per architecture, packs into a .kpack archive, and builds the host-side loader.
+# per architecture, extracts spec metadata, packs into a .kpack archive, and
+# builds the host-side loader.
 #
 # Usage:
 #   cmake -B build -S . -G Ninja \
@@ -52,17 +53,34 @@ set(gemm_fp16_wmma_GPU_TARGETS "gfx1100;gfx1101;gfx1102;gfx1150;gfx1151")
 set(ROCM_CK_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
 get_filename_component(ROCM_CK_INCLUDE_DIR "${ROCM_CK_INCLUDE_DIR}" ABSOLUTE)
 
-# --- Verify pack.py has entries for all KERNEL_VARIANTS ---
-# pack.py has a hardcoded VARIANTS list that must stay in sync with KERNEL_VARIANTS.
-# Missing entries cause silent failures (hsaco compiles but isn't archived).
-file(READ ${CMAKE_CURRENT_SOURCE_DIR}/pack.py PACK_PY_CONTENT)
+# --- Extract spec metadata from each .hip file (dual compilation) ---
+# Each .hip file defines kName, kTargets, kSpec as static constexpr.
+# The extractor compiles the .hip as host code (device code excluded via
+# #ifdef __HIP_DEVICE_COMPILE__), serializes the spec to JSON.
+set(EXTRACT_SPEC_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/extract_spec.cpp")
+
+set(SPEC_JSON_FILES "")
 foreach(variant IN LISTS KERNEL_VARIANTS)
-    string(FIND "${PACK_PY_CONTENT}" "\"name\": \"${variant}\"" PACK_PY_MATCH)
-    if(PACK_PY_MATCH EQUAL -1)
-        message(FATAL_ERROR
-            "Variant '${variant}' is in KERNEL_VARIANTS but missing from pack.py. "
-            "Add a matching entry to pack.py or the kpack archive will be incomplete.")
-    endif()
+    set(spec_json "${CMAKE_CURRENT_BINARY_DIR}/${variant}.spec.json")
+
+    add_executable(_extract_${variant} ${EXTRACT_SPEC_SRC})
+    target_compile_features(_extract_${variant} PRIVATE cxx_std_20)
+    target_compile_definitions(_extract_${variant} PRIVATE
+        "VARIANT_HEADER=\"${CMAKE_CURRENT_SOURCE_DIR}/${variant}.hip\"")
+    target_include_directories(_extract_${variant} PRIVATE
+        ${ROCM_CK_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(_extract_${variant} PRIVATE rocm_ck)
+    set_target_properties(_extract_${variant} PROPERTIES
+        EXCLUDE_FROM_ALL OFF
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_extractors")
+
+    add_custom_command(
+        OUTPUT ${spec_json}
+        COMMAND $<TARGET_FILE:_extract_${variant}> > ${spec_json}
+        DEPENDS _extract_${variant} ${CMAKE_CURRENT_SOURCE_DIR}/${variant}.hip
+        COMMENT "Extracting spec: ${variant}"
+    )
+    list(APPEND SPEC_JSON_FILES ${spec_json})
 endforeach()
 
 # --- Compile each variant x architecture into .hsaco code objects ---
@@ -92,7 +110,6 @@ foreach(variant IN LISTS KERNEL_VARIANTS)
                     -o ${hsaco_output}
                     ${CMAKE_CURRENT_SOURCE_DIR}/${variant}.hip
             DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${variant}.hip
-                    ${CMAKE_CURRENT_SOURCE_DIR}/gemm_variants.hpp
                     ${ROCM_CK_INCLUDE_DIR}/rocm_ck/gemm_spec.hpp
                     ${ROCM_CK_INCLUDE_DIR}/rocm_ck/gemm_dev.hpp
             COMMENT "Compiling ${variant}.hip -> ${arch}.hsaco"
@@ -101,13 +118,13 @@ foreach(variant IN LISTS KERNEL_VARIANTS)
     endforeach()
 endforeach()
 
-# --- Pack .hsaco files into a kpack archive ---
+# --- Pack .hsaco files + spec metadata into a kpack archive ---
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/gemm.kpack
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/pack.py ${CMAKE_CURRENT_BINARY_DIR}
-    DEPENDS ${HSACO_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/pack.py
+    DEPENDS ${HSACO_FILES} ${SPEC_JSON_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/pack.py
     COMMENT "Creating gemm.kpack archive"
 )
 add_custom_target(gemm_kpack_archive ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/gemm.kpack)
