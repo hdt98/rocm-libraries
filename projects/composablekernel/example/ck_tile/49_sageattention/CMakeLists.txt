@@ -51,7 +51,7 @@ add_custom_command(
 )
 
 # Build the kernel instances library
-add_library(tile_sageattn_fwd_instances OBJECT ${SAGEATTN_FWD_GEN_BLOBS})
+add_library(tile_sageattn_fwd_instances OBJECT EXCLUDE_FROM_ALL ${SAGEATTN_FWD_GEN_BLOBS})
 target_include_directories(tile_sageattn_fwd_instances PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 
 # Compile options for kernel instances

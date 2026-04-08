@@ -284,7 +284,7 @@ class SageAttnFwdApiTrait:
             assert False
 
     def seqtune(self, max_bm0: int) -> str:
-        if self.bm0 == max_bm0:
+        if self.bm0 == max_bm0 or self.bm0 == 64:
             return "true/*fall back to largest tile*/"
         else:
             return f"a.seqlen_q <= {self.bm0}"
@@ -377,8 +377,6 @@ class SageAttnFwdPipeline:
             n += f"_{pn}"
         else:
             n += "_npad"
-
-        n += "_nbias"
 
         if self.F_mask[0:2] == "s_":
             if self.F_mask == "s_mask":
@@ -957,7 +955,7 @@ def get_fwd_blobs(
 
     for factory, dtype in ((f, t) for f in factories for t in f.supported_dtypes()):
         d = factory.get_hdim_tile_size_dict(dtype)
-        # for hdim_str, mode, mask, bias, lse in itertools.product(d.keys(), MODE_MAP.keys(), MASK_MAP.keys(), ["t", "f"], ["t", "f"]):
+        # for hdim_str, mode, mask, lse in itertools.product(d.keys(), MODE_MAP.keys(), MASK_MAP.keys(), ["t", "f"], ["t", "f"]):
         for ((hdim, hdim_v), tiles), mode in itertools.product(
             d.items(), MODE_MAP.keys()
         ):
@@ -1042,5 +1040,5 @@ def list_blobs(
             targets, kernel_filter, receipt, optdim_list, mask_impl
         )
         for kernel in kernels:
-            f.write(str(file_path.parent / GEN_DIR / kernel.filename) + "\n")
-        f.write(str(file_path.parent / GEN_DIR / SAGEATTN_FWD_API_FILENAME) + "\n")
+            f.write((file_path.parent / GEN_DIR / kernel.filename).as_posix() + "\n")
+        f.write((file_path.parent / GEN_DIR / SAGEATTN_FWD_API_FILENAME).as_posix() + "\n")

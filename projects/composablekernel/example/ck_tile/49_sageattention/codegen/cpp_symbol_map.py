@@ -91,12 +91,6 @@ QSCALE_CHECK_MAP = {
     "perthread": "quant_scale_enum::perthread",
 }
 
-BIAS_MAP = {
-    "no": "ck_tile::BlockAttentionBiasEnum::NO_BIAS",
-    "bias": "ck_tile::BlockAttentionBiasEnum::ELEMENTWISE_BIAS",
-    "alibi": "ck_tile::BlockAttentionBiasEnum::ALIBI",
-}
-
 MODE_MAP = {"batch": "false", "group": "true"}
 
 LAYOUT_MAP = {"row": "true", "col": "false"}

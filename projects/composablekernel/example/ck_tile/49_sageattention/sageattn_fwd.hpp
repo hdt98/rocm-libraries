@@ -93,7 +93,6 @@ struct SageAttentionFwdTypeConfig<SageAttentionFwdFp8>
     using KDataType           = ck_tile::fp8_t;
     using VDataType           = ck_tile::fp8_t;
     using ScaleType           = float; // scale type for quantized inputs
-    using BiasDataType        = float;
     using SaccDataType        = float;          // data type for first gemm accumulation
     using SMPLComputeDataType = float;          // data type for reduction, softmax
     using PDataType           = ck_tile::fp8_t; // data type for A matrix of second gemm
@@ -170,7 +169,6 @@ struct sageattn_fwd_args
     const void* q_ptr;
     const void* k_ptr;
     const void* v_ptr;
-    const void* bias_ptr; // bias or alibi_slope pointer
     const void* q_descale_ptr;
     const void* k_descale_ptr;
     const void* v_descale_ptr;
@@ -235,18 +233,15 @@ struct sageattn_fwd_args
     ck_tile::index_t stride_q;
     ck_tile::index_t stride_k;
     ck_tile::index_t stride_v;
-    ck_tile::index_t stride_bias; // if alibi, b*h need set this to h, 1*h need set this to 0
     ck_tile::index_t stride_o;
     ck_tile::index_t nhead_stride_q;
     ck_tile::index_t nhead_stride_k;
     ck_tile::index_t nhead_stride_v;
-    ck_tile::index_t nhead_stride_bias;
     ck_tile::index_t nhead_stride_lse;
     ck_tile::index_t nhead_stride_o;
     ck_tile::index_t batch_stride_q;
     ck_tile::index_t batch_stride_k;
     ck_tile::index_t batch_stride_v;
-    ck_tile::index_t batch_stride_bias;
     ck_tile::index_t batch_stride_lse;
     ck_tile::index_t batch_stride_o;
 
@@ -279,7 +274,6 @@ auto sageattn_fwd_create_kargs_and_grids(sageattn_fwd_args args)
             return SageAttnKernel::MakeKargs(args.q_ptr,
                                                  args.k_ptr,
                                                  args.v_ptr,
-                                                 args.bias_ptr,
                                                  args.q_descale_ptr,
                                                  args.k_descale_ptr,
                                                  args.v_descale_ptr,
@@ -296,12 +290,10 @@ auto sageattn_fwd_create_kargs_and_grids(sageattn_fwd_args args)
                                                  args.stride_q,
                                                  args.stride_k,
                                                  args.stride_v,
-                                                 args.stride_bias,
                                                  args.stride_o,
                                                  args.nhead_stride_q,
                                                  args.nhead_stride_k,
                                                  args.nhead_stride_v,
-                                                 args.nhead_stride_bias,
                                                  args.nhead_stride_o,
                                                  args.nhead_stride_q_descale,
                                                  args.nhead_stride_k_descale,
@@ -323,7 +315,6 @@ auto sageattn_fwd_create_kargs_and_grids(sageattn_fwd_args args)
             return SageAttnKernel::MakeKargs(args.q_ptr,
                                                  args.k_ptr,
                                                  args.v_ptr,
-                                                 args.bias_ptr,
                                                  args.q_descale_ptr,
                                                  args.k_descale_ptr,
                                                  args.v_descale_ptr,
@@ -338,12 +329,10 @@ auto sageattn_fwd_create_kargs_and_grids(sageattn_fwd_args args)
                                                  args.stride_q,
                                                  args.stride_k,
                                                  args.stride_v,
-                                                 args.stride_bias,
                                                  args.stride_o,
                                                  args.nhead_stride_q,
                                                  args.nhead_stride_k,
                                                  args.nhead_stride_v,
-                                                 args.nhead_stride_bias,
                                                  args.nhead_stride_o,
                                                  args.nhead_stride_q_descale,
                                                  args.nhead_stride_k_descale,
@@ -351,7 +340,6 @@ auto sageattn_fwd_create_kargs_and_grids(sageattn_fwd_args args)
                                                  args.batch_stride_q,
                                                  args.batch_stride_k,
                                                  args.batch_stride_v,
-                                                 args.batch_stride_bias,
                                                  args.batch_stride_o,
                                                  args.batch_stride_q_descale,
                                                  args.batch_stride_k_descale,
@@ -398,7 +386,6 @@ template <ck_tile::index_t HDim_,
           bool kPadSK_,
           bool kPadD_,
           bool kPadDv_,
-          bool kUseTrLoad_,
           bool kSkipMinSeqlenQ_ = false>
 struct sageattn_fwd_traits_
 {
@@ -419,7 +406,6 @@ struct sageattn_fwd_traits_
     static constexpr bool kPadSK                     = kPadSK_;
     static constexpr bool kPadD                      = kPadD_;
     static constexpr bool kPadDv                     = kPadDv_;
-    static constexpr bool kUseTrLoad                 = kUseTrLoad_;
     static constexpr bool kSkipMinSeqlenQ            = kSkipMinSeqlenQ_;
 };
 

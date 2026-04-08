@@ -565,8 +565,7 @@ struct BlockSageAttentionPipelineQRKSVS
             sweep_tile_span(p_spans[number<0>{}], [&](auto idx0) {
                 constexpr auto i_idx = make_tuple(idx0);
                 // For BLOCKSCALE: precompute (m - shift) once per row
-                // Bias/Alibi: exp2(s - m + shift) = exp2(s - (m - shift))
-                // else: exp2(scale_s*s - scale_s*m + shift) = exp2(scale_s*s - (scale_s*m - shift))
+                // exp2(s - m + shift) = exp2(s - (m - shift)); pertensor path uses scale_s on s,m
                 auto validated_m = get_validated_m(m[i_idx]);
                 auto row_max     = scale_s * validated_m;
                 if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::BLOCKSCALE ||
@@ -574,7 +573,7 @@ struct BlockSageAttentionPipelineQRKSVS
                              QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD)
                 {
 #if CK_TILE_USE_OCP_FP8
-                    validated_m -= OCP_FP8_SHIFT; // for Bias/Alibi
+                    validated_m -= OCP_FP8_SHIFT; // OCP FP8 softmax shift
                     row_max -= OCP_FP8_SHIFT;     // for else branch
 #else
                     validated_m -= FNUZ_FP8_SHIFT;

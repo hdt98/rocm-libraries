@@ -17,8 +17,7 @@
 #define CK_TILE_FMHA_HANDLE_XOR_LENGTH_FOLD 0
 // S[seqlen_q, seqlen_k] = Q[seqlen_q, hdim_q] @ K[seqlen_k, hdim_q]
 // S'[seqlen_q, seqlen_k] = S[seqlen_q, seqlen_k] * Scale[1]
-// S''[seqlen_q, seqlen_k] = S'[seqlen_q, seqlen_k] + Bias[seqlen_q, seqlen_k]
-// P[seqlen_q, seqlen_k] = Softmax(S''[seqlen_q, seqlen_k])
+// P[seqlen_q, seqlen_k] = Softmax(S'[seqlen_q, seqlen_k])
 // O[seqlen_q, hdim_v] = P[seqlen_q, seqlen_k] @ V^T[hdim_v, seqlen_k]
 
 namespace ck_tile {
@@ -58,8 +57,9 @@ struct SageAttnFwdKernel
 
     static constexpr bool kUseAsyncCopy = SageAttnPipeline::Policy::AsyncCopy;
 
-    template <ck_tile::index_t I> // to avoid duplicated base class prblem, introduce an template
-                                  // arg
+    // Distinct empty bases (I = 0 mask slot, 1 qscale slot, 2 min_seqlen_q slot) avoid duplicate
+    // base-class issues under multiple inheritance.
+    template <ck_tile::index_t I>
     struct SageAttnFwdEmptyKargs
     {
     };
@@ -140,8 +140,7 @@ struct SageAttnFwdKernel
 
     struct SageAttnFwdBatchModeKargs
         : SageAttnFwdCommonKargs,
-          SageAttnFwdEmptyKargs<0>,
-          std::conditional_t<kHasMask, SageAttnFwdMaskKargs, SageAttnFwdEmptyKargs<1>>,
+          std::conditional_t<kHasMask, SageAttnFwdMaskKargs, SageAttnFwdEmptyKargs<0>>,
           std::conditional_t<
               QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTENSOR,
               SageAttnFwdCommonQScaleKargs,
@@ -149,7 +148,7 @@ struct SageAttnFwdKernel
                                      QScaleEnum == BlockSageAttentionQuantScaleEnum::PERWARP ||
                                      QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD,
                                  SageAttnFwdBatchBlockScaleKargs,
-                                 SageAttnFwdEmptyKargs<2>>>
+                                 SageAttnFwdEmptyKargs<1>>>
     {
         ck_tile::index_t batch_stride_q;
         ck_tile::index_t batch_stride_k;
@@ -164,8 +163,7 @@ struct SageAttnFwdKernel
 
     struct SageAttnFwdGroupModeKargs
         : SageAttnFwdCommonKargs,
-          SageAttnFwdEmptyKargs<0>,
-          std::conditional_t<kHasMask, SageAttnFwdMaskKargs, SageAttnFwdEmptyKargs<1>>,
+          std::conditional_t<kHasMask, SageAttnFwdMaskKargs, SageAttnFwdEmptyKargs<0>>,
           std::conditional_t<
               QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTENSOR,
               SageAttnFwdCommonQScaleKargs,
@@ -173,10 +171,10 @@ struct SageAttnFwdKernel
                                      QScaleEnum == BlockSageAttentionQuantScaleEnum::PERWARP ||
                                      QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD,
                                  SageAttnFwdGroupBlockScaleKargs,
-                                 SageAttnFwdEmptyKargs<2>>>,
+                                 SageAttnFwdEmptyKargs<1>>>,
           std::conditional_t<kSkipMinSeqlenQ,
                              SageAttnFwdSkipMinSeqlenQKargs,
-                             SageAttnFwdEmptyKargs<3>>
+                             SageAttnFwdEmptyKargs<2>>
     {
         const int32_t* seqstart_q_ptr;
         const int32_t* seqstart_k_ptr;
@@ -203,7 +201,6 @@ struct SageAttnFwdKernel
     MakeKargs(const void* q_ptr,
               const void* k_ptr,
               const void* v_ptr,
-              const void* /*bias_ptr*/,
               const void* q_descale_ptr,
               const void* k_descale_ptr,
               const void* v_descale_ptr,
@@ -218,12 +215,10 @@ struct SageAttnFwdKernel
               ck_tile::index_t stride_q,
               ck_tile::index_t stride_k,
               ck_tile::index_t stride_v,
-              ck_tile::index_t /*stride_bias*/,
               ck_tile::index_t stride_o,
               ck_tile::index_t nhead_stride_q,
               ck_tile::index_t nhead_stride_k,
               ck_tile::index_t nhead_stride_v,
-              ck_tile::index_t /*nhead_stride_bias*/,
               ck_tile::index_t nhead_stride_o,
               ck_tile::index_t nhead_stride_q_descale,
               ck_tile::index_t nhead_stride_k_descale,
@@ -231,7 +226,6 @@ struct SageAttnFwdKernel
               ck_tile::index_t batch_stride_q,
               ck_tile::index_t batch_stride_k,
               ck_tile::index_t batch_stride_v,
-              ck_tile::index_t /*batch_stride_bias*/,
               ck_tile::index_t batch_stride_o,
               ck_tile::index_t batch_stride_q_descale,
               ck_tile::index_t batch_stride_k_descale,
@@ -263,9 +257,8 @@ struct SageAttnFwdKernel
                      nhead_stride_k,
                      nhead_stride_v,
                      nhead_stride_o}, // args for common karg
-                    {},               // placeholder for bias
-                    {},               // placeholder for mask
-                    {},               // placeholder for qscale
+                    {},               // mask or SageAttnFwdEmptyKargs<0>
+                    {},               // qscale or SageAttnFwdEmptyKargs<1>
                     batch_stride_q,
                     batch_stride_k,
                     batch_stride_v,
@@ -314,7 +307,6 @@ struct SageAttnFwdKernel
     MakeKargs(const void* q_ptr,
               const void* k_ptr,
               const void* v_ptr,
-              const void* /*bias_ptr*/,
               const void* q_descale_ptr,
               const void* k_descale_ptr,
               const void* v_descale_ptr,
@@ -331,12 +323,10 @@ struct SageAttnFwdKernel
               ck_tile::index_t stride_q,
               ck_tile::index_t stride_k,
               ck_tile::index_t stride_v,
-              ck_tile::index_t /*stride_bias*/,
               ck_tile::index_t stride_o,
               ck_tile::index_t nhead_stride_q,
               ck_tile::index_t nhead_stride_k,
               ck_tile::index_t nhead_stride_v,
-              ck_tile::index_t /*nhead_stride_bias*/,
               ck_tile::index_t nhead_stride_o,
               ck_tile::index_t nhead_stride_q_descale,
               ck_tile::index_t nhead_stride_k_descale,
@@ -372,10 +362,9 @@ struct SageAttnFwdKernel
                      nhead_stride_k,
                      nhead_stride_v,
                      nhead_stride_o}, // args for common karg
-                    {},               // placeholder for bias
-                    {},               // placeholder for mask
-                    {},               // placeholder for qscale
-                    {},               // placeholder for min_seqlen_q
+                    {},               // mask or SageAttnFwdEmptyKargs<0>
+                    {},               // qscale or SageAttnFwdEmptyKargs<1>
+                    {},               // min_seqlen_q or SageAttnFwdEmptyKargs<2>
                     reinterpret_cast<const int32_t*>(seqstart_q_ptr),
                     reinterpret_cast<const int32_t*>(seqstart_k_ptr),
                     reinterpret_cast<const int32_t*>(seqlen_q_ptr),
