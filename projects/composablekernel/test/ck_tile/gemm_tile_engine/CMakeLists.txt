@@ -1,3 +1,6 @@
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+
 # ============================================================================
 # GEMM Tile Engine Unit Tests
 # 
@@ -84,7 +87,7 @@ function(create_individual_gemm_test_target datatype layout config_name trait ti
         target_compile_options(${target_name} PRIVATE -DCK_TILE_USE_OCP_FP8)
     endif()
 
-    message(STATUS "  Created test target: ${target_name}")
+    message(DEBUG "  Created test target: ${target_name}")
 endfunction()
 
 # ============================================================================
@@ -135,11 +138,11 @@ function(build_gemm_test_targets datatype layout config_name)
 
     # Verify kernel list file was generated
     if(NOT EXISTS ${working_path}/gemm_kernel_list.txt)
-        message(STATUS "No kernels found for ${datatype}_${layout}_${config_name} (validation filtered out all combinations)")
+        message(DEBUG "No kernels found for ${datatype}_${layout}_${config_name} (validation filtered out all combinations)")
         return()
     endif()
 
-    message(STATUS "Building tests for ${datatype}_${layout}_${config_name}")
+    message(DEBUG "Building tests for ${datatype}_${layout}_${config_name}")
 
     # STEP 2a: Extract test parameters from config
     set(test_params_file "${working_path}/test_params.hpp")
@@ -229,7 +232,7 @@ message(STATUS "SUPPORTED_GPU_TARGETS: ${SUPPORTED_GPU_TARGETS}")
 
 # GPU architecture filtering - only build tests for supported architectures
 set(GEMM_TEST_GPU_TARGETS "")
-set(DESIRED_TARGETS "gfx90a;gfx942;gfx950;gfx1201")
+set(DESIRED_TARGETS "gfx90a;gfx942;gfx950;gfx1201;gfx12-generic")
 
 foreach(target IN LISTS SUPPORTED_GPU_TARGETS)
     if(target IN_LIST DESIRED_TARGETS)
@@ -240,7 +243,7 @@ endforeach()
 
 # Early exit if no compatible GPU architectures are available
 if(NOT GEMM_TEST_GPU_TARGETS)
-    message(WARNING "Skipping GEMM Tile Engine tests: No supported GPU targets (gfx90a, gfx942, gfx950, gfx1201) found in SUPPORTED_GPU_TARGETS: ${SUPPORTED_GPU_TARGETS}")
+    message(WARNING "Skipping GEMM Tile Engine tests: No supported GPU targets (gfx90a, gfx942, gfx950, gfx1201, gfx12-generic) found in SUPPORTED_GPU_TARGETS: ${SUPPORTED_GPU_TARGETS}")
     return()
 endif()
 

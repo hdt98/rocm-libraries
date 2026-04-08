@@ -1,5 +1,5 @@
-// Copyright © Advanced Micro Devices, Inc., or its affiliates.
-// SPDX-License-Identifier:  MIT
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
 
 #pragma once
 
@@ -40,5 +40,33 @@ struct is_mma_op_mfma<MmaOp, std::enable_if_t<std::is_same_v<typename MmaOp::OpT
  */
 template <typename MmaOp>
 static constexpr bool is_mma_op_mfma_v = is_mma_op_mfma<MmaOp>::value;
+
+/**
+ * @struct DefaultMfmaCtrlFlags
+ * @brief Default MFMA flags, no broadcasting or rotation of inputs
+ */
+struct DefaultMfmaCtrlFlags
+{
+    static constexpr uint32_t Cbsz = 0; // CBSZ flag, default 0
+    static constexpr uint32_t Abid = 0; // ABID flag, default 0
+    static constexpr uint32_t Blgp = 0; // BLGP flag, default 0
+};
+
+#if CK_TILE_CONCEPTS && CK_TILE_CONCEPTS_HEADER
+#include <concepts>
+
+/**
+ * @concept CtrlFlagsGfx9I
+ * @brief  Expresses the interface of required members for each CtrlFlags type on Gfx9
+ */
+template <typename CtrlFlags>
+concept CtrlFlagsGfx9I = requires(CtrlFlags ctrlFlags) {
+    // Flag members for Gfx9 MFMA instructions
+    { CtrlFlags::Cbsz } -> std::convertible_to<int>;
+    { CtrlFlags::Abid } -> std::convertible_to<int>;
+    { CtrlFlags::Blgp } -> std::convertible_to<int>;
+};
+
+#endif // CK_TILE_CONCEPTS && CK_TILE_CONCEPTS_HEADER
 
 } // namespace ck_tile::core::arch::mma

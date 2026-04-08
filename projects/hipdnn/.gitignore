@@ -14,6 +14,8 @@
 *.dylib
 *.dll
 
+# Hipdnn Local install
+
 # Fortran module files
 *.mod
 
@@ -57,16 +59,16 @@ _build/
 _images/
 _static/
 _templates/
-_toc.yml
-_doxygen/
 
 # JetBrains IDE
 .idea/
 cmake-build*/
 build*/
+CMakeUserPresets.json
 
 # Python virtualenv
 .venv/
+hipdnn_env/
 
 # Python cache
 __pycache__/

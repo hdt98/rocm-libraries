@@ -164,6 +164,8 @@ set(rocblas_ex_source_no_tensile
     blas_ex/rocblas_trsv_batched_ex.cpp
     blas_ex/rocblas_syrk_ex.cpp
     blas_ex/rocblas_syrk_ex_kernels.cpp
+    blas_ex/rocblas_herk_ex.cpp
+    blas_ex/rocblas_herk_ex_kernels.cpp
 )
 
 set( rocblas_blas3_source_no_tensile
@@ -665,6 +667,11 @@ add_library( rocblas
   ${rocblas_auxiliary_source}
   ${subdir_src64_list}
 )
+
+# Add Windows version resource to library
+if(WIN32 AND BUILD_SHARED_LIBS)
+  target_sources(rocblas PRIVATE "${PROJECT_BINARY_DIR}/version.rc")
+endif()
 
 foreach( file ${subdir_src64_list} )
   SET_SOURCE_FILES_PROPERTIES( ${file} PROPERTIES COMPILE_DEFINITIONS ROCBLAS_INTERNAL_ILP64 )

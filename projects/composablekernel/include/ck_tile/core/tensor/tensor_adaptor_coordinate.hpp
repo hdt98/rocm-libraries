@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -13,6 +13,9 @@
 #include "ck_tile/core/numeric/math.hpp"
 #include "ck_tile/core/utility/type_traits.hpp"
 #include "ck_tile/core/utility/print.hpp"
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
 
 namespace ck_tile {
 
@@ -367,3 +370,4 @@ CK_TILE_HOST_DEVICE void print(const tensor_adaptor_coordinate<N, B, T>& coord)
     detail::CK_PRINT_X_<>{}(coord);
 }
 } // namespace ck_tile
+#pragma clang diagnostic pop

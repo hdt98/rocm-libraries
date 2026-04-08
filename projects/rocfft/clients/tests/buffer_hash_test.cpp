@@ -22,7 +22,6 @@
 #include "../../shared/params_gen.h"
 #include "../../shared/rocfft_params.h"
 #include <algorithm>
-#include <chrono>
 #include <gtest/gtest.h>
 #include <memory>
 #include <random>
@@ -371,7 +370,11 @@ TEST(rocfft_UnitTest, buffer_hashing_half)
     {
         run_test(params);
     }
-    catch(HOSTBUF_MEM_USAGE& e)
+    catch(const HOSTBUF_MEM_USAGE& e)
+    {
+        GTEST_SKIP() << e.what();
+    }
+    catch(const DEVICEBUF_MEM_USAGE& e)
     {
         GTEST_SKIP() << e.what();
     }
@@ -393,7 +396,11 @@ TEST(rocfft_UnitTest, buffer_hashing_single)
     {
         run_test(params);
     }
-    catch(HOSTBUF_MEM_USAGE& e)
+    catch(const HOSTBUF_MEM_USAGE& e)
+    {
+        GTEST_SKIP() << e.what();
+    }
+    catch(const DEVICEBUF_MEM_USAGE& e)
     {
         GTEST_SKIP() << e.what();
     }
@@ -415,7 +422,11 @@ TEST(rocfft_UnitTest, buffer_hashing_double)
     {
         run_test(params);
     }
-    catch(HOSTBUF_MEM_USAGE& e)
+    catch(const HOSTBUF_MEM_USAGE& e)
+    {
+        GTEST_SKIP() << e.what();
+    }
+    catch(const DEVICEBUF_MEM_USAGE& e)
     {
         GTEST_SKIP() << e.what();
     }

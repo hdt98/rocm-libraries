@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2024, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -165,8 +165,6 @@ struct BlockReduce2d
     template <typename XDistributedTensor_>
     CK_TILE_DEVICE static auto MakeYBlockTile()
     {
-        static_assert(std::is_same_v<XDataType, typename XDistributedTensor_::DataType>, "wrong!");
-
         // FIXME: hard coded to reduce 2nd axis
         constexpr auto reduce_dims = sequence<1>{};
 
@@ -425,7 +423,7 @@ struct BlockReduce2dCrossWarpSync
 
         if constexpr(num_reduce_warps == 1)
             return;
-
+        block_sync_lds();
         // Each warp's lane 0 writes its partial results to shared memory
         const index_t smem_offset = warp_id;
         if(lane_id == 0)
@@ -633,17 +631,17 @@ struct BlockReduce2dLinearCrossWarpSync
                                             IndexDataType> all_indices;
 
         // Load data from shared memory
-        static_for<0, thread_buf_size, 1>{}([&](auto i_0) {
-            static_for<0, num_reduce_warps, 1>{}([&](auto i_1) {
-                all_scratch[i_0 * num_reduce_warps + i_1] =
-                    smem_ptr[i_0 * num_warps + local_smem_os + i_1];
+        static_ford<sequence<thread_buf_size, num_reduce_warps>>{}([&](auto ii) {
+            constexpr auto i_0 = number<ii[number<0>{}]>{};
+            constexpr auto i_1 = number<ii[number<1>{}]>{};
+            all_scratch[i_0 * num_reduce_warps + i_1] =
+                smem_ptr[i_0 * num_warps + local_smem_os + i_1];
 
-                if constexpr(kProcessIndex)
-                {
-                    all_indices[i_0 * num_reduce_warps + i_1] =
-                        smem_indices[i_0 * num_warps + local_smem_os + i_1];
-                }
-            });
+            if constexpr(kProcessIndex)
+            {
+                all_indices[i_0 * num_reduce_warps + i_1] =
+                    smem_indices[i_0 * num_warps + local_smem_os + i_1];
+            }
         });
         block_sync_lds(); // TODO: we don't need sync here
 
