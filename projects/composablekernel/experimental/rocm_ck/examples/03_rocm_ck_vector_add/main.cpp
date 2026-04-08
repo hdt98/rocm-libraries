@@ -1,19 +1,19 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 //
-// Host-side loader for the rocm_ck vector add example. Loads multiple kernel
-// variants from a kpack archive and runs each one, verifying correctness.
+// Host-side loader for the rocm_ck vector add example. Discovers kernel
+// variants from the kpack archive's TOC, loads and runs each one, verifying
+// correctness.
 //
 // Supports same-type (fp32, fp16, bf16) and mixed-type (fp16->fp32, fp32->fp16)
 // variants. Each variant gets typed device buffers with host-side conversion
 // for upload/download/verification. Kernels compute c = alpha * a + beta * b.
 
-#include "vector_add_variants.hpp"
-
 #include <rocm_ck/datatype_convert.hpp>
 #include <rocm_ck/datatype_utils.hpp>
 #include <rocm_ck/hip_check.hpp>
 #include <rocm_ck/kpack_module.hpp>
+#include <rocm_ck/kpack_spec_reader.hpp>
 #include <rocm_ck/typed_buffer.hpp>
 
 #include <hip/hip_runtime.h>
@@ -22,9 +22,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
-
-using rocm_ck::vector_add_variant_count;
-using rocm_ck::vector_add_variants;
 
 enum class VariantResult
 {
@@ -35,7 +32,8 @@ enum class VariantResult
 
 /// Run a single variant: load from archive, launch kernel, verify results.
 /// Returns Skipped if the kernel isn't available for this GPU, Passed/Failed otherwise.
-static VariantResult runVariant(const rocm_ck::ElementwiseVariant& variant,
+static VariantResult runVariant(const char* name,
+                                const rocm_ck::ElementwiseSpec& spec,
                                 const rocm_ck::KpackArchive& archive,
                                 const std::vector<float>& host_a,
                                 const std::vector<float>& host_b,
@@ -43,12 +41,12 @@ static VariantResult runVariant(const rocm_ck::ElementwiseVariant& variant,
                                 float beta)
 {
     const int num_elements = static_cast<int>(host_a.size());
-    const auto in_dtype    = variant.spec.lhs().dtype;
-    const auto out_dtype   = variant.spec.output().dtype;
+    const auto in_dtype    = spec.lhs().dtype;
+    const auto out_dtype   = spec.output().dtype;
 
     // Load kernel — not found means this variant isn't built for the current GPU
     rocm_ck::KpackKernel kernel;
-    if(!kernel.load(archive, variant.name))
+    if(!kernel.load(archive, name))
         return VariantResult::Skipped;
 
     // Allocate typed device buffers
@@ -61,13 +59,13 @@ static VariantResult runVariant(const rocm_ck::ElementwiseVariant& variant,
     buf_result.zero();
 
     // Launch
-    const int grid_size  = (num_elements + variant.spec.block_tile - 1) / variant.spec.block_tile;
-    const int block_size = variant.spec.workgroup_size;
-    const bool aligned   = rocm_ck::isAligned(variant.spec, num_elements);
+    const int grid_size  = (num_elements + spec.block_tile - 1) / spec.block_tile;
+    const int block_size = spec.workgroup_size;
+    const bool aligned   = rocm_ck::isAligned(spec, num_elements);
     std::printf("  %s: tile=%d, waves=%d, work_items=%d, N=%d %s\n",
-                variant.name,
-                variant.spec.block_tile,
-                variant.spec.block_waves,
+                name,
+                spec.block_tile,
+                spec.block_waves,
                 block_size,
                 num_elements,
                 aligned ? "(aligned)" : "(padded)");
@@ -102,7 +100,7 @@ static VariantResult runVariant(const rocm_ck::ElementwiseVariant& variant,
         {
             std::fprintf(stderr,
                          "  %s: MISMATCH at index %d: got %f, expected %f\n",
-                         variant.name,
+                         name,
                          i,
                          result[i],
                          expected);
@@ -112,7 +110,7 @@ static VariantResult runVariant(const rocm_ck::ElementwiseVariant& variant,
     }
 
     std::printf("  %s (grid=%d, block=%d): %s\n",
-                variant.name,
+                name,
                 grid_size,
                 block_size,
                 passed ? "PASSED" : "FAILED");
@@ -133,6 +131,14 @@ int main(int argc, char** argv)
     if(!archive.open(argv[1]))
         return 1;
 
+    // --- Discover variants from the kpack archive's TOC ---
+    auto variants = rocm_ck::readVariantSpecs(argv[1]);
+    if(variants.empty())
+    {
+        std::fprintf(stderr, "No variant specs found in kpack TOC\n");
+        return 1;
+    }
+
     // --- Test data (small integers exactly representable in fp16 and bf16) ---
     // bf16 has 7 mantissa bits, so only integers <= 128 are exact.
     // Keep sums <= 62 to stay well within range.
@@ -146,38 +152,19 @@ int main(int argc, char** argv)
         host_b[i] = static_cast<float>((i * 2) % 32);
     }
 
-    // --- Demonstrate findVariant (same-type and mixed-type lookups) ---
-    std::printf("\nVariant selection for N=%d:\n", NUM_ELEMENTS);
-    for(auto dt : {rocm_ck::DataType::FP32, rocm_ck::DataType::FP16, rocm_ck::DataType::BF16})
-    {
-        const auto* best = rocm_ck::findVariant(dt, dt, NUM_ELEMENTS);
-        if(best)
-            std::printf("  %s -> %s (tile=%d, waves=%d)\n",
-                        rocm_ck::dataTypeName(dt),
-                        best->name,
-                        best->spec.block_tile,
-                        best->spec.block_waves);
-    }
-    // Mixed-type: widening variants (narrow input -> FP32 output)
-    for(auto in_dt : {rocm_ck::DataType::FP16, rocm_ck::DataType::BF16})
-    {
-        const auto* best = rocm_ck::findVariant(in_dt, rocm_ck::DataType::FP32, NUM_ELEMENTS);
-        if(best)
-            std::printf("  %s->FP32 -> %s (tile=%d)\n",
-                        rocm_ck::dataTypeName(in_dt),
-                        best->name,
-                        best->spec.block_tile);
-    }
-
     // --- Verify all variants with plain add (alpha=1, beta=1) ---
-    std::printf("\nRunning all %d variants (alpha=1, beta=1):\n", vector_add_variant_count);
+    std::printf("\nRunning all %zu variants (alpha=1, beta=1):\n", variants.size());
     bool all_passed  = true;
     int variants_run = 0;
     int skipped      = 0;
 
-    for(const auto& variant : vector_add_variants)
+    for(const auto& vi : variants)
     {
-        auto result = runVariant(variant, archive, host_a, host_b, 1.0f, 1.0f);
+        if(vi.spec_type != "ElementwiseSpec")
+            continue;
+
+        auto result =
+            runVariant(vi.name.c_str(), vi.elementwise_spec, archive, host_a, host_b, 1.0f, 1.0f);
         if(result == VariantResult::Failed)
             all_passed = false;
         if(result == VariantResult::Skipped)
@@ -186,19 +173,24 @@ int main(int argc, char** argv)
             ++variants_run;
     }
 
-    // --- Scaled-add test (alpha=2, beta=0.5) ---
-    // findVariant is not arch-aware, so the selected variant may not be loadable.
-    // Try it; if skipped, that's fine — scaled-add isn't critical.
+    // --- Scaled-add test (alpha=2, beta=0.5) with the first FP32 variant ---
     std::printf("\nScaled-add test (alpha=2, beta=0.5):\n");
-    const auto* scaled_variant =
-        rocm_ck::findVariant(rocm_ck::DataType::FP32, rocm_ck::DataType::FP32, NUM_ELEMENTS);
-    if(scaled_variant)
+    for(const auto& vi : variants)
     {
-        auto result = runVariant(*scaled_variant, archive, host_a, host_b, 2.0f, 0.5f);
+        if(vi.spec_type != "ElementwiseSpec")
+            continue;
+        if(vi.elementwise_spec.lhs().dtype != rocm_ck::DataType::FP32)
+            continue;
+        if(vi.elementwise_spec.output().dtype != rocm_ck::DataType::FP32)
+            continue;
+
+        auto result =
+            runVariant(vi.name.c_str(), vi.elementwise_spec, archive, host_a, host_b, 2.0f, 0.5f);
         if(result == VariantResult::Failed)
             all_passed = false;
         else if(result == VariantResult::Passed)
             ++variants_run;
+        break; // only test one
     }
 
     std::printf(

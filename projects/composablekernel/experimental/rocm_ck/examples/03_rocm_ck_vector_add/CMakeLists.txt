@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: MIT
 #
 # Build for the rocm_ck kpack vector-add example with multiple variants.
-# Compiles multiple type × block-size variants per architecture, packs into a .kpack
-# archive, and builds the host-side loader.
+# Compiles multiple type x block-size variants per architecture, extracts
+# spec metadata, packs into a .kpack archive, and builds the host-side loader.
 #
 # Usage:
 #   cmake -B build -S . -G Ninja \
@@ -58,7 +58,38 @@ set(vector_add_fp32_b1024_rdna_GPU_TARGETS "gfx1100;gfx1101;gfx1102;gfx1150;gfx1
 set(vector_add_fp16_b1024_rdna_GPU_TARGETS "gfx1100;gfx1101;gfx1102;gfx1150;gfx1151")
 set(vector_add_bf16_b1024_rdna_GPU_TARGETS "gfx1100;gfx1101;gfx1102;gfx1150;gfx1151")
 
-# --- Compile each variant × architecture into .hsaco code objects ---
+# rocm_ck headers
+set(ROCM_CK_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
+get_filename_component(ROCM_CK_INCLUDE_DIR "${ROCM_CK_INCLUDE_DIR}" ABSOLUTE)
+
+# --- Extract spec metadata from each .hip file (dual compilation) ---
+set(EXTRACT_SPEC_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/extract_spec.cpp")
+
+set(SPEC_JSON_FILES "")
+foreach(variant IN LISTS KERNEL_VARIANTS)
+    set(spec_json "${CMAKE_CURRENT_BINARY_DIR}/${variant}.spec.json")
+
+    add_executable(_extract_${variant} ${EXTRACT_SPEC_SRC})
+    target_compile_features(_extract_${variant} PRIVATE cxx_std_20)
+    target_compile_definitions(_extract_${variant} PRIVATE
+        "VARIANT_HEADER=\"${CMAKE_CURRENT_SOURCE_DIR}/${variant}.hip\"")
+    target_include_directories(_extract_${variant} PRIVATE
+        ${ROCM_CK_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(_extract_${variant} PRIVATE rocm_ck)
+    set_target_properties(_extract_${variant} PROPERTIES
+        EXCLUDE_FROM_ALL OFF
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_extractors")
+
+    add_custom_command(
+        OUTPUT ${spec_json}
+        COMMAND $<TARGET_FILE:_extract_${variant}> > ${spec_json}
+        DEPENDS _extract_${variant} ${CMAKE_CURRENT_SOURCE_DIR}/${variant}.hip
+        COMMENT "Extracting spec: ${variant}"
+    )
+    list(APPEND SPEC_JSON_FILES ${spec_json})
+endforeach()
+
+# --- Compile each variant x architecture into .hsaco code objects ---
 # Uses --cuda-device-only to produce raw code objects without host stubs.
 # -std=c++20 is required for struct NTTPs and consteval.
 set(HSACO_FILES "")
@@ -81,28 +112,26 @@ foreach(variant IN LISTS KERNEL_VARIANTS)
                     --rocm-path=${KPACK_ROCM_PATH}
                     -I${CK_INCLUDE_DIR}
                     -I${CMAKE_CURRENT_SOURCE_DIR}
-                    -I${CMAKE_CURRENT_SOURCE_DIR}/../../include
+                    -I${ROCM_CK_INCLUDE_DIR}
                     -o ${hsaco_output}
                     ${CMAKE_CURRENT_SOURCE_DIR}/${variant}.hip
             DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${variant}.hip
-                    ${CMAKE_CURRENT_SOURCE_DIR}/vector_add_variants.hpp
-                    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/rocm_ck/elementwise_dev.hpp
-                    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/rocm_ck/elementwise_spec.hpp
-                    ${CMAKE_CURRENT_SOURCE_DIR}/../../include/rocm_ck/datatype_utils.hpp
+                    ${ROCM_CK_INCLUDE_DIR}/rocm_ck/elementwise_spec.hpp
+                    ${ROCM_CK_INCLUDE_DIR}/rocm_ck/elementwise_dev.hpp
             COMMENT "Compiling ${variant}.hip -> ${arch}.hsaco"
         )
         list(APPEND HSACO_FILES ${hsaco_output})
     endforeach()
 endforeach()
 
-# --- Pack .hsaco files into a kpack archive ---
+# --- Pack .hsaco files + spec metadata into a kpack archive ---
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/kernels.kpack
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/pack.py ${CMAKE_CURRENT_BINARY_DIR}
-    DEPENDS ${HSACO_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/pack.py
-    COMMENT "Creating kernels.kpack archive (${KERNEL_VARIANTS})"
+    DEPENDS ${HSACO_FILES} ${SPEC_JSON_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/pack.py
+    COMMENT "Creating kernels.kpack archive"
 )
 add_custom_target(rocm_ck_vector_add_kpack_archive ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/kernels.kpack)
 
