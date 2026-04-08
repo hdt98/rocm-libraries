@@ -1062,10 +1062,12 @@ fwd_result sageattn_fwd_run(mode_enum mode,
             }
             else if(mask.type == mask_enum::window_generic)
             {
+                // Match device: kernel sets is_top_left from (mask_type == MASK_FROM_TOP_LEFT);
+                // window_generic maps to MASK_GENERIC, so is_top_left is false (not the default).
                 ck_tile::reference_batched_masking<SaccDataType>(
                     s_host_ref,
                     ck_tile::make_generic_attention_mask_from_lr_window<FmhaMasks::GenericMask>(
-                        mask.left, mask.right, 0, real_seqlen_q, real_seqlen_k));
+                        mask.left, mask.right, 0, real_seqlen_q, real_seqlen_k, false));
             }
             else
             {

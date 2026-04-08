@@ -247,6 +247,7 @@ struct BlockSageAttentionPipelineQRKSVSAsync
         }();
         const auto seqlen_k_start = tile_range_result.get(ck_tile::number<0>{});
         const auto seqlen_k_end   = tile_range_result.get(ck_tile::number<1>{});
+        const auto kv_load_start  = seqlen_k_start > 0 ? seqlen_k_start : 0;
 
         const auto num_total_loop = integer_divide_ceil(seqlen_k_end - seqlen_k_start, kN0);
 
@@ -267,7 +268,7 @@ struct BlockSageAttentionPipelineQRKSVSAsync
         auto k_dram_block_window =
             make_tile_window(k_dram_block_window_tmp.get_bottom_tensor_view(),
                              k_dram_block_window_tmp.get_window_lengths(),
-                             {0, 0});
+                             {kv_load_start, 0});
 
         auto k_dram_window = make_tile_window(
             k_dram_block_window.get_bottom_tensor_view(),
@@ -282,7 +283,7 @@ struct BlockSageAttentionPipelineQRKSVSAsync
         auto v_dram_window =
             make_tile_window(v_dram_block_window_tmp.get_bottom_tensor_view(),
                              v_dram_block_window_tmp.get_window_lengths(),
-                             {0, 0},
+                             {0, kv_load_start},
                              Policy::template MakeVDramTileDistribution<Problem>());
 
         // prefetch K tile
@@ -491,6 +492,12 @@ struct BlockSageAttentionPipelineQRKSVSAsync
                 s.get_tile_distribution()); // Pcompute{j}
 
             __builtin_amdgcn_sched_barrier(0x7F);
+            // Ensure gemm_0's LDS reads (K tile) from all threads are completed before V store
+            // Only needed when K tail and V use the same LDS buffer
+            if constexpr(LdsSeq.at(number<k0_loops - 1>{}) == LdsSeq.at(number<k0_loops>{}))
+            {
+                __builtin_amdgcn_s_barrier();
+            }
             // store & prefetch next v, after the max reduction
             if constexpr(std::is_same_v<VLayout, ck_tile::tensor_layout::gemm::RowMajor>)
             {

@@ -224,6 +224,7 @@ struct BlockSageAttentionPipelineQRKSVS
         }();
         const auto seqlen_k_start = tile_range_result.get(ck_tile::number<0>{});
         const auto seqlen_k_end   = tile_range_result.get(ck_tile::number<1>{});
+        const auto kv_load_start  = seqlen_k_start > 0 ? seqlen_k_start : 0;
 
         const auto num_total_loop = integer_divide_ceil(seqlen_k_end - seqlen_k_start, kN0);
 
@@ -241,12 +242,12 @@ struct BlockSageAttentionPipelineQRKSVS
         auto k_dram_block_window =
             make_tile_window(k_dram_block_window_tmp.get_bottom_tensor_view(),
                              k_dram_block_window_tmp.get_window_lengths(),
-                             {0, 0});
+                             {kv_load_start, 0});
 
         auto v_dram_window =
             make_tile_window(v_dram_block_window_tmp.get_bottom_tensor_view(),
                              v_dram_block_window_tmp.get_window_lengths(),
-                             {0, 0},
+                             {0, kv_load_start},
                              Policy::template MakeVDramTileDistribution<Problem>());
 
         auto q_tile = [&]() {
