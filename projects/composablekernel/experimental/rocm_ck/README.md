@@ -70,7 +70,8 @@ Every architectural concept is visible: Signature declares the compute graph, Al
 ## Compilation Boundary
 
 Examples 03 and 04 enforce clean separation between metaprogramming, device
-code, and host runtime:
+code, and host runtime. Example 05 shows the same types work in a single-file
+HIP program with standard `<<<>>>` launch (no separate device compilation).
 
 ```text
 include/rocm_ck/
@@ -143,6 +144,7 @@ Progressive examples, each building on the last:
 | [02_ck_tile_vector_add](examples/02_ck_tile_vector_add/) | Bridge pattern — `extern "C"` wrapper around CK Tile's `ElementWiseKernel` |
 | [03_rocm_ck_vector_add](examples/03_rocm_ck_vector_add/) | Full schema — Signature/Algorithm split, `makeSpec` validation, 15 compiled variants, registry-based selection |
 | [04_gemm](examples/04_gemm/) | Composed operators — multi-type GEMM (fp32/fp16/bf16), fused epilogue, mixed-precision accumulation |
+| [05_gemm_no_kpack](examples/05_gemm_no_kpack/) | Conventional HIP — single-file GEMM without kpack, `<<<>>>` launch |
 
 ### Example 01: Hello World
 
@@ -175,6 +177,20 @@ Extends the schema to GEMM:
 - **Typed host buffers** — `floatToTyped` / `typedToFloat` for type-agnostic verification
 
 See the [example 04 README](examples/04_gemm/README.md) for full details.
+
+### Example 05: GEMM without kpack
+
+Proves that rocm_ck works as a conventional single-file HIP program:
+
+- **Single compilation** — kernel and host code in one `.hip` file
+- **`<<<>>>` launch** — standard HIP chevron syntax, no `hipModuleLaunchKernel`
+- **No kpack** — no archive, no Python packing, no runtime module loading
+- **Spec-driven** — same `makeSpec()` and `Args` pattern as example 04
+
+Use this pattern for fixed kernel configurations with simple builds. Use kpack
+(example 04) for multi-variant dispatch or multi-arch distribution.
+
+See the [example 05 README](examples/05_gemm_no_kpack/README.md) for full details.
 
 ## Design for Integration
 
@@ -273,14 +289,17 @@ experimental/rocm_ck/
     │   ├── vector_add_*.hip            # 15 variant instantiations (~12 lines each)
     │   ├── pack.py                     # Variant-aware packer with metadata
     │   └── main.cpp                    # Variant selection demo + verify-all mode
-    └── 04_gemm/                     # GEMM: multi-type via operator-centric Signature
+    ├── 04_gemm/                     # GEMM: multi-type via operator-centric Signature
+    │   ├── CMakeLists.txt
+    │   ├── gemm_variants.hpp           # Variant table + consteval lookup
+    │   ├── gemm_*.hip                  # 24 variant instantiations (~12 lines each)
+    │   ├── cpu_ref.hpp                 # CPU reference GEMM implementation
+    │   ├── cpu_ref.cpp                 # CPU reference implementation
+    │   ├── pack.py                     # Variant-aware packer with dtype metadata
+    │   └── main.cpp                    # Multi-variant loop with typed buffers
+    └── 05_gemm_no_kpack/            # GEMM without kpack: single-file HIP program
         ├── CMakeLists.txt
-        ├── gemm_variants.hpp           # Variant table + consteval lookup
-        ├── gemm_*.hip                  # 24 variant instantiations (~12 lines each)
-        ├── cpu_ref.hpp                 # CPU reference GEMM implementation
-        ├── cpu_ref.cpp                 # CPU reference implementation
-        ├── pack.py                     # Variant-aware packer with dtype metadata
-        └── main.cpp                    # Multi-variant loop with typed buffers
+        └── gemm_no_kpack.hip           # Kernel + host in one file, <<<>>> launch
 ```
 
 ## Dependencies
@@ -294,7 +313,7 @@ experimental/rocm_ck/
 Each example is standalone — build from its directory:
 
 ```bash
-cd experimental/rocm_ck/examples/01_hello_world  # or 02_, 03_, 04_
+cd experimental/rocm_ck/examples/01_hello_world  # or 02_, 03_, 04_, 05_
 
 cmake -B build -S . -G Ninja \
     -DCMAKE_HIP_COMPILER=/opt/rocm/llvm/bin/clang++ \
@@ -322,6 +341,9 @@ On a machine with a supported GPU:
 
 # Example 04
 ./build/kpack_gemm build/gemm.kpack
+
+# Example 05 (no arguments — kernel compiled in)
+./build/gemm_no_kpack
 ```
 
 If the current GPU's architecture is not in the archive, the demo prints a clear error and exits.
