@@ -5,95 +5,22 @@
 #include <rocRoller/Utilities/Settings.hpp>
 #include <rocRoller/Utilities/Timer.hpp>
 
-#include <bitset>
 #include <cmath>
 #include <iomanip>
 
 namespace rocRoller::KernelGraph::ControlGraph
 {
-    void bitsetSet(std::vector<uint64_t>& bs, int id)
-    {
-        AssertFatal(id > 0, "Invalid id ", ShowValue(id));
-        size_t word = static_cast<size_t>(id) >> 6;
-        if(word >= bs.size())
-            bs.resize(word + 1, 0);
-        bs[word] |= uint64_t(1) << (id & 63);
-    }
-
-    void bitsetOr(std::vector<uint64_t>& dst, std::vector<uint64_t> const& src)
-    {
-        if(dst.size() < src.size())
-            dst.resize(src.size(), 0);
-        for(size_t i = 0; i < src.size(); ++i)
-            dst[i] |= src[i];
-    }
-
-    bool bitsetAny(std::vector<uint64_t> const& bs)
-    {
-        return std::ranges::any_of(bs, [](auto const& w) { return w != 0; });
-    }
-
-    std::vector<int> bitsetToSortedVec(std::vector<uint64_t> const& bs)
-    {
-        std::vector<int> result;
-        for(size_t w = 0; w < bs.size(); ++w)
-        {
-            uint64_t bits = bs[w];
-            while(bits)
-            {
-                int bit = std::countr_zero(bits);
-                result.push_back(static_cast<int>(w * 64 + bit));
-                bits &= bits - 1;
-            }
-        }
-        return result;
-    }
-
-    std::vector<uint64_t>& selectOrder(NodeOrders& orders, NodeOrdering const order)
-    {
-        switch(order)
-        {
-        case NodeOrdering::LeftFirst:
-            return orders.after;
-        case NodeOrdering::RightFirst:
-            return orders.before;
-        case NodeOrdering::RightInBodyOfLeft:
-            return orders.inBody;
-        case NodeOrdering::LeftInBodyOfRight:
-            return orders.containing;
-        default:
-            break;
-        }
-        AssertFatal(false, "Invalid order: ", ShowValue(order));
-        return orders.after;
-    }
-
-    std::unordered_map<int, std::unordered_map<int, NodeOrdering>>
+    std::unordered_map<int, std::unordered_map<int, NodeOrdering>> const&
         ControlGraph::nodeOrderTable() const
     {
         populateOrderCache();
-        std::unordered_map<int, std::unordered_map<int, NodeOrdering>> table;
-        for(auto const& [node, orders] : m_orderCache)
-        {
-            for(int other : bitsetToSortedVec(orders.after))
-            {
-                if(node < other)
-                    table[node][other] = NodeOrdering::LeftFirst;
-            }
-            for(int other : bitsetToSortedVec(orders.inBody))
-            {
-                if(node < other)
-                    table[node][other] = NodeOrdering::RightInBodyOfLeft;
-                else
-                    table[other][node] = NodeOrdering::LeftInBodyOfRight;
-            }
-        }
-        return table;
+        return m_orderCache;
     }
 
     std::string ControlGraph::nodeOrderTableString(std::set<int> const& nodes) const
     {
         populateOrderCache();
+
         if(nodes.empty())
         {
             return "Empty order cache.\n";
@@ -106,7 +33,6 @@ namespace rocRoller::KernelGraph::ControlGraph
 
         msg << std::setw(width) << " "
             << "\\";
-
         for(int n : nodes)
             msg << " " << std::setw(width) << n;
 
@@ -127,38 +53,38 @@ namespace rocRoller::KernelGraph::ControlGraph
                     msg << " " << std::setw(width) << abbrev(lookupOrder(CacheOnly, i, j));
                 }
             }
+
             msg << " | " << std::setw(width) << i;
         }
+
         msg << std::endl
             << std::setw(width) << " "
             << "|";
         for(int n : nodes)
             msg << " " << std::setw(width) << n;
+
         msg << std::endl;
+
         return msg.str();
     }
 
     std::string ControlGraph::nodeOrderTableString() const
     {
         populateOrderCache();
+
         TIMER(t, "nodeOrderTable");
+
         std::set<int> nodes;
-        for(auto const& [node, orders] : m_orderCache)
+
+        for(auto const& [node, nodeOrderPairs] : m_orderCache)
         {
-            if(bitsetAny(orders.after) || bitsetAny(orders.before) || bitsetAny(orders.inBody)
-               || bitsetAny(orders.containing))
+            for(auto const pair : nodeOrderPairs)
             {
                 nodes.insert(node);
+                nodes.insert(pair.first);
             }
-            for(int n : bitsetToSortedVec(orders.after))
-                nodes.insert(n);
-            for(int n : bitsetToSortedVec(orders.before))
-                nodes.insert(n);
-            for(int n : bitsetToSortedVec(orders.inBody))
-                nodes.insert(n);
-            for(int n : bitsetToSortedVec(orders.containing))
-                nodes.insert(n);
         }
+
         return nodeOrderTableString(nodes);
     }
 
@@ -212,33 +138,6 @@ namespace rocRoller::KernelGraph::ControlGraph
         }
     }
 
-    void ControlGraph::validateOrderCache() const
-    {
-        auto bitsetOverlaps = [](std::vector<uint64_t> const& a, std::vector<uint64_t> const& b) {
-            size_t n = std::min(a.size(), b.size());
-            for(size_t i = 0; i < n; ++i)
-                if(a[i] & b[i])
-                    return true;
-            return false;
-        };
-
-        for(auto const& [node, orders] : m_orderCache)
-        {
-            AssertFatal(!bitsetOverlaps(orders.after, orders.before),
-                        "Node has conflicting orders (after & before)");
-            AssertFatal(!bitsetOverlaps(orders.after, orders.inBody),
-                        "Node has conflicting orders (after & inBody)");
-            AssertFatal(!bitsetOverlaps(orders.after, orders.containing),
-                        "Node has conflicting orders (after & containing)");
-            AssertFatal(!bitsetOverlaps(orders.before, orders.inBody),
-                        "Node has conflicting orders (before & inBody)");
-            AssertFatal(!bitsetOverlaps(orders.before, orders.containing),
-                        "Node has conflicting orders (before & containing)");
-            AssertFatal(!bitsetOverlaps(orders.inBody, orders.containing),
-                        "Node has conflicting orders (inBody & containing)");
-        }
-    }
-
     void ControlGraph::populateOrderCache() const
     {
         TIMER(t, "populateOrderCache");
@@ -246,14 +145,10 @@ namespace rocRoller::KernelGraph::ControlGraph
         if(m_cacheStatus == CacheStatus::Valid)
             return;
 
-        m_orderCache.clear();
-
-        auto rootNodes = roots().to<std::vector>();
-
-        populateOrderCache(rootNodes);
-        validateOrderCache();
-
+        auto r = roots().to<std::set>();
+        populateOrderCache(r);
         m_cacheStatus = CacheStatus::Valid;
+
         //
         // m_descendentCache is only used to help build m_orderCache,
         // and it must be cleared after finish building m_orderCache
@@ -264,148 +159,117 @@ namespace rocRoller::KernelGraph::ControlGraph
     }
 
     template <CForwardRangeOf<int> Range>
-    std::vector<uint64_t> ControlGraph::populateOrderCache(Range const& startingNodes) const
+    std::set<int> ControlGraph::populateOrderCache(Range const& startingNodes) const
     {
-        std::vector<uint64_t> rv;
-        for(auto it = startingNodes.begin(); it != startingNodes.end(); ++it)
+        std::set<int> rv;
+
+        auto it = startingNodes.begin();
+        if(it == startingNodes.end())
+            return rv;
+
+        rv = populateOrderCache(*it);
+
+        for(it++; it != startingNodes.end(); it++)
         {
-            auto const nodes = populateOrderCache(*it);
-            bitsetOr(rv, nodes);
+            auto nodes = populateOrderCache(*it);
+            rv.insert(nodes.begin(), nodes.end());
         }
+
         return rv;
     }
 
-    std::vector<uint64_t> ControlGraph::populateOrderCache(int startingNode) const
+    std::set<int> ControlGraph::populateOrderCache(int startingNode) const
     {
-
         auto ccEntry = m_descendentCache.find(startingNode);
         if(ccEntry != m_descendentCache.end())
             return ccEntry->second;
-        static_assert(std::variant_size_v<ControlEdge> == 5,
-                      "Currently the available edge types are Sequence(0), Initialize(1), "
-                      "ForLoopIncrement(2), Body(3) and Else(4)."
-                      "If more edge types are added, this function has to be updated.");
-        using GD = Graph::Direction;
-        std::array<std::vector<int>, std::variant_size_v<ControlEdge>> directChildren;
-        for(auto edge : getNeighbours<GD::Downstream>(startingNode))
-        {
-            auto edgeTypeIndex = getEdge(edge).index();
-            for(auto child : getNeighbours<GD::Downstream>(edge))
-                directChildren[edgeTypeIndex].push_back(child);
-        }
-        auto addDescendents = [this](std::vector<int> const& children) -> std::vector<uint64_t> {
-            std::vector<uint64_t> descendents = populateOrderCache(children);
-            std::vector<uint64_t> result      = descendents;
-            for(int c : children)
-                bitsetSet(result, c);
-            return result;
+
+        auto addDescendents = [this](Generator<int> nodes) {
+            auto theNodes = nodes.to<std::set>();
+
+            auto descendents = populateOrderCache(theNodes);
+            theNodes.insert(descendents.begin(), descendents.end());
+
+            return theNodes;
         };
-        auto initNodes = addDescendents(directChildren[1]);
-        auto bodyNodes = addDescendents(directChildren[3]);
-        auto elseNodes = addDescendents(directChildren[4]);
-        auto incNodes  = addDescendents(directChildren[2]);
-        auto seqNodes  = addDescendents(directChildren[0]);
 
-        writeOrderCache(startingNode, initNodes, NodeOrdering::RightInBodyOfLeft);
-        writeOrderCache(startingNode, bodyNodes, NodeOrdering::RightInBodyOfLeft);
-        writeOrderCache(startingNode, elseNodes, NodeOrdering::RightInBodyOfLeft);
-        writeOrderCache(startingNode, incNodes, NodeOrdering::RightInBodyOfLeft);
+        auto initNodes     = addDescendents(getOutputNodeIndices<Initialize>(startingNode));
+        auto bodyNodes     = addDescendents(getOutputNodeIndices<Body>(startingNode));
+        auto elseNodes     = addDescendents(getOutputNodeIndices<Else>(startingNode));
+        auto incNodes      = addDescendents(getOutputNodeIndices<ForLoopIncrement>(startingNode));
+        auto sequenceNodes = addDescendents(getOutputNodeIndices<Sequence>(startingNode));
 
-        writeOrderCache(startingNode, seqNodes, NodeOrdering::LeftFirst);
+        // {init, body, else, inc} nodes are in the body of the current node
+        writeOrderCache({startingNode}, initNodes, NodeOrdering::RightInBodyOfLeft);
+        writeOrderCache({startingNode}, bodyNodes, NodeOrdering::RightInBodyOfLeft);
+        writeOrderCache({startingNode}, elseNodes, NodeOrdering::RightInBodyOfLeft);
+        writeOrderCache({startingNode}, incNodes, NodeOrdering::RightInBodyOfLeft);
+
+        // Sequence connected nodes are after the current node
+        writeOrderCache({startingNode}, sequenceNodes, NodeOrdering::LeftFirst);
+
+        // {body, else, inc, sequence} are after init nodes
         writeOrderCache(initNodes, bodyNodes, NodeOrdering::LeftFirst);
         writeOrderCache(initNodes, elseNodes, NodeOrdering::LeftFirst);
         writeOrderCache(initNodes, incNodes, NodeOrdering::LeftFirst);
-        writeOrderCache(initNodes, seqNodes, NodeOrdering::LeftFirst);
+        writeOrderCache(initNodes, sequenceNodes, NodeOrdering::LeftFirst);
+
+        // {else, inc, sequence} are after body nodes
         writeOrderCache(bodyNodes, elseNodes, NodeOrdering::LeftFirst);
         writeOrderCache(bodyNodes, incNodes, NodeOrdering::LeftFirst);
-        writeOrderCache(bodyNodes, seqNodes, NodeOrdering::LeftFirst);
-        writeOrderCache(elseNodes, incNodes, NodeOrdering::LeftFirst);
-        writeOrderCache(elseNodes, seqNodes, NodeOrdering::LeftFirst);
-        writeOrderCache(incNodes, seqNodes, NodeOrdering::LeftFirst);
+        writeOrderCache(bodyNodes, sequenceNodes, NodeOrdering::LeftFirst);
 
-        std::vector<uint64_t> allNodes = std::move(initNodes);
-        bitsetOr(allNodes, bodyNodes);
-        bitsetOr(allNodes, elseNodes);
-        bitsetOr(allNodes, incNodes);
-        bitsetOr(allNodes, seqNodes);
+        // {inc, sequence} are after else nodes
+        writeOrderCache(elseNodes, incNodes, NodeOrdering::LeftFirst);
+        writeOrderCache(elseNodes, sequenceNodes, NodeOrdering::LeftFirst);
+
+        // sequence are after inc nodes.
+        writeOrderCache(incNodes, sequenceNodes, NodeOrdering::LeftFirst);
+
+        auto allNodes = std::move(sequenceNodes);
+        allNodes.insert(bodyNodes.begin(), bodyNodes.end());
+        allNodes.insert(elseNodes.begin(), elseNodes.end());
+        allNodes.insert(incNodes.begin(), incNodes.end());
+        allNodes.insert(initNodes.begin(), initNodes.end());
+
         m_descendentCache[startingNode] = allNodes;
+
         return allNodes;
     }
 
-    void ControlGraph::writeOrderCache(std::vector<uint64_t> const& nodesA,
-                                       std::vector<uint64_t> const& nodesB,
-                                       NodeOrdering                 order) const
+    template <CForwardRangeOf<int> ARange, CForwardRangeOf<int> BRange>
+    void ControlGraph::writeOrderCache(ARange const& nodesA,
+                                       BRange const& nodesB,
+                                       NodeOrdering  order) const
     {
-        if(!bitsetAny(nodesA) || !bitsetAny(nodesB))
-            return;
-        for(size_t w = 0; w < nodesA.size(); ++w)
-        {
-            uint64_t bits = nodesA[w];
-            while(bits)
-            {
-                int bit = std::countr_zero(bits);
-                int a   = static_cast<int>(w * 64 + bit);
-                bitsetOr(selectOrder(m_orderCache[a], order), nodesB);
-                bits &= bits - 1;
-            }
-        }
-        auto oppositeOrder = opposite(order);
-        for(size_t w = 0; w < nodesB.size(); ++w)
-        {
-            uint64_t bits = nodesB[w];
-            while(bits)
-            {
-                int bit = std::countr_zero(bits);
-                int b   = static_cast<int>(w * 64 + bit);
-                bitsetOr(selectOrder(m_orderCache[b], oppositeOrder), nodesA);
-                bits &= bits - 1;
-            }
-        }
-    }
-
-    void ControlGraph::writeOrderCache(int                          nodeA,
-                                       std::vector<uint64_t> const& nodesB,
-                                       NodeOrdering                 order) const
-    {
-        if(!bitsetAny(nodesB))
-            return;
-        bitsetOr(selectOrder(m_orderCache[nodeA], order), nodesB);
-        auto oppositeOrder = opposite(order);
-        for(size_t w = 0; w < nodesB.size(); ++w)
-        {
-            uint64_t bits = nodesB[w];
-            while(bits)
-            {
-                int bit = std::countr_zero(bits);
-                int b   = static_cast<int>(w * 64 + bit);
-                bitsetSet(selectOrder(m_orderCache[b], oppositeOrder), nodeA);
-                bits &= bits - 1;
-            }
-        }
+        for(int nodeA : nodesA)
+            for(int nodeB : nodesB)
+                writeOrderCache(nodeA, nodeB, order);
     }
 
     void ControlGraph::writeOrderCache(int nodeA, int nodeB, NodeOrdering order) const
     {
-        switch(order)
+        if(nodeA > nodeB)
         {
-        case NodeOrdering::LeftFirst:
-            bitsetSet(m_orderCache[nodeA].after, nodeB);
-            bitsetSet(m_orderCache[nodeB].before, nodeA);
-            break;
-        case NodeOrdering::RightFirst:
-            bitsetSet(m_orderCache[nodeA].before, nodeB);
-            bitsetSet(m_orderCache[nodeB].after, nodeA);
-            break;
-        case NodeOrdering::RightInBodyOfLeft:
-            bitsetSet(m_orderCache[nodeA].inBody, nodeB);
-            bitsetSet(m_orderCache[nodeB].containing, nodeA);
-            break;
-        case NodeOrdering::LeftInBodyOfRight:
-            bitsetSet(m_orderCache[nodeA].containing, nodeB);
-            bitsetSet(m_orderCache[nodeB].inBody, nodeA);
-            break;
-        default:
-            break;
+            writeOrderCache(nodeB, nodeA, opposite(order));
+        }
+        else
+        {
+            auto [iter, _ignore] = m_orderCache.try_emplace(nodeA);
+
+            if(iter->second.contains(nodeB))
+            {
+                AssertFatal(iter->second.at(nodeB) == order,
+                            "Different kinds of orderings!",
+                            ShowValue(nodeA),
+                            ShowValue(nodeB),
+                            ShowValue(iter->second.at(nodeB)),
+                            ShowValue(order));
+            }
+            else
+            {
+                iter->second.emplace(nodeB, order);
+            }
         }
     }
 

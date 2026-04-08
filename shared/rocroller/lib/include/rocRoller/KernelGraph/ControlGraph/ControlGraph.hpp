@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <cstdint>
 #include <functional>
 #include <variant>
 
@@ -83,27 +82,6 @@ namespace rocRoller
          * If ordering `order` applies to (a, b), return the ordering that applies to (b, a).
          */
         NodeOrdering opposite(NodeOrdering order);
-
-        struct NodeOrders
-        {
-            //
-            // These are bit vectors. Bit vector where the bit at
-            // index i indicates whether the i-th node is after,
-            // before, inBody or containing the current node.
-            // These bit vectors are set up inside populateOrderCache.
-            //
-            std::vector<uint64_t> after;
-            std::vector<uint64_t> before;
-            std::vector<uint64_t> inBody;
-            std::vector<uint64_t> containing;
-            void                  clear()
-            {
-                after.clear();
-                before.clear();
-                inBody.clear();
-                containing.clear();
-            }
-        };
 
         /**
          * Control flow graph.
@@ -194,7 +172,8 @@ namespace rocRoller
              * Also, if a reference to the returned value is maintained through any changes
              * to the graph, the returned map will be cleared.
              */
-            std::unordered_map<int, std::unordered_map<int, NodeOrdering>> nodeOrderTable() const;
+            std::unordered_map<int, std::unordered_map<int, NodeOrdering>> const&
+                nodeOrderTable() const;
 
             template <typename T>
             requires(std::constructible_from<Operation, T>)
@@ -254,43 +233,41 @@ namespace rocRoller
             }
 
         private:
+            virtual void clearCache(Graph::GraphModification modification) override;
+            void         checkOrderCache() const;
+            void         populateOrderCache() const;
+
             /**
              * Populates m_orderCache for startingNodes relative to their descendents, and the
              * descendents of each relative to each other. Returns the descendents of
              * startingNodes.
              */
             template <CForwardRangeOf<int> Range>
-            std::vector<uint64_t> populateOrderCache(Range const& startingNodes) const;
+            std::set<int> populateOrderCache(Range const& startingNodes) const;
 
             /**
              * Populates m_orderCache for startingNode relative to its descendents, and the
              * descendents relative to each other. Returns the descendents of startingNode.
              */
-            std::vector<uint64_t> populateOrderCache(int startingNode) const;
-
-            virtual void clearCache(Graph::GraphModification modification) override;
-            void         populateOrderCache() const;
-            void         validateOrderCache() const;
+            std::set<int> populateOrderCache(int startingNode) const;
 
             NodeOrdering lookupOrder(CacheOnlyPolicy const, int nodeA, int nodeB) const;
             NodeOrdering lookupOrder(IgnoreCachePolicy const, int nodeA, int nodeB) const;
 
-            void writeOrderCache(std::vector<uint64_t> const& nodesA,
-                                 std::vector<uint64_t> const& nodesB,
-                                 NodeOrdering                 order) const;
-
-            void writeOrderCache(int                          nodeA,
-                                 std::vector<uint64_t> const& nodesB,
-                                 NodeOrdering                 order) const;
-
             void writeOrderCache(int nodeA, int nodeB, NodeOrdering order) const;
 
-            mutable std::unordered_map<int, NodeOrders> m_orderCache;
+            template <CForwardRangeOf<int> ARange = std::initializer_list<int>,
+                      CForwardRangeOf<int> BRange = std::initializer_list<int>>
+            void writeOrderCache(ARange const& nodesA,
+                                 BRange const& nodesB,
+                                 NodeOrdering  order) const;
+
+            mutable std::unordered_map<int, std::unordered_map<int, NodeOrdering>> m_orderCache;
             /**
              * If an entry is present, the value will be the IDs of every descendent from the key,
              * following every kind of edge.
              */
-            mutable std::unordered_map<int, std::vector<uint64_t>> m_descendentCache;
+            mutable std::unordered_map<int, std::set<int>> m_descendentCache;
 
             mutable CacheStatus m_cacheStatus = CacheStatus::Invalid;
 

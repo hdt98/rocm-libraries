@@ -101,105 +101,115 @@ namespace rocRoller::KernelGraph::ControlGraph
         Throw<FatalError>("Invalid NodeOrdering");
     }
 
+    inline void ControlGraph::checkOrderCache() const
+    {
+        if(m_orderCache.empty())
+            populateOrderCache();
+    }
+
     inline NodeOrdering ControlGraph::lookupOrder(CacheOnlyPolicy const, int nodeA, int nodeB) const
     {
-        auto bitsetTest = [](std::vector<uint64_t> const& bs, int id) {
-            size_t word = static_cast<size_t>(id) >> 6;
-            return word < bs.size() && ((bs[word] >> (id & 63)) & 1);
-        };
+        if(nodeA > nodeB)
+            return opposite(lookupOrder(CacheOnly, nodeB, nodeA));
 
-        auto it = m_orderCache.find(nodeA);
-        if(it == m_orderCache.end())
+        if(not m_orderCache.contains(nodeA))
             return NodeOrdering::Undefined;
-        auto const& orders = it->second;
-        if(bitsetTest(orders.after, nodeB))
-            return NodeOrdering::LeftFirst;
-        if(bitsetTest(orders.before, nodeB))
-            return NodeOrdering::RightFirst;
-        if(bitsetTest(orders.inBody, nodeB))
-            return NodeOrdering::RightInBodyOfLeft;
-        if(bitsetTest(orders.containing, nodeB))
-            return NodeOrdering::LeftInBodyOfRight;
-        return NodeOrdering::Undefined;
+
+        auto const& nodeOrderPairs = m_orderCache.at(nodeA);
+        return nodeOrderPairs.contains(nodeB) ? nodeOrderPairs.at(nodeB) : NodeOrdering::Undefined;
     }
 
     inline Generator<int> ControlGraph::nodesAfter(int node) const
     {
         populateOrderCache();
-        auto it = m_orderCache.find(node);
-        if(it != m_orderCache.end())
+
+        if(m_orderCache.contains(node))
         {
-            auto const& bs = it->second.after;
-            for(size_t w = 0; w < bs.size(); ++w)
+            for(auto const& [otherNode, order] : m_orderCache.at(node))
             {
-                uint64_t bits = bs[w];
-                while(bits)
-                {
-                    int bit = std::countr_zero(bits);
-                    co_yield static_cast<int>(w * 64 + bit);
-                    bits &= bits - 1;
-                }
+                if(order == NodeOrdering::LeftFirst)
+                    co_yield otherNode;
             }
+        }
+
+        for(auto const& [otherNode, nodeOrderPairs] : m_orderCache)
+        {
+            if(otherNode >= node)
+                continue;
+
+            if(nodeOrderPairs.contains(node) && nodeOrderPairs.at(node) == NodeOrdering::RightFirst)
+                co_yield otherNode;
         }
     }
 
     inline Generator<int> ControlGraph::nodesBefore(int node) const
     {
         populateOrderCache();
-        auto it = m_orderCache.find(node);
-        if(it != m_orderCache.end())
+
+        if(m_orderCache.contains(node))
         {
-            auto const& bs = it->second.before;
-            for(size_t w = 0; w < bs.size(); ++w)
+            for(auto const& [otherNode, order] : m_orderCache.at(node))
             {
-                uint64_t bits = bs[w];
-                while(bits)
-                {
-                    int bit = std::countr_zero(bits);
-                    co_yield static_cast<int>(w * 64 + bit);
-                    bits &= bits - 1;
-                }
+                if(order == NodeOrdering::RightFirst)
+                    co_yield otherNode;
             }
+        }
+
+        for(auto const& [otherNode, nodeOrderPairs] : m_orderCache)
+        {
+            if(otherNode >= node)
+                continue;
+
+            if(nodeOrderPairs.contains(node) && nodeOrderPairs.at(node) == NodeOrdering::LeftFirst)
+                co_yield otherNode;
         }
     }
 
     inline Generator<int> ControlGraph::nodesInBody(int node) const
     {
         populateOrderCache();
-        auto it = m_orderCache.find(node);
-        if(it != m_orderCache.end())
+
+        if(m_orderCache.contains(node))
         {
-            auto const& bs = it->second.inBody;
-            for(size_t w = 0; w < bs.size(); ++w)
+            for(auto const& [otherNode, order] : m_orderCache.at(node))
             {
-                uint64_t bits = bs[w];
-                while(bits)
-                {
-                    int bit = std::countr_zero(bits);
-                    co_yield static_cast<int>(w * 64 + bit);
-                    bits &= bits - 1;
-                }
+                if(order == NodeOrdering::RightInBodyOfLeft)
+                    co_yield otherNode;
             }
+        }
+
+        for(auto const& [otherNode, nodeOrderPairs] : m_orderCache)
+        {
+            if(otherNode >= node)
+                continue;
+
+            if(nodeOrderPairs.contains(node)
+               && nodeOrderPairs.at(node) == NodeOrdering::LeftInBodyOfRight)
+                co_yield otherNode;
         }
     }
 
     inline Generator<int> ControlGraph::nodesContaining(int node) const
     {
         populateOrderCache();
-        auto it = m_orderCache.find(node);
-        if(it != m_orderCache.end())
+
+        if(m_orderCache.contains(node))
         {
-            auto const& bs = it->second.containing;
-            for(size_t w = 0; w < bs.size(); ++w)
+            for(auto const& [otherNode, order] : m_orderCache.at(node))
             {
-                uint64_t bits = bs[w];
-                while(bits)
-                {
-                    int bit = std::countr_zero(bits);
-                    co_yield static_cast<int>(w * 64 + bit);
-                    bits &= bits - 1;
-                }
+                if(order == NodeOrdering::LeftInBodyOfRight)
+                    co_yield otherNode;
             }
+        }
+
+        for(auto const& [otherNode, nodeOrderPairs] : m_orderCache)
+        {
+            if(otherNode >= node)
+                continue;
+
+            if(nodeOrderPairs.contains(node)
+               && nodeOrderPairs.at(node) == NodeOrdering::RightInBodyOfLeft)
+                co_yield otherNode;
         }
     }
 
