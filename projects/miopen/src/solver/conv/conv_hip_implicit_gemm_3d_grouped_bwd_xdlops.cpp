@@ -38,7 +38,7 @@
 #include <miopen/conv/heuristics/ai_candidate_selection.hpp>
 #include <miopen/conv/heuristics/ai_conv_3d_kernel_tuning_utils.hpp>
 #endif
-#include <miopen/solver/implicitgemm_ck_util.hpp>
+#include <miopen/solver/implicitgemm_ck_util_common.hpp>
 #include <miopen/solver/ck_impl_lib_loader.hpp>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_3D_CONV_IMPLICIT_GEMM_HIP_BWD_XDLOPS)
@@ -156,7 +156,7 @@ void PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::HeuristicInit(
             using T        = decltype(CKDataType);
             using TCompute = decltype(CKComputeType);
             constexpr bool mode_use_tf32 =
-                std::is_same_v<T, float> && std::is_same_v<TCompute, ck::tf32_t>;
+                std::is_same_v<T, float> && std::is_same_v<TCompute, TF32Tag>;
 
             auto fill_valid_kernels =
                 [&loader](const ProblemDescription& p) -> std::vector<std::string> {
@@ -193,12 +193,12 @@ void PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::HeuristicInit(
         switch(problem.GetInDataType())
         {
         case miopenHalf:
-            std::tie(ai_success, result) = run_ai_heuristics(ck::half_t{}, ck::half_t{});
+            std::tie(ai_success, result) = run_ai_heuristics(HalfTag{}, HalfTag{});
             break;
         case miopenFloat:
             if(problem.UseTF32())
             {
-                std::tie(ai_success, result) = run_ai_heuristics(float{}, ck::tf32_t{});
+                std::tie(ai_success, result) = run_ai_heuristics(float{}, TF32Tag{});
                 if(!ai_success || result.IsEmpty())
                 {
                     MIOPEN_LOG_I2("Step 1: AI heuristics with TF32 failed, retrying with FP32");
@@ -211,7 +211,7 @@ void PerformanceConfigHipImplicitGemm3DGroupBwdXdlops::HeuristicInit(
             }
             break;
         case miopenBFloat16:
-            std::tie(ai_success, result) = run_ai_heuristics(ck::bhalf_t{}, ck::bhalf_t{});
+            std::tie(ai_success, result) = run_ai_heuristics(BFloat16Tag{}, BFloat16Tag{});
             break;
         default: break;
         }

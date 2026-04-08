@@ -14,7 +14,7 @@
 #include <miopen/execution_context.hpp>
 #include <miopen/fusion/fusion_invoke_params.hpp>
 #include <miopen/solver/ck_utility_common.hpp>
-#include <miopen/solver/implicitgemm_ck_util.hpp>
+#include "implicitgemm_ck_util.hpp"
 #include <miopen/solver/problem_description_interpreter.hpp>
 #include <ck/tensor_operation/gpu/device/device_conv_fwd_bias_activation.hpp>
 #include <ck/library/tensor_operation_instance/gpu/grouped_convolution_forward_scaleadd_scaleadd_relu.hpp>
@@ -260,11 +260,11 @@ auto DispatchFusedByDataType(miopenDataType_t dtype, Fn&& fn)
 
 using miopen::solver::InitAnyInvokerFactory;
 
-extern "C" ck_impl_status_t ck_impl_fused_bias_res_add_activ_fill_valid_kernels(
-    const miopen::conv::ProblemDescription* problem,
-    miopenDataType_t data_type,
-    bool /*use_tf32*/,
-    CKKernelListHandle** out_handle)
+extern "C" ck_impl_status_t
+ck_impl_fused_bias_res_add_activ_fill_valid_kernels(const miopen::conv::ProblemDescription* problem,
+                                                    miopenDataType_t data_type,
+                                                    bool /*use_tf32*/,
+                                                    CKKernelListHandle** out_handle)
 {
     return ck_impl_try_catch([&]() {
         CK_IMPL_THROW_IF_NULL(out_handle, CK_IMPL_STATUS_BAD_PARAM, "Null out_handle");
@@ -279,9 +279,9 @@ extern "C" ck_impl_status_t ck_impl_fused_bias_res_add_activ_fill_valid_kernels(
 
 extern "C" ck_impl_status_t
 ck_impl_fused_bias_res_add_activ_is_applicable(const miopen::conv::ProblemDescription* problem,
-                                                 miopenDataType_t data_type,
-                                                 bool /*use_tf32*/,
-                                                 bool* out_result)
+                                               miopenDataType_t data_type,
+                                               bool /*use_tf32*/,
+                                               bool* out_result)
 {
     return ck_impl_try_catch([&]() {
         CK_IMPL_THROW_IF_NULL(out_result, CK_IMPL_STATUS_BAD_PARAM, "Null out_result");
@@ -292,12 +292,12 @@ ck_impl_fused_bias_res_add_activ_is_applicable(const miopen::conv::ProblemDescri
     });
 }
 
-extern "C" ck_impl_status_t ck_impl_fused_bias_res_add_activ_is_args_supported(
-    const miopen::conv::ProblemDescription* problem,
-    const char* kernel_id,
-    miopenDataType_t data_type,
-    bool /*use_tf32*/,
-    bool* out_result)
+extern "C" ck_impl_status_t
+ck_impl_fused_bias_res_add_activ_is_args_supported(const miopen::conv::ProblemDescription* problem,
+                                                   const char* kernel_id,
+                                                   miopenDataType_t data_type,
+                                                   bool /*use_tf32*/,
+                                                   bool* out_result)
 {
     return ck_impl_try_catch([&]() {
         CK_IMPL_THROW_IF_NULL(out_result, CK_IMPL_STATUS_BAD_PARAM, "Null out_result");
@@ -325,10 +325,10 @@ extern "C" ck_impl_status_t ck_impl_fused_bias_res_add_activ_get_workspace_size(
 
 extern "C" ck_impl_status_t
 ck_impl_fused_bias_res_add_activ_get_solution(const miopen::ExecutionContext* /*ctx*/,
-                                                const miopen::conv::ProblemDescription* problem,
-                                                const char* kernel_id,
-                                                bool /*use_tf32*/,
-                                                miopen::solver::ConvSolution** out_solution)
+                                              const miopen::conv::ProblemDescription* problem,
+                                              const char* kernel_id,
+                                              bool /*use_tf32*/,
+                                              miopen::solver::ConvSolution** out_solution)
 {
     return ck_impl_try_catch([&]() {
         CK_IMPL_THROW_IF_NULL(out_solution, CK_IMPL_STATUS_BAD_PARAM, "Null out_solution");
