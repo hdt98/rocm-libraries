@@ -6,7 +6,8 @@
 #include "mathutil.h"
 #include "launch_params.h"
 #include "kernel_variant.h"
-#include "transpose_4x4.h"
+#include "transpose_lds_layout.h"
+#include "memory.h"
 #include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
 
@@ -133,6 +134,7 @@ __device__ void conv2d_grouped_4c_fp16_cdna4_nhwc_impl(const _Float16* __restric
     constexpr int MFMA_BATCH = 16;
     using OperandLayout      = MatrixLayout<MFMA_M, MFMA_K, MFMA_BATCH, __half>;
     using ResultLayout       = MatrixLayout<MFMA_N, MFMA_K, MFMA_BATCH, float>;
+    using int16x4_t          = __attribute__((ext_vector_type(4))) short;
 
 
     constexpr int GROUP_SIZE_4 = GROUP_SIZE / 4; // 1
@@ -274,23 +276,38 @@ __device__ void conv2d_grouped_4c_fp16_cdna4_nhwc_impl(const _Float16* __restric
     }
 
     {
-        // Wait for the filters to load from global to LDS ..
-        // but allow the first chunk of inputs to still be flight.
-        asm volatile("s_waitcnt vmcnt(1)\n");
+        // Wait for all buffer_load_lds operations (weights + first input chunk)
+        // to complete before reading from LDS.
+        wait_vmcnt<0>();
         __syncthreads();
 
-        auto lane_k      = OperandLayout::outer(lane);
-        auto lane_batch  = OperandLayout::batch(lane);
-        int filter_local = wave_c64 * 64 + lane_batch * GROUP_SIZE + lane_k;
-        auto* weight_lds = reinterpret_cast<const uint2*>(output_lds);
-        for(int khw = 0; khw < cfg.kh * cfg.kw; khw++)
+        if constexpr(cfg.direction == hipconv::Direction::Dgrad)
         {
-            auto* lds_ptr    = &weight_lds[filter_local * cfg.kh * cfg.kw + khw];
-            weights_reg[khw] = *(const fp16x4_t*)lds_ptr;
-            if constexpr(cfg.direction == hipconv::Direction::Dgrad)
+            using TransposeLayout = TransposeLDSLayout<4, 4, 16>;
+            const int tr_batch    = TransposeLayout::batch(lane);
+            const int tr_row      = TransposeLayout::row(lane);
+            int filter_local      = wave_c64 * 64 + tr_batch * GROUP_SIZE + tr_row;
+            auto* weight_lds      = reinterpret_cast<__half*>(output_lds);
+            const int khw_stride  = GROUP_SIZE; // 4 fp16 per filter position
+
+            for(int khw = 0; khw < cfg.kh * cfg.kw; khw++)
             {
-                auto& w = reinterpret_cast<uint2&>(weights_reg[khw]);
-                transpose_4x4_batch16(w.x, w.y);
+                auto* addr = reinterpret_cast<int16x4_t*>(
+                    &weight_lds[filter_local * cfg.kh * cfg.kw * khw_stride + khw * khw_stride]);
+                int16x4_t r      = __builtin_amdgcn_ds_read_tr16_b64_v4i16(addr);
+                weights_reg[khw] = __builtin_bit_cast(fp16x4_t, r);
+            }
+        }
+        else
+        {
+            auto lane_k      = OperandLayout::outer(lane);
+            auto lane_batch  = OperandLayout::batch(lane);
+            int filter_local = wave_c64 * 64 + lane_batch * GROUP_SIZE + lane_k;
+            auto* weight_lds = reinterpret_cast<const uint2*>(output_lds);
+            for(int khw = 0; khw < cfg.kh * cfg.kw; khw++)
+            {
+                auto* lds_ptr    = &weight_lds[filter_local * cfg.kh * cfg.kw + khw];
+                weights_reg[khw] = *(const fp16x4_t*)lds_ptr;
             }
         }
     }
@@ -329,7 +346,7 @@ __device__ void conv2d_grouped_4c_fp16_cdna4_nhwc_impl(const _Float16* __restric
         static_for<cfg.kh>(
             [&]<int Y_LOCAL>()
             {
-                asm volatile("s_waitcnt vmcnt(0)\n");
+                wait_vmcnt<0>();
                 __syncthreads();
 
                 int y = y_base + Y_LOCAL;
@@ -416,7 +433,7 @@ __device__ void conv2d_grouped_4c_fp16_cdna4_nhwc_impl(const _Float16* __restric
                     return;
                 int y = y_rem_base + Y_LOCAL;
 
-                asm volatile("s_waitcnt vmcnt(0)\n");
+                wait_vmcnt<0>();
                 __syncthreads();
 
                 if(load_active && (y + 1) < hi)
@@ -491,10 +508,9 @@ __device__ void conv2d_grouped_4c_fp16_cdna4_nhwc_impl(const _Float16* __restric
     // An output row p_out is last touched at input row y = p_out + kh-1 - py; it needs
     // flushing when that y >= hi, i.e. p_out >= hi - kh + 1 + py.
     //
-    // Synchronize output LDS buffer access.
-    __syncthreads();
     for(int p_out = hi - cfg.kh + 1 + py; p_out < ho; p_out++)
     {
+        __syncthreads(); // separate prior LDS reads from this iteration's writes
         int p_idx = (p_out - py + cfg.kh) % cfg.kh;
         fp32x4_t slot;
         dispatch<cfg.kh>(p_idx,
@@ -615,6 +631,7 @@ inline void launch(int config_idx,
                    const void* in,
                    const void* wei,
                    void* out,
+                   void* /*workspace*/,
                    hipStream_t stream)
 {
     launch_dispatch(
@@ -656,9 +673,10 @@ constexpr KernelVariant make_variant()
         },
         .config_is_compatible = [](const hipconv::Conv2dParams& par, int idx)
         { return is_valid_config(par, configs[idx]); },
-        .get_launch_params = &get_launch_params,
-        .launch            = &launch,
-        .num_configs       = NUM_CONFIGS,
+        .get_launch_params  = &get_launch_params,
+        .launch             = &launch,
+        .get_workspace_size = [](int, const hipconv::Conv2dParams&) -> size_t { return 0; },
+        .num_configs        = NUM_CONFIGS,
     };
 }
 

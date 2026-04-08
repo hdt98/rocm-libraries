@@ -8,6 +8,7 @@
 #include "mathutil.h"
 #include "launch_params.h"
 #include "kernel_variant.h"
+#include "memory.h"
 #include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
 
@@ -95,6 +96,7 @@ inline LaunchParams get_launch_params(int config_idx, const hipconv::Conv2dParam
 
 } // namespace grouped_8c
 
+
 template <grouped_8c::Config cfg>
 __device__ void conv2d_grouped_8c_fp16_cdna4_nhwc_impl(const _Float16* __restrict__ in,
                                                        const _Float16* __restrict__ wei,
@@ -120,11 +122,11 @@ __device__ void conv2d_grouped_8c_fp16_cdna4_nhwc_impl(const _Float16* __restric
 {
     using namespace grouped_8c;
     using namespace grouped_8c_transforms;
+    using fp16x8_t = __attribute__((ext_vector_type(8))) _Float16;
 
     // MFMA 16x16x32: operands are fp16x8, result is fp32x4.
     using OperandLayout = MatrixLayout<16, 32, 1, __half>;
     using ResultLayout  = MatrixLayout<16, 16, 1, float>;
-    using fp16x8_t      = __attribute__((ext_vector_type(8))) _Float16;
 
     constexpr int GROUP_SIZE_8 = cfg.group_size / 8; // 1
     constexpr int GROUP_SIZE_4 = cfg.group_size / 4; // 2
@@ -236,7 +238,7 @@ __device__ void conv2d_grouped_8c_fp16_cdna4_nhwc_impl(const _Float16* __restric
                 weight_rsrc, &lds_buf[j], 16, voffset_base + j * sizeof(uint4), 0, 0, 0);
         }
 
-        asm volatile("s_waitcnt vmcnt(0)\n");
+        wait_vmcnt<0>();
         __syncthreads();
 
         // Map lane to GT matrix position.
@@ -348,7 +350,7 @@ __device__ void conv2d_grouped_8c_fp16_cdna4_nhwc_impl(const _Float16* __restric
         static_for<cfg.kh>(
             [&]<int Y_LOCAL>()
             {
-                asm volatile("s_waitcnt vmcnt(0)\n");
+                wait_vmcnt<0>();
                 __syncthreads();
 
                 int y = y_base + Y_LOCAL;
@@ -416,7 +418,7 @@ __device__ void conv2d_grouped_8c_fp16_cdna4_nhwc_impl(const _Float16* __restric
                     return;
                 int y = y_rem_base + Y_LOCAL;
 
-                asm volatile("s_waitcnt vmcnt(0)\n");
+                wait_vmcnt<0>();
                 __syncthreads();
 
                 if(load_active && (y + 1) < hi)
@@ -471,9 +473,9 @@ __device__ void conv2d_grouped_8c_fp16_cdna4_nhwc_impl(const _Float16* __restric
     }
 
     // Flush output rows whose last input contribution would land at y >= hi.
-    __syncthreads();
     for(int p_out = hi - cfg.kh + 1 + py; p_out < ho; p_out++)
     {
+        __syncthreads(); // separate prior LDS reads from this iteration's writes
         int p_idx = (p_out - py + cfg.kh) % cfg.kh;
         fp32x4_t slot;
         dispatch<cfg.kh>(p_idx,
@@ -595,6 +597,7 @@ inline void launch(int config_idx,
                    const void* in,
                    const void* wei,
                    void* out,
+                   void* /*workspace*/,
                    hipStream_t stream)
 {
     launch_dispatch(
@@ -636,9 +639,10 @@ constexpr KernelVariant make_variant()
         },
         .config_is_compatible = [](const hipconv::Conv2dParams& par, int idx)
         { return is_valid_config(par, configs[idx]); },
-        .get_launch_params = &get_launch_params,
-        .launch            = &launch,
-        .num_configs       = NUM_CONFIGS,
+        .get_launch_params  = &get_launch_params,
+        .launch             = &launch,
+        .get_workspace_size = [](int, const hipconv::Conv2dParams&) -> size_t { return 0; },
+        .num_configs        = NUM_CONFIGS,
     };
 }
 

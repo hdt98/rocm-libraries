@@ -2,6 +2,7 @@
 #include "grouped/grouped_conv.hpp"
 
 #include <optional>
+#include <exception>
 #include <stdexcept>
 #include <vector>
 
@@ -65,17 +66,26 @@ std::optional<KernelConfig> find_config(const Conv2dParams& par)
     return cfgs.front();
 }
 
+size_t get_workspace_size(KernelConfig cfg, const Conv2dParams& par)
+{
+    auto* entry = find_algorithm(cfg.algorithm);
+    if(!entry)
+        throw std::invalid_argument("unsupported algorithm");
+    return entry->get_workspace_size({cfg.kernel_variant, cfg.config_idx}, par);
+}
+
 void launch(KernelConfig cfg,
             const Conv2dParams& par,
             const void* in,
             const void* wei,
             void* out,
+            void* workspace,
             hipStream_t stream)
 {
     auto* entry = find_algorithm(cfg.algorithm);
     if(!entry)
         throw std::invalid_argument("unsupported algorithm");
-    entry->launch({cfg.kernel_variant, cfg.config_idx}, par, in, wei, out, stream);
+    entry->launch({cfg.kernel_variant, cfg.config_idx}, par, in, wei, out, workspace, stream);
 }
 
 void get_tolerance(KernelConfig cfg, const Conv2dParams& par, float& atol, float& rtol)

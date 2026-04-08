@@ -23,7 +23,11 @@ struct KernelVariant
                    const void* in,
                    const void* wei,
                    void* out,
+                   void* workspace,
                    hipStream_t stream);
+
+    // Returns the workspace size in bytes (0 if no workspace needed).
+    size_t (*get_workspace_size)(int config_idx, const hipconv::Conv2dParams& par);
 
     // Number of configurations used by this kernel.
     int num_configs;

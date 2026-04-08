@@ -107,22 +107,6 @@ set( MIOpen_Source
     getitem_api.cpp
     glu/problem_description.cpp
     glu_api.cpp
-    graphapi/convolution.cpp
-    graphapi/conv_bias_res_add_activ_forward_executor.cpp
-    graphapi/engine.cpp
-    graphapi/enginecfg.cpp
-    graphapi/engineheur.cpp
-    graphapi/execution_plan.cpp
-    graphapi/find_engine.cpp
-    graphapi/graphapi.cpp
-    graphapi/matmul.cpp
-    graphapi/opgraph.cpp
-    graphapi/pointwise.cpp
-    graphapi/reduction.cpp
-    graphapi/reshape.cpp
-    graphapi/rng.cpp
-    graphapi/tensor.cpp
-    graphapi/variant_pack.cpp
     groupnorm_api.cpp
     groupnorm/problem_description.cpp
     handle_api.cpp
@@ -223,7 +207,6 @@ set( MIOpen_Source
     solver/conv/conv_direct_naive_conv_bwd.cpp
     solver/conv/conv_direct_naive_conv_fwd.cpp
     solver/conv/conv_direct_naive_conv_wrw.cpp
-    solver/conv/conv_hip_implicit_gemm_bwd_data_xdlops.cpp
     solver/conv/conv_hip_implicit_gemm_bwd_v1r1.cpp
     solver/conv/conv_hip_implicit_gemm_bwd_v1r1_xdlops.cpp
     solver/conv/conv_hip_implicit_gemm_bwd_v4r1.cpp
@@ -233,7 +216,6 @@ set( MIOpen_Source
     solver/conv/conv_hip_implicit_gemm_fwd_v4r4_xdlops.cpp
     solver/conv/conv_hip_implicit_gemm_fwd_v4r4_xdlops_padded_gemm.cpp
     solver/conv/conv_hip_implicit_gemm_fwd_v4r5_xdlops.cpp
-    solver/conv/conv_hip_implicit_gemm_fwd_xdlops.cpp
     solver/conv/conv_hip_implicit_gemm_grouped_fwd_xdlops.cpp
     solver/conv/conv_hip_implicit_gemm_grouped_bwd_xdlops.cpp
     solver/conv/conv_hip_implicit_gemm_grouped_wrw_xdlops.cpp
@@ -269,6 +251,7 @@ set( MIOpen_Source
     solver/conv/gemm_common.cpp
     solver/conv/gemm_wrw.cpp
     solver/conv/conv_ck_grouped_conv_fwd.cpp
+    solver/conv/conv_3d_depthwise_fwd.cpp
     solver/conv_asm_1x1u_bias_activ_fused.cpp
     solver/conv_bin_winoRxS_fused.cpp
     solver/conv_ck_igemm_grp_fwd_activ_fused.cpp
@@ -555,6 +538,7 @@ if( MIOPEN_BACKEND MATCHES "OpenCL" OR MIOPEN_BACKEND STREQUAL "HIPOC" OR MIOPEN
         ${GPU_REFERENCE_KERNEL_ASM}
         ${GPU_BATCHED_TRANSPOSE_KERNEL_HIP}
         ${GPU_GENERAL_TENSOR_REORDER_KERNEL_HIP_SOURCE}
+        kernels/miopen_conv3d_depthwise_fwd.cpp
         kernels/MIOpenAdam.cpp
         kernels/MIOpenAddLayerNorm.cpp
         kernels/MIOpenCat.cpp

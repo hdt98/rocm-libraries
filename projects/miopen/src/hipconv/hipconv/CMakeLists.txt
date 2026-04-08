@@ -21,4 +21,4 @@ target_include_directories(hipconv
 )
 target_link_libraries(hipconv PUBLIC hip::device)
 target_compile_options(hipconv PRIVATE -fvisibility=hidden -fvisibility-inlines-hidden)
-target_compile_definitions(hipconv PRIVATE HIPCONV_BUILDING_LIBRARY)
+target_compile_definitions(hipconv PUBLIC HIPCONV_BUILDING_LIBRARY)
