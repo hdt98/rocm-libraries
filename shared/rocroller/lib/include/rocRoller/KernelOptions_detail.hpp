@@ -124,6 +124,13 @@ namespace rocRoller
          */
         bool removeSetCoordinate = false;
 
+        /**
+         * If enabled, runtime strides will be pre-computed into registers rather than
+         * rematerialised as expressions at each use site. Compile-time constant strides
+         * are always kept as expressions regardless of this setting.
+         */
+        bool materialStrides = false;
+
         std::string toString() const;
     };
 

@@ -646,15 +646,21 @@ namespace rocRoller
 
                     auto strideExpr = m_fastArith(assign.expression);
 
-                    if(Expression::evaluationTimes(strideExpr)[Expression::EvaluationTime::Translate])
+                    auto isConstant = Expression::evaluationTimes(
+                        strideExpr)[Expression::EvaluationTime::Translate];
+                    auto materialise = m_context->kernelOptions()->materialStrides && !isConstant;
+
+                    if(!materialise)
                     {
-                        // Compile-time constant stride: store as expression (no register needed).
-                        co_yield Instruction::Comment("Assign stride expression (constant)");
+                        // Compile-time constant stride, or materialStrides disabled:
+                        // store as expression to be rematerialised at each use.
+                        co_yield Instruction::Comment("Assign stride expression");
                         m_context->registerTagManager()->addExpression(dimTag, strideExpr, attrs);
                     }
                     else
                     {
-                        // Runtime stride: pre-compute into a register now.
+                        // Runtime stride with materialStrides enabled:
+                        // pre-compute into a register now.
                         co_yield Instruction::Comment("Assign stride register");
                         auto dest = Register::Value::Placeholder(
                             m_context, assign.regType, attrs.dataType, 1);

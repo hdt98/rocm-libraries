@@ -166,6 +166,7 @@ namespace rocRoller
         ShowString(scaleSkipPermlane);
         ShowString(assertOpKind);
         ShowOption(removeSetCoordinate);
+        ShowOption(materialStrides);
 
 #undef Show
 #undef ShowOption
