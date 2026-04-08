@@ -273,18 +273,18 @@ void latrd_getError(const rocblas_handle handle,
     auto A = (*AWrap).block(BDesc().nrows(n).ncols(n));
     /* std::cout << "Matrix A.diag() (lapack):" << std::endl; */
     /* A.diag().print(); */
-    std::cout << "Matrix A (lapack):" << std::endl;
-    A.print();
+    /* std::cout << "Matrix A (lapack):" << std::endl; */
+    /* A.print(); */
     auto E = *HMat::Convert(hE[0], 1, n - 1);
-    std::cout << "Matrix E (lapack):" << std::endl;
-    E.print();
+    /* std::cout << "Matrix E (lapack):" << std::endl; */
+    /* E.print(); */
     // Create tridiagonal Tl (lapack) with diagonal and off-diagonal entries computed with lapack's LATRD
     // Tl is a (k + 1) x (k + 1) matrix
     auto Tl = HMat::Zeros(n, n);
     Tl.diag(A.diag());
     Tl.sub_diag(E);
     Tl.sup_diag(E);
-    /* auto W = (*WWrap).block(BDesc().nrows(n).ncols(k)); */
+    auto W = (*WWrap).block(BDesc().nrows(n).ncols(k));
     /* std::cout << "Matrix W (lapack):" << std::endl; */
     /* W.print(); */
 
@@ -294,17 +294,17 @@ void latrd_getError(const rocblas_handle handle,
     std::cout << "Matrix Ares (rocsolver):" << std::endl;
     ARes.print();
     auto ERes = *HMat::Convert(hERes[0], 1, n - 1);
-    std::cout << "Matrix E (rocsolver):" << std::endl;
-    E.print();
+    /* std::cout << "Matrix E (rocsolver):" << std::endl; */
+    /* E.print(); */
     // Create tridiagonal Tr (rocsolver) with diagonal and off-diagonal entries computed with rocsolver's LATRD
     // Tr is a (k + 1) x (k + 1) matrix
     auto Tr = HMat::Zeros(n, n);
     Tr.diag(ARes.diag());
     Tr.sub_diag(ERes);
     Tr.sup_diag(ERes);
-    /* auto WRes = (*WResWrap).block(BDesc().nrows(n).ncols(k)); */
-    /* std::cout << "Matrix Wres (rocsolver):" << std::endl; */
-    /* WRes.print(); */
+    auto WRes = (*WResWrap).block(BDesc().nrows(n).ncols(k));
+    std::cout << "Matrix Wres (rocsolver):" << std::endl;
+    WRes.print();
 
     //
     // Old error bounds, comparing rocsolver's outputs with lapack's outputs
