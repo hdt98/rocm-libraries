@@ -7,13 +7,12 @@ Reads .spec.json files (emitted by build-time spec extractors) to discover
 variants and their metadata. The archive carries both device code and
 structured spec metadata in the msgpack TOC.
 
-Archive format:
+Archive format (--zstd compresses blobs with zstd-per-kernel):
 
     [0x00]  "KPAK"           4 bytes   Magic
     [0x04]  version          4 bytes   uint32 LE (currently 1)
     [0x08]  toc_offset       8 bytes   uint64 LE
-    [0x10]  blob_0           variable  Raw .hsaco bytes
-            blob_1           variable  ...
+    [0x10]  data             variable  Raw blobs or zstd-compressed blob
     [toc_offset]  TOC        variable  MessagePack table of contents
 """
 
