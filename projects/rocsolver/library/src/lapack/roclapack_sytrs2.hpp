@@ -35,11 +35,6 @@
 #include "rocblas.hpp"
 #include "rocsolver/rocsolver.h"
 
-#undef USE_SYTRS
-#ifdef USE_SYTRS
-#include "roclapack_sytrs.hpp"
-#endif
-
 #include "roclapack_syconv.hpp"
 
 ROCSOLVER_BEGIN_NAMESPACE
@@ -1786,24 +1781,6 @@ static inline rocblas_status rocsolver_sytrs2_template(rocblas_handle handle,
                                                        void* const work,
                                                        size_t const size_work)
 {
-#ifdef USE_SYTRS
-
-    {
-        rocblas_status istat = rocsolver_sytrs_template<T, I>(handle, uplo, n, nrhs,
-
-                                                              A, shiftA, lda, strideA,
-
-                                                              ipiv, strideP,
-
-                                                              B, shiftB, ldb, strideB,
-
-                                                              batch_count,
-
-                                                              work, size_work);
-        return (istat);
-    }
-#endif
-
     {
         bool const has_work_to_do = (n >= 1) && (nrhs >= 1) && (batch_count >= 1);
         if(!has_work_to_do)
@@ -1850,37 +1827,37 @@ static inline rocblas_status rocsolver_sytrs2_template(rocblas_handle handle,
     // -------------------------------------------------
     // solve linear system with converted storage format
     // -------------------------------------------------
+    rocblas_status istat_sytrs1 = rocblas_status_success;
     {
         auto const pfree_save = pfree;
         size_t size_remain = (pwork + size_work) - pfree;
 
-        auto const istat = sytrs1_template<T, I>(handle, is_upper, n, nrhs,
+        istat_sytrs1 = sytrs1_template<T, I>(handle, is_upper, n, nrhs,
 
-                                                 A, shiftA, lda, strideA,
+                                             A, shiftA, lda, strideA,
 
-                                                 ipiv, strideP,
+                                             ipiv, strideP,
 
-                                                 E, strideE,
+                                             E, strideE,
 
-                                                 B, shiftB, ldb, strideB,
+                                             B, shiftB, ldb, strideB,
 
-                                                 batch_count,
+                                             batch_count,
 
-                                                 pfree, size_remain);
-
-        if(istat != rocblas_status_success)
-        {
-            return (istat);
-        }
+                                             pfree, size_remain);
 
         pfree = pfree_save;
     }
 
     // ---------------
-    // revert matrix A
+    // NOTE: always revert matrix A
+    // even if sytrs1 has an error
     // ---------------
 
+    rocblas_status istat_syconv = rocblas_status_success;
     {
+        auto const pfree_save = pfree;
+
         size_t const size_remain = (pwork + size_work) - pfree;
         bool is_convert = false;
         auto const istat = rocsolver_syconv_template<T, I>(handle,
@@ -1897,11 +1874,19 @@ static inline rocblas_status rocsolver_sytrs2_template(rocblas_handle handle,
 
                                                            (void*)pfree, size_remain);
 
-        if(istat != rocblas_status_success)
-        {
-            return (istat);
-        }
+        pfree = pfree_save;
     }
+
+    if(istat_sytrs1 != rocblas_status_success)
+    {
+        return (istat_sytrs1);
+    }
+
+    if(istat_syconv != rocblas_status_success)
+    {
+        return (istat_syconv);
+    }
+
     return (rocblas_status_success);
 }
 ROCSOLVER_END_NAMESPACE

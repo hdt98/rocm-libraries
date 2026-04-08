@@ -280,8 +280,8 @@ static __global__
 
     for(I bid = 0 + bid_start; bid < batch_count; bid += bid_inc)
     {
-        I* const ipiv = ipiv_arg + bid * strideP;
-        I* const icount = icount_arg + bid * n;
+        I* const ipiv = ipiv_arg + static_cast<int64_t>(bid) * strideP;
+        I* const icount = icount_arg + static_cast<int64_t>(bid) * n;
 
         for(I i = 0 + i_start; i < n; i += i_inc)
         {
@@ -360,22 +360,16 @@ static __global__ __launch_bounds__(SYCONV_MAX_THDS) void syconv_kernel(
         // ------------------------------------------------------------
         // note __syncthreads() is not needed in syconv_swap_rows()
         // since each column is always consistently handled by the same thread
+        //
+        //
+        // swap( A(row_k, col_start:col_end), A(row_kp, col_start:col_end)
         // ------------------------------------------------------------
         auto syconv_swap_rows
             = [=](I const row_k, I const row_kp, I const col_start, I const col_end) {
-                  I const lcol_start = std::max(gcol_start, col_start);
-                  I const lcol_end = std::min(gcol_end, col_end);
+                  __syncthreads();
+                  for(I icol = gcol_start + ij_start; icol <= gcol_end; icol += ij_inc)
                   {
-                      bool has_work = (row_k != row_kp) && (lcol_end >= lcol_start);
-                      if(!has_work)
-                      {
-                          return;
-                      }
-                  }
-
-                  for(I icol = gcol_start + ij_start; icol <= lcol_end; icol += ij_inc)
-                  {
-                      bool const is_in_range = (lcol_start <= icol);
+                      bool const is_in_range = (col_start <= icol) && (icol <= col_end);
                       if(is_in_range)
                       {
                           auto const temp = A(row_k, icol);
@@ -383,6 +377,7 @@ static __global__ __launch_bounds__(SYCONV_MAX_THDS) void syconv_kernel(
                           A(row_kp, icol) = temp;
                       }
                   }
+                  __syncthreads();
               };
 
         if(is_upper)

@@ -1444,3 +1444,4 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
     return rocblas_status_success;
 }
 ROCSOLVER_END_NAMESPACE
+#undef USE_SYTRS2
