@@ -68,14 +68,14 @@ rocblas_status rocsolver_sytrs_batched_impl(rocblas_handle handle,
     // working with unshifted arrays
     Istride shiftA = 0;
     Istride shiftB = 0;
-    Istride strideA = 0;
-    Istride strideB = 0;
+    Istride strideA = Istride(lda) * n;
+    Istride strideB = Istride(ldb) * nrhs;
 
     // ----------------------
     // memory workspace sizes:
     // ----------------------
     size_t size_work = 0;
-    rocsolver_sytrs_getMemorySize<T>(n, nrhs, batch_count, &size_work);
+    rocsolver_sytrs_getMemorySize<T>(n, nrhs, batch_count, lda, ldb, &size_work);
 
     if(rocblas_is_device_memory_size_query(handle))
     {

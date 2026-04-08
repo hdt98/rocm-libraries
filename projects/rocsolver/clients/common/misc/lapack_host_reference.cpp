@@ -5832,8 +5832,7 @@ void cpu_sytrs2<float>(rocblas_fill uplo,
 {
     rocblas_int info = 0;
 
-    auto abs = [](auto x) { return ((x >= 0) ? x : (-x)); };
-    auto lwork = abs(n * nrhs) + 1;
+    rocblas_int const lwork = n;
     std::vector<float> work(lwork);
 
     char uploC = rocblas2char_fill(uplo);
@@ -5853,8 +5852,7 @@ void cpu_sytrs2<double>(rocblas_fill uplo,
 {
     rocblas_int info = 0;
 
-    auto abs = [](auto x) { return ((x >= 0) ? x : (-x)); };
-    auto lwork = abs(n * nrhs) + 1;
+    rocblas_int const lwork = n;
     std::vector<double> work(lwork);
 
     char uploC = rocblas2char_fill(uplo);
@@ -5874,8 +5872,7 @@ void cpu_sytrs2<rocblas_float_complex>(rocblas_fill uplo,
 {
     rocblas_int info = 0;
 
-    auto abs = [](auto x) { return ((x >= 0) ? x : (-x)); };
-    auto lwork = abs(n * nrhs) + 1;
+    rocblas_int const lwork = n;
     std::vector<rocblas_float_complex> work(lwork);
 
     char uploC = rocblas2char_fill(uplo);
@@ -5895,8 +5892,7 @@ void cpu_sytrs2<rocblas_double_complex>(rocblas_fill uplo,
 {
     rocblas_int info = 0;
 
-    auto abs = [](auto x) { return ((x >= 0) ? x : (-x)); };
-    auto lwork = abs(n * nrhs) + 1;
+    rocblas_int const lwork = n;
     std::vector<rocblas_double_complex> work(lwork);
 
     char uploC = rocblas2char_fill(uplo);

@@ -59,17 +59,18 @@ rocblas_status rocsolver_sytrs2_batched_impl(rocblas_handle handle,
     {
         rocblas_status st
             = rocsolver_sytrs2_argCheck(handle, uplo, n, nrhs, lda, ldb, A, B, ipiv, batch_count);
-        if(st != rocblas_status_continue)
+        bool const is_ok = (st == rocblas_status_continue) || (st == rocblas_status_success);
+        if(!is_ok)
         {
             return st;
         }
     }
 
     // working with unshifted arrays
-    Istride shiftA = 0;
-    Istride shiftB = 0;
-    Istride strideA = 0;
-    Istride strideB = 0;
+    Istride const shiftA = 0;
+    Istride const shiftB = 0;
+    Istride const strideA = Istride(lda) * n;
+    Istride const strideB = Istride(ldb) * nrhs;
 
     // ----------------------
     // memory workspace sizes:
@@ -92,7 +93,7 @@ rocblas_status rocsolver_sytrs2_batched_impl(rocblas_handle handle,
         return rocblas_status_memory_error;
     }
 
-    T* const work = static_cast<T*>(mem[0]);
+    void* const work = static_cast<void*>(mem[0]);
 
     // execution
     return rocsolver_sytrs2_template<T>(handle, uplo, n, nrhs,

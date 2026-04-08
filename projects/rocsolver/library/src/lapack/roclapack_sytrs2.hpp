@@ -85,29 +85,6 @@ static __global__
 
     T const one = 1;
 
-    // -------------------------
-    // scale vector x[] by alpha
-    // -------------------------
-    auto call_scal = [=](auto const n, auto const alpha, T* const x, I const incx) {
-        if(incx == 1)
-        {
-            for(I i = 0 + ij_start; i < n; i += ij_inc)
-            {
-                x[i] *= alpha;
-            }
-        }
-        else
-        {
-            for(I i = 0 + ij_start; i < n; i += ij_inc)
-            {
-                auto const ix = i * static_cast<int64_t>(incx);
-
-                x[ix] *= alpha;
-            }
-        }
-        __syncthreads();
-    };
-
     auto idx2F
         = [](auto i, auto j, auto ld) { return ((i - 1) + (j - 1) * static_cast<int64_t>(ld)); };
 
@@ -157,6 +134,17 @@ static __global__
 
         auto ipiv = [=](I const i) -> I { return (ipiv_bid[(i - 1)]); };
 
+        // ---------------------------
+        // scale row of B
+        // B( krow, 1:nrhs) *= alpha
+        // ---------------------------
+        auto scale_row = [=](I const krow, T const alpha) {
+            for(I j = 1 + ij_start; j <= nrhs; j += ij_inc)
+            {
+                B(krow, j) *= alpha;
+            }
+        };
+
         if(is_forward)
         {
             //          i=1
@@ -185,7 +173,9 @@ static __global__
                 if(ipiv(i) > 0)
                 {
                     auto const alpha = one / A(i, i);
-                    call_scal(nrhs, alpha, &(B(i, 1)), ldb);
+                    I krow{};
+
+                    scale_row(krow = i, alpha);
                 }
                 else
                 {
@@ -235,13 +225,15 @@ static __global__
             //            endif
             //            i = i - 1
             //         end do
+
             I i = n;
             while(i >= 1)
             {
                 if(ipiv(i) > 0)
                 {
                     auto const alpha = one / A(i, i);
-                    call_scal(nrhs, alpha, &(B(i, 1)), ldb);
+                    I krow{};
+                    scale_row(krow = i, alpha);
                 }
                 else if(i > 1)
                 {
@@ -259,6 +251,7 @@ static __global__
                             B(i - 1, j) = (ak * bkm1 - bk) / denom;
                             B(i, j) = (akm1 * bk - bkm1) / denom;
                         }
+
                         __syncthreads();
 
                         i = i - 1;
@@ -269,6 +262,7 @@ static __global__
             } // end while do
         } // if (is_forward)
 
+        __syncthreads();
     } // end for bid
 }
 
@@ -397,12 +391,6 @@ static __global__
     auto idx2F
         = [](auto i, auto j, auto ld) { return ((i - 1) + (j - 1) * static_cast<int64_t>(ld)); };
 
-    auto swap = [](T& x, T& y) {
-        auto const temp = x;
-        x = y;
-        y = temp;
-    };
-
     for(auto bid = 0 + bid_start; bid < batch_count; bid += bid_inc)
     {
         T* const B_bid = load_ptr_batch<T>(B_arg, bid, shiftB, strideB);
@@ -423,11 +411,14 @@ static __global__
         // is consistently swapped by the same thread
         // --------------------------------------------
 
-        auto swap_rows_no_sync = [=](I const k, I const kp) {
+        auto swap_rows = [=](I const k, I const kp) {
             for(I j = 1 + ij_start; j <= nrhs; j += ij_inc)
             {
-                swap(B(k, j), B(kp, j));
+                auto const temp = B(k, j);
+                B(k, j) = B(kp, j);
+                B(kp, j) = temp;
             }
+            __syncthreads();
         };
 
         if(!is_forward)
@@ -468,8 +459,7 @@ static __global__
                     I const kp = ipiv(k);
                     if(kp != k)
                     {
-                        // call_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
-                        swap_rows_no_sync(k, kp);
+                        swap_rows(k, kp);
                     }
                     k = k - 1;
                 }
@@ -482,8 +472,7 @@ static __global__
                     I const kp = -ipiv(k);
                     if(kp == (-ipiv(k - 1)))
                     {
-                        // call_swap(nrhs, &(B(k - 1, 1)), ldb, &(B(kp, 1)), ldb);
-                        swap_rows_no_sync(k - 1, kp);
+                        swap_rows(k - 1, kp);
                     }
                     k = k - 2;
                 }
@@ -526,8 +515,7 @@ static __global__
                     I const kp = ipiv(k);
                     if(kp != k)
                     {
-                        // call_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
-                        swap_rows_no_sync(k, kp);
+                        swap_rows(k, kp);
                     }
                     k = k + 1;
                 }
@@ -541,13 +529,14 @@ static __global__
                     if((k < n) && (kp == (-ipiv(k + 1))))
                     {
                         // call_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
-                        swap_rows_no_sync(k, kp);
+                        swap_rows(k, kp);
                     }
                     k = k + 2;
                 }
             } // end while
         }
 
+        __syncthreads();
     } // end for bid
 }
 
@@ -584,8 +573,8 @@ static rocblas_status apply_pivot_upper(rocblas_handle handle,
 
     I const max_blocks = 64 * 1024 - 3;
 
-    I const nb = SYTRS1_MAX_THDS;
-    I const nbx = std::max(I(1), std::min(max_blocks, ceildiv(nrhs_arg, nb)));
+    I const NB = SYTRS1_MAX_THDS;
+    I const nbx = std::max(I(1), std::min(max_blocks, ceildiv(nrhs_arg, NB)));
     I const nby = 1;
     I const nbz = std::min(max_blocks, batch_count);
 
@@ -670,12 +659,6 @@ static __global__ __launch_bounds__(SYTRS1_MAX_THDS) void apply_pivot_lower_kern
     auto idx2F
         = [](auto i, auto j, auto ld) { return ((i - 1) + (j - 1) * static_cast<int64_t>(ld)); };
 
-    auto swap = [](T& x, T& y) {
-        auto const temp = x;
-        x = y;
-        y = temp;
-    };
-
     for(auto bid = 0 + bid_start; bid < batch_count; bid += bid_inc)
     {
         T* const B_bid = load_ptr_batch<T>(B_arg, bid, shiftB, strideB);
@@ -692,14 +675,18 @@ static __global__ __launch_bounds__(SYTRS1_MAX_THDS) void apply_pivot_lower_kern
         auto ipiv = [=](auto i) { return (ipiv_bid[(i - 1)]); };
 
         // --------------------------------------------
-        // No syncthreads() is needed since each column
-        // is consistently swapped by the same thread
+        // swap rows k and kp of matrix B
+        //
+        // swap(  B(k,1:nrhs),  B(kp, 1:nrhs) )
         // --------------------------------------------
-        auto swap_rows_no_sync = [=](I const k, I const kp) {
+        auto swap_rows = [=](I const k, I const kp) {
             for(I j = 1 + ij_start; j <= nrhs; j += ij_inc)
             {
-                swap(B(k, j), B(kp, j));
+                auto const temp = B(k, j);
+                B(k, j) = B(kp, j);
+                B(kp, j) = temp;
             }
+            __syncthreads();
         };
 
         if(!is_forward)
@@ -739,8 +726,7 @@ static __global__ __launch_bounds__(SYTRS1_MAX_THDS) void apply_pivot_lower_kern
                     I const kp = ipiv(k);
                     if(kp != k)
                     {
-                        // call_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
-                        swap_rows_no_sync(k, kp);
+                        swap_rows(k, kp);
                     }
                     k = k - 1;
                 }
@@ -748,13 +734,11 @@ static __global__ __launch_bounds__(SYTRS1_MAX_THDS) void apply_pivot_lower_kern
                 {
                     //           ---------------------------------
                     //           2 x 2 diagonal block
-                    //           interchange rows k-1 and -ipiv(k).
                     //           ---------------------------------
                     I const kp = -ipiv(k);
                     if((k > 1) && (kp == (-ipiv(k - 1))))
                     {
-                        // call_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
-                        swap_rows_no_sync(k, kp);
+                        swap_rows(k, kp);
                     }
                     k = k - 2;
                 }
@@ -797,8 +781,7 @@ static __global__ __launch_bounds__(SYTRS1_MAX_THDS) void apply_pivot_lower_kern
                     I const kp = ipiv(k);
                     if(kp != k)
                     {
-                        // call_swap(nrhs, &(B(k, 1)), ldb, &(B(kp, 1)), ldb);
-                        swap_rows_no_sync(k, kp);
+                        swap_rows(k, kp);
                     }
                     k = k + 1;
                 }
@@ -806,19 +789,19 @@ static __global__ __launch_bounds__(SYTRS1_MAX_THDS) void apply_pivot_lower_kern
                 {
                     // --------------------------------------------
                     //            2 x 2 diagonal block
-                    //            interchange rows k and -ipiv(k+1).
                     // --------------------------------------------
                     I const kp = -ipiv(k + 1);
                     if(kp == (-ipiv(k)))
                     {
                         // call_swap(nrhs, &(B(k + 1, 1)), ldb, &(B(kp, 1)), ldb);
-                        swap_rows_no_sync(k + 1, kp);
+                        swap_rows(k + 1, kp);
                     }
                     k = k + 2;
                 }
             } // end while
         }
 
+        __syncthreads();
     } // end for bid
 }
 
@@ -932,25 +915,34 @@ static rocblas_status sytrs1_template(rocblas_handle handle,
     rocblas_get_pointer_mode(handle, &old_mode);
     rocblas_set_pointer_mode(handle, rocblas_pointer_mode_host);
 
-    auto call_trsm = [=, &pfree](rocblas_side const side, rocblas_fill const uplo,
+    auto call_trsm = [=, &pfree](
 
-                                 rocblas_operation const trans, rocblas_diagonal const diag,
+                         rocblas_side const side, rocblas_fill const uplo,
 
-                                 I const n, I const nrhs, T const alpha,
+                         rocblas_operation const trans, rocblas_diagonal const diag,
 
-                                 UA A_arg, Istride const shiftA, I const lda, Istride const strideA,
+                         I const n, I const nrhs, T alpha,
 
-                                 UB B_arg, Istride const shiftB, I const ldb, Istride const strideB,
+                         UA A_arg, Istride const shiftA, I const lda, Istride const strideA,
 
-                                 I const batch_count) -> rocblas_status {
+                         UB B_arg, Istride const shiftB, I const ldb, Istride const strideB,
+
+                         I const batch_count) -> rocblas_status {
+        static_assert(std::is_pointer_v<decltype(A_arg)>, "invalid A type");
+        static_assert(std::is_pointer_v<decltype(B_arg)>, "invalid B type");
+        static_assert(std::is_pointer_v<decltype(A_arg)> == std::is_pointer_v<decltype(B_arg)>,
+                      "mismatch of A,B types");
+
+        bool constexpr BATCHED
+            = std::is_pointer_v<std::remove_reference_t<
+                  decltype(A_arg[0])>> || std::is_array_v<std::remove_reference_t<decltype(A_arg[0])>>;
+        bool constexpr STRIDED = !BATCHED;
+
         auto const pfree_saved = pfree;
 
         bool const is_upper = (uplo == rocblas_fill_upper);
 
         bool optim_mem = true;
-
-        bool constexpr BATCHED = std::is_pointer<decltype(A_arg[0])>::value;
-        bool constexpr STRIDED = !BATCHED;
 
         size_t size_work1 = 0;
         size_t size_work2 = 0;
@@ -989,7 +981,6 @@ static rocblas_status sytrs1_template(rocblas_handle handle,
         }
 
         {
-            T alpha = 1;
             auto const istat = rocblasCall_trsm<T, I>(
 
                 handle, side, uplo, trans, diag, n, nrhs,
@@ -1011,6 +1002,7 @@ static rocblas_status sytrs1_template(rocblas_handle handle,
         }
 
         pfree = pfree_saved;
+
         return (rocblas_status_success);
     }; // end call_trsm
 
@@ -1498,7 +1490,7 @@ static inline rocblas_status rocsolver_sytrs2_argCheck(rocblas_handle handle,
         }
     }
 
-    return (rocblas_status_success);
+    return (rocblas_status_continue);
 }
 
 template <typename T, typename I, typename UA, typename UB, typename Istride = rocblas_stride>
@@ -1572,37 +1564,37 @@ static inline rocblas_status rocsolver_sytrs2_template(rocblas_handle handle,
     // -------------------------------------------------
     // solve linear system with converted storage format
     // -------------------------------------------------
+    rocblas_status istat_sytrs1 = rocblas_status_success;
     {
         auto const pfree_save = pfree;
         size_t size_remain = (pwork + size_work) - pfree;
 
-        auto const istat = sytrs1_template<T, I>(handle, is_upper, n, nrhs,
+        istat_sytrs1 = sytrs1_template<T, I>(handle, is_upper, n, nrhs,
 
-                                                 A, shiftA, lda, strideA,
+                                             A, shiftA, lda, strideA,
 
-                                                 ipiv, strideP,
+                                             ipiv, strideP,
 
-                                                 E, strideE,
+                                             E, strideE,
 
-                                                 B, shiftB, ldb, strideB,
+                                             B, shiftB, ldb, strideB,
 
-                                                 batch_count,
+                                             batch_count,
 
-                                                 pfree, size_remain);
-
-        if(istat != rocblas_status_success)
-        {
-            return (istat);
-        }
+                                             pfree, size_remain);
 
         pfree = pfree_save;
     }
 
     // ---------------
-    // revert matrix A
+    // NOTE: always revert matrix A
+    // even if sytrs1 has an error
     // ---------------
 
+    rocblas_status istat_syconv = rocblas_status_success;
     {
+        auto const pfree_save = pfree;
+
         size_t const size_remain = (pwork + size_work) - pfree;
         bool is_convert = false;
         auto const istat = rocsolver_syconv_template<T, I>(handle,
@@ -1619,11 +1611,19 @@ static inline rocblas_status rocsolver_sytrs2_template(rocblas_handle handle,
 
                                                            (void*)pfree, size_remain);
 
-        if(istat != rocblas_status_success)
-        {
-            return (istat);
-        }
+        pfree = pfree_save;
     }
+
+    if(istat_sytrs1 != rocblas_status_success)
+    {
+        return (istat_sytrs1);
+    }
+
+    if(istat_syconv != rocblas_status_success)
+    {
+        return (istat_syconv);
+    }
+
     return (rocblas_status_success);
 }
 ROCSOLVER_END_NAMESPACE

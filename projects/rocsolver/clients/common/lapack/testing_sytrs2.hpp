@@ -230,6 +230,7 @@ void sytrs2_initData(const rocblas_handle handle,
             std::vector<T> work(lwork);
 
             cpu_sytrf(uplo, n, hA[b], lda, hIpiv_cpu[b], work.data(), lwork, &info);
+            assert(info == 0);
 
             for(I i = 0; i < n; i++)
             {

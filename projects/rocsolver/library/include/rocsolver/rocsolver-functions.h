@@ -10574,9 +10574,10 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs_strided_batched_64(rocblas_hand
     nrhs        rocblas_int. nrhs >= 0.
                 The number of right hand sides, that is, the number of columns
                 of the matrix B.
-    @param[in]
+    @param[in,out]
     A           pointer to type. Array on the GPU of dimension lda*n.
-                The factors L (or U) and D  of the factorization A  returned by \ref rocsolver_ssytrf "SYTRF".
+                The factors L (or U) and D  of the factorization A  returned by \ref rocsolver_Xsytrf "SYTRF" 
+		and converted then restored by rocsolver_Xsyconv "SYCONV"
     @param[in]
     lda         rocblas_int. lda >= n.
                 The leading dimension of A.
@@ -10705,9 +10706,10 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs2_64(rocblas_handle handle,
     nrhs        rocblas_int. nrhs >= 0.
                 The number of right hand sides, that is, the number of columns
                 of all the matrices B_l.
-    @param[in]
+    @param[in,out]
     A           Array of pointers to type. Each pointer points to an array on the GPU of dimension lda*n.
-                The factors L_l (or U_l) and D_l of the factorization A_l  returned by \ref rocsolver_ssytrf_batched "SYTRF_BATCHED".
+                The factors L_l (or U_l) and D_l of the factorization A_l  returned by \ref rocsolver_Xsytrf_batched "SYTRF_BATCHED".
+		and converted then restored by rocsolver_Xsyconv_batched "SYCONV_BATCHED"
     @param[in]
     lda         rocblas_int. lda >= n.
                 The leading dimension of matrices A_l.
@@ -10859,9 +10861,10 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs2_batched_64(rocblas_handle hand
     nrhs        rocblas_int. nrhs >= 0.
                 The number of right hand sides, that is, the number of columns
                 of all the matrices B_l.
-    @param[in]
+    @param[in,out]
     A           pointer to type. Array on the GPU (the size depends on the value of strideA).
-                The factors L_l (or U_l) and D_l of the factorization A_l  returned by \ref rocsolver_ssytrf_strided_batched "SYTRF_STRIDED_BATCHED".
+                The factors L_l (or U_l) and D_l of the factorization A_l  returned by \ref rocsolver_Xsytrf_strided_batched "SYTRF_STRIDED_BATCHED"
+		and converted then restored by rocsolver_Xsyconv_strided_batched "SYCONV_STRIDED_BATCHED"
     @param[in]
     lda         rocblas_int. lda >= n.
                 The leading dimension of matrices A_l.
