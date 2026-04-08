@@ -296,7 +296,8 @@ def validate_lds_capacity(
     matrix_b_size = (tile_n * tile_k) * element_size(b_datatype)
     total_tile_in_lds = matrix_a_size + matrix_b_size
 
-    hw_lds_size = LDS_SIZE_MAP.get(gpu_target, DEFAULT_LDS_SIZE)
+    base_gpu_target = gpu_target.split(":")[0] if gpu_target else gpu_target
+    hw_lds_size = LDS_SIZE_MAP.get(base_gpu_target, DEFAULT_LDS_SIZE)
     double_buffer = pipeline in ["preshufflev2", "compv4"]
     max_tile_size = hw_lds_size // 2 if double_buffer else hw_lds_size
 
@@ -304,7 +305,7 @@ def validate_lds_capacity(
         error_msg = (
             f"LDS capacity exceeded: Total required {total_tile_in_lds:,}B ({total_tile_in_lds / 1024:.1f}KB) > "
             f"maximum allowed {max_tile_size:,}B ({max_tile_size / 1024}KB) "
-            f"[{gpu_target}, {'double' if double_buffer else 'single'} buffer]. Breakdown:\n"
+            f"[{base_gpu_target}, {'double' if double_buffer else 'single'} buffer]. Breakdown:\n"
             f"- Matrix A ({a_datatype}): {tile_m}x{tile_k} = {matrix_a_size:,}B\n"
             f"- Matrix B ({b_datatype}): {tile_n}x{tile_k} = {matrix_b_size:,}B"
         )
