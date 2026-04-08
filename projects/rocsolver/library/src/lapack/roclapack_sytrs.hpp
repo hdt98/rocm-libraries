@@ -35,17 +35,24 @@
 #include "rocblas.hpp"
 #include "rocsolver/rocsolver.h"
 
+#define USE_SYTRS2
 #ifdef USE_SYTRS2
 #include "roclapack_sytrs2.hpp"
 #endif
 
 ROCSOLVER_BEGIN_NAMESPACE
 
+#ifdef USE_SYTRS2
+// ----------------------------------------
+// simple heuristic to switch to use SYTRS2
+// when nrhs is sufficiently large
+// ----------------------------------------
 template <typename T, typename I>
 static inline bool use_sytrs2(I const n, I const nrhs, I const batch_count)
 {
     return (nrhs * 2 >= n);
 }
+#endif
 
 static inline int get_warp_size()
 {
