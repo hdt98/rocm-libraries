@@ -148,7 +148,7 @@ rocblas_status rocsolver_gesv_template(rocblas_handle handle,
     rocsolver_workspace_helper* getrf_work = work_helper->get_nested("getrf");
     rocsolver_workspace_helper* phase2_work = work_helper->get_nested("phase2");
     rocsolver_workspace_helper* getrs_work = phase2_work->get_nested("getrs");
-    T* copyB = (T*)(*phase2_work)[0];
+    T* copyB = (T*)(*phase2_work)["copyB"];
 
     // constants in host memory
     const rocblas_int copyblocksx = (n - 1) / 32 + 1;

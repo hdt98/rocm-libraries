@@ -570,8 +570,7 @@ void rocsolver_getrf_getMemorySize(const I m,
         // largest block panel dimension is 512
         dim = min(dim, I(512));
 
-        // extra workspace to store info about singularity and pivots of sub blocks
-        size_t size_iinfo = sizeof(I) * batch_count;
+        // extra workspace to store pivots of sub blocks
         size_t size_iipiv = pivot ? m * sizeof(I) * batch_count : 0;
 
         // requirements for largest possible GETF2 for the sub blocks
@@ -597,7 +596,7 @@ void rocsolver_getrf_getMemorySize(const I m,
         }
 
         work_helper->set_optim_mem(opt1 && opt2);
-        work_helper->assign_sizes({{"iinfo", size_iinfo}, {"iipiv", size_iipiv}},
+        work_helper->assign_sizes({{"iipiv", size_iipiv}},
                                   {{"work1", size_work1},
                                    {"work2", size_work2},
                                    {"work3", size_work3},
@@ -664,12 +663,11 @@ rocblas_status rocsolver_getrf_template(rocblas_handle handle,
     // prepare workspace
     rocsolver_workspace_helper* getf2_work = work_helper->get_nested("getf2");
     const bool optim_mem = work_helper->get_optim_mem();
-    INFO* iinfo = (INFO*)(*work_helper)[0];
-    I* iipiv = (I*)(*work_helper)[1];
-    void* work1 = (void*)(*work_helper)[2];
-    void* work2 = (void*)(*work_helper)[3];
-    void* work3 = (void*)(*work_helper)[4];
-    void* work4 = (void*)(*work_helper)[5];
+    I* iipiv = (I*)(*work_helper)["iipiv"];
+    void* work1 = (void*)(*work_helper)["work1"];
+    void* work2 = (void*)(*work_helper)["work2"];
+    void* work3 = (void*)(*work_helper)["work3"];
+    void* work4 = (void*)(*work_helper)["work4"];
 
     I jb, dimx, dimy;
     I nextpiv, mm, nn;

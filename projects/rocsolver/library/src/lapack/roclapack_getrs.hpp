@@ -141,10 +141,10 @@ rocblas_status rocsolver_getrs_template(rocblas_handle handle,
 
     // prepare workspace
     const bool optim_mem = work_helper->get_optim_mem();
-    void* work1 = (void*)(*work_helper)[0];
-    void* work2 = (void*)(*work_helper)[1];
-    void* work3 = (void*)(*work_helper)[2];
-    void* work4 = (void*)(*work_helper)[3];
+    void* work1 = (void*)(*work_helper)["work1"];
+    void* work2 = (void*)(*work_helper)["work2"];
+    void* work3 = (void*)(*work_helper)["work3"];
+    void* work4 = (void*)(*work_helper)["work4"];
 
     if(trans == rocblas_operation_none)
     {

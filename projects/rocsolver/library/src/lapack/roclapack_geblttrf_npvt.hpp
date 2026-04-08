@@ -164,7 +164,7 @@ rocblas_status rocsolver_geblttrf_npvt_template(rocblas_handle handle,
     // prepare workspace
     rocsolver_workspace_helper* getrf_work = work_helper->get_nested("getrf");
     rocsolver_workspace_helper* getrs_work = work_helper->get_nested("getrs");
-    rocblas_int* iinfo = (rocblas_int*)(*work_helper)[0];
+    rocblas_int* iinfo = (rocblas_int*)(*work_helper)["iinfo"];
 
     // prepare kernels
     rocblas_int blocksReset = (batch_count - 1) / BS1 + 1;
